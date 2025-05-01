@@ -53,6 +53,7 @@ CMakeUserPresets.json
 # More idea files
 .idea/discord.xml
 .idea/EzPacker.iml
+.idea/.gitignore
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
