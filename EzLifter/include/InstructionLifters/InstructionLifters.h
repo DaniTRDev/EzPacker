@@ -10,6 +10,7 @@ MAKE_INSTRUCTION_LIFTER(_Mov, [&](const InstructionLiftContext &context) -> bool
      return false;
 });
 
+// TODO: Finish lifters.
 MAKE_INSTRUCTION_LIFTER(Add, [&](const InstructionLiftContext &context) -> bool {
     
     llvm::Value *lhs = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*context.m_context), 10);

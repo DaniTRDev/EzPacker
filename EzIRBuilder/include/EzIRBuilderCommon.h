@@ -1,0 +1,7 @@
+#ifndef EZPACKER_EZIRBUILDERCOMMON_H
+#define EZPACKER_EZIRBUILDERCOMMON_H
+
+#include <EzLibCommon.h>
+#include <EzLogger.h>
+
+#endif // EZPACKER_EZIRBUILDERCOMMON_H
