@@ -1,5 +1,16 @@
 This file describes the syntax of the IR.
 
+# Syntax Format
+The general syntax for the IR depends on the keyword. Generally, for instruction keywords this syntax is followed:
+
+- Single arguments: ``.instr source`` / ``.instr destination``. Depends on the instruction (push, pop, ...).
+- Multiple arguments: ``.instr destination, source``.
+
+Sources and destinations can be of type:
+- Virtual Register: In the form of %vRegName.
+- Immediate: In the form of 12312, 4919, ....
+- Memory: In the form discussed in [Memory Addressing](#memory-adressing)
+
 # Data types
 
 This chapter includes how to types are defined within the IR. Take in my mind that many types are architecture-specific:
@@ -16,7 +27,9 @@ Supported data types are:
 - ``.i16``: 16-bits integer.
 - ``.i32``: 32-bits integer.
 - ``.i64``: 64-bits integer.
-- ``.ptr``: Represents a pointer. It will also need information about the underlying type, e.g: ``.ptr .i8``.
+- ``.ptr``: Represents a pointer. It will also need information about the underlying type,
+  e.g: ``.ptr .i8``. A type can only contain a single .ptr declaration. If pointers to pointers are needed,
+  first pointer should be accessed to get the second one and access it.
 
 (More data types will be added in a future to support vectored operations).
 
@@ -49,6 +62,10 @@ Here are a few examples to illustrate:
 > If no initial value is given, 0 will be default. If there are more or less ``VALUE_ELEMENT_...`` than ``SIZE`` in the
 > vector, an error will be thrown.
 
+# Registers
+Register must be manually created (as virtual registers within the IR). The syntax to reference a register is:
+``%registerName``
+
 # Module syntaxis
 
 This chapter introduces how a module is defined in the IR. Modules need information so they can be correctly translated
@@ -63,13 +80,11 @@ and analysed. Here's a breakdown of how to define a simple module:
 As you might have noticed, modules don't have a return type. That's because it's left to the lifter to correctly set
 return values accordingly from the source code. Arguments are also left to the lifter, a function might use arguments
 in the source architecture but the resulting lifting function might not contain any, since this IR is intended to be
-used
-by a packer, we don't really need this information, but it might be of use to apply certain types of obfuscations.
+used by a packer, we don't really need this information, but it might be of use to apply certain types of obfuscations.
 
 Here's an example that shows what we've discussed earlier:
-Imagine this piece of code in C++
-
 ```C++
+    // C++
     int MyModule(int a)
     {
         a += 1;
@@ -100,7 +115,7 @@ And within our IR, it will be lifted into (without metadata such as .markUse or 
     .reserveStack .i8 8 # Reserves 8 elements of 8-bits -> 8 bytes.
     .push %stackFrame  # %stackFrame represents the stackFrame register.
     
-    .mov %vReg1, .ptr(i64) (%stackFrame, 4) # Moves the portion of memory at stackFrame+4 into vReg1.
+    .load %vReg1, .ptr i64 (%stackFrame, 4) # Moves the 64-bit-portion of memory at stackFrame+4 into vReg1.
     
     .pop %stackFrame
     .freeStack .i8 8
@@ -110,15 +125,15 @@ And within our IR, it will be lifted into (without metadata such as .markUse or 
 
 As you can see, the IR is blind about most of the registers. In the compiling stage, IRCompiler will be fed with a
 virtual-register-translate table that will match ``vReg1`` with ``rax``. Since this IR is not intended for
-recompilation on other architectures, is safe to assume that lifted IR will always be compatible with target
+recompilation on other architectures, it is safe to assume that lifted IR will always be compatible with target
 architecture. It's also remarkable that, as a safety measure, each IR file defines what architecture was it lift from.
 
 Another important point is the reserved register ``%stackFrame``, which is defined by the IR and represents the register
 used to access function's stack frame. If it's not available in an architecture, it should be defined as the stack
-pointer.
+pointer or any other volatile memory indicator.
 
 Lastly, ``.push`` and ``.pop`` instructions might not be present in the target architecture, they will be replaced by
-``.stackReserve .... && .mov [stackAddr], value`` and ``.mov place, [stackAddr] && .stackFree ...``.
+``.stackReserve .... && .store [stackAddr], value`` and ``.load value, [stackAddr] && .stackFree ...``.
 
 # Memory Adressing
 

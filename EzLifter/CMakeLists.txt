@@ -79,17 +79,20 @@ if (EZPACKER_BUILD_TESTS)
             "T_EzZydisDecodedOperand"
             "-DEZLIFTER"
             "EzLifter"
+            ""
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/TestEzZydisDecodedOperand.cpp"
     )
     EzPacker_AddTest(
             "T_ZydisDecodedInstructionParser"
             "-DEZLIFTER"
             "EzLifter"
+            ""
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/TestZydisDecodedInstructionParser.cpp"
     )
     EzPacker_AddTest("T_ZydisDecoder"
             "-DEZLIFTER"
             "EzLifter"
+            ""
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/TestZydisDecoder.cpp"
     )
 endif ()

@@ -1,7 +1,15 @@
-function(EzPacker_AddTest testName testDefinitions testDependencies testFiles)
+function(EzPacker_AddTest testName testDefinitions testLibraries testDependencies testFiles)
     add_executable("${testName}" ${testFiles})
-    target_compile_definitions("${testName}" PUBLIC ${testDefinitions})
-    target_link_libraries("${testName}" PUBLIC ${testDependencies})
+
+    if (testDefinitions)
+        target_compile_definitions("${testName}" PUBLIC ${testDefinitions})
+    endif ()
+
+    target_link_libraries("${testName}" PUBLIC ${testLibraries})
+
+    if (testDependencies)
+        add_dependencies("${testName}" ${testDependencies})
+    endif ()
 
     message(STATUS "Adding test ${testName}")
     add_test("${testName}" "${testName}")
