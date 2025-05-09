@@ -338,6 +338,12 @@ TEST_F(TokenizerTest, TokenizeTestFile)
     EXPECT_TRUE(checkTypeAndContent(IRTokenType::NumberInt, "40"));
     EXPECT_TRUE(checkTypeAndContent(IRTokenType::NumberInt, "50"));
 
+    EXPECT_TRUE(checkTypeAndContent(IRTokenType::Variable, ".variable"));
+    EXPECT_TRUE(checkTypeAndContent(IRTokenType::Identifier, "myTestString"));
+    EXPECT_TRUE(checkTypeAndContent(IRTokenType::DoubleDot, ":"));
+    EXPECT_TRUE(checkTypeAndContent(IRTokenType::StringKeyword, ".string"));
+    EXPECT_TRUE(checkStringToken("- This is a test string\n\r Next line- This part is from the multiline"));
+    
     EXPECT_TRUE(checkTypeAndContent(IRTokenType::Comment, "# Module using different data types"));
 
     // Check module declaration

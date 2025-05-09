@@ -112,7 +112,7 @@ const static std::function<bool(char ch)> isWhiteSpace = [](char ch) -> bool { r
 enum IRTokenType : uint8_t
 {
     Invalid = 0,
-    Arch,       // From keywords.
+    Arch, // From keywords.
     Comma,
     Comment,
     DoubleDot,   // :
@@ -122,19 +122,20 @@ enum IRTokenType : uint8_t
     Label,       // From keywords.
     LeftParen,   // Left parenthesis.
     Memory,
-    Module,      // From keywords
-    NumberInt,   // A word that is not a keyword, nor a register, nor an identifier formed with: [0-9]
-    NumberFloat, // A word that is not a keyword, nor a register, nor an identifier formed with: {NumberInt}.NumberInt
-    Register,    // Registers are identified with '%regName'.
-    RightParen,  // Right parenthesis.
-    String,      // Starts with " and ends with ". ANY character is allowed inside.
-    TypeI8,      // From types.
-    TypeI16,     // From types.
-    TypeI32,     // From types.
-    TypeI64,     // From types.
-    TypePtr,     // From types.
+    Module,        // From keywords
+    NumberInt,     // A word that is not a keyword, nor a register, nor an identifier formed with: [0-9]
+    NumberFloat,   // A word that is not a keyword, nor a register, nor an identifier formed with: {NumberInt}.NumberInt
+    Register,      // Registers are identified with '%regName'.
+    RightParen,    // Right parenthesis.
+    String,        // Starts with " and ends with ". ANY character is allowed inside.
+    StringKeyword, // From keywords. ".string" used to define global variables.
+    TypeI8,        // From types.
+    TypeI16,       // From types.
+    TypeI32,       // From types.
+    TypeI64,       // From types.
+    TypePtr,       // From types.
     Variable,
-    Vector      // From keywords.
+    Vector // From keywords.
 };
 
 class ITokenizer
