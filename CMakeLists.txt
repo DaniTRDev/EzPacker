@@ -16,5 +16,7 @@ endif ()
 
 include("CMake/Vendor.cmake") # Fetch 3rd party libs.
 
-add_subdirectory(EzIRBuilder) # Add IR builder library.
-add_subdirectory(EzLifter) # Add lifter library.
+#add_subdirectory(EzIRBuilder)
+#add_subdirectory(EzLifter)
+add_subdirectory(EzFrontend)
+add_subdirectory(EzArchitectureBuilder)

@@ -2,7 +2,9 @@
 #define EZPACKER_EZIRBUILDERCOMMON_H
 
 #include <functional>
+#include <list>
 #include <set>
+#include <stack>
 
 #include <EzLibCommon.h>
 #include <EzLogger.h>

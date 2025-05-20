@@ -1,0 +1,11 @@
+.load .i64 %tmp1, .ptr (%stackFrame, 0)
+.pop .i8 %stackFrame
+.freeStack .i8 32
+.push .i64 %rcx
+.add .i32 %rcx, %rcx
+.load .i32 %tmp2, .ptr (%stackFrame, 8)
+.sub .i64 %tmp1, %tmp2
+.mul .i32 %rax, %rbx
+.store .i64 %tmp1, .ptr (%stackFrame, 16)
+.push .i8 %rflags
+.and .i8 %rflags, %rflags

@@ -1,0 +1,33 @@
+.module mathOps:
+  .add .i64 %rcx, %rbx
+  .sub .i64 %rcx, %rax
+  .load .i64 .ptr (, %rsi, 8), %rbx
+  .store .i64 %rbx, .ptr (, %rsi, 8)
+.end
+
+.module stackHandling:
+  .push .i64 %rax
+  .pop .i64 %rbx
+  .xchg .i64 .ptr (, %rdi, 4), %rbx
+  .xchg .i32 .ptr (%rbp, 0), %rcx
+.end
+
+.module memAccess:
+  .load .i32 .ptr (%rbp, 16), %r10d
+  .store .i32 %r10d, .ptr (%rbp, 16)
+  .load .i64 .ptr (, %r9, 2), %r11
+  .store .i64 %r11, .ptr (, %r9, 2)
+.end
+
+.module cleanup:
+  .freeStack .i8 32
+  .pop .i8 %flags
+  .push .i64 %r8
+  .xchg .i64 .ptr (%rsp, 0), %r8
+.end
+
+.module trickyLoad:
+  .load .i64 .ptr (, %rax, 4), %rbx
+  .xchg .i64 .ptr (, %rax, 4), %rbx
+  .store .i64 %rbx, .ptr (, %rax, 4)
+.end

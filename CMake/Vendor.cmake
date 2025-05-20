@@ -33,6 +33,16 @@ function(AddGTest)
     FetchContent_MakeAvailable(GTest)
 endfunction()
 
+function(AddJsonLib)
+    FetchContent_Declare(
+            json
+            GIT_REPOSITORY https://github.com/nlohmann/json
+            GIT_TAG 3cca3ad21012e289d34970e2e3060d255494c548
+    )
+    FetchContent_MakeAvailable(json)
+endfunction()
+
 AddEzLib()
 AddZydis()
 AddGTest()
+AddJsonLib()

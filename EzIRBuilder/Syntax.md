@@ -27,7 +27,7 @@ Supported data types are:
 - ``.i16``: 16-bits integer.
 - ``.i32``: 32-bits integer.
 - ``.i64``: 64-bits integer.
-- ``.ptr``: Represents a pointer. It will also need information about the underlying type,
+- ``.ptr``: Represents a pointer. It only indicates that memory is going to be used,
   e.g: ``.ptr .i8``. A type can only contain a single .ptr declaration. If pointers to pointers are needed,
   first pointer should be accessed to get the second one and access it.
 
@@ -49,18 +49,17 @@ Here are a few examples to illustrate:
 - Create a vector of 64-bit integers, all of them initialized to a single value:
 
 ```
-    .variable MyVariable: .vector .i64 SIZE INITIAL_VALUE
+    .variable MyVariable: .i64 INITIAL_VALUE
 ```
 
 - Create a vector of 64-bit integers, all of them initialized to a value
 
 ```
-    .variable MyVariable: .vector .i64 SIZE VALUE_ELEMENT_1 VALUE_ELEMENT_2 VALUE_ELEMENT_3  
+    .variable MyVariable: .i64 VALUE_ELEMENT_1, VALUE_ELEMENT_2, VALUE_ELEMENT_3  
 ```
 
 > [!CAUTION]
-> If no initial value is given, 0 will be default. If there are more or less ``VALUE_ELEMENT_...`` than ``SIZE`` in the
-> vector, an error will be thrown.
+> If no initial value is given, 0 will be default.
 
 # Registers
 Register must be manually created (as virtual registers within the IR). The syntax to reference a register is:
@@ -72,15 +71,13 @@ This chapter introduces how a module is defined in the IR. Modules need informat
 and analysed. Here's a breakdown of how to define a simple module:
 
 ```
-.module MyModule: argument1 TYPE argument2 TYPE
+.module MyModule
     # Comments are supported!
 .end
 ```
 
 As you might have noticed, modules don't have a return type. That's because it's left to the lifter to correctly set
-return values accordingly from the source code. Arguments are also left to the lifter, a function might use arguments
-in the source architecture but the resulting lifting function might not contain any, since this IR is intended to be
-used by a packer, we don't really need this information, but it might be of use to apply certain types of obfuscations.
+return values accordingly from the source code. Arguments are also left to the lifter.
 
 Here's an example that shows what we've discussed earlier:
 ```C++
@@ -96,12 +93,12 @@ It will be compiled into something like:
 
 ```asm
 MyModule:
-    sub rsp, 8 ; Reserve space for return address and 'a'. Order of the phrase represents order in stack.
+    sub rsp, 4 ; Reserve space for 'a'.
     push rbp ; Save rbp's content.
     mov rbp, rsp ; Set RBP to use current frame.
 
-    inc [rbp+4] ; Increment local variable
-    mov rax, [rbp+4] ; Save return value
+    inc [rbp] ; Increment local variable
+    mov rax, [rbp] ; Save return value
 
     pop rbp ; Restore RBP's content.
     add rsp, 4 ; Restore reserved stack for variables.
@@ -112,13 +109,14 @@ And within our IR, it will be lifted into (without metadata such as .markUse or 
 
 ```
 .module MyModule
-    .reserveStack .i8 8 # Reserves 8 elements of 8-bits -> 8 bytes.
-    .push %stackFrame  # %stackFrame represents the stackFrame register.
+    .reserveStack .i32 1 # Reserves 1 element of 32-bits -> 4 bytes.
+    .push .i64 %stackFrame  # %stackFrame represents the stackFrame register.
+    .lea .i64 %stackFrame, %stackPtr
     
-    .load %vReg1, .ptr i64 (%stackFrame, 4) # Moves the 64-bit-portion of memory at stackFrame+4 into vReg1.
+    .load .i64 %vReg1, .ptr (%stackFrame) # Moves the 64-bit-portion of memory at stackFrame into vReg1.
     
-    .pop %stackFrame
-    .freeStack .i8 8
+    .pop .i64 %stackFrame
+    .freeStack .i32 1
     .ret
 .end
 ```
