@@ -14,6 +14,6 @@ namespace grammar
  * @return std::shared_ptr<ParseRule>
  */
 extern std::shared_ptr<ParseRule> keyword();
-} // namespace grammar
+} // namespace Grammar
 
 #endif // EZPACKER_KEYWORD_H
