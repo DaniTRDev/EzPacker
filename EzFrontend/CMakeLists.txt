@@ -6,34 +6,75 @@ function(GetLibraryBuildType out)
     endif ()
 endfunction()
 
-function(GetGrammarFiles out)
+function(GetParserFiles out)
     set(${out}
-            "include/grammar/Grammar.h"
-            "include/grammar/Instruction.h"
-            "include/grammar/Variable.h"
-            "include/grammar/Addressing.h"
-            "include/grammar/Combinators.h"
-            "include/grammar/Identifier.h"
-            "include/grammar/Keyword.h"
-            "include/grammar/Module.h"
-            "include/grammar/Number.h"
-            "include/grammar/Register.h"
-            "include/grammar/String.h"
-            "include/grammar/TokenType.h"
-            "include/grammar/Type.h"
+            "include/Parser/Grammar/Grammar.h"
+            "include/Parser/Grammar/Instruction.h"
+            "include/Parser/Grammar/Addressing.h"
+            "include/Parser/Grammar/Combinators.h"
+            "include/Parser/Grammar/Identifier.h"
+            "include/Parser/Grammar/Keyword.h"
+            "include/Parser/Grammar/Module.h"
+            "include/Parser/Grammar/Number.h"
+            "include/Parser/Grammar/String.h"
+            "include/Parser/Grammar/TokenType.h"
+            "include/Parser/Grammar/Type.h"
+            "include/Parser/Grammar/Variable.h"
+            "include/Parser/Grammar/VirtualVariable.h"
+            "include/Parser/Ast/Ast.h"
+            "include/Parser/Ast/IdentifierNode.h"
+            "include/Parser/Ast/MemoryNode.h"
+            "include/Parser/Ast/TokenTypeNode.h"
+            "include/Parser/Ast/ValueNode.h"
 
-            "src/grammar/Instruction.cpp"
-            "src/grammar/Variable.cpp"
-            "src/grammar/Addressing.cpp"
-            "src/grammar/Combinators.cpp"
-            "src/grammar/Identifier.cpp"
-            "src/grammar/Keyword.cpp"
-            "src/grammar/Module.cpp"
-            "src/grammar/Number.cpp"
-            "src/grammar/Register.cpp"
-            "src/grammar/String.cpp"
-            "src/grammar/TokenType.cpp"
-            "src/grammar/Type.cpp"
+            "src/Parser/Ast/Ast.cpp"
+            "src/Parser/Ast/IdentifierNode.cpp"
+            "src/Parser/Ast/MemoryNode.cpp"
+            "src/Parser/Ast/TokenTypeNode.cpp"
+            "src/Parser/Ast/ValueNode.cpp"
+            "src/Parser/Grammar/Instruction.cpp"
+            "src/Parser/Grammar/Addressing.cpp"
+            "src/Parser/Grammar/Combinators.cpp"
+            "src/Parser/Grammar/Identifier.cpp"
+            "src/Parser/Grammar/Keyword.cpp"
+            "src/Parser/Grammar/Module.cpp"
+            "src/Parser/Grammar/Number.cpp"
+            "src/Parser/Grammar/String.cpp"
+            "src/Parser/Grammar/TokenType.cpp"
+            "src/Parser/Grammar/Type.cpp"
+            "src/Parser/Grammar/Variable.cpp"
+            "src/Parser/Grammar/VirtualVariableNode.cpp"
+            PARENT_SCOPE)
+endfunction()
+
+function(GetNormalizerFiles out)
+    set(${out}
+            "include/Semantics/IAstVisitor.h"
+            "include/Semantics/NormalTable.h"
+            "include/Semantics/Normalizer/INormalizer.h"
+            "include/Semantics/Normalizer/InstructionNormalizer.h"
+            "include/Semantics/Normalizer/MemoryNodeNormalizer.h"
+            "include/Semantics/Normalizer/ModuleNormalizer.h"
+            "include/Semantics/Normalizer/OperandNormalizer.h"
+            "include/Semantics/Normalizer/SymbolNormalizer.h"
+            "include/Semantics/Normalizer/TypeNormalizer.h"
+            "include/Semantics/Normalizer/ValueNormalizer.h"
+            "include/Semantics/Normalizer/VirtualVariableNormalizer.h"
+            "include/Semantics/Tables/SemanticTable.h"
+            "include/Semantics/Tables/SymbolTable.h"
+            "include/Semantics/Tables/TypeTable.h"
+
+            "src/Semantics/NormalTable.cpp"
+            "src/Semantics/Normalizer/InstructionNormalizer.cpp"
+            "src/Semantics/Normalizer/MemoryNodeNormalizer.cpp"
+            "src/Semantics/Normalizer/ModuleNormalizer.cpp"
+            "src/Semantics/Normalizer/OperandNormalizer.cpp"
+            "src/Semantics/Normalizer/SymbolNormalizer.cpp"
+            "src/Semantics/Normalizer/TypeNormalizer.cpp"
+            "src/Semantics/Normalizer/ValueNormalizer.cpp"
+            "src/Semantics/Normalizer/VirtualVariableNodeNormalizer.cpp"
+            "src/Semantics/Tables/SymbolTable.cpp"
+            "src/Semantics/Tables/TypeTable.cpp"
             PARENT_SCOPE)
 endfunction()
 
@@ -41,37 +82,33 @@ function(BuildEzFrontend)
     GetLibraryBuildType(EZFRONTEND_BUILD_TYPE)
     message(STATUS "Building EzFrontend as ${EZFRONTEND_BUILD_TYPE}")
 
-    GetGrammarFiles(EZFRONTEND_GRAMMAR_FILES)
-    message(STATUS "Adding grammar files: ${EZFRONTEND_GRAMMAR_FILES}")
+    GetParserFiles(EZFRONTEND_PARSER_FILES)
+    message(STATUS "Adding parser files: ${EZFRONTEND_PARSER_FILES}")
+
+    GetNormalizerFiles(EZFRONTEND_NORMALIZER_FILES)
+    message(STATUS "Adding normalizer files: ${EZFRONTEND_NORMALIZER_FILES}")
 
     add_library("EzFrontend" ${EZFRONTEND_BUILD_TYPE}
-            ${EZFRONTEND_GRAMMAR_FILES}
+            ${EZFRONTEND_PARSER_FILES}
+            ${EZFRONTEND_NORMALIZER_FILES}
             "include/EzFrontend.h"
             "include/EzFrontendCommon.h"
-            "include/BasicParser.h"
+            "include/IFrontendLogSink.h"
+            "include/Parser/BasicParser.h"
             "include/IRTypes.h"
-            "include/IParser.h"
-            "include/ParseRule.h"
-            "include/ast/Ast.h"
-            "include/ast/IdentifierNode.h"
-            "include/ast/MemoryNode.h"
-            "include/ast/TokenTypeNode.h"
-            "include/ast/ValueNode.h"
-            "include/number/BigInt.h"
-            "include/number/IBigNumber.h"
-            "include/tokenizer/BasicTokenizer.h"
-            "include/tokenizer/ITokenizer.h"
+            "include/Parser/IParser.h"
+            "include/Parser/ParseRule.h"
 
-            "src/BasicParser.cpp"
+            "include/Number/BigInt.h"
+            "include/Number/IBigNumber.h"
+            "include/Tokenizer/BasicTokenizer.h"
+            "include/Tokenizer/ITokenizer.h"
+
+            "src/Parser/BasicParser.cpp"
             "src/IRTypes.cpp"
-            "src/ParseRule.cpp"
-            "src/ast/Ast.cpp"
-            "src/ast/IdentifierNode.cpp"
-            "src/ast/MemoryNode.cpp"
-            "src/ast/TokenTypeNode.cpp"
-            "src/ast/ValueNode.cpp"
-            "src/number/BigInt.cpp"
-            "src/tokenizer/BasicTokenizer.cpp"
+            "src/Parser/ParseRule.cpp"
+            "src/Number/BigInt.cpp"
+            "src/Tokenizer/BasicTokenizer.cpp"
     )
 
     # Set precompiled header.

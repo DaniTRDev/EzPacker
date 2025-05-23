@@ -1,9 +1,9 @@
 #ifndef EZPACKER_BASICTESTPARSER_H
 #define EZPACKER_BASICTESTPARSER_H
 
-#include "BasicParser.h"
 #include "EzFrontendCommon.h"
-#include "grammar/Grammar.h"
+#include "parser/grammar/Grammar.h"
+#include "parser/BasicParser.h"
 #include "gtest/gtest.h"
 
 class BasicParserTest : public ::testing::Test

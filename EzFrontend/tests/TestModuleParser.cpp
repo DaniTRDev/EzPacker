@@ -3,8 +3,8 @@
 TEST(TestModuleParser, TestValidModule)
 {
     std::string moduleText = ".module myModule:"
-                             "  .add .i64 %rcx, %rbx"
-                             "  .load .i64 .ptr (, %rax, 4), %rbx"
+                             "  .add .i64 %rcx, .i64 %rbx"
+                             "  .load .i64 (, %rax, 4), .i64 %rbx"
                              ".end";
 
     auto nodes = BasicParserTest::testRule(false, grammar::module(), moduleText);
@@ -25,9 +25,9 @@ TEST(TestModuleParser, TestValidModule)
 TEST(TestModuleParser, TestValidModule2)
 {
     std::string moduleText = ".module _asdadasda_:"
-                             "  .add .i64 %rcx, %rbx"
-                             "  .load .i64 .ptr (, %rax, 4), %rbx"
-                             "  .xchg .i64 .ptr (, %rax, 4), %rbx"
+                             "  .add .i64 %rcx, .i64 %rbx"
+                             "  .load .i64 (, %rax, 4), .i64 %rbx"
+                             "  .xchg .i64 (, %rax, 4), .i64 %rbx"
                              ".end";
 
     auto nodes = BasicParserTest::testRule(false, grammar::module(), moduleText);
@@ -49,9 +49,9 @@ TEST(TestModuleParser, TestValidModule2)
 TEST(TestModuleParser, TestInvalidKeyword)
 {
     std::string moduleText = "module _asdadasda_:"
-                             "  .add .i64 %rcx, %rbx"
-                             "  .load .i64 .ptr (, %rax, 4), %rbx"
-                             "  .xchg .i64 .ptr (, %rax, 4), %rbx"
+                             "  .add .i64 %rcx, .i64 %rbx"
+                             "  .load .i64 (, %rax, 4), .i64 %rbx"
+                             "  .xchg .i64 (, %rax, 4), .i64 %rbx"
                              ".end";
 
     auto nodes = BasicParserTest::testRule(true, grammar::module(), moduleText);
@@ -61,9 +61,9 @@ TEST(TestModuleParser, TestInvalidKeyword)
 TEST(TestModuleParser, TestInvalidKeyword2)
 {
     std::string moduleText = ".module _asdadasda_:"
-                             "  .add .i64 %rcx, %rbx"
-                             "  .load .i64 .ptr (, %rax, 4), %rbx"
-                             "  .xchg .i64 .ptr (, %rax, 4), %rbx"
+                             "  .add .i64 %rcx, .i64 %rbx"
+                             "  .load .i64 (, %rax, 4), .i64 %rbx"
+                             "  .xchg .i64 (, %rax, 4), .i64 %rbx"
                              "end";
 
     auto nodes = BasicParserTest::testRule(true, grammar::module(), moduleText);
@@ -73,9 +73,9 @@ TEST(TestModuleParser, TestInvalidKeyword2)
 TEST(TestModuleParser, TestInvalidName)
 {
     std::string moduleText = ".module :"
-                             "  .add .i64 %rcx, %rbx"
-                             "  .load .i64 .ptr (, %rax, 4), %rbx"
-                             "  .xchg .i64 .ptr (, %rax, 4), %rbx"
+                             "  .add .i64 %rcx, .i64 %rbx"
+                             "  .load .i64 (, %rax, 4), .i64 %rbx"
+                             "  .xchg .i64 (, %rax, 4), .i64 %rbx"
                              "end";
 
     auto nodes = BasicParserTest::testRule(true, grammar::module(), moduleText);
@@ -85,7 +85,7 @@ TEST(TestModuleParser, TestInvalidName)
 TEST(TestModuleParser, TestInvalidBody)
 {
     std::string moduleText = ".module myModule:"
-                             "  %rcx"
+                             " .add i64 %rcx"
                              ".end";
 
     auto nodes = BasicParserTest::testRule(true, grammar::module(), moduleText);
@@ -95,7 +95,7 @@ TEST(TestModuleParser, TestInvalidBody)
 TEST(TestModuleParser, TestInvalidBody2)
 {
     std::string moduleText = ".module myModule:"
-                             "  \" asd \" "
+                             " .add"
                              ".end";
 
     auto nodes = BasicParserTest::testRule(true, grammar::module(), moduleText);

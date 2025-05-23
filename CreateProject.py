@@ -1,5 +1,6 @@
 import os
 
+
 def create_cmake_library_template(project_name):
     # Create directory structure
     directories = [
@@ -14,9 +15,7 @@ def create_cmake_library_template(project_name):
     # Create common header files
     common_header_content = f"""#pragma once
 
-// {project_name} Common Header
-// This will be used as the precompiled header
-
+// {project_name} Precompiled Header
 #include <memory>
 #include <vector>
 #include <string>
@@ -27,34 +26,10 @@ def create_cmake_library_template(project_name):
 
     main_header_content = f"""#pragma once
 
-// Main {project_name} header file
-
 #include "{project_name}Common.h"
-
-// Your library interface goes here
 """
     with open(f"{project_name}/include/{project_name}.h", "w") as f:
         f.write(main_header_content)
-
-    # Create sample source file
-    sample_src_content = f"""#include "{project_name}.h"
-
-// Your implementation goes here
-"""
-    with open(f"{project_name}/src/{project_name}.cpp", "w") as f:
-        f.write(sample_src_content)
-
-    # Create test file
-    test_content = f"""#include <gtest/gtest.h>
-#include "{project_name}.h"
-
-TEST({project_name}Test, BasicTest) {{
-    // Your test code here
-    EXPECT_TRUE(true);
-}}
-"""
-    with open(f"{project_name}/tests/Test{project_name}.cpp", "w") as f:
-        f.write(test_content)
 
     # Create CMakeLists.txt
     cmake_content = f"""# {project_name} CMake build configuration
@@ -91,19 +66,12 @@ Build{project_name}()
 if (EZPACKER_BUILD_TESTS)
     message(STATUS "Building tests for {project_name}")
 
-    add_custom_target(CopyTestFiles ALL
-            COMMAND ${{CMAKE_COMMAND}} -E copy_directory_if_different
-            "${{CMAKE_CURRENT_SOURCE_DIR}}/tests/testData"
-            "$<TARGET_FILE_DIR:{project_name}>/testData"
-            COMMENT "Copying test data"
-    )
-
-    EzPacker_AddTest(
-            "T_{project_name}Test"
-            ""
-            "{project_name}"
-            ""
-            "${{CMAKE_CURRENT_SOURCE_DIR}}/tests/Test{project_name}.cpp"
+    #EzPacker_AddTest(
+    #       "T_{project_name}Test"
+    #       ""
+    #       "{project_name}"
+    #       ""
+    #       "${{CMAKE_CURRENT_SOURCE_DIR}}/tests/Test{project_name}.cpp"
     )
 endif()
 """
@@ -124,6 +92,5 @@ if __name__ == "__main__":
     if os.path.exists(project_name):
         print("Sub project already exists")
         sys.exit(1)
-
 
     create_cmake_library_template(project_name)

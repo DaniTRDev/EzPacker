@@ -15,7 +15,7 @@ bool ParsedDecodedInstruction::getFromParser(std::unique_ptr<IDecodedInstruction
     if (!parser)
     {
         LogSink::pushLog(
-            LogMessage("").add("Could not getFromParser instruction because parser is invalid").colorize(Colors::red));
+            LogMessage("").add("Could not getFromParser instruction because Parser is invalid").colorize(Colors::red));
         return false;
     }
 

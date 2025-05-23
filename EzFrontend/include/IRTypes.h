@@ -30,7 +30,7 @@ enum class IRInstructionType : uint8_t
     Pop,                                       // Pop from stack
     UNSUPPORTED_IRINSTRUCTION_TYPE(Prefetch),  // Memory prefetch. Adds given block to CACHE (L1, L2, L3).
     Push,                                      // Push to stack
-    ReserveStack,                              // Reserves a number of bytes in the stack.
+    ReserveStack,                              // Reserves a Number of bytes in the stack.
     Return,                                    // Function return
     RotateLeft,                                // Bitwise rotate left
     RotateRight,                               // Bitwise rotate right
