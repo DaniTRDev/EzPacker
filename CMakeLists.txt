@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.27)
 project(EzPacker)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -18,5 +18,5 @@ include("CMake/Vendor.cmake") # Fetch 3rd party libs.
 
 #add_subdirectory(EzIRBuilder)
 #add_subdirectory(EzLifter)
+add_subdirectory(EzTargetBuilder)
 add_subdirectory(EzFrontend)
-add_subdirectory(EzArchitectureBuilder)

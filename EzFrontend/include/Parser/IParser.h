@@ -3,12 +3,13 @@
 
 #include "EzFrontendCommon.h"
 #include "tokenizer/BasicTokenizer.h"
+#include "ErrorCollector/ErrorCollector.h"
 
 /**
  * Interface that represents a generic parser. It should receive an array of tokens and it should convert them to
  * architecture-specific terms (instructions, operands, ...), build the AST and check the grammar with ParseRules.
  */
-class IParser : public IFrontendLogSink
+class IParser
 {
   public:
     virtual ~IParser() = default;
@@ -46,18 +47,17 @@ class IParser : public IFrontendLogSink
      * @return size_t
      */
     virtual size_t getPosition() const = 0;
-    
-    /**
-     * Logs an error related to parsing with detailed information.
-     * @param msg
-     * @param token
-     */
-    virtual void logParserError(const LogMessage &msg, const TokenInformation &token) = 0;
 
     /**
      * Skips every white space or new line and consumes tokens.
      */
     virtual void skipWhiteSpacesAndNewLines() = 0;
+
+    /**
+     * Returns the error collector linked to this parser.
+     * @return std::shared_ptr<ErrorCollector> &
+     */
+    virtual const std::shared_ptr<ErrorCollector> &getErrorCollector() = 0;
 };
 
 #endif // EZPACKER_IPARSER_H

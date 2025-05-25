@@ -24,17 +24,37 @@ class BigInt : public IBigNumber
     BigInt();
 
     /**
-     * Parses the given string into an integer. Returns true if succeeded.
+     * Returns the type of the number.
+     * @return BigNumberType
+     */
+    BigNumberType getType() override;
+
+    /**
+     * Parses the given string into an integer. Returns true if succeeded. It assumes str is in base-10
+     * if it isn't and there's an invalid digit, it will throw an exception.
      * @param str
      * @return bool
      */
     bool fromStr(const std::string &str) override;
 
     /**
+     * Returns the encoded (raw binary bits) of the number. This returns a pointer to the internal buffer,
+     * modifying it WILL modify the number.
+     * @return char*
+     */
+    char *getEncoded() override;
+
+    /**
      * Returns the size in bits of the number.
      * @return size_t
      */
     size_t getBitSize() override;
+
+    /**
+     * Returns the size of the encoded buffer.
+     * @return size_t
+     */
+    size_t getEncodedSize() override;
 
     /**
      * Returns the number in a formatted string.
@@ -44,13 +64,19 @@ class BigInt : public IBigNumber
 
   private:
     /**
-     * Returns the digit for the given character.
+     * Returns the digit for the given character. It ASSUMES base-10.
      * @param ch
-     * @param base
-     * @return
+     * @return uint8_t
      */
-    uint8_t digitFromStr(uint8_t ch, size_t base);
-    
+    uint8_t digitFromStr(uint8_t ch);
+
+    /**
+     * Returns the string character of a digit.
+     * @param ch
+     * @return uint8_t
+     */
+    uint8_t digitToStr(uint8_t ch);
+
   private:
     std::vector<BlockSizeT> m_blocks;
 };

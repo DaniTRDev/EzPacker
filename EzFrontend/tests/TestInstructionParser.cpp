@@ -1,4 +1,5 @@
 #include "BasicParserTest.h"
+#include "Semantics/Normalizer/InstructionNormalizer.h"
 
 TEST(TestInstructionParser, TestValidInstruction)
 {

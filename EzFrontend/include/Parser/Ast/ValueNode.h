@@ -8,7 +8,7 @@ enum class ValueNodeType : uint8_t
 {
     Invalid = 0,
     Int,
-    Float, // Float + double
+    FloatingPoint, // FloatingPoint + double
     String
 };
 

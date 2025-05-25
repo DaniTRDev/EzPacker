@@ -7,8 +7,8 @@
 
 struct NormalizedVirtualVariable
 {
-    std::shared_ptr<SymbolEntry> m_symbol;
-    std::shared_ptr<TypeEntry> m_type;
+    std::shared_ptr<NormalizedSymbol> m_symbol;
+    std::shared_ptr<NormalizedType> m_type;
 };
 
 class VirtualVariableNormalizer : public INormalizer<NormalizedVirtualVariable>
@@ -16,7 +16,7 @@ class VirtualVariableNormalizer : public INormalizer<NormalizedVirtualVariable>
   public:
     /**
      * Tries to normalize the given virtual variable. This only creates the virtual variable, type must be obtained
-     * with deeper semantics (type evaluator).
+     * with deeper semantics (type evaluator). Assumes node is valid and it's type is AstType::VirtualVariable.
      * @param node
      * @param context
      * @return std::shared_ptr<SymbolEntry>

@@ -15,6 +15,12 @@ namespace grammar
  * @return std::shared_ptr<ParseRule>
  */
 extern std::shared_ptr<ParseRule> module();
+/**
+ * Creates a rule that tries to match a single module parameter:
+ * (type Param1, type Param2, ...)
+ * @return std::shared_ptr<ParseRule>
+ */
+extern std::shared_ptr<ParseRule> parameter();
 }
 
 #endif // EZPACKER_MODULE_H

@@ -68,6 +68,13 @@ class ParseRule : public std::enable_shared_from_this<ParseRule>
     }
 
     /**
+     * Sets the name of the rule.
+     * @param name
+     * @return std::shared_ptr<ParseRule>
+     */
+    std::shared_ptr<ParseRule> setName(const std::string &name);
+
+    /**
      * Sets the then for when the rule is matched.
      * @param callback
      * @return std::shared_ptr<ParseRule>

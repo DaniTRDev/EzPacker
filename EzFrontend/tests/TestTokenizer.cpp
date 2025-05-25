@@ -7,12 +7,19 @@
 class BasicTokenizerTest : public ::testing::Test
 {
   protected:
-    BasicTokenizer tokenizer;
+    std::shared_ptr<BasicTokenizer> tokenizer;
+
     std::vector<TokenInformation> run(const std::string &input)
     {
+        std::shared_ptr<SourceManager> sourceManager = std::make_unique<SourceManager>();
+        std::shared_ptr<FrontendLogger> logger = std::make_shared<FrontendLogger>(sourceManager);
+
+        sourceManager->addSourceContent("TEST", input);
+        tokenizer = std::make_unique<BasicTokenizer>(sourceManager, logger, "TEST");
+
         char *buffer = const_cast<char *>(input.c_str());
-        EXPECT_TRUE(tokenizer.tokenize(buffer, 0, input.size()));
-        return tokenizer.getTokens();
+        tokenizer->tokenize(buffer, 0, input.size());
+        return tokenizer->getTokens();
     }
 };
 
@@ -137,18 +144,18 @@ TEST_F(BasicTokenizerTest, MultipleTokens)
 
 TEST_F(BasicTokenizerTest, InvalidCharacterFails)
 {
-    char input[] = "@";
-    EXPECT_FALSE(tokenizer.tokenize(input, 0, sizeof(input)));
+    std::string input = "@";
+    EXPECT_EQ(run(input).size(), 0);
 }
 
 TEST_F(BasicTokenizerTest, InvalidFloat)
 {
-    std::string number = "3.13.2";
-    EXPECT_FALSE(tokenizer.tokenize(number.data(), 0, number.size()));
+    std::string input = "3.13.2";
+    EXPECT_EQ(run(std::string(input)).size(), 0);
 }
 
 TEST_F(BasicTokenizerTest, UnterminatedStringFails)
 {
-    char input[] = "\"Hello";
-    EXPECT_FALSE(tokenizer.tokenize(input, 0, sizeof(input)));
+    std::string input = "\"Hello";
+    EXPECT_EQ(run(input).size(), 0);
 }

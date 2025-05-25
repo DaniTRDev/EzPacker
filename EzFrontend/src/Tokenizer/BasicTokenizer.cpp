@@ -1,13 +1,15 @@
 #include "tokenizer/BasicTokenizer.h"
 
-BasicTokenizer::BasicTokenizer()
-    : m_buffer(nullptr), m_address(0), m_bufferSize(0), m_col(1), m_lastTokenCol(1), m_lastTokenLine(1), m_line(1),
-      LogSink(g_logger.get(), LogSegment("Tokenizer").colorize(Colors::yellow))
+BasicTokenizer::BasicTokenizer(const std::shared_ptr<SourceManager> &sourceManager,
+                               const std::shared_ptr<FrontendLogger> &logger, const std::string &source)
+    : m_buffer(nullptr), m_address(0), m_bufferSize(0), m_col(0), m_line(0), m_sourceManager(sourceManager),
+      m_logger(logger), m_source(source)
 {
 }
 
 BasicTokenizer::~BasicTokenizer()
 {
+    m_sourceManager.reset();
     m_tokens.clear();
 }
 
@@ -15,14 +17,14 @@ bool BasicTokenizer::tokenize(char *buffer, size_t address, size_t bufferSize)
 {
     if (!buffer || address >= bufferSize)
     {
-        LogSink::pushLog(LogMessage("").add("Could not tokenize because buffer, address or buffer size invalid"));
+        m_logger->logError(LogMessage("").add("Could not tokenize because buffer, address or buffer size invalid"));
         return false;
     }
 
     m_buffer = buffer;
     m_address = address;
     m_bufferSize = bufferSize;
-    m_col = m_lastTokenCol = m_lastTokenLine = m_line = 1;
+    m_col = m_line = 0;
     m_tokens.clear();
 
     while (m_address < m_bufferSize)
@@ -30,7 +32,7 @@ bool BasicTokenizer::tokenize(char *buffer, size_t address, size_t bufferSize)
         IRTokenType type = IRTokenType::Invalid;
         if (!tokenize(buffer, m_bufferSize, type))
         {
-            logTokenizerError(LogMessage("").add("Unexpected token"));
+            m_logger->logError(LogMessage("").add("Unexpected token"));
             return false;
         }
     }
@@ -72,11 +74,11 @@ char BasicTokenizer::peek()
 
 bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &tokenType)
 {
-    tokenLogCheckPoint();
-    
     char ch = peek();
     tokenType = IRTokenType::Invalid;
-    TokenInformation information{.m_type = tokenType, .m_col = m_col, .m_line = m_line, .m_str = ""};
+    TokenInformation information{.m_type = tokenType,
+                                 .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_source),
+                                 .m_str = ""};
 
     switch (ch)
     {
@@ -97,16 +99,17 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &toke
         while (consume())
         {
             ch = peek();
-            
+            information.m_sourceReference->m_length++;
+
             if (TokenizerHelpers::isEndOfLine(ch))
             {
                 consume(); // Skip '\n'.
                 break;
             }
-            
+
             information.m_str += ch;
         }
-        
+
         m_tokens.push_back(information);
         return true;
     }
@@ -134,7 +137,8 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &toke
         while (consume())
         {
             ch = peek();
-            
+            information.m_sourceReference->m_length++;
+
             if (isEscaping)
             {
                 switch (ch)
@@ -168,13 +172,13 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &toke
                     break;
                 }
                 default: {
-                    // Unknown escape, keep as-is (e.g., \x stays as \x)
-                    information.m_str += '\\';
-                    information.m_str += ch;
-                    break;
+                    // Unknown escape throw error.
+                    m_logger->logError(LogMessage("").add("Unrecognised scape sequence"),
+                                       information.m_sourceReference);
+                    return false;
                 }
                 }
-                
+
                 isEscaping = false;
                 continue;
             }
@@ -182,7 +186,7 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &toke
             {
                 isFinished = true;
                 consume(); // Skip this.
-                
+
                 break;
             }
             else if (ch == '\\')
@@ -193,14 +197,14 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &toke
 
             information.m_str += ch;
         }
-        
-        tokenLogCheckPoint(); // We want to know where this character was expected.
+
         if (!isFinished)
         {
-            logTokenizerError(LogMessage("").add("Expected quote to mark end of string!"));
+            m_logger->logError(LogMessage("").add("Expected quote to mark end of string!"),
+                               information.m_sourceReference);
             return false;
         }
-        
+
         m_tokens.push_back(information);
         return true;
     }
@@ -223,7 +227,7 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &toke
         else
         {
             // We don't have a token for the character throw error.
-            logTokenizerError(LogMessage("").add("Unrecognised token"));
+            m_logger->logError(LogMessage("").add("Unrecognised token"), information.m_sourceReference);
             return false;
         }
     }
@@ -236,37 +240,17 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, IRTokenType &toke
     return true;
 }
 
-void BasicTokenizer::beginLogBlock()
-{
-    m_logStack.push(std::queue<LogMessage>{});
-}
-
-void BasicTokenizer::endLogBlock(bool commit)
-{
-    if (m_logStack.empty())
-        return;
-    
-    auto logs = std::move(m_logStack.top());
-    m_logStack.pop();
-
-    while (!logs.empty())
-    {
-        if (commit)
-            LogSink::pushLog(logs.front());
-
-        logs.pop();
-    }
-}
-
 bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, IRTokenType &token)
 {
     char ch = peek();
-    TokenInformation information{.m_type = IRTokenType::Identifier, .m_col = m_col, .m_line = m_line, .m_str = ""};
+    TokenInformation information{.m_type = IRTokenType::Identifier,
+                                 .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_source),
+                                 .m_str = ""};
 
-    tokenLogCheckPoint();
     if (!TokenizerHelpers::isLetter(ch) && !TokenizerHelpers::isSpecial(ch))
     {
-        logTokenizerError(LogMessage("").add("Expected -, - or letter for the start of an identifier"));
+        m_logger->logError(LogMessage("").add("Expected -, - or letter for the start of an identifier"),
+                           information.m_sourceReference);
         return false;
     }
 
@@ -278,8 +262,8 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, IRToken
         {
             break;
         }
-
         information.m_str += ch;
+        information.m_sourceReference->m_length++;
     }
 
     token = information.m_type;
@@ -290,26 +274,31 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, IRToken
 
 bool BasicTokenizer::tokenizeNumber(char *buffer, size_t bufferSize, IRTokenType &token)
 {
-    TokenInformation information{.m_type = IRTokenType::NumberInt, .m_str = ""};
+    TokenInformation information{.m_type = IRTokenType::NumberInt,
+                                 .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_source),
+                                 .m_str = ""};
 
     information.m_str += peek();
     while (consume())
     {
         char ch = peek();
+        information.m_sourceReference->m_length++;
+
         if (TokenizerHelpers::isDot(ch))
         {
             // Number is a float value.
-            tokenLogCheckPoint();
             if (information.m_type == IRTokenType::NumberFloat)
             {
                 // If there's a double dot, it's bad formed.
-                logTokenizerError(LogMessage("").add("Dot not expected here, expected digits"));
+                m_logger->logError(LogMessage("").add("Dot not expected here, expected digits"),
+                                   information.m_sourceReference);
                 return false;
             }
             information.m_type = IRTokenType::NumberFloat;
         }
         else if (!TokenizerHelpers::isDigit(ch))
         {
+            information.m_sourceReference->m_length--;
             break;
         }
         information.m_str += ch;
@@ -319,18 +308,4 @@ bool BasicTokenizer::tokenizeNumber(char *buffer, size_t bufferSize, IRTokenType
     m_tokens.push_back(information);
 
     return true;
-}
-
-void BasicTokenizer::logTokenizerError(const LogMessage &logMessage)
-{
-    LogSink::pushLog(LogMessage("")
-                         .add("Tokenize error at line: {}, column: {} -> ", m_lastTokenLine, m_lastTokenCol)
-                         .add(logMessage.getRawMessage())
-                         .colorize(Colors::red));
-}
-
-void BasicTokenizer::tokenLogCheckPoint()
-{
-    m_lastTokenCol = m_col;
-    m_lastTokenLine = m_line;
 }

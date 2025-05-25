@@ -13,7 +13,7 @@ namespace grammar
 {
 /**
  * Tries to parse a list of initializers: initializer1, initializer2, ...
- * Supported types are Int, Float or String.
+ * Supported types are Int, FloatingPoint or String.
  * @return std::shared_ptr<ParseRule>
  */
 extern std::shared_ptr<ParseRule> initializer();

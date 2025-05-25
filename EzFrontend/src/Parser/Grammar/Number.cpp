@@ -5,7 +5,7 @@ namespace grammar
 
 std::shared_ptr<ParseRule> numberFloat()
 {
-    return tokenType(IRTokenType::NumberFloat)->map<ValueNode>(ValueNodeType::Float);
+    return tokenType(IRTokenType::NumberFloat)->map<ValueNode>(ValueNodeType::FloatingPoint);
 }
 
 std::shared_ptr<ParseRule> numberInt()

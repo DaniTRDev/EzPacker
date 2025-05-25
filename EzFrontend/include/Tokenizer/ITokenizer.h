@@ -2,6 +2,7 @@
 #define EZPACKER_ITOKENIZER_H
 
 #include "EzFrontendCommon.h"
+#include "SourceManager/SourceManager.h"
 
 namespace TokenizerHelpers
 {
@@ -142,12 +143,11 @@ inline std::map<IRTokenType, const char *> g_IRTokenTypeStr = {
 struct TokenInformation
 {
     IRTokenType m_type; // Type of the token.
-    size_t m_col;       // Column this token was extracted from.
-    size_t m_line;      // Line this token was extracted from.
+    std::shared_ptr<SourceReference> m_sourceReference;
     std::string m_str;
 };
 
-class ITokenizer : public IFrontendLogSink
+class ITokenizer
 {
   public:
     virtual ~ITokenizer() = default;

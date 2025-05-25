@@ -3,17 +3,22 @@
 
 #include "EzFrontendCommon.h"
 #include "ITokenizer.h"
+#include "Logger/FrontendLogger.h"
 
-class BasicTokenizer : public ITokenizer, public LogSink
+class BasicTokenizer : public ITokenizer
 {
   public:
     /**
-     * Creates the object.
+     * Creates the object with the given sourceManager, logger and source file.
+     * @param sourceManager
+     * @param logger
+     * @param source
      */
-    BasicTokenizer();
+    BasicTokenizer(const std::shared_ptr<SourceManager> &sourceManager, const std::shared_ptr<FrontendLogger> &logger,
+                   const std::string &source);
 
     /**
-     * Destroys the object and released resources.
+     * Destroys the object and releases resources.
      */
     ~BasicTokenizer() override;
 
@@ -23,20 +28,10 @@ class BasicTokenizer : public ITokenizer, public LogSink
      * @param buffer
      * @param address
      * @param bufferSize
-     * @return
+     * @return bool
      */
     bool tokenize(char *buffer, size_t address, size_t bufferSize);
 
-    /**
-     * Begins a new log block.
-     */
-    void beginLogBlock() override;
-    
-    /**
-     * Finishes the log block, and logs it if commit is set to true.
-     */
-    void endLogBlock(bool commit) override;
-    
     /**
      * Returns the list of tokens.
      * @return std::vector<TokenInformation>.
@@ -85,25 +80,16 @@ class BasicTokenizer : public ITokenizer, public LogSink
      * @return size_t
      */
     bool tokenizeNumber(char *buffer, size_t bufferSize, IRTokenType &token);
-    
-    /**
-     * Logs an error when tokenizing and prints relevant information.
-     */
-    void logTokenizerError(const LogMessage &logMessage);
 
-    /**
-     * Sets m_lastTokenLine & m_lastTokenCol to current m_col and m_line. Used to log properly.
-     */
-    void tokenLogCheckPoint();
-    
   private:
     char *m_buffer;
     size_t m_address;
     size_t m_bufferSize;
     size_t m_col;
-    size_t m_lastTokenLine; // Used not to have log showing col & line after the end of the token.
-    size_t m_lastTokenCol;  // Used not to have log showing col & line after the end of the token.
     size_t m_line;
+    std::shared_ptr<SourceManager> m_sourceManager;
+    std::shared_ptr<FrontendLogger> m_logger;
+    std::string m_source;
     std::vector<TokenInformation> m_tokens;
 };
 

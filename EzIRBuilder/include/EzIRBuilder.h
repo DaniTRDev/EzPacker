@@ -1,6 +1,0 @@
-#ifndef EZPACKER_EZIRBUILDER_H
-#define EZPACKER_EZIRBUILDER_H
-
-#include "EzIRBuilderCommon.h"
-
-#endif // EZPACKER_EZIRBUILDER_H

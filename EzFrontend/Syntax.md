@@ -78,10 +78,13 @@ To reference a virtual variable, you must use "%identifier":
 
 ```
 .module myMod:
-  load %myVar, .ptr (1231)
-  .add %myVar, 314
+  .load .i64 %myVar, .i64 (1231)
+  .add .i32 %myVar, .i32 314
 .end
 ```
+
+In this example, myVar acquires the type of a 64-bit integer that get its content by reading 64bits of given direct
+memory reference. In the next line, the first 32 bits of myVar (low part) are set from a 32-bit constant.
 
 # Module syntaxis
 

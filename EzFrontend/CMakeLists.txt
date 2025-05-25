@@ -8,6 +8,12 @@ endfunction()
 
 function(GetParserFiles out)
     set(${out}
+            "include/Parser/Ast/Ast.h"
+            "include/Parser/Ast/IdentifierNode.h"
+            "include/Parser/Ast/MemoryNode.h"
+            "include/Parser/Ast/TokenTypeNode.h"
+            "include/Parser/Ast/ValueNode.h"
+            "include/Parser/ErrorCollector/ErrorCollector.h"
             "include/Parser/Grammar/Grammar.h"
             "include/Parser/Grammar/Instruction.h"
             "include/Parser/Grammar/Addressing.h"
@@ -21,17 +27,13 @@ function(GetParserFiles out)
             "include/Parser/Grammar/Type.h"
             "include/Parser/Grammar/Variable.h"
             "include/Parser/Grammar/VirtualVariable.h"
-            "include/Parser/Ast/Ast.h"
-            "include/Parser/Ast/IdentifierNode.h"
-            "include/Parser/Ast/MemoryNode.h"
-            "include/Parser/Ast/TokenTypeNode.h"
-            "include/Parser/Ast/ValueNode.h"
 
             "src/Parser/Ast/Ast.cpp"
             "src/Parser/Ast/IdentifierNode.cpp"
             "src/Parser/Ast/MemoryNode.cpp"
             "src/Parser/Ast/TokenTypeNode.cpp"
             "src/Parser/Ast/ValueNode.cpp"
+            "src/Parser/ErrorCollector/ErrorCollector.cpp"
             "src/Parser/Grammar/Instruction.cpp"
             "src/Parser/Grammar/Addressing.cpp"
             "src/Parser/Grammar/Combinators.cpp"
@@ -50,7 +52,6 @@ endfunction()
 function(GetNormalizerFiles out)
     set(${out}
             "include/Semantics/IAstVisitor.h"
-            "include/Semantics/NormalTable.h"
             "include/Semantics/Normalizer/INormalizer.h"
             "include/Semantics/Normalizer/InstructionNormalizer.h"
             "include/Semantics/Normalizer/MemoryNodeNormalizer.h"
@@ -60,11 +61,11 @@ function(GetNormalizerFiles out)
             "include/Semantics/Normalizer/TypeNormalizer.h"
             "include/Semantics/Normalizer/ValueNormalizer.h"
             "include/Semantics/Normalizer/VirtualVariableNormalizer.h"
+            "include/Semantics/Tables/InstructionTable.h"
             "include/Semantics/Tables/SemanticTable.h"
             "include/Semantics/Tables/SymbolTable.h"
             "include/Semantics/Tables/TypeTable.h"
 
-            "src/Semantics/NormalTable.cpp"
             "src/Semantics/Normalizer/InstructionNormalizer.cpp"
             "src/Semantics/Normalizer/MemoryNodeNormalizer.cpp"
             "src/Semantics/Normalizer/ModuleNormalizer.cpp"
@@ -93,21 +94,27 @@ function(BuildEzFrontend)
             ${EZFRONTEND_NORMALIZER_FILES}
             "include/EzFrontend.h"
             "include/EzFrontendCommon.h"
-            "include/IFrontendLogSink.h"
-            "include/Parser/BasicParser.h"
             "include/IRTypes.h"
+            "include/Logger/FrontendLogger.h"
+            "include/Number/BigInt.h"
+            "include/Number/Double.h"
+            "include/Number/Float.h"
+            "include/Number/IBigNumber.h"
+            "include/Parser/BasicParser.h"
             "include/Parser/IParser.h"
             "include/Parser/ParseRule.h"
-
-            "include/Number/BigInt.h"
-            "include/Number/IBigNumber.h"
+            "include/SourceManager/SourceManager.h"
             "include/Tokenizer/BasicTokenizer.h"
             "include/Tokenizer/ITokenizer.h"
 
-            "src/Parser/BasicParser.cpp"
             "src/IRTypes.cpp"
-            "src/Parser/ParseRule.cpp"
+            "src/Logger/FrontendLogger.cpp"
             "src/Number/BigInt.cpp"
+            "src/Number/Double.cpp"
+            "src/Number/Float.cpp"
+            "src/Parser/BasicParser.cpp"
+            "src/Parser/ParseRule.cpp"
+            "src/SourceManager/SourceManager.cpp"
             "src/Tokenizer/BasicTokenizer.cpp"
     )
 
@@ -133,6 +140,14 @@ if (EZPACKER_BUILD_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/testData"
             "$<TARGET_FILE_DIR:EzFrontend>/testData"
             COMMENT "Copying test data"
+    )
+
+    EzPacker_AddTest(
+            "T_Normalizer"
+            ""
+            "EzFrontend"
+            ""
+            "tests/TestNormalizer.cpp;tests/BasicNormalizerTest.cpp;tests/BasicNormalizerTest.h"
     )
 
     EzPacker_AddTest(

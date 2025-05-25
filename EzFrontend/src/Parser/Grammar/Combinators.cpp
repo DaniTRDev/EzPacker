@@ -6,9 +6,9 @@ std::shared_ptr<ParseRule> anyOf(const std::vector<std::shared_ptr<ParseRule>> &
 {
     return ParseRule::create(
         [rules](IParser &parser, const std::shared_ptr<Ast> &out) -> bool {
+            parser.getErrorCollector()->enterRule();
             for (auto &rule : rules)
             {
-                parser.beginLogBlock();
                 parser.skipWhiteSpacesAndNewLines();
 
                 std::shared_ptr<Ast> intermediateOut = std::make_shared<TokenTypeNode>();
@@ -16,12 +16,12 @@ std::shared_ptr<ParseRule> anyOf(const std::vector<std::shared_ptr<ParseRule>> &
                     continue;
 
                 intermediateOut->copyChildrenTo(out); // Add children only if we matched at least 1 rule.
-
-                parser.endLogBlock(false);
+                parser.getErrorCollector()->exitRule(ErrorHandleType::Discard);
                 return true;
             }
-
-            parser.logParserError(LogMessage("").add("Malformed unknown expression"), parser.peek());
+            parser.getErrorCollector()->collect(LogMessage("").add("Malformed unknown expression"),
+                                                parser.peek().m_sourceReference);
+            parser.getErrorCollector()->exitRule(ErrorHandleType::Propagate);
             return false;
         },
         "anyOf");
@@ -31,30 +31,38 @@ std::shared_ptr<ParseRule> manyOf(size_t min, size_t max, const std::shared_ptr<
 {
     return ParseRule::create(
         [min, max, rule](IParser &parser, const std::shared_ptr<Ast> &out) -> bool {
-            parser.beginLogBlock(); // Start a block
             size_t matchCount = 0;
             std::shared_ptr<TokenTypeNode> intermediateOut = std::make_shared<TokenTypeNode>();
 
+            parser.getErrorCollector()->enterRule();
             parser.skipWhiteSpacesAndNewLines();
-            while (rule->matchRet(parser, intermediateOut))
+
+            while (true)
             {
+                parser.getErrorCollector()->enterRule();
+
+                if (!rule->matchRet(parser, intermediateOut))
+                {
+                    parser.getErrorCollector()->exitRule(ErrorHandleType::Propagate);
+                    break;
+                }
+
                 matchCount++;
+                parser.getErrorCollector()->exitRule(ErrorHandleType::Discard);
                 parser.skipWhiteSpacesAndNewLines();
             }
 
-            parser.endLogBlock(false); // We can't know for sure what caused it, so we don't log errors.
-
             if (matchCount < min || matchCount > max)
             {
-                parser.beginLogBlock();
-                parser.logParserError(
+                parser.getErrorCollector()->collect(
                     LogMessage("").add("Expected at least {} items, maximum {} but got {}", min, max, matchCount),
-                    parser.peek());
-                parser.endLogBlock(true);
+                    parser.peek().m_sourceReference);
 
+                parser.getErrorCollector()->exitRule(ErrorHandleType::Propagate);
                 return false;
             }
 
+            parser.getErrorCollector()->exitRule(ErrorHandleType::Discard);
             intermediateOut->copyChildrenTo(out); // Only add children if matchCount is withing the provided range.
             return true;
         },
@@ -65,22 +73,21 @@ std::shared_ptr<ParseRule> matchIf(std::shared_ptr<ParseRule> ifRule, std::share
 {
     return ParseRule::create(
         [ifRule, nextRule](IParser &parser, const std::shared_ptr<Ast> &out) -> bool {
-            parser.beginLogBlock();
+            parser.getErrorCollector()->enterRule();
             parser.skipWhiteSpacesAndNewLines();
-
             std::shared_ptr<Ast> intermediateOut = std::make_shared<TokenTypeNode>();
             if (ifRule->matchRet(parser, intermediateOut))
             {
                 parser.skipWhiteSpacesAndNewLines();
                 if (!nextRule->matchRet(parser, intermediateOut))
                 {
-                    parser.endLogBlock(true); // We need to emit the error, so we know why this failed.
+                    parser.getErrorCollector()->exitRule(ErrorHandleType::Propagate);
                     return false;
                 }
             }
+            parser.getErrorCollector()->exitRule(ErrorHandleType::Discard);
 
             intermediateOut->copyChildrenTo(out);
-            parser.endLogBlock(false); // Since it is optional, we don't want to log errors.
             return true;
         },
         "matchIf");
@@ -90,12 +97,10 @@ std::shared_ptr<ParseRule> optional(std::shared_ptr<ParseRule> rule)
 {
     return ParseRule::create(
         [rule](IParser &parser, const std::shared_ptr<Ast> &out) -> bool {
-            parser.beginLogBlock();
+            parser.getErrorCollector()->enterRule();
             parser.skipWhiteSpacesAndNewLines();
-
             rule->matchRet(parser, out);
-
-            parser.endLogBlock(false); // Since it is optional, we don't want to log errors.
+            parser.getErrorCollector()->exitRule(ErrorHandleType::Discard);
             return true;
         },
         "optional");
@@ -105,22 +110,28 @@ std::shared_ptr<ParseRule> sequence(const std::vector<std::shared_ptr<ParseRule>
 {
     return ParseRule::create(
         [rules](IParser &parser, const std::shared_ptr<Ast> &out) -> bool {
+            parser.getErrorCollector()->enterRule();
+
             std::shared_ptr<TokenTypeNode> intermediateOut = std::make_shared<TokenTypeNode>();
             for (auto &rule : rules)
             {
                 parser.skipWhiteSpacesAndNewLines();
 
                 if (!rule->matchRet(parser, intermediateOut))
+                {
+                    parser.getErrorCollector()->exitRule(ErrorHandleType::Propagate);
                     return false;
+                }
             }
 
             // Only copy results if succeeded.
             for (auto &child : intermediateOut->getChildren())
                 out->addChild(child);
 
+            parser.getErrorCollector()->exitRule(ErrorHandleType::Discard);
             return true;
         },
-        "secuence");
+        "sequence");
 }
 
-} // namespace Grammar::combinators
+} // namespace grammar::combinators

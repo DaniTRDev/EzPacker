@@ -1,16 +1,15 @@
 #include "parser/BasicParser.h"
 
-BasicParser::BasicParser(const std::vector<TokenInformation> &tokens)
-    : m_position(0), m_tokens(tokens),
-      LogSink(g_logger.get(), LogSegment("PARSER").colorize(Colors::underline))
+BasicParser::BasicParser(const std::shared_ptr<FrontendLogger> &logger,
+                         const std::shared_ptr<SourceManager> &sourceManager,
+                         const std::vector<TokenInformation> &tokens)
+    : m_position(0), m_logger(logger), m_tokens(tokens),
+      m_errorCollector(std::make_shared<ErrorCollector>(logger, sourceManager))
 {
 }
 
 BasicParser::~BasicParser()
 {
-    while (!m_logStack.empty())
-        endLogBlock(false);
-
     m_tokens.clear();
 }
 
@@ -33,9 +32,9 @@ bool BasicParser::consumeIfToken(IRTokenType token)
         return true;
     }
 
-    logParserError(
-        LogMessage("").add("Expected type '{}' but got '{}'", g_IRTokenTypeStr[token], g_IRTokenTypeStr[peek().m_type]),
-        peek());
+    m_errorCollector->collect(LogMessage("").add("Expected token '{}' but got '{}'", g_IRTokenTypeStr[token],
+                                                 g_IRTokenTypeStr[peek().m_type]),
+                              peek().m_sourceReference);
     return false;
 }
 
@@ -53,47 +52,14 @@ const TokenInformation &BasicParser::peek() const
     if (m_position < m_tokens.size())
         return m_tokens[m_position];
 
-    static TokenInformation invalid = TokenInformation{.m_type = IRTokenType::Invalid, .m_str = ""};
+    static TokenInformation invalid = TokenInformation{
+        .m_type = IRTokenType::Invalid, .m_sourceReference = std::make_shared<SourceReference>(), .m_str = ""};
     return invalid;
 }
 
 size_t BasicParser::getPosition() const
 {
     return m_position;
-}
-
-void BasicParser::beginLogBlock()
-{
-    m_logStack.push(std::queue<LogMessage>{});
-}
-
-void BasicParser::endLogBlock(bool commit)
-{
-    if (m_logStack.empty())
-        return;
-
-    auto logs = std::move(m_logStack.top());
-    m_logStack.pop();
-
-    while (!logs.empty())
-    {
-        if (commit)
-            LogSink::pushLog(logs.front());
-
-        logs.pop();
-    }
-}
-
-void BasicParser::logParserError(const LogMessage &logMessage, const TokenInformation &token)
-{
-    LogMessage msg = LogMessage("")
-                         .add("Parsing error at line {}, column {} -> ", token.m_line, token.m_col)
-                         .colorize(Colors::red)
-                         .add(logMessage.getRawMessage());
-    if (m_logStack.empty())
-        LogSink::pushLog(msg);
-    else
-        m_logStack.top().push(msg);
 }
 
 void BasicParser::skipWhiteSpacesAndNewLines()
@@ -105,4 +71,9 @@ void BasicParser::skipWhiteSpacesAndNewLines()
         consume();
         token = peek();
     }
+}
+
+const std::shared_ptr<ErrorCollector> &BasicParser::getErrorCollector()
+{
+    return m_errorCollector;
 }

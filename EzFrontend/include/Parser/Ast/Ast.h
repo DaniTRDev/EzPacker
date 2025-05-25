@@ -3,6 +3,7 @@
 
 #include "EzFrontendCommon.h"
 #include "IRTypes.h"
+#include "SourceManager/SourceManager.h"
 
 enum class AstType : uint8_t
 {
@@ -11,7 +12,8 @@ enum class AstType : uint8_t
     Instruction,
     Memory, // Memory Reference Declaration.
     Module, // Module Declaration.
-    Type,   // Type (IRType).
+    ModuleParameter,
+    Type, // Type (IRType).
     TokenTypeNode,
     Value,          // Operand of type Number (int / float / string).
     Variable,       // Variable Declaration (global).
@@ -21,6 +23,11 @@ enum class AstType : uint8_t
 class Ast
 {
   public:
+    /**
+     * Creates the object.
+     */
+    Ast();
+
     /**
      * Destroys the object and releases resources.
      */
@@ -39,7 +46,8 @@ class Ast
     bool hasChildren() const;
 
     /**
-     * Adds a child to the current AST expression.
+     * Adds a child to the current AST expression. If this node doesn't have a valid memory reference,
+     * one will be created and children references will be merged. If a new child is added, it will also be merged.
      * @param node
      */
     void addChild(std::shared_ptr<Ast> node);
@@ -56,6 +64,12 @@ class Ast
     void copyChildrenTo(const std::shared_ptr<Ast> &other);
 
     /**
+     * Sets the source reference for this node.
+     * @param ref
+     */
+    void setSourceRef(const std::shared_ptr<SourceReference> &ref);
+
+    /**
      * Sets the type of the node.
      * @param type
      */
@@ -66,6 +80,12 @@ class Ast
      * @return std::shared_ptr<Ast>
      */
     virtual std::shared_ptr<Ast> clone() const = 0;
+
+    /**
+     * Returns the source reference of this node.
+     * @return const std::shared_ptr<SourceReference> &
+     */
+    const std::shared_ptr<SourceReference> &getSourceRef();
 
     /**
      * Returns the children of this node.
@@ -83,7 +103,7 @@ class Ast
     {
         return std::dynamic_pointer_cast<Type>(node);
     }
-    
+
     /**
      * Tries to cast the given node to given type. If cast succeeded returns the casted pointer, other ways nullptr.
      * @tparam Type
@@ -94,12 +114,14 @@ class Ast
     {
         if (id >= m_children.size())
             return nullptr;
-        
+
         return cast<Type>(getChildren()[id]);
     }
 
   private:
     AstType m_type;
+    bool m_mergeSourceReferences;
+    std::shared_ptr<SourceReference> m_sourceRef;
     std::vector<std::shared_ptr<Ast>> m_children;
 };
 
@@ -127,6 +149,8 @@ class Ast
 LAZY_AST_NODE_DEFINER(AstType::Instruction, InstructionNode)
 
 LAZY_AST_NODE_DEFINER(AstType::Module, ModuleNode)
+
+LAZY_AST_NODE_DEFINER(AstType::ModuleParameter, ModuleParameterNode)
 
 LAZY_AST_NODE_DEFINER(AstType::VirtualVariable, VirtualVariableNode)
 

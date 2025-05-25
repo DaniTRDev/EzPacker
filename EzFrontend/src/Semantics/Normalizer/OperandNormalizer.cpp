@@ -3,12 +3,6 @@
 std::shared_ptr<NormalizedOperand> OperandNormalizer::normalizeNode(std::shared_ptr<Ast> node,
                                                                     const std::shared_ptr<NormalizerContext> &context)
 {
-    if (!node)
-    {
-        // TODO: Given node is not a valid operand node.
-        return nullptr;
-    }
-
     std::shared_ptr<NormalizedOperand> operand = std::make_shared<NormalizedOperand>();
 
     if (node->getType() == AstType::Memory)
@@ -17,7 +11,7 @@ std::shared_ptr<NormalizedOperand> OperandNormalizer::normalizeNode(std::shared_
         operand->m_memoryNode = MemoryNodeNormalizer().normalizeNode(node, context);
         if (operand->m_memoryNode == nullptr)
         {
-            // TODO: "Could not normalize given memory"
+            context->m_logger->logError(LogMessage("").add("Error normalizing memory operand"), node->getSourceRef());
             return nullptr;
         }
     }
@@ -27,7 +21,8 @@ std::shared_ptr<NormalizedOperand> OperandNormalizer::normalizeNode(std::shared_
         operand->m_virtualVariable = VirtualVariableNormalizer().normalizeNode(node, context);
         if (operand->m_virtualVariable == nullptr)
         {
-            // TODO: "Could not normalize given virtual variable"
+            context->m_logger->logError(LogMessage("").add("Error normalizing virtual variable operand"),
+                                        node->getSourceRef());
             return nullptr;
         }
     }
@@ -35,15 +30,16 @@ std::shared_ptr<NormalizedOperand> OperandNormalizer::normalizeNode(std::shared_
     {
         operand->m_operandType = NormalizedOperandType::Value;
         operand->m_value = ValueNormalizer().normalizeNode(node, context);
-        if (operand->m_virtualVariable == nullptr)
+        if (operand->m_value == nullptr)
         {
-            // TODO: "Could not normalize given virtual variable"
+            context->m_logger->logError(LogMessage("").add("Error normalizing value"), node->getSourceRef());
             return nullptr;
         }
     }
     else
     {
-        // TODO: "Given node can't be normalized into an operand."
+        context->m_logger->logError(LogMessage("").add("Given node can't be normalized into operand"),
+                                    node->getSourceRef());
         return nullptr;
     }
 

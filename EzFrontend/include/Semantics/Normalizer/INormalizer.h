@@ -2,8 +2,10 @@
 #define EZPACKER_INORMALIZER_H
 
 #include "EzFrontendCommon.h"
+#include "Logger/FrontendLogger.h"
 #include "Number/IBigNumber.h"
 #include "Parser/Ast/Ast.h"
+#include "Semantics/Tables/InstructionTable.h"
 #include "Semantics/Tables/SymbolTable.h"
 #include "Semantics/Tables/TypeTable.h"
 
@@ -12,6 +14,8 @@
  */
 struct NormalizerContext
 {
+    std::shared_ptr<FrontendLogger> m_logger;
+    std::shared_ptr<InstructionTable> m_instructionTable;
     std::shared_ptr<SymbolTable> m_symbolTable;
     std::shared_ptr<TypeTable> m_typeTable;
 };

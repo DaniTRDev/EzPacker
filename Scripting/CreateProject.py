@@ -1,6 +1,5 @@
 import os
 
-
 def create_cmake_library_template(project_name):
     # Create directory structure
     directories = [
@@ -13,20 +12,25 @@ def create_cmake_library_template(project_name):
         os.makedirs(directory, exist_ok=True)
 
     # Create common header files
-    common_header_content = f"""#pragma once
-
+    common_header_content = f"""#ifndef {project_name.upper()}_COMMON_H
+#define {project_name.upper()}_COMMON_H
 // {project_name} Precompiled Header
 #include <memory>
 #include <vector>
 #include <string>
 #include <cstdint>
+
+#endif // {project_name.upper()}_COMMON_H
 """
     with open(f"{project_name}/include/{project_name}Common.h", "w") as f:
         f.write(common_header_content)
 
-    main_header_content = f"""#pragma once
+    main_header_content = f"""#ifndef {project_name.upper()}_H
+#define {project_name.upper()}_H
 
 #include "{project_name}Common.h"
+
+#endif // {project_name.upper()}_H
 """
     with open(f"{project_name}/include/{project_name}.h", "w") as f:
         f.write(main_header_content)
@@ -49,7 +53,6 @@ function(Build{project_name})
     add_library("{project_name}" ${{{project_name.upper()}_BUILD_TYPE}}
             "include/{project_name}.h"
             "include/{project_name}Common.h"
-            "src/{project_name}.cpp"
     )
 
     # Set precompiled header
@@ -72,7 +75,7 @@ if (EZPACKER_BUILD_TESTS)
     #       "{project_name}"
     #       ""
     #       "${{CMAKE_CURRENT_SOURCE_DIR}}/tests/Test{project_name}.cpp"
-    )
+    #)
 endif()
 """
     with open(f"{project_name}/CMakeLists.txt", "w") as f:

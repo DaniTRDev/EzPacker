@@ -3,12 +3,6 @@
 std::shared_ptr<NormalizedMemoryNode> MemoryNodeNormalizer::normalizeNode(
     std::shared_ptr<Ast> node, const std::shared_ptr<NormalizerContext> &context)
 {
-    if (!node || node->getType() != AstType::Memory)
-    {
-        // TODO: Given node is not a memory node
-        return nullptr;
-    }
-
     auto memoryNode = Ast::cast<MemoryNode>(node);
     std::shared_ptr<NormalizedMemoryNode> normalizedMemoryNode = std::make_shared<NormalizedMemoryNode>();
 
@@ -47,10 +41,12 @@ std::shared_ptr<NormalizedMemoryNode> MemoryNodeNormalizer::normalizeNode(
     }
     case IRMemoryReferenceType::IPRelative: {
         // TODO: Implement.
-        break;
+        context->m_logger->logError(
+            LogMessage("").add("IP Relative memory operands are not supported yet"), node->getSourceRef());
+        return nullptr;
     }
     default: {
-        // TODO: Invalid memory reference type.
+        context->m_logger->logError(LogMessage("").add("Invalid memory operand"), node->getSourceRef());
         return nullptr;
     }
     }
@@ -59,9 +55,9 @@ std::shared_ptr<NormalizedMemoryNode> MemoryNodeNormalizer::normalizeNode(
         normalizedMemoryNode->m_scale == nullptr && normalizedMemoryNode->m_displ == nullptr &&
         normalizedMemoryNode->m_absolute)
     {
-        // TODO: Expected at least 1 argument to conform a memory reference.
+        context->m_logger->logError(LogMessage("").add("Error while normalizing memory node"), node->getSourceRef());
         return nullptr;
     }
-    
+
     return normalizedMemoryNode;
 }

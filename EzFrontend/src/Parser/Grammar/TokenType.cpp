@@ -9,9 +9,11 @@ std::shared_ptr<ParseRule> tokenType(IRTokenType type)
             auto &token = parser.peek();
             if (!parser.consumeIfToken(type))
             {
-                parser.logParserError(LogMessage("").add("Expected {} but got {}", g_IRTokenTypeStr[type],
-                                                         g_IRTokenTypeStr[token.m_type]),
-                                      token);
+                parser.getErrorCollector()->enterRule();
+                parser.getErrorCollector()->collect(LogMessage("").add("Expected {} but got {}", g_IRTokenTypeStr[type],
+                                                                       g_IRTokenTypeStr[token.m_type]),
+                                                    parser.peek().m_sourceReference);
+                parser.getErrorCollector()->exitRule(ErrorHandleType::Propagate);
                 return false;
             }
 
@@ -29,6 +31,7 @@ std::shared_ptr<ParseRule> tokenType(IRTokenType type)
                 std::shared_ptr<TokenTypeNode> node = std::make_shared<TokenTypeNode>();
                 node->setTokenType(token.m_type);
                 node->setContent(token.m_str);
+                node->setSourceRef(token.m_sourceReference);
 
                 out->addChild(node);
             }
@@ -37,4 +40,4 @@ std::shared_ptr<ParseRule> tokenType(IRTokenType type)
         },
         "tokenType");
 }
-} // namespace Grammar
+} // namespace grammar

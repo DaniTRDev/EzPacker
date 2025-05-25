@@ -9,6 +9,4 @@
 #include <EzLibCommon.h>
 #include <EzLogger.h>
 
-#include "IFrontendLogSink.h"
-
 inline std::unique_ptr<SyncLogger> g_logger = EzLogger::createSinkLogger("FRONTEND");

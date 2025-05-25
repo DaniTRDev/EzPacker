@@ -8,16 +8,18 @@
 /**
  * Simple parser that can consume, peek and restore the vector of tokens.
  */
-class BasicParser : public IParser, public LogSink
+class BasicParser : public IParser
 {
   public:
     friend class ParseRule;
     /**
      * Creates the object.
-     * @param registerMap
+     * @param logger
+     * @param sourceManager
      * @param tokens
      */
-    BasicParser(const std::vector<TokenInformation> &tokens);
+    BasicParser(const std::shared_ptr<FrontendLogger> &logger, const std::shared_ptr<SourceManager> &sourceManager,
+                const std::vector<TokenInformation> &tokens);
 
     /**
      * Destroys the object and releases resources.
@@ -37,7 +39,7 @@ class BasicParser : public IParser, public LogSink
      * @return bool.
      */
     bool consumeIfToken(IRTokenType token) override;
-    
+
     /**
      * Tries to restore vector's position to pos. Returns true if succeeded.
      * @param pos
@@ -57,31 +59,22 @@ class BasicParser : public IParser, public LogSink
      * @return size_t
      */
     size_t getPosition() const override;
-    
-    /**
-     * Begins a new log block.
-     */
-    void beginLogBlock() override;
-    
-    /**
-     * Finishes the log block, and logs it if commit is set to true.
-     */
-    void endLogBlock(bool commit) override;
-    
-    /**
-     * Logs an error related to parsing with detailed information.
-     * @param msg
-     * @param token
-     */
-    void logParserError(const LogMessage &msg, const TokenInformation &token) override;
 
     /**
      * Skips every white space or new line and consumes tokens.
      */
     void skipWhiteSpacesAndNewLines() override;
-    
+
+    /**
+     * Returns the error collector linked to this parser.
+     * @return std::shared_ptr<ErrorCollector> &
+     */
+    const std::shared_ptr<ErrorCollector> &getErrorCollector() override;
+
   private:
     size_t m_position;
+    std::shared_ptr<ErrorCollector> m_errorCollector;
+    std::shared_ptr<FrontendLogger> m_logger;
     std::vector<TokenInformation> m_tokens;
 };
 

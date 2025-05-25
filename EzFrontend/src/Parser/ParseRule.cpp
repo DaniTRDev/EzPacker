@@ -38,12 +38,18 @@ bool ParseRule::matchRet(class IParser &parser, const std::shared_ptr<Ast> &out)
     }
     else
     {
-        // Result should be pushed as a child of out.
+        // Result should be pushed as a child of out (combinators).
         out->addChild(m_result->clone());
     }
 
     m_result->clearChildren(); // Clear result.
     return matched;
+}
+
+std::shared_ptr<ParseRule> ParseRule::setName(const std::string &name)
+{
+    m_name = name;
+    return shared_from_this();
 }
 
 std::shared_ptr<ParseRule> ParseRule::then(const MatchedCallback &callback)
