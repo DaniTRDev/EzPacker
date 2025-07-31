@@ -4,8 +4,8 @@ This file describes the syntax of the IR.
 
 The general syntax for the IR depends on the keyword. Generally, for instruction keywords this syntax is followed:
 
-- Single arguments: ``.instr source`` / ``.instr destination``. Depends on the instruction (push, pop, ...).
-- Multiple arguments: ``.instr destination, source``.
+- Single arguments: ``.instr source;`` / ``.instr destination;``. Depends on the instruction (push, pop, ...).
+- Multiple arguments: ``.instr destination, source;``.
 
 Sources and destinations can be of type:
 
@@ -29,11 +29,8 @@ Supported data types are:
 - ``.i16``: 16-bits integer.
 - ``.i32``: 32-bits integer.
 - ``.i64``: 64-bits integer.
-- ``.ptr``: Represents a pointer. It only indicates that memory is going to be used,
-  e.g: ``.ptr .i8``. A type can only contain a single .ptr declaration. If pointers to pointers are needed,
-  first pointer should be accessed to get the second one and access it.
 
-(More data types will be added in a future to support vectored operations).
+(More data types will be added in the future to support vectored operations).
 
 # Global variables
 
@@ -68,7 +65,7 @@ Here are a few examples to illustrate:
 Virtual variables are slots in a virtual memory used by the Compiler to know where should it write / read each time a
 variable is used. They can be a register (given by the source architecture) or a stack reference. Deep, in the
 AstNormalizer there is a table that contains defined virtual variable names that later will be converted to physical
-registers in the compiling stage. 
+registers in the compiling stage.
 
 > [!CAUTION]
 > Only 'load' instruction will define new variables: if you want to reference a variable you must have declared it

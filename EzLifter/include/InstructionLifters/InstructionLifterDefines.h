@@ -15,7 +15,7 @@
         inline bool liftFunction(const InstructionLiftContext &liftContext) override                                   \
         {                                                                                                              \
             const char *str = "Lifter##name";                                                                          \
-            LogSink::pushLog(LogMessage("").add("Lifting {}", str));                                                   \
+            LogSink::pushLog(LogMessage("Lifting {}", str));                                                   \
             return code(liftContext);                                                                                  \
         }                                                                                                              \
     };                                                                                                                 \

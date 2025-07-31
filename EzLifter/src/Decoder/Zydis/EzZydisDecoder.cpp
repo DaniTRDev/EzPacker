@@ -17,7 +17,7 @@ bool EzZydisDecoder::initialize(std::shared_ptr<IArchitecture> arch)
 {
     if (!arch)
     {
-        LogSink::pushLog(LogMessage("").add("Could not initialize because ARCH is invalid").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("Could not initialize because ARCH is invalid").colorize(Colors::red));
         return false;
     }
 
@@ -56,24 +56,24 @@ bool EzZydisDecoder::initialize(std::shared_ptr<IArchitecture> arch)
 
     if (!validWidth)
     {
-        LogSink::pushLog(LogMessage("").add("Could not initialize because WORD-SIZE is invalid").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("Could not initialize because WORD-SIZE is invalid").colorize(Colors::red));
         return false;
     }
     if (!validArch)
     {
-        LogSink::pushLog(LogMessage("").add("Could not initialize because ARCH-TYPE is invalid").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("Could not initialize because ARCH-TYPE is invalid").colorize(Colors::red));
         return false;
     }
 
     if (ZydisDecoderInit(m_decoder.get(), mode, width) != ZYAN_STATUS_SUCCESS)
     {
-        LogSink::pushLog(LogMessage("").add("There was an error initializing Zydis Decoder").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("There was an error initializing Zydis Decoder").colorize(Colors::red));
         return false;
     }
 
     if (ZydisFormatterInit(m_formatter.get(), ZYDIS_FORMATTER_STYLE_INTEL) != ZYAN_STATUS_SUCCESS)
     {
-        LogSink::pushLog(LogMessage("").add("There was an error initializing Zydis Formatter").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("There was an error initializing Zydis Formatter").colorize(Colors::red));
         return false;
     }
 
@@ -83,7 +83,7 @@ bool EzZydisDecoder::initialize(std::shared_ptr<IArchitecture> arch)
         arch->m_registerMap[regId] = registerSize; // Insert.
     }
 
-    LogSink::pushLog(LogMessage("").add("Initialized").colorize(Colors::magenta));
+    LogSink::pushLog(LogMessage("Initialized").colorize(Colors::magenta));
     return true;
 }
 
@@ -109,7 +109,7 @@ std::shared_ptr<ParsedDecodedInstruction> EzZydisDecoder::decodeInstruction(
     if (status != ZYAN_STATUS_SUCCESS)
     {
         LogSink::pushLog(
-            LogMessage("").add("Could not decode instruction (error: 0x{:x})", status).colorize(Colors::red));
+            LogMessage("Could not decode instruction (error: 0x{:x})", status).colorize(Colors::red));
         return nullptr;
     }
 

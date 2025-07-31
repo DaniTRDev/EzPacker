@@ -28,7 +28,7 @@ bool EzLifter::initialize()
         return false;
     }
 
-    LogSink::pushLog(LogMessage("").add("Lifter intialized"));
+    LogSink::pushLog(LogMessage("Lifter intialized"));
     return true;
 }
 
@@ -36,7 +36,7 @@ llvm::Function *EzLifter::lift(char *buffer, size_t baseAddress, size_t bufferSi
 {
     if (!m_function)
     {
-        LogSink::pushLog(LogMessage("").add("Can't lift because lifter was not initialized").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("Can't lift because lifter was not initialized").colorize(Colors::red));
         return nullptr;
     }
 
@@ -53,7 +53,7 @@ llvm::Function *EzLifter::lift(char *buffer, size_t baseAddress, size_t bufferSi
 
         if (instr == nullptr)
         {
-            LogSink::pushLog(LogMessage("").add("Could not lift instruction, aborting").colorize(Colors::red));
+            LogSink::pushLog(LogMessage("Could not lift instruction, aborting").colorize(Colors::red));
             return nullptr;
         }
 
@@ -61,7 +61,7 @@ llvm::Function *EzLifter::lift(char *buffer, size_t baseAddress, size_t bufferSi
 
         if (instrData->m_instrType == DecodedInstructionType::Unsupported)
         {
-            LogSink::pushLog(LogMessage("").add("Detected an unsupported instruction").colorize(Colors::red));
+            LogSink::pushLog(LogMessage("Detected an unsupported instruction").colorize(Colors::red));
             return nullptr;
         }
 
@@ -72,14 +72,14 @@ llvm::Function *EzLifter::lift(char *buffer, size_t baseAddress, size_t bufferSi
         auto it = g_lifters.find(instrData->m_instrType);
         if (it == g_lifters.end())
         {
-            LogSink::pushLog(LogMessage("").add("No lifter found for instruction").colorize(Colors::red));
+            LogSink::pushLog(LogMessage("No lifter found for instruction").colorize(Colors::red));
             return nullptr;
         }
         
         liftResult = it->second->liftFunction(context);
         if (!liftResult)
         {
-            LogSink::pushLog(LogMessage("").add("Could not lift instruction.").colorize(Colors::red));
+            LogSink::pushLog(LogMessage("Could not lift instruction.").colorize(Colors::red));
             return nullptr;
         }
     }

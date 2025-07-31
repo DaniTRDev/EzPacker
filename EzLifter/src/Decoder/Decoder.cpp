@@ -19,11 +19,11 @@ bool Decoder::initialize()
     ZyanStatus status = ZydisDecoderInit(&m_decoder, mode, stackWidth);
     if (status != ZYAN_STATUS_SUCCESS)
     {
-        LogSink::pushLog(LogMessage("").add("Could not initialize Decoder!").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("Could not initialize Decoder!").colorize(Colors::red));
         return false;
     }
 
-    LogSink::pushLog(LogMessage("").add("Decoder initialized"));
+    LogSink::pushLog(LogMessage("Decoder initialized"));
     return true;
 }
 
@@ -46,13 +46,13 @@ std::shared_ptr<ZydisDecodedInstruction> Decoder::decodeInstruction(const char *
     if (address >= bufferSize)
     {
         LogSink::pushLog(
-            LogMessage("").add("Could not decode instruction because address is invalid!").colorize(Colors::red));
+            LogMessage("Could not decode instruction because address is invalid!").colorize(Colors::red));
         return nullptr;
     }
     if (!context)
     {
         LogSink::pushLog(
-            LogMessage("").add("Could not decode instruction because CONTEXT is null!").colorize(Colors::red));
+            LogMessage("Could not decode instruction because CONTEXT is null!").colorize(Colors::red));
         return nullptr;
     }
 
@@ -62,7 +62,7 @@ std::shared_ptr<ZydisDecodedInstruction> Decoder::decodeInstruction(const char *
 
     if (status != ZYAN_STATUS_SUCCESS)
     {
-        LogSink::pushLog(LogMessage("").add("Could not decode instruction!").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("Could not decode instruction!").colorize(Colors::red));
         return nullptr;
     }
 
@@ -88,7 +88,7 @@ std::vector<ZydisDecodedOperand> Decoder::decodeOperands(
                                                    (ZydisDecodedOperand *)result.data(), result.size());
     if (status != ZYAN_STATUS_SUCCESS)
     {
-        LogSink::pushLog(LogMessage("").add("Could not decode instruction operands!").colorize(Colors::red));
+        LogSink::pushLog(LogMessage("Could not decode instruction operands!").colorize(Colors::red));
         return {};
     }
 

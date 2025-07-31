@@ -1,1 +1,48 @@
-BasedOnStyle: Microsoft
+# Style base
+BasedOnStyle: LLVM
+
+# Indentation and Braces
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+BreakBeforeBraces: Allman
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: false
+
+# Function Calls
+BinPackArguments: false
+BinPackParameters: false
+
+# Indent control blocks inside conditions
+IndentCaseLabels: true
+IndentGotoLabels: false
+
+# Line breaking and alignment
+AlignOperands: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignTrailingComments: true
+BreakBeforeBinaryOperators: None
+BreakConstructorInitializers: AfterColon
+PenaltyBreakBeforeFirstCallParameter: 1
+PenaltyBreakComment: 300
+PenaltyBreakString: 1000
+
+# Formatting for blocks like function calls and multi-line expressions
+ColumnLimit: 120
+
+# Indentation inside expressions (e.g., function arguments)
+ContinuationIndentWidth: 8
+
+# Control wrapping in function calls like:
+# parser.getErrorCollector()->collect
+#     (
+#         ...
+#     );
+AllowAllArgumentsOnNextLine: false
+Cpp11BracedListStyle: false
+
+# Sort includes? (Set false if you want to preserve order)
+SortIncludes: false
