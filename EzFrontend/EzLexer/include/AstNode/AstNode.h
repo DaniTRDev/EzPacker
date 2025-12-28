@@ -146,7 +146,7 @@ class AstNode
     virtual std::string getAsStr(AstNodeStringMode mode) const = 0;
 
     /**
-     * Returns the annotation of this node. If set, return != nullptr; other ways result = nullptr.
+     * Returns the annotation of this node. If set, result != nullptr; other ways result = nullptr.
      * @return const std::shared_ptr<IAstNodeAnnotation> &
      */
     const std::shared_ptr<IAstNodeAnnotation> &getAnnotation() const;
