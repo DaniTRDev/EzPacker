@@ -13,6 +13,10 @@ ErrorCollector::~ErrorCollector()
         m_errors.pop();
 }
 
+bool ErrorCollector::areThereErrors() const { return !m_errors.empty(); }
+
+void ErrorCollector::addPipe(ErrorCollectorPipe pipe) { m_pipes.push_back(std::move(pipe)); }
+
 void ErrorCollector::enterScope() { m_errors.emplace(); }
 
 void ErrorCollector::exitScope(ErrorHandleType handle)
@@ -31,14 +35,20 @@ void ErrorCollector::exitScope(ErrorHandleType handle)
         {
             while (!m_errors.empty())
             {
-                auto errors = std::move(m_errors.top());
-                while (!errors.empty())
+                auto errorMessages = std::move(m_errors.top());
+                while (!errorMessages.empty())
                 {
                     LogMessage msg;
-                    errors.front().moveTo(msg);
+                    auto errorMsg = errorMessages.top();
+                    errorMsg.moveTo(msg);
 
-                    m_logSink->logError(std::move(msg));
-                    errors.pop();
+                    for (auto &pipe : m_pipes)
+                    {
+                        pipe.m_onErrorCallback(msg);
+                    }
+
+                    m_logSink->logError(msg);
+                    errorMessages.pop();
                 }
 
                 m_errors.pop();
@@ -60,7 +70,7 @@ void ErrorCollector::exitScope(ErrorHandleType handle)
 
                 while (!errors.empty())
                 {
-                    m_errors.top().push(std::move(errors.front()));
+                    m_errors.top().push(std::move(errors.top()));
                     errors.pop();
                 }
             }
@@ -68,26 +78,32 @@ void ErrorCollector::exitScope(ErrorHandleType handle)
         }
     }
 }
-
-void ErrorCollector::error(LogMessage msg)
+void ErrorCollector::information(LogMessage msg)
 {
-    if (m_errors.empty())
-        m_logSink->logError(std::move(msg));
-    else
-        m_errors.top().push(std::move(msg));
+    for (auto &pipe : m_pipes)
+    {
+        pipe.m_onInfoCallback(msg);
+    }
+
+    m_logSink->logInfo(std::move(msg));
 }
 
 void ErrorCollector::error(LogMessage msg, const std::shared_ptr<SourceReference> &ref)
 {
-    LogMessage fullMsg = LogMessage("EzLexer")
-                                 .add(msg.getRawMessage())
-                                 .add("\n{}:{}: {}: -> \n\t{}\n",
-                                      ref->m_sourceFile,
-                                      ref->m_line,
-                                      ref->m_col,
-                                      m_sourceManager->getReferenceContent(ref));
-    if (m_errors.empty())
-        m_logSink->logError(std::move(fullMsg));
+    LogMessage fullMsg = LogMessage("");
+    
+    if (ref)
+    {
+        fullMsg.add("{}:{}:{}: -> ", ref->m_sourceFile, ref->m_line + 1, ref->m_col + 1).add(msg);
+    }
     else
-        m_errors.top().push(std::move(fullMsg));
+    {
+        fullMsg.add("ERROR: -> ").add(msg);
+    }
+
+    if (m_errors.empty())
+        enterScope();
+
+    // Errors are handled inside exitScope.
+    m_errors.top().push(std::move(fullMsg));
 }

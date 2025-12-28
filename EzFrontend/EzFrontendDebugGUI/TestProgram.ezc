@@ -1,0 +1,29 @@
+i32 %myInteger: 123
+i32 %myIntegerArray: {1, 123, 1231, 31}
+
+float %myFloat: 3.14
+float %myFloatArray: {3.1415, 3.141516, 3.14151617, 3.1415161718}
+
+string %myString: "ASDASDASD"
+
+i32 myModule()
+{
+    myLabel:
+    {
+        add i32 %rax, 12;
+
+        myLabel2:
+        {
+            sub i32 %rax, 12;
+
+            # Memory operands are here ->
+            sub i32 (1231312), 0xFF; # Direct
+            sub i32 (%base, 0xFF), 0xFFFF; # Base + displ
+            sub i32 (, %scale, 0x00), 0xFFFFFF; # Index * scale
+            sub i32 (%base, %index, 0x00, 0xFF), 0xFFFFFFFF; # Base + index*scale + displ
+            # LEL
+        }
+    }
+
+    add i32 %rax, 12;
+}

@@ -1,155 +1,98 @@
-function(GetLibraryBuildType out)
-    if (EZPACKER_BUILD_STATIC)
-        set(${out} "STATIC" PARENT_SCOPE)
-    else ()
-        set(${out} "SHARED" PARENT_SCOPE)
-    endif ()
-endfunction()
 
-function(BuildEzLexer)
-    GetLibraryBuildType(EZLEXER_BUILD_TYPE)
-    message(STATUS "Building EzLexer as ${EZLEXER_BUILD_TYPE}")
+set(EZLEXER_FILES_LIST
+        "include/EzLexer.h"
+        "include/EzLexerCommon.h"
+        "include/AstNode/AstNode.h"
+        "include/AstNodes/ImmediateOperand.h"
+        "include/AstNodes/Instruction.h"
+        "include/AstNodes/Label.h"
+        "include/AstNodes/MemoryOperand.h"
+        "include/AstNodes/Module.h"
+        "include/AstNodes/Variable.h"
+        "include/ErrorCollector/ErrorCollector.h"
+        "include/AstNodeParser/AstNodeParsingUtils.h"
+        "include/AstNodeParser/IAstNodeParser.h"
+        "include/AstNodeParser/IParsingContext.h"
+        "include/AstNodeParser/SingleThreadParsingContext.h"
+        "include/AstNodeParsers/ImmediateOperandParser.h"
+        "include/AstNodeParsers/InstructionParser.h"
+        "include/AstNodeParsers/LabelParser.h"
+        "include/AstNodeParsers/MemoryOperandParser.h"
+        "include/AstNodeParsers/ModuleParser.h"
+        "include/AstNodeParsers/VariableParser.h"
+        "include/Tokenizer/BasicTokenizer.h"
+        "include/Tokenizer/ITokenizer.h"
 
-    add_library("EzLexer" ${EZLEXER_BUILD_TYPE}
-            "include/Parser/BasicParsingContext.h"
-            "include/EzLexer.h"
-            "include/EzLexerCommon.h"
-            "include/AstNode/AstNode.h"
-            "include/AstNode/AstNodes.h"
-            "include/ErrorCollector/ErrorCollector.h"
-            "include/Parser/ComplexParsers.h"
-            "include/Parser/IParsingContext.h"
-            "include/Parser/MemoryParsers.h"
-            "include/Parser/Parsers.h"
-            "include/Parser/PrimitiveParsers.h"
-            "include/Parser/TokenParsers.h"
-            "include/Parser/Rule.h"
-            "include/Parser/Rules.h"
-            "include/Tokenizer/BasicTokenizer.h"
-            "include/Tokenizer/ITokenizer.h"
+        "src/AstNode/AstNode.cpp"
+        "src/AstNodes/ImmediateOperand.cpp"
+        "src/AstNodes/Instruction.cpp"
+        "src/AstNodes/Label.cpp"
+        "src/AstNodes/MemoryOperand.cpp"
+        "src/AstNodes/Module.cpp"
+        "src/AstNodes/Variable.cpp"
+        "src/AstNodeParser/AstNodeParsingUtils.cpp"
+        "src/AstNodeParser/SingleThreadParsingContext.cpp"
+        "src/AstNodeParsers/ImmediateOperandParser.cpp"
+        "src/AstNodeParsers/InstructionParser.cpp"
+        "src/AstNodeParsers/LabelParser.cpp"
+        "src/AstNodeParsers/MemoryOperandParser.cpp"
+        "src/AstNodeParsers/ModuleParser.cpp"
+        "src/AstNodeParsers/VariableParser.cpp"
+        "src/ErrorCollector/ErrorCollector.cpp"
+        "src/Tokenizer/BasicTokenizer.cpp"
+)
 
-            "src/AstNode/AstNode.cpp"
-            "src/AstNode/AstNodes.cpp"
-            "src/ErrorCollector/ErrorCollector.cpp"
-            "src/Parser/BasicParsingContext.cpp"
-            "src/Parser/ComplexParsers.cpp"
-            "src/Parser/MemoryParsers.cpp"
-            "src/Parser/PrimitiveParsers.cpp"
-            "src/Parser/TokenParsers.cpp"
-            "src/Parser/Rule.cpp"
-            "src/Parser/Rules.cpp"
-            "src/Tokenizer/BasicTokenizer.cpp"
-    )
+EzCMK_ConfigureLib(NAME "EzLexer"
+        FILE_LIST ${EZLEXER_FILES_LIST}
+        PRECOMPILED_HEADER "include/EzLexerCommon.h"
+        LINKED_LIBRARIES "EzCore;EzLogger;libtommath"
+        INCLUDED_DIRS "include")
 
-    # Set precompiled header.
-    target_precompile_headers(EzLexer PUBLIC "include/EzLexerCommon.h")
+EzPacker_AddTest(
+        "TokenizerTest"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Tokenizer/TokenizerTest.cpp;tests/Tokenizer/TokenizerTestFixture.h;tests/Tokenizer/TokenizerTestFixture.cpp"
+)
 
-    # Adds EzLexer's own directory to include path and link GTest and EzLogger.
-    target_link_libraries(EzLexer PUBLIC EzCore EzLogger)
-    target_include_directories(EzLexer PUBLIC "include" ${gtest_build_include_dirs})
-    set_target_properties(EzLexer PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-endfunction()
+EzPacker_AddTest(
+        "ParsersTest_Immediate"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestImmediate.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
 
-BuildEzLexer()
+EzPacker_AddTest(
+        "ParsersTest_Variable"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestVariable.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
 
-# Add tests
-if (EZPACKER_BUILD_TESTS)
-    message(STATUS "Building tests for EzLexer")
+EzPacker_AddTest(
+        "ParsersTest_Memory"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestMemory.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
 
-    EzPacker_AddTest(
-            "T_InstructionParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestInstructionParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
+EzPacker_AddTest(
+        "ParsersTest_Instruction"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestInstruction.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
 
-    EzPacker_AddTest(
-            "T_InstructionParserFile"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestInstructionParserFile.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
+EzPacker_AddTest(
+        "ParsersTest_Label"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestLabel.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
 
-    EzPacker_AddTest(
-            "T_ModuleParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestModuleParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_ModuleWithLabelsParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestModuleWithLabelsParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_ModuleParserFile"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestModuleParserFile.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_NumberParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestNumberParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_MemoryParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestMemoryParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_VirtualVariableParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestVirtualVariableParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_BasicTokenizer"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestTokenizer.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_TypeParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestTypeParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_VariableParser"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestVariableParser.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-    EzPacker_AddTest(
-            "T_VariableParserFile"
-            ""
-            "EzLexer"
-            ""
-            "tests/TestVariableParserFile.cpp;tests/BasicParserTest.cpp;tests/BasicParserTest.h"
-    )
-
-endif ()
+EzPacker_AddTest(
+        "ParsersTest_Module"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestModule.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)

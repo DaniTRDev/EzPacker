@@ -11,36 +11,42 @@ class SourceLoggingSink : public LogSink
 {
   public:
     /**
-     * Creates the sink with the given logger and source manager.
+     * Creates the sink with the given logger.
      * @param logger
-     * @param sourceManager
      */
-    SourceLoggingSink(ILogger *logger, const std::shared_ptr<SourceManager> &sourceManager);
-    
+    SourceLoggingSink(ILogger *logger);
 
     /**
      * Logs a given error message, adding source reference.
      * @param msg
+     * @param sourceManager
      * @param sourceRef
      */
-    void logSourceError(LogMessage msg, const std::shared_ptr<SourceReference> &sourceRef);
+    virtual void logSourceError(LogMessage msg,
+                                const std::shared_ptr<SourceManager> &sourceManager,
+                                const std::shared_ptr<SourceReference> &sourceRef);
 
     /**
      * Logs a given message, adding source reference.
      * @param msg
+     * @param sourceManager
      * @param sourceRef
      */
-    void logSourceMessage(LogMessage msg, const std::shared_ptr<SourceReference> &sourceRef);
+    virtual void logSourceMessage(LogMessage msg,
+                                  const std::shared_ptr<SourceManager> &sourceManager,
+                                  const std::shared_ptr<SourceReference> &sourceRef);
 
     /**
      * Logs a given warning message, adding source reference.
      * @param msg
+     * @param sourceManager
      * @param sourceRef
      */
-    void logSourceWarning(LogMessage msg, const std::shared_ptr<SourceReference> &sourceRef);
+    virtual void logSourceWarning(LogMessage msg,
+                                  const std::shared_ptr<SourceManager> &sourceManager,
+                                  const std::shared_ptr<SourceReference> &sourceRef);
 
   private:
-    std::shared_ptr<SourceManager> m_sourceManager;
 };
 
 #endif // EZPACKER_SOURCELOGGINGSINK_H

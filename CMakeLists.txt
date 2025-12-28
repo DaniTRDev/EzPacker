@@ -8,17 +8,28 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 option(EZPACKER_BUILD_TESTS "Builds tests for EzPacker" ON)
-
 set(EZPACKER_BUILD_STATIC OFF CACHE BOOL "Builds EzPacker as STATIC" FORCE)
 
-if (EZPACKER_BUILD_TESTS)
-    message(STATUS "Enabling CTest on EzPacker")
-    enable_testing()
+include(FetchContent)
+message(STATUS "Retrieving EzLib")
+enable_testing()
 
-    include("CMake/Tests.cmake")
-endif ()
+set(EZLIB_BUILD_TESTS OFF CACHE BOOL "Builds tests for EzLib" FORCE)
+set(EZLIB_BUILD_STATIC OFF CACHE BOOL "Build EzLib as a SHARED lib" FORCE)
+FetchContent_Declare(EzLib
+        GIT_REPOSITORY https://github.com/DaniTRDev/EzLib
+        GIT_TAG 2a8c0b611ba93daa100f0a7cb75622bd884f0062
+)
+FetchContent_MakeAvailable(EzLib)
+EzCMK_Bootstrap()
+EzCMK_SetLibraryBuildType("SHARED")
 
 include("CMake/Vendor.cmake") # Fetch 3rd party libs.
+include("CMake/TestWrapper.cmake")
+
+if (EZPACKER_BUILD_TESTS)
+    EzCMK_EnableTestsForCurrentProject()
+endif ()
 
 add_subdirectory(EzCore)
 add_subdirectory(EzFrontend)

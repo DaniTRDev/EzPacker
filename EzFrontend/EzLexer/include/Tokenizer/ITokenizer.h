@@ -56,29 +56,25 @@ enum class _TokenType : uint8_t
     RightBrace,  // '}'
     RightParen,  // '('
     SemiColon,   // ';'
-    String,      // "..." Multiline strings are not supported. // TODO: Add support for multiline strings.
-    WhiteSpace   // ' '
+    String       // "..." Multiline strings are not supported. // TODO: Add support for multiline strings.
 };
 
-inline std::map<_TokenType, const char *> TokenType2StrMap = {
-    { _TokenType::Invalid, "Invalid" },
-    { _TokenType::Dot, "Dot" },
-    { _TokenType::Colon, "Colon" },
-    { _TokenType::Comma, "Comma" },
-    { _TokenType::Comment, "Comment" },
-    { _TokenType::Identifier, "Identifier" },
-    { _TokenType::LeftBrace, "LeftBrace" },
-    { _TokenType::LeftParen, "LeftParen" },
-    { _TokenType::NewLine, "NewLine" },
-    { _TokenType::NumberInt, "NumberInt" },
-    { _TokenType::NumberFloat, "NumberFloat" },
-    { _TokenType::Percentage, "Percentage" },
-    { _TokenType::RightBrace, "RightBrace" },
-    { _TokenType::RightParen, "RightParen" },
-    { _TokenType::SemiColon, "SemiColon" },
-    { _TokenType::String, "String" },
-    { _TokenType::WhiteSpace, "WhiteSpace" },
-};
+inline std::map<_TokenType, const char *> TokenType2StrMap = { { _TokenType::Invalid, "Invalid" },
+                                                               { _TokenType::Dot, "Dot" },
+                                                               { _TokenType::Colon, "Colon" },
+                                                               { _TokenType::Comma, "Comma" },
+                                                               { _TokenType::Comment, "Comment" },
+                                                               { _TokenType::Identifier, "Identifier" },
+                                                               { _TokenType::LeftBrace, "LeftBrace" },
+                                                               { _TokenType::LeftParen, "LeftParen" },
+                                                               { _TokenType::NewLine, "NewLine" },
+                                                               { _TokenType::NumberInt, "NumberInt" },
+                                                               { _TokenType::NumberFloat, "NumberFloat" },
+                                                               { _TokenType::Percentage, "Percentage" },
+                                                               { _TokenType::RightBrace, "RightBrace" },
+                                                               { _TokenType::RightParen, "RightParen" },
+                                                               { _TokenType::SemiColon, "SemiColon" },
+                                                               { _TokenType::String, "String" } };
 
 /**
  * Structure contains information about the token.
@@ -100,16 +96,19 @@ class ITokenizer
     virtual ~ITokenizer() = default;
 
     /**
-     * Tries to read the input buffer, starting at pos 0, to match a SINGLE-FIRST-OCCURRENCE _TokenType and
-     * returns true if a token was identified.
+     * Tries to read the input buffer, starting at address, to and generate _TokenType(s) for the entire input. Returns
+     * true if the buffer was tokenized. Results shall be retrieved from getTokens.
      * @param buffer
      * @param bufferSize
-     * @param token
      * @return bool
      */
-    virtual bool tokenize(char *buffer, size_t bufferSize, _TokenType &token) = 0;
+    virtual bool tokenizeBuffer(char *buffer, size_t address, size_t bufferSize) = 0;
 
-  private:
+    /**
+     * Returns the generated tokens after calling to tokenizeSingle.
+     * @return std::vector<TokenInformation>
+     */
+    virtual const std::vector<TokenInformation> &getTokens() const = 0;
 };
 
 #endif // EZPACKER_ITOKENIZER_H

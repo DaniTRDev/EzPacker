@@ -5,6 +5,8 @@
 #include <limits>
 #include <set>
 #include <stack>
+#include <ranges>
+#include <algorithm>
 
 #include <EzLibCommon.h>
 #include <EzLogger.h>

@@ -47,8 +47,8 @@ The parser starts from any the top-most entities
 and starts descending the tree until it gets in a leaf (which would be a Token, or rather, the content of a token).
 Here's a general explanation of how each top node is expected to be matched. For simplicity’s sake, simple nodes and
 nodes that result of direct token matching are ignored. If you're curious, you can read everything at
-[TokenParsers](./src/Parser/TokenParsers.cpp), [PrimitiveParsers](./src/Parser/PrimitiveParsers.cpp)
-and [ComplexParsers](./src/Parser/ComplexParsers.cpp)
+[TokenParsers](src/AstNodeParser/TokenParsers.cpp), [PrimitiveParsers](src/AstNodeParser/PrimitiveParsers.cpp)
+and [ComplexParsers](src/AstNodeParser/ComplexParsers.cpp)
 
 Before starting with AstNodes, you must know some symbols used in the representation of the parsing string:
 

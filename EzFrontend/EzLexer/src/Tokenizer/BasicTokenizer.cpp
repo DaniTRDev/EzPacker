@@ -25,7 +25,7 @@ bool BasicTokenizer::tokenizeBuffer(char *buffer, size_t address, size_t bufferS
     while (m_address < m_bufferSize)
     {
         _TokenType type = _TokenType::Invalid;
-        if (!tokenize(buffer, m_bufferSize, type))
+        if (!tokenizeSingle(buffer, m_bufferSize, type))
         {
             m_logger->logError(LogMessage("Unexpected token"));
             return false;
@@ -56,7 +56,7 @@ char BasicTokenizer::peek() const
     return 0;
 }
 
-bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &tokenType)
+bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType &tokenType)
 {
     char ch = peek();
 
@@ -67,19 +67,45 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &token
 
     switch (ch)
     {
+        case '\r':
+        {
+            if ((m_address + 1) < m_bufferSize && buffer[m_address + 1] == '\n')
+            {
+                ++m_address; // consume the '\n' too
+            }
+        }
+        case '\n':
+        {
+            consume();
+            ++m_line;  // count a new line
+            m_col = 0; // reset column
+
+            return true;
+        }
+        case ' ':
+        {
+            consume();
+            return true;
+        }
         case ':':
         {
             information.m_type = _TokenType::Colon;
+            information.m_str += ch;
+
             break;
         }
         case ',':
         {
             information.m_type = _TokenType::Comma;
+            information.m_str += ch;
+
             break;
         }
         case '.':
         {
             information.m_type = _TokenType::Dot;
+            information.m_str += ch;
+
             break;
         }
         case '#':
@@ -105,36 +131,43 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &token
         case '{':
         {
             information.m_type = _TokenType::LeftBrace;
+            information.m_str += ch;
+
             break;
         }
         case '(':
         {
             information.m_type = _TokenType::LeftParen;
-            break;
-        }
-        case '\n':
-        {
-            information.m_type = _TokenType::NewLine;
+            information.m_str += ch;
+
             break;
         }
         case '%':
         {
             information.m_type = _TokenType::Percentage;
+            information.m_str += ch;
+
             break;
         }
         case '}':
         {
             information.m_type = _TokenType::RightBrace;
+            information.m_str += ch;
+
             break;
         }
         case ')':
         {
             information.m_type = _TokenType::RightParen;
+            information.m_str += ch;
+
             break;
         }
         case ';':
         {
             information.m_type = _TokenType::SemiColon;
+            information.m_str += ch;
+
             break;
         }
         case '"':
@@ -191,6 +224,7 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &token
                         {
                             // Unknown escape throw error.
                             m_logger->logSourceError(LogMessage("Unrecognised scape sequence"),
+                                                     m_sourceManager,
                                                      information.m_sourceReference);
                             return false;
                         }
@@ -202,7 +236,7 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &token
                 else if (ch == '"')
                 {
                     isFinished = true;
-                    consume(); // Skip this.
+                    consume(); // Skip " character.
 
                     break;
                 }
@@ -218,6 +252,7 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &token
             if (!isFinished)
             {
                 m_logger->logSourceError(LogMessage("Expected quote to mark end of string!"),
+                                         m_sourceManager,
                                          information.m_sourceReference);
                 return false;
             }
@@ -225,28 +260,28 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &token
             m_tokens.push_back(information);
             return true;
         }
-        case ' ':
-        {
-            information.m_type = _TokenType::WhiteSpace;
-            break;
-        }
         default:
         {
+            bool isNenegativeNumber =
+                    (ch == '-') && (m_address < m_bufferSize) && TokenizerHelpers::isDigit(buffer[m_address + 1]);
+
             // Identifier or Number.
             if (TokenizerHelpers::isSpecial(ch) || TokenizerHelpers::isLetter(ch))
             {
                 // Identifier.
                 return tokenizeIdentifier(buffer, bufferSize, tokenType);
             }
-            else if (TokenizerHelpers::isDigit(ch))
+            else if (isNenegativeNumber || TokenizerHelpers::isDigit(ch))
             {
                 // Number.
-                return tokenizeNumber(buffer, bufferSize, tokenType);
+                return tokenizeNumber(isNenegativeNumber, buffer, bufferSize, tokenType);
             }
             else
             {
-                // We don't have a token for the character throw error.
-                m_logger->logSourceError(LogMessage("Unrecognised token"), information.m_sourceReference);
+                // We don't have a token for the character, throw error.
+                m_logger->logSourceError(LogMessage("Unrecognised token"),
+                                         m_sourceManager,
+                                         information.m_sourceReference);
                 return false;
             }
         }
@@ -255,12 +290,6 @@ bool BasicTokenizer::tokenize(char *buffer, size_t bufferSize, _TokenType &token
     tokenType = information.m_type;
     m_tokens.push_back(information);
     consume();
-
-    if (tokenType == _TokenType::NewLine)
-    {
-        m_col = 0; // Reset line
-        m_line++;
-    }
 
     return true;
 }
@@ -275,6 +304,7 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
     if (!TokenizerHelpers::isLetter(ch) && !TokenizerHelpers::isSpecial(ch))
     {
         m_logger->logSourceError(LogMessage("Expected -, - or letter for the start of an identifier"),
+                                 m_sourceManager,
                                  information.m_sourceReference);
         return false;
     }
@@ -297,17 +327,36 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
     return true;
 }
 
-bool BasicTokenizer::tokenizeNumber(char *buffer, size_t bufferSize, _TokenType &token)
+bool BasicTokenizer::tokenizeNumber(bool _signed, char *buffer, size_t bufferSize, _TokenType &token)
 {
     TokenInformation information{ .m_type = _TokenType::NumberInt,
                                   .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_source),
                                   .m_str = "" };
+    if (_signed)
+    {
+        if (peek() != '-')
+        {
+            m_logger->logSourceError(LogMessage("Negative sign not expected here"),
+                                     m_sourceManager,
+                                     information.m_sourceReference);
+            return false;
+        }
+        else
+        {
+            information.m_str += peek();
+            consume();
+        }
+    }
+
+    bool canBeHex = peek() == '0';
+    bool isHex = false;
 
     information.m_str += peek();
+    information.m_sourceReference->m_length++;
+
     while (consume())
     {
         char ch = peek();
-        information.m_sourceReference->m_length++;
 
         if (ch == '.')
         {
@@ -316,17 +365,33 @@ bool BasicTokenizer::tokenizeNumber(char *buffer, size_t bufferSize, _TokenType 
             {
                 // If there's a double dot, it's bad formed.
                 m_logger->logSourceError(LogMessage("Dot not expected here, expected digits"),
+                                         m_sourceManager,
                                          information.m_sourceReference);
                 return false;
             }
             information.m_type = _TokenType::NumberFloat;
         }
+        else if (ch == 'x' || ch == 'X')
+        {
+            if (canBeHex)
+            {
+                isHex = true;
+            }
+            else
+                break; // Not a digit.
+        }
         else if (!TokenizerHelpers::isDigit(ch))
         {
-            information.m_sourceReference->m_length--;
-            break;
+            if (!isHex)
+                break;
+
+            if (std::tolower(ch) < 'a' || std::tolower(ch) > 'f')
+                break; // Not a hex digit.
         }
+
+        information.m_sourceReference->m_length++;
         information.m_str += ch;
+        canBeHex = false;
     }
 
     token = information.m_type;

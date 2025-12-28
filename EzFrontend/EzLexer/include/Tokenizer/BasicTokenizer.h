@@ -35,14 +35,14 @@ class BasicTokenizer : public ITokenizer
      * @param bufferSize
      * @return bool
      */
-    bool tokenizeBuffer(char *buffer, size_t address, size_t bufferSize);
+    bool tokenizeBuffer(char *buffer, size_t address, size_t bufferSize) override;
 
     /**
      * Returns the list of generated tokens.
      * @return std::vector<TokenInformation>.
      */
-    const std::vector<TokenInformation> &getTokens() const;
-
+    const std::vector<TokenInformation> &getTokens() const override;
+    
   private:
     /**
      * Consumes current character of the input by incrementing address. Returns true if there's more input remaining,
@@ -65,7 +65,7 @@ class BasicTokenizer : public ITokenizer
      * @param token
      * @return bool
      */
-    bool tokenize(char *buffer, size_t bufferSize, _TokenType &tokenType) override;
+    bool tokenizeSingle(char *buffer, size_t bufferSize, _TokenType &tokenType);
 
     /**
      * Tokenizes as an identifier the current position of buffer at given address. Returns of true if succeeded.
@@ -77,13 +77,15 @@ class BasicTokenizer : public ITokenizer
     bool tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenType &token);
 
     /**
-     * Tokenizes as an identifier the current position of buffer at given address. Returns of true if succeeded.
+     * Tokenizes as a number at the current position of buffer at given address. Returns of true if succeeded and, if
+     * signed is set, it will need the FIRST character of current buffer position to be a '-'.
+     * @param _signed
      * @param buffer
      * @param bufferSize
      * @param token
      * @return size_t
      */
-    bool tokenizeNumber(char *buffer, size_t bufferSize, _TokenType &token);
+    bool tokenizeNumber(bool _signed, char *buffer, size_t bufferSize, _TokenType &token);
 
   private:
     char *m_buffer;
