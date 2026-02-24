@@ -6,6 +6,8 @@ AstNodeType Label::getType() const { return AstNodeType::Label; }
 
 const char *Label::getAstNodeName() const { return "Label"; }
 
+void Label::setCodeScope(const std::shared_ptr<CodeScope> &codeScope) {m_codeScope = codeScope;}
+
 const std::shared_ptr<CodeScope> &Label::getCodeScope() const { return m_codeScope; }
 
 std::string Label::getAsStr(AstNodeStringMode mode) const

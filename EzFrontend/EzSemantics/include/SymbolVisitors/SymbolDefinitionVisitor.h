@@ -17,13 +17,6 @@ class SymbolDefinitionVisitor : public SemanticVisitor
 {
   public:
     /**
-     * Visits given CodeScope node.
-     * @param instr
-     * @return bool
-     */
-    bool visit(const std::shared_ptr<struct CodeScope> &scope) override;
-
-    /**
      * Visits given instruction node. It will only do something on "create" instruction, which is a language
      * keyword used to create local variables.
      * @param instr

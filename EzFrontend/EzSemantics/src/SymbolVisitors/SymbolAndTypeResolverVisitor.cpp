@@ -1,19 +1,5 @@
 #include "SymbolVisitors/SymbolAndTypeResolverVisitor.h"
 
-bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct CodeScope> &scope)
-{
-    for (auto &[id, expression] : scope->getExpressions())
-    {
-        if (!visitBaseClass(expression))
-        {
-            // The concrete error of the fail will already be in the error collector.
-            return false;
-        }
-    }
-
-    return true;
-}
-
 bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Instruction> &instr)
 {
     if (instr->getInstructionName() == "create")
@@ -22,16 +8,7 @@ bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Instructio
         return true;
     }
 
-    for (auto &operand : instr->getOperands())
-    {
-        if (!visitBaseClass(operand))
-        {
-            // The concrete error of the fail will already be in the error collector.
-            return false;
-        }
-    }
-
-    return true;
+    return AstNodeVisitor::visit(instr);
 }
 
 bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Label> &label)
@@ -48,7 +25,7 @@ bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Label> &la
     }
 
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
-    return visitBaseClass(label->getCodeScope());
+    return AstNodeVisitor::visit(label);
 }
 
 bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct MemoryOperandAstNode> &operand)
@@ -114,7 +91,7 @@ bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Module> &m
     }
 
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
-    return visit(body);
+    return AstNodeVisitor::visit(module);
 }
 
 bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Variable> &var)

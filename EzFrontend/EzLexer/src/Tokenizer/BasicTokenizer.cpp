@@ -351,10 +351,6 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
     {
         information.m_type = _TokenType::Else;
     }
-    else if (identifierToLower == "elif")
-    {
-        information.m_type = _TokenType::Elif;
-    }
     else if (identifierToLower == "while")
     {
         information.m_type = _TokenType::While;

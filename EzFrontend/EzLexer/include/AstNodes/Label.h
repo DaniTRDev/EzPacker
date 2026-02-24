@@ -33,11 +33,17 @@ class Label : public AstNode
     const char *getAstNodeName() const override;
 
     /**
+     * Sets the code scope of the label.
+     * @param codeScope
+     */
+    void setCodeScope(const std::shared_ptr<CodeScope> &codeScope);
+
+    /**
      * Returns the code scope of the label.
      * @return const std::shared_ptr<CodeScope> &
      */
     const std::shared_ptr<CodeScope> &getCodeScope() const;
-    
+
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
      * formatted string depends on mode. See AstNodeStringMode for more information. Shows label names and nested labels

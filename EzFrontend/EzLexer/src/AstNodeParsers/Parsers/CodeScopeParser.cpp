@@ -18,7 +18,7 @@ std::shared_ptr<AstNode> CodeScopeParser::parse(const std::shared_ptr<BasicParsi
     {
         // At least 1 instruction is expected;
         ParserBatch batch;
-        batch.addParsersFromTypeList<LabelParser, InstructionParser::InstructionParser>();
+        batch.addParsersFromTypeList<LabelParser, IfParser, WhileParser, InstructionParser::InstructionParser>();
 
         std::shared_ptr<AstNode> exprNode = batch.parse(ctx).m_node;
         while (exprNode)

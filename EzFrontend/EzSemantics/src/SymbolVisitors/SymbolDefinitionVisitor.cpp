@@ -55,20 +55,6 @@ bool DefineSymbolFromVariable(SymbolType symbolType,
     return true;
 }
 
-bool SymbolDefinitionVisitor::visit(const std::shared_ptr<struct CodeScope> &scope)
-{
-    for (auto &[id, expression] : scope->getExpressions())
-    {
-        if (!visitBaseClass(expression))
-        {
-            // The concrete error of the fail will already be in the error collector.
-            return false;
-        }
-    }
-
-    return true;
-}
-
 bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Instruction> &instr)
 {
     if (instr->getInstructionName() != "create")
@@ -114,7 +100,8 @@ bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Label> &label)
     getSemanticContext()->beginScope(labelName);
     {
         ownedScope = getSemanticContext()->getCurrentScope();
-        if (!visitBaseClass(label->getCodeScope()))
+
+        if (!AstNodeVisitor::visit(label))
         {
             return false;
         }
@@ -172,7 +159,7 @@ bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Module> &module)
         }
 
         // Body
-        if (!visit(body))
+        if (!AstNodeVisitor::visit(body))
         {
             // The concrete error of the fail will already be in the error collector.
             return false;

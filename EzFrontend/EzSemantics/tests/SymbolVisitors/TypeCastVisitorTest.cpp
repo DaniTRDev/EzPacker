@@ -16,7 +16,7 @@ myLabel:
     ASSERT_NE(label, nullptr);
 
     // Get the 'mov' instruction (second expression in label)
-    auto expressions = label->getExpressions();
+    auto expressions = label->getCodeScope()->getExpressions();
     ASSERT_GE(expressions.size(), 2);
 
     auto it = expressions.begin();
@@ -46,7 +46,7 @@ myLabel:
     auto label = std::dynamic_pointer_cast<Label>(getAstNode());
     ASSERT_NE(label, nullptr);
 
-    auto expressions = label->getExpressions();
+    auto expressions = label->getCodeScope()->getExpressions();
     ASSERT_GE(expressions.size(), 2);
 
     auto it = expressions.begin();
@@ -78,7 +78,7 @@ myLabel:
     auto label = std::dynamic_pointer_cast<Label>(getAstNode());
     ASSERT_NE(label, nullptr);
 
-    auto expressions = label->getExpressions();
+    auto expressions = label->getCodeScope()->getExpressions();
     ASSERT_GE(expressions.size(), 2);
 
     auto it = expressions.begin();
@@ -131,13 +131,13 @@ myLabel:
     EXPECT_TRUE(runVisitor<LabelParser>(code, true));
 
     auto label = std::dynamic_pointer_cast<Label>(getAstNode());
-    auto expressions = label->getExpressions();
+    auto expressions = label->getCodeScope()->getExpressions();
     ASSERT_GE(expressions.size(), 2);
 
     auto it = expressions.begin();
     std::advance(it, 1);
     auto instr = std::dynamic_pointer_cast<Instruction>(it->second);
-    
+
     auto baseVar = std::dynamic_pointer_cast<Variable>(instr->getOperands()[1]);
     ASSERT_NE(baseVar, nullptr);
 
@@ -160,7 +160,7 @@ myLabel:
     EXPECT_TRUE(runVisitor<LabelParser>(code, true));
 
     auto label = std::dynamic_pointer_cast<Label>(getAstNode());
-    auto expressions = label->getExpressions();
+    auto expressions = label->getCodeScope()->getExpressions();
     ASSERT_GE(expressions.size(), 2);
 
     auto it = expressions.begin();

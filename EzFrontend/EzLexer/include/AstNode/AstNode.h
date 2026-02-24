@@ -24,6 +24,7 @@ enum class AstNodeType
 {
     Invalid = 0,
     CodeScope,
+    Condition,
     Elif, //"elif"
     Else,
     If,

@@ -6,6 +6,7 @@ set(EZLEXER_FILES_LIST
         "include/AstNode/AstNodeContainer.h"
         "include/AstNode/AstNodeVisitor.h"
         "include/AstNodes/CodeScope.h"
+        "include/AstNodes/ConditionAstNode.h"
         "include/AstNodes/IfAstNode.h"
         "include/AstNodes/ImmediateOperand.h"
         "include/AstNodes/Instruction.h"
@@ -18,18 +19,22 @@ set(EZLEXER_FILES_LIST
         "include/AstNodeParsers/IAstNodeParser.h"
         "include/AstNodeParsers/ParserBatch.h"
         "include/AstNodeParsers/Parsers/CodeScopeParser.h"
+        "include/AstNodeParsers/Parsers/ConditionParser.h"
+        "include/AstNodeParsers/Parsers/IfParser.h"
         "include/AstNodeParsers/Parsers/ImmediateParser.h"
         "include/AstNodeParsers/Parsers/InstructionParser.h"
         "include/AstNodeParsers/Parsers/LabelParser.h"
         "include/AstNodeParsers/Parsers/MemoryOperandParser.h"
         "include/AstNodeParsers/Parsers/ModuleParser.h"
         "include/AstNodeParsers/Parsers/VariableParser.h"
+        "include/AstNodeParsers/Parsers/WhileParser.h"
         "include/Tokenizer/BasicTokenizer.h"
 
         "src/AstNode/AstNode.cpp"
         "src/AstNode/AstNodeContainer.cpp"
         "src/AstNode/AstNodeVisitor.cpp"
         "src/AstNodes/CodeScope.cpp"
+        "src/AstNodes/ConditionAstNode.cpp"
         "src/AstNodes/IfAstNode.cpp"
         "src/AstNodes/ImmediateOperand.cpp"
         "src/AstNodes/Instruction.cpp"
@@ -41,12 +46,15 @@ set(EZLEXER_FILES_LIST
         "src/AstNodeParsers/BasicParsingContext.cpp"
         "src/AstNodeParsers/ParserBatch.cpp"
         "src/AstNodeParsers/Parsers/CodeScopeParser.cpp"
+        "src/AstNodeParsers/Parsers/ConditionParser.cpp"
+        "src/AstNodeParsers/Parsers/IfParser.cpp"
         "src/AstNodeParsers/Parsers/ImmediateParser.cpp"
         "src/AstNodeParsers/Parsers/InstructionParser.cpp"
         "src/AstNodeParsers/Parsers/LabelParser.cpp"
         "src/AstNodeParsers/Parsers/MemoryOperandParser.cpp"
         "src/AstNodeParsers/Parsers/ModuleParser.cpp"
         "src/AstNodeParsers/Parsers/VariableParser.cpp"
+        "src/AstNodeParsers/Parsers/WhileParser.cpp"
         "src/Tokenizer/BasicTokenizer.cpp"
 )
 
@@ -103,4 +111,25 @@ EzPacker_AddTest(
         "EzLexer;gtest_main"
         ""
         "tests/Parsers/ParsersTestModule.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
+
+EzPacker_AddTest(
+        "ParsersTest_Condition"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestCondition.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
+
+EzPacker_AddTest(
+        "ParsersTest_If"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestIf.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
+)
+
+EzPacker_AddTest(
+        "ParsersTest_While"
+        "EzLexer;gtest_main"
+        ""
+        "tests/Parsers/ParsersTestWhile.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
 )

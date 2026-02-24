@@ -93,7 +93,7 @@ inline constexpr auto TEST_INTEGER_IMMEDIATE_IMPL = [](IntegerValueT value, Pars
 
     std::shared_ptr<IntegerImmediate> integer;
     EXPECT_TRUE(fixture->expectNodeCast<>(integer));
-    EXPECT_EQ(mp_get_mag_u64(integer->getInteger()), value);
+    EXPECT_EQ(mp_get_mag_u64(integer->getInteger().get()), value);
 };
 
 inline constexpr auto TEST_BIG_INTEGER_IMMEDIATE_IMPL = [](mp_int *value, ParsersTestFixture *fixture)
@@ -106,7 +106,7 @@ inline constexpr auto TEST_BIG_INTEGER_IMMEDIATE_IMPL = [](mp_int *value, Parser
 
     std::shared_ptr<IntegerImmediate> integer;
     EXPECT_TRUE(fixture->expectNodeCast<>(integer));
-    EXPECT_EQ(mp_cmp(value, integer->getInteger()), MP_EQ);
+    EXPECT_EQ(mp_cmp(value, integer->getInteger().get()), MP_EQ);
 };
 
 inline constexpr auto TEST_FLOAT_IMMEDIATE_IMPL = [](double value, ParsersTestFixture *fixture)
@@ -285,7 +285,7 @@ inline constexpr auto TEST_LABEL_IMPL =
     EXPECT_TRUE(fixture->expectNodeCast<>(label));
     EXPECT_EQ(label->getLabelName(), name);
 
-    auto &expressions = label->getExpressions();
+    auto &expressions = label->getCodeScope()->getExpressions();
     EXPECT_EQ(expressions.size(), expectedExpressions.size());
 
     size_t i = 0;
@@ -312,59 +312,6 @@ inline constexpr auto TEST_MODULE_HEADER_IMPL =
         auto paramType = params[i]->getType();
         EXPECT_EQ(paramType, parameterTypes[i]);
     }
-};
-
-inline constexpr auto TEST_MODULE_BODY_IMPL =
-        [](size_t expectedInstructions, size_t expectedLabels, ParsersTestFixture *fixture)
-{
-    std::shared_ptr<ModuleBody> body;
-    EXPECT_TRUE(fixture->expectNodeCast<>(body));
-
-    std::function<size_t(const std::shared_ptr<Label> &label)> labelCounterRec =
-            [&labelCounterRec](const std::shared_ptr<Label> &label) -> size_t
-    {
-        if (label)
-        {
-            auto &expressions = label->getExpressions();
-            size_t res = 1;
-
-            for (auto &[id, expr] : expressions)
-            {
-                if (expr->getType() == AstNodeType::Label)
-                {
-                    res += labelCounterRec(std::dynamic_pointer_cast<Label>(expr));
-                }
-                else
-                {
-                }
-            }
-
-            return res;
-        }
-
-        return 0;
-    };
-
-    size_t totalInstructions = 0, totalLabels = 0;
-    for (auto &[id, expr] : body->getExpressions())
-    {
-        if (expr->getType() == AstNodeType::Instruction)
-        {
-            totalInstructions++;
-        }
-        else if (expr->getType() == AstNodeType::Label)
-        {
-            totalLabels += labelCounterRec(std::dynamic_pointer_cast<Label>(expr));
-        }
-        else
-        {
-            // Invalid expression inside module.
-            EXPECT_TRUE(false);
-        }
-    }
-
-    EXPECT_EQ(totalInstructions, expectedInstructions);
-    EXPECT_EQ(totalLabels, expectedLabels);
 };
 
 #define TEST_INTEGER_IMMEDIATE(value) TEST_INTEGER_IMMEDIATE_IMPL<typeof(value)>(value, this);
@@ -394,7 +341,4 @@ inline constexpr auto TEST_MODULE_BODY_IMPL =
 #define TEST_LABEL(name, ...) TEST_LABEL_IMPL(name, { __VA_ARGS__ }, this);
 
 #define TEST_MODULE_HEADER(name, type, ...) TEST_MODULE_HEADER_IMPL(name, type, { __VA_ARGS__ }, this);
-#define TEST_MODULE_BODY(expectedInstructions, expectedLabels)                                                         \
-    TEST_MODULE_BODY_IMPL(expectedInstructions, expectedLabels, this);
-
 #endif // EZPACKER_PARSERSTESTFIXTURE_H

@@ -20,7 +20,6 @@ class SemanticVisitor : public AstNodeVisitor
      * @return const std::shared_ptr<class BasicSemanticContext> &
      */
     const std::shared_ptr<class BasicSemanticContext> &getSemanticContext() const;
-
   protected:
     std::shared_ptr<class BasicSemanticContext> m_ctx;
 };

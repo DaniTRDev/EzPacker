@@ -1,19 +1,5 @@
 #include "SymbolVisitors/TypeCheckVisitor.h"
 
-bool TypeCheckVisitor::visit(const std::shared_ptr<struct CodeScope> &scope)
-{
-    for (auto &[id, expression] : scope->getExpressions())
-    {
-        if (!visitBaseClass(expression))
-        {
-            // The concrete error of the fail will already be in the error collector.
-            return false;
-        }
-    }
-
-    return true;
-}
-
 bool TypeCheckVisitor::visit(const std::shared_ptr<struct Instruction> &instr)
 {
     for (auto &operand : instr->getOperands())
@@ -64,8 +50,6 @@ bool TypeCheckVisitor::visit(const std::shared_ptr<struct Instruction> &instr)
     return true;
 }
 
-bool TypeCheckVisitor::visit(const std::shared_ptr<struct Label> &label) { return visit(label->getCodeScope()); }
-
 bool TypeCheckVisitor::visit(const std::shared_ptr<struct MemoryOperandAstNode> &operand)
 {
     std::shared_ptr<AstNode> base, index;
@@ -97,8 +81,6 @@ bool TypeCheckVisitor::visit(const std::shared_ptr<struct MemoryOperandAstNode> 
     // This can't happen.
     return false;
 }
-
-bool TypeCheckVisitor::visit(const std::shared_ptr<struct Module> &module) { return visit(module->getBody()); }
 
 bool TypeCheckVisitor::visit(const std::shared_ptr<struct Variable> &var)
 {

@@ -6,8 +6,12 @@
 #include "AstNodeParsers/BasicParsingContext.h"
 #include "AstNodeParsers/IAstNodeParser.h"
 #include "AstNodeParsers/ParserBatch.h"
-#include "AstNodeParsers/Parsers/LabelParser.h"
+
+// TODO: Fix circular dependency between CodeScopeParser and: InstructionParser, LabelParser, IfParser, WhileParser.
+#include "AstNodeParsers/Parsers/IfParser.h"
 #include "AstNodeParsers/Parsers/InstructionParser.h"
+#include "AstNodeParsers/Parsers/LabelParser.h"
+#include "AstNodeParsers/Parsers/WhileParser.h"
 
 class CodeScopeParser : public IAstNodeParser
 {

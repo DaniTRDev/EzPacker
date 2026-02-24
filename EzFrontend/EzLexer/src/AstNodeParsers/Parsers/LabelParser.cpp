@@ -23,28 +23,18 @@ std::shared_ptr<AstNode> LabelParser::parse(const std::shared_ptr<BasicParsingCo
         return nullptr;
     }
 
-    /**
-     * If parser reached this place, this expression can only be a Label.
-     */
-
-    if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftBrace))
-    {
-        ctx->emitError(ErrorSeverity::Fatal,
-                       "Expected '{' after label ':'",
-                       "LabelParser",
-                       ctx->getLastSourceReference());
-        return nullptr;
-    }
-
     /*
-     * A label may or may not have any instructions.
+     * If parser reached this place, this expression can only be a Label.A label may or may not have any instructions.
      */
     node = std::make_shared<Label>(std::move(token.m_str));
-    if (auto scope = CodeScopeParser().parse(ctx); !scope)
+    std::shared_ptr<CodeScope> codeScope = std::dynamic_pointer_cast<CodeScope>(CodeScopeParser().parse(ctx));
+
+    if (!codeScope)
     {
         ctx->emitError(ErrorSeverity::Fatal, "Empty label scope", "LabelParser", ctx->getLastSourceReference());
         return nullptr;
     }
 
+    node->setCodeScope(codeScope);
     return std::move(node);
 }

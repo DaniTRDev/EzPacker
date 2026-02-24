@@ -42,6 +42,8 @@ bool ModuleInstructionLowererVisitor::visit(const std::shared_ptr<struct CodeSco
             }
         }
     }
+
+    return true;
 }
 
 bool ModuleInstructionLowererVisitor::visit(const std::shared_ptr<struct Instruction> &instr)

@@ -18,13 +18,6 @@ class SymbolAndTypeResolverVisitor : public SemanticVisitor
 {
   public:
     /**
-     * Visits given CodeScope operand node. Recursively visits sub code scopes and instructions.
-     * @param scope
-     * @return bool
-     */
-    bool visit(const std::shared_ptr<struct CodeScope> &scope) override;
-
-    /**
      * Visits given instruction node. If instruction uses virtual variables, this visitor will check if they have been
      * previously defined. If instruction == create, it returns true without doing nothing.
      * @param instr

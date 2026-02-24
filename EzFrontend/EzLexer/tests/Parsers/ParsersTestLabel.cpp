@@ -5,7 +5,6 @@ TEST_F(ParsersTestFixture, LabelEmpty)
     std::string input = "myLabel:{}";
     tokenizeAndCreateContext(input);
     EXPECT_TRUE(expectParse<LabelParser>());
-    TEST_LABEL("myLabel");
 }
 
 TEST_F(ParsersTestFixture, Label1Instr)

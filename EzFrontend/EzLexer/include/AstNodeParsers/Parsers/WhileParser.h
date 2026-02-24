@@ -1,0 +1,22 @@
+#ifndef EZPACKER_WHILEPARSER_H
+#define EZPACKER_WHILEPARSER_H
+
+#include "EzLexerCommon.h"
+#include "AstNodeParsers/BasicParsingContext.h"
+#include "AstNodeParsers/IAstNodeParser.h"
+#include "AstNodeParsers/ParserBatch.h"
+#include "AstNodeParsers/Parsers/CodeScopeParser.h"
+#include "AstNodeParsers/Parsers/ConditionParser.h"
+
+class WhileParser : public IAstNodeParser
+{
+  public:
+    /**
+     * Tries to parse a while block.
+     * @param ctx
+     * @return std::shared_ptr<IfAstNode>
+     */
+    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+};
+
+#endif // EZPACKER_WHILEPARSER_H

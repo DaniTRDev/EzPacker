@@ -46,7 +46,6 @@ enum class _TokenType : uint8_t
     Colon,       // ':'
     Comma,       //','
     Comment,     // # ...
-    Elif,        // "elif"
     Else,        // "else"
     Identifier,  // Something formed with [a-z] | [A-Z] | [0, 9] | [_]. It can't start with digits.
     If,          // "if"
@@ -71,7 +70,6 @@ inline std::map<_TokenType, const char *> TokenType2StrMap = {
     { _TokenType::Colon, "Colon" },
     { _TokenType::Comma, "Comma" },
     { _TokenType::Comment, "Comment" },
-    { _TokenType::Elif, "Elif" },
     { _TokenType::Else, "Else" },
     { _TokenType::Identifier, "Identifier" },
     { _TokenType::If, "If" },

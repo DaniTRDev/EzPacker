@@ -63,8 +63,7 @@ TEST_F(ParsersTestFixture, ModuleBodyEmpty)
 {
     std::string input = "{}";
     tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
-    TEST_MODULE_BODY(0, 0);
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBody1Instr)
@@ -75,8 +74,7 @@ TEST_F(ParsersTestFixture, ModuleBody1Instr)
 }
 )";
     tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
-    TEST_MODULE_BODY(1, 0);
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBodyNInstr)
@@ -91,8 +89,7 @@ TEST_F(ParsersTestFixture, ModuleBodyNInstr)
 }
 )";
     tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
-    TEST_MODULE_BODY(5, 0);
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBody1Instr1Label)
@@ -104,8 +101,7 @@ TEST_F(ParsersTestFixture, ModuleBody1Instr1Label)
 }
 )";
     tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
-    TEST_MODULE_BODY(1, 1);
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBody1Instr1LabelBounds)
@@ -121,8 +117,7 @@ TEST_F(ParsersTestFixture, ModuleBody1Instr1LabelBounds)
 }
 )";
     tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
-    TEST_MODULE_BODY(1, 2);
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBodyNInstrNLabelBounds)
@@ -143,8 +138,7 @@ TEST_F(ParsersTestFixture, ModuleBodyNInstrNLabelBounds)
 }
 )";
     tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
-    TEST_MODULE_BODY(1, 2);
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBodyNInstrNestedLabel)
@@ -165,20 +159,19 @@ TEST_F(ParsersTestFixture, ModuleBodyNInstrNestedLabel)
 }
 )";
     tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
-    TEST_MODULE_BODY(1, 2);
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBodyMissingLeftBrace)
 {
     std::string input = "add i8 %myVar, 1; }";
     tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<ModuleParser::ModuleBodyParser>());
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
 
 TEST_F(ParsersTestFixture, ModuleBodyMissingRightBrace)
 {
     std::string input = "{ add i8 %myVar, 1;";
     tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<ModuleParser::ModuleBodyParser>());
+    EXPECT_TRUE(expectParse<CodeScopeParser>());
 }
