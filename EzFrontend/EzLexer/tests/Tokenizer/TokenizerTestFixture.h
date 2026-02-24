@@ -54,13 +54,14 @@ class TokenizerTestFixture : public ::testing::Test
 
     /**
      * Creates a basic tokenizer.
-     * @return std::shared_ptr<ITokenizer>
+     * @return std::shared_ptr<BasicTokenizer>
      */
-    std::shared_ptr<ITokenizer> createBasicTokenizer();
+    std::shared_ptr<BasicTokenizer> createBasicTokenizer();
 
   private:
     size_t m_currentPos;
-    std::shared_ptr<ITokenizer> m_tokenizer; // Must be created by createTokenizer.
+    std::shared_ptr<ErrorCollector> m_errorCollector;
+    std::shared_ptr<BasicTokenizer> m_tokenizer; // Must be created by createTokenizer.
     std::shared_ptr<SourceLoggingSink> m_loggingSink;
     std::shared_ptr<SourceManager> m_sourceManager;
     std::shared_ptr<SyncLogger> m_logger;

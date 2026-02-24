@@ -41,7 +41,8 @@ bool TokenizerTestFixture::expectTokenType(_TokenType type)
 void TokenizerTestFixture::SetUp()
 {
     m_currentPos = 0;
-    m_logger = EzLogger::createSinkLogger("TEST");
+    m_errorCollector = std::make_shared<ErrorCollector>();
+    m_logger = EzLogger::createSyncLogger("TEST");
     m_sourceManager = std::make_shared<SourceManager>();
     m_loggingSink = std::make_shared<SourceLoggingSink>(m_logger.get());
 
@@ -57,8 +58,35 @@ void TokenizerTestFixture::TearDown()
     Test::TearDown();
 }
 
-std::shared_ptr<ITokenizer> TokenizerTestFixture::createBasicTokenizer()
+std::shared_ptr<BasicTokenizer> TokenizerTestFixture::createBasicTokenizer()
 {
-    m_tokenizer = std::make_shared<BasicTokenizer>(m_loggingSink, m_sourceManager, "TEST_SOURCE");
+    m_errorCollector->addSubscriber(
+            [](void *userParam, const std::shared_ptr<Error> &error) -> void
+            {
+                TokenizerTestFixture *fixture = (TokenizerTestFixture *)userParam;
+                if (error->m_sourceRef)
+                {
+                    g_logger->pushLog(
+                            LogMessage("[{}]{} {}:{}:{} {} \n\t {}",
+                                       error->m_sender,
+                                       error->m_timeStamp,
+                                       error->m_sourceRef->m_sourceFile,
+                                       error->m_sourceRef->m_line,
+                                       error->m_sourceRef->m_col,
+                                       error->m_message,
+                                       fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
+                }
+                else
+                {
+                    g_logger->pushLog(
+                            LogMessage("[{}]{} {}",
+                                       error->m_sender,
+                                       error->m_timeStamp,
+                                       error->m_message));
+                }
+            },
+            this);
+
+    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager, "TEST_SOURCE");
     return m_tokenizer;
 }

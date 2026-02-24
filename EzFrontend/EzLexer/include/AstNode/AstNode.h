@@ -20,83 +20,21 @@ class IAstNodeAnnotation
     virtual const char *getAnnotationName() const = 0;
 };
 
-class IAstNodeVisitor
-{
-  public:
-    virtual ~IAstNodeVisitor() = default;
-    
-    /**
-     * Visits given Immediate operand node. Should return true visitor wants to keep traversing the tree.
-     * @param operand
-     * @return bool
-     */
-    virtual bool visit(struct ImmediateOperand *operand)
-    {
-        return true;
-    }
-    
-    /**
-     * Visits given instruction node. Should return true visitor wants to keep traversing the tree.
-     * @param instr
-     * @return bool
-     */
-    virtual bool visit(struct Instruction *instr)
-    {
-        return true;
-    }
-    
-    /**
-     * Visits given Label operand node. Should return true visitor wants to keep traversing the tree.
-     * @param label
-     * @return bool
-     */
-    virtual bool visit(struct Label *label)
-    {
-        return true;
-    }
-    
-    /**
-     * Visits given Memory operand node. Should return true visitor wants to keep traversing the tree.
-     * @param operand
-     * @return bool
-     */
-    virtual bool visit(struct MemoryOperandAstNode *operand)
-    {
-        return true;
-    }
-    
-    /**
-     * Visits given Module node. Should return true visitor wants to keep traversing the tree.
-     * @param module
-     * @return bool
-     */
-    virtual bool visit(struct Module *module)
-    {
-        return true;
-    }
-    
-    /**
-     * Visits given Variable node. Should return true visitor wants to keep traversing the tree.
-     * @param var
-     * @return bool
-     */
-    virtual bool visit(struct Variable *var)
-    {
-        return true;
-    }
-};
-
 enum class AstNodeType
 {
     Invalid = 0,
+    CodeScope,
+    Elif, //"elif"
+    Else,
+    If,
     Instruction,
     Immediate,
     Label,
     MemoryOperand,
-    Module, // Contains the header and the body.
+    Module, // Contains the header and the code scope.
     ModuleHeader,
-    ModuleBody,
-    Variable
+    Variable,
+    While
 };
 
 enum class AstNodeStringMode : uint8_t
@@ -120,22 +58,40 @@ class AstNode
     virtual AstNodeType getType() const = 0;
 
     /**
+     * Returns true if this node has annotations.
+     * @return bool
+     */
+    bool hasAnnotations() const;
+
+    /**
      * Returns the name of this AstNode.
      * @return const char*
      */
     virtual const char *getAstNodeName() const = 0;
 
     /**
-     * Sets the annotation of this node. Will be filled by EzAnnotator during the semantic analysis.
+     * Adds an annotation to this node. It sets it as the first-top-most annotation.
      * @param annotation
      */
-    void setAnnotation(const std::shared_ptr<IAstNodeAnnotation> &annotation);
+    void addAnnotation(const std::shared_ptr<IAstNodeAnnotation> &annotation);
 
     /**
-     * Sets the source reference for this node.
+     * Adds 1 source reference for this node.
      * @param ref
      */
     void setSourceRef(const std::shared_ptr<SourceReference> &ref);
+
+    /**
+     * Adds given source references to this node.
+     * @param ref
+     */
+    void setSourceRef(const std::vector<std::shared_ptr<SourceReference>> &refs);
+
+    /**
+     * Returns the annotation of this node. If set, result != nullptr; other ways result = nullptr.
+     * @return const std::shared_ptr<IAstNodeAnnotation> &
+     */
+    const std::list<std::shared_ptr<IAstNodeAnnotation>> &getAnnotations() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -146,20 +102,39 @@ class AstNode
     virtual std::string getAsStr(AstNodeStringMode mode) const = 0;
 
     /**
-     * Returns the annotation of this node. If set, result != nullptr; other ways result = nullptr.
-     * @return const std::shared_ptr<IAstNodeAnnotation> &
+     * Returns the first source reference out of the reference array. If no references are set, nullptr is returned.
+     * @return std::shared_ptr<SourceReference>
      */
-    const std::shared_ptr<IAstNodeAnnotation> &getAnnotation() const;
+    std::shared_ptr<SourceReference> getFirstSourceReference() const;
 
     /**
-     * Returns the source reference of this node. If set, return != nullptr; other ways result = nullptr.
-     * @return const std::shared_ptr<SourceReference> &
+     * Returns an annotation based on its type. By design, a node can't have 2 annotations with the same type. This
+     * module will return the FIRST one, traversing the list in DESCENDING order.
+     * @tparam T
+     * @return const std::shared_ptr<T> &
      */
-    const std::shared_ptr<SourceReference> &getSourceRef() const;
+    template <typename T>
+        requires(std::is_base_of<IAstNodeAnnotation, T>::value)
+    std::shared_ptr<T> getAnnotation() const
+    {
+        for (auto &annot : m_annotations)
+        {
+            if (auto casted = std::dynamic_pointer_cast<T>(annot); casted)
+                return casted;
+        }
+
+        return nullptr;
+    }
+
+    /**
+     * Returns the source references of this node. May or may not return an empty array.
+     * @return const std::vector<std::shared_ptr<SourceReference>> &
+     */
+    const std::vector<std::shared_ptr<SourceReference>> &getSourceRefs() const;
 
   private:
-    std::shared_ptr<IAstNodeAnnotation> m_annotation;
-    std::shared_ptr<SourceReference> m_sourceRef;
+    std::list<std::shared_ptr<IAstNodeAnnotation>> m_annotations;
+    std::vector<std::shared_ptr<SourceReference>> m_sourceRefs;
 };
 
 #endif // EZPACKER_AST_H

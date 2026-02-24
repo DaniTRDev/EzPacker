@@ -42,6 +42,21 @@ class ImmediateOperand : public AstNode
      * @return ImmediateType
      */
     virtual ImmediateType getImmediateType() const = 0;
+
+    /**
+     * Sets the data type of the immediate.
+     * @param dataType
+     */
+    void setDataType(const std::string &dataType);
+
+    /**
+     * Returns the data type this immediate is casted to. See m_dataType.
+     * @return const std::string &
+     */
+    const std::string &getDataType();
+
+  private:
+    std::string m_dataType; // Only set for floats and integers, used to cast values: i16 0xFF.
 };
 
 /**
@@ -51,9 +66,10 @@ class IntegerImmediate : public ImmediateOperand
 {
   public:
     /**
-     * Creates the object with the given intenger
+     * Creates the object with the given integer
+     * @param integer
      */
-    explicit IntegerImmediate(mp_int integer);
+    explicit IntegerImmediate(std::shared_ptr<mp_int> integer);
 
     /**
      * Returns "Integer".
@@ -68,10 +84,16 @@ class IntegerImmediate : public ImmediateOperand
     ImmediateType getImmediateType() const override;
 
     /**
-     * Returns the contained integer.
-     * @return const mp_int *
+     * Copies current number and returns it. If there's no valid number, an error-object will be returned.
+     * @return std::shared_ptr<mp_int>
      */
-    const mp_int *getInteger() const;
+    std::shared_ptr<mp_int> copy() const;
+
+    /**
+     * Returns the contained integer.
+     * @return const std::shared_ptr<mp_int> &
+     */
+    const std::shared_ptr<mp_int> &getInteger() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -83,7 +105,7 @@ class IntegerImmediate : public ImmediateOperand
     std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
-    mp_int m_integer;
+    std::shared_ptr<mp_int> m_integer;
 };
 
 /**

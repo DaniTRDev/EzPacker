@@ -1,3 +1,5 @@
 #include "SemanticVisitor.h"
 
-SemanticVisitor::SemanticVisitor(std::shared_ptr<struct ISemanticAnalyzerContext> ctx) : m_ctx(std::move(ctx)) {}
+void SemanticVisitor::setSemanticContext(const std::shared_ptr<class BasicSemanticContext> &ctx) { m_ctx = ctx; }
+
+const std::shared_ptr<struct BasicSemanticContext> &SemanticVisitor::getSemanticContext() const { return m_ctx; }

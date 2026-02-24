@@ -37,13 +37,6 @@ class Variable : public AstNode
     bool getIsArray() const;
 
     /**
-     * Returns true if the current variable is local. If a variable is local, it's definition was made inside a module,
-     * without explicit immediate initialization.
-     * @return bool
-     */
-    bool getIsLocal() const;
-
-    /**
      * Returns the "Variable".
      * @return const char*
      */
@@ -78,7 +71,6 @@ class Variable : public AstNode
 
   private:
     bool m_isArray;
-    bool m_isLocal; // Is a local variable? (defined within a module's scope and NOT initialized in-place)
     std::string m_variableName;
     std::string m_variableDataType;
     std::vector<std::shared_ptr<AstNode>> m_initializers;

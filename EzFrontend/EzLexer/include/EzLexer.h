@@ -4,19 +4,18 @@
 #include "EzLexerCommon.h"
 
 #include "AstNode/AstNode.h"
+#include "AstNode/AstNodeVisitor.h"
 
-#include "AstNodeParser/AstNodeParsingUtils.h"
-#include "AstNodeParser/IAstNodeParser.h"
-#include "AstNodeParser/IParsingContext.h"
-#include "AstNodeParser/IParsingContext.h"
-#include "AstNodeParser/SingleThreadParsingContext.h"
+#include "AstNodeParsers/BasicParsingContext.h"
+#include "AstNodeParsers/IAstNodeParser.h"
+#include "AstNodeParsers/ParserBatch.h"
 
-#include "AstNodeParsers/ImmediateOperandParser.h"
-#include "AstNodeParsers/InstructionParser.h"
-#include "AstNodeParsers/LabelParser.h"
-#include "AstNodeParsers/MemoryOperandParser.h"
-#include "AstNodeParsers/ModuleParser.h"
-#include "AstNodeParsers/VariableParser.h"
+#include "AstNodeParsers/Parsers/ImmediateParser.h"
+#include "AstNodeParsers/Parsers/InstructionParser.h"
+#include "AstNodeParsers/Parsers/LabelParser.h"
+#include "AstNodeParsers/Parsers/MemoryOperandParser.h"
+#include "AstNodeParsers/Parsers/ModuleParser.h"
+#include "AstNodeParsers/Parsers/VariableParser.h"
 
 #include "AstNodes/ImmediateOperand.h"
 #include "AstNodes/Instruction.h"
@@ -28,6 +27,5 @@
 #include "ErrorCollector/ErrorCollector.h"
 
 #include "Tokenizer/BasicTokenizer.h"
-#include "Tokenizer/ITokenizer.h"
 
 #endif // EZPACKER_EZLEXER_H

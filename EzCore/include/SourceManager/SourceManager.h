@@ -17,8 +17,8 @@ struct SourceReference
 
 struct LineSourceRange
 {
-    size_t m_end;   // End of the line within the code buffer (ALWAYS \n character).
-    size_t m_start; // Start of the line within the code buffer.
+    size_t m_start;  // Byte offset in the file where line starts
+    size_t m_length; // Length of the line (excluding newline)
 };
 
 /**
@@ -28,16 +28,6 @@ struct LineSourceRange
 class SourceManager
 {
   public:
-    /**
-     * Crates the object with default values.
-     */
-    SourceManager();
-
-    /**
-     * Destroys the object and free resources.
-     */
-    ~SourceManager();
-
     /**
      * Adds a new source file using given content and name.
      * @param name

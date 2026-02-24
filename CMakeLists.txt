@@ -18,7 +18,7 @@ set(EZLIB_BUILD_TESTS OFF CACHE BOOL "Builds tests for EzLib" FORCE)
 set(EZLIB_BUILD_STATIC OFF CACHE BOOL "Build EzLib as a SHARED lib" FORCE)
 FetchContent_Declare(EzLib
         GIT_REPOSITORY https://github.com/DaniTRDev/EzLib
-        GIT_TAG 2a8c0b611ba93daa100f0a7cb75622bd884f0062
+        GIT_TAG 37ea798a7e15e40e6551a5a4696a588796b368c2
 )
 FetchContent_MakeAvailable(EzLib)
 EzCMK_Bootstrap()

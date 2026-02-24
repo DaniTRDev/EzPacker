@@ -25,7 +25,7 @@ TEST_F(ParsersTestFixture, GlobalVariableArray)
 
 TEST_F(ParsersTestFixture, GlobalVariableInvalidArray)
 {
-    std::string input = R"(i8 %myVar: {})";
+    std::string input = R"(i8 %myVar: {)";
     tokenizeAndCreateContext(input);
     EXPECT_FALSE(expectParse<VariableParser>());
 }
@@ -36,4 +36,25 @@ TEST_F(ParsersTestFixture, LocalVariable)
     tokenizeAndCreateContext(input);
     EXPECT_TRUE(expectParse<VariableParser>());
     TEST_VARIABLE(false, "", "myVar", );
+}
+
+TEST_F(ParsersTestFixture, VariableMissingPercent)
+{
+    std::string input = "i8 myVar";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<VariableParser>());
+}
+
+TEST_F(ParsersTestFixture, VariableMissingName)
+{
+    std::string input = "i8 %";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<VariableParser>());
+}
+
+TEST_F(ParsersTestFixture, VariableArrayMissingRightBrace)
+{
+    std::string input = "i8 %myVar: { 1, 2 ";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<VariableParser>());
 }

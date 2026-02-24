@@ -45,6 +45,20 @@ TEST_F(ParsersTestFixture, ModuleHeader2Params)
     TEST_MODULE_HEADER("myModule", "i8", AstNodeType::Variable, AstNodeType::Variable);
 }
 
+TEST_F(ParsersTestFixture, ModuleHeaderMissingLeftParen)
+{
+    std::string input = "i8 myModule i8 %myParam)";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<ModuleParser::ModuleHeaderParser>());
+}
+
+TEST_F(ParsersTestFixture, ModuleHeaderMissingRightParen)
+{
+    std::string input = "i8 myModule(i8 %myParam";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<ModuleParser::ModuleHeaderParser>());
+}
+
 TEST_F(ParsersTestFixture, ModuleBodyEmpty)
 {
     std::string input = "{}";
@@ -71,8 +85,8 @@ TEST_F(ParsersTestFixture, ModuleBodyNInstr)
 {
     add i8 %myVar, 1;
     add %myVar2, i64 (1234);
-    add %myVar3, i64 (%base);
-    add %myVar4, i64 (%base, 123);
+    add %myVar3, i64 (%base+0);
+    add %myVar4, i64 (%base+0xFEEF);
     nop;
 }
 )";
@@ -123,8 +137,8 @@ TEST_F(ParsersTestFixture, ModuleBodyNInstrNLabelBounds)
     myLabel2:
     {
         add %myVar2, i64 (1234);
-        add %myVar3, i32 (%base);
-        add %myVar4, i16 (%base, 123);
+        add %myVar3, i32 (%base+0);
+        add %myVar4, i16 (%base+0xFEEF);
     }
 }
 )";
@@ -144,8 +158,8 @@ TEST_F(ParsersTestFixture, ModuleBodyNInstrNestedLabel)
         myLabel2:
         {
         add %myVar2, i64 (1234);
-        add %myVar3, i32 (%base);
-        add %myVar4, i16 (%base, 123);
+        add %myVar3, i32 (%base+0);
+        add %myVar4, i16 (%base+0xFEEF);
         }
     }
 }
@@ -153,4 +167,18 @@ TEST_F(ParsersTestFixture, ModuleBodyNInstrNestedLabel)
     tokenizeAndCreateContext(input);
     EXPECT_TRUE(expectParse<ModuleParser::ModuleBodyParser>());
     TEST_MODULE_BODY(1, 2);
+}
+
+TEST_F(ParsersTestFixture, ModuleBodyMissingLeftBrace)
+{
+    std::string input = "add i8 %myVar, 1; }";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<ModuleParser::ModuleBodyParser>());
+}
+
+TEST_F(ParsersTestFixture, ModuleBodyMissingRightBrace)
+{
+    std::string input = "{ add i8 %myVar, 1;";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<ModuleParser::ModuleBodyParser>());
 }

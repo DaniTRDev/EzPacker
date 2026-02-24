@@ -39,8 +39,8 @@ TEST_F(ParsersTestFixture, LabelMultiple2Instr)
 myLabel:
 {
     add %myVar2, i64 (1234);
-    add %myVar3, i32 (%base);
-    add %myVar4, i16 (%base, 123);
+    add %myVar3, i32 (%base+0);
+    add %myVar4, i16 (%base + 123);
     nop;
 })";
     tokenizeAndCreateContext(input);
@@ -72,11 +72,32 @@ myLabel:
     myLabel2:
     {
         add %myVar2, i64 (1234);
-        add %myVar3, i32 (%base);
-        add %myVar4, i16 (%base, 123);
+        add %myVar3, i32 (%base+0);
+        add %myVar4, i16 (%base      +       123);
     }
 })";
     tokenizeAndCreateContext(input);
     EXPECT_TRUE(expectParse<LabelParser>());
     TEST_LABEL("myLabel", AstNodeType::Instruction, AstNodeType::Label);
+}
+
+TEST_F(ParsersTestFixture, LabelMissingColon)
+{
+    std::string input = "myLabel {}";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<LabelParser>());
+}
+
+TEST_F(ParsersTestFixture, LabelMissingLeftBrace)
+{
+    std::string input = "myLabel: ";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<LabelParser>());
+}
+
+TEST_F(ParsersTestFixture, LabelMissingRightBrace)
+{
+    std::string input = "myLabel: { nop; ";
+    tokenizeAndCreateContext(input);
+    EXPECT_FALSE(expectParse<LabelParser>());
 }

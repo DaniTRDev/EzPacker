@@ -3,11 +3,20 @@
 
 #include "EzSemanticsCommon.h"
 
-#include "ScopeManager/Scope.h"
-#include "ScopeManager/ScopeManager.h"
+#include "BasicSemanticContext.h"
+#include "SemanticVisitor.h"
 
-#include "SymbolResolverVisitor/Symbol.h"
-#include "SymbolResolverVisitor/SymbolAnnotation.h"
-#include "SymbolResolverVisitor/SymbolResolverVisitor.h"
+#include "Scope/Scope.h"
+#include "Scope/Symbol.h"
+#include "Scope/TypeTable.h"
+
+#include "SemanticAnnotations/ScopeAnnotation.h"
+#include "SemanticAnnotations/ScopedSymbolAnnotation.h"
+#include "SemanticAnnotations/SymbolAnnotation.h"
+#include "SemanticAnnotations/TypeCastAnnotation.h"
+
+#include "SymbolVisitors/SymbolDefinitionVisitor.h"
+#include "SymbolVisitors/SymbolAndTypeResolverVisitor.h"
+#include "SymbolVisitors/TypeCheckVisitor.h"
 
 #endif // EZPACKER_EZSEMANTICS_H

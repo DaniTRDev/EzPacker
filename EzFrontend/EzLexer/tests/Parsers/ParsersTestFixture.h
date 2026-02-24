@@ -23,7 +23,10 @@ class ParsersTestFixture : public ::testing::Test
      */
     template <typename ParserType> bool expectParse()
     {
-        m_parseResult = AstNodeParsingUtils::tryParsers<ParserType>(m_parsingContext);
+        ParserBatch batch;
+        batch.addParsersFromTypeList<ParserType>();
+
+        m_parseResult = batch.parse(m_parsingContext).m_node;
         return m_parseResult != nullptr;
     }
 
@@ -72,8 +75,8 @@ class ParsersTestFixture : public ::testing::Test
   private:
     std::shared_ptr<AstNode> m_parseResult;
     std::shared_ptr<ErrorCollector> m_errorCollector;
-    std::shared_ptr<ITokenizer> m_tokenizer;
-    std::shared_ptr<IParsingContext> m_parsingContext;
+    std::shared_ptr<BasicTokenizer> m_tokenizer;
+    std::shared_ptr<BasicParsingContext> m_parsingContext;
     std::shared_ptr<SourceManager> m_sourceManager;
     std::shared_ptr<SourceLoggingSink> m_sourceSinkLogger;
     std::shared_ptr<SyncLogger> m_logger;
@@ -243,7 +246,7 @@ inline constexpr auto TEST_MEMORY_IMPL =
 {
     std::shared_ptr<MemoryOperandAstNode> memory;
     EXPECT_TRUE(fixture->expectNodeCast<>(memory));
-    EXPECT_EQ(memory->getReferencedMemoryDataType(), referencedMemoryType);
+    EXPECT_EQ(memory->getReferencedMemoryDataTypeStr(), referencedMemoryType);
     EXPECT_EQ(memory->getMemoryOperandType(), type);
 };
 
@@ -285,24 +288,11 @@ inline constexpr auto TEST_LABEL_IMPL =
     auto &expressions = label->getExpressions();
     EXPECT_EQ(expressions.size(), expectedExpressions.size());
 
-    for (size_t i = 0; i < expressions.size(); i++)
+    size_t i = 0;
+    for (auto &[id, expression] : expressions)
     {
-        auto expressionType = expressions[i];
-        if (std::holds_alternative<std::shared_ptr<Instruction>>(expressionType))
-        {
-            std::shared_ptr<Instruction> instr = std::get<std::shared_ptr<Instruction>>(expressionType);
-            EXPECT_EQ(instr->getType(), expectedExpressions[i]);
-        }
-        else if (std::holds_alternative<std::shared_ptr<Label>>(expressionType))
-        {
-            std::shared_ptr<Label> nestedlabel = std::get<std::shared_ptr<Label>>(expressionType);
-            EXPECT_EQ(nestedlabel->getType(), expectedExpressions[i]);
-        }
-        else
-        {
-            // Invalid expression inside label.
-            EXPECT_TRUE(false);
-        }
+        EXPECT_EQ(expression->getType(), expectedExpressions[i]);
+        i++;
     }
 };
 
@@ -312,7 +302,7 @@ inline constexpr auto TEST_MODULE_HEADER_IMPL =
     std::shared_ptr<ModuleHeader> header;
     EXPECT_TRUE(fixture->expectNodeCast<>(header));
     EXPECT_EQ(header->getModuleName(), name);
-    EXPECT_EQ(header->getReturnType(), type);
+    EXPECT_EQ(header->getReturnTypeName(), type);
 
     auto &params = header->getParameters();
     EXPECT_EQ(params.size(), parameterTypes.size());
@@ -338,11 +328,11 @@ inline constexpr auto TEST_MODULE_BODY_IMPL =
             auto &expressions = label->getExpressions();
             size_t res = 1;
 
-            for (auto &expr : expressions)
+            for (auto &[id, expr] : expressions)
             {
-                if (std::holds_alternative<std::shared_ptr<Label>>(expr))
+                if (expr->getType() == AstNodeType::Label)
                 {
-                    res += labelCounterRec(std::get<std::shared_ptr<Label>>(expr));
+                    res += labelCounterRec(std::dynamic_pointer_cast<Label>(expr));
                 }
                 else
                 {
@@ -356,15 +346,15 @@ inline constexpr auto TEST_MODULE_BODY_IMPL =
     };
 
     size_t totalInstructions = 0, totalLabels = 0;
-    for (auto &expr : body->getExpressions())
+    for (auto &[id, expr] : body->getExpressions())
     {
-        if (std::holds_alternative<std::shared_ptr<Instruction>>(expr))
+        if (expr->getType() == AstNodeType::Instruction)
         {
             totalInstructions++;
         }
-        else if (std::holds_alternative<std::shared_ptr<Label>>(expr))
+        else if (expr->getType() == AstNodeType::Label)
         {
-            totalLabels += labelCounterRec(std::get<std::shared_ptr<Label>>(expr));
+            totalLabels += labelCounterRec(std::dynamic_pointer_cast<Label>(expr));
         }
         else
         {

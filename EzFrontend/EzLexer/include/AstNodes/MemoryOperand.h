@@ -60,7 +60,7 @@ class MemoryOperandAstNode : public AstNode
      * Returns the underlying type of the referenced memory region: uint64_t* -> memory referenced is an uint64_t.
      * @return const std::string &
      */
-    const std::string &getReferencedMemoryDataType() const;
+    const std::string &getReferencedMemoryDataTypeStr() const;
     
   private:
     /**

@@ -1,3 +1,3 @@
 add_subdirectory(EzLexer)
 add_subdirectory(EzSemantics)
-add_subdirectory(EzFrontendDebugGUI)
+#add_subdirectory(EzFrontendDebugGUI)

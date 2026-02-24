@@ -33,6 +33,12 @@ class Instruction : public AstNode
     const char *getAstNodeName() const override;
 
     /**
+     * Returns the number of operands this instruction has.
+     * @return
+     */
+    size_t getOperandCount() const;
+
+    /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
      * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default, only
      * instruction code and basic operand information are shown. If mode is set to debug, instruction operands are also

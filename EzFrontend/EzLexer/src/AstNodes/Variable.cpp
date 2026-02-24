@@ -13,16 +13,13 @@ AstNodeType Variable::getType() const { return AstNodeType::Variable; }
 
 bool Variable::getIsArray() const { return m_isArray; }
 
-bool Variable::getIsLocal() const { return m_isLocal; }
-
 const char *Variable::getAstNodeName() const { return "Variable"; }
 
 std::string Variable::getAsStr(AstNodeStringMode mode) const
 {
-    std::string str = std::format("@Variable(type: {} name: {} isLocal: {} isArray: {}) {{\n",
+    std::string str = std::format("@Variable(type: {} name: {} isArray: {}) {{\n",
                                   getVariableDataType(),
                                   getVariableName(),
-                                  getIsLocal(),
                                   getIsArray());
 
     if (mode == AstNodeStringMode::Debug)

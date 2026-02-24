@@ -6,9 +6,13 @@
 #include <string>
 #include <cstdint>
 #include <unordered_map>
+#include <stack>
+#include <functional>
+#include <memory>
+#include <list>
 
 #include <EzLogger.h>
 
-inline std::unique_ptr<SyncLogger> g_logger = EzLogger::createSinkLogger("EzPacker");
+inline std::unique_ptr<SyncLogger> g_logger = EzLogger::createSyncLogger("EzPacker");
 
 #endif // EZCORE_COMMON_H

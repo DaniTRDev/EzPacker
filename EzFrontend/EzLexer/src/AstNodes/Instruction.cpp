@@ -11,6 +11,8 @@ const char *Instruction::getAstNodeName() const { return "Instruction"; }
 
 const std::string &Instruction::getInstructionName() const { return m_instructionName; }
 
+size_t Instruction::getOperandCount() const { return m_operands.size(); }
+
 const std::vector<std::shared_ptr<AstNode>> &Instruction::getOperands() const { return m_operands; }
 
 std::string Instruction::getAsStr(AstNodeStringMode mode) const

@@ -15,9 +15,13 @@ function(BuildEzCore)
     add_library("EzCore" ${EZCORE_BUILD_TYPE}
             "include/EzCore.h"
             "include/EzCoreCommon.h"
+            "include/ErrorCollector/ErrorCollector.h"
+            "include/ErrorCollector/ErrorEmitter.h"
             "include/Logger/SourceLoggingSink.h"
             "include/SourceManager/SourceManager.h"
 
+            "src/ErrorCollector/ErrorCollector.cpp"
+            "src/ErrorCollector/ErrorEmitter.cpp"
             "src/Logger/SourceLogger.cpp"
             "src/SourceManager/SourceManager.cpp"
     )

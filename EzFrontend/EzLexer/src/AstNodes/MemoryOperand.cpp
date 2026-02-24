@@ -14,7 +14,7 @@ void MemoryOperandAstNode::setReferencedDataType(std::string dataType)
     m_referencedMemoryDataType = std::move(dataType);
 }
 
-const std::string &MemoryOperandAstNode::getReferencedMemoryDataType() const { return m_referencedMemoryDataType; }
+const std::string &MemoryOperandAstNode::getReferencedMemoryDataTypeStr() const { return m_referencedMemoryDataType; }
 
 BaseDisplacementMemory::BaseDisplacementMemory(std::shared_ptr<IntegerImmediate> displacement,
                                                std::shared_ptr<Variable> base,
@@ -36,7 +36,7 @@ std::string BaseDisplacementMemory::getAsStr(AstNodeStringMode mode) const
 {
     std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
                                   getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataType());
+                                  getReferencedMemoryDataTypeStr());
 
     if (mode == AstNodeStringMode::Default)
     {
@@ -72,7 +72,7 @@ std::string IndexScaleMemory::getAsStr(AstNodeStringMode mode) const
 {
     std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
                                   getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataType());
+                                  getReferencedMemoryDataTypeStr());
 
     if (mode == AstNodeStringMode::Default)
     {
@@ -109,7 +109,7 @@ std::string BaseIndexScaleDisplacementMemory::getAsStr(AstNodeStringMode mode) c
 {
     std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
                                   getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataType());
+                                  getReferencedMemoryDataTypeStr());
 
     if (mode == AstNodeStringMode::Default)
     {
@@ -140,7 +140,7 @@ std::string DirectMemory::getAsStr(AstNodeStringMode mode) const
 {
     std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
                                   getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataType());
+                                  getReferencedMemoryDataTypeStr());
 
     if (mode == AstNodeStringMode::Default)
     {

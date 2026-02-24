@@ -6,17 +6,23 @@
 /**
  * This interface adds the ability of modifying semantic context to visitors.
  */
-class SemanticVisitor : public IAstNodeVisitor
+class SemanticVisitor : public AstNodeVisitor
 {
   public:
     /**
-     * Creates the visitor with the given semantic context.
+     * Sets the semantic context.
      * @param ctx
      */
-    SemanticVisitor(std::shared_ptr<class ISemanticAnalyzerContext> ctx);
-    
+    void setSemanticContext(const std::shared_ptr<class BasicSemanticContext> &ctx);
+
+    /**
+     * Returns the semantic context of this object.
+     * @return const std::shared_ptr<class BasicSemanticContext> &
+     */
+    const std::shared_ptr<class BasicSemanticContext> &getSemanticContext() const;
+
   protected:
-    std::shared_ptr<class ISemanticAnalyzerContext> m_ctx;
+    std::shared_ptr<class BasicSemanticContext> m_ctx;
 };
 
 #endif // EZPACKER_SEMANTICVISITOR_H
