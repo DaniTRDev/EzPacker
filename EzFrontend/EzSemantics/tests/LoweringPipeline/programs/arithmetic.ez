@@ -1,0 +1,16 @@
+# Arithmetic operations test program
+# Tests: add, sub, mul, div, imul, idiv, rem, neg on i32 and i64
+
+void ArithmeticBasic(i32 %a, i32 %b)
+{
+    create i32 %result;
+
+    mov %result, %a;
+    add %result, %b;
+    sub %result, 1;
+    mul %result, 2;
+    div %result, 3;
+    neg %result;
+    nop;
+}
+

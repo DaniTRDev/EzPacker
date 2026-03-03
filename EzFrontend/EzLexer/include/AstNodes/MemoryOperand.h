@@ -2,6 +2,7 @@
 #define EZPACKER_MEMORYOPERAND_H
 
 #include "EzLexerCommon.h"
+#include "AstNode/AstNodeVisitor.h"
 #include "AstNodes/Variable.h"
 #include "AstNodes/ImmediateOperand.h"
 
@@ -24,7 +25,7 @@ class MemoryOperandAstNode : public AstNode
      * Creates the node with the given data type.
      * @param referencedMemoryDataType
      */
-    MemoryOperandAstNode(std::string referencedMemoryDataType);
+    MemoryOperandAstNode(std::string_view referencedMemoryDataType);
 
     /**
      * Returns AstNodeType::MemoryOperand.
@@ -32,6 +33,14 @@ class MemoryOperandAstNode : public AstNode
      */
     AstNodeType getType() const override;
 
+    /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+    
     /**
      * Returns "MemoryOperand"
      * @return const char*
@@ -51,22 +60,22 @@ class MemoryOperandAstNode : public AstNode
     virtual MemoryOperandType getMemoryOperandType() const = 0;
 
     /**
-     * Sets the refenced data type.
+     * Sets the referenced data type.
      * @param dataType
      */
-    void setReferencedDataType(std::string dataType);
+    void setReferencedDataType(std::string_view dataType);
 
     /**
      * Returns the underlying type of the referenced memory region: uint64_t* -> memory referenced is an uint64_t.
      * @return const std::string &
      */
-    const std::string &getReferencedMemoryDataTypeStr() const;
-    
+    const std::string_view &getReferencedMemoryDataTypeStr() const;
+
   private:
     /**
      * Real type of the memory being referenced: uint64_t* -> memory referenced is an uint64_t.
      */
-    std::string m_referencedMemoryDataType;
+    std::string_view m_referencedMemoryDataType;
 };
 
 class BaseDisplacementMemory : virtual public MemoryOperandAstNode
@@ -74,10 +83,11 @@ class BaseDisplacementMemory : virtual public MemoryOperandAstNode
   public:
     /**
      * Creates the memory operand with the given displacement, base and referenced data type.
+     * @param displacement
+     * @param base
+     * @param referencedDataType
      */
-    BaseDisplacementMemory(std::shared_ptr<IntegerImmediate> displacement,
-                           std::shared_ptr<Variable> base,
-                           std::string referencedDataType);
+    BaseDisplacementMemory(IntegerImmediate *displacement, Variable *base, std::string_view referencedDataType);
 
     /**
      * Returns "BaseDisplacement".
@@ -86,23 +96,23 @@ class BaseDisplacementMemory : virtual public MemoryOperandAstNode
     const char *getMemoryOperandTypeName() const override;
 
     /**
+     * Returns the displacement of the memory address.
+     * @return IntegerImmediate*
+     */
+    IntegerImmediate *getDisplacement() const;
+
+    /**
      * Returns MemoryOperandType::BaseDisplacement.
      * @return MemoryOperandType
      */
     MemoryOperandType getMemoryOperandType() const override;
 
     /**
-     * Returns the displacement of the memory address.
-     * @return const std::shared_ptr<IntegerImmediate> &
-     */
-    const std::shared_ptr<IntegerImmediate> &getDisplacement() const;
-
-    /**
      * Returns the base of the memory address.
-     * @return const std::shared_ptr<Variable>
+     * @return Variable*
      */
-    const std::shared_ptr<Variable> &getBase() const;
-    
+    Variable *getBase() const;
+
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
      * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default,
@@ -114,8 +124,8 @@ class BaseDisplacementMemory : virtual public MemoryOperandAstNode
     std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
-    std::shared_ptr<IntegerImmediate> m_displacement;
-    std::shared_ptr<Variable> m_base;
+    IntegerImmediate *m_displacement;
+    Variable *m_base;
 };
 
 class IndexScaleMemory : virtual public MemoryOperandAstNode
@@ -127,9 +137,7 @@ class IndexScaleMemory : virtual public MemoryOperandAstNode
      * @param index
      * @param referencedDataType
      */
-    IndexScaleMemory(std::shared_ptr<IntegerImmediate> scalingFactor,
-                     std::shared_ptr<Variable> index,
-                     std::string referencedDataType);
+    IndexScaleMemory(IntegerImmediate *scalingFactor, Variable *index, std::string_view referencedDataType);
 
     /**
      * Returns "IndexScale".
@@ -138,22 +146,22 @@ class IndexScaleMemory : virtual public MemoryOperandAstNode
     const char *getMemoryOperandTypeName() const override;
 
     /**
-     * Returns MemoryOperandType::BaseDisplacement.
+     * Returns the scaling factor, if any, for this memory reference.
+     * @return IntegerImmediate *
+     */
+    IntegerImmediate *getScalingFactor() const;
+
+    /**
+     * Returns MemoryOperandType::IndexScale.
      * @return MemoryOperandType
      */
     MemoryOperandType getMemoryOperandType() const override;
 
     /**
-     * Returns the scaling factor, if any, for this memory reference.
-     * @return const std::shared_ptr<IntegerImmediate> &
-     */
-    const std::shared_ptr<IntegerImmediate> &getScalingFactor() const;
-
-    /**
      * Returns the index, if any, for this memory reference.
-     * @return const std::shared_ptr<Variable> &
+     * @return Variable *
      */
-    const std::shared_ptr<Variable> &getIndex() const;
+    Variable *getIndex() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -164,10 +172,10 @@ class IndexScaleMemory : virtual public MemoryOperandAstNode
      * @return std::string
      */
     std::string getAsStr(AstNodeStringMode mode) const override;
-    
+
   private:
-    std::shared_ptr<IntegerImmediate> m_scalingFactor;
-    std::shared_ptr<Variable> m_index;
+    IntegerImmediate *m_scalingFactor;
+    Variable *m_index;
 };
 
 class BaseIndexScaleDisplacementMemory : public IndexScaleMemory, public BaseDisplacementMemory
@@ -181,11 +189,11 @@ class BaseIndexScaleDisplacementMemory : public IndexScaleMemory, public BaseDis
      * @param index
      * @param referencedDataType
      */
-    BaseIndexScaleDisplacementMemory(std::shared_ptr<IntegerImmediate> displacement,
-                                     std::shared_ptr<IntegerImmediate> scalingFactor,
-                                     std::shared_ptr<Variable> base,
-                                     std::shared_ptr<Variable> index,
-                                     std::string referencedDataType);
+    BaseIndexScaleDisplacementMemory(IntegerImmediate *displacement,
+                                     IntegerImmediate *scalingFactor,
+                                     Variable *base,
+                                     Variable *index,
+                                     std::string_view referencedDataType);
 
     /**
      * Returns "BaseIndexScaleDisplacement".
@@ -198,7 +206,7 @@ class BaseIndexScaleDisplacementMemory : public IndexScaleMemory, public BaseDis
      * @return MemoryOperandType
      */
     MemoryOperandType getMemoryOperandType() const override;
-    
+
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
      * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default,
@@ -218,7 +226,7 @@ class DirectMemory : public MemoryOperandAstNode
      * @param address
      * @param referencedDataType
      */
-    DirectMemory(std::shared_ptr<IntegerImmediate> address, std::string referencedDataType);
+    DirectMemory(IntegerImmediate *address, std::string_view referencedDataType);
 
     /**
      * Returns "BaseDisplacement".
@@ -234,10 +242,10 @@ class DirectMemory : public MemoryOperandAstNode
 
     /**
      * Returns the address being referenced.
-     * @return const std::shared_ptr<IntegerImmediate> &
+     * @return IntegerImmediate *
      */
-    const std::shared_ptr<IntegerImmediate> &getAddress() const;
-    
+    IntegerImmediate *getAddress() const;
+
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
      * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default,
@@ -249,7 +257,7 @@ class DirectMemory : public MemoryOperandAstNode
     std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
-    std::shared_ptr<IntegerImmediate> m_address;
+    IntegerImmediate *m_address;
 };
 
 #endif // EZPACKER_MEMORYOPERAND_H

@@ -13,9 +13,9 @@ class Integer : public IAstNodeParser
     /**
      * Tries to parse an integer immediate out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<AstNode>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class Float : public IAstNodeParser
@@ -24,9 +24,9 @@ class Float : public IAstNodeParser
     /**
      * Tries to parse a floating-point immediate out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<AstNode>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class String : public IAstNodeParser
@@ -35,9 +35,9 @@ class String : public IAstNodeParser
     /**
      * Tries to parse a string immediate out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<AstNode>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class ImmediateParser : public IAstNodeParser
@@ -46,9 +46,9 @@ class ImmediateParser : public IAstNodeParser
     /**
      * Tries to parse an immediate (Integer, Float or String) out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<AstNode>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 }; // namespace ImmediateParser

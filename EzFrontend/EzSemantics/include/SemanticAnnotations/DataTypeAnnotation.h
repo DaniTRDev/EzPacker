@@ -14,22 +14,22 @@ class DataTypeAnnotation : public IAstNodeAnnotation
      * Creates the annotation with the given type.
      * @param type
      */
-    DataTypeAnnotation(const std::shared_ptr<Type> &type);
+    DataTypeAnnotation(Type *type);
+
+    /**
+     * Returns the data type.
+     * @return
+     */
+    Type *getDataType() const;
 
     /**
      * Returns "DataTypeAnnotation".
      * @return const char*
      */
     const char *getAnnotationName() const override;
-    
-    /**
-     * Returns the data type.
-     * @return
-     */
-    const std::shared_ptr<Type> &getDataType() const;
 
   private:
-    std::shared_ptr<Type> m_type;
+    Type *m_type;
 };
 
 #endif // EZPACKER_TYPEANNOTATION_H

@@ -1,12 +1,11 @@
 #include "Scope/Symbol.h"
 
-Symbol::Symbol(SymbolType symbolType,
-               const std::shared_ptr<AstNode> &definingNode,
-               const std::shared_ptr<Type> &symbolDataType,
-               const std::string &name) :
-    m_symbolType(symbolType), m_definingNode(definingNode), m_name(name), m_symbolDataType(symbolDataType)
+Symbol::Symbol(AstNode *definingNode, Type *symbolDataType, SymbolType symbolType, const std::string_view &name) :
+    m_definingNode(definingNode), m_symbolType(symbolType), m_id(0), m_symbolDataType(symbolDataType), m_name(name)
 {
 }
+
+AstNode *Symbol::getDefiningNode() const { return m_definingNode; }
 
 const char *Symbol::getSymbolTypeAsString(SymbolType symbolType)
 {
@@ -32,10 +31,8 @@ size_t Symbol::getId() const { return m_id; }
 
 SymbolType Symbol::getType() const { return m_symbolType; }
 
+Type *Symbol::getSymbolDataType() { return m_symbolDataType; }
+
 void Symbol::setId(size_t id) { m_id = id; }
 
-const std::shared_ptr<AstNode> &Symbol::getDefiningNode() const { return m_definingNode; }
-
-const std::shared_ptr<Type> &Symbol::getSymbolDataType() const { return m_symbolDataType; }
-
-const std::string &Symbol::getName() const { return m_name; }
+const std::string_view &Symbol::getName() const { return m_name; }

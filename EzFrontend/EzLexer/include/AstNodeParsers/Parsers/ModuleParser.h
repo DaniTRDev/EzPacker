@@ -14,9 +14,9 @@ class ModuleHeaderParser : public IAstNodeParser
     /**
      * Tries to parse the header of a module out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<::ModuleHeaderParser>
+     * @return ModuleHeader * (as AstNode *)
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class ModuleParser : public IAstNodeParser
@@ -25,9 +25,9 @@ class ModuleParser : public IAstNodeParser
     /**
      * Tries to parse an module out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<Module>
+     * @return Module *
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 }; // namespace ModuleParser
 #endif // EZPACKER_MODULEPARSER_H

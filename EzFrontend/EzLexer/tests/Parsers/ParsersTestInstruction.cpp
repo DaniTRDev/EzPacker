@@ -1,152 +1,166 @@
 #include "ParsersTestFixture.h"
 
-TEST_F(ParsersTestFixture, InstructionVariableImmediate)
+// =============================================================================
+//  Two-operand instructions
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Instruction_VarImm)
 {
-    std::string input = "add i64 %variable, 123;";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
-    TEST_INSTRUCTION("add", { AstNodeType::Variable, AstNodeType::Immediate });
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("add i64 %variable, 123;"));
+    TEST_INSTRUCTION("add", AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, InstructionVariableMemory)
+TEST_F(ParsersTestFixture, Instruction_VarMem)
 {
-    std::string input = "lea %variable, i64 (1231);";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
-    TEST_INSTRUCTION("lea", { AstNodeType::Variable, AstNodeType::MemoryOperand });
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("lea %variable, i64 (1231);"));
+    TEST_INSTRUCTION("lea", AstNodeType::Variable, AstNodeType::MemoryOperand);
 }
 
-TEST_F(ParsersTestFixture, InstructionImmediateVariable)
+TEST_F(ParsersTestFixture, Instruction_ImmVar)
 {
-    std::string input = "instr 123, %myVar;";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
-    TEST_INSTRUCTION("instr", { AstNodeType::Immediate, AstNodeType::Variable });
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("instr 123, %myVar;"));
+    TEST_INSTRUCTION("instr", AstNodeType::Immediate, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, InstructionImmediateMemory)
+TEST_F(ParsersTestFixture, Instruction_ImmMem)
 {
-    std::string input = "instr 123, i64 (%base+0);";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
-    TEST_INSTRUCTION("instr", { AstNodeType::Immediate, AstNodeType::MemoryOperand });
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("instr 123, i64 (%base+0);"));
+    TEST_INSTRUCTION("instr", AstNodeType::Immediate, AstNodeType::MemoryOperand);
 }
 
-TEST_F(ParsersTestFixture, InstructionNoOperands)
+TEST_F(ParsersTestFixture, Instruction_VarVar)
 {
-    std::string input = "nop;";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("mov %dst, %src;"));
+    TEST_INSTRUCTION("mov", AstNodeType::Variable, AstNodeType::Variable);
+}
+
+TEST_F(ParsersTestFixture, Instruction_MemMem)
+{
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("instr i64 (%a+0), i64 (%b+0);"));
+    TEST_INSTRUCTION("instr", AstNodeType::MemoryOperand, AstNodeType::MemoryOperand);
+}
+
+// =============================================================================
+//  Zero-operand instructions
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Instruction_Nop)
+{
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("nop;"));
     TEST_INSTRUCTION("nop");
 }
 
-TEST_F(ParsersTestFixture, InstructionImmediate)
+TEST_F(ParsersTestFixture, Instruction_Halt)
 {
-    std::string input = "instr 123;";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("halt;"));
+    TEST_INSTRUCTION("halt");
+}
+
+// =============================================================================
+//  One-operand instructions
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Instruction_SingleImm)
+{
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("instr 123;"));
     TEST_INSTRUCTION("instr", AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, InstructionVariable)
+TEST_F(ParsersTestFixture, Instruction_SingleVar)
 {
-    std::string input = "instr i64 %myVar;";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("instr i64 %myVar;"));
     TEST_INSTRUCTION("instr", AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, InstructionMemory)
+TEST_F(ParsersTestFixture, Instruction_SingleMem)
 {
-    std::string input = "jmp i64 (%myVar+0);";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("jmp i64 (%myVar+0);"));
     TEST_INSTRUCTION("jmp", AstNodeType::MemoryOperand);
 }
 
-TEST_F(ParsersTestFixture, InstructionMissingSemicolon)
+// =============================================================================
+//  Instruction error cases
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Instruction_MissingSemicolon)
 {
-    std::string input = "nop";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("nop"));
 }
 
-TEST_F(ParsersTestFixture, InstructionMissingSemicolonWithOperands)
+TEST_F(ParsersTestFixture, Instruction_MissingSemicolonWithOperands)
 {
-    std::string input = "add %a, %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("add %a, %b"));
 }
 
-TEST_F(ParsersTestFixture, InstructionInvalidOperand)
+TEST_F(ParsersTestFixture, Instruction_TrailingCommaBeforeSemicolon)
 {
-    std::string input = "add %a, ;";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("add %a, ;"));
 }
 
-TEST_F(ParsersTestFixture, CallInstructionInvalidCallee)
-{
-    std::string input = "call i64 31();";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
-}
+// =============================================================================
+//  Call instruction – valid cases
+// =============================================================================
 
-TEST_F(ParsersTestFixture, CallInstructionInvalidReturnType)
+TEST_F(ParsersTestFixture, CallInstruction_NoParams)
 {
-    std::string input = "call 1231 myFunc();";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
-}
-
-TEST_F(ParsersTestFixture, CallInstructionNoParameters)
-{
-    std::string input = "call i64 myFunc();";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc();"));
     TEST_CALL_INSTRUCTION("myFunc", "i64");
 }
 
-TEST_F(ParsersTestFixture, CallInstruction1Parameter)
+TEST_F(ParsersTestFixture, CallInstruction_1Param)
 {
-    std::string input = "call i64 myFunc(%myVar);";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(%myVar);"));
     TEST_CALL_INSTRUCTION("myFunc", "i64", AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, CallInstruction2Parameters)
+TEST_F(ParsersTestFixture, CallInstruction_2Params)
 {
-    std::string input = "call i64 myFunc(1231, %myVar);";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(1231, %myVar);"));
     TEST_CALL_INSTRUCTION("myFunc", "i64", AstNodeType::Immediate, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, CallInstructionMissingLeftParen)
+TEST_F(ParsersTestFixture, CallInstruction_3Params)
 {
-    std::string input = "call i64 myFunc);";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call void myFunc(%a, %b, %c);"));
+    TEST_CALL_INSTRUCTION("myFunc", "void", AstNodeType::Variable, AstNodeType::Variable, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, CallInstructionMissingRightParen)
+TEST_F(ParsersTestFixture, CallInstruction_VoidReturn)
 {
-    std::string input = "call i64 myFunc(;";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call void doNothing();"));
+    TEST_CALL_INSTRUCTION("doNothing", "void");
 }
 
-TEST_F(ParsersTestFixture, CallInstructionMissingSemicolon)
+// =============================================================================
+//  Call instruction – error cases
+// =============================================================================
+
+TEST_F(ParsersTestFixture, CallInstruction_InvalidCallee)
 {
-    std::string input = "call i64 myFunc()";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 31();"));
 }
 
-TEST_F(ParsersTestFixture, CallInstructionInvalidArg)
+TEST_F(ParsersTestFixture, CallInstruction_InvalidReturnType)
 {
-    std::string input = "call i64 myFunc(invalid)";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<InstructionParser::InstructionParser>());
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call 1231 myFunc();"));
+}
+
+TEST_F(ParsersTestFixture, CallInstruction_MissingLeftParen)
+{
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc);"));
+}
+
+TEST_F(ParsersTestFixture, CallInstruction_MissingRightParen)
+{
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(;"));
+}
+
+TEST_F(ParsersTestFixture, CallInstruction_MissingSemicolon)
+{
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc()"));
+}
+
+TEST_F(ParsersTestFixture, CallInstruction_InvalidArg)
+{
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(invalid)"));
 }

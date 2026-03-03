@@ -13,8 +13,7 @@ enum class SymbolType : uint8_t
     GlobalVariable,
     Label,
     LocalVariable,
-    Module,
-    ModuleParameter
+    Module
 };
 
 /**
@@ -26,15 +25,18 @@ class Symbol
   public:
     /**
      * Creates a symbol with the given data type, symbol type, defining node and name.
+     * @param definingNode
      * @param symbolDataType
      * @param symbolType
-     * @param definingNode
      * @param name
      */
-    Symbol(SymbolType symbolType,
-           const std::shared_ptr<AstNode> &definingNode,
-           const std::shared_ptr<Type> &symbolDataType,
-           const std::string &name);
+    Symbol(AstNode *definingNode, Type *symbolDataType, SymbolType symbolType, const std::string_view &name);
+
+    /**
+     * Returns the AstNode that defined this symbol.
+     * @return AstNode *
+     */
+    AstNode *getDefiningNode() const;
 
     /**
      * Returns the name of the symbol data type.
@@ -68,35 +70,29 @@ class Symbol
     SymbolType getType() const;
 
     /**
+     * Returns the data type behind this symbol.
+     * @return Type
+     */
+    Type *getSymbolDataType();
+
+    /**
      * Sets the ID of this symbol. Called by the scope when a new symbol, is created.
      * @param id
      */
     void setId(size_t id);
 
     /**
-     * Returns the AstNode that defined this symbol.
-     * @return const std::shared_ptr<AstNode> &
-     */
-    const std::shared_ptr<AstNode> &getDefiningNode() const;
-
-    /**
-     * Returns the data type behind this symbol.
-     * @return SymbolDataType
-     */
-    const std::shared_ptr<Type> &getSymbolDataType() const;
-
-    /**
      * Returns the name of the symbol.
      * @return const std::string &
      */
-    const std::string &getName() const;
+    const std::string_view &getName() const;
 
   private:
-    size_t m_id;
+    AstNode *m_definingNode; // Where this symbol was firstly defined.
     SymbolType m_symbolType;
-    std::shared_ptr<AstNode> m_definingNode; // Where this symbol was firstly defined.
-    std::shared_ptr<Type> m_symbolDataType;  // i64, i32, ...
-    std::string m_name;
+    size_t m_id;
+    Type *m_symbolDataType; // i64, i32, ...
+    std::string_view m_name;
 };
 
 #endif // EZPACKER_SYMBOL_H

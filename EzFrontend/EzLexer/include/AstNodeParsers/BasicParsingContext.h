@@ -1,6 +1,7 @@
 #ifndef EZPACKER_SINGLETHREADPARSER_H
 #define EZPACKER_SINGLETHREADPARSER_H
 
+#include "AstNode/AstNodeTypedPool.h"
 #include "ErrorCollector/ErrorCollector.h"
 #include "Tokenizer/BasicTokenizer.h"
 
@@ -20,6 +21,12 @@ class BasicParsingContext : public ErrorEmitter
     BasicParsingContext(const std::shared_ptr<ErrorCollector> &errorCollector,
                         const std::shared_ptr<SourceManager> &sourceManager,
                         std::vector<TokenInformation> tokens);
+
+    /**
+     * Returns the pool of nodes.
+     * @return TypedPool *
+     */
+    AstNodeTypedPool *getNodePool();
 
     /**
      * Returns true if the current token stream can be peeked.
@@ -54,49 +61,40 @@ class BasicParsingContext : public ErrorEmitter
     size_t getRemainingTokenCount() const;
 
     /**
-     * Peeks the current context without consuming the token. canPeek must habe returned true.
-     * @return const std::shared_ptr<TokenInformation> &
+     * Returns the string pool.
+     * @return StringPool*
+     */
+    StringPool *getStringPool();
+
+    /**
+     * Returns the last valid source reference.
+     * @return const SourceReference &
+     */
+    const SourceReference &getLastSourceReference() const;
+
+    /**
+     * Peeks the current context without consuming the token. canPeek must have returned true.
+     * @return const TokenInformation &
      */
     const TokenInformation &peek() const;
 
     /**
-     * Begins a new multiple source reference that will be filled with "consumed nodes".
-     */
-    void beginMultiSourceRef();
-
-    /**
-     * Advances the stream position by 1 if canPeek didn't return false. Will push the consumed node into the
-     * current "merged" source reference for the caller AstNode. If no multi source ref was pushed, an access violation
-     * is thrown.
+     * Advances the stream position by 1 if canPeek() returns true. Updates the last source reference to the
+     * consumed token's reference. If the next token after advancing is a Comment, it is automatically skipped
+     * (consumed recursively).
      */
     void consume();
-
-    /**
-     * Ends the current multiple source reference.
-     */
-    void endMultiSourceRef();
 
     /**
      * Sets the position of the stream to the one given, if pos is invalid an exception is thrown.
      */
     void setPosition(size_t pos);
 
-    /**
-     * Returns the last valid source reference.
-     * @return const std::shared_ptr<SourceReference> &
-     */
-    const std::shared_ptr<SourceReference> &getLastSourceReference() const;
-
-    /**
-     * Returns the current multiple reference.
-     * @return std::vector<std::shared_ptr<SourceReference>>
-     */
-    std::vector<std::shared_ptr<SourceReference>> getCurrentMultiReference() const;
-
   private:
+    AstNodeTypedPool m_nodePool; // Used to store AstNode objects in memory. This is cache-friendly.
     size_t m_currentPos;
-    std::shared_ptr<SourceReference> m_lastSourceRef;
-    std::stack<std::vector<std::shared_ptr<SourceReference>>> m_multiSourceRefs;
+    StringPool m_stringPool; // Used to store strings in memory. This is cache-friendly.
+    SourceReference m_lastSourceRef;
     std::vector<TokenInformation> m_tokens;
 };
 
@@ -114,6 +112,9 @@ struct ParsingCondition
         {
             return false;
         }
+
+        while (ctx->canPeek() && ctx->peek().m_type == _TokenType::Comment)
+            ctx->consume();
 
         if (ctx->peek().m_type == type)
         {

@@ -1,23 +1,22 @@
 #include "Scope/Scope.h"
 
-Scope::Scope(const std::map<std::string, std::shared_ptr<Symbol>> &symbols,
-             const std::shared_ptr<Scope> &parent,
-             const std::string &name) : m_symbols(symbols), m_parent(std::move(parent)), m_name(name)
+Scope::Scope(Scope *parent, const std::map<std::string_view, Symbol *> &symbols, const std::string_view &name) :
+    m_parent(parent), m_symbols(symbols), m_name(name)
 {
 }
 
-Scope::Scope(const std::shared_ptr<Scope> &parent, const std::string &name) : Scope({}, parent, name) {}
+Scope::Scope(Scope *parent, const std::string_view &name) : Scope(parent, {}, name) {}
 
-bool Scope::define(const std::string &name, const std::shared_ptr<Symbol> &symbol)
+bool Scope::define(Symbol *symbol, const std::string_view &name)
 {
     if (m_symbols.contains(name))
         return false;
 
-    m_symbols.insert({ name, std::move(symbol) });
+    m_symbols.insert({ name, symbol });
     return true;
 }
 
-bool Scope::resolve(const std::string &name, std::shared_ptr<Symbol> *outSymbol, bool searchParent)
+bool Scope::resolve(const std::string_view &name, Symbol **outSymbol, bool searchParent)
 {
     auto it = m_symbols.find(name);
     if (it == m_symbols.end())
@@ -37,4 +36,4 @@ bool Scope::resolve(const std::string &name, std::shared_ptr<Symbol> *outSymbol,
     return true;
 }
 
-const std::shared_ptr<Scope> &Scope::getParent() const { return m_parent; }
+Scope *Scope::getParent() const { return m_parent; }

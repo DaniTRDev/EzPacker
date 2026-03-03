@@ -42,15 +42,17 @@ const static std::function<bool(char ch)> isSpecial = [](char ch) -> bool { retu
 enum class _TokenType : uint8_t
 {
     Invalid = 0,
-    Dot,         // '.'
+    Break,       // "break"
     Colon,       // ':'
     Comma,       //','
     Comment,     // # ...
+    Continue,    // "continue"
+    Dot,         // '.'
     Else,        // "else"
     Identifier,  // Something formed with [a-z] | [A-Z] | [0, 9] | [_]. It can't start with digits.
     If,          // "if"
     LeftBrace,   // '{'
-    LeftParen,   // ')'
+    LeftParen,   // '('
     Minus,       // '-'
     NewLine,     // '\n'
     NumberInt,   // Something formed with [0-9]
@@ -58,7 +60,7 @@ enum class _TokenType : uint8_t
     Percentage,  // '%'
     Plus,        // '+'
     RightBrace,  // '}'
-    RightParen,  // '('
+    RightParen,  // ')'
     SemiColon,   // ';'
     String,      // "..." Multiline strings are not supported. // TODO: Add support for multiline strings.
     While        //"while"
@@ -66,15 +68,18 @@ enum class _TokenType : uint8_t
 
 inline std::map<_TokenType, const char *> TokenType2StrMap = {
     { _TokenType::Invalid, "Invalid" },
-    { _TokenType::Dot, "Dot" },
+    { _TokenType::Break, "Break" },
     { _TokenType::Colon, "Colon" },
     { _TokenType::Comma, "Comma" },
     { _TokenType::Comment, "Comment" },
+    { _TokenType::Continue, "Continue" },
+    { _TokenType::Dot, "Dot" },
     { _TokenType::Else, "Else" },
     { _TokenType::Identifier, "Identifier" },
     { _TokenType::If, "If" },
     { _TokenType::LeftBrace, "LeftBrace" },
     { _TokenType::LeftParen, "LeftParen" },
+    { _TokenType::Minus, "Minus" },
     { _TokenType::NewLine, "NewLine" },
     { _TokenType::NumberInt, "NumberInt" },
     { _TokenType::NumberFloat, "NumberFloat" },
@@ -93,14 +98,17 @@ inline std::map<_TokenType, const char *> TokenType2StrMap = {
 struct TokenInformation
 {
     _TokenType m_type; // Type of the token.
-    std::shared_ptr<SourceReference> m_sourceReference;
+    SourceReference m_sourceReference;
     std::string m_str;
 };
 
 /**
- * Basic SYNCHRONOUS tokenizer class that implements tokenizeBuffer method. It also implements a higher
- * level tokenizeBuffer method that tokenizers the entire input.
+ * Basic SYNCHRONOUS tokenizer class. Given a character buffer and a starting address, it scans the input
+ * and produces a sequence of TokenInformation objects. Whitespace and newlines are consumed but not emitted
+ * as tokens (except for tracking line/column information). Comments (starting with '#') are preserved as
+ * Comment tokens. Strings support common escape sequences (\\n, \\r, \\t, \\\\, \\', \\", \\0).
  *
+ * After tokenization, the resulting tokens can be retrieved via getTokens().
  */
 class BasicTokenizer
 {
@@ -157,22 +165,25 @@ class BasicTokenizer
     bool tokenizeSingle(char *buffer, size_t bufferSize, _TokenType &tokenType);
 
     /**
-     * Tokenizes as an identifier the current position of buffer at given address. Returns of true if succeeded.
+     * Tokenizes an identifier at the current position of buffer at given address. An identifier starts with a letter
+     * (a-z, A-Z) or underscore ('_'), followed by letters, digits, or underscores. Reserved keywords ("if", "else",
+     * "while") are recognized and assigned their corresponding token types. Returns true if succeeded.
      * @param buffer
      * @param bufferSize
      * @param token
-     * @return size_t
+     * @return bool
      */
     bool tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenType &token);
 
     /**
-     * Tokenizes as a number at the current position of buffer at given address. Returns of true if succeeded and, if
-     * signed is set, it will need the FIRST character of current buffer position to be a '-'.
-     * @param _signed
+     * Tokenizes a number (integer or float) at the current position of buffer at given address.
+     * Returns true if succeeded. Supports decimal and hexadecimal (0x...) integer formats, as well
+     * as floating-point numbers containing a single '.'. Sign characters (+/-) are NOT handled here;
+     * they are tokenized separately as Plus/Minus tokens.
      * @param buffer
      * @param bufferSize
      * @param token
-     * @return size_t
+     * @return bool
      */
     bool tokenizeNumber(char *buffer, size_t bufferSize, _TokenType &token);
 

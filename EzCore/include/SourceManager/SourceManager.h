@@ -8,11 +8,12 @@
  */
 struct SourceReference
 {
-    size_t m_col;
-    size_t m_length;
-    size_t m_line;
+    bool m_valid{ false };
+    size_t m_col{ 0 };
+    size_t m_length{ 0 };
+    size_t m_line{ 0 };
 
-    std::string m_sourceFile; // Includes path.
+    size_t m_sourceFileId;
 };
 
 struct LineSourceRange
@@ -42,60 +43,39 @@ class SourceManager
      * @param length
      * @param line
      * @param sourceFile
-     * @return std::shared_ptr<SourceReference>
+     * @return SourceReference
      */
-    std::shared_ptr<SourceReference>
-    createReference(size_t col, size_t length, size_t line, const std::string &sourceFile);
+    SourceReference createReference(size_t col, size_t length, size_t line, const std::string &sourceFile);
 
     /**
-     * Merges the given references into a single reference. This function SUPPOSES that references are one after
-     * another. Can't merge 2 references that are not close.
-     * @param refs
-     * @return std::shared_ptr<SourceReference>
+     * Returns the raw line of where this reference was created. Returns true if no reference is given or if it is not
+     * from any known sources.
+     * @param ref
+     * @return std::string
      */
-    std::shared_ptr<SourceReference> mergeReferences(const std::vector<std::shared_ptr<SourceReference>> &refs);
+    std::string getRawLineContent(const SourceReference &ref);
 
     /**
      * Returns the line content of the given reference. This function assumes ref is DEFINED.
      * @param ref
      * @return std::string
      */
-    std::string getReferenceContent(const std::shared_ptr<SourceReference> &ref);
+    std::string getReferenceContent(const SourceReference &ref);
+
+    /**
+     * Returns the source name of the given source file id.
+     * @param id
+     * @return const std::string &
+     */
+    std::string_view getSourceName(size_t id) const;
 
   private:
-    // full file path, file content, divided in lines.
-    std::map<std::string, std::vector<LineSourceRange>> m_sourceLines;
-    std::map<std::string, std::string> m_sources;
-};
+    // full file path, file content divided in lines.
+    std::map<size_t, std::vector<LineSourceRange>> m_sourceLines;
+    std::map<size_t, std::string> m_sources;
 
-/**
- * Simple class that allows creating a single reference out of multiple references (merging) easier and cleaner.
- */
-class MultiSourceReferenceCreator
-{
-  public:
-  
-    /**
-     * Attaches this creator to a SourceManager. If given source manager is null, an exception is thrown.
-     * @param sourceManager
-     */
-    void attach(std::shared_ptr<SourceManager> sourceManager);
-  
-    /**
-     * Pushes a reference to the creator. If given reference is null, an exception is thrown.
-     * @param reference
-     */
-    void push(std::shared_ptr<SourceReference> reference);
-    
-    /**
-     * Merges all the given references into a single returned reference. Throws an exception if no references were
-     * given, source manager was not set or resulting reference is invalid.
-     */
-    std::shared_ptr<SourceReference> merge();
-    
-  private:
-    std::shared_ptr<SourceManager> m_sourceManager;
-    std::vector<std::shared_ptr<SourceReference>> m_references;
+    // id, name
+    std::map<size_t, std::string> m_sourcesNames;
 };
 
 #endif // EZPACKER_SOURCEMANAGER_H

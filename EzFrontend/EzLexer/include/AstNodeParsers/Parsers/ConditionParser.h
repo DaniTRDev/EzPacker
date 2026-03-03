@@ -14,9 +14,9 @@ class ConditionParser : public IAstNodeParser
     /**
      * Tries to parse a condition.
      * @param ctx
-     * @return std::shared_ptr<::ModuleHeaderParser>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 #endif // EZPACKER_CONDITIONPARSER_H

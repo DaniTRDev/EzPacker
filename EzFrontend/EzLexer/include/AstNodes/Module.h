@@ -4,6 +4,7 @@
 #include "EzLexerCommon.h"
 #include "AstNode/AstNode.h"
 #include "AstNode/AstNodeContainer.h"
+#include "AstNode/AstNodeVisitor.h"
 #include "AstNodes/CodeScope.h"
 #include "AstNodes/Instruction.h"
 #include "AstNodes/Label.h"
@@ -12,16 +13,16 @@
  * This class represents the definition of a module, aka it's header. At the moment has little attributes but this
  * class is sensible to expansion.
  */
-class ModuleHeader : public AstNode
+class ModuleHeader : public AstNode, public AstNodeContainer
 {
   public:
     /**
      * Creates the module with the given name, return type and parameters.
+     * @param parameters
      * @param moduleName
      * @param returnType
-     * @param parameters
      */
-    ModuleHeader(std::string moduleName, std::string returnType, std::vector<std::shared_ptr<AstNode>> parameters);
+    ModuleHeader(TypedPoolSlice<AstNode> *parameters, std::string_view moduleName, std::string_view returnType);
 
     /**
      * Returns the type of the node.
@@ -30,6 +31,14 @@ class ModuleHeader : public AstNode
     AstNodeType getType() const override;
 
     /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+    
+    /**
      * Returns the name of this AstNode.
      * @return const char*
      */
@@ -37,35 +46,28 @@ class ModuleHeader : public AstNode
 
     /**
      * Returns the name of the module.
-     * @return const std::string &
+     * @return const std::string_view &
      */
-    const std::string &getModuleName() const;
+    const std::string_view &getModuleName() const;
 
     /**
      * Returns the "return type" of the module.
      * @return const std::string &
      */
-    const std::string &getReturnTypeName() const;
+    const std::string_view &getReturnTypeName() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. If mode is set to default, only module return type and name will be shwown.
-     * If mode is set to debug, parameters will also be shown.
+     * formatted string depends on mode. If mode is set to default, only module return type and name will be shown.
+     * Note: Debug mode currently builds parameter strings internally but does not include them in the output.
      * @param mode
      * @return std::string
      */
     std::string getAsStr(AstNodeStringMode mode) const override;
 
-    /**
-     * Returns the parameters of the module.
-     * @return const std::vector<std::shared_ptr<AstNode>> &
-     */
-    const std::vector<std::shared_ptr<AstNode>> &getParameters() const;
-
   private:
-    std::string m_moduleName;
-    std::string m_returnType;
-    std::vector<std::shared_ptr<AstNode>> m_parameters;
+    std::string_view m_moduleName;
+    std::string_view m_returnType;
 };
 
 /**
@@ -81,7 +83,7 @@ class Module : public AstNode
      * @param body
      * @param header
      */
-    Module(std::shared_ptr<CodeScope> body, std::shared_ptr<ModuleHeader> header);
+    Module(CodeScope *body, ModuleHeader *header);
 
     /**
      * Returns the type of the node.
@@ -90,22 +92,30 @@ class Module : public AstNode
     AstNodeType getType() const override;
 
     /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+    
+    /**
+     * Returns the body of the module.
+     * @return CodeScope*
+     */
+    CodeScope *getBody() const;
+
+    /**
      * Returns the name of this AstNode.
      * @return const char*
      */
     const char *getAstNodeName() const override;
 
     /**
-     * Returns the body of the module.
-     * @return const std::shared_ptr<CodeScope> &
+     * Returns the header of this module.
+     * @return ModuleHeader*
      */
-    const std::shared_ptr<CodeScope> &getBody() const;
-
-    /**
-     * Returns the header of a module
-     * @return const std::shared_ptr<ModuleHeaderParser> &
-     */
-    const std::shared_ptr<ModuleHeader> &getHeader() const;
+    ModuleHeader *getHeader() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -116,8 +126,8 @@ class Module : public AstNode
     std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
-    std::shared_ptr<CodeScope> m_body;
-    std::shared_ptr<ModuleHeader> m_header;
+    CodeScope *m_body;
+    ModuleHeader *m_header;
 };
 
 #endif // EZPACKER_MODULE_H

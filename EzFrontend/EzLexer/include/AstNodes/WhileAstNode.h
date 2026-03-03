@@ -3,6 +3,7 @@
 
 #include "EzLexerCommon.h"
 #include "AstNode/AstNode.h"
+#include "AstNode/AstNodeVisitor.h"
 #include "AstNodes/CodeScope.h"
 #include "AstNodes/ConditionAstNode.h"
 
@@ -21,6 +22,26 @@ class WhileAstNode : public AstNode
     AstNodeType getType() const override;
 
     /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+    
+    /**
+     * Gets the code scope of this while loop.
+     * @return CodeScope *
+     */
+    CodeScope *getCodeScope() const;
+
+    /**
+     * Gets the condition of this while loop.
+     * @return ConditionAstNode *
+     */
+    ConditionAstNode *getCondition() const;
+
+    /**
      * Returns 'WhileAstNode'.
      * @return const char*
      */
@@ -30,25 +51,13 @@ class WhileAstNode : public AstNode
      * Sets the code scope for this while loop.
      * @param codeScope
      */
-    void setCodeScope(const std::shared_ptr<CodeScope> &codeScope);
+    void setCodeScope(CodeScope *codeScope);
 
     /**
      * Sets the condition for this while loop.
      * @param condition
      */
-    void setCondition(const std::shared_ptr<ConditionAstNode> &condition);
-
-    /**
-     * Gets the condition of this while loop.
-     * @return const std::shared_ptr<ConditionAstNode> &
-     */
-    const std::shared_ptr<ConditionAstNode> &getCondition() const;
-
-    /**
-     * Gets the code scope of this while loop.
-     * @return const std::shared_ptr<CodeScope> &
-     */
-    const std::shared_ptr<CodeScope> &getCodeScope() const;
+    void setCondition(ConditionAstNode *condition);
 
     /**
      * Returns a string representation of this node. This is described as:
@@ -60,8 +69,8 @@ class WhileAstNode : public AstNode
     std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
-    std::shared_ptr<ConditionAstNode> m_condition;
-    std::shared_ptr<CodeScope> m_codeScope;
+    ConditionAstNode *m_condition;
+    CodeScope *m_codeScope;
 };
 
 #endif // EZPACKER_WHILEASTNODE_H

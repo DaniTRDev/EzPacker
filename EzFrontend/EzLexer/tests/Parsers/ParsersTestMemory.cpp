@@ -1,34 +1,58 @@
 #include "ParsersTestFixture.h"
 
-TEST_F(ParsersTestFixture, BaseDispl)
+// =============================================================================
+//  BaseDisplacement  – valid
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_BaseDispl_Subtract)
 {
-    std::string input = R"(i8 (%myVar, 1231))";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (%myVar-1231)"));
     TEST_MEMORY(MemoryOperandType::BaseDisplacement, "i8");
     TEST_MEMORY_BASE_DISPL(AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, BaseDisplInvalidBase)
+TEST_F(ParsersTestFixture, Memory_BaseDispl_Add)
 {
-    std::string input = R"(i8 (1231, 1231))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i64 (%base+0x10)"));
+    TEST_MEMORY(MemoryOperandType::BaseDisplacement, "i64");
+    TEST_MEMORY_BASE_DISPL(AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, BaseDisplInvalidDispl)
+TEST_F(ParsersTestFixture, Memory_BaseDispl_ZeroOffset)
 {
-    std::string input = R"(i8 (%base+ %wrong))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i32 (%ptr+0)"));
+    TEST_MEMORY(MemoryOperandType::BaseDisplacement, "i32");
+    TEST_MEMORY_BASE_DISPL(AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, BaseIndexScaleDisplacement)
+TEST_F(ParsersTestFixture, Memory_BaseDispl_Whitespace)
 {
-    // 4 = scaling factor, 1231 = displacement.
-    std::string input = R"(i8 (%base, %index, 4, 1231))";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i16 (%base      +       123)"));
+    TEST_MEMORY(MemoryOperandType::BaseDisplacement, "i16");
+    TEST_MEMORY_BASE_DISPL(AstNodeType::Variable, AstNodeType::Immediate);
+}
+
+// =============================================================================
+//  BaseDisplacement  – invalid
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_BaseDispl_InvalidBase)
+{
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (1231+1231)"));
+}
+
+TEST_F(ParsersTestFixture, Memory_BaseDispl_InvalidDispl)
+{
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (%base + %wrong)"));
+}
+
+// =============================================================================
+//  BaseIndexScaleDisplacement – valid
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_BISD_Valid)
+{
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (%base, %index, 4, 1231)"));
     TEST_MEMORY(MemoryOperandType::BaseIndexScaleDisplacement, "i8");
     TEST_MEMORY_BASE_INDEX_SCALE_DISPL(AstNodeType::Variable,
                                        AstNodeType::Variable,
@@ -36,97 +60,100 @@ TEST_F(ParsersTestFixture, BaseIndexScaleDisplacement)
                                        AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, BaseIndexScaleDisplacementInvalidBase)
+// =============================================================================
+//  BaseIndexScaleDisplacement – invalid
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_BISD_InvalidBase)
 {
-    // myVar = index, 1231 = scaling factor
-    std::string input = R"(i8 (1231, %index, 4, 1231))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (1231, %index, 4, 1231)"));
 }
 
-TEST_F(ParsersTestFixture, BaseIndexScaleDisplacementInvalidIndex)
+TEST_F(ParsersTestFixture, Memory_BISD_InvalidIndex)
 {
-    // myVar = index, 1231 = scaling factor
-    std::string input = R"(i8 (%base, 1231, 4, 1231))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (%base, 1231, 4, 1231)"));
 }
 
-TEST_F(ParsersTestFixture, BaseIndexScaleDisplacementInvalidScale)
+TEST_F(ParsersTestFixture, Memory_BISD_InvalidScale)
 {
-    // myVar = index, 1231 = scaling factor
-    std::string input = R"(i8 (%base, %index, %wrong, 1231))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (%base, %index, %wrong, 1231)"));
 }
 
-TEST_F(ParsersTestFixture, BaseIndexScaleInvalidDispl)
+TEST_F(ParsersTestFixture, Memory_BISD_InvalidDispl)
 {
-    // myVar = index, 1231 = scaling factor
-    std::string input = R"(i8 (%base, %index, 4, %wrong))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (%base, %index, 4, %wrong)"));
 }
 
-TEST_F(ParsersTestFixture, IndexScale)
+// =============================================================================
+//  IndexScale – valid
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_IndexScale_Valid)
 {
-    // myVar = index, 1231 = scaling factor
-    std::string input = R"(i8 (, %myVar, 4))";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (, %myVar, 4)"));
     TEST_MEMORY(MemoryOperandType::IndexScale, "i8");
     TEST_MEMORY_INDEX_SCALE(AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, IndexScaleInvalidIndex)
+TEST_F(ParsersTestFixture, Memory_IndexScale_Scale1)
 {
-    // myVar = index, 1231 = scaling factor
-    std::string input = R"(i8 (, 231, 4))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i64 (, %idx, 1)"));
+    TEST_MEMORY(MemoryOperandType::IndexScale, "i64");
+    TEST_MEMORY_INDEX_SCALE(AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, IndexScaleInvalidScale)
+// =============================================================================
+//  IndexScale – invalid
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_IndexScale_InvalidIndex)
 {
-    // myVar = index, 1231 = scaling factor
-    std::string input = R"(i8 (, %myVar, %wrong))";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (, 231, 4)"));
 }
 
-TEST_F(ParsersTestFixture, Direct)
+TEST_F(ParsersTestFixture, Memory_IndexScale_InvalidScale)
 {
-    std::string input = R"(i8 (1231))";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (, %myVar, %wrong)"));
+}
+
+// =============================================================================
+//  Direct – valid
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_Direct_Decimal)
+{
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (1231)"));
     TEST_MEMORY(MemoryOperandType::Direct, "i8");
     TEST_MEMORY_DIRECT();
 }
 
-TEST_F(ParsersTestFixture, MemoryOperandMissingType)
+TEST_F(ParsersTestFixture, Memory_Direct_Hex)
 {
-    std::string input = "(1231)";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_TRUE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i64 (0x400000)"));
+    TEST_MEMORY(MemoryOperandType::Direct, "i64");
+    TEST_MEMORY_DIRECT();
 }
 
-TEST_F(ParsersTestFixture, MemoryOperandMissingLeftParen)
+// =============================================================================
+//  Structural error cases
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Memory_MissingLeftParen)
 {
-    std::string input = "i8 1231)";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 1231)"));
 }
 
-TEST_F(ParsersTestFixture, MemoryOperandMissingRightParen)
+TEST_F(ParsersTestFixture, Memory_MissingRightParen)
 {
-    std::string input = "i8 (1231";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (1231"));
 }
 
-TEST_F(ParsersTestFixture, MemoryOperandInvalidContent)
+TEST_F(ParsersTestFixture, Memory_InvalidContent)
 {
-    std::string input = "i8 (invalid)";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<MemoryOperandParser::MemoryOperandParser>());
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 (invalid)"));
+}
+
+TEST_F(ParsersTestFixture, Memory_EmptyParens)
+{
+    EXPECT_FALSE(tokenizeAndParse<MemoryOperandParser::MemoryOperandParser>("i8 ()"));
 }

@@ -9,7 +9,7 @@ ErrorEmitter::ErrorEmitter(const std::shared_ptr<ErrorCollector> &errorCollector
 void ErrorEmitter::emitError(ErrorSeverity severity,
                              const std::string &message,
                              const std::string &sender,
-                             const std::shared_ptr<SourceReference> &sourceRef)
+                             const SourceReference &sourceRef)
 {
     m_errorCollector->onError(severity, message, sender, sourceRef);
 }

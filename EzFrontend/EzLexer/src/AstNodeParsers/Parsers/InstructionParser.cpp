@@ -13,11 +13,14 @@ ParserBatch CreateInstructionOperandBatch()
     return batch;
 }
 
-std::shared_ptr<AstNode> CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     TokenInformation instructionToken, calleeNameToken, returnTypeToken;
-    std::shared_ptr<CallInstruction> node;
-    std::vector<std::shared_ptr<AstNode>> arguments;
+
+    CallInstruction *node = nullptr;
+    StringPool *stringPool = ctx->getStringPool();
+    TypedPool *nodePool = ctx->getNodePool();
+    TypedPoolSlice<AstNode> *arguments = nodePool->createSlice<AstNode>();
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, &instructionToken, _TokenType::Identifier))
     {
@@ -75,7 +78,8 @@ std::shared_ptr<AstNode> CallInstructionParser::parse(const std::shared_ptr<Basi
         return nullptr;
     }
 
-    std::string &calleeName = calleeNameToken.m_str, &returnType = returnTypeToken.m_str;
+    std::string_view calleeName = stringPool->createConstantString(calleeNameToken.m_str),
+                     returnType = stringPool->createConstantString(returnTypeToken.m_str);
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
     {
@@ -83,8 +87,7 @@ std::shared_ptr<AstNode> CallInstructionParser::parse(const std::shared_ptr<Basi
         ParserBatch batch = CreateInstructionOperandBatch();
         do
         {
-            std::shared_ptr<AstNode> argument = batch.parse(ctx).m_node;
-
+            AstNode *argument = batch.parse(ctx).m_node;
             if (!argument)
             {
                 ctx->emitError(ErrorSeverity::Fatal,
@@ -95,7 +98,7 @@ std::shared_ptr<AstNode> CallInstructionParser::parse(const std::shared_ptr<Basi
                 return nullptr;
             }
 
-            arguments.push_back(std::move(argument));
+            nodePool->appendToSlice(arguments, argument);
         } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
         if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
@@ -117,15 +120,17 @@ std::shared_ptr<AstNode> CallInstructionParser::parse(const std::shared_ptr<Basi
         return nullptr;
     }
 
-    node = std::make_shared<::CallInstruction>(std::move(calleeName), std::move(returnType), std::move(arguments));
-    return std::move(node);
+    node = nodePool->create<CallInstruction>(arguments, std::move(calleeName), std::move(returnType));
+    return node;
 }
 
-std::shared_ptr<AstNode> NonCallInstructionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *NonCallInstructionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     TokenInformation token;
-    std::shared_ptr<Instruction> node;
-    std::vector<std::shared_ptr<AstNode>> operands;
+    Instruction *node = nullptr;
+    StringPool *stringPool = ctx->getStringPool();
+    TypedPool *nodePool = ctx->getNodePool();
+    TypedPoolSlice<AstNode> *operands = nodePool->createSlice<AstNode>();
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, &token, _TokenType::Identifier))
     {
@@ -136,10 +141,11 @@ std::shared_ptr<AstNode> NonCallInstructionParser::parse(const std::shared_ptr<B
         return nullptr;
     }
 
-    std::string &instructionName = token.m_str;
-    std::ranges::transform(instructionName,
-                           instructionName.begin(),
+    std::string instructionNameToLower = token.m_str;
+    std::ranges::transform(instructionNameToLower,
+                           instructionNameToLower.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::string_view instructionName = stringPool->createConstantString(instructionNameToLower);
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::SemiColon))
     {
@@ -147,8 +153,7 @@ std::shared_ptr<AstNode> NonCallInstructionParser::parse(const std::shared_ptr<B
         static ParserBatch batch = CreateInstructionOperandBatch();
         do
         {
-            std::shared_ptr<AstNode> operand = batch.parse(ctx).m_node;
-
+            AstNode *operand = batch.parse(ctx).m_node;
             if (!operand)
             {
                 ctx->emitError(ErrorSeverity::Soft,
@@ -157,8 +162,7 @@ std::shared_ptr<AstNode> NonCallInstructionParser::parse(const std::shared_ptr<B
                                ctx->getLastSourceReference());
                 return nullptr;
             }
-
-            operands.push_back(std::move(operand));
+            nodePool->appendToSlice(operands, operand);
         } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
         // If this place have been reached, this expression can only be an instruction.
@@ -172,11 +176,11 @@ std::shared_ptr<AstNode> NonCallInstructionParser::parse(const std::shared_ptr<B
         }
     }
 
-    node = std::make_shared<Instruction>(std::move(instructionName), std::move(operands));
-    return std::move(node);
+    node = nodePool->create<Instruction>(operands, std::move(instructionName));
+    return node;
 }
 
-std::shared_ptr<AstNode> InstructionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *InstructionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     ParserBatch batch;
     batch.addParsersFromTypeList<CallInstructionParser, NonCallInstructionParser>();

@@ -1,11 +1,10 @@
 #include "AstNodeParsers/Parsers/ConditionParser.h"
 
-std::shared_ptr<AstNode> ConditionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *ConditionParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     ConditionComparisonType comparisonType;
-    std::shared_ptr<ConditionAstNode> node;
-    std::shared_ptr<AstNode> leftOperand;
-    std::shared_ptr<AstNode> rightOperand;
+    ConditionAstNode *node = nullptr;
+    AstNode *leftOperand = nullptr, *rightOperand = nullptr;
 
     if (leftOperand = VariableParser().parse(ctx); !leftOperand)
     {
@@ -71,6 +70,6 @@ std::shared_ptr<AstNode> ConditionParser::parse(const std::shared_ptr<BasicParsi
         return nullptr;
     }
 
-    node = std::make_shared<ConditionAstNode>(comparisonType, leftOperand, rightOperand);
+    node = ctx->getNodePool()->create<ConditionAstNode>(leftOperand, rightOperand, comparisonType);
     return node;
 }

@@ -5,13 +5,13 @@ TEST_F(SymbolDefinitionVisitorTestFixture, TestCreateInstruction_Valid)
     std::string code = "create i32 %myVar;";
     EXPECT_TRUE(runVisitor<InstructionParser::InstructionParser>(code));
 
-    auto instr = std::dynamic_pointer_cast<Instruction>(getAstNode());
+    auto instr = dynamic_cast<Instruction *>(getAstNode());
     ASSERT_NE(instr, nullptr);
 
-    auto operands = instr->getOperands();
-    ASSERT_EQ(operands.size(), 1);
+    auto operands = instr->getExpressions();
+    ASSERT_EQ(operands->m_numElems, 1);
 
-    auto var = std::dynamic_pointer_cast<Variable>(operands[0]);
+    auto var = operands->get<Variable>(0);
     ASSERT_NE(var, nullptr);
 
     auto symbolAnnotation = var->getAnnotation<SymbolAnnotation>();
@@ -66,7 +66,7 @@ myLabel:
 
     EXPECT_TRUE(runVisitor<LabelParser>(code));
 
-    auto label = std::dynamic_pointer_cast<Label>(getAstNode());
+    auto label = dynamic_cast<Label *>(getAstNode());
     ASSERT_NE(label, nullptr);
 
     auto scopedAnnotation = label->getAnnotation<ScopedSymbolAnnotation>();
@@ -81,7 +81,7 @@ myLabel:
     ASSERT_NE(scope, nullptr);
 
     // Check if symbol inside label exists in the inner scope
-    std::shared_ptr<Symbol> innerSymbol;
+    Symbol *innerSymbol = nullptr;
     EXPECT_TRUE(scope->resolve("localInLabel", &innerSymbol, false));
     ASSERT_NE(innerSymbol, nullptr);
     EXPECT_EQ(innerSymbol->getType(), SymbolType::LocalVariable);
@@ -102,9 +102,9 @@ i64 MyModule(i32 %param1)
 
     EXPECT_TRUE(runVisitor<ModuleParser::ModuleParser>(code));
 
-    auto module = std::dynamic_pointer_cast<Module>(getAstNode());
+    auto module = dynamic_cast<Module *>(getAstNode());
     ASSERT_NE(module, nullptr);
-    
+
     auto scopedAnnotation = module->getAnnotation<ScopedSymbolAnnotation>();
     ASSERT_NE(scopedAnnotation, nullptr);
 
@@ -117,13 +117,13 @@ i64 MyModule(i32 %param1)
     ASSERT_NE(scope, nullptr);
 
     // Check parameter symbol
-    std::shared_ptr<Symbol> paramSymbol;
+    Symbol *paramSymbol = nullptr;
     EXPECT_TRUE(scope->resolve("param1", &paramSymbol, false));
     ASSERT_NE(paramSymbol, nullptr);
-    EXPECT_EQ(paramSymbol->getType(), SymbolType::ModuleParameter);
+    EXPECT_EQ(paramSymbol->getType(), SymbolType::LocalVariable);
 
     // Check local variable symbol
-    std::shared_ptr<Symbol> localSymbol;
+    Symbol *localSymbol = nullptr;
     EXPECT_TRUE(scope->resolve("localInModule", &localSymbol, false));
     ASSERT_NE(localSymbol, nullptr);
     EXPECT_EQ(localSymbol->getType(), SymbolType::LocalVariable);

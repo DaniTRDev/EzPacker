@@ -1,10 +1,12 @@
 #include "ParsersTestFixture.h"
 
+AstNode *ParsersTestFixture::getParseResult() { return m_parseResult; }
+
 bool ParsersTestFixture::expectNodeType(AstNodeType type) { return m_parseResult && m_parseResult->getType() == type; }
 
 void ParsersTestFixture::SetUp()
 {
-    m_parseResult.reset();
+    m_parseResult = nullptr;
     m_logger = EzLogger::createSyncLogger("TEST_PARSERS");
     m_sourceManager = std::make_shared<SourceManager>();
     m_sourceSinkLogger = std::make_shared<SourceLoggingSink>(m_logger.get());
@@ -15,16 +17,17 @@ void ParsersTestFixture::SetUp()
             [](void *userParam, const std::shared_ptr<Error> &error) -> void
             {
                 ParsersTestFixture *fixture = (ParsersTestFixture *)userParam;
-                if (error->m_sourceRef)
+                if (error->m_sourceRef.m_length)
                 {
-                    g_logger->pushLog(LogMessage("[{}]{} {}:{}:{} {} \n\t {}",
-                                                 error->m_sender,
-                                                 error->m_timeStamp,
-                                                 error->m_sourceRef->m_sourceFile,
-                                                 error->m_sourceRef->m_line,
-                                                 error->m_sourceRef->m_col,
-                                                 error->m_message,
-                                                 fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
+                    g_logger->pushLog(
+                            LogMessage("[{}]{} {}:{}:{} {} \n{}",
+                                       error->m_sender,
+                                       error->m_timeStamp,
+                                       fixture->m_sourceManager->getSourceName(error->m_sourceRef.m_sourceFileId),
+                                       error->m_sourceRef.m_line,
+                                       error->m_sourceRef.m_col,
+                                       error->m_message,
+                                       fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
                 }
                 else
                 {
@@ -54,5 +57,3 @@ void ParsersTestFixture::tokenizeAndCreateContext(const std::string &input)
     m_parsingContext =
             std::make_shared<BasicParsingContext>(m_errorCollector, m_sourceManager, m_tokenizer->getTokens());
 }
-
-const std::shared_ptr<AstNode> &ParsersTestFixture::getParseResult() { return m_parseResult; }

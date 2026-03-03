@@ -8,21 +8,23 @@ void SymbolDefinitionVisitorTestFixture::SetUp()
     m_errorCollector = std::make_shared<ErrorCollector>();
     m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager, "TEST_SEMANTICS");
     m_semanticContext = std::make_shared<BasicSemanticContext>(m_errorCollector, m_sourceManager);
+    m_astNode = nullptr;
 
     m_errorCollector->addSubscriber(
             [](void *userParam, const std::shared_ptr<Error> &error) -> void
             {
                 SymbolDefinitionVisitorTestFixture *fixture = (SymbolDefinitionVisitorTestFixture *)userParam;
-                if (error->m_sourceRef)
+                if (error->m_sourceRef.m_valid)
                 {
-                    g_logger->pushLog(LogMessage("[{}]{} {}:{}:{} {} \n\t {}",
-                                                 error->m_sender,
-                                                 error->m_timeStamp,
-                                                 error->m_sourceRef->m_sourceFile,
-                                                 error->m_sourceRef->m_line,
-                                                 error->m_sourceRef->m_col,
-                                                 error->m_message,
-                                                 fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
+                    g_logger->pushLog(
+                            LogMessage("[{}]{} {}:{}:{} {} \n\t {}",
+                                       error->m_sender,
+                                       error->m_timeStamp,
+                                       fixture->m_sourceManager->getSourceName(error->m_sourceRef.m_sourceFileId),
+                                       error->m_sourceRef.m_line,
+                                       error->m_sourceRef.m_col,
+                                       error->m_message,
+                                       fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
                 }
                 else
                 {

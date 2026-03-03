@@ -1,10 +1,8 @@
 #include "AstNodeParsers/Parsers/LabelParser.h"
 
-std::shared_ptr<AstNode> LabelParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *LabelParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     TokenInformation token;
-    std::shared_ptr<Label> node;
-
     if (!ctx->consumeIf(ParsingCondition::TokenType, &token, _TokenType::Identifier))
     {
         ctx->emitError(ErrorSeverity::Soft,
@@ -24,17 +22,17 @@ std::shared_ptr<AstNode> LabelParser::parse(const std::shared_ptr<BasicParsingCo
     }
 
     /*
-     * If parser reached this place, this expression can only be a Label.A label may or may not have any instructions.
+     * If parser reached this place, this expression can only be a Label. A label may or may not have any instructions.
      */
-    node = std::make_shared<Label>(std::move(token.m_str));
-    std::shared_ptr<CodeScope> codeScope = std::dynamic_pointer_cast<CodeScope>(CodeScopeParser().parse(ctx));
-
+    CodeScope *codeScope = (CodeScope *)CodeScopeParser().parse(ctx);
     if (!codeScope)
     {
         ctx->emitError(ErrorSeverity::Fatal, "Empty label scope", "LabelParser", ctx->getLastSourceReference());
         return nullptr;
     }
 
+    Label *node = ctx->getNodePool()->create<Label>(ctx->getStringPool()->createConstantString(token.m_str));
     node->setCodeScope(codeScope);
-    return std::move(node);
+
+    return node;
 }

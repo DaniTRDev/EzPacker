@@ -1,17 +1,15 @@
 #include "AstNodeParsers/Parsers/VariableParser.h"
 
-std::shared_ptr<AstNode> VariableParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *VariableParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    bool isArray = false;
     TokenInformation typeToken, nameToken;
-    std::shared_ptr<Variable> node;
-    std::string type, name;
-    std::vector<std::shared_ptr<AstNode>> initializers;
+    TypedPoolSlice<AstNode> *initializers = nullptr;
+    std::string_view type, name;
 
     // A variable might or might not have a type. This will be guarded in the semantic checker.
     if (ctx->consumeIf(ParsingCondition::TokenType, &typeToken, _TokenType::Identifier))
     {
-        type = std::move(typeToken.m_str);
+        type = std::move(ctx->getStringPool()->createConstantString(typeToken.m_str));
     }
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Percentage))
@@ -38,11 +36,13 @@ std::shared_ptr<AstNode> VariableParser::parse(const std::shared_ptr<BasicParsin
         return nullptr;
     }
 
-    name = std::move(nameToken.m_str);
+    name = ctx->getStringPool()->createConstantString(nameToken.m_str);
 
     if (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Colon))
     {
         // Variable has initializers.
+        initializers = ctx->getNodePool()->createSlice<AstNode>();
+
         if (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftBrace))
         {
             // Variable is an array.
@@ -60,8 +60,7 @@ std::shared_ptr<AstNode> VariableParser::parse(const std::shared_ptr<BasicParsin
                         return nullptr;
                     }
 
-                    initializers.push_back(std::move(initializer));
-
+                    ctx->getNodePool()->appendToSlice(initializers, initializer);
                 } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
                 if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightBrace))
@@ -73,13 +72,11 @@ std::shared_ptr<AstNode> VariableParser::parse(const std::shared_ptr<BasicParsin
                     return nullptr;
                 }
             }
-
-            isArray = true;
         }
         else
         {
             // Single-initializer variable.
-            std::shared_ptr<AstNode> initializer;
+            AstNode *initializer;
             if (initializer = ImmediateParser::ImmediateParser().parse(ctx); !initializer)
             {
                 ctx->emitError(ErrorSeverity::Fatal,
@@ -89,10 +86,10 @@ std::shared_ptr<AstNode> VariableParser::parse(const std::shared_ptr<BasicParsin
                 return nullptr;
             }
 
-            initializers.push_back(std::move(initializer));
+            ctx->getNodePool()->appendToSlice(initializers, initializer);
         }
     }
 
-    node = std::make_shared<Variable>(isArray, type, name, std::move(initializers));
+    Variable *node = ctx->getNodePool()->create<Variable>(initializers, type, name);
     return std::move(node);
 }

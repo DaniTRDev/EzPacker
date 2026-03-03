@@ -12,43 +12,34 @@ class AstNodeContainer
 {
   public:
     /**
-     * Returns true if this container hast at least 1 expression.
+     * Returns true if this container has at least 1 expression. Requires that expressions have been set
+     * (via setExpressions) prior to calling.
      * @return bool
      */
     bool containsExpressions() const;
 
     /**
-     * Adds an expression to the container.
-     * @param expression
+     * Returns the count of expressions. Assumes expressions have been set (via setExpressions); calling
+     * this when expressions are unset results in undefined behavior.
+     * @return size_t
      */
-    void addExpression(const std::shared_ptr<AstNode> &expression);
+    size_t getExpressionCount() const;
 
     /**
-     * Erases the given set of elements out of the expression list. If any key is invalid, an exception is thrown.
-     *
-     * IMPORTANT: If called inside a for loop will CRASH the program due to iterator invalidation. If you want
-     * to delete a set / single element(s) save the indexes to be deleted. And ONLY delete them after every iteration
-     * has been finished.
-     * @param keys
+     * Returns the expressions defined in this container (as a slice of a TypedPool). May return nullptr
+     * if no expressions have been set.
+     * @return TypedPoolSlice<AstNode> *
      */
-    void eraseExpression(std::list<size_t> keys);
+    TypedPoolSlice<AstNode> *getExpressions() const;
 
     /**
-     * Returns the expression linked to the given key. If no expression has been found, nullptr is returned.
-     * @param key
-     * @return std::shared_ptr<AstNode>
+     * Sets the expressions of this container.
+     * @param expressions
      */
-    std::shared_ptr<AstNode> getExpressionAtIndex(size_t key) const;
-
-    /**
-     * Returns the expressions defined in this container.
-     * @return const std::map<size_t, std::shared_ptr<AstNode>> &
-     */
-    const std::map<size_t, std::shared_ptr<AstNode>> &getExpressions() const;
+    void setExpressions(TypedPoolSlice<AstNode> *expressions);
 
   private:
-    size_t currentId{ 0 };
-    std::map<size_t, std::shared_ptr<AstNode>> m_expressions;
+    TypedPoolSlice<AstNode> *m_expressions{ nullptr };
 };
 
 #endif // EZPACKER_ASTNODECONTAINER_H

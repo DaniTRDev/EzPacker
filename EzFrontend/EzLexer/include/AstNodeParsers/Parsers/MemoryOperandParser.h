@@ -15,9 +15,9 @@ class BaseDisplacement : public IAstNodeParser
     /**
      * Tries to parse a BaseDisplacement memory operand out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<BaseDisplacementMemory>
+     * @return BaseDisplacementMemory*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class BaseIndexScaleDisplacement : public IAstNodeParser
@@ -26,9 +26,9 @@ class BaseIndexScaleDisplacement : public IAstNodeParser
     /**
      * Tries to parse a BaseIndexScaleDisplacement memory operand out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<BaseIndexScaleDisplacement>
+     * @return BaseIndexScaleDisplacement*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class IndexScale : public IAstNodeParser
@@ -37,9 +37,9 @@ class IndexScale : public IAstNodeParser
     /**
      * Tries to parse a IndexScale memory operand out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<IndexScale>
+     * @return IndexScale*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class Direct : public IAstNodeParser
@@ -48,9 +48,9 @@ class Direct : public IAstNodeParser
     /**
      * Tries to parse a DirectMemory operand out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<DirectMemory>
+     * @return DirectMemory*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 class MemoryOperandParser : public IAstNodeParser
@@ -59,9 +59,9 @@ class MemoryOperandParser : public IAstNodeParser
     /**
      * Tries to parse a memory operand out of the token list within context.
      * @param ctx
-     * @return std::shared_ptr<AstNode>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 }; // namespace MemoryOperandParser
 

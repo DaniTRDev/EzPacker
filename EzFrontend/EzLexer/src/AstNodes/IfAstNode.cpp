@@ -1,20 +1,29 @@
 #include "AstNodes/IfAstNode.h"
 
+AstNode *IfAstNode::getFalseScope() const { return m_falseScope; }
+
 AstNodeType IfAstNode::getType() const { return AstNodeType::If; }
+
+bool IfAstNode::accept(AstNodeVisitor *visitor)
+{
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+    return false;
+}
+
+CodeScope *IfAstNode::getTrueScope() const { return m_trueScope; }
+
+ConditionAstNode *IfAstNode::getCondition() const { return m_condition; }
 
 const char *IfAstNode::getAstNodeName() const { return "IfAstNode"; }
 
-void IfAstNode::setFalseScope(const std::shared_ptr<AstNode> &falseScope) { m_falseScope = falseScope; }
+void IfAstNode::setFalseScope(AstNode *falseScope) { m_falseScope = falseScope; }
 
-void IfAstNode::setTrueScope(const std::shared_ptr<CodeScope> &trueScope) { m_trueScope = trueScope; }
+void IfAstNode::setTrueScope(CodeScope *trueScope) { m_trueScope = trueScope; }
 
-void IfAstNode::setCondition(const std::shared_ptr<ConditionAstNode> &condition) { m_condition = condition; }
-
-const std::shared_ptr<AstNode> &IfAstNode::getFalseScope() const { return m_falseScope; }
-
-const std::shared_ptr<CodeScope> &IfAstNode::getTrueScope() const { return m_trueScope; }
-
-const std::shared_ptr<ConditionAstNode> &IfAstNode::getCondition() const { return m_condition; }
+void IfAstNode::setCondition(ConditionAstNode *condition) { m_condition = condition; }
 
 std::string IfAstNode::getAsStr(AstNodeStringMode mode) const
 {

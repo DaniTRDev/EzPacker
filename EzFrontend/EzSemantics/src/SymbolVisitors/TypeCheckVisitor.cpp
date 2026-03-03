@@ -1,48 +1,94 @@
 #include "SymbolVisitors/TypeCheckVisitor.h"
 
-bool TypeCheckVisitor::visit(const std::shared_ptr<struct Instruction> &instr)
+bool TypeCheckVisitor::visit(BreakAstNode *_break)
 {
-    for (auto &operand : instr->getOperands())
+    if (!m_ctx->isContextInsideLoop())
     {
-        if (operand->getType() == AstNodeType::Immediate)
-        {
-            // Check if the type is an immediate and if it uses a data type.
-            const std::string &dataTypeStr = std::dynamic_pointer_cast<ImmediateOperand>(operand)->getDataType();
-            if (!dataTypeStr.empty())
-            {
-                // Annotate the type of this immediate.
-                std::shared_ptr<Type> dataType = TypeTable::getType(dataTypeStr);
-                if (!dataType)
-                {
-                    getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                                    "Invalid cast for immediate",
-                                                    "TypeCheckVisitor::Instruction",
-                                                    operand->getFirstSourceReference());
+        m_ctx->emitError(ErrorSeverity::Fatal,
+                         "Break statement is not inside a loop",
+                         "TypeCheckVisitor::BreakAstNode",
+                         _break->getSourceRef());
+        return false;
+    }
 
+    return true;
+}
+
+bool TypeCheckVisitor::visit(CodeScope *scope) { return AstNodeVisitor::visitAll(scope->getExpressions()); }
+
+bool TypeCheckVisitor::visit(ContinueAstNode *_continue)
+{
+    if (!m_ctx->isContextInsideLoop())
+    {
+        m_ctx->emitError(ErrorSeverity::Fatal,
+                         "Continue statement is not inside a loop",
+                         "TypeCheckVisitor::ContinueAstNode",
+                         _continue->getSourceRef());
+        return false;
+    }
+
+    return true;
+}
+
+bool TypeCheckVisitor::visit(IfAstNode *ifNode)
+{
+    return ifNode->getCondition()->accept(this) && ifNode->getTrueScope()->accept(this) &&
+            (!ifNode->getFalseScope() || ifNode->getFalseScope()->accept(this));
+}
+
+bool TypeCheckVisitor::visit(Instruction *instr)
+{
+    // We need to manually traverse this container to infer the types of immediates.
+    Type *targetInstructionType = nullptr;
+
+    // First pass: Find the target type (usually from the first Variable or Memory operand)
+    for (const void *ptr : *instr->getExpressions())
+    {
+        AstNode *node = (AstNode *)ptr;
+        if (node->getType() == AstNodeType::Variable)
+        {
+            Variable *var = static_cast<Variable *>(node);
+            Symbol *sym = var->getAnnotation<SymbolAnnotation>()->getSymbol();
+            targetInstructionType = sym->getSymbolDataType();
+            break;
+        }
+        else if (node->getType() == AstNodeType::MemoryOperand)
+        {
+            MemoryOperandAstNode *mem = dynamic_cast<MemoryOperandAstNode *>(node);
+            targetInstructionType = TypeTable::getType(mem->getReferencedMemoryDataTypeStr()).get();
+            break;
+        }
+    }
+
+    // Second pass: Validate all operands against this context
+    for (const void *ptr : *instr->getExpressions())
+    {
+        AstNode *node = (AstNode *)ptr;
+
+        if (node->getType() == AstNodeType::Immediate)
+        {
+            ImmediateOperand *imm = dynamic_cast<ImmediateOperand *>(node);
+            Type *immType = imm->getAnnotation<DataTypeAnnotation>()->getDataType();
+
+            if (targetInstructionType)
+            {
+                if (!checkImmediateSafety(imm, immType))
+                {
+                    m_ctx->emitError(ErrorSeverity::Fatal,
+                                     "Invalid immediate found",
+                                     "TypeCheckVisitor",
+                                     node->getSourceRef());
                     return false;
                 }
 
-                operand->addAnnotation(std::make_shared<DataTypeAnnotation>(dataType));
-            }
-            // TODO: Infer type and check if cast can be performed.
-        }
-        else if (operand->getType() == AstNodeType::MemoryOperand)
-        {
-            const std::string &dataTypeStr =
-                    std::dynamic_pointer_cast<MemoryOperandAstNode>(operand)->getReferencedMemoryDataTypeStr();
-            if (dataTypeStr.empty())
-            {
-                getSemanticContext()->emitError(ErrorSeverity::Warning,
-                                                "Unknown memory operand data-type, using default i64",
-                                                "TypeCheckVisitor::Instruction",
-                                                instr->getFirstSourceReference());
-                operand->addAnnotation(std::make_shared<DataTypeAnnotation>(TypeTable::getType("i64")));
+                // Attach an annotation so the Lowerer knows exactly what size this immediate should be emitted as.
+                node->createAnnotation<TypeCastAnnotation>(getSemanticContext()->getAnnotPool(),
+                                                           nullptr, // Immediates don't have symbols
+                                                           targetInstructionType);
             }
         }
-
-        if (!visitBaseClass(operand))
+        else if (!node->accept(this))
         {
-            // The concrete error of the fail will already be in the error collector.
             return false;
         }
     }
@@ -50,26 +96,41 @@ bool TypeCheckVisitor::visit(const std::shared_ptr<struct Instruction> &instr)
     return true;
 }
 
-bool TypeCheckVisitor::visit(const std::shared_ptr<struct MemoryOperandAstNode> &operand)
+bool TypeCheckVisitor::visit(Label *label) { return label->getCodeScope()->accept(this); }
+
+bool TypeCheckVisitor::visit(Module *module) { return module->getBody()->accept(this); }
+
+bool TypeCheckVisitor::visit(MemoryOperandAstNode *operand)
 {
-    std::shared_ptr<AstNode> base, index;
+    const std::string_view &dataTypeStr =
+            dynamic_cast<MemoryOperandAstNode *>(operand)->getReferencedMemoryDataTypeStr();
+    if (dataTypeStr.empty())
+    {
+        getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                        "Unknown memory operand data-type",
+                                        "TypeCheckVisitor::MemoryOperandAstNode",
+                                        operand->getSourceRef());
+        return false;
+    }
+
+    AstNode *base = nullptr, *index = nullptr;
     switch (operand->getMemoryOperandType())
     {
         case MemoryOperandType::BaseDisplacement:
         {
-            base = std::dynamic_pointer_cast<BaseDisplacementMemory>(operand)->getBase();
-            return visitBaseClass(base);
+            base = dynamic_cast<BaseDisplacementMemory *>(operand)->getBase();
+            return base->accept(this);
         }
         case MemoryOperandType::BaseIndexScaleDisplacement:
         {
-            base = std::dynamic_pointer_cast<BaseIndexScaleDisplacementMemory>(operand)->getBase();
-            index = std::dynamic_pointer_cast<BaseIndexScaleDisplacementMemory>(operand)->getIndex();
-            return visitBaseClass(base) && visitBaseClass(index);
+            base = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getBase();
+            index = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getIndex();
+            return base->accept(this) && index->accept(this);
         }
         case MemoryOperandType::IndexScale:
         {
-            index = std::dynamic_pointer_cast<IndexScaleMemory>(operand)->getIndex();
-            return visitBaseClass(index);
+            index = dynamic_cast<IndexScaleMemory *>(operand)->getIndex();
+            return index->accept(this);
         }
         default:
         {
@@ -82,20 +143,20 @@ bool TypeCheckVisitor::visit(const std::shared_ptr<struct MemoryOperandAstNode> 
     return false;
 }
 
-bool TypeCheckVisitor::visit(const std::shared_ptr<struct Variable> &var)
+bool TypeCheckVisitor::visit(Variable *var)
 {
-    std::shared_ptr<SymbolAnnotation> annotation = var->getAnnotation<SymbolAnnotation>();
+    SymbolAnnotation *annotation = var->getAnnotation<SymbolAnnotation>();
     if (!annotation)
     {
         getSemanticContext()->emitError(
                 ErrorSeverity::Fatal,
                 "Internal Compiler Error: Variable has no associated symbol, Definition pass failed?",
                 "TypeCheckVisitor::Variable",
-                var->getFirstSourceReference());
+                var->getSourceRef());
         return false;
     }
 
-    const std::shared_ptr<Symbol> &symbol = annotation->getSymbol();
+    Symbol *symbol = annotation->getSymbol();
 
     std::shared_ptr<Type> usedType = TypeTable::getType(var->getVariableDataType());
     if (!usedType)
@@ -104,45 +165,66 @@ bool TypeCheckVisitor::visit(const std::shared_ptr<struct Variable> &var)
         return true;
     }
 
-    std::shared_ptr<Type> symbolDataType = symbol->getSymbolDataType();
-    if (usedType->getUnderlyingType() == UnderlyingType::Pointer ||
-        usedType->getTypeName() == symbolDataType->getTypeName())
+    Type *symbolDataType = symbol->getSymbolDataType();
+    if (!checkCastSafety(var, symbolDataType, usedType.get()))
+    {
+        return false;
+    }
+
+    var->createAnnotation<TypeCastAnnotation>(getSemanticContext()->getAnnotPool(), symbol, usedType.get());
+    return true;
+}
+
+bool TypeCheckVisitor::visit(WhileAstNode *whileNode)
+{
+    if (!whileNode->getCondition()->accept(this))
+    {
+        return false;
+    }
+
+    LoopGuard loopGuard(m_ctx); // This will set the context to be inside a loop for the duration of this scope,
+                                // allowing break and continue statements.
+    return whileNode->getCodeScope()->accept(this);
+}
+
+bool TypeCheckVisitor::checkCastSafety(AstNode *node, Type *originalType, Type *usedType)
+{
+    if (usedType->getTypeName() == originalType->getTypeName())
     {
         // Used type matches the type of the symbol, no cast needed.
-        // No cast is neither needed for this type of symbol.
         return true;
     }
 
     // Check if casting is safe.
-    if (usedType->getUnderlyingType() == symbolDataType->getUnderlyingType())
+    if (usedType->getUnderlyingType() == originalType->getUnderlyingType())
     {
-        if (usedType->getUnderlyingTypeSize() > symbolDataType->getUnderlyingTypeSize())
+        if (usedType->getUnderlyingTypeSize() > originalType->getUnderlyingTypeSize())
         {
             getSemanticContext()->emitError(
                     ErrorSeverity::NoError,
                     "Used type is bigger than the original symbol size, this might result in more "
                     "instructions in the final code to expand the value",
                     "TypeCheckVisitor::Variable",
-                    var->getFirstSourceReference());
+                    node->getSourceRef());
         }
-        else if (usedType->getUnderlyingTypeSize() < symbolDataType->getUnderlyingTypeSize())
+        else if (usedType->getUnderlyingTypeSize() < originalType->getUnderlyingTypeSize())
         {
             getSemanticContext()->emitError(
                     ErrorSeverity::Warning,
                     "Used type is smaller than the original symbol size, this might result in a data loss",
                     "TypeCheckVisitor::Variable",
-                    var->getFirstSourceReference());
+                    node->getSourceRef());
         }
     }
     else
     {
-        if (symbolDataType->getUnderlyingType() == UnderlyingType::String)
+        if (originalType->getUnderlyingType() == UnderlyingType::String)
         {
             getSemanticContext()->emitError(
                     ErrorSeverity::Fatal,
                     std::format("Can't perform a cast from string to '{}'", usedType->getTypeName()),
                     "TypeCheckVisitor::Variable",
-                    var->getFirstSourceReference());
+                    node->getSourceRef());
             return false;
         }
 
@@ -150,21 +232,152 @@ bool TypeCheckVisitor::visit(const std::shared_ptr<struct Variable> &var)
         {
             getSemanticContext()->emitError(
                     ErrorSeverity::Fatal,
-                    std::format("Can't perform a cast from '{}' to string", symbolDataType->getTypeName()),
+                    std::format("Can't perform a cast from '{}' to string", originalType->getTypeName()),
                     "TypeCheckVisitor::Variable",
-                    var->getFirstSourceReference());
+                    node->getSourceRef());
             return false;
         }
 
         // Types are different, we need to be cautious.
         getSemanticContext()->emitError(ErrorSeverity::Warning,
                                         std::format("Explicit cast from '{}' to '{}' might cause a data loss",
-                                                    symbolDataType->getTypeName(),
+                                                    originalType->getTypeName(),
                                                     usedType->getTypeName()),
                                         "TypeCheckVisitor::Variable",
-                                        var->getFirstSourceReference());
+                                        node->getSourceRef());
+    }
+    return true;
+}
+
+bool TypeCheckVisitor::checkImmediateSafety(ImmediateOperand *operand, Type *usedType)
+{
+    size_t targetSize = static_cast<size_t>(usedType->getUnderlyingTypeSize());
+
+    if (auto *strImm = dynamic_cast<StringImmediate *>(operand); strImm)
+    {
+        if (usedType->getUnderlyingType() != UnderlyingType::String)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            "Cannot assign a string literal to a non-string target.",
+                                            "TypeCheckVisitor::Immediate",
+                                            operand->getSourceRef());
+            return false;
+        }
+        return true;
     }
 
-    var->addAnnotation(std::make_shared<TypeCastAnnotation>(symbol, usedType));
+    if (auto *floatImm = dynamic_cast<FloatImmediate *>(operand); floatImm)
+    {
+        if (usedType->getUnderlyingType() != UnderlyingType::FloatingPoint)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            "Cannot assign a floating-point literal to an integer target.",
+                                            "TypeCheckVisitor::Immediate",
+                                            operand->getSourceRef());
+            return false;
+        }
+        return true;
+    }
+
+    if (auto *smallInt = dynamic_cast<IntegerImmediate *>(operand); smallInt && targetSize <= 64)
+    {
+        if (usedType->getUnderlyingType() != UnderlyingType::Integer)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            "Cannot assign an integer literal to a non-integer target.",
+                                            "TypeCheckVisitor::Immediate",
+                                            operand->getSourceRef());
+            return false;
+        }
+
+        if (smallInt->isSigned())
+        {
+            // Calculate Signed Bounds
+            int64_t maxAllowed = (targetSize == 64) ? INT64_MAX : (1ULL << (targetSize - 1)) - 1;
+            int64_t minAllowed = (targetSize == 64) ? INT64_MIN : -(1ULL << (targetSize - 1));
+
+            int64_t val = static_cast<int64_t>(mp_get_i64(smallInt->getInteger()));
+
+            if (val > maxAllowed || val < minAllowed)
+            {
+                getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                                std::format("Signed literal '{}' is out of bounds for {}-bit type '{}'",
+                                                            val,
+                                                            targetSize,
+                                                            usedType->getTypeName()),
+                                                "TypeCheckVisitor::Immediate",
+                                                smallInt->getSourceRef());
+                return false;
+            }
+        }
+        else
+        {
+            uint64_t maxAllowed = (targetSize == 64) ? UINT64_MAX : ((1ULL << targetSize) - 1);
+            uint64_t val = mp_get_i64(smallInt->getInteger());
+
+            if (smallInt->isSigned() || val > maxAllowed)
+            {
+                getSemanticContext()->emitError(
+                        ErrorSeverity::Fatal,
+                        std::format("Literal is out of bounds or invalid for unsigned {}-bit type '{}'",
+                                    targetSize,
+                                    usedType->getTypeName()),
+                        "TypeCheckVisitor::Immediate",
+                        smallInt->getSourceRef());
+                return false;
+            }
+        }
+    }
+    else if (auto *bigInt = dynamic_cast<IntegerImmediate *>(operand); bigInt)
+    {
+        mp_int max_val, min_val;
+        mp_err err = MP_OKAY; // We need this to avoid warnings about return not being used.
+
+        err = mp_init(&max_val);
+        err = mp_init(&min_val);
+
+        if (bigInt->isSigned())
+        {
+            // Max = 2^(targetSize - 1) - 1
+            err = mp_2expt(&max_val, targetSize - 1);
+            err = mp_sub_d(&max_val, 1, &max_val);
+
+            // Min = -(2^(targetSize - 1))
+            err = mp_2expt(&min_val, targetSize - 1);
+            err = mp_neg(&min_val, &min_val);
+        }
+        else
+        {
+            // Max = 2^targetSize - 1
+            err = mp_2expt(&max_val, targetSize);
+            err = mp_sub_d(&max_val, 1, &max_val);
+
+            // Min = 0
+            mp_zero(&min_val);
+        }
+
+        mp_int *val = bigInt->getInteger();
+        bool isOutOfBounds = false;
+
+        // Compare: val > max_val OR val < min_val
+        if (mp_cmp(val, &max_val) == MP_GT || mp_cmp(val, &min_val) == MP_LT)
+        {
+            isOutOfBounds = true;
+        }
+
+        mp_clear(&max_val);
+        mp_clear(&min_val);
+
+        if (isOutOfBounds)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            std::format("BigInteger literal is too large to fit in {}-bit type '{}'",
+                                                        targetSize,
+                                                        usedType->getTypeName()),
+                                            "TypeCheckVisitor::Immediate",
+                                            bigInt->getSourceRef());
+            return false;
+        }
+    }
     return true;
 }

@@ -8,7 +8,6 @@ enum class UnderlyingType : uint8_t
     Invalid = 0,
     FloatingPoint,
     Integer,
-    Pointer,
     String,
     Void
 };
@@ -35,7 +34,7 @@ class Type
      * @param underlyingTypeSize
      * @param typeName
      */
-    Type(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string &typeName);
+    Type(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string_view &typeName);
 
     /**
      * Returns the underlying type of this type object.
@@ -51,14 +50,14 @@ class Type
 
     /**
      * Returns the name of the type.
-     * @return const std::string &
+     * @return const std::string_view &
      */
-    const std::string &getTypeName() const;
+    const std::string_view &getTypeName() const;
 
   private:
     UnderlyingType m_underlyingType;
     UnderlyingTypeSize m_underlyingTypeSize;
-    std::string m_typeName;
+    std::string_view m_typeName;
 };
 
 /**
@@ -72,17 +71,23 @@ class TypeTable
      * @param typeName
      * @return bool
      */
-    static bool doesTypeExists(const std::string &typeName);
+    static bool doesTypeExists(const std::string_view &typeName);
 
     /**
      * Returns a type, if exists, of the given typeName. Returns true if type does not exist.
      * @param typeName
      * @return bool
      */
-    static std::shared_ptr<Type> getType(const std::string &typeName);
+    static std::shared_ptr<Type> getType(const std::string_view &typeName);
+
+    /**
+     * Returns the default type for the compiler.
+     * @return std::shared_ptr<Type>
+     */
+    static std::shared_ptr<Type> getDefaultType();
 
   private:
-    static std::map<std::string, std::shared_ptr<Type>> m_types;
+    static std::map<std::string_view, std::shared_ptr<Type>> m_types;
 };
 
 #endif // EZPACKER_TYPETABLE_H

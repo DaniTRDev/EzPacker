@@ -2,11 +2,12 @@
 
 namespace ModuleParser
 {
-std::shared_ptr<AstNode> ModuleHeaderParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *ModuleHeaderParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
+    ModuleHeader *node = nullptr;
+    StringPool *stringPool = ctx->getStringPool();
+    TypedPool *nodePool = ctx->getNodePool();
     TokenInformation nameToken, returnTypeToken;
-    std::shared_ptr<::ModuleHeader> node;
-    std::vector<std::shared_ptr<AstNode>> arguments;
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, &returnTypeToken, _TokenType::Identifier))
     {
@@ -26,7 +27,8 @@ std::shared_ptr<AstNode> ModuleHeaderParser::parse(const std::shared_ptr<BasicPa
         return nullptr;
     }
 
-    std::string &name = nameToken.m_str, &returnType = returnTypeToken.m_str;
+    std::string_view name = stringPool->createConstantString(nameToken.m_str),
+                     returnType = stringPool->createConstantString(returnTypeToken.m_str);
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftParen))
     {
@@ -43,6 +45,7 @@ std::shared_ptr<AstNode> ModuleHeaderParser::parse(const std::shared_ptr<BasicPa
      * Which can only be a ModuleHeader.
      */
 
+    TypedPoolSlice<AstNode> *arguments = nodePool->createSlice<AstNode>();
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
     {
 
@@ -53,7 +56,7 @@ std::shared_ptr<AstNode> ModuleHeaderParser::parse(const std::shared_ptr<BasicPa
         // At least 1 parameter is expected.
         do
         {
-            std::shared_ptr<AstNode> argument;
+            AstNode *argument = nullptr;
             if (argument = batch.parse(ctx).m_node; !argument)
             {
                 ctx->emitError(ErrorSeverity::Fatal,
@@ -62,8 +65,7 @@ std::shared_ptr<AstNode> ModuleHeaderParser::parse(const std::shared_ptr<BasicPa
                                ctx->getLastSourceReference());
                 return nullptr;
             }
-
-            arguments.push_back(std::move(argument));
+            nodePool->appendToSlice(arguments, argument);
         } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
         if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
@@ -76,20 +78,20 @@ std::shared_ptr<AstNode> ModuleHeaderParser::parse(const std::shared_ptr<BasicPa
         }
     }
 
-    node = std::make_shared<::ModuleHeader>(std::move(name), std::move(returnType), std::move(arguments));
-    return std::move(node);
+    node = nodePool->create<ModuleHeader>(arguments, name, returnType);
+    return node;
 }
 
-std::shared_ptr<AstNode> ModuleParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *ModuleParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     // Order is important, we can't alphabetically order these variables.
-    std::shared_ptr<AstNode> header = ModuleHeaderParser().parse(ctx);
+    AstNode *header = ModuleHeaderParser().parse(ctx);
     if (!header)
     {
         return nullptr;
     }
 
-    std::shared_ptr<AstNode> body = CodeScopeParser().parse(ctx);
+    AstNode *body = CodeScopeParser().parse(ctx);
     if (!body)
     {
         ctx->emitError(ErrorSeverity::Fatal,
@@ -99,7 +101,6 @@ std::shared_ptr<AstNode> ModuleParser::parse(const std::shared_ptr<BasicParsingC
         return nullptr;
     }
 
-    return std::make_shared<Module>(std::move(std::dynamic_pointer_cast<CodeScope>(body)),
-                                    std::move(std::dynamic_pointer_cast<ModuleHeader>(header)));
+    return ctx->getNodePool()->create<Module>((CodeScope *)body, (ModuleHeader *)header);
 }
 }; // namespace ModuleParser

@@ -11,9 +11,9 @@ class LabelParser : public IAstNodeParser
   public:
     /**
      * Tries to parse a label out of the token list within context.
-     * @return std::shared_ptr<Label>
+     * @return Label*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 #endif // EZPACKER_LABELPARSER_H

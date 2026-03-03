@@ -11,7 +11,7 @@
 class IAstNodeAnnotation
 {
   public:
-    virtual ~IAstNodeAnnotation() = default;
+    ~IAstNodeAnnotation() = default;
 
     /**
      * Returns the name of the Annotation.
@@ -23,10 +23,10 @@ class IAstNodeAnnotation
 enum class AstNodeType
 {
     Invalid = 0,
+    Break,
     CodeScope,
     Condition,
-    Elif, //"elif"
-    Else,
+    Continue,
     If,
     Instruction,
     Immediate,
@@ -47,16 +47,49 @@ enum class AstNodeStringMode : uint8_t
 /**
  * Very crucial class for the entire frontend. This class holds information about a node in the abstract syntax tree
  * (AST). It's also indispensable for the Annotator (during semantic analysis) because it keeps a pointer to an
- * annotation that will be used to give a meaning to the AST.
+ * annotation list that will be used to give a meaning to the AST.
  */
 class AstNode
 {
   public:
     /**
+     * Creates the given annotation type with the given arguments and adds it to the node.
+     * @tparam Args
+     * @param annotPool
+     * @param args
+     */
+    template <typename AnnotType, typename... Args>
+        requires(std::is_base_of<IAstNodeAnnotation, AnnotType>::value)
+    AnnotType *createAnnotation(TypedPool *annotPool, Args &&...args)
+    {
+        if (!annotPool)
+        {
+            throw std::runtime_error(
+                    "Internal compiler error: Tries to annotate something invalid or pool is not valid");
+        }
+
+        if (!m_annotations)
+        {
+            m_annotations = annotPool->createSlice<IAstNodeAnnotation>();
+        }
+
+        return annotPool->createAndAppendToSliceInFront<AnnotType, IAstNodeAnnotation>(m_annotations,
+                                                                                       std::forward<Args>(args)...);
+    }
+
+    /**
      * Returns the type of the node.
      * @return AstNodeType
      */
     virtual AstNodeType getType() const = 0;
+
+    /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type.Returns
+     * the result of visit.
+     * @param visitor
+     * @return
+     */
+    virtual bool accept(class AstNodeVisitor *visitor) = 0;
 
     /**
      * Returns true if this node has annotations.
@@ -71,28 +104,30 @@ class AstNode
     virtual const char *getAstNodeName() const = 0;
 
     /**
-     * Adds an annotation to this node. It sets it as the first-top-most annotation.
-     * @param annotation
+     * Returns the source references of this node. May or may not return an empty array.
+     * @return const SourceReference &
      */
-    void addAnnotation(const std::shared_ptr<IAstNodeAnnotation> &annotation);
-
-    /**
-     * Adds 1 source reference for this node.
-     * @param ref
-     */
-    void setSourceRef(const std::shared_ptr<SourceReference> &ref);
-
-    /**
-     * Adds given source references to this node.
-     * @param ref
-     */
-    void setSourceRef(const std::vector<std::shared_ptr<SourceReference>> &refs);
+    const SourceReference &getSourceRef() const;
 
     /**
      * Returns the annotation of this node. If set, result != nullptr; other ways result = nullptr.
-     * @return const std::shared_ptr<IAstNodeAnnotation> &
+     * @return TypedPoolSlice<IAstNodeAnnotation> *
      */
-    const std::list<std::shared_ptr<IAstNodeAnnotation>> &getAnnotations() const;
+    TypedPoolSlice<IAstNodeAnnotation> *getAnnotations();
+
+    /**
+     * Sets the source references of this node.
+     * @param ref
+     */
+    void setSourceRefs(const SourceReference &ref);
+
+    /**
+     * Adds an annotation to the node. If no previous annotation was made, a new slice is created from the annot pool
+     * and the element is appended.
+     * @param annot
+     * @param annotPool
+     */
+    void addAnnotation(IAstNodeAnnotation *annot, TypedPool *annotPool);
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -103,39 +138,29 @@ class AstNode
     virtual std::string getAsStr(AstNodeStringMode mode) const = 0;
 
     /**
-     * Returns the first source reference out of the reference array. If no references are set, nullptr is returned.
-     * @return std::shared_ptr<SourceReference>
-     */
-    std::shared_ptr<SourceReference> getFirstSourceReference() const;
-
-    /**
-     * Returns an annotation based on its type. By design, a node can't have 2 annotations with the same type. This
-     * module will return the FIRST one, traversing the list in DESCENDING order.
-     * @tparam T
-     * @return const std::shared_ptr<T> &
+     * Returns the first annotation in the list, cast to the requested type T. By design, a node should not have
+     * two annotations of the same type. If no annotations exist, nullptr is returned.
+     * @tparam T Annotation type (must derive from IAstNodeAnnotation).
+     * @return T * Pointer to the annotation, or nullptr if none exist.
      */
     template <typename T>
         requires(std::is_base_of<IAstNodeAnnotation, T>::value)
-    std::shared_ptr<T> getAnnotation() const
+    T *getAnnotation() const
     {
-        for (auto &annot : m_annotations)
+        if (!m_annotations)
+            return nullptr;
+
+        for (IAstNodeAnnotation *annot : *m_annotations)
         {
-            if (auto casted = std::dynamic_pointer_cast<T>(annot); casted)
-                return casted;
+            return dynamic_cast<T *>(annot);
         }
 
         return nullptr;
     }
 
-    /**
-     * Returns the source references of this node. May or may not return an empty array.
-     * @return const std::vector<std::shared_ptr<SourceReference>> &
-     */
-    const std::vector<std::shared_ptr<SourceReference>> &getSourceRefs() const;
-
   private:
-    std::list<std::shared_ptr<IAstNodeAnnotation>> m_annotations;
-    std::vector<std::shared_ptr<SourceReference>> m_sourceRefs;
+    SourceReference m_sourceRef;                                  // A node might or might not have a source reference.
+    TypedPoolSlice<IAstNodeAnnotation> *m_annotations{ nullptr }; // A node might or might not have an annotation.
 };
 
 #endif // EZPACKER_AST_H

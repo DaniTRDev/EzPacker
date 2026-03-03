@@ -13,16 +13,17 @@ void SymbolResolverVisitorTestFixture::SetUp()
             [](void *userParam, const std::shared_ptr<Error> &error) -> void
             {
                 SymbolResolverVisitorTestFixture *fixture = (SymbolResolverVisitorTestFixture *)userParam;
-                if (error->m_sourceRef)
+                if (error->m_sourceRef.m_valid)
                 {
-                    g_logger->pushLog(LogMessage("[{}]{} {}:{}:{} {} \n\t {}",
-                                                 error->m_sender,
-                                                 error->m_timeStamp,
-                                                 error->m_sourceRef->m_sourceFile,
-                                                 error->m_sourceRef->m_line,
-                                                 error->m_sourceRef->m_col,
-                                                 error->m_message,
-                                                 fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
+                    g_logger->pushLog(
+                            LogMessage("[{}]{} {}:{}:{} {} \n\t {}",
+                                       error->m_sender,
+                                       error->m_timeStamp,
+                                       fixture->m_sourceManager->getSourceName(error->m_sourceRef.m_sourceFileId),
+                                       error->m_sourceRef.m_line,
+                                       error->m_sourceRef.m_col,
+                                       error->m_message,
+                                       fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
                 }
                 else
                 {

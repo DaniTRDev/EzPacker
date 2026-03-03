@@ -2,16 +2,22 @@ set(EZSEMANTICS_FILES_LIST
         "include/BasicSemanticContext.h"
         "include/EzSemantics.h"
         "include/EzSemanticsCommon.h"
-        "include/HighLevelMirVisitor.h"
         "include/SemanticVisitor.h"
-        "include/HighLevelMir/HighLevelInstructionSet.h"
-        "include/HighLevelMir/HighLevelMirBlock.h"
-        "include/HighLevelMir/HighLevelMirDefs.h"
-        "include/HighLevelMir/HighLevelMirInstruction.h"
-        "include/HighLevelMir/HighLevelMirInstructionOperand.h"
-        "include/HighLevelMir/HighLevelMirModule.h"
-        "include/HighLevelMirVisitors/InstructionSemanticCheckerVisitor.h"
-        "include/HighLevelMirVisitors/ModuleInstructionLowererVisitor.h"
+        "include/AstLowererVisitor/AstLowererVisitor.h"
+        "include/AstLowererVisitor/BreakLowerer.h"
+        "include/AstLowererVisitor/CodeScopeLowerer.h"
+        "include/AstLowererVisitor/ConditionLowerer.h"
+        "include/AstLowererVisitor/ContinueLowerer.h"
+        "include/AstLowererVisitor/GenericLowerer.h"
+        "include/AstLowererVisitor/IfLowerer.h"
+        "include/AstLowererVisitor/ImmediateLowerer.h"
+        "include/AstLowererVisitor/InstructionLowerer.h"
+        "include/AstLowererVisitor/LabelLowerer.h"
+        "include/AstLowererVisitor/LoweringContext.h"
+        "include/AstLowererVisitor/MemoryLowerer.h"
+        "include/AstLowererVisitor/ModuleLowerer.h"
+        "include/AstLowererVisitor/VariableLowerer.h"
+        "include/AstLowererVisitor/WhileLowerer.h"
         "include/Scope/Scope.h"
         "include/Scope/Symbol.h"
         "include/Scope/TypeTable.h"
@@ -25,14 +31,21 @@ set(EZSEMANTICS_FILES_LIST
         "include/SymbolVisitors/TypeCheckVisitor.h"
 
         "src/BasicSemanticContext.cpp"
-        "src/HighLevelMirVisitor.cpp"
         "src/SemanticVisitor.cpp"
-        "src/HighLevelMir/HighLevelMirBlock.cpp"
-        "src/HighLevelMir/HighLevelMirInstruction.cpp"
-        "src/HighLevelMir/HighLevelMirInstructionOperand.cpp"
-        "src/HighLevelMir/HighLevelMirModule.cpp"
-        "src/HighLevelMirVisitors/InstructionSemanticCheckerVisitor.cpp"
-        "src/HighLevelMirVisitors/ModuleInstructionLowererVisitor.cpp"
+        "src/AstLowererVisitor/AstLowererVisitor.cpp"
+        "src/AstLowererVisitor/BreakLowerer.cpp"
+        "src/AstLowererVisitor/CodeScopeLowerer.cpp"
+        "src/AstLowererVisitor/ConditionLowerer.cpp"
+        "src/AstLowererVisitor/ContinueLowerer.cpp"
+        "src/AstLowererVisitor/IfLowerer.cpp"
+        "src/AstLowererVisitor/ImmediateLowerer.cpp"
+        "src/AstLowererVisitor/InstructionLowerer.cpp"
+        "src/AstLowererVisitor/LabelLowerer.cpp"
+        "src/AstLowererVisitor/LoweringContext.cpp"
+        "src/AstLowererVisitor/MemoryLowerer.cpp"
+        "src/AstLowererVisitor/ModuleLowerer.cpp"
+        "src/AstLowererVisitor/VariableLowerer.cpp"
+        "src/AstLowererVisitor/WhileLowerer.cpp"
         "src/Scope/Scope.cpp"
         "src/Scope/Symbol.cpp"
         "src/Scope/TypeTable.cpp"
@@ -49,7 +62,7 @@ set(EZSEMANTICS_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzSemantics"
         FILE_LIST ${EZSEMANTICS_FILES_LIST}
         PRECOMPILED_HEADER "include/EzSemanticsCommon.h"
-        LINKED_LIBRARIES "EzLexer"
+        LINKED_LIBRARIES "EzLexer;EzMir"
         INCLUDED_DIRS "include")
 
 EzPacker_AddTest(
@@ -67,22 +80,94 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
-        "TypeCastVisitorTest"
+        "TypeCheckVisitorTest"
         "EzSemantics;EzLexer;gtest_main"
         ""
-        "tests/SymbolVisitors/TypeCastVisitorTest.cpp;tests/SymbolVisitors/TypeCastVisitorTestFixture.h;tests/SymbolVisitors/TypeCastVisitorTestFixture.cpp"
+        "tests/SymbolVisitors/TypeCheckVisitorTest.cpp;tests/SymbolVisitors/TypeCheckVisitorTestFixture.h;tests/SymbolVisitors/TypeCheckVisitorTestFixture.cpp"
 )
 
 EzPacker_AddTest(
-        "InstructionLowererVisitorTest"
-        "EzSemantics;EzLexer;gtest_main"
+        "AstLowererVisitorTest"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
         ""
-        "tests/HighLevelMirVisitors/InstructionLowererVisitorTest.cpp;tests/HighLevelMirVisitors/InstructionLowererVisitorTestFixture.h;tests/HighLevelMirVisitors/InstructionLowererVisitorTestFixture.cpp"
+        "tests/AstLowererVisitor/AstLowererVisitorTest.cpp;tests/AstLowererVisitor/AstLowererVisitorTestFixture.h;tests/AstLowererVisitor/AstLowererVisitorTestFixture.cpp"
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  LoweringPipeline – file-based integration tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+set(LP_FIXTURE
+        "tests/LoweringPipeline/LoweringPipelineTestFixture.h;tests/LoweringPipeline/LoweringPipelineTestFixture.cpp"
 )
 
 EzPacker_AddTest(
-        "InstructionSemanticCheckerVisitorTest"
-        "EzSemantics;EzLexer;gtest_main"
+        "LP_ArithmeticLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
         ""
-        "tests/HighLevelMirVisitors/InstructionSemanticCheckerVisitorTest.cpp;tests/HighLevelMirVisitors/InstructionSemanticCheckerVisitorTestFixture.h;tests/HighLevelMirVisitors/InstructionSemanticCheckerVisitorTestFixture.cpp"
+        "tests/LoweringPipeline/ArithmeticLoweringTest.cpp;${LP_FIXTURE}"
 )
+
+EzPacker_AddTest(
+        "LP_BitwiseLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/BitwiseLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_DataMovementLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/DataMovementLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_IfLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/IfLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_WhileLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/WhileLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_LabelLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/LabelLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_ModuleLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/ModuleLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_VariableLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/VariableLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_ImmediateLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/ImmediateLoweringTest.cpp;${LP_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "LP_ComplexProgramLowering"
+        "EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/LoweringPipeline/ComplexProgramLoweringTest.cpp;${LP_FIXTURE}"
+)
+

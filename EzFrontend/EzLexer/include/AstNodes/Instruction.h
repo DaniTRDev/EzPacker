@@ -5,20 +5,22 @@
 #include "Variable.h"
 #include "MemoryOperand.h"
 #include "ImmediateOperand.h"
+#include "AstNode/AstNodeContainer.h"
+#include "AstNode/AstNodeVisitor.h"
 
 /**
  * This class represents an instruction in our language. Special instructions (that require extra logic) must inherit
  * from this class.
  */
-class Instruction : public AstNode
+class Instruction : public AstNode, public AstNodeContainer
 {
   public:
     /**
-     * Creates the instruction with the given name and operands.
-     * @param instructionName
+     * Creates the instruction with the given operands and instruction name.
      * @param operands
+     * @param instructionName
      */
-    Instruction(std::string instructionName, std::vector<std::shared_ptr<AstNode>> operands);
+    Instruction(TypedPoolSlice<AstNode> *operands, std::string_view instructionName);
 
     /**
      * Returns AstNodeType::Instruction.
@@ -27,16 +29,18 @@ class Instruction : public AstNode
     AstNodeType getType() const override;
 
     /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+
+    /**
      * Returns "Instruction".
      * @return const char*
      */
     const char *getAstNodeName() const override;
-
-    /**
-     * Returns the number of operands this instruction has.
-     * @return
-     */
-    size_t getOperandCount() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -50,19 +54,12 @@ class Instruction : public AstNode
 
     /**
      * Returns the name of the instruction.
-     * @return const std::string &
+     * @return const std::string_view &
      */
-    const std::string &getInstructionName() const;
-
-    /**
-     * Returns the operands of this instruction.
-     * @return const std::vector<std::shared_ptr<AstNode>> &
-     */
-    const std::vector<std::shared_ptr<AstNode>> &getOperands() const;
+    const std::string_view &getInstructionName() const;
 
   private:
-    std::string m_instructionName;
-    std::vector<std::shared_ptr<AstNode>> m_operands;
+    std::string_view m_instructionName;
 };
 
 /**
@@ -73,12 +70,12 @@ class CallInstruction : public Instruction
 {
   public:
     /**
-     * Creates the call instruction with the given calleName, return type and parameters.
+     * Creates the call instruction with the given params, calleName and return type.
+     * @param params
      * @param calleeName
      * @param returnType
-     * @param parameters
      */
-    CallInstruction(std::string calleeName, std::string returnType, std::vector<std::shared_ptr<AstNode>> parameters);
+    CallInstruction(TypedPoolSlice<AstNode> *params, std::string_view calleeName, std::string_view returnType);
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -92,19 +89,19 @@ class CallInstruction : public Instruction
 
     /**
      * Returns the name of the callee function.
-     * @return const std::string &
+     * @return const std::string_view &
      */
-    const std::string &getCalleeName() const;
+    const std::string_view &getCalleeName() const;
 
     /**
      * Returns the "return type" of the function.
-     * @return const std::string &
+     * @return const std::string_view &
      */
-    const std::string &getReturnType() const;
+    const std::string_view &getReturnType() const;
 
   private:
-    std::string m_calleeName;
-    std::string m_returnType;
+    std::string_view m_calleeName;
+    std::string_view m_returnType;
 };
 
 #endif // EZPACKER_INSTRUCTION_H

@@ -8,6 +8,8 @@
 #include "AstNodeParsers/ParserBatch.h"
 
 // TODO: Fix circular dependency between CodeScopeParser and: InstructionParser, LabelParser, IfParser, WhileParser.
+#include "AstNodeParsers/Parsers/BreakParser.h"
+#include "AstNodeParsers/Parsers/ContinueParser.h"
 #include "AstNodeParsers/Parsers/IfParser.h"
 #include "AstNodeParsers/Parsers/InstructionParser.h"
 #include "AstNodeParsers/Parsers/LabelParser.h"
@@ -19,9 +21,9 @@ class CodeScopeParser : public IAstNodeParser
     /**
      * Tries to parse the code of a scope.
      * @param ctx
-     * @return std::shared_ptr<::ModuleHeaderParser>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 #endif // EZPACKER_CODESCOPEPARSER_H

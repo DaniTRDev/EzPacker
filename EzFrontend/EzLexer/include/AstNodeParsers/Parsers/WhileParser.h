@@ -14,9 +14,9 @@ class WhileParser : public IAstNodeParser
     /**
      * Tries to parse a while block.
      * @param ctx
-     * @return std::shared_ptr<IfAstNode>
+     * @return WhileAstNode *
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 #endif // EZPACKER_WHILEPARSER_H

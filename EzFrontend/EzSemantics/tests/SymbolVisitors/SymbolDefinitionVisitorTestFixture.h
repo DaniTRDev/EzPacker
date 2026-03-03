@@ -48,27 +48,14 @@ class SymbolDefinitionVisitorTestFixture : public ::testing::Test
          * IMPORTANT NOTE: Global variables are not handled because they are essentially a local variable but on top
          * scope.
          */
-        bool result = true;
-
-        if (auto instr = std::dynamic_pointer_cast<Instruction>(m_astNode))
-        {
-            result = m_visitor->visit(instr);
-        }
-        else if (auto label = std::dynamic_pointer_cast<Label>(m_astNode))
-        {
-            result = m_visitor->visit(label);
-        }
-        else if (auto module = std::dynamic_pointer_cast<Module>(m_astNode))
-        {
-            result = m_visitor->visit(module);
-        }
+        bool result = m_astNode->accept(m_visitor.get());
 
         m_errorCollector->endScope(ErrorAction::Propagate);
         return result;
     }
 
     std::shared_ptr<BasicSemanticContext> getSemanticContext() { return m_semanticContext; }
-    std::shared_ptr<AstNode> getAstNode() { return m_astNode; }
+    AstNode* getAstNode() { return m_astNode; }
 
   protected:
     std::shared_ptr<SyncLogger> m_logger;
@@ -79,7 +66,7 @@ class SymbolDefinitionVisitorTestFixture : public ::testing::Test
     std::shared_ptr<BasicParsingContext> m_parsingContext;
     std::shared_ptr<BasicSemanticContext> m_semanticContext;
     std::shared_ptr<SymbolDefinitionVisitor> m_visitor;
-    std::shared_ptr<AstNode> m_astNode;
+    AstNode* m_astNode;
 };
 
 #endif // EZPACKER_SYMBOLDEFINITIONVISITORTESTFIXTURE_H

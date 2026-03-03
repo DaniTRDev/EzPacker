@@ -24,7 +24,7 @@ class SourceLoggingSink : public LogSink
      */
     virtual void logSourceError(LogMessage msg,
                                 const std::shared_ptr<SourceManager> &sourceManager,
-                                const std::shared_ptr<SourceReference> &sourceRef);
+                                const SourceReference &sourceRef);
 
     /**
      * Logs a given message, adding source reference.
@@ -34,7 +34,7 @@ class SourceLoggingSink : public LogSink
      */
     virtual void logSourceMessage(LogMessage msg,
                                   const std::shared_ptr<SourceManager> &sourceManager,
-                                  const std::shared_ptr<SourceReference> &sourceRef);
+                                  const SourceReference &sourceRef);
 
     /**
      * Logs a given warning message, adding source reference.
@@ -44,7 +44,7 @@ class SourceLoggingSink : public LogSink
      */
     virtual void logSourceWarning(LogMessage msg,
                                   const std::shared_ptr<SourceManager> &sourceManager,
-                                  const std::shared_ptr<SourceReference> &sourceRef);
+                                  const SourceReference &sourceRef);
 
   private:
 };

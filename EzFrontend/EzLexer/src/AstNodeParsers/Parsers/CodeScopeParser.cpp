@@ -1,9 +1,7 @@
 #include "AstNodeParsers/Parsers/CodeScopeParser.h"
 
-std::shared_ptr<AstNode> CodeScopeParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *CodeScopeParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    std::shared_ptr<CodeScope> node;
-
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftBrace))
     {
         ctx->emitError(ErrorSeverity::Fatal,
@@ -13,21 +11,28 @@ std::shared_ptr<AstNode> CodeScopeParser::parse(const std::shared_ptr<BasicParsi
         return nullptr;
     }
 
-    node = std::make_shared<CodeScope>();
+    TypedPool *nodePool = ctx->getNodePool();
+    TypedPoolSlice<AstNode> *expressions = nodePool->createSlice<AstNode>();
+
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightBrace))
     {
         // At least 1 instruction is expected;
         ParserBatch batch;
-        batch.addParsersFromTypeList<LabelParser, IfParser, WhileParser, InstructionParser::InstructionParser>();
+        batch.addParsersFromTypeList<LabelParser,
+                                     IfParser,
+                                     WhileParser,
+                                     InstructionParser::InstructionParser,
+                                     ContinueParser,
+                                     BreakParser>();
 
-        std::shared_ptr<AstNode> exprNode = batch.parse(ctx).m_node;
+        AstNode *exprNode = batch.parse(ctx).m_node;
         while (exprNode)
         {
-            node->addExpression(exprNode);
+            nodePool->appendToSlice(expressions, exprNode);
             exprNode = batch.parse(ctx).m_node;
         }
 
-        if (!node->containsExpressions())
+        if (expressions->m_numElems == 0)
         {
             ctx->emitError(ErrorSeverity::Fatal,
                            "Expected instruction or nested label in module body",
@@ -46,5 +51,8 @@ std::shared_ptr<AstNode> CodeScopeParser::parse(const std::shared_ptr<BasicParsi
         }
     }
 
-    return std::move(node);
+    CodeScope *node = nodePool->create<CodeScope>();
+    node->setExpressions(expressions);
+
+    return node;
 }

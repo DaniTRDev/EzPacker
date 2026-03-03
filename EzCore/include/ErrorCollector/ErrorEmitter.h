@@ -30,7 +30,7 @@ class ErrorEmitter
     virtual void emitError(ErrorSeverity severity,
                            const std::string &message,
                            const std::string &sender,
-                           const std::shared_ptr<SourceReference> &sourceRef = nullptr);
+                           const SourceReference &sourceRef = {});
 
     /**
      * Returns the error collector.

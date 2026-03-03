@@ -1,19 +1,25 @@
 #include "AstNodes/Instruction.h"
 
-Instruction::Instruction(std::string instructionName, std::vector<std::shared_ptr<AstNode>> operands) :
-    m_instructionName(instructionName), m_operands(operands)
+Instruction::Instruction(TypedPoolSlice<AstNode> *operands, std::string_view instructionName) :
+    m_instructionName(instructionName)
 {
+    AstNodeContainer::setExpressions(operands);
 }
 
 AstNodeType Instruction::getType() const { return AstNodeType::Instruction; }
 
+bool Instruction::accept(AstNodeVisitor *visitor)
+{
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+    return false;
+}
+
 const char *Instruction::getAstNodeName() const { return "Instruction"; }
 
-const std::string &Instruction::getInstructionName() const { return m_instructionName; }
-
-size_t Instruction::getOperandCount() const { return m_operands.size(); }
-
-const std::vector<std::shared_ptr<AstNode>> &Instruction::getOperands() const { return m_operands; }
+const std::string_view &Instruction::getInstructionName() const { return m_instructionName; }
 
 std::string Instruction::getAsStr(AstNodeStringMode mode) const
 {
@@ -21,10 +27,15 @@ std::string Instruction::getAsStr(AstNodeStringMode mode) const
 
     if (mode == AstNodeStringMode::Debug)
     {
-        auto &operands = getOperands();
-        for (size_t i = 0; i < operands.size(); i++)
+        auto operand = getExpressions()->m_head;
+        size_t i = 0;
+
+        while (operand && operand->m_object)
         {
-            res += std::format("\t{} = {}\n", i, operands[i]->getAsStr(mode));
+            AstNode *node = (AstNode *)operand->m_object;
+            res += std::format("\t{} = {}\n", i, node->getAsStr(mode));
+            operand = operand->m_next;
+            i++;
         }
     }
 
@@ -32,16 +43,14 @@ std::string Instruction::getAsStr(AstNodeStringMode mode) const
     return std::move(res);
 }
 
-CallInstruction::CallInstruction(std::string calleeName,
-                                 std::string returnType,
-                                 std::vector<std::shared_ptr<AstNode>> parameters) :
-    m_calleeName(std::move(calleeName)), m_returnType(std::move(returnType)), Instruction("call", std::move(parameters))
+CallInstruction::CallInstruction(TypedPoolSlice<AstNode> *params, std::string_view calleeName, std::string_view returnType) :
+    m_calleeName(std::move(calleeName)), m_returnType(std::move(returnType)), Instruction(params, "call")
 {
 }
 
-const std::string &CallInstruction::getCalleeName() const { return m_calleeName; }
+const std::string_view &CallInstruction::getCalleeName() const { return m_calleeName; }
 
-const std::string &CallInstruction::getReturnType() const { return m_returnType; }
+const std::string_view &CallInstruction::getReturnType() const { return m_returnType; }
 
 std::string CallInstruction::getAsStr(AstNodeStringMode mode) const
 {
@@ -49,10 +58,15 @@ std::string CallInstruction::getAsStr(AstNodeStringMode mode) const
 
     if (mode == AstNodeStringMode::Debug)
     {
-        auto &parameters = getOperands();
-        for (size_t i = 0; i < parameters.size(); i++)
+        auto parameter = getExpressions()->m_head;
+        size_t i = 0;
+
+        while (parameter && parameter->m_object)
         {
-            res += std::format("{} = {}\n", i, parameters[i]->getAsStr(mode));
+            AstNode *node = (AstNode *)parameter->m_object;
+            res += std::format("\t{} = {}\n", i, node->getAsStr(mode));
+            parameter = parameter->m_next;
+            i++;
         }
     }
 

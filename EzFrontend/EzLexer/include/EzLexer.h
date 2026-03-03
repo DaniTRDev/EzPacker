@@ -34,6 +34,10 @@
 
 #include "ErrorCollector/ErrorCollector.h"
 
+#include "TypedPool/StringPool.h"
+#include "TypedPool/TypedArrayPool.h"
+#include "TypedPool/TypedPool.h"
+
 #include "Tokenizer/BasicTokenizer.h"
 
 #endif // EZPACKER_EZLEXER_H

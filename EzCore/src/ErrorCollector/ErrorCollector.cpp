@@ -100,7 +100,7 @@ void ErrorCollector::endScope(ErrorAction action)
 void ErrorCollector::onError(ErrorSeverity severity,
                              const std::string &message,
                              const std::string &sender,
-                             const std::shared_ptr<SourceReference> &sourceRef)
+                             const SourceReference &sourceRef)
 {
     std::scoped_lock lock(m_mutex);
 

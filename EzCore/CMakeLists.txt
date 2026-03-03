@@ -19,6 +19,8 @@ function(BuildEzCore)
             "include/ErrorCollector/ErrorEmitter.h"
             "include/Logger/SourceLoggingSink.h"
             "include/SourceManager/SourceManager.h"
+            "include/TypedPool/TypedArrayPool.h"
+            "include/TypedPool/TypedPool.h"
 
             "src/ErrorCollector/ErrorCollector.cpp"
             "src/ErrorCollector/ErrorEmitter.cpp"

@@ -2,33 +2,39 @@
 #define EZPACKER_VARIABLE_H
 
 #include "EzLexerCommon.h"
+#include "AstNode/AstNodeContainer.h"
+#include "AstNode/AstNodeVisitor.h"
 #include "AstNodes/ImmediateOperand.h"
 
 /**
  * This AstNode defines a global variable, local variable or function argument. The parser is blind about "where" the
  * definition of the variable is made. The semantic checker is the responsible of setting m_isLocal properly.
  */
-class Variable : public AstNode
+class Variable : public AstNode, public AstNodeContainer
 {
   public:
     /**
      * Creates the variable with the given data type, variable name and initializers. By default initializers are not
      * set (default parameters = {}). Also sets if this variable is an array or it isn't.
-     * @param isArray
+     * @param initializers
      * @param dataType
      * @param variableName
-     * @param initializers
      */
-    Variable(bool isArray,
-             std::string dataType,
-             std::string variableName,
-             std::vector<std::shared_ptr<AstNode>> initializers = {});
+    Variable(TypedPoolSlice<AstNode> *initializers, std::string_view dataType, std::string_view variableName);
 
     /**
      * Returns AstNodeType::Variable.
      * @return AstNodeType
      */
     AstNodeType getType() const override;
+
+    /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
 
     /**
      * Returns if this variable is an array.
@@ -53,27 +59,20 @@ class Variable : public AstNode
 
     /**
      * Returns the data-type name of this variable.
-     * @return const std::string &
+     * @return const std::string_view &
      */
-    const std::string &getVariableDataType() const;
+    const std::string_view &getVariableDataType() const;
 
     /**
      * Returns the name of this variable
      * @return const std::string &
      */
-    const std::string &getVariableName() const;
-
-    /**
-     * Returns the initializers for the current variable.
-     * @return const std::vector<std::shared_ptr<AstNode>> &
-     */
-    const std::vector<std::shared_ptr<AstNode>> &getInitializers() const;
+    const std::string_view &getVariableName() const;
 
   private:
     bool m_isArray;
-    std::string m_variableName;
-    std::string m_variableDataType;
-    std::vector<std::shared_ptr<AstNode>> m_initializers;
+    std::string_view m_variableName;
+    std::string_view m_variableDataType;
 };
 
 #endif // EZPACKER_VARIABLE_H

@@ -1,0 +1,42 @@
+# Labels and jumps control flow test program
+# Tests: multiple labels, nested labels, instructions in labels
+
+void ControlFlowLabels(i32 %x, i32 %y)
+{
+    create i32 %counter;
+    create i32 %acc;
+
+    mov %counter, 0;
+    mov %acc, 0;
+
+    label_init:
+    {
+        mov %counter, %x;
+        mov %acc, %y;
+    }
+
+    label_compute:
+    {
+        add %acc, %counter;
+        sub %counter, 1;
+    }
+
+    label_nested_outer:
+    {
+        add %acc, 10;
+
+        label_nested_inner:
+        {
+            add %acc, 20;
+            nop;
+        }
+
+        sub %acc, 5;
+    }
+
+    label_final:
+    {
+        nop;
+    }
+}
+

@@ -15,9 +15,9 @@ class IfParser : public IAstNodeParser
     /**
      * Tries to parse an if-elseif-else block.
      * @param ctx
-     * @return std::shared_ptr<IfAstNode>
+     * @return IfAstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
+    AstNode* parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
 
 #endif // EZPACKER_IFPARSER_H

@@ -50,13 +50,7 @@ class SymbolResolverVisitorTestFixture : public ::testing::Test
             m_definitionVisitor = std::make_shared<SymbolDefinitionVisitor>();
             m_definitionVisitor->setSemanticContext(m_semanticContext);
 
-            bool defResult = false;
-            if (auto instr = std::dynamic_pointer_cast<Instruction>(m_astNode))
-                defResult = m_definitionVisitor->visit(instr);
-            else if (auto label = std::dynamic_pointer_cast<Label>(m_astNode))
-                defResult = m_definitionVisitor->visit(label);
-            else if (auto module = std::dynamic_pointer_cast<Module>(m_astNode))
-                defResult = m_definitionVisitor->visit(module);
+            bool defResult = m_astNode->accept(m_definitionVisitor.get());
 
             if (!defResult)
             {
@@ -69,26 +63,14 @@ class SymbolResolverVisitorTestFixture : public ::testing::Test
         m_resolverVisitor = std::make_shared<SymbolAndTypeResolverVisitor>();
         m_resolverVisitor->setSemanticContext(m_semanticContext);
 
-        bool result = true;
-        if (auto instr = std::dynamic_pointer_cast<Instruction>(m_astNode))
-        {
-            result = m_resolverVisitor->visit(instr);
-        }
-        else if (auto label = std::dynamic_pointer_cast<Label>(m_astNode))
-        {
-            result = m_resolverVisitor->visit(label);
-        }
-        else if (auto module = std::dynamic_pointer_cast<Module>(m_astNode))
-        {
-            result = m_resolverVisitor->visit(module);
-        }
+        bool result = m_astNode->accept(m_resolverVisitor.get());
 
         m_errorCollector->endScope(ErrorAction::Propagate);
         return result;
     }
 
     std::shared_ptr<BasicSemanticContext> getSemanticContext() { return m_semanticContext; }
-    std::shared_ptr<AstNode> getAstNode() { return m_astNode; }
+    AstNode *getAstNode() { return m_astNode; }
 
   protected:
     std::shared_ptr<SyncLogger> m_logger;
@@ -100,7 +82,7 @@ class SymbolResolverVisitorTestFixture : public ::testing::Test
     std::shared_ptr<BasicSemanticContext> m_semanticContext;
     std::shared_ptr<SymbolDefinitionVisitor> m_definitionVisitor;
     std::shared_ptr<SymbolAndTypeResolverVisitor> m_resolverVisitor;
-    std::shared_ptr<AstNode> m_astNode;
+    AstNode *m_astNode;
 };
 
 #endif // EZPACKER_SYMBOLRESOLVERVISITORTESTFIXTURE_H

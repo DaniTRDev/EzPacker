@@ -6,6 +6,7 @@
 #include "AstNode/AstNodeContainer.h"
 #include "AstNodes/CodeScope.h"
 #include "AstNodes/Instruction.h"
+#include "AstNode/AstNodeVisitor.h"
 
 /**
  * This class represents a label, which is a specific region inside the body of a module.
@@ -14,17 +15,30 @@ class Label : public AstNode
 {
   public:
     /**
-     * Creates the label with the given name and expressions.
+     * Creates the label with the given name. The code scope must be set separately via setCodeScope().
      * @param name
-     * @param expressions
      */
-    Label(std::string name);
+    Label(std::string_view name);
 
     /**
      * Returns AstNodeType::Label.
      * @return AstNodeType
      */
     AstNodeType getType() const override;
+
+    /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+
+    /**
+     * Returns the code scope of the label.
+     * @return CodeScope*
+     */
+    CodeScope *getCodeScope() const;
 
     /**
      * Returns "Label".
@@ -36,13 +50,7 @@ class Label : public AstNode
      * Sets the code scope of the label.
      * @param codeScope
      */
-    void setCodeScope(const std::shared_ptr<CodeScope> &codeScope);
-
-    /**
-     * Returns the code scope of the label.
-     * @return const std::shared_ptr<CodeScope> &
-     */
-    const std::shared_ptr<CodeScope> &getCodeScope() const;
+    void setCodeScope(CodeScope *codeScope);
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -55,13 +63,13 @@ class Label : public AstNode
 
     /**
      * Returns the name of the label.
-     * @return const std::string &
+     * @return const std::string_view &
      */
-    const std::string &getLabelName() const;
+    const std::string_view &getLabelName() const;
 
   private:
-    std::string m_name;
-    std::shared_ptr<CodeScope> m_codeScope;
+    CodeScope *m_codeScope;
+    std::string_view m_name;
 };
 
 #endif // EZPACKER_LABEL_H

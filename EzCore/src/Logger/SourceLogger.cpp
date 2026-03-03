@@ -4,33 +4,33 @@ SourceLoggingSink::SourceLoggingSink(ILogger *logger) : LogSink(logger, LogSegme
 
 void SourceLoggingSink::logSourceError(LogMessage msg,
                                        const std::shared_ptr<SourceManager> &sourceManager,
-                                       const std::shared_ptr<SourceReference> &sourceRef)
+                                       const SourceReference &sourceRef)
 {
     LogMessage fullMsg = LogMessage("Error detected: ")
                                  .add(msg)
                                  .add("\n{}:{}: -> {}\n",
-                                      sourceRef->m_sourceFile,
-                                      sourceRef->m_line,
+                                      sourceManager->getSourceName(sourceRef.m_sourceFileId),
+                                      sourceRef.m_line,
                                       sourceManager->getReferenceContent(sourceRef));
     LogSink::logError(std::move(fullMsg));
 }
 
 void SourceLoggingSink::logSourceMessage(LogMessage msg,
                                          const std::shared_ptr<SourceManager> &sourceManager,
-                                         const std::shared_ptr<SourceReference> &sourceRef)
+                                         const SourceReference &sourceRef)
 {
     LogMessage fullMsg = LogMessage("Message: ")
                                  .add(msg)
                                  .add("\n{}:{}: -> {}\n",
-                                      sourceRef->m_sourceFile,
-                                      sourceRef->m_line,
+                                      sourceManager->getSourceName(sourceRef.m_sourceFileId),
+                                      sourceRef.m_line,
                                       sourceManager->getReferenceContent(sourceRef));
     LogSink::logInfo(std::move(fullMsg));
 }
 
 void SourceLoggingSink::logSourceWarning(LogMessage msg,
                                          const std::shared_ptr<SourceManager> &sourceManager,
-                                         const std::shared_ptr<SourceReference> &sourceRef)
+                                         const SourceReference &sourceRef)
 {
     LogMessage fullMsg = LogMessage("Warning detected: ")
                                  .add(msg)

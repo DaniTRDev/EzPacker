@@ -1,113 +1,81 @@
 #include "ParsersTestFixture.h"
 
-TEST_F(ParsersTestFixture, ConditionEqual)
-{
-    std::string input = "%a EQ %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ConditionParser>());
+// =============================================================================
+//  All comparison operators
+// =============================================================================
 
-    std::shared_ptr<ConditionAstNode> condition;
-    EXPECT_TRUE(expectNodeCast<>(condition));
-    EXPECT_EQ(condition->getComparisonType(), ConditionComparisonType::Equal);
-    EXPECT_EQ(condition->getLeft()->getType(), AstNodeType::Variable);
-    EXPECT_EQ(condition->getRight()->getType(), AstNodeType::Variable);
+TEST_F(ParsersTestFixture, Condition_Equal)
+{
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a EQ %b"));
+    TEST_CONDITION(ConditionComparisonType::Equal, AstNodeType::Variable, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, ConditionNotEqual)
+TEST_F(ParsersTestFixture, Condition_NotEqual)
 {
-    std::string input = "%a NE %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ConditionParser>());
-
-    std::shared_ptr<ConditionAstNode> condition;
-    EXPECT_TRUE(expectNodeCast<>(condition));
-    EXPECT_EQ(condition->getComparisonType(), ConditionComparisonType::NotEqual);
-    EXPECT_EQ(condition->getLeft()->getType(), AstNodeType::Variable);
-    EXPECT_EQ(condition->getRight()->getType(), AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a NE %b"));
+    TEST_CONDITION(ConditionComparisonType::NotEqual, AstNodeType::Variable, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, ConditionGreaterThan)
+TEST_F(ParsersTestFixture, Condition_GreaterThan)
 {
-    std::string input = "%a GT %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ConditionParser>());
-
-    std::shared_ptr<ConditionAstNode> condition;
-    EXPECT_TRUE(expectNodeCast<>(condition));
-    EXPECT_EQ(condition->getComparisonType(), ConditionComparisonType::GreaterThan);
-    EXPECT_EQ(condition->getLeft()->getType(), AstNodeType::Variable);
-    EXPECT_EQ(condition->getRight()->getType(), AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a GT %b"));
+    TEST_CONDITION(ConditionComparisonType::GreaterThan, AstNodeType::Variable, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, ConditionGreaterThanOrEqual)
+TEST_F(ParsersTestFixture, Condition_GreaterThanOrEqual)
 {
-    std::string input = "%a GE %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ConditionParser>());
-
-    std::shared_ptr<ConditionAstNode> condition;
-    EXPECT_TRUE(expectNodeCast<>(condition));
-    EXPECT_EQ(condition->getComparisonType(), ConditionComparisonType::GreaterThanOrEqual);
-    EXPECT_EQ(condition->getLeft()->getType(), AstNodeType::Variable);
-    EXPECT_EQ(condition->getRight()->getType(), AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a GE %b"));
+    TEST_CONDITION(ConditionComparisonType::GreaterThanOrEqual, AstNodeType::Variable, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, ConditionLessThan)
+TEST_F(ParsersTestFixture, Condition_LessThan)
 {
-    std::string input = "%a LT %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ConditionParser>());
-
-    std::shared_ptr<ConditionAstNode> condition;
-    EXPECT_TRUE(expectNodeCast<>(condition));
-    EXPECT_EQ(condition->getComparisonType(), ConditionComparisonType::LessThan);
-    EXPECT_EQ(condition->getLeft()->getType(), AstNodeType::Variable);
-    EXPECT_EQ(condition->getRight()->getType(), AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a LT %b"));
+    TEST_CONDITION(ConditionComparisonType::LessThan, AstNodeType::Variable, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, ConditionLessThanOrEqual)
+TEST_F(ParsersTestFixture, Condition_LessThanOrEqual)
 {
-    std::string input = "%a LE %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ConditionParser>());
-
-    std::shared_ptr<ConditionAstNode> condition;
-    EXPECT_TRUE(expectNodeCast<>(condition));
-    EXPECT_EQ(condition->getComparisonType(), ConditionComparisonType::LessThanOrEqual);
-    EXPECT_EQ(condition->getLeft()->getType(), AstNodeType::Variable);
-    EXPECT_EQ(condition->getRight()->getType(), AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a LE %b"));
+    TEST_CONDITION(ConditionComparisonType::LessThanOrEqual, AstNodeType::Variable, AstNodeType::Variable);
 }
 
-TEST_F(ParsersTestFixture, ConditionImmediate)
-{
-    std::string input = "%a EQ 123";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<ConditionParser>());
+// =============================================================================
+//  Mixed operand types
+// =============================================================================
 
-    std::shared_ptr<ConditionAstNode> condition;
-    EXPECT_TRUE(expectNodeCast<>(condition));
-    EXPECT_EQ(condition->getComparisonType(), ConditionComparisonType::Equal);
-    EXPECT_EQ(condition->getLeft()->getType(), AstNodeType::Variable);
-    EXPECT_EQ(condition->getRight()->getType(), AstNodeType::Immediate);
+TEST_F(ParsersTestFixture, Condition_VarVsImmediate)
+{
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a EQ 123"));
+    TEST_CONDITION(ConditionComparisonType::Equal, AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, ConditionInvalid)
+TEST_F(ParsersTestFixture, Condition_VarVsHex)
 {
-    std::string input = "%a AS %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<ConditionParser>());
+    EXPECT_TRUE(tokenizeAndParse<ConditionParser>("%a LT 0xFF"));
+    TEST_CONDITION(ConditionComparisonType::LessThan, AstNodeType::Variable, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, ConditionMissingRightOperand)
+// =============================================================================
+//  Error cases
+// =============================================================================
+
+TEST_F(ParsersTestFixture, Condition_InvalidOperator)
 {
-    std::string input = "%a EQ";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<ConditionParser>());
+    EXPECT_FALSE(tokenizeAndParse<ConditionParser>("%a AS %b"));
 }
 
-TEST_F(ParsersTestFixture, ConditionMissingLeftOperand)
+TEST_F(ParsersTestFixture, Condition_MissingRight)
 {
-    std::string input = "EQ %b";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<ConditionParser>());
+    EXPECT_FALSE(tokenizeAndParse<ConditionParser>("%a EQ"));
+}
+
+TEST_F(ParsersTestFixture, Condition_MissingLeft)
+{
+    EXPECT_FALSE(tokenizeAndParse<ConditionParser>("EQ %b"));
+}
+
+TEST_F(ParsersTestFixture, Condition_MissingOperator)
+{
+    EXPECT_FALSE(tokenizeAndParse<ConditionParser>("%a %b"));
 }

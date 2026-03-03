@@ -3,6 +3,7 @@
 
 #include "EzLexerCommon.h"
 #include "AstNode/AstNode.h"
+#include "AstNode/AstNodeVisitor.h"
 #include <tommath.h>
 
 enum class ImmediateType
@@ -26,6 +27,14 @@ class ImmediateOperand : public AstNode
     AstNodeType getType() const override;
 
     /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+
+    /**
      * Returns the name of this AstNode.
      * @return const char*
      */
@@ -47,16 +56,16 @@ class ImmediateOperand : public AstNode
      * Sets the data type of the immediate.
      * @param dataType
      */
-    void setDataType(const std::string &dataType);
+    void setDataType(const std::string_view &dataType);
 
     /**
      * Returns the data type this immediate is casted to. See m_dataType.
      * @return const std::string &
      */
-    const std::string &getDataType();
+    const std::string_view &getDataType();
 
   private:
-    std::string m_dataType; // Only set for floats and integers, used to cast values: i16 0xFF.
+    std::string_view m_dataType; // Only set for floats and integers, used to cast values: i16 0xFF.
 };
 
 /**
@@ -69,7 +78,13 @@ class IntegerImmediate : public ImmediateOperand
      * Creates the object with the given integer
      * @param integer
      */
-    explicit IntegerImmediate(std::shared_ptr<mp_int> integer);
+    explicit IntegerImmediate(mp_int *integer);
+
+    /**
+     * Returns true if this integer is signed.
+     * @return bool
+     */
+    bool isSigned() const;
 
     /**
      * Returns "Integer".
@@ -84,16 +99,22 @@ class IntegerImmediate : public ImmediateOperand
     ImmediateType getImmediateType() const override;
 
     /**
-     * Copies current number and returns it. If there's no valid number, an error-object will be returned.
-     * @return std::shared_ptr<mp_int>
+     * Returns the contained integer.
+     * @return mp_int
      */
-    std::shared_ptr<mp_int> copy() const;
+    mp_int *getInteger();
 
     /**
-     * Returns the contained integer.
-     * @return const std::shared_ptr<mp_int> &
+     * Copies current number into destination. If there's no valid number, destination an exception will be thrown.
      */
-    const std::shared_ptr<mp_int> &getInteger() const;
+    void copy(mp_int *destination);
+
+    /**
+     * Returns this integer encoded in LittleEndian. If the number is signed, the Two's complement is automatically
+     * applied.
+     * @return std::string
+     */
+    std::string getAsBin() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -105,7 +126,8 @@ class IntegerImmediate : public ImmediateOperand
     std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
-    std::shared_ptr<mp_int> m_integer;
+    bool m_signed;
+    mp_int *m_integer;
 };
 
 /**
@@ -162,7 +184,7 @@ class StringImmediate : public ImmediateOperand
      * Creates the string immediate with the given str.
      * @param str
      */
-    explicit StringImmediate(std::string str);
+    explicit StringImmediate(std::string_view str);
 
     /**
      * Returns the name of the immediate type.
@@ -178,9 +200,9 @@ class StringImmediate : public ImmediateOperand
 
     /**
      * Returns the string of this immediate.
-     * @return
+     * @return const std::string_view &
      */
-    const std::string &getStr() const;
+    const std::string_view &getStr() const;
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -192,7 +214,7 @@ class StringImmediate : public ImmediateOperand
     std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
-    std::string m_str;
+    std::string_view m_str;
 };
 
 #endif // EZPACKER_IMMEDIATE_H

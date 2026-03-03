@@ -18,37 +18,32 @@ ParserBatchResult ParserBatch::parse(const std::shared_ptr<BasicParsingContext> 
         {
             size_t currentPos = ctx->getCurrentPosition();
             ctx->getErrorCollector()->beginScope();
-            ctx->beginMultiSourceRef();
 
             if (auto node = parser->parse(ctx); node)
             {
                 /*
-                 * This ternary operator is needed, there's a few cases in which the current multireference is already
-                 * saved in the node: A batch of type <Label, InstructionParser>, the instruction parser will already
-                 * return a node with source references, meaning the multireference created in the for loop for the
-                 * parsers has empty elements.
+                 * There are some nodes that doesn't actually have a source reference. They merely act as
+                 * "semantic containers". This is needed to have at least 1 source reference to be able to track the
+                 * element.
                  */
-                std::vector<std::shared_ptr<SourceReference>> sourceRefs = ctx->getCurrentMultiReference().empty()
-                        ? node->getSourceRefs()
-                        : ctx->getCurrentMultiReference();
-                node->setSourceRef(sourceRefs);
+
+                if (!node->getSourceRef().m_valid)
+                {
+                    node->setSourceRefs(ctx->getLastSourceReference());
+                }
 
                 ctx->getErrorCollector()->endScope(ErrorAction::Discard); // Discard this scope.
-                ctx->endMultiSourceRef();
-
-                return ParserBatchResult{ .m_node = std::move(node), .m_parser = parser };
+                return ParserBatchResult{ .m_node = node, .m_parser = parser };
             }
 
             if (ctx->getErrorCollector()->doesCurrentScopeHasFatalErrors())
             {
                 // Stop trying parsers, last node returned because it was malformed.
                 ctx->getErrorCollector()->endScope(ErrorAction::Propagate);
-                ctx->endMultiSourceRef();
                 break;
             }
 
             ctx->getErrorCollector()->endScope(ErrorAction::Discard); // Move to the scope begun in the first line.
-            ctx->endMultiSourceRef();
             ctx->setPosition(currentPos); // Reset parser context position prior to the initial point.
         }
     }

@@ -2,16 +2,16 @@
 
 namespace ImmediateParser
 {
-std::shared_ptr<AstNode> Integer::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *Integer::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    std::shared_ptr<mp_int> integer = std::make_shared<mp_int>();
-    std::shared_ptr<IntegerImmediate> node;
+    mp_int *integer = ctx->getNodePool()->create<mp_int>();
+    IntegerImmediate *node;
     TokenInformation immediateToken, typeToken;
 
     bool isNegative = false;
 
-    ctx->consumeIf(ParsingCondition::TokenType, &typeToken, _TokenType::Plus);
-    if (ctx->consumeIf(ParsingCondition::TokenType, &typeToken, _TokenType::Minus))
+    ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Plus);
+    if (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Minus))
     {
         isNegative = true;
     }
@@ -38,7 +38,7 @@ std::shared_ptr<AstNode> Integer::parse(const std::shared_ptr<BasicParsingContex
         str.erase(0, 2); // Remove '0x' from input.
     }
 
-    if (mp_init(integer.get()) != MP_OKAY)
+    if (mp_init(integer) != MP_OKAY)
     {
         ctx->emitError(ErrorSeverity::Fatal,
                        "Error with big integer library",
@@ -47,7 +47,7 @@ std::shared_ptr<AstNode> Integer::parse(const std::shared_ptr<BasicParsingContex
         return nullptr;
     }
 
-    if (mp_read_radix(integer.get(), str.data(), radix) != MP_OKAY)
+    if (mp_read_radix(integer, str.data(), radix) != MP_OKAY)
     {
         ctx->emitError(ErrorSeverity::Fatal,
                        "Integer is malformed",
@@ -56,17 +56,16 @@ std::shared_ptr<AstNode> Integer::parse(const std::shared_ptr<BasicParsingContex
         return nullptr;
     }
 
-    node = std::make_shared<IntegerImmediate>(std::move(integer));
-    node->setDataType(typeToken.m_str);
+    node = ctx->getNodePool()->create<IntegerImmediate>(integer);
+    node->setDataType(ctx->getStringPool()->createConstantString(typeToken.m_str));
 
-    return std::move(node);
+    return node;
 }
 
-std::shared_ptr<AstNode> Float::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *Float::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     double value = 0;
     TokenInformation token;
-    std::shared_ptr<FloatImmediate> node;
     TokenInformation immediateToken, typeToken;
 
     // Immediate type.
@@ -92,16 +91,15 @@ std::shared_ptr<AstNode> Float::parse(const std::shared_ptr<BasicParsingContext>
         return nullptr;
     }
 
-    node = std::make_shared<FloatImmediate>(value);
-    node->setDataType(typeToken.m_str);
+    FloatImmediate *node = ctx->getNodePool()->create<FloatImmediate>(value);
+    node->setDataType(ctx->getStringPool()->createConstantString(typeToken.m_str));
 
-    return std::move(node);
+    return node;
 }
 
-std::shared_ptr<AstNode> String::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *String::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     TokenInformation token;
-    std::shared_ptr<StringImmediate> node;
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, &token, _TokenType::String))
     {
@@ -112,10 +110,10 @@ std::shared_ptr<AstNode> String::parse(const std::shared_ptr<BasicParsingContext
         return nullptr;
     }
 
-    std::string &str = token.m_str;
+    std::string_view str = ctx->getStringPool()->createConstantString(token.m_str);
+    StringImmediate *node = ctx->getNodePool()->create<StringImmediate>(std::move(str));
 
-    node = std::make_shared<StringImmediate>(std::move(str));
-    return std::move(node);
+    return node;
 }
 
 ParserBatch CreateImmediateParserBatch()
@@ -126,7 +124,7 @@ ParserBatch CreateImmediateParserBatch()
     return batch;
 }
 
-std::shared_ptr<AstNode> ImmediateParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *ImmediateParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     ParserBatch batch;
     batch.addParsersFromTypeList<Integer, Float, String>();

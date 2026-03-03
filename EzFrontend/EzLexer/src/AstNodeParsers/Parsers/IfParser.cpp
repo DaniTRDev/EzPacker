@@ -1,6 +1,6 @@
 #include "AstNodeParsers/Parsers/IfParser.h"
 
-std::shared_ptr<AstNode> IfParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *IfParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::If))
     {
@@ -15,9 +15,7 @@ std::shared_ptr<AstNode> IfParser::parse(const std::shared_ptr<BasicParsingConte
         return nullptr;
     }
 
-    std::shared_ptr<AstNode> condition;
-    std::shared_ptr<AstNode> trueScope;
-    std::shared_ptr<AstNode> falseScope;
+    AstNode *condition = nullptr, *trueScope = nullptr, *falseScope = nullptr;
 
     if (condition = ConditionParser().parse(ctx); !condition)
     {
@@ -96,9 +94,9 @@ std::shared_ptr<AstNode> IfParser::parse(const std::shared_ptr<BasicParsingConte
         }
     }
 
-    std::shared_ptr<IfAstNode> node = std::make_shared<IfAstNode>();
-    node->setCondition(std::dynamic_pointer_cast<ConditionAstNode>(condition));
-    node->setTrueScope(std::dynamic_pointer_cast<CodeScope>(trueScope));
+    IfAstNode *node = ctx->getNodePool()->create<IfAstNode>();
+    node->setCondition((ConditionAstNode *)(condition));
+    node->setTrueScope((CodeScope *)(trueScope));
     node->setFalseScope(falseScope);
 
     return node;

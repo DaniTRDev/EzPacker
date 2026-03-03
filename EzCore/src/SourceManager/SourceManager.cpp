@@ -4,18 +4,17 @@
 
 bool SourceManager::addSourceContent(const std::string &name, const std::string &content)
 {
-    // C++20 contains check
-    if (m_sources.contains(name))
+    size_t id = std::hash<std::string>{}(name);
+
+    if (m_sources.contains(id))
         return false;
 
     // Store the content
-    m_sources[name] = content;
+    m_sources[id] = content;
 
     // We will build the line ranges.
-    // Optimization: Reserve distinct memory based on a heuristic to avoid reallocations,
-    // though not strictly necessary for correctness.
-    std::vector<LineSourceRange> &lines = m_sourceLines[name];
-    lines.reserve(content.size() / 40); // Estimate avg line length of 40 chars
+    std::vector<LineSourceRange> &lines = m_sourceLines[id];
+    lines.reserve(content.size() / 40); // Optimization: estimate avg line length of 40 chars.
 
     size_t lineStart = 0;
     size_t currentPos = 0;
@@ -41,152 +40,95 @@ bool SourceManager::addSourceContent(const std::string &name, const std::string 
     return true;
 }
 
-std::shared_ptr<SourceReference>
-SourceManager::createReference(size_t col, size_t length, size_t line, const std::string &sourceFile)
+SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, const std::string &sourceFile)
 {
-    auto it = m_sourceLines.find(sourceFile);
+    size_t id = std::hash<std::string>{}(sourceFile);
+
+    auto it = m_sourceLines.find(id);
     if (it == m_sourceLines.end())
-        return nullptr; // File not found
+        return {}; // File not found
 
     const std::vector<LineSourceRange> &lines = it->second;
 
     if (line >= lines.size())
-        return nullptr; // Invalid line number
+        return {}; // Invalid line number
 
     const LineSourceRange &lineRange = lines[line];
 
     // Bounds check: Column + Length must not exceed the actual line length
     if ((col + length) > lineRange.m_length)
-        return nullptr;
+        return {};
 
-    auto ref = std::make_shared<SourceReference>();
-    ref->m_col = col;
-    ref->m_length = length;
-    ref->m_line = line;
-    ref->m_sourceFile = sourceFile;
+    SourceReference ref;
+    ref.m_valid = true;
+    ref.m_col = col;
+    ref.m_length = length;
+    ref.m_line = line;
+    ref.m_sourceFileId = id;
 
     return ref;
 }
 
-std::string SourceManager::getReferenceContent(const std::shared_ptr<SourceReference> &ref)
+std::string SourceManager::getRawLineContent(const SourceReference &ref)
 {
-    if (!ref)
-        return {};
+    if (!ref.m_valid)
+        return "";
 
-    auto itSource = m_sources.find(ref->m_sourceFile);
-    auto itLines = m_sourceLines.find(ref->m_sourceFile);
+    auto itSource = m_sources.find(ref.m_sourceFileId);
+    auto itLines = m_sourceLines.find(ref.m_sourceFileId);
 
     if (itSource == m_sources.end() || itLines == m_sourceLines.end())
-        return {};
+        return "";
 
     const std::vector<LineSourceRange> &lines = itLines->second;
-    if (ref->m_line >= lines.size())
-        return {};
+    if (ref.m_line >= lines.size())
+        return "";
 
-    const LineSourceRange &lineRange = lines[ref->m_line];
+    const LineSourceRange &lineRange = lines[ref.m_line];
     const std::string &fullSource = itSource->second;
 
-    // Note: lineRange.m_length excludes the newline character.
-    std::string lineContent = fullSource.substr(lineRange.m_start, lineRange.m_length);
+    return fullSource.substr(lineRange.m_start, lineRange.m_length);
+}
 
-    std::string markerLine;
-    markerLine.reserve(lineContent.size() + 1);
+std::string SourceManager::getReferenceContent(const SourceReference &ref)
+{
+    auto lineContentOpt = getRawLineContent(ref);
 
-    // Step 4a: Build the prefix (indentation)
-    // We iterate through the line up to the error column.
-    // IMPORTANT: We mirror tabs as tabs and other chars as spaces to preserve visual alignment.
-    for (size_t i = 0; i < ref->m_col && i < lineContent.size(); ++i)
+    if (lineContentOpt.empty())
+        return "Internal Compiler Error: Invalid SourceReference";
+
+    std::string lineContent = lineContentOpt;
+    std::string indent;
+    indent.reserve(ref.m_col);
+
+    // Build indentation mirroring tabs
+    for (size_t i = 0; i < ref.m_col && i < lineContent.size(); ++i)
     {
-        if (lineContent[i] == '\t')
-            markerLine += '\t';
-        else
-            markerLine += ' ';
+        indent += (lineContent[i] == '\t') ? '\t' : ' ';
     }
 
-    // We clamp the length to ensure we don't overflow the actual line length
-    size_t markLength = ref->m_length;
-    if (ref->m_col + markLength > lineContent.size())
+    size_t markLength = ref.m_length;
+    if (ref.m_col + markLength > lineContent.size())
     {
-        markLength = (ref->m_col < lineContent.size()) ? lineContent.size() - ref->m_col : 0;
+        markLength = (ref.m_col < lineContent.size()) ? lineContent.size() - ref.m_col : 0;
     }
-
-    // Ensure we print at least one caret if the length is 0 (e.g. EOF or single char token)
     if (markLength == 0)
         markLength = 1;
 
-    markerLine.append(markLength, '^');
+    std::string squiggles = "^";
+    if (markLength > 1)
+        squiggles += std::string(markLength - 1, '~');
 
-    return lineContent + "\n" + markerLine;
+    return std::format("{}\n{}{}", lineContent, indent, squiggles);
 }
 
-std::shared_ptr<SourceReference>
-SourceManager::mergeReferences(const std::vector<std::shared_ptr<SourceReference>> &refs)
+std::string_view SourceManager::getSourceName(size_t id) const
 {
-    if (refs.empty())
-        return nullptr;
-
-    // Validation: All references must belong to the same file and the same line
-    // to be mergeable into a single contiguous block (conceptually).
-    const std::string &targetFile = refs[0]->m_sourceFile;
-    const size_t targetLine = refs[0]->m_line;
-
-    uint64_t minCol = UINT64_MAX;
-    uint64_t maxBound = 0;
-
-    for (const auto &ref : refs)
+    auto it = m_sourcesNames.find(id);
+    if (it == m_sourcesNames.end())
     {
-        if (!ref)
-            continue;
-
-        // Sanity check: Can only merge refs on same line of same file
-        if (ref->m_sourceFile != targetFile || ref->m_line != targetLine)
-        {
-            throw std::runtime_error("Internal compiler error: Tried to merge a multi-reference in different lines");
-        }
-
-        minCol = std::min(minCol, (uint64_t)ref->m_col);
-        maxBound = std::max(maxBound, (uint64_t)(ref->m_col + ref->m_length));
+        return "";
     }
 
-    if (minCol == UINT64_MAX)
-        return nullptr; // All inputs were nullptr
-
-    return std::make_shared<SourceReference>(SourceReference{ .m_col = (size_t)minCol,
-                                                              .m_length = (size_t)(maxBound - minCol),
-                                                              .m_line = targetLine,
-                                                              .m_sourceFile = targetFile });
-}
-
-void MultiSourceReferenceCreator::attach(std::shared_ptr<SourceManager> sourceManager)
-{
-    if (!sourceManager)
-        throw std::invalid_argument("Invalid source manager passed to attach");
-
-    m_sourceManager = std::move(sourceManager);
-}
-
-void MultiSourceReferenceCreator::push(std::shared_ptr<SourceReference> reference)
-{
-    if (!reference)
-        throw std::invalid_argument("Invalid source reference passed to push");
-
-    m_references.push_back(std::move(reference));
-}
-
-std::shared_ptr<SourceReference> MultiSourceReferenceCreator::merge()
-{
-    if (!m_sourceManager)
-        throw std::runtime_error("SourceManager not attached to MultiSourceReferenceCreator");
-
-    if (m_references.empty())
-        throw std::runtime_error("No references to merge");
-
-    auto result = m_sourceManager->mergeReferences(m_references);
-
-    if (result)
-    {
-        return result;
-    }
-
-    throw std::runtime_error("Failed to merge references (likely file/line mismatch)");
+    return it->second;
 }

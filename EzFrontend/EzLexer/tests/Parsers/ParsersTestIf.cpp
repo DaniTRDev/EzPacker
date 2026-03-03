@@ -1,97 +1,183 @@
 #include "ParsersTestFixture.h"
 
-TEST_F(ParsersTestFixture, IfSimple)
-{
-    std::string input = "if (%a EQ %b) { nop; }";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<IfParser>());
+// =============================================================================
+//  Simple if (no else)
+// =============================================================================
 
-    std::shared_ptr<IfAstNode> ifNode;
-    EXPECT_TRUE(expectNodeCast<>(ifNode));
-    EXPECT_NE(ifNode->getCondition(), nullptr);
-    EXPECT_NE(ifNode->getTrueScope(), nullptr);
-    EXPECT_EQ(ifNode->getFalseScope(), nullptr);
+TEST_F(ParsersTestFixture, If_Simple)
+{
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%a EQ %b) { nop; }"));
+    TEST_IF(true, false, AstNodeType::Invalid);
 }
 
-TEST_F(ParsersTestFixture, IfElse)
+TEST_F(ParsersTestFixture, If_MultipleStatements)
 {
-    std::string input = "if (%a EQ %b) { nop; } else { nop; }";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<IfParser>());
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%a NE %b) { nop; nop; nop; }"));
+    TEST_IF(true, false, AstNodeType::Invalid);
 
-    std::shared_ptr<IfAstNode> ifNode;
-    EXPECT_TRUE(expectNodeCast<>(ifNode));
-    EXPECT_NE(ifNode->getCondition(), nullptr);
-    EXPECT_NE(ifNode->getTrueScope(), nullptr);
-    EXPECT_NE(ifNode->getFalseScope(), nullptr);
-    EXPECT_EQ(ifNode->getFalseScope()->getType(), AstNodeType::CodeScope);
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(ifNode->getTrueScope()->getExpressions()->m_numElems, 3);
 }
 
-TEST_F(ParsersTestFixture, IfElseIf)
+TEST_F(ParsersTestFixture, If_EmptyBody)
 {
-    std::string input = "if (%a EQ %b) { nop; } else if (%a GT %b) { nop; }";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<IfParser>());
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%a EQ %b) {}"));
+    TEST_IF(true, false, AstNodeType::Invalid);
 
-    std::shared_ptr<IfAstNode> ifNode;
-    EXPECT_TRUE(expectNodeCast<>(ifNode));
-    EXPECT_NE(ifNode->getCondition(), nullptr);
-    EXPECT_NE(ifNode->getTrueScope(), nullptr);
-    EXPECT_NE(ifNode->getFalseScope(), nullptr);
-    EXPECT_EQ(ifNode->getFalseScope()->getType(), AstNodeType::If);
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(ifNode->getTrueScope()->getExpressions()->m_numElems, 0);
 }
 
-TEST_F(ParsersTestFixture, IfElseIfElse)
+// =============================================================================
+//  If-else
+// =============================================================================
+
+TEST_F(ParsersTestFixture, If_Else)
 {
-    std::string input = "if (%a EQ %b) { nop; } else if (%a GT %b) { nop; } else { nop; }";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<IfParser>());
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%a EQ %b) { nop; } else { nop; }"));
+    TEST_IF(true, true, AstNodeType::CodeScope);
+}
 
-    std::shared_ptr<IfAstNode> ifNode;
-    EXPECT_TRUE(expectNodeCast<>(ifNode));
-    EXPECT_NE(ifNode->getCondition(), nullptr);
-    EXPECT_NE(ifNode->getTrueScope(), nullptr);
-    EXPECT_NE(ifNode->getFalseScope(), nullptr);
-    EXPECT_EQ(ifNode->getFalseScope()->getType(), AstNodeType::If);
+TEST_F(ParsersTestFixture, If_ElseEmptyBodies)
+{
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%a EQ %b) {} else {}"));
+    TEST_IF(true, true, AstNodeType::CodeScope);
+}
 
-    std::shared_ptr<IfAstNode> elseIfNode = std::dynamic_pointer_cast<IfAstNode>(ifNode->getFalseScope());
+// =============================================================================
+//  If-elseif chains
+// =============================================================================
+
+TEST_F(ParsersTestFixture, If_ElseIf)
+{
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%a EQ %b) { nop; } else if (%a GT %b) { nop; }"));
+    TEST_IF(true, true, AstNodeType::If);
+}
+
+TEST_F(ParsersTestFixture, If_ElseIfElse)
+{
+    EXPECT_TRUE(tokenizeAndParse<IfParser>(
+            "if (%a EQ %b) { nop; } else if (%a GT %b) { nop; } else { nop; }"));
+    TEST_IF(true, true, AstNodeType::If);
+
+    // Verify the chain
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+
+    IfAstNode *elseIfNode = dynamic_cast<IfAstNode *>(ifNode->getFalseScope());
+    ASSERT_NE(elseIfNode, nullptr);
     EXPECT_NE(elseIfNode->getCondition(), nullptr);
     EXPECT_NE(elseIfNode->getTrueScope(), nullptr);
     EXPECT_NE(elseIfNode->getFalseScope(), nullptr);
     EXPECT_EQ(elseIfNode->getFalseScope()->getType(), AstNodeType::CodeScope);
 }
 
-TEST_F(ParsersTestFixture, IfMissingCondition)
+TEST_F(ParsersTestFixture, If_LongElseIfChain)
 {
-    std::string input = "if { nop; }";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<IfParser>());
+    std::string input =
+            "if (%a EQ %b) { nop; } "
+            "else if (%a GT %b) { nop; } "
+            "else if (%a LT %b) { nop; } "
+            "else { nop; }";
+    EXPECT_TRUE(tokenizeAndParse<IfParser>(input));
+    TEST_IF(true, true, AstNodeType::If);
 }
 
-TEST_F(ParsersTestFixture, IfMissingScope)
+// =============================================================================
+//  All condition types in if
+// =============================================================================
+
+TEST_F(ParsersTestFixture, If_ConditionEQ)
 {
-    std::string input = "if (%a EQ %b)";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<IfParser>());
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%x EQ %y) { nop; }"));
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(dynamic_cast<ConditionAstNode *>(ifNode->getCondition())->getComparisonType(),
+              ConditionComparisonType::Equal);
 }
 
-TEST_F(ParsersTestFixture, IfInvalidCondition)
+TEST_F(ParsersTestFixture, If_ConditionNE)
 {
-    std::string input = "if (%a ASD) { nop; }";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<IfParser>());
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%x NE %y) { nop; }"));
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(dynamic_cast<ConditionAstNode *>(ifNode->getCondition())->getComparisonType(),
+              ConditionComparisonType::NotEqual);
 }
 
-TEST_F(ParsersTestFixture, IfElseMissingScope)
+TEST_F(ParsersTestFixture, If_ConditionGT)
 {
-    std::string input = "if (%a EQ %b) { nop; } else";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<IfParser>());
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%x GT %y) { nop; }"));
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(dynamic_cast<ConditionAstNode *>(ifNode->getCondition())->getComparisonType(),
+              ConditionComparisonType::GreaterThan);
 }
 
-TEST_F(ParsersTestFixture, IfElseIfMissingCondition)
+TEST_F(ParsersTestFixture, If_ConditionGE)
 {
-    std::string input = "if (%a EQ %b) { nop; } else if { nop; }";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<IfParser>());
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%x GE %y) { nop; }"));
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(dynamic_cast<ConditionAstNode *>(ifNode->getCondition())->getComparisonType(),
+              ConditionComparisonType::GreaterThanOrEqual);
+}
+
+TEST_F(ParsersTestFixture, If_ConditionLT)
+{
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%x LT %y) { nop; }"));
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(dynamic_cast<ConditionAstNode *>(ifNode->getCondition())->getComparisonType(),
+              ConditionComparisonType::LessThan);
+}
+
+TEST_F(ParsersTestFixture, If_ConditionLE)
+{
+    EXPECT_TRUE(tokenizeAndParse<IfParser>("if (%x LE %y) { nop; }"));
+    IfAstNode *ifNode;
+    ASSERT_TRUE(expectNodeCast<>(ifNode));
+    EXPECT_EQ(dynamic_cast<ConditionAstNode *>(ifNode->getCondition())->getComparisonType(),
+              ConditionComparisonType::LessThanOrEqual);
+}
+
+// =============================================================================
+//  If error cases
+// =============================================================================
+
+TEST_F(ParsersTestFixture, If_MissingCondition)
+{
+    EXPECT_FALSE(tokenizeAndParse<IfParser>("if { nop; }"));
+}
+
+TEST_F(ParsersTestFixture, If_MissingBody)
+{
+    EXPECT_FALSE(tokenizeAndParse<IfParser>("if (%a EQ %b)"));
+}
+
+TEST_F(ParsersTestFixture, If_InvalidCondition)
+{
+    EXPECT_FALSE(tokenizeAndParse<IfParser>("if (%a ASD) { nop; }"));
+}
+
+TEST_F(ParsersTestFixture, If_ElseMissingBody)
+{
+    EXPECT_FALSE(tokenizeAndParse<IfParser>("if (%a EQ %b) { nop; } else"));
+}
+
+TEST_F(ParsersTestFixture, If_ElseIfMissingCondition)
+{
+    EXPECT_FALSE(tokenizeAndParse<IfParser>("if (%a EQ %b) { nop; } else if { nop; }"));
+}
+
+TEST_F(ParsersTestFixture, If_MissingLeftParen)
+{
+    EXPECT_FALSE(tokenizeAndParse<IfParser>("if %a EQ %b) { nop; }"));
+}
+
+TEST_F(ParsersTestFixture, If_MissingRightParen)
+{
+    EXPECT_FALSE(tokenizeAndParse<IfParser>("if (%a EQ %b { nop; }"));
 }

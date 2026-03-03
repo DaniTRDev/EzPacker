@@ -2,6 +2,6 @@
 
 const char *ScopedSymbolAnnotation::getAnnotationName() const { return "ScopedSymbolAnnotation"; }
 
-void ScopedSymbolAnnotation::setOwnedScope(const std::shared_ptr<Scope> &scope) { m_ownedScope = scope; }
+Scope *ScopedSymbolAnnotation::getOwnedScope() { return m_ownedScope; }
 
-const std::shared_ptr<Scope> &ScopedSymbolAnnotation::getOwnedScope() { return m_ownedScope; }
+void ScopedSymbolAnnotation::setOwnedScope(Scope *scope) { m_ownedScope = scope; }

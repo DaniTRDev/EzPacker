@@ -1,0 +1,27 @@
+# Immediate lowering test program
+# Tests: small integers, hex, large constants, zero
+
+void ImmediateLowering(i32 %dummy)
+{
+    create i32 %a;
+    create i32 %b;
+    create i64 %c;
+
+    mov %a, 0;
+    mov %a, 1;
+    mov %a, 42;
+    mov %a, 255;
+    mov %a, 65535;
+    mov %b, 0xFF;
+    mov %b, 0xDEAD;
+    mov %b, 0xCAFE;
+    mov %c, 0xDEADBEEF;
+
+    add %a, 100;
+    sub %b, 0x10;
+    and %a, 0xFF;
+    or  %b, 0x8000;
+    xor %a, 0x55;
+    nop;
+}
+

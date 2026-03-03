@@ -2,22 +2,33 @@
 
 AstNodeType CodeScope::getType() const { return AstNodeType::CodeScope; }
 
-const char *CodeScope::getAstNodeName() const { return nullptr; }
+bool CodeScope::accept(AstNodeVisitor *visitor)
+{
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+
+    return false;
+}
+
+const char *CodeScope::getAstNodeName() const { return "CodeScope"; }
 
 std::string CodeScope::getAsStr(AstNodeStringMode mode) const
 {
-    const std::map<size_t, std::shared_ptr<AstNode>> &expressions = getExpressions();
+    TypedPoolSlice<AstNode> *expressions = getExpressions();
     if (mode == AstNodeStringMode::Debug)
     {
         std::string str = "CodeScope\n{\n";
 
-        for (auto &expr : expressions)
+        for (void *expr : *expressions)
         {
-            str += expr.second->getAsStr(mode);
+            AstNode *node = (AstNode *)expr;
+            str += node->getAsStr(mode);
         }
 
         return str + "\n}\n";
     }
 
-    return std::format("CodeScope (size: {})", expressions.size());
+    return std::format("CodeScope (size: {})", expressions->m_numElems);
 }

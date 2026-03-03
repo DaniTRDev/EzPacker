@@ -1,0 +1,21 @@
+# Bitwise operations test program
+# Tests: and, or, xor, not, shl, shr, sar
+
+void BitwiseOps(i32 %val)
+{
+    create i32 %mask;
+    create i32 %temp;
+
+    mov %mask, 0xFF;
+    mov %temp, %val;
+
+    and %temp, %mask;
+    or  %temp, 0x10;
+    xor %temp, 0x01;
+    not %temp;
+    shl %temp, 2;
+    shr %temp, 1;
+    sar %temp, 3;
+    nop;
+}
+

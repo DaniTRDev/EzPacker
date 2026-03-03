@@ -1,6 +1,56 @@
 #include "SymbolVisitors/SymbolAndTypeResolverVisitor.h"
 
-bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Instruction> &instr)
+bool SymbolAndTypeResolverVisitor::visit(CodeScope *scope) { return AstNodeVisitor::visitAll(scope->getExpressions()); }
+
+bool SymbolAndTypeResolverVisitor::visit(ConditionAstNode *cond)
+{
+    return cond->getLeft()->accept(this) && cond->getRight()->accept(this);
+}
+
+bool SymbolAndTypeResolverVisitor::visit(IfAstNode *ifNode)
+{
+    return ifNode->getCondition()->accept(this) && ifNode->getTrueScope()->accept(this) &&
+            (!ifNode->getFalseScope() || ifNode->getFalseScope()->accept(this));
+}
+
+bool SymbolAndTypeResolverVisitor::visit(ImmediateOperand *imm)
+{
+    const std::string_view &dataTypeStr = imm->getDataType();
+    if (!dataTypeStr.empty())
+    {
+        // Annotate the type of this immediate.
+        std::shared_ptr<Type> dataType = TypeTable::getType(dataTypeStr);
+        if (!dataType)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            "Invalid cast for immediate",
+                                            "TypeCheckVisitor::ImmediateOperand",
+                                            imm->getSourceRef());
+
+            return false;
+        }
+
+        imm->createAnnotation<DataTypeAnnotation>(getSemanticContext()->getAnnotPool(), dataType.get());
+    }
+    else
+    {
+        std::shared_ptr<Type> dataType = imm->getImmediateType() == ImmediateType::Integer
+                ? TypeTable::getType("i64")
+                : TypeTable::getType("double");
+        if (!dataType)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            "Internal Compiler Error: default Immediate value not defined",
+                                            "TypeCheckVisitor::ImmediateOperand",
+                                            imm->getSourceRef());
+            return false;
+        }
+        imm->createAnnotation<DataTypeAnnotation>(getSemanticContext()->getAnnotPool(), dataType.get());
+    }
+    return true;
+}
+
+bool SymbolAndTypeResolverVisitor::visit(Instruction *instr)
 {
     if (instr->getInstructionName() == "create")
     {
@@ -8,61 +58,61 @@ bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Instructio
         return true;
     }
 
-    return AstNodeVisitor::visit(instr);
+    return visitAll(instr->getExpressions());
 }
 
-bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Label> &label)
+bool SymbolAndTypeResolverVisitor::visit(Label *label)
 {
-    std::shared_ptr<ScopedSymbolAnnotation> annotation = label->getAnnotation<ScopedSymbolAnnotation>();
+    ScopedSymbolAnnotation *annotation = label->getAnnotation<ScopedSymbolAnnotation>();
     if (!annotation || !annotation->getOwnedScope())
     {
         getSemanticContext()->emitError(
                 ErrorSeverity::Fatal,
                 "Internal Compiler Error: Label has no associated scope (Definition pass failed?)",
                 "SymbolAndTypeResolverVisitor::Label",
-                label->getFirstSourceReference());
+                label->getSourceRef());
         return false;
     }
 
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
-    return AstNodeVisitor::visit(label);
+    return label->getCodeScope()->accept(this);
 }
 
-bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct MemoryOperandAstNode> &operand)
+bool SymbolAndTypeResolverVisitor::visit(MemoryOperandAstNode *operand)
 {
-    const std::string &typeStr = operand->getReferencedMemoryDataTypeStr();
-    std::shared_ptr<Type> type = TypeTable::getType(typeStr.empty() ? "pointer" : typeStr);
+    const std::string_view &typeStr = operand->getReferencedMemoryDataTypeStr();
+    std::shared_ptr<Type> type = TypeTable::getType(typeStr);
 
-    operand->addAnnotation(std::make_shared<DataTypeAnnotation>(type));
-
-    if (!type)
+    if (!typeStr.empty() && !type)
     {
-        getSemanticContext()->emitError(
-                ErrorSeverity::Fatal,
-                "Internal Compiler Error: Given node type is not a valid type (not even a pointer)",
-                "SymbolAndTypeResolverVisitor::MemoryOperandAstNode",
-                operand->getFirstSourceReference());
+        getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                        "Internal Compiler Error: Given node type is not a valid type",
+                                        "SymbolAndTypeResolverVisitor::MemoryOperandAstNode",
+                                        operand->getSourceRef());
         return false;
     }
 
-    std::shared_ptr<AstNode> base, index;
+    type = TypeTable::getDefaultType();
+    operand->createAnnotation<DataTypeAnnotation>(getSemanticContext()->getAnnotPool(), type.get());
+
+    AstNode *base = nullptr, *index = nullptr;
     switch (operand->getMemoryOperandType())
     {
         case MemoryOperandType::BaseDisplacement:
         {
-            base = std::dynamic_pointer_cast<BaseDisplacementMemory>(operand)->getBase();
-            return visitBaseClass(base);
+            base = dynamic_cast<BaseDisplacementMemory *>(operand)->getBase();
+            return base->accept(this);
         }
         case MemoryOperandType::BaseIndexScaleDisplacement:
         {
-            base = std::dynamic_pointer_cast<BaseIndexScaleDisplacementMemory>(operand)->getBase();
-            index = std::dynamic_pointer_cast<BaseIndexScaleDisplacementMemory>(operand)->getIndex();
-            return visitBaseClass(base) && visitBaseClass(index);
+            base = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getBase();
+            index = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getIndex();
+            return base->accept(this) && index->accept(this);
         }
         case MemoryOperandType::IndexScale:
         {
-            index = std::dynamic_pointer_cast<IndexScaleMemory>(operand)->getIndex();
-            return visitBaseClass(index);
+            index = dynamic_cast<IndexScaleMemory *>(operand)->getIndex();
+            return index->accept(this);
         }
         default:
         {
@@ -75,10 +125,9 @@ bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct MemoryOper
     return false;
 }
 
-bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Module> &module)
+bool SymbolAndTypeResolverVisitor::visit(Module *module)
 {
-    const std::shared_ptr<CodeScope> &body = module->getBody();
-    std::shared_ptr<ScopedSymbolAnnotation> annotation = module->getAnnotation<ScopedSymbolAnnotation>();
+    ScopedSymbolAnnotation *annotation = module->getAnnotation<ScopedSymbolAnnotation>();
 
     if (!annotation || !annotation->getOwnedScope())
     {
@@ -86,27 +135,27 @@ bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Module> &m
                 ErrorSeverity::Fatal,
                 "Internal Compiler Error: Module has no associated scope (Definition pass failed?)",
                 "SymbolAndTypeResolverVisitor::Module",
-                module->getFirstSourceReference());
+                module->getSourceRef());
         return false;
     }
 
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
-    return AstNodeVisitor::visit(module);
+    return module->getBody()->accept(this);
 }
 
-bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Variable> &var)
+bool SymbolAndTypeResolverVisitor::visit(Variable *var)
 {
-    if (!var->getAnnotations().empty())
+    if (var->getAnnotation<SymbolAnnotation>() != nullptr)
     {
         /*
-         * If the variable already has an annotation, it means this is a global variable. We don't need to check if
-         * this symbol exists.
+         * If the variable already has a symbol annotation, it means this is a global variable. We don't need to check
+         * if this symbol exists.
          */
         return true;
     }
 
-    const std::string &variableName = var->getVariableName();
-    std::shared_ptr<Symbol> symbol;
+    Symbol *symbol = nullptr;
+    const std::string_view &variableName = var->getVariableName();
 
     if (!getSemanticContext()->resolveSymbolInScope(variableName, &symbol, true))
     {
@@ -114,15 +163,11 @@ bool SymbolAndTypeResolverVisitor::visit(const std::shared_ptr<struct Variable> 
         return false;
     }
 
-    if (symbol->getSymbolDataType() && symbol->getSymbolDataType()->getUnderlyingType() == UnderlyingType::String)
-    {
-        getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                        "String type can't be used in local scopes",
-                                        "SymbolAndTypeResolverVisitor::Variable",
-                                        var->getFirstSourceReference());
-        return false;
-    }
-
-    var->addAnnotation(std::make_shared<SymbolAnnotation>(symbol));
+    var->createAnnotation<SymbolAnnotation>(getSemanticContext()->getAnnotPool(), symbol);
     return true;
+}
+
+bool SymbolAndTypeResolverVisitor::visit(WhileAstNode *whileNode)
+{
+    return whileNode->getCondition()->accept(this) && whileNode->getCodeScope()->accept(this);
 }

@@ -1,60 +1,78 @@
 #include "ParsersTestFixture.h"
 
-TEST_F(ParsersTestFixture, GlobalVariableSingleInitializer)
+// =============================================================================
+//  Global Variables – single initializer
+// =============================================================================
+
+TEST_F(ParsersTestFixture, GlobalVariable_SingleIntInit)
 {
-    std::string input = R"(i8 %myVar: 12345)";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<VariableParser>());
+    EXPECT_TRUE(tokenizeAndParse<VariableParser>("i8 %myVar: 12345"));
     TEST_VARIABLE(false, "i8", "myVar", AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, GlobalVariableInvalidSingleInitializer)
+TEST_F(ParsersTestFixture, GlobalVariable_SingleHexInit)
 {
-    std::string input = R"(i8 %myVar: )";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<VariableParser>());
+    EXPECT_TRUE(tokenizeAndParse<VariableParser>("i32 %addr: 0xDEAD"));
+    TEST_VARIABLE(false, "i32", "addr", AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, GlobalVariableArray)
+TEST_F(ParsersTestFixture, GlobalVariable_InvalidMissingInit)
 {
-    std::string input = R"(i8 %myVar: {1234, 1231, 0xFFFFFF})";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<VariableParser>());
+    EXPECT_FALSE(tokenizeAndParse<VariableParser>("i8 %myVar: "));
+}
+
+// =============================================================================
+//  Global Variables – array initializer
+// =============================================================================
+
+TEST_F(ParsersTestFixture, GlobalVariable_Array3Elems)
+{
+    EXPECT_TRUE(tokenizeAndParse<VariableParser>("i8 %myVar: {1234, 1231, 0xFFFFFF}"));
     TEST_VARIABLE(true, "i8", "myVar", AstNodeType::Immediate, AstNodeType::Immediate, AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, GlobalVariableInvalidArray)
+TEST_F(ParsersTestFixture, GlobalVariable_SingleElementWithBraces)
 {
-    std::string input = R"(i8 %myVar: {)";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<VariableParser>());
+    EXPECT_TRUE(tokenizeAndParse<VariableParser>("i32 %single: {42}"));
+    TEST_VARIABLE(false, "i32", "single", AstNodeType::Immediate);
 }
 
-TEST_F(ParsersTestFixture, LocalVariable)
+TEST_F(ParsersTestFixture, GlobalVariable_InvalidArrayUnclosed)
 {
-    std::string input = R"(%myVar)";
-    tokenizeAndCreateContext(input);
-    EXPECT_TRUE(expectParse<VariableParser>());
+    EXPECT_FALSE(tokenizeAndParse<VariableParser>("i8 %myVar: {"));
+}
+
+TEST_F(ParsersTestFixture, GlobalVariable_InvalidArrayMissingRBrace)
+{
+    EXPECT_FALSE(tokenizeAndParse<VariableParser>("i8 %myVar: { 1, 2 "));
+}
+
+// =============================================================================
+//  Local Variables (no type, no initializer)
+// =============================================================================
+
+TEST_F(ParsersTestFixture, LocalVariable_Simple)
+{
+    EXPECT_TRUE(tokenizeAndParse<VariableParser>("%myVar"));
     TEST_VARIABLE(false, "", "myVar", );
 }
 
-TEST_F(ParsersTestFixture, VariableMissingPercent)
+TEST_F(ParsersTestFixture, LocalVariable_WithType)
 {
-    std::string input = "i8 myVar";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<VariableParser>());
+    EXPECT_TRUE(tokenizeAndParse<VariableParser>("i64 %bigVar"));
+    TEST_VARIABLE(false, "i64", "bigVar", );
 }
 
-TEST_F(ParsersTestFixture, VariableMissingName)
-{
-    std::string input = "i8 %";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<VariableParser>());
-}
+// =============================================================================
+//  Variable error cases
+// =============================================================================
 
-TEST_F(ParsersTestFixture, VariableArrayMissingRightBrace)
+TEST_F(ParsersTestFixture, Variable_MissingPercent) { EXPECT_FALSE(tokenizeAndParse<VariableParser>("i8 myVar")); }
+
+TEST_F(ParsersTestFixture, Variable_MissingName) { EXPECT_FALSE(tokenizeAndParse<VariableParser>("i8 %")); }
+
+TEST_F(ParsersTestFixture, Variable_TypeOnly)
 {
-    std::string input = "i8 %myVar: { 1, 2 ";
-    tokenizeAndCreateContext(input);
-    EXPECT_FALSE(expectParse<VariableParser>());
+    // "i8" alone is an identifier, not a variable
+    EXPECT_FALSE(tokenizeAndParse<VariableParser>("i8"));
 }

@@ -2,22 +2,19 @@
 
 bool DefineSymbolFromVariable(SymbolType symbolType,
                               const std::shared_ptr<BasicSemanticContext> &ctx,
-                              const std::shared_ptr<AstNode> &node,
+                              AstNode *node,
                               const std::string &moduleName)
 {
     if (node->getType() != AstNodeType::Variable)
     {
-        ctx->emitError(ErrorSeverity::Fatal,
-                       "Expected variable for symbol",
-                       moduleName,
-                       node->getFirstSourceReference());
+        ctx->emitError(ErrorSeverity::Fatal, "Expected variable for symbol", moduleName, node->getSourceRef());
         return false;
     }
 
-    std::shared_ptr<Symbol> symbol;
-    const std::shared_ptr<Variable> &variable = std::dynamic_pointer_cast<Variable>(node);
-    const std::string &variableDataType = variable->getVariableDataType();
-    const std::string &variableName = variable->getVariableName();
+    Symbol *symbol = nullptr;
+    Variable *variable = (Variable *)node;
+    const std::string_view &variableDataType = variable->getVariableDataType();
+    const std::string_view &variableName = variable->getVariableName();
 
     std::shared_ptr<Type> dataType = TypeTable::getType(variableDataType);
     if (!dataType || dataType->getUnderlyingType() == UnderlyingType::Void)
@@ -25,14 +22,14 @@ bool DefineSymbolFromVariable(SymbolType symbolType,
         ctx->emitError(ErrorSeverity::Fatal,
                        "Invalid data type provided for variable",
                        moduleName,
-                       variable->getFirstSourceReference());
+                       variable->getSourceRef());
         return false;
     }
 
-    std::shared_ptr<Symbol> upperScopeSymbol;
+    Symbol *upperScopeSymbol = nullptr;
     bool isSymbolDefinedInParentScopes = ctx->resolveSymbolInScope(variableName, &upperScopeSymbol, true);
 
-    if (!ctx->createSymbol(symbolType, variable, &symbol, dataType, variableName))
+    if (!ctx->createSymbol(variable, symbolType, &symbol, dataType.get(), variableName))
     {
         ctx->emitSymbolRedefinitionError(moduleName, variableName, variable);
         return false;
@@ -43,55 +40,66 @@ bool DefineSymbolFromVariable(SymbolType symbolType,
         ctx->emitError(ErrorSeverity::Warning,
                        "Variable shadows another variable defined in upper scopes",
                        moduleName,
-                       variable->getFirstSourceReference());
+                       variable->getSourceRef());
 
         ctx->emitError(ErrorSeverity::Warning,
                        "Previously defined here",
                        moduleName,
-                       upperScopeSymbol->getDefiningNode()->getFirstSourceReference());
+                       upperScopeSymbol->getDefiningNode()->getSourceRef());
     }
 
-    variable->addAnnotation(std::make_shared<SymbolAnnotation>(symbol));
+    variable->createAnnotation<SymbolAnnotation>(ctx->getAnnotPool(), symbol);
     return true;
 }
 
-bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Instruction> &instr)
+bool SymbolDefinitionVisitor::visit(struct CodeScope *scope)
+{
+    return AstNodeVisitor::visitAll(scope->getExpressions());
+}
+
+bool SymbolDefinitionVisitor::visit(IfAstNode *ifNode)
+{
+    return ifNode->getCondition()->accept(this) && ifNode->getTrueScope()->accept(this) &&
+            (!ifNode->getFalseScope() || ifNode->getFalseScope()->accept(this));
+}
+
+bool SymbolDefinitionVisitor::visit(Instruction *instr)
 {
     if (instr->getInstructionName() != "create")
         return true;
 
-    auto &operands = instr->getOperands();
-    if (operands.empty())
+    auto operands = instr->getExpressions();
+    if (!operands || operands->m_numElems == 0)
     {
         getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                         "Create instruction must have at least 1 operand",
                                         "SymbolDefinitionVisitor::Instruction",
-                                        instr->getFirstSourceReference());
+                                        instr->getSourceRef());
         return false;
     }
-    else if (operands.size() > 1)
+    else if (operands->m_numElems > 1)
     {
         getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                         "Create instruction can only have 1 operand",
                                         "SymbolDefinitionVisitor::Instruction",
-                                        instr->getFirstSourceReference());
+                                        instr->getSourceRef());
         return false;
     }
 
-    const std::shared_ptr<AstNode> &operand = operands[0];
+    AstNode *operand = (AstNode *)operands->m_head->m_object;
     return DefineSymbolFromVariable(SymbolType::LocalVariable,
                                     getSemanticContext(),
                                     operand,
                                     "SymbolDefinitionVisitor::Instruction");
 }
 
-bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Label> &label)
+bool SymbolDefinitionVisitor::visit(Label *label)
 {
-    std::shared_ptr<Scope> ownedScope;
-    std::shared_ptr<Symbol> symbol;
-    const std::string &labelName = label->getLabelName();
+    Symbol *symbol = nullptr;
+    Scope *ownedScope = nullptr;
+    const std::string_view &labelName = label->getLabelName();
 
-    if (!getSemanticContext()->createSymbol(SymbolType::Label, label, &symbol, nullptr, labelName))
+    if (!getSemanticContext()->createSymbol(label, SymbolType::Label, &symbol, nullptr, labelName))
     {
         getSemanticContext()->emitSymbolRedefinitionError("SymbolDefinitionVisitor::Label", labelName, label);
         return false;
@@ -101,30 +109,37 @@ bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Label> &label)
     {
         ownedScope = getSemanticContext()->getCurrentScope();
 
-        if (!AstNodeVisitor::visit(label))
+        // CodeScope. Visit code scope and its expressions.
+        if (!label->getCodeScope()->accept(this))
         {
+            // Error is already in the collector.
             return false;
         }
     }
     getSemanticContext()->endScope();
 
-    std::shared_ptr<ScopedSymbolAnnotation> annotation = std::make_shared<ScopedSymbolAnnotation>();
+    ScopedSymbolAnnotation *annotation = label->createAnnotation<ScopedSymbolAnnotation>(m_ctx->getAnnotPool());
     annotation->setOwnedScope(ownedScope);
     annotation->setSymbol(symbol);
 
-    label->addAnnotation(annotation);
     return true;
 }
 
-bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Module> &module)
+bool SymbolDefinitionVisitor::visit(struct ModuleHeader *header)
 {
-    std::shared_ptr<Scope> ownedScope;
-    std::shared_ptr<Symbol> moduleSymbol;
-    const std::shared_ptr<ModuleHeader> &header = module->getHeader();
-    const std::shared_ptr<CodeScope> &body = module->getBody();
 
-    const std::string &moduleName = header->getModuleName();
-    const std::string &moduleReturn = header->getReturnTypeName();
+    return AstNodeVisitor::visitAll(header->getExpressions());
+}
+
+bool SymbolDefinitionVisitor::visit(Module *module)
+{
+    CodeScope *body = module->getBody();
+    ModuleHeader *header = module->getHeader();
+    Symbol *moduleSymbol = nullptr;
+    Scope *ownedScope = nullptr;
+
+    const std::string_view &moduleName = header->getModuleName();
+    const std::string_view &moduleReturn = header->getReturnTypeName();
 
     std::shared_ptr<Type> moduleReturnType = TypeTable::getType(moduleReturn);
     if (!moduleReturnType)
@@ -132,11 +147,12 @@ bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Module> &module)
         getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                         "Invalid return type provided for module",
                                         "SymbolDefinitionVisitor::Module",
-                                        header->getFirstSourceReference());
+                                        header->getSourceRef());
         return false;
     }
 
-    if (!getSemanticContext()->createSymbol(SymbolType::Module, module, &moduleSymbol, moduleReturnType, moduleName))
+    if (!getSemanticContext()
+                 ->createSymbol(module, SymbolType::Module, &moduleSymbol, moduleReturnType.get(), moduleName))
     {
         getSemanticContext()->emitSymbolRedefinitionError("SymbolDefinitionVisitor::Module", moduleName, module);
         return false;
@@ -146,20 +162,15 @@ bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Module> &module)
     {
         ownedScope = getSemanticContext()->getCurrentScope();
 
-        // Header
-        for (auto &param : header->getParameters())
+        // Header. Visit parameters.
+        if (!header->accept(this))
         {
-            if (!DefineSymbolFromVariable(SymbolType::ModuleParameter,
-                                          getSemanticContext(),
-                                          param,
-                                          "SymbolDefinitionVisitor::Module"))
-            {
-                return false;
-            }
+            // The concrete error of the fail will already be in the error collector.
+            return false;
         }
 
-        // Body
-        if (!AstNodeVisitor::visit(body))
+        // Body. Visit code scope.
+        if (!body->accept(this))
         {
             // The concrete error of the fail will already be in the error collector.
             return false;
@@ -167,24 +178,21 @@ bool SymbolDefinitionVisitor::visit(const std::shared_ptr<Module> &module)
     }
     getSemanticContext()->endScope();
 
-    std::shared_ptr<ScopedSymbolAnnotation> annotation = std::make_shared<ScopedSymbolAnnotation>();
+    ScopedSymbolAnnotation *annotation = module->createAnnotation<ScopedSymbolAnnotation>(m_ctx->getAnnotPool());
     annotation->setOwnedScope(ownedScope);
     annotation->setSymbol(moduleSymbol);
-
-    module->addAnnotation(annotation);
     return true;
 }
 
-bool SymbolDefinitionVisitor::visit(const std::shared_ptr<struct Variable> &variable)
+bool SymbolDefinitionVisitor::visit(Variable *variable)
 {
-    if (!getSemanticContext()->isCurrentScopeGlobalScope())
+    SymbolType type = SymbolType::LocalVariable;
+    if (getSemanticContext()->isCurrentScopeGlobalScope())
     {
-        throw std::runtime_error(
-                "Internal compiler error: Called SymbolDefinitionVisitor::Variable on non-global variable.");
+        type = SymbolType::GlobalVariable;
     }
 
-    return DefineSymbolFromVariable(SymbolType::GlobalVariable,
-                                    getSemanticContext(),
-                                    variable,
-                                    "SymbolDefinitionVisitor::Variable");
+    return DefineSymbolFromVariable(type, getSemanticContext(), variable, "SymbolDefinitionVisitor::Variable");
 }
+
+bool SymbolDefinitionVisitor::visit(WhileAstNode *whileNode) { return whileNode->getCodeScope()->accept(this); }

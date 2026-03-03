@@ -5,36 +5,33 @@
 #include "Symbol.h"
 
 /**
- * Represents a scope, which is a batch of important data that should be preserved in certain locations for the
- * compilation.
+ * Represents a scope, which is a batch of defined symbols in the AST.
  */
 class Scope
 {
   public:
     /**
      * Creates the scope with the given id, subScopes, symbols and parent.
-     * @param symbols
      * @param parent
+     * @param symbols
      * @param name
      */
-    Scope(const std::map<std::string, std::shared_ptr<Symbol>> &symbols,
-          const std::shared_ptr<Scope> &parent,
-          const std::string &name);
+    Scope(Scope *parent, const std::map<std::string_view, Symbol *> &symbols, const std::string_view &name);
 
     /**
      * Creates an empty scope with its id and parent.
      * @param parent
      * @param name
      */
-    Scope(const std::shared_ptr<Scope> &parent, const std::string &name);
+    Scope(Scope *parent, const std::string_view &name);
 
     /**
      * Tries to define a symbol in the current scope. If symbol is already defined, an error will be thrown.
-     * @param name
      * @param symbol
-     * @return
+     * @param name
+     * @return bool
      */
-    bool define(const std::string &name, const std::shared_ptr<Symbol> &symbol);
+    bool define(Symbol *symbol, const std::string_view &name);
 
     /**
      * Tries to resolve the given symbol by its name. If outSymbol is not nullptr and if there's a match, outSymbol will
@@ -47,18 +44,18 @@ class Scope
      * @param searchParent
      * @return bool
      */
-    bool resolve(const std::string &name, std::shared_ptr<Symbol> *outSymbol, bool searchParent);
+    bool resolve(const std::string_view &name, Symbol **outSymbol, bool searchParent);
 
     /**
      * Returns the parent of this scope.
-     * @return const std::shared_ptr<Scope> &
+     * @return Scope*
      */
-    const std::shared_ptr<Scope> &getParent() const;
+    Scope *getParent() const;
 
   private:
-    std::string m_name;
-    std::map<std::string, std::shared_ptr<Symbol>> m_symbols;
-    std::shared_ptr<Scope> m_parent;
+    Scope *m_parent;
+    std::string_view m_name;
+    std::map<std::string_view, Symbol *> m_symbols;
 };
 
 #endif // EZPACKER_SCOPE_H

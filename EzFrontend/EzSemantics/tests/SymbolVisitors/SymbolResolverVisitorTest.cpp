@@ -6,27 +6,31 @@ TEST_F(SymbolResolverVisitorTestFixture, TestResolveVariable_Defined)
     // Since we are testing unit level, we can simulate this by manually adding a symbol to the context
     // and then parsing an instruction that uses it.
 
-    std::shared_ptr<Symbol> symbol;
-    getSemanticContext()->createSymbol(SymbolType::LocalVariable, nullptr, &symbol, TypeTable::getType("i32"), "myVar");
+    Symbol *symbol;
+    getSemanticContext()->createSymbol(nullptr,
+                                       SymbolType::LocalVariable,
+                                       &symbol,
+                                       TypeTable::getType("i32").get(),
+                                       "myVar");
 
     std::string code = "mov %myVar, 123;";
     // We don't run definition visitor here because 'mov' doesn't define symbols, it uses them.
     // And we already manually defined 'myVar'.
     EXPECT_TRUE(runVisitor<InstructionParser::InstructionParser>(code, false));
 
-    auto instr = std::dynamic_pointer_cast<Instruction>(getAstNode());
+    auto instr = dynamic_cast<Instruction *>(getAstNode());
     ASSERT_NE(instr, nullptr);
 
-    auto operands = instr->getOperands();
-    ASSERT_EQ(operands.size(), 2);
+    auto operands = instr->getExpressions();
+    ASSERT_EQ(operands->m_numElems, 2);
 
-    auto var = std::dynamic_pointer_cast<Variable>(operands[0]);
+    auto var = operands->get<Variable>(0);
     ASSERT_NE(var, nullptr);
 
     auto symbolAnnotation = var->getAnnotation<SymbolAnnotation>();
     ASSERT_NE(symbolAnnotation, nullptr);
 
-    EXPECT_EQ(symbolAnnotation->getSymbol(), symbol);
+    EXPECT_EQ(symbolAnnotation->getSymbol()->getId(), symbol->getId());
 }
 
 TEST_F(SymbolResolverVisitorTestFixture, TestResolveVariable_Undefined)
@@ -56,6 +60,62 @@ TEST_F(SymbolResolverVisitorTestFixture, TestResolveModule_InternalScope)
     std::string code = R"(
 i64 MyModule(i32 %param1, i64 %base)
 {
+    create float %localInModule;
+    create i8 %localInModule2;
+    add %localInModule, 1;
+    add %param1, i64 (1234);
+    add %param1, i64 (%base+0);
+    add %localInModule2, i64 (%base+0xFEEF);
+    nop;
+})";
+
+    EXPECT_TRUE(runVisitor<ModuleParser::ModuleParser>(code, true));
+}
+
+TEST_F(SymbolResolverVisitorTestFixture, TestResolveModule_If)
+{
+    // Test that symbols defined inside a module (params and locals) are resolvable
+    std::string code = R"(
+i64 MyModule(i32 %param1, i64 %base)
+{
+    if (%param1 EQ %base)
+    {
+        create i64 %myIfVar1;
+        create i64 %myIfVar2;
+    }
+    else if (%param1 NE %base)
+    {
+        create i64 %myElseIfVar1;
+        create i64 %myElseIfVar2;
+    }
+    else
+    {
+        create i64 %myIfElseVar1;
+        create i64 %myIfElseVar2;
+    }
+    create float %localInModule;
+    create i8 %localInModule2;
+    add %localInModule, 1;
+    add %param1, i64 (1234);
+    add %param1, i64 (%base+0);
+    add %localInModule2, i64 (%base+0xFEEF);
+    nop;
+})";
+
+    EXPECT_TRUE(runVisitor<ModuleParser::ModuleParser>(code, true));
+}
+
+TEST_F(SymbolResolverVisitorTestFixture, TestResolveModule_While)
+{
+    // Test that symbols defined inside a module (params and locals) are resolvable
+    std::string code = R"(
+i64 MyModule(i32 %param1, i64 %base)
+{
+    while(%param1 EQ %base)
+    {
+        create i64 %myWhileVar;
+        create i64 %myWhileVar2;
+    }
     create float %localInModule;
     create i8 %localInModule2;
     add %localInModule, 1;
@@ -136,11 +196,11 @@ i64 CalculateChecksum(i64 %bufferPtr, i32 %length, i64 %key)
 
 TEST_F(SymbolResolverVisitorTestFixture, TestResolveMemoryOperand_Base)
 {
-    std::shared_ptr<Symbol> symbol;
-    getSemanticContext()->createSymbol(SymbolType::LocalVariable,
-                                       nullptr,
+    Symbol *symbol;
+    getSemanticContext()->createSymbol(nullptr,
+                                       SymbolType::LocalVariable,
                                        &symbol,
-                                       TypeTable::getType("i64"),
+                                       TypeTable::getType("i64").get(),
                                        "baseVar");
 
     std::string code = "mov i32 (%baseVar + 10), 123;";
@@ -149,11 +209,11 @@ TEST_F(SymbolResolverVisitorTestFixture, TestResolveMemoryOperand_Base)
 
 TEST_F(SymbolResolverVisitorTestFixture, TestResolveMemoryOperand_Index)
 {
-    std::shared_ptr<Symbol> symbol;
-    getSemanticContext()->createSymbol(SymbolType::LocalVariable,
-                                       nullptr,
+    Symbol *symbol;
+    getSemanticContext()->createSymbol(nullptr,
+                                       SymbolType::LocalVariable,
                                        &symbol,
-                                       TypeTable::getType("i64"),
+                                       TypeTable::getType("i64").get(),
                                        "indexVar");
 
     std::string code = "mov i32 (, %indexVar, 4), 123;";

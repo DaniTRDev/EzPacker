@@ -1,21 +1,29 @@
 #include "AstNodes/ConditionAstNode.h"
 
-ConditionAstNode::ConditionAstNode(ConditionComparisonType comparisonType,
-                                   const std::shared_ptr<AstNode> &left,
-                                   const std::shared_ptr<AstNode> &right) :
-    m_comparisonType(comparisonType), m_left(left), m_right(right)
+ConditionAstNode::ConditionAstNode(AstNode *left, AstNode *right, ConditionComparisonType comparisonType) :
+    m_left(left), m_right(right), m_comparisonType(comparisonType)
 {
 }
 
+AstNode *ConditionAstNode::getLeft() const { return m_left; }
+
+AstNode *ConditionAstNode::getRight() const { return m_right; }
+
 AstNodeType ConditionAstNode::getType() const { return AstNodeType::Condition; }
+
+bool ConditionAstNode::accept(AstNodeVisitor *visitor)
+{
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+
+    return false;
+}
 
 ConditionComparisonType ConditionAstNode::getComparisonType() const { return m_comparisonType; }
 
 const char *ConditionAstNode::getAstNodeName() const { return "ConditionAstNode"; }
-
-const std::shared_ptr<AstNode> &ConditionAstNode::getLeft() const { return m_left; }
-
-const std::shared_ptr<AstNode> &ConditionAstNode::getRight() const { return m_right; }
 
 std::string ConditionAstNode::getAsStr(AstNodeStringMode mode) const
 {

@@ -1,16 +1,16 @@
 #include "AstNodeParsers/Parsers/WhileParser.h"
 
-std::shared_ptr<AstNode> WhileParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *WhileParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::While))
     {
-        // This is not an if-clause.
+        // This is not a while loop.
         return nullptr;
     }
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftParen))
     {
-        // Expected '(' after 'if'.
+        // Expected '(' after 'while'.
         ctx->emitError(ErrorSeverity::Fatal,
                        "Expected '(' after 'while'",
                        "WhileParser",
@@ -18,8 +18,7 @@ std::shared_ptr<AstNode> WhileParser::parse(const std::shared_ptr<BasicParsingCo
         return nullptr;
     }
 
-    std::shared_ptr<AstNode> condition;
-    std::shared_ptr<AstNode> codeScope;
+    AstNode *condition = nullptr, *codeScope = nullptr;
 
     if (condition = ConditionParser().parse(ctx); !condition)
     {
@@ -33,7 +32,7 @@ std::shared_ptr<AstNode> WhileParser::parse(const std::shared_ptr<BasicParsingCo
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
     {
-        // Expected '(' after 'if'.
+        // Expected ')' after 'while' condition.
         ctx->emitError(ErrorSeverity::Fatal,
                        "Expected ')' after 'while' condition",
                        "WhileParser",
@@ -43,7 +42,7 @@ std::shared_ptr<AstNode> WhileParser::parse(const std::shared_ptr<BasicParsingCo
 
     if (codeScope = CodeScopeParser().parse(ctx); !codeScope)
     {
-        // Failed to parse true scope.
+        // Failed to parse while loop body.
         ctx->emitError(ErrorSeverity::Fatal,
                        "Failed to parse code block for 'while' statement",
                        "WhileParser",
@@ -51,9 +50,9 @@ std::shared_ptr<AstNode> WhileParser::parse(const std::shared_ptr<BasicParsingCo
         return nullptr;
     }
 
-    std::shared_ptr<WhileAstNode> node = std::make_shared<WhileAstNode>();
-    node->setCondition(std::dynamic_pointer_cast<ConditionAstNode>(condition));
-    node->setCodeScope(std::dynamic_pointer_cast<CodeScope>(codeScope));
+    WhileAstNode *node = ctx->getNodePool()->createNode<WhileAstNode>();
+    node->setCondition((ConditionAstNode *)condition);
+    node->setCodeScope((CodeScope *)codeScope);
 
     return node;
 }

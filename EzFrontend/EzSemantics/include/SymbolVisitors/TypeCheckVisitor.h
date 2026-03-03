@@ -12,22 +12,62 @@
 class TypeCheckVisitor : public SemanticVisitor
 {
   public:
-    // Needed to include every visit method from SemanticVisitor. TODO: Remove after changing to an "accept" design.
-    using SemanticVisitor::visit;
+    /**
+     * Visits given BreakAstNode node. It will throw an error if the node is not inside a loop.
+     * @param _break
+     * @return bool
+     */
+    bool visit(BreakAstNode *_break) override;
+    
+    /**
+     * Visits given CodeScope node. It will visit its expressions.
+     * @param scope
+     * @return bool
+     */
+    bool visit(CodeScope *scope) override;
+    
+    /**
+     * Visits given ContinueAstNode node. It will throw an error if the node is not inside a loop.
+     * @param _continue
+     * @return bool
+     */
+    bool visit(ContinueAstNode *_continue) override;
+
+    /**
+     * Visits the given IfAstNode. Will try to resolve the symbol and types from the condition and true and false
+     * branches.
+     * @param ifNode
+     * @return bool
+     */
+    bool visit(IfAstNode *ifNode);
 
     /**
      * Visits given instruction node. Recursively visits operands.
      * @param instr
      * @return bool
      */
-    bool visit(const std::shared_ptr<struct Instruction> &instr) override;
+    bool visit(Instruction *instr) override;
+
+    /**
+     * Visits given Label node. Recursively visits its expressions.
+     * @param label
+     * @return bool
+     */
+    bool visit(Label *label) override;
+
+    /**
+     * Visits given Module node. Recursively visits its expressions.
+     * @param module
+     * @return bool
+     */
+    bool visit(Module *module) override;
 
     /**
      * Visits given Memory operand node. Visits used variable nodes (if any).
      * @param operand
      * @return bool
      */
-    bool visit(const std::shared_ptr<struct MemoryOperandAstNode> &operand) override;
+    bool visit(MemoryOperandAstNode *operand) override;
 
     /**
      * Visits given Variable node. This visitor will check for the types of
@@ -36,9 +76,32 @@ class TypeCheckVisitor : public SemanticVisitor
      * @param var
      * @return bool
      */
-    bool visit(const std::shared_ptr<struct Variable> &var) override;
+    bool visit(Variable *var) override;
+
+    /**
+     * Visits the given WhileAstNode. Will try to resolve the symbol and types from the condition the loop branch.
+     * @param whileNode
+     * @return bool
+     */
+    bool visit(WhileAstNode *whileNode) override;
 
   private:
+    /**
+     * Performs a type cast safety check and returns true if cast can be done.
+     * @param node
+     * @param originalType The original type.
+     * @param usedType The new type which, if possible, will be used.
+     * @return bool
+     */
+    bool checkCastSafety(AstNode *node, Type *originalType, Type *usedType);
+
+    /**
+     * Checks if the given immediate matches the target type or can be casted onto it.
+     * @param operand
+     * @param usedType
+     * @return
+     */
+    bool checkImmediateSafety(ImmediateOperand *operand, Type *usedType);
 };
 
 #endif // EZPACKER_TYPECHECKVISITOR_H

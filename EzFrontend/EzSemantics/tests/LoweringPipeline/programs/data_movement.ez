@@ -1,0 +1,21 @@
+# Data movement test program
+# Tests: mov, create, load, store, lea with memory operands
+
+void DataMovement(i64 %srcPtr, i64 %dstPtr)
+{
+    create i64 %localA;
+    create i64 %localB;
+    create i32 %smallVal;
+
+    mov %localA, 0;
+    mov %localB, %srcPtr;
+    mov %smallVal, 42;
+
+    mov %localA, i64 (%srcPtr+0);
+    mov %localA, i64 (%srcPtr+0x10);
+    mov %localA, i64 (%dstPtr+0);
+
+    add %localA, %localB;
+    nop;
+}
+

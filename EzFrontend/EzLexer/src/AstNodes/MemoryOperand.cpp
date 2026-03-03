@@ -1,36 +1,44 @@
 #include "AstNodes/MemoryOperand.h"
 
-MemoryOperandAstNode::MemoryOperandAstNode(std::string referencedMemoryDataType) :
+MemoryOperandAstNode::MemoryOperandAstNode(std::string_view referencedMemoryDataType) :
     m_referencedMemoryDataType(referencedMemoryDataType)
 {
 }
 
 AstNodeType MemoryOperandAstNode::getType() const { return AstNodeType::MemoryOperand; }
 
-const char *MemoryOperandAstNode::getAstNodeName() const { return "MemoryOperad"; }
-
-void MemoryOperandAstNode::setReferencedDataType(std::string dataType)
+bool MemoryOperandAstNode::accept(AstNodeVisitor *visitor)
 {
-    m_referencedMemoryDataType = std::move(dataType);
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+    return false;
 }
 
-const std::string &MemoryOperandAstNode::getReferencedMemoryDataTypeStr() const { return m_referencedMemoryDataType; }
+const char *MemoryOperandAstNode::getAstNodeName() const { return "MemoryOperand"; }
 
-BaseDisplacementMemory::BaseDisplacementMemory(std::shared_ptr<IntegerImmediate> displacement,
-                                               std::shared_ptr<Variable> base,
-                                               std::string referencedDataType) :
-    m_displacement(std::move(displacement)), m_base(std::move(base)),
-    MemoryOperandAstNode(std::move(referencedDataType))
+void MemoryOperandAstNode::setReferencedDataType(std::string_view dataType) { m_referencedMemoryDataType = dataType; }
+
+const std::string_view &MemoryOperandAstNode::getReferencedMemoryDataTypeStr() const
+{
+    return m_referencedMemoryDataType;
+}
+
+BaseDisplacementMemory::BaseDisplacementMemory(IntegerImmediate *displacement,
+                                               Variable *base,
+                                               std::string_view referencedDataType) :
+    m_displacement(displacement), m_base(base), MemoryOperandAstNode(referencedDataType)
 {
 }
 
 const char *BaseDisplacementMemory::getMemoryOperandTypeName() const { return "BaseDisplacement"; }
 
+IntegerImmediate *BaseDisplacementMemory::getDisplacement() const { return m_displacement; }
+
 MemoryOperandType BaseDisplacementMemory::getMemoryOperandType() const { return MemoryOperandType::BaseDisplacement; }
 
-const std::shared_ptr<IntegerImmediate> &BaseDisplacementMemory::getDisplacement() const { return m_displacement; }
-
-const std::shared_ptr<Variable> &BaseDisplacementMemory::getBase() const { return m_base; }
+Variable *BaseDisplacementMemory::getBase() const { return m_base; }
 
 std::string BaseDisplacementMemory::getAsStr(AstNodeStringMode mode) const
 {
@@ -52,21 +60,20 @@ std::string BaseDisplacementMemory::getAsStr(AstNodeStringMode mode) const
     }
 }
 
-IndexScaleMemory::IndexScaleMemory(std::shared_ptr<IntegerImmediate> scalingFactor,
-                                   std::shared_ptr<Variable> index,
-                                   std::string referencedDataType) :
-    m_scalingFactor(std::move(scalingFactor)), m_index(std::move(index)),
-    MemoryOperandAstNode(std::move(referencedDataType))
+IndexScaleMemory::IndexScaleMemory(IntegerImmediate *scalingFactor,
+                                   Variable *index,
+                                   std::string_view referencedDataType) :
+    m_scalingFactor(scalingFactor), m_index(index), MemoryOperandAstNode(referencedDataType)
 {
 }
 
 const char *IndexScaleMemory::getMemoryOperandTypeName() const { return "IndexScale"; }
 
+IntegerImmediate *IndexScaleMemory::getScalingFactor() const { return m_scalingFactor; }
+
 MemoryOperandType IndexScaleMemory::getMemoryOperandType() const { return MemoryOperandType::IndexScale; }
 
-const std::shared_ptr<IntegerImmediate> &IndexScaleMemory::getScalingFactor() const { return m_scalingFactor; }
-
-const std::shared_ptr<Variable> &IndexScaleMemory::getIndex() const { return m_index; }
+Variable *IndexScaleMemory::getIndex() const { return m_index; }
 
 std::string IndexScaleMemory::getAsStr(AstNodeStringMode mode) const
 {
@@ -87,14 +94,13 @@ std::string IndexScaleMemory::getAsStr(AstNodeStringMode mode) const
                            getScalingFactor()->getAsStr(mode));
     }
 }
-BaseIndexScaleDisplacementMemory::BaseIndexScaleDisplacementMemory(std::shared_ptr<IntegerImmediate> displacement,
-                                                                   std::shared_ptr<IntegerImmediate> scalingFactor,
-                                                                   std::shared_ptr<Variable> base,
-                                                                   std::shared_ptr<Variable> index,
-                                                                   std::string referencedDataType) :
-    BaseDisplacementMemory(std::move(displacement), std::move(base), referencedDataType),
-    IndexScaleMemory(std::move(scalingFactor), std::move(index), referencedDataType),
-    MemoryOperandAstNode(referencedDataType)
+BaseIndexScaleDisplacementMemory::BaseIndexScaleDisplacementMemory(IntegerImmediate *displacement,
+                                                                   IntegerImmediate *scalingFactor,
+                                                                   Variable *base,
+                                                                   Variable *index,
+                                                                   std::string_view referencedDataType) :
+    BaseDisplacementMemory(displacement, base, referencedDataType),
+    IndexScaleMemory(scalingFactor, index, referencedDataType), MemoryOperandAstNode(referencedDataType)
 {
 }
 
@@ -125,7 +131,8 @@ std::string BaseIndexScaleDisplacementMemory::getAsStr(AstNodeStringMode mode) c
                            getDisplacement()->getAsStr(mode));
     }
 }
-DirectMemory::DirectMemory(std::shared_ptr<IntegerImmediate> address, std::string referencedDataType) :
+
+DirectMemory::DirectMemory(IntegerImmediate *address, std::string_view referencedDataType) :
     m_address(std::move(address)), MemoryOperandAstNode(std::move(referencedDataType))
 {
 }
@@ -134,7 +141,7 @@ const char *DirectMemory::getMemoryOperandTypeName() const { return "Direct"; }
 
 MemoryOperandType DirectMemory::getMemoryOperandType() const { return MemoryOperandType::Direct; }
 
-const std::shared_ptr<IntegerImmediate> &DirectMemory::getAddress() const { return m_address; }
+IntegerImmediate *DirectMemory::getAddress() const { return m_address; }
 
 std::string DirectMemory::getAsStr(AstNodeStringMode mode) const
 {

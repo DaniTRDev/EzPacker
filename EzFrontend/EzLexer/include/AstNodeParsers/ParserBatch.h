@@ -7,7 +7,7 @@
 
 struct ParserBatchResult
 {
-    std::shared_ptr<AstNode> m_node;
+    AstNode *m_node;
     std::shared_ptr<IAstNodeParser> m_parser;
 };
 
@@ -56,11 +56,16 @@ class ParserBatch
     }
 
     /**
-     * Tries to apply set parsers, if any, in the given context. Returns in the first match. This function will create
-     * 1 scope within the error collector of the given context. In this scope other parsers will also begin/end a new
-     * scope in which their errors, if any, will be pushed.
+     * Tries each parser in order against the current token stream. For each parser:
+     *   1. The current stream position is saved and a new error scope is begun.
+     *   2. If the parser succeeds (returns a non-null node), its error scope is discarded and the result is
+     *      returned immediately. If the node has no source reference, one is assigned from the context.
+     *   3. If the parser fails with a fatal error, the error scope is propagated upward and no further
+     *      parsers are attempted.
+     *   4. If the parser fails without a fatal error, the error scope is discarded, the stream position is
+     *      restored, and the next parser is tried.
      *
-     * IMPORTANT: If there's a match, errors will be DISCARDED.
+     * Returns {nullptr, nullptr} if no parser matched or if a fatal error occurred.
      * @param ctx
      * @return ParserBatchResult
      */

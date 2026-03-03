@@ -4,15 +4,24 @@ WhileAstNode::WhileAstNode() {}
 
 AstNodeType WhileAstNode::getType() const { return AstNodeType::While; }
 
+bool WhileAstNode::accept(AstNodeVisitor *visitor)
+{
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+    return false;
+}
+
+CodeScope *WhileAstNode::getCodeScope() const { return m_codeScope; }
+
+ConditionAstNode *WhileAstNode::getCondition() const { return m_condition; }
+
 const char *WhileAstNode::getAstNodeName() const { return "WhileAstNode"; }
 
-void WhileAstNode::setCodeScope(const std::shared_ptr<CodeScope> &codeScope) { m_codeScope = codeScope; }
+void WhileAstNode::setCodeScope(CodeScope *codeScope) { m_codeScope = codeScope; }
 
-void WhileAstNode::setCondition(const std::shared_ptr<ConditionAstNode> &condition) { m_condition = condition; }
-
-const std::shared_ptr<ConditionAstNode> &WhileAstNode::getCondition() const { return m_condition; }
-
-const std::shared_ptr<CodeScope> &WhileAstNode::getCodeScope() const { return m_codeScope; }
+void WhileAstNode::setCondition(ConditionAstNode *condition) { m_condition = condition; }
 
 std::string WhileAstNode::getAsStr(AstNodeStringMode mode) const
 {

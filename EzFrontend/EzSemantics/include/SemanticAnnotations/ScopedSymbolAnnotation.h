@@ -19,19 +19,19 @@ class ScopedSymbolAnnotation : public SymbolAnnotation
     const char *getAnnotationName() const override;
 
     /**
+     * Returns the owned scope of this annotation.
+     * @return Scope*
+     */
+    Scope *getOwnedScope();
+
+    /**
      * Sets the owned scope of this annotation.
      * @param scope
      */
-    void setOwnedScope(const std::shared_ptr<Scope> &scope);
-
-    /**
-     * Returns the owned scope of this annotation.
-     * @return const std::shared_ptr<Scope> &
-     */
-    const std::shared_ptr<Scope> &getOwnedScope();
+    void setOwnedScope(Scope *scope);
 
   private:
-    std::shared_ptr<Scope> m_ownedScope;
+    Scope *m_ownedScope;
 };
 
 #endif // EZPACKER_SCOPEDSYMBOLANNOTATION_H

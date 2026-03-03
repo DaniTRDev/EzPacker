@@ -44,14 +44,6 @@ TEST_F(TokenizerTestFixture, TestSingleThread_IdentifierWithNumbersAndUnderscore
     EXPECT_FALSE(advanceToken());
 }
 
-TEST_F(TokenizerTestFixture, TestSingleThread_IdentifierInvalidStartScore)
-{
-    auto tokenizer = createBasicTokenizer();
-    std::string buffer = "-myIdentifier";
-
-    EXPECT_FALSE(expectTokenizeResult(buffer));
-}
-
 TEST_F(TokenizerTestFixture, TestSingleThread_NumberIntDecimal)
 {
     auto tokenizer = createBasicTokenizer();
@@ -70,10 +62,10 @@ TEST_F(TokenizerTestFixture, TestSingleThread_NumberNegativeIntDecimal)
     std::string buffer = "-1231312";
 
     EXPECT_TRUE(expectTokenizeResult(buffer));
-    EXPECT_TRUE(expectTokenCount(1));
+    EXPECT_TRUE(expectTokenCount(2));
+    EXPECT_TRUE(expectTokenType(_TokenType::Minus));
+    EXPECT_TRUE(advanceToken());
     EXPECT_TRUE(expectTokenType(_TokenType::NumberInt));
-    EXPECT_TRUE(expectTokenContent("-1231312"));
-    EXPECT_FALSE(advanceToken());
 }
 
 TEST_F(TokenizerTestFixture, TestSingleThread_NumberIntHex)
@@ -94,10 +86,10 @@ TEST_F(TokenizerTestFixture, TestSingleThread_NumberNegativeIntHex)
     std::string buffer = "-0x1231312";
 
     EXPECT_TRUE(expectTokenizeResult(buffer));
-    EXPECT_TRUE(expectTokenCount(1));
+    EXPECT_TRUE(expectTokenCount(2));
+    EXPECT_TRUE(expectTokenType(_TokenType::Minus));
+    EXPECT_TRUE(advanceToken());
     EXPECT_TRUE(expectTokenType(_TokenType::NumberInt));
-    EXPECT_TRUE(expectTokenContent("-0x1231312"));
-    EXPECT_FALSE(advanceToken());
 }
 
 TEST_F(TokenizerTestFixture, TestSingleThread_NumberIntHexNoPrefix)

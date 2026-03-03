@@ -1,15 +1,23 @@
 #include "AstNodes/Module.h"
 
-ModuleHeader::ModuleHeader(std::string moduleName,
-                           std::string returnType,
-                           std::vector<std::shared_ptr<AstNode>> parameters) :
-    m_moduleName(std::move(moduleName)), m_returnType(std::move(returnType)), m_parameters(std::move(parameters))
+ModuleHeader::ModuleHeader(TypedPoolSlice<AstNode> *parameters, std::string_view moduleName, std::string_view returnType) :
+    m_moduleName(std::move(moduleName)), m_returnType(std::move(returnType))
 {
+    AstNodeContainer::setExpressions(parameters);
 }
 
 AstNodeType ModuleHeader::getType() const { return AstNodeType::ModuleHeader; }
 
-const char *ModuleHeader::getAstNodeName() const { return "ModuleHeaderParser"; }
+bool ModuleHeader::accept(AstNodeVisitor *visitor)
+{
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+    return false;
+}
+
+const char *ModuleHeader::getAstNodeName() const { return "ModuleHeader"; }
 
 std::string ModuleHeader::getAsStr(AstNodeStringMode mode) const
 {
@@ -18,10 +26,16 @@ std::string ModuleHeader::getAsStr(AstNodeStringMode mode) const
 
     if (mode == AstNodeStringMode::Debug)
     {
+        auto param = getExpressions()->m_head;
+        size_t i = 0;
         std::string parametersContent;
-        for (size_t i = 0; i < m_parameters.size(); i++)
+
+        while (param)
         {
-            parametersContent += std::format("\t{} = {}\n", i, m_parameters[i]->getAsStr(mode));
+            AstNode *node = (AstNode *)param->m_object;
+            parametersContent += std::format("\t{} = {}\n", i, node->getAsStr(mode));
+            param = param->m_next;
+            i++;
         }
     }
 
@@ -29,24 +43,28 @@ std::string ModuleHeader::getAsStr(AstNodeStringMode mode) const
     return std::move(str);
 }
 
-const std::string &ModuleHeader::getModuleName() const { return m_moduleName; }
+const std::string_view &ModuleHeader::getModuleName() const { return m_moduleName; }
 
-const std::string &ModuleHeader::getReturnTypeName() const { return m_returnType; }
+const std::string_view &ModuleHeader::getReturnTypeName() const { return m_returnType; }
 
-const std::vector<std::shared_ptr<AstNode>> &ModuleHeader::getParameters() const { return m_parameters; }
-
-Module::Module(std::shared_ptr<CodeScope> body, std::shared_ptr<ModuleHeader> header) :
-    m_body(std::move(body)), m_header(std::move(header))
-{
-}
+Module::Module(CodeScope *body, ModuleHeader *header) : m_body(std::move(body)), m_header(std::move(header)) {}
 
 AstNodeType Module::getType() const { return AstNodeType::Module; }
 
+bool Module::accept(AstNodeVisitor *visitor)
+{
+    if (visitor)
+    {
+        return visitor->visit(this);
+    }
+    return false;
+}
+
+CodeScope *Module::getBody() const { return m_body; }
+
 const char *Module::getAstNodeName() const { return "Module"; }
 
-const std::shared_ptr<CodeScope> &Module::getBody() const { return m_body; }
-
-const std::shared_ptr<ModuleHeader> &Module::getHeader() const { return m_header; }
+ModuleHeader *Module::getHeader() const { return m_header; }
 
 std::string Module::getAsStr(AstNodeStringMode mode) const
 {

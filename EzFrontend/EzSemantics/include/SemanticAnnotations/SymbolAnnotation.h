@@ -13,13 +13,19 @@ class SymbolAnnotation : public IAstNodeAnnotation
     /**
      * Creates a default object WITHOUT a symbol.
      */
-    SymbolAnnotation();
+    explicit SymbolAnnotation();
 
     /**
      * Creates the annotation linked to the given symbol.
      * @param symbol
      */
-    SymbolAnnotation(const std::shared_ptr<Symbol> &symbol);
+    SymbolAnnotation(Symbol *symbol);
+
+    /**
+     * Returns the symbol of this annotation.
+     * @return Symbol *
+     */
+    Symbol *getSymbol() const;
 
     /**
      * Returns "SymbolAnnotation".
@@ -31,16 +37,10 @@ class SymbolAnnotation : public IAstNodeAnnotation
      * Sets the symbol of this annotation.
      * @param symbol
      */
-    void setSymbol(const std::shared_ptr<Symbol> &symbol);
-
-    /**
-     * Returns the symbol of this annotation.
-     * @return const std::shared_ptr<Symbol> &
-     */
-    const std::shared_ptr<Symbol> &getSymbol() const;
+    void setSymbol(Symbol *symbol);
 
   private:
-    std::shared_ptr<Symbol> m_symbol;
+    Symbol *m_symbol;
 };
 
 #endif // EZPACKER_SYMBOLANNOTATION_H

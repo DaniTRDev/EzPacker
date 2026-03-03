@@ -2,10 +2,10 @@
 
 namespace MemoryOperandParser
 {
-std::shared_ptr<AstNode> BaseDisplacement::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *BaseDisplacement::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    std::shared_ptr<BaseDisplacementMemory> node;
-    std::shared_ptr<AstNode> base, displacement;
+    BaseDisplacementMemory *node = nullptr;
+    AstNode *base = nullptr, *displacement = nullptr;
 
     if (base = VariableParser().parse(ctx); !base)
     {
@@ -23,19 +23,15 @@ std::shared_ptr<AstNode> BaseDisplacement::parse(const std::shared_ptr<BasicPars
      */
 
     displacement = ImmediateParser::ImmediateParser().parse(ctx);
+    node = ctx->getNodePool()->create<BaseDisplacementMemory>((IntegerImmediate *)displacement, (Variable *)base, "");
 
-    node = std::make_shared<BaseDisplacementMemory>(
-            std::move(std::dynamic_pointer_cast<IntegerImmediate>(displacement)),
-            std::move(std::dynamic_pointer_cast<Variable>(base)),
-            "");
     return node;
 }
 
-std::shared_ptr<AstNode> BaseIndexScaleDisplacement::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *BaseIndexScaleDisplacement::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    std::shared_ptr<BaseIndexScaleDisplacementMemory> node;
-    std::shared_ptr<AstNode> base, index;
-    std::shared_ptr<AstNode> scale, displacement;
+    BaseIndexScaleDisplacementMemory *node = nullptr;
+    AstNode *base = nullptr, *index = nullptr, *scale = nullptr, *displacement = nullptr;
 
     if (base = VariableParser().parse(ctx); !base)
     {
@@ -105,19 +101,18 @@ std::shared_ptr<AstNode> BaseIndexScaleDisplacement::parse(const std::shared_ptr
         return nullptr;
     }
 
-    node = std::make_shared<BaseIndexScaleDisplacementMemory>(
-            std::move(std::dynamic_pointer_cast<IntegerImmediate>(displacement)),
-            std::move(std::dynamic_pointer_cast<IntegerImmediate>(scale)),
-            std::move(std::dynamic_pointer_cast<Variable>(base)),
-            std::move(std::dynamic_pointer_cast<Variable>(index)),
-            "");
+    node = ctx->getNodePool()->create<BaseIndexScaleDisplacementMemory>((IntegerImmediate *)displacement,
+                                                                        (IntegerImmediate *)scale,
+                                                                        (Variable *)base,
+                                                                        (Variable *)index,
+                                                                        "");
     return node;
 }
 
-std::shared_ptr<AstNode> IndexScale::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *IndexScale::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    std::shared_ptr<IndexScaleMemory> node;
-    std::shared_ptr<AstNode> index, scale;
+    IndexScaleMemory *node = nullptr;
+    AstNode *index = nullptr, *scale = nullptr;
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma))
     {
@@ -159,16 +154,14 @@ std::shared_ptr<AstNode> IndexScale::parse(const std::shared_ptr<BasicParsingCon
         return nullptr;
     }
 
-    node = std::make_shared<IndexScaleMemory>(std::move(std::dynamic_pointer_cast<IntegerImmediate>(scale)),
-                                              std::move(std::dynamic_pointer_cast<Variable>(index)),
-                                              "");
+    node = ctx->getNodePool()->create<IndexScaleMemory>((IntegerImmediate *)scale, (Variable *)index, "");
     return node;
 }
 
-std::shared_ptr<AstNode> Direct::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *Direct::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    std::shared_ptr<DirectMemory> node;
-    std::shared_ptr<AstNode> address;
+    DirectMemory *node;
+    AstNode *address = nullptr;
 
     if (address = ImmediateParser::Integer().parse(ctx); !address)
     {
@@ -179,14 +172,14 @@ std::shared_ptr<AstNode> Direct::parse(const std::shared_ptr<BasicParsingContext
         return nullptr;
     }
 
-    node = std::make_shared<DirectMemory>(std::move(std::dynamic_pointer_cast<IntegerImmediate>(address)), "");
+    node = ctx->getNodePool()->create<DirectMemory>((IntegerImmediate *)address, "");
     return node;
 }
 
-std::shared_ptr<AstNode> MemoryOperandParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
+AstNode *MemoryOperandParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     TokenInformation token;
-    std::shared_ptr<AstNode> node;
+    AstNode *node;
 
     ctx->consumeIf(ParsingCondition::TokenType, &token, _TokenType::Identifier);
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftParen))
@@ -226,7 +219,9 @@ std::shared_ptr<AstNode> MemoryOperandParser::parse(const std::shared_ptr<BasicP
         return nullptr;
     }
 
-    std::dynamic_pointer_cast<MemoryOperandAstNode>(node)->setReferencedDataType(std::move(token.m_str));
-    return node;
+    MemoryOperandAstNode *memoryOperand = (MemoryOperandAstNode *)node;
+    memoryOperand->setReferencedDataType(ctx->getStringPool()->createConstantString(token.m_str));
+
+    return memoryOperand;
 }
 }; // namespace MemoryOperandParser

@@ -1,7 +1,6 @@
 #include "SemanticAnnotations/TypeCastAnnotation.h"
 
-TypeCastAnnotation::TypeCastAnnotation(const std::shared_ptr<Symbol> &originalSymbol,
-                                       const std::shared_ptr<Type> &castedDataType) :
+TypeCastAnnotation::TypeCastAnnotation(Symbol *originalSymbol, Type *castedDataType) :
     m_castedDataType(castedDataType), SymbolAnnotation(originalSymbol)
 {
 }
@@ -72,6 +71,6 @@ bool TypeCastAnnotation::isIntegerToInteger() const
             m_castedDataType->getUnderlyingType() == UnderlyingType::Integer;
 }
 
-const char *TypeCastAnnotation::getAnnotationName() const { return "TypeCastAnnotation"; }
+Type *TypeCastAnnotation::getCastedDataType() const { return m_castedDataType; }
 
-const std::shared_ptr<Type> &TypeCastAnnotation::getCastedDataType() const { return m_castedDataType; }
+const char *TypeCastAnnotation::getAnnotationName() const { return "TypeCastAnnotation"; }

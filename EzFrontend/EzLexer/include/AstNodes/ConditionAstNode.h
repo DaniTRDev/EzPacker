@@ -3,6 +3,7 @@
 
 #include "EzLexerCommon.h"
 #include "AstNode/AstNode.h"
+#include "AstNode/AstNodeVisitor.h"
 
 enum class ConditionComparisonType
 {
@@ -19,13 +20,23 @@ class ConditionAstNode : public AstNode
   public:
     /**
      * Creates the condition node with the specified type and left and right operands.
-     * @param conditionType
+     * @param comparisonType
      * @param left
      * @param right
      */
-    ConditionAstNode(ConditionComparisonType conditionType,
-                     const std::shared_ptr<AstNode> &left,
-                     const std::shared_ptr<AstNode> &right);
+    ConditionAstNode(AstNode *left, AstNode *right, ConditionComparisonType comparisonType);
+
+    /**
+     * Returns the left-hand side of the condition (e.g., a variable or expression).
+     * @return AstNode *
+     */
+    AstNode *getLeft() const;
+
+    /**
+     * Returns the right-hand side of the condition (e.g., a variable, expression, or literal).
+     * @return AstNode *
+     */
+    AstNode *getRight() const;
 
     /**
      * Returns 'Condition' as the type of this node.
@@ -34,28 +45,24 @@ class ConditionAstNode : public AstNode
     AstNodeType getType() const override;
 
     /**
+     * Accepts the given visitor and calls its internal visit method with the correct node type. Returns
+     * the result of visit.
+     * @param visitor
+     * @return bool
+     */
+    bool accept(AstNodeVisitor *visitor) override;
+
+    /**
      * Returns the type of condition (e.g., Equal, GreaterThan, etc.).
      * @return ComparisonType
      */
     ConditionComparisonType getComparisonType() const;
 
     /**
-     * Returns 'Condition'.
+     * Returns "ConditionAstNode".
      * @return const char*
      */
     const char *getAstNodeName() const override;
-
-    /**
-     * Returns the left-hand side of the condition (e.g., a variable or expression).
-     * @return const std::shared_ptr<AstNode> &
-     */
-    const std::shared_ptr<AstNode> &getLeft() const;
-
-    /**
-     * Returns the right-hand side of the condition (e.g., a variable, expression, or literal).
-     * @return const std::shared_ptr<AstNode> &
-     */
-    const std::shared_ptr<AstNode> &getRight() const;
 
     /**
      * Returns a string representation of this node. This is described as:
@@ -67,9 +74,8 @@ class ConditionAstNode : public AstNode
 
   private:
     ConditionComparisonType m_comparisonType; // The type of condition (e.g., Equal, GreaterThan, etc.)
-    std::shared_ptr<AstNode> m_left;          // The left-hand side of the condition (e.g., a variable or expression).
-    std::shared_ptr<AstNode>
-            m_right; // The right-hand side of the condition (e.g., a variable, expression, or literal).
+    AstNode *m_left;                          // The left-hand side of the condition (e.g., a variable or expression).
+    AstNode *m_right; // The right-hand side of the condition (e.g., a variable, expression, or literal).
 };
 
 #endif // EZPACKER_CONDITIONASTNODE_H

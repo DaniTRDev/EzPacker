@@ -1,0 +1,11 @@
+# Module lowering test program with parameters and body
+# Tests: return type, multiple params, body instructions
+
+i64 ModuleWithParams(i32 %paramA, i64 %paramB, i32 %paramC)
+{
+    create i64 %local;
+    mov %local, %paramB;
+    add %local, 1;
+    nop;
+}
+

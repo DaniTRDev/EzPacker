@@ -11,9 +11,9 @@ class VariableParser : public IAstNodeParser
   public:
     /**
      * Tries to parse a variable node out of the given context.
-     * @return std::shared_ptr<AstNode>
+     * @return AstNode*
      */
-    std::shared_ptr<AstNode> parse(const std::shared_ptr<BasicParsingContext> &ctx);
+    AstNode* parse(const std::shared_ptr<BasicParsingContext> &ctx);
 };
 
 #endif // EZPACKER_VARIABLEPARSER_H

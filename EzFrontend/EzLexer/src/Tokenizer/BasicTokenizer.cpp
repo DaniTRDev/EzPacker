@@ -15,8 +15,7 @@ bool BasicTokenizer::tokenizeBuffer(char *buffer, size_t address, size_t bufferS
     {
         m_errorCollector->onError(ErrorSeverity::Fatal,
                                   "Could not tokenizeBuffer because buffer, address or buffer size is invalid",
-                                  "Tokenizer",
-                                  nullptr);
+                                  "Tokenizer");
         m_errorCollector->endScope(ErrorAction::Commit); // If there was any error, commit it.
         return false;
     }
@@ -32,7 +31,7 @@ bool BasicTokenizer::tokenizeBuffer(char *buffer, size_t address, size_t bufferS
         _TokenType type = _TokenType::Invalid;
         if (!tokenizeSingle(buffer, m_bufferSize, type))
         {
-            m_errorCollector->onError(ErrorSeverity::Fatal, "Unexpected token", "Tokenizer", nullptr);
+            m_errorCollector->onError(ErrorSeverity::Fatal, "Unexpected token", "Tokenizer");
             m_errorCollector->endScope(ErrorAction::Commit); // If there was any error, commit it.
             return false;
         }
@@ -121,7 +120,7 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
             while (consume())
             {
                 ch = peek();
-                information.m_sourceReference->m_length++;
+                information.m_sourceReference.m_length++;
 
                 if (TokenizerHelpers::isEndOfLine(ch))
                 {
@@ -199,7 +198,7 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
             while (consume())
             {
                 ch = peek();
-                information.m_sourceReference->m_length++;
+                information.m_sourceReference.m_length++;
 
                 if (isEscaping)
                 {
@@ -339,11 +338,19 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
             break;
         }
         information.m_str += ch;
-        information.m_sourceReference->m_length++;
+        information.m_sourceReference.m_length++;
     }
 
     std::string identifierToLower = StrToLower(information.m_str);
-    if (identifierToLower == "if")
+    if (identifierToLower == "break")
+    {
+        information.m_type = _TokenType::Break;
+    }
+    else if (identifierToLower == "continue")
+    {
+        information.m_type = _TokenType::Continue;
+    }
+    else if (identifierToLower == "if")
     {
         information.m_type = _TokenType::If;
     }
@@ -372,7 +379,7 @@ bool BasicTokenizer::tokenizeNumber(char *buffer, size_t bufferSize, _TokenType 
     bool isHex = false;
 
     information.m_str += peek();
-    information.m_sourceReference->m_length++;
+    information.m_sourceReference.m_length++;
 
     while (consume())
     {
@@ -410,7 +417,7 @@ bool BasicTokenizer::tokenizeNumber(char *buffer, size_t bufferSize, _TokenType 
                 break; // Not a hex digit.
         }
 
-        information.m_sourceReference->m_length++;
+        information.m_sourceReference.m_length++;
         information.m_str += ch;
         canBeHex = false;
     }

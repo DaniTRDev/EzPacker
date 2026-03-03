@@ -21,7 +21,7 @@ class TypeCastAnnotation : public SymbolAnnotation
      * @param originalSymbol
      * @param castedDataType
      */
-    TypeCastAnnotation(const std::shared_ptr<Symbol> &originalSymbol, const std::shared_ptr<Type> &castedDataType);
+    TypeCastAnnotation(Symbol *originalSymbol, Type *castedDataType);
 
     /**
      * Returns true if the cast is from double to float.
@@ -40,7 +40,7 @@ class TypeCastAnnotation : public SymbolAnnotation
      * @return bool
      */
     bool isExpansion() const;
-    
+
     /**
      * Returns true if the cast is from float to double.
      * @return bool.
@@ -76,7 +76,7 @@ class TypeCastAnnotation : public SymbolAnnotation
      * @return bool
      */
     bool isTruncation() const;
-    
+
     /**
      * Returns "TypeCastAnnotation".
      * @return const char*
@@ -84,12 +84,12 @@ class TypeCastAnnotation : public SymbolAnnotation
     const char *getAnnotationName() const override;
     /**
      * Returns the casted type of this symbol.
-     * @return SymbolDataType
+     * @return Type
      */
-    const std::shared_ptr<Type> &getCastedDataType() const;
-    
+    Type *getCastedDataType() const;
+
   private:
-    std::shared_ptr<Type> m_castedDataType;
+    Type *m_castedDataType;
 };
 
 #endif // EZPACKER_TYPECASTANNOTATION_H

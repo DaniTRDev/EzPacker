@@ -31,7 +31,7 @@ enum class ErrorSeverity : uint8_t
 struct Error
 {
     ErrorSeverity m_severity;
-    std::shared_ptr<SourceReference> m_sourceRef; // Can be nullptr
+    SourceReference m_sourceRef;
     std::string m_message;
     std::string m_sender;    /* Module that threw the error.
                               * TODO: Change this for a modular system in which module add themselves (lexer, parser,
@@ -100,7 +100,7 @@ class ErrorCollector
     void onError(ErrorSeverity severity,
                  const std::string &message,
                  const std::string &sender,
-                 const std::shared_ptr<SourceReference> &sourceRef = nullptr);
+                 const SourceReference &sourceRef = {});
 
   private:
     std::recursive_mutex m_mutex;
