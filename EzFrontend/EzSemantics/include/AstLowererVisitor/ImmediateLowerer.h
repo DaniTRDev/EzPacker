@@ -1,3 +1,12 @@
+/**
+ * @file ImmediateLowerer.h
+ * @brief Lowerer for compile-time constant operands (integers, floats, strings).
+ *
+ * Small integers are emitted inline as MirInteger operands.  Strings and
+ * arbitrary-precision big integers are emitted as global data entries
+ * (via MirGlobalDataEmitter) and a MirReference to that entry is pushed
+ * onto the operand stack.
+ */
 #ifndef EZPACKER_IMMEDIATELOWERER_H
 #define EZPACKER_IMMEDIATELOWERER_H
 

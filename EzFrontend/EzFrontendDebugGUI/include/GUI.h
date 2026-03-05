@@ -1,3 +1,12 @@
+/**
+ * @file GUI.h
+ * @brief Singleton that owns the ImGui / DirectX 11 rendering loop and
+ *        the set of debug views (editor, output, menu bar, …).
+ *
+ * Call Gui::get().initialize() to create the transparent overlay window,
+ * then run the main render loop.  Views are registered as IView subclasses
+ * and rendered each frame.
+ */
 #ifndef EZPACKER_GUI_H
 #define EZPACKER_GUI_H
 

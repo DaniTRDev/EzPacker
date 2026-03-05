@@ -1,3 +1,21 @@
+/**
+ * @file MirOperand.h
+ * @brief Variant type representing any operand an MIR instruction can use.
+ *
+ * A MirOperand is a type-safe union (std::variant) that can hold one of:
+ *   - MirRegister    — a virtual register (ID + byte-size).
+ *   - MirInteger     — a 64-bit signed integer immediate.
+ *   - MirBigInteger  — a reference to an arbitrary-precision integer stored
+ *                       in the global data section.
+ *   - MirDouble      — a 64-bit floating-point immediate.
+ *   - MirMemory      — base + index*scale + offset addressing.
+ *   - MirReference   — an ID that refers to another MIR entity (block,
+ *                       function, global data entry, …).
+ *
+ * MirOperand supports implicit construction from any of its member types
+ * (e.g. `MirOperand op = MirRegister{5, 4};`), copy/move semantics, and
+ * typed accessors (getRegister(), getInteger(), …).
+ */
 #ifndef EZPACKER_MIROPERAND_H
 #define EZPACKER_MIROPERAND_H
 

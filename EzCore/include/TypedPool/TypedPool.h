@@ -76,6 +76,16 @@ template <typename ElemType> struct TypedPoolSlice
 
 /**
  * Allocates a pool of objects using a linear arena allocator.
+ *
+ * TODO: Move inlined template<typename ElementType> into the class. This will make working with slices and other
+ * data structures a bit more intuitive, as the user won't have to specify the type of the slice and the element
+ * separately. The type of the slice can be inferred from the type of the element being added to it. This will also help
+ * with virtual objects and inheritance, as the slice can hold elements of an upper-in-inheritance class without needing
+ * explicit casts.
+ *
+ * This will also allow to follow C++ STL guidelines and expose the slice type directly within the object / class
+ * definition: for example, if we have `TypedPool<Type>` we can use TypedPool<Type>::Slice as the type of the slice, and
+ * the user won't have to specify the type of the slice separately.
  */
 class TypedPool
 {
@@ -84,6 +94,13 @@ class TypedPool
      * Ensure default constructor.
      */
     TypedPool() = default;
+
+    /**
+     * We don't need a destructor to manually free resources because we are using smart pointers (std::unique_ptr) to
+     * manage memory. When the TypedPool instance is destroyed, the destructor of std::unique_ptr is called by the
+     * destructor of the chunk list. It will automatically free the allocated memory for each chunk in m_chunks. This
+     * approach simplifies memory management and helps prevent memory leaks.
+     */
 
     // Disable copying to prevent double-free logic or pointer invalidation
     TypedPool(const TypedPool &) = delete;

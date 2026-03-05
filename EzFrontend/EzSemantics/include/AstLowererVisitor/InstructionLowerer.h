@@ -1,3 +1,13 @@
+/**
+ * @file InstructionLowerer.h
+ * @brief Lowerer for assembly-style instructions (mov, add, call, …).
+ *
+ * Maps the instruction's mnemonic to a MirInstructionOpCode, lowers every
+ * operand (variables, immediates, memory references) by delegating to the
+ * visitor, pops the resulting MirOperands, and emits the final MIR
+ * instruction.  Call instructions are handled separately to account for
+ * their distinct grammar (callee name + return type).
+ */
 #ifndef EZPACKER_INSTRUCTIONLOWERER_H
 #define EZPACKER_INSTRUCTIONLOWERER_H
 

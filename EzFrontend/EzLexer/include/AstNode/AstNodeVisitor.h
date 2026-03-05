@@ -1,3 +1,18 @@
+/**
+ * @file AstNodeVisitor.h
+ * @brief Visitor-pattern base class for traversing the Abstract Syntax Tree.
+ *
+ * Subclasses override individual visit() overloads to perform operations on
+ * specific node types (instructions, variables, labels, control-flow, etc.).
+ * The default implementation of every visit() is a no-op that returns true,
+ * so a subclass only needs to override the methods it cares about.
+ *
+ * Helper utilities:
+ *   - visitAll()       — iterates a TypedPoolSlice of nodes, calling
+ *                         accept() on each one.
+ *   - visitBaseClass() — takes a generic AstNode* and dispatches to the
+ *                         correct concrete visit() overload.
+ */
 #ifndef EZPACKER_ASTNODEVISITOR_H
 #define EZPACKER_ASTNODEVISITOR_H
 
@@ -45,9 +60,8 @@ class AstNodeVisitor
     virtual bool visit(class ContinueAstNode *_continue) { return true; }
 
     /**
-     * Visits given instruction node and visits its operands. Should return true visitor wants to keep traversing the
-     * tree.
-     * @param instr
+     * Visits the given IfAstNode and its condition, true-branch, and optional false-branch.
+     * @param ifNode
      * @return bool
      */
     virtual bool visit(class IfAstNode *ifNode) { return true; }

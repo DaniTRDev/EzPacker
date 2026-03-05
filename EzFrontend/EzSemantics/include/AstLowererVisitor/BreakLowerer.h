@@ -1,3 +1,12 @@
+/**
+ * @file BreakLowerer.h
+ * @brief Lowerer for the `break` statement — emits a JMP to the enclosing
+ *        loop's exit block.
+ *
+ * After the JMP, a dead-code block is created and bound so that any
+ * unreachable statements following the break do not corrupt the terminated
+ * basic block.
+ */
 #ifndef EZPACKER_BREAKLOWERER_H
 #define EZPACKER_BREAKLOWERER_H
 

@@ -5,6 +5,7 @@ bool InstructionLowerer::lower(AstNode *node, LoweringContext *ctx)
 {
     // We don't care if it's a call or a regular instruction, we can lower them both.
     Instruction *instruction = dynamic_cast<Instruction *>(node);
+
     const std::string_view &instrName = instruction->getInstructionName();
     std::string instrName2Lower = StrToLower(std::string(instrName.data(), instrName.size()));
     MirInstructionOpCode opcode = getOpCodeFromStr(instrName2Lower);
@@ -13,22 +14,24 @@ bool InstructionLowerer::lower(AstNode *node, LoweringContext *ctx)
     {
         ctx->getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                              "Could not lower instruction because its mnemonic is invalid",
-                                             "InstructionLowerer");
+                                             "InstructionLowerer",
+                                             node->getSourceRef());
         return false;
     }
 
-    MirInstruction *instr = ctx->getEmitter()->emit(opcode);
-    for (const void *ptr : *instruction->getExpressions())
+    MirInstruction *loweredInstr = ctx->getEmitter()->emit(opcode);
+    for (AstNode *ptr : *instruction->getExpressions())
     {
         AstNode *casted = (AstNode *)ptr;
         if (!casted->accept(ctx->getOwnerLowererVisitor()))
         {
             ctx->getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                                  "Could not lower instruction because one operand failed to be lowered",
-                                                 "InstructionLowerer");
+                                                 "InstructionLowerer",
+                                                 node->getSourceRef());
             return false;
         }
-        ctx->getEmitter()->pushOperandToInstruction(instr, ctx->popOperand());
+        ctx->getEmitter()->pushOperandToInstruction(loweredInstr, ctx->popOperand());
     }
 
     return true;

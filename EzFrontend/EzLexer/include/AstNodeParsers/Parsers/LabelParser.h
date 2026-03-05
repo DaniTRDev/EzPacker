@@ -1,3 +1,11 @@
+/**
+ * @file LabelParser.h
+ * @brief Parser for named labels: `myLabel: { … }`.
+ *
+ * Consumes an identifier followed by a colon and a brace-delimited code
+ * scope.  Produces a Label node whose name is the identifier and whose
+ * body is the parsed CodeScope.
+ */
 #ifndef EZPACKER_LABELPARSER_H
 #define EZPACKER_LABELPARSER_H
 

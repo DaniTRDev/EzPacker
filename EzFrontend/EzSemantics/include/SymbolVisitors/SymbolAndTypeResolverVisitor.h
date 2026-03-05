@@ -1,3 +1,17 @@
+/**
+ * @file SymbolAndTypeResolverVisitor.h
+ * @brief Second semantic pass — resolves every name reference to its
+ *        defining symbol and attaches concrete type information.
+ *
+ * SymbolAndTypeResolverVisitor walks the annotated AST produced by
+ * SymbolDefinitionVisitor and:
+ *   - Resolves each Variable reference to the Symbol that defined it,
+ *     emitting an "unknown symbol" error if no definition is found.
+ *   - Resolves type-name strings (on immediates, memory operands, etc.)
+ *     to their Type objects via the TypeTable.
+ *   - Annotates nodes with DataTypeAnnotation and SymbolAnnotation so the
+ *     TypeCheckVisitor can validate operand compatibility.
+ */
 #ifndef EZPACKER_SYMBOLANDTYPERESOLVERVISITOR_H
 #define EZPACKER_SYMBOLANDTYPERESOLVERVISITOR_H
 

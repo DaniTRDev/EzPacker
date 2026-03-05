@@ -1,3 +1,12 @@
+/**
+ * @file IfLowerer.h
+ * @brief Lowerer for `if / else if / else` control-flow blocks.
+ *
+ * Creates true-branch, false-branch, and merge blocks.  The condition is
+ * lowered in the current block (via ConditionLowerer); then both branches
+ * are lowered into their respective blocks.  All paths converge at the
+ * merge block which becomes the new "current" block after lowering.
+ */
 #ifndef EZPACKER_IFLOWERER_H
 #define EZPACKER_IFLOWERER_H
 

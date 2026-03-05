@@ -6,6 +6,7 @@ MirEmitterContext::MirEmitterContext(const std::shared_ptr<ErrorCollector> &erro
     ErrorEmitter(errorCollector, sourceManager)
 {
     m_functionList = m_functionPool.createSlice<MirFunction>();
+    m_typeList = m_typePool.createSlice<MirType>();
 }
 
 bool MirEmitterContext::bindToBlock(MirBlock *block)
@@ -78,6 +79,42 @@ MirInstruction *MirEmitterContext::createInstruction(MirInstructionOpCode opcode
     return instr;
 }
 
+MirType *MirEmitterContext::createType(MirTypeKind kind, TypedPoolSlice<MirType> *types, const std::string_view &name)
+{
+    if (name.empty())
+    {
+        emitError(ErrorSeverity::Fatal, "Could not create type because name is empty", "MirEmitterContext::createType");
+        return nullptr;
+    }
+
+    MirType *type = m_typePool.create<MirType>(kind, createId(), types, name);
+
+    m_typePool.appendToSlice(m_typeList, type);
+    m_idToTypeMap.insert({ type->getId(), type });
+
+    return type;
+}
+
+MirType *MirEmitterContext::getMirTypeById(size_t id)
+{
+    if (id == 0)
+    {
+        emitError(ErrorSeverity::Fatal, "Cannot get MIR type with null ID", "MirEmitterContext::getMirTypeById");
+        return nullptr;
+    }
+
+    auto it = m_idToTypeMap.find(id);
+    if (it == m_idToTypeMap.end())
+    {
+        emitError(ErrorSeverity::Fatal,
+                  "No MIR type with the given ID exists in the context",
+                  "MirEmitterContext::getMirTypeById");
+        return nullptr;
+    }
+
+    return it->second;
+}
+
 TypedPool *MirEmitterContext::getBlockPool() { return &m_blockPool; }
 
 TypedPool *MirEmitterContext::getFunctionPool() { return &m_functionPool; }
@@ -89,5 +126,7 @@ TypedPool *MirEmitterContext::getInstructionPool() { return &m_instructionPool; 
 TypedPool *MirEmitterContext::getOperandPool() { return &m_operandPool; }
 
 TypedPool *MirEmitterContext::getDataEntryPool() { return &m_dataEntryPool; }
+
+TypedPool *MirEmitterContext::getTypePool() { return &m_typePool; }
 
 TypedArrayPool<uint8_t> *MirEmitterContext::getEntryDataPool() { return &m_dataPool; }

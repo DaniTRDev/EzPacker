@@ -1,3 +1,11 @@
+/**
+ * @file ConditionParser.h
+ * @brief Parser for comparison conditions: `(%lhs OP %rhs)`.
+ *
+ * Parses a parenthesised binary comparison expression used inside `if` and
+ * `while` constructs.  The left and right sides are variables and the
+ * operator is one of EQ, NE, GT, GE, LT, LE.  Produces a ConditionAstNode.
+ */
 #ifndef EZPACKER_CONDITIONPARSER_H
 #define EZPACKER_CONDITIONPARSER_H
 

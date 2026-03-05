@@ -1,3 +1,13 @@
+/**
+ * @file Variable.h
+ * @brief AST node for variable references and declarations: `%name` or `type %name`.
+ *
+ * A Variable can represent a function parameter, a local variable created
+ * with the `create` instruction, or a global variable.  The parser records
+ * the data-type prefix (if present) and the variable name; the semantic
+ * passes later resolve the symbol, validate types, and link the node to a
+ * MIR virtual register.
+ */
 #ifndef EZPACKER_VARIABLE_H
 #define EZPACKER_VARIABLE_H
 

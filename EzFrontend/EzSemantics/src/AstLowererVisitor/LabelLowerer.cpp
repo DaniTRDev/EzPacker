@@ -7,7 +7,7 @@ bool LabelLowerer::lower(AstNode *node, LoweringContext *ctx)
     MirBlock *labelBlock = ctx->getEmitterContext()->createBlock();
     SymbolAnnotation *symbolAnnot = labelNode->getAnnotation<SymbolAnnotation>();
 
-    ctx->getSemanticContext()->linkSymbolToMirId(symbolAnnot->getSymbol(), labelBlock->getId());
+    ctx->linkSymbolToMirId(symbolAnnot->getSymbol(), labelBlock->getId());
     ctx->getEmitter()->emitJMP(MirReference{ labelBlock->getId() });
 
     ctx->getEmitterContext()->bindToBlock(labelBlock);

@@ -1,3 +1,14 @@
+ /**
+ * @file BasicParsingContext.h
+ * @brief Shared state for all parsers: the token stream, position cursor,
+ *        node pool, string pool, and conditional-consume helpers.
+ *
+ * Every parser receives a BasicParsingContext and reads tokens through
+ * peek() / consume() / consumeIf().  Successfully parsed nodes are
+ * allocated from the internal AstNodeTypedPool so they share a single
+ * cache-friendly arena.  ParsingCondition provides pre-built lambda
+ * predicates (match-by-type, match-by-content) used with consumeIf().
+ */
 #ifndef EZPACKER_SINGLETHREADPARSER_H
 #define EZPACKER_SINGLETHREADPARSER_H
 

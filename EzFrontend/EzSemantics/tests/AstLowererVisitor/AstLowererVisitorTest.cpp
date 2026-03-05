@@ -26,7 +26,7 @@ myLabel:
     auto symbolAnnot = label->getAnnotation<SymbolAnnotation>();
     ASSERT_NE(symbolAnnot, nullptr);
 
-    MirId labelBlockId = getSemanticContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
+    MirId labelBlockId = getLoweringContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
     EXPECT_NE(labelBlockId, MIRID_INVALID);
 }
 
@@ -187,8 +187,8 @@ myLabel:
     EXPECT_TRUE(labelScope->resolve("myLocal", &sym, false));
     ASSERT_NE(sym, nullptr);
 
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(sym));
-    EXPECT_NE(getSemanticContext()->getMirIdOfSymbol(sym), MIRID_INVALID);
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(sym));
+    EXPECT_NE(getLoweringContext()->getMirIdOfSymbol(sym), MIRID_INVALID);
 }
 
 TEST_F(AstLowererVisitorTestFixture, VariableLowering_ReuseVregOnSecondUse)
@@ -215,7 +215,7 @@ myLabel:
     EXPECT_TRUE(labelScope->resolve("v", &sym, false));
     ASSERT_NE(sym, nullptr);
 
-    MirId id = getSemanticContext()->getMirIdOfSymbol(sym);
+    MirId id = getLoweringContext()->getMirIdOfSymbol(sym);
     EXPECT_NE(id, MIRID_INVALID);
 }
 
@@ -242,8 +242,8 @@ myLabel:
     ASSERT_NE(symA, nullptr);
     ASSERT_NE(symB, nullptr);
 
-    MirId idA = getSemanticContext()->getMirIdOfSymbol(symA);
-    MirId idB = getSemanticContext()->getMirIdOfSymbol(symB);
+    MirId idA = getLoweringContext()->getMirIdOfSymbol(symA);
+    MirId idB = getLoweringContext()->getMirIdOfSymbol(symB);
     EXPECT_NE(idA, MIRID_INVALID);
     EXPECT_NE(idB, MIRID_INVALID);
     EXPECT_NE(idA, idB);
@@ -392,7 +392,7 @@ myLabel:
     ASSERT_NE(labelSym, nullptr);
     EXPECT_EQ(labelSym->getType(), SymbolType::Label);
 
-    MirId blockId = getSemanticContext()->getMirIdOfSymbol(labelSym);
+    MirId blockId = getLoweringContext()->getMirIdOfSymbol(labelSym);
     EXPECT_NE(blockId, MIRID_INVALID);
 }
 
@@ -420,7 +420,7 @@ void MyFunc()
     auto moduleAnnot = module->getAnnotation<SymbolAnnotation>();
     ASSERT_NE(moduleAnnot, nullptr);
 
-    MirId moduleBlockId = getSemanticContext()->getMirIdOfSymbol(moduleAnnot->getSymbol());
+    MirId moduleBlockId = getLoweringContext()->getMirIdOfSymbol(moduleAnnot->getSymbol());
     EXPECT_NE(moduleBlockId, MIRID_INVALID);
 }
 
@@ -445,7 +445,7 @@ void EmptyFunc()
     ASSERT_NE(symbolAnnot, nullptr);
     EXPECT_EQ(symbolAnnot->getSymbol()->getType(), SymbolType::Module);
 
-    MirId blockId = getSemanticContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
+    MirId blockId = getLoweringContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
     EXPECT_NE(blockId, MIRID_INVALID);
 }
 
@@ -479,14 +479,14 @@ i64 MyFunc(i32 %param1, i64 %param2)
     ASSERT_NE(param2Sym, nullptr);
     ASSERT_NE(localSym, nullptr);
 
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(param1Sym));
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(param2Sym));
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(localSym));
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(param1Sym));
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(param2Sym));
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(localSym));
 
     // All three should have distinct MIR IDs.
-    MirId idP1 = getSemanticContext()->getMirIdOfSymbol(param1Sym);
-    MirId idP2 = getSemanticContext()->getMirIdOfSymbol(param2Sym);
-    MirId idL  = getSemanticContext()->getMirIdOfSymbol(localSym);
+    MirId idP1 = getLoweringContext()->getMirIdOfSymbol(param1Sym);
+    MirId idP2 = getLoweringContext()->getMirIdOfSymbol(param2Sym);
+    MirId idL = getLoweringContext()->getMirIdOfSymbol(localSym);
     EXPECT_NE(idP1, idP2);
     EXPECT_NE(idP1, idL);
     EXPECT_NE(idP2, idL);
@@ -504,7 +504,7 @@ void Foo()
 
     auto module = dynamic_cast<Module *>(getAstNode());
     auto symbolAnnot = module->getAnnotation<SymbolAnnotation>();
-    MirId blockId = getSemanticContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
+    MirId blockId = getLoweringContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
     EXPECT_NE(blockId, MIRID_INVALID);
 }
 
@@ -892,7 +892,7 @@ i64 ComputeSum(i32 %n, i64 %start)
     ASSERT_NE(moduleAnnot, nullptr);
     EXPECT_EQ(moduleAnnot->getSymbol()->getName(), "ComputeSum");
 
-    MirId moduleBlockId = getSemanticContext()->getMirIdOfSymbol(moduleAnnot->getSymbol());
+    MirId moduleBlockId = getLoweringContext()->getMirIdOfSymbol(moduleAnnot->getSymbol());
     EXPECT_NE(moduleBlockId, MIRID_INVALID);
 
     // Verify parameter and local symbol linkage
@@ -910,10 +910,10 @@ i64 ComputeSum(i32 %n, i64 %start)
     ASSERT_NE(sumSym, nullptr);
     ASSERT_NE(iSym, nullptr);
 
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(nSym));
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(startSym));
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(sumSym));
-    EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(iSym));
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(nSym));
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(startSym));
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(sumSym));
+    EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(iSym));
 }
 
 TEST_F(AstLowererVisitorTestFixture, Integration_IfElseWithVarsAndArith)
@@ -1056,8 +1056,7 @@ i64 CalculateChecksum(i64 %bufferPtr, i32 %length, i64 %key)
         EXPECT_TRUE(scope->resolve(name, &sym, false)) << "Symbol '" << name << "' not found";
         if (sym)
         {
-            EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(sym))
-                << "Symbol '" << name << "' not linked to MIR";
+            EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(sym)) << "Symbol '" << name << "' not linked to MIR";
         }
     }
 }
@@ -1082,7 +1081,7 @@ myLabel:
     // Retrieve the label's MIR block via symbol linkage
     auto label = dynamic_cast<Label *>(getAstNode());
     auto symbolAnnot = label->getAnnotation<SymbolAnnotation>();
-    MirId labelBlockId = getSemanticContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
+    MirId labelBlockId = getLoweringContext()->getMirIdOfSymbol(symbolAnnot->getSymbol());
     EXPECT_NE(labelBlockId, MIRID_INVALID);
 
     // We can't easily get the MirBlock* from just the ID without iterating the pool,
@@ -1105,8 +1104,30 @@ void SimpleFunc(i32 %p)
     auto module = dynamic_cast<Module *>(getAstNode());
     auto symbolAnnot = module->getAnnotation<SymbolAnnotation>();
     Symbol *moduleSym = symbolAnnot->getSymbol();
-    MirId moduleBlockId = getSemanticContext()->getMirIdOfSymbol(moduleSym);
+    MirId moduleBlockId = getLoweringContext()->getMirIdOfSymbol(moduleSym);
     EXPECT_NE(moduleBlockId, MIRID_INVALID);
+}
+
+TEST_F(AstLowererVisitorTestFixture, MirDetail_ModuleType)
+{
+    std::string code = R"(
+void SimpleFunc(i32 %p)
+{
+    create i32 %a;
+    mov %a, %p;
+    add %a, 100;
+    nop;
+})";
+
+    ASSERT_TRUE(runLowering<ModuleParser::ModuleParser>(code));
+
+    auto module = dynamic_cast<Module *>(getAstNode());
+    auto symbolAnnot = module->getAnnotation<SymbolAnnotation>();
+    Symbol *moduleSym = symbolAnnot->getSymbol();
+    MirId moduleBlockId = getLoweringContext()->getMirIdOfSymbol(moduleSym);
+    MirId moduleTypeId = getLoweringContext()->getMirIdOfSymbol(moduleSym);
+    EXPECT_NE(moduleBlockId, MIRID_INVALID);
+    EXPECT_NE(moduleTypeId, MIRID_INVALID);
 }
 
 // =============================================================================
@@ -1907,8 +1928,7 @@ i64 FindValue(i64 %ptr, i32 %len, i32 %target)
         EXPECT_TRUE(moduleScope->resolve(name, &sym, false)) << "Symbol '" << name << "' not found";
         if (sym)
         {
-            EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(sym))
-                << "Symbol '" << name << "' not linked to MIR";
+            EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(sym)) << "Symbol '" << name << "' not linked to MIR";
         }
     }
 }
@@ -1951,9 +1971,7 @@ i64 Accumulate(i32 %n, i32 %skip, i32 %zero)
         EXPECT_TRUE(moduleScope->resolve(name, &sym, false)) << "Symbol '" << name << "' not found";
         if (sym)
         {
-            EXPECT_TRUE(getSemanticContext()->isSymbolLinkedToMir(sym))
-                << "Symbol '" << name << "' not linked to MIR";
+            EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(sym)) << "Symbol '" << name << "' not linked to MIR";
         }
     }
 }
-

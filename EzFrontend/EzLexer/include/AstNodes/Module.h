@@ -1,3 +1,15 @@
+/**
+ * @file Module.h
+ * @brief AST nodes for a module (function) declaration: header + body.
+ *
+ * A Module is the top-level compilation construct in the language.  It is
+ * split into two parts:
+ *   - ModuleHeader — return type, name, and parameter list.
+ *   - Module       — owns the header and the body CodeScope.
+ *
+ * This separation lets the internal structure of a module evolve without
+ * changing the Module class itself.
+ */
 #ifndef EZPACKER_MODULE_H
 #define EZPACKER_MODULE_H
 

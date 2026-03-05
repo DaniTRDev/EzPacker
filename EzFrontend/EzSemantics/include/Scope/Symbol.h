@@ -1,3 +1,13 @@
+/**
+ * @file Symbol.h
+ * @brief A named entity in the symbol table: variable, label, or module.
+ *
+ * Each Symbol records the AstNode that originally defined it, the symbol's
+ * kind (GlobalVariable, LocalVariable, Label, Module), its data type, a
+ * unique numeric ID, and its name.  Symbols are created by
+ * BasicSemanticContext::createSymbol() and stored in the Scope that owns
+ * them.
+ */
 #ifndef EZPACKER_SYMBOL_H
 #define EZPACKER_SYMBOL_H
 

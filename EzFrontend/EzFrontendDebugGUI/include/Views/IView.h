@@ -1,3 +1,10 @@
+/**
+ * @file IView.h
+ * @brief Abstract interface for a renderable ImGui panel in the debug GUI.
+ *
+ * Every debug view (Editor, Output, Lexer, MainMenuBar, …) implements
+ * IView so the GUI singleton can iterate and render them uniformly.
+ */
 #ifndef EZPACKER_IVIEW_H
 #define EZPACKER_IVIEW_H
 

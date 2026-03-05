@@ -1,3 +1,12 @@
+/**
+ * @file AstNodeContainer.h
+ * @brief Mix-in that gives an AstNode the ability to hold a list of child expressions.
+ *
+ * Nodes such as CodeScope, Instruction, ModuleHeader, and Variable inherit
+ * from AstNodeContainer (in addition to AstNode) so they can store and
+ * iterate over an ordered sequence of child nodes.  The children are kept
+ * in a TypedPoolSlice for cache-friendly, arena-allocated storage.
+ */
 #ifndef EZPACKER_ASTNODECONTAINER_H
 #define EZPACKER_ASTNODECONTAINER_H
 

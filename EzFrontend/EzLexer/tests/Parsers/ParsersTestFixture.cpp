@@ -11,7 +11,7 @@ void ParsersTestFixture::SetUp()
     m_sourceManager = std::make_shared<SourceManager>();
     m_sourceSinkLogger = std::make_shared<SourceLoggingSink>(m_logger.get());
     m_errorCollector = std::make_shared<ErrorCollector>();
-    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager, "TEST_PARSERS");
+    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager);
 
     m_errorCollector->addSubscriber(
             [](void *userParam, const std::shared_ptr<Error> &error) -> void
@@ -52,8 +52,8 @@ void ParsersTestFixture::TearDown()
 
 void ParsersTestFixture::tokenizeAndCreateContext(const std::string &input)
 {
-    m_sourceManager->addSourceContent("TEST_PARSERS", input);
-    m_tokenizer->tokenizeBuffer((char *)input.data(), 0, input.size());
+    size_t id = m_sourceManager->addSourceContent("TEST_PARSERS", input);
+    m_tokenizer->tokenizeBuffer(0, id);
     m_parsingContext =
             std::make_shared<BasicParsingContext>(m_errorCollector, m_sourceManager, m_tokenizer->getTokens());
 }

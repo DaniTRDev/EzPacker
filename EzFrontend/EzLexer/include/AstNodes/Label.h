@@ -1,3 +1,12 @@
+/**
+ * @file Label.h
+ * @brief AST node for a named label with its own code scope: `name: { … }`.
+ *
+ * A Label defines a named entry point inside a module body.  It owns a
+ * CodeScope containing the statements that belong to that label.  During
+ * lowering, LabelLowerer creates a new MIR basic block and links the
+ * label's symbol to that block's ID.
+ */
 #ifndef EZPACKER_LABEL_H
 #define EZPACKER_LABEL_H
 

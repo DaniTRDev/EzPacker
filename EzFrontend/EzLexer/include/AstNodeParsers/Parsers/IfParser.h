@@ -1,3 +1,12 @@
+/**
+ * @file IfParser.h
+ * @brief Parser for `if / else if / else` control-flow blocks.
+ *
+ * Parses an `if (condition) { … }` with optional `else if` and `else`
+ * chains.  Each branch body is parsed as a CodeScope.  Produces an
+ * IfAstNode whose false-scope may be another IfAstNode (else-if) or a
+ * plain CodeScope (else).
+ */
 #ifndef EZPACKER_IFPARSER_H
 #define EZPACKER_IFPARSER_H
 

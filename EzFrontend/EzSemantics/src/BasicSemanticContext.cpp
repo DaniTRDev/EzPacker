@@ -1,10 +1,11 @@
 #include "BasicSemanticContext.h"
 
 BasicSemanticContext::BasicSemanticContext(const std::shared_ptr<ErrorCollector> &errorCollector,
-                                           const std::shared_ptr<SourceManager> &sourceManager) :
+                                           const std::shared_ptr<SourceManager> &sourceManager,
+                                           const std::shared_ptr<Scope> &globalScope) :
     m_currentLoopNestLevel(0), m_currentSymbolId(1), ErrorEmitter(errorCollector, sourceManager)
 {
-    m_globalScope = std::make_shared<Scope>(nullptr, "global");
+    m_globalScope = globalScope ? globalScope : std::make_shared<Scope>(nullptr, "global");
     m_currentScope = m_globalScope.get();
 
     m_scopes.reserve(1024); // Pre-allocate 1024 scopes to avoid reallocations.
@@ -40,44 +41,11 @@ bool BasicSemanticContext::isCurrentScopeGlobalScope() const { return m_currentS
 
 bool BasicSemanticContext::isContextInsideLoop() const { return m_currentLoopNestLevel != 0; }
 
-bool BasicSemanticContext::isSymbolLinkedToMir(Symbol *symbol) const
-{
-    return m_symbolToMirMap.contains(symbol->getId());
-}
-
-bool BasicSemanticContext::linkSymbolToMirId(Symbol *sym, size_t mirId)
-{
-    if (!sym || m_symbolToMirMap.contains(sym->getId()))
-    {
-        emitError(ErrorSeverity::Fatal, "Could not link symbol to MIR", "linkSymbolToMirId");
-        return false;
-    }
-
-    m_symbolToMirMap[sym->getId()] = mirId;
-    return true;
-}
-
 bool BasicSemanticContext::resolveSymbolInScope(const std::string_view &symbolName,
                                                 Symbol **outSymbol,
                                                 bool searchParent)
 {
     return getCurrentScope()->resolve(symbolName, outSymbol, searchParent);
-}
-
-MirId BasicSemanticContext::getMirIdOfSymbol(Symbol *sym) const
-{
-    if (!sym)
-    {
-        return MIRID_INVALID;
-    }
-
-    auto it = m_symbolToMirMap.find(sym->getId());
-    if (it == m_symbolToMirMap.end())
-    {
-        return MIRID_INVALID;
-    }
-
-    return it->second;
 }
 
 Scope *BasicSemanticContext::getCurrentScope() const { return m_currentScope; }
@@ -98,6 +66,20 @@ void BasicSemanticContext::beginScope(const std::string_view &name)
     }
 
     m_currentScope = scope.get();
+}
+
+void BasicSemanticContext::discoverInclusion(const std::string_view &includePath)
+{
+    if (m_discoveredInclusions.contains(includePath.data()))
+    {
+        emitError(ErrorSeverity::Warning,
+                  std::format("Inclusion of '{}' was already discovered, skipping", includePath),
+                  std::string(includePath),
+                  SourceReference());
+        return;
+    }
+    
+    m_discoveredInclusions.insert(includePath.data());
 }
 
 void BasicSemanticContext::emitSymbolRedefinitionError(const std::string_view &module,

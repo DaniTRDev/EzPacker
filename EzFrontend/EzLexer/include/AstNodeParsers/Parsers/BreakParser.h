@@ -1,3 +1,11 @@
+/**
+ * @file BreakParser.h
+ * @brief Parser for the `break;` statement.
+ *
+ * Consumes the `break` keyword followed by a semicolon and produces a
+ * BreakAstNode.  Returns nullptr (soft error) if the current token is not
+ * `break`, or emits a fatal error if the semicolon is missing.
+ */
 #ifndef EZPACKER_BREAKPARSER_H
 #define EZPACKER_BREAKPARSER_H
 

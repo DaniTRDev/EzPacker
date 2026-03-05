@@ -1,3 +1,14 @@
+/**
+ * @file AstNodeTypedPool.h
+ * @brief Arena allocator specialised for AstNode-derived objects.
+ *
+ * AstNodeTypedPool extends TypedPool with a createNode<T>() helper that
+ * guarantees correct alignment and placement-new construction for any
+ * trivially-destructible AstNode subclass.  All nodes allocated through
+ * this pool share a contiguous, cache-friendly memory region and live
+ * until the pool itself is destroyed — no per-object deallocation is
+ * needed.
+ */
 #ifndef EZPACKER_ASTNODETYPEDPOOL_H
 #define EZPACKER_ASTNODETYPEDPOOL_H
 
@@ -5,9 +16,10 @@
 #include "AstNode.h"
 
 /**
- * A specialized TypedPool for allocating AstNode-derived objects. Ensures proper memory alignment
- * and placement-new construction. Only trivially destructible types derived from AstNode may be
- * created through createNode(). Objects allocated here live until the pool itself is destroyed.
+ * @brief Arena allocator for AstNode subclasses.
+ *
+ * Only trivially-destructible types that derive from AstNode may be created
+ * through createNode().  Objects live until the pool is destroyed.
  */
 class AstNodeTypedPool : public TypedPool
 {

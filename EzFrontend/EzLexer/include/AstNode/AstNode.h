@@ -1,3 +1,14 @@
+/**
+ * @file AstNode.h
+ * @brief Core definitions for the Abstract Syntax Tree: the base node class,
+ *        the annotation interface, node-type enumeration, and display modes.
+ *
+ * Every parsed construct in the language (instructions, variables, labels,
+ * control-flow blocks, …) is represented as a subclass of AstNode.  Nodes
+ * can be enriched with semantic metadata through the IAstNodeAnnotation
+ * interface — this is how later compiler passes (symbol definition, type
+ * resolution, type checking) attach meaning without modifying node classes.
+ */
 #ifndef EZPACKER_AST_H
 #define EZPACKER_AST_H
 
@@ -5,8 +16,13 @@
 #include "SourceManager/SourceManager.h"
 
 /**
- * Interface used so this project can be fully self-contained. Annotator will work on top of this class, making the code
- * much more modular and maintainable.
+ * @brief Base interface for annotations that can be attached to any AstNode.
+ *
+ * Annotations are the mechanism through which semantic passes (symbol
+ * definition, type resolution, type checking, lowering) decorate the AST
+ * with extra information — symbol links, resolved types, scope ownership,
+ * etc. — without changing the node classes themselves.  Every annotation
+ * must be trivially destructible so it can live inside a TypedPool.
  */
 class IAstNodeAnnotation
 {
@@ -28,6 +44,7 @@ enum class AstNodeType
     Condition,
     Continue,
     If,
+    Include,
     Instruction,
     Immediate,
     Label,
@@ -45,9 +62,21 @@ enum class AstNodeStringMode : uint8_t
 };
 
 /**
- * Very crucial class for the entire frontend. This class holds information about a node in the abstract syntax tree
- * (AST). It's also indispensable for the Annotator (during semantic analysis) because it keeps a pointer to an
- * annotation list that will be used to give a meaning to the AST.
+ * @brief The base class for every node in the Abstract Syntax Tree.
+ *
+ * AstNode provides the common interface shared by all parsed constructs:
+ *   - A type tag (AstNodeType) so callers can identify the concrete kind.
+ *   - A visitor accept() method that dispatches to the correct
+ *     AstNodeVisitor::visit() overload (double-dispatch / Visitor pattern).
+ *   - An optional annotation list where semantic passes can attach metadata
+ *     (symbol links, data types, scope ownership, cast info, …).
+ *   - A source reference that ties the node back to its position in the
+ *     original source text (used for error messages and diagnostics).
+ *   - A human-readable string representation for debugging.
+ *
+ * Concrete node types (Instruction, Variable, Label, Module, …) inherit
+ * from AstNode and are allocated inside an AstNodeTypedPool so they remain
+ * cache-friendly and trivially destructible.
  */
 class AstNode
 {

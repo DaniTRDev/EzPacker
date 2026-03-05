@@ -1,0 +1,18 @@
+# This file has references to other files:
+# ./heavy_arithmetic.ez
+# ./full_pipeline_stress.ez
+
+void main()
+{
+    create i64 %bufferPtr;
+    create i32 %length;
+    create i64 %key;
+    create i64 %salt;
+    create i32 %rounds;
+
+    # Reference to a function in another file
+    call %HeavyArithmetic(1, 1000, 0xFFFF, 100);
+
+    # Reference to another function in a different file
+    call %StressChecksum(i64 %bufferPtr, i32 %length, i64 %key, i64 %salt, i32 %rounds);
+}

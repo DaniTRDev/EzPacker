@@ -25,20 +25,19 @@ void LoweringPipelineTestFixture::SetUp()
                 auto *fixture = static_cast<LoweringPipelineTestFixture *>(userParam);
                 if (error->m_sourceRef.m_valid)
                 {
-                    g_logger->pushLog(LogMessage(
-                            "[{}]{} {}:{}:{} {} \n\t {}",
-                            error->m_sender,
-                            error->m_timeStamp,
-                            fixture->m_sourceManager->getSourceName(error->m_sourceRef.m_sourceFileId),
-                            error->m_sourceRef.m_line,
-                            error->m_sourceRef.m_col,
-                            error->m_message,
-                            fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
+                    g_logger->pushLog(
+                            LogMessage("[{}]{} {}:{}:{} {} \n\t {}",
+                                       error->m_sender,
+                                       error->m_timeStamp,
+                                       fixture->m_sourceManager->getSourceName(error->m_sourceRef.m_sourceFileId),
+                                       error->m_sourceRef.m_line,
+                                       error->m_sourceRef.m_col,
+                                       error->m_message,
+                                       fixture->m_sourceManager->getReferenceContent(error->m_sourceRef)));
                 }
                 else
                 {
-                    g_logger->pushLog(
-                            LogMessage("[{}]{} {}", error->m_sender, error->m_timeStamp, error->m_message));
+                    g_logger->pushLog(LogMessage("[{}]{} {}", error->m_sender, error->m_timeStamp, error->m_message));
                 }
             },
             this);
@@ -101,9 +100,9 @@ bool LoweringPipelineTestFixture::runPipeline(const std::string &input, const st
     m_errorCollector->beginScope();
 
     // 1. Tokenize
-    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager, sourceName);
-    m_sourceManager->addSourceContent(sourceName, input);
-    if (!m_tokenizer->tokenizeBuffer((char *)input.data(), 0, input.size()))
+    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager);
+    size_t id = m_sourceManager->addSourceContent(sourceName, input);
+    if (!m_tokenizer->tokenizeBuffer(0, id))
     {
         m_errorCollector->endScope(ErrorAction::Propagate);
         return false;
@@ -195,7 +194,7 @@ Symbol *LoweringPipelineTestFixture::resolveInModuleScope(const std::string_view
 }
 
 Symbol *LoweringPipelineTestFixture::resolveInLabelScope(const std::string_view &labelName,
-                                                          const std::string_view &symbolName) const
+                                                         const std::string_view &symbolName) const
 {
     auto *mod = getModule();
     if (!mod || !mod->getBody())
@@ -284,15 +283,9 @@ size_t LoweringPipelineTestFixture::getOperandCount(MirInstruction *instr) const
 //  Symbol-to-MIR linkage
 // ─────────────────────────────────────────────────────────────────────────────
 
-bool LoweringPipelineTestFixture::isSymbolLinked(Symbol *sym) const
-{
-    return m_semanticContext->isSymbolLinkedToMir(sym);
-}
+bool LoweringPipelineTestFixture::isSymbolLinked(Symbol *sym) const { return m_loweringCtx->isSymbolLinkedToMir(sym); }
 
-MirId LoweringPipelineTestFixture::getMirId(Symbol *sym) const
-{
-    return m_semanticContext->getMirIdOfSymbol(sym);
-}
+MirId LoweringPipelineTestFixture::getMirId(Symbol *sym) const { return m_loweringCtx->getMirIdOfSymbol(sym); }
 
 MirId LoweringPipelineTestFixture::expectSymbolLinked(const std::string_view &name) const
 {
@@ -307,7 +300,7 @@ MirId LoweringPipelineTestFixture::expectSymbolLinked(const std::string_view &na
 }
 
 void LoweringPipelineTestFixture::expectDistinctMirIds(const std::string_view &nameA,
-                                                        const std::string_view &nameB) const
+                                                       const std::string_view &nameB) const
 {
     MirId idA = expectSymbolLinked(nameA);
     MirId idB = expectSymbolLinked(nameB);
@@ -318,8 +311,8 @@ void LoweringPipelineTestFixture::expectDistinctMirIds(const std::string_view &n
 //  Instruction assertion helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-MirInstruction *LoweringPipelineTestFixture::expectOpcode(MirBlock *block, size_t instrIdx,
-                                                           MirInstructionOpCode expected) const
+MirInstruction *
+LoweringPipelineTestFixture::expectOpcode(MirBlock *block, size_t instrIdx, MirInstructionOpCode expected) const
 {
     MirInstruction *instr = getInstruction(block, instrIdx);
     EXPECT_NE(instr, nullptr);
@@ -334,8 +327,8 @@ void LoweringPipelineTestFixture::expectOperandCount(MirInstruction *instr, size
     EXPECT_EQ(getOperandCount(instr), expected);
 }
 
-MirOperand *LoweringPipelineTestFixture::expectOperandType(MirInstruction *instr, size_t opIdx,
-                                                            MirOperandType expected) const
+MirOperand *
+LoweringPipelineTestFixture::expectOperandType(MirInstruction *instr, size_t opIdx, MirOperandType expected) const
 {
     MirOperand *op = getOperand(instr, opIdx);
     EXPECT_NE(op, nullptr);
@@ -345,7 +338,7 @@ MirOperand *LoweringPipelineTestFixture::expectOperandType(MirInstruction *instr
 }
 
 TypedPoolSlice<MirInstruction> *LoweringPipelineTestFixture::expectInstructionCount(MirBlock *block,
-                                                                                     size_t expected) const
+                                                                                    size_t expected) const
 {
     auto *instrs = block->getInstructions();
     EXPECT_NE(instrs, nullptr);
@@ -353,4 +346,3 @@ TypedPoolSlice<MirInstruction> *LoweringPipelineTestFixture::expectInstructionCo
         EXPECT_EQ(instrs->m_numElems, expected);
     return instrs;
 }
-

@@ -1,3 +1,13 @@
+/**
+ * @file EzFrontendWrapper.h
+ * @brief Convenience wrapper that drives the frontend pipeline from the
+ *        debug GUI: open a file, tokenize it, parse it, and expose results.
+ *
+ * EzFrontendWrapper is used by the Editor view to interactively compile
+ * source files.  It owns the tokenizer, parsing context, error collector,
+ * and source manager, exposing the token list and AST parse results for
+ * the GUI views to render.
+ */
 #ifndef EZPACKER_EZFRONTENDWRAPPER_H
 #define EZPACKER_EZFRONTENDWRAPPER_H
 

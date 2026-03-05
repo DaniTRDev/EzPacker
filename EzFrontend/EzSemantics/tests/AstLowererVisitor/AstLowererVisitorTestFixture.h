@@ -38,8 +38,8 @@ class AstLowererVisitorTestFixture : public ::testing::Test
         m_errorCollector->beginScope();
 
         // 1. Tokenize
-        m_sourceManager->addSourceContent("TEST_LOWERING", input);
-        if (!m_tokenizer->tokenizeBuffer((char *)input.data(), 0, input.size()))
+        size_t id = m_sourceManager->addSourceContent("TEST_LOWERING", input);
+        if (!m_tokenizer->tokenizeBuffer(0, id))
         {
             m_errorCollector->endScope(ErrorAction::Propagate);
             return false;
@@ -190,7 +190,7 @@ class AstLowererVisitorTestFixture : public ::testing::Test
         if (!sym)
             return MIRID_INVALID;
 
-        return m_semanticContext->getMirIdOfSymbol(sym);
+        return m_loweringCtx->getMirIdOfSymbol(sym);
     }
 
     /**

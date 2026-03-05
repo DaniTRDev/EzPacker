@@ -2,15 +2,16 @@
 #include <algorithm>
 #include <stdexcept>
 
-bool SourceManager::addSourceContent(const std::string &name, const std::string &content)
+size_t SourceManager::addSourceContent(const std::string &name, const std::string &content)
 {
     size_t id = std::hash<std::string>{}(name);
 
     if (m_sources.contains(id))
-        return false;
+        return 0; // Source with the same name already exists, return 0 to indicate failure.
 
     // Store the content
     m_sources[id] = content;
+    m_sourcesNames[id] = name;
 
     // We will build the line ranges.
     std::vector<LineSourceRange> &lines = m_sourceLines[id];
@@ -37,14 +38,18 @@ bool SourceManager::addSourceContent(const std::string &name, const std::string 
         lines.push_back({ .m_start = lineStart, .m_length = contentSize - lineStart });
     }
 
-    return true;
+    return id;
 }
 
 SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, const std::string &sourceFile)
 {
     size_t id = std::hash<std::string>{}(sourceFile);
+    return createReference(col, length, line, id);
+}
 
-    auto it = m_sourceLines.find(id);
+SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, size_t sourceId)
+{
+    auto it = m_sourceLines.find(sourceId);
     if (it == m_sourceLines.end())
         return {}; // File not found
 
@@ -64,7 +69,7 @@ SourceReference SourceManager::createReference(size_t col, size_t length, size_t
     ref.m_col = col;
     ref.m_length = length;
     ref.m_line = line;
-    ref.m_sourceFileId = id;
+    ref.m_sourceFileId = sourceId;
 
     return ref;
 }
@@ -120,6 +125,17 @@ std::string SourceManager::getReferenceContent(const SourceReference &ref)
         squiggles += std::string(markLength - 1, '~');
 
     return std::format("{}\n{}{}", lineContent, indent, squiggles);
+}
+
+std::string_view SourceManager::getSourceContent(size_t id) const
+{
+    auto it = m_sources.find(id);
+    if (it == m_sources.end())
+    {
+        return "";
+    }
+
+    return it->second;
 }
 
 std::string_view SourceManager::getSourceName(size_t id) const

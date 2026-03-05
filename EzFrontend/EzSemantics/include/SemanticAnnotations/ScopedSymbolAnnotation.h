@@ -1,3 +1,12 @@
+/**
+ * @file ScopedSymbolAnnotation.h
+ * @brief Annotation for nodes that both define a symbol AND own a scope.
+ *
+ * Used on Module and Label nodes, which introduce a new name into the
+ * enclosing scope and simultaneously create a child scope for their body.
+ * Inherits from SymbolAnnotation (avoiding a diamond with ScopeAnnotation)
+ * and adds a raw Scope* to the owned scope.
+ */
 #ifndef EZPACKER_SCOPEDSYMBOLANNOTATION_H
 #define EZPACKER_SCOPEDSYMBOLANNOTATION_H
 

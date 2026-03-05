@@ -1,3 +1,13 @@
+/**
+ * @file GenericLowerer.h
+ * @brief Abstract interface for a single-node AST-to-MIR lowerer.
+ *
+ * Every language construct that needs MIR translation (module, label,
+ * instruction, variable, immediate, memory, condition, if, while, break,
+ * continue, code-scope) implements GenericLowerer::lower().  The
+ * AstLowererVisitor dispatches each visited node to the appropriate
+ * concrete lowerer.
+ */
 #ifndef EZPACKER_GENERICLOWERER_H
 #define EZPACKER_GENERICLOWERER_H
 

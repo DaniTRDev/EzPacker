@@ -1,3 +1,13 @@
+/**
+ * @file VariableLowerer.h
+ * @brief Lowerer for variable references — maps symbols to MIR virtual
+ *        registers or global data entries.
+ *
+ * For local variables and parameters the lowerer looks up the symbol's MIR
+ * ID and pushes a MirRegister operand.  For global variables it emits the
+ * initializer data through MirGlobalDataEmitter and pushes a MirReference.
+ * Type-cast annotations are also handled here (TRUNC, ZEXT, SEXT, …).
+ */
 #ifndef EZPACKER_VARIABLELOWERER_H
 #define EZPACKER_VARIABLELOWERER_H
 

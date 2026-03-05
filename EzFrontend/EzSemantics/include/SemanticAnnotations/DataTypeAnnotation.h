@@ -1,3 +1,13 @@
+/**
+ * @file DataTypeAnnotation.h
+ * @brief Annotation that attaches a resolved Type to an AST node.
+ *
+ * DataTypeAnnotation is used on nodes whose concrete type has been
+ * determined by the SymbolAndTypeResolverVisitor — for example, an
+ * ImmediateOperand whose `i16` prefix has been resolved to the
+ * corresponding Type object.  This is distinct from SymbolAnnotation,
+ * which links a node to its declaring symbol.
+ */
 #ifndef EZPACKER_DATATYPEANNOTATION_H
 #define EZPACKER_DATATYPEANNOTATION_H
 

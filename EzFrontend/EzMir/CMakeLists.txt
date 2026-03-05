@@ -10,6 +10,7 @@ set(EZMIR_FILES_LIST
         "include/Instruction/MirInstructionSet.h"
         "include/Function/MirFunction.h"
         "include/Operand/MirOperand.h"
+        "include/Type/MirType.h"
 
         "src/MirBlock.cpp"
         "src/Emitter/MirEmitter.cpp"
@@ -18,6 +19,7 @@ set(EZMIR_FILES_LIST
         "src/Instruction/MirInstruction.cpp"
         "src/Function/MirFunction.cpp"
         "src/Operand/MirOperand.cpp"
+        "src/Type/MirType.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzMir"

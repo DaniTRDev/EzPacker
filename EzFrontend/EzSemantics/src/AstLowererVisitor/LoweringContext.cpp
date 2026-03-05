@@ -17,6 +17,31 @@ bool LoweringContext::hasInstructions() const { return !m_instructionStack.empty
 
 bool LoweringContext::hasOperands() const { return !m_operandStack.empty(); }
 
+bool LoweringContext::isSymbolLinkedToMir(Symbol *symbol) const { return m_symbolToMirMap.contains(symbol->getId()); }
+
+bool LoweringContext::linkSymbolToMirId(Symbol *sym, size_t mirId)
+{
+    if (isSymbolLinkedToMir(sym))
+    {
+        return false; // Symbol is already linked to a MIR ID.
+    }
+
+    m_symbolToMirMap[sym->getId()] = mirId;
+    return true;
+}
+
+bool LoweringContext::linkTypeNameToMirTypeId(Type *semanticType, size_t mirTypeId)
+{
+    const std::string_view &semanticTypeName = semanticType->getTypeName();
+    if (m_typeNameToMirTypeIdMap.contains(semanticTypeName))
+    {
+        return false; // Type name is already linked to a MIR type ID.
+    }
+
+    m_typeNameToMirTypeIdMap[semanticTypeName] = mirTypeId;
+    return true;
+}
+
 MirBlock *LoweringContext::popBlock()
 {
     if (!hasBlocks())
@@ -28,6 +53,22 @@ MirBlock *LoweringContext::popBlock()
     MirBlock *block = m_blockStack.top();
     m_blockStack.pop();
     return block;
+}
+
+MirId LoweringContext::getMirIdOfSymbol(Symbol *sym) const
+{
+    if (!sym)
+    {
+        return MIRID_INVALID;
+    }
+
+    auto it = m_symbolToMirMap.find(sym->getId());
+    if (it == m_symbolToMirMap.end())
+    {
+        return MIRID_INVALID;
+    }
+
+    return it->second;
 }
 
 MirInstruction *LoweringContext::popInstruction()
@@ -54,6 +95,59 @@ MirOperand LoweringContext::popOperand()
     MirOperand operand = m_operandStack.top();
     m_operandStack.pop();
     return operand;
+}
+
+MirType *LoweringContext::createMirTypeFromSemanticType(Type *semanticType)
+{
+    if (!semanticType)
+    {
+        throw std::runtime_error("Internal Compiler Error: Attempting to create a MIR type from a null semantic type");
+    }
+
+    if (m_typeNameToMirTypeIdMap.contains(semanticType->getTypeName()))
+    {
+        size_t mirTypeId = m_typeNameToMirTypeIdMap[semanticType->getTypeName()];
+        return m_emitterContext->getMirTypeById(mirTypeId);
+    }
+
+    MirTypeKind kind = MirTypeKind::Invalid;
+    switch (semanticType->getUnderlyingType())
+    {
+        case UnderlyingType::FloatingPoint:
+        {
+            kind = MirTypeKind::FloatingPoint;
+            break;
+        }
+        case UnderlyingType::Integer:
+        {
+            kind = MirTypeKind::Integer;
+            break;
+        }
+        case UnderlyingType::String:
+        {
+            kind = MirTypeKind::Pointer;
+            break;
+        }
+        case UnderlyingType::Void:
+        {
+            kind = MirTypeKind::Void;
+            break;
+        }
+        default:
+        {
+            throw std::runtime_error("Internal Compiler Error: Don't know how to create a MIR type from semantic type "
+                                     "with underlying type ");
+        }
+    }
+
+    MirType *mirType = m_emitterContext->createType(kind, nullptr, semanticType->getTypeName());
+    if (!linkTypeNameToMirTypeId(semanticType, mirType->getId()))
+    {
+        throw std::runtime_error("Internal Compiler Error: Failed to link semantic type name to MIR type ID");
+    }
+
+    m_typeNameToMirTypeIdMap.insert({ semanticType->getTypeName(), mirType->getId() });
+    return mirType;
 }
 
 void LoweringContext::enterLoop(const LoopContext &loopContext) { m_loopContextStack.push(loopContext); }

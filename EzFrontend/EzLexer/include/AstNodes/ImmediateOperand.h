@@ -1,3 +1,15 @@
+/**
+ * @file ImmediateOperand.h
+ * @brief AST nodes for compile-time constant operands (integers, floats, strings).
+ *
+ * ImmediateOperand is the abstract base; concrete subclasses are:
+ *   - IntegerImmediate  — arbitrary-precision integer via libtommath.
+ *   - FloatImmediate    — double-precision floating-point value.
+ *   - StringImmediate   — UTF-8 string literal (stored in the string pool).
+ *
+ * An optional data-type prefix (e.g. `i16 0xFF`) is recorded so the
+ * semantic pass can resolve the correct type.
+ */
 #ifndef EZPACKER_IMMEDIATE_H
 #define EZPACKER_IMMEDIATE_H
 

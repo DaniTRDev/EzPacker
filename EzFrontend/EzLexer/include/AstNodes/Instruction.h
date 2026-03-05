@@ -1,3 +1,12 @@
+/**
+ * @file Instruction.h
+ * @brief AST nodes for assembly-style instructions and call instructions.
+ *
+ * An Instruction holds a mnemonic name (mov, add, cmp, …) and an ordered
+ * list of operands (variables, immediates, memory references).
+ * CallInstruction is a specialised subclass for `call` instructions that
+ * additionally stores the callee name and the expected return type.
+ */
 #ifndef EZPACKER_INSTRUCTION_H
 #define EZPACKER_INSTRUCTION_H
 
@@ -71,11 +80,9 @@ class CallInstruction : public Instruction
   public:
     /**
      * Creates the call instruction with the given params, calleName and return type.
-     * @param params
-     * @param calleeName
      * @param returnType
      */
-    CallInstruction(TypedPoolSlice<AstNode> *params, std::string_view calleeName, std::string_view returnType);
+    CallInstruction(TypedPoolSlice<AstNode> *params);
 
     /**
      * Returns this object in a formatted string (human readable). The quantity of the information included in the
@@ -86,22 +93,6 @@ class CallInstruction : public Instruction
      * @return std::string
      */
     std::string getAsStr(AstNodeStringMode mode) const override;
-
-    /**
-     * Returns the name of the callee function.
-     * @return const std::string_view &
-     */
-    const std::string_view &getCalleeName() const;
-
-    /**
-     * Returns the "return type" of the function.
-     * @return const std::string_view &
-     */
-    const std::string_view &getReturnType() const;
-
-  private:
-    std::string_view m_calleeName;
-    std::string_view m_returnType;
 };
 
 #endif // EZPACKER_INSTRUCTION_H

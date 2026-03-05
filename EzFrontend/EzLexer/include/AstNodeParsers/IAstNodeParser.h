@@ -1,3 +1,12 @@
+/**
+ * @file IAstNodeParser.h
+ * @brief Interface that every individual language-construct parser implements.
+ *
+ * A parser attempts to consume tokens from the stream and produce a single
+ * AstNode.  When used through ParserBatch the stream position is
+ * automatically saved and restored on failure; when used standalone the
+ * caller is responsible for that bookkeeping.
+ */
 #ifndef EZPACKER_IASTNODEPARSER_H
 #define EZPACKER_IASTNODEPARSER_H
 

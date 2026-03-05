@@ -1,3 +1,14 @@
+/**
+ * @file MirGlobalDataEmitter.h
+ * @brief Builder API for emitting global/static data entries (.data, .rdata, .bss).
+ *
+ * MirGlobalDataEmitter creates MirGlobalDataEntry objects — each one
+ * representing an initialized or uninitialized blob of bytes that lives at
+ * a fixed address in the final binary.  Convenience wrappers exist for
+ * common cases: 64-bit integers, doubles, and null-terminated strings.
+ * The data is copied into an internal arena so the caller may free the
+ * source buffer immediately after the call.
+ */
 #ifndef EZPACKER_MIRDATAEMITTER_H
 #define EZPACKER_MIRDATAEMITTER_H
 

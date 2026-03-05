@@ -1,3 +1,13 @@
+/**
+ * @file MirBlock.h
+ * @brief A basic block in the MIR — a straight-line sequence of instructions.
+ *
+ * Every MirBlock has a unique ID and owns a linked list of MirInstruction
+ * objects.  Basic blocks are the fundamental unit of the control-flow graph:
+ * each block has a single entry point and ends with a terminator instruction
+ * (JMP, conditional jump, RET, or HALT).  Blocks are created and managed by
+ * MirEmitterContext.
+ */
 #ifndef EZPACKER_MIRBLOCK_H
 #define EZPACKER_MIRBLOCK_H
 

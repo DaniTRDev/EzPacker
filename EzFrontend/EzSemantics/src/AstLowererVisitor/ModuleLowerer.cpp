@@ -23,12 +23,23 @@ bool ModuleLowerer::lower(AstNode *node, LoweringContext *ctx)
 {
     Module *module = dynamic_cast<Module *>(node);
     CodeScope *body = module->getBody();
-    MirBlock *block = ctx->getEmitterContext()->createBlock();
     ModuleHeader *header = module->getHeader();
-    SymbolAnnotation *sym = module->getAnnotation<SymbolAnnotation>();
+    SymbolAnnotation *symAnnot = module->getAnnotation<SymbolAnnotation>();
+    Symbol *sym = symAnnot->getSymbol();
 
-    ctx->getSemanticContext()->linkSymbolToMirId(sym->getSymbol(), block->getId());
-    ctx->getEmitterContext()->bindToBlock(block);
+    MirType *moduleType = ctx->createMirTypeFromSemanticType(sym->getSymbolDataType());
+    if (!moduleType)
+    {
+        ctx->getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                             "Failed to link module symbol to MIR ID",
+                                             "ModuleLowerer");
+        return false;
+    }
+
+    MirFunction *func = ctx->getEmitterContext()->createFunction(moduleType->getId());
+
+    ctx->linkSymbolToMirId(sym, func->getId());
+    ctx->getEmitterContext()->bindToBlock(func->getEntryPoint());
 
     if (!header->accept(ctx->getOwnerLowererVisitor()))
     {

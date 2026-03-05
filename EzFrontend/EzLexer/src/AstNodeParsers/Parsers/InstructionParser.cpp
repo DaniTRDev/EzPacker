@@ -51,23 +51,17 @@ AstNode *CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext>
      * Which can only be a CallInstruction.
      */
 
-    if (!ctx->consumeIf(ParsingCondition::TokenType, &returnTypeToken, _TokenType::Identifier))
+    AstNode *callee = VariableParser().parse(ctx);
+    if (!callee)
     {
         ctx->emitError(ErrorSeverity::Fatal,
-                       "Invalid callee function return type",
+                       "Expected function symbol after 'call' instruction",
                        "InstructionParser::CallInstructionParser",
                        ctx->getLastSourceReference());
         return nullptr;
     }
 
-    if (!ctx->consumeIf(ParsingCondition::TokenType, &calleeNameToken, _TokenType::Identifier))
-    {
-        ctx->emitError(ErrorSeverity::Fatal,
-                       "Invalid callee function name",
-                       "InstructionParser::CallInstructionParser",
-                       ctx->getLastSourceReference());
-        return nullptr;
-    }
+    nodePool->appendToSlice(arguments, callee);
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftParen))
     {
@@ -77,9 +71,6 @@ AstNode *CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext>
                        ctx->getLastSourceReference());
         return nullptr;
     }
-
-    std::string_view calleeName = stringPool->createConstantString(calleeNameToken.m_str),
-                     returnType = stringPool->createConstantString(returnTypeToken.m_str);
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
     {
@@ -120,7 +111,7 @@ AstNode *CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext>
         return nullptr;
     }
 
-    node = nodePool->create<CallInstruction>(arguments, std::move(calleeName), std::move(returnType));
+    node = nodePool->create<CallInstruction>(arguments);
     return node;
 }
 

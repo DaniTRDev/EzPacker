@@ -1,3 +1,19 @@
+/**
+ * @file SymbolDefinitionVisitor.h
+ * @brief First semantic pass — creates scopes and registers every declared symbol.
+ *
+ * SymbolDefinitionVisitor walks the AST and:
+ *   - Creates a child scope for each Module, Label, If/Else branch, and
+ *     While body.
+ *   - Defines symbols for module names, parameters, labels, and local
+ *     variables (via the `create` instruction).
+ *   - Annotates the corresponding AST nodes with SymbolAnnotation or
+ *     ScopedSymbolAnnotation so that the next pass (resolution) can find
+ *     the symbols without re-scanning.
+ *
+ * No name resolution or type checking happens here — that is deferred to
+ * SymbolAndTypeResolverVisitor and TypeCheckVisitor respectively.
+ */
 #ifndef EZPACKER_SYMBOLDEFINITIONVISITOR_H
 #define EZPACKER_SYMBOLDEFINITIONVISITOR_H
 

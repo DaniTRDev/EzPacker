@@ -1,3 +1,12 @@
+/**
+ * @file TypeTable.h
+ * @brief The language's built-in type registry: `i8`, `i16`, `i32`, `i64`, `f32`, `f64`, `void`, etc.
+ *
+ * Type describes a single primitive type (underlying kind + bit-width +
+ * human-readable name).  TypeTable is a static lookup that maps type-name
+ * strings to their Type objects and provides a default type (`i64`) used
+ * when no explicit type annotation is given.
+ */
 #ifndef EZPACKER_TYPETABLE_H
 #define EZPACKER_TYPETABLE_H
 
@@ -22,7 +31,7 @@ enum class UnderlyingTypeSize : uint16_t
     _128bits = 128,
     _256bits = 256,
     _512bits = 512,
-    Variable = 0xFFFF // Strings, they don't have a pre-fixed known size or ptrs.
+    Variable = 0xFFFF // Strings, they don't have a pre-fixed known size.
 };
 
 class Type

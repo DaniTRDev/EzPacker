@@ -1,7 +1,26 @@
+/**
+ * @file LoweringContext.h
+ * @brief Runtime state shared by all lowerers during the AST-to-MIR translation.
+ *
+ * LoweringContext provides:
+ *   - Block / instruction / operand stacks that lowerers use to pass MIR
+ *     artefacts up and down the AST tree.
+ *   - A LoopContext stack (enterLoop / exitLoop / getCurrentLoopContext) so
+ *     that BreakLowerer and ContinueLowerer can find the correct jump targets.
+ *   - Symbol-to-MIR-ID linkage (linkSymbolToMirId / getMirIdOfSymbol) that
+ *     connects semantic symbols to the virtual registers or blocks they were
+ *     lowered into.
+ *   - Convenience accessors for the shared MIR emitter, emitter context,
+ *     and global data emitter.
+ *
+ * The LoopContext struct is also defined here, holding the break-target and
+ * continue-target blocks for the innermost active loop.
+ */
 #ifndef EZPACKER_LOWERINGCONTEXT_H
 #define EZPACKER_LOWERINGCONTEXT_H
 
 #include "EzSemanticsCommon.h"
+#include "Scope/Symbol.h"
 
 /**
  * Struct to hold the context of a loop during lowering. This is useful for handling break and continue statements, as
@@ -53,10 +72,45 @@ class LoweringContext
     bool hasOperands() const;
 
     /**
+     * Returns true if the given symbol has a MIR ID linked.
+     * @param symbol
+     * @return bool
+     */
+    bool isSymbolLinkedToMir(Symbol *symbol) const;
+
+    /**
+     * Links the given symbol to the MIR id and returns true if succeded. If the symbol is already linked with a MIR ID,
+     * false is returned.
+     * @param sym
+     * @param mirId
+     * @return bool
+     */
+    bool linkSymbolToMirId(Symbol *sym, size_t mirId);
+
+    /**
+     * This function is used internally by the lowerer. Its purpose is to decouple linking from creation.
+     *
+     * Links the given semantic type to the MIR type ID and returns true if succeeded. If the type name is already
+     * linked with a MIR type ID, false is returned.
+     * @param semanticType
+     * @param mirTypeId
+     * @return bool
+     */
+    bool linkTypeNameToMirTypeId(Type *semanticType, size_t mirTypeId);
+
+    /**
      * Pops a block (if any) from the block stack and returns it. If block stack is empty, an exception is thrown.
      * @return MirBlock *
      */
     MirBlock *popBlock();
+
+    /**
+     * Returns the MIR ID of the given symbol, if any. It returns MIRID_INVALID if the symbol is not linked to any
+     * MIR ID.
+     * @param sym
+     * @return MirId
+     */
+    MirId getMirIdOfSymbol(Symbol *sym) const;
 
     /**
      * Pops an instruction (if any) from the instruction stack and returns it. If instruction stack is empty, an
@@ -71,6 +125,18 @@ class LoweringContext
      * @return MirOperand
      */
     MirOperand popOperand();
+
+    /**
+     * Creates a MIR type from the given semantic type. This is useful for handling type information during
+     * lowering, as it allows the lowerer to work with MIR types that correspond to the semantic types used in the AST
+     * and semantic analysis phases.
+     *
+     * This function will link the semantic type's name to the created MIR type's ID in the context, so that future
+     * requests for the same semantic type can be resolved to the same MIR type ID.
+     * @param semanticType
+     * @return MirType *
+     */
+    MirType *createMirTypeFromSemanticType(Type *semanticType);
 
     /**
      * Enters a loop context by pushing the provided loop context onto the block stack. This is useful for handling
@@ -161,7 +227,10 @@ class LoweringContext
     const std::stack<MirOperand> &getOperandStack() const;
 
   private:
-    class AstLowererVisitor *m_ownerVisitor; // Visitor that is using this context.
+    class AstLowererVisitor *m_ownerVisitor;   // Visitor that is using this context.
+    std::map<size_t, size_t> m_symbolToMirMap; // Map that links a symbol with its corresponding MIR ID.
+    std::map<std::string_view, size_t>
+            m_typeNameToMirTypeIdMap; // Map that links a semantic type name to its corresponding MIR type ID.
     std::shared_ptr<struct BasicSemanticContext> m_semanticCtx;
     std::shared_ptr<struct MirEmitter> m_emitter;
     std::shared_ptr<struct MirEmitterContext> m_emitterContext;

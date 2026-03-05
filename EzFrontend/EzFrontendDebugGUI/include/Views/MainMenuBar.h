@@ -1,3 +1,7 @@
+/**
+ * @file MainMenuBar.h
+ * @brief ImGui view that renders the top-level menu bar (File, Edit, …).
+ */
 #ifndef EZPACKER_MAINMENUBAR_H
 #define EZPACKER_MAINMENUBAR_H
 

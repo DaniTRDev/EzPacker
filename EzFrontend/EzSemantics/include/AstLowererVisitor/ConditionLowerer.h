@@ -1,3 +1,12 @@
+/**
+ * @file ConditionLowerer.h
+ * @brief Lowerer for binary comparison conditions (`%a EQ %b`, etc.).
+ *
+ * Emits a CMP instruction for the two operands, followed by a conditional
+ * jump to the true-branch block and an unconditional JMP to the false-branch
+ * block.  Expects two target blocks on the LoweringContext block stack
+ * (pushed by the caller, typically IfLowerer or WhileLowerer).
+ */
 #ifndef EZPACKER_CONDITIONLOWERER_H
 #define EZPACKER_CONDITIONLOWERER_H
 

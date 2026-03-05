@@ -1,3 +1,14 @@
+/**
+ * @file ImmediateParser.h
+ * @brief Parsers for compile-time constant operands: integers, floats, and strings.
+ *
+ * Three parser classes live inside the ImmediateParser namespace:
+ *   - Integer — decimal and hexadecimal integer literals (arbitrary precision
+ *               via libtommath).
+ *   - Float   — floating-point literals (e.g. 3.14).
+ *   - String  — double-quoted string literals.
+ * Each produces the corresponding ImmediateOperand subclass.
+ */
 #ifndef EZPACKER_IMMEDIATEPARSER_H
 #define EZPACKER_IMMEDIATEPARSER_H
 

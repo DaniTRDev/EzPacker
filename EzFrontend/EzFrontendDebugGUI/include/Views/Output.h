@@ -1,3 +1,8 @@
+/**
+ * @file Output.h
+ * @brief ImGui view that displays compiler errors and warnings collected
+ *        by the ErrorCollector during tokenization, parsing, and semantic analysis.
+ */
 #ifndef EZPACKER_OUTPUT_H
 #define EZPACKER_OUTPUT_H
 

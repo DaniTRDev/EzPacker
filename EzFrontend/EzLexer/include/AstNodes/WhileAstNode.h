@@ -1,3 +1,12 @@
+/**
+ * @file WhileAstNode.h
+ * @brief AST node for `while` loops: `while (condition) { body }`.
+ *
+ * A WhileAstNode owns a ConditionAstNode and a CodeScope.  During lowering,
+ * the WhileLowerer creates three basic blocks (condition-check, loop-body,
+ * exit) and pushes a LoopContext so that any break/continue statements
+ * inside the body know which blocks to target.
+ */
 #ifndef EZPACKER_WHILEASTNODE_H
 #define EZPACKER_WHILEASTNODE_H
 

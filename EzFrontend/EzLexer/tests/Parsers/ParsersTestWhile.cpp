@@ -12,7 +12,7 @@ TEST_F(ParsersTestFixture, While_Simple)
 
 TEST_F(ParsersTestFixture, While_MultipleStatements)
 {
-    EXPECT_TRUE(tokenizeAndParse<WhileParser>("while (%x LT %y) { nop; continue; }"));
+    EXPECT_TRUE(tokenizeAndParse<WhileParser>("while (%x LT %y) { nop; nop; continue; }"));
     TEST_WHILE(3);
 }
 

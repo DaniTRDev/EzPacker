@@ -1,3 +1,11 @@
+/**
+ * @file LabelLowerer.h
+ * @brief Lowerer for named labels — creates a new basic block and links
+ *        the label's symbol to its ID.
+ *
+ * After creating and binding the new block, the label's body scope is
+ * lowered into it by delegating to the AstLowererVisitor.
+ */
 #ifndef EZPACKER_LABELLOWERER_H
 #define EZPACKER_LABELLOWERER_H
 

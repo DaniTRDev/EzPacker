@@ -1,3 +1,21 @@
+/**
+ * @file BasicSemanticContext.h
+ * @brief Shared state for every semantic pass: scopes, symbols, loop tracking,
+ *        error reporting, and the symbol-to-MIR linkage map.
+ *
+ * BasicSemanticContext is the central façade used by all semantic visitors
+ * and the AST-to-MIR lowerer.  It owns:
+ *   - The global scope and the scope stack (beginScope / endScope / enterScope).
+ *   - An arena pool for Symbol and IAstNodeAnnotation objects.
+ *   - A loop-nesting counter so the TypeCheckVisitor can reject break/continue
+ *     outside of loops.
+ *   - Helper methods for creating symbols, resolving names, and emitting
+ *     diagnostic errors tied to source locations.
+ *
+ * Two RAII guards are provided for convenience:
+ *   - ScopeGuard — calls enterScope on construction and exitScope on destruction.
+ *   - LoopGuard  — calls enterLoop on construction and exitLoop on destruction.
+ */
 #ifndef EZPACKER_BASICSEMANTICCONTEXT_H
 #define EZPACKER_BASICSEMANTICCONTEXT_H
 
@@ -14,12 +32,16 @@ class BasicSemanticContext : public ErrorEmitter
 {
   public:
     /**
-     * Creates the context with the given error collector and source manager.
+     * Creates the context with the given error collector and source manager. Global scope is created by default, but it
+     * can be overridden by passing a custom global scope (can be used to link multiple files at once without extra
+     * efforts).
      * @param errorCollector
      * @param sourceManager
+     * @param globalScope
      */
     BasicSemanticContext(const std::shared_ptr<ErrorCollector> &errorCollector,
-                         const std::shared_ptr<SourceManager> &sourceManager);
+                         const std::shared_ptr<SourceManager> &sourceManager,
+                         const std::shared_ptr<Scope> &globalScope = nullptr);
 
     /**
      * Creates a symbol in the current scope linked to an AstNode. If symbol is present in the scope false is returned
@@ -50,22 +72,6 @@ class BasicSemanticContext : public ErrorEmitter
     bool isCurrentScopeGlobalScope() const;
 
     /**
-     * Returns true if the given symbol has a MIR ID linked.
-     * @param symbol
-     * @return bool
-     */
-    bool isSymbolLinkedToMir(Symbol *symbol) const;
-
-    /**
-     * Links the given symbol to the MIR id and returns true if succeded. If the symbol is already linked with a MIR ID,
-     * false is returned.
-     * @param sym
-     * @param mirId
-     * @return bool
-     */
-    bool linkSymbolToMirId(Symbol *sym, size_t mirId);
-
-    /**
      * Tries to search for a symbol in the current scope. If it's found, true is returned. If it's found and
      * outSymbol != nullptr, outSymbol will be set to the occurrence.
      *
@@ -77,14 +83,6 @@ class BasicSemanticContext : public ErrorEmitter
      * @return bool
      */
     bool resolveSymbolInScope(const std::string_view &symbolName, Symbol **outSymbol, bool searchParent);
-
-    /**
-     * Returns the MIR ID of the given symbol, if any. It returns MIRID_INVALID if the symbol is not linked to any
-     * MIR ID.
-     * @param sym
-     * @return MirId
-     */
-    MirId getMirIdOfSymbol(Symbol *sym) const;
 
     /**
      * Returns the current scope. If no scope is opened, global scope is returned.
@@ -109,6 +107,15 @@ class BasicSemanticContext : public ErrorEmitter
      * @param name
      */
     void beginScope(const std::string_view &name);
+
+    /**
+     * Discovers an inclusion of a module. If the module was already discovered, nothing is done. If the module was not
+     * discovered, it is added to the list of discovered inclusions. This is used to prevent including the same file
+     * multiple times and to detect circular dependencies. As well as being able to reference modules from external
+     * files.
+     * @param includePath
+     */
+    void discoverInclusion(const std::string_view &includePath);
 
     /**
      * Emits an error because of the redefinition of a symbol. It will print the first place the symbol was defined in.
@@ -170,13 +177,19 @@ class BasicSemanticContext : public ErrorEmitter
     size_t m_currentSymbolId;      // Used to give symbols an ID. Error is 0, this starts at 1.
     TypedPool m_annotationPool;    // Cache-friendly container of annotations.
     TypedPool m_symbolPool;        // Cache-friendly container of symbols.
-    std::map<size_t, size_t> m_symbolToMirMap; // Map that links a symbol with its corresponding MIR ID.
+    std::set<std::string> m_discoveredInclusions; /**
+                                                   * Set of all the included files discovered during the semantic
+                                                   * analysis. This is used to prevent including the same file
+                                                   * multiple times and to detect circular dependencies. As well
+                                                   * as being able to reference modules from external files.
+                                                   */
     std::shared_ptr<Scope> m_globalScope;
     std::vector<std::shared_ptr<Scope>>
             m_scopes; /*
                        * Scopes can't be easily adapted into the cache-friendly pool because
                        * they have a dynamic Map. There will be quite frequent searches so
-                       * and for this reason, O(log n) (map search) < O (n) (linked list search)
+                       * and for this reason, O(log n) (map search) < O (n) (linked list search) is preferred, even if
+                       * it means that scopes are not stored contiguously in memory.
                        */
 };
 

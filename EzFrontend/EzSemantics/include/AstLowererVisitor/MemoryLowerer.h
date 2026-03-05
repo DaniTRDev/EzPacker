@@ -1,3 +1,14 @@
+/**
+ * @file MemoryLowerer.h
+ * @brief Lowerer for memory-addressing operands (base+disp, index*scale, etc.).
+ *
+ * Translates each MemoryOperandAstNode variant into a MirMemory operand
+ * by resolving the base/index variables to their MIR register IDs,
+ * reading the displacement and scale factor, and pushing the resulting
+ * MirOperand onto the operand stack.  Each addressing mode
+ * (BaseDisplacement, IndexScale, BaseIndexScaleDisplacement) has a
+ * dedicated private helper.
+ */
 #ifndef EZPACKER_MEMORYLOWERER_H
 #define EZPACKER_MEMORYLOWERER_H
 

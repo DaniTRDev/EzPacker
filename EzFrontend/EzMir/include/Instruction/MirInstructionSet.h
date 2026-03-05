@@ -1,3 +1,16 @@
+/**
+ * @file MirInstructionSet.h
+ * @brief X-macro catalogue of every MIR instruction.
+ *
+ * This file is included multiple times with different definitions of
+ * the INSTRUCTION(NAME, OPERAND_COUNT, FLAGS) macro to generate:
+ *   - The MirInstructionOpCode enum values.
+ *   - The g_MirInstructionSet[] metadata table.
+ *   - Per-opcode emit helpers in MirEmitter (emitMOV, emitADD, …).
+ *
+ * To add a new instruction, append a single INSTRUCTION() line in the
+ * appropriate section below — everything else is generated automatically.
+ */
 #ifdef INSTRUCTION
 
 INSTRUCTION(INVALID, 0, None)

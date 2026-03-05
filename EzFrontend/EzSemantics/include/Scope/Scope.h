@@ -1,3 +1,13 @@
+/**
+ * @file Scope.h
+ * @brief A lexical scope that maps names to Symbol objects.
+ *
+ * Scopes form a tree: every scope (except the global one) has a parent.
+ * Name resolution walks upward through the parent chain when the
+ * `searchParent` flag is set, implementing the familiar shadowing rules.
+ * Scopes are created by BasicSemanticContext::beginScope() during the
+ * SymbolDefinitionVisitor pass.
+ */
 #ifndef EZPACKER_SCOPE_H
 #define EZPACKER_SCOPE_H
 

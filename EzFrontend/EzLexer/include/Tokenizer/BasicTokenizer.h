@@ -1,3 +1,18 @@
+/**
+ * @file BasicTokenizer.h
+ * @brief Synchronous tokenizer that splits raw source text into a stream of typed tokens.
+ *
+ * BasicTokenizer scans a character buffer and produces a sequence of
+ * TokenInformation objects.  It recognises identifiers, reserved keywords
+ * (`if`, `else`, `while`, `break`, `continue`), integer and floating-point
+ * literals (decimal and hexadecimal), string literals with escape sequences,
+ * single-character punctuation, and `#`-prefixed comments.  The resulting
+ * token list is consumed by the parsing stage (BasicParsingContext).
+ *
+ * This file also defines the _TokenType enumeration (all possible token
+ * kinds) and the TokenInformation struct that pairs a type with the
+ * original text and source location.
+ */
 #ifndef EZPACKER_BASICTOKENIZER_H
 #define EZPACKER_BASICTOKENIZER_H
 
@@ -51,6 +66,7 @@ enum class _TokenType : uint8_t
     Else,        // "else"
     Identifier,  // Something formed with [a-z] | [A-Z] | [0, 9] | [_]. It can't start with digits.
     If,          // "if"
+    Include,     // "include"
     LeftBrace,   // '{'
     LeftParen,   // '('
     Minus,       // '-'
@@ -63,6 +79,7 @@ enum class _TokenType : uint8_t
     RightParen,  // ')'
     SemiColon,   // ';'
     String,      // "..." Multiline strings are not supported. // TODO: Add support for multiline strings.
+    Tab,         // '\t'
     While        //"while"
 };
 
@@ -114,25 +131,22 @@ class BasicTokenizer
 {
   public:
     /**
-     * Creates the object with the given errorCollector, sourceManager and links it to a source file.
+     * Creates the object with the given errorCollector and sourceManager.
      * @param errorCollector
      * @param sourceManager
-     * @param source
      */
     BasicTokenizer(const std::shared_ptr<ErrorCollector> &errorCollector,
-                   const std::shared_ptr<SourceManager> &sourceManager,
-                   const std::string &source);
+                   const std::shared_ptr<SourceManager> &sourceManager);
 
     /**
-     * Tries to read the input buffer, starting at pos = address, and generate a set of tokens. Returns true if there
-     * wasn't any error with the input while tokenizing. If buffer is invalid or if address >= bufferSize, false is
-     * returned.
-     * @param buffer
+     * Tries to get the content of the given source file and tokenize it. Returns true if succeeded, false other ways.
+     * The generated tokens can be retrieved via getTokens(). The address parameter indicates the starting position in
+     * the buffer for tokenization.
      * @param address
-     * @param bufferSize
+     * @param sourceId
      * @return bool
      */
-    bool tokenizeBuffer(char *buffer, size_t address, size_t bufferSize);
+    bool tokenizeBuffer(size_t address, size_t sourceId);
 
     /**
      * Returns the list of generated tokens.
@@ -193,9 +207,9 @@ class BasicTokenizer
     size_t m_bufferSize;
     size_t m_col;
     size_t m_line;
+    size_t m_sourceId;
     std::shared_ptr<ErrorCollector> m_errorCollector;
     std::shared_ptr<SourceManager> m_sourceManager;
-    std::string m_source;
     std::vector<TokenInformation> m_tokens;
 };
 

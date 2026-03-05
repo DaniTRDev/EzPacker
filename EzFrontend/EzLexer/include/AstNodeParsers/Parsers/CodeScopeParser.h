@@ -1,3 +1,12 @@
+/**
+ * @file CodeScopeParser.h
+ * @brief Parser for brace-delimited code scopes: `{ … }`.
+ *
+ * Expects an opening `{`, then repeatedly tries to parse child statements
+ * (labels, if/else, while, instructions, break, continue) until the closing
+ * `}` is reached.  Produces a CodeScope node containing the ordered list of
+ * parsed children.
+ */
 #ifndef EZPACKER_CODESCOPEPARSER_H
 #define EZPACKER_CODESCOPEPARSER_H
 

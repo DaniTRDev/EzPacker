@@ -30,13 +30,15 @@ class SourceManager
 {
   public:
     /**
-     * Adds a new source file using given content and name.
-     * @param name
-     * @param content
-     * @return bool
+     * Creates a source reference that can be used to show source content.
+     * @param col
+     * @param length
+     * @param line
+     * @param sourceId
+     * @return SourceReference
      */
-    bool addSourceContent(const std::string &name, const std::string &content);
-
+    SourceReference createReference(size_t col, size_t length, size_t line, size_t sourceId);
+    
     /**
      * Creates a source reference that can be used to show source content.
      * @param col
@@ -46,7 +48,16 @@ class SourceManager
      * @return SourceReference
      */
     SourceReference createReference(size_t col, size_t length, size_t line, const std::string &sourceFile);
-
+    
+    /**
+     * Adds a new source file using given content and name. Returns the ID of the source file, which is a hash of the
+     * name. If a source with the same name already exists, it returns 0, indicating failure to add the source.
+     * @param name
+     * @param content
+     * @return size_t
+     */
+    size_t addSourceContent(const std::string &name, const std::string &content);
+    
     /**
      * Returns the raw line of where this reference was created. Returns true if no reference is given or if it is not
      * from any known sources.
@@ -61,6 +72,14 @@ class SourceManager
      * @return std::string
      */
     std::string getReferenceContent(const SourceReference &ref);
+
+    /**
+     * Returns the source content for the given ID. This is the full content of the source file. If ID is not found, it
+     * returns an empty string.
+     * @param id
+     * @return std::string_view
+     */
+    std::string_view getSourceContent(size_t id) const;
 
     /**
      * Returns the source name of the given source file id.

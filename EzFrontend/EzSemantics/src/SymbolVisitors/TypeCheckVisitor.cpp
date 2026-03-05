@@ -39,12 +39,12 @@ bool TypeCheckVisitor::visit(IfAstNode *ifNode)
 bool TypeCheckVisitor::visit(Instruction *instr)
 {
     // We need to manually traverse this container to infer the types of immediates.
+    CallInstruction *callInstr = dynamic_cast<CallInstruction *>(instr);
     Type *targetInstructionType = nullptr;
 
     // First pass: Find the target type (usually from the first Variable or Memory operand)
-    for (const void *ptr : *instr->getExpressions())
+    for (AstNode *node : *instr->getExpressions())
     {
-        AstNode *node = (AstNode *)ptr;
         if (node->getType() == AstNodeType::Variable)
         {
             Variable *var = static_cast<Variable *>(node);

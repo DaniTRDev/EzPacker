@@ -93,7 +93,7 @@ bool VariableLowerer::lowerGlobalVariable(Variable *var, LoweringContext *ctx)
     MirGlobalDataEntry *entry =
             ctx->getGlobalDataEmitter()->createGlobalData(tempBuffer.data(), tempBuffer.size(), false);
 
-    return ctx->getSemanticContext()->linkSymbolToMirId(sym, entry->m_entryId);
+    return ctx->linkSymbolToMirId(sym, entry->m_entryId);
 }
 
 bool VariableLowerer::lowerLocalVariable(Variable *var, LoweringContext *ctx)
@@ -102,7 +102,7 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, LoweringContext *ctx)
     Symbol *sym = symbolAnnot->getSymbol();
     size_t varSize = static_cast<size_t>(sym->getSymbolDataType()->getUnderlyingTypeSize());
 
-    if (ctx->getSemanticContext()->isSymbolLinkedToMir(sym))
+    if (ctx->isSymbolLinkedToMir(sym))
     {
         /*
          * We already have a vreg for this local variable, so we just reuse it. We don't need to care for the size not
@@ -111,7 +111,7 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, LoweringContext *ctx)
          * and the original operand in the inserted cast instruction (TRUNC, ZEXT, SEXT, ...), so the size should
          * already be correct. If there is a mismatch, it's a bug in the TypeChecker pass, not here.
          */
-        size_t existingVreg = ctx->getSemanticContext()->getMirIdOfSymbol(sym);
+        size_t existingVreg = ctx->getMirIdOfSymbol(sym);
         ctx->pushOperand(MirOperand{ MirRegister{ .m_id = existingVreg, .m_size = varSize } });
 
         return true;
@@ -120,7 +120,7 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, LoweringContext *ctx)
     MirRegister vReg = ctx->getEmitter()->createRegister(varSize);
 
     // Link it so future usages find it
-    ctx->getSemanticContext()->linkSymbolToMirId(sym, vReg.m_id);
+    ctx->linkSymbolToMirId(sym, vReg.m_id);
     ctx->pushOperand(MirOperand{ vReg });
 
     return true;

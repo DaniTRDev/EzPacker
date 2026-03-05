@@ -1,3 +1,19 @@
+/**
+ * @file MirInstructionDefs.h
+ * @brief Compile-time instruction catalogue: opcodes, flags, and metadata.
+ *
+ * This header uses an X-macro pattern (MirInstructionSet.h) to generate:
+ *   - MirInstructionFlags  — bit-field constants describing data-flow
+ *     (read/write), operand constraints, type safety, memory semantics,
+ *     control-flow properties, and CPU-flag usage for each instruction.
+ *   - MirInstructionOpCode — a compact enum listing every opcode.
+ *   - MirInstructionMetadata / g_MirInstructionSet[] — a lookup table
+ *     that maps each opcode to its name, expected operand count, and flag
+ *     bitmask.
+ *
+ * Adding a new instruction requires only a single line in
+ * MirInstructionSet.h; everything else is generated automatically.
+ */
 #ifndef EZPACKER_MIRINSTRUCTIONDEFS_H
 #define EZPACKER_MIRINSTRUCTIONDEFS_H
 

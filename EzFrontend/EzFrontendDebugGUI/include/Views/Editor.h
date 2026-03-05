@@ -1,3 +1,8 @@
+/**
+ * @file Editor.h
+ * @brief ImGui view that provides a simple code editor with tokenize/parse
+ *        buttons and displays the resulting AST.
+ */
 #ifndef EZPACKER_EDITOR_H
 #define EZPACKER_EDITOR_H
 

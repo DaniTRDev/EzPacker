@@ -1,3 +1,12 @@
+/**
+ * @file MirInstruction.h
+ * @brief A single MIR instruction: opcode + operand list.
+ *
+ * Each MirInstruction carries an opcode (MirInstructionOpCode), a linked
+ * list of MirOperand values, and the associated metadata (operand count,
+ * flags such as IsTerminator, ReadsCPUFlags, etc.).  Instructions live
+ * inside a MirBlock and are allocated from an arena pool.
+ */
 #ifndef EZPACKER_MIRINSTRUCTION_H
 #define EZPACKER_MIRINSTRUCTION_H
 
@@ -10,8 +19,8 @@ class MirInstruction
   public:
     /**
      * Creates the instruction with the given opcode and operand list.
-     * @param opcode
-     * @param opcode
+     * @param opcode   The operation this instruction performs.
+     * @param operands Initially-empty slice that will hold operands.
      */
     MirInstruction(MirInstructionOpCode opcode, TypedPoolSlice<MirOperand> *operands);
 

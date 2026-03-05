@@ -1,3 +1,8 @@
+/**
+ * @file Lexer.h
+ * @brief ImGui view that displays debug information about the EzLexer
+ *        token stream (token types, source locations, content).
+ */
 #ifndef EZPACKER_LEXER_H
 #define EZPACKER_LEXER_H
 

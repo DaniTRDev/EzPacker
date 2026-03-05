@@ -1,3 +1,10 @@
+/**
+ * @file CodeScopeLowerer.h
+ * @brief Lowerer for brace-delimited code scopes (`{ … }`).
+ *
+ * Iterates through every child expression in the CodeScope and delegates
+ * each one to the AstLowererVisitor, preserving statement order.
+ */
 #ifndef EZPACKER_CODESCOPELOWERER_H
 #define EZPACKER_CODESCOPELOWERER_H
 

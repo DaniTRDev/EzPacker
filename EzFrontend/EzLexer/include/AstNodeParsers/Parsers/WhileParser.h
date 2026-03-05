@@ -1,3 +1,10 @@
+/**
+ * @file WhileParser.h
+ * @brief Parser for `while` loops: `while (condition) { body }`.
+ *
+ * Consumes the `while` keyword, a parenthesised condition, and a
+ * brace-delimited body scope.  Produces a WhileAstNode.
+ */
 #ifndef EZPACKER_WHILEPARSER_H
 #define EZPACKER_WHILEPARSER_H
 

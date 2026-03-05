@@ -1,0 +1,396 @@
+# Multi-module stress test
+# Exercises: many modules in a single file, different signatures, all return types,
+# mixed parameter counts, varied bodies
+
+void InitializeBuffer(i64 %bufPtr, i32 %size)
+{
+    create i32 %i;
+    create i64 %addr;
+    mov %i, 0;
+    mov %addr, %bufPtr;
+
+    while (%i LT %size)
+    {
+        mov %addr, %bufPtr;
+        add %addr, %i;
+        add %i, 1;
+    }
+    nop;
+}
+
+i64 ComputeHash(i64 %dataPtr, i32 %length, i64 %seed)
+{
+    create i64 %hash;
+    create i32 %idx;
+    create i64 %curAddr;
+    create i64 %val;
+    create i64 %mix;
+
+    mov %hash, %seed;
+    mov %idx, 0;
+    mov %curAddr, %dataPtr;
+
+    while (%idx LT %length)
+    {
+        mov %val, i64 (%curAddr+0);
+        mov %mix, %val;
+        shl %mix, 5;
+        xor %mix, %val;
+        add %hash, %mix;
+        xor %hash, 0xFF00FF00;
+        shr %hash, 1;
+        or %hash, 0x1;
+
+        add %curAddr, 8;
+        add %idx, 1;
+    }
+
+    label_finalize_hash:
+    {
+        xor %hash, %seed;
+        and %hash, 0xFFFFFFFF;
+        nop;
+    }
+}
+
+i32 FindMaxElement(i64 %arrayPtr, i32 %count)
+{
+    create i32 %maxVal;
+    create i32 %current;
+    create i32 %idx;
+    create i64 %addr;
+
+    mov %idx, 0;
+    mov %addr, %arrayPtr;
+    mov %maxVal, i32 (%addr+0);
+    add %idx, 1;
+    add %addr, 4;
+
+    while (%idx LT %count)
+    {
+        mov %current, i32 (%addr+0);
+        if (%current GT %maxVal)
+        {
+            mov %maxVal, %current;
+        }
+        add %addr, 4;
+        add %idx, 1;
+    }
+
+    nop;
+}
+
+i32 CountMatches(i64 %arrayPtr, i32 %size, i32 %target)
+{
+    create i32 %count;
+    create i32 %idx;
+    create i64 %addr;
+    create i32 %val;
+
+    mov %count, 0;
+    mov %idx, 0;
+    mov %addr, %arrayPtr;
+
+    while (%idx LT %size)
+    {
+        mov %val, i32 (%addr+0);
+        if (%val EQ %target)
+        {
+            add %count, 1;
+        }
+        add %addr, 4;
+        add %idx, 1;
+    }
+
+    nop;
+}
+
+void BubbleSortPass(i64 %arrayPtr, i32 %size)
+{
+    create i32 %i;
+    create i32 %limit;
+    create i64 %addr;
+    create i32 %current;
+    create i32 %next;
+    create i32 %temp;
+
+    mov %limit, %size;
+    sub %limit, 1;
+    mov %i, 0;
+    mov %addr, %arrayPtr;
+
+    while (%i LT %limit)
+    {
+        mov %current, i32 (%addr+0);
+        mov %next, i32 (%addr+4);
+
+        if (%current GT %next)
+        {
+            # Swap
+            mov %temp, %current;
+            mov %current, %next;
+            mov %next, %temp;
+        }
+
+        add %addr, 4;
+        add %i, 1;
+    }
+
+    nop;
+}
+
+i64 DotProduct(i64 %vecA, i64 %vecB, i32 %dimensions)
+{
+    create i64 %result;
+    create i32 %idx;
+    create i64 %addrA;
+    create i64 %addrB;
+    create i64 %valA;
+    create i64 %valB;
+    create i64 %prod;
+
+    mov %result, 0;
+    mov %idx, 0;
+    mov %addrA, %vecA;
+    mov %addrB, %vecB;
+
+    while (%idx LT %dimensions)
+    {
+        mov %valA, i64 (%addrA+0);
+        mov %valB, i64 (%addrB+0);
+        mov %prod, %valA;
+        mul %prod, %valB;
+        add %result, %prod;
+
+        add %addrA, 8;
+        add %addrB, 8;
+        add %idx, 1;
+    }
+
+    nop;
+}
+
+void MemoryFill(i64 %dstPtr, i32 %size, i64 %value)
+{
+    create i32 %idx;
+    create i64 %addr;
+
+    mov %idx, 0;
+    mov %addr, %dstPtr;
+
+    while (%idx LT %size)
+    {
+        # Write the value at current address
+        mov %addr, %dstPtr;
+        add %addr, %idx;
+        add %idx, 1;
+    }
+
+    nop;
+}
+
+i64 BitwiseMixer(i64 %input, i64 %key, i32 %rounds)
+{
+    create i64 %state;
+    create i32 %round;
+    create i64 %temp;
+
+    mov %state, %input;
+    mov %round, 0;
+
+    while (%round LT %rounds)
+    {
+        # Forward mixing
+        mov %temp, %state;
+        shl %temp, 13;
+        xor %state, %temp;
+
+        mov %temp, %state;
+        shr %temp, 7;
+        xor %state, %temp;
+
+        mov %temp, %state;
+        shl %temp, 17;
+        xor %state, %temp;
+
+        # Key injection
+        xor %state, %key;
+        add %state, %round;
+
+        # Conditional path
+        if (%state GT 0xFFFFFFFF)
+        {
+            and %state, 0xFFFFFFFF;
+        }
+
+        add %round, 1;
+    }
+
+    label_finalize_mixer:
+    {
+        xor %state, %key;
+        nop;
+    }
+}
+
+i8 ExtractByte(i64 %value, i32 %byteIndex)
+{
+    create i64 %temp;
+    create i32 %shiftAmount;
+    create i8 %result;
+
+    mov %temp, %value;
+    mov %shiftAmount, %byteIndex;
+    mul %shiftAmount, 8;
+
+    shr %temp, %shiftAmount;
+    and %temp, 0xFF;
+    mov %result, %temp;
+
+    nop;
+}
+
+void ProcessArray(i64 %arrayPtr, i32 %size, i64 %mask, i32 %threshold)
+{
+    create i32 %idx;
+    create i64 %addr;
+    create i64 %val;
+    create i64 %processed;
+    create i32 %aboveCount;
+    create i32 %belowCount;
+
+    mov %idx, 0;
+    mov %addr, %arrayPtr;
+    mov %aboveCount, 0;
+    mov %belowCount, 0;
+
+    while (%idx LT %size)
+    {
+        mov %val, i64 (%addr+0);
+        mov %processed, %val;
+        and %processed, %mask;
+
+        if (%processed GT %threshold)
+        {
+            add %aboveCount, 1;
+            shr %processed, 1;
+        }
+        else if (%processed LT %threshold)
+        {
+            add %belowCount, 1;
+            shl %processed, 1;
+        }
+        else
+        {
+            xor %processed, 0xAAAA;
+        }
+
+        add %addr, 8;
+        add %idx, 1;
+    }
+
+    # Summary label
+    label_summary:
+    {
+        if (%aboveCount GT %belowCount)
+        {
+            nop;
+        }
+        else
+        {
+            nop;
+        }
+    }
+}
+
+i64 AccumulateWithStride(i64 %basePtr, i32 %count, i64 %stride)
+{
+    create i64 %accum;
+    create i32 %idx;
+    create i64 %addr;
+    create i64 %val;
+
+    mov %accum, 0;
+    mov %idx, 0;
+    mov %addr, %basePtr;
+
+    while (%idx LT %count)
+    {
+        mov %val, i64 (%addr+0);
+        add %accum, %val;
+        add %addr, %stride;
+        add %idx, 1;
+    }
+
+    label_return:
+    {
+        and %accum, 0xFFFFFFFF;
+        nop;
+    }
+}
+
+void ComplexTransform(i64 %srcPtr, i64 %dstPtr, i32 %length, i64 %key, i32 %mode)
+{
+    create i32 %idx;
+    create i64 %srcAddr;
+    create i64 %dstAddr;
+    create i64 %val;
+    create i64 %transformed;
+    create i64 %temp;
+
+    mov %idx, 0;
+    mov %srcAddr, %srcPtr;
+    mov %dstAddr, %dstPtr;
+
+    while (%idx LT %length)
+    {
+        mov %val, i64 (%srcAddr+0);
+        mov %transformed, %val;
+
+        if (%mode EQ 0)
+        {
+            # XOR mode
+            xor %transformed, %key;
+        }
+        else if (%mode EQ 1)
+        {
+            # Shift mode
+            mov %temp, %transformed;
+            shl %temp, 5;
+            xor %transformed, %temp;
+            shr %transformed, 3;
+            add %transformed, %key;
+        }
+        else if (%mode EQ 2)
+        {
+            # Mix mode
+            mov %temp, %key;
+            and %temp, 0xFF;
+            xor %transformed, %temp;
+            shl %transformed, 1;
+            and %transformed, 0xFFFFFFFF;
+        }
+        else
+        {
+            # Default: add
+            add %transformed, %key;
+            and %transformed, 0xFFFFFFFF;
+        }
+
+        # Inner conditional
+        if (%transformed GT 0xFFFF)
+        {
+            and %transformed, 0xFFFF;
+        }
+
+        add %srcAddr, 8;
+        add %dstAddr, 8;
+        add %idx, 1;
+    }
+
+    label_complete:
+    {
+        nop;
+    }
+}
+

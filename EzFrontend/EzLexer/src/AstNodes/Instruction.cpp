@@ -43,18 +43,11 @@ std::string Instruction::getAsStr(AstNodeStringMode mode) const
     return std::move(res);
 }
 
-CallInstruction::CallInstruction(TypedPoolSlice<AstNode> *params, std::string_view calleeName, std::string_view returnType) :
-    m_calleeName(std::move(calleeName)), m_returnType(std::move(returnType)), Instruction(params, "call")
-{
-}
-
-const std::string_view &CallInstruction::getCalleeName() const { return m_calleeName; }
-
-const std::string_view &CallInstruction::getReturnType() const { return m_returnType; }
+CallInstruction::CallInstruction(TypedPoolSlice<AstNode> *params) : Instruction(params, "call") {}
 
 std::string CallInstruction::getAsStr(AstNodeStringMode mode) const
 {
-    std::string res = std::format("@Call(type: {} name: {}) {{\n", m_returnType, m_calleeName);
+    std::string res = std::format("@Call(type: {} name: {}) {{\n", "", "");
 
     if (mode == AstNodeStringMode::Debug)
     {

@@ -1,3 +1,16 @@
+/**
+ * @file AstLowererVisitor.h
+ * @brief Top-level AST visitor that orchestrates the AST-to-MIR lowering pass.
+ *
+ * AstLowererVisitor walks a fully-annotated AST (after symbol definition,
+ * resolution, and type checking) and dispatches each node to its
+ * corresponding GenericLowerer subclass (ModuleLowerer, InstructionLowerer,
+ * IfLowerer, WhileLowerer, BreakLowerer, ContinueLowerer, etc.).
+ *
+ * The visitor owns a shared LoweringContext that provides block/operand
+ * stacks, loop-context management, and access to the MIR emitter
+ * infrastructure.
+ */
 #ifndef EZPACKER_ASTLOWERERVISITOR_H
 #define EZPACKER_ASTLOWERERVISITOR_H
 

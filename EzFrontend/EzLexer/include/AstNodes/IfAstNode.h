@@ -1,3 +1,12 @@
+/**
+ * @file IfAstNode.h
+ * @brief AST node for `if / else if / else` control-flow.
+ *
+ * An IfAstNode owns a ConditionAstNode, a true-branch CodeScope, and an
+ * optional false-branch.  The false-branch may be another IfAstNode
+ * (representing `else if`) or a plain CodeScope (representing `else`).
+ * When no else/else-if exists the false-branch is nullptr.
+ */
 #ifndef EZPACKER_IFASTNODE_H
 #define EZPACKER_IFASTNODE_H
 

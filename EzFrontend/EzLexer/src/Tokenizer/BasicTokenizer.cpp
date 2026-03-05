@@ -1,17 +1,19 @@
 #include "tokenizer/BasicTokenizer.h"
 
 BasicTokenizer::BasicTokenizer(const std::shared_ptr<ErrorCollector> &errorCollector,
-                               const std::shared_ptr<SourceManager> &sourceManager,
-                               const std::string &source) :
-    m_buffer(nullptr), m_address(0), m_bufferSize(0), m_col(0), m_line(0), m_errorCollector(errorCollector),
-    m_sourceManager(sourceManager), m_source(source)
+                               const std::shared_ptr<SourceManager> &sourceManager) :
+    m_buffer(nullptr), m_address(0), m_bufferSize(0), m_col(0), m_line(0), m_sourceId(0),
+    m_errorCollector(errorCollector), m_sourceManager(sourceManager)
 {
 }
 
-bool BasicTokenizer::tokenizeBuffer(char *buffer, size_t address, size_t bufferSize)
+bool BasicTokenizer::tokenizeBuffer(size_t address, size_t sourceId)
 {
+    std::string_view buffer = m_sourceManager->getSourceContent(sourceId);
     m_errorCollector->beginScope();
-    if (!buffer || address >= bufferSize)
+
+    size_t buffSize = buffer.size();
+    if (address >= buffSize)
     {
         m_errorCollector->onError(ErrorSeverity::Fatal,
                                   "Could not tokenizeBuffer because buffer, address or buffer size is invalid",
@@ -20,16 +22,16 @@ bool BasicTokenizer::tokenizeBuffer(char *buffer, size_t address, size_t bufferS
         return false;
     }
 
-    m_buffer = buffer;
+    m_buffer = (char *)buffer.data();
     m_address = address;
-    m_bufferSize = bufferSize;
+    m_bufferSize = buffSize - address;
     m_col = m_line = 0;
     m_tokens.clear();
 
     while (m_address < m_bufferSize)
     {
         _TokenType type = _TokenType::Invalid;
-        if (!tokenizeSingle(buffer, m_bufferSize, type))
+        if (!tokenizeSingle(m_buffer, m_bufferSize, type))
         {
             m_errorCollector->onError(ErrorSeverity::Fatal, "Unexpected token", "Tokenizer");
             m_errorCollector->endScope(ErrorAction::Commit); // If there was any error, commit it.
@@ -68,7 +70,7 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
 
     tokenType = _TokenType::Invalid;
     TokenInformation information{ .m_type = tokenType,
-                                  .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_source),
+                                  .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_sourceId),
                                   .m_str = "" };
 
     switch (ch)
@@ -189,6 +191,13 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
 
             break;
         }
+        case '\t':
+        {
+            information.m_type = _TokenType::Tab;
+            information.m_str += ch;
+
+            break;
+        }
         case '"':
         {
             bool isEscaping = false;
@@ -298,7 +307,7 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
             {
                 // We don't have a token for the character, throw error.
                 m_errorCollector->onError(ErrorSeverity::Fatal,
-                                          "Unrecognised token",
+                                          std::format("Unrecognised token: {}", ch),
                                           "Tokenizer",
                                           information.m_sourceReference);
                 return false;
@@ -317,7 +326,7 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
 {
     char ch = peek();
     TokenInformation information{ .m_type = _TokenType::Identifier,
-                                  .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_source),
+                                  .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_sourceId),
                                   .m_str = "" };
 
     if (!TokenizerHelpers::isLetter(ch) && !TokenizerHelpers::isSpecial(ch))
@@ -341,6 +350,7 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
         information.m_sourceReference.m_length++;
     }
 
+    // TODO: Ensure proper handling of reserver keywords.
     std::string identifierToLower = StrToLower(information.m_str);
     if (identifierToLower == "break")
     {
@@ -353,6 +363,10 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
     else if (identifierToLower == "if")
     {
         information.m_type = _TokenType::If;
+    }
+    else if (identifierToLower == "include")
+    {
+        information.m_type = _TokenType::Include;
     }
     else if (identifierToLower == "else")
     {
@@ -372,7 +386,7 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
 bool BasicTokenizer::tokenizeNumber(char *buffer, size_t bufferSize, _TokenType &token)
 {
     TokenInformation information{ .m_type = _TokenType::NumberInt,
-                                  .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_source),
+                                  .m_sourceReference = m_sourceManager->createReference(m_col, 1, m_line, m_sourceId),
                                   .m_str = "" };
 
     bool canBeHex = peek() == '0';

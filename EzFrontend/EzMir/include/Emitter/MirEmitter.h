@@ -1,3 +1,15 @@
+/**
+ * @file MirEmitter.h
+ * @brief High-level builder API for emitting typed MIR instructions.
+ *
+ * MirEmitter wraps MirEmitterContext and provides convenient, type-safe
+ * helper methods — one per opcode (emitMOV, emitADD, emitJMP, …) — that
+ * validate operand counts against the instruction-set metadata at call time.
+ * It also offers createRegister() for allocating new virtual registers.
+ *
+ * All emitted instructions are automatically appended to whatever block the
+ * underlying MirEmitterContext is currently bound to.
+ */
 #ifndef EZPACKER_MIREMITTER_H
 #define EZPACKER_MIREMITTER_H
 

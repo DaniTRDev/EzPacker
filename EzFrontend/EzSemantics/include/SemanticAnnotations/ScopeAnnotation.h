@@ -1,3 +1,12 @@
+/**
+ * @file ScopeAnnotation.h
+ * @brief Annotation for AST nodes that own a lexical scope.
+ *
+ * Attached to nodes like CodeScope during SymbolDefinitionVisitor.  It
+ * holds a shared_ptr<Scope> so that later passes (resolution, type
+ * checking, lowering) can re-enter the correct scope when they visit the
+ * annotated node.
+ */
 #ifndef EZPACKER_SCOPEANNOTATION_H
 #define EZPACKER_SCOPEANNOTATION_H
 
@@ -19,7 +28,7 @@ class ScopeAnnotation : public IAstNodeAnnotation
      * Creates the annotation linked to the given scope.
      * @param scope
      */
-    ScopeAnnotation(const std::shared_ptr<Scope> &scope);
+    ScopeAnnotation(Scope *scope);
 
     /**
      * Returns "ScopeAnnotation".
@@ -31,16 +40,16 @@ class ScopeAnnotation : public IAstNodeAnnotation
      * Sets the owned scope of this annotation.
      * @param scope
      */
-    void setOwnedScope(const std::shared_ptr<Scope> &scope);
+    void setOwnedScope(Scope *scope);
 
     /**
      * Returns the owned scope of this annotation.
-     * @return const std::shared_ptr<Scope> &
+     * @return Scope *
      */
-    const std::shared_ptr<Scope> &getOwnedScope();
+    Scope *getOwnedScope();
 
   private:
-    std::shared_ptr<Scope> m_ownedScope;
+    Scope * m_ownedScope;
 };
 
 #endif // EZPACKER_SCOPEANNOTATION_H

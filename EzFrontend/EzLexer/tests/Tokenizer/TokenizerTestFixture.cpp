@@ -26,8 +26,8 @@ bool TokenizerTestFixture::expectTokenCount(size_t count)
 
 bool TokenizerTestFixture::expectTokenizeResult(const std::string &content)
 {
-    m_sourceManager->addSourceContent("TEST_SOURCE", content);
-    return m_tokenizer->tokenizeBuffer((char *)content.data(), 0, content.size());
+    size_t id = m_sourceManager->addSourceContent("TEST_SOURCE", content);
+    return m_tokenizer->tokenizeBuffer(0, id);
 }
 
 bool TokenizerTestFixture::expectTokenType(_TokenType type)
@@ -83,6 +83,6 @@ std::shared_ptr<BasicTokenizer> TokenizerTestFixture::createBasicTokenizer()
             },
             this);
 
-    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager, "TEST_SOURCE");
+    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager);
     return m_tokenizer;
 }

@@ -1,3 +1,12 @@
+/**
+ * @file ParserBatch.h
+ * @brief Ordered collection of parsers that tries each one until a match is found.
+ *
+ * ParserBatch is the main entry point for parsing a piece of source code.
+ * Parsers are tried in registration order; for each one the stream position
+ * and error scope are saved, and automatically rolled back on failure.
+ * The first parser that produces a non-null AstNode wins.
+ */
 #ifndef EZPACKER_PARSERBATCH_H
 #define EZPACKER_PARSERBATCH_H
 

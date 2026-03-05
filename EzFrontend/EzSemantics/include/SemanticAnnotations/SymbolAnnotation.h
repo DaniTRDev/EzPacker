@@ -1,3 +1,12 @@
+/**
+ * @file SymbolAnnotation.h
+ * @brief Annotation that links an AST node to its defining Symbol.
+ *
+ * Attached to Variable, Label, and Module nodes after
+ * SymbolDefinitionVisitor creates their symbols.  Later passes and the
+ * lowerer read this annotation to look up type information, MIR IDs, and
+ * other symbol metadata.
+ */
 #ifndef EZPACKER_SYMBOLANNOTATION_H
 #define EZPACKER_SYMBOLANNOTATION_H
 

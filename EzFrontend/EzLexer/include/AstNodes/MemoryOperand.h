@@ -1,3 +1,17 @@
+/**
+ * @file MemoryOperand.h
+ * @brief AST nodes for the various memory-addressing modes.
+ *
+ * MemoryOperandAstNode is the abstract base class; concrete subclasses are:
+ *   - BaseDisplacementMemory              — `type (%base + disp)`
+ *   - IndexScaleMemory                    — `type (, %idx, scale)`
+ *   - BaseIndexScaleDisplacementMemory    — combines base+disp with idx*scale
+ *   - DirectMemory                        — `type (address)`
+ *
+ * Each variant records the referenced data type (e.g. i64, i8) and the
+ * addressing components.  The MemoryLowerer translates these into MirMemory
+ * operands during the AST-to-MIR lowering phase.
+ */
 #ifndef EZPACKER_MEMORYOPERAND_H
 #define EZPACKER_MEMORYOPERAND_H
 

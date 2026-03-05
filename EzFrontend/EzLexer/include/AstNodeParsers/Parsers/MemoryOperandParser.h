@@ -1,3 +1,17 @@
+/**
+ * @file MemoryOperandParser.h
+ * @brief Parsers for the various memory-addressing modes.
+ *
+ * Four parser classes live inside the MemoryOperandParser namespace,
+ * each recognising a different addressing pattern:
+ *   - BaseDisplacement            — `type (%base + disp)`
+ *   - BaseIndexScaleDisplacement  — `type (%base, %idx, scale, disp)`
+ *   - IndexScale                  — `type (, %idx, scale)`
+ *   - Direct                      — `type (address)`
+ *
+ * The top-level MemoryOperandParser tries each sub-parser in order and
+ * returns the first match as a MemoryOperandAstNode subclass.
+ */
 #ifndef EZPACKER_MEMORYOPERANDPARSER_H
 #define EZPACKER_MEMORYOPERANDPARSER_H
 

@@ -34,10 +34,14 @@ void BasicParsingContext::consume()
         m_lastSourceRef = m_tokens[m_currentPos].m_sourceReference;
         m_currentPos++;
 
-        if (canPeek() && peek().m_type == _TokenType::Comment)
+        if (canPeek())
         {
-            // If there's a comment, we skip it.
-            consume();
+            bool shouldSkip = (peek().m_type == _TokenType::Comment) || (peek().m_type == _TokenType::NewLine) ||
+                    (peek().m_type == _TokenType::Tab);
+
+            // If there's a comment, a tab or a newline, we skip it.
+            if (shouldSkip)
+                consume();
         }
     }
 }

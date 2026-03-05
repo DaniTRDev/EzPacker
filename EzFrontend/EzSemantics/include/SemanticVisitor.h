@@ -1,3 +1,12 @@
+/**
+ * @file SemanticVisitor.h
+ * @brief Thin base class that equips an AstNodeVisitor with a shared
+ *        BasicSemanticContext.
+ *
+ * Every semantic pass (SymbolDefinitionVisitor, SymbolAndTypeResolverVisitor,
+ * TypeCheckVisitor) and the AstLowererVisitor inherit from SemanticVisitor
+ * so they all share the same setSemanticContext / getSemanticContext plumbing.
+ */
 #ifndef EZPACKER_SEMANTICVISITOR_H
 #define EZPACKER_SEMANTICVISITOR_H
 

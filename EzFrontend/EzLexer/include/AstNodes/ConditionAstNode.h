@@ -1,3 +1,12 @@
+/**
+ * @file ConditionAstNode.h
+ * @brief AST node for a binary comparison expression used in `if` and `while`.
+ *
+ * A ConditionAstNode holds a left operand, a right operand, and a
+ * ConditionComparisonType (EQ, NE, GT, GE, LT, LE).  During lowering the
+ * ConditionLowerer translates this into a CMP instruction followed by the
+ * appropriate conditional jump.
+ */
 #ifndef EZPACKER_CONDITIONASTNODE_H
 #define EZPACKER_CONDITIONASTNODE_H
 

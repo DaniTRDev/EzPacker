@@ -1,3 +1,16 @@
+/**
+ * @file TypeCastAnnotation.h
+ * @brief Annotation for variables used with a type different from their declared type.
+ *
+ * When a variable declared as `i64` is used in a context that expects `i32`
+ * (e.g. `add i32 %myVar, 2;`), the TypeCheckVisitor replaces the plain
+ * SymbolAnnotation with a TypeCastAnnotation that records both the original
+ * symbol and the target (casted) Type.  The lowerer later reads this to
+ * emit the correct cast instruction (TRUNC, ZEXT, SEXT, BITCAST, …).
+ *
+ * Convenience query methods (isExpansion, isTruncation, isIntegerToDouble,
+ * etc.) help downstream code decide which cast opcode to use.
+ */
 #ifndef EZPACKER_TYPECASTANNOTATION_H
 #define EZPACKER_TYPECASTANNOTATION_H
 

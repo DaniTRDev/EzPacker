@@ -1,3 +1,12 @@
+/**
+ * @file ModuleParser.h
+ * @brief Parser for function/module declarations: `returnType Name(params) { body }`.
+ *
+ * Two parser classes live inside the ModuleParser namespace:
+ *   - ModuleHeaderParser — parses the return type, name, and parameter list.
+ *   - ModuleParser       — parses the full declaration (header + body scope).
+ * A Module is the top-level compilation unit in the language.
+ */
 #ifndef EZPACKER_MODULEPARSER_H
 #define EZPACKER_MODULEPARSER_H
 

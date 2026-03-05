@@ -1,3 +1,12 @@
+/**
+ * @file CodeScope.h
+ * @brief AST node for a brace-delimited block of statements: `{ … }`.
+ *
+ * A CodeScope is both an AstNode and an AstNodeContainer — it owns an
+ * ordered list of child expressions (instructions, labels, nested
+ * control-flow, break/continue, etc.).  It serves as the body for labels,
+ * if/else branches, while loops, and module definitions.
+ */
 #ifndef EZPACKER_CODESCOPE_H
 #define EZPACKER_CODESCOPE_H
 

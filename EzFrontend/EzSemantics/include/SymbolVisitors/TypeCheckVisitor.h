@@ -1,3 +1,19 @@
+/**
+ * @file TypeCheckVisitor.h
+ * @brief Third semantic pass — validates type compatibility and structural rules.
+ *
+ * TypeCheckVisitor walks the fully-resolved AST and:
+ *   - Verifies that instruction operand types are compatible (e.g. both
+ *     sides of an ADD must have the same bit-width, or an implicit cast
+ *     must be possible).
+ *   - Replaces a SymbolAnnotation with a TypeCastAnnotation when a variable
+ *     is used with a type different from its declared type.
+ *   - Rejects break/continue statements that appear outside of a while-loop.
+ *   - Validates memory operand types and condition operand types.
+ *
+ * After this pass succeeds the AST is fully validated and ready for
+ * lowering to MIR.
+ */
 #ifndef EZPACKER_TYPECHECKVISITOR_H
 #define EZPACKER_TYPECHECKVISITOR_H
 

@@ -6,7 +6,7 @@ void AstLowererVisitorTestFixture::SetUp()
     m_sourceManager = std::make_shared<SourceManager>();
     m_sourceSinkLogger = std::make_shared<SourceLoggingSink>(m_logger.get());
     m_errorCollector = std::make_shared<ErrorCollector>();
-    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager, "TEST_LOWERING");
+    m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager);
     m_semanticContext = std::make_shared<BasicSemanticContext>(m_errorCollector, m_sourceManager);
 
     // MIR infrastructure

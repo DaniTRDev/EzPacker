@@ -1,3 +1,12 @@
+/**
+ * @file MirFunction.h
+ * @brief Function-level container in the MIR: entry point, blocks, parameters, return type.
+ *
+ * A MirFunction groups an ordered list of basic blocks into a single
+ * callable unit.  It has a designated entry-point block, a return-type ID,
+ * a unique function ID, and a parameter operand list.  Functions are
+ * created through MirEmitterContext::createFunction().
+ */
 #ifndef EZPACKER_MIRFUNCTION_H
 #define EZPACKER_MIRFUNCTION_H
 
@@ -8,12 +17,12 @@ class MirFunction
 {
   public:
     /**
-     *
-     * @param entryPoint
-     * @param id
-     * @param returnTypeId
-     * @param blocks
-     * @param parameters
+     * Creates a function with the given entry point, ID, return type, block list, and parameters.
+     * @param entryPoint   The first block to execute when the function is called.
+     * @param id           Unique identifier for this function within the compilation.
+     * @param returnTypeId The MIR type ID representing the function's return type.
+     * @param blocks       Linked list of all basic blocks owned by this function.
+     * @param parameters   Linked list of operands representing the function's parameters.
      */
     MirFunction(MirBlock *entryPoint,
                 size_t id,
