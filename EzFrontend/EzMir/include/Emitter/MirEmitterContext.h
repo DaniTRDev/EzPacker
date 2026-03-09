@@ -1,15 +1,20 @@
 /**
  * @file MirEmitterContext.h
- * @brief Central bookkeeping for all MIR artefacts: blocks, functions,
- *        instructions, operands, types, IDs, and the "current block" cursor.
+ * @brief Central bookkeeping for MIR allocation, IDs, active bindings, and arena pools.
  *
- * MirEmitterContext owns the arena pools that back every MIR object and
- * provides factory methods (createBlock, createInstruction, createFunction,
- * createType, createId).  It also maintains the "currently bound block" so
- * that newly created instructions are automatically appended to it.
+ * `MirEmitterContext` is the owning hub behind EzMir construction. It stores
+ * every arena/pool used to allocate MIR entities and keeps track of the
+ * currently active block/function so emitters can append instructions and
+ * blocks automatically.
  *
- * The special constant MIRID_INVALID (0) is defined here and used
- * throughout the compiler to signal an unlinked or missing MIR ID.
+ * Key responsibilities:
+ *   - issue monotonic non-zero MIR IDs,
+ *   - allocate blocks, instructions, functions, types, and global data,
+ *   - remember the currently bound block,
+ *   - remember the currently active function so new blocks join it,
+ *   - map MIR type IDs back to `MirType*` for later lookup.
+ *
+ * `MIRID_INVALID` is reserved as the sentinel "no MIR object" value.
  */
 #ifndef EZPACKER_MIREMITTERCONTEXT_H
 #define EZPACKER_MIREMITTERCONTEXT_H
@@ -20,142 +25,131 @@
 #include "Type/MirType.h"
 
 using MirId = size_t;
-constexpr MirId MIRID_INVALID = 0; // Easy error checking.
+constexpr MirId MIRID_INVALID = 0; // Sentinel used for invalid/unlinked MIR IDs.
 
 class MirEmitterContext : public ErrorEmitter
 {
   public:
     /**
-     * Creates the object with default values.
-     * @param errorCollector
-     * @param sourceManager
+     * Creates an empty MIR context.
+     *
+     * IDs start at `1`, no block or function is initially bound, and the root
+     * slices for functions and types are created eagerly.
      */
     MirEmitterContext(const std::shared_ptr<ErrorCollector> &errorCollector,
                       const std::shared_ptr<SourceManager> &sourceManager);
 
     /**
-     * Binds the context to the given block.
-     * @param block
-     * @return bool
+     * Binds subsequent instruction creation to `block`.
+     *
+     * After a successful bind, `createInstruction()` automatically appends new
+     * instructions to the block's instruction slice.
+     *
+     * @return `false` when `block` is `nullptr`; otherwise `true`.
      */
     bool bindToBlock(MirBlock *block);
 
     /**
-     * Creates a block and returns the allocated pointer to the new block.
-     * @return MirBlock *
+     * Allocates a new empty block.
+     *
+     * If a function is currently active, the block is also appended to that
+     * function's block list. The new block is not automatically bound as the
+     * current block; callers must bind it explicitly if they want to emit into
+     * it.
      */
     MirBlock *createBlock();
 
     /**
-     * Returns the block this context is bound to at the moment of the call.
-     * @return MirBlock *
+     * Returns the block currently bound for instruction emission, or `nullptr`
+     * if no block is bound.
      */
     MirBlock *getCurrentBoundBlock() const;
 
     /**
-     * Creates an id and returns it.
-     * @return MirId
+     * Returns a fresh, monotonic, non-zero MIR ID.
      */
     MirId createId();
 
     /**
-     * Creates an empty instruction with the given opcode.
-     * @param opcode
-     * @return opcode
+     * Creates a new instruction with an empty operand slice.
+     *
+     * If a block is currently bound, the instruction is appended to that
+     * block's instruction list immediately.
      */
     MirInstruction *createInstruction(MirInstructionOpCode opcode);
 
     /**
-     * Creates a function, appends it to the context and sets it as the active function. It also updates current
-     * function and creates the entry point block for the function and sets it as the current one.
-     * @param returnTypeId
-     * @return MirFunction *
+     * Creates a new function and makes it the active function in the context.
+     *
+     * On success the function receives:
+     *   - a fresh entry-point block,
+     *   - an initially one-element block list containing that entry point,
+     *   - an empty parameter list,
+     *   - and a fresh function ID.
+     *
+     * `returnTypeId` must be non-zero, otherwise a fatal error is emitted and
+     * `nullptr` is returned.
      */
     MirFunction *createFunction(size_t returnTypeId);
 
     /**
-     * Creates a type with the given kind, subtypes and name. The type is added to the context and returned.
-     * @param kind
-     * @param types
-     * @param name
-     * @return MirType *
+     * Creates and registers a new MIR type.
+     *
+     * The created type is appended to the context's type list and inserted into
+     * the ID -> type lookup map. An empty `name` is rejected with a fatal
+     * diagnostic and results in `nullptr`.
      */
     MirType *createType(MirTypeKind kind, TypedPoolSlice<MirType> *types, const std::string_view &name);
 
     /**
-     * Returns the MIR type with the given ID, or nullptr if no type with that ID exists in the context.
-     * @param id
-     * @return MirType *
+     * Returns the MIR type for `id`.
+     *
+     * `id` must be non-zero and present in the context's type map. Otherwise a
+     * fatal diagnostic is emitted and `nullptr` is returned.
      */
     MirType *getMirTypeById(size_t id);
-    
-    /**
-     * Returns the pool of blocks.
-     * @return TypedPool.
-     */
+
+    /** Returns the arena pool used to allocate `MirBlock` objects and block slices. */
     TypedPool *getBlockPool();
 
-    /**
-     * Returns the pool of global data entries.
-     * @return TypedPool *
-     */
+    /** Returns the arena pool used to allocate `MirGlobalDataEntry` objects. */
     TypedPool *getDataEntryPool();
 
-    /**
-     * Returns the pool of functions.
-     * @return TypedPool.
-     */
+    /** Returns the arena pool used to allocate `MirFunction` objects and function lists. */
     TypedPool *getFunctionPool();
 
-    /**
-     * Returns the pool of function parameters.
-     * @return  TypedPool *
-     */
+    /** Returns the arena pool used for function-parameter operand slices. */
     TypedPool *getFunctionParameterPool();
 
-    /**
-     * Returns the pool of instructions.
-     * @return TypedPool
-     */
+    /** Returns the arena pool used to allocate `MirInstruction` objects and slices. */
     TypedPool *getInstructionPool();
 
-    /**
-     * Returns the pool of instruction operands.
-     * @return TypedPool *
-     */
+    /** Returns the arena pool used to allocate instruction operands and operand slices. */
     TypedPool *getOperandPool();
 
-    /**
-     *  Returns the pool of the data stored in each entry.
-     * @return TypedArrayPool<uint8_t> *
-     */
+    /** Returns the byte-array pool used to store copied global-data payloads. */
     TypedArrayPool<uint8_t> *getEntryDataPool();
 
-    /**
-     * Returns the type pool.
-     * @return TypedPool *
-     */
+    /** Returns the arena pool used to allocate `MirType` objects and type slices. */
     TypedPool *getTypePool();
 
   private:
-    MirId m_currentId; // 0 == invalid.
+    MirId m_currentId; // Next MIR ID to issue; 0 is reserved as invalid.
 
     MirBlock *m_currentBoundBlock;
     MirFunction *m_currentBoundFunction;
 
     TypedPool m_blockPool;
-    TypedPool m_dataEntryPool; // Pool to contain the entry itself, the entry data is independent.
+    TypedPool m_dataEntryPool; // Allocates MirGlobalDataEntry objects; raw bytes live in m_dataPool.
     TypedPool m_functionPool;
     TypedPool m_functionParameterPool;
     TypedPool m_instructionPool;
     TypedPool m_operandPool;
     TypedPool m_typePool;
-    TypedArrayPool<uint8_t> m_dataPool;          // Pool to contain the data of an entry.
-    TypedPoolSlice<MirFunction> *m_functionList; // Linked list of functions managed by this context.
-    TypedPoolSlice<MirType> *m_typeList; // Pool to contain the types used in the module, this is not managed by this
-                                         // context but it is needed for type checking and function creation.
-    std::map<size_t, MirType *> m_idToTypeMap; // Map to link a MIR type ID to the corresponding MIR type, this is used
-                                               // to make type checking faster.
+    TypedArrayPool<uint8_t> m_dataPool;          // Stores copied bytes for global data entries.
+    TypedPoolSlice<MirFunction> *m_functionList; // Root list of functions created in this context.
+    TypedPoolSlice<MirType> *m_typeList;         // Root list of MIR types created in this context.
+    std::map<size_t, MirType *> m_idToTypeMap;   // Fast lookup from MIR type ID to MirType.
 };
 
 #endif // EZPACKER_MIREMITTERCONTEXT_H

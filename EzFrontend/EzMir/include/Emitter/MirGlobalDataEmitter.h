@@ -2,12 +2,13 @@
  * @file MirGlobalDataEmitter.h
  * @brief Builder API for emitting global/static data entries (.data, .rdata, .bss).
  *
- * MirGlobalDataEmitter creates MirGlobalDataEntry objects — each one
- * representing an initialized or uninitialized blob of bytes that lives at
- * a fixed address in the final binary.  Convenience wrappers exist for
- * common cases: 64-bit integers, doubles, and null-terminated strings.
- * The data is copied into an internal arena so the caller may free the
- * source buffer immediately after the call.
+ * `MirGlobalDataEmitter` creates `MirGlobalDataEntry` records backed by memory
+ * owned by `MirEmitterContext`. Each entry receives a fresh MIR ID and stores
+ * a copied byte buffer inside the context's byte-array pool, so callers may
+ * discard the original source data immediately after emission.
+ *
+ * Passing `nullptr` to `createGlobalData()` produces an entry marked as
+ * uninitialized; the backing buffer is still allocated and zero-filled.
  */
 #ifndef EZPACKER_MIRDATAEMITTER_H
 #define EZPACKER_MIRDATAEMITTER_H
@@ -17,72 +18,66 @@
 
 struct MirGlobalDataEntry
 {
-    bool m_isReadOnly;
-    bool m_uninitialized;
-    size_t m_entryId;
-    size_t m_dataSize;
-    ConstantArray<uint8_t> m_data;
+    bool m_isReadOnly;      // True for read-only constants / literal data.
+    bool m_uninitialized;   // True when the original payload pointer was null.
+    size_t m_entryId;       // Unique MIR ID of this global-data entry.
+    size_t m_dataSize;      // Size of the stored byte payload.
+    ConstantArray<uint8_t> m_data; // Arena-managed byte storage for the payload.
 };
 
 class MirGlobalDataEmitter
 {
   public:
     /**
-     * Creates the emitter and attaches it to the given context. If there was any error while attaching, an exception is
-     * thrown.
-     * @param ctx
+     * Creates an emitter attached to `ctx`.
+     *
+     * Construction throws if attachment fails.
      */
     MirGlobalDataEmitter(MirEmitterContext *ctx);
 
     /**
-     * Attaches to the given context and returns true if succeeded. If there was any error, an exception is thrown.
-     * @param ctx
-     * @return bool
+     * Attaches the emitter to a context.
+     *
+     * @return `false` when `ctx` is null; otherwise `true`.
      */
     bool attachToContext(MirEmitterContext *ctx);
 
     /**
-     * Returns the context this emitter is attached to.
-     * @return MirEmitterContext *
+     * Returns the attached context.
      */
     MirEmitterContext *getContext();
-    
+
     /**
-     * Emits an initialized global variable (.data or .rdata section equivalent). Important: Data will be COPIED into
-     * the entry. This makes the caller be able to free the data right after the call yet the emitter will still know
-     * what the content is. If data is nullptr, the entry will be marked as "uninitialized".
-     * @param data
-     * @param size
-     * @param isReadOnly
-     * @return MirGlobalDataEntry *
+     * Creates a raw global-data entry.
+     *
+     * The byte range `[data, data + size)` is copied into context-owned
+     * storage. If `data` is `nullptr`, the entry is flagged as uninitialized
+     * and the allocated storage is zero-filled.
+     *
+     * @param data       Source bytes to copy, or `nullptr` for an
+     *                   uninitialized/zero-filled entry.
+     * @param size       Number of bytes to allocate and store.
+     * @param isReadOnly Whether the entry should be treated as read-only.
      */
     MirGlobalDataEntry *
     createGlobalData(const void *data, size_t size, bool isReadOnly = true);
 
     /**
-     * Creates a global variable whose type is double. This is a wrapper around createGlobalData.
-     * @param val
-     * @return MirGlobalDataEntry *
+     * Convenience wrapper that emits a read-only `double` constant.
      */
     MirGlobalDataEntry *createGlobalFloatingPoint(double val);
 
     /**
-     * Creates a global variable whose type is integer. This is a wrapper around createGlobalData.
-     * @param val
-     * @return MirGlobalDataEntry *
+     * Convenience wrapper that emits a read-only `uint64_t` constant.
      */
     MirGlobalDataEntry *createGlobalInteger(uint64_t val);
 
     /**
-     * Emits an initialized global string (.data or .rdata section equivalent). Important: Data will be COPIED into
-     * the entry. This makes the caller be able to free the data right after the call yet the emitter will still know
-     * what the content is.
+     * Emits a string as a global byte array.
      *
-     * If includeNullTerminator is set, the global string will have a null terminator.
-     * @param str
-     * @param includeNullTerminator
-     * @param isReadOnly
-     * @return MirGlobalDataEntry *
+     * The string contents are copied into context-owned storage. When
+     * `includeNullTerminator` is true, one extra `\0` byte is appended after
+     * the copied characters.
      */
     MirGlobalDataEntry *
     createGlobalString(const std::string_view &str, bool includeNullTerminator = true, bool isReadOnly = true);

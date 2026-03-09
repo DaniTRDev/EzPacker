@@ -1,10 +1,11 @@
 /**
  * @file EzMirCommon.h
- * @brief Precompiled common includes for the EzMir library.
+ * @brief Shared foundational includes for the EzMir library.
  *
- * Pulls in the C++ standard library headers, libtommath, and EzCore
- * foundations that every EzMir source file needs.  This header is
- * included (directly or transitively) by every file in the library.
+ * This header centralizes the standard-library, third-party, and EzCore
+ * includes needed across EzMir. The module uses it as its precompiled header,
+ * so most public/private EzMir files include it either directly or
+ * transitively.
  */
 #ifndef EZPACKER_EZMIRCOMMON_H
 #define EZPACKER_EZMIRCOMMON_H

@@ -2,14 +2,25 @@
  * @file MirType.h
  * @brief Lightweight, self-contained type representation for the MIR layer.
  *
- * MirType is intentionally decoupled from the semantic-layer Type class.
- * It describes primitive kinds (Integer, FloatingPoint, Pointer, Void) and
- * compound kinds (Array) with an optional list of sub-types.  Every MirType
- * has a unique ID assigned by MirEmitterContext and a human-readable name
- * for debugging.
+ * `MirType` is intentionally decoupled from semantic-layer type objects. It
+ * captures just enough information for MIR construction and later lowering:
+ * a kind (`MirTypeKind`), a unique MIR ID, an optional slice of child types,
+ * and a debug-friendly name.
  *
- * This class is kept trivially destructible so it can live inside a
- * TypedPool arena alongside other MIR objects.
+ * The currently supported kinds are:
+ *   - `Integer`
+ *   - `FloatingPoint`
+ *   - `Pointer`
+ *   - `Array`
+ *   - `Void`
+ *
+ * `subTypes` is used only when a kind needs extra type structure. In the
+ * current implementation this is primarily intended for compound/container
+ * forms such as arrays or pointer targets; primitive and `Void` types usually
+ * leave it null.
+ *
+ * This class should remain trivially destructible so it can live in arena
+ * storage without custom lifetime management.
  */
 #ifndef EZPACKER_MIRTYPE_H
 #define EZPACKER_MIRTYPE_H
@@ -27,59 +38,53 @@ enum class MirTypeKind
 };
 
 /**
- * Represents a type in the MIR (Mid-level Intermediate Representation). This class is completely decoupled from
- * EzSemantics/Scope/Type and is designed to be a simple, self-contained representation of types for the MIR. It can
- * represent basic types (like int, float), compound types (like structs, arrays), and function types. It should be
- * designed to be easily serializable and should not contain any complex logic or dependencies on other parts of the
- * system.
+ * Represents one MIR type record stored in the emitter context's type pool.
  *
- * This class MUST BE KEPT TRIVIALLY DESTRUCTIBLE to allow for efficient storage in containers and easy serialization.
+ * The object is a plain descriptor. It performs no semantic validation on its
+ * own and does not resolve names; callers are expected to build valid type
+ * graphs before referencing them from functions or instructions.
  */
 class MirType
 {
   public:
-    /***
-     * Constructs a MirType with the given kind, id, subTypes and name.
-     * @param kind
-     * @param id
-     * @param subTypes For compound types (like structs, arrays), this can hold the subtypes. For basic types, this can
-     * be null.
-     * @param name
+    /**
+     * Constructs a MIR type descriptor.
+     *
+     * @param kind     High-level classification of the type.
+     * @param id       Unique MIR ID assigned by the context.
+     * @param subTypes Optional child-type slice used by compound kinds.
+     * @param name     Human-readable type name kept for diagnostics/debugging.
      */
     MirType(MirTypeKind kind, size_t id, TypedPoolSlice<MirType> *subTypes, const std::string_view &name);
 
     /**
-     * Returns the kind of the type (e.g., Integer, Float, Pointer, Array, Void).
-     * @return MirTypeKind
+     * Returns the high-level kind of this type.
      */
     MirTypeKind getKind() const;
 
     /**
-     * Returns the unique identifier for the type. This can be used to distinguish between different types, especially
-     * when
-     * @return size_t
+     * Returns the unique MIR ID of this type.
      */
     size_t getId() const;
 
     /**
-     * Returns the subtypes of this type if it is a compound type (like struct or array). For basic types, this will be
-     * @return TypedPoolSlice<MirType> *
+     * Returns the child-type slice for compound kinds, or `nullptr` when this
+     * type has no subordinate types.
      */
     TypedPoolSlice<MirType> *getSubTypes() const;
 
     /**
-     * Returns the name of the type (e.g., "int", "float", "MyStruct"). This is primarily for debugging and
-     * serialization purposes.
-     * @return const std::string_view &
+     * Returns the human-readable name associated with this type.
+     *
+     * This name is informational; identity is determined by `getId()`.
      */
     const std::string_view &getName() const;
 
   private:
-    MirTypeKind m_kind;                  // The kind of the type.
-    size_t m_id;                         // Unique identifier for the type
-    TypedPoolSlice<MirType> *m_subTypes; // For compound types (like structs, arrays), this can hold the subtypes. For
-                                         // basic types, this can be null.
-    std::string_view m_name;             // Name of the type (e.g., "int", "float", "MyStruct")
+    MirTypeKind m_kind;                  // High-level classification of the type.
+    size_t m_id;                         // Unique MIR identifier for this type.
+    TypedPoolSlice<MirType> *m_subTypes; // Optional child types for compound kinds.
+    std::string_view m_name;             // Debug/diagnostic name.
 };
 
 #endif // EZPACKER_MIRTYPE_H

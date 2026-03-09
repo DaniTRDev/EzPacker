@@ -2,10 +2,11 @@
  * @file MirInstruction.h
  * @brief A single MIR instruction: opcode + operand list.
  *
- * Each MirInstruction carries an opcode (MirInstructionOpCode), a linked
- * list of MirOperand values, and the associated metadata (operand count,
- * flags such as IsTerminator, ReadsCPUFlags, etc.).  Instructions live
- * inside a MirBlock and are allocated from an arena pool.
+ * `MirInstruction` is the executable atom stored inside a `MirBlock`. It owns
+ * no heap memory itself; instead, it points at an arena-managed operand slice
+ * created by `MirEmitterContext`. The opcode determines how many operands are
+ * expected and which semantic flags apply, via `MirInstructionMetadata` from
+ * the compile-time instruction catalogue.
  */
 #ifndef EZPACKER_MIRINSTRUCTION_H
 #define EZPACKER_MIRINSTRUCTION_H
@@ -18,39 +19,40 @@ class MirInstruction
 {
   public:
     /**
-     * Creates the instruction with the given opcode and operand list.
-     * @param opcode   The operation this instruction performs.
-     * @param operands Initially-empty slice that will hold operands.
+     * Creates an instruction wrapper around an opcode and its operand slice.
+     *
+     * @param opcode   Opcode describing the operation performed.
+     * @param operands Arena-managed operand slice initially associated with the
+     *                 instruction. Emitters append to this slice later.
      */
     MirInstruction(MirInstructionOpCode opcode, TypedPoolSlice<MirOperand> *operands);
 
     /**
-     * Returns true if this instruction contains at least 1 operand.
-     * @return bool
+     * Returns `true` when the instruction currently stores at least one
+     * operand in its operand slice.
      */
     bool hasOperands() const;
 
     /**
-     * Returns this instruction's metadata.
-     * @return const MirInstructionMetadata &
+     * Returns the metadata entry associated with this instruction's opcode.
+     *
+     * The metadata contains the printable opcode name, expected operand count,
+     * and instruction flags.
      */
     const MirInstructionMetadata &getMetadata() const;
 
     /**
-     * Returns the instruction's operation code.
-     * @return MirInstructionOpCode
+     * Returns this instruction's opcode.
      */
     MirInstructionOpCode getOpCode() const;
 
     /**
-     * Returns the operands of this instruction.
-     * @return TypedPoolSlice<MirOperand> *
+     * Returns the mutable operand slice for this instruction.
      */
     TypedPoolSlice<MirOperand> *getOperands();
 
     /**
-     * Returns the flags of this instruction. Retrieved from metadata.
-     * @return uint32_t
+     * Returns the instruction flags from the opcode metadata.
      */
     uint32_t getFlags() const;
 

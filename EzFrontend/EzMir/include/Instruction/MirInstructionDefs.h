@@ -2,17 +2,17 @@
  * @file MirInstructionDefs.h
  * @brief Compile-time instruction catalogue: opcodes, flags, and metadata.
  *
- * This header uses an X-macro pattern (MirInstructionSet.h) to generate:
- *   - MirInstructionFlags  — bit-field constants describing data-flow
- *     (read/write), operand constraints, type safety, memory semantics,
- *     control-flow properties, and CPU-flag usage for each instruction.
- *   - MirInstructionOpCode — a compact enum listing every opcode.
- *   - MirInstructionMetadata / g_MirInstructionSet[] — a lookup table
- *     that maps each opcode to its name, expected operand count, and flag
- *     bitmask.
+ * This header turns the X-macro list in `MirInstructionSet.h` into the public
+ * instruction definitions used throughout EzMir:
+ *   - `MirInstructionFlags`: bit flags describing operand roles, control-flow,
+ *     memory behavior, and side effects.
+ *   - `MirInstructionOpCode`: the opcode enum.
+ *   - `MirInstructionMetadata`: one metadata record per opcode.
+ *   - `g_MirInstructionSet`: opcode-indexed metadata table.
+ *   - `g_String2MirInstruction`: lowercase name -> opcode lookup map.
  *
- * Adding a new instruction requires only a single line in
- * MirInstructionSet.h; everything else is generated automatically.
+ * Because the tables are generated from one source list, adding or changing an
+ * instruction requires editing only `MirInstructionSet.h`.
  */
 #ifndef EZPACKER_MIRINSTRUCTIONDEFS_H
 #define EZPACKER_MIRINSTRUCTIONDEFS_H
@@ -23,10 +23,12 @@
 #include <cstdint>
 
 /**
- * File used to define utility to be able to define the instruction set at compile time with easy "command-like"
- * methods.
+ * Bit flags attached to instruction metadata.
+ *
+ * Individual flags are combined to express the semantic contract of an opcode:
+ * which operands are read or written, whether memory or CPU flags are touched,
+ * whether the instruction terminates a block, and so on.
  */
-
 enum MirInstructionFlags : uint32_t
 {
     None = 0,
@@ -121,8 +123,20 @@ inline std::map<std::string, MirInstructionOpCode> g_String2MirInstruction = {
 #undef INSTRUCTION
 };
 
+/**
+ * Returns the metadata entry for a given opcode.
+ *
+ * The opcode value is used directly as an index into `g_MirInstructionSet`.
+ */
 inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op) { return g_MirInstructionSet[op]; }
 
+/**
+ * Resolves a textual opcode name to its enum value.
+ *
+ * Lookup is case-insensitive because both the input and generated table keys
+ * are normalized with `StrToLower()`. If the string is unknown,
+ * `MirInstructionOpCode::INVALID` is returned.
+ */
 inline MirInstructionOpCode getOpCodeFromStr(const std::string &str)
 {
     auto it = g_String2MirInstruction.find(StrToLower(str));

@@ -1,15 +1,17 @@
 /**
  * @file MirInstructionSet.h
- * @brief X-macro catalogue of every MIR instruction.
+ * @brief X-macro source list containing every MIR opcode definition.
  *
- * This file is included multiple times with different definitions of
- * the INSTRUCTION(NAME, OPERAND_COUNT, FLAGS) macro to generate:
- *   - The MirInstructionOpCode enum values.
- *   - The g_MirInstructionSet[] metadata table.
- *   - Per-opcode emit helpers in MirEmitter (emitMOV, emitADD, …).
+ * This file is intentionally not a normal header with declarations of its own.
+ * Instead, it is included multiple times with different `INSTRUCTION(name,
+ * operandCount, flags)` macro definitions in order to generate:
+ *   - enum values (`MirInstructionOpCode`),
+ *   - metadata table entries (`g_MirInstructionSet`),
+ *   - and emitter helpers (`emitADD`, `emitJMP`, ...).
  *
- * To add a new instruction, append a single INSTRUCTION() line in the
- * appropriate section below — everything else is generated automatically.
+ * Each row defines the public contract of one opcode: its symbolic name, the
+ * exact operand count expected by `MirEmitter`, and the semantic flags exposed
+ * through `MirInstructionMetadata`.
  */
 #ifdef INSTRUCTION
 

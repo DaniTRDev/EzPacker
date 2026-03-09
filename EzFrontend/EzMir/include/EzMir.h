@@ -2,37 +2,24 @@
  * @file EzMir.h
  * @brief Umbrella header for the EzMir library (Mid-level Intermediate Representation).
  *
- * EzMir defines the compiler's intermediate representation that sits between
- * the high-level AST (produced by EzLexer) and any final code-generation or
- * optimization backend.  Its main building blocks are:
+ * Including this header gives access to the full public EzMir API. The module
+ * models a compiler IR that sits between higher-level semantic analysis and
+ * later lowering/code-generation stages.
  *
- *   - **MirBlock** – A basic block: a straight-line sequence of instructions
- *     with a single entry point and a single terminating control-flow edge.
- *
- *   - **MirInstruction / MirInstructionSet** – A typed, opcode-driven
- *     instruction (MOV, ADD, CMP, JMP, …) together with the full catalogue
- *     of supported opcodes and their metadata (operand count, flags, etc.).
- *
- *   - **MirOperand** – A variant value that an instruction operates on.
- *     Operands can be virtual registers, integer/float immediates, memory
- *     references (base + index*scale + displacement), or block references.
- *
- *   - **MirFunction** – A function-level container that owns an ordered list
- *     of basic blocks, an entry point, a return type, and parameter operands.
- *
- *   - **MirType** – Representation of primitive types and their sizes used
- *     during MIR emission and later lowering stages.
- *
- *   - **Emitters** – Builder APIs that make constructing well-formed MIR
- *     convenient:
- *       • MirEmitterContext – manages block/instruction/operand pools and
- *         tracks the currently bound block and function.
- *       • MirEmitter – high-level helpers to emit typed instructions
- *         (emitMOV, emitADD, emitJMP, …) into the current block.
- *       • MirGlobalDataEmitter – emits initialized and uninitialized global
- *         data entries (the .data / .rdata / .bss equivalent).
- *
- * Including this single header gives you access to every public type in EzMir.
+ * Main building blocks:
+ *   - `MirType`: self-contained MIR type descriptors identified by MIR IDs.
+ *   - `MirOperand`: variant payloads used as instruction arguments.
+ *   - `MirInstruction`: opcode + operand slice, with metadata derived from the
+ *     instruction catalogue.
+ *   - `MirBlock`: ordered instruction list representing one basic block.
+ *   - `MirFunction`: entry block plus block/parameter lists for one callable
+ *     unit.
+ *   - `MirEmitterContext`: owning arena context that allocates and links MIR
+ *     objects.
+ *   - `MirEmitter`: convenience API for emitting instructions into the bound
+ *     block.
+ *   - `MirGlobalDataEmitter`: convenience API for emitting context-owned
+ *     global data blobs and literals.
  */
 #ifndef EZPACKER_EZMIR_H
 #define EZPACKER_EZMIR_H
