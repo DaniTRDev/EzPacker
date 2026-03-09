@@ -6,10 +6,11 @@
 
 void FrontendCompilerTestFixture::SetUp()
 {
-    m_logger = EzLogger::createSyncLogger("FRONTEND_COMPILER_TEST");
-    m_sourceManager = std::make_shared<SourceManager>();
+    m_logger = EzLogger::createSyncLogger("FC_TEST");
+    m_sourceManager = std::make_shared<SourceManager>(getProgramsDir());
     m_sourceSinkLogger = std::make_shared<SourceLoggingSink>(m_logger.get());
     m_errorCollector = std::make_shared<ErrorCollector>();
+    m_driver = std::make_shared<FrontendCompilerDriver>(m_errorCollector, m_sourceManager);
 
     m_errorCollector->beginScope();
     m_errorCollector->addSubscriber(
@@ -40,7 +41,8 @@ void FrontendCompilerTestFixture::SetUp()
 
 void FrontendCompilerTestFixture::TearDown()
 {
-    m_errorCollector->endScope(ErrorAction::Propagate);
+    m_errorCollector->endScope(ErrorAction::Commit);
+    m_driver.reset();
     m_errorCollector.reset();
     m_sourceSinkLogger.reset();
     m_sourceManager.reset();
@@ -50,18 +52,26 @@ void FrontendCompilerTestFixture::TearDown()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Compilation-unit helpers
+//  Compilation unit helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-std::unique_ptr<FrontendCompilationUnit> FrontendCompilerTestFixture::createUnit(const std::string &sourceContent,
-                                                                                 const std::string &sourceName)
+std::shared_ptr<FrontendCompilationUnit> FrontendCompilerTestFixture::createUnitFromSource(const std::string &content,
+                                                                                           const std::string &name)
 {
-    auto unit = std::make_unique<FrontendCompilationUnit>(m_errorCollector, m_sourceManager);
-    if (!unit->create(sourceContent, sourceName))
+    size_t id = m_sourceManager->addSourceContent(name, content);
+    if (id == 0)
     {
-        ADD_FAILURE() << "Failed to create compilation unit for source: " << sourceName;
+        ADD_FAILURE() << "Failed to register source content: " << name;
         return nullptr;
     }
+
+    auto unit = std::make_shared<FrontendCompilationUnit>(m_errorCollector, m_sourceManager);
+    if (!unit->create(id))
+    {
+        ADD_FAILURE() << "FrontendCompilationUnit::create failed for source: " << name;
+        return nullptr;
+    }
+
     return unit;
 }
 
@@ -75,63 +85,69 @@ bool FrontendCompilerTestFixture::runTokenization(FrontendCompilationUnit *unit)
     return phase.execute(unit);
 }
 
-bool FrontendCompilerTestFixture::runThroughParsing(FrontendCompilationUnit *unit)
+bool FrontendCompilerTestFixture::runUpToParsing(FrontendCompilationUnit *unit)
 {
     if (!runTokenization(unit))
         return false;
+
     ParsingPhase phase;
     return phase.execute(unit);
 }
 
-bool FrontendCompilerTestFixture::runThroughSemantics(FrontendCompilationUnit *unit)
+bool FrontendCompilerTestFixture::runUpToSemantics(FrontendCompilationUnit *unit)
 {
-    if (!runThroughParsing(unit))
+    if (!runUpToParsing(unit))
         return false;
-    SemanticAnalysisPhase phase(nullptr); // No global scope is needed for these tests.
+
+    // Set up the semantic context before running semantic analysis
+    auto semanticContext =
+            std::make_shared<BasicSemanticContext>(m_errorCollector, m_sourceManager, unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
     return phase.execute(unit);
 }
 
-bool FrontendCompilerTestFixture::runFullPipeline(FrontendCompilationUnit *unit)
+bool FrontendCompilerTestFixture::runFullSingleUnit(FrontendCompilationUnit *unit)
 {
-    if (!runThroughSemantics(unit))
+    if (!runUpToSemantics(unit))
         return false;
+
     AstLoweringPhase phase;
     return phase.execute(unit);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Driver helpers
+//  Compiler driver helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-std::unique_ptr<FrontendCompilerDriver> FrontendCompilerTestFixture::createDriver()
+bool FrontendCompilerTestFixture::compileFromSource(const std::string &content, const std::string &name)
 {
-    return std::make_unique<FrontendCompilerDriver>(m_errorCollector, m_sourceManager);
+    if (!m_driver->addSource(content, name))
+        return false;
+    return m_driver->compile();
+}
+
+bool FrontendCompilerTestFixture::compileFromFile(const std::string &fileName)
+{
+    if (!m_driver->addSourceFromFile(fileName))
+        return false;
+    return m_driver->compile();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  File helpers
+//  Accessors
 // ─────────────────────────────────────────────────────────────────────────────
+
+std::shared_ptr<ErrorCollector> FrontendCompilerTestFixture::getErrorCollector() const { return m_errorCollector; }
+std::shared_ptr<SourceManager> FrontendCompilerTestFixture::getSourceManager() const { return m_sourceManager; }
+FrontendCompilerDriver *FrontendCompilerTestFixture::getDriver() const { return m_driver.get(); }
+
+bool FrontendCompilerTestFixture::hasFatalErrors() const { return m_errorCollector->doesCurrentScopeHasFatalErrors(); }
 
 std::filesystem::path FrontendCompilerTestFixture::getProgramsDir()
 {
+    // __FILE__ resolves to .../tests/FrontendCompilerTestFixture.cpp
     std::filesystem::path thisFile(__FILE__);
     return thisFile.parent_path() / "programs";
 }
-
-std::string FrontendCompilerTestFixture::readProgramFile(const std::string &fileName)
-{
-    auto path = getProgramsDir() / fileName;
-    std::ifstream ifs(path, std::ios::in);
-    if (!ifs.is_open())
-    {
-        ADD_FAILURE() << "Could not open test program: " << path.string();
-        return "";
-    }
-    return { std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>() };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Error state helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-bool FrontendCompilerTestFixture::hasFatalErrors() const { return m_errorCollector->doesCurrentScopeHasFatalErrors(); }

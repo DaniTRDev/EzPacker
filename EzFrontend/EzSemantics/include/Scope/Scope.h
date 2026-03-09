@@ -1,12 +1,19 @@
 /**
  * @file Scope.h
- * @brief A lexical scope that maps names to Symbol objects.
+ * @brief Lexical scope used by EzSemantics name resolution.
  *
- * Scopes form a tree: every scope (except the global one) has a parent.
- * Name resolution walks upward through the parent chain when the
- * `searchParent` flag is set, implementing the familiar shadowing rules.
- * Scopes are created by BasicSemanticContext::beginScope() during the
- * SymbolDefinitionVisitor pass.
+ * A `Scope` owns the symbol table for one lexical region and points to its
+ * parent scope. `BasicSemanticContext` creates and stores these scopes during
+ * symbol definition, and later passes re-enter them using annotations stored
+ * in the AST.
+ *
+ * Lookup semantics:
+ *   - `define()` inserts only in the current scope.
+ *   - `resolve(..., false)` queries only the current scope.
+ *   - `resolve(..., true)` walks the parent chain until a match is found.
+ *
+ * Duplicate names in the same scope are rejected. Reusing a name from a
+ * parent scope is allowed and implements lexical shadowing.
  */
 #ifndef EZPACKER_SCOPE_H
 #define EZPACKER_SCOPE_H
@@ -15,52 +22,68 @@
 #include "Symbol.h"
 
 /**
- * Represents a scope, which is a batch of defined symbols in the AST.
+ * Symbol table for one lexical scope.
  */
 class Scope
 {
   public:
     /**
-     * Creates the scope with the given id, subScopes, symbols and parent.
-     * @param parent
-     * @param symbols
-     * @param name
+     * Creates a scope with an existing symbol map.
+     *
+     * This overload is mainly useful when a caller already has a prepared
+     * symbol table and wants to attach it to a parent scope.
      */
     Scope(Scope *parent, const std::map<std::string_view, Symbol *> &symbols, const std::string_view &name);
 
     /**
-     * Creates an empty scope with its id and parent.
-     * @param parent
-     * @param name
+     * Creates an empty scope with the given parent and descriptive name.
      */
     Scope(Scope *parent, const std::string_view &name);
 
     /**
-     * Tries to define a symbol in the current scope. If symbol is already defined, an error will be thrown.
-     * @param symbol
-     * @param name
-     * @return bool
+     * Inserts a symbol into this scope only.
+     *
+     * @return `false` if another symbol with the same name already exists in
+     *         this scope.
      */
     bool define(Symbol *symbol, const std::string_view &name);
 
     /**
-     * Tries to resolve the given symbol by its name. If outSymbol is not nullptr and if there's a match, outSymbol will
-     * be set to this occurrence. If the symbol does exist in this scope, true is returned.
+     * Merges another symbol map into this scope.
      *
-     * If searchParent is true, if the given name does not exist in this scope and m_parent is valid, m_parent->resolve
-     * will be used with the same parameters given to this method.
-     * @param name
-     * @param outSymbol
-     * @param searchParent
-     * @return bool
+     * If a name collision is found, no special recovery is performed: the
+     * method returns `false` and optionally reports the conflicting incoming
+     * symbol through `outErrSym`.
+     */
+    bool mergeSymbols(const std::map<std::string_view, Symbol *> &symbols, Symbol **outErrSym);
+
+    /**
+     * Resolves a symbol name in this scope, optionally walking parent scopes.
+     *
+     * @param name Name to resolve.
+     * @param outSymbol Optional output receiving the matching symbol.
+     * @param searchParent Whether lookup may continue in parent scopes.
+     * @return `true` if the symbol is found.
      */
     bool resolve(const std::string_view &name, Symbol **outSymbol, bool searchParent);
 
     /**
-     * Returns the parent of this scope.
-     * @return Scope*
+     * Returns the lexical parent of this scope, or `nullptr` for the global
+     * scope.
      */
     Scope *getParent() const;
+
+    /**
+     * Replaces the parent scope pointer.
+     */
+    void setParent(Scope *parent);
+
+    /**
+     * Returns the symbols defined directly in this scope.
+     *
+     * Parent-scope symbols are not included.
+     */
+    const std::map<std::string_view, Symbol *> &getSymbols() const;
 
   private:
     Scope *m_parent;

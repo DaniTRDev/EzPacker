@@ -4,6 +4,10 @@
 #include "EzFrontendCompilerCommon.h"
 #include "FrontendCompilationUnitPhase.h"
 
+#include "Semantic/SymbolAndTypeResolver.h"
+#include "Semantic/SymbolDefinition.h"
+#include "Semantic/TypeCheck.h"
+
 /**
  * Performs the semantic analysis step of the compilation process. This involves checking the AST for semantic
  * errors, such as type errors, undefined variables, and other issues that cannot be detected during parsing. If

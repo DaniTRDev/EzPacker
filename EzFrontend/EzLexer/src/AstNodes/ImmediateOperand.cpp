@@ -35,24 +35,6 @@ void IntegerImmediate::copy(mp_int *destination)
     }
 }
 
-std::string IntegerImmediate::getAsStr(AstNodeStringMode mode) const
-{
-    int radix = 16, len = 0;
-    size_t written = 0;
-
-    if (mp_radix_size(m_integer, int(radix), &len) != MP_OKAY)
-        throw std::runtime_error("Could not get out number buffer size");
-
-    std::string value;
-    value.resize(len);
-
-    if (mp_to_radix(m_integer, (char *)value.data(), len, &written, radix) != MP_OKAY)
-        throw std::runtime_error("Could not convert big integer to hex number");
-
-    value.pop_back(); // Pops back '\0' from the C-string.
-    return std::format("@Immediate(type: {}, value: 0x{})", getImmediateTypeName(), value);
-}
-
 std::string IntegerImmediate::getAsBin() const
 {
     std::string str;
@@ -96,20 +78,10 @@ ImmediateType FloatImmediate::getImmediateType() const { return ImmediateType::F
 
 double FloatImmediate::getFloatingValue() const { return m_floatingValue; }
 
-std::string FloatImmediate::getAsStr(AstNodeStringMode mode) const
-{
-    return std::format("@Immediate(type: {}, value: {})", getImmediateTypeName(), getFloatingValue());
-}
-
 StringImmediate::StringImmediate(std::string_view str) : m_str(std::move(str)) {}
 
 const char *StringImmediate::getImmediateTypeName() const { return "String"; }
 
 ImmediateType StringImmediate::getImmediateType() const { return ImmediateType::String; }
-
-std::string StringImmediate::getAsStr(AstNodeStringMode mode) const
-{
-    return std::format("@Immediate(type: {}, value: {})", getImmediateTypeName(), getStr());
-}
 
 const std::string_view &StringImmediate::getStr() const { return m_str; }

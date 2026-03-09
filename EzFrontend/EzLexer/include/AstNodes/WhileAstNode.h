@@ -68,15 +68,6 @@ class WhileAstNode : public AstNode
      */
     void setCondition(ConditionAstNode *condition);
 
-    /**
-     * Returns a string representation of this node. This is described as:
-     * while (condition)
-     * {CodeScope::getAsStr(mode)}
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
   private:
     ConditionAstNode *m_condition;
     CodeScope *m_codeScope;

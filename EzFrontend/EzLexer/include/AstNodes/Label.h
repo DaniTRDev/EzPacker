@@ -60,16 +60,7 @@ class Label : public AstNode
      * @param codeScope
      */
     void setCodeScope(CodeScope *codeScope);
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. Shows label names and nested labels
-     * or instructions. Mode is passed to expression AST nodes.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
     /**
      * Returns the name of the label.
      * @return const std::string_view &

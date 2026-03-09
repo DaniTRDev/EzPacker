@@ -1,0 +1,32 @@
+# Module with control flow: labels, if, while
+# Tests: control flow structures through the full pipeline
+
+i32 ModuleWithControlFlow(i32 %input)
+{
+    create i32 %result;
+    create i32 %counter;
+
+    mov %result, 0;
+    mov %counter, 0;
+
+    while (%counter LT %input)
+    {
+        add %result, %counter;
+        add %counter, 1;
+    }
+
+    if (%result GT 100)
+    {
+        mov %result, 100;
+    }
+    else
+    {
+        add %result, 1;
+    }
+
+    label_end:
+    {
+        nop;
+    }
+}
+

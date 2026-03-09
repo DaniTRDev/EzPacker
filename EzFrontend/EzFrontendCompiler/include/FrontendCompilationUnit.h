@@ -30,12 +30,14 @@ class FrontendCompilationUnit : public ErrorEmitter
                             const std::shared_ptr<SourceManager> &sourceManager);
 
     /**
-     * Creates the compilation unit and adds the given source to the source manager.
-     * @param sourceContent
-     * @param sourceName
+     * Creates the compilation unit and links it to the source content identified by the given source ID. The source ID
+     * is assigned by the source manager when the source content is added. If the source ID is invalid (e.g., 0), the
+     * function will emit a fatal error and return false. On success, it returns true, indicating that the compilation
+     * unit is ready for the next phases of the compilation process.
+     * @param sourceId
      * @return bool
      */
-    bool create(const std::string &sourceContent, const std::string &sourceName);
+    bool create(size_t sourceId);
 
     /**
      * Returns the source ID of the source file being compiled. This ID is assigned by the source manager when the
@@ -48,115 +50,107 @@ class FrontendCompilationUnit : public ErrorEmitter
      * Returns a pointer to the slice of AST nodes that belong to the global scope. This slice is populated during the
      * parsing phase and is used in subsequent phases of the compilation process, such as semantic analysis and MIR
      * emission.
-     * @return const TypedPoolSlice<AstNode> *
+     * @return TypedPoolSlice<AstNode> *
      */
-    const TypedPoolSlice<AstNode> *getGlobalScopeAstNodes() const;
-    
-    /**
-     * Returns a pointer to the slice of AST nodes that belong to the global scope. This slice is populated during the
-     * parsing phase and is used in subsequent phases of the compilation process, such as semantic analysis and MIR
-     * emission.
-     * @return TypedPoolSlice<AstNode> *&
-     */
-    TypedPoolSlice<AstNode> *&getGlobalScopeAstNodes();
-    
+    TypedPoolSlice<AstNode> *getGlobalScopeAstNodes();
+
     /**
      * Cleans up all resources used by the compilation unit. This includes clearing the tokenizer, parsing context,
      * semantic context, and MIR emitter. After this function is called, the compilation unit should be in a state where
      * it can be safely destroyed or re-initialized.
      */
     void cleanup();
-    
+
     /**
      * Sets the slice of AST nodes that belong to the global scope.
      * @param globalScopeAstNodes
      */
     void setGlobalScopeAstNodes(TypedPoolSlice<AstNode> *globalScopeAstNodes);
-    
+
     /**
      * Sets the lowering context used by the compilation unit.
      * @param loweringContext
      */
     void setLoweringContext(const std::shared_ptr<LoweringContext> &loweringContext);
-    
+
     /**
      * Sets the MIR emitter used by the compilation unit.
      * @param mirEmitter
      */
     void setMirEmitter(const std::shared_ptr<MirEmitter> &mirEmitter);
-    
+
     /**
      * Sets the MIR emitter context used by the compilation unit.
      * @param mirEmitterContext
      */
     void setMirEmitterContext(const std::shared_ptr<MirEmitterContext> &mirEmitterContext);
-    
+
     /**
      * Sets the MIR global data emitter used by the compilation unit.
      * @param mirGlobalDataEmitter
      */
     void setMirGlobalDataEmitter(const std::shared_ptr<MirGlobalDataEmitter> &mirGlobalDataEmitter);
-    
+
     /**
      * Sets the parsing context used by the compilation unit.
      * @param parsingContext
      */
     void setParsingContext(const std::shared_ptr<BasicParsingContext> &parsingContext);
-    
+
     /**
      * Sets the semantic context used by the compilation unit.
      * @param semanticContext
      */
     void setSemanticContext(const std::shared_ptr<BasicSemanticContext> &semanticContext);
-    
+
     /**
      * Sets the tokenizer used by the compilation unit.
      * @param tokenizer
      */
     void setTokenizer(const std::shared_ptr<BasicTokenizer> &tokenizer);
-    
+
     /**
      * Returns a const reference to the parsing context used by the compilation unit.
      * @return const std::shared_ptr<BasicParsingContext> &
      */
     const std::shared_ptr<BasicParsingContext> &getParsingContext() const;
-    
+
     /**
      * Returns a const reference to the semantic context used by the compilation unit.
      * @return const std::shared_ptr<BasicSemanticContext> &
      */
     const std::shared_ptr<BasicSemanticContext> &getSemanticContext() const;
-    
+
     /**
      * Returns a const reference to the tokenizer used by the compilation unit.
      * @return const std::shared_ptr<BasicTokenizer> &
      */
     const std::shared_ptr<BasicTokenizer> &getTokenizer() const;
-    
+
     /**
      * Returns a const reference to the lowering context used by the compilation unit.
      * @return const std::shared_ptr<LoweringContext> &
      */
     const std::shared_ptr<LoweringContext> &getLoweringContext() const;
-    
+
     /**
      * Returns a const reference to the MIR emitter used by the compilation unit.
      * @return const std::shared_ptr<MirEmitter> &
      */
     const std::shared_ptr<MirEmitter> &getMirEmitter() const;
-    
+
     /**
      * Returns a const reference to the MIR emitter context used by the compilation unit.
      * @return const std::shared_ptr<MirEmitterContext> &
      */
     const std::shared_ptr<MirEmitterContext> &getMirEmitterContext() const;
-    
+
     /**
      * Returns a const reference to the MIR global data emitter used by the compilation unit.
      * @return const std::shared_ptr<MirGlobalDataEmitter> &
      */
     const std::shared_ptr<MirGlobalDataEmitter> &getMirGlobalDataEmitter() const;
-    
+
     /**
      * Returns a pointer to the global scope of the source file being compiled. The global scope is the top-level scope
      * that contains all other scopes and declarations in the source file. It is populated during the parsing phase and
@@ -168,6 +162,7 @@ class FrontendCompilationUnit : public ErrorEmitter
   private:
     TypedPoolSlice<AstNode> *m_globalScopeAstNodes; // AST nodes that belong to the global scope.
     size_t m_targetSourceId;                        // The source ID of the source file being compiled.
+    std::set<std::string> m_includedFiles; // Set of file paths that have been included during the compilation process.
     std::shared_ptr<BasicParsingContext> m_parsingContext;
     std::shared_ptr<BasicSemanticContext> m_semanticContext;
     std::shared_ptr<BasicTokenizer> m_tokenizer;
@@ -175,7 +170,7 @@ class FrontendCompilationUnit : public ErrorEmitter
     std::shared_ptr<MirEmitter> m_mirEmitter;
     std::shared_ptr<MirEmitterContext> m_mirEmitterContext;
     std::shared_ptr<MirGlobalDataEmitter> m_mirGlobalDataEmitter;
-    std::shared_ptr<Scope> m_globalScope;                           // The global scope of the source file being compiled.
+    std::shared_ptr<Scope> m_globalScope; // The global scope of the source file being compiled.
 };
 
 #endif // EZPACKER_FRONTENDCOMPILATIONUNIT_H

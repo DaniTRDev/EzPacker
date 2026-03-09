@@ -1,17 +1,23 @@
 /**
  * @file BasicTokenizer.h
- * @brief Synchronous tokenizer that splits raw source text into a stream of typed tokens.
+ * @brief Synchronous tokenizer that converts source text into parser-ready tokens.
  *
- * BasicTokenizer scans a character buffer and produces a sequence of
- * TokenInformation objects.  It recognises identifiers, reserved keywords
- * (`if`, `else`, `while`, `break`, `continue`), integer and floating-point
- * literals (decimal and hexadecimal), string literals with escape sequences,
- * single-character punctuation, and `#`-prefixed comments.  The resulting
- * token list is consumed by the parsing stage (BasicParsingContext).
+ * BasicTokenizer reads a source buffer owned by SourceManager and emits a flat
+ * sequence of TokenInformation entries. The tokenizer is intentionally simple:
+ * it does not build partial syntax, it only classifies source substrings and
+ * preserves enough SourceReference data for later diagnostics.
  *
- * This file also defines the _TokenType enumeration (all possible token
- * kinds) and the TokenInformation struct that pairs a type with the
- * original text and source location.
+ * Observable behavior relevant to callers:
+ * - Spaces, tabs, and line breaks are consumed and are not exposed by
+ *   getTokens().
+ * - `#` starts a comment that runs until the end of the current line; comments
+ *   are skipped and are not exposed by getTokens().
+ * - Negative numbers are tokenized as a separate `Minus` token followed by the
+ *   numeric token.
+ * - Strings are delimited by double quotes and support `\\n`, `\\r`, `\\t`,
+ *   `\\\\`, `\\'`, `\\\"`, and `\\0`.
+ * - On the first fatal tokenization error, tokenizeBuffer() returns false and
+ *   reports the diagnostic through the shared ErrorCollector.
  */
 #ifndef EZPACKER_BASICTOKENIZER_H
 #define EZPACKER_BASICTOKENIZER_H
@@ -53,22 +59,31 @@ const static std::function<bool(char ch)> isSpecial = [](char ch) -> bool { retu
 
 /**
  * Enum to indicate different types of tokens.
+ *
+ * Note: some entries (such as NewLine, Tab, and Comment) exist because the
+ * tokenizer handles them internally, but the current implementation skips them
+ * instead of returning them to callers through getTokens().
  */
 enum class _TokenType : uint8_t
 {
     Invalid = 0,
     Break,       // "break"
+    Case,        // "case"
     Colon,       // ':'
     Comma,       //','
     Comment,     // # ...
     Continue,    // "continue"
+    Default,     // "default"
     Dot,         // '.'
     Else,        // "else"
+    GreaterThan, // '>'
     Identifier,  // Something formed with [a-z] | [A-Z] | [0, 9] | [_]. It can't start with digits.
     If,          // "if"
     Include,     // "include"
+    For,         // "for"
     LeftBrace,   // '{'
     LeftParen,   // '('
+    LowerThan,   // '<'
     Minus,       // '-'
     NewLine,     // '\n'
     NumberInt,   // Something formed with [0-9]
@@ -79,6 +94,7 @@ enum class _TokenType : uint8_t
     RightParen,  // ')'
     SemiColon,   // ';'
     String,      // "..." Multiline strings are not supported. // TODO: Add support for multiline strings.
+    Switch,      // "switch"
     Tab,         // '\t'
     While        //"while"
 };
@@ -86,16 +102,20 @@ enum class _TokenType : uint8_t
 inline std::map<_TokenType, const char *> TokenType2StrMap = {
     { _TokenType::Invalid, "Invalid" },
     { _TokenType::Break, "Break" },
+    { _TokenType::Case, "Case" },
     { _TokenType::Colon, "Colon" },
     { _TokenType::Comma, "Comma" },
     { _TokenType::Comment, "Comment" },
     { _TokenType::Continue, "Continue" },
+    { _TokenType::Default, "Default" },
     { _TokenType::Dot, "Dot" },
     { _TokenType::Else, "Else" },
+    { _TokenType::GreaterThan, "GreaterThan" },
     { _TokenType::Identifier, "Identifier" },
     { _TokenType::If, "If" },
     { _TokenType::LeftBrace, "LeftBrace" },
     { _TokenType::LeftParen, "LeftParen" },
+    { _TokenType::LowerThan, "LowerThan" },
     { _TokenType::Minus, "Minus" },
     { _TokenType::NewLine, "NewLine" },
     { _TokenType::NumberInt, "NumberInt" },
@@ -106,11 +126,18 @@ inline std::map<_TokenType, const char *> TokenType2StrMap = {
     { _TokenType::RightParen, "RightParen" },
     { _TokenType::SemiColon, "SemiColon" },
     { _TokenType::String, "String" },
+    { _TokenType::Switch, "Switch" },
+    { _TokenType::Tab, "\\n" },
     { _TokenType::While, "While" },
 };
 
 /**
- * Structure contains information about the token.
+ * Structure contains information about a token emitted by the tokenizer.
+ *
+ * m_str stores the normalized token payload:
+ * - identifiers/keywords keep their textual spelling,
+ * - strings store the unescaped content without surrounding quotes,
+ * - punctuation stores the matched single-character lexeme.
  */
 struct TokenInformation
 {
@@ -120,37 +147,49 @@ struct TokenInformation
 };
 
 /**
- * Basic SYNCHRONOUS tokenizer class. Given a character buffer and a starting address, it scans the input
- * and produces a sequence of TokenInformation objects. Whitespace and newlines are consumed but not emitted
- * as tokens (except for tracking line/column information). Comments (starting with '#') are preserved as
- * Comment tokens. Strings support common escape sequences (\\n, \\r, \\t, \\\\, \\', \\", \\0).
+ * Basic synchronous tokenizer.
  *
- * After tokenization, the resulting tokens can be retrieved via getTokens().
+ * Typical usage:
+ *   1. Construct the tokenizer with the shared ErrorCollector and SourceManager.
+ *   2. Call tokenizeBuffer(startOffset, sourceId).
+ *   3. If the call returns true, pass getTokens() to BasicParsingContext.
+ *
+ * Lifetime notes:
+ * - The token list belongs to the tokenizer instance and stays valid until the
+ *   tokenizer is reused or destroyed.
+ * - Source text is read from SourceManager; callers do not pass raw buffers.
  */
 class BasicTokenizer
 {
   public:
     /**
-     * Creates the object with the given errorCollector and sourceManager.
-     * @param errorCollector
-     * @param sourceManager
+     * Creates a tokenizer bound to the given diagnostics and source registry.
+     *
+     * The tokenizer does not take ownership of these shared services, but it
+     * expects them to outlive tokenization calls.
      */
     BasicTokenizer(const std::shared_ptr<ErrorCollector> &errorCollector,
                    const std::shared_ptr<SourceManager> &sourceManager);
 
     /**
-     * Tries to get the content of the given source file and tokenize it. Returns true if succeeded, false other ways.
-     * The generated tokens can be retrieved via getTokens(). The address parameter indicates the starting position in
-     * the buffer for tokenization.
-     * @param address
-     * @param sourceId
-     * @return bool
+     * Tokenizes the source identified by sourceId, starting at the given byte
+     * offset within that source.
+     *
+     * @param address Start offset inside the source buffer.
+     * @param sourceId SourceManager identifier for the input source.
+     * @return true when the whole remaining buffer was tokenized successfully;
+     *         false when input is invalid or a fatal lexical error was emitted.
+     *
+     * On success, getTokens() exposes the generated token stream. On failure,
+     * the token stream should be considered incomplete.
      */
     bool tokenizeBuffer(size_t address, size_t sourceId);
 
     /**
-     * Returns the list of generated tokens.
-     * @return std::vector<TokenInformation>.
+     * Returns the generated tokens in source order.
+     *
+     * The returned reference becomes stale only if the tokenizer is reused or
+     * destroyed.
      */
     const std::vector<TokenInformation> &getTokens() const;
 

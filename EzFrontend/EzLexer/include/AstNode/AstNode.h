@@ -1,13 +1,14 @@
 /**
  * @file AstNode.h
- * @brief Core definitions for the Abstract Syntax Tree: the base node class,
- *        the annotation interface, node-type enumeration, and display modes.
+ * @brief Core AST contracts: base node type, node tags, and semantic
+ *        annotation support.
  *
- * Every parsed construct in the language (instructions, variables, labels,
- * control-flow blocks, …) is represented as a subclass of AstNode.  Nodes
- * can be enriched with semantic metadata through the IAstNodeAnnotation
- * interface — this is how later compiler passes (symbol definition, type
- * resolution, type checking) attach meaning without modifying node classes.
+ * Every concrete syntax element produced by EzLexer inherits from AstNode.
+ * Consumers are expected to inspect nodes through the combination of:
+ * - `getType()` for quick kind checks,
+ * - `accept()` for structured traversal,
+ * - node-specific getters for payload,
+ * - annotations added later by EzSemantics.
  */
 #ifndef EZPACKER_AST_H
 #define EZPACKER_AST_H
@@ -18,11 +19,10 @@
 /**
  * @brief Base interface for annotations that can be attached to any AstNode.
  *
- * Annotations are the mechanism through which semantic passes (symbol
- * definition, type resolution, type checking, lowering) decorate the AST
- * with extra information — symbol links, resolved types, scope ownership,
- * etc. — without changing the node classes themselves.  Every annotation
- * must be trivially destructible so it can live inside a TypedPool.
+ * EzLexer itself only creates the syntactic tree. Later phases attach semantic
+ * meaning through annotations instead of mutating node layouts. Typical uses
+ * include resolved symbols, resolved data types, scope ownership, and cast
+ * information.
  */
 class IAstNodeAnnotation
 {
@@ -43,6 +43,7 @@ enum class AstNodeType
     CodeScope,
     Condition,
     Continue,
+    For,
     If,
     Include,
     Instruction,
@@ -51,6 +52,8 @@ enum class AstNodeType
     MemoryOperand,
     Module, // Contains the header and the code scope.
     ModuleHeader,
+    Switch,
+    SwitchCase,
     Variable,
     While
 };
@@ -62,30 +65,30 @@ enum class AstNodeStringMode : uint8_t
 };
 
 /**
- * @brief The base class for every node in the Abstract Syntax Tree.
+ * Base class for every AST node emitted by EzLexer.
  *
- * AstNode provides the common interface shared by all parsed constructs:
- *   - A type tag (AstNodeType) so callers can identify the concrete kind.
- *   - A visitor accept() method that dispatches to the correct
- *     AstNodeVisitor::visit() overload (double-dispatch / Visitor pattern).
- *   - An optional annotation list where semantic passes can attach metadata
- *     (symbol links, data types, scope ownership, cast info, …).
- *   - A source reference that ties the node back to its position in the
- *     original source text (used for error messages and diagnostics).
- *   - A human-readable string representation for debugging.
+ * Ownership and lifetime:
+ * - Concrete nodes are expected to be allocated from AstNodeTypedPool.
+ * - The node object itself does not own child nodes or annotation pools.
+ * - Any pointers returned by getters remain valid while the owning parse or
+ *   semantic context remains alive.
  *
- * Concrete node types (Instruction, Variable, Label, Module, …) inherit
- * from AstNode and are allocated inside an AstNodeTypedPool so they remain
- * cache-friendly and trivially destructible.
+ * Source references:
+ * - Parsers should set a SourceReference when they can identify the exact
+ *   source span for the construct.
+ * - ParserBatch assigns a fallback reference when a parser returns a node
+ *   without one.
  */
 class AstNode
 {
   public:
     /**
-     * Creates the given annotation type with the given arguments and adds it to the node.
-     * @tparam Args
-     * @param annotPool
-     * @param args
+     * Creates and attaches a new annotation of the requested type.
+     *
+     * New annotations are prepended to the annotation slice. Callers typically
+     * use this from semantic passes, not from parsers.
+     *
+     * @throws std::runtime_error if annotPool is null.
      */
     template <typename AnnotType, typename... Args>
         requires(std::is_base_of<IAstNodeAnnotation, AnnotType>::value)
@@ -107,70 +110,60 @@ class AstNode
     }
 
     /**
-     * Returns the type of the node.
-     * @return AstNodeType
+     * Returns the concrete node kind.
      */
     virtual AstNodeType getType() const = 0;
 
     /**
-     * Accepts the given visitor and calls its internal visit method with the correct node type.Returns
-     * the result of visit.
-     * @param visitor
-     * @return
+     * Dispatches this node to the corresponding AstNodeVisitor overload.
+     *
+     * Returns whatever the visitor returns for this node type.
      */
     virtual bool accept(class AstNodeVisitor *visitor) = 0;
 
     /**
-     * Returns true if this node has annotations.
-     * @return bool
+     * Returns true when at least one annotation has been attached.
      */
     bool hasAnnotations() const;
 
     /**
-     * Returns the name of this AstNode.
-     * @return const char*
+     * Returns a short stable name for the node class, mainly for debugging,
+     * logging, and diagnostics.
      */
     virtual const char *getAstNodeName() const = 0;
 
     /**
-     * Returns the source references of this node. May or may not return an empty array.
-     * @return const SourceReference &
+     * Returns the source span associated with this node.
+     *
+     * The reference may be empty when the node has not been assigned a source
+     * span yet.
      */
     const SourceReference &getSourceRef() const;
 
     /**
-     * Returns the annotation of this node. If set, result != nullptr; other ways result = nullptr.
-     * @return TypedPoolSlice<IAstNodeAnnotation> *
+     * Returns the raw annotation slice, or nullptr when the node has not been
+     * annotated.
      */
     TypedPoolSlice<IAstNodeAnnotation> *getAnnotations();
 
     /**
-     * Sets the source references of this node.
-     * @param ref
+     * Assigns the source span associated with this node.
      */
     void setSourceRefs(const SourceReference &ref);
 
     /**
-     * Adds an annotation to the node. If no previous annotation was made, a new slice is created from the annot pool
-     * and the element is appended.
-     * @param annot
-     * @param annotPool
+     * Attaches an already-created annotation to the node.
+     *
+     * This is the low-level companion to createAnnotation().
      */
     void addAnnotation(IAstNodeAnnotation *annot, TypedPool *annotPool);
 
     /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information.
-     * @param mode
-     * @return std::string
-     */
-    virtual std::string getAsStr(AstNodeStringMode mode) const = 0;
-
-    /**
-     * Returns the first annotation in the list, cast to the requested type T. By design, a node should not have
-     * two annotations of the same type. If no annotations exist, nullptr is returned.
-     * @tparam T Annotation type (must derive from IAstNodeAnnotation).
-     * @return T * Pointer to the annotation, or nullptr if none exist.
+     * Returns the first annotation in the slice that can be dynamically cast to
+     * the requested type.
+     *
+     * By convention a node should not carry multiple annotations of the same
+     * concrete type.
      */
     template <typename T>
         requires(std::is_base_of<IAstNodeAnnotation, T>::value)

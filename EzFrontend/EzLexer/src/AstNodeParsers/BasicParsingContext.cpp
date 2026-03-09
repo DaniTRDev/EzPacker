@@ -36,10 +36,9 @@ void BasicParsingContext::consume()
 
         if (canPeek())
         {
-            bool shouldSkip = (peek().m_type == _TokenType::Comment) || (peek().m_type == _TokenType::NewLine) ||
-                    (peek().m_type == _TokenType::Tab);
+            bool shouldSkip = (peek().m_type == _TokenType::NewLine) || (peek().m_type == _TokenType::Tab);
 
-            // If there's a comment, a tab or a newline, we skip it.
+            // If there's a tab or a newline, we skip it.
             if (shouldSkip)
                 consume();
         }

@@ -13,22 +13,3 @@ bool CodeScope::accept(AstNodeVisitor *visitor)
 }
 
 const char *CodeScope::getAstNodeName() const { return "CodeScope"; }
-
-std::string CodeScope::getAsStr(AstNodeStringMode mode) const
-{
-    TypedPoolSlice<AstNode> *expressions = getExpressions();
-    if (mode == AstNodeStringMode::Debug)
-    {
-        std::string str = "CodeScope\n{\n";
-
-        for (void *expr : *expressions)
-        {
-            AstNode *node = (AstNode *)expr;
-            str += node->getAsStr(mode);
-        }
-
-        return str + "\n}\n";
-    }
-
-    return std::format("CodeScope (size: {})", expressions->m_numElems);
-}

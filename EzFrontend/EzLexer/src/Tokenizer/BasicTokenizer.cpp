@@ -116,6 +116,13 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
 
             break;
         }
+        case '>':
+        {
+            information.m_type = _TokenType::GreaterThan;
+            information.m_str += ch;
+
+            break;
+        }
         case '#':
         {
             information.m_type = _TokenType::Comment;
@@ -132,7 +139,7 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
                 information.m_str += ch;
             }
 
-            m_tokens.push_back(information);
+            // m_tokens.push_back(information);
             return true;
         }
         case '{':
@@ -145,6 +152,13 @@ bool BasicTokenizer::tokenizeSingle(char *buffer, size_t bufferSize, _TokenType 
         case '(':
         {
             information.m_type = _TokenType::LeftParen;
+            information.m_str += ch;
+
+            break;
+        }
+        case '<':
+        {
+            information.m_type = _TokenType::LowerThan;
             information.m_str += ch;
 
             break;
@@ -352,13 +366,25 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
 
     // TODO: Ensure proper handling of reserver keywords.
     std::string identifierToLower = StrToLower(information.m_str);
-    if (identifierToLower == "break")
+    if (identifierToLower == "case")
+    {
+        information.m_type = _TokenType::Case;
+    }
+    else if (identifierToLower == "break")
     {
         information.m_type = _TokenType::Break;
     }
     else if (identifierToLower == "continue")
     {
         information.m_type = _TokenType::Continue;
+    }
+    else if (identifierToLower == "default")
+    {
+        information.m_type = _TokenType::Default;
+    }
+    else if (identifierToLower == "for")
+    {
+        information.m_type = _TokenType::For;
     }
     else if (identifierToLower == "if")
     {
@@ -371,6 +397,10 @@ bool BasicTokenizer::tokenizeIdentifier(char *buffer, size_t bufferSize, _TokenT
     else if (identifierToLower == "else")
     {
         information.m_type = _TokenType::Else;
+    }
+    if (identifierToLower == "switch")
+    {
+        information.m_type = _TokenType::Switch;
     }
     else if (identifierToLower == "while")
     {

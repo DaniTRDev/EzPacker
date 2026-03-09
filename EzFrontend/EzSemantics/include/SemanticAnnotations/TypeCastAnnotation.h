@@ -1,15 +1,20 @@
 /**
  * @file TypeCastAnnotation.h
- * @brief Annotation for variables used with a type different from their declared type.
+ * @brief Annotation that records how a value must be viewed or converted.
  *
- * When a variable declared as `i64` is used in a context that expects `i32`
- * (e.g. `add i32 %myVar, 2;`), the TypeCheckVisitor replaces the plain
- * SymbolAnnotation with a TypeCastAnnotation that records both the original
- * symbol and the target (casted) Type.  The lowerer later reads this to
- * emit the correct cast instruction (TRUNC, ZEXT, SEXT, BITCAST, …).
+ * `TypeCheckVisitor` attaches this annotation when a node is semantically
+ * valid but lowering needs more information than a plain `SymbolAnnotation`
+ * or `DataTypeAnnotation` can provide.
  *
- * Convenience query methods (isExpansion, isTruncation, isIntegerToDouble,
- * etc.) help downstream code decide which cast opcode to use.
+ * Two common cases in the current implementation are:
+ *   - a variable use explicitly requests a type different from the symbol's
+ *     declared type;
+ *   - an immediate literal must be emitted using the destination type inferred
+ *     from its surrounding instruction or switch statement.
+ *
+ * For variable uses, the annotation keeps both the original symbol and the
+ * destination type. For immediate literals, the original symbol may be null and
+ * only the destination type is relevant.
  */
 #ifndef EZPACKER_TYPECASTANNOTATION_H
 #define EZPACKER_TYPECASTANNOTATION_H
@@ -20,84 +25,71 @@
 #include "SemanticAnnotations/SymbolAnnotation.h"
 
 /**
- * A type cast annotation is used in places where variables declared with a certain type are used with other types:
- *
- * create i64 %myVar;
- * add i32 %myVar, 2; <- The resulting variable node in this instruction contains a TypeCastAnnotation with the
- * original symbol and the casted type.
+ * Annotation that describes the destination type expected during lowering.
  */
 class TypeCastAnnotation : public SymbolAnnotation
 {
   public:
     /**
-     * @brief Construct a new Type Cast Annotation object
-     * @param originalSymbol
-     * @param castedDataType
+     * Creates a cast annotation.
+     *
+     * `originalSymbol` may be null for nodes such as immediates, where only
+     * the destination type matters.
      */
     TypeCastAnnotation(Symbol *originalSymbol, Type *castedDataType);
 
     /**
-     * Returns true if the cast is from double to float.
-     * @return bool.
+     * Returns true when the cast is from `double` to `float`.
      */
     bool isDoubleToFloat() const;
 
     /**
-     * Returns true if the cast is from double to integer.
-     * @return bool.
+     * Returns true when the cast is from `double` to an integer type.
      */
     bool isDoubleToInteger() const;
 
     /**
-     * Returns true if cast is performed to get a bigger value than the original.
-     * @return bool
+     * Returns true when the destination type is wider than the original type.
      */
     bool isExpansion() const;
 
     /**
-     * Returns true if the cast is from float to double.
-     * @return bool.
+     * Returns true when the cast is from `float` to `double`.
      */
     bool isFloatToDouble() const;
 
     /**
-     * Returns true if the cast is from float to integer.
-     * @return bool.
+     * Returns true when the cast is from `float` to an integer type.
      */
     bool isFloatToInteger() const;
 
     /**
-     * Returns true if cast is from integer to double.
-     * @return bool
+     * Returns true when the cast is from an integer type to `double`.
      */
     bool isIntegerToDouble() const;
 
     /**
-     * Returns true if the cast is from integer to float.
-     * @return bool.
+     * Returns true when the cast is from an integer type to `float`.
      */
     bool isIntegerToFloat() const;
 
     /**
-     * Returns true if the cast is from integer to integer.
-     * @return bool.
+     * Returns true when both source and destination are integer types.
      */
     bool isIntegerToInteger() const;
 
     /**
-     * Returns true if cast is performed to get a smaller value than the original.
-     * @return bool
+     * Returns true when the destination type is narrower than the original
+     * type.
      */
     bool isTruncation() const;
 
     /**
-     * Returns "TypeCastAnnotation".
-     * @return const char*
+     * Returns the runtime annotation kind name: `"TypeCastAnnotation"`.
      */
     const char *getAnnotationName() const override;
     /**
-     * Returns the casted type of this symbol.
-     * @return Type
+     * Returns the type that lowering should emit/use for this node.
      */
     Type *getCastedDataType() const;
 

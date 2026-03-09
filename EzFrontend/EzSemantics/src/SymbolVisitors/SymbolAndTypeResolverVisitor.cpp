@@ -7,10 +7,38 @@ bool SymbolAndTypeResolverVisitor::visit(ConditionAstNode *cond)
     return cond->getLeft()->accept(this) && cond->getRight()->accept(this);
 }
 
+bool SymbolAndTypeResolverVisitor::visit(ForAstNode *_for)
+{
+    ScopeAnnotation *annotation = _for->getAnnotation<ScopeAnnotation>();
+    ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
+
+    return _for->getInitialization()->accept(this) && _for->getCondition()->accept(this) &&
+            _for->getNextItClause()->accept(this) && _for->getBody()->accept(this);
+}
+
 bool SymbolAndTypeResolverVisitor::visit(IfAstNode *ifNode)
 {
-    return ifNode->getCondition()->accept(this) && ifNode->getTrueScope()->accept(this) &&
-            (!ifNode->getFalseScope() || ifNode->getFalseScope()->accept(this));
+    if (!ifNode->getCondition()->accept(this))
+        return false;
+
+    // True branch gets its own lexical scope
+    {
+        ScopeAnnotation *trueScope = ifNode->getTrueScope()->getAnnotation<ScopeAnnotation>();
+        ScopeGuard trueGuard(getSemanticContext(), trueScope->getOwnedScope());
+        if (!ifNode->getTrueScope()->accept(this))
+            return false;
+    }
+
+    // False branch (if it exists) gets its own isolated lexical scope
+    if (ifNode->getFalseScope())
+    {
+        ScopeAnnotation *falseScope = ifNode->getFalseScope()->getAnnotation<ScopeAnnotation>();
+        ScopeGuard falseGuard(getSemanticContext(), falseScope->getOwnedScope());
+        if (!ifNode->getFalseScope()->accept(this))
+            return false;
+    }
+
+    return true;
 }
 
 bool SymbolAndTypeResolverVisitor::visit(ImmediateOperand *imm)
@@ -24,7 +52,7 @@ bool SymbolAndTypeResolverVisitor::visit(ImmediateOperand *imm)
         {
             getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                             "Invalid cast for immediate",
-                                            "TypeCheckVisitor::ImmediateOperand",
+                                            "SymbolAndTypeResolverVisitor::ImmediateOperand",
                                             imm->getSourceRef());
 
             return false;
@@ -41,7 +69,7 @@ bool SymbolAndTypeResolverVisitor::visit(ImmediateOperand *imm)
         {
             getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                             "Internal Compiler Error: default Immediate value not defined",
-                                            "TypeCheckVisitor::ImmediateOperand",
+                                            "SymbolAndTypeResolverVisitor::ImmediateOperand",
                                             imm->getSourceRef());
             return false;
         }
@@ -64,35 +92,33 @@ bool SymbolAndTypeResolverVisitor::visit(Instruction *instr)
 bool SymbolAndTypeResolverVisitor::visit(Label *label)
 {
     ScopedSymbolAnnotation *annotation = label->getAnnotation<ScopedSymbolAnnotation>();
-    if (!annotation || !annotation->getOwnedScope())
-    {
-        getSemanticContext()->emitError(
-                ErrorSeverity::Fatal,
-                "Internal Compiler Error: Label has no associated scope (Definition pass failed?)",
-                "SymbolAndTypeResolverVisitor::Label",
-                label->getSourceRef());
-        return false;
-    }
-
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
+
     return label->getCodeScope()->accept(this);
 }
 
 bool SymbolAndTypeResolverVisitor::visit(MemoryOperandAstNode *operand)
 {
     const std::string_view &typeStr = operand->getReferencedMemoryDataTypeStr();
-    std::shared_ptr<Type> type = TypeTable::getType(typeStr);
+    std::shared_ptr<Type> type = nullptr;
 
-    if (!typeStr.empty() && !type)
+    if (typeStr.empty())
     {
-        getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                        "Internal Compiler Error: Given node type is not a valid type",
-                                        "SymbolAndTypeResolverVisitor::MemoryOperandAstNode",
-                                        operand->getSourceRef());
-        return false;
+        type = TypeTable::getDefaultType();
+    }
+    else
+    {
+        type = TypeTable::getType(typeStr);
+        if (!type)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            "Unknown memory operand data type: " + std::string(typeStr),
+                                            "SymbolAndTypeResolverVisitor::MemoryOperand",
+                                            operand->getSourceRef());
+            return false;
+        }
     }
 
-    type = TypeTable::getDefaultType();
     operand->createAnnotation<DataTypeAnnotation>(getSemanticContext()->getAnnotPool(), type.get());
 
     AstNode *base = nullptr, *index = nullptr;
@@ -128,17 +154,6 @@ bool SymbolAndTypeResolverVisitor::visit(MemoryOperandAstNode *operand)
 bool SymbolAndTypeResolverVisitor::visit(Module *module)
 {
     ScopedSymbolAnnotation *annotation = module->getAnnotation<ScopedSymbolAnnotation>();
-
-    if (!annotation || !annotation->getOwnedScope())
-    {
-        getSemanticContext()->emitError(
-                ErrorSeverity::Fatal,
-                "Internal Compiler Error: Module has no associated scope (Definition pass failed?)",
-                "SymbolAndTypeResolverVisitor::Module",
-                module->getSourceRef());
-        return false;
-    }
-
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
     return module->getBody()->accept(this);
 }
@@ -167,7 +182,27 @@ bool SymbolAndTypeResolverVisitor::visit(Variable *var)
     return true;
 }
 
+bool SymbolAndTypeResolverVisitor::visit(SwitchAstNode *_switch)
+{
+    return _switch->getSwitchVariable()->accept(this) && AstNodeVisitor::visitAll(_switch->getCases());
+}
+
+bool SymbolAndTypeResolverVisitor::visit(SwitchCaseAstNode *switchCase)
+{
+    ScopeAnnotation *annotation = switchCase->getAnnotation<ScopeAnnotation>();
+    ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
+    return switchCase->getCaseValue()->accept(this) && switchCase->getBody()->accept(this);
+}
+
 bool SymbolAndTypeResolverVisitor::visit(WhileAstNode *whileNode)
 {
-    return whileNode->getCondition()->accept(this) && whileNode->getCodeScope()->accept(this);
+    if (whileNode->getCondition() && !whileNode->getCondition()->accept(this))
+    {
+        return false;
+    }
+
+    // Loop body needs its own lexical scope
+    ScopeAnnotation *annotation = whileNode->getAnnotation<ScopeAnnotation>();
+    ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
+    return whileNode->getCodeScope()->accept(this);
 }

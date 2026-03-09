@@ -32,16 +32,7 @@ class IncludeAstNode : public AstNode
      * @return const char*
      */
     const char *getAstNodeName() const override;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. This function will always return "include <path>" regardless of mode, where
-     * <path> is the RELATIVE path of the file to be included.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
     /**
      * Returns the relative path of the file to be included.
      * @return const std::string_view &

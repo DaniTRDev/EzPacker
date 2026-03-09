@@ -37,27 +37,34 @@ class AstNodeVisitor
      * @return bool
      */
     virtual bool visit(class BreakAstNode *_break) { return true; }
-    
+
     /**
      * Visits given CodeScope by visiting its expressions.
      * @param scope
      * @return bool
      */
     virtual bool visit(class CodeScope *scope) { return true; }
-    
+
     /**
      * Visits given ConditionAstNode by visiting its condition nodes, true case and false case.
      * @param condition
      * @return bool
      */
     virtual bool visit(class ConditionAstNode *condition) { return true; }
-    
+
     /**
      * Visits given ContinueAstNode.
      * @param _continue
      * @return bool
      */
     virtual bool visit(class ContinueAstNode *_continue) { return true; }
+
+    /**
+     * Visits given ForAstNode.
+     * @param _for
+     * @return bool
+     */
+    virtual bool visit(class ForAstNode *_for) { return true; }
 
     /**
      * Visits the given IfAstNode and its condition, true-branch, and optional false-branch.
@@ -72,6 +79,13 @@ class AstNodeVisitor
      * @return bool
      */
     virtual bool visit(class ImmediateOperand *operand) { return true; }
+
+    /**
+     * Visits given include node and appends the include to the list of includes to be resolved. Returns true always
+     * @param instr
+     * @return bool
+     */
+    virtual bool visit(class IncludeAstNode *instr) { return true; }
 
     /**
      * Visits given instruction node and visits its operands. Should return true visitor wants to keep traversing the
@@ -112,6 +126,20 @@ class AstNodeVisitor
     virtual bool visit(class Module *module) { return true; }
 
     /**
+     * Visits given SwitchAstNode.
+     * @param _switch
+     * @return bool
+     */
+    virtual bool visit(class SwitchAstNode *_switch) { return true; }
+
+    /**
+     * Visits given SwitchCaseAstNode.
+     * @param switchCase
+     * @return bool
+     */
+    virtual bool visit(class SwitchCaseAstNode *switchCase) { return true; }
+
+    /**
      * Visits given Variable node. Should return true visitor wants to keep traversing the tree.
      * @param var
      * @return bool
@@ -131,14 +159,6 @@ class AstNodeVisitor
      * @return bool
      */
     bool visitAll(TypedPoolSlice<AstNode> *nodeList);
-
-  protected:
-    /**
-     * Resolves the real node type and calls its appropriated visitor. Returns true if succeeded.
-     * @param astNode
-     * @return bool
-     */
-    bool visitBaseClass(AstNode *astNode);
 };
 
 #endif // EZPACKER_ASTNODEVISITOR_H

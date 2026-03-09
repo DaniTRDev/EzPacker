@@ -15,8 +15,3 @@ bool ContinueAstNode::accept(struct AstNodeVisitor *visitor)
 }
 
 const char *ContinueAstNode::getAstNodeName() const { return "ContinueAstNode"; }
-
-std::string ContinueAstNode::getAsStr(AstNodeStringMode mode) const
-{
-    return getAstNodeName();
-}

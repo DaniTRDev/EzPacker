@@ -152,6 +152,8 @@ MirType *LoweringContext::createMirTypeFromSemanticType(Type *semanticType)
 
 void LoweringContext::enterLoop(const LoopContext &loopContext) { m_loopContextStack.push(loopContext); }
 
+void LoweringContext::enterSwitch(MirBlock *breakBlock) { m_switchContextStack.push(breakBlock); }
+
 void LoweringContext::exitLoop()
 {
     if (m_loopContextStack.empty())
@@ -160,6 +162,15 @@ void LoweringContext::exitLoop()
                 "Internal Compiler Error: Attempting to exit a loop context when no loop context is active");
     }
     m_loopContextStack.pop();
+}
+
+void LoweringContext::exitSwitch()
+{
+    if (m_switchContextStack.empty())
+    {
+        throw std::runtime_error("Internal Compiler Error: Attempting to exit a switch when no switch is active");
+    }
+    m_switchContextStack.pop();
 }
 
 void LoweringContext::pushBlock(MirBlock *block) { m_blockStack.push(std::move(block)); }

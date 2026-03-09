@@ -40,26 +40,6 @@ MemoryOperandType BaseDisplacementMemory::getMemoryOperandType() const { return 
 
 Variable *BaseDisplacementMemory::getBase() const { return m_base; }
 
-std::string BaseDisplacementMemory::getAsStr(AstNodeStringMode mode) const
-{
-    std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
-                                  getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataTypeStr());
-
-    if (mode == AstNodeStringMode::Default)
-    {
-        res += "}\n";
-        return std::move(res);
-    }
-    else // Debug
-    {
-        return std::format("{}(base: {} + displacement: {}) \n}}\n",
-                           std::move(res),
-                           getBase()->getVariableName(),
-                           getDisplacement()->getAsStr(mode));
-    }
-}
-
 IndexScaleMemory::IndexScaleMemory(IntegerImmediate *scalingFactor,
                                    Variable *index,
                                    std::string_view referencedDataType) :
@@ -75,25 +55,6 @@ MemoryOperandType IndexScaleMemory::getMemoryOperandType() const { return Memory
 
 Variable *IndexScaleMemory::getIndex() const { return m_index; }
 
-std::string IndexScaleMemory::getAsStr(AstNodeStringMode mode) const
-{
-    std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
-                                  getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataTypeStr());
-
-    if (mode == AstNodeStringMode::Default)
-    {
-        res += "}\n";
-        return std::move(res);
-    }
-    else
-    { // Debug
-        return std::format("{}({} * {}) \n}}\n",
-                           std::move(res),
-                           getIndex()->getVariableName(),
-                           getScalingFactor()->getAsStr(mode));
-    }
-}
 BaseIndexScaleDisplacementMemory::BaseIndexScaleDisplacementMemory(IntegerImmediate *displacement,
                                                                    IntegerImmediate *scalingFactor,
                                                                    Variable *base,
@@ -111,27 +72,6 @@ MemoryOperandType BaseIndexScaleDisplacementMemory::getMemoryOperandType() const
     return MemoryOperandType::BaseIndexScaleDisplacement;
 }
 
-std::string BaseIndexScaleDisplacementMemory::getAsStr(AstNodeStringMode mode) const
-{
-    std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
-                                  getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataTypeStr());
-
-    if (mode == AstNodeStringMode::Default)
-    {
-        return std::move(res);
-    }
-    else
-    { // Debug
-        return std::format("{}({} + {} * {} + {}) \n}}\n",
-                           std::move(res),
-                           getBase()->getVariableName(),
-                           getIndex()->getVariableName(),
-                           getScalingFactor()->getAsStr(mode),
-                           getDisplacement()->getAsStr(mode));
-    }
-}
-
 DirectMemory::DirectMemory(IntegerImmediate *address, std::string_view referencedDataType) :
     m_address(std::move(address)), MemoryOperandAstNode(std::move(referencedDataType))
 {
@@ -142,20 +82,3 @@ const char *DirectMemory::getMemoryOperandTypeName() const { return "Direct"; }
 MemoryOperandType DirectMemory::getMemoryOperandType() const { return MemoryOperandType::Direct; }
 
 IntegerImmediate *DirectMemory::getAddress() const { return m_address; }
-
-std::string DirectMemory::getAsStr(AstNodeStringMode mode) const
-{
-    std::string res = std::format("@Memory(type: {} dataType: {}) {{\n",
-                                  getMemoryOperandTypeName(),
-                                  getReferencedMemoryDataTypeStr());
-
-    if (mode == AstNodeStringMode::Default)
-    {
-        res += "}\n";
-        return std::move(res);
-    }
-    else // Debug
-    {
-        return std::format("{}({}) \n}}\n", std::move(res), getAddress()->getAsStr(mode));
-    }
-}

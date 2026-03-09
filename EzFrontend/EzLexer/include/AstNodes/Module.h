@@ -1,14 +1,16 @@
 /**
  * @file Module.h
- * @brief AST nodes for a module (function) declaration: header + body.
+ * @brief AST nodes for top-level module declarations.
  *
- * A Module is the top-level compilation construct in the language.  It is
- * split into two parts:
- *   - ModuleHeader — return type, name, and parameter list.
- *   - Module       — owns the header and the body CodeScope.
+ * In EzLexer, a module is the closest equivalent to a function definition:
  *
- * This separation lets the internal structure of a module evolve without
- * changing the Module class itself.
+ * `returnType ModuleName(param1, param2) { ...body... }`
+ *
+ * The syntax tree intentionally splits the declaration into:
+ * - ModuleHeader: signature information only.
+ * - Module:       pair of header + body scope.
+ *
+ * This keeps signature processing independent from body traversal.
  */
 #ifndef EZPACKER_MODULE_H
 #define EZPACKER_MODULE_H
@@ -22,17 +24,21 @@
 #include "AstNodes/Label.h"
 
 /**
- * This class represents the definition of a module, aka it's header. At the moment has little attributes but this
- * class is sensible to expansion.
+ * Signature portion of a module declaration.
+ *
+ * The inherited AstNodeContainer stores parameters as Variable nodes in source
+ * order. Parameter nodes keep their parsed type spelling and `%name` exactly as
+ * written by the user (after string interning).
  */
 class ModuleHeader : public AstNode, public AstNodeContainer
 {
   public:
     /**
-     * Creates the module with the given name, return type and parameters.
-     * @param parameters
-     * @param moduleName
-     * @param returnType
+     * Creates a module header.
+     *
+     * @param parameters Parameter slice, usually containing Variable nodes.
+     * @param moduleName Module/function name.
+     * @param returnType Parsed return type spelling.
      */
     ModuleHeader(TypedPoolSlice<AstNode> *parameters, std::string_view moduleName, std::string_view returnType);
 
@@ -57,43 +63,34 @@ class ModuleHeader : public AstNode, public AstNodeContainer
     const char *getAstNodeName() const override;
 
     /**
-     * Returns the name of the module.
-     * @return const std::string_view &
+     * Returns the declared module name.
      */
     const std::string_view &getModuleName() const;
 
     /**
-     * Returns the "return type" of the module.
-     * @return const std::string &
+     * Returns the declared return type spelling.
+     *
+     * Type resolution is deferred to EzSemantics.
      */
     const std::string_view &getReturnTypeName() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. If mode is set to default, only module return type and name will be shown.
-     * Note: Debug mode currently builds parameter strings internally but does not include them in the output.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
   private:
     std::string_view m_moduleName;
     std::string_view m_returnType;
 };
 
 /**
- * This is the very first high-level node. A module is represented by its header and body, each one being a different
- * AstNode. This is a design decision to be able to change (if required) the internal structure of a module without
- * affecting its class directly.
+ * Complete top-level module node.
+ *
+ * A successful ModuleParser always produces both parts:
+ * - a non-null header,
+ * - a non-null body CodeScope.
  */
 class Module : public AstNode
 {
   public:
     /**
-     * Creates the module with the given body and header.
-     * @param body
-     * @param header
+     * Creates a module node from its parsed body and header.
      */
     Module(CodeScope *body, ModuleHeader *header);
 
@@ -112,8 +109,7 @@ class Module : public AstNode
     bool accept(AstNodeVisitor *visitor) override;
     
     /**
-     * Returns the body of the module.
-     * @return CodeScope*
+     * Returns the body scope that contains the module statements.
      */
     CodeScope *getBody() const;
 
@@ -124,19 +120,10 @@ class Module : public AstNode
     const char *getAstNodeName() const override;
 
     /**
-     * Returns the header of this module.
-     * @return ModuleHeader*
+     * Returns the parsed signature information for this module.
      */
     ModuleHeader *getHeader() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. Mode is passed into ModuleHeader and ModuleBody.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
   private:
     CodeScope *m_body;
     ModuleHeader *m_header;

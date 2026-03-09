@@ -40,14 +40,6 @@ class ContinueAstNode : public AstNode
      * @return const char*
      */
     const char *getAstNodeName() const override;
-
-    /**
-     * Returns a human-readable string for this node (same as getAstNodeName,
-     * since continue has no children or extra data).
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
 };
 
 #endif // EZPACKER_CONTINUEASTNODE_H

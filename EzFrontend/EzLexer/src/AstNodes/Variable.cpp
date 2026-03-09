@@ -23,28 +23,6 @@ bool Variable::getIsArray() const { return m_isArray; }
 
 const char *Variable::getAstNodeName() const { return "Variable"; }
 
-std::string Variable::getAsStr(AstNodeStringMode mode) const
-{
-    std::string str = std::format("@Variable(type: {} name: {} isArray: {}) {{\n",
-                                  getVariableDataType(),
-                                  getVariableName(),
-                                  getIsArray());
-
-    if (mode == AstNodeStringMode::Debug)
-    {
-        for (const void *obj : *getExpressions())
-        {
-            AstNode *node = (AstNode *)obj;
-            str += std::format("\t{}\n", node->getAsStr(mode));
-        }
-        str += "}\n";
-        return std::move(str);
-    }
-
-    str += "}\n";
-    return std::move(str);
-}
-
 const std::string_view &Variable::getVariableDataType() const { return m_variableDataType; }
 
 const std::string_view &Variable::getVariableName() const { return m_variableName; }

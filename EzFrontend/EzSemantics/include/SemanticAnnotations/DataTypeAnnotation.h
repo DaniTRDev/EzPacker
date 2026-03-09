@@ -1,12 +1,13 @@
 /**
  * @file DataTypeAnnotation.h
- * @brief Annotation that attaches a resolved Type to an AST node.
+ * @brief Annotation that stores a resolved semantic `Type` on an AST node.
  *
- * DataTypeAnnotation is used on nodes whose concrete type has been
- * determined by the SymbolAndTypeResolverVisitor — for example, an
- * ImmediateOperand whose `i16` prefix has been resolved to the
- * corresponding Type object.  This is distinct from SymbolAnnotation,
- * which links a node to its declaring symbol.
+ * This annotation is used when a node has an explicit or inferred data type
+ * that is not merely "look it up from the referenced symbol". Typical examples
+ * are immediates and memory operands after `SymbolAndTypeResolverVisitor`
+ * resolves their type names.
+ *
+ * The annotation is later consumed by `TypeCheckVisitor` and lowering code.
  */
 #ifndef EZPACKER_DATATYPEANNOTATION_H
 #define EZPACKER_DATATYPEANNOTATION_H
@@ -15,26 +16,23 @@
 #include "Scope/TypeTable.h"
 
 /**
- * Class used to tell that an AstNode has a type (DIFFERENT FROM SYMBOL).
+ * Annotation that stores a resolved semantic data type for a node.
  */
 class DataTypeAnnotation : public IAstNodeAnnotation
 {
   public:
     /**
-     * Creates the annotation with the given type.
-     * @param type
+     * Creates the annotation with the resolved semantic type.
      */
     DataTypeAnnotation(Type *type);
 
     /**
-     * Returns the data type.
-     * @return
+     * Returns the semantic type attached to the node.
      */
     Type *getDataType() const;
 
     /**
-     * Returns "DataTypeAnnotation".
-     * @return const char*
+     * Returns the runtime annotation kind name: `"DataTypeAnnotation"`.
      */
     const char *getAnnotationName() const override;
 

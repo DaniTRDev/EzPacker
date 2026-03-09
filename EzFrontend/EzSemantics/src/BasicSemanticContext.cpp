@@ -3,7 +3,8 @@
 BasicSemanticContext::BasicSemanticContext(const std::shared_ptr<ErrorCollector> &errorCollector,
                                            const std::shared_ptr<SourceManager> &sourceManager,
                                            const std::shared_ptr<Scope> &globalScope) :
-    m_currentLoopNestLevel(0), m_currentSymbolId(1), ErrorEmitter(errorCollector, sourceManager)
+    m_currentLoopNestLevel(0), m_currentSwitchLevel(0), m_currentSymbolId(1),
+    ErrorEmitter(errorCollector, sourceManager)
 {
     m_globalScope = globalScope ? globalScope : std::make_shared<Scope>(nullptr, "global");
     m_currentScope = m_globalScope.get();
@@ -41,6 +42,8 @@ bool BasicSemanticContext::isCurrentScopeGlobalScope() const { return m_currentS
 
 bool BasicSemanticContext::isContextInsideLoop() const { return m_currentLoopNestLevel != 0; }
 
+bool BasicSemanticContext::isContextInsideSwitch() const { return m_currentSwitchLevel != 0; }
+
 bool BasicSemanticContext::resolveSymbolInScope(const std::string_view &symbolName,
                                                 Symbol **outSymbol,
                                                 bool searchParent)
@@ -66,20 +69,6 @@ void BasicSemanticContext::beginScope(const std::string_view &name)
     }
 
     m_currentScope = scope.get();
-}
-
-void BasicSemanticContext::discoverInclusion(const std::string_view &includePath)
-{
-    if (m_discoveredInclusions.contains(includePath.data()))
-    {
-        emitError(ErrorSeverity::Warning,
-                  std::format("Inclusion of '{}' was already discovered, skipping", includePath),
-                  std::string(includePath),
-                  SourceReference());
-        return;
-    }
-    
-    m_discoveredInclusions.insert(includePath.data());
 }
 
 void BasicSemanticContext::emitSymbolRedefinitionError(const std::string_view &module,
@@ -125,6 +114,8 @@ void BasicSemanticContext::enterLoop() { m_currentLoopNestLevel++; }
 
 void BasicSemanticContext::enterScope(Scope *scope) { m_currentScope = scope; }
 
+void BasicSemanticContext::enterSwitch() { m_currentSwitchLevel++; }
+
 void BasicSemanticContext::exitLoop()
 {
     if (m_currentLoopNestLevel == 0)
@@ -143,6 +134,16 @@ void BasicSemanticContext::exitScope()
     }
 
     m_currentScope = m_currentScope->getParent();
+}
+
+void BasicSemanticContext::exitSwitch()
+{
+    if (m_currentSwitchLevel == 0)
+    {
+        throw std::runtime_error("Internal Compiler Error: Can't exit switch when not in a switch");
+    }
+
+    m_currentSwitchLevel--;
 }
 
 const std::shared_ptr<Scope> &BasicSemanticContext::getGlobalScope() const { return m_globalScope; }

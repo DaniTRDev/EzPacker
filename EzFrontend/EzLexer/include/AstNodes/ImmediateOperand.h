@@ -127,16 +127,7 @@ class IntegerImmediate : public ImmediateOperand
      * @return std::string
      */
     std::string getAsBin() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. For integers, their type
-     * and value are shown no matter the mode.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
   private:
     bool m_signed;
     mp_int *m_integer;
@@ -172,16 +163,7 @@ class FloatImmediate : public ImmediateOperand
      * @return double
      */
     double getFloatingValue() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. For floating values, their value is
-     * shown no matter the mode.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
   private:
     double m_floatingValue;
 };
@@ -215,15 +197,6 @@ class StringImmediate : public ImmediateOperand
      * @return const std::string_view &
      */
     const std::string_view &getStr() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. For string values, their value is
-     * shown no matter the mode.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
 
   private:
     std::string_view m_str;

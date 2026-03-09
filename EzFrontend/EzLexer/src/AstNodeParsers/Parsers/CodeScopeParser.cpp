@@ -19,10 +19,12 @@ AstNode *CodeScopeParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
         // At least 1 instruction is expected;
         ParserBatch batch;
         batch.addParsersFromTypeList<LabelParser,
+                                     ForParser,
                                      IfParser,
                                      WhileParser,
                                      InstructionParser::InstructionParser,
                                      ContinueParser,
+                                     SwitchParser,
                                      BreakParser>();
 
         AstNode *exprNode = batch.parse(ctx).m_node;

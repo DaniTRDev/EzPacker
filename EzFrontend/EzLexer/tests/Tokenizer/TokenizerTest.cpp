@@ -170,11 +170,7 @@ TEST_F(TokenizerTestFixture, TestSingleThread_Comments)
     std::string buffer = "# This is a comment";
 
     EXPECT_TRUE(expectTokenizeResult(buffer));
-    EXPECT_TRUE(expectTokenCount(1));
-
-    EXPECT_TRUE(expectTokenType(_TokenType::Comment));
-    EXPECT_TRUE(expectTokenContent(" This is a comment"));
-    EXPECT_FALSE(advanceToken());
+    EXPECT_TRUE(expectTokenCount(0));
 }
 
 TEST_F(TokenizerTestFixture, TestSingleThread_SingleTokens)

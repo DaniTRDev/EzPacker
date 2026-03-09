@@ -1,11 +1,18 @@
 /**
  * @file Instruction.h
- * @brief AST nodes for assembly-style instructions and call instructions.
+ * @brief AST nodes for regular instructions and the specialized `call` form.
  *
- * An Instruction holds a mnemonic name (mov, add, cmp, …) and an ordered
- * list of operands (variables, immediates, memory references).
- * CallInstruction is a specialised subclass for `call` instructions that
- * additionally stores the callee name and the expected return type.
+ * An Instruction models one statement terminated by `;` inside a code scope.
+ * Operands are stored in source order inside AstNodeContainer.
+ *
+ * Grammar notes derived from the public parser contract:
+ * - Regular instruction: `mnemonic;` or `mnemonic operand[, operand...];`
+ * - `mnemonic` is case-insensitive at parse time and is normalized to lower
+ *   case before being stored.
+ * - Supported operand categories are variables, immediates, and memory
+ *   operands.
+ * - `CallInstruction` uses a specialized grammar and stores the callee as the
+ *   first expression, followed by the argument expressions.
  */
 #ifndef EZPACKER_INSTRUCTION_H
 #define EZPACKER_INSTRUCTION_H
@@ -18,16 +25,23 @@
 #include "AstNode/AstNodeVisitor.h"
 
 /**
- * This class represents an instruction in our language. Special instructions (that require extra logic) must inherit
- * from this class.
+ * Assembly-style instruction with zero or more operands.
+ *
+ * Examples:
+ * - `nop;`
+ * - `add %dst, 1;`
+ * - `lea %dst, i64 (%base+0x10);`
  */
 class Instruction : public AstNode, public AstNodeContainer
 {
   public:
     /**
-     * Creates the instruction with the given operands and instruction name.
-     * @param operands
-     * @param instructionName
+     * Creates an instruction node.
+     *
+     * @param operands Operand slice in source order. May be empty, but should
+     *                 not be null.
+     * @param instructionName Lower-cased instruction mnemonic interned in the
+     *                        parsing context's StringPool.
      */
     Instruction(TypedPoolSlice<AstNode> *operands, std::string_view instructionName);
 
@@ -52,18 +66,7 @@ class Instruction : public AstNode, public AstNodeContainer
     const char *getAstNodeName() const override;
 
     /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default, only
-     * instruction code and basic operand information are shown. If mode is set to debug, instruction operands are also
-     * shown.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
-    /**
-     * Returns the name of the instruction.
-     * @return const std::string_view &
+     * Returns the normalized mnemonic exactly as stored by the parser.
      */
     const std::string_view &getInstructionName() const;
 
@@ -72,27 +75,29 @@ class Instruction : public AstNode, public AstNodeContainer
 };
 
 /**
- * A call instruction, it has its own class because it has different grammar than an "average" instruction, and I wanted
- * that to be reflected.
+ * Specialized instruction node for function/module calls.
+ *
+ * Parsed shape:
+ * - `call %callee();`
+ * - `call %callee(arg1, arg2);`
+ *
+ * Representation contract:
+ * - expression 0 is always the callee variable,
+ * - expressions 1..N are the call arguments in source order.
+ *
+ * EzSemantics is responsible for resolving the callee symbol and validating
+ * the argument list.
  */
 class CallInstruction : public Instruction
 {
   public:
     /**
-     * Creates the call instruction with the given params, calleName and return type.
-     * @param returnType
+     * Creates the call instruction.
+     *
+     * @param params Slice whose first element is the callee and remaining
+     *               elements are call arguments.
      */
     CallInstruction(TypedPoolSlice<AstNode> *params);
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default, only
-     * callee name and type are shown. If mode is set to debug, call parameters will also be shown.
-     * shown.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
 };
 
 #endif // EZPACKER_INSTRUCTION_H

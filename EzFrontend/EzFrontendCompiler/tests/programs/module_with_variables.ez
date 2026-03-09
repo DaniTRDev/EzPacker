@@ -1,0 +1,17 @@
+# Module with variables of all types
+# Tests: variable declarations, multiple types
+
+void ModuleWithVariables()
+{
+    create i8  %byte;
+    create i16 %word;
+    create i32 %dword;
+    create i64 %qword;
+
+    mov %byte, 1;
+    mov %word, 256;
+    mov %dword, 100000;
+    mov %qword, 0xDEADBEEF;
+    nop;
+}
+

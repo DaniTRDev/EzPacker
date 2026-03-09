@@ -1861,6 +1861,26 @@ void DeepContinue(i32 %a, i32 %b, i32 %c, i32 %d)
     ASSERT_TRUE(runLowering<ModuleParser::ModuleParser>(code));
 }
 
+TEST_F(AstLowererVisitorTestFixture, ContinueLowering_InvalidContinueInSwitch)
+{
+    // Continue inside a deeply nested if structure inside a while.
+    std::string code = R"(
+void DeepContinue(i32 %a, i32 %b, i32 %c, i32 %d)
+{
+    switch (%a)
+    {
+        case 1:
+        {
+            nop;
+            continue;
+        }
+    }
+    nop;
+})";
+
+    ASSERT_FALSE(runLowering<ModuleParser::ModuleParser>(code));
+}
+
 TEST_F(AstLowererVisitorTestFixture, BreakContinueLowering_ThreeNestedWhilesBreakMiddle)
 {
     // Three nested while loops. Break in the middle loop.
@@ -1974,4 +1994,33 @@ i64 Accumulate(i32 %n, i32 %skip, i32 %zero)
             EXPECT_TRUE(getLoweringContext()->isSymbolLinkedToMir(sym)) << "Symbol '" << name << "' not linked to MIR";
         }
     }
+}
+
+TEST_F(AstLowererVisitorTestFixture, BreakLowering_BreakInSwitch)
+{
+    // Continue inside a deeply nested if structure inside a while.
+    std::string code = R"(
+void DeepContinue(i32 %a, i32 %b, i32 %c, i32 %d)
+{
+    switch (%a)
+    {
+        case 1:
+        {
+            nop;
+            break;
+        }
+        case 2:
+        {
+            # Implicit fallthrough here.
+        }
+        case 3:
+        {
+            nop;
+            break;
+        }
+    }
+    nop;
+})";
+    
+    ASSERT_TRUE(runLowering<ModuleParser::ModuleParser>(code));
 }

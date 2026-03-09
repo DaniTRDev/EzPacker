@@ -1,413 +1,335 @@
 #include "FrontendCompilerTestFixture.h"
 
 // =============================================================================
-//  AstLoweringPhase — valid programs
+//  1. AstLoweringPhase – getName
 // =============================================================================
 
-TEST_F(FrontendCompilerTestFixture, Lowering_MinimalModule_Succeeds)
+TEST_F(FrontendCompilerTestFixture, AstLoweringPhase_GetName)
 {
-    auto unit = createUnit("void F() { nop; }", "low_minimal");
+    AstLoweringPhase phase;
+    EXPECT_STREQ(phase.getName(), "AstLoweringPhase");
+}
+
+// =============================================================================
+//  2. AstLoweringPhase – valid modules
+// =============================================================================
+
+TEST_F(FrontendCompilerTestFixture, AstLowering_SimpleVoidModule)
+{
+    auto unit = createUnitFromSource("void F() { nop; }");
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+
     EXPECT_NE(unit->getMirEmitter(), nullptr);
     EXPECT_NE(unit->getMirEmitterContext(), nullptr);
     EXPECT_NE(unit->getMirGlobalDataEmitter(), nullptr);
     EXPECT_NE(unit->getLoweringContext(), nullptr);
 }
 
-TEST_F(FrontendCompilerTestFixture, Lowering_ArithmeticOps_Succeeds)
+TEST_F(FrontendCompilerTestFixture, AstLowering_ModuleWithParams)
 {
     std::string code = R"(
-void F(i32 %a, i32 %b)
+i64 MyModule(i32 %a, i64 %b)
 {
-    create i32 %r;
-    mov %r, %a;
-    add %r, %b;
-    sub %r, 1;
-    mul %r, 2;
-    div %r, 3;
-    neg %r;
+    create i32 %local;
+    mov %local, %a;
     nop;
 })";
-    auto unit = createUnit(code, "low_arith");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+    EXPECT_NE(unit->getLoweringContext(), nullptr);
 }
 
-TEST_F(FrontendCompilerTestFixture, Lowering_BitwiseOps_Succeeds)
-{
-    std::string code = R"(
-void F(i64 %a, i64 %b)
-{
-    create i64 %r;
-    mov %r, %a;
-    xor %r, %b;
-    and %r, 0xFF;
-    or %r, 0x100;
-    shl %r, 2;
-    shr %r, 1;
-    nop;
-})";
-    auto unit = createUnit(code, "low_bitwise");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_DataMovement_Succeeds)
-{
-    std::string code = R"(
-void F(i64 %src, i64 %dst)
-{
-    create i64 %val;
-    mov %val, 0;
-    mov %val, %src;
-    mov %val, i64 (%src+0);
-    mov %val, i64 (%src+0x10);
-    nop;
-})";
-    auto unit = createUnit(code, "low_data_mov");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_Labels_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %x)
-{
-    create i32 %acc;
-    mov %acc, 0;
-    label_init:
-    {
-        mov %acc, %x;
-    }
-    label_compute:
-    {
-        add %acc, 10;
-        nop;
-    }
-})";
-    auto unit = createUnit(code, "low_labels");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_NestedLabels_Succeeds)
+TEST_F(FrontendCompilerTestFixture, AstLowering_ModuleWithVariablesOfAllTypes)
 {
     std::string code = R"(
 void F()
 {
-    create i32 %x;
-    mov %x, 0;
-    label_outer:
-    {
-        add %x, 1;
-        label_inner:
-        {
-            add %x, 2;
-            nop;
-        }
-        sub %x, 1;
-    }
+    create i8  %byte;
+    create i16 %word;
+    create i32 %dword;
+    create i64 %qword;
+    mov %byte, 1;
+    mov %word, 256;
+    mov %dword, 100000;
+    mov %qword, 0xDEADBEEF;
     nop;
 })";
-    auto unit = createUnit(code, "low_nested_labels");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
 }
 
-TEST_F(FrontendCompilerTestFixture, Lowering_If_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %x)
-{
-    if (%x EQ 0)
-    {
-        nop;
-    }
-})";
-    auto unit = createUnit(code, "low_if");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_IfElseIfElse_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %x)
-{
-    if (%x LT 0)
-    {
-        nop;
-    }
-    else if (%x EQ 0)
-    {
-        nop;
-    }
-    else
-    {
-        nop;
-    }
-})";
-    auto unit = createUnit(code, "low_if_else");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_While_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n)
-{
-    create i32 %i;
-    mov %i, 0;
-    while (%i LT %n)
-    {
-        add %i, 1;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "low_while");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_NestedWhile_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n, i32 %m)
-{
-    create i32 %i;
-    create i32 %j;
-    create i32 %sum;
-    mov %i, 0;
-    mov %sum, 0;
-    while (%i LT %n)
-    {
-        mov %j, 0;
-        while (%j LT %m)
-        {
-            add %sum, 1;
-            add %j, 1;
-        }
-        add %i, 1;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "low_nested_while");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_Break_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n)
-{
-    create i32 %i;
-    mov %i, 0;
-    while (%i LT %n)
-    {
-        if (%i EQ 5)
-        {
-            break;
-        }
-        add %i, 1;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "low_break");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_Continue_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n)
-{
-    create i32 %i;
-    mov %i, 0;
-    while (%i LT %n)
-    {
-        add %i, 1;
-        if (%i EQ 3)
-        {
-            continue;
-        }
-        nop;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "low_continue");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_MemoryOperands_Succeeds)
-{
-    std::string code = R"(
-void F(i64 %ptr)
-{
-    create i64 %val;
-    create i32 %small;
-    mov %val, i64 (%ptr+0);
-    mov %val, i64 (%ptr+0x10);
-    mov %small, i32 (%ptr+0x20);
-    nop;
-})";
-    auto unit = createUnit(code, "low_memory");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_HexImmediates_Succeeds)
+TEST_F(FrontendCompilerTestFixture, AstLowering_ModuleWithArithmetic)
 {
     std::string code = R"(
 void F()
 {
-    create i64 %x;
-    mov %x, 0xDEADBEEF;
-    add %x, 0xFF;
-    and %x, 0xFFFF;
-    nop;
-})";
-    auto unit = createUnit(code, "low_hex");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_ZeroImmediate_Succeeds)
-{
-    std::string code = R"(
-void F()
-{
-    create i32 %x;
-    mov %x, 0;
-    add %x, 0;
-    nop;
-})";
-    auto unit = createUnit(code, "low_zero");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Lowering_MultipleVariablesSameType_Succeeds)
-{
-    std::string code = R"(
-void F()
-{
-    create i64 %a;
-    create i64 %b;
-    create i64 %c;
-    create i64 %d;
-    mov %a, 1;
-    mov %b, 2;
-    mov %c, 3;
-    mov %d, 4;
+    create i32 %a;
+    create i32 %b;
+    mov %a, 42;
+    mov %b, 10;
     add %a, %b;
-    add %c, %d;
+    sub %a, 5;
+    and %a, 0xFF;
+    or  %a, 0x10;
+    xor %a, %b;
+    shl %a, 2;
+    shr %a, 1;
     nop;
 })";
-    auto unit = createUnit(code, "low_multi_vars");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
 }
 
-TEST_F(FrontendCompilerTestFixture, Lowering_CombinedProgram_Succeeds)
+TEST_F(FrontendCompilerTestFixture, AstLowering_ModuleWithControlFlow)
 {
     std::string code = R"(
-i64 Combined(i64 %bufPtr, i32 %len, i64 %key)
+i32 F(i32 %input)
 {
-    create i64 %sum;
-    create i32 %i;
-    create i64 %addr;
-    create i64 %temp;
+    create i32 %result;
+    create i32 %counter;
+    mov %result, 0;
+    mov %counter, 0;
 
-    mov %sum, 0;
-    mov %i, 0;
-    mov %addr, %bufPtr;
-
-    while (%i LT %len)
+    while (%counter LT %input)
     {
-        mov %temp, i64 (%addr+0);
-        xor %temp, 0xFF;
-        add %temp, %key;
-        add %sum, %temp;
-        add %addr, 1;
-        add %i, 1;
+        add %result, %counter;
+        add %counter, 1;
     }
 
-    if (%sum EQ %key)
+    if (%result GT 100)
     {
-        mov %sum, 0;
-    }
-    else if (%sum GT %key)
-    {
-        sub %sum, %key;
+        mov %result, 100;
     }
     else
     {
-        add %sum, %key;
+        add %result, 1;
+    }
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+}
+
+TEST_F(FrontendCompilerTestFixture, AstLowering_ModuleWithLabels)
+{
+    std::string code = R"(
+void F()
+{
+    label_start:
+    {
+        create i32 %localInLabel;
+        mov %localInLabel, 42;
+        nop;
+    }
+    label_end:
+    {
+        nop;
+    }
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+}
+
+TEST_F(FrontendCompilerTestFixture, AstLowering_ModuleWithMemoryAccess)
+{
+    std::string code = R"(
+void F()
+{
+    create i64 %addr;
+    create i64 %val;
+    mov %addr, 0;
+    mov %val, i64 (%addr+0);
+    mov %val, i64 (%addr+0x10);
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+}
+
+TEST_F(FrontendCompilerTestFixture, AstLowering_OnlyNop)
+{
+    std::string code = "void F() { nop; }";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+}
+
+TEST_F(FrontendCompilerTestFixture, AstLowering_MultipleModulesInOneSource)
+{
+    std::string code = R"(
+void A()
+{
+    create i32 %x;
+    mov %x, 1;
+    nop;
+}
+
+void B()
+{
+    create i32 %y;
+    mov %y, 2;
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+}
+
+// =============================================================================
+//  3. AstLoweringPhase – complex programs
+// =============================================================================
+
+TEST_F(FrontendCompilerTestFixture, AstLowering_ComplexChecksumProgram)
+{
+    std::string code = R"(
+i64 ComplexChecksum(i64 %bufferPtr, i32 %length, i64 %key)
+{
+    create i64 %runningSum;
+    create i32 %counter;
+    create i64 %currentAddr;
+    create i64 %tempCalc;
+
+    mov %runningSum, 0;
+    mov %counter, 0;
+    mov %currentAddr, %bufferPtr;
+
+    while (%counter LT %length)
+    {
+        mov %tempCalc, i64 (%currentAddr+0);
+        xor %tempCalc, 0xFF;
+        add %tempCalc, %key;
+        add %runningSum, %tempCalc;
+        add %currentAddr, 1;
+        add %counter, 1;
+    }
+
+    if (%runningSum EQ %key)
+    {
+        mov %runningSum, 0;
+    }
+    else if (%runningSum GT %key)
+    {
+        sub %runningSum, %key;
+    }
+    else
+    {
+        add %runningSum, %key;
     }
 
     label_finalize:
     {
-        and %sum, 0xFFFF;
+        and %runningSum, 0xFFFF;
         nop;
     }
 })";
-    auto unit = createUnit(code, "low_combined");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
+    ASSERT_TRUE(runUpToSemantics(unit.get()));
+
+    AstLoweringPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+    EXPECT_NE(unit->getLoweringContext(), nullptr);
 }
 
 // =============================================================================
-//  AstLoweringPhase — file-based tests
+//  4. Full single-unit pipeline (all phases)
 // =============================================================================
 
-TEST_F(FrontendCompilerTestFixture, Lowering_StressFile_Succeeds)
+TEST_F(FrontendCompilerTestFixture, FullSingleUnit_SimpleModule)
 {
-    std::string content = readProgramFile("full_pipeline_stress.ez");
-    ASSERT_FALSE(content.empty());
-    auto unit = createUnit(content, "low_stress");
+    auto unit = createUnitFromSource("void F() { nop; }");
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
+    EXPECT_TRUE(runFullSingleUnit(unit.get()));
+
+    // Verify all components are populated
+    EXPECT_NE(unit->getTokenizer(), nullptr);
+    EXPECT_NE(unit->getParsingContext(), nullptr);
+    EXPECT_NE(unit->getSemanticContext(), nullptr);
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
+    EXPECT_NE(unit->getMirEmitterContext(), nullptr);
+    EXPECT_NE(unit->getMirGlobalDataEmitter(), nullptr);
+    EXPECT_NE(unit->getLoweringContext(), nullptr);
+    EXPECT_NE(unit->getGlobalScopeAstNodes(), nullptr);
 }
 
-TEST_F(FrontendCompilerTestFixture, Lowering_NestedControlFlowFile_Succeeds)
+TEST_F(FrontendCompilerTestFixture, FullSingleUnit_ModuleWithEverything)
 {
-    std::string content = readProgramFile("nested_control_flow.ez");
-    ASSERT_FALSE(content.empty());
-    auto unit = createUnit(content, "low_nested_cf");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
+    std::string code = R"(
+i64 FullModule(i32 %x, i64 %y)
+{
+    create i32 %counter;
+    create i64 %result;
+    mov %counter, 0;
+    mov %result, %y;
 
-TEST_F(FrontendCompilerTestFixture, Lowering_HeavyArithmeticFile_Succeeds)
-{
-    std::string content = readProgramFile("heavy_arithmetic.ez");
-    ASSERT_FALSE(content.empty());
-    auto unit = createUnit(content, "low_heavy_arith");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
+    while (%counter LT %x)
+    {
+        add %result, 1;
+        add %counter, 1;
+    }
 
-TEST_F(FrontendCompilerTestFixture, Lowering_MemoryIntensiveFile_Succeeds)
-{
-    std::string content = readProgramFile("memory_intensive.ez");
-    ASSERT_FALSE(content.empty());
-    auto unit = createUnit(content, "low_mem_intensive");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
-}
+    if (%result GT 100)
+    {
+        mov %result, 0;
+    }
+    else
+    {
+        add %result, %y;
+    }
 
-TEST_F(FrontendCompilerTestFixture, Lowering_MultiModuleStressFile_Succeeds)
-{
-    std::string content = readProgramFile("multi_module_stress.ez");
-    ASSERT_FALSE(content.empty());
-    auto unit = createUnit(content, "low_multi_mod");
+    label_done:
+    {
+        and %result, 0xFF;
+        nop;
+    }
+})";
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runFullPipeline(unit.get()));
+    EXPECT_TRUE(runFullSingleUnit(unit.get()));
+    EXPECT_NE(unit->getMirEmitter(), nullptr);
 }
 

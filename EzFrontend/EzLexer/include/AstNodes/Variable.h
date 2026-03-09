@@ -1,12 +1,14 @@
 /**
  * @file Variable.h
- * @brief AST node for variable references and declarations: `%name` or `type %name`.
+ * @brief AST node for `%name` references and typed variable declarations.
  *
- * A Variable can represent a function parameter, a local variable created
- * with the `create` instruction, or a global variable.  The parser records
- * the data-type prefix (if present) and the variable name; the semantic
- * passes later resolve the symbol, validate types, and link the node to a
- * MIR virtual register.
+ * Variable nodes are reused by several parts of the grammar:
+ * - plain variable references: `%value`
+ * - typed references/declarations: `i64 %value`
+ * - variable declarations with initializers: `i8 %bytes: {1, 2, 3}`
+ *
+ * The parser records only syntax. Questions such as "is this local, global,
+ * parameter, or symbol use?" are answered later by EzSemantics.
  */
 #ifndef EZPACKER_VARIABLE_H
 #define EZPACKER_VARIABLE_H
@@ -17,18 +19,25 @@
 #include "AstNodes/ImmediateOperand.h"
 
 /**
- * This AstNode defines a global variable, local variable or function argument. The parser is blind about "where" the
- * definition of the variable is made. The semantic checker is the responsible of setting m_isLocal properly.
+ * Parsed variable-like construct.
+ *
+ * The inherited AstNodeContainer stores optional initializer expressions. When
+ * present today, initializer entries are immediate values parsed from the
+ * source. An empty or null initializer list means the variable was written
+ * without `:` initialization syntax.
  */
 class Variable : public AstNode, public AstNodeContainer
 {
   public:
     /**
-     * Creates the variable with the given data type, variable name and initializers. By default initializers are not
-     * set (default parameters = {}). Also sets if this variable is an array or it isn't.
-     * @param initializers
-     * @param dataType
-     * @param variableName
+     * Creates a variable node.
+     *
+     * @param initializers Optional initializer slice. When this represents an
+     *                     array initializer, the slice contains one entry per
+     *                     element in source order.
+     * @param dataType Parsed type spelling, or an empty string view when the
+     *                 source omitted an explicit type.
+     * @param variableName Variable name without the leading `%`.
      */
     Variable(TypedPoolSlice<AstNode> *initializers, std::string_view dataType, std::string_view variableName);
 
@@ -47,8 +56,10 @@ class Variable : public AstNode, public AstNodeContainer
     bool accept(AstNodeVisitor *visitor) override;
 
     /**
-     * Returns if this variable is an array.
-     * @return bool
+     * Returns true when the parsed initializer used brace syntax and contains
+     * more than one element.
+     *
+     * A single-element `{value}` initializer is represented as a non-array.
      */
     bool getIsArray() const;
 
@@ -59,23 +70,14 @@ class Variable : public AstNode, public AstNodeContainer
     const char *getAstNodeName() const override;
 
     /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default, only
-     * variable type and name will be shown. If mode is set to debug, initializers will also be included.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
-    /**
-     * Returns the data-type name of this variable.
-     * @return const std::string_view &
+     * Returns the parsed data-type spelling.
+     *
+     * This may be empty for untyped variable references.
      */
     const std::string_view &getVariableDataType() const;
 
     /**
-     * Returns the name of this variable
-     * @return const std::string &
+     * Returns the variable name without the leading `%`.
      */
     const std::string_view &getVariableName() const;
 

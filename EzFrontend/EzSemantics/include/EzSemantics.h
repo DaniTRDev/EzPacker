@@ -2,62 +2,32 @@
  * @file EzSemantics.h
  * @brief Umbrella header for the EzSemantics library.
  *
- * EzSemantics sits between the parser (EzLexer) and the final code output.
- * It takes the raw AST produced by the lexer and transforms it into validated,
- * type-checked MIR (Mid-level Intermediate Representation) ready for
- * optimization or emission.  The pipeline has two major phases:
+ * EzSemantics is the semantic-analysis and lowering layer that sits between
+ * the parsed Ez AST and the MIR back-end. A typical consumer uses it in this
+ * order:
  *
- *   1. **Semantic Analysis** (SymbolVisitors) — A sequence of AST visitor
- *      passes that progressively enrich the tree with meaning:
- *        • SymbolDefinitionVisitor  – Creates scopes and registers every
- *          declared symbol (variables, labels, modules/functions, parameters).
- *        • SymbolAndTypeResolverVisitor – Resolves name references to their
- *          defining symbols and attaches concrete type information.
- *        • TypeCheckVisitor – Validates type compatibility across operands
- *          and enforces structural rules (e.g. break/continue must appear
- *          inside a loop).
- *      Each pass annotates AST nodes with SemanticAnnotations (symbol links,
- *      data types, scope ownership, type-cast requirements) so that later
- *      stages never need to re-derive that information.
+ *   1. Create a shared `BasicSemanticContext`.
+ *   2. Run the semantic passes on the AST:
+ *        - `SymbolDefinitionVisitor`
+ *        - `SymbolAndTypeResolverVisitor`
+ *        - `TypeCheckVisitor`
+ *   3. Create a `LoweringContext` and run `AstLowererVisitor` to emit MIR.
  *
- *   2. **AST-to-MIR Lowering** (AstLowererVisitor) — An AST visitor that
- *      walks the fully-annotated tree and emits the equivalent MIR.  Every
- *      language construct has a dedicated lowerer:
- *        • ModuleLowerer   – Creates the function entry block and lowers
- *          header parameters, then delegates to the body.
- *        • LabelLowerer    – Creates a new basic block and links the label
- *          symbol to it.
- *        • InstructionLowerer – Maps mnemonics to MIR opcodes and lowers
- *          each operand.
- *        • VariableLowerer / ImmediateLowerer / MemoryLowerer – Emit
- *          virtual registers, integer/float constants, and memory operands.
- *        • ConditionLowerer – Emits CMP + conditional jump sequences.
- *        • IfLowerer        – Creates true/false/merge blocks and wires
- *          the condition into them.
- *        • WhileLowerer     – Creates condition-check, loop-body, and exit
- *          blocks, and pushes a LoopContext for break/continue handling.
- *        • BreakLowerer     – Emits a JMP to the current loop's exit block
- *          and opens a dead-code block for any unreachable code that follows.
- *        • ContinueLowerer  – Emits a JMP back to the current loop's
- *          condition-check block, also opening a dead-code block.
- *        • CodeScopeLowerer – Iterates through a brace-delimited scope and
- *          lowers every child expression in order.
- *      A shared LoweringContext tracks the block/operand stacks and the
- *      nested LoopContext stack that break/continue rely on.
+ * Semantic analysis enriches the AST with `SemanticAnnotations` so later
+ * passes can consume resolved symbols, owned scopes, data types and required
+ * casts without re-deriving them. The lowering layer then translates the
+ * validated AST into MIR using construct-specific lowerers for modules,
+ * labels, instructions, immediates, memory operands, conditions, `if`,
+ * `while`, `break` and `continue`.
  *
- * Supporting infrastructure:
- *   - Scope / Symbol / TypeTable – The symbol table and type registry that
- *     back every name-resolution and type-checking decision.
- *   - BasicSemanticContext – A façade that owns the global scope, the
- *     error collector, the symbol-to-MIR-ID linkage map, and loop-nesting
- *     tracking used across all visitor passes.
- *   - SemanticVisitor – A thin base class that all semantic visitors derive
- *     from, providing the shared context plumbing.
+ * Scope-sensitive constructs supported by the semantic passes include modules,
+ * labels, `if` branches, `while`, `for` and `switch` / `case`. Note that the
+ * umbrella header exposes the public lowering infrastructure only; not every
+ * AST construct necessarily has a dedicated public lowerer class.
  *
- * Including this single header gives you access to every public type in
- * EzSemantics: the semantic context, all visitor passes, every annotation,
- * the scope/symbol infrastructure, and the complete set of AST-to-MIR
- * lowerers.
+ * Including this header gives third-party code access to the public
+ * EzSemantics API surface: context objects, semantic passes, scope/type
+ * infrastructure, AST annotations and MIR lowering entry points.
  */
 #ifndef EZPACKER_EZSEMANTICS_H
 #define EZPACKER_EZSEMANTICS_H
@@ -68,7 +38,7 @@
 #include "BasicSemanticContext.h"
 #include "SemanticVisitor.h"
 
-// ── AST-to-MIR lowerers (one per language construct) ────────────────────────
+// ── AST-to-MIR lowerers (public lowering entry points and helpers) ──────────
 #include "AstLowererVisitor/AstLowererVisitor.h"
 #include "AstLowererVisitor/BreakLowerer.h"
 #include "AstLowererVisitor/CodeScopeLowerer.h"

@@ -72,15 +72,6 @@ class ConditionAstNode : public AstNode
      * @return const char*
      */
     const char *getAstNodeName() const override;
-
-    /**
-     * Returns a string representation of this node. This is described as:
-     * op1 comparison_operator op2
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
   private:
     ConditionComparisonType m_comparisonType; // The type of condition (e.g., Equal, GreaterThan, etc.)
     AstNode *m_left;                          // The left-hand side of the condition (e.g., a variable or expression).

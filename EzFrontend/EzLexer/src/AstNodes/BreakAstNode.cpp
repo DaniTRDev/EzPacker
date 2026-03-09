@@ -15,5 +15,3 @@ bool BreakAstNode::accept(struct AstNodeVisitor *visitor)
 }
 
 const char *BreakAstNode::getAstNodeName() const { return "BreakAstNode"; }
-
-std::string BreakAstNode::getAsStr(AstNodeStringMode mode) const { return getAstNodeName(); }

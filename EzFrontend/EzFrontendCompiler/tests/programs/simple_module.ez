@@ -1,0 +1,8 @@
+# Simple void module with no parameters
+# Tests: basic module compilation
+
+void SimpleModule()
+{
+    nop;
+}
+

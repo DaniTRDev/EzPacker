@@ -1,14 +1,14 @@
 /**
  * @file InstructionParser.h
- * @brief Parsers for assembly-style instructions: `mnemonic op1, op2;`.
+ * @brief Parsers for statement-level instructions.
  *
- * Three parser classes live inside the InstructionParser namespace:
- *   - CallInstructionParser    — parses `call` instructions that invoke
- *                                 another module/function.
- *   - NonCallInstructionParser — parses regular instructions (mov, add, …)
- *                                 with their variable/immediate/memory operands.
- *   - InstructionParser        — top-level parser that tries call first,
- *                                 then falls back to non-call.
+ * Supported source forms:
+ * - regular instruction: `mnemonic;`
+ * - regular instruction with operands: `mnemonic op1, op2;`
+ * - call instruction: `call %callee()` or `call %callee(arg1, arg2);`
+ *
+ * Operand parsers are tried in this order: immediate, variable, memory operand.
+ * This matters when multiple operand syntaxes share a prefix.
  */
 #ifndef EZPACKER_INSTRUCTIONPARSER_H
 #define EZPACKER_INSTRUCTIONPARSER_H
@@ -26,8 +26,11 @@ class CallInstructionParser : public IAstNodeParser
 {
   public:
     /**
-     * Tries to parse a call instruction out of the given context.
-     * @return InstructionAstNode
+     * Parses the specialized `call` form.
+     *
+     * On success, the returned node is a CallInstruction whose expression list
+     * begins with the callee variable followed by zero or more arguments.
+     * The parser expects the call to be terminated by `;`.
      */
     AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
@@ -36,8 +39,11 @@ class NonCallInstructionParser : public IAstNodeParser
 {
   public:
     /**
-     * Tries to parse a regular instruction out of the given context.
-     * @return AstNode *
+     * Parses any non-`call` instruction.
+     *
+     * The mnemonic must be an identifier. Zero-operand instructions must still
+     * end with `;`. Operands, when present, are comma-separated and parsed in
+     * source order.
      */
     AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };
@@ -46,8 +52,11 @@ class InstructionParser : public IAstNodeParser
 {
   public:
     /**
-     * Tries to parse an instruction (CallInstructionParser, NonCallInstructionParser) out of the given context.
-     * @return AstNode *
+     * Tries `CallInstructionParser` first and falls back to
+     * `NonCallInstructionParser` on a non-fatal miss.
+     *
+     * This ordering ensures that the `call` keyword is handled by its special
+     * grammar before the generic instruction parser can consume it.
      */
     AstNode *parse(const std::shared_ptr<BasicParsingContext> &ctx) override;
 };

@@ -1,11 +1,11 @@
 /**
  * @file SymbolAnnotation.h
- * @brief Annotation that links an AST node to its defining Symbol.
+ * @brief Annotation that links an AST node to a resolved semantic symbol.
  *
- * Attached to Variable, Label, and Module nodes after
- * SymbolDefinitionVisitor creates their symbols.  Later passes and the
- * lowerer read this annotation to look up type information, MIR IDs, and
- * other symbol metadata.
+ * This is the primary bridge between syntax and the symbol table. It can be
+ * attached either at a declaration site (for example, when a variable/module/
+ * label definition creates its symbol) or at a use site after the resolver
+ * matches a name reference to a declaration.
  */
 #ifndef EZPACKER_SYMBOLANNOTATION_H
 #define EZPACKER_SYMBOLANNOTATION_H
@@ -14,37 +14,33 @@
 #include "Scope/Symbol.h"
 
 /**
- * Annotation used for nodes that are symbols.
+ * Annotation that stores the `Symbol` associated with an AST node.
  */
 class SymbolAnnotation : public IAstNodeAnnotation
 {
   public:
     /**
-     * Creates a default object WITHOUT a symbol.
+     * Creates an annotation with no associated symbol yet.
      */
     explicit SymbolAnnotation();
 
     /**
-     * Creates the annotation linked to the given symbol.
-     * @param symbol
+     * Creates the annotation pointing at an already resolved symbol.
      */
     SymbolAnnotation(Symbol *symbol);
 
     /**
-     * Returns the symbol of this annotation.
-     * @return Symbol *
+     * Returns the associated semantic symbol.
      */
     Symbol *getSymbol() const;
 
     /**
-     * Returns "SymbolAnnotation".
-     * @return const char*
+     * Returns the runtime annotation kind name: `"SymbolAnnotation"`.
      */
     const char *getAnnotationName() const override;
 
     /**
-     * Sets the symbol of this annotation.
-     * @param symbol
+     * Stores the associated semantic symbol.
      */
     void setSymbol(Symbol *symbol);
 

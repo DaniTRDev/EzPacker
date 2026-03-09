@@ -1,16 +1,24 @@
 /**
  * @file SymbolAndTypeResolverVisitor.h
- * @brief Second semantic pass — resolves every name reference to its
- *        defining symbol and attaches concrete type information.
+ * @brief Second semantic pass: resolve name uses and concrete data types.
  *
- * SymbolAndTypeResolverVisitor walks the annotated AST produced by
- * SymbolDefinitionVisitor and:
- *   - Resolves each Variable reference to the Symbol that defined it,
- *     emitting an "unknown symbol" error if no definition is found.
- *   - Resolves type-name strings (on immediates, memory operands, etc.)
- *     to their Type objects via the TypeTable.
- *   - Annotates nodes with DataTypeAnnotation and SymbolAnnotation so the
- *     TypeCheckVisitor can validate operand compatibility.
+ * This visitor expects the AST to have already been processed by
+ * `SymbolDefinitionVisitor`. It re-enters the scopes created in that first
+ * pass and turns unresolved syntax into explicit semantic links.
+ *
+ * Observable effects of this visitor:
+ *   - Resolves variable uses to the `Symbol` that defines them.
+ *   - Resolves explicit type names on immediates and memory operands through
+ *     `TypeTable`.
+ *   - Applies default types where the syntax omitted them (`i64` for integer
+ *     immediates, `double` for floating-point immediates, and the language
+ *     default type for untyped memory operands).
+ *   - Attaches `SymbolAnnotation`, `DataTypeAnnotation` and consumes
+ *     `ScopeAnnotation` / `ScopedSymbolAnnotation` produced by the first pass.
+ *
+ * This pass does not enforce cast safety or structural rules such as whether
+ * `break` is legal in the current context; that belongs to
+ * `TypeCheckVisitor`.
  */
 #ifndef EZPACKER_SYMBOLANDTYPERESOLVERVISITOR_H
 #define EZPACKER_SYMBOLANDTYPERESOLVERVISITOR_H
@@ -25,84 +33,108 @@
 #include "SemanticAnnotations/SymbolAnnotation.h"
 
 /**
- * This resolves every symbol. If a symbol is used but not defined, an error is thrown. It also resolves types
- * used in memory operands.
+ * Semantic pass that resolves symbols and concrete operand types.
  */
 class SymbolAndTypeResolverVisitor : public SemanticVisitor
 {
   public:
     /**
-     * Visits given CodeScope node. It will visit its expressions.
-     * @param scope
-     * @return bool
+     * Visits a lexical code scope and resolves all child expressions in the
+     * already active scope.
      */
     bool visit(CodeScope *scope) override;
 
     /**
-     * Visits given CodeScope node. It will visit its expressions.
-     * @param cond
-     * @return bool
+     * Visits a condition and resolves both operands that participate in the
+     * comparison.
      */
     bool visit(ConditionAstNode *cond) override;
 
     /**
-     * Visits the given IfAstNode. Will try to resolve the symbol and types from the condition and true and false
-     * branches.
-     * @param ifNode
-     * @return bool
+     * Visits a `for` loop.
+     *
+     * The visitor re-enters the scope attached to the `ForAstNode` during the
+     * definition pass so the initialiser, condition, next-iteration clause and
+     * body see the same declarations.
      */
-    bool visit(IfAstNode *ifNode);
+    bool visit(ForAstNode *_for) override;
 
     /**
-     * Visits given immediate node. It tries to resolve its type if it was given. If no type was set, the default
-     * i64 type is used.
-     * @param instr
-     * @return bool
+     * Visits an `if` statement.
+     *
+     * The condition is resolved in the current scope. Each branch body is then
+     * resolved inside the dedicated scope attached to that branch's
+     * `CodeScope`.
+     */
+    bool visit(IfAstNode *ifNode) override;
+
+    /**
+     * Visits an immediate literal.
+     *
+     * If the source explicitly specified a type name, that type is resolved and
+     * attached as a `DataTypeAnnotation`. Otherwise a default type is inferred
+     * from the literal kind.
      */
     bool visit(ImmediateOperand *imm) override;
 
     /**
-     * Visits given instruction node. If instruction uses virtual variables, this visitor will check if they have been
-     * previously defined. If instruction == create, it returns true without doing nothing.
-     * @param instr
-     * @return bool
+     * Visits an instruction.
+     *
+     * Ordinary operands are resolved recursively. The declaration instruction
+     * `create` is treated as already fully handled by `SymbolDefinitionVisitor`
+     * and therefore skipped here.
      */
     bool visit(Instruction *instr) override;
 
     /**
-     * Visits given Label operand node. Recursively visits sub labels and instructions.
-     * @param label
-     * @return bool
+     * Visits a label definition and resolves its body inside the scope owned by
+     * the label.
      */
     bool visit(Label *label) override;
 
     /**
-     * Visits given Memory operand node. If the operand uses virtual variables, this visitor will check if they have
-     * been previously defined. It will also create the corresponding type, using POINTER as default (if no type is
-     * provided).
-     * @param operand
-     * @return bool
+     * Visits a memory operand.
+     *
+     * The referenced element type is resolved (or defaulted if omitted) and
+     * stored as a `DataTypeAnnotation`. Any base/index variables used by the
+     * addressing mode are then resolved recursively.
      */
     bool visit(MemoryOperandAstNode *operand) override;
 
     /**
-     * Visits given Module node. Recursively visits child instructions and labels.
-     * @param module
-     * @return bool
+     * Visits a module and resolves its body inside the scope owned by the
+     * module.
      */
     bool visit(Module *module) override;
 
     /**
-     * Visits given Variable node. Resolves the symbol this variables represent.
-     * @param var
-     * @return bool
+     * Visits a variable use.
+     *
+     * If the node already carries a `SymbolAnnotation` (for example because it
+     * is also the declaration site of a global or local definition), no extra
+     * lookup is performed. Otherwise the visitor resolves the name against the
+     * active scope chain and attaches the matching symbol.
      */
     bool visit(Variable *var) override;
 
     /**
-     * Visits the given WhileAstNode. Will try to resolve the symbol and types from the condition the loop branch.
-     * @param whileNode
-     * @return bool
+     * Visits a `switch` statement, resolving the controlling variable and then
+     * each case.
+     */
+    bool visit(SwitchAstNode *_switch) override;
+
+    /**
+     * Visits a single switch case inside the scope attached to that case.
+     *
+     * Both the case value and the case body are resolved there.
+     */
+    bool visit(SwitchCaseAstNode *switchCase) override;
+
+    /**
+     * Visits a `while` loop.
+     *
+     * The condition is resolved in the enclosing scope, then the body is
+     * resolved inside the scope attached to the `WhileAstNode`.
      */
     bool visit(WhileAstNode *whileNode) override;
 };

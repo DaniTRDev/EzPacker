@@ -2,20 +2,25 @@
 #define EZPACKER_FRONTENDCOMPILERTESTFIXTURE_H
 
 #include "EzFrontendCompilerCommon.h"
+#include "FrontendCompilerDriver.h"
 #include "FrontendCompilationUnit.h"
 #include "FrontendCompilationUnitPhase.h"
-#include "FrontendCompilerDriver.h"
 #include "CompilationPhases/AstLowering.h"
+#include "CompilationPhases/IncludePhase.h"
 #include "CompilationPhases/Parsing.h"
 #include "CompilationPhases/SemanticAnalysis.h"
 #include "CompilationPhases/Tokenization.h"
+#include "CompilationPhases/Semantic/SymbolAndTypeResolver.h"
+#include "CompilationPhases/Semantic/SymbolDefinition.h"
+#include "CompilationPhases/Semantic/TypeCheck.h"
 #include <gtest/gtest.h>
 #include <fstream>
 #include <filesystem>
 
 /**
- * Test fixture for the EzFrontendCompiler library. Provides shared infrastructure (error collector, source manager,
- * logger) and helpers to run individual phases or the full driver on inline source strings and .ez files on disk.
+ * Test fixture for the EzFrontendCompiler module.
+ * Provides shared infrastructure (logger, source manager, error collector, compiler driver)
+ * and helper methods for running individual phases or the full pipeline.
  */
 class FrontendCompilerTestFixture : public ::testing::Test
 {
@@ -24,79 +29,66 @@ class FrontendCompilerTestFixture : public ::testing::Test
     void TearDown() override;
 
     // ──────────────────────────────────────────────────────────────
-    //  Compilation-unit helpers
+    //  Compilation unit helpers
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Creates a FrontendCompilationUnit and registers the given source content under the given name.
-     * @param sourceContent  The source text.
-     * @param sourceName     A human-readable name.
-     * @return A fully initialised compilation unit, or nullptr on failure.
+     * Creates a FrontendCompilationUnit from inline source content.
+     * Registers the source in the source manager and calls create().
+     * @param content  Source code string.
+     * @param name     Logical name for the source.
+     * @return shared_ptr to the created compilation unit, or nullptr on failure.
      */
-    std::unique_ptr<FrontendCompilationUnit> createUnit(const std::string &sourceContent,
-                                                        const std::string &sourceName);
+    std::shared_ptr<FrontendCompilationUnit> createUnitFromSource(const std::string &content,
+                                                                   const std::string &name = "TEST_SOURCE");
 
     // ──────────────────────────────────────────────────────────────
-    //  Phase runners
+    //  Phase runners (on a single unit)
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Runs the tokenization phase on the given unit.
-     * @return true if the phase succeeded.
-     */
+    /** Runs only the TokenizationPhase on the given unit. */
     bool runTokenization(FrontendCompilationUnit *unit);
 
-    /**
-     * Runs tokenization + parsing on the given unit.
-     * @return true if both phases succeeded.
-     */
-    bool runThroughParsing(FrontendCompilationUnit *unit);
+    /** Runs Tokenization + Parsing on the given unit. */
+    bool runUpToParsing(FrontendCompilationUnit *unit);
 
-    /**
-     * Runs tokenization + parsing + semantic analysis on the given unit.
-     * @return true if all three phases succeeded.
-     */
-    bool runThroughSemantics(FrontendCompilationUnit *unit);
+    /** Runs Tokenization + Parsing + SemanticAnalysis (all 3 sub-phases) on the given unit. */
+    bool runUpToSemantics(FrontendCompilationUnit *unit);
 
-    /**
-     * Runs the full four-phase pipeline on the given unit.
-     * @return true if all four phases succeeded.
-     */
-    bool runFullPipeline(FrontendCompilationUnit *unit);
+    /** Runs the full single-unit pipeline: Tokenization → Parsing → Semantic → AstLowering. */
+    bool runFullSingleUnit(FrontendCompilationUnit *unit);
 
     // ──────────────────────────────────────────────────────────────
-    //  Driver helpers
+    //  Compiler driver helpers
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Creates a FrontendCompilerDriver that shares the fixture's error collector and source manager.
+     * Adds inline source to the driver and compiles everything.
+     * @param content  Source code string.
+     * @param name     Logical name for the source.
+     * @return true if addSource + compile both succeed.
      */
-    std::unique_ptr<FrontendCompilerDriver> createDriver();
-
-    // ──────────────────────────────────────────────────────────────
-    //  File helpers
-    // ──────────────────────────────────────────────────────────────
+    bool compileFromSource(const std::string &content, const std::string &name = "TEST_SOURCE");
 
     /**
-     * Reads the content of an .ez file from the programs/ subfolder next to this fixture file.
-     * @param fileName  File name relative to programs/ (e.g. "full_pipeline_stress.ez").
-     * @return The file contents, or an empty string on failure (and an ADD_FAILURE is emitted).
+     * Adds an .ez file from the programs/ subfolder to the driver and compiles it.
+     * @param fileName  File name relative to the programs/ folder.
+     * @return true if addSourceFromFile + compile both succeed.
      */
-    std::string readProgramFile(const std::string &fileName);
+    bool compileFromFile(const std::string &fileName);
 
     // ──────────────────────────────────────────────────────────────
-    //  Error state helpers
+    //  Accessors
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Returns true if the shared error collector currently holds at least one fatal error.
-     */
+    std::shared_ptr<ErrorCollector> getErrorCollector() const;
+    std::shared_ptr<SourceManager> getSourceManager() const;
+    FrontendCompilerDriver *getDriver() const;
+
+    /** Returns true if the error collector has any fatal errors in the current scope. */
     bool hasFatalErrors() const;
 
-  protected:
-    /**
-     * Returns the path to the programs/ folder, derived from __FILE__.
-     */
+    /** Returns the path to the programs/ directory. */
     static std::filesystem::path getProgramsDir();
 
   protected:
@@ -104,6 +96,7 @@ class FrontendCompilerTestFixture : public ::testing::Test
     std::shared_ptr<SourceManager> m_sourceManager;
     std::shared_ptr<SourceLoggingSink> m_sourceSinkLogger;
     std::shared_ptr<ErrorCollector> m_errorCollector;
+    std::shared_ptr<FrontendCompilerDriver> m_driver;
 };
 
 #endif // EZPACKER_FRONTENDCOMPILERTESTFIXTURE_H

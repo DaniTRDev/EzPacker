@@ -1,11 +1,11 @@
 /**
  * @file ScopedSymbolAnnotation.h
- * @brief Annotation for nodes that both define a symbol AND own a scope.
+ * @brief Annotation for AST nodes that both define a symbol and own a scope.
  *
- * Used on Module and Label nodes, which introduce a new name into the
- * enclosing scope and simultaneously create a child scope for their body.
- * Inherits from SymbolAnnotation (avoiding a diamond with ScopeAnnotation)
- * and adds a raw Scope* to the owned scope.
+ * This is the combined annotation used by declarations such as `Module` and
+ * `Label`, where one AST node introduces a named symbol into its parent scope
+ * and simultaneously owns a nested body scope. It extends `SymbolAnnotation`
+ * and adds a non-owning pointer to the owned `Scope`.
  */
 #ifndef EZPACKER_SCOPEDSYMBOLANNOTATION_H
 #define EZPACKER_SCOPEDSYMBOLANNOTATION_H
@@ -15,27 +15,23 @@
 #include "SymbolAnnotation.h"
 
 /**
- * Annotation used for nodes that define a symbol and OWN a scope. This class inherits ONLY from the symbol annotation
- * to avoid "Diamond Problem" (2 classes inheriting from the same class).
+ * Combined annotation for nodes that define a symbol and own a child scope.
  */
 class ScopedSymbolAnnotation : public SymbolAnnotation
 {
   public:
     /**
-     * Returns "ScopedSymbolAnnotation".
-     * @return const char*
+     * Returns the runtime annotation kind name: `"ScopedSymbolAnnotation"`.
      */
     const char *getAnnotationName() const override;
 
     /**
-     * Returns the owned scope of this annotation.
-     * @return Scope*
+     * Returns the scope owned by the annotated declaration node.
      */
     Scope *getOwnedScope();
 
     /**
-     * Sets the owned scope of this annotation.
-     * @param scope
+     * Stores the scope owned by the annotated declaration node.
      */
     void setOwnedScope(Scope *scope);
 

@@ -2,16 +2,25 @@
 #include <algorithm>
 #include <stdexcept>
 
+SourceManager::SourceManager(const std::filesystem::path &workingPath) : m_workingPath(workingPath) {}
+
+bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) const
+{
+    size_t id = std::hash<std::string_view>{}(resolveSourcePath(sourceName).string());
+    return m_sources.contains(id);
+}
+
 size_t SourceManager::addSourceContent(const std::string &name, const std::string &content)
 {
-    size_t id = std::hash<std::string>{}(name);
+    std::string resolvedName = resolveSourcePath(name).string();
+    size_t id = std::hash<std::string>{}(resolvedName);
 
     if (m_sources.contains(id))
         return 0; // Source with the same name already exists, return 0 to indicate failure.
 
     // Store the content
     m_sources[id] = content;
-    m_sourcesNames[id] = name;
+    m_sourcesNames[id] = resolvedName;
 
     // We will build the line ranges.
     std::vector<LineSourceRange> &lines = m_sourceLines[id];
@@ -43,7 +52,7 @@ size_t SourceManager::addSourceContent(const std::string &name, const std::strin
 
 SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, const std::string &sourceFile)
 {
-    size_t id = std::hash<std::string>{}(sourceFile);
+    size_t id = std::hash<std::string>{}(resolveSourcePath(sourceFile).string());
     return createReference(col, length, line, id);
 }
 
@@ -72,6 +81,18 @@ SourceReference SourceManager::createReference(size_t col, size_t length, size_t
     ref.m_sourceFileId = sourceId;
 
     return ref;
+}
+
+const std::filesystem::path &SourceManager::getWorkingPath() const { return m_workingPath; }
+
+std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::path &sourceFile) const
+{
+    std::filesystem::path sourcePath;
+    if (sourceFile.is_relative())
+    {
+        sourcePath = m_workingPath / sourceFile;
+    }
+    return sourcePath;
 }
 
 std::string SourceManager::getRawLineContent(const SourceReference &ref)

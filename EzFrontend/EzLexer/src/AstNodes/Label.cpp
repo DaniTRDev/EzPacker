@@ -19,11 +19,4 @@ const char *Label::getAstNodeName() const { return "Label"; }
 
 void Label::setCodeScope(CodeScope *codeScope) { m_codeScope = codeScope; }
 
-std::string Label::getAsStr(AstNodeStringMode mode) const
-{
-    std::string res;
-    res += std::format("@Label(name {}) {{ {} }}\n", getLabelName(), m_codeScope->getAsStr(mode));
-    return std::move(res);
-}
-
 const std::string_view &Label::getLabelName() const { return m_name; }

@@ -7,7 +7,7 @@ bool ParsingPhase::execute(struct FrontendCompilationUnit *unit)
     const std::shared_ptr<SourceManager> &sourceManager = unit->getSourceManager();
 
     ParserBatch batch;
-    batch.addParsersFromTypeList<VariableParser, ModuleParser::ModuleParser>();
+    batch.addParsersFromTypeList<IncludeParser, VariableParser, ModuleParser::ModuleParser>();
 
     std::shared_ptr<BasicParsingContext> parsingContext =
             std::make_shared<BasicParsingContext>(errorCollector, sourceManager, tokenizer->getTokens());
@@ -21,8 +21,8 @@ bool ParsingPhase::execute(struct FrontendCompilationUnit *unit)
 
         if (!node)
         {
-            unit->emitError(ErrorSeverity::Fatal, "Parsing failed due to previous errors", getName());
-            return false;
+            // There must be at least 1 fatal error that made the compilation stop.
+            break;
         }
 
         nodePool->appendToSlice(globalScopeAstNodes, node);

@@ -1,4 +1,5 @@
 #include "SymbolVisitors/SymbolDefinitionVisitor.h"
+// Assume ScopeCreatorGuard is included or available via context headers
 
 bool DefineSymbolFromVariable(SymbolType symbolType,
                               const std::shared_ptr<BasicSemanticContext> &ctx,
@@ -57,10 +58,39 @@ bool SymbolDefinitionVisitor::visit(struct CodeScope *scope)
     return AstNodeVisitor::visitAll(scope->getExpressions());
 }
 
+bool SymbolDefinitionVisitor::visit(struct ForAstNode *_for)
+{
+    // A 'for' loop creates an overarching scope so variables declared in the
+    // initialization block are available to the condition, nextIt, and body.
+    ScopeCreatorGuard guard(_for, getSemanticContext(), "ForLoopScope");
+
+    return _for->getInitialization()->accept(this) && _for->getCondition()->accept(this) &&
+            _for->getBody()->accept(this) &&
+            // Ensure we safely handle nextIt since it was parsed separately
+            (_for->getNextItClause() ? _for->getNextItClause()->accept(this) : true);
+}
+
 bool SymbolDefinitionVisitor::visit(IfAstNode *ifNode)
 {
-    return ifNode->getCondition()->accept(this) && ifNode->getTrueScope()->accept(this) &&
-            (!ifNode->getFalseScope() || ifNode->getFalseScope()->accept(this));
+    if (!ifNode->getCondition()->accept(this))
+        return false;
+
+    // True branch gets its own lexical scope
+    {
+        ScopeCreatorGuard trueGuard(ifNode->getTrueScope(), getSemanticContext(), "IfTrueScope");
+        if (!ifNode->getTrueScope()->accept(this))
+            return false;
+    }
+
+    // False branch (if it exists) gets its own isolated lexical scope
+    if (ifNode->getFalseScope())
+    {
+        ScopeCreatorGuard falseGuard(ifNode->getFalseScope(), getSemanticContext(), "IfFalseScope");
+        if (!ifNode->getFalseScope()->accept(this))
+            return false;
+    }
+
+    return true;
 }
 
 bool SymbolDefinitionVisitor::visit(Instruction *instr)
@@ -105,18 +135,15 @@ bool SymbolDefinitionVisitor::visit(Label *label)
         return false;
     }
 
-    getSemanticContext()->beginScope(labelName);
     {
+        ScopeCreatorGuard guard(label, getSemanticContext(), std::string(labelName));
         ownedScope = getSemanticContext()->getCurrentScope();
 
-        // CodeScope. Visit code scope and its expressions.
         if (!label->getCodeScope()->accept(this))
         {
-            // Error is already in the collector.
             return false;
         }
     }
-    getSemanticContext()->endScope();
 
     ScopedSymbolAnnotation *annotation = label->createAnnotation<ScopedSymbolAnnotation>(m_ctx->getAnnotPool());
     annotation->setOwnedScope(ownedScope);
@@ -127,7 +154,6 @@ bool SymbolDefinitionVisitor::visit(Label *label)
 
 bool SymbolDefinitionVisitor::visit(struct ModuleHeader *header)
 {
-
     return AstNodeVisitor::visitAll(header->getExpressions());
 }
 
@@ -158,25 +184,15 @@ bool SymbolDefinitionVisitor::visit(Module *module)
         return false;
     }
 
-    getSemanticContext()->beginScope(moduleName);
     {
+        ScopeCreatorGuard guard(module, getSemanticContext(), std::string(moduleName));
         ownedScope = getSemanticContext()->getCurrentScope();
 
-        // Header. Visit parameters.
-        if (!header->accept(this))
+        if (!header->accept(this) || !body->accept(this))
         {
-            // The concrete error of the fail will already be in the error collector.
-            return false;
-        }
-
-        // Body. Visit code scope.
-        if (!body->accept(this))
-        {
-            // The concrete error of the fail will already be in the error collector.
             return false;
         }
     }
-    getSemanticContext()->endScope();
 
     ScopedSymbolAnnotation *annotation = module->createAnnotation<ScopedSymbolAnnotation>(m_ctx->getAnnotPool());
     annotation->setOwnedScope(ownedScope);
@@ -195,4 +211,28 @@ bool SymbolDefinitionVisitor::visit(Variable *variable)
     return DefineSymbolFromVariable(type, getSemanticContext(), variable, "SymbolDefinitionVisitor::Variable");
 }
 
-bool SymbolDefinitionVisitor::visit(WhileAstNode *whileNode) { return whileNode->getCodeScope()->accept(this); }
+bool SymbolDefinitionVisitor::visit(SwitchAstNode *_switch)
+{
+    // The switch variable does not need a new scope, just traverse it
+    // and then traverse all the cases.
+    return AstNodeVisitor::visitAll(_switch->getCases());
+}
+
+bool SymbolDefinitionVisitor::visit(SwitchCaseAstNode *_switchCase)
+{
+    // Each case block requires its own scope to prevent variable leakage between cases
+    ScopeCreatorGuard guard(_switchCase, getSemanticContext(), "SwitchCaseScope");
+    return _switchCase->getBody()->accept(this);
+}
+
+bool SymbolDefinitionVisitor::visit(WhileAstNode *whileNode)
+{
+    if (whileNode->getCondition() && !whileNode->getCondition()->accept(this))
+    {
+        return false;
+    }
+
+    // Loop body needs its own lexical scope
+    ScopeCreatorGuard guard(whileNode, getSemanticContext(), "WhileBodyScope");
+    return whileNode->getCodeScope()->accept(this);
+}

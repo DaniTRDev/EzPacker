@@ -43,7 +43,7 @@ void TokenizerTestFixture::SetUp()
     m_currentPos = 0;
     m_errorCollector = std::make_shared<ErrorCollector>();
     m_logger = EzLogger::createSyncLogger("TEST");
-    m_sourceManager = std::make_shared<SourceManager>();
+    m_sourceManager = std::make_shared<SourceManager>("");
     m_loggingSink = std::make_shared<SourceLoggingSink>(m_logger.get());
 
     Test::SetUp();

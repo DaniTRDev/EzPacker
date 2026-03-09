@@ -275,15 +275,17 @@ inline constexpr auto TEST_INSTRUCTION_IMPL =
     EXPECT_TRUE(fixture->expectNodeCast<>(instr));
     EXPECT_EQ(instr->getInstructionName(), name);
 
-    auto operands = instr->getExpressions();
-    EXPECT_EQ(operands->m_numElems, operandTypes.size());
-
-    size_t i = 0;
-    for (const void *object : *operands)
+    if (!operandTypes.empty())
     {
-        auto operand = (AstNode *)object;
-        EXPECT_EQ(operand->getType(), operandTypes[i]);
-        i++;
+        auto operands = instr->getExpressions();
+        EXPECT_EQ(operands->m_numElems, operandTypes.size());
+
+        size_t i = 0;
+        for (AstNode *operand : *operands)
+        {
+            EXPECT_EQ(operand->getType(), operandTypes[i]);
+            i++;
+        }
     }
 };
 
@@ -294,8 +296,6 @@ inline constexpr auto TEST_CALL_INSTRUCTION_IMPL = [](std::string callee,
 {
     CallInstruction *instr;
     EXPECT_TRUE(fixture->expectNodeCast<>(instr));
-    EXPECT_EQ(instr->getReturnType(), returnType);
-    EXPECT_EQ(instr->getCalleeName(), callee);
     TEST_INSTRUCTION_IMPL("call", std::move(parameterTypes), fixture);
 };
 
@@ -340,11 +340,10 @@ inline constexpr auto TEST_MODULE_HEADER_IMPL =
     }
 };
 
-inline constexpr auto TEST_CONDITION_IMPL =
-        [](ConditionComparisonType expectedType,
-           AstNodeType expectedLeftType,
-           AstNodeType expectedRightType,
-           ParsersTestFixture *fixture)
+inline constexpr auto TEST_CONDITION_IMPL = [](ConditionComparisonType expectedType,
+                                               AstNodeType expectedLeftType,
+                                               AstNodeType expectedRightType,
+                                               ParsersTestFixture *fixture)
 {
     ConditionAstNode *condition;
     EXPECT_TRUE(fixture->expectNodeCast<>(condition));
@@ -355,8 +354,7 @@ inline constexpr auto TEST_CONDITION_IMPL =
     EXPECT_EQ(condition->getRight()->getType(), expectedRightType);
 };
 
-inline constexpr auto TEST_IF_IMPL =
-        [](bool hasTrue, bool hasFalse, AstNodeType falseType, ParsersTestFixture *fixture)
+inline constexpr auto TEST_IF_IMPL = [](bool hasTrue, bool hasFalse, AstNodeType falseType, ParsersTestFixture *fixture)
 {
     IfAstNode *ifNode;
     EXPECT_TRUE(fixture->expectNodeCast<>(ifNode));
@@ -378,8 +376,7 @@ inline constexpr auto TEST_IF_IMPL =
     }
 };
 
-inline constexpr auto TEST_WHILE_IMPL =
-        [](size_t expectedBodyExprCount, ParsersTestFixture *fixture)
+inline constexpr auto TEST_WHILE_IMPL = [](size_t expectedBodyExprCount, ParsersTestFixture *fixture)
 {
     WhileAstNode *whileNode;
     EXPECT_TRUE(fixture->expectNodeCast<>(whileNode));

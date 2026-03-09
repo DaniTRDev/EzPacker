@@ -1,57 +1,81 @@
 /**
  * @file BasicSemanticContext.h
- * @brief Shared state for every semantic pass: scopes, symbols, loop tracking,
- *        error reporting, and the symbol-to-MIR linkage map.
+ * @brief Shared semantic state used by all EzSemantics passes.
  *
- * BasicSemanticContext is the central façade used by all semantic visitors
- * and the AST-to-MIR lowerer.  It owns:
- *   - The global scope and the scope stack (beginScope / endScope / enterScope).
- *   - An arena pool for Symbol and IAstNodeAnnotation objects.
- *   - A loop-nesting counter so the TypeCheckVisitor can reject break/continue
- *     outside of loops.
- *   - Helper methods for creating symbols, resolving names, and emitting
- *     diagnostic errors tied to source locations.
+ * `BasicSemanticContext` is the main coordination object for semantic
+ * analysis and lowering. It owns the root scope, tracks the currently active
+ * scope, provides allocation pools for semantic annotations and symbols, and
+ * centralises diagnostic emission.
  *
- * Two RAII guards are provided for convenience:
- *   - ScopeGuard — calls enterScope on construction and exitScope on destruction.
- *   - LoopGuard  — calls enterLoop on construction and exitLoop on destruction.
+ * Public responsibilities:
+ *   - Manage lexical scopes created during `SymbolDefinitionVisitor`.
+ *   - Re-enter previously created scopes in later passes.
+ *   - Create symbols with unique IDs and resolve them by name.
+ *   - Track whether the current traversal is inside a loop and/or switch.
+ *   - Emit user-facing diagnostics tied to AST source locations.
+ *
+ * Lifetime notes:
+ *   - A global scope always exists after construction.
+ *   - Symbols and annotations are allocated from the internal pools owned by
+ *     the context; callers should treat returned raw pointers as non-owning.
+ *   - `Scope` objects are heap-allocated and retained by the context for the
+ *     lifetime of the semantic session.
+ *
+ * Two scope-related RAII guards and one loop-related guard are provided:
+ *   - `ScopeGuard`: temporarily re-enters an already existing scope.
+ *   - `ScopeCreatorGuard`: creates a fresh scope, attaches it to an AST node
+ *     as a `ScopeAnnotation`, then closes it on destruction.
+ *   - `LoopGuard`: increments loop nesting on entry and decrements it on exit.
  */
 #ifndef EZPACKER_BASICSEMANTICCONTEXT_H
 #define EZPACKER_BASICSEMANTICCONTEXT_H
 
 #include "EzSemanticsCommon.h"
 #include "Scope/Scope.h"
+#include "SemanticAnnotations/ScopeAnnotation.h"
 
 /**
- * Context used by the semantic analyzer.
+ * Shared semantic-analysis context.
  *
- * IMPORTANT: By default global scope is created on object creation. It is available by getCurrentScope (if no
- * more scopes were begin) or through getGlobalScope.
+ * The constructor ensures there is always an active global scope. Until a
+ * nested scope is created or re-entered, both `getCurrentScope()` and
+ * `getGlobalScope()` refer to that root scope.
  */
 class BasicSemanticContext : public ErrorEmitter
 {
   public:
     /**
-     * Creates the context with the given error collector and source manager. Global scope is created by default, but it
-     * can be overridden by passing a custom global scope (can be used to link multiple files at once without extra
-     * efforts).
-     * @param errorCollector
-     * @param sourceManager
-     * @param globalScope
+     * Creates a semantic context.
+     *
+     * If `globalScope` is null, a fresh scope named `"global"` is created.
+     * Passing an existing global scope allows several ASTs/files to share the
+     * same symbol table across semantic passes.
+     *
+     * @param errorCollector Diagnostic sink used by `ErrorEmitter`.
+     * @param sourceManager Source manager used to format source locations.
+     * @param globalScope Optional pre-existing root scope to reuse.
      */
     BasicSemanticContext(const std::shared_ptr<ErrorCollector> &errorCollector,
                          const std::shared_ptr<SourceManager> &sourceManager,
                          const std::shared_ptr<Scope> &globalScope = nullptr);
 
     /**
-     * Creates a symbol in the current scope linked to an AstNode. If symbol is present in the scope false is returned
-     * and nothing is done. If symbol was correctly created, outSymbol will be set to it.
-     * @param definingNode
-     * @param symbolType
-     * @param outSymbol
-     * @param symbolDataType
-     * @param symbolName
-     * @return bool
+     * Defines a new symbol in the current scope.
+     *
+     * The symbol is created only if another symbol with the same name does not
+     * already exist in the current scope. Parent scopes are not considered a
+     * conflict, which means shadowing is allowed and handled by callers.
+     *
+     * On success, `*outSymbol` receives the newly created symbol and the method
+     * assigns it a unique context-wide ID. On failure, the method returns
+     * `false` and performs no mutation.
+     *
+     * @param definingNode AST node that introduces the symbol.
+     * @param symbolType Semantic category of the symbol.
+     * @param outSymbol Output parameter for the created symbol.
+     * @param symbolDataType Declared type of the symbol, if any.
+     * @param symbolName Unqualified symbol name as it appears in source.
+     * @return `true` if the symbol was inserted in the current scope.
      */
     bool createSymbol(AstNode *definingNode,
                       SymbolType symbolType,
@@ -59,130 +83,139 @@ class BasicSemanticContext : public ErrorEmitter
                       Type *symbolDataType,
                       const std::string_view &symbolName);
     /**
-     * Returns true if the current context is inside a loop. This is used to check if break and continue statements are
-     * valid (in most cases)-
-     * @return bool
+     * Returns whether the current traversal is nested inside at least one
+     * loop.
+     *
+     * This is consumed by semantic checks for `break` / `continue`.
      */
     bool isContextInsideLoop() const;
 
     /**
-     * Returns true if the current scope is the global scope.
-     * @return bool
+     * Returns whether the current traversal is nested inside at least one
+     * `switch`.
+     *
+     * This is consumed by semantic checks for `break`.
+     */
+    bool isContextInsideSwitch() const;
+
+    /**
+     * Returns `true` when the active scope is the root/global scope.
      */
     bool isCurrentScopeGlobalScope() const;
 
     /**
-     * Tries to search for a symbol in the current scope. If it's found, true is returned. If it's found and
-     * outSymbol != nullptr, outSymbol will be set to the occurrence.
+     * Resolves a symbol name starting from the current scope.
      *
-     * If the symbol is not found in this scope and searchParent is set to true, it will start a recursive bottom-to-top
-     * search in parent scopes.
-     * @param symbolName
-     * @param outSymbol
-     * @param searchParent
-     * @return bool
+     * If `searchParent` is `false`, only the current lexical scope is queried.
+     * If `searchParent` is `true`, lookup walks parent scopes until the symbol
+     * is found or the global scope is exhausted.
+     *
+     * @param symbolName Symbol name to resolve.
+     * @param outSymbol Optional output pointer receiving the matching symbol.
+     * @param searchParent Whether to continue lookup in parent scopes.
+     * @return `true` when a symbol with that name is found.
      */
     bool resolveSymbolInScope(const std::string_view &symbolName, Symbol **outSymbol, bool searchParent);
 
     /**
-     * Returns the current scope. If no scope is opened, global scope is returned.
-     * @return Scope *
+     * Returns the currently active lexical scope.
      */
     Scope *getCurrentScope() const;
 
     /**
-     * Returns the pool of annotations.
-     * @return TypedPool *
+     * Returns the annotation pool used to allocate AST annotations.
      */
     TypedPool *getAnnotPool();
 
     /**
-     * Returns the pool of symbols.
-     * @return TypedPool *
+     * Returns the symbol pool used to allocate `Symbol` instances.
      */
     TypedPool *getSymbolPool();
 
     /**
-     * Begins a new scope with the given name. Scope names CAN BE duplicated.
-     * @param name
+     * Creates and enters a child scope below the current scope.
+     *
+     * The created scope is retained by the context and remains valid for the
+     * rest of the semantic session even after `endScope()` / `exitScope()`.
+     * Scope names are descriptive only and are allowed to repeat.
      */
     void beginScope(const std::string_view &name);
 
     /**
-     * Discovers an inclusion of a module. If the module was already discovered, nothing is done. If the module was not
-     * discovered, it is added to the list of discovered inclusions. This is used to prevent including the same file
-     * multiple times and to detect circular dependencies. As well as being able to reference modules from external
-     * files.
-     * @param includePath
-     */
-    void discoverInclusion(const std::string_view &includePath);
-
-    /**
-     * Emits an error because of the redefinition of a symbol. It will print the first place the symbol was defined in.
-     * @param module
-     * @param symbolName
-     * @param errorNode
+     * Emits a redefinition diagnostic for a symbol already present in the
+     * current scope.
+     *
+     * The implementation also emits a secondary diagnostic pointing to the
+     * original definition site.
      */
     void
     emitSymbolRedefinitionError(const std::string_view &module, const std::string_view &symbolName, AstNode *errorNode);
 
     /**
-     * Emits an error because an unknown symbol.
-     * @param module
-     * @param symbolName
-     * @param errorNode
+     * Emits an "unknown symbol" diagnostic for an unresolved name use.
      */
     void emitUnknownSymbolError(const std::string_view &module, const std::string_view &symbolName, AstNode *errorNode);
 
     /**
-     * Tries to end a scope. If currentScope == globalScope, an exception will be thrown.
+     * Leaves the current child scope.
      *
-     * Internally, this function calls exitScope.
+     * This is equivalent to `exitScope()` with an additional guard that
+     * rejects attempts to leave the global scope.
      */
     void endScope();
 
     /**
-     * Enters in a loop causing the loop nesting level to increase by one. This is used to track if we are in a loop and
-     how many nested loops we are in. This is useful for break and continue statements, which need to know if they are
-     inside a loop and how many loops they need to break/continue.
+     * Marks the beginning of a loop-sensitive region.
      */
     void enterLoop();
 
     /**
-     * This method is intended for passes after the first semantic pass (SymbolDefinitionVisitor).
-     * @param scope
+     * Re-enters an already existing scope.
+     *
+     * This is intended for passes after symbol definition, where the scope was
+     * already created and attached to the AST via `ScopeAnnotation` or
+     * `ScopedSymbolAnnotation`.
      */
     void enterScope(Scope *scope);
 
     /**
-     * Exits a loop causing the loop nesting level to decrease by one. If we are not in any loop, an exception is
-     * thrown.
+     * Marks the beginning of a switch-sensitive region.
+     */
+    void enterSwitch();
+
+    /**
+     * Leaves the current loop-sensitive region.
+     *
+     * Throws if no loop is currently active.
      */
     void exitLoop();
 
     /**
-     * Sets current scope to the parent of current scope. If current scope is global scope, an exception is thrown.
+     * Restores the active scope to the parent of the current scope.
+     *
+     * Throws if called while already in the global scope.
      */
     void exitScope();
 
     /**
-     * Returns the global scope.
-     * @return const std::shared_ptr<Scope> &
+     * Leaves the current switch-sensitive region.
+     *
+     * Throws if no switch is currently active.
+     */
+    void exitSwitch();
+
+    /**
+     * Returns the root/global scope used by this semantic session.
      */
     const std::shared_ptr<Scope> &getGlobalScope() const;
 
   private:
     Scope *m_currentScope;
+    size_t m_currentSwitchLevel;   // Used to track the current switch nesting level. It starts at 0 (not in a switch).
     size_t m_currentLoopNestLevel; // Used to track the current loop nesting level. It starts at 0 (not in any loop).
     size_t m_currentSymbolId;      // Used to give symbols an ID. Error is 0, this starts at 1.
     TypedPool m_annotationPool;    // Cache-friendly container of annotations.
     TypedPool m_symbolPool;        // Cache-friendly container of symbols.
-    std::set<std::string> m_discoveredInclusions; /**
-                                                   * Set of all the included files discovered during the semantic
-                                                   * analysis. This is used to prevent including the same file
-                                                   * multiple times and to detect circular dependencies. As well
-                                                   * as being able to reference modules from external files.
-                                                   */
     std::shared_ptr<Scope> m_globalScope;
     std::vector<std::shared_ptr<Scope>>
             m_scopes; /*
@@ -194,7 +227,10 @@ class BasicSemanticContext : public ErrorEmitter
 };
 
 /**
- * Simple RAII (Resource Acquisition Is Initialization) guard to manage scopes AFTER SymbolDefinitionVisitor.
+ * RAII helper that temporarily enters an already existing scope.
+ *
+ * This is the guard used by passes that revisit scopes created earlier by
+ * `SymbolDefinitionVisitor`.
  */
 class ScopeGuard
 {
@@ -215,8 +251,46 @@ class ScopeGuard
 };
 
 /**
- * Simple RAII (Resource Acquisition Is Initialization) guard to manage loops. It will call enterLoop on construction
- * and exitLoop on destruction.
+ * RAII helper that creates a new child scope and attaches it to an AST node.
+ *
+ * Construction calls `beginScope(name)`. Destruction captures the current
+ * scope, writes it into a `ScopeAnnotation` owned by `outAst`, and then calls
+ * `endScope()`.
+ *
+ * This is intended for `SymbolDefinitionVisitor`, the pass that owns scope
+ * creation.
+ */
+class ScopeCreatorGuard
+{
+  public:
+    inline ScopeCreatorGuard(AstNode *outAst,
+                             const std::shared_ptr<class BasicSemanticContext> &ctx,
+                             const std::string_view &name) : m_ctx(ctx)
+    {
+        m_outAst = outAst;
+        m_ctx->beginScope(name);
+    }
+
+    ~ScopeCreatorGuard()
+    {
+        Scope *exitedScope = m_ctx->getCurrentScope();
+        ScopeAnnotation *annotation = m_outAst->createAnnotation<ScopeAnnotation>(m_ctx->getAnnotPool());
+        annotation->setOwnedScope(exitedScope);
+
+        m_ctx->endScope();
+    }
+
+    // Disable copying to prevent double-exiting
+    ScopeCreatorGuard(const ScopeGuard &) = delete;
+    ScopeCreatorGuard &operator=(const ScopeGuard &) = delete;
+
+  private:
+    AstNode *m_outAst;
+    std::shared_ptr<BasicSemanticContext> m_ctx;
+};
+
+/**
+ * RAII helper that marks a region as being inside a loop for semantic checks.
  */
 class LoopGuard
 {

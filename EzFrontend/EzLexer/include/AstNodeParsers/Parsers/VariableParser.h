@@ -1,10 +1,18 @@
 /**
  * @file VariableParser.h
- * @brief Parser for variable references: `%name` or typed declarations `type %name`.
+ * @brief Parser for `%name` references and variable declarations.
  *
- * Produces a Variable node.  When a type prefix is present it is stored on
- * the node; otherwise the type is left unset and will be resolved later by
- * the semantic analysis pass.
+ * Accepted source forms:
+ * - `%name`
+ * - `type %name`
+ * - `type %name: immediate`
+ * - `type %name: { immediate[, immediate...] }`
+ *
+ * Notes:
+ * - The parser requires the leading `%` before the variable name.
+ * - Initializers are limited to immediate expressions.
+ * - Semantic meaning (parameter, local, global, symbol use) is not decided
+ *   here; only syntax is recorded.
  */
 #ifndef EZPACKER_VARIABLEPARSER_H
 #define EZPACKER_VARIABLEPARSER_H
@@ -18,8 +26,11 @@ class VariableParser : public IAstNodeParser
 {
   public:
     /**
-     * Tries to parse a variable node out of the given context.
-     * @return AstNode*
+     * Parses a Variable node from the current token position.
+     *
+     * The parser accepts an optional type identifier before `%name`. If a colon
+     * follows the name, it expects either a single immediate initializer or a
+     * brace-delimited list of immediates.
      */
     AstNode* parse(const std::shared_ptr<BasicParsingContext> &ctx);
 };

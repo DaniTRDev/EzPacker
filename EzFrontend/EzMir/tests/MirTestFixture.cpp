@@ -3,7 +3,7 @@
 void MirTestFixture::SetUp()
 {
     m_errorCollector = std::make_shared<ErrorCollector>();
-    m_sourceManager = std::make_shared<SourceManager>();
+    m_sourceManager = std::make_shared<SourceManager>("");
     m_context = std::make_shared<MirEmitterContext>(m_errorCollector, m_sourceManager);
     m_emitter = std::make_shared<MirEmitter>(m_context.get());
     m_globalDataEmitter = std::make_shared<MirGlobalDataEmitter>(m_context.get());

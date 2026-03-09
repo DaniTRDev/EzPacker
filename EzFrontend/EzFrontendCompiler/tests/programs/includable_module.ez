@@ -1,0 +1,10 @@
+# A simple module designed to be included by another file
+# Tests: include resolution, cross-file symbol visibility
+
+i32 IncludableHelper()
+{
+    create i32 %helperVar;
+    mov %helperVar, 999;
+    nop;
+}
+

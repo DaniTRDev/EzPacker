@@ -1,11 +1,14 @@
 /**
  * @file ScopeAnnotation.h
- * @brief Annotation for AST nodes that own a lexical scope.
+ * @brief Annotation for AST nodes that own a lexical `Scope`.
  *
- * Attached to nodes like CodeScope during SymbolDefinitionVisitor.  It
- * holds a shared_ptr<Scope> so that later passes (resolution, type
- * checking, lowering) can re-enter the correct scope when they visit the
- * annotated node.
+ * `SymbolDefinitionVisitor` attaches this annotation to nodes that create a
+ * child scope but do not themselves define a named symbol that also needs to
+ * be tracked separately. Later passes re-enter that stored scope through
+ * `BasicSemanticContext::enterScope()`.
+ *
+ * The stored pointer is non-owning: the actual `Scope` lifetime is managed by
+ * `BasicSemanticContext`.
  */
 #ifndef EZPACKER_SCOPEANNOTATION_H
 #define EZPACKER_SCOPEANNOTATION_H
@@ -14,37 +17,33 @@
 #include "Scope/Scope.h"
 
 /**
- * Annotation used for nodes that OWN a scope.
+ * Annotation that points to the scope owned by an AST node.
  */
 class ScopeAnnotation : public IAstNodeAnnotation
 {
   public:
     /**
-     * Creates a default object WITHOUT a scope.
+     * Creates an annotation with no owned scope attached yet.
      */
     ScopeAnnotation();
 
     /**
-     * Creates the annotation linked to the given scope.
-     * @param scope
+     * Creates the annotation already pointing at an existing scope.
      */
     ScopeAnnotation(Scope *scope);
 
     /**
-     * Returns "ScopeAnnotation".
-     * @return const char*
+     * Returns the runtime annotation kind name: `"ScopeAnnotation"`.
      */
     const char *getAnnotationName() const override;
-    
+
     /**
-     * Sets the owned scope of this annotation.
-     * @param scope
+     * Stores the scope owned by the annotated AST node.
      */
     void setOwnedScope(Scope *scope);
 
     /**
-     * Returns the owned scope of this annotation.
-     * @return Scope *
+     * Returns the scope associated with the annotated AST node.
      */
     Scope *getOwnedScope();
 

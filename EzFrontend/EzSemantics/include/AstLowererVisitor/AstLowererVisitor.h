@@ -1,15 +1,20 @@
 /**
  * @file AstLowererVisitor.h
- * @brief Top-level AST visitor that orchestrates the AST-to-MIR lowering pass.
+ * @brief Public entry-point visitor for lowering a validated AST into MIR.
  *
- * AstLowererVisitor walks a fully-annotated AST (after symbol definition,
- * resolution, and type checking) and dispatches each node to its
- * corresponding GenericLowerer subclass (ModuleLowerer, InstructionLowerer,
- * IfLowerer, WhileLowerer, BreakLowerer, ContinueLowerer, etc.).
+ * This visitor is intended to run after the three semantic passes have
+ * succeeded. It delegates each supported AST node kind to a specialised
+ * lowerer and shares a `LoweringContext` across the whole traversal.
  *
- * The visitor owns a shared LoweringContext that provides block/operand
- * stacks, loop-context management, and access to the MIR emitter
- * infrastructure.
+ * Pre-conditions for consumers:
+ *   - The AST must already carry the semantic annotations produced by the
+ *     definition/resolution/type-check pipeline.
+ *   - The supplied `LoweringContext` must already contain the MIR emitter
+ *     services needed by the lowerers.
+ *
+ * Supported public lowering entry points in this module currently include code
+ * scopes, conditions, `if`, immediates, instructions, labels, modules,
+ * module headers, memory operands, variables and `while` loops.
  */
 #ifndef EZPACKER_ASTLOWERERVISITOR_H
 #define EZPACKER_ASTLOWERERVISITOR_H
@@ -25,84 +30,82 @@ class AstLowererVisitor : public SemanticVisitor
 {
   public:
     /**
-     * Creates the lowerer visitor with the given lowering context.
-     * @param loweringCtx
+     * Creates the lowering visitor that will use the given shared lowering
+     * context.
      */
-    AstLowererVisitor(const std::shared_ptr<LoweringContext> &loweringCtx);
+    explicit AstLowererVisitor(const std::shared_ptr<LoweringContext> &loweringCtx);
 
     /**
-     * Visits given CodeScope node. It will visit its expressions.
-     * @param scope
-     * @return bool
+     * Lowers a code scope by delegating to `CodeScopeLowerer`.
      */
     bool visit(CodeScope *scope) override;
 
     /**
-     * Visits the given condition and emits the corresponding compare and jump to block.
+     * Lowers a condition node into the MIR comparison/jump sequence expected
+     * by surrounding control-flow lowerers.
      */
     bool visit(ConditionAstNode *cond) override;
 
     /**
-     * Visits the given IfAstNode. Will try to resolve the symbol and types from the condition and true and false
-     * branches.
-     * @param ifNode
-     * @return bool
+     * Lowers a for node into the MIR initialization, comparison, body and next iteration clause blocks.
      */
-    bool visit(IfAstNode *ifNode);
+    bool visit(ForAstNode *_for) override;
+
     /**
-     * Visits the given immediate and checks its type.
-     * @return
+     * Lowers an `if` statement by delegating to `IfLowerer`.
+     */
+    bool visit(IfAstNode *ifNode) override;
+    /**
+     * Lowers an immediate operand.
+     *
+     * Any type information required for emission is expected to already be
+     * present in semantic annotations.
      */
     bool visit(ImmediateOperand *imm) override;
 
     /**
-     * Visits given instruction node. Recursively visits operands.
-     * @param instr
-     * @return bool
+     * Lowers one instruction and its operands.
      */
     bool visit(Instruction *instr) override;
 
     /**
-     * Visits given Label node. Recursively visits its expressions.
-     * @param label
-     * @return bool
+     * Lowers a label and the body associated with it.
      */
     bool visit(Label *label) override;
 
     /**
-     * Visits given Module node. Recursively visits its expressions.
-     * @param module
-     * @return bool
+     * Lowers a module definition into MIR function/module state.
      */
     bool visit(Module *module) override;
 
     /**
-     * Visits given Module node. Recursively visits its expressions.
-     * @param header
-     * @return bool
+     * Lowers a module header, typically parameters and signature metadata.
      */
     bool visit(ModuleHeader *header) override;
-    
+
     /**
-     * Visits given Memory operand node. Visits used variable nodes (if any).
-     * @param operand
-     * @return bool
+     * Lowers a memory operand, including any addressing subexpressions needed
+     * to materialise it.
      */
     bool visit(MemoryOperandAstNode *operand) override;
 
     /**
-     * Visits given Variable node. This visitor will check for the types of
-     * the symbol this variable references and the used type. If these types do not match will change node's annotation
-     * to a TypeCastAnnotation.
-     * @param var
-     * @return bool
+     * Lowers a switch into its corresponding case condition checker and case body block. Will also handle
+     * jumping to the next block if no case is going to be executed and also handles case-fallthrough if no break
+     * is specified.
+     */
+    bool visit(SwitchAstNode *_switch) override;
+
+    /**
+     * Lowers a variable use or definition reference.
+     *
+     * Symbol and cast annotations produced by semantic analysis determine the
+     * MIR operand emitted here.
      */
     bool visit(Variable *var) override;
 
     /**
-     * Visits the given WhileAstNode. Will try to resolve the symbol and types from the condition the loop branch.
-     * @param whileNode
-     * @return bool
+     * Lowers a `while` loop by delegating to `WhileLowerer`.
      */
     bool visit(WhileAstNode *whileNode) override;
 

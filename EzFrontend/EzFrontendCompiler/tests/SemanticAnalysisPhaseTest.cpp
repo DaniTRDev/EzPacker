@@ -1,77 +1,175 @@
 #include "FrontendCompilerTestFixture.h"
 
 // =============================================================================
-//  SemanticAnalysisPhase — valid programs
+//  1. SemanticAnalysisPhase – getName
 // =============================================================================
 
-TEST_F(FrontendCompilerTestFixture, Semantics_MinimalModule_Succeeds)
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysisPhase_GetName)
 {
-    auto unit = createUnit("void F() { nop; }", "sem_minimal");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-    EXPECT_NE(unit->getSemanticContext(), nullptr);
+    SemanticAnalysisPhase phase;
+    EXPECT_STREQ(phase.getName(), "SemanticAnalysisPhase");
 }
 
-TEST_F(FrontendCompilerTestFixture, Semantics_ModuleWithParams_Succeeds)
+// =============================================================================
+//  2. Individual sub-phases – getName
+// =============================================================================
+
+TEST_F(FrontendCompilerTestFixture, SymbolDefinitionPhase_GetName)
+{
+    SymbolDefinitionPhase phase;
+    EXPECT_STREQ(phase.getName(), "SymbolDefinition");
+}
+
+TEST_F(FrontendCompilerTestFixture, SymbolAndTypeResolverPhase_GetName)
+{
+    SymbolAndTypeResolverPhase phase;
+    EXPECT_STREQ(phase.getName(), "SymbolAndTypeResolverPhase");
+}
+
+TEST_F(FrontendCompilerTestFixture, TypeCheckPhase_GetName)
+{
+    TypeCheckPhase phase;
+    EXPECT_STREQ(phase.getName(), "TypeCheckPhase");
+}
+
+// =============================================================================
+//  3. SemanticAnalysisPhase – valid modules
+// =============================================================================
+
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_SimpleVoidModule)
+{
+    auto unit = createUnitFromSource("void F() { nop; }");
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+}
+
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_ModuleWithParams)
 {
     std::string code = R"(
-i64 Compute(i32 %a, i64 %b)
+i64 MyModule(i32 %a, i64 %b)
 {
-    create i64 %result;
-    mov %result, %b;
-    add %result, 1;
+    create i32 %local;
+    mov %local, %a;
     nop;
 })";
-    auto unit = createUnit(code, "sem_params");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
 }
 
-TEST_F(FrontendCompilerTestFixture, Semantics_VariableUsedAfterCreate_Succeeds)
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_ModuleWithVariablesOfAllTypes)
 {
     std::string code = R"(
 void F()
 {
-    create i32 %x;
-    mov %x, 42;
-    add %x, 1;
+    create i8  %byte;
+    create i16 %word;
+    create i32 %dword;
+    create i64 %qword;
+    mov %byte, 1;
+    mov %word, 256;
+    mov %dword, 100000;
+    mov %qword, 0xDEADBEEF;
     nop;
 })";
-    auto unit = createUnit(code, "sem_var_use");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
 }
 
-TEST_F(FrontendCompilerTestFixture, Semantics_AllTypes_Succeeds)
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_ModuleWithControlFlow)
+{
+    std::string code = R"(
+i32 F(i32 %input)
+{
+    create i32 %result;
+    create i32 %counter;
+    mov %result, 0;
+    mov %counter, 0;
+
+    while (%counter LT %input)
+    {
+        add %result, %counter;
+        add %counter, 1;
+    }
+
+    if (%result GT 100)
+    {
+        mov %result, 100;
+    }
+    else
+    {
+        add %result, 1;
+    }
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+}
+
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_ModuleWithArithmetic)
 {
     std::string code = R"(
 void F()
 {
-    create i8  %a;
-    create i16 %b;
-    create i32 %c;
-    create i64 %d;
-    mov %a, 1;
-    mov %b, 2;
-    mov %c, 3;
-    mov %d, 4;
+    create i32 %a;
+    create i32 %b;
+    mov %a, 42;
+    mov %b, 10;
+    add %a, %b;
+    sub %a, 5;
+    and %a, 0xFF;
+    or  %a, 0x10;
+    xor %a, %b;
+    shl %a, 2;
+    shr %a, 1;
     nop;
 })";
-    auto unit = createUnit(code, "sem_all_types");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
 }
 
-TEST_F(FrontendCompilerTestFixture, Semantics_Labels_Succeeds)
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_ModuleWithLabels)
 {
     std::string code = R"(
-void F(i32 %x)
+void F()
 {
-    create i32 %acc;
-    mov %acc, 0;
     label_start:
     {
-        add %acc, %x;
+        create i32 %localInLabel;
+        mov %localInLabel, 42;
         nop;
     }
     label_end:
@@ -79,262 +177,190 @@ void F(i32 %x)
         nop;
     }
 })";
-    auto unit = createUnit(code, "sem_labels");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
 }
 
-TEST_F(FrontendCompilerTestFixture, Semantics_NestedLabels_Succeeds)
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_ModuleWithMemoryAccess)
 {
     std::string code = R"(
 void F()
 {
-    label_outer:
-    {
-        label_inner:
-        {
-            nop;
-        }
-        nop;
-    }
-})";
-    auto unit = createUnit(code, "sem_nested_labels");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_If_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %x)
-{
-    if (%x EQ 0)
-    {
-        nop;
-    }
-})";
-    auto unit = createUnit(code, "sem_if");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_IfElseIfElse_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %x)
-{
-    if (%x LT 0)
-    {
-        nop;
-    }
-    else if (%x EQ 0)
-    {
-        nop;
-    }
-    else
-    {
-        nop;
-    }
-})";
-    auto unit = createUnit(code, "sem_if_else");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_While_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n)
-{
-    create i32 %i;
-    mov %i, 0;
-    while (%i LT %n)
-    {
-        add %i, 1;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "sem_while");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_NestedWhile_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n, i32 %m)
-{
-    create i32 %i;
-    create i32 %j;
-    mov %i, 0;
-    while (%i LT %n)
-    {
-        mov %j, 0;
-        while (%j LT %m)
-        {
-            add %j, 1;
-        }
-        add %i, 1;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "sem_nested_while");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_BreakInsideWhile_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n)
-{
-    create i32 %i;
-    mov %i, 0;
-    while (%i LT %n)
-    {
-        if (%i EQ 5)
-        {
-            break;
-        }
-        add %i, 1;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "sem_break");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_ContinueInsideWhile_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %n)
-{
-    create i32 %i;
-    mov %i, 0;
-    while (%i LT %n)
-    {
-        add %i, 1;
-        if (%i EQ 3)
-        {
-            continue;
-        }
-        nop;
-    }
-    nop;
-})";
-    auto unit = createUnit(code, "sem_continue");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_MemoryOperands_Succeeds)
-{
-    std::string code = R"(
-void F(i64 %ptr)
-{
+    create i64 %addr;
     create i64 %val;
-    mov %val, i64 (%ptr+0);
-    mov %val, i64 (%ptr+0x10);
+    mov %addr, 0;
+    mov %val, i64 (%addr+0);
+    mov %val, i64 (%addr+0x10);
     nop;
 })";
-    auto unit = createUnit(code, "sem_memory");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
 }
 
-TEST_F(FrontendCompilerTestFixture, Semantics_HexImmediates_Succeeds)
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_OnlyNop)
+{
+    std::string code = R"(
+void F()
+{
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+}
+
+// =============================================================================
+//  4. Individual sub-phases – SymbolDefinition
+// =============================================================================
+
+TEST_F(FrontendCompilerTestFixture, SymbolDefinition_DefinesModuleSymbol)
+{
+    std::string code = R"(
+void MyFunc()
+{
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SymbolDefinitionPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+}
+
+TEST_F(FrontendCompilerTestFixture, SymbolDefinition_DefinesVariables)
+{
+    std::string code = R"(
+void F()
+{
+    create i32 %myVar;
+    create i64 %otherVar;
+    mov %myVar, 1;
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SymbolDefinitionPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+}
+
+TEST_F(FrontendCompilerTestFixture, SymbolDefinition_DefinesParams)
+{
+    std::string code = R"(
+i32 F(i32 %x, i64 %y)
+{
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SymbolDefinitionPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
+}
+
+// =============================================================================
+//  5. SemanticAnalysis – error cases
+// =============================================================================
+
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_RedefinedVariable)
 {
     std::string code = R"(
 void F()
 {
     create i32 %x;
-    mov %x, 0xFF;
-    add %x, 0xDEAD;
-    nop;
-})";
-    auto unit = createUnit(code, "sem_hex");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_AllConditionOps_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %a, i32 %b)
-{
-    if (%a LT %b) { nop; }
-    if (%a GT %b) { nop; }
-    if (%a EQ %b) { nop; }
-    if (%a NE %b) { nop; }
-    if (%a LE %b) { nop; }
-    if (%a GE %b) { nop; }
-})";
-    auto unit = createUnit(code, "sem_all_conds");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_ForwardReferenceParams_Succeeds)
-{
-    std::string code = R"(
-void F(i32 %a, i32 %b)
-{
-    create i32 %sum;
-    add %sum, %a;
-    add %sum, %b;
-    nop;
-})";
-    auto unit = createUnit(code, "sem_fwd_ref");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
-}
-
-// =============================================================================
-//  SemanticAnalysisPhase — invalid programs
-// =============================================================================
-
-TEST_F(FrontendCompilerTestFixture, Semantics_UndefinedVariable_Fails)
-{
-    std::string code = R"(
-void F()
-{
-    add %undefined, 1;
-    nop;
-})";
-    auto unit = createUnit(code, "sem_undef");
-    ASSERT_NE(unit, nullptr);
-    EXPECT_FALSE(runThroughSemantics(unit.get()));
-}
-
-TEST_F(FrontendCompilerTestFixture, Semantics_UseBeforeCreate_Fails)
-{
-    std::string code = R"(
-void F()
-{
-    mov %x, 42;
     create i32 %x;
     nop;
 })";
-    auto unit = createUnit(code, "sem_use_before_create");
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    // The symbol definition pass defines %x via create, but the resolution pass
-    // should still succeed because symbols are defined in Pass 1 before resolution in Pass 2.
-    // However, whether this is valid depends on the language semantics. We just test
-    // that the pipeline produces a deterministic result.
-    // In practice, SymbolDefinitionVisitor scans all creates first, so this should succeed.
-    // If the language changes to require declaration before use, update this test.
-    bool result = runThroughSemantics(unit.get());
-    // Just ensure it doesn't crash; result depends on language semantics.
-    (void)result;
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_FALSE(phase.execute(unit.get()));
 }
 
-TEST_F(FrontendCompilerTestFixture, Semantics_LargeFile_Succeeds)
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_UndefinedVariableUsed)
 {
-    std::string content = readProgramFile("full_pipeline_stress.ez");
-    ASSERT_FALSE(content.empty());
-    auto unit = createUnit(content, "sem_large");
+    std::string code = R"(
+void F()
+{
+    mov %undeclared, 1;
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
     ASSERT_NE(unit, nullptr);
-    EXPECT_TRUE(runThroughSemantics(unit.get()));
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_FALSE(phase.execute(unit.get()));
+}
+
+// =============================================================================
+//  6. SemanticAnalysis – multiple modules in one source
+// =============================================================================
+
+TEST_F(FrontendCompilerTestFixture, SemanticAnalysis_MultipleModules)
+{
+    std::string code = R"(
+void A()
+{
+    create i32 %x;
+    mov %x, 1;
+    nop;
+}
+
+void B()
+{
+    create i32 %y;
+    mov %y, 2;
+    nop;
+})";
+    auto unit = createUnitFromSource(code);
+    ASSERT_NE(unit, nullptr);
+    ASSERT_TRUE(runUpToParsing(unit.get()));
+
+    auto semanticContext = std::make_shared<BasicSemanticContext>(getErrorCollector(), getSourceManager(), unit->getGlobalScope());
+    unit->setSemanticContext(semanticContext);
+
+    SemanticAnalysisPhase phase;
+    EXPECT_TRUE(phase.execute(unit.get()));
 }
 

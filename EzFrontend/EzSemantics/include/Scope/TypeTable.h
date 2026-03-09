@@ -1,17 +1,27 @@
 /**
  * @file TypeTable.h
- * @brief The language's built-in type registry: `i8`, `i16`, `i32`, `i64`, `f32`, `f64`, `void`, etc.
+ * @brief Built-in semantic type system used by EzSemantics.
  *
- * Type describes a single primitive type (underlying kind + bit-width +
- * human-readable name).  TypeTable is a static lookup that maps type-name
- * strings to their Type objects and provides a default type (`i64`) used
- * when no explicit type annotation is given.
+ * `Type` models one semantic type known to the front-end. `TypeTable` is the
+ * shared registry used by semantic passes to resolve source-level type names
+ * into canonical `Type` objects.
+ *
+ * According to the current implementation, the built-in table contains:
+ *   - floating-point types: `float`, `double`
+ *   - integer types: `i8`, `i16`, `i32`, `i64`, `i128`, `i256`, `i512`
+ *   - `string`
+ *   - `void`
+ *
+ * The default semantic type returned by `getDefaultType()` is `i64`.
  */
 #ifndef EZPACKER_TYPETABLE_H
 #define EZPACKER_TYPETABLE_H
 
 #include "EzSemanticsCommon.h"
 
+/**
+ * Broad runtime category of a semantic type.
+ */
 enum class UnderlyingType : uint8_t
 {
     Invalid = 0,
@@ -21,6 +31,12 @@ enum class UnderlyingType : uint8_t
     Void
 };
 
+/**
+ * Storage width used by a semantic type.
+ *
+ * `Variable` is used for types such as `string`, whose size is not represented
+ * as a fixed integer bit-width in this layer.
+ */
 enum class UnderlyingTypeSize : uint16_t
 {
     Invalid = 0,
@@ -38,28 +54,22 @@ class Type
 {
   public:
     /**
-     * Creates a new type object with the given parameters.
-     * @param underlyingType
-     * @param underlyingTypeSize
-     * @param typeName
+     * Creates one semantic type descriptor.
      */
     Type(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string_view &typeName);
 
     /**
-     * Returns the underlying type of this type object.
-     * @return UnderlyingType
+     * Returns the broad runtime category of this type.
      */
     UnderlyingType getUnderlyingType() const;
 
     /**
-     * Returns the underlying type size of this type object.
-     * @return UnderlyingType
+     * Returns the storage width associated with this type.
      */
     UnderlyingTypeSize getUnderlyingTypeSize() const;
 
     /**
-     * Returns the name of the type.
-     * @return const std::string_view &
+     * Returns the canonical source-level name of this type.
      */
     const std::string_view &getTypeName() const;
 
@@ -70,28 +80,24 @@ class Type
 };
 
 /**
- * This class contains a table of allowed types in the language. Made this structure static for convenient access.
+ * Static registry of all semantic types recognised by the front-end.
  */
 class TypeTable
 {
   public:
     /**
-     * Returns true if the given type exists.
-     * @param typeName
-     * @return bool
+     * Returns whether a semantic type with the given canonical name exists.
      */
     static bool doesTypeExists(const std::string_view &typeName);
 
     /**
-     * Returns a type, if exists, of the given typeName. Returns true if type does not exist.
-     * @param typeName
-     * @return bool
+     * Returns the canonical `Type` object for the given name, or `nullptr` if
+     * the type is unknown.
      */
     static std::shared_ptr<Type> getType(const std::string_view &typeName);
 
     /**
-     * Returns the default type for the compiler.
-     * @return std::shared_ptr<Type>
+     * Returns the language default semantic type, currently `i64`.
      */
     static std::shared_ptr<Type> getDefaultType();
 

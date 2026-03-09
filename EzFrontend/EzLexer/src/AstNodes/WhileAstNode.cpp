@@ -22,9 +22,3 @@ const char *WhileAstNode::getAstNodeName() const { return "WhileAstNode"; }
 void WhileAstNode::setCodeScope(CodeScope *codeScope) { m_codeScope = codeScope; }
 
 void WhileAstNode::setCondition(ConditionAstNode *condition) { m_condition = condition; }
-
-std::string WhileAstNode::getAsStr(AstNodeStringMode mode) const
-{
-    std::string str = std::format("while ({})\n{{\n{}\n}}\n", m_condition->getAsStr(mode), m_codeScope->getAsStr(mode));
-    return str;
-}

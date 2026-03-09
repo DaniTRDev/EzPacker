@@ -1,13 +1,23 @@
- /**
+/**
  * @file BasicParsingContext.h
- * @brief Shared state for all parsers: the token stream, position cursor,
- *        node pool, string pool, and conditional-consume helpers.
+ * @brief Shared parsing state: token stream, cursor, node pool, string pool,
+ *        and token-matching helpers.
  *
- * Every parser receives a BasicParsingContext and reads tokens through
- * peek() / consume() / consumeIf().  Successfully parsed nodes are
- * allocated from the internal AstNodeTypedPool so they share a single
- * cache-friendly arena.  ParsingCondition provides pre-built lambda
- * predicates (match-by-type, match-by-content) used with consumeIf().
+ * Every parser in EzLexer receives the same BasicParsingContext instance. This
+ * keeps all parser attempts consistent: they observe the same token sequence,
+ * allocate nodes from the same arena, and report diagnostics through the same
+ * ErrorCollector/SourceManager pair.
+ *
+ * Important behavioral rules for parser authors and integrators:
+ * - `peek()` never consumes input.
+ * - `consume()` advances by one logical token and automatically skips trailing
+ *   newlines and tabs.
+ * - `consumeIf(...)` is the preferred way to match expected tokens because it
+ *   keeps the common "match + optional capture + consume" pattern compact.
+ * - Rollback is not automatic when calling a parser directly. That behavior is
+ *   provided by ParserBatch.
+ * - AST nodes and pooled strings returned by this context remain valid for as
+ *   long as the context itself stays alive.
  */
 #ifndef EZPACKER_SINGLETHREADPARSER_H
 #define EZPACKER_SINGLETHREADPARSER_H
@@ -24,34 +34,36 @@ class BasicParsingContext : public ErrorEmitter
 {
   public:
     /**
-     * Creates the parsing context with the given error collector, source manager and token array.
-     * @param errorCollector
-     * @param sourceManager
-     * @param tokens
+     * Creates a parsing context over an already-tokenized input stream.
+     *
+     * The token vector is moved into the context. All AST nodes created by
+     * parsers working on this context will be allocated from the internal node
+     * pool and therefore share the context's lifetime.
      */
     BasicParsingContext(const std::shared_ptr<ErrorCollector> &errorCollector,
                         const std::shared_ptr<SourceManager> &sourceManager,
                         std::vector<TokenInformation> tokens);
 
     /**
-     * Returns the pool of nodes.
-     * @return TypedPool *
+     * Returns the arena used to allocate AST nodes for this parse session.
+     *
+     * Callers usually do not need to manage this directly unless they are
+     * implementing a parser.
      */
     AstNodeTypedPool *getNodePool();
 
     /**
-     * Returns true if the current token stream can be peeked.
-     * @return bool
+     * Returns true when the cursor still points to a valid token.
      */
-    bool canPeek() const;
+    [[nodiscard]] bool canPeek() const;
 
     /**
-     * If condition is met, true is returned, consume is called and if out token != nullptr, it will be set to the
-     * current token (before consume call).
-     * @param condition
-     * @param outToken
-     * @tparam Args
-     * @return bool
+     * Consumes the current token only when the given predicate succeeds.
+     *
+     * @param condition Matching function, usually one of ParsingCondition's
+     *                  predefined helpers.
+     * @param outToken Optional output copy of the consumed token.
+     * @return true if the condition matched and the token was consumed.
      */
     template <typename... Args>
     bool consumeIf(ParsingConditionType<Args...> &condition, TokenInformation *outToken, Args &&...args)
@@ -60,44 +72,49 @@ class BasicParsingContext : public ErrorEmitter
     }
 
     /**
-     * Returns the current position in the token stream.
-     * @return size_t
+     * Returns the current zero-based token index.
      */
-    size_t getCurrentPosition() const;
+    [[nodiscard]] size_t getCurrentPosition() const;
 
     /**
-     * Returns the number of tokens left to parse.
-     * @return size_t
+     * Returns how many tokens are left from the current position to the end.
      */
-    size_t getRemainingTokenCount() const;
+    [[nodiscard]] size_t getRemainingTokenCount() const;
 
     /**
-     * Returns the string pool.
-     * @return StringPool*
+     * Returns the pool that owns canonical string storage for parsed names and
+     * type spellings.
      */
     StringPool *getStringPool();
 
     /**
-     * Returns the last valid source reference.
-     * @return const SourceReference &
+     * Returns the source reference of the last token consumed successfully.
+     *
+     * This is commonly used when a parser needs to report an error after it has
+     * already advanced past the most relevant source token.
      */
-    const SourceReference &getLastSourceReference() const;
+    [[nodiscard]] const SourceReference &getLastSourceReference() const;
 
     /**
-     * Peeks the current context without consuming the token. canPeek must have returned true.
-     * @return const TokenInformation &
+     * Returns the current token without consuming it.
+     *
+     * Precondition: canPeek() must be true.
      */
-    const TokenInformation &peek() const;
+    [[nodiscard]] const TokenInformation &peek() const;
 
     /**
-     * Advances the stream position by 1 if canPeek() returns true. Updates the last source reference to the
-     * consumed token's reference. If the next token after advancing is a Comment, it is automatically skipped
-     * (consumed recursively).
+     * Advances to the next logical token.
+     *
+     * After consuming one token, the implementation also skips any immediately
+     * following newline or tab tokens. This means most parsers can treat line
+     * breaks as ordinary whitespace.
      */
     void consume();
 
     /**
-     * Sets the position of the stream to the one given, if pos is invalid an exception is thrown.
+     * Restores the cursor to a previously saved token position.
+     *
+     * @throws std::runtime_error if pos is outside the token array.
      */
     void setPosition(size_t pos);
 
@@ -113,8 +130,10 @@ struct ParsingCondition
 {
     friend class BasicParsingContext;
     /**
-     * This condition checks if the current token (if any) is of the given type. If so returns true and sets outToken
-     * to the current token before consuming it.
+     * Matches the current token by exact token type.
+     *
+     * If the current token matches, it is copied into outToken (when provided)
+     * and consumed before returning true.
      */
     inline static ParsingConditionType<_TokenType> TokenType =
             [](class BasicParsingContext *ctx, TokenInformation *outToken, _TokenType type) -> bool
@@ -142,8 +161,11 @@ struct ParsingCondition
     };
 
     /**
-     * This condition checks if the current token content (if any) matches the string given. If so returns true and sets
-     * outToken to the current token before consuming it.
+     * Matches the current token by exact token text.
+     *
+     * This helper is useful for grammar fragments that are represented as
+     * generic identifiers in the tokenizer but have keyword-like meaning at the
+     * parser level, such as instruction mnemonics or condition operators.
      */
     inline static ParsingConditionType<const std::string &> TokenContent =
             [](class BasicParsingContext *ctx, TokenInformation *outToken, const std::string &content) -> bool

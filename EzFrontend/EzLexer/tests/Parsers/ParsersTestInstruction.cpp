@@ -103,31 +103,36 @@ TEST_F(ParsersTestFixture, Instruction_TrailingCommaBeforeSemicolon)
 
 TEST_F(ParsersTestFixture, CallInstruction_NoParams)
 {
-    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc();"));
-    TEST_CALL_INSTRUCTION("myFunc", "i64");
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %myFunc();"));
+    TEST_CALL_INSTRUCTION("myFunc", "i64", AstNodeType::Variable);
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_1Param)
 {
-    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(%myVar);"));
-    TEST_CALL_INSTRUCTION("myFunc", "i64", AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %myFunc(%myVar);"));
+    TEST_CALL_INSTRUCTION("myFunc", "i64", AstNodeType::Variable, AstNodeType::Variable);
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_2Params)
 {
-    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(1231, %myVar);"));
-    TEST_CALL_INSTRUCTION("myFunc", "i64", AstNodeType::Immediate, AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %myFunc(1231, %myVar);"));
+    TEST_CALL_INSTRUCTION("myFunc", "i64", AstNodeType::Variable, AstNodeType::Immediate, AstNodeType::Variable);
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_3Params)
 {
-    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call void myFunc(%a, %b, %c);"));
-    TEST_CALL_INSTRUCTION("myFunc", "void", AstNodeType::Variable, AstNodeType::Variable, AstNodeType::Variable);
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call void %myFunc(%a, %b, %c);"));
+    TEST_CALL_INSTRUCTION("myFunc",
+                          "void",
+                          AstNodeType::Variable,
+                          AstNodeType::Variable,
+                          AstNodeType::Variable,
+                          AstNodeType::Variable);
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_VoidReturn)
 {
-    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call void doNothing();"));
+    EXPECT_TRUE(tokenizeAndParse<InstructionParser::InstructionParser>("call void %doNothing();"));
     TEST_CALL_INSTRUCTION("doNothing", "void");
 }
 
@@ -137,30 +142,30 @@ TEST_F(ParsersTestFixture, CallInstruction_VoidReturn)
 
 TEST_F(ParsersTestFixture, CallInstruction_InvalidCallee)
 {
-    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 31();"));
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %31();"));
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_InvalidReturnType)
 {
-    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call 1231 myFunc();"));
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call 1231 %myFunc();"));
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_MissingLeftParen)
 {
-    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc);"));
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %myFunc);"));
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_MissingRightParen)
 {
-    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(;"));
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %myFunc(;"));
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_MissingSemicolon)
 {
-    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc()"));
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %myFunc()"));
 }
 
 TEST_F(ParsersTestFixture, CallInstruction_InvalidArg)
 {
-    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 myFunc(invalid)"));
+    EXPECT_FALSE(tokenizeAndParse<InstructionParser::InstructionParser>("call i64 %myFunc(invalid)"));
 }

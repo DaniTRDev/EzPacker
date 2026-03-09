@@ -141,6 +141,28 @@ myLabel:
     EXPECT_FALSE(runVisitor<LabelParser>(code, true));
 }
 
+TEST_F(TypeCheckVisitorTestFixture, TestValidSwitch_Cast)
+{
+    std::string code = R"(
+void myMod(i32 %a)
+{
+    switch(%a)
+    {
+        case 2:
+        {
+            break;
+        }
+        default:
+        {
+            create i64 %myVar2;
+            add %myVar2, 1;
+        }
+    }
+})";
+
+    EXPECT_FALSE(runVisitor<LabelParser>(code, true));
+}
+
 TEST_F(TypeCheckVisitorTestFixture, TestMemoryOperand_SourceCast)
 {
     std::string code = R"(

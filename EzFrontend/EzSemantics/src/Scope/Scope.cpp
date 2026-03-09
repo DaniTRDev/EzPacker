@@ -16,6 +16,24 @@ bool Scope::define(Symbol *symbol, const std::string_view &name)
     return true;
 }
 
+bool Scope::mergeSymbols(const std::map<std::string_view, Symbol *> &symbols, Symbol **outErrSym)
+{
+    for (auto &sym : symbols)
+    {
+        if (m_symbols.contains(sym.first))
+        {
+            if (outErrSym)
+            {
+                *outErrSym = sym.second;
+            }
+            return false;
+        }
+
+        m_symbols[sym.first] = sym.second;
+    }
+    return true;
+}
+
 bool Scope::resolve(const std::string_view &name, Symbol **outSymbol, bool searchParent)
 {
     auto it = m_symbols.find(name);
@@ -37,3 +55,7 @@ bool Scope::resolve(const std::string_view &name, Symbol **outSymbol, bool searc
 }
 
 Scope *Scope::getParent() const { return m_parent; }
+
+void Scope::setParent(Scope *parent) { m_parent = parent; }
+
+const std::map<std::string_view, Symbol *> &Scope::getSymbols() const { return m_symbols; }

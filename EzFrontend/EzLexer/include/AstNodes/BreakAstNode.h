@@ -40,14 +40,6 @@ class BreakAstNode : public AstNode
      * @return const char*
      */
     const char *getAstNodeName() const override;
-
-    /**
-     * Returns a human-readable string for this node (same as getAstNodeName,
-     * since break has no children or extra data).
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
 };
 
 #endif // EZPACKER_BREAKASTNODE_H

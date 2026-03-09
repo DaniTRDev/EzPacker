@@ -37,16 +37,6 @@ class CodeScope : public AstNode, public AstNodeContainer
      * @return const char*
      */
     const char *getAstNodeName() const override;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. If mode is set to default, only the expression count is shown (e.g.,
-     * "CodeScope (size: N)"). If mode is set to debug, each contained expression is expanded with its own getAsStr
-     * output.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
 };
 
 #endif // EZPACKER_CODESCOPE_H

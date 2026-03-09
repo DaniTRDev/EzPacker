@@ -5,6 +5,7 @@
 #include "FrontendCompilationUnit.h"
 #include "FrontendCompilationUnitPhase.h"
 #include "CompilationPhases/AstLowering.h"
+#include "CompilationPhases/IncludePhase.h"
 #include "CompilationPhases/Parsing.h"
 #include "CompilationPhases/SemanticAnalysis.h"
 #include "CompilationPhases/Tokenization.h"
@@ -23,12 +24,28 @@ class FrontendCompilerDriver : public ErrorEmitter
     /**
      * Creates a compilation unit for the given source content and source name, and adds it to the list of compilation
      * units. The method returns true if the source was successfully added, and false if there was an error during the
-     * process.
+     * process. If the source is successfully added and the outUnit parameter is provided, the created compilation unit
+     * will be assigned to the outUnit pointer for further use.
      * @param sourceContent
      * @param sourceName
+     * @param outUnit
      * @return bool
      */
-    bool addSource(const std::string &sourceContent, const std::string &sourceName);
+    bool addSource(const std::string &sourceContent,
+                   const std::string &sourceName,
+                   std::shared_ptr<FrontendCompilationUnit> *outUnit = nullptr);
+
+    /**
+     * Adds a source file to the compilation process by creating a compilation unit for the file's content. The method
+     * reads the content of the specified file, creates a compilation unit for it, and adds it to the list of
+     * compilation units. The method returns true if the file was successfully added, and false if there was an error
+     * during the process (e.g., if the file could not be read). If the file is successfully added and the outUnit
+     * parameter is provided, the created compilation unit will be assigned to the outUnit pointer for further use.
+     * @param filePath
+     * @param outUnit
+     * @return bool
+     */
+    bool addSourceFromFile(const std::string &filePath, std::shared_ptr<FrontendCompilationUnit> *outUnit = nullptr);
 
     /**
      * Starts the compilation process for all added sources. This method will process each source, generate the
@@ -41,19 +58,23 @@ class FrontendCompilerDriver : public ErrorEmitter
 
   private:
     /**
-     * Executes the specified compilation unit phase for all compilation units. This method will iterate through each
-     * compilation unit and perform the given phase (e.g., tokenization, parsing) on it. If any errors are encountered
+     * Executes the specified compilation unit phase for the given compilation unit. If any errors are encountered
      * during the execution of the phase, they will be collected and emitted through the error collector. The method
-     * returns true if the phase is successfully executed for all compilation units without any errors, and false
-     * otherwise.
+     * returns true if the phase is successfully executed, and false otherwise.
+     * @param unit
      * @param phase
      * @return bool
      */
-    bool executeCompilationUnitPhase(const std::shared_ptr<FrontendCompilationUnitPhase> &phase);
+    bool executeCompilationUnitPhase(FrontendCompilationUnit *unit,
+                                     const std::shared_ptr<FrontendCompilationUnitPhase> &phase);
 
   private:
     std::shared_ptr<Scope> m_globalScope; // Scope shared across all compilation units.
-    std::list<FrontendCompilationUnit> m_compilationUnits;
+    std::stack<std::shared_ptr<FrontendCompilationUnit>>
+            m_queuedCompilationUnits; /*
+                                       * Compilation units that are waiting to be processed in the compilation. The
+                                       * top of the stack is the next unit to be processed.
+                                       */
 };
 
 #endif // EZPACKER_COMPILERDRIVER_H

@@ -2,10 +2,10 @@
 
 bool TypeCheckVisitor::visit(BreakAstNode *_break)
 {
-    if (!m_ctx->isContextInsideLoop())
+    if (!m_ctx->isContextInsideLoop() && !m_ctx->isContextInsideSwitch())
     {
         m_ctx->emitError(ErrorSeverity::Fatal,
-                         "Break statement is not inside a loop",
+                         "Break statement is not inside a loop or switch",
                          "TypeCheckVisitor::BreakAstNode",
                          _break->getSourceRef());
         return false;
@@ -28,6 +28,18 @@ bool TypeCheckVisitor::visit(ContinueAstNode *_continue)
     }
 
     return true;
+}
+
+bool TypeCheckVisitor::visit(ForAstNode *_for)
+{
+    if (!_for->getInitialization()->accept(this) || !_for->getCondition()->accept(this) ||
+        (_for->getNextItClause() && !_for->getNextItClause()->accept(this)))
+    {
+        return false;
+    }
+
+    LoopGuard loopGuard(m_ctx); // Allow break/continue inside the for-loop body
+    return _for->getBody()->accept(this);
 }
 
 bool TypeCheckVisitor::visit(IfAstNode *ifNode)
@@ -72,7 +84,7 @@ bool TypeCheckVisitor::visit(Instruction *instr)
 
             if (targetInstructionType)
             {
-                if (!checkImmediateSafety(imm, immType))
+                if (!checkImmediateSafety(imm, targetInstructionType))
                 {
                     m_ctx->emitError(ErrorSeverity::Fatal,
                                      "Invalid immediate found",
@@ -175,6 +187,43 @@ bool TypeCheckVisitor::visit(Variable *var)
     return true;
 }
 
+bool TypeCheckVisitor::visit(SwitchAstNode *_switch)
+{
+    if (!_switch->getSwitchVariable()->accept(this))
+        return false;
+
+    // Get the type of the switch variable to check all cases against
+    SymbolAnnotation *symAnnot = _switch->getSwitchVariable()->getAnnotation<SymbolAnnotation>();
+    Type *switchVarType = symAnnot->getSymbol()->getSymbolDataType();
+
+    for (const void *ptr : *_switch->getCases())
+    {
+        getSemanticContext()->enterSwitch();
+        {
+            SwitchCaseAstNode *_case = (SwitchCaseAstNode *)ptr;
+
+            // Check the immediate value against the switch variable's type
+            if (!checkImmediateSafety(_case->getCaseValue(), switchVarType))
+            {
+                return false;
+            }
+
+            // Attach the cast annotation so the Lowerer emits the correct size Immediate
+            _case->getCaseValue()->createAnnotation<TypeCastAnnotation>(getSemanticContext()->getAnnotPool(),
+                                                                        nullptr,
+                                                                        switchVarType);
+
+            if (!_case->accept(this))
+                return false; // Visit the body
+        }
+        getSemanticContext()->exitSwitch();
+    }
+
+    return true;
+}
+
+bool TypeCheckVisitor::visit(SwitchCaseAstNode *_switchCase) { return _switchCase->getBody()->accept(this); }
+
 bool TypeCheckVisitor::visit(WhileAstNode *whileNode)
 {
     if (!whileNode->getCondition()->accept(this))
@@ -201,7 +250,7 @@ bool TypeCheckVisitor::checkCastSafety(AstNode *node, Type *originalType, Type *
         if (usedType->getUnderlyingTypeSize() > originalType->getUnderlyingTypeSize())
         {
             getSemanticContext()->emitError(
-                    ErrorSeverity::NoError,
+                    ErrorSeverity::Warning,
                     "Used type is bigger than the original symbol size, this might result in more "
                     "instructions in the final code to expand the value",
                     "TypeCheckVisitor::Variable",

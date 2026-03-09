@@ -1,11 +1,12 @@
 /**
  * @file ParserBatch.h
- * @brief Ordered collection of parsers that tries each one until a match is found.
+ * @brief Ordered parser dispatcher with automatic rollback on non-fatal misses.
  *
- * ParserBatch is the main entry point for parsing a piece of source code.
- * Parsers are tried in registration order; for each one the stream position
- * and error scope are saved, and automatically rolled back on failure.
- * The first parser that produces a non-null AstNode wins.
+ * ParserBatch is the safest way to combine multiple grammar alternatives. It
+ * preserves the token cursor when a parser simply does not match, but stops
+ * immediately when a parser reports a fatal error. This lets individual parser
+ * implementations stay focused on one construct while the batch handles the
+ * backtracking policy.
  */
 #ifndef EZPACKER_PARSERBATCH_H
 #define EZPACKER_PARSERBATCH_H
@@ -21,21 +22,26 @@ struct ParserBatchResult
 };
 
 /**
- * This class represents a batch of parsers that will be tried in the input, by order, and will return the first match.
+ * Ordered collection of parsers evaluated against the same token stream.
+ *
+ * Registration order is part of the contract: if two parsers can begin with
+ * the same token prefix, the earlier one gets priority. This is why specialized
+ * parsers such as `CallInstructionParser` are typically registered before more
+ * generic ones.
  */
 class ParserBatch
 {
   public:
     /**
-     * Adds a parser to the batch. If parses is null an exception is thrown.
-     * @param parser
+     * Adds one parser instance to the end of the batch.
+     *
+     * @throws std::runtime_error if parser is null.
      */
     void addParser(std::shared_ptr<IAstNodeParser> parser);
 
     /**
-     * Uses a type list to create and add (using void addParser(std::shared_ptr<IAstNodeParser> parser)) them to this
-     * batch.
-     * @tparam ParserTypes
+     * Convenience helper that default-constructs and appends parser types in
+     * the order they appear in the template parameter pack.
      */
     template <typename FirstParserType, typename... ParserTypes>
         requires(std::is_base_of<IAstNodeParser, FirstParserType>::value)
@@ -65,18 +71,19 @@ class ParserBatch
     }
 
     /**
-     * Tries each parser in order against the current token stream. For each parser:
-     *   1. The current stream position is saved and a new error scope is begun.
-     *   2. If the parser succeeds (returns a non-null node), its error scope is discarded and the result is
-     *      returned immediately. If the node has no source reference, one is assigned from the context.
-     *   3. If the parser fails with a fatal error, the error scope is propagated upward and no further
-     *      parsers are attempted.
-     *   4. If the parser fails without a fatal error, the error scope is discarded, the stream position is
-     *      restored, and the next parser is tried.
+     * Tries each parser in registration order against the current token stream.
      *
-     * Returns {nullptr, nullptr} if no parser matched or if a fatal error occurred.
-     * @param ctx
-     * @return ParserBatchResult
+     * Success contract:
+     * - returns the produced node and the parser instance that produced it,
+     * - leaves the context cursor advanced past the matched construct,
+     * - assigns a source reference from the context if the node did not set one.
+     *
+     * Failure contract:
+     * - soft failure from one parser rolls the cursor back and continues with
+     *   the next parser,
+     * - fatal failure stops the batch immediately and propagates that error
+     *   scope upward,
+     * - if no parser matches, the returned node and parser are both null.
      */
     ParserBatchResult parse(const std::shared_ptr<BasicParsingContext> &ctx);
 

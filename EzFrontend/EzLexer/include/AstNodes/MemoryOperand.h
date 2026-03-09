@@ -1,16 +1,19 @@
 /**
  * @file MemoryOperand.h
- * @brief AST nodes for the various memory-addressing modes.
+ * @brief AST nodes for frontend-visible memory addressing modes.
  *
- * MemoryOperandAstNode is the abstract base class; concrete subclasses are:
- *   - BaseDisplacementMemory              — `type (%base + disp)`
- *   - IndexScaleMemory                    — `type (, %idx, scale)`
- *   - BaseIndexScaleDisplacementMemory    — combines base+disp with idx*scale
- *   - DirectMemory                        — `type (address)`
+ * All memory operands share two common pieces of information:
+ * - the referenced element type (for example `i8`, `i32`, `i64`), and
+ * - one of the supported addressing layouts.
  *
- * Each variant records the referenced data type (e.g. i64, i8) and the
- * addressing components.  The MemoryLowerer translates these into MirMemory
- * operands during the AST-to-MIR lowering phase.
+ * Public parser grammar accepted today:
+ * - BaseDisplacement:             `type (%base +/- displacement)`
+ * - BaseIndexScaleDisplacement:   `type (%base, %index, scale, displacement)`
+ * - IndexScale:                   `type (, %index, scale)`
+ * - Direct:                       `type (address)`
+ *
+ * The frontend stores the components structurally; it does not attempt to map
+ * them to target-specific addressing modes yet.
  */
 #ifndef EZPACKER_MEMORYOPERAND_H
 #define EZPACKER_MEMORYOPERAND_H
@@ -36,8 +39,9 @@ class MemoryOperandAstNode : public AstNode
 {
   public:
     /**
-     * Creates the node with the given data type.
-     * @param referencedMemoryDataType
+     * Creates a memory operand with the given referenced element type.
+     *
+     * The type spelling is stored as parsed and later resolved by EzSemantics.
      */
     MemoryOperandAstNode(std::string_view referencedMemoryDataType);
 
@@ -62,26 +66,27 @@ class MemoryOperandAstNode : public AstNode
     const char *getAstNodeName() const override;
 
     /**
-     * Returns the name of the operand type.
-     * @return const char*
+     * Returns a stable string describing the concrete memory operand subclass.
      */
     virtual const char *getMemoryOperandTypeName() const = 0;
 
     /**
-     * Returns the type of memory operand.
-     * @return MemoryOperandType
+     * Returns the concrete addressing kind.
      */
     virtual MemoryOperandType getMemoryOperandType() const = 0;
 
     /**
-     * Sets the referenced data type.
-     * @param dataType
+     * Updates the referenced element type spelling.
+     *
+     * Parsers typically construct the node first and assign the type after the
+     * specific addressing mode has been recognized.
      */
     void setReferencedDataType(std::string_view dataType);
 
     /**
-     * Returns the underlying type of the referenced memory region: uint64_t* -> memory referenced is an uint64_t.
-     * @return const std::string &
+     * Returns the parsed element type spelling for the referenced memory.
+     *
+     * Example: in `i64 (%base+8)`, this returns `i64`.
      */
     const std::string_view &getReferencedMemoryDataTypeStr() const;
 
@@ -96,10 +101,7 @@ class BaseDisplacementMemory : virtual public MemoryOperandAstNode
 {
   public:
     /**
-     * Creates the memory operand with the given displacement, base and referenced data type.
-     * @param displacement
-     * @param base
-     * @param referencedDataType
+     * Memory operand of the form `type (%base +/- displacement)`.
      */
     BaseDisplacementMemory(IntegerImmediate *displacement, Variable *base, std::string_view referencedDataType);
 
@@ -110,8 +112,9 @@ class BaseDisplacementMemory : virtual public MemoryOperandAstNode
     const char *getMemoryOperandTypeName() const override;
 
     /**
-     * Returns the displacement of the memory address.
-     * @return IntegerImmediate*
+     * Returns the parsed integer displacement.
+     *
+     * The sign, when present, is represented inside the immediate node value.
      */
     IntegerImmediate *getDisplacement() const;
 
@@ -122,21 +125,10 @@ class BaseDisplacementMemory : virtual public MemoryOperandAstNode
     MemoryOperandType getMemoryOperandType() const override;
 
     /**
-     * Returns the base of the memory address.
-     * @return Variable*
+     * Returns the base variable used to form the address.
      */
     Variable *getBase() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default,
-     * referenced data type and addressing format will be the only information shown. If mode is set to debug, memory
-     * address operands will also be shown.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
   private:
     IntegerImmediate *m_displacement;
     Variable *m_base;
@@ -146,10 +138,7 @@ class IndexScaleMemory : virtual public MemoryOperandAstNode
 {
   public:
     /**
-     * Creates the memory operand with the given scaling factor, index and referenced data type.
-     * @param scalingFactor
-     * @param index
-     * @param referencedDataType
+     * Memory operand of the form `type (, %index, scale)`.
      */
     IndexScaleMemory(IntegerImmediate *scalingFactor, Variable *index, std::string_view referencedDataType);
 
@@ -160,8 +149,7 @@ class IndexScaleMemory : virtual public MemoryOperandAstNode
     const char *getMemoryOperandTypeName() const override;
 
     /**
-     * Returns the scaling factor, if any, for this memory reference.
-     * @return IntegerImmediate *
+     * Returns the parsed scale factor.
      */
     IntegerImmediate *getScalingFactor() const;
 
@@ -172,21 +160,10 @@ class IndexScaleMemory : virtual public MemoryOperandAstNode
     MemoryOperandType getMemoryOperandType() const override;
 
     /**
-     * Returns the index, if any, for this memory reference.
-     * @return Variable *
+     * Returns the index variable used in the address calculation.
      */
     Variable *getIndex() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default,
-     * referenced data type and addressing format will be the only information shown. If mode is set to debug, memory
-     * address operands will also be shown.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
   private:
     IntegerImmediate *m_scalingFactor;
     Variable *m_index;
@@ -196,12 +173,8 @@ class BaseIndexScaleDisplacementMemory : public IndexScaleMemory, public BaseDis
 {
   public:
     /**
-     * Creates the memory operand with the given displacement, scaling factor, base, index and referenced data type.
-     * @param displacement
-     * @param scalingFactor
-     * @param base
-     * @param index
-     * @param referencedDataType
+     * Memory operand of the form
+     * `type (%base, %index, scale, displacement)`.
      */
     BaseIndexScaleDisplacementMemory(IntegerImmediate *displacement,
                                      IntegerImmediate *scalingFactor,
@@ -220,56 +193,34 @@ class BaseIndexScaleDisplacementMemory : public IndexScaleMemory, public BaseDis
      * @return MemoryOperandType
      */
     MemoryOperandType getMemoryOperandType() const override;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default,
-     * referenced data type and addressing format will be the only information shown. If mode is set to debug, memory
-     * address operands will also be shown.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
+    
 };
 
 class DirectMemory : public MemoryOperandAstNode
 {
   public:
     /**
-     * Creates the memory operand with the given address and referenced data type.
-     * @param address
-     * @param referencedDataType
+     * Memory operand of the form `type (address)`.
      */
     DirectMemory(IntegerImmediate *address, std::string_view referencedDataType);
 
     /**
-     * Returns "BaseDisplacement".
+     * Returns "Direct".
      * @return const char*
      */
     const char *getMemoryOperandTypeName() const override;
 
     /**
-     * Returns MemoryOperandType::BaseDisplacement.
+     * Returns MemoryOperandType::Direct.
      * @return MemoryOperandType
      */
     MemoryOperandType getMemoryOperandType() const override;
 
     /**
-     * Returns the address being referenced.
-     * @return IntegerImmediate *
+     * Returns the immediate address value.
      */
     IntegerImmediate *getAddress() const;
-
-    /**
-     * Returns this object in a formatted string (human readable). The quantity of the information included in the
-     * formatted string depends on mode. See AstNodeStringMode for more information. If mode is set to default,
-     * referenced data type and addressing format will be the only information shown. If mode is set to debug, memory
-     * address operands will also be shown.
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
+    
   private:
     IntegerImmediate *m_address;
 };

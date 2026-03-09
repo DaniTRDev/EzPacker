@@ -5,16 +5,26 @@ set(EZFRONTEND_COMPILATION_UNIT_FILES_LIST
         "include/FrontendCompilationUnitPhase.h"
         "include/FrontendCompilerDriver.h"
         "include/CompilationPhases/AstLowering.h"
+        "include/CompilationPhases/IncludePhase.h"
         "include/CompilationPhases/Parsing.h"
         "include/CompilationPhases/SemanticAnalysis.h"
         "include/CompilationPhases/Tokenization.h"
-
+        "include/CompilationPhases/Semantic/SymbolAndTypeResolver.h"
+        "include/CompilationPhases/Semantic/SymbolDefinition.h"
+        "include/CompilationPhases/Semantic/TypeCheck.h"
+        "include/IncludeVisitor/IncludeVisitor.h"
+        
         "src/FrontendCompilationUnit.cpp"
         "src/FrontendCompilerDriver.cpp"
         "src/CompilationPhases/AstLowering.cpp"
+        "src/CompilationPhases/IncludePhase.cpp"
         "src/CompilationPhases/Parsing.cpp"
         "src/CompilationPhases/SemanticAnalysis.cpp"
         "src/CompilationPhases/Tokenization.cpp"
+        "src/CompilationPhases/Semantic/SymbolAndTypeResolver.cpp"
+        "src/CompilationPhases/Semantic/SymbolDefinition.cpp"
+        "src/CompilationPhases/Semantic/TypeCheck.cpp"
+        "src/IncludeVisitor/IncludeVisitor.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzFrontendCompiler"
@@ -24,7 +34,7 @@ EzCMK_ConfigureLib(NAME "EzFrontendCompiler"
         INCLUDED_DIRS "include")
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  EzFrontendCompiler Tests
+#  EzFrontendCompiler tests
 # ─────────────────────────────────────────────────────────────────────────────
 
 set(FC_FIXTURE
@@ -35,21 +45,7 @@ EzPacker_AddTest(
         "FC_CompilationUnit"
         "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
         ""
-        "tests/CompilationUnitTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_CompilerDriver"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/CompilerDriverTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_CompilerDriver_MultiFiles"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/CompilerDriverTestMultiFiles.cpp;${FC_FIXTURE}"
+        "tests/FrontendCompilationUnitTest.cpp;${FC_FIXTURE}"
 )
 
 EzPacker_AddTest(
@@ -78,4 +74,18 @@ EzPacker_AddTest(
         "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
         ""
         "tests/AstLoweringPhaseTest.cpp;${FC_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "FC_IncludePhase"
+        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/IncludePhaseTest.cpp;${FC_FIXTURE}"
+)
+
+EzPacker_AddTest(
+        "FC_CompilerDriver"
+        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
+        ""
+        "tests/CompilerDriverTest.cpp;${FC_FIXTURE}"
 )

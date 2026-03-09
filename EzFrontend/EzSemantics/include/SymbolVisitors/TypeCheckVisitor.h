@@ -1,18 +1,23 @@
 /**
  * @file TypeCheckVisitor.h
- * @brief Third semantic pass — validates type compatibility and structural rules.
+ * @brief Third semantic pass: validate structure, casts and operand type use.
  *
- * TypeCheckVisitor walks the fully-resolved AST and:
- *   - Verifies that instruction operand types are compatible (e.g. both
- *     sides of an ADD must have the same bit-width, or an implicit cast
- *     must be possible).
- *   - Replaces a SymbolAnnotation with a TypeCastAnnotation when a variable
- *     is used with a type different from its declared type.
- *   - Rejects break/continue statements that appear outside of a while-loop.
- *   - Validates memory operand types and condition operand types.
+ * This pass expects a fully defined and resolved AST. It does not create
+ * scopes or resolve names; instead it validates that the previously attached
+ * semantic information is used consistently.
  *
- * After this pass succeeds the AST is fully validated and ready for
- * lowering to MIR.
+ * Observable effects of this visitor:
+ *   - Validates `break` / `continue` against the current loop/switch nesting.
+ *   - Checks instruction operands against the inferred target type when that
+ *     type can be derived from another operand.
+ *   - Validates explicit variable type uses and, when needed, replaces the
+ *     plain symbol view with `TypeCastAnnotation` so lowering knows which cast
+ *     to emit.
+ *   - Checks immediates and switch-case literals against the destination type
+ *     and annotates them with a cast target when required for lowering.
+ *
+ * After this pass succeeds, the AST is considered semantically valid for the
+ * public lowering entry points available in EzSemantics.
  */
 #ifndef EZPACKER_TYPECHECKVISITOR_H
 #define EZPACKER_TYPECHECKVISITOR_H
@@ -29,93 +34,108 @@ class TypeCheckVisitor : public SemanticVisitor
 {
   public:
     /**
-     * Visits given BreakAstNode node. It will throw an error if the node is not inside a loop.
-     * @param _break
-     * @return bool
+     * Visits a `break` statement.
+     *
+     * `break` is legal inside either a loop or a `switch`.
      */
     bool visit(BreakAstNode *_break) override;
-    
+
     /**
-     * Visits given CodeScope node. It will visit its expressions.
-     * @param scope
-     * @return bool
+     * Visits a lexical code scope and validates each child expression.
      */
     bool visit(CodeScope *scope) override;
-    
+
     /**
-     * Visits given ContinueAstNode node. It will throw an error if the node is not inside a loop.
-     * @param _continue
-     * @return bool
+     * Visits a `continue` statement.
+     *
+     * `continue` is legal only inside a loop.
      */
     bool visit(ContinueAstNode *_continue) override;
 
     /**
-     * Visits the given IfAstNode. Will try to resolve the symbol and types from the condition and true and false
-     * branches.
-     * @param ifNode
-     * @return bool
+     * Visits a `for` loop.
+     *
+     * The initialiser, condition and next-iteration clause are validated first;
+     * the loop body is then validated while the semantic context is marked as
+     * being inside a loop.
      */
-    bool visit(IfAstNode *ifNode);
+    bool visit(ForAstNode *_for) override;
 
     /**
-     * Visits given instruction node. Recursively visits operands.
-     * @param instr
-     * @return bool
+     * Visits an `if` statement and validates its condition plus both branches.
+     */
+    bool visit(IfAstNode *ifNode) override;
+
+    /**
+     * Visits an instruction.
+     *
+     * The visitor derives a target operand type when possible and uses it to
+     * validate immediates and operand compatibility across the instruction.
      */
     bool visit(Instruction *instr) override;
 
     /**
-     * Visits given Label node. Recursively visits its expressions.
-     * @param label
-     * @return bool
+     * Visits a label and validates all expressions in its body.
      */
     bool visit(Label *label) override;
 
     /**
-     * Visits given Module node. Recursively visits its expressions.
-     * @param module
-     * @return bool
+     * Visits a module and validates all expressions in its body.
      */
     bool visit(Module *module) override;
 
     /**
-     * Visits given Memory operand node. Visits used variable nodes (if any).
-     * @param operand
-     * @return bool
+     * Visits a memory operand.
+     *
+     * The memory reference must already have a resolved element type. Any
+     * variables used in its addressing mode are validated recursively.
      */
     bool visit(MemoryOperandAstNode *operand) override;
 
     /**
-     * Visits given Variable node. This visitor will check for the types of
-     * the symbol this variable references and the used type. If these types do not match will change node's annotation
-     * to a TypeCastAnnotation.
-     * @param var
-     * @return bool
+     * Visits a variable use.
+     *
+     * If the use explicitly requests a different type than the symbol's
+     * declared type, cast safety is checked and a `TypeCastAnnotation` is
+     * attached for the lowerer.
      */
     bool visit(Variable *var) override;
 
     /**
-     * Visits the given WhileAstNode. Will try to resolve the symbol and types from the condition the loop branch.
-     * @param whileNode
-     * @return bool
+     * Visits a `switch` statement.
+     *
+     * The controlling variable is validated first, then each case literal is
+     * checked against the switch variable type while the semantic context is
+     * marked as being inside a switch.
+     */
+    bool visit(SwitchAstNode *_switch) override;
+
+    /**
+     * Visits a single switch case and validates its body.
+     */
+    bool visit(SwitchCaseAstNode *_switchCase) override;
+
+    /**
+     * Visits a `while` loop.
+     *
+     * The condition is validated first; the body is then validated while the
+     * semantic context is marked as being inside a loop.
      */
     bool visit(WhileAstNode *whileNode) override;
 
   private:
     /**
-     * Performs a type cast safety check and returns true if cast can be done.
-     * @param node
-     * @param originalType The original type.
-     * @param usedType The new type which, if possible, will be used.
-     * @return bool
+     * Checks whether using `usedType` in place of `originalType` is legal for
+     * the given node.
+     *
+     * Fatal errors are emitted for unsupported conversions; lossy but allowed
+     * conversions produce warnings.
      */
     bool checkCastSafety(AstNode *node, Type *originalType, Type *usedType);
 
     /**
-     * Checks if the given immediate matches the target type or can be casted onto it.
-     * @param operand
-     * @param usedType
-     * @return
+     * Checks whether the given immediate literal can be represented by the
+     * requested target type.
      */
     bool checkImmediateSafety(ImmediateOperand *operand, Type *usedType);
 };

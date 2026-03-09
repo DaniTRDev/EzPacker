@@ -1,0 +1,10 @@
+# Intentional syntax error for negative testing
+# Tests: error handling in parsing phase
+
+void SyntaxError()
+{
+    create i32 %a
+    mov %a, 1;
+    nop;
+}
+

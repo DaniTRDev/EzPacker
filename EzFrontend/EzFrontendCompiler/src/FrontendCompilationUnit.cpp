@@ -7,22 +7,13 @@ FrontendCompilationUnit::FrontendCompilationUnit(const std::shared_ptr<ErrorColl
     cleanup();
 }
 
-bool FrontendCompilationUnit::create(const std::string &sourceContent, const std::string &sourceName)
+bool FrontendCompilationUnit::create(size_t sourceId)
 {
     cleanup();
-
-    size_t id = getSourceManager()->addSourceContent(sourceName, sourceContent);
-    if (id == 0)
-    {
-        emitError(ErrorSeverity::Fatal,
-                  "Failed to add source content to source manager because it is already present. Source name: " +
-                          sourceName,
-                  "FrontendCompilationUnit::create");
-        return false;
-    }
-
-    m_targetSourceId = id;
-    m_globalScope = std::make_shared<Scope>(nullptr, std::format("@global_scope@{}@{}", sourceName, id));
+    m_targetSourceId = sourceId;
+    m_globalScope = std::make_shared<Scope>(
+            nullptr,
+            std::format("@global_scope@{}@{}", getSourceManager()->getSourceName(sourceId), sourceId));
     return true;
 }
 
@@ -30,9 +21,7 @@ size_t FrontendCompilationUnit::getTargetSourceId() const { return m_targetSourc
 
 const std::shared_ptr<Scope> &FrontendCompilationUnit::getGlobalScope() const { return m_globalScope; }
 
-const TypedPoolSlice<AstNode> *FrontendCompilationUnit::getGlobalScopeAstNodes() const { return m_globalScopeAstNodes; }
-
-TypedPoolSlice<AstNode> *&FrontendCompilationUnit::getGlobalScopeAstNodes() { return m_globalScopeAstNodes; }
+TypedPoolSlice<AstNode> *FrontendCompilationUnit::getGlobalScopeAstNodes() { return m_globalScopeAstNodes; }
 
 void FrontendCompilationUnit::cleanup()
 {

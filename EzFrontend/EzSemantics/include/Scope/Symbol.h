@@ -1,12 +1,19 @@
 /**
  * @file Symbol.h
- * @brief A named entity in the symbol table: variable, label, or module.
+ * @brief Semantic description of a declared named entity.
  *
- * Each Symbol records the AstNode that originally defined it, the symbol's
- * kind (GlobalVariable, LocalVariable, Label, Module), its data type, a
- * unique numeric ID, and its name.  Symbols are created by
- * BasicSemanticContext::createSymbol() and stored in the Scope that owns
- * them.
+ * A `Symbol` represents one declaration that can later be referenced by
+ * source code: modules, labels and variables. Symbols are created by
+ * `BasicSemanticContext::createSymbol()` during the definition pass and then
+ * referenced from AST nodes through `SymbolAnnotation` or
+ * `TypeCastAnnotation`.
+ *
+ * The object stores:
+ *   - the AST node that introduced the declaration,
+ *   - the semantic category (`SymbolType`),
+ *   - the declared data type when applicable,
+ *   - a context-wide unique ID, and
+ *   - the original source-level name.
  */
 #ifndef EZPACKER_SYMBOL_H
 #define EZPACKER_SYMBOL_H
@@ -15,7 +22,8 @@
 #include "TypeTable.h"
 
 /**
- * This enumeration contains the possible type of a symbol.
+ * Enumerates the kinds of source declarations represented in the symbol
+ * table.
  */
 enum class SymbolType : uint8_t
 {
@@ -27,73 +35,60 @@ enum class SymbolType : uint8_t
 };
 
 /**
- * This class contains basic information about a symbol. It will be of use to define constraints during the semantic
- * analysis.
+ * Semantic record for one declaration in the symbol table.
  */
 class Symbol
 {
   public:
     /**
-     * Creates a symbol with the given data type, symbol type, defining node and name.
-     * @param definingNode
-     * @param symbolDataType
-     * @param symbolType
-     * @param name
+     * Creates a symbol for one declaration site.
      */
     Symbol(AstNode *definingNode, Type *symbolDataType, SymbolType symbolType, const std::string_view &name);
 
     /**
-     * Returns the AstNode that defined this symbol.
-     * @return AstNode *
+     * Returns the AST node that introduced this symbol.
      */
     AstNode *getDefiningNode() const;
 
     /**
-     * Returns the name of the symbol data type.
-     * @return const char*
+     * Returns a textual name for the symbol's declared data type.
+     *
+     * This is meaningful only when the symbol has an associated type.
      */
     const char *getSymbolDataTypeName() const;
 
     /**
-     * Returns the name of the symbol type
-     * @return const char *
+     * Returns a textual name for this symbol's semantic category.
      */
     const char *getSymbolTypeName() const;
 
     /**
-     * Returns the name of the given symbol type.
-     * @param symbolType
-     * @return const char *
+     * Converts a `SymbolType` enum value to its human-readable string name.
      */
     static const char *getSymbolTypeAsString(SymbolType symbolType);
 
     /**
-     * Returns the ID of this symbol.
-     * @return size_t
+     * Returns the context-wide unique ID assigned to this symbol.
      */
     size_t getId() const;
 
     /**
-     * Returns the type of the symbol.
-     * @return SymbolType
+     * Returns the semantic category of this symbol.
      */
     SymbolType getType() const;
 
     /**
-     * Returns the data type behind this symbol.
-     * @return Type
+     * Returns the declared data type associated with this symbol, if any.
      */
     Type *getSymbolDataType();
 
     /**
-     * Sets the ID of this symbol. Called by the scope when a new symbol, is created.
-     * @param id
+     * Sets the unique ID assigned by the semantic context.
      */
     void setId(size_t id);
 
     /**
-     * Returns the name of the symbol.
-     * @return const std::string &
+     * Returns the source-level name of the symbol.
      */
     const std::string_view &getName() const;
 

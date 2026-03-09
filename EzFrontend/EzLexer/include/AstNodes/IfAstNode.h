@@ -74,18 +74,6 @@ class IfAstNode : public AstNode
      * @param condition
      */
     void setCondition(ConditionAstNode *condition);
-
-    /**
-     * Returns a string representation of this node. This is described as:
-     * if (condition)
-     * {CodeScope::getAsStr(Default)}
-     * else || elif ...
-     * {}
-     * @param mode
-     * @return std::string
-     */
-    std::string getAsStr(AstNodeStringMode mode) const override;
-
   private:
     AstNode *m_falseScope;         /** Node that handles the else part of the if statement, if it exists.
                                     * It can either be a CodeScope for an else block or another IfAstNode for an

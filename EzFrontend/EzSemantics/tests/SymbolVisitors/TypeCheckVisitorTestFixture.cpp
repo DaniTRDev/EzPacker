@@ -3,7 +3,7 @@
 void TypeCheckVisitorTestFixture::SetUp()
 {
     m_logger = EzLogger::createSyncLogger("TEST_SEMANTICS_TYPECAST");
-    m_sourceManager = std::make_shared<SourceManager>();
+    m_sourceManager = std::make_shared<SourceManager>("");
     m_sourceSinkLogger = std::make_shared<SourceLoggingSink>(m_logger.get());
     m_errorCollector = std::make_shared<ErrorCollector>();
     m_tokenizer = std::make_shared<BasicTokenizer>(m_errorCollector, m_sourceManager);

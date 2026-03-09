@@ -1,0 +1,21 @@
+# Module with arithmetic and bitwise operations
+# Tests: add, sub, mul, div, and, or, xor, shl, shr
+
+void ModuleWithArithmetic()
+{
+    create i32 %a;
+    create i32 %b;
+
+    mov %a, 42;
+    mov %b, 10;
+
+    add %a, %b;
+    sub %a, 5;
+    and %a, 0xFF;
+    or  %a, 0x10;
+    xor %a, %b;
+    shl %a, 2;
+    shr %a, 1;
+    nop;
+}
+

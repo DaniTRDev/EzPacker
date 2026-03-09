@@ -7,7 +7,7 @@
 void LoweringPipelineTestFixture::SetUp()
 {
     m_logger = EzLogger::createSyncLogger("LOWERING_PIPELINE");
-    m_sourceManager = std::make_shared<SourceManager>();
+    m_sourceManager = std::make_shared<SourceManager>("");
     m_sourceSinkLogger = std::make_shared<SourceLoggingSink>(m_logger.get());
     m_errorCollector = std::make_shared<ErrorCollector>();
     m_semanticContext = std::make_shared<BasicSemanticContext>(m_errorCollector, m_sourceManager);
