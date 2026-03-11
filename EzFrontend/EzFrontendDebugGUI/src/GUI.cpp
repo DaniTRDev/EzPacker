@@ -359,6 +359,26 @@ bool Gui::createImGuiContext()
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+    // Font loading
+    if (std::filesystem::exists("assets/font.ttf"))
+    {
+        io.Fonts->AddFontFromFileTTF("assets/font.ttf", 16.0f);
+    }
+    else if (std::filesystem::exists("font.ttf")) // Fallback
+    {
+        io.Fonts->AddFontFromFileTTF("font.ttf", 16.0f);
+    }
+    else
+    {
+        // Try to find assets/font.ttf relative to the executable if not in CWD
+        // This is a common issue when running from IDE or debugger
+        // Assuming typical layout: bin/EzFrontendDebugGUI.exe and assets/ is sibling to bin/ or inside bin/
+        if (std::filesystem::exists("../assets/font.ttf"))
+        {
+            io.Fonts->AddFontFromFileTTF("../assets/font.ttf", 16.0f);
+        }
+    }
+
 #ifdef _WIN32
     if (!ImGui_ImplWin32_Init(m_guiWindow))
     {

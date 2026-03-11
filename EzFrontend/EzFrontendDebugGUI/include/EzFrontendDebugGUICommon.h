@@ -10,6 +10,10 @@
 #define EZPACKER_EZFRONTENDDEBUGGUICOMMON_H
 
 #include <fstream>
+#include <filesystem>
+#include <vector>
+#include <string>
+#include <optional>
 
 #ifdef _WIN32
 

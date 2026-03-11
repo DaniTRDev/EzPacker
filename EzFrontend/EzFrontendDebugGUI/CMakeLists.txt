@@ -77,3 +77,11 @@ EzCMK_AddExecutable(NAME EzFrontendDebugGUI
         LINKED_LIBRARIES "${EZFRONTEND_DEBUG_GUI_LIBS}"
         INCLUDED_DIRS "include"
 )
+
+# Copy assets folder to the build directory next to the executable
+add_custom_command(TARGET EzFrontendDebugGUI POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/../../assets"
+    "$<TARGET_FILE_DIR:EzFrontendDebugGUI>/assets"
+    COMMENT "Copying assets directory to build output..."
+)

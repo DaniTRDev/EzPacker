@@ -10,6 +10,14 @@
 #include "Frontend/EzFrontendWrapper.h"
 #include "Views/IView.h"
 
+struct OpenedFile
+{
+    std::string m_path;
+    std::string m_content;
+    bool m_dirty = false;
+    // We could store scroll positions here if ImGui::InputTextMultiline exposed them easily
+};
+
 class Editor : public IView
 {
   public:
@@ -34,6 +42,7 @@ class Editor : public IView
     static constexpr size_t c_editorBufferSize = 1024 * 1024;
 
     bool promptOpenFile();
+    bool openFile(const std::string &path);
     bool promptSaveFileAs();
     bool saveCurrentFile();
     bool compileCurrentBuffer();
@@ -62,11 +71,26 @@ class Editor : public IView
     std::string formatSourceReference(const SourceReference &sourceRef) const;
     std::string formatOperand(const MirOperand &operand) const;
 
+    // Helper to switch active file
+    void switchToTab(size_t index);
+    void closeTab(size_t index);
+    void createNewTab();
+
+    // Helper for "Go to Definition" / Error navigation
+    void navigateToSource(const SourceReference &sourceRef);
+
   private:
     std::shared_ptr<EzFrontendWrapper> m_frontend;
-    std::array<char, c_editorBufferSize> m_editorBuffer{};
+    std::vector<char> m_editorBuffer; // Resizable buffer for current editor content
     std::string m_statusMessage;
-    bool m_dirty{ false };
+
+    // Multi-file support
+    std::vector<OpenedFile> m_openedFiles;
+    size_t m_activeFileIndex = 0; // Index into m_openedFiles
+    
+    // For navigation request
+    bool m_scrollToLineRequested = false;
+    int m_scrollToLine = 0;
 };
 
 #endif // EZPACKER_EDITOR_H
