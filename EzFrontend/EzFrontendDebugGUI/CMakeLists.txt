@@ -52,6 +52,7 @@ set(EZFRONTEND_DEBUG_GUI_FILE_LIST
         "include/GUI.h"
         "include/Frontend/EzFrontendWrapper.h"
         "include/Views/Editor.h"
+        "include/Views/FileExplorer.h"
         "include/Views/IView.h"
         "include/Views/Lexer.h"
         "include/Views/MainMenuBar.h"
@@ -61,6 +62,7 @@ set(EZFRONTEND_DEBUG_GUI_FILE_LIST
         "src/main.cpp"
         "src/Frontend/EzFrontendWrapper.cpp"
         "src/Views/Editor.cpp"
+        "src/Views/FileExplorer.cpp"
         "src/Views/Lexer.cpp"
         "src/Views/MainMenuBar.cpp"
         "src/Views/Output.cpp"
@@ -81,7 +83,7 @@ EzCMK_AddExecutable(NAME EzFrontendDebugGUI
 # Copy assets folder to the build directory next to the executable
 add_custom_command(TARGET EzFrontendDebugGUI POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/../../assets"
+    "${CMAKE_SOURCE_DIR}/assets"
     "$<TARGET_FILE_DIR:EzFrontendDebugGUI>/assets"
     COMMENT "Copying assets directory to build output..."
 )

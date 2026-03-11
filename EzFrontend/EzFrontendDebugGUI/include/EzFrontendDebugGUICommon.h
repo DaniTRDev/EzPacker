@@ -14,6 +14,9 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <memory>
+#include <format>
+#include <functional>
 
 #ifdef _WIN32
 

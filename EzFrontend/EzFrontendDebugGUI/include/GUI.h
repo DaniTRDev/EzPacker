@@ -12,6 +12,7 @@
 
 #include "EzFrontendDebugGUICommon.h"
 #include "Views/Editor.h"
+#include "Views/FileExplorer.h"
 #include "Views/Output.h"
 #include "Views/IView.h"
 #include "Views/MainMenuBar.h"
@@ -36,7 +37,7 @@ class Gui
      * Returns true if the Gui is initialized.
      * @return bool
      */
-    bool isInitialized() const;
+    [[nodiscard]] bool isInitialized() const;
 
     /**
      * Uninitializes the GUI, destroying window gui and console window, returns true if succeeded.
@@ -78,58 +79,33 @@ class Gui
      */
     bool createGuiWindow();
 
-    /**
-     * Creates a render target for the given device and swapchain, returns true if succeeded.
-     * @return bool
-     */
-    bool createRenderTarget();
+    /** Creates a render target for the current device and swapchain. */
+    void createRenderTarget();
 
-    /**
-     * Destroysd the D3D device for the current window and returns true if succeeded.
-     * @return bool
-     */
-    bool destroyDeviceD3D();
+    /** Destroys the D3D device for the current window. */
+    void destroyDeviceD3D();
 
-    /**
-     * Destroys the current GUI window and returns true if succeeded.
-     * @return bool
-     */
-    bool destroyGuiWindow();
+    /** Destroys the current GUI window. */
+    void destroyGuiWindow();
 
-    /**
-     * Destroys the render target and returns true if succeeded.
-     * @return bool
-     */
-    bool destroyRenderTarget();
+    /** Destroys the render target. */
+    void destroyRenderTarget();
 
-    /**
-     * The WndProc callback that will pass input to GUI.
-     * @param hwnd
-     * @param code
-     * @param msg
-     * @param lparam
-     * @return LRESULT
-     */
+    /** The WndProc callback that passes input to ImGui. */
     static LRESULT WndProc(HWND hwnd, UINT code, WPARAM msg, LPARAM lparam);
 
 #elif defined(__linux__)
 
     bool createGlfwWindow();
-    bool destroyGlfwWindow();
+    void destroyGlfwWindow();
 
 #endif
 
-    /**
-     * Attaches ImGui to the created window and D3D device and returns true if succeeded.
-     * @return bool
-     */
+    /** Attaches ImGui to the created window and device. Returns false on failure. */
     bool createImGuiContext();
 
-    /**
-     * Destroys the current imgui context attached to the windows and d3d device and returns true if succeeded.
-     * @return bool
-     */
-    bool destroyImGuiContext();
+    /** Shuts down and destroys the ImGui context. */
+    void destroyImGuiContext();
 
   private:
     bool m_initialized;

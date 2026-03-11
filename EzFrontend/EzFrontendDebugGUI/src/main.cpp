@@ -1,6 +1,4 @@
 #include "GUI.h"
-#include "Views/Lexer.h"
-#include "Views/Editor.h"
 
 int main(int, char **)
 {

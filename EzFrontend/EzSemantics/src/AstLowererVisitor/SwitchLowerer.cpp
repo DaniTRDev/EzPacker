@@ -54,13 +54,11 @@ bool SwitchLowerer::lower(AstNode *node, LoweringContext *ctx)
         if (_switch->getDefault())
         {
             // Lower the default body directly into the final checker block.
-            MirBlock *defaultBlock = emitterCtx->createBlock();
-
-            emitterCtx->bindToBlock(defaultBlock);
             _switch->getDefault()->accept(ctx->getOwnerLowererVisitor());
         }
 
         // Whether we ran a default block or not, we must jump to the merge block.
+        // Because we stayed in currentCheckerBlock, this perfectly terminates it!
         emitter->emitJMP(MirReference{ mergeBlock->getId() });
     }
     ctx->exitSwitch();

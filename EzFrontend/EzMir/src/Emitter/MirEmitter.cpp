@@ -56,7 +56,10 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
 
     // Helper to determine if an operand is an immediate value
     auto isImmediate = [](const MirOperand *op)
-    { return op->getInteger() != nullptr || op->getDouble() != nullptr || op->getBigInteger() != nullptr; };
+    {
+        return op->getReference() != nullptr || op->getInteger() != nullptr || op->getDouble() != nullptr ||
+                op->getBigInteger() != nullptr;
+    };
 
     if (flags & static_cast<uint32_t>(MirInstructionFlags::Op1_MustBeReg))
     {

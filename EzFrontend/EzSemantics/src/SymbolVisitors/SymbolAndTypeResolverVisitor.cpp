@@ -157,7 +157,7 @@ bool SymbolAndTypeResolverVisitor::visit(Module *module)
 {
     ScopedSymbolAnnotation *annotation = module->getAnnotation<ScopedSymbolAnnotation>();
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
-    return module->getBody()->accept(this);
+    return module->getHeader()->accept(this) && module->getBody()->accept(this);
 }
 
 bool SymbolAndTypeResolverVisitor::visit(Variable *var)
@@ -186,7 +186,8 @@ bool SymbolAndTypeResolverVisitor::visit(Variable *var)
 
 bool SymbolAndTypeResolverVisitor::visit(SwitchAstNode *_switch)
 {
-    return _switch->getSwitchVariable()->accept(this) && AstNodeVisitor::visitAll(_switch->getCases());
+    return _switch->getSwitchVariable()->accept(this) && AstNodeVisitor::visitAll(_switch->getCases()) &&
+            (!_switch->getDefault() || _switch->getDefault()->accept(this));
 }
 
 bool SymbolAndTypeResolverVisitor::visit(SwitchCaseAstNode *switchCase)

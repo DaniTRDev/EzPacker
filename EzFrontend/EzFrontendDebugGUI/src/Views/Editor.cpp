@@ -1,10 +1,11 @@
 #include "Views/Editor.h"
+#include <imgui_internal.h>
 
 Editor::Editor(std::shared_ptr<EzFrontendWrapper> frontend) : m_frontend(std::move(frontend))
 {
     m_editorBuffer.resize(c_editorBufferSize);
-    createNewTab(); // Initialize with a default scratch tab
-    m_statusMessage = "Ready. Open an .ez file, edit the buffer and compile to inspect the full frontend pipeline.";
+    std::fill(m_editorBuffer.begin(), m_editorBuffer.end(), '\0');
+    m_statusMessage = "Ready. Open an .ez file or create a new scratch buffer.";
 }
 
 const char *Editor::getName() { return "Editor"; }
@@ -42,15 +43,10 @@ bool Editor::promptOpenFile()
 
 bool Editor::openFile(const std::string &path)
 {
-    if (!m_frontend->loadSourceFromFile(path))
-    {
-        m_statusMessage = std::format("Could not open '{}'", path);
-        return false;
-    }
-
     // Check if file is already open
     for (size_t i = 0; i < m_openedFiles.size(); ++i)
     {
+        // Simple path comparison
         if (m_openedFiles[i].m_path == path)
         {
             switchToTab(i);
@@ -58,12 +54,27 @@ bool Editor::openFile(const std::string &path)
         }
     }
 
+    if (!m_frontend->loadSourceFromFile(path))
+    {
+        m_statusMessage = std::format("Could not open '{}'", path);
+        return false;
+    }
+
     // New file, create tab
     OpenedFile file;
     file.m_path = path;
     file.m_content = m_frontend->getLoadedSourceText();
     file.m_dirty = false;
-    
+
+    // Record the file's last-write time for external modification detection
+    try
+    {
+        file.m_lastWriteTime = std::filesystem::last_write_time(path);
+    }
+    catch (const std::filesystem::filesystem_error &)
+    {
+    }
+
     m_openedFiles.push_back(file);
     switchToTab(m_openedFiles.size() - 1);
 
@@ -74,6 +85,8 @@ bool Editor::openFile(const std::string &path)
 
 bool Editor::promptSaveFileAs()
 {
+    if (m_openedFiles.empty())
+        return false;
 #ifdef _WIN32
     OPENFILENAMEA ofn{};
     char fileName[MAX_PATH] = {};
@@ -101,6 +114,15 @@ bool Editor::promptSaveFileAs()
     m_openedFiles[m_activeFileIndex].m_dirty = false;
     m_frontend->loadSourceFromFile(fileName);
 
+    // Refresh last-write time after saving
+    try
+    {
+        m_openedFiles[m_activeFileIndex].m_lastWriteTime = std::filesystem::last_write_time(fileName);
+    }
+    catch (const std::filesystem::filesystem_error &)
+    {
+    }
+
     m_statusMessage = std::format("Saved '{}'", fileName);
     return true;
 #else
@@ -111,6 +133,9 @@ bool Editor::promptSaveFileAs()
 
 bool Editor::saveCurrentFile()
 {
+    if (m_openedFiles.empty())
+        return false;
+
     if (m_openedFiles[m_activeFileIndex].m_path.empty())
     {
         return promptSaveFileAs();
@@ -125,20 +150,32 @@ bool Editor::saveCurrentFile()
 
     m_openedFiles[m_activeFileIndex].m_dirty = false;
     m_frontend->loadSourceFromFile(path);
+
+    // Refresh last-write time after saving
+    try
+    {
+        m_openedFiles[m_activeFileIndex].m_lastWriteTime = std::filesystem::last_write_time(path);
+    }
+    catch (const std::filesystem::filesystem_error &)
+    {
+    }
+
     m_statusMessage = std::format("Saved '{}'", path);
     return true;
 }
 
 bool Editor::compileCurrentBuffer()
 {
+    if (m_openedFiles.empty())
+        return false;
+
     const std::string sourceText = getEditorText();
     // Update content in memory
     m_openedFiles[m_activeFileIndex].m_content = sourceText;
 
     const std::filesystem::path loadedPath(m_openedFiles[m_activeFileIndex].m_path);
-    const std::filesystem::path workingDirectory = loadedPath.empty()
-            ? std::filesystem::current_path()
-            : loadedPath.parent_path();
+    const std::filesystem::path workingDirectory =
+            loadedPath.empty() ? std::filesystem::current_path() : loadedPath.parent_path();
     const std::string sourceName = loadedPath.empty() ? "scratch.ez" : loadedPath.filename().string();
 
     const bool ok = m_frontend->compileSource(sourceText, sourceName, workingDirectory);
@@ -154,134 +191,149 @@ void Editor::syncEditorBufferFromSource(const std::string &source)
     std::copy_n(source.data(), copySize, m_editorBuffer.data());
 }
 
-std::string Editor::getEditorText() const { return std::string(m_editorBuffer.data()); }
+std::string Editor::getEditorText() const { return { m_editorBuffer.data() }; }
 
 void Editor::createNewTab()
 {
     OpenedFile file;
     file.m_path = "";
     file.m_content = "void main() {\n    nop;\n}\n";
-    file.m_dirty = false;
+    file.m_dirty = true; // virtual file — not on disk
     m_openedFiles.push_back(file);
     switchToTab(m_openedFiles.size() - 1);
 }
 
 void Editor::switchToTab(size_t index)
 {
-    if (index >= m_openedFiles.size()) return;
+    if (index >= m_openedFiles.size())
+        return;
 
     // Save current buffer to memory before switching
     if (m_activeFileIndex < m_openedFiles.size())
-    {
         m_openedFiles[m_activeFileIndex].m_content = getEditorText();
-    }
 
     m_activeFileIndex = index;
+    m_pendingTabSwitch = true; // tell renderEditorPanel to apply SetSelected once
     syncEditorBufferFromSource(m_openedFiles[index].m_content);
-    
-    // Also tell frontend context about this file so diagnostics match
+
+    // Tell the frontend about this file so diagnostics match
     if (!m_openedFiles[index].m_path.empty())
-    {
         m_frontend->loadSourceFromFile(m_openedFiles[index].m_path);
-    }
 }
 
 void Editor::closeTab(size_t index)
 {
-    if (index >= m_openedFiles.size()) return;
+    if (index >= m_openedFiles.size())
+        return;
 
-    m_openedFiles.erase(m_openedFiles.begin() + index);
+    m_openedFiles.erase(m_openedFiles.begin() + static_cast<std::ptrdiff_t>(index));
+
     if (m_openedFiles.empty())
     {
-        createNewTab();
+        // No files left — welcome screen will show
+        m_activeFileIndex = 0;
+        std::fill(m_editorBuffer.begin(), m_editorBuffer.end(), '\0');
+        m_statusMessage = "No files open.";
+        return;
     }
-    else
-    {
-        if (m_activeFileIndex >= index && m_activeFileIndex > 0)
-        {
-            m_activeFileIndex--;
-        }
-        switchToTab(m_activeFileIndex);
-    }
+
+    // Clamp the active index
+    if (m_activeFileIndex >= m_openedFiles.size())
+        m_activeFileIndex = m_openedFiles.size() - 1;
+    else if (m_activeFileIndex > index)
+        m_activeFileIndex--;
+
+    switchToTab(m_activeFileIndex);
 }
 
 void Editor::renderToolbar()
 {
-    if (ImGui::Button("New"))
-    {
+    const bool hasFiles = !m_openedFiles.empty();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(5, 2));
+
+    if (ImGui::SmallButton("New"))
         createNewTab();
-    }
     ImGui::SameLine();
-    if (ImGui::Button("Open"))
-    {
+    if (ImGui::SmallButton("Open"))
         promptOpenFile();
-    }
 
-    ImGui::SameLine();
-    if (ImGui::Button("Save"))
+    if (hasFiles)
     {
-        saveCurrentFile();
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Save As"))
-    {
-        promptSaveFileAs();
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Compile"))
-    {
-        compileCurrentBuffer();
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Reload") && !m_openedFiles[m_activeFileIndex].m_path.empty())
-    {
-        if (m_frontend->loadSourceFromFile(m_openedFiles[m_activeFileIndex].m_path))
-        {
-            m_openedFiles[m_activeFileIndex].m_content = m_frontend->getLoadedSourceText();
-            m_openedFiles[m_activeFileIndex].m_dirty = false;
-            syncEditorBufferFromSource(m_openedFiles[m_activeFileIndex].m_content);
-            m_statusMessage = std::format("Reloaded '{}'", m_openedFiles[m_activeFileIndex].m_path);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Save"))
+            saveCurrentFile();
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Save As"))
+            promptSaveFileAs();
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Compile"))
             compileCurrentBuffer();
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Reload") && !m_openedFiles[m_activeFileIndex].m_path.empty())
+        {
+            if (m_frontend->loadSourceFromFile(m_openedFiles[m_activeFileIndex].m_path))
+            {
+                m_openedFiles[m_activeFileIndex].m_content = m_frontend->getLoadedSourceText();
+                m_openedFiles[m_activeFileIndex].m_dirty = false;
+                try
+                {
+                    m_openedFiles[m_activeFileIndex].m_lastWriteTime =
+                            std::filesystem::last_write_time(m_openedFiles[m_activeFileIndex].m_path);
+                }
+                catch (const std::filesystem::filesystem_error &)
+                {
+                }
+                syncEditorBufferFromSource(m_openedFiles[m_activeFileIndex].m_content);
+                m_resetCursorRequested = true;
+                m_statusMessage = std::format("Reloaded '{}'", m_openedFiles[m_activeFileIndex].m_path);
+                compileCurrentBuffer();
+            }
         }
     }
 
-    ImGui::SameLine();
-    ImGui::TextDisabled("|");
-    ImGui::SameLine();
+    ImGui::PopStyleVar();
 
-    const bool buildOk = m_frontend->lastCompilationSucceeded();
-    const std::string activeFile = m_openedFiles[m_activeFileIndex].m_path.empty()
-                                           ? std::string("scratch.ez")
-                                           : std::filesystem::path(m_openedFiles[m_activeFileIndex].m_path).filename().string();
-    ImGui::TextColored(buildOk ? ImVec4(0.35f, 0.85f, 0.45f, 1.0f) : ImVec4(0.95f, 0.45f, 0.35f, 1.0f),
-                       "%s",
-                       buildOk ? "BUILD OK" : "BUILD IDLE/FAILED");
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", m_statusMessage.c_str());
-    ImGui::SameLine();
-    ImGui::TextDisabled("| file: %s | buffer: %zu bytes%s",
-                        activeFile.c_str(),
-                        getEditorText().size(),
-                        m_openedFiles[m_activeFileIndex].m_dirty ? " | modified" : "");
+    // ── Status line ───────────────────────────────────────────────────────
+    if (hasFiles)
+    {
+        const bool buildOk = m_frontend->lastCompilationSucceeded();
+        const std::string activeFile = m_openedFiles[m_activeFileIndex].m_path.empty()
+                ? std::string("scratch.ez")
+                : std::filesystem::path(m_openedFiles[m_activeFileIndex].m_path).filename().string();
+        const char *dirtyMark = m_openedFiles[m_activeFileIndex].m_dirty ? " *" : "";
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("|");
+        ImGui::SameLine();
+        ImGui::TextColored(buildOk ? ImVec4(0.35f, 0.85f, 0.45f, 1.0f) : ImVec4(0.95f, 0.45f, 0.35f, 1.0f),
+                           "%s",
+                           buildOk ? "OK" : "ERR");
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s%s — %s", activeFile.c_str(), dirtyMark, m_statusMessage.c_str());
+    }
+    else
+    {
+        ImGui::SameLine();
+        ImGui::TextDisabled("| No files open");
+    }
 }
 
 void Editor::renderWorkspace()
 {
-    constexpr float diagnosticsHeight = 235.0f;
+    // Top: editor code area + inspector side-bar
+    // Bottom: diagnostics panel
+    // Use a proportional split so it adapts to any window height.
+    const float totalHeight = ImGui::GetContentRegionAvail().y;
+    const float diagnosticsH = std::max(160.0f, totalHeight * 0.28f);
+    const float topH = totalHeight - diagnosticsH - ImGui::GetStyle().ItemSpacing.y - 1.0f;
 
-    if (ImGui::BeginChild("##workspace-top", ImVec2(0, -diagnosticsHeight), false))
+    if (ImGui::BeginChild("##workspace-top", ImVec2(0, topH), false))
     {
-        if (ImGui::BeginTable("##ide-layout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
+        if (ImGui::BeginTable("##ide-layout-main", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV))
         {
-            ImGui::TableSetupColumn("Workspace", ImGuiTableColumnFlags_WidthFixed, 200.0f);
             ImGui::TableSetupColumn("Editor", ImGuiTableColumnFlags_WidthStretch, 0.0f);
-            ImGui::TableSetupColumn("Inspectors", ImGuiTableColumnFlags_WidthFixed, 430.0f);
-
-            ImGui::TableNextColumn();
-            renderProjectPanel();
+            ImGui::TableSetupColumn("Inspectors", ImGuiTableColumnFlags_WidthFixed, 390.0f);
 
             ImGui::TableNextColumn();
             renderEditorPanel();
@@ -302,105 +354,74 @@ void Editor::renderWorkspace()
     ImGui::EndChild();
 }
 
-void Editor::renderProjectPanel()
-{
-    ImGui::TextUnformatted("Open Files");
-    ImGui::Separator();
-
-    if (ImGui::BeginListBox("##file-list", ImVec2(-FLT_MIN, 150.0f)))
-    {
-        for (size_t i = 0; i < m_openedFiles.size(); ++i)
-        {
-            const std::string label = m_openedFiles[i].m_path.empty()
-                ? "scratch.ez"
-                : std::filesystem::path(m_openedFiles[i].m_path).filename().string();
-            
-            std::string itemLabel = label + (m_openedFiles[i].m_dirty ? " *" : "");
-            
-            const bool isSelected = (m_activeFileIndex == i);
-            if (ImGui::Selectable(itemLabel.c_str(), isSelected))
-            {
-                switchToTab(i);
-            }
-
-            if (isSelected)
-            {
-                ImGui::SetItemDefaultFocus();
-            }
-            
-            // Context menu to close
-            if (ImGui::BeginPopupContextItem())
-            {
-                if (ImGui::MenuItem("Close"))
-                {
-                    closeTab(i);
-                }
-                ImGui::EndPopup();
-            }
-        }
-        ImGui::EndListBox();
-    }
-
-    ImGui::Spacing();
-    ImGui::TextUnformatted("Project Info");
-    ImGui::Separator();
-
-    const std::string loadedFile =
-            m_openedFiles[m_activeFileIndex].m_path.empty() ? "<unsaved>" : m_openedFiles[m_activeFileIndex].m_path;
-    const std::string workingDir = std::filesystem::current_path().string();
-
-    ImGui::TextWrapped("File: %s", loadedFile.c_str());
-    ImGui::TextWrapped("Working Dir: %s", workingDir.c_str());
-    ImGui::Spacing();
-
-    if (ImGui::CollapsingHeader("Pipeline", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        renderPipelineStages();
-    }
-
-    if (ImGui::CollapsingHeader("Includes", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        renderIncludedFiles();
-    }
-}
-
 void Editor::renderEditorPanel()
 {
-    // Tab bar for open files
-    if (ImGui::BeginTabBar("##editor-tabs", ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs))
+    // ── Empty state: no files open ───────────────────────────────────────
+    if (m_openedFiles.empty())
+    {
+        const ImVec2 avail = ImGui::GetContentRegionAvail();
+        ImGui::Dummy(ImVec2(0, avail.y * 0.3f));
+
+        // Center the text block
+        const float textWidth = 340.0f;
+        ImGui::SetCursorPosX((avail.x - textWidth) * 0.5f);
+        ImGui::BeginGroup();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.56f, 0.74f, 0.96f, 1.0f));
+        ImGui::TextUnformatted("EZ Language Frontend IDE");
+        ImGui::PopStyleColor();
+        ImGui::Spacing();
+        ImGui::TextDisabled("No files are open.");
+        ImGui::TextDisabled("Open a file from the Explorer, or create a scratch buffer.");
+        ImGui::Spacing();
+        if (ImGui::Button("Create Test File (scratch.ez)", ImVec2(textWidth, 0)))
+        {
+            createNewTab(); // creates a dirty virtual file
+        }
+        ImGui::EndGroup();
+        return;
+    }
+
+    // ── Tab bar ──────────────────────────────────────────────────────────
+    if (ImGui::BeginTabBar("##editor-tabs",
+                           ImGuiTabBarFlags_Reorderable | ImGuiTabBarFlags_AutoSelectNewTabs |
+                                   ImGuiTabBarFlags_FittingPolicyScroll))
     {
         for (size_t i = 0; i < m_openedFiles.size(); ++i)
         {
-            bool open = true;
+            bool tabOpen = true;
             std::string label = m_openedFiles[i].m_path.empty()
-                ? "scratch.ez"
-                : std::filesystem::path(m_openedFiles[i].m_path).filename().string();
-            if (m_openedFiles[i].m_dirty) label += " *";
-            
-            int flags = (i == m_activeFileIndex) ? ImGuiTabItemFlags_SetSelected : 0;
-            if (ImGui::BeginTabItem(label.c_str(), &open, flags))
+                    ? std::format("scratch.ez##{}", i)
+                    : std::format("{}##{}", std::filesystem::path(m_openedFiles[i].m_path).filename().string(), i);
+
+            // Build a display label with dirty marker
+            std::string displayLabel = m_openedFiles[i].m_path.empty()
+                    ? "scratch.ez"
+                    : std::filesystem::path(m_openedFiles[i].m_path).filename().string();
+            if (m_openedFiles[i].m_dirty)
+                displayLabel += " *";
+            // Use the unique label for ImGui IDs but show displayLabel text
+            // ImGui uses the part before ## for display and the full string for ID
+            std::string tabLabel = displayLabel + std::format("##{}", i);
+
+            // Only force-select a tab once after switchToTab sets the pending flag
+            int flags = 0;
+            if (m_pendingTabSwitch && i == m_activeFileIndex)
             {
+                flags = ImGuiTabItemFlags_SetSelected;
+                m_pendingTabSwitch = false;
+            }
+
+            if (ImGui::BeginTabItem(tabLabel.c_str(), &tabOpen, flags))
+            {
+                // If the user clicked this tab, update our active index
                 if (i != m_activeFileIndex)
-                {
                     switchToTab(i);
-                }
-                
-                // Editor Input
+
+                // ── Editor input (unique ID per tab) ─────────────────────
                 const ImVec2 size = ImGui::GetContentRegionAvail();
-                
-                // If scroll requested, we need a way to do it. ImGui InputTextMultiline doesn't support SetScrollY easily.
-                // However, we can use a child window if we weren't using InputTextMultiline, but for a simple editor we are stuck.
-                // A workaround is to use SetKeyboardFocusHere + simulate keys or just accept we can't scroll easily without a real editor widget (like ImGuiColorTextEdit).
-                // But let's try a simple focus approach if possible, or just ignore scroll for now with standard InputText.
-                // Actually, standard InputText doesn't expose scroll API.
-                
-                // For "Go to Definition", we really need a better editor widget.
-                // BUT, we can use SetCursorPos? No.
-                // We will implement a basic "Status bar" message for now when navigation happens,
-                // or try to find the line string position?
-                
-                bool reclaim_focus = false;
-                if (ImGui::InputTextMultiline("##ez-source",
+                const std::string inputId = std::format("##ez-source-{}", i);
+
+                if (ImGui::InputTextMultiline(inputId.c_str(),
                                               m_editorBuffer.data(),
                                               m_editorBuffer.size(),
                                               size,
@@ -408,25 +429,36 @@ void Editor::renderEditorPanel()
                 {
                     m_openedFiles[m_activeFileIndex].m_dirty = true;
                 }
-                
+
+                // Reset cursor to the beginning after a reload
+                if (m_resetCursorRequested)
+                {
+                    if (ImGuiInputTextState *state = ImGui::GetInputTextState(ImGui::GetItemID()))
+                    {
+                        // Tell ImGui to reload from the user buffer and place
+                        // the cursor + selection at position 0.
+                        state->ReloadSelectionStart = 0;
+                        state->ReloadSelectionEnd = 0;
+                        state->WantReloadUserBuf = true;
+                        state->Scroll = ImVec2(0.0f, 0.0f);
+                    }
+                    m_resetCursorRequested = false;
+                }
+
                 if (m_scrollToLineRequested)
                 {
-                    // This is a hack because InputTextMultiline doesn't support programmatic scrolling.
-                    // We can only notify the user.
-                    // To do this properly, we'd need a custom render loop for text or a library like ImGuiColorTextEdit.
-                    // For this task, I will just log the jump request.
-                    m_statusMessage = std::format("Jump to line {} requested (editor widget limitation)", m_scrollToLine);
+                    m_statusMessage = std::format("Jump to line {} requested", m_scrollToLine);
                     m_scrollToLineRequested = false;
                 }
 
                 ImGui::EndTabItem();
             }
 
-            if (!open)
+            if (!tabOpen)
             {
                 closeTab(i);
-                // Adjust loop index if we removed current or previous element
-                if (i > 0) i--;
+                if (i > 0)
+                    --i; // re-check index after removal
             }
         }
         ImGui::EndTabBar();
@@ -512,13 +544,15 @@ void Editor::renderDiagnosticsPanel()
 
 void Editor::navigateToSource(const SourceReference &sourceRef)
 {
-    if (!sourceRef.m_valid) return;
+    if (!sourceRef.m_valid)
+        return;
 
     std::shared_ptr<SourceManager> sm = m_frontend->getSourceManager();
-    if (!sm) return;
+    if (!sm)
+        return;
 
-    std::string filename = sm->getSourceName(sourceRef.m_sourceFileId);
-    
+    std::string filename = std::string(sm->getSourceName(sourceRef.m_sourceFileId));
+
     // Check if file is already open
     bool found = false;
     for (size_t i = 0; i < m_openedFiles.size(); ++i)
@@ -527,7 +561,7 @@ void Editor::navigateToSource(const SourceReference &sourceRef)
         // In a real app we'd use canonical paths
         std::filesystem::path p1(m_openedFiles[i].m_path);
         std::filesystem::path p2(filename);
-        
+
         if (m_openedFiles[i].m_path == filename || p1.filename() == p2.filename())
         {
             switchToTab(i);
@@ -557,32 +591,50 @@ void Editor::navigateToSource(const SourceReference &sourceRef)
     m_scrollToLine = static_cast<int>(sourceRef.m_line);
 }
 
-void Editor::renderPipelineStages()
+void Editor::checkExternalFileModifications()
 {
-    for (const FrontendPipelineStage &stage : m_frontend->getPipelineStages())
+    for (size_t i = 0; i < m_openedFiles.size(); ++i)
     {
-        ImGui::Bullet();
-        ImGui::SameLine();
-        ImGui::TextColored(stage.m_available ? ImVec4(0.35f, 0.85f, 0.45f, 1.0f) : ImVec4(0.85f, 0.5f, 0.45f, 1.0f),
-                           "%s",
-                           stage.m_name.c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("- %s", stage.m_detail.c_str());
-    }
-}
+        OpenedFile &file = m_openedFiles[i];
+        if (file.m_path.empty())
+            continue; // scratch buffers have no disk path
 
-void Editor::renderIncludedFiles()
-{
-    const auto &includedFiles = m_frontend->getIncludedFiles();
-    if (includedFiles.empty())
-    {
-        ImGui::TextDisabled("No include directives resolved.");
-        return;
-    }
+        try
+        {
+            if (!std::filesystem::exists(file.m_path))
+                continue;
 
-    for (const std::string &file : includedFiles)
-    {
-        ImGui::BulletText("%s", file.c_str());
+            const auto currentWriteTime = std::filesystem::last_write_time(file.m_path);
+            if (currentWriteTime != file.m_lastWriteTime)
+            {
+                // File was modified externally — reload it
+                if (m_frontend->loadSourceFromFile(file.m_path))
+                {
+                    file.m_content = m_frontend->getLoadedSourceText();
+                    file.m_dirty = false;
+                    file.m_lastWriteTime = currentWriteTime;
+
+                    // If this is the active tab, update the editor buffer too
+                    if (i == m_activeFileIndex)
+                    {
+                        syncEditorBufferFromSource(file.m_content);
+                        m_resetCursorRequested = true;
+                        compileCurrentBuffer();
+                    }
+
+                    m_statusMessage = std::format("File '{}' changed on disk — reloaded",
+                                                  std::filesystem::path(file.m_path).filename().string());
+                }
+                else
+                {
+                    // Update the write time even on failure to avoid retrying every check
+                    file.m_lastWriteTime = currentWriteTime;
+                }
+            }
+        }
+        catch (const std::filesystem::filesystem_error &)
+        {
+        }
     }
 }
 
@@ -700,7 +752,7 @@ void Editor::renderMir()
     }
 
     MirEmitterContext *mirContext = unit->getMirEmitterContext().get();
-    
+
     //
     // Render Type Table
     //
@@ -709,7 +761,9 @@ void Editor::renderMir()
         TypedPoolSlice<MirType> *typeList = mirContext->getTypeList();
         if (typeList && typeList->m_numElems > 0)
         {
-            if (ImGui::BeginTable("##mir-types", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+            if (ImGui::BeginTable("##mir-types",
+                                  4,
+                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
             {
                 ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 40.0f);
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
@@ -720,36 +774,50 @@ void Editor::renderMir()
                 for (MirType *type : *typeList)
                 {
                     ImGui::TableNextRow();
-                    
+
                     ImGui::TableNextColumn();
                     ImGui::Text("%zu", type->getId());
 
                     ImGui::TableNextColumn();
                     ImGui::Text("%s", type->getName().empty() ? "<anon>" : std::string(type->getName()).c_str());
-                    
+
                     ImGui::TableNextColumn();
-                    const char* kindStr = "Unknown";
-                    switch(type->getKind()) {
-                        case MirTypeKind::Invalid: kindStr = "Invalid"; break;
-                        case MirTypeKind::Integer: kindStr = "Integer"; break;
-                        case MirTypeKind::FloatingPoint: kindStr = "Float"; break;
-                        case MirTypeKind::Pointer: kindStr = "Pointer"; break;
-                        case MirTypeKind::Array: kindStr = "Array"; break;
-                        case MirTypeKind::Void: kindStr = "Void"; break;
+                    const char *kindStr = "Unknown";
+                    switch (type->getKind())
+                    {
+                        case MirTypeKind::Invalid:
+                            kindStr = "Invalid";
+                            break;
+                        case MirTypeKind::Integer:
+                            kindStr = "Integer";
+                            break;
+                        case MirTypeKind::FloatingPoint:
+                            kindStr = "Float";
+                            break;
+                        case MirTypeKind::Pointer:
+                            kindStr = "Pointer";
+                            break;
+                        case MirTypeKind::Array:
+                            kindStr = "Array";
+                            break;
+                        case MirTypeKind::Void:
+                            kindStr = "Void";
+                            break;
                     }
                     ImGui::Text("%s", kindStr);
 
                     ImGui::TableNextColumn();
                     if (type->getSubTypes() && type->getSubTypes()->m_numElems > 0)
                     {
-                         // Just listing subtype IDs for brevity
-                         std::string subTypeIds;
-                         for (MirType* sub : *type->getSubTypes())
-                         {
-                             if (!subTypeIds.empty()) subTypeIds += ", ";
-                             subTypeIds += std::to_string(sub->getId());
-                         }
-                         ImGui::Text("SubTypes: [%s]", subTypeIds.c_str());
+                        // Just listing subtype IDs for brevity
+                        std::string subTypeIds;
+                        for (MirType *sub : *type->getSubTypes())
+                        {
+                            if (!subTypeIds.empty())
+                                subTypeIds += ", ";
+                            subTypeIds += std::to_string(sub->getId());
+                        }
+                        ImGui::Text("SubTypes: [%s]", subTypeIds.c_str());
                     }
                     else
                     {
@@ -764,9 +832,9 @@ void Editor::renderMir()
             ImGui::TextDisabled("No types registered.");
         }
     }
-    
+
     ImGui::Separator();
-    
+
     //
     // Render Functions
     //
@@ -791,8 +859,10 @@ void Editor::renderMir()
 
                 if (ImGui::TreeNode(label.c_str()))
                 {
-                    ImGui::Text("Entry block: %zu", function->getEntryPoint() ? function->getEntryPoint()->getId() : 0ull);
-                    ImGui::Text("Parameters: %zu", function->getParameters() ? function->getParameters()->m_numElems : 0ull);
+                    ImGui::Text("Entry block: %zu",
+                                function->getEntryPoint() ? function->getEntryPoint()->getId() : 0ull);
+                    ImGui::Text("Parameters: %zu",
+                                function->getParameters() ? function->getParameters()->m_numElems : 0ull);
 
                     if (function->getBlocks())
                     {
@@ -813,7 +883,8 @@ void Editor::renderMir()
                                         {
                                             ImGui::Text("Opcode: %d", static_cast<int>(instruction->getOpCode()));
                                             ImGui::Text("Flags: 0x%X", instruction->getFlags());
-                                            if (instruction->getOperands() && instruction->getOperands()->m_numElems > 0)
+                                            if (instruction->getOperands() &&
+                                                instruction->getOperands()->m_numElems > 0)
                                             {
                                                 int operandIndex = 0;
                                                 for (MirOperand *operand : *instruction->getOperands())
@@ -895,9 +966,13 @@ void Editor::renderScopeTree(const Scope *scope, const char *label, bool include
                 {
                     if (symbol)
                     {
+                        std::string dataType = symbol->getSymbolDataTypeName().empty()
+                                ? "NO_TYPE"
+                                : std::string(symbol->getSymbolDataTypeName());
+                        
                         ImGui::Text("Id: %zu", symbol->getId());
                         ImGui::Text("Kind: %s", symbol->getSymbolTypeName());
-                        ImGui::Text("Data type: %s", symbol->getSymbolDataTypeName().data());
+                        ImGui::Text("Data type: %s", dataType.c_str());
                         if (symbol->getDefiningNode())
                         {
                             ImGui::Separator();
@@ -920,7 +995,7 @@ void Editor::renderScopeTree(const Scope *scope, const char *label, bool include
     }
 }
 
-std::string Editor::formatSeverity(ErrorSeverity severity) const
+std::string Editor::formatSeverity(ErrorSeverity severity)
 {
     switch (severity)
     {
@@ -945,12 +1020,12 @@ std::string Editor::formatSourceReference(const SourceReference &sourceRef) cons
     }
 
     return std::format("{}:{}:{}",
-                       m_frontend->getSourceManager()->getSourceName(sourceRef.m_sourceFileId),
+                       std::string(m_frontend->getSourceManager()->getSourceName(sourceRef.m_sourceFileId)),
                        sourceRef.m_line,
                        sourceRef.m_col);
 }
 
-std::string Editor::formatOperand(const MirOperand &operand) const
+std::string Editor::formatOperand(const MirOperand &operand)
 {
     switch (operand.getType())
     {

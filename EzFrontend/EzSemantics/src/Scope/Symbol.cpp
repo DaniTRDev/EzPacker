@@ -40,7 +40,7 @@ const std::string_view &Symbol::getName() const { return m_name; }
 std::string_view Symbol::getSymbolDataTypeName() const
 {
     if (m_symbolDataType)
-        return m_symbolDataType->getTypeName().data();
+        return m_symbolDataType->getTypeName();
 
     return "";
 }

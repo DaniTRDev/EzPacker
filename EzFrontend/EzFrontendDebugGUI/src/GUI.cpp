@@ -1,4 +1,5 @@
 #include "GUI.h"
+#include "Views/FileExplorer.h"
 
 Gui::Gui() : m_initialized(false), m_windowPos(120.0f, 80.0f), m_windowSize(1600.0f, 960.0f)
 {
@@ -9,8 +10,8 @@ Gui::Gui() : m_initialized(false), m_windowPos(120.0f, 80.0f), m_windowSize(1600
     m_mainRenderTargetView = nullptr;
     m_pSwapChain = nullptr;
 
-    const float screenWidth = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
-    const float screenHeight = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
+    const auto screenWidth = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
+    const auto screenHeight = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
     m_windowSize.x = std::min(m_windowSize.x, screenWidth - 120.0f);
     m_windowSize.y = std::min(m_windowSize.y, screenHeight - 120.0f);
     m_windowPos.x = std::max(40.0f, (screenWidth - m_windowSize.x) * 0.5f);
@@ -32,30 +33,17 @@ bool Gui::initialize(std::shared_ptr<Logger> logger)
 
 #ifdef _WIN32
     if (!createGuiWindow())
-    {
         return false;
-    }
 
     if (!createDeviceD3D())
-    {
         return false;
-    }
-
-    if (!createRenderTarget())
-    {
-        return false;
-    }
 #elif defined(__linux__)
     if (!createGlfwWindow())
-    {
         return false;
-    }
 #endif
 
     if (!createImGuiContext())
-    {
         return false;
-    }
 
     m_initialized = true;
     return true;
@@ -67,26 +55,13 @@ bool Gui::uninitialize()
 {
     m_initialized = false;
 
-    if (!destroyImGuiContext())
-    {
-        return false;
-    }
+    destroyImGuiContext();
 
 #ifdef _WIN32
-    if (!destroyDeviceD3D())
-    {
-        return false;
-    }
-
-    if (!destroyGuiWindow())
-    {
-        return false;
-    }
+    destroyDeviceD3D();
+    destroyGuiWindow();
 #elif defined(__linux__)
-    if (!destroyGlfwWindow())
-    {
-        return false;
-    }
+    destroyGlfwWindow();
 #endif
 
     return true;
@@ -98,30 +73,21 @@ void Gui::onResize(int width, int height)
         return;
 
 #ifdef _WIN32
-    if (m_pd3dDevice != nullptr)
+    if (m_pd3dDevice != nullptr && width > 0 && height > 0)
     {
+        // Unbind the render target from the pipeline so ResizeBuffers can
+        // release the back-buffer reference.  Without this the call may
+        // silently fail and the old (smaller) buffer is kept → content is
+        // cropped after resizing the window.
+        m_pd3dDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
         destroyRenderTarget();
-        m_pSwapChain->ResizeBuffers(0,
-                                    (UINT)width,
-                                    (UINT)height,
-                                    DXGI_FORMAT_UNKNOWN,
-                                    0);
+
+        m_pSwapChain->ResizeBuffers(0, (UINT)width, (UINT)height, DXGI_FORMAT_UNKNOWN, 0);
         createRenderTarget();
-        
-        // Update viewport
-        D3D11_VIEWPORT vp;
-        vp.Width = (FLOAT)width;
-        vp.Height = (FLOAT)height;
-        vp.MinDepth = 0.0f;
-        vp.MaxDepth = 1.0f;
-        vp.TopLeftX = 0;
-        vp.TopLeftY = 0;
-        m_pd3dDeviceContext->RSSetViewports(1, &vp);
     }
 #elif defined(__linux__)
-    // GLFW/OpenGL resize is typically handled by glViewport in the render loop or callback
-    // ImGui handles window size automatically via IO.DisplaySize
-    glViewport(0, 0, width, height);
+    if (width > 0 && height > 0)
+        glViewport(0, 0, width, height);
 #endif
 }
 
@@ -208,20 +174,24 @@ bool Gui::createGuiWindow()
         return false;
     }
 
-    ::SetWindowPos(m_guiWindow, nullptr, desiredRect.left, desiredRect.top, desiredRect.right - desiredRect.left,
-                   desiredRect.bottom - desiredRect.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    ::SetWindowPos(m_guiWindow,
+                   nullptr,
+                   desiredRect.left,
+                   desiredRect.top,
+                   desiredRect.right - desiredRect.left,
+                   desiredRect.bottom - desiredRect.top,
+                   SWP_NOZORDER | SWP_NOACTIVATE);
     ::ShowWindow(m_guiWindow, SW_SHOWDEFAULT);
     ::UpdateWindow(m_guiWindow);
     return true;
 }
 
-bool Gui::createRenderTarget()
+void Gui::createRenderTarget()
 {
     ID3D11Texture2D *pBackBuffer = nullptr;
     m_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
     m_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_mainRenderTargetView);
     pBackBuffer->Release();
-    return true;
 }
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -239,7 +209,7 @@ LRESULT Gui::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
         {
             if (gui.isInitialized() && wparam != SIZE_MINIMIZED)
             {
-                gui.onResize((UINT)LOWORD(lparam), (UINT)HIWORD(lparam));
+                gui.onResize(static_cast<int>(LOWORD(lparam)), static_cast<int>(HIWORD(lparam)));
             }
             return 0;
         }
@@ -260,7 +230,7 @@ LRESULT Gui::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
     return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-bool Gui::destroyDeviceD3D()
+void Gui::destroyDeviceD3D()
 {
     if (m_mainRenderTargetView)
     {
@@ -282,20 +252,17 @@ bool Gui::destroyDeviceD3D()
         m_pd3dDevice->Release();
         m_pd3dDevice = nullptr;
     }
-
-    return true;
 }
 
-bool Gui::destroyGuiWindow() { return DestroyWindow(m_guiWindow); }
+void Gui::destroyGuiWindow() { DestroyWindow(m_guiWindow); }
 
-bool Gui::destroyRenderTarget()
+void Gui::destroyRenderTarget()
 {
     if (m_mainRenderTargetView)
     {
         m_mainRenderTargetView->Release();
         m_mainRenderTargetView = nullptr;
     }
-    return true;
 }
 
 #endif // _WIN32
@@ -306,10 +273,7 @@ static void glfw_error_callback(int error, const char *description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-static void glfw_resize_callback(GLFWwindow* window, int width, int height)
-{
-     Gui::get().onResize(width, height);
-}
+static void glfw_resize_callback(GLFWwindow *window, int width, int height) { Gui::get().onResize(width, height); }
 
 bool Gui::createGlfwWindow()
 {
@@ -321,8 +285,6 @@ bool Gui::createGlfwWindow()
     const char *glsl_version = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 
     m_window = glfwCreateWindow((int)m_windowSize.x,
                                 (int)m_windowSize.y,
@@ -334,17 +296,16 @@ bool Gui::createGlfwWindow()
 
     glfwMakeContextCurrent(m_window);
     glfwSwapInterval(1); // Enable vsync
-    
+
     glfwSetFramebufferSizeCallback(m_window, glfw_resize_callback);
 
     return true;
 }
 
-bool Gui::destroyGlfwWindow()
+void Gui::destroyGlfwWindow()
 {
     glfwDestroyWindow(m_window);
     glfwTerminate();
-    return true;
 }
 #endif // __linux__
 
@@ -359,25 +320,31 @@ bool Gui::createImGuiContext()
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    // Font loading
-    if (std::filesystem::exists("assets/font.ttf"))
+    // ── Font loading (JetBrains Mono / any font.ttf in assets/) ──────────
+    // Search relative to CWD — matches the POST_BUILD copy-assets step.
+    const std::vector<std::string> fontSearchPaths = {
+        "assets/font.ttf",
+        "font.ttf",
+        "../assets/font.ttf",
+        "../../assets/font.ttf",
+    };
+
+    // Pick a DPI-appropriate size: 17 px — readable but compact.
+    constexpr float c_fontSize = 17.0f;
+    for (const auto &candidate : fontSearchPaths)
     {
-        io.Fonts->AddFontFromFileTTF("assets/font.ttf", 16.0f);
-    }
-    else if (std::filesystem::exists("font.ttf")) // Fallback
-    {
-        io.Fonts->AddFontFromFileTTF("font.ttf", 16.0f);
-    }
-    else
-    {
-        // Try to find assets/font.ttf relative to the executable if not in CWD
-        // This is a common issue when running from IDE or debugger
-        // Assuming typical layout: bin/EzFrontendDebugGUI.exe and assets/ is sibling to bin/ or inside bin/
-        if (std::filesystem::exists("../assets/font.ttf"))
+        if (std::filesystem::exists(std::filesystem::current_path() / candidate))
         {
-            io.Fonts->AddFontFromFileTTF("../assets/font.ttf", 16.0f);
+            // Build ImFontConfig for nicer rendering
+            ImFontConfig cfg;
+            cfg.OversampleH = 2;
+            cfg.OversampleV = 2;
+            cfg.PixelSnapH = true;
+            io.Fonts->AddFontFromFileTTF(candidate.c_str(), c_fontSize, &cfg);
+            break;
         }
     }
+    // If no custom font was found ImGui falls back to its own built-in font.
 
 #ifdef _WIN32
     if (!ImGui_ImplWin32_Init(m_guiWindow))
@@ -400,84 +367,82 @@ bool Gui::createImGuiContext()
     }
 #endif
 
+    // ONE DARK THEME
     ImGuiStyle &style = ImGui::GetStyle();
     ImVec4 *colors = style.Colors;
 
-    // Primary background
-    colors[ImGuiCol_WindowBg] = ImVec4(0.07f, 0.07f, 0.09f, 1.00f);  // #131318
-    colors[ImGuiCol_MenuBarBg] = ImVec4(0.12f, 0.12f, 0.15f, 1.00f); // #131318
-
-    colors[ImGuiCol_PopupBg] = ImVec4(0.18f, 0.18f, 0.22f, 1.00f);
-
-    // Headers
-    colors[ImGuiCol_Header] = ImVec4(0.18f, 0.18f, 0.22f, 1.00f);
-    colors[ImGuiCol_HeaderHovered] = ImVec4(0.30f, 0.30f, 0.40f, 1.00f);
-    colors[ImGuiCol_HeaderActive] = ImVec4(0.25f, 0.25f, 0.35f, 1.00f);
-
-    // Buttons
-    colors[ImGuiCol_Button] = ImVec4(0.20f, 0.22f, 0.27f, 1.00f);
-    colors[ImGuiCol_ButtonHovered] = ImVec4(0.30f, 0.32f, 0.40f, 1.00f);
-    colors[ImGuiCol_ButtonActive] = ImVec4(0.35f, 0.38f, 0.50f, 1.00f);
-
-    // Frame BG
-    colors[ImGuiCol_FrameBg] = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
-    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.22f, 0.22f, 0.27f, 1.00f);
-    colors[ImGuiCol_FrameBgActive] = ImVec4(0.25f, 0.25f, 0.30f, 1.00f);
-
-    // Tabs
-    colors[ImGuiCol_Tab] = ImVec4(0.18f, 0.18f, 0.22f, 1.00f);
-    colors[ImGuiCol_TabHovered] = ImVec4(0.35f, 0.35f, 0.50f, 1.00f);
-    colors[ImGuiCol_TabActive] = ImVec4(0.25f, 0.25f, 0.38f, 1.00f);
-    colors[ImGuiCol_TabUnfocused] = ImVec4(0.13f, 0.13f, 0.17f, 1.00f);
-    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.20f, 0.20f, 0.25f, 1.00f);
-
-    // Title
-    colors[ImGuiCol_TitleBg] = ImVec4(0.12f, 0.12f, 0.15f, 1.00f);
-    colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.20f, 1.00f);
-    colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
-
-    // Borders
-    colors[ImGuiCol_Border] = ImVec4(0.20f, 0.20f, 0.25f, 0.50f);
+    colors[ImGuiCol_Text] = ImVec4(0.67f, 0.70f, 0.75f, 1.00f);
+    colors[ImGuiCol_TextDisabled] = ImVec4(0.37f, 0.40f, 0.45f, 1.00f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_ChildBg] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_PopupBg] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_Border] = ImVec4(0.11f, 0.12f, 0.14f, 1.00f);
     colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_FrameBg] = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_FrameBgActive] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_TitleBg] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_MenuBarBg] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.30f, 0.32f, 0.35f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.35f, 0.37f, 0.40f, 1.00f);
+    colors[ImGuiCol_CheckMark] = ImVec4(0.56f, 0.74f, 0.96f, 1.00f);
+    colors[ImGuiCol_SliderGrab] = ImVec4(0.56f, 0.74f, 0.96f, 1.00f);
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.56f, 0.74f, 0.96f, 1.00f);
+    colors[ImGuiCol_Button] = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_Header] = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_Separator] = ImVec4(0.11f, 0.12f, 0.14f, 1.00f);
+    colors[ImGuiCol_SeparatorHovered] = ImVec4(0.56f, 0.74f, 0.96f, 1.00f);
+    colors[ImGuiCol_SeparatorActive] = ImVec4(0.56f, 0.74f, 0.96f, 1.00f);
+    colors[ImGuiCol_ResizeGrip] = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_Tab] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_TabHovered] = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    colors[ImGuiCol_TabUnfocused] = ImVec4(0.15f, 0.16f, 0.19f, 1.00f);
+    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.20f, 0.22f, 0.25f, 1.00f);
+    colors[ImGuiCol_PlotLines] = ImVec4(0.56f, 0.74f, 0.96f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(0.56f, 0.74f, 0.96f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(0.25f, 0.27f, 0.30f, 1.00f);
+    colors[ImGuiCol_DragDropTarget] = ImVec4(1.00f, 1.00f, 0.00f, 0.90f);
+    colors[ImGuiCol_NavHighlight] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 
-    // Text
-    colors[ImGuiCol_Text] = ImVec4(0.90f, 0.90f, 0.95f, 1.00f);
-    colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.55f, 1.00f);
-
-    // Highlights
-    colors[ImGuiCol_CheckMark] = ImVec4(0.50f, 0.70f, 1.00f, 1.00f);
-    colors[ImGuiCol_SliderGrab] = ImVec4(0.50f, 0.70f, 1.00f, 1.00f);
-    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.60f, 0.80f, 1.00f, 1.00f);
-    colors[ImGuiCol_ResizeGrip] = ImVec4(0.50f, 0.70f, 1.00f, 0.50f);
-    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.60f, 0.80f, 1.00f, 0.75f);
-    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.70f, 0.90f, 1.00f, 1.00f);
-
-    // Scrollbar
-    colors[ImGuiCol_ScrollbarBg] = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
-    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.30f, 0.30f, 0.35f, 1.00f);
-    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.40f, 0.40f, 0.50f, 1.00f);
-    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.45f, 0.45f, 0.55f, 1.00f);
-
-    // Style tweaks
-    style.WindowRounding = 7.0f;
-    style.FrameRounding = 5.0f;
-    style.GrabRounding = 5.0f;
-    style.TabRounding = 5.0f;
-    style.PopupRounding = 5.0f;
-    style.ScrollbarRounding = 6.0f;
-    style.WindowPadding = ImVec2(10, 10);
-    style.FramePadding = ImVec2(8, 5);
-    style.ItemSpacing = ImVec2(8, 6);
-    style.ItemInnerSpacing = ImVec2(6, 4);
-    style.PopupBorderSize = 0.f;
+    style.WindowRounding = 4.0f;
+    style.FrameRounding = 2.0f;
+    style.GrabRounding = 2.0f;
+    style.TabRounding = 2.0f;
+    style.PopupRounding = 3.0f;
+    style.ScrollbarRounding = 2.0f;
+    style.WindowPadding = ImVec2(6, 5);
+    style.FramePadding = ImVec2(4, 2);
+    style.ItemSpacing = ImVec2(6, 3);
+    style.ItemInnerSpacing = ImVec2(4, 3);
+    style.IndentSpacing = 16.0f;
+    style.ScrollbarSize = 10.0f;
+    style.GrabMinSize = 8.0f;
     style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 1.0f;
+    style.PopupBorderSize = 1.0f;
     style.FrameBorderSize = 0.0f;
+    style.TabBorderSize = 0.0f;
 
     return true;
 }
 
-bool Gui::destroyImGuiContext()
+void Gui::destroyImGuiContext()
 {
 #ifdef _WIN32
     ImGui_ImplDX11_Shutdown();
@@ -487,8 +452,6 @@ bool Gui::destroyImGuiContext()
     ImGui_ImplGlfw_Shutdown();
 #endif
     ImGui::DestroyContext();
-
-    return true;
 }
 
 void Gui::loop()
@@ -499,7 +462,10 @@ void Gui::loop()
     std::shared_ptr<EzFrontendWrapper> frontend =
             std::make_shared<EzFrontendWrapper>(std::make_shared<SourceLoggingSink>(m_logger.get()));
     std::shared_ptr<Editor> editor = std::make_shared<Editor>(frontend);
+    std::shared_ptr<FileExplorer> fileExplorer = std::make_shared<FileExplorer>(editor);
     std::shared_ptr<MainMenuBar> menuBar = std::make_shared<MainMenuBar>();
+    menuBar->setEditor(editor);
+    menuBar->setFileExplorer(fileExplorer);
 
     while (true)
     {
@@ -552,15 +518,47 @@ void Gui::loop()
         ImGui::SetNextWindowSize(clientSize);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
         if (ImGui::Begin("EzFrontendDebugGUI",
                          &opened,
                          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-                                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar))
+                                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar |
+                                 ImGuiWindowFlags_NoBringToFrontOnFocus))
         {
             menuBar->render();
-            editor->render();
+
+            // ── Main layout: FileExplorer (left) | Editor (right) ────────
+            constexpr float c_explorerWidth = 240.0f;
+            const ImVec2 availableSize = ImGui::GetContentRegionAvail();
+
+            // ── Left panel: File Explorer ─────────────────────────────────
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 4));
+            if (ImGui::BeginChild("##panel-explorer",
+                                  ImVec2(c_explorerWidth, availableSize.y),
+                                  true,
+                                  ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+            {
+                // Panel title
+                ImGui::TextColored(ImVec4(0.56f, 0.74f, 0.96f, 1.0f), "EXPLORER");
+                ImGui::Separator();
+                fileExplorer->render();
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
+
+            ImGui::SameLine(0.0f, 1.0f);
+
+            // ── Right panel: Editor ───────────────────────────────────────
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 4));
+            if (ImGui::BeginChild("##panel-editor",
+                                  ImVec2(availableSize.x - c_explorerWidth - 1.0f, availableSize.y),
+                                  false))
+            {
+                editor->render();
+            }
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
         }
         ImGui::End();
         ImGui::PopStyleVar(3);
@@ -571,7 +569,7 @@ void Gui::loop()
             break;
         }
 
-        const float clear_color[4] = { 0.04f, 0.04f, 0.05f, 1.0f };
+        const float clear_color[4] = { 0.15f, 0.16f, 0.19f, 1.0f }; // Match One Dark background
 #ifdef _WIN32
         m_pd3dDeviceContext->OMSetRenderTargets(1, &m_mainRenderTargetView, nullptr);
         m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, clear_color);

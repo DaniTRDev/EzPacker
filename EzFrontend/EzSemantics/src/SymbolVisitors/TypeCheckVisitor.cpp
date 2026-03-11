@@ -95,13 +95,15 @@ bool TypeCheckVisitor::visit(Instruction *instr)
                 return false;
             }
 
+            if (!(*paramIt)->accept(this))
+            {
+                return false;
+            }
+
             Type *parameterType = (*paramIt)->getAnnotation<DataTypeAnnotation>()->getDataType();
             if (!checkCastSafety(instr, calleeSubTypes[i], parameterType))
             {
-                m_ctx->emitError(ErrorSeverity::Fatal,
-                                 std::format("Can't perform a type cast in parameter {}", i),
-                                 "TypeCheckVisitor",
-                                 instr->getSourceRef());
+                m_ctx->emitError(ErrorSeverity::Fatal, "Invalid parameter", "TypeCheckVisitor");
                 return false;
             }
 
@@ -226,8 +228,14 @@ bool TypeCheckVisitor::visit(Variable *var)
         return false;
     }
 
-    DataTypeAnnotation *annot = var->getAnnotation<DataTypeAnnotation>();
     Symbol *symbol = annotation->getSymbol();
+    if (symbol->getType() == SymbolType::Label)
+    {
+        // Labels do not need casting.
+        return true;
+    }
+
+    DataTypeAnnotation *annot = var->getAnnotation<DataTypeAnnotation>();
     TypedPool *annotPool = getSemanticContext()->getAnnotPool();
 
     if (!annot)
