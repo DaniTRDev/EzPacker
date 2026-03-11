@@ -41,10 +41,10 @@ bool FrontendCompilerDriver::addSource(const std::string &sourceContent,
 
 bool FrontendCompilerDriver::compile()
 {
-    std::stack<std::shared_ptr<FrontendCompilationUnit>> workingSet = m_queuedCompilationUnits;
+    std::queue<std::shared_ptr<FrontendCompilationUnit>> workingSet = m_queuedCompilationUnits;
     while (!workingSet.empty())
     {
-        std::shared_ptr<FrontendCompilationUnit> unit = std::move(workingSet.top());
+        std::shared_ptr<FrontendCompilationUnit> unit = std::move(workingSet.front());
         std::shared_ptr<IncludePhase> includePhase = std::make_shared<IncludePhase>();
 
         workingSet.pop();
@@ -93,7 +93,7 @@ bool FrontendCompilerDriver::compile()
     workingSet = m_queuedCompilationUnits;
     while (!workingSet.empty())
     {
-        std::shared_ptr<FrontendCompilationUnit> unit = std::move(workingSet.top());
+        std::shared_ptr<FrontendCompilationUnit> unit = std::move(workingSet.front());
         workingSet.pop();
 
         const std::shared_ptr<ErrorCollector> &errorCollector = unit->getErrorCollector();
@@ -129,7 +129,7 @@ bool FrontendCompilerDriver::compile()
     workingSet = m_queuedCompilationUnits;
     while (!workingSet.empty())
     {
-        std::shared_ptr<FrontendCompilationUnit> unit = std::move(workingSet.top());
+        std::shared_ptr<FrontendCompilationUnit> unit = std::move(workingSet.front());
         workingSet.pop();
 
         if (!executeCompilationUnitPhase(unit.get(), std::make_shared<SymbolAndTypeResolverPhase>()))

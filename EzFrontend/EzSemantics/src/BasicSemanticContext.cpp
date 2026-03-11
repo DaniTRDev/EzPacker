@@ -8,6 +8,7 @@ BasicSemanticContext::BasicSemanticContext(const std::shared_ptr<ErrorCollector>
 {
     m_globalScope = globalScope ? globalScope : std::make_shared<Scope>(nullptr, "global");
     m_currentScope = m_globalScope.get();
+    m_typeTable = std::make_shared<TypeTable>();
 
     m_scopes.reserve(1024); // Pre-allocate 1024 scopes to avoid reallocations.
 }
@@ -18,7 +19,22 @@ bool BasicSemanticContext::createSymbol(AstNode *definingNode,
                                         Type *symbolDataType,
                                         const std::string_view &symbolName)
 {
-    if (resolveSymbolInScope(symbolName, nullptr, false))
+    return createSymbolInScope(definingNode, m_currentScope, symbolType, outSymbol, symbolDataType, symbolName);
+}
+
+bool BasicSemanticContext::createSymbolInScope(AstNode *definingNode,
+                                               Scope *targetScope,
+                                               SymbolType symbolType,
+                                               Symbol **outSymbol,
+                                               Type *symbolDataType,
+                                               const std::string_view &symbolName)
+{
+    if (!targetScope)
+    {
+        throw std::runtime_error("Internal Compiler Error: Can't create symbol in null scope");
+    }
+
+    if (targetScope->resolve(symbolName, nullptr, false))
     {
         // Symbol already created.
         return false;
@@ -26,7 +42,7 @@ bool BasicSemanticContext::createSymbol(AstNode *definingNode,
 
     Symbol *sym = m_symbolPool.create<Symbol>(definingNode, symbolDataType, symbolType, symbolName);
 
-    if (!getCurrentScope()->define(sym, symbolName))
+    if (!targetScope->define(sym, symbolName))
     {
         // Mustn't happen, but still it's nice to have.
         return false;
@@ -89,6 +105,23 @@ void BasicSemanticContext::emitSymbolRedefinitionError(const std::string_view &m
     emitError(ErrorSeverity::Fatal, "Previously defined here", moduleCopy, definingSourceRef);
 }
 
+void BasicSemanticContext::emitTypeRedefinitionError(const std::string_view &module,
+                                                     const std::string_view &typeName,
+                                                     AstNode *errorNode)
+{
+    std::shared_ptr<Type> type = m_typeTable->getType(typeName);
+    if (!type)
+    {
+        throw std::runtime_error("Internal Compiler Error: Type should be defined but it's not.");
+    }
+
+    const SourceReference &errorSourceRef = errorNode->getSourceRef(), &definingSourceRef = type->getSourceRef();
+
+    std::string moduleCopy = std::string(module);
+    emitError(ErrorSeverity::Fatal, std::format("Redefinition of type '{}'", typeName), moduleCopy, errorSourceRef);
+    emitError(ErrorSeverity::Fatal, "Previously defined here", moduleCopy, definingSourceRef);
+}
+
 void BasicSemanticContext::emitUnknownSymbolError(const std::string_view &module,
                                                   const std::string_view &symbolName,
                                                   AstNode *errorNode)
@@ -147,3 +180,5 @@ void BasicSemanticContext::exitSwitch()
 }
 
 const std::shared_ptr<Scope> &BasicSemanticContext::getGlobalScope() const { return m_globalScope; }
+
+const std::shared_ptr<TypeTable> &BasicSemanticContext::getTypeTable() const { return m_typeTable; }

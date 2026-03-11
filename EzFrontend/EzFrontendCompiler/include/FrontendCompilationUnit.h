@@ -1,7 +1,13 @@
 /**
  * @file FrontendCompilationUnit.h
- * @brief Self-contained compilation unit for the frontend. This class encapsulates the entire process of compiling a
- * source file, including tokenization and parsing.
+ * @brief Represents a single source file or compilation unit.
+ *
+ * A FrontendCompilationUnit encapsulates all the state and resources associated with
+ * compiling a single source file. This includes its source code, token stream, AST,
+ * and various contexts used during compilation (parsing, semantics, MIR generation).
+ *
+ * It acts as a container that moves through the compilation pipeline, accumulating
+ * information at each stage.
  */
 #ifndef EZPACKER_FRONTENDCOMPILATIONUNIT_H
 #define EZPACKER_FRONTENDCOMPILATIONUNIT_H
@@ -9,153 +15,181 @@
 #include "EzFrontendCompilerCommon.h"
 
 /**
- * Represents a single compilation unit in the frontend. It encapsulates the entire process of compiling a source file,
- * including including tokenization and parsing.
+ * @class FrontendCompilationUnit
+ * @brief Encapsulates the compilation state for a single source file.
  *
- * To act in consonance with other components, it inherits from ErrorEmitter, allowing it to emit errors that can be
- * collected and logged by an ErrorCollector. This design ensures that any errors encountered during the compilation
- * process are properly reported and can be handled by the caller.
+ * This class manages the lifecycle of a compilation unit, from source code loading
+ * to MIR generation. It holds references to the tokenizer, parser, semantic analyzer,
+ * and MIR emitter contexts specific to this unit.
+ *
+ * It inherits from `ErrorEmitter` to allow reporting diagnostics associated with this unit.
  */
 class FrontendCompilationUnit : public ErrorEmitter
 {
   public:
     /**
-     * Initializes the compilation unit without source content. This allows for a two-step initialization where the unit
-     * is created first and then the source content is provided later through the create() function. This can be useful
-     * in scenarios where the source content is not immediately available at the time of construction.
-     * @param errorCollector
-     * @param sourceManager
+     * @brief Constructs a new FrontendCompilationUnit.
+     *
+     * Initializes the unit with the necessary error handling and source management components.
+     * Note that the source content is not loaded until `create()` is called.
+     *
+     * @param errorCollector Shared pointer to the error collector for reporting diagnostics.
+     * @param sourceManager Shared pointer to the source manager for handling source files.
      */
     FrontendCompilationUnit(const std::shared_ptr<ErrorCollector> &errorCollector,
                             const std::shared_ptr<SourceManager> &sourceManager);
 
     /**
-     * Creates the compilation unit and links it to the source content identified by the given source ID. The source ID
-     * is assigned by the source manager when the source content is added. If the source ID is invalid (e.g., 0), the
-     * function will emit a fatal error and return false. On success, it returns true, indicating that the compilation
-     * unit is ready for the next phases of the compilation process.
-     * @param sourceId
-     * @return bool
+     * @brief Initializes the compilation unit with a source file.
+     *
+     * Links the unit to a specific source file identified by `sourceId`. This prepares the unit
+     * for tokenization and parsing.
+     *
+     * @param sourceId The unique identifier for the source file (assigned by SourceManager).
+     * @return `true` if initialization was successful; `false` otherwise (e.g., invalid source ID).
      */
     bool create(size_t sourceId);
 
     /**
-     * Returns the source ID of the source file being compiled. This ID is assigned by the source manager when the
-     * source content is added. If no source was added, returns 0.
-     * @return size_t
+     * @brief Gets the source ID associated with this unit.
+     *
+     * @return The unique identifier for the source file, or 0 if not initialized.
      */
     size_t getTargetSourceId() const;
 
     /**
-     * Returns a pointer to the slice of AST nodes that belong to the global scope. This slice is populated during the
-     * parsing phase and is used in subsequent phases of the compilation process, such as semantic analysis and MIR
-     * emission.
-     * @return TypedPoolSlice<AstNode> *
+     * @brief Retrieves the AST nodes belonging to the global scope of this unit.
+     *
+     * These nodes represent top-level declarations (functions, globals, etc.) parsed from the source.
+     *
+     * @return Pointer to the `TypedPoolSlice` containing the global AST nodes.
      */
     TypedPoolSlice<AstNode> *getGlobalScopeAstNodes();
 
     /**
-     * Cleans up all resources used by the compilation unit. This includes clearing the tokenizer, parsing context,
-     * semantic context, and MIR emitter. After this function is called, the compilation unit should be in a state where
-     * it can be safely destroyed or re-initialized.
+     * @brief Releases resources held by this compilation unit.
+     *
+     * Clears the tokenizer, parser, semantic context, and other resources to free memory.
+     * This is typically called after the unit has been fully processed and its output (MIR)
+     * has been consumed.
      */
     void cleanup();
 
+    // ── Setters ─────────────────────────────────────────────────────────────
+
     /**
-     * Sets the slice of AST nodes that belong to the global scope.
-     * @param globalScopeAstNodes
+     * @brief Sets the global scope AST nodes for this unit.
+     *
+     * @param globalScopeAstNodes Pointer to the AST node slice.
      */
     void setGlobalScopeAstNodes(TypedPoolSlice<AstNode> *globalScopeAstNodes);
 
     /**
-     * Sets the lowering context used by the compilation unit.
-     * @param loweringContext
+     * @brief Sets the lowering context used for AST-to-MIR conversion.
+     *
+     * @param loweringContext Shared pointer to the lowering context.
      */
     void setLoweringContext(const std::shared_ptr<LoweringContext> &loweringContext);
 
     /**
-     * Sets the MIR emitter used by the compilation unit.
-     * @param mirEmitter
+     * @brief Sets the MIR emitter used for generating intermediate representation.
+     *
+     * @param mirEmitter Shared pointer to the MIR emitter.
      */
     void setMirEmitter(const std::shared_ptr<MirEmitter> &mirEmitter);
 
     /**
-     * Sets the MIR emitter context used by the compilation unit.
-     * @param mirEmitterContext
+     * @brief Sets the MIR emitter context.
+     *
+     * @param mirEmitterContext Shared pointer to the MIR emitter context.
      */
     void setMirEmitterContext(const std::shared_ptr<MirEmitterContext> &mirEmitterContext);
 
     /**
-     * Sets the MIR global data emitter used by the compilation unit.
-     * @param mirGlobalDataEmitter
+     * @brief Sets the MIR global data emitter.
+     *
+     * @param mirGlobalDataEmitter Shared pointer to the MIR global data emitter.
      */
     void setMirGlobalDataEmitter(const std::shared_ptr<MirGlobalDataEmitter> &mirGlobalDataEmitter);
 
     /**
-     * Sets the parsing context used by the compilation unit.
-     * @param parsingContext
+     * @brief Sets the parsing context used for syntax analysis.
+     *
+     * @param parsingContext Shared pointer to the parsing context.
      */
     void setParsingContext(const std::shared_ptr<BasicParsingContext> &parsingContext);
 
     /**
-     * Sets the semantic context used by the compilation unit.
-     * @param semanticContext
+     * @brief Sets the semantic context used for type checking and analysis.
+     *
+     * @param semanticContext Shared pointer to the semantic context.
      */
     void setSemanticContext(const std::shared_ptr<BasicSemanticContext> &semanticContext);
 
     /**
-     * Sets the tokenizer used by the compilation unit.
-     * @param tokenizer
+     * @brief Sets the tokenizer used for lexical analysis.
+     *
+     * @param tokenizer Shared pointer to the tokenizer.
      */
     void setTokenizer(const std::shared_ptr<BasicTokenizer> &tokenizer);
 
+    // ── Getters ─────────────────────────────────────────────────────────────
+
     /**
-     * Returns a const reference to the parsing context used by the compilation unit.
-     * @return const std::shared_ptr<BasicParsingContext> &
+     * @brief Gets the parsing context.
+     *
+     * @return Const reference to the shared pointer of the parsing context.
      */
     const std::shared_ptr<BasicParsingContext> &getParsingContext() const;
 
     /**
-     * Returns a const reference to the semantic context used by the compilation unit.
-     * @return const std::shared_ptr<BasicSemanticContext> &
+     * @brief Gets the semantic context.
+     *
+     * @return Const reference to the shared pointer of the semantic context.
      */
     const std::shared_ptr<BasicSemanticContext> &getSemanticContext() const;
 
     /**
-     * Returns a const reference to the tokenizer used by the compilation unit.
-     * @return const std::shared_ptr<BasicTokenizer> &
+     * @brief Gets the tokenizer.
+     *
+     * @return Const reference to the shared pointer of the tokenizer.
      */
     const std::shared_ptr<BasicTokenizer> &getTokenizer() const;
 
     /**
-     * Returns a const reference to the lowering context used by the compilation unit.
-     * @return const std::shared_ptr<LoweringContext> &
+     * @brief Gets the lowering context.
+     *
+     * @return Const reference to the shared pointer of the lowering context.
      */
     const std::shared_ptr<LoweringContext> &getLoweringContext() const;
 
     /**
-     * Returns a const reference to the MIR emitter used by the compilation unit.
-     * @return const std::shared_ptr<MirEmitter> &
+     * @brief Gets the MIR emitter.
+     *
+     * @return Const reference to the shared pointer of the MIR emitter.
      */
     const std::shared_ptr<MirEmitter> &getMirEmitter() const;
 
     /**
-     * Returns a const reference to the MIR emitter context used by the compilation unit.
-     * @return const std::shared_ptr<MirEmitterContext> &
+     * @brief Gets the MIR emitter context.
+     *
+     * @return Const reference to the shared pointer of the MIR emitter context.
      */
     const std::shared_ptr<MirEmitterContext> &getMirEmitterContext() const;
 
     /**
-     * Returns a const reference to the MIR global data emitter used by the compilation unit.
-     * @return const std::shared_ptr<MirGlobalDataEmitter> &
+     * @brief Gets the MIR global data emitter.
+     *
+     * @return Const reference to the shared pointer of the MIR global data emitter.
      */
     const std::shared_ptr<MirGlobalDataEmitter> &getMirGlobalDataEmitter() const;
 
     /**
-     * Returns a pointer to the global scope of the source file being compiled. The global scope is the top-level scope
-     * that contains all other scopes and declarations in the source file. It is populated during the parsing phase and
-     * is used in subsequent phases of the compilation process, such as semantic analysis and MIR emission.
-     * @return const std::shared_ptr<Scope> &
+     * @brief Gets the global scope associated with this unit.
+     *
+     * The global scope contains top-level symbols visible in this unit.
+     *
+     * @return Const reference to the shared pointer of the global scope.
      */
     const std::shared_ptr<Scope> &getGlobalScope() const;
 

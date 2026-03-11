@@ -5,7 +5,7 @@
 int main(int, char **)
 {
     auto &gui = Gui::get();
-    std::shared_ptr<Logger> logger = EzLogger::createSinkLogger("DEBUG_LOGGER");
+    std::shared_ptr<Logger> logger = EzLogger::createSyncLogger("DEBUG_LOGGER");
 
     if (!gui.initialize(logger))
     {

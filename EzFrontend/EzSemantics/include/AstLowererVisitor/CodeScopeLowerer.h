@@ -9,10 +9,10 @@
 #define EZPACKER_CODESCOPELOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 #include "VariableLowerer.h"
 
-class CodeScopeLowerer : public GenericLowerer
+class CodeScopeLowerer : public GenericAstLowerer
 {
   public:
     /**

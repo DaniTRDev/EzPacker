@@ -10,9 +10,9 @@
 #define EZPACKER_LABELLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class LabelLowerer : public GenericLowerer
+class LabelLowerer : public GenericAstLowerer
 {
   public:
     /**

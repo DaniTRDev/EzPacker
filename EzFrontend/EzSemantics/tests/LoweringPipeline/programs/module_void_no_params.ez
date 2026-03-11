@@ -1,8 +1,0 @@
-# Module lowering test program
-# Tests: void return, parameters, return type
-
-void ModuleVoidNoParams()
-{
-    nop;
-}
-

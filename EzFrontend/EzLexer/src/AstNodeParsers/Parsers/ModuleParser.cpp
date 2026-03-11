@@ -88,6 +88,10 @@ AstNode *ModuleParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
     AstNode *header = ModuleHeaderParser().parse(ctx);
     if (!header)
     {
+        ctx->emitError(ErrorSeverity::Fatal,
+                       "Error in module header",
+                       "ModuleParser::ModuleHeaderParser",
+                       ctx->getLastSourceReference());
         return nullptr;
     }
 
@@ -95,7 +99,7 @@ AstNode *ModuleParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
     if (!body)
     {
         ctx->emitError(ErrorSeverity::Fatal,
-                       "Empty module scope",
+                       "Error in module scope",
                        "ModuleParser::ModuleHeaderParser",
                        ctx->getLastSourceReference());
         return nullptr;

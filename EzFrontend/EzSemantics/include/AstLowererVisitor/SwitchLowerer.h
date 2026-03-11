@@ -2,9 +2,9 @@
 #define EZPACKER_SWITCHLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class SwitchLowerer : public GenericLowerer
+class SwitchLowerer : public GenericAstLowerer
 {
   public:
     /**

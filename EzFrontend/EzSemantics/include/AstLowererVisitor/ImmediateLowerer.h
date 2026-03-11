@@ -11,9 +11,9 @@
 #define EZPACKER_IMMEDIATELOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class ImmediateLowerer : public GenericLowerer
+class ImmediateLowerer : public GenericAstLowerer
 {
   public:
     /**

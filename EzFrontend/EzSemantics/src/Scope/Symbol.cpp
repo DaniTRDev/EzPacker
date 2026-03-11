@@ -36,3 +36,11 @@ Type *Symbol::getSymbolDataType() { return m_symbolDataType; }
 void Symbol::setId(size_t id) { m_id = id; }
 
 const std::string_view &Symbol::getName() const { return m_name; }
+
+std::string_view Symbol::getSymbolDataTypeName() const
+{
+    if (m_symbolDataType)
+        return m_symbolDataType->getTypeName().data();
+
+    return "";
+}

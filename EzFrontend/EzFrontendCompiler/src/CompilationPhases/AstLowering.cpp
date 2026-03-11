@@ -14,11 +14,18 @@ bool AstLoweringPhase::execute(struct FrontendCompilationUnit *unit)
     auto loweringContext =
             std::make_shared<LoweringContext>(semanticContext, mirEmitter, mirEmitterContext, mirGlobalDataEmitter);
 
+    TypeLowerer typeLowerer;
     AstLowererVisitor lowererVisitor(loweringContext);
+
+    if (!typeLowerer.lower(semanticContext->getTypeTable().get(), loweringContext.get()))
+    {
+        unit->emitError(ErrorSeverity::Fatal, "Type lowering failed during AST lowering.", getName());
+        return false;
+    }
+
     lowererVisitor.setSemanticContext(unit->getSemanticContext());
-    
     loweringContext->setOwnerVisitor(&lowererVisitor);
-    
+
     for (AstNode *node : *globalScopeAstNodes)
     {
         if (!node->accept(&lowererVisitor))

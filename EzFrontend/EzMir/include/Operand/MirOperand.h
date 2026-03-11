@@ -20,6 +20,7 @@
 struct MirBigInteger
 {
     size_t m_constantId{ 0 }; // ID of a global data entry containing the big integer payload.
+    size_t m_size{ 0 };
 };
 struct MirDouble
 {
@@ -28,6 +29,7 @@ struct MirDouble
 struct MirInteger
 {
     int64_t m_value{ 0 }; // Immediate signed integer literal.
+    size_t m_size{ 0 };
 };
 struct MirMemory
 {
@@ -35,6 +37,7 @@ struct MirMemory
     size_t m_indexRegId{ 0 }; // Optional index register ID; `0` means none.
     int8_t m_scale{ 0 };      // Scale applied to the index register.
     int64_t m_offset{ 0 };    // Constant displacement added to the address.
+    size_t m_size{ 0 };       // Size that will be read/written of/to memory.
 };
 struct MirReference
 {
@@ -126,6 +129,11 @@ class MirOperand
     MirRegister *getRegister();
     /** Returns the active `MirRegister` payload, or `nullptr` if not active. */
     const MirRegister *getRegister() const;
+
+    /**
+     * @return The size in BYTES of the operand.
+     */
+    size_t getSize() const;
 
     /**
      * Returns direct mutable access to the underlying variant.

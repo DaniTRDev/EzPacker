@@ -1,3 +1,11 @@
+/**
+ * @file IncludePhase.h
+ * @brief Compilation phase for resolving include directives.
+ *
+ * The IncludePhase scans the parsed AST for `IncludeAstNode`s and resolves the
+ * included files. This phase is crucial for building the dependency graph of
+ * source files and ensuring all necessary code is compiled.
+ */
 #ifndef EZPACKER_INCLUDEPHASE_H
 #define EZPACKER_INCLUDEPHASE_H
 
@@ -6,28 +14,40 @@
 #include "IncludeVisitor/IncludeVisitor.h"
 
 /**
- * Scans the just-parsed AST for include directives and adds the included files to the compilation unit's list of files
- * to compile.
+ * @class IncludePhase
+ * @brief Resolves file inclusions in the AST.
+ *
+ * This phase uses the `IncludeVisitor` to traverse the AST and collect all
+ * included file paths. These paths are then made available to the compiler
+ * driver so that the corresponding files can be loaded and compiled.
  */
 class IncludePhase : public FrontendCompilationUnitPhase
 {
   public:
     /**
-     * Performs the discovery of includes.
-     * @param unit
-     * @return bool
+     * @brief Executes the include resolution phase.
+     *
+     * Runs the `IncludeVisitor` on the unit's AST to find include directives.
+     *
+     * @param unit Pointer to the compilation unit to process.
+     * @return `true` if include resolution succeeded; `false` otherwise.
      */
     bool execute(class FrontendCompilationUnit *unit) override;
 
     /**
-     * Returns "AstLoweringPhase"
-     * @return const char *
+     * @brief Gets the phase name.
+     *
+     * @return "IncludePhase"
      */
     const char *getName() override;
 
     /**
-     * Moves the included files from the destination set.
-     * @param dest
+     * @brief Retrieves the set of included files discovered during this phase.
+     *
+     * Moves the internal set of discovered file paths to the destination set.
+     * This is typically called by the compiler driver after the phase completes.
+     *
+     * @param[out] dest The set to receive the included file paths.
      */
     void moveIncludedFilesToDest(std::set<std::string_view> &dest);
 

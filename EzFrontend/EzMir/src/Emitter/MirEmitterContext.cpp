@@ -18,6 +18,10 @@ bool MirEmitterContext::bindToBlock(MirBlock *block)
     return true;
 }
 
+bool MirEmitterContext::doesTypeExist(size_t typeId) const { return m_idToTypeMap.contains(typeId); }
+
+bool MirEmitterContext::doesTypeExist(const std::string_view &typeName) const { return m_typeNames.contains(typeName); }
+
 MirBlock *MirEmitterContext::createBlock()
 {
     MirBlock *block = m_blockPool.create<MirBlock>(createId(), m_instructionPool.createSlice<MirInstruction>());
@@ -130,3 +134,5 @@ TypedPool *MirEmitterContext::getDataEntryPool() { return &m_dataEntryPool; }
 TypedPool *MirEmitterContext::getTypePool() { return &m_typePool; }
 
 TypedArrayPool<uint8_t> *MirEmitterContext::getEntryDataPool() { return &m_dataPool; }
+
+TypedPoolSlice<MirFunction> *MirEmitterContext::getFunctionList() const { return m_functionList; }

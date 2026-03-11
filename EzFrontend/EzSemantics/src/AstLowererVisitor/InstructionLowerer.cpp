@@ -20,10 +20,11 @@ bool InstructionLowerer::lower(AstNode *node, LoweringContext *ctx)
     }
 
     MirInstruction *loweredInstr = ctx->getEmitter()->emit(opcode);
+    TypedPoolSlice<MirOperand> *operandList = loweredInstr->getOperands();
+
     for (AstNode *ptr : *instruction->getExpressions())
     {
-        AstNode *casted = (AstNode *)ptr;
-        if (!casted->accept(ctx->getOwnerLowererVisitor()))
+        if (!ptr->accept(ctx->getOwnerLowererVisitor()))
         {
             ctx->getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                                  "Could not lower instruction because one operand failed to be lowered",
@@ -32,6 +33,22 @@ bool InstructionLowerer::lower(AstNode *node, LoweringContext *ctx)
             return false;
         }
         ctx->getEmitter()->pushOperandToInstruction(loweredInstr, ctx->popOperand());
+    }
+
+    size_t operandCount = operandList->m_numElems;
+    MirOperand *first = operandCount > 0 ? *operandList->begin() : nullptr;
+    MirOperand *second = operandCount > 1 ? *(operandList->begin() + 1) : nullptr;
+
+    if (!ctx->getEmitter()->areInstructionOperandsLegal(getMeta(loweredInstr->getOpCode()),
+                                                        first,
+                                                        second,
+                                                        operandCount))
+    {
+        ctx->getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                             "Instruction is illegal",
+                                             "MirEmitter::emit",
+                                             node->getSourceRef());
+        return false;
     }
 
     return true;

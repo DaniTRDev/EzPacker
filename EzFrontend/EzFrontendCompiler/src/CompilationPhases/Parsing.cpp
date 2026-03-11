@@ -21,7 +21,19 @@ bool ParsingPhase::execute(struct FrontendCompilationUnit *unit)
 
         if (!node)
         {
-            // There must be at least 1 fatal error that made the compilation stop.
+            if (!errorCollector->doesCurrentScopeHasFatalErrors())
+            {
+                // Unknown expression in top-level scope.
+                unit->emitError(ErrorSeverity::Fatal,
+                                "Unknown expression",
+                                "ParsingPhase::execute",
+                                unit->getParsingContext()->getLastSourceReference());
+            }
+
+            /*
+             * There must be at least 1 fatal error that made the compilation stop. If there is no error, an unknown
+             * expression has been submitted.
+             */
             break;
         }
 

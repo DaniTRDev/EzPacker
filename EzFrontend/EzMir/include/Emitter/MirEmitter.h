@@ -40,6 +40,21 @@ class MirEmitter
     bool attachToContext(MirEmitterContext *ctx);
 
     /**
+     * Checks if the operands of an instruction are legal within the MIR. For call instructions, only callee operand
+     * will be checked (if it's a reference, ...). Call operands MUST BE CORRECT, so caller MUST ENSURE this on his own.
+     * `totalOperandCount` is also needed to ensure before-hand that the instruction is expecting first, second, both or
+     * none.
+     *
+     * @return `true` if the operands are legal. If they are illegal, an error is emitted. To check
+     * the validity of the given operands, the metadata of the instruction is used to compare its operands to what the
+     * metadata says.
+     */
+    bool areInstructionOperandsLegal(const MirInstructionMetadata &instructionMeta,
+                                     MirOperand *first,
+                                     MirOperand *second,
+                                     size_t totalOperandCount) const;
+
+    /**
      * Returns the context currently attached to this emitter.
      */
     MirEmitterContext *getContext() const;
@@ -52,38 +67,20 @@ class MirEmitter
      */
     MirInstruction *emit(MirInstructionOpCode opcode);
 
-    template <typename... OperandTypes> MirInstruction *emit(MirInstructionOpCode opcode, OperandTypes &&...operands)
-    {
-        const size_t operandTypesSize = sizeof...(OperandTypes);
-        if (operandTypesSize != getMeta(opcode).m_operandCount)
-        {
-            m_ctx->emitError(ErrorSeverity::Fatal,
-                             std::format("Instruction expected {} operand but got {}",
-                                         getMeta(opcode).m_operandCount,
-                                         operandTypesSize),
-                             "MirEmitter::emit");
-            return nullptr;
-        }
-
-        MirInstruction *instr = emit(opcode);
-        if (operandTypesSize != 0)
-        {
-            if (!emitOperands(instr, std::forward<OperandTypes>(operands)...))
-            {
-                m_ctx->emitError(ErrorSeverity::Fatal, "Could not emit instruction operands", "MirEmitter::emit");
-                return nullptr;
-            }
-        }
-
-        return instr;
-    }
+    /**
+     * Emits an instruction with the given operand list.
+     * @return `true` if the instruction was created and all the operands were correctly added to it, false other ways.
+     * If the instruction is illegal, an error is emitted.
+     */
+    MirInstruction *emit(MirInstructionOpCode opcode, const std::initializer_list<MirOperand> &operands);
 
     // Define the macro to generate a method for each instruction
 
 #define INSTRUCTION(NAME, ARGS_COUNT, FLAGS)                                                                           \
     template <typename... OperandTypes> MirInstruction *emit##NAME(OperandTypes &&...operands)                         \
     {                                                                                                                  \
-        return emit(MirInstructionOpCode::NAME, std::forward<OperandTypes>(operands)...);                              \
+        std::initializer_list<MirOperand> operandList = { std::forward<OperandTypes>(operands)... };                   \
+        return emit(MirInstructionOpCode::NAME, std::move(operandList));                                               \
     }
     // Include the file again to expand the macros
 
@@ -110,24 +107,7 @@ class MirEmitter
      * The method is recursive and returns `false` if any append operation
      * fails.
      */
-    template <typename FirstOperandType, typename... OperandTypes>
-    bool emitOperands(MirInstruction *instr, FirstOperandType firstOperand, OperandTypes &&...restOfOperands)
-    {
-        TypedPool *operandPool = m_ctx->getOperandPool();
-
-        auto instructionOperandList = instr->getOperands();
-        if (!operandPool->createAndAppendToSlice<MirOperand>(instructionOperandList, firstOperand))
-        {
-            return false;
-        }
-
-        if constexpr (sizeof...(OperandTypes) > 0)
-        {
-            return emitOperands(instr, std::forward<OperandTypes>(restOfOperands)...);
-        }
-
-        return true;
-    };
+    bool emitOperands(MirInstruction *instr, const std::initializer_list<MirOperand> &operands);
 
   private:
     MirBlock *m_currentBlock;

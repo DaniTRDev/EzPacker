@@ -33,59 +33,13 @@ EzCMK_ConfigureLib(NAME "EzFrontendCompiler"
         LINKED_LIBRARIES "EzSemantics"
         INCLUDED_DIRS "include")
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  EzFrontendCompiler tests
-# ─────────────────────────────────────────────────────────────────────────────
+if (EZPACKER_BUILD_TESTS)
+    message(STATUS "Building tests for EzFrontendCompiler")
 
-set(FC_FIXTURE
-        "tests/FrontendCompilerTestFixture.h;tests/FrontendCompilerTestFixture.cpp"
-)
-
-EzPacker_AddTest(
-        "FC_CompilationUnit"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/FrontendCompilationUnitTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_TokenizationPhase"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/TokenizationPhaseTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_ParsingPhase"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/ParsingPhaseTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_SemanticAnalysisPhase"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/SemanticAnalysisPhaseTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_AstLoweringPhase"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/AstLoweringPhaseTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_IncludePhase"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/IncludePhaseTest.cpp;${FC_FIXTURE}"
-)
-
-EzPacker_AddTest(
-        "FC_CompilerDriver"
-        "EzFrontendCompiler;EzSemantics;EzLexer;EzMir;gtest_main"
-        ""
-        "tests/CompilerDriverTest.cpp;${FC_FIXTURE}"
-)
+    EzPacker_AddTest(
+            "T_FrontendCompiler"
+            "EzFrontendCompiler"
+            ""
+            "tests/T_FrontendCompiler.cpp"
+    )
+endif ()

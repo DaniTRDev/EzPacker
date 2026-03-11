@@ -11,9 +11,9 @@
 #define EZPACKER_IFLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class IfLowerer : public GenericLowerer
+class IfLowerer : public GenericAstLowerer
 {
   public:
     /**

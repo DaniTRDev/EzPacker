@@ -27,6 +27,7 @@ bool BasicTokenizer::tokenizeBuffer(size_t address, size_t sourceId)
     m_bufferSize = buffSize - address;
     m_col = m_line = 0;
     m_tokens.clear();
+    m_sourceId = sourceId;
 
     while (m_address < m_bufferSize)
     {

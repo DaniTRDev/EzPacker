@@ -13,71 +13,76 @@
 
 #include "EzFrontendDebugGUICommon.h"
 
+struct FrontendDiagnosticEntry
+{
+    ErrorSeverity m_severity{ ErrorSeverity::NoError };
+    SourceReference m_sourceRef{};
+    std::string m_message;
+    std::string m_sender;
+    std::string m_timeStamp;
+};
+
+struct FrontendPipelineStage
+{
+    std::string m_name;
+    bool m_available{ false };
+    std::string m_detail;
+};
+
 class EzFrontendWrapper
 {
   public:
-    /**
-     * Creates the wrapper with the given source logging sink.
-     * @param sink
-     */
-    EzFrontendWrapper(std::shared_ptr<SourceLoggingSink> sink);
+    explicit EzFrontendWrapper(std::shared_ptr<SourceLoggingSink> sink);
 
-    /**
-     * Tries to tokenize given file and returns true if succeeded. If there was an error, they will be pushed
-     * to the logger and false will be returned. If success, file content will be returned inside outFileData and
-     * outFileDataSize will also have the size of the buffer.
-     * @param filePath
-     * @param outFileDataSize
-     * @param outFileData
-     * @return bool
-     */
-    bool
-    openAndTokenize(std::filesystem::path filePath, size_t &outFileDataSize, std::unique_ptr<uint8_t[]> &outFileData);
+    bool loadSourceFromFile(const std::filesystem::path &filePath);
+    bool saveSourceToFile(const std::filesystem::path &filePath, std::string_view sourceText) const;
+    bool compileSource(const std::string &sourceText,
+                       const std::string &sourceName,
+                       const std::filesystem::path &workingDirectory);
 
-    /**
-     * Tries to parse the opened file. If file was not tokenized or if there was any error, false is returned and an
-     * error is pushed into the error collector.
-     * @return bool
-     */
-    bool parse();
-
-    /**
-     * Returns the error collector linked to this frontend instance.
-     * @return const std::shared_ptr<ErrorCollector> &
-     */
     const std::shared_ptr<ErrorCollector> &getErrorCollector() const;
-
-    /**
-     * Returns the tokens resulting from openAndTokenize, if any. If there are no tokens, an emty array is returned.
-     * @return const std::vector<TokenInformation> &
-     */
-    const std::vector<TokenInformation> &getTokens() const;
-
-    /**
-     * Returns the logging sink used by this frontend instance.
-     * @return const std::shared_ptr<SourceLoggingSink> &
-     */
     const std::shared_ptr<SourceLoggingSink> &getLoggingSink() const;
-
-    /**
-     * Returns the source manager linked to this frontend instance.
-     * @return const std::shared_ptr<SourceManager> &
-     */
     const std::shared_ptr<SourceManager> &getSourceManager() const;
+    const std::shared_ptr<FrontendCompilationUnit> &getCompilationUnit() const;
 
-    /**
-     * Returns the result of parsing, if there was any error this will return nullptr.
-     * @return const std::shared_ptr<AstNode> &
-     */
-    const std::vector<std::shared_ptr<AstNode>> &getParseResult() const;
+    const std::vector<TokenInformation> &getTokens() const;
+    const std::vector<AstNode *> &getParseResult() const;
+    const std::vector<FrontendDiagnosticEntry> &getDiagnostics() const;
+    const std::vector<std::string> &getIncludedFiles() const;
+    const std::vector<FrontendPipelineStage> &getPipelineStages() const;
+
+    const std::filesystem::path &getLoadedFilePath() const;
+    const std::string &getLoadedSourceText() const;
+    const std::string &getSourceName() const;
+    const std::filesystem::path &getWorkingDirectory() const;
+
+    bool hasCompilationResult() const;
+    bool lastCompilationSucceeded() const;
 
   private:
-    std::shared_ptr<BasicTokenizer> m_tokenizer;
+    static void onDiagnostic(void *userParam, const std::shared_ptr<Error> &error);
+    void rebuildFrontendState(const std::filesystem::path &workingDirectory);
+    void clearCompilationArtifacts();
+    void collectIncludeFiles();
+    void rebuildPipelineStages();
+
+  private:
     std::shared_ptr<ErrorCollector> m_errorCollector;
-    std::shared_ptr<IParsingContext> m_parsingContext;
     std::shared_ptr<SourceLoggingSink> m_sink;
     std::shared_ptr<SourceManager> m_sourceManager;
-    std::vector<std::shared_ptr<AstNode>> m_parseResult;
+    std::shared_ptr<FrontendCompilerDriver> m_compilerDriver;
+    std::shared_ptr<FrontendCompilationUnit> m_compilationUnit;
+
+    std::filesystem::path m_loadedFilePath;
+    std::filesystem::path m_workingDirectory;
+    std::string m_sourceName;
+    std::string m_sourceText;
+    bool m_lastCompilationSucceeded{ false };
+
+    mutable std::vector<AstNode *> m_cachedParseResult;
+    std::vector<FrontendDiagnosticEntry> m_diagnostics;
+    std::vector<std::string> m_includedFiles;
+    std::vector<FrontendPipelineStage> m_pipelineStages;
 };
 
 #endif // EZPACKER_EZFRONTENDWRAPPER_H

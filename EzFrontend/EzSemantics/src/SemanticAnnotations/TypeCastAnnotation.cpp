@@ -1,45 +1,45 @@
 #include "SemanticAnnotations/TypeCastAnnotation.h"
 
 TypeCastAnnotation::TypeCastAnnotation(Symbol *originalSymbol, Type *castedDataType) :
-    m_castedDataType(castedDataType), SymbolAnnotation(originalSymbol)
+    SymbolAnnotation(originalSymbol), DataTypeAnnotation(castedDataType)
 {
 }
 
 bool TypeCastAnnotation::isDoubleToFloat() const
 {
     return getSymbol()->getSymbolDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
-            m_castedDataType->getUnderlyingType() == UnderlyingType::FloatingPoint &&
+            getDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
 
-            m_castedDataType->getUnderlyingTypeSize() == UnderlyingTypeSize::_32bits &&
+            getDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_32bits &&
             getSymbol()->getSymbolDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_64bits;
 }
 
 bool TypeCastAnnotation::isDoubleToInteger() const
 {
     return getSymbol()->getSymbolDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
-            m_castedDataType->getUnderlyingType() == UnderlyingType::Integer &&
+            getDataType()->getUnderlyingType() == UnderlyingType::Integer &&
 
-            m_castedDataType->getUnderlyingTypeSize() == UnderlyingTypeSize::_64bits;
+            getDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_64bits;
 }
 
 bool TypeCastAnnotation::isExpansion() const
 {
-    return m_castedDataType->getUnderlyingTypeSize() > getSymbol()->getSymbolDataType()->getUnderlyingTypeSize();
+    return getDataType()->getUnderlyingTypeSize() > getSymbol()->getSymbolDataType()->getUnderlyingTypeSize();
 }
 
 bool TypeCastAnnotation::isFloatToDouble() const
 {
     return getSymbol()->getSymbolDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
-            m_castedDataType->getUnderlyingType() == UnderlyingType::FloatingPoint &&
+            getDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
 
             getSymbol()->getSymbolDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_32bits &&
-            m_castedDataType->getUnderlyingTypeSize() == UnderlyingTypeSize::_64bits;
+            getDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_64bits;
 }
 
 bool TypeCastAnnotation::isFloatToInteger() const
 {
     return getSymbol()->getSymbolDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
-            m_castedDataType->getUnderlyingType() == UnderlyingType::Integer &&
+            getDataType()->getUnderlyingType() == UnderlyingType::Integer &&
 
             getSymbol()->getSymbolDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_32bits;
 }
@@ -47,30 +47,28 @@ bool TypeCastAnnotation::isFloatToInteger() const
 bool TypeCastAnnotation::isIntegerToDouble() const
 {
     return getSymbol()->getSymbolDataType()->getUnderlyingType() == UnderlyingType::Integer &&
-            m_castedDataType->getUnderlyingType() == UnderlyingType::FloatingPoint &&
+            getDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
 
-            m_castedDataType->getUnderlyingTypeSize() == UnderlyingTypeSize::_64bits;
+            getDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_64bits;
 }
 
 bool TypeCastAnnotation::isIntegerToFloat() const
 {
     return getSymbol()->getSymbolDataType()->getUnderlyingType() == UnderlyingType::Integer &&
-            m_castedDataType->getUnderlyingType() == UnderlyingType::FloatingPoint &&
+            getDataType()->getUnderlyingType() == UnderlyingType::FloatingPoint &&
 
-            m_castedDataType->getUnderlyingTypeSize() == UnderlyingTypeSize::_32bits;
+            getDataType()->getUnderlyingTypeSize() == UnderlyingTypeSize::_32bits;
 }
 
 bool TypeCastAnnotation::isTruncation() const
 {
-    return m_castedDataType->getUnderlyingTypeSize() < getSymbol()->getSymbolDataType()->getUnderlyingTypeSize();
+    return getDataType()->getUnderlyingTypeSize() < getSymbol()->getSymbolDataType()->getUnderlyingTypeSize();
 }
 
 bool TypeCastAnnotation::isIntegerToInteger() const
 {
     return getSymbol()->getSymbolDataType()->getUnderlyingType() == UnderlyingType::Integer &&
-            m_castedDataType->getUnderlyingType() == UnderlyingType::Integer;
+            getDataType()->getUnderlyingType() == UnderlyingType::Integer;
 }
-
-Type *TypeCastAnnotation::getCastedDataType() const { return m_castedDataType; }
 
 const char *TypeCastAnnotation::getAnnotationName() const { return "TypeCastAnnotation"; }

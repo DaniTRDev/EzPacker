@@ -28,23 +28,20 @@ EzCMK_ConfigureLib(NAME "EzMir"
         LINKED_LIBRARIES "EzCore;libtommath"
         INCLUDED_DIRS "include")
 
-EzPacker_AddTest(
-        "MirEmitterTest"
-        "EzMir;gtest_main"
-        ""
-        "tests/MirEmitterTest.cpp;tests/MirTestFixture.h;tests/MirTestFixture.cpp"
-)
+if (EZPACKER_BUILD_TESTS)
+    message(STATUS "Building tests for EzMir")
 
-EzPacker_AddTest(
-        "MirEmitterContextTest"
-        "EzMir;gtest_main"
-        ""
-        "tests/MirEmitterContextTest.cpp;tests/MirTestFixture.h;tests/MirTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_MirEmitterContext"
+            "EzMir"
+            ""
+            "tests/T_MirEmitterContext.cpp"
+    )
 
-EzPacker_AddTest(
-        "MirGlobalDataEmitterTest"
-        "EzMir;gtest_main"
-        ""
-        "tests/MirGlobalDataEmitterTest.cpp;tests/MirTestFixture.h;tests/MirTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_MirEmitter"
+            "EzMir"
+            ""
+            "tests/T_MirEmitter.cpp"
+    )
+endif ()

@@ -50,6 +50,16 @@ class MirEmitterContext : public ErrorEmitter
     bool bindToBlock(MirBlock *block);
 
     /**
+     * Returns `true` if the given type ID exists in the MIR type table.
+     */
+    bool doesTypeExist(size_t typeId) const;
+    
+    /**
+     * Returns `true` if the given type name exists in the MIR type table.
+     */
+    bool doesTypeExist(const std::string_view &typeName) const;
+
+    /**
      * Allocates a new empty block.
      *
      * If a function is currently active, the block is also appended to that
@@ -133,6 +143,9 @@ class MirEmitterContext : public ErrorEmitter
     /** Returns the arena pool used to allocate `MirType` objects and type slices. */
     TypedPool *getTypePool();
 
+    /** Returns the list of functions created in this context. */
+    TypedPoolSlice<MirFunction> *getFunctionList() const;
+
   private:
     MirId m_currentId; // Next MIR ID to issue; 0 is reserved as invalid.
 
@@ -150,6 +163,7 @@ class MirEmitterContext : public ErrorEmitter
     TypedPoolSlice<MirFunction> *m_functionList; // Root list of functions created in this context.
     TypedPoolSlice<MirType> *m_typeList;         // Root list of MIR types created in this context.
     std::map<size_t, MirType *> m_idToTypeMap;   // Fast lookup from MIR type ID to MirType.
+    std::set<std::string_view> m_typeNames; // Set used to search, by name, if a type exists. Sets allows log n lookup.
 };
 
 #endif // EZPACKER_MIREMITTERCONTEXT_H

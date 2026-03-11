@@ -16,7 +16,7 @@ class Output : public IView
      * Creates the error view with the given error collector.
      * @param errorCollector
      */
-    Output(const std::shared_ptr<ErrorCollector> &errorCollector);
+    explicit Output(const std::shared_ptr<ErrorCollector> &errorCollector);
     /**
      * Returns "Output".
      * @return const char*
@@ -29,8 +29,6 @@ class Output : public IView
     void render() override;
 
   private:
-    std::list<LogMessage> m_errors;
-    std::list<LogMessage> m_info;
     std::shared_ptr<ErrorCollector> m_errorCollector;
 };
 

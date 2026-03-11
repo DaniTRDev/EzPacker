@@ -13,11 +13,11 @@ bool DefineSymbolFromVariable(SymbolType symbolType,
     }
 
     Symbol *symbol = nullptr;
-    Variable *variable = (Variable *)node;
+    Variable *variable = dynamic_cast<Variable *>(node);
     const std::string_view &variableDataType = variable->getVariableDataType();
     const std::string_view &variableName = variable->getVariableName();
 
-    std::shared_ptr<Type> dataType = TypeTable::getType(variableDataType);
+    std::shared_ptr<Type> dataType = ctx->getTypeTable()->getType(variableDataType);
     if (!dataType || dataType->getUnderlyingType() == UnderlyingType::Void)
     {
         ctx->emitError(ErrorSeverity::Fatal,
@@ -64,17 +64,13 @@ bool SymbolDefinitionVisitor::visit(struct ForAstNode *_for)
     // initialization block are available to the condition, nextIt, and body.
     ScopeCreatorGuard guard(_for, getSemanticContext(), "ForLoopScope");
 
-    return _for->getInitialization()->accept(this) && _for->getCondition()->accept(this) &&
-            _for->getBody()->accept(this) &&
+    return _for->getInitialization()->accept(this) && _for->getBody()->accept(this) &&
             // Ensure we safely handle nextIt since it was parsed separately
             (_for->getNextItClause() ? _for->getNextItClause()->accept(this) : true);
 }
 
 bool SymbolDefinitionVisitor::visit(IfAstNode *ifNode)
 {
-    if (!ifNode->getCondition()->accept(this))
-        return false;
-
     // True branch gets its own lexical scope
     {
         ScopeCreatorGuard trueGuard(ifNode->getTrueScope(), getSemanticContext(), "IfTrueScope");
@@ -116,7 +112,7 @@ bool SymbolDefinitionVisitor::visit(Instruction *instr)
         return false;
     }
 
-    AstNode *operand = (AstNode *)operands->m_head->m_object;
+    AstNode *operand = operands->m_head->m_object;
     return DefineSymbolFromVariable(SymbolType::LocalVariable,
                                     getSemanticContext(),
                                     operand,
@@ -164,31 +160,65 @@ bool SymbolDefinitionVisitor::visit(Module *module)
     Symbol *moduleSymbol = nullptr;
     Scope *ownedScope = nullptr;
 
+    const std::shared_ptr<TypeTable> &typeTable = getSemanticContext()->getTypeTable();
     const std::string_view &moduleName = header->getModuleName();
     const std::string_view &moduleReturn = header->getReturnTypeName();
-
-    std::shared_ptr<Type> moduleReturnType = TypeTable::getType(moduleReturn);
-    if (!moduleReturnType)
-    {
-        getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                        "Invalid return type provided for module",
-                                        "SymbolDefinitionVisitor::Module",
-                                        header->getSourceRef());
-        return false;
-    }
-
-    if (!getSemanticContext()
-                 ->createSymbol(module, SymbolType::Module, &moduleSymbol, moduleReturnType.get(), moduleName))
-    {
-        getSemanticContext()->emitSymbolRedefinitionError("SymbolDefinitionVisitor::Module", moduleName, module);
-        return false;
-    }
 
     {
         ScopeCreatorGuard guard(module, getSemanticContext(), std::string(moduleName));
         ownedScope = getSemanticContext()->getCurrentScope();
 
-        if (!header->accept(this) || !body->accept(this))
+        if (!header->accept(this))
+        {
+            return false;
+        }
+
+        /**
+         * Create the type and define the symbol before the body is traversed, this ensures that calls to self are
+         * allowed and can be correctly linked to the symbol of the module later or check for duplicates.
+         */
+
+        std::vector<Type *> moduleSubTypes;
+        std::shared_ptr<Type> moduleReturnType = typeTable->getType(moduleReturn);
+
+        if (!moduleReturnType)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            "Invalid return type provided for module",
+                                            "SymbolDefinitionVisitor::Module",
+                                            header->getSourceRef());
+            return false;
+        }
+
+        moduleSubTypes.push_back(moduleReturnType.get());
+
+        for (AstNode *node : *header->getExpressions())
+        {
+            Symbol *sym = node->getAnnotation<SymbolAnnotation>()->getSymbol();
+            moduleSubTypes.push_back(sym->getSymbolDataType());
+        }
+
+        std::shared_ptr<Type> moduleType = typeTable->addModuleType(moduleName, moduleSubTypes);
+        if (!moduleType)
+        {
+            getSemanticContext()->emitTypeRedefinitionError("SymbolDefinitionVisitor::Module", moduleName, module);
+            return false;
+        }
+
+        moduleType->setSourceRef(header->getSourceRef());
+
+        if (!getSemanticContext()->createSymbolInScope(module,
+                                                       ownedScope->getParent(),
+                                                       SymbolType::Module,
+                                                       &moduleSymbol,
+                                                       moduleType.get(),
+                                                       moduleName))
+        {
+            getSemanticContext()->emitSymbolRedefinitionError("SymbolDefinitionVisitor::Module", moduleName, module);
+            return false;
+        }
+
+        if (!body->accept(this))
         {
             return false;
         }
@@ -227,11 +257,6 @@ bool SymbolDefinitionVisitor::visit(SwitchCaseAstNode *_switchCase)
 
 bool SymbolDefinitionVisitor::visit(WhileAstNode *whileNode)
 {
-    if (whileNode->getCondition() && !whileNode->getCondition()->accept(this))
-    {
-        return false;
-    }
-
     // Loop body needs its own lexical scope
     ScopeCreatorGuard guard(whileNode, getSemanticContext(), "WhileBodyScope");
     return whileNode->getCodeScope()->accept(this);

@@ -13,7 +13,7 @@ struct SourceReference
     size_t m_length{ 0 };
     size_t m_line{ 0 };
 
-    size_t m_sourceFileId;
+    size_t m_sourceFileId{ 0 };
 };
 
 struct LineSourceRange
@@ -77,7 +77,7 @@ class SourceManager
      * @return const std::filesystem::path &
      */
     const std::filesystem::path &getWorkingPath() const;
-    
+
     /**
      * Resolves the given source file path to an absolute path based on the working directory. If the source file is
      * already an absolute path, it returns it as is. If the source file is a relative path, it combines it with the
@@ -86,7 +86,7 @@ class SourceManager
      * @return std::filesystem::path
      */
     std::filesystem::path resolveSourcePath(const std::filesystem::path &sourceFile) const;
-    
+
     /**
      * Returns the raw line of where this reference was created. Returns true if no reference is given or if it is not
      * from any known sources.
@@ -94,14 +94,14 @@ class SourceManager
      * @return std::string
      */
     std::string getRawLineContent(const SourceReference &ref);
-    
+
     /**
      * Returns the line content of the given reference. This function assumes ref is DEFINED.
      * @param ref
      * @return std::string
      */
     std::string getReferenceContent(const SourceReference &ref);
-    
+
     /**
      * Returns the source content for the given ID. This is the full content of the source file. If ID is not found, it
      * returns an empty string.
@@ -109,15 +109,15 @@ class SourceManager
      * @return std::string_view
      */
     std::string_view getSourceContent(size_t id) const;
-    
+
     /**
      * Returns the source name of the given source file id.
      * @param id
      * @return const std::string &
      */
     std::string_view getSourceName(size_t id) const;
-  private:
 
+  private:
   private:
     std::filesystem::path m_workingPath;
     // full file path, file content divided in lines.

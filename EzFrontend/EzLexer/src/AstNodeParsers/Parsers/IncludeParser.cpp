@@ -2,17 +2,13 @@
 
 AstNode *IncludeParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
-    TokenInformation relFilePath;
-
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Include))
     {
-        ctx->emitError(ErrorSeverity::Soft,
-                       "Expected 'include' directive",
-                       "IncludeParser::parse",
-                       ctx->getLastSourceReference());
+        // Return silent error not to overlap with other parser.
         return nullptr;
     }
 
+    TokenInformation relFilePath;
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LowerThan))
     {
         ctx->emitError(ErrorSeverity::Fatal,

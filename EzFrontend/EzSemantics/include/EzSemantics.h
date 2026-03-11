@@ -44,7 +44,8 @@
 #include "AstLowererVisitor/CodeScopeLowerer.h"
 #include "AstLowererVisitor/ConditionLowerer.h"
 #include "AstLowererVisitor/ContinueLowerer.h"
-#include "AstLowererVisitor/GenericLowerer.h"
+#include "AstLowererVisitor/ForLowerer.h"
+#include "AstLowererVisitor/GenericAstLowerer.h"
 #include "AstLowererVisitor/IfLowerer.h"
 #include "AstLowererVisitor/ImmediateLowerer.h"
 #include "AstLowererVisitor/InstructionLowerer.h"
@@ -52,6 +53,8 @@
 #include "AstLowererVisitor/LoweringContext.h"
 #include "AstLowererVisitor/MemoryLowerer.h"
 #include "AstLowererVisitor/ModuleLowerer.h"
+#include "AstLowererVisitor/SwitchLowerer.h"
+#include "AstLowererVisitor/TypeLowerer.h"
 #include "AstLowererVisitor/VariableLowerer.h"
 #include "AstLowererVisitor/WhileLowerer.h"
 

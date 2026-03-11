@@ -15,6 +15,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <set>
 
 #include <tommath.h>
 #include <EzCore.h>

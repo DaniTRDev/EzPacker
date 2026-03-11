@@ -82,6 +82,32 @@ class BasicSemanticContext : public ErrorEmitter
                       Symbol **outSymbol,
                       Type *symbolDataType,
                       const std::string_view &symbolName);
+
+    /**
+     * Defines a new symbol in the given scope.
+     *
+     * The symbol is created only if another symbol with the same name does not
+     * already exist in the given scope. Parent scopes are not considered a
+     * conflict, which means shadowing is allowed and handled by callers.
+     *
+     * On success, `*outSymbol` receives the newly created symbol and the method
+     * assigns it a unique context-wide ID. On failure, the method returns
+     * `false` and performs no mutation.
+     *
+     * @param definingNode AST node that introduces the symbol.
+     * @param targetScope The target scope to insert the symbol in.
+     * @param symbolType Semantic category of the symbol.
+     * @param outSymbol Output parameter for the created symbol.
+     * @param symbolDataType Declared type of the symbol, if any.
+     * @param symbolName Unqualified symbol name as it appears in source.
+     * @return `true` if the symbol was inserted in the current scope.
+     */
+    bool createSymbolInScope(AstNode *definingNode,
+                             Scope *targetScope,
+                             SymbolType symbolType,
+                             Symbol **outSymbol,
+                             Type *symbolDataType,
+                             const std::string_view &symbolName);
     /**
      * Returns whether the current traversal is nested inside at least one
      * loop.
@@ -142,14 +168,20 @@ class BasicSemanticContext : public ErrorEmitter
     void beginScope(const std::string_view &name);
 
     /**
-     * Emits a redefinition diagnostic for a symbol already present in the
-     * current scope.
+     * Emits a redefinition diagnostic for a symbol already present in the current scope.
      *
-     * The implementation also emits a secondary diagnostic pointing to the
-     * original definition site.
+     * The implementation also emits a secondary diagnostic pointing to the original definition site.
      */
     void
     emitSymbolRedefinitionError(const std::string_view &module, const std::string_view &symbolName, AstNode *errorNode);
+
+    /**
+     * Emits a redefinition diagnostic for a type already present in the current scope.
+     *
+     * The implementation also emits a secondary diagnostic pointing to the original definition site.
+     */
+    void
+    emitTypeRedefinitionError(const std::string_view &module, const std::string_view &typeName, AstNode *errorNode);
 
     /**
      * Emits an "unknown symbol" diagnostic for an unresolved name use.
@@ -209,6 +241,11 @@ class BasicSemanticContext : public ErrorEmitter
      */
     const std::shared_ptr<Scope> &getGlobalScope() const;
 
+    /**
+     * Returns the type table used by this semantic context.
+     */
+    const std::shared_ptr<TypeTable> &getTypeTable() const;
+
   private:
     Scope *m_currentScope;
     size_t m_currentSwitchLevel;   // Used to track the current switch nesting level. It starts at 0 (not in a switch).
@@ -217,12 +254,18 @@ class BasicSemanticContext : public ErrorEmitter
     TypedPool m_annotationPool;    // Cache-friendly container of annotations.
     TypedPool m_symbolPool;        // Cache-friendly container of symbols.
     std::shared_ptr<Scope> m_globalScope;
+    std::shared_ptr<TypeTable> m_typeTable; /*
+                                             * Type table can't be easily adapted into the cache-friendly pool because
+                                             * it has a dynamic Map. There will be quite frequent searches so for this
+                                             * reason, O(log n) (map search) < O (n) (linked list search) is preferred,
+                                             * even if it means that types are not stored contiguously in memory.
+                                             */
     std::vector<std::shared_ptr<Scope>>
             m_scopes; /*
                        * Scopes can't be easily adapted into the cache-friendly pool because
-                       * they have a dynamic Map. There will be quite frequent searches so
-                       * and for this reason, O(log n) (map search) < O (n) (linked list search) is preferred, even if
-                       * it means that scopes are not stored contiguously in memory.
+                       * they have a dynamic Map. There will be quite frequent searches so for this reason, O(log n)
+                       * (map search) < O (n) (linked list search) is preferred, even if it means that scopes are not
+                       * stored contiguously in memory.
                        */
 };
 

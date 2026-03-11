@@ -6,15 +6,20 @@ bool VariableLowerer::lower(AstNode *node, LoweringContext *ctx)
     SymbolAnnotation *symbolAnnot = var->getAnnotation<SymbolAnnotation>();
     Symbol *sym = symbolAnnot->getSymbol();
 
-    if (sym->getType() == SymbolType::GlobalVariable)
+    if (sym->getType() == SymbolType::LocalVariable)
+    {
+        // Local variable.
+        return lowerLocalVariable(var, ctx);
+    }
+    else if (sym->getType() == SymbolType::GlobalVariable)
     {
         // Global variable.
         return lowerGlobalVariable(var, ctx);
     }
     else
     {
-        // Local variable.
-        return lowerLocalVariable(var, ctx);
+        // Module or label, emit a reference.
+        ctx->pushOperand(MirReference{ .m_refId = ctx->getMirIdOfSymbol(sym) });
     }
 
     return true;
@@ -24,7 +29,11 @@ bool VariableLowerer::lowerGlobalVariable(Variable *var, LoweringContext *ctx)
 {
     if (!ctx->getSemanticContext()->isCurrentScopeGlobalScope())
     {
-        return true; // Not in global scope, ignore this.
+        // Not in global scope, so this is a reference to a global variable within a code scope.
+        Symbol *sym = var->getAnnotation<SymbolAnnotation>()->getSymbol();
+        ctx->pushOperand(MirReference{ .m_refId = ctx->getMirIdOfSymbol(sym) });
+
+        return true;
     }
 
     SymbolAnnotation *symbolAnnot = var->getAnnotation<SymbolAnnotation>();
@@ -112,12 +121,12 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, LoweringContext *ctx)
          * already be correct. If there is a mismatch, it's a bug in the TypeChecker pass, not here.
          */
         size_t existingVreg = ctx->getMirIdOfSymbol(sym);
-        ctx->pushOperand(MirOperand{ MirRegister{ .m_id = existingVreg, .m_size = varSize } });
+        ctx->pushOperand(MirOperand{ MirRegister{ .m_id = existingVreg, .m_size = varSize / 8 } });
 
         return true;
     }
 
-    MirRegister vReg = ctx->getEmitter()->createRegister(varSize);
+    MirRegister vReg = ctx->getEmitter()->createRegister(varSize / 8);
 
     // Link it so future usages find it
     ctx->linkSymbolToMirId(sym, vReg.m_id);

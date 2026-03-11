@@ -23,7 +23,7 @@ AstNode *BaseDisplacement::parse(const std::shared_ptr<BasicParsingContext> &ctx
      */
 
     displacement = ImmediateParser::ImmediateParser().parse(ctx);
-    node = ctx->getNodePool()->create<BaseDisplacementMemory>((IntegerImmediate *)displacement, (Variable *)base, "");
+    node = ctx->getNodePool()->create<BaseDisplacementMemory>(dynamic_cast<IntegerImmediate *>(displacement), dynamic_cast<Variable *>(base), "");
 
     return node;
 }
@@ -101,10 +101,10 @@ AstNode *BaseIndexScaleDisplacement::parse(const std::shared_ptr<BasicParsingCon
         return nullptr;
     }
 
-    node = ctx->getNodePool()->create<BaseIndexScaleDisplacementMemory>((IntegerImmediate *)displacement,
-                                                                        (IntegerImmediate *)scale,
-                                                                        (Variable *)base,
-                                                                        (Variable *)index,
+    node = ctx->getNodePool()->create<BaseIndexScaleDisplacementMemory>(dynamic_cast<IntegerImmediate *>(displacement),
+                                                                        dynamic_cast<IntegerImmediate *>(scale),
+                                                                        dynamic_cast<Variable *>(base),
+                                                                        dynamic_cast<Variable *>(index),
                                                                         "");
     return node;
 }
@@ -154,7 +154,7 @@ AstNode *IndexScale::parse(const std::shared_ptr<BasicParsingContext> &ctx)
         return nullptr;
     }
 
-    node = ctx->getNodePool()->create<IndexScaleMemory>((IntegerImmediate *)scale, (Variable *)index, "");
+    node = ctx->getNodePool()->create<IndexScaleMemory>(dynamic_cast<IntegerImmediate *>(scale), dynamic_cast<Variable *>(index), "");
     return node;
 }
 
@@ -172,7 +172,7 @@ AstNode *Direct::parse(const std::shared_ptr<BasicParsingContext> &ctx)
         return nullptr;
     }
 
-    node = ctx->getNodePool()->create<DirectMemory>((IntegerImmediate *)address, "");
+    node = ctx->getNodePool()->create<DirectMemory>(dynamic_cast<IntegerImmediate *>(address), "");
     return node;
 }
 
@@ -219,7 +219,7 @@ AstNode *MemoryOperandParser::parse(const std::shared_ptr<BasicParsingContext> &
         return nullptr;
     }
 
-    MemoryOperandAstNode *memoryOperand = (MemoryOperandAstNode *)node;
+    auto *memoryOperand = dynamic_cast<MemoryOperandAstNode *>(node);
     memoryOperand->setReferencedDataType(ctx->getStringPool()->createConstantString(token.m_str));
 
     return memoryOperand;

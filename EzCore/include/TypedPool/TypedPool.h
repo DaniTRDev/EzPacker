@@ -33,7 +33,11 @@ template <typename ElemType> struct TypedPoolSlice
 
     struct Iterator
     {
-        TypedPoolNode<ElemType> *m_curr;
+        TypedPoolNode<ElemType> *m_curr{ nullptr };
+
+        explicit operator bool() const { return m_curr != nullptr; }
+
+        bool operator!() { return m_curr == nullptr; }
 
         ElemType *operator*() const { return m_curr->m_object; }
 
@@ -41,6 +45,23 @@ template <typename ElemType> struct TypedPoolSlice
         {
             if (m_curr)
                 m_curr = m_curr->m_next;
+            return *this;
+        }
+
+        Iterator &operator+(size_t id)
+        {
+            size_t it = 0;
+            while (it < id)
+            {
+                if (!m_curr)
+                {
+                    break;
+                }
+
+                m_curr = m_curr->m_next;
+                it++;
+            }
+
             return *this;
         }
 

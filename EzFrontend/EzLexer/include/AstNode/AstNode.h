@@ -174,7 +174,11 @@ class AstNode
 
         for (IAstNodeAnnotation *annot : *m_annotations)
         {
-            return dynamic_cast<T *>(annot);
+            T *ptr = dynamic_cast<T *>(annot);
+            if (ptr)
+            {
+                return ptr;
+            }
         }
 
         return nullptr;

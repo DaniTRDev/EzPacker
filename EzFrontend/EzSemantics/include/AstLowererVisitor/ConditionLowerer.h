@@ -11,9 +11,9 @@
 #define EZPACKER_CONDITIONLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class ConditionLowerer : public GenericLowerer
+class ConditionLowerer : public GenericAstLowerer
 {
   public:
     /**

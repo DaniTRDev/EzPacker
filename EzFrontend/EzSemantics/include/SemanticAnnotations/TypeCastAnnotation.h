@@ -23,11 +23,12 @@
 #include "Scope/Symbol.h"
 #include "Scope/TypeTable.h"
 #include "SemanticAnnotations/SymbolAnnotation.h"
+#include "SemanticAnnotations/DataTypeAnnotation.h"
 
 /**
  * Annotation that describes the destination type expected during lowering.
  */
-class TypeCastAnnotation : public SymbolAnnotation
+class TypeCastAnnotation : public SymbolAnnotation, public DataTypeAnnotation
 {
   public:
     /**
@@ -88,13 +89,6 @@ class TypeCastAnnotation : public SymbolAnnotation
      * Returns the runtime annotation kind name: `"TypeCastAnnotation"`.
      */
     const char *getAnnotationName() const override;
-    /**
-     * Returns the type that lowering should emit/use for this node.
-     */
-    Type *getCastedDataType() const;
-
-  private:
-    Type *m_castedDataType;
 };
 
 #endif // EZPACKER_TYPECASTANNOTATION_H

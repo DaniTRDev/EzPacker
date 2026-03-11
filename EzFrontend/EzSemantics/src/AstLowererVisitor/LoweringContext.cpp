@@ -133,6 +133,11 @@ MirType *LoweringContext::createMirTypeFromSemanticType(Type *semanticType)
             kind = MirTypeKind::Void;
             break;
         }
+        case UnderlyingType::Module:
+        {
+            kind = MirTypeKind::Array;
+            break;
+        }
         default:
         {
             throw std::runtime_error("Internal Compiler Error: Don't know how to create a MIR type from semantic type "
@@ -140,7 +145,22 @@ MirType *LoweringContext::createMirTypeFromSemanticType(Type *semanticType)
         }
     }
 
-    MirType *mirType = m_emitterContext->createType(kind, nullptr, semanticType->getTypeName());
+    TypedPoolSlice<MirType> *subTypes = nullptr;
+    if (kind == MirTypeKind::Array)
+    {
+        subTypes = m_emitterContext->getTypePool()->createSlice<MirType>();
+        for (auto &subType : semanticType->getSubTypes())
+        {
+            MirType *mirSubType =
+                    createMirTypeFromSemanticType(subType); /*
+                                                             * If type is defined, its real type is returned, if type is
+                                                             * not defined it is created and returned.
+                                                             */
+            m_emitterContext->getTypePool()->appendToSlice(subTypes, mirSubType);
+        }
+    }
+
+    MirType *mirType = m_emitterContext->createType(kind, subTypes, semanticType->getTypeName());
     if (!linkTypeNameToMirTypeId(semanticType, mirType->getId()))
     {
         throw std::runtime_error("Internal Compiler Error: Failed to link semantic type name to MIR type ID");

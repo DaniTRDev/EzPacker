@@ -43,37 +43,39 @@ bool SymbolAndTypeResolverVisitor::visit(IfAstNode *ifNode)
 
 bool SymbolAndTypeResolverVisitor::visit(ImmediateOperand *imm)
 {
+    const std::shared_ptr<BasicSemanticContext> &ctx = getSemanticContext();
     const std::string_view &dataTypeStr = imm->getDataType();
+
     if (!dataTypeStr.empty())
     {
         // Annotate the type of this immediate.
-        std::shared_ptr<Type> dataType = TypeTable::getType(dataTypeStr);
+        std::shared_ptr<Type> dataType = ctx->getTypeTable()->getType(dataTypeStr);
         if (!dataType)
         {
-            getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                            "Invalid cast for immediate",
-                                            "SymbolAndTypeResolverVisitor::ImmediateOperand",
-                                            imm->getSourceRef());
+            ctx->emitError(ErrorSeverity::Fatal,
+                           "Invalid cast for immediate",
+                           "SymbolAndTypeResolverVisitor::ImmediateOperand",
+                           imm->getSourceRef());
 
             return false;
         }
 
-        imm->createAnnotation<DataTypeAnnotation>(getSemanticContext()->getAnnotPool(), dataType.get());
+        imm->createAnnotation<DataTypeAnnotation>(ctx->getAnnotPool(), dataType.get());
     }
     else
     {
         std::shared_ptr<Type> dataType = imm->getImmediateType() == ImmediateType::Integer
-                ? TypeTable::getType("i64")
-                : TypeTable::getType("double");
+                ? ctx->getTypeTable()->getType("i64")
+                : ctx->getTypeTable()->getType("double");
         if (!dataType)
         {
-            getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                            "Internal Compiler Error: default Immediate value not defined",
-                                            "SymbolAndTypeResolverVisitor::ImmediateOperand",
-                                            imm->getSourceRef());
+            ctx->emitError(ErrorSeverity::Fatal,
+                           "Internal Compiler Error: default Immediate value not defined",
+                           "SymbolAndTypeResolverVisitor::ImmediateOperand",
+                           imm->getSourceRef());
             return false;
         }
-        imm->createAnnotation<DataTypeAnnotation>(getSemanticContext()->getAnnotPool(), dataType.get());
+        imm->createAnnotation<DataTypeAnnotation>(ctx->getAnnotPool(), dataType.get());
     }
     return true;
 }
@@ -104,11 +106,11 @@ bool SymbolAndTypeResolverVisitor::visit(MemoryOperandAstNode *operand)
 
     if (typeStr.empty())
     {
-        type = TypeTable::getDefaultType();
+        type = getSemanticContext()->getTypeTable()->getDefaultType();
     }
     else
     {
-        type = TypeTable::getType(typeStr);
+        type = getSemanticContext()->getTypeTable()->getType(typeStr);
         if (!type)
         {
             getSemanticContext()->emitError(ErrorSeverity::Fatal,

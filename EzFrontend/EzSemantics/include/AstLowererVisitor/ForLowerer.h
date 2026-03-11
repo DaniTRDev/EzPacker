@@ -2,9 +2,9 @@
 #define EZPACKER_FORLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class ForLowerer : public GenericLowerer
+class ForLowerer : public GenericAstLowerer
 {
   public:
     /**

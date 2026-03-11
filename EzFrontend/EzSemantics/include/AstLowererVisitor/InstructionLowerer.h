@@ -12,9 +12,9 @@
 #define EZPACKER_INSTRUCTIONLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class InstructionLowerer : public GenericLowerer
+class InstructionLowerer : public GenericAstLowerer
 {
   public:
     /**

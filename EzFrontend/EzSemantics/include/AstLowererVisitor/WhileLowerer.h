@@ -16,10 +16,10 @@
 #define EZPACKER_WHILELOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 #include "IfLowerer.h"
 
-class WhileLowerer : public GenericLowerer
+class WhileLowerer : public GenericAstLowerer
 {
   public:
     /**

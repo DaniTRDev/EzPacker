@@ -11,9 +11,9 @@
 #define EZPACKER_BREAKLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class BreakLowerer : public GenericLowerer
+class BreakLowerer : public GenericAstLowerer
 {
   public:
     /**

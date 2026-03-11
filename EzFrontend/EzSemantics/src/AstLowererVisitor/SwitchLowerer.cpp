@@ -48,19 +48,22 @@ bool SwitchLowerer::lower(AstNode *node, LoweringContext *ctx)
             // Advance our checker block for the next loop iteration.
             currentCheckerBlock = nextCheckerBlock;
         }
+
+        emitterCtx->bindToBlock(currentCheckerBlock);
+
+        if (_switch->getDefault())
+        {
+            // Lower the default body directly into the final checker block.
+            MirBlock *defaultBlock = emitterCtx->createBlock();
+
+            emitterCtx->bindToBlock(defaultBlock);
+            _switch->getDefault()->accept(ctx->getOwnerLowererVisitor());
+        }
+
+        // Whether we ran a default block or not, we must jump to the merge block.
+        emitter->emitJMP(MirReference{ mergeBlock->getId() });
     }
     ctx->exitSwitch();
-
-    emitterCtx->bindToBlock(currentCheckerBlock);
-
-    if (_switch->getDefault())
-    {
-        // Lower the default body directly into the final checker block.
-        _switch->getDefault()->accept(ctx->getOwnerLowererVisitor());
-    }
-
-    // Whether we ran a default block or not, we must jump to the merge block.
-    emitter->emitJMP(MirReference{ mergeBlock->getId() });
 
     // Bind to the merge block so subsequent AST nodes are placed after the switch.
     emitterCtx->bindToBlock(mergeBlock);

@@ -28,7 +28,8 @@ enum class UnderlyingType : uint8_t
     FloatingPoint,
     Integer,
     String,
-    Void
+    Void,
+    Module // Used to identify this type derived from a module.
 };
 
 /**
@@ -47,7 +48,7 @@ enum class UnderlyingTypeSize : uint16_t
     _128bits = 128,
     _256bits = 256,
     _512bits = 512,
-    Variable = 0xFFFF // Strings, they don't have a pre-fixed known size.
+    Variable = 0xFFFF // Strings or Modules, they don't have a pre-fixed known size.
 };
 
 class Type
@@ -57,6 +58,12 @@ class Type
      * Creates one semantic type descriptor.
      */
     Type(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string_view &typeName);
+
+    /**
+     * Returns the source reference (if exists) that defined this type. Caller should check m_valid to ensure it
+     * contains valid data.
+     */
+    const SourceReference &getSourceRef() const;
 
     /**
      * Returns the broad runtime category of this type.
@@ -69,14 +76,32 @@ class Type
     UnderlyingTypeSize getUnderlyingTypeSize() const;
 
     /**
+     * Sets the source reference of where this type has been defined.
+     * @param ref
+     */
+    void setSourceRef(const SourceReference &ref);
+
+    /**
+     * Sets the subtypes replacing the previous ones, if any.
+     */
+    void setSubTypes(const std::vector<Type *> &types);
+
+    /**
      * Returns the canonical source-level name of this type.
      */
     const std::string_view &getTypeName() const;
 
+    /**
+     * Returns the subtypes of this type. This field will only be != empty when the underlying type is a Module.
+     */
+    const std::vector<Type *> &getSubTypes() const;
+
   private:
+    SourceReference m_sourceRef;
     UnderlyingType m_underlyingType;
     UnderlyingTypeSize m_underlyingTypeSize;
     std::string_view m_typeName;
+    std::vector<Type *> m_subTypes;
 };
 
 /**
@@ -86,23 +111,50 @@ class TypeTable
 {
   public:
     /**
+     * Creates the default type table with privitive types defined.
+     */
+    TypeTable();
+
+    /**
      * Returns whether a semantic type with the given canonical name exists.
      */
-    static bool doesTypeExists(const std::string_view &typeName);
+    bool doesTypeExists(const std::string_view &typeName);
 
     /**
      * Returns the canonical `Type` object for the given name, or `nullptr` if
      * the type is unknown.
      */
-    static std::shared_ptr<Type> getType(const std::string_view &typeName);
+    std::shared_ptr<Type> getType(const std::string_view &typeName);
+
+    /**
+     * Adds a type into the type table.
+     *
+     * A valid `std::shared_ptr<Type>` instance if type did not exist and could be added. Returns `nullptr` if
+     * the type already exists.
+     */
+    std::shared_ptr<Type>
+    addType(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string_view &typeName);
+
+    /**
+     * Creates a module type and sets its subtypes.
+     *
+     * A valid `std::shared_ptr<Type>` instance if type did not exist and could be added. Returns `nullptr` if
+     * the type already exists.
+     */
+    std::shared_ptr<Type> addModuleType(const std::string_view &moduleName, const std::vector<Type *> &subTypes);
 
     /**
      * Returns the language default semantic type, currently `i64`.
      */
-    static std::shared_ptr<Type> getDefaultType();
+    std::shared_ptr<Type> getDefaultType();
+
+    /**
+     * Returns the internal type list used by this class.
+     */
+    const std::map<std::string_view, std::shared_ptr<Type>> &getTypeMap() const;
 
   private:
-    static std::map<std::string_view, std::shared_ptr<Type>> m_types;
+    std::map<std::string_view, std::shared_ptr<Type>> m_types;
 };
 
 #endif // EZPACKER_TYPETABLE_H

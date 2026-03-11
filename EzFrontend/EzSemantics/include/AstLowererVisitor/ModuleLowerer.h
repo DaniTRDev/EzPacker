@@ -12,10 +12,10 @@
 #define EZPACKER_MODULELOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 #include "VariableLowerer.h"
 
-class ModuleHeaderLowerer : public GenericLowerer
+class ModuleHeaderLowerer : public GenericAstLowerer
 {
   public:
     /**
@@ -28,7 +28,7 @@ class ModuleHeaderLowerer : public GenericLowerer
     bool lower(AstNode *node, LoweringContext *ctx) override;
 };
 
-class ModuleLowerer : public GenericLowerer
+class ModuleLowerer : public GenericAstLowerer
 {
   public:
     /**

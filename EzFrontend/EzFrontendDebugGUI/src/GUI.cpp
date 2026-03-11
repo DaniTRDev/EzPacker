@@ -2,9 +2,14 @@
 
 Gui::Gui() :
     m_initialized(false), m_guiWindow(nullptr), m_pd3dDevice(nullptr), m_pd3dDeviceContext(nullptr),
-    m_mainRenderTargetView(nullptr), m_windowPos(0, 0),
-    m_windowSize(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)), m_pSwapChain(nullptr)
+    m_mainRenderTargetView(nullptr), m_windowPos(120.0f, 80.0f), m_windowSize(1600.0f, 960.0f), m_pSwapChain(nullptr)
 {
+    const float screenWidth = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
+    const float screenHeight = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
+    m_windowSize.x = std::min(m_windowSize.x, screenWidth - 120.0f);
+    m_windowSize.y = std::min(m_windowSize.y, screenHeight - 120.0f);
+    m_windowPos.x = std::max(40.0f, (screenWidth - m_windowSize.x) * 0.5f);
+    m_windowPos.y = std::max(40.0f, (screenHeight - m_windowSize.y) * 0.5f);
 }
 
 Gui &Gui::get()
@@ -108,32 +113,38 @@ bool Gui::createDeviceD3D()
 
 bool Gui::createGuiWindow()
 {
-    const wchar_t *className = L"EzFrontendDebugGUI";
+    const char *className = "EzFrontendDebugGUI";
 
-    WNDCLASSEX wc;
-
+    WNDCLASSEXA wc{};
     wc.cbClsExtra = 0;
-    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.cbSize = sizeof(WNDCLASSEXA);
     wc.cbWndExtra = 0;
-    wc.hbrBackground = (HBRUSH)CreateSolidBrush(RGB(0, 0, 0));
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
     wc.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);
     wc.hInstance = GetModuleHandle(nullptr);
     wc.lpfnWndProc = WndProc;
-    wc.lpszClassName = "EzFrontendDebugGUI";
+    wc.lpszClassName = className;
     wc.lpszMenuName = nullptr;
     wc.style = CS_VREDRAW | CS_HREDRAW;
 
-    ::RegisterClassEx(&wc);
-    m_guiWindow = ::CreateWindowExW(WS_EX_TRANSPARENT,
+    ::RegisterClassExA(&wc);
+
+    RECT desiredRect{ static_cast<LONG>(m_windowPos.x),
+                      static_cast<LONG>(m_windowPos.y),
+                      static_cast<LONG>(m_windowPos.x + m_windowSize.x),
+                      static_cast<LONG>(m_windowPos.y + m_windowSize.y) };
+    ::AdjustWindowRect(&desiredRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+    m_guiWindow = ::CreateWindowExA(0,
                                     className,
-                                    L"EzFrontendDebugGUI",
-                                    WS_POPUP,
-                                    int(m_windowPos.x),
-                                    int(m_windowPos.y),
-                                    int(m_windowSize.x),
-                                    int(m_windowSize.y),
+                                    "EzFrontendDebugGUI - EZ Language IDE",
+                                    WS_OVERLAPPEDWINDOW,
+                                    desiredRect.left,
+                                    desiredRect.top,
+                                    desiredRect.right - desiredRect.left,
+                                    desiredRect.bottom - desiredRect.top,
                                     nullptr,
                                     nullptr,
                                     wc.hInstance,
@@ -144,10 +155,10 @@ bool Gui::createGuiWindow()
         return false;
     }
 
-    ShowWindow(m_guiWindow, SW_SHOWDEFAULT);
-    UpdateWindow(m_guiWindow);
-
-    SetLayeredWindowAttributes(m_guiWindow, 0, 255, LWA_ALPHA);
+    ::SetWindowPos(m_guiWindow, nullptr, desiredRect.left, desiredRect.top, desiredRect.right - desiredRect.left,
+                   desiredRect.bottom - desiredRect.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    ::ShowWindow(m_guiWindow, SW_SHOWDEFAULT);
+    ::UpdateWindow(m_guiWindow);
     return true;
 }
 
@@ -161,7 +172,6 @@ bool Gui::createImGuiContext()
 
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    // io.FontGlobalScale = 1.5f;
 
     if (!ImGui_ImplWin32_Init(m_guiWindow))
     {
@@ -232,16 +242,20 @@ bool Gui::createImGuiContext()
     colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.45f, 0.45f, 0.55f, 1.00f);
 
     // Style tweaks
-    style.WindowRounding = 5.0f;
+    style.WindowRounding = 7.0f;
     style.FrameRounding = 5.0f;
     style.GrabRounding = 5.0f;
     style.TabRounding = 5.0f;
     style.PopupRounding = 5.0f;
-    style.ScrollbarRounding = 5.0f;
+    style.ScrollbarRounding = 6.0f;
     style.WindowPadding = ImVec2(10, 10);
-    style.FramePadding = ImVec2(6, 4);
+    style.FramePadding = ImVec2(8, 5);
     style.ItemSpacing = ImVec2(8, 6);
+    style.ItemInnerSpacing = ImVec2(6, 4);
     style.PopupBorderSize = 0.f;
+    style.WindowBorderSize = 1.0f;
+    style.ChildBorderSize = 1.0f;
+    style.FrameBorderSize = 0.0f;
 
     return true;
 }
@@ -354,6 +368,8 @@ void Gui::loop()
 
     std::shared_ptr<EzFrontendWrapper> frontend =
             std::make_shared<EzFrontendWrapper>(std::make_shared<SourceLoggingSink>(m_logger.get()));
+    std::shared_ptr<Editor> editor = std::make_shared<Editor>(frontend);
+    std::shared_ptr<MainMenuBar> menuBar = std::make_shared<MainMenuBar>();
 
     while (true)
     {
@@ -376,32 +392,28 @@ void Gui::loop()
         ImGui_ImplDX11_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowPos(m_windowPos);
-        ImGui::SetNextWindowSize(m_windowSize);
+        RECT clientRect{};
+        ::GetClientRect(m_guiWindow, &clientRect);
+        const ImVec2 clientPos(0.0f, 0.0f);
+        const ImVec2 clientSize(static_cast<float>(clientRect.right - clientRect.left),
+                                static_cast<float>(clientRect.bottom - clientRect.top));
+
+        ImGui::SetNextWindowPos(clientPos);
+        ImGui::SetNextWindowSize(clientSize);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
 
         if (ImGui::Begin("EzFrontendDebugGUI",
                          &opened,
                          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-                                 ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoSavedSettings))
+                                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_MenuBar))
         {
-            static std::shared_ptr<Editor> editor = std::make_shared<Editor>(frontend);
-            static std::shared_ptr<Output> output = std::make_shared<Output>(frontend->getErrorCollector());
-            static std::shared_ptr<MainMenuBar> menuBar = std::make_shared<MainMenuBar>();
-
             menuBar->render();
-            if (ImGui::BeginChild(editor->getName()))
-            {
-                editor->render();
-
-                if (ImGui::BeginChild(output->getName()))
-                {
-                    output->render();
-                }
-                ImGui::EndChild();
-            }
-            ImGui::EndChild();
+            editor->render();
         }
         ImGui::End();
+        ImGui::PopStyleVar(3);
         ImGui::Render();
 
         if (!opened)
@@ -409,7 +421,7 @@ void Gui::loop()
             break;
         }
 
-        const float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        const float clear_color[4] = { 0.04f, 0.04f, 0.05f, 1.0f };
         m_pd3dDeviceContext->OMSetRenderTargets(1, &m_mainRenderTargetView, nullptr);
         m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, clear_color);
 

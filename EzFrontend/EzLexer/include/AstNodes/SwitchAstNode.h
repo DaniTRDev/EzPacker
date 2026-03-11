@@ -22,10 +22,9 @@ class SwitchAstNode : public AstNode
     /**
      * Creates a switch node.
      *
-     * @param _default Optional default case body. May be nullptr.
      * @param switchVariable Selector variable from `switch (%var)`.
      */
-    SwitchAstNode(CodeScope *_default, Variable *switchVariable);
+    SwitchAstNode(Variable *switchVariable);
 
     /**
      * Returns AstNodeType::Switch.
@@ -69,8 +68,13 @@ class SwitchAstNode : public AstNode
      * Sets the cases of the switch.
      * @param cases
      */
-    void setCases(TypedPoolSlice<AstNode> * cases);
-    
+    void setCases(TypedPoolSlice<AstNode> *cases);
+
+    /**
+     * Sets the default scope for this switch.
+     */
+    void setDefault(CodeScope *_default);
+
   private:
     CodeScope *m_default;
     TypedPoolSlice<AstNode> *m_cases;

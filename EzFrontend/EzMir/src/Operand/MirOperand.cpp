@@ -24,6 +24,45 @@ const MirReference *MirOperand::getReference() const { return std::get_if<MirRef
 MirRegister *MirOperand::getRegister() { return std::get_if<MirRegister>(&m_data); }
 const MirRegister *MirOperand::getRegister() const { return std::get_if<MirRegister>(&m_data); }
 
+size_t MirOperand::getSize() const
+{
+    return std::visit(
+            [&](auto &&arg) -> size_t
+            {
+                using T = std::decay_t<decltype(arg)>;
+
+                if constexpr (std::is_same_v<T, MirRegister>)
+                {
+                    return arg.m_size;
+                }
+                else if constexpr (std::is_same_v<T, MirMemory>)
+                {
+                    return arg.m_size;
+                }
+                else if constexpr (std::is_same_v<T, MirInteger>)
+                {
+                    return arg.m_size;
+                }
+                else if constexpr (std::is_same_v<T, MirDouble>)
+                {
+                    return 8; // IEEE 754 double is strictly 64-bit
+                }
+                else if constexpr (std::is_same_v<T, MirReference>)
+                {
+                    return 0; // We don't know the size yet, this is a task for the backend.
+                }
+                else if constexpr (std::is_same_v<T, MirBigInteger>)
+                {
+                    return arg.m_size;
+                }
+                else
+                {
+                    return 0; // Fallback for unknown types
+                }
+            },
+            getVariant());
+}
+
 MirOperand::VariantType &MirOperand::getVariant() { return m_data; }
 
 const MirOperand::VariantType &MirOperand::getVariant() const { return m_data; }

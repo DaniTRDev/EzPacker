@@ -1,4 +1,3 @@
-
 EzCMK_AddVendor(https://github.com/ocornut/imgui
         8a944222469ab23559bc01a563f4e9b516e4e701
         imgui
@@ -52,6 +51,6 @@ set(EZFRONTEND_DEBUG_GUI_FILE_LIST
 EzCMK_AddExecutable(NAME EzFrontendDebugGUI
         FILE_LIST "${EZFRONTEND_DEBUG_GUI_FILE_LIST}"
         PRECOMPILED_HEADER "include/EzFrontendDebugGUICommon.h"
-        LINKED_LIBRARIES "EzLexer;EzFrontendVisitors;imgui;d3d11"
+        LINKED_LIBRARIES "EzLexer;EzSemantics;EzMir;EzFrontendCompiler;imgui;d3d11"
         INCLUDED_DIRS "include"
 )

@@ -1,5 +1,5 @@
 /**
- * @file EzFrontendCompilationUnitCommon.h
+ * @file EzFrontendCompilerCommon.h
  * @brief Common includes for the EzFrontendCompiler library.
  *
  * Pulls in the full EzSemantics umbrella header (which transitively includes

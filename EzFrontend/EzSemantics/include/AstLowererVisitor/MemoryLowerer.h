@@ -13,10 +13,10 @@
 #define EZPACKER_MEMORYLOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 #include "VariableLowerer.h"
 
-class MemoryLowerer : public GenericLowerer
+class MemoryLowerer : public GenericAstLowerer
 {
   public:
     /**

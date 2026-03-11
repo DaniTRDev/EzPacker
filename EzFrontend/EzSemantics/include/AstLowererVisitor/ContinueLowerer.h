@@ -11,9 +11,9 @@
 #define EZPACKER_CONTINUELOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 
-class ContinueLowerer : public GenericLowerer
+class ContinueLowerer : public GenericAstLowerer
 {
   public:
     /**

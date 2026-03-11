@@ -12,10 +12,10 @@
 #define EZPACKER_VARIABLELOWERER_H
 
 #include "EzSemanticsCommon.h"
-#include "GenericLowerer.h"
+#include "GenericAstLowerer.h"
 #include "ImmediateLowerer.h"
 
-class VariableLowerer : public GenericLowerer
+class VariableLowerer : public GenericAstLowerer
 {
   public:
     /**

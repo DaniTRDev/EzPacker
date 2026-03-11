@@ -50,8 +50,68 @@ bool TypeCheckVisitor::visit(IfAstNode *ifNode)
 
 bool TypeCheckVisitor::visit(Instruction *instr)
 {
-    // We need to manually traverse this container to infer the types of immediates.
     CallInstruction *callInstr = dynamic_cast<CallInstruction *>(instr);
+    if (callInstr)
+    {
+        Variable *callee = callInstr->getExpressions()->get<Variable>(0);
+        if (!callee)
+        {
+            m_ctx->emitError(ErrorSeverity::Fatal,
+                             "Invalid callee for call instruction",
+                             "TypeCheckVisitor",
+                             instr->getSourceRef());
+            return false;
+        }
+
+        Symbol *calleeSym = callee->getAnnotation<SymbolAnnotation>()->getSymbol();
+        Type *calleeType = calleeSym->getSymbolDataType();
+        std::vector<Type *> calleeSubTypes = calleeType->getSubTypes();
+
+        size_t expectedCalleeSubTypeCount = calleeSubTypes.size() - 1;
+        size_t currentCalleeSubTypeCount = callInstr->getExpressionCount() - 1;
+
+        if (currentCalleeSubTypeCount != expectedCalleeSubTypeCount)
+        {
+            m_ctx->emitError(ErrorSeverity::Fatal,
+                             std::format("Given {} parameters and expected {}",
+                                         currentCalleeSubTypeCount,
+                                         expectedCalleeSubTypeCount),
+                             "TypeCheckVisitor",
+                             instr->getSourceRef());
+            return false;
+        }
+
+        TypedPoolSlice<AstNode>::Iterator paramIt = callInstr->getExpressions()->begin();
+        ++paramIt;
+
+        for (size_t i = 1; i < currentCalleeSubTypeCount + 1; i++)
+        {
+            if (!paramIt)
+            {
+                m_ctx->emitError(ErrorSeverity::Fatal,
+                                 std::format("Expected parameter {} (pos {})", calleeSubTypes[i]->getTypeName(), i),
+                                 "TypeCheckVisitor",
+                                 instr->getSourceRef());
+                return false;
+            }
+
+            Type *parameterType = (*paramIt)->getAnnotation<DataTypeAnnotation>()->getDataType();
+            if (!checkCastSafety(instr, calleeSubTypes[i], parameterType))
+            {
+                m_ctx->emitError(ErrorSeverity::Fatal,
+                                 std::format("Can't perform a type cast in parameter {}", i),
+                                 "TypeCheckVisitor",
+                                 instr->getSourceRef());
+                return false;
+            }
+
+            ++paramIt;
+        }
+
+        return true;
+    }
+
+    // We need to manually traverse this container to infer the types of immediates.
     Type *targetInstructionType = nullptr;
 
     // First pass: Find the target type (usually from the first Variable or Memory operand)
@@ -59,7 +119,7 @@ bool TypeCheckVisitor::visit(Instruction *instr)
     {
         if (node->getType() == AstNodeType::Variable)
         {
-            Variable *var = static_cast<Variable *>(node);
+            Variable *var = dynamic_cast<Variable *>(node);
             Symbol *sym = var->getAnnotation<SymbolAnnotation>()->getSymbol();
             targetInstructionType = sym->getSymbolDataType();
             break;
@@ -67,16 +127,15 @@ bool TypeCheckVisitor::visit(Instruction *instr)
         else if (node->getType() == AstNodeType::MemoryOperand)
         {
             MemoryOperandAstNode *mem = dynamic_cast<MemoryOperandAstNode *>(node);
-            targetInstructionType = TypeTable::getType(mem->getReferencedMemoryDataTypeStr()).get();
+            targetInstructionType =
+                    getSemanticContext()->getTypeTable()->getType(mem->getReferencedMemoryDataTypeStr()).get();
             break;
         }
     }
 
     // Second pass: Validate all operands against this context
-    for (const void *ptr : *instr->getExpressions())
+    for (AstNode *node : *instr->getExpressions())
     {
-        AstNode *node = (AstNode *)ptr;
-
         if (node->getType() == AstNodeType::Immediate)
         {
             ImmediateOperand *imm = dynamic_cast<ImmediateOperand *>(node);
@@ -114,8 +173,7 @@ bool TypeCheckVisitor::visit(Module *module) { return module->getBody()->accept(
 
 bool TypeCheckVisitor::visit(MemoryOperandAstNode *operand)
 {
-    const std::string_view &dataTypeStr =
-            dynamic_cast<MemoryOperandAstNode *>(operand)->getReferencedMemoryDataTypeStr();
+    const std::string_view &dataTypeStr = operand->getReferencedMemoryDataTypeStr();
     if (dataTypeStr.empty())
     {
         getSemanticContext()->emitError(ErrorSeverity::Fatal,
@@ -168,22 +226,38 @@ bool TypeCheckVisitor::visit(Variable *var)
         return false;
     }
 
+    DataTypeAnnotation *annot = var->getAnnotation<DataTypeAnnotation>();
     Symbol *symbol = annotation->getSymbol();
+    TypedPool *annotPool = getSemanticContext()->getAnnotPool();
 
-    std::shared_ptr<Type> usedType = TypeTable::getType(var->getVariableDataType());
-    if (!usedType)
+    if (!annot)
     {
         // Variable didn't have attached a type, it will use symbol's type.
-        return true;
+        annot = var->createAnnotation<DataTypeAnnotation>(annotPool, symbol->getSymbolDataType());
     }
 
+    Type *usedType = annot->getDataType();
     Type *symbolDataType = symbol->getSymbolDataType();
-    if (!checkCastSafety(var, symbolDataType, usedType.get()))
+
+    if (!checkCastSafety(var, symbolDataType, usedType))
     {
         return false;
     }
 
-    var->createAnnotation<TypeCastAnnotation>(getSemanticContext()->getAnnotPool(), symbol, usedType.get());
+    if (symbol->getType() == SymbolType::GlobalVariable || symbol->getType() == SymbolType::LocalVariable)
+    {
+        if (symbolDataType->getUnderlyingType() == UnderlyingType::Void)
+        {
+            getSemanticContext()->emitError(
+                    ErrorSeverity::Fatal,
+                    std::format("Variables can't be declared with {} type", symbolDataType->getTypeName()),
+                    "TypeCheckVisitor::Variable",
+                    var->getSourceRef());
+            return false;
+        }
+    }
+
+    var->createAnnotation<TypeCastAnnotation>(annotPool, symbol, usedType);
     return true;
 }
 
@@ -196,11 +270,11 @@ bool TypeCheckVisitor::visit(SwitchAstNode *_switch)
     SymbolAnnotation *symAnnot = _switch->getSwitchVariable()->getAnnotation<SymbolAnnotation>();
     Type *switchVarType = symAnnot->getSymbol()->getSymbolDataType();
 
-    for (const void *ptr : *_switch->getCases())
+    getSemanticContext()->enterSwitch();
     {
-        getSemanticContext()->enterSwitch();
+        for (AstNode *ptr : *_switch->getCases())
         {
-            SwitchCaseAstNode *_case = (SwitchCaseAstNode *)ptr;
+            SwitchCaseAstNode *_case = dynamic_cast<SwitchCaseAstNode *>(ptr);
 
             // Check the immediate value against the switch variable's type
             if (!checkImmediateSafety(_case->getCaseValue(), switchVarType))
@@ -216,8 +290,8 @@ bool TypeCheckVisitor::visit(SwitchAstNode *_switch)
             if (!_case->accept(this))
                 return false; // Visit the body
         }
-        getSemanticContext()->exitSwitch();
     }
+    getSemanticContext()->exitSwitch();
 
     return true;
 }
@@ -267,6 +341,18 @@ bool TypeCheckVisitor::checkCastSafety(AstNode *node, Type *originalType, Type *
     }
     else
     {
+        if (originalType->getUnderlyingType() == UnderlyingType::Void ||
+            usedType->getUnderlyingType() == UnderlyingType::Void)
+        {
+            getSemanticContext()->emitError(ErrorSeverity::Fatal,
+                                            std::format("Can't perform a cast from '{}' to '{}'",
+                                                        usedType->getTypeName(),
+                                                        originalType->getTypeName()),
+                                            "TypeCheckVisitor::Variable",
+                                            node->getSourceRef());
+            return false;
+        }
+
         if (originalType->getUnderlyingType() == UnderlyingType::String)
         {
             getSemanticContext()->emitError(

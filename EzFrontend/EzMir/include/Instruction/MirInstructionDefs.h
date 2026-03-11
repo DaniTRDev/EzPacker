@@ -28,6 +28,8 @@
  * Individual flags are combined to express the semantic contract of an opcode:
  * which operands are read or written, whether memory or CPU flags are touched,
  * whether the instruction terminates a block, and so on.
+ *
+ * MirReference acts as a MEMORY operand.
  */
 enum MirInstructionFlags : uint32_t
 {
@@ -42,35 +44,37 @@ enum MirInstructionFlags : uint32_t
 
     // --- 2. Operand Constraints ---
     // Strict enforcement of what the operand can physically be.
-    Op1_MustBeReg = 1 << 4,
-    Op1_MustBeMem = 1 << 5,
-    Op2_MustBeReg = 1 << 6,
-    Op2_MustBeMem = 1 << 7,
-    Op2_MustBeImm = 1 << 8,
+    Op1_MustBeRef = 1 << 4,
+    Op1_MustBeReg = 1 << 5,
+    Op1_MustBeImm = 1 << 6,
+    Op1_MustBeMem = 1 << 7,
+    Op2_MustBeReg = 1 << 8,
+    Op2_MustBeMem = 1 << 9,
+    Op2_MustBeImm = 1 << 10,
 
     // --- 3. Type & Size Safety ---
-    SizeMatch = 1 << 9,    // Op1 and Op2 must be the exact same bit-width
-    DestLarger = 1 << 10,  // sizeof(Op1) > sizeof(Op2) (e.g., ZEXT, SEXT)
-    DestSmaller = 1 << 11, // sizeof(Op1) < sizeof(Op2) (e.g., TRUNC)
+    SizeMatch = 1 << 11,   // Op1 and Op2 must be the exact same bit-width
+    DestLarger = 1 << 12,  // sizeof(Op1) > sizeof(Op2) (e.g., ZEXT, SEXT)
+    DestSmaller = 1 << 13, // sizeof(Op1) < sizeof(Op2) (e.g., TRUNC)
 
     // --- 4. Memory Semantics ---
     // Differentiates between instructions that calculate addresses (LEA) vs touch RAM (LOAD)
-    ReadsMemory = 1 << 12,  // Reads from RAM
-    WritesMemory = 1 << 13, // Writes to RAM
+    ReadsMemory = 1 << 14,  // Reads from RAM
+    WritesMemory = 1 << 15, // Writes to RAM
 
     // --- 5. Control Flow & Graph Building ---
-    IsTerminator = 1 << 14, // Ends a Basic Block (JMP, RET, HALT)
-    IsBranch = 1 << 15,     // Conditional Control Flow (JE, JNE)
-    IsCall = 1 << 16,       // Function Call (Implies caller-saved registers are clobbered)
-    IsReturn = 1 << 17,     // Returns from function
+    IsTerminator = 1 << 16, // Ends a Basic Block (JMP, RET, HALT)
+    IsBranch = 1 << 17,     // Conditional Control Flow (JE, JNE)
+    IsCall = 1 << 18,       // Function Call (Implies caller-saved registers are clobbered)
+    IsReturn = 1 << 19,     // Returns from function
 
     // --- 6. Optimization Barriers ---
-    HasSideEffect = 1 << 18, // Cannot be optimized away or reordered (SYSCALL, Volatile)
+    HasSideEffect = 1 << 20, // Cannot be optimized away or reordered (SYSCALL, Volatile)
 
     // --- 7. CPU Status Flags (Implicit State) ---
     // Critical for preventing optimizations from breaking conditional jumps
-    ReadsCPUFlags = 1 << 19,  // Depends on previous CMP/TEST (e.g., JE, CMOV)
-    WritesCPUFlags = 1 << 20, // Overwrites CPU flags (e.g., ADD, CMP, AND)
+    ReadsCPUFlags = 1 << 21,  // Depends on previous CMP/TEST (e.g., JE, CMOV)
+    WritesCPUFlags = 1 << 22, // Overwrites CPU flags (e.g., ADD, CMP, AND)
 
     // ==========================================
     // --- Composite Shortcuts ---
@@ -78,9 +82,10 @@ enum MirInstructionFlags : uint32_t
     // ==========================================
 
     // Operand combinations
-    Op1_MustBeMemOrReg = Op1_MustBeMem | Op1_MustBeReg,
-    Op2_MustBeMemOrReg = Op2_MustBeMem | Op2_MustBeReg,
-    Op2_MustBeRegOrImm = Op1_MustBeReg | Op2_MustBeImm,
+    Op1_MustBeRegOrImm = 1 << 23,
+    Op1_MustBeMemOrReg = 1 << 24,
+    Op2_MustBeMemOrReg = 1 << 25,
+    Op2_MustBeRegOrImm = 1 << 26,
 
     // Standard Math (e.g., ADD x, y -> x = x + y)
     ReadWrite = Op1_Read | Op1_Write | Op2_Read,

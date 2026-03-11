@@ -1,45 +1,12 @@
 #include "Views/Output.h"
 
-Output::Output(const std::shared_ptr<ErrorCollector> &errorCollector) : m_errorCollector(errorCollector)
-{
-    errorCollector->addPipe(
-            { .m_onErrorCallback =
-                      [this](LogMessage msg)
-              {
-                  m_errors.push_back(std::move(msg));
-              },
-
-              .m_onInfoCallback =
-                      [this](LogMessage msg)
-              {
-                  m_info.push_back(std::move(msg));
-              } });
-}
+Output::Output(const std::shared_ptr<ErrorCollector> &errorCollector) : m_errorCollector(errorCollector) {}
 
 const char *Output::getName() { return "Output"; }
 
 void Output::render()
 {
-    if (ImGui::BeginTabBar("Output"))
-    {
-        if (ImGui::BeginTabItem("Errors"))
-        {
-            for (auto &msg : m_errors)
-            {
-                ImGui::Text(msg.getRawMessage().c_str());
-            }
-            ImGui::EndTabItem();
-        }
-
-        if (ImGui::BeginTabItem("Information"))
-        {
-            for (auto &msg : m_info)
-            {
-                ImGui::Text(msg.getRawMessage().c_str());
-            }
-            ImGui::EndTabItem();
-        }
-
-        ImGui::EndTabBar();
-    }
+    ImGui::TextUnformatted("Diagnostics are integrated in the IDE bottom panel.");
+    ImGui::TextDisabled("This auxiliary view is kept for compatibility with the existing GUI shell.");
+    ImGui::Text("Error collector attached: %s", m_errorCollector ? "yes" : "no");
 }

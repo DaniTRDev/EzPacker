@@ -86,72 +86,56 @@ EzCMK_ConfigureLib(NAME "EzLexer"
         LINKED_LIBRARIES "EzCore;EzLogger;libtommath"
         INCLUDED_DIRS "include")
 
-EzPacker_AddTest(
-        "TokenizerTest"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Tokenizer/TokenizerTest.cpp;tests/Tokenizer/TokenizerTestFixture.h;tests/Tokenizer/TokenizerTestFixture.cpp"
-)
+if (EZPACKER_BUILD_TESTS)
+    message(STATUS "Building tests for EzLexer")
 
-EzPacker_AddTest(
-        "ParsersTest_Immediate"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestImmediate.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_BasicTokenizer"
+            "EzLexer"
+            ""
+            "tests/T_BasicTokenizer.cpp"
+    )
 
-EzPacker_AddTest(
-        "ParsersTest_Variable"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestVariable.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_InstructionParser"
+            "EzLexer"
+            ""
+            "tests/T_InstructionParser.cpp"
+    )
 
-EzPacker_AddTest(
-        "ParsersTest_Memory"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestMemory.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_ModuleParser"
+            "EzLexer"
+            ""
+            "tests/T_ModuleParser.cpp"
+    )
 
-EzPacker_AddTest(
-        "ParsersTest_Instruction"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestInstruction.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_VariableParser"
+            "EzLexer"
+            ""
+            "tests/T_VariableParser.cpp"
+    )
 
-EzPacker_AddTest(
-        "ParsersTest_Label"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestLabel.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_MemoryParser"
+            "EzLexer"
+            ""
+            "tests/T_MemoryParser.cpp"
+    )
 
-EzPacker_AddTest(
-        "ParsersTest_Module"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestModule.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_ControlFlowParsers"
+            "EzLexer"
+            ""
+            "tests/T_ControlFlowParsers.cpp"
+    )
 
-EzPacker_AddTest(
-        "ParsersTest_Condition"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestCondition.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
+    EzPacker_AddTest(
+            "T_ParserBatch"
+            "EzLexer"
+            ""
+            "tests/T_ParserBatch.cpp"
+    )
+endif ()
 
-EzPacker_AddTest(
-        "ParsersTest_If"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestIf.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)
-
-EzPacker_AddTest(
-        "ParsersTest_While"
-        "EzLexer;gtest_main"
-        ""
-        "tests/Parsers/ParsersTestWhile.cpp;tests/Parsers/ParsersTestFixture.h;tests/Parsers/ParsersTestFixture.cpp"
-)

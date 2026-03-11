@@ -1,7 +1,7 @@
 #include "AstNodes/SwitchAstNode.h"
 
-SwitchAstNode::SwitchAstNode(CodeScope *_default, Variable *switchVariable) :
-    m_default(_default), m_cases(nullptr), m_switchVariable(switchVariable)
+SwitchAstNode::SwitchAstNode(Variable *switchVariable) :
+    m_default(nullptr), m_cases(nullptr), m_switchVariable(switchVariable)
 {
 }
 
@@ -25,3 +25,5 @@ TypedPoolSlice<AstNode> *SwitchAstNode::getCases() { return m_cases; }
 Variable *SwitchAstNode::getSwitchVariable() { return m_switchVariable; }
 
 void SwitchAstNode::setCases(TypedPoolSlice<AstNode> *cases) { m_cases = cases; }
+
+void SwitchAstNode::setDefault(CodeScope *_default) { m_default = _default; }

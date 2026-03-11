@@ -3,16 +3,7 @@
 bool ImmediateLowerer::lower(AstNode *node, LoweringContext *ctx)
 {
     ImmediateOperand *imm = dynamic_cast<ImmediateOperand *>(node);
-    Type *type = nullptr;
-
-    if (imm->getAnnotation<DataTypeAnnotation>())
-    {
-        type = imm->getAnnotation<DataTypeAnnotation>()->getDataType();
-    }
-    else
-    {
-        type = imm->getAnnotation<TypeCastAnnotation>()->getCastedDataType();
-    }
+    Type *type = imm->getAnnotation<DataTypeAnnotation>()->getDataType();
 
     switch (imm->getImmediateType())
     {
@@ -23,7 +14,8 @@ bool ImmediateLowerer::lower(AstNode *node, LoweringContext *ctx)
             if (type->getUnderlyingTypeSize() <= UnderlyingTypeSize::_64bits)
             {
                 int64_t value = mp_get_i64(integer->getInteger());
-                ctx->pushOperand(MirInteger{ .m_value = value });
+                ctx->pushOperand(MirInteger{ .m_value = value,
+                                             .m_size = static_cast<size_t>(type->getUnderlyingTypeSize()) / 8 });
             }
             else
             {
@@ -32,7 +24,7 @@ bool ImmediateLowerer::lower(AstNode *node, LoweringContext *ctx)
                 MirGlobalDataEntry *entry =
                         ctx->getGlobalDataEmitter()->createGlobalData(encoded.data(), encoded.size());
 
-                ctx->pushOperand(MirReference{ .m_refId = entry->m_entryId });
+                ctx->pushOperand(MirBigInteger{ .m_constantId = entry->m_entryId, .m_size = entry->m_dataSize });
             }
             break;
         }

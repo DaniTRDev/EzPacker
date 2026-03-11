@@ -7,9 +7,8 @@
 #define EZPACKER_EDITOR_H
 
 #include "EzFrontendDebugGUICommon.h"
-#include "Views/IView.h"
 #include "Frontend/EzFrontendWrapper.h"
-#include "Views/Output.h"
+#include "Views/IView.h"
 
 class Editor : public IView
 {
@@ -18,7 +17,7 @@ class Editor : public IView
      * Creates the frontend editor linked to given frontend instance and logging sink.
      * @param frontend
      */
-    Editor(std::shared_ptr<EzFrontendWrapper> frontend);
+    explicit Editor(std::shared_ptr<EzFrontendWrapper> frontend);
 
     /**
      * Returns "Editor".
@@ -32,34 +31,42 @@ class Editor : public IView
     void render() override;
 
   private:
-    /**
-     * Renders any error as a sub-window.
-     */
-    void renderErrorWindow();
+    static constexpr size_t c_editorBufferSize = 1024 * 1024;
 
-    /**
-     * Renders the content of the file as a sub-window.
-     */
-    void renderFileContent();
+    bool promptOpenFile();
+    bool promptSaveFileAs();
+    bool saveCurrentFile();
+    bool compileCurrentBuffer();
 
-    /**
-     * Renders the result of the tokenizer as a sub-window.
-     */
+    void syncEditorBufferFromSource(const std::string &source);
+    std::string getEditorText() const;
+
+    void renderToolbar();
+    void renderWorkspace();
+    void renderProjectPanel();
+    void renderEditorPanel();
+    void renderInspectorPanel();
+    void renderDiagnosticsPanel();
+
+    void renderPipelineStages();
+    void renderIncludedFiles();
     void renderTokenizer();
-
-    /**
-     * Renders the result of the parser as a sub-window.
-     */
     void renderParser();
+    void renderSemantics();
+    void renderMir();
+
+    void renderAstNodeTree(AstNode *node, const std::string &label);
+    void renderScopeTree(const Scope *scope, const char *label, bool includeParents = true);
+
+    std::string formatSeverity(ErrorSeverity severity) const;
+    std::string formatSourceReference(const SourceReference &sourceRef) const;
+    std::string formatOperand(const MirOperand &operand) const;
 
   private:
-    bool m_error;
-    bool m_isFileOpened;
-    bool m_isFileParsed;
-    size_t m_fileContentSize;
-    std::filesystem::path m_openedFilePath;
     std::shared_ptr<EzFrontendWrapper> m_frontend;
-    std::string m_fileContent;
+    std::array<char, c_editorBufferSize> m_editorBuffer{};
+    std::string m_statusMessage;
+    bool m_dirty{ false };
 };
 
 #endif // EZPACKER_EDITOR_H

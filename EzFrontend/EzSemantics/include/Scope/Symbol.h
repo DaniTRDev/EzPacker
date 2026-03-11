@@ -51,46 +51,46 @@ class Symbol
     AstNode *getDefiningNode() const;
 
     /**
-     * Returns a textual name for the symbol's declared data type.
-     *
-     * This is meaningful only when the symbol has an associated type.
-     */
-    const char *getSymbolDataTypeName() const;
-
-    /**
      * Returns a textual name for this symbol's semantic category.
      */
     const char *getSymbolTypeName() const;
-
+    
     /**
      * Converts a `SymbolType` enum value to its human-readable string name.
      */
     static const char *getSymbolTypeAsString(SymbolType symbolType);
-
+    
     /**
      * Returns the context-wide unique ID assigned to this symbol.
      */
     size_t getId() const;
-
+    
     /**
      * Returns the semantic category of this symbol.
      */
     SymbolType getType() const;
-
+    
     /**
      * Returns the declared data type associated with this symbol, if any.
      */
     Type *getSymbolDataType();
-
+    
     /**
      * Sets the unique ID assigned by the semantic context.
      */
     void setId(size_t id);
-
+    
     /**
      * Returns the source-level name of the symbol.
      */
     const std::string_view &getName() const;
+    
+    /**
+     * Returns a textual name for the symbol's declared data type.
+     *
+     * This is meaningful only when the symbol has an associated type.
+     */
+    std::string_view getSymbolDataTypeName() const;
 
   private:
     AstNode *m_definingNode; // Where this symbol was firstly defined.
