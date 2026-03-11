@@ -107,10 +107,21 @@ void Gui::onResize(int width, int height)
                                     DXGI_FORMAT_UNKNOWN,
                                     0);
         createRenderTarget();
+        
+        // Update viewport
+        D3D11_VIEWPORT vp;
+        vp.Width = (FLOAT)width;
+        vp.Height = (FLOAT)height;
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        vp.TopLeftX = 0;
+        vp.TopLeftY = 0;
+        m_pd3dDeviceContext->RSSetViewports(1, &vp);
     }
 #elif defined(__linux__)
     // GLFW/OpenGL resize is typically handled by glViewport in the render loop or callback
     // ImGui handles window size automatically via IO.DisplaySize
+    glViewport(0, 0, width, height);
 #endif
 }
 
@@ -149,10 +160,7 @@ bool Gui::createDeviceD3D()
         return false;
     }
 
-    ID3D11Texture2D *pBackBuffer;
-    m_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    m_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_mainRenderTargetView);
-    pBackBuffer->Release();
+    createRenderTarget();
     return true;
 }
 
