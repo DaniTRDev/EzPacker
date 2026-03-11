@@ -53,7 +53,7 @@ class MirEmitterContext : public ErrorEmitter
      * Returns `true` if the given type ID exists in the MIR type table.
      */
     bool doesTypeExist(size_t typeId) const;
-    
+
     /**
      * Returns `true` if the given type name exists in the MIR type table.
      */
@@ -145,6 +145,11 @@ class MirEmitterContext : public ErrorEmitter
 
     /** Returns the list of functions created in this context. */
     TypedPoolSlice<MirFunction> *getFunctionList() const;
+
+    /**
+     * Returns the type list defined in this context.
+     */
+    TypedPoolSlice<MirType> *getTypeList() const;
 
   private:
     MirId m_currentId; // Next MIR ID to issue; 0 is reserved as invalid.

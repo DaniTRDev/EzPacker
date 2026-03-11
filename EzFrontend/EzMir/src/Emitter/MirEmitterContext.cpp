@@ -136,3 +136,5 @@ TypedPool *MirEmitterContext::getTypePool() { return &m_typePool; }
 TypedArrayPool<uint8_t> *MirEmitterContext::getEntryDataPool() { return &m_dataPool; }
 
 TypedPoolSlice<MirFunction> *MirEmitterContext::getFunctionList() const { return m_functionList; }
+
+TypedPoolSlice<MirType> *MirEmitterContext::getTypeList() const { return m_typeList; }

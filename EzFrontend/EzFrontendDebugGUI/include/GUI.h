@@ -45,6 +45,13 @@ class Gui
     bool uninitialize();
 
     /**
+     * Handles window resize event.
+     * @param width
+     * @param height
+     */
+    void onResize(int width, int height);
+
+    /**
      * Executes the main loop of the GUI.
      */
     void loop();
@@ -58,6 +65,7 @@ class Gui
 
     Gui(const Gui &copy) = default;
 
+#ifdef _WIN32
     /**
      * Creates the D3D device for the current windows and returns true if succeeded.
      * @return bool
@@ -69,12 +77,6 @@ class Gui
      * @return bool
      */
     bool createGuiWindow();
-
-    /**
-     * Attaches ImGui to the created window and D3D device and returns true if succeeded.
-     * @return bool
-     */
-    bool createImGuiContext();
 
     /**
      * Creates a render target for the given device and swapchain, returns true if succeeded.
@@ -95,12 +97,6 @@ class Gui
     bool destroyGuiWindow();
 
     /**
-     * Destroys the current imgui context attached to the windows and d3d device and returns true if succeeded.
-     * @return bool
-     */
-    bool destroyImGuiContext();
-
-    /**
      * Destroys the render target and returns true if succeeded.
      * @return bool
      */
@@ -116,15 +112,39 @@ class Gui
      */
     static LRESULT WndProc(HWND hwnd, UINT code, WPARAM msg, LPARAM lparam);
 
+#elif defined(__linux__)
+
+    bool createGlfwWindow();
+    bool destroyGlfwWindow();
+
+#endif
+
+    /**
+     * Attaches ImGui to the created window and D3D device and returns true if succeeded.
+     * @return bool
+     */
+    bool createImGuiContext();
+
+    /**
+     * Destroys the current imgui context attached to the windows and d3d device and returns true if succeeded.
+     * @return bool
+     */
+    bool destroyImGuiContext();
+
   private:
     bool m_initialized;
+    ImVec2 m_windowPos;
+    ImVec2 m_windowSize;
+
+#ifdef _WIN32
     HWND m_guiWindow;
     ID3D11Device *m_pd3dDevice;
     ID3D11DeviceContext *m_pd3dDeviceContext;
     IDXGISwapChain *m_pSwapChain;
     ID3D11RenderTargetView *m_mainRenderTargetView;
-    ImVec2 m_windowPos;
-    ImVec2 m_windowSize;
+#elif defined(__linux__)
+    GLFWwindow *m_window;
+#endif
 
     std::shared_ptr<Logger> m_logger;
 };

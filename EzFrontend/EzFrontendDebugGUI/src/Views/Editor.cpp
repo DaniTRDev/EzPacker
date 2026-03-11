@@ -17,6 +17,7 @@ void Editor::render()
 
 bool Editor::promptOpenFile()
 {
+#ifdef _WIN32
     OPENFILENAMEA ofn{};
     char fileName[MAX_PATH] = {};
     ofn.lStructSize = sizeof(ofn);
@@ -42,10 +43,15 @@ bool Editor::promptOpenFile()
     m_statusMessage = std::format("Opened '{}'", m_frontend->getLoadedFilePath().string());
     compileCurrentBuffer();
     return true;
+#else
+    m_statusMessage = "File dialogs not supported on this platform yet.";
+    return false;
+#endif
 }
 
 bool Editor::promptSaveFileAs()
 {
+#ifdef _WIN32
     OPENFILENAMEA ofn{};
     char fileName[MAX_PATH] = {};
     ofn.lStructSize = sizeof(ofn);
@@ -72,6 +78,10 @@ bool Editor::promptSaveFileAs()
     m_dirty = false;
     m_statusMessage = std::format("Saved '{}'", fileName);
     return true;
+#else
+    m_statusMessage = "File dialogs not supported on this platform yet.";
+    return false;
+#endif
 }
 
 bool Editor::saveCurrentFile()
@@ -465,74 +475,147 @@ void Editor::renderMir()
     }
 
     MirEmitterContext *mirContext = unit->getMirEmitterContext().get();
-    auto *functionList = mirContext->getFunctionList();
-    if (!functionList || functionList->m_numElems == 0)
+    
+    //
+    // Render Type Table
+    //
+    if (ImGui::CollapsingHeader("Type Table", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ImGui::TextDisabled("No MIR functions available.");
-        ImGui::EndTabItem();
-        return;
-    }
-
-    int functionIndex = 0;
-    for (MirFunction *function : *functionList)
-    {
-        MirType *returnType = mirContext->getMirTypeById(function->getReturnTypeId());
-        const std::string label =
-                std::format("fn#{} (id={}, return={})",
-                            functionIndex++,
-                            function->getId(),
-                            returnType ? std::string(returnType->getName()) : std::string("<invalid>"));
-
-        if (ImGui::TreeNode(label.c_str()))
+        TypedPoolSlice<MirType> *typeList = mirContext->getTypeList();
+        if (typeList && typeList->m_numElems > 0)
         {
-            ImGui::Text("Entry block: %zu", function->getEntryPoint() ? function->getEntryPoint()->getId() : 0ull);
-            ImGui::Text("Parameters: %zu", function->getParameters() ? function->getParameters()->m_numElems : 0ull);
-
-            if (function->getBlocks())
+            if (ImGui::BeginTable("##mir-types", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
             {
-                for (MirBlock *block : *function->getBlocks())
+                ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 40.0f);
+                ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Kind", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+                ImGui::TableSetupColumn("Details", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableHeadersRow();
+
+                for (MirType *type : *typeList)
                 {
-                    const std::string blockLabel = std::format("block {}", block->getId());
-                    if (ImGui::TreeNode(blockLabel.c_str()))
+                    ImGui::TableNextRow();
+                    
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%zu", type->getId());
+
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s", type->getName().empty() ? "<anon>" : std::string(type->getName()).c_str());
+                    
+                    ImGui::TableNextColumn();
+                    const char* kindStr = "Unknown";
+                    switch(type->getKind()) {
+                        case MirTypeKind::Invalid: kindStr = "Invalid"; break;
+                        case MirTypeKind::Integer: kindStr = "Integer"; break;
+                        case MirTypeKind::FloatingPoint: kindStr = "Float"; break;
+                        case MirTypeKind::Pointer: kindStr = "Pointer"; break;
+                        case MirTypeKind::Array: kindStr = "Array"; break;
+                        case MirTypeKind::Void: kindStr = "Void"; break;
+                    }
+                    ImGui::Text("%s", kindStr);
+
+                    ImGui::TableNextColumn();
+                    if (type->getSubTypes() && type->getSubTypes()->m_numElems > 0)
                     {
-                        if (block->getInstructions())
-                        {
-                            int instructionIndex = 0;
-                            for (MirInstruction *instruction : *block->getInstructions())
-                            {
-                                const MirInstructionMetadata &metadata = instruction->getMetadata();
-                                const std::string instructionLabel =
-                                        std::format("{}: {}", instructionIndex++, metadata.m_name);
-                                if (ImGui::TreeNode(instructionLabel.c_str()))
-                                {
-                                    ImGui::Text("Opcode: %d", static_cast<int>(instruction->getOpCode()));
-                                    ImGui::Text("Flags: 0x%X", instruction->getFlags());
-                                    if (instruction->getOperands() && instruction->getOperands()->m_numElems > 0)
-                                    {
-                                        int operandIndex = 0;
-                                        for (MirOperand *operand : *instruction->getOperands())
-                                        {
-                                            if (operand)
-                                            {
-                                                ImGui::BulletText("op%d = %s",
-                                                                  operandIndex++,
-                                                                  formatOperand(*operand).c_str());
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        ImGui::TextDisabled("No operands");
-                                    }
-                                    ImGui::TreePop();
-                                }
-                            }
-                        }
-                        ImGui::TreePop();
+                         // Just listing subtype IDs for brevity
+                         std::string subTypeIds;
+                         for (MirType* sub : *type->getSubTypes())
+                         {
+                             if (!subTypeIds.empty()) subTypeIds += ", ";
+                             subTypeIds += std::to_string(sub->getId());
+                         }
+                         ImGui::Text("SubTypes: [%s]", subTypeIds.c_str());
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("-");
                     }
                 }
+                ImGui::EndTable();
             }
-            ImGui::TreePop();
+        }
+        else
+        {
+            ImGui::TextDisabled("No types registered.");
+        }
+    }
+    
+    ImGui::Separator();
+    
+    //
+    // Render Functions
+    //
+    if (ImGui::CollapsingHeader("Functions", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        auto *functionList = mirContext->getFunctionList();
+        if (!functionList || functionList->m_numElems == 0)
+        {
+            ImGui::TextDisabled("No MIR functions available.");
+        }
+        else
+        {
+            int functionIndex = 0;
+            for (MirFunction *function : *functionList)
+            {
+                MirType *returnType = mirContext->getMirTypeById(function->getReturnTypeId());
+                const std::string label =
+                        std::format("fn#{} (id={}, return={})",
+                                    functionIndex++,
+                                    function->getId(),
+                                    returnType ? std::string(returnType->getName()) : std::string("<invalid>"));
+
+                if (ImGui::TreeNode(label.c_str()))
+                {
+                    ImGui::Text("Entry block: %zu", function->getEntryPoint() ? function->getEntryPoint()->getId() : 0ull);
+                    ImGui::Text("Parameters: %zu", function->getParameters() ? function->getParameters()->m_numElems : 0ull);
+
+                    if (function->getBlocks())
+                    {
+                        for (MirBlock *block : *function->getBlocks())
+                        {
+                            const std::string blockLabel = std::format("block {}", block->getId());
+                            if (ImGui::TreeNode(blockLabel.c_str()))
+                            {
+                                if (block->getInstructions())
+                                {
+                                    int instructionIndex = 0;
+                                    for (MirInstruction *instruction : *block->getInstructions())
+                                    {
+                                        const MirInstructionMetadata &metadata = instruction->getMetadata();
+                                        const std::string instructionLabel =
+                                                std::format("{}: {}", instructionIndex++, metadata.m_name);
+                                        if (ImGui::TreeNode(instructionLabel.c_str()))
+                                        {
+                                            ImGui::Text("Opcode: %d", static_cast<int>(instruction->getOpCode()));
+                                            ImGui::Text("Flags: 0x%X", instruction->getFlags());
+                                            if (instruction->getOperands() && instruction->getOperands()->m_numElems > 0)
+                                            {
+                                                int operandIndex = 0;
+                                                for (MirOperand *operand : *instruction->getOperands())
+                                                {
+                                                    if (operand)
+                                                    {
+                                                        ImGui::BulletText("op%d = %s",
+                                                                          operandIndex++,
+                                                                          formatOperand(*operand).c_str());
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                ImGui::TextDisabled("No operands");
+                                            }
+                                            ImGui::TreePop();
+                                        }
+                                    }
+                                }
+                                ImGui::TreePop();
+                            }
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+            }
         }
     }
 

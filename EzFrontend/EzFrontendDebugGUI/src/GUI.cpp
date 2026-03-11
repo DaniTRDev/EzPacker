@@ -1,15 +1,23 @@
 #include "GUI.h"
 
-Gui::Gui() :
-    m_initialized(false), m_guiWindow(nullptr), m_pd3dDevice(nullptr), m_pd3dDeviceContext(nullptr),
-    m_mainRenderTargetView(nullptr), m_windowPos(120.0f, 80.0f), m_windowSize(1600.0f, 960.0f), m_pSwapChain(nullptr)
+Gui::Gui() : m_initialized(false), m_windowPos(120.0f, 80.0f), m_windowSize(1600.0f, 960.0f)
 {
+#ifdef _WIN32
+    m_guiWindow = nullptr;
+    m_pd3dDevice = nullptr;
+    m_pd3dDeviceContext = nullptr;
+    m_mainRenderTargetView = nullptr;
+    m_pSwapChain = nullptr;
+
     const float screenWidth = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
     const float screenHeight = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
     m_windowSize.x = std::min(m_windowSize.x, screenWidth - 120.0f);
     m_windowSize.y = std::min(m_windowSize.y, screenHeight - 120.0f);
     m_windowPos.x = std::max(40.0f, (screenWidth - m_windowSize.x) * 0.5f);
     m_windowPos.y = std::max(40.0f, (screenHeight - m_windowSize.y) * 0.5f);
+#elif defined(__linux__)
+    m_window = nullptr;
+#endif
 }
 
 Gui &Gui::get()
@@ -22,6 +30,7 @@ bool Gui::initialize(std::shared_ptr<Logger> logger)
 {
     m_logger = std::move(logger);
 
+#ifdef _WIN32
     if (!createGuiWindow())
     {
         return false;
@@ -36,6 +45,12 @@ bool Gui::initialize(std::shared_ptr<Logger> logger)
     {
         return false;
     }
+#elif defined(__linux__)
+    if (!createGlfwWindow())
+    {
+        return false;
+    }
+#endif
 
     if (!createImGuiContext())
     {
@@ -57,6 +72,7 @@ bool Gui::uninitialize()
         return false;
     }
 
+#ifdef _WIN32
     if (!destroyDeviceD3D())
     {
         return false;
@@ -66,10 +82,39 @@ bool Gui::uninitialize()
     {
         return false;
     }
+#elif defined(__linux__)
+    if (!destroyGlfwWindow())
+    {
+        return false;
+    }
+#endif
 
     return true;
 }
 
+void Gui::onResize(int width, int height)
+{
+    if (!m_initialized)
+        return;
+
+#ifdef _WIN32
+    if (m_pd3dDevice != nullptr)
+    {
+        destroyRenderTarget();
+        m_pSwapChain->ResizeBuffers(0,
+                                    (UINT)width,
+                                    (UINT)height,
+                                    DXGI_FORMAT_UNKNOWN,
+                                    0);
+        createRenderTarget();
+    }
+#elif defined(__linux__)
+    // GLFW/OpenGL resize is typically handled by glViewport in the render loop or callback
+    // ImGui handles window size automatically via IO.DisplaySize
+#endif
+}
+
+#ifdef _WIN32
 bool Gui::createDeviceD3D()
 {
     if (!m_guiWindow)
@@ -162,6 +207,139 @@ bool Gui::createGuiWindow()
     return true;
 }
 
+bool Gui::createRenderTarget()
+{
+    ID3D11Texture2D *pBackBuffer = nullptr;
+    m_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
+    m_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_mainRenderTargetView);
+    pBackBuffer->Release();
+    return true;
+}
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+LRESULT Gui::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
+        return true;
+
+    auto &gui = Gui::get();
+
+    switch (msg)
+    {
+        case WM_SIZE:
+        {
+            if (gui.isInitialized() && wparam != SIZE_MINIMIZED)
+            {
+                gui.onResize((UINT)LOWORD(lparam), (UINT)HIWORD(lparam));
+            }
+            return 0;
+        }
+        case WM_DESTROY:
+        {
+            PostQuitMessage(0);
+            return 0;
+        }
+        case WM_SYSCOMMAND:
+        {
+            if ((wparam & 0xfff0) == SC_KEYMENU)
+                return 0;
+            break;
+        }
+        default:
+            break;
+    }
+    return DefWindowProc(hwnd, msg, wparam, lparam);
+}
+
+bool Gui::destroyDeviceD3D()
+{
+    if (m_mainRenderTargetView)
+    {
+        m_mainRenderTargetView->Release();
+        m_mainRenderTargetView = nullptr;
+    }
+    if (m_pSwapChain)
+    {
+        m_pSwapChain->Release();
+        m_pSwapChain = nullptr;
+    }
+    if (m_pd3dDeviceContext)
+    {
+        m_pd3dDeviceContext->Release();
+        m_pd3dDeviceContext = nullptr;
+    }
+    if (m_pd3dDevice)
+    {
+        m_pd3dDevice->Release();
+        m_pd3dDevice = nullptr;
+    }
+
+    return true;
+}
+
+bool Gui::destroyGuiWindow() { return DestroyWindow(m_guiWindow); }
+
+bool Gui::destroyRenderTarget()
+{
+    if (m_mainRenderTargetView)
+    {
+        m_mainRenderTargetView->Release();
+        m_mainRenderTargetView = nullptr;
+    }
+    return true;
+}
+
+#endif // _WIN32
+
+#ifdef __linux__
+static void glfw_error_callback(int error, const char *description)
+{
+    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+}
+
+static void glfw_resize_callback(GLFWwindow* window, int width, int height)
+{
+     Gui::get().onResize(width, height);
+}
+
+bool Gui::createGlfwWindow()
+{
+    glfwSetErrorCallback(glfw_error_callback);
+    if (!glfwInit())
+        return false;
+
+    // GL 3.0 + GLSL 130
+    const char *glsl_version = "#version 130";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+
+    m_window = glfwCreateWindow((int)m_windowSize.x,
+                                (int)m_windowSize.y,
+                                "EzFrontendDebugGUI - EZ Language IDE",
+                                NULL,
+                                NULL);
+    if (m_window == NULL)
+        return false;
+
+    glfwMakeContextCurrent(m_window);
+    glfwSwapInterval(1); // Enable vsync
+    
+    glfwSetFramebufferSizeCallback(m_window, glfw_resize_callback);
+
+    return true;
+}
+
+bool Gui::destroyGlfwWindow()
+{
+    glfwDestroyWindow(m_window);
+    glfwTerminate();
+    return true;
+}
+#endif // __linux__
+
 bool Gui::createImGuiContext()
 {
     IMGUI_CHECKVERSION();
@@ -173,6 +351,7 @@ bool Gui::createImGuiContext()
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+#ifdef _WIN32
     if (!ImGui_ImplWin32_Init(m_guiWindow))
     {
         return false;
@@ -182,6 +361,16 @@ bool Gui::createImGuiContext()
     {
         return false;
     }
+#elif defined(__linux__)
+    if (!ImGui_ImplGlfw_InitForOpenGL(m_window, true))
+    {
+        return false;
+    }
+    if (!ImGui_ImplOpenGL3_Init("#version 130"))
+    {
+        return false;
+    }
+#endif
 
     ImGuiStyle &style = ImGui::GetStyle();
     ImVec4 *colors = style.Colors;
@@ -260,104 +449,17 @@ bool Gui::createImGuiContext()
     return true;
 }
 
-bool Gui::createRenderTarget()
-{
-    ID3D11Texture2D *pBackBuffer = nullptr;
-    m_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    m_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &m_mainRenderTargetView);
-    pBackBuffer->Release();
-    return true;
-}
-
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-LRESULT Gui::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
-    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
-        return true;
-
-    auto &gui = Gui::get();
-
-    switch (msg)
-    {
-        case WM_SIZE:
-        {
-            if (gui.isInitialized() && wparam != SIZE_MINIMIZED)
-            {
-                if (gui.m_pd3dDevice != nullptr)
-                {
-                    gui.destroyRenderTarget();
-                    gui.m_pSwapChain->ResizeBuffers(0,
-                                                    (UINT)LOWORD(lparam),
-                                                    (UINT)HIWORD(lparam),
-                                                    DXGI_FORMAT_UNKNOWN,
-                                                    0);
-                    gui.createRenderTarget();
-                }
-            }
-            return 0;
-        }
-        case WM_DESTROY:
-        {
-            PostQuitMessage(0);
-            return 0;
-        }
-        case WM_SYSCOMMAND:
-        {
-            if ((wparam & 0xfff0) == SC_KEYMENU)
-                return 0;
-            break;
-        }
-        default:
-            break;
-    }
-    return DefWindowProc(hwnd, msg, wparam, lparam);
-}
-
-bool Gui::destroyDeviceD3D()
-{
-    if (m_mainRenderTargetView)
-    {
-        m_mainRenderTargetView->Release();
-        m_mainRenderTargetView = nullptr;
-    }
-    if (m_pSwapChain)
-    {
-        m_pSwapChain->Release();
-        m_pSwapChain = nullptr;
-    }
-    if (m_pd3dDeviceContext)
-    {
-        m_pd3dDeviceContext->Release();
-        m_pd3dDeviceContext = nullptr;
-    }
-    if (m_pd3dDevice)
-    {
-        m_pd3dDevice->Release();
-        m_pd3dDevice = nullptr;
-    }
-
-    return true;
-}
-
-bool Gui::destroyGuiWindow() { return DestroyWindow(m_guiWindow); }
-
 bool Gui::destroyImGuiContext()
 {
+#ifdef _WIN32
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
+#elif defined(__linux__)
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+#endif
     ImGui::DestroyContext();
 
-    return true;
-}
-
-bool Gui::destroyRenderTarget()
-{
-    if (m_mainRenderTargetView)
-    {
-        m_mainRenderTargetView->Release();
-        m_mainRenderTargetView = nullptr;
-    }
     return true;
 }
 
@@ -373,6 +475,7 @@ void Gui::loop()
 
     while (true)
     {
+#ifdef _WIN32
         MSG msg;
         while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
         {
@@ -384,19 +487,38 @@ void Gui::loop()
                 break;
             }
         }
+#elif defined(__linux__)
+        glfwPollEvents();
+        if (glfwWindowShouldClose(m_window))
+        {
+            exit = true;
+        }
+#endif
 
         if (exit)
             break;
 
+#ifdef _WIN32
         ImGui_ImplWin32_NewFrame();
         ImGui_ImplDX11_NewFrame();
+#elif defined(__linux__)
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+#endif
         ImGui::NewFrame();
 
+#ifdef _WIN32
         RECT clientRect{};
         ::GetClientRect(m_guiWindow, &clientRect);
         const ImVec2 clientPos(0.0f, 0.0f);
         const ImVec2 clientSize(static_cast<float>(clientRect.right - clientRect.left),
                                 static_cast<float>(clientRect.bottom - clientRect.top));
+#elif defined(__linux__)
+        int width, height;
+        glfwGetWindowSize(m_window, &width, &height);
+        const ImVec2 clientPos(0.0f, 0.0f);
+        const ImVec2 clientSize(static_cast<float>(width), static_cast<float>(height));
+#endif
 
         ImGui::SetNextWindowPos(clientPos);
         ImGui::SetNextWindowSize(clientSize);
@@ -422,10 +544,21 @@ void Gui::loop()
         }
 
         const float clear_color[4] = { 0.04f, 0.04f, 0.05f, 1.0f };
+#ifdef _WIN32
         m_pd3dDeviceContext->OMSetRenderTargets(1, &m_mainRenderTargetView, nullptr);
         m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, clear_color);
 
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         m_pSwapChain->Present(1, 0);
+#elif defined(__linux__)
+        int display_w, display_h;
+        glfwGetFramebufferSize(m_window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        glClearColor(clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(m_window);
+#endif
     }
 }

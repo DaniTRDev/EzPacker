@@ -10,22 +10,40 @@ endif ()
 
 set(IMGUI_FILE_LIST
         "${imgui_SOURCE_DIR}/imgui.h"
-        "${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.h"
-        "${imgui_SOURCE_DIR}/backends/imgui_impl_win32.h"
-
         "${imgui_SOURCE_DIR}/imgui.cpp"
         "${imgui_SOURCE_DIR}/imgui_demo.cpp"
         "${imgui_SOURCE_DIR}/imgui_draw.cpp"
         "${imgui_SOURCE_DIR}/imgui_tables.cpp"
         "${imgui_SOURCE_DIR}/imgui_widgets.cpp"
-        "${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp"
-        "${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp"
 )
+
+set(IMGUI_LINKED_LIBRARIES "")
+
+if (WIN32)
+    list(APPEND IMGUI_FILE_LIST
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.h"
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_win32.h"
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_dx11.cpp"
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp"
+    )
+    list(APPEND IMGUI_LINKED_LIBRARIES "d3dcompiler;dwmapi")
+elseif (UNIX AND NOT APPLE)
+    find_package(glfw3 REQUIRED)
+    find_package(OpenGL REQUIRED)
+
+    list(APPEND IMGUI_FILE_LIST
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.h"
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.h"
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp"
+            "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
+    )
+    list(APPEND IMGUI_LINKED_LIBRARIES "glfw;OpenGL::GL")
+endif()
 
 EzCMK_ConfigureLib(NAME "imgui"
         FILE_LIST ${IMGUI_FILE_LIST}
         PRECOMPILED_HEADER ""
-        LINKED_LIBRARIES "d3dcompiler;dwmapi"
+        LINKED_LIBRARIES ${IMGUI_LINKED_LIBRARIES}
         INCLUDED_DIRS "${imgui_SOURCE_DIR};${imgui_SOURCE_DIR}/backends")
 
 set(EZFRONTEND_DEBUG_GUI_FILE_LIST
@@ -48,9 +66,14 @@ set(EZFRONTEND_DEBUG_GUI_FILE_LIST
         "src/Views/Output.cpp"
 )
 
+set(EZFRONTEND_DEBUG_GUI_LIBS "EzLexer;EzSemantics;EzMir;EzFrontendCompiler;imgui")
+if(WIN32)
+    list(APPEND EZFRONTEND_DEBUG_GUI_LIBS "d3d11")
+endif()
+
 EzCMK_AddExecutable(NAME EzFrontendDebugGUI
         FILE_LIST "${EZFRONTEND_DEBUG_GUI_FILE_LIST}"
         PRECOMPILED_HEADER "include/EzFrontendDebugGUICommon.h"
-        LINKED_LIBRARIES "EzLexer;EzSemantics;EzMir;EzFrontendCompiler;imgui;d3d11"
+        LINKED_LIBRARIES "${EZFRONTEND_DEBUG_GUI_LIBS}"
         INCLUDED_DIRS "include"
 )
