@@ -1,4 +1,4 @@
-#include "tokenizer/BasicTokenizer.h"
+#include "Tokenizer/BasicTokenizer.h"
 
 BasicTokenizer::BasicTokenizer(const std::shared_ptr<ErrorCollector> &errorCollector,
                                const std::shared_ptr<SourceManager> &sourceManager) :

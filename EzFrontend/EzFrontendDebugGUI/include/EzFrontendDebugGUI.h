@@ -13,6 +13,6 @@
 
 #include "GUI.h"
 
-#include "views/Lexer.h"
+#include "Views/Lexer.h"
 
 #endif // EZPACKER_EZFRONTENDDEBUGGUI_H

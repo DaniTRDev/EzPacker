@@ -10,6 +10,7 @@
 #ifndef EZPACKER_EZMIRCOMMON_H
 #define EZPACKER_EZMIRCOMMON_H
 
+#include <cstring>
 #include <cstdint>
 #include <string>
 #include <vector>
