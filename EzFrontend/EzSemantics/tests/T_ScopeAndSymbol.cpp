@@ -62,7 +62,6 @@ TEST_F(ScopeAndSymbolTests, BuiltinIntegerTypesExist)
 
 TEST_F(ScopeAndSymbolTests, FloatingPointTypesExist)
 {
-    EXPECT_TRUE(ctx->getTypeTable()->doesTypeExists("float"));
     EXPECT_TRUE(ctx->getTypeTable()->doesTypeExists("double"));
 }
 
@@ -74,7 +73,7 @@ TEST_F(ScopeAndSymbolTests, VoidAndStringExist)
 
 TEST_F(ScopeAndSymbolTests, UnknownTypeDoesNotExist)
 {
-    EXPECT_FALSE(ctx->getTypeTable()->doesTypeExists("u64"));
+    EXPECT_FALSE(ctx->getTypeTable()->doesTypeExists("u640"));
     EXPECT_FALSE(ctx->getTypeTable()->doesTypeExists(""));
 }
 

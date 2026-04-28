@@ -78,7 +78,7 @@ bool SymbolDefinitionVisitor::visit(IfAstNode *ifNode)
             return false;
     }
 
-    // False branch (if it exists) gets its own isolated lexical scope
+    // False branch (if it exists) gets its own lexical scope
     if (ifNode->getFalseScope())
     {
         ScopeCreatorGuard falseGuard(ifNode->getFalseScope(), getSemanticContext(), "IfFalseScope");

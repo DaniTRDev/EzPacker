@@ -102,14 +102,7 @@ class AstNodeVisitor
      * @return
      */
     virtual bool visit(class Label *label) { return true; }
-
-    /**
-     * Visits given Memory operand node. Should return true visitor wants to keep traversing the tree.
-     * @param operand
-     * @return bool
-     */
-    virtual bool visit(class MemoryOperandAstNode *operand) { return true; }
-
+    
     /**
      * Visits given Module node and visits its header. Should return true visitor wants to keep traversing the tree.
      * @param module

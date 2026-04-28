@@ -19,7 +19,6 @@
 
 #include "EzLexerCommon.h"
 #include "Variable.h"
-#include "MemoryOperand.h"
 #include "ImmediateOperand.h"
 #include "AstNode/AstNodeContainer.h"
 #include "AstNode/AstNodeVisitor.h"

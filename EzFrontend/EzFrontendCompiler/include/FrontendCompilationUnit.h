@@ -89,7 +89,7 @@ class FrontendCompilationUnit : public ErrorEmitter
      *
      * @param loweringContext Shared pointer to the lowering context.
      */
-    void setLoweringContext(const std::shared_ptr<LoweringContext> &loweringContext);
+    void setLoweringContext(const std::shared_ptr<AstLoweringContext> &loweringContext);
 
     /**
      * @brief Sets the MIR emitter used for generating intermediate representation.
@@ -161,7 +161,7 @@ class FrontendCompilationUnit : public ErrorEmitter
      *
      * @return Const reference to the shared pointer of the lowering context.
      */
-    const std::shared_ptr<LoweringContext> &getLoweringContext() const;
+    const std::shared_ptr<AstLoweringContext> &getLoweringContext() const;
 
     /**
      * @brief Gets the MIR emitter.
@@ -200,7 +200,7 @@ class FrontendCompilationUnit : public ErrorEmitter
     std::shared_ptr<BasicParsingContext> m_parsingContext;
     std::shared_ptr<BasicSemanticContext> m_semanticContext;
     std::shared_ptr<BasicTokenizer> m_tokenizer;
-    std::shared_ptr<LoweringContext> m_loweringContext;
+    std::shared_ptr<AstLoweringContext> m_loweringContext;
     std::shared_ptr<MirEmitter> m_mirEmitter;
     std::shared_ptr<MirEmitterContext> m_mirEmitterContext;
     std::shared_ptr<MirGlobalDataEmitter> m_mirGlobalDataEmitter;

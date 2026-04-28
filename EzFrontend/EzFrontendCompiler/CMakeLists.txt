@@ -30,7 +30,7 @@ set(EZFRONTEND_COMPILATION_UNIT_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzFrontendCompiler"
         FILE_LIST ${EZFRONTEND_COMPILATION_UNIT_FILES_LIST}
         PRECOMPILED_HEADER "include/EzFrontendCompilerCommon.h"
-        LINKED_LIBRARIES "EzSemantics"
+        LINKED_LIBRARIES "EzSemantics;EzAstLowerer"
         INCLUDED_DIRS "include")
 
 if (EZPACKER_BUILD_TESTS)

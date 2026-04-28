@@ -12,7 +12,7 @@ bool AstLoweringPhase::execute(struct FrontendCompilationUnit *unit)
     auto mirGlobalDataEmitter = std::make_shared<MirGlobalDataEmitter>(mirEmitterContext.get());
 
     auto loweringContext =
-            std::make_shared<LoweringContext>(semanticContext, mirEmitter, mirEmitterContext, mirGlobalDataEmitter);
+            std::make_shared<AstLoweringContext>(semanticContext, mirEmitter, mirEmitterContext, mirGlobalDataEmitter);
 
     TypeLowerer typeLowerer;
     AstLowererVisitor lowererVisitor(loweringContext);

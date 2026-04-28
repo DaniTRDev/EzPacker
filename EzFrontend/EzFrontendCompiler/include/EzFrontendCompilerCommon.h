@@ -10,5 +10,6 @@
 #define EZPACKER_EZFRONTENDCOMPILERCOMMON_H
 
 #include "EzSemantics.h"
+#include "EzAstLowerer.h"
 
 #endif // EZPACKER_EZFRONTENDCOMPILERCOMMON_H

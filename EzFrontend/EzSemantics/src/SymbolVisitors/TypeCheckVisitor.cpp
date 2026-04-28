@@ -126,13 +126,6 @@ bool TypeCheckVisitor::visit(Instruction *instr)
             targetInstructionType = sym->getSymbolDataType();
             break;
         }
-        else if (node->getType() == AstNodeType::MemoryOperand)
-        {
-            MemoryOperandAstNode *mem = dynamic_cast<MemoryOperandAstNode *>(node);
-            targetInstructionType =
-                    getSemanticContext()->getTypeTable()->getType(mem->getReferencedMemoryDataTypeStr()).get();
-            break;
-        }
     }
 
     // Second pass: Validate all operands against this context
@@ -172,48 +165,6 @@ bool TypeCheckVisitor::visit(Instruction *instr)
 bool TypeCheckVisitor::visit(Label *label) { return label->getCodeScope()->accept(this); }
 
 bool TypeCheckVisitor::visit(Module *module) { return module->getBody()->accept(this); }
-
-bool TypeCheckVisitor::visit(MemoryOperandAstNode *operand)
-{
-    const std::string_view &dataTypeStr = operand->getReferencedMemoryDataTypeStr();
-    if (dataTypeStr.empty())
-    {
-        getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                        "Unknown memory operand data-type",
-                                        "TypeCheckVisitor::MemoryOperandAstNode",
-                                        operand->getSourceRef());
-        return false;
-    }
-
-    AstNode *base = nullptr, *index = nullptr;
-    switch (operand->getMemoryOperandType())
-    {
-        case MemoryOperandType::BaseDisplacement:
-        {
-            base = dynamic_cast<BaseDisplacementMemory *>(operand)->getBase();
-            return base->accept(this);
-        }
-        case MemoryOperandType::BaseIndexScaleDisplacement:
-        {
-            base = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getBase();
-            index = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getIndex();
-            return base->accept(this) && index->accept(this);
-        }
-        case MemoryOperandType::IndexScale:
-        {
-            index = dynamic_cast<IndexScaleMemory *>(operand)->getIndex();
-            return index->accept(this);
-        }
-        default:
-        {
-            // If the memory operand does not have a base / scale (the case of direct), just return true.
-            return true;
-        }
-    }
-
-    // This can't happen.
-    return false;
-}
 
 bool TypeCheckVisitor::visit(Variable *var)
 {
@@ -350,7 +301,10 @@ bool TypeCheckVisitor::checkCastSafety(AstNode *node, Type *originalType, Type *
     else
     {
         if (originalType->getUnderlyingType() == UnderlyingType::Void ||
-            usedType->getUnderlyingType() == UnderlyingType::Void)
+            usedType->getUnderlyingType() == UnderlyingType::Void ||
+            
+            originalType->getUnderlyingType() == UnderlyingType::String ||
+            usedType->getUnderlyingType() == UnderlyingType::String)
         {
             getSemanticContext()->emitError(ErrorSeverity::Fatal,
                                             std::format("Can't perform a cast from '{}' to '{}'",
@@ -358,26 +312,6 @@ bool TypeCheckVisitor::checkCastSafety(AstNode *node, Type *originalType, Type *
                                                         originalType->getTypeName()),
                                             "TypeCheckVisitor::Variable",
                                             node->getSourceRef());
-            return false;
-        }
-
-        if (originalType->getUnderlyingType() == UnderlyingType::String)
-        {
-            getSemanticContext()->emitError(
-                    ErrorSeverity::Fatal,
-                    std::format("Can't perform a cast from string to '{}'", usedType->getTypeName()),
-                    "TypeCheckVisitor::Variable",
-                    node->getSourceRef());
-            return false;
-        }
-
-        if (usedType->getUnderlyingType() == UnderlyingType::String)
-        {
-            getSemanticContext()->emitError(
-                    ErrorSeverity::Fatal,
-                    std::format("Can't perform a cast from '{}' to string", originalType->getTypeName()),
-                    "TypeCheckVisitor::Variable",
-                    node->getSourceRef());
             return false;
         }
 
@@ -433,7 +367,7 @@ bool TypeCheckVisitor::checkImmediateSafety(ImmediateOperand *operand, Type *use
             return false;
         }
 
-        if (smallInt->isSigned())
+        if (usedType->isSigned())
         {
             // Calculate Signed Bounds
             int64_t maxAllowed = (targetSize == 64) ? INT64_MAX : (1ULL << (targetSize - 1)) - 1;
@@ -458,7 +392,7 @@ bool TypeCheckVisitor::checkImmediateSafety(ImmediateOperand *operand, Type *use
             uint64_t maxAllowed = (targetSize == 64) ? UINT64_MAX : ((1ULL << targetSize) - 1);
             uint64_t val = mp_get_i64(smallInt->getInteger());
 
-            if (smallInt->isSigned() || val > maxAllowed)
+            if (usedType->isSigned() || val > maxAllowed)
             {
                 getSemanticContext()->emitError(
                         ErrorSeverity::Fatal,
@@ -479,7 +413,7 @@ bool TypeCheckVisitor::checkImmediateSafety(ImmediateOperand *operand, Type *use
         err = mp_init(&max_val);
         err = mp_init(&min_val);
 
-        if (bigInt->isSigned())
+        if (usedType->isSigned())
         {
             // Max = 2^(targetSize - 1) - 1
             err = mp_2expt(&max_val, targetSize - 1);

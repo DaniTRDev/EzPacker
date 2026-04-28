@@ -2,6 +2,7 @@
 #define EZCORE_H
 
 #include "EzCoreCommon.h"
+#include "MathUtils.h"
 #include "StringUtils.h"
 
 #include "ErrorCollector/ErrorCollector.h"

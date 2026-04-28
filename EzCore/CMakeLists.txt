@@ -15,6 +15,8 @@ function(BuildEzCore)
     add_library("EzCore" ${EZCORE_BUILD_TYPE}
             "include/EzCore.h"
             "include/EzCoreCommon.h"
+            "include/MathUtils.h"
+            "include/StringUtils.h"
             "include/ErrorCollector/ErrorCollector.h"
             "include/ErrorCollector/ErrorEmitter.h"
             "include/Logger/SourceLoggingSink.h"
@@ -22,6 +24,7 @@ function(BuildEzCore)
             "include/TypedPool/TypedArrayPool.h"
             "include/TypedPool/TypedPool.h"
 
+            "src/MathUtils.cpp"
             "src/ErrorCollector/ErrorCollector.cpp"
             "src/ErrorCollector/ErrorEmitter.cpp"
             "src/Logger/SourceLogger.cpp"

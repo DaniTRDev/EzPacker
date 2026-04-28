@@ -18,7 +18,6 @@
 #include "AstNodes/Instruction.h"
 #include "VariableParser.h"
 #include "ImmediateParser.h"
-#include "MemoryOperandParser.h"
 
 namespace InstructionParser
 {

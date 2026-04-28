@@ -41,7 +41,7 @@ void FrontendCompilationUnit::setGlobalScopeAstNodes(TypedPoolSlice<AstNode> *gl
     m_globalScopeAstNodes = globalScopeAstNodes;
 }
 
-void FrontendCompilationUnit::setLoweringContext(const std::shared_ptr<LoweringContext> &loweringContext)
+void FrontendCompilationUnit::setLoweringContext(const std::shared_ptr<AstLoweringContext> &loweringContext)
 {
     m_loweringContext = loweringContext;
 }
@@ -88,7 +88,7 @@ const std::shared_ptr<BasicSemanticContext> &FrontendCompilationUnit::getSemanti
 
 const std::shared_ptr<BasicTokenizer> &FrontendCompilationUnit::getTokenizer() const { return m_tokenizer; }
 
-const std::shared_ptr<LoweringContext> &FrontendCompilationUnit::getLoweringContext() const
+const std::shared_ptr<AstLoweringContext> &FrontendCompilationUnit::getLoweringContext() const
 {
     return m_loweringContext;
 }

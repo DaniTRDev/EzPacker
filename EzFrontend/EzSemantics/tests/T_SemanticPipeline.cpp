@@ -12,7 +12,6 @@
 #include <EzSemantics.h>
 
 using ModParser = ModuleParser::ModuleParser;
-using MemParser = MemoryOperandParser::MemoryOperandParser;
 
 class SemanticPipelineTests : public ::testing::Test
 {
@@ -210,23 +209,6 @@ TEST_F(SemanticPipelineTests, ExplicitTypeOnImmediateIsUsed)
     ASSERT_NE(annot, nullptr);
     ASSERT_NE(annot->getDataType(), nullptr);
     EXPECT_EQ(annot->getDataType()->getTypeName(), "i16");
-}
-
-TEST_F(SemanticPipelineTests, MemoryOperandGetsTypeAnnotation)
-{
-    auto pctx = makeParseCtx("i32 (%base+4)");
-    MemParser memParser;
-    AstNode *memNode = memParser.parse(pctx);
-    ASSERT_NE(memNode, nullptr);
-
-    SymbolAndTypeResolverVisitor resolver;
-    resolver.setSemanticContext(ctx);
-    memNode->accept(&resolver);
-
-    auto *annot = memNode->getAnnotation<DataTypeAnnotation>();
-    ASSERT_NE(annot, nullptr);
-    ASSERT_NE(annot->getDataType(), nullptr);
-    EXPECT_EQ(annot->getDataType()->getTypeName(), "i32");
 }
 
 // ─── TypeCheckVisitor ─────────────────────────────────────────────────────────

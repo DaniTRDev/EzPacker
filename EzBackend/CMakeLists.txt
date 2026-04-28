@@ -1,0 +1,3 @@
+add_subdirectory(EzMir)
+add_subdirectory(EzABI)
+add_subdirectory(EzMirLegalizer)

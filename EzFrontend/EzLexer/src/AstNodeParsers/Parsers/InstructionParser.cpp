@@ -7,8 +7,7 @@ ParserBatch CreateInstructionOperandBatch()
 {
     ParserBatch batch;
     batch.addParsersFromTypeList<ImmediateParser::ImmediateParser,
-                                 VariableParser,
-                                 MemoryOperandParser::MemoryOperandParser>();
+                                 VariableParser>();
 
     return batch;
 }

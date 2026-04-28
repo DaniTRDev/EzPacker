@@ -15,7 +15,6 @@ set(EZLEXER_FILES_LIST
         "include/AstNodes/IncludeAstNode.h"
         "include/AstNodes/Instruction.h"
         "include/AstNodes/Label.h"
-        "include/AstNodes/MemoryOperand.h"
         "include/AstNodes/Module.h"
         "include/AstNodes/SwitchAstNode.h"
         "include/AstNodes/SwitchCaseAstNode.h"
@@ -34,7 +33,6 @@ set(EZLEXER_FILES_LIST
         "include/AstNodeParsers/Parsers/IncludeParser.h"
         "include/AstNodeParsers/Parsers/InstructionParser.h"
         "include/AstNodeParsers/Parsers/LabelParser.h"
-        "include/AstNodeParsers/Parsers/MemoryOperandParser.h"
         "include/AstNodeParsers/Parsers/ModuleParser.h"
         "include/AstNodeParsers/Parsers/VariableParser.h"
         "include/AstNodeParsers/Parsers/SwitchParser.h"
@@ -54,7 +52,6 @@ set(EZLEXER_FILES_LIST
         "src/AstNodes/IncludeAstNode.cpp"
         "src/AstNodes/Instruction.cpp"
         "src/AstNodes/Label.cpp"
-        "src/AstNodes/MemoryOperand.cpp"
         "src/AstNodes/Module.cpp"
         "src/AstNodes/SwitchAstNode.cpp"
         "src/AstNodes/SwitchCaseAstNode.cpp"
@@ -72,7 +69,6 @@ set(EZLEXER_FILES_LIST
         "src/AstNodeParsers/Parsers/IncludeParser.cpp"
         "src/AstNodeParsers/Parsers/InstructionParser.cpp"
         "src/AstNodeParsers/Parsers/LabelParser.cpp"
-        "src/AstNodeParsers/Parsers/MemoryOperandParser.cpp"
         "src/AstNodeParsers/Parsers/ModuleParser.cpp"
         "src/AstNodeParsers/Parsers/VariableParser.cpp"
         "src/AstNodeParsers/Parsers/SwitchParser.cpp"
@@ -115,13 +111,6 @@ if (EZPACKER_BUILD_TESTS)
             "EzLexer"
             ""
             "tests/T_VariableParser.cpp"
-    )
-
-    EzPacker_AddTest(
-            "T_MemoryParser"
-            "EzLexer"
-            ""
-            "tests/T_MemoryParser.cpp"
     )
 
     EzPacker_AddTest(

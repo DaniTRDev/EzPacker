@@ -1,9 +1,15 @@
 #include "Scope/TypeTable.h"
 
-Type::Type(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string_view &typeName) :
-    m_sourceRef(), m_underlyingType(underlyingType), m_underlyingTypeSize(underlyingTypeSize), m_typeName(typeName)
+Type::Type(bool _signed,
+           UnderlyingType underlyingType,
+           UnderlyingTypeSize underlyingTypeSize,
+           const std::string_view &typeName) :
+    m_signed(_signed), m_sourceRef(), m_underlyingType(underlyingType), m_underlyingTypeSize(underlyingTypeSize),
+    m_typeName(typeName)
 {
 }
+
+bool Type::isSigned() const { return m_signed; }
 
 const SourceReference &Type::getSourceRef() const { return m_sourceRef; }
 
@@ -21,22 +27,29 @@ const std::vector<Type *> &Type::getSubTypes() const { return m_subTypes; }
 
 TypeTable::TypeTable()
 {
-    addType(UnderlyingType::FloatingPoint, UnderlyingTypeSize::_32bits, "float");
-    addType(UnderlyingType::FloatingPoint, UnderlyingTypeSize::_64bits, "double");
-    addType(UnderlyingType::Integer, UnderlyingTypeSize::_8bits, "i8");
-    addType(UnderlyingType::Integer, UnderlyingTypeSize::_16bits, "i16");
-    addType(UnderlyingType::Integer, UnderlyingTypeSize::_32bits, "i32");
-    addType(UnderlyingType::Integer, UnderlyingTypeSize::_64bits, "i64");
-    addType(UnderlyingType::Integer, UnderlyingTypeSize::_128bits, "i128");
-    addType(UnderlyingType::Integer, UnderlyingTypeSize::_256bits, "i256");
-    addType(UnderlyingType::Integer, UnderlyingTypeSize::_512bits, "i512");
-    addType(UnderlyingType::String, UnderlyingTypeSize::Variable, "string");
-    addType(UnderlyingType::Void, UnderlyingTypeSize::Invalid, "void");
+    addType(true, UnderlyingType::FloatingPoint, UnderlyingTypeSize::_64bits, "double");
+    addType(false, UnderlyingType::Integer, UnderlyingTypeSize::_8bits, "i8");
+    addType(false, UnderlyingType::Integer, UnderlyingTypeSize::_16bits, "i16");
+    addType(false, UnderlyingType::Integer, UnderlyingTypeSize::_32bits, "i32");
+    addType(false, UnderlyingType::Integer, UnderlyingTypeSize::_64bits, "i64");
+    addType(false, UnderlyingType::Integer, UnderlyingTypeSize::_128bits, "i128");
+    addType(false, UnderlyingType::Integer, UnderlyingTypeSize::_256bits, "i256");
+    addType(false, UnderlyingType::Integer, UnderlyingTypeSize::_512bits, "i512");
+    addType(true, UnderlyingType::Integer, UnderlyingTypeSize::_8bits, "u8");
+    addType(true, UnderlyingType::Integer, UnderlyingTypeSize::_16bits, "u16");
+    addType(true, UnderlyingType::Integer, UnderlyingTypeSize::_32bits, "u32");
+    addType(true, UnderlyingType::Integer, UnderlyingTypeSize::_64bits, "u64");
+    addType(true, UnderlyingType::Integer, UnderlyingTypeSize::_128bits, "u128");
+    addType(true, UnderlyingType::Integer, UnderlyingTypeSize::_256bits, "u256");
+    addType(true, UnderlyingType::Integer, UnderlyingTypeSize::_512bits, "u512");
+    addType(false, UnderlyingType::String, UnderlyingTypeSize::Variable, "string");
+    addType(false, UnderlyingType::Void, UnderlyingTypeSize::Invalid, "void");
 }
 
 bool TypeTable::doesTypeExists(const std::string_view &typeName) { return m_types.contains(typeName); }
 
-std::shared_ptr<Type> TypeTable::addType(UnderlyingType underlyingType,
+std::shared_ptr<Type> TypeTable::addType(bool _signed,
+                                         UnderlyingType underlyingType,
                                          UnderlyingTypeSize underlyingTypeSize,
                                          const std::string_view &typeName)
 {
@@ -45,7 +58,7 @@ std::shared_ptr<Type> TypeTable::addType(UnderlyingType underlyingType,
         return nullptr;
     }
 
-    std::shared_ptr<Type> type = std::make_shared<Type>(underlyingType, underlyingTypeSize, typeName);
+    std::shared_ptr<Type> type = std::make_shared<Type>(_signed, underlyingType, underlyingTypeSize, typeName);
 
     m_types.emplace(typeName, type);
     return type;
@@ -59,7 +72,7 @@ std::shared_ptr<Type> TypeTable::addModuleType(const std::string_view &moduleNam
     }
 
     std::shared_ptr<Type> type =
-            std::make_shared<Type>(UnderlyingType::Module, UnderlyingTypeSize::Variable, moduleName);
+            std::make_shared<Type>(false, UnderlyingType::Module, UnderlyingTypeSize::Variable, moduleName);
     type->setSubTypes(subTypes);
 
     m_types.emplace(moduleName, type);

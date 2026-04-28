@@ -91,16 +91,7 @@ class SymbolAndTypeResolverVisitor : public SemanticVisitor
      * the label.
      */
     bool visit(Label *label) override;
-
-    /**
-     * Visits a memory operand.
-     *
-     * The referenced element type is resolved (or defaulted if omitted) and
-     * stored as a `DataTypeAnnotation`. Any base/index variables used by the
-     * addressing mode are then resolved recursively.
-     */
-    bool visit(MemoryOperandAstNode *operand) override;
-
+    
     /**
      * Visits a module and resolves its body inside the scope owned by the
      * module.

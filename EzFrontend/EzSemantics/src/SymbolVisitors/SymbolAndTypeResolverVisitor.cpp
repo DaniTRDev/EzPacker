@@ -53,7 +53,7 @@ bool SymbolAndTypeResolverVisitor::visit(ImmediateOperand *imm)
         if (!dataType)
         {
             ctx->emitError(ErrorSeverity::Fatal,
-                           "Invalid cast for immediate",
+                           "Invalid type for immediate",
                            "SymbolAndTypeResolverVisitor::ImmediateOperand",
                            imm->getSourceRef());
 
@@ -97,60 +97,6 @@ bool SymbolAndTypeResolverVisitor::visit(Label *label)
     ScopeGuard guard(getSemanticContext(), annotation->getOwnedScope());
 
     return label->getCodeScope()->accept(this);
-}
-
-bool SymbolAndTypeResolverVisitor::visit(MemoryOperandAstNode *operand)
-{
-    const std::string_view &typeStr = operand->getReferencedMemoryDataTypeStr();
-    std::shared_ptr<Type> type = nullptr;
-
-    if (typeStr.empty())
-    {
-        type = getSemanticContext()->getTypeTable()->getDefaultType();
-    }
-    else
-    {
-        type = getSemanticContext()->getTypeTable()->getType(typeStr);
-        if (!type)
-        {
-            getSemanticContext()->emitError(ErrorSeverity::Fatal,
-                                            "Unknown memory operand data type: " + std::string(typeStr),
-                                            "SymbolAndTypeResolverVisitor::MemoryOperand",
-                                            operand->getSourceRef());
-            return false;
-        }
-    }
-
-    operand->createAnnotation<DataTypeAnnotation>(getSemanticContext()->getAnnotPool(), type.get());
-
-    AstNode *base = nullptr, *index = nullptr;
-    switch (operand->getMemoryOperandType())
-    {
-        case MemoryOperandType::BaseDisplacement:
-        {
-            base = dynamic_cast<BaseDisplacementMemory *>(operand)->getBase();
-            return base->accept(this);
-        }
-        case MemoryOperandType::BaseIndexScaleDisplacement:
-        {
-            base = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getBase();
-            index = dynamic_cast<BaseIndexScaleDisplacementMemory *>(operand)->getIndex();
-            return base->accept(this) && index->accept(this);
-        }
-        case MemoryOperandType::IndexScale:
-        {
-            index = dynamic_cast<IndexScaleMemory *>(operand)->getIndex();
-            return index->accept(this);
-        }
-        default:
-        {
-            // If the memory operand does not have a base / scale (direct), just return true.
-            return true;
-        }
-    }
-
-    // This can't happen.
-    return false;
 }
 
 bool SymbolAndTypeResolverVisitor::visit(Module *module)

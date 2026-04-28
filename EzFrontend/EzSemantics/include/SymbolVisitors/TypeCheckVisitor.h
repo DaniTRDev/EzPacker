@@ -83,15 +83,7 @@ class TypeCheckVisitor : public SemanticVisitor
      * Visits a module and validates all expressions in its body.
      */
     bool visit(Module *module) override;
-
-    /**
-     * Visits a memory operand.
-     *
-     * The memory reference must already have a resolved element type. Any
-     * variables used in its addressing mode are validated recursively.
-     */
-    bool visit(MemoryOperandAstNode *operand) override;
-
+    
     /**
      * Visits a variable use.
      *

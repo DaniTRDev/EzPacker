@@ -1,0 +1,7 @@
+#ifndef EZPACKER_EZABICOMMON_H
+#define EZPACKER_EZABICOMMON_H
+
+#include "EzCore.h"
+
+
+#endif // EZPACKER_EZABICOMMON_H

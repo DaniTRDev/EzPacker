@@ -11,6 +11,5 @@
 #include <cstring>
 
 #include <EzLexer.h>
-#include <EzMir.h>
 
 #endif // EZPACKER_EZSEMANTICSCOMMON_H

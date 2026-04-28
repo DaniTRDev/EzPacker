@@ -49,7 +49,6 @@ enum class AstNodeType
     Instruction,
     Immediate,
     Label,
-    MemoryOperand,
     Module, // Contains the header and the code scope.
     ModuleHeader,
     Switch,

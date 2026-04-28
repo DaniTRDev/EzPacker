@@ -93,12 +93,6 @@ class IntegerImmediate : public ImmediateOperand
     explicit IntegerImmediate(mp_int *integer);
 
     /**
-     * Returns true if this integer is signed.
-     * @return bool
-     */
-    bool isSigned() const;
-
-    /**
      * Returns "Integer".
      * @return const char*
      */
@@ -129,7 +123,6 @@ class IntegerImmediate : public ImmediateOperand
     std::string getAsBin() const;
     
   private:
-    bool m_signed;
     mp_int *m_integer;
 };
 

@@ -17,9 +17,7 @@ void ImmediateOperand::setDataType(const std::string_view &dataType) { m_dataTyp
 
 const std::string_view &ImmediateOperand::getDataType() { return m_dataType; }
 
-IntegerImmediate::IntegerImmediate(mp_int *integer) : m_integer(integer), m_signed(integer->sign == MP_NEG) {}
-
-bool IntegerImmediate::isSigned() const { return m_signed; }
+IntegerImmediate::IntegerImmediate(mp_int *integer) : m_integer(integer) {}
 
 const char *IntegerImmediate::getImmediateTypeName() const { return "Integer"; }
 

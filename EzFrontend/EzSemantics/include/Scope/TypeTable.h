@@ -57,7 +57,15 @@ class Type
     /**
      * Creates one semantic type descriptor.
      */
-    Type(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string_view &typeName);
+    Type(bool _signed,
+         UnderlyingType underlyingType,
+         UnderlyingTypeSize underlyingTypeSize,
+         const std::string_view &typeName);
+
+    /**
+     * Returns true if this type includes a sign.
+     */
+    bool isSigned() const;
 
     /**
      * Returns the source reference (if exists) that defined this type. Caller should check m_valid to ensure it
@@ -97,6 +105,7 @@ class Type
     const std::vector<Type *> &getSubTypes() const;
 
   private:
+    bool m_signed; // Does this type include sign?
     SourceReference m_sourceRef;
     UnderlyingType m_underlyingType;
     UnderlyingTypeSize m_underlyingTypeSize;
@@ -132,8 +141,10 @@ class TypeTable
      * A valid `std::shared_ptr<Type>` instance if type did not exist and could be added. Returns `nullptr` if
      * the type already exists.
      */
-    std::shared_ptr<Type>
-    addType(UnderlyingType underlyingType, UnderlyingTypeSize underlyingTypeSize, const std::string_view &typeName);
+    std::shared_ptr<Type> addType(bool _signed,
+                                  UnderlyingType underlyingType,
+                                  UnderlyingTypeSize underlyingTypeSize,
+                                  const std::string_view &typeName);
 
     /**
      * Creates a module type and sets its subtypes.

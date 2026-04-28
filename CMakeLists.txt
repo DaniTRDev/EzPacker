@@ -33,6 +33,8 @@ endif ()
 
 add_subdirectory(EzCore)
 add_subdirectory(EzFrontend)
+add_subdirectory(EzBackend)
+add_subdirectory(EzGui)
 
 if (EZPACKER_BUILD_TESTS)
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")

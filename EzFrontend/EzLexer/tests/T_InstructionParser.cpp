@@ -151,23 +151,6 @@ TEST_F(InstructionParserTests, FloatImmediateOperand)
     EXPECT_EQ(second->getType(), AstNodeType::Immediate);
 }
 
-TEST_F(InstructionParserTests, MemoryOperandInsideInstruction)
-{
-    AstNode *node = parseWith<InstructionParser::InstructionParser>("mov %dst, i64 (%base+0);");
-    ASSERT_NE(node, nullptr);
-    auto *instr = dynamic_cast<Instruction *>(node);
-    ASSERT_EQ(instr->getExpressions()->m_numElems, 2u);
-    AstNode *second = nullptr;
-    size_t idx = 0;
-    for (AstNode *n : *instr->getExpressions())
-    {
-        if (idx == 1) second = n;
-        idx++;
-    }
-    ASSERT_NE(second, nullptr);
-    EXPECT_EQ(second->getType(), AstNodeType::MemoryOperand);
-}
-
 TEST_F(InstructionParserTests, ThreeOperandInstruction)
 {
     // Some instructions might accept 3 operands (e.g. an arbitrary mnemonic).
