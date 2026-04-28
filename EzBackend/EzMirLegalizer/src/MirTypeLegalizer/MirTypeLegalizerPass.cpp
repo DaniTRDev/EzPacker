@@ -20,7 +20,7 @@ bool MirTypeLegalizerPass::run(MirFunction *func, MirPassManager *passManager)
             {
                 changed = true;
             }
-            it = nextIt;
+            it = ++nextIt;
         }
     }
     return changed;
@@ -94,10 +94,8 @@ MirTypeLegalizerPass::runOnInstruction(TypedPoolSlice<MirInstruction>::Iterator 
     {
         return promoteInstruction(instrIt, parentBlock);
     }
-
-    auto next = instrIt;
-    ++next;
-    return next;
+    
+    return instrIt;
 }
 
 SplitRegister MirTypeLegalizerPass::getOrCreateSplitRegister(const MirRegister &oldReg)
