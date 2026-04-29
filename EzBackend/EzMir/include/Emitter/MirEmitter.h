@@ -74,7 +74,7 @@ class MirEmitter
 
     // Define the macro to generate a method for each instruction
 
-#define INSTRUCTION(NAME, category, ops, flags)                                                                   \
+#define INSTRUCTION(NAME, category, ops, flags)                                                                        \
     template <typename... OperandTypes> MirInstruction *emit##NAME(OperandTypes &&...operands)                         \
     {                                                                                                                  \
         std::initializer_list<MirOperand> operandList = { std::forward<OperandTypes>(operands)... };                   \
@@ -84,6 +84,14 @@ class MirEmitter
 
 #include "Instruction/MirInstructionSet.h"
 #undef INSTRUCTION
+    
+    /**
+     * Creates a physical register with the given ID and size. Id might be created with createId or not, depends on
+     * target's register information.
+     * @param size
+     * @return
+     */
+    MirRegister createPhysicalRegister(size_t id, size_t size);
 
     /**
      * Creates a new virtual register descriptor.

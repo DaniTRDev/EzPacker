@@ -15,7 +15,7 @@ bool ImmediateLowerer::lower(AstNode *node, AstLoweringContext *ctx)
             {
                 int64_t value = mp_get_i64(integer->getInteger());
                 ctx->pushOperand(MirInteger{ .m_value = value,
-                                             .m_size = static_cast<size_t>(type->getUnderlyingTypeSize()) / 8 });
+                                             .m_sizeInBytes = static_cast<size_t>(type->getUnderlyingTypeSize()) / 8 });
             }
             else
             {

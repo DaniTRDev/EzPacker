@@ -8,15 +8,27 @@
 #include <EzMir.h>
 #include <memory>
 
+class Mips64Abi : public ABIDesc
+{
+  public:
+    const ArgLocation &getArgLoc(size_t id) const override
+    {
+        // Not needed for the test.
+        static ArgLocation test{};
+        return test;
+    }
+};
+
 class MirLegalizerContextTests : public ::testing::Test
 {
   protected:
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
     std::shared_ptr<MirEmitterContext> emitterCtx;
-    MirEmitter* emitter;
-    MirPassManager* passManager;
-    ABIDesc abi;
+    MirEmitter *emitter;
+    MirPassManager *passManager;
+    Mips64Abi abi;
+    std::shared_ptr<MirLegalizerContext> ctx;
 
     void SetUp() override
     {
@@ -25,6 +37,7 @@ class MirLegalizerContextTests : public ::testing::Test
         emitterCtx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(emitterCtx.get());
         passManager = new MirPassManager();
+        ctx = std::make_shared<MirLegalizerContext>(ec, sm);
 
         abi.setRegSizeInBits(32);
         abi.setEndianness(LittleEndian);
@@ -39,21 +52,18 @@ class MirLegalizerContextTests : public ::testing::Test
 
 TEST_F(MirLegalizerContextTests, SetAndGetEmitter)
 {
-    MirLegalizerContext ctx;
-    ctx.setEmitter(emitter);
-    EXPECT_EQ(ctx.getEmitter(), emitter);
+    ctx->setEmitter(emitter);
+    EXPECT_EQ(ctx->getEmitter(), emitter);
 }
 
 TEST_F(MirLegalizerContextTests, SetAndGetAbiDesc)
 {
-    MirLegalizerContext ctx;
-    ctx.setAbiDesc(&abi);
-    EXPECT_EQ(ctx.getAbiDesc(), &abi);
+    ctx->setAbiDesc(&abi);
+    EXPECT_EQ(ctx->getAbiDesc(), &abi);
 }
 
 TEST_F(MirLegalizerContextTests, SetAndGetPassManager)
 {
-    MirLegalizerContext ctx;
-    ctx.setPassManager(passManager);
-    EXPECT_EQ(ctx.getPassManager(), passManager);
+    ctx->setPassManager(passManager);
+    EXPECT_EQ(ctx->getPassManager(), passManager);
 }

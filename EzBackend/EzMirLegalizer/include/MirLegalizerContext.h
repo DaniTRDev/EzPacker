@@ -3,9 +3,16 @@
 
 #include "EzMirLegalizerCommon.h"
 
-class MirLegalizerContext
+class MirLegalizerContext : public ErrorEmitter
 {
   public:
+    /**
+     * Creates the context with the given error collector and source manager.
+     * @param errorEmitter
+     */
+    MirLegalizerContext(const std::shared_ptr<ErrorCollector> &errorCollector,
+                        const std::shared_ptr<SourceManager> &sourceManager);
+
     /**
      * Sets the emitter of the context.
      *

@@ -11,7 +11,7 @@ constexpr size_t ChunkBlockSize = 1024 * 16; // 16KB block size.
 
 struct PoolChunk
 {
-    size_t m_size{ 0 };     // In bytes.
+    size_t m_sizeInBytes{ 0 };     // In bytes.
     size_t m_usedSize{ 0 }; // In bytes.
     std::unique_ptr<uint8_t[]> m_data;
 };
@@ -306,7 +306,7 @@ class TypedPool
         size_t padding = (alignment - (currentAddr % alignment)) % alignment;
         size_t totalNeeded = size + padding;
 
-        if (chunk->m_usedSize + totalNeeded > chunk->m_size)
+        if (chunk->m_usedSize + totalNeeded > chunk->m_sizeInBytes)
         {
             allocateNewChunk(totalNeeded);
             chunk = &m_chunks.back();
@@ -428,7 +428,7 @@ class TypedPool
     void allocateNewChunk(size_t size)
     {
         size_t max = std::max(size, ChunkBlockSize);
-        m_chunks.push_back(PoolChunk{ .m_size = max, .m_usedSize = 0, .m_data = std::make_unique<uint8_t[]>(max) });
+        m_chunks.push_back(PoolChunk{ .m_sizeInBytes = max, .m_usedSize = 0, .m_data = std::make_unique<uint8_t[]>(max) });
     }
 
   protected:

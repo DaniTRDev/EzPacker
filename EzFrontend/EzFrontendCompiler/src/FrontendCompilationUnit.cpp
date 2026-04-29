@@ -33,7 +33,6 @@ void FrontendCompilationUnit::cleanup()
     m_loweringContext.reset();
     m_mirEmitter.reset();
     m_mirEmitterContext.reset();
-    m_mirGlobalDataEmitter.reset();
 }
 
 void FrontendCompilationUnit::setGlobalScopeAstNodes(TypedPoolSlice<AstNode> *globalScopeAstNodes)
@@ -56,10 +55,6 @@ void FrontendCompilationUnit::setMirEmitterContext(const std::shared_ptr<MirEmit
     m_mirEmitterContext = mirEmitterContext;
 }
 
-void FrontendCompilationUnit::setMirGlobalDataEmitter(const std::shared_ptr<MirGlobalDataEmitter> &mirGlobalDataEmitter)
-{
-    m_mirGlobalDataEmitter = mirGlobalDataEmitter;
-}
 
 void FrontendCompilationUnit::setParsingContext(const std::shared_ptr<BasicParsingContext> &parsingContext)
 {
@@ -98,9 +93,4 @@ const std::shared_ptr<MirEmitter> &FrontendCompilationUnit::getMirEmitter() cons
 const std::shared_ptr<MirEmitterContext> &FrontendCompilationUnit::getMirEmitterContext() const
 {
     return m_mirEmitterContext;
-}
-
-const std::shared_ptr<MirGlobalDataEmitter> &FrontendCompilationUnit::getMirGlobalDataEmitter() const
-{
-    return m_mirGlobalDataEmitter;
 }

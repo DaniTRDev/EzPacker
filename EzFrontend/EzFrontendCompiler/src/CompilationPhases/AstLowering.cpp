@@ -9,10 +9,8 @@ bool AstLoweringPhase::execute(struct FrontendCompilationUnit *unit)
 
     auto mirEmitterContext = std::make_shared<MirEmitterContext>(errorCollector, sourceManager);
     auto mirEmitter = std::make_shared<MirEmitter>(mirEmitterContext.get());
-    auto mirGlobalDataEmitter = std::make_shared<MirGlobalDataEmitter>(mirEmitterContext.get());
 
-    auto loweringContext =
-            std::make_shared<AstLoweringContext>(semanticContext, mirEmitter, mirEmitterContext, mirGlobalDataEmitter);
+    auto loweringContext = std::make_shared<AstLoweringContext>(semanticContext, mirEmitter, mirEmitterContext);
 
     TypeLowerer typeLowerer;
     AstLowererVisitor lowererVisitor(loweringContext);
@@ -37,7 +35,6 @@ bool AstLoweringPhase::execute(struct FrontendCompilationUnit *unit)
 
     unit->setMirEmitterContext(mirEmitterContext);
     unit->setMirEmitter(mirEmitter);
-    unit->setMirGlobalDataEmitter(mirGlobalDataEmitter);
     unit->setLoweringContext(loweringContext);
     return true;
 }

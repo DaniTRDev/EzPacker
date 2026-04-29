@@ -32,6 +32,13 @@ class ABIDesc
     const ArgLocation &getReturnValueLoc() const;
 
     /**
+     * Returns the location of the given argument.
+     * @param id
+     * @return
+     */
+    virtual ArgLocation getArgLoc(size_t id) const = 0;
+
+    /**
      * @brief Get the location of the stack frame pointer.
      * @return
      */
@@ -60,12 +67,6 @@ class ABIDesc
      * @return
      */
     const StackLayout &getStackLayout() const;
-
-    /**
-     * @brief Set the list of argument registers.
-     * @param regs
-     */
-    void setArgRegs(const std::vector<PhysicalRegId> &regs);
 
     /**
      * @brief Get the endianness of the ABI.
@@ -122,12 +123,6 @@ class ABIDesc
     void setStackReg(PhysicalRegId stackReg);
 
     /**
-     * @brief Get the list of argument registers.
-     * @return
-     */
-    const std::vector<PhysicalRegId> &getArgRegs() const;
-
-    /**
      * @brief Get the list of callee-saved registers.
      * @return
      */
@@ -147,7 +142,6 @@ class ABIDesc
     size_t m_regSizeInBits;
     size_t m_stackOffsetSizeInBits;
     StackLayout m_stackLayout;
-    std::vector<PhysicalRegId> m_argRegs;
     std::vector<PhysicalRegId> m_calleeSavedRegs;
     std::vector<PhysicalRegId> m_callerSavedRegs;
 };

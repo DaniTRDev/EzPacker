@@ -43,11 +43,11 @@ size_t MirOperand::getSizeInBytes() const
 
                 if constexpr (std::is_same_v<T, MirRegister>)
                 {
-                    return arg.m_size;
+                    return arg.m_sizeInBytes;
                 }
                 else if constexpr (std::is_same_v<T, MirInteger>)
                 {
-                    return arg.m_size;
+                    return arg.m_sizeInBytes;
                 }
                 else if constexpr (std::is_same_v<T, MirDouble>)
                 {
@@ -59,7 +59,7 @@ size_t MirOperand::getSizeInBytes() const
                 }
                 else if constexpr (std::is_same_v<T, MirBigInteger>)
                 {
-                    return arg.m_size;
+                    return arg.m_sizeInBytes;
                 }
                 else
                 {

@@ -1,5 +1,11 @@
 #include "MirLegalizerContext.h"
 
+MirLegalizerContext::MirLegalizerContext(const std::shared_ptr<ErrorCollector> &errorCollector,
+                                         const std::shared_ptr<SourceManager> &sourceManager) :
+    ErrorEmitter(errorCollector, sourceManager)
+{
+}
+
 void MirLegalizerContext::setEmitter(MirEmitter *emitter) { m_emitter = emitter; }
 
 void MirLegalizerContext::setAbiDesc(ABIDesc *abiDesc) { m_abiDesc = abiDesc; }

@@ -6,6 +6,17 @@
 #include <EzMir.h>
 #include <memory>
 
+class Mips64Abi : public ABIDesc
+{
+  public:
+    const ArgLocation &getArgLoc(size_t id) const override
+    {
+        // Not needed for the test.
+        static ArgLocation test{};
+        return test;
+    }
+};
+
 class MirTypeLegalizerTests : public ::testing::Test
 {
   protected:
@@ -13,8 +24,8 @@ class MirTypeLegalizerTests : public ::testing::Test
     std::shared_ptr<SourceManager> sm;
     std::shared_ptr<MirEmitterContext> emitterCtx;
     MirEmitter *emitter;
-    MirLegalizerContext legalizerCtx;
-    ABIDesc abi;
+    std::shared_ptr<MirLegalizerContext> legalizerCtx;
+    Mips64Abi abi;
 
     void SetUp() override
     {
@@ -22,13 +33,14 @@ class MirTypeLegalizerTests : public ::testing::Test
         sm = std::make_shared<SourceManager>(std::filesystem::current_path());
         emitterCtx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(emitterCtx.get());
+        legalizerCtx = std::make_shared<MirLegalizerContext>(ec, sm);
 
         // Setup a 32-bit ABI (4 bytes)
         abi.setRegSizeInBits(32);
         abi.setEndianness(LittleEndian);
 
-        legalizerCtx.setEmitter(emitter);
-        legalizerCtx.setAbiDesc(&abi);
+        legalizerCtx->setEmitter(emitter);
+        legalizerCtx->setAbiDesc(&abi);
     }
 
     void TearDown() override { delete emitter; }
@@ -46,7 +58,7 @@ TEST_F(MirTypeLegalizerTests, NoChangesForLegalSizedRegisters)
     MirRegister r2 = emitter->createVirtualRegister(4);
     emitter->emitMOV(MirOperand(r1), MirOperand(r2));
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_FALSE(changed);
@@ -66,7 +78,7 @@ TEST_F(MirTypeLegalizerTests, ExpandMovWithLargeRegister)
     MirRegister src = emitter->createVirtualRegister(8);
     emitter->emitMOV(MirOperand(dest), MirOperand(src));
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -96,7 +108,7 @@ TEST_F(MirTypeLegalizerTests, PromoteMovWithSmallRegister)
     MirRegister src = emitter->createVirtualRegister(2);
     emitter->emitMOV(MirOperand(dest), MirOperand(src));
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -111,8 +123,8 @@ TEST_F(MirTypeLegalizerTests, PromoteMovWithSmallRegister)
     // Ensure the size of the promoted registers is now 4 bytes
     auto *ops = newInstr->getOperands();
     EXPECT_EQ(ops->m_numElems, 2u);
-    EXPECT_EQ(ops->get<MirOperand>(0)->getRegister()->m_size, 4u);
-    EXPECT_EQ(ops->get<MirOperand>(1)->getRegister()->m_size, 4u);
+    EXPECT_EQ(ops->get<MirOperand>(0)->getRegister()->m_sizeInBytes, 4u);
+    EXPECT_EQ(ops->get<MirOperand>(1)->getRegister()->m_sizeInBytes, 4u);
 
     ec->endScope(ErrorAction::Discard);
 }
@@ -129,7 +141,7 @@ TEST_F(MirTypeLegalizerTests, ExpandAddProducesAddAndAdc)
     MirRegister src = emitter->createVirtualRegister(8);
     emitter->emitADD(MirOperand(dest), MirOperand(src));
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -158,7 +170,7 @@ TEST_F(MirTypeLegalizerTests, PromoteAddInjectsMask)
     MirRegister src = emitter->createVirtualRegister(1);
     emitter->emitADD(MirOperand(dest), MirOperand(src));
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -194,7 +206,7 @@ TEST_F(MirTypeLegalizerTests, ExpandMovWithImmediate)
     MirOperand immOp(MirInteger{ 0x123456789ABCDEF0, 8 });
     emitter->emitMOV(MirOperand(dest), immOp);
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -224,7 +236,7 @@ TEST_F(MirTypeLegalizerTests, PromoteMovWithImmediate)
     MirOperand immOp(MirInteger{ 0x1234, 2 });
     emitter->emitMOV(MirOperand(dest), immOp);
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -235,8 +247,8 @@ TEST_F(MirTypeLegalizerTests, PromoteMovWithImmediate)
     EXPECT_EQ(mov->getOpCode(), MirInstructionOpCode::MOV);
 
     auto *ops = mov->getOperands();
-    EXPECT_EQ(ops->get<MirOperand>(0)->getRegister()->m_size, 4u); // promoted dest
-    EXPECT_EQ(ops->get<MirOperand>(1)->getInteger()->m_size, 4u);  // promoted imm
+    EXPECT_EQ(ops->get<MirOperand>(0)->getRegister()->m_sizeInBytes, 4u); // promoted dest
+    EXPECT_EQ(ops->get<MirOperand>(1)->getInteger()->m_sizeInBytes, 4u);  // promoted imm
 
     ec->endScope(ErrorAction::Discard);
 }
@@ -252,7 +264,7 @@ TEST_F(MirTypeLegalizerTests, ExpandStoreWithImmediate)
     MirOperand immOp(MirInteger{ 0x1122334455667788, 8 });
     emitter->emitSTORE(MirOperand(ptrReg), immOp);
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -297,7 +309,7 @@ TEST_F(MirTypeLegalizerTests, ExpandLoadWithOffset)
             emitterCtx->getInstructionPool()->create<MirInstruction>(MirInstructionOpCode::LOAD, loadOps);
     emitterCtx->getInstructionPool()->appendToSlice(block->getInstructions(), loadInstr);
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);
@@ -333,7 +345,7 @@ TEST_F(MirTypeLegalizerTests, ExpandSubProducesSubAndSbb)
     MirRegister src = emitter->createVirtualRegister(8);
     emitter->emitSUB(MirOperand(dest), MirOperand(src));
 
-    MirTypeLegalizerPass pass(&legalizerCtx);
+    MirTypeLegalizerPass pass(legalizerCtx.get());
     bool changed = pass.run(func, nullptr);
 
     EXPECT_TRUE(changed);

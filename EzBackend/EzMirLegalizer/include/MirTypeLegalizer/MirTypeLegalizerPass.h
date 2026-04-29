@@ -10,7 +10,7 @@ struct SplitRegister
     TypedPoolSlice<MirRegister> *m_split;
 };
 
-class MirTypeLegalizerPass
+class MirTypeLegalizerPass : public IMirTransformPass
 {
   public:
     /**
@@ -23,7 +23,7 @@ class MirTypeLegalizerPass
      * Executes the type legalization pass on a single function.
      * Returns true if the MIR was modified (requires invalidating analysis passes).
      */
-    bool run(MirFunction *func, class MirPassManager *passManager);
+    bool run(MirFunction *func, class MirPassManager *passManager) override;
 
   private:
     // Creates an immediate operand dynamically
@@ -42,6 +42,9 @@ class MirTypeLegalizerPass
                                                         MirBlock *parentBlock);
 
     TypedPoolSlice<MirInstruction>::Iterator expandMov(TypedPoolSlice<MirInstruction>::Iterator instrIt,
+                                                       MirBlock *parentBlock);
+
+    TypedPoolSlice<MirInstruction>::Iterator expandRet(TypedPoolSlice<MirInstruction>::Iterator instrIt,
                                                        MirBlock *parentBlock);
 
     TypedPoolSlice<MirInstruction>::Iterator expandStore(TypedPoolSlice<MirInstruction>::Iterator instrIt,

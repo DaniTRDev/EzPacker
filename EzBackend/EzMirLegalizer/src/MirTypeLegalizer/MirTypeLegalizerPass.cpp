@@ -42,11 +42,11 @@ MirTypeLegalizerPass::runOnInstruction(TypedPoolSlice<MirInstruction>::Iterator 
         if (operand->getType() == MirOperandType::Register)
         {
             MirRegister *reg = operand->getRegister();
-            if (reg->m_size > targetRegBytes || m_splitMap.count(reg->m_id))
+            if (reg->m_sizeInBytes > targetRegBytes || m_splitMap.count(reg->m_id))
             {
                 needsExpansion = true;
             }
-            else if (reg->m_size < targetRegBytes || m_promoteMap.count(reg->m_id))
+            else if (reg->m_sizeInBytes < targetRegBytes || m_promoteMap.count(reg->m_id))
             {
                 needsPromotion = true;
             }
@@ -86,6 +86,11 @@ MirTypeLegalizerPass::runOnInstruction(TypedPoolSlice<MirInstruction>::Iterator 
             case MirInstructionCategory::Arithmetic:
                 return expandArithmetic(instrIt, parentBlock);
 
+            case MirInstructionCategory::ControlFlow:
+                if (instr->getOpCode() == MirInstructionOpCode::RET)
+                    return expandRet(instrIt, parentBlock);
+                break;
+
             default:
                 break; // Fallback to advancing the iterator if unhandled
         }
@@ -94,7 +99,7 @@ MirTypeLegalizerPass::runOnInstruction(TypedPoolSlice<MirInstruction>::Iterator 
     {
         return promoteInstruction(instrIt, parentBlock);
     }
-    
+
     return instrIt;
 }
 
@@ -108,7 +113,7 @@ SplitRegister MirTypeLegalizerPass::getOrCreateSplitRegister(const MirRegister &
     MirEmitter *emitter = m_ctx->getEmitter();
     TypedPool *operandPool = m_ctx->getEmitter()->getContext()->getOperandPool();
     size_t targetRegBytes = desc->getRegSizeInBits() / 8;
-    size_t numSplits = (oldReg.m_size + targetRegBytes - 1) / targetRegBytes;
+    size_t numSplits = (oldReg.m_sizeInBytes + targetRegBytes - 1) / targetRegBytes;
 
     SplitRegister split;
     split.m_split = operandPool->createSlice<MirRegister>();
@@ -237,7 +242,7 @@ MirTypeLegalizerPass::expandMov(TypedPoolSlice<MirInstruction>::Iterator instrIt
             }
             else
             {
-                srcChunkOp.swapData(MirInteger{ 0, destChunk->m_size });
+                srcChunkOp.swapData(MirInteger{ 0, destChunk->m_sizeInBytes });
             }
         }
         else if (srcOp.getType() == MirOperandType::Integer)
@@ -296,7 +301,7 @@ MirTypeLegalizerPass::expandArithmetic(TypedPoolSlice<MirInstruction>::Iterator 
             {
                 // E.g., Adding a 32-bit register to a 64-bit register.
                 // We add 0 to the upper chunk, allowing the carry flag to propagate.
-                srcChunkOp.swapData(MirInteger{ 0, destChunk->m_size });
+                srcChunkOp.swapData(MirInteger{ 0, destChunk->m_sizeInBytes });
             }
         }
         else if (srcOp.getType() == MirOperandType::Integer)
@@ -316,6 +321,55 @@ MirTypeLegalizerPass::expandArithmetic(TypedPoolSlice<MirInstruction>::Iterator 
     }
 
     return instrPool->removeFromSlice(instrList, instrIt);
+}
+
+TypedPoolSlice<MirInstruction>::Iterator
+MirTypeLegalizerPass::expandRet(TypedPoolSlice<MirInstruction>::Iterator instrIt, MirBlock *parentBlock)
+{
+    MirInstruction *oldInstr = *instrIt;
+    auto instrList = parentBlock->getInstructions();
+    TypedPool *pool = m_ctx->getEmitter()->getContext()->getOperandPool();
+
+    MirOperand retValOp = *(oldInstr->getOperands()->get<MirOperand>(0));
+
+    SplitRegister valSplit;
+    size_t numSplits = 0;
+    size_t targetRegBytes = m_ctx->getAbiDesc()->getRegSizeInBits() / 8;
+
+    if (retValOp.getType() == MirOperandType::Register)
+    {
+        valSplit = getOrCreateSplitRegister(*(retValOp.getRegister()));
+        numSplits = valSplit.m_split->m_numElems;
+    }
+    else if (retValOp.getType() == MirOperandType::Integer)
+    {
+        numSplits = (retValOp.getSizeInBytes() + targetRegBytes - 1) / targetRegBytes;
+    }
+
+    auto *newOps = pool->createSlice<MirOperand>();
+
+    // Append the legal-sized chunks into the new RET instruction
+    for (size_t i = 0; i < numSplits; ++i)
+    {
+        // Endianness dictates which chunk goes first in the return sequence
+        size_t logicalChunkIndex = m_ctx->getAbiDesc()->getEndianness() == LittleEndian ? i : (numSplits - 1 - i);
+
+        if (retValOp.getType() == MirOperandType::Register)
+        {
+            MirRegister *chunkReg = valSplit.m_split->get<MirRegister>(logicalChunkIndex);
+            pool->appendToSlice(newOps, pool->create<MirOperand>(*chunkReg));
+        }
+        else
+        {
+            pool->appendToSlice(newOps,
+                                pool->create<MirOperand>(splitImmediate(retValOp.getInteger(), logicalChunkIndex)));
+        }
+    }
+
+    MirInstruction *newRet = pool->create<MirInstruction>(MirInstructionOpCode::RET, newOps);
+    pool->appendToSliceBefore(instrList, instrIt, newRet);
+
+    return pool->removeFromSlice(instrList, instrIt);
 }
 
 TypedPoolSlice<MirInstruction>::Iterator
@@ -425,14 +479,14 @@ MirTypeLegalizerPass::promoteInstruction(TypedPoolSlice<MirInstruction>::Iterato
         if (operand->getType() == MirOperandType::Register)
         {
             MirRegister *reg = operand->getRegister();
-            if (reg->m_size < targetRegBytes)
+            if (reg->m_sizeInBytes < targetRegBytes)
             {
                 MirRegister promotedReg = getOrCreatePromotedRegister(*reg);
                 operandPool->appendToSlice(newOps, operandPool->create<MirOperand>(promotedReg));
 
                 if (i == 0 && isMathOperation)
                 {
-                    originalDestBytes = reg->m_size;
+                    originalDestBytes = reg->m_sizeInBytes;
                     promotedDestReg = promotedReg;
                 }
             }

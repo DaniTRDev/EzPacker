@@ -104,14 +104,7 @@ class FrontendCompilationUnit : public ErrorEmitter
      * @param mirEmitterContext Shared pointer to the MIR emitter context.
      */
     void setMirEmitterContext(const std::shared_ptr<MirEmitterContext> &mirEmitterContext);
-
-    /**
-     * @brief Sets the MIR global data emitter.
-     *
-     * @param mirGlobalDataEmitter Shared pointer to the MIR global data emitter.
-     */
-    void setMirGlobalDataEmitter(const std::shared_ptr<MirGlobalDataEmitter> &mirGlobalDataEmitter);
-
+    
     /**
      * @brief Sets the parsing context used for syntax analysis.
      *
@@ -176,14 +169,7 @@ class FrontendCompilationUnit : public ErrorEmitter
      * @return Const reference to the shared pointer of the MIR emitter context.
      */
     const std::shared_ptr<MirEmitterContext> &getMirEmitterContext() const;
-
-    /**
-     * @brief Gets the MIR global data emitter.
-     *
-     * @return Const reference to the shared pointer of the MIR global data emitter.
-     */
-    const std::shared_ptr<MirGlobalDataEmitter> &getMirGlobalDataEmitter() const;
-
+    
     /**
      * @brief Gets the global scope associated with this unit.
      *
@@ -203,7 +189,6 @@ class FrontendCompilationUnit : public ErrorEmitter
     std::shared_ptr<AstLoweringContext> m_loweringContext;
     std::shared_ptr<MirEmitter> m_mirEmitter;
     std::shared_ptr<MirEmitterContext> m_mirEmitterContext;
-    std::shared_ptr<MirGlobalDataEmitter> m_mirGlobalDataEmitter;
     std::shared_ptr<Scope> m_globalScope; // The global scope of the source file being compiled.
 };
 

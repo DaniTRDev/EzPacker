@@ -119,7 +119,7 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, AstLoweringContext *ctx)
         }
 
         size_t existingVRegId = ctx->getMirIdOfSymbol(sym);
-        ctx->pushOperand(MirOperand{ MirRegister{ .m_id = existingVRegId, .m_size = varSize / 8 } });
+        ctx->pushOperand(MirOperand{ MirRegister{ .m_id = existingVRegId, .m_sizeInBytes = varSize / 8 } });
 
         return true;
     }
@@ -147,7 +147,7 @@ bool VariableLowerer::lowerVariableCast(Variable *var, AstLoweringContext *ctx)
     size_t sourceTypeSize = static_cast<size_t>(sym->getSymbolDataType()->getUnderlyingTypeSize());
 
     MirRegister resultVReg = ctx->getEmitter()->createVirtualRegister(destTypeSize / 8);
-    MirRegister sourceVReg = MirRegister{ .m_id = existingVRegId, .m_size = sourceTypeSize };
+    MirRegister sourceVReg = MirRegister{ .m_id = existingVRegId, .m_sizeInBytes = sourceTypeSize };
 
     if (sourceTypeSize != destTypeSize)
     {

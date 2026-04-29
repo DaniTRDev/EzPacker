@@ -28,7 +28,7 @@ enum class MirReferenceType : uint8_t
 struct MirBigInteger
 {
     size_t m_constantId{ 0 }; // ID of a global data entry containing the big integer payload.
-    size_t m_size{ 0 };
+    size_t m_sizeInBytes{ 0 };
 };
 struct MirDouble
 {
@@ -37,7 +37,7 @@ struct MirDouble
 struct MirInteger
 {
     int64_t m_value{ 0 }; // Immediate signed integer literal.
-    size_t m_size{ 0 };
+    size_t m_sizeInBytes{ 0 };   // In bytes.
 };
 struct MirReference
 {
@@ -70,9 +70,9 @@ struct MirReference
 };
 struct MirRegister
 {
-    bool m_virtual{ true }; // Whether this is a virtual register (true) or a physical register (false).
-    size_t m_id{ 0 };       // Unique register ID.
-    size_t m_size{ 0 };     // Register size in bytes.
+    bool m_virtual{ true };   // Whether this is a virtual register (true) or a physical register (false).
+    size_t m_id{ 0 };         // Unique register ID.
+    size_t m_sizeInBytes{ 0 }; // Register size in bytes.
 
     /**
      * Returns `true` if this register is a virtual register.

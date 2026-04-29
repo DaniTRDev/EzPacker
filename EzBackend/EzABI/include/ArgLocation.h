@@ -9,12 +9,12 @@ using StackOffset = int64_t;
 struct PhysicalRegLocation
 {
     PhysicalRegId m_id;
-    size_t m_size;
+    size_t m_sizeInBits;
 };
 
 struct SplitLocation
 {
-    std::vector<PhysicalRegId> m_regs;
+    std::vector<PhysicalRegLocation> m_regs;
 };
 
 struct StackLocation

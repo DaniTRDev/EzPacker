@@ -60,7 +60,7 @@ template <typename ElemType> class TypedArrayPool : public TypedPool
         size_t totalNeeded = size + padding;
 
         // Check if fits
-        if (chunk->m_usedSize + totalNeeded > chunk->m_size)
+        if (chunk->m_usedSize + totalNeeded > chunk->m_sizeInBytes)
         {
             allocateNewChunk(totalNeeded);
             chunk = &m_chunks.back();

@@ -94,7 +94,7 @@ TEST_F(MirEmitterTests, CreateRegisterHasUniqueId)
 TEST_F(MirEmitterTests, RegisterStoressSize)
 {
     MirRegister r = emitter->createVirtualRegister(4);
-    EXPECT_EQ(r.m_size, 4u);
+    EXPECT_EQ(r.m_sizeInBytes, 4u);
 }
 
 // ─── Additional MirEmitter tests ─────────────────────────────────────────────
@@ -194,7 +194,7 @@ TEST_F(MirEmitterTests, MirOperandRegisterType)
     EXPECT_EQ(op.getType(), MirOperandType::Register);
     ASSERT_NE(op.getRegister(), nullptr);
     EXPECT_EQ(op.getRegister()->m_id, r.m_id);
-    EXPECT_EQ(op.getRegister()->m_size, 8u);
+    EXPECT_EQ(op.getRegister()->m_sizeInBytes, 8u);
 }
 
 TEST_F(MirEmitterTests, MirOperandIntegerType)
@@ -238,10 +238,10 @@ TEST_F(MirEmitterTests, CreateRegisterDifferentSizes)
     MirRegister r2 = emitter->createVirtualRegister(2);
     MirRegister r4 = emitter->createVirtualRegister(4);
     MirRegister r8 = emitter->createVirtualRegister(8);
-    EXPECT_EQ(r1.m_size, 1u);
-    EXPECT_EQ(r2.m_size, 2u);
-    EXPECT_EQ(r4.m_size, 4u);
-    EXPECT_EQ(r8.m_size, 8u);
+    EXPECT_EQ(r1.m_sizeInBytes, 1u);
+    EXPECT_EQ(r2.m_sizeInBytes, 2u);
+    EXPECT_EQ(r4.m_sizeInBytes, 4u);
+    EXPECT_EQ(r8.m_sizeInBytes, 8u);
     // All unique IDs
     EXPECT_NE(r1.m_id, r2.m_id);
     EXPECT_NE(r2.m_id, r4.m_id);

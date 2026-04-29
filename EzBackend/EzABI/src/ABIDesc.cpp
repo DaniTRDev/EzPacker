@@ -19,11 +19,6 @@ size_t ABIDesc::getStackOffsetSizeInBits() { return m_stackOffsetSizeInBits; }
 
 const StackLayout &ABIDesc::getStackLayout() const { return m_stackLayout; }
 
-void ABIDesc::setArgRegs(const std::vector<PhysicalRegId> &regs)
-{
-    m_argRegs = regs;
-}
-
 void ABIDesc::setEndianness(AbiEndianness endianness) { m_endianess = endianness; }
 
 void ABIDesc::setReturnValueLoc(const ArgLocation &loc) { m_returnValueLoc = loc; }
@@ -45,5 +40,3 @@ void ABIDesc::setStackReg(PhysicalRegId stackReg) {}
 const std::vector<PhysicalRegId> &ABIDesc::getCalleeSavedRegs() const { return m_calleeSavedRegs; }
 
 const std::vector<PhysicalRegId> &ABIDesc::getCallerSavedRegs() const { return m_callerSavedRegs; }
-
-const std::vector<PhysicalRegId> &ABIDesc::getArgRegs() const { return m_argRegs; }

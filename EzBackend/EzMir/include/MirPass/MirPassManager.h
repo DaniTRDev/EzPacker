@@ -53,7 +53,7 @@ class MirPassManager
         {
             if (!pass->run(func, this))
             {
-                return false;
+            
             }
 
             if (pass->getPassType() == MirPassType::Transform)

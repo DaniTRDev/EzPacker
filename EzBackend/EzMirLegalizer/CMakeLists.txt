@@ -1,9 +1,13 @@
 set(EZMIRLEGALIZER_FILES_LIST
         "include/EzMirLegalizerCommon.h"
         "include/MirLegalizerContext.h"
+        "include/MirAbiLegalizerPass/MirAbiLegalizerPass.h"
+        "include/MirInstructionLegalizer/MirInstructionLegalizerPass.h"
         "include/MirTypeLegalizer/MirTypeLegalizerPass.h"
 
         "src/MirLegalizerContext.cpp"
+        "src/MirAbiLegalizerPass/MirAbiLegalizerPass.cpp"
+        "src/MirInstructionLegalizer/MirInstructionLegalizerPass.cpp"
         "src/MirTypeLegalizer/MirTypeLegalizerPass.cpp"
 )
 
@@ -28,5 +32,12 @@ if (EZPACKER_BUILD_TESTS)
             "EzMirLegalizer;EzABI"
             ""
             "tests/T_MirLegalizerContext.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_MirAbiLegalizer"
+            "EzMirLegalizer;EzABI"
+            ""
+            "tests/T_MirAbiLegalizer.cpp"
     )
 endif ()

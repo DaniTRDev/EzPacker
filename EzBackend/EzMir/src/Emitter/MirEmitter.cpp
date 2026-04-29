@@ -189,6 +189,12 @@ MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode, const std::initial
     return instr;
 }
 
+MirRegister MirEmitter::createPhysicalRegister(size_t id, size_t size)
+{
+    MirRegister mirRegister{ false, id, size };
+    return mirRegister;
+}
+
 MirRegister MirEmitter::createVirtualRegister(size_t size)
 {
     MirRegister mirRegister{ true, m_ctx->createId(), size };
