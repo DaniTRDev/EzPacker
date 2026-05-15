@@ -3,7 +3,7 @@
 AstNode *VariableParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 {
     TokenInformation typeToken, nameToken;
-    TypedPoolSlice<AstNode> *initializers = nullptr;
+    TypedPoolLinkedList<AstNode> *initializers = nullptr;
     std::string_view type, name;
 
     // A variable might or might not have a type. This will be guarded in the semantic checker.
@@ -41,7 +41,7 @@ AstNode *VariableParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
     if (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Colon))
     {
         // Variable has initializers.
-        initializers = ctx->getNodePool()->createSlice<AstNode>();
+        initializers = ctx->getNodePool()->createLinkedList<AstNode>();
 
         if (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftBrace))
         {
@@ -60,7 +60,7 @@ AstNode *VariableParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
                         return nullptr;
                     }
 
-                    ctx->getNodePool()->appendToSlice(initializers, initializer);
+                    ctx->getNodePool()->appendToListBack(initializers, initializer);
                 } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
                 if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightBrace))
@@ -86,7 +86,7 @@ AstNode *VariableParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
                 return nullptr;
             }
 
-            ctx->getNodePool()->appendToSlice(initializers, initializer);
+            ctx->getNodePool()->appendToListBack(initializers, initializer);
         }
     }
 

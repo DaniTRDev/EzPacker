@@ -1,27 +1,31 @@
 #include "Instruction/MirInstruction.h"
 
-MirInstruction::MirInstruction(MirInstructionOpCode opcode, TypedPoolSlice<MirOperand> *operands) :
+MirInstruction::MirInstruction(MirInstructionOpCode opcode, TypedPoolLinkedList<MirOperand> *operands) :
     m_opcode(opcode), m_operands(operands)
 {
 }
 
 bool MirInstruction::hasOperands() const { return m_operands && m_operands->m_numElems > 0; }
 
+bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstructionFlags::TreatAsSigned; }
+
 const MirInstructionMetadata &MirInstruction::getMetadata() const { return getMeta(getOpCode()); }
+
+const MirInstructionLinearEquivalent &MirInstruction::getLinearEquivalent() const
+{
+    return getMetadata().m_linearEquivalent;
+}
 
 MirInstructionOpCode MirInstruction::getOpCode() const { return m_opcode; }
 
-size_t MirInstruction::getLoweredOpCode() const { return m_loweredOpCode; }
+TypedPoolLinkedList<MirOperand> *MirInstruction::getOperands() const { return m_operands; }
 
-TypedPoolSlice<MirOperand> *MirInstruction::getOperands() const { return m_operands; }
-
-uint32_t MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
-
-void MirInstruction::setLoweredOpCode(size_t loweredOpCode) { m_loweredOpCode = loweredOpCode; }
+MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
 
 std::string MirInstruction::toString() const
 {
-    std::string res = getMetadata().m_name;
+    std::string res;
+    res += getMetadata().m_name;
 
     for (auto operand : *m_operands)
     {

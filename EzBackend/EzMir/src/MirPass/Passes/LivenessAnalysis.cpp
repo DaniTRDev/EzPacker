@@ -3,34 +3,34 @@
 
 LivenessAnalysis::LivenessAnalysis(MirEmitter *emitter) : m_emitter(emitter) {}
 
-bool LivenessAnalysis::run(MirFunction *func, MirPassManager *pm)
+bool LivenessAnalysis::run(TypedPoolLinkedList<class MirBlock> *blockList,
+                           TypedPoolLinkedList<class MirBlock>::Iterator it,
+                           class MirPassManager *passManager)
 {
     m_result.m_liveIn.clear();
     m_result.m_liveOut.clear();
     m_result.m_def.clear();
     m_result.m_use.clear();
 
-    auto &cfgPass = pm->getAnalysis<CodeFlowAnalysis>(func, m_emitter);
+    auto &cfgPass = passManager->getAnalysis<CodeFlowAnalysis>(blockList, it, m_emitter);
     const ControlFlowResult &cfg = cfgPass.getResult();
 
-    computeLocalLiveness(func);
-    computeGlobalLiveness(func, cfg);
+    computeLocalLiveness(blockList, it);
+    computeGlobalLiveness(blockList, it, cfg);
 
     return true;
 }
 
 const LivenessResult &LivenessAnalysis::getResult() const { return m_result; }
 
-void LivenessAnalysis::computeLocalLiveness(MirFunction *func)
+void LivenessAnalysis::computeLocalLiveness(TypedPoolLinkedList<class MirBlock> *blockList,
+                                            TypedPoolLinkedList<class MirBlock>::Iterator it)
 {
-    TypedPoolSlice<MirBlock> *blocks = func->getBlocks();
-    if (!blocks)
-        return;
-
-    for (auto blockIt = blocks->begin(); blockIt != blocks->end(); ++blockIt)
+    for (auto blockIt = it; blockIt != blockList->end(); ++blockIt)
     {
         MirBlock *block = *blockIt;
-        TypedPoolSlice<MirInstruction> *instructions = block->getInstructions();
+        size_t blockId = block->getId();
+        TypedPoolLinkedList<MirInstruction> *instructions = block->getInstructions();
 
         if (!instructions)
             continue;
@@ -38,64 +38,75 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func)
         for (auto instIt = instructions->begin(); instIt != instructions->end(); ++instIt)
         {
             MirInstruction *inst = *instIt;
-            TypedPoolSlice<MirOperand> *operands = inst->getOperands();
+            TypedPoolLinkedList<MirOperand> *operands = inst->getOperands();
 
             if (!operands)
                 continue;
 
-            // Look for uses (reads).
+            const auto &metadataOperands = inst->getMetadata().m_operandConstraints;
+
+            // Look for defs (writes).
             size_t opIndex = 0;
             for (auto opIt = operands->begin(); opIt != operands->end(); ++opIt, ++opIndex)
             {
                 MirOperand *op = *opIt;
-                MirRegister *reg = op->getRegister();
-                OperandConstraint constraint = inst->getMetadata().m_operands[opIndex];
 
-                bool isReadOperand = constraint.flags & OperandFlag::Read;
+                if (!op->isOfType<MirRegister>())
+                    continue;
+                if (opIndex >= metadataOperands.size())
+                    continue;
 
-                if (reg && reg->m_virtual && isReadOperand)
+                MirRegister *reg = op->get<MirRegister>();
+                OperandConstraint constraint = metadataOperands[opIndex];
+
+                if (reg && reg->isVirtual() && (constraint.flags & OperandFlag::Write))
                 {
-                    // If it's defined, insert it in the use.
-                    if (m_result.m_def[block].find(*reg) == m_result.m_def[block].end())
-                    {
-                        m_result.m_use[block].insert(*reg);
-                    }
+                    m_result.m_def[blockId].insert(*reg);
                 }
             }
 
-            // Look for defs (writes).
+            // Look for uses (reads).
             opIndex = 0;
             for (auto opIt = operands->begin(); opIt != operands->end(); ++opIt, ++opIndex)
             {
                 MirOperand *op = *opIt;
-                MirRegister *reg = op->getRegister();
-                OperandConstraint constraint = inst->getMetadata().m_operands[opIndex];
 
-                bool isWriteOperand = constraint.flags & OperandFlag::Write;
-                if (reg && reg->m_virtual && isWriteOperand)
+                if (!op->isOfType<MirRegister>())
+                    continue;
+
+                if (opIndex >= metadataOperands.size())
+                    continue;
+
+                MirRegister *reg = op->get<MirRegister>();
+                OperandConstraint constraint = metadataOperands[opIndex];
+
+                if (reg && reg->isVirtual() && (constraint.flags & OperandFlag::Read))
                 {
-                    m_result.m_def[block].insert(*reg);
+                    // If it is read before being written in this block, it's a use.
+                    if (m_result.m_def[blockId].find(*reg) == m_result.m_def[blockId].end())
+                    {
+                        m_result.m_use[blockId].insert(*reg);
+                    }
                 }
             }
         }
     }
 }
 
-void LivenessAnalysis::computeGlobalLiveness(MirFunction *func, const ControlFlowResult &cfg)
+void LivenessAnalysis::computeGlobalLiveness(TypedPoolLinkedList<class MirBlock> *blockList,
+                                             TypedPoolLinkedList<class MirBlock>::Iterator it,
+                                             const ControlFlowResult &cfg)
 {
-    TypedPoolSlice<MirBlock> *blocks = func->getBlocks();
-    if (!blocks || blocks->m_numElems == 0)
-        return;
-
     bool changed = true;
-
     while (changed)
     {
         changed = false;
 
-        for (auto it = blocks->rbegin(); it != blocks->rend(); ++it)
+        // Iterate backwards safely. Assuming `rbegin` and `rend` exist and work as expected.
+        for (auto reverseIterator = blockList->rbegin(); reverseIterator != blockList->rend(); ++reverseIterator)
         {
-            MirBlock *block = *it;
+            MirBlock *block = *reverseIterator;
+            size_t blockId = block->getId();
             std::unordered_set<MirRegister> newLiveOut;
 
             auto succIt = cfg.m_successors.find(block);
@@ -103,30 +114,39 @@ void LivenessAnalysis::computeGlobalLiveness(MirFunction *func, const ControlFlo
             {
                 for (MirBlock *succ : succIt->second)
                 {
-                    for (const MirRegister &reg : m_result.m_liveIn[succ])
+                    for (const MirRegister &reg : m_result.m_liveIn[succ->getId()])
                     {
                         newLiveOut.insert(reg);
                     }
                 }
             }
 
-            m_result.m_liveOut[block] = newLiveOut;
+            m_result.m_liveOut[blockId] = newLiveOut;
 
-            std::unordered_set<MirRegister> newLiveIn = m_result.m_use[block];
+            std::unordered_set<MirRegister> newLiveIn = m_result.m_use[blockId];
 
-            for (const MirRegister &reg : m_result.m_liveOut[block])
+            for (const MirRegister &reg : m_result.m_liveOut[blockId])
             {
-                if (m_result.m_def[block].find(reg) == m_result.m_def[block].end())
+                if (m_result.m_def[blockId].find(reg) == m_result.m_def[blockId].end())
                 {
                     newLiveIn.insert(reg);
                 }
             }
 
-            if (newLiveIn != m_result.m_liveIn[block])
+            if (newLiveIn != m_result.m_liveIn[blockId])
             {
-                m_result.m_liveIn[block] = std::move(newLiveIn);
+                m_result.m_liveIn[blockId] = std::move(newLiveIn);
                 changed = true;
+            }
+
+            // Manually break *after* we've processed the target iterator 'it'
+            // (Assumes `*reverseIterator == *it` is checking block pointer equality)
+            if (*reverseIterator == *it)
+            {
+                break;
             }
         }
     }
 }
+
+MirPassIterationPlace LivenessAnalysis::getIterationPlace() const { return MirPassIterationPlace::Block; }

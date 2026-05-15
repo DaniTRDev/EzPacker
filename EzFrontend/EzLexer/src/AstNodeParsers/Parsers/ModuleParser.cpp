@@ -45,7 +45,7 @@ AstNode *ModuleHeaderParser::parse(const std::shared_ptr<BasicParsingContext> &c
      * Which can only be a ModuleHeader.
      */
 
-    TypedPoolSlice<AstNode> *arguments = nodePool->createSlice<AstNode>();
+    TypedPoolLinkedList<AstNode> *arguments = nodePool->createLinkedList<AstNode>();
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
     {
 
@@ -65,7 +65,7 @@ AstNode *ModuleHeaderParser::parse(const std::shared_ptr<BasicParsingContext> &c
                                ctx->getLastSourceReference());
                 return nullptr;
             }
-            nodePool->appendToSlice(arguments, argument);
+            nodePool->appendToListBack(arguments, argument);
         } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
         if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))

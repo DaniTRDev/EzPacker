@@ -29,7 +29,9 @@ class CodeFlowAnalysis : public IMirAnalysisPass
      * @param pm
      * @return
      */
-    bool run(MirFunction *func, MirPassManager *pm) override;
+    bool run(TypedPoolLinkedList<class MirBlock> *blockList,
+             TypedPoolLinkedList<class MirBlock>::Iterator it,
+             class MirPassManager *passManager) override;
 
     /**
      * Returns the result of the analysis.
@@ -37,6 +39,12 @@ class CodeFlowAnalysis : public IMirAnalysisPass
      */
     const ControlFlowResult &getResult() const;
 
+    /**
+     * Returns the iteration place. Depending on the place, one callback or the other will be called.
+     * @return
+     */
+    MirPassIterationPlace getIterationPlace() const override;
+    
   private:
     /**
      * Adds an edge to the flow graph.

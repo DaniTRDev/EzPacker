@@ -5,7 +5,7 @@ bool AstLoweringPhase::execute(struct FrontendCompilationUnit *unit)
     const std::shared_ptr<ErrorCollector> &errorCollector = unit->getErrorCollector();
     const std::shared_ptr<BasicSemanticContext> &semanticContext = unit->getSemanticContext();
     const std::shared_ptr<SourceManager> &sourceManager = unit->getSourceManager();
-    TypedPoolSlice<AstNode> *globalScopeAstNodes = unit->getGlobalScopeAstNodes();
+    TypedPoolLinkedList<AstNode> *globalScopeAstNodes = unit->getGlobalScopeAstNodes();
 
     auto mirEmitterContext = std::make_shared<MirEmitterContext>(errorCollector, sourceManager);
     auto mirEmitter = std::make_shared<MirEmitter>(mirEmitterContext.get());

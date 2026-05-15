@@ -100,7 +100,7 @@ bool FrontendCompilerDriver::compile()
         const std::shared_ptr<SourceManager> &sourceManager = unit->getSourceManager();
         std::shared_ptr<BasicSemanticContext> semanticContext =
                 std::make_shared<BasicSemanticContext>(errorCollector, sourceManager, unit->getGlobalScope());
-        TypedPoolSlice<AstNode> *globalScopeAstNodes = unit->getGlobalScopeAstNodes();
+        TypedPoolLinkedList<AstNode> *globalScopeAstNodes = unit->getGlobalScopeAstNodes();
 
         unit->setSemanticContext(semanticContext);
         unit->setGlobalScopeAstNodes(globalScopeAstNodes);

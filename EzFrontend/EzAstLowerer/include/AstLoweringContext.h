@@ -33,8 +33,8 @@ class AstLoweringContext
      * required by the public lowerers.
      */
     AstLoweringContext(const std::shared_ptr<struct BasicSemanticContext> &semanticCtx,
-                    const std::shared_ptr<struct MirEmitter> &emitter,
-                    const std::shared_ptr<struct MirEmitterContext> &emitterContext);
+                       const std::shared_ptr<struct MirEmitter> &emitter,
+                       const std::shared_ptr<struct MirEmitterContext> &emitterContext);
 
     /**
      * Returns the `AstLowererVisitor` currently using this context, if one has
@@ -80,7 +80,7 @@ class AstLoweringContext
      *
      * @return `false` if the semantic type name was already linked.
      */
-    bool linkTypeNameToMirTypeId(Type *semanticType, size_t mirTypeId);
+    bool linkTypeToMirTypeId(Type *semanticType, size_t mirTypeId);
 
     /**
      * Pops and returns the top MIR block from the block stack.
@@ -103,11 +103,11 @@ class AstLoweringContext
     MirInstruction *popInstruction();
 
     /**
-     * Pops and returns the top MIR operand from the operand stack.
+     * Pops and returns the top MIR operand and its type from the operand stack.
      *
      * Throws if the stack is empty.
      */
-    MirOperand popOperand();
+    std::pair<MirOperand, MirType *> popOperand();
 
     /**
      * Returns a MIR type corresponding to the provided semantic type.
@@ -149,7 +149,7 @@ class AstLoweringContext
     /**
      * Pushes a MIR operand onto the operand stack.
      */
-    void pushOperand(MirOperand operand);
+    void pushOperand(MirOperand operand, MirType *type);
 
     /**
      * Pushes a MIR instruction onto the instruction stack.
@@ -198,7 +198,7 @@ class AstLoweringContext
     /**
      * Returns the current operand stack.
      */
-    const std::stack<MirOperand> &getOperandStack() const;
+    const std::stack<std::pair<MirOperand, MirType *>> &getOperandStack() const;
 
   private:
     class AstLowererVisitor *m_ownerVisitor;   // Visitor that is using this context.
@@ -211,7 +211,7 @@ class AstLoweringContext
     std::stack<MirBlock *> m_switchContextStack; // Used to know how to handle break in nested switches.
     std::stack<MirBlock *> m_blockStack;         // Used to transfer blocks between lowerers.
     std::stack<MirInstruction *> m_instructionStack;
-    std::stack<MirOperand>
+    std::stack<std::pair<MirOperand, MirType *>>
             m_operandStack; // Stack to hold operands during lowering, useful for expressions and temporary values.
 };
 

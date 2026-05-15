@@ -17,7 +17,7 @@
 #include "EzMirCommon.h"
 #include "MirBlock.h"
 #include "MirEmitterContext.h"
-#include "Operand/MirOperand.h"
+#include "Operand/MirOperands.h"
 
 class MirEmitter
 {
@@ -50,7 +50,7 @@ class MirEmitter
      * metadata says.
      */
     bool areInstructionOperandsLegal(const MirInstructionMetadata &instructionMeta,
-                                     TypedPoolSlice<MirOperand> *operands) const;
+                                     TypedPoolLinkedList<MirOperand> *operands) const;
 
     /**
      * Returns the context currently attached to this emitter.
@@ -60,8 +60,8 @@ class MirEmitter
     /**
      * Emits an instruction with no explicit operands.
      *
-     * The created instruction is allocated by the context and, if a block is
-     * currently bound there, appended to that block automatically.
+     * The created instruction is allocated by the context and, if a block is currently bound, appended to that block
+     * automatically.
      */
     MirInstruction *emit(MirInstructionOpCode opcode);
 
@@ -70,28 +70,26 @@ class MirEmitter
      * @return `true` if the instruction was created and all the operands were correctly added to it, false other ways.
      * If the instruction is illegal, an error is emitted.
      */
-    MirInstruction *emit(MirInstructionOpCode opcode, const std::initializer_list<MirOperand> &operands);
+    MirInstruction *emit(MirInstructionOpCode opcode, const std::initializer_list<MirOperand *> &operands);
 
     // Define the macro to generate a method for each instruction
-
-#define INSTRUCTION(NAME, category, ops, flags)                                                                        \
+#define INSTRUCTION(NAME, category, linearEq, ops, flags)                                                              \
     template <typename... OperandTypes> MirInstruction *emit##NAME(OperandTypes &&...operands)                         \
     {                                                                                                                  \
-        std::initializer_list<MirOperand> operandList = { std::forward<OperandTypes>(operands)... };                   \
+        std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
         return emit(MirInstructionOpCode::NAME, std::move(operandList));                                               \
-    }
-    // Include the file again to expand the macros
+    } // Include the file again to expand the macros
 
 #include "Instruction/MirInstructionSet.h"
 #undef INSTRUCTION
-    
+
     /**
      * Creates a physical register with the given ID and size. Id might be created with createId or not, depends on
      * target's register information.
      * @param size
      * @return
      */
-    MirRegister createPhysicalRegister(size_t id, size_t size);
+    MirRegister *createPhysicalRegister(MirType *type, size_t id);
 
     /**
      * Creates a new virtual register descriptor.
@@ -99,12 +97,44 @@ class MirEmitter
      * The register receives a fresh MIR ID from the context and stores the
      * requested size in bytes.
      */
-    MirRegister createVirtualRegister(size_t size);
+    MirRegister *createVirtualRegister(MirType *type);
+
+    /**
+     * Creates a new reference out of the given block.
+     * @param block
+     * @return
+     */
+    MirReference *createReference(MirBlock *block);
+
+    /**
+     * Creates an immediate integer operand allocated in the context's operand pool.
+     */
+    MirInteger *createImmediateInteger(MirType *type, int64_t value);
+
+    /**
+     * Creates an immediate double operand allocated in the context's operand pool.
+     */
+    MirDouble *createImmediateDouble(MirType *type, double value);
+
+    /**
+     * Creates a constant pool reference operand allocated in the context's operand pool.
+     */
+    MirConstantPoolRef *createConstantPoolRef(MirType *type, size_t entryId);
+
+    /**
+     * Creates a memory access operand allocated in the context's operand pool.
+     */
+    MirMemory *createMemoryOperand(MirType *type, class MirOperand *base, class MirOperand *displ);
+
+    /**
+     * Creates a frame index operand allocated in the context's operand pool.
+     */
+    MirFrameIndex *createFrameIndex(MirType *type, size_t frameId);
 
     /**
      * Appends one operand to an existing instruction's operand slice.
      */
-    void emitOperandToInstruction(MirInstruction *instr, MirOperand operand);
+    void emitOperandToInstruction(MirInstruction *instr, MirOperand *operand);
 
   private:
     /**
@@ -113,7 +143,7 @@ class MirEmitter
      * The method is recursive and returns `false` if any append operation
      * fails.
      */
-    bool emitOperands(MirInstruction *instr, const std::initializer_list<MirOperand> &operands);
+    bool emitOperands(MirInstruction *instr, const std::initializer_list<MirOperand *> &operands);
 
   private:
     MirBlock *m_currentBlock;

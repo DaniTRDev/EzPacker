@@ -1,6 +1,6 @@
 #include "AstNode/AstNodeVisitor.h"
 
-bool AstNodeVisitor::visitAll(TypedPoolSlice<AstNode> *nodeList)
+bool AstNodeVisitor::visitAll(TypedPoolLinkedList<AstNode> *nodeList)
 {
     if (!nodeList || nodeList->m_numElems == 0)
         return true;

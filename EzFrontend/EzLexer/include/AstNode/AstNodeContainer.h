@@ -5,7 +5,7 @@
  * Nodes such as CodeScope, Instruction, ModuleHeader, and Variable inherit
  * from AstNodeContainer (in addition to AstNode) so they can store and
  * iterate over an ordered sequence of child nodes.  The children are kept
- * in a TypedPoolSlice for cache-friendly, arena-allocated storage.
+ * in a TypedPoolLinkedList for cache-friendly, arena-allocated storage.
  */
 #ifndef EZPACKER_ASTNODECONTAINER_H
 #define EZPACKER_ASTNODECONTAINER_H
@@ -37,18 +37,18 @@ class AstNodeContainer
     /**
      * Returns the expressions defined in this container (as a slice of a TypedPool). May return nullptr
      * if no expressions have been set.
-     * @return TypedPoolSlice<AstNode> *
+     * @return TypedPoolLinkedList<AstNode> *
      */
-    TypedPoolSlice<AstNode> *getExpressions() const;
+    TypedPoolLinkedList<AstNode> *getExpressions() const;
 
     /**
      * Sets the expressions of this container.
      * @param expressions
      */
-    void setExpressions(TypedPoolSlice<AstNode> *expressions);
+    void setExpressions(TypedPoolLinkedList<AstNode> *expressions);
 
   private:
-    TypedPoolSlice<AstNode> *m_expressions{ nullptr };
+    TypedPoolLinkedList<AstNode> *m_expressions{ nullptr };
 };
 
 #endif // EZPACKER_ASTNODECONTAINER_H

@@ -8,7 +8,7 @@
  * so a subclass only needs to override the methods it cares about.
  *
  * Helper utilities:
- *   - visitAll()       — iterates a TypedPoolSlice of nodes, calling
+ *   - visitAll()       — iterates a TypedPoolLinkedList of nodes, calling
  *                         accept() on each one.
  *   - visitBaseClass() — takes a generic AstNode* and dispatches to the
  *                         correct concrete visit() overload.
@@ -23,7 +23,7 @@
  * to perform operations on specific node types. Each visit() returns true to continue traversal
  * or false to stop. The default implementation of every visit() returns true (no-op).
  *
- * Use visitAll() to iterate an entire TypedPoolSlice of nodes, or visitBaseClass() to dispatch
+ * Use visitAll() to iterate an entire TypedPoolLinkedList of nodes, or visitBaseClass() to dispatch
  * a single AstNode* to its concrete visit() overload.
  */
 class AstNodeVisitor
@@ -151,7 +151,7 @@ class AstNodeVisitor
      * @param nodeList
      * @return bool
      */
-    bool visitAll(TypedPoolSlice<AstNode> *nodeList);
+    bool visitAll(TypedPoolLinkedList<AstNode> *nodeList);
 };
 
 #endif // EZPACKER_ASTNODEVISITOR_H

@@ -20,24 +20,38 @@
 
 #include "EzMirCommon.h"
 #include "MirBlock.h"
+#include "Type/MirType.h"
+#include "MirFunctionStackFrame.h"
 
+/**
+ * Important: Parameters MUST BE VIRTUAL/PHYSICAL REGISTERS.
+ */
 class MirFunction
 {
   public:
     /**
      * Creates a function wrapper over arena-managed MIR data structures.
      *
-     * @param entryPoint   First block executed when the function starts.
-     * @param id           Unique MIR ID for the function itself.
-     * @param returnTypeId MIR type ID describing the function's return value.
-     * @param blocks       Ordered block slice belonging to the function.
-     * @param parameters   Slice of parameter operands in declaration order.
+     * @param entryPoint    First block executed when the function starts.
+     * @param id            Unique MIR ID for the function itself.
+     * @param returnType    MIR type describing the function's return value.
+     * @param blocks        Ordered block slice belonging to the function.
+     * @param parameters    Slice of parameter operands in declaration order.
+     * @param name
      */
     MirFunction(MirBlock *entryPoint,
+                MirType *returnType,
+                MirFunctionStackFrame *stackFrame,
                 size_t id,
-                size_t returnTypeId,
-                TypedPoolSlice<MirBlock> *blocks,
-                TypedPoolSlice<MirOperand> *parameters);
+                TypedPoolLinkedList<MirBlock> *blocks,
+                TypedPoolLinkedList<MirOperand*> *parameters,
+                const char *name);
+
+    /**
+     * Returns the name of the function.
+     * @return
+     */
+    const char *getName();
 
     /**
      * Returns the function entry block.
@@ -45,14 +59,21 @@ class MirFunction
     MirBlock *getEntryPoint();
 
     /**
+     * Returns the stack frame linked to this object.
+     * @return
+     */
+    MirFunctionStackFrame *getStackFrame();
+
+    /**
+     * Returns the return type of the function.
+     * @return
+     */
+    MirType *getReturnType();
+
+    /**
      * Returns the unique MIR ID assigned to this function.
      */
     size_t getId();
-
-    /**
-     * Returns the MIR type ID of the function's return value.
-     */
-    size_t getReturnTypeId();
 
     /**
      * Returns the mutable list of blocks that belong to this function.
@@ -60,7 +81,7 @@ class MirFunction
      * The list always contains the entry point as its first block right after
      * `MirEmitterContext::createFunction()` succeeds.
      */
-    TypedPoolSlice<MirBlock> *getBlocks();
+    TypedPoolLinkedList<MirBlock> *getBlocks();
 
     /**
      * Returns the parameter list for this function.
@@ -68,14 +89,24 @@ class MirFunction
      * Each element is a `MirOperand` describing one incoming parameter. The
      * exact calling-convention meaning is defined by later lowering stages.
      */
-    TypedPoolSlice<MirOperand> *getParameters();
+    TypedPoolLinkedList<MirOperand*> *getParameters();
+
+    /**
+     * Appends a parameter to the function.
+     * @param param
+     * @param paramType
+     * @param name
+     */
+    void appendParameter(MirRegister *param, const char *name);
 
   private:
     MirBlock *m_entryPoint;
+    MirFunctionStackFrame *m_stackFrame;
+    MirType *m_returnType;
     size_t m_id;
-    size_t m_returnTypeId;
-    TypedPoolSlice<MirBlock> *m_blocks; // Arena-managed blocks belonging to this function.
-    TypedPoolSlice<MirOperand> *m_parameters;
+    TypedPoolLinkedList<MirBlock> *m_blocks; // Arena-managed blocks belonging to this function.
+    TypedPoolLinkedList<MirOperand *> *m_parameters;
+    const char *m_name;
 };
 
 #endif // EZPACKER_MIRFUNCTION_H

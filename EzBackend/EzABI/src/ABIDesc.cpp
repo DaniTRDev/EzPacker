@@ -35,7 +35,7 @@ void ABIDesc::setStackFrame(PhysicalRegId stackFrame) { m_stackFrame = stackFram
 
 void ABIDesc::setStackOffsetSize(size_t sizeInBits) { m_stackOffsetSizeInBits = sizeInBits; }
 
-void ABIDesc::setStackReg(PhysicalRegId stackReg) {}
+void ABIDesc::setStackReg(PhysicalRegId stackReg) { m_stackReg = stackReg; }
 
 const std::vector<PhysicalRegId> &ABIDesc::getCalleeSavedRegs() const { return m_calleeSavedRegs; }
 

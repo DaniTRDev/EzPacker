@@ -3,6 +3,7 @@
 
 #include "EzMirCommon.h"
 #include "IMirPass.h"
+#include "Function/MirFunction.h"
 
 class MirPassManager
 {
@@ -20,7 +21,10 @@ class MirPassManager
         m_passes.push_back(std::make_unique<T>(std::forward<Args>(args)...));
     }
 
-    template <typename T, typename... Args> T &getAnalysis(MirFunction *func, Args &&...args)
+    template <typename T, typename IteratedElementType, typename... Args>
+    T &getAnalysis(TypedPoolLinkedList<IteratedElementType> *list,
+                   TypedPoolLinkedList<IteratedElementType>::Iterator it,
+                   Args &&...args)
     {
         std::type_index typeId = std::type_index(typeid(T));
 
@@ -34,10 +38,10 @@ class MirPassManager
         auto analysisPass = std::make_unique<T>(std::forward<Args...>(args)...);
         if (analysisPass->getPassType() != MirPassType::Analysis)
         {
-            throw std::runtime_error("Attempted to require a Transform pass as an Analysis");
+            throw std::runtime_error("Attempted to require a Transform pass inside an Analysis");
         }
 
-        analysisPass->run(func, this);
+        analysisPass->run(list, it, this);
 
         T *passPtr = analysisPass.get();
         m_validAnalyses[typeId] = passPtr;
@@ -47,22 +51,29 @@ class MirPassManager
         return *passPtr;
     }
 
-    bool run(MirFunction *func)
-    {
-        for (auto &pass : m_passes)
-        {
-            if (!pass->run(func, this))
-            {
-            
-            }
+    /**
+     * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
+     * iterator was modified.
+     */
+    bool run(TypedPoolLinkedList<class MirFunction> *funcList,
+             TypedPoolLinkedList<class MirFunction>::Iterator it,
+             class MirPassManager *passManager);
 
-            if (pass->getPassType() == MirPassType::Transform)
-            {
-                invalidateAllAnalyses();
-            }
-        }
-        return true;
-    }
+    /**
+     * Runs the pass on the given MIR block. Returns false if the list (or the elem inside the iterator) that holds the
+     * iterator was modified.
+     */
+    bool run(TypedPoolLinkedList<class MirBlock> *blockList,
+             TypedPoolLinkedList<class MirBlock>::Iterator it,
+             class MirPassManager *passManager);
+
+    /**
+     * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
+     * iterator was modified.
+     */
+    bool run(TypedPoolLinkedList<class MirInstruction> *instrList,
+             TypedPoolLinkedList<class MirInstruction>::Iterator it,
+             class MirPassManager *passManager);
 
     void invalidateAllAnalyses()
     {

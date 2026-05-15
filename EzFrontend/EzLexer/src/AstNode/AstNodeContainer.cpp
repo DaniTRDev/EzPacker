@@ -4,6 +4,6 @@ bool AstNodeContainer::containsExpressions() const { return getExpressionCount()
 
 size_t AstNodeContainer::getExpressionCount() const { return m_expressions->m_numElems; }
 
-TypedPoolSlice<AstNode> *AstNodeContainer::getExpressions() const { return m_expressions; }
+TypedPoolLinkedList<AstNode> *AstNodeContainer::getExpressions() const { return m_expressions; }
 
-void AstNodeContainer::setExpressions(TypedPoolSlice<AstNode> *expressions) { m_expressions = expressions; }
+void AstNodeContainer::setExpressions(TypedPoolLinkedList<AstNode> *expressions) { m_expressions = expressions; }

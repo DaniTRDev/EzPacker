@@ -62,9 +62,9 @@ class FrontendCompilationUnit : public ErrorEmitter
      *
      * These nodes represent top-level declarations (functions, globals, etc.) parsed from the source.
      *
-     * @return Pointer to the `TypedPoolSlice` containing the global AST nodes.
+     * @return Pointer to the `TypedPoolLinkedList` containing the global AST nodes.
      */
-    TypedPoolSlice<AstNode> *getGlobalScopeAstNodes();
+    TypedPoolLinkedList<AstNode> *getGlobalScopeAstNodes();
 
     /**
      * @brief Releases resources held by this compilation unit.
@@ -82,7 +82,7 @@ class FrontendCompilationUnit : public ErrorEmitter
      *
      * @param globalScopeAstNodes Pointer to the AST node slice.
      */
-    void setGlobalScopeAstNodes(TypedPoolSlice<AstNode> *globalScopeAstNodes);
+    void setGlobalScopeAstNodes(TypedPoolLinkedList<AstNode> *globalScopeAstNodes);
 
     /**
      * @brief Sets the lowering context used for AST-to-MIR conversion.
@@ -180,7 +180,7 @@ class FrontendCompilationUnit : public ErrorEmitter
     const std::shared_ptr<Scope> &getGlobalScope() const;
 
   private:
-    TypedPoolSlice<AstNode> *m_globalScopeAstNodes; // AST nodes that belong to the global scope.
+    TypedPoolLinkedList<AstNode> *m_globalScopeAstNodes; // AST nodes that belong to the global scope.
     size_t m_targetSourceId;                        // The source ID of the source file being compiled.
     std::set<std::string> m_includedFiles; // Set of file paths that have been included during the compilation process.
     std::shared_ptr<BasicParsingContext> m_parsingContext;

@@ -39,7 +39,7 @@ class Variable : public AstNode, public AstNodeContainer
      *                 source omitted an explicit type.
      * @param variableName Variable name without the leading `%`.
      */
-    Variable(TypedPoolSlice<AstNode> *initializers, std::string_view dataType, std::string_view variableName);
+    Variable(TypedPoolLinkedList<AstNode> *initializers, std::string_view dataType, std::string_view variableName);
 
     /**
      * Returns AstNodeType::Variable.

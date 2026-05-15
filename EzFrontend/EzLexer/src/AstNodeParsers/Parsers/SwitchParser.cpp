@@ -46,7 +46,7 @@ AstNode *SwitchParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
 
     CodeScope *_default = nullptr;
     TypedPool *nodePool = ctx->getNodePool();
-    TypedPoolSlice<AstNode> *cases = nodePool->createSlice<AstNode>();
+    TypedPoolLinkedList<AstNode> *cases = nodePool->createLinkedList<AstNode>();
     SwitchAstNode *switchAstNode = nodePool->create<SwitchAstNode>(switchVar);
 
     while (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightBrace))
@@ -123,7 +123,7 @@ AstNode *SwitchParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
             return nullptr;
         }
 
-        nodePool->createAndAppendToSlice<SwitchCaseAstNode>(cases, _caseScope, immediate);
+        nodePool->createAndAppendToListBack<SwitchCaseAstNode>(cases, _caseScope, immediate);
     }
 
     switchAstNode->setCases(cases);

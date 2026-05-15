@@ -40,7 +40,7 @@ class ModuleHeader : public AstNode, public AstNodeContainer
      * @param moduleName Module/function name.
      * @param returnType Parsed return type spelling.
      */
-    ModuleHeader(TypedPoolSlice<AstNode> *parameters, std::string_view moduleName, std::string_view returnType);
+    ModuleHeader(TypedPoolLinkedList<AstNode> *parameters, std::string_view moduleName, std::string_view returnType);
 
     /**
      * Returns the type of the node.

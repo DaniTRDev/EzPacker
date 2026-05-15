@@ -87,7 +87,7 @@ TEST_F(MirEmitterContextTests, CreateFunctionReturnsNonNull)
     // We need a valid return type ID.
     MirType *voidType = ctx->createType(MirTypeKind::Void, nullptr, "void");
     ASSERT_NE(voidType, nullptr);
-    MirFunction *fn = ctx->createFunction(voidType->getId());
+    MirFunction *fn = ctx->createFunction(voidType, nullptr, nullptr, "test");
     ASSERT_NE(fn, nullptr);
     EXPECT_NE(fn->getId(), MIRID_INVALID);
     EXPECT_NE(fn->getEntryPoint(), nullptr);
@@ -95,7 +95,7 @@ TEST_F(MirEmitterContextTests, CreateFunctionReturnsNonNull)
 
 TEST_F(MirEmitterContextTests, CreateFunctionWithInvalidReturnTypeEmitsError)
 {
-    MirFunction *fn = ctx->createFunction(MIRID_INVALID);
+    MirFunction *fn = ctx->createFunction(nullptr, nullptr, nullptr, "test");
     EXPECT_EQ(fn, nullptr);
 }
 
@@ -187,7 +187,7 @@ TEST_F(MirEmitterContextTests, FunctionHasEntryPointBlock)
 {
     MirType *voidType = ctx->createType(MirTypeKind::Void, nullptr, "void");
     ASSERT_NE(voidType, nullptr);
-    MirFunction *fn = ctx->createFunction(voidType->getId());
+    MirFunction *fn = ctx->createFunction(voidType, nullptr, nullptr, "test");
     ASSERT_NE(fn, nullptr);
     ASSERT_NE(fn->getEntryPoint(), nullptr);
     ASSERT_NE(fn->getBlocks(), nullptr);
@@ -198,9 +198,9 @@ TEST_F(MirEmitterContextTests, FunctionReturnTypeIdIsStored)
 {
     MirType *i64Type = ctx->createType(MirTypeKind::Integer, nullptr, "i64");
     ASSERT_NE(i64Type, nullptr);
-    MirFunction *fn = ctx->createFunction(i64Type->getId());
+    MirFunction *fn = ctx->createFunction(i64Type, nullptr, nullptr, "test");
     ASSERT_NE(fn, nullptr);
-    EXPECT_EQ(fn->getReturnTypeId(), i64Type->getId());
+    EXPECT_EQ(fn->getReturnType()->getId(), i64Type->getId());
 }
 
 TEST_F(MirEmitterContextTests, FunctionParameterPoolAccessible)
@@ -245,7 +245,7 @@ TEST_F(MirEmitterContextTests, CreatePointerType)
 TEST_F(MirEmitterContextTests, FunctionEntryPointIsFirstBlock)
 {
     MirType *voidType = ctx->createType(MirTypeKind::Void, nullptr, "void");
-    MirFunction *fn = ctx->createFunction(voidType->getId());
+    MirFunction *fn = ctx->createFunction(voidType, nullptr, nullptr, "test");
     ASSERT_NE(fn, nullptr);
     MirBlock *entry = fn->getEntryPoint();
     ASSERT_NE(entry, nullptr);

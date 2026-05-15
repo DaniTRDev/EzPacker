@@ -15,19 +15,6 @@
 #include "GenericAstLowerer.h"
 #include "VariableLowerer.h"
 
-class ModuleHeaderLowerer : public GenericAstLowerer
-{
-  public:
-    /**
-     * Tries to lower the given ModuleHeader node with the given lowering context. Will lower the parameters by register
-     * them as virtual registers.
-     * @param node
-     * @param ctx
-     * @return bool
-     */
-    bool lower(AstNode *node, AstLoweringContext *ctx) override;
-};
-
 class ModuleLowerer : public GenericAstLowerer
 {
   public:

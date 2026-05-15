@@ -20,7 +20,7 @@ bool InstructionLowerer::lower(AstNode *node, AstLoweringContext *ctx)
     }
 
     MirInstruction *loweredInstr = ctx->getEmitter()->emit(opcode);
-    TypedPoolSlice<MirOperand> *operandList = loweredInstr->getOperands();
+    TypedPoolLinkedList<MirOperand> *operandList = loweredInstr->getOperands();
 
     for (AstNode *ptr : *instruction->getExpressions())
     {
@@ -32,7 +32,7 @@ bool InstructionLowerer::lower(AstNode *node, AstLoweringContext *ctx)
                                                  node->getSourceRef());
             return false;
         }
-        ctx->getEmitter()->emitOperandToInstruction(loweredInstr, ctx->popOperand());
+        ctx->getEmitter()->emitOperandToInstruction(loweredInstr, ctx->popOperand().first);
     }
     
     if (!ctx->getEmitter()->areInstructionOperandsLegal(getMeta(loweredInstr->getOpCode()), operandList))

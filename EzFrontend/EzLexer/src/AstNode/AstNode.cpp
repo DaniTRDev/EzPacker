@@ -4,7 +4,7 @@ bool AstNode::hasAnnotations() const { return m_annotations && m_annotations->m_
 
 const SourceReference &AstNode::getSourceRef() const { return m_sourceRef; }
 
-TypedPoolSlice<IAstNodeAnnotation> *AstNode::getAnnotations() { return m_annotations; }
+TypedPoolLinkedList<IAstNodeAnnotation> *AstNode::getAnnotations() { return m_annotations; }
 
 void AstNode::setSourceRefs(const SourceReference &refs) { m_sourceRef = refs; }
 
@@ -17,8 +17,8 @@ void AstNode::addAnnotation(IAstNodeAnnotation *annot, TypedPool *annotPool)
 
     if (!m_annotations)
     {
-        m_annotations = annotPool->createSlice<IAstNodeAnnotation>();
+        m_annotations = annotPool->createLinkedList<IAstNodeAnnotation>();
     }
 
-    annotPool->appendToSliceInFront<IAstNodeAnnotation>(m_annotations, annot);
+    annotPool->appendToListFront<IAstNodeAnnotation>(m_annotations, annot);
 }

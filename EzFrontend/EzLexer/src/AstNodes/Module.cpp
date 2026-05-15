@@ -1,6 +1,6 @@
 #include "AstNodes/Module.h"
 
-ModuleHeader::ModuleHeader(TypedPoolSlice<AstNode> *parameters, std::string_view moduleName, std::string_view returnType) :
+ModuleHeader::ModuleHeader(TypedPoolLinkedList<AstNode> *parameters, std::string_view moduleName, std::string_view returnType) :
     m_moduleName(std::move(moduleName)), m_returnType(std::move(returnType))
 {
     AstNodeContainer::setExpressions(parameters);

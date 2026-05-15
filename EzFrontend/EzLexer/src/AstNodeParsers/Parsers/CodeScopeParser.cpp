@@ -12,7 +12,7 @@ AstNode *CodeScopeParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
     }
 
     TypedPool *nodePool = ctx->getNodePool();
-    TypedPoolSlice<AstNode> *expressions = nodePool->createSlice<AstNode>();
+    TypedPoolLinkedList<AstNode> *expressions = nodePool->createLinkedList<AstNode>();
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightBrace))
     {
@@ -30,7 +30,7 @@ AstNode *CodeScopeParser::parse(const std::shared_ptr<BasicParsingContext> &ctx)
         AstNode *exprNode = batch.parse(ctx).m_node;
         while (exprNode)
         {
-            nodePool->appendToSlice(expressions, exprNode);
+            nodePool->appendToListBack(expressions, exprNode);
             exprNode = batch.parse(ctx).m_node;
         }
 

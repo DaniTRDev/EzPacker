@@ -42,7 +42,7 @@ class Instruction : public AstNode, public AstNodeContainer
      * @param instructionName Lower-cased instruction mnemonic interned in the
      *                        parsing context's StringPool.
      */
-    Instruction(TypedPoolSlice<AstNode> *operands, std::string_view instructionName);
+    Instruction(TypedPoolLinkedList<AstNode> *operands, std::string_view instructionName);
 
     /**
      * Returns AstNodeType::Instruction.
@@ -96,7 +96,7 @@ class CallInstruction : public Instruction
      * @param params Slice whose first element is the callee and remaining
      *               elements are call arguments.
      */
-    CallInstruction(TypedPoolSlice<AstNode> *params);
+    CallInstruction(TypedPoolLinkedList<AstNode> *params);
 };
 
 #endif // EZPACKER_INSTRUCTION_H

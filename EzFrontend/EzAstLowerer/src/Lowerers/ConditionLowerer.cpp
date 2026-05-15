@@ -22,7 +22,7 @@ bool ConditionLowerer::lower(AstNode *node, AstLoweringContext *ctx)
         return false;
     }
 
-    MirOperand right = ctx->popOperand();
+    MirOperand right = ctx->popOperand().first;
 
     if (!ctx->hasBlocks())
     {
@@ -32,7 +32,7 @@ bool ConditionLowerer::lower(AstNode *node, AstLoweringContext *ctx)
         return false;
     }
 
-    MirOperand left = ctx->popOperand();
+    MirOperand left = ctx->popOperand().first;
 
     // Emit CMP into the CURRENT block
     ctx->getEmitter()->emitCMP(left, right);

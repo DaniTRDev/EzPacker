@@ -57,7 +57,7 @@ class SwitchAstNode : public AstNode
      *
      * Elements are expected to be SwitchCaseAstNode instances.
      */
-    TypedPoolSlice<AstNode> *getCases();
+    TypedPoolLinkedList<AstNode> *getCases();
 
     /**
      * Returns the selector variable evaluated by the switch statement.
@@ -68,7 +68,7 @@ class SwitchAstNode : public AstNode
      * Sets the cases of the switch.
      * @param cases
      */
-    void setCases(TypedPoolSlice<AstNode> *cases);
+    void setCases(TypedPoolLinkedList<AstNode> *cases);
 
     /**
      * Sets the default scope for this switch.
@@ -77,7 +77,7 @@ class SwitchAstNode : public AstNode
 
   private:
     CodeScope *m_default;
-    TypedPoolSlice<AstNode> *m_cases;
+    TypedPoolLinkedList<AstNode> *m_cases;
     Variable *m_switchVariable;
 };
 

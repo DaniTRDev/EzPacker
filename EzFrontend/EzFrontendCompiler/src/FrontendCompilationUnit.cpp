@@ -21,7 +21,7 @@ size_t FrontendCompilationUnit::getTargetSourceId() const { return m_targetSourc
 
 const std::shared_ptr<Scope> &FrontendCompilationUnit::getGlobalScope() const { return m_globalScope; }
 
-TypedPoolSlice<AstNode> *FrontendCompilationUnit::getGlobalScopeAstNodes() { return m_globalScopeAstNodes; }
+TypedPoolLinkedList<AstNode> *FrontendCompilationUnit::getGlobalScopeAstNodes() { return m_globalScopeAstNodes; }
 
 void FrontendCompilationUnit::cleanup()
 {
@@ -35,7 +35,7 @@ void FrontendCompilationUnit::cleanup()
     m_mirEmitterContext.reset();
 }
 
-void FrontendCompilationUnit::setGlobalScopeAstNodes(TypedPoolSlice<AstNode> *globalScopeAstNodes)
+void FrontendCompilationUnit::setGlobalScopeAstNodes(TypedPoolLinkedList<AstNode> *globalScopeAstNodes)
 {
     m_globalScopeAstNodes = globalScopeAstNodes;
 }

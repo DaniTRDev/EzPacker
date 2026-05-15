@@ -178,13 +178,13 @@ TEST_F(MirEmitterTests, InstructionMetadataOperandCount)
 {
     MirInstruction *nop = emitter->emitNOP();
     ASSERT_NE(nop, nullptr);
-    EXPECT_EQ(nop->getMetadata().m_operands.size(), 0u);
+    EXPECT_EQ(nop->getMetadata().m_operandConstraints.size(), 0u);
 
     MirRegister dst = emitter->createVirtualRegister(8);
     MirRegister src = emitter->createVirtualRegister(8);
     MirInstruction *mov = emitter->emitMOV(MirOperand(dst), MirOperand(src));
     ASSERT_NE(mov, nullptr);
-    EXPECT_EQ(mov->getMetadata().m_operands.size(), 2u);
+    EXPECT_EQ(mov->getMetadata().m_operandConstraints.size(), 2u);
 }
 
 TEST_F(MirEmitterTests, MirOperandRegisterType)

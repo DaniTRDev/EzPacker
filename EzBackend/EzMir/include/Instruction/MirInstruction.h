@@ -13,7 +13,7 @@
 
 #include "EzMirCommon.h"
 #include "MirInstructionDefs.h"
-#include "Operand/MirOperand.h"
+#include "Operand/MirOperands.h"
 
 class MirInstruction
 {
@@ -22,10 +22,10 @@ class MirInstruction
      * Creates an instruction wrapper around an opcode and its operand slice.
      *
      * @param opcode   Opcode describing the operation performed.
-     * @param operands Arena-managed operand slice initially associated with the
-     *                 instruction. Emitters append to this slice later.
+     * @param operands Arena-managed operand list initially associated with the
+     *                 instruction. Emitters append to this list later.
      */
-    explicit MirInstruction(MirInstructionOpCode opcode, TypedPoolSlice<MirOperand> *operands);
+    explicit MirInstruction(MirInstructionOpCode opcode, TypedPoolLinkedList<MirOperand> *operands);
 
     /**
      * Creates an instruction wrapper around an opcode and its operand slice, with a lowered opcode for instruction
@@ -33,13 +33,26 @@ class MirInstruction
      * @param opcode
      * @param operands
      */
-    explicit MirInstruction(size_t opcode, TypedPoolSlice<MirOperand> *operands);
+    explicit MirInstruction(size_t opcode, TypedPoolLinkedList<MirOperand> *operands);
 
     /**
      * Returns `true` when the instruction currently stores at least one
      * operand in its operand slice.
      */
     bool hasOperands() const;
+
+    /**
+     * Returns `true` when the instruction's opcode is marked as signed in its metadata flags.
+     * @return
+     */
+    bool isSigned() const;
+
+    /**
+     * Returns the linear equivalent of this instruction. If this instruction does not have any linear equivalent,
+     * a pair of INVALID, INVALID is returned.
+     * @return
+     */
+    const MirInstructionLinearEquivalent &getLinearEquivalent() const;
 
     /**
      * Returns the metadata entry associated with this instruction's opcode.
@@ -55,26 +68,14 @@ class MirInstruction
     MirInstructionOpCode getOpCode() const;
 
     /**
-     * Returns the lowered opcode stored by instruction selectors after selection.
-     * @return
-     */
-    size_t getLoweredOpCode() const;
-
-    /**
      * Returns the mutable operand slice for this instruction.
      */
-    TypedPoolSlice<MirOperand> *getOperands() const;
+    TypedPoolLinkedList<MirOperand> *getOperands() const;
 
     /**
      * Returns the instruction flags from the opcode metadata.
      */
-    uint32_t getFlags() const;
-
-    /**
-     * Sets the lowered opcode for instruction selectors to store the result of selection.
-     * @param loweredOpCode
-     */
-    void setLoweredOpCode(size_t loweredOpCode);
+    MirInstructionFlags getFlags() const;
 
     /**
      * Returns a string representation of the instruction in assembly format.
@@ -84,8 +85,7 @@ class MirInstruction
 
   private:
     MirInstructionOpCode m_opcode;
-    size_t m_loweredOpCode; // For instruction selectors to store the lowered opcode after selection
-    TypedPoolSlice<MirOperand> *m_operands;
+    TypedPoolLinkedList<MirOperand> *m_operands;
 };
 
 #endif // EZPACKER_MIRINSTRUCTION_H

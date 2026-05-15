@@ -31,8 +31,6 @@ bool AstLowererVisitor::visit(Label *label) { return LabelLowerer().lower(label,
 
 bool AstLowererVisitor::visit(Module *module) { return ModuleLowerer().lower(module, m_loweringCtx.get()); }
 
-bool AstLowererVisitor::visit(ModuleHeader *header) { return ModuleHeaderLowerer().lower(header, m_loweringCtx.get()); }
-
 bool AstLowererVisitor::visit(SwitchAstNode *_switch) { return SwitchLowerer().lower(_switch, m_loweringCtx.get()); }
 
 bool AstLowererVisitor::visit(Variable *var) { return VariableLowerer().lower(var, m_loweringCtx.get()); }

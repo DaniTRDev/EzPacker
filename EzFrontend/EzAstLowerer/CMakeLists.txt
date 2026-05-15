@@ -20,7 +20,7 @@ set(EZASTLOWERER_FILES_LIST
         "include/Lowerers/WhileLowerer.h"
 
         "src/AstLowererVisitor.cpp"
-        "src/LoweringContext.cpp"
+        "src/AstLoweringContext.cpp"
         "src/Lowerers/BreakLowerer.cpp"
         "src/Lowerers/CodeScopeLowerer.cpp"
         "src/Lowerers/ConditionLowerer.cpp"

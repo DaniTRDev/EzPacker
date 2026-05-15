@@ -19,7 +19,7 @@
 #include <sstream>
 
 // Dummy implementation of AST node extraction since it depends on Visitors
-// We just create a dummy AST info for now. In real logic, we'd traverse the TypedPoolSlice.
+// We just create a dummy AST info for now. In real logic, we'd traverse the TypedPoolLinkedList.
 
 namespace EzGui
 {

@@ -101,10 +101,10 @@ class AstNode
 
         if (!m_annotations)
         {
-            m_annotations = annotPool->createSlice<IAstNodeAnnotation>();
+            m_annotations = annotPool->createLinkedList<IAstNodeAnnotation>();
         }
 
-        return annotPool->createAndAppendToSliceInFront<AnnotType, IAstNodeAnnotation>(m_annotations,
+        return annotPool->createAndAppendToListFront<AnnotType, IAstNodeAnnotation>(m_annotations,
                                                                                        std::forward<Args>(args)...);
     }
 
@@ -143,7 +143,7 @@ class AstNode
      * Returns the raw annotation slice, or nullptr when the node has not been
      * annotated.
      */
-    TypedPoolSlice<IAstNodeAnnotation> *getAnnotations();
+    TypedPoolLinkedList<IAstNodeAnnotation> *getAnnotations();
 
     /**
      * Assigns the source span associated with this node.
@@ -185,7 +185,7 @@ class AstNode
 
   private:
     SourceReference m_sourceRef;                                  // A node might or might not have a source reference.
-    TypedPoolSlice<IAstNodeAnnotation> *m_annotations{ nullptr }; // A node might or might not have an annotation.
+    TypedPoolLinkedList<IAstNodeAnnotation> *m_annotations{ nullptr }; // A node might or might not have an annotation.
 };
 
 #endif // EZPACKER_AST_H

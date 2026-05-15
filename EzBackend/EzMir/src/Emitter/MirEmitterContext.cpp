@@ -1,19 +1,31 @@
 #include "Emitter/MirEmitterContext.h"
+#include <cstring>
+#include <algorithm>
 
 MirEmitterContext::MirEmitterContext(const std::shared_ptr<ErrorCollector> &errorCollector,
                                      const std::shared_ptr<SourceManager> &sourceManager) :
-    m_currentId(1), m_currentBoundBlock(nullptr), m_currentBoundFunction(nullptr),
-    ErrorEmitter(errorCollector, sourceManager)
+    m_currentId(1), m_currentBoundFunction(nullptr), ErrorEmitter(errorCollector, sourceManager)
 {
-    m_functionList = m_functionPool.createSlice<MirFunction>();
-    m_typeList = m_typePool.createSlice<MirType>();
+    m_functionList = m_functionPool.createLinkedList<MirFunction>();
+    m_typeList = m_typePool.createLinkedList<MirType>();
 }
 
-bool MirEmitterContext::bindToBlock(MirBlock *block)
+bool MirEmitterContext::setInsertPoint(MirBlock *block)
 {
-    m_currentBoundBlock = block;
-    return true;
+    m_insertState.block = block;
+    m_insertState.mode = InsertMode::Append;
+    m_insertState.iterator = {}; // Clear iterator
+    return block != nullptr;
 }
+
+void MirEmitterContext::setInsertPoint(MirBlock *block, TypedPoolLinkedList<MirInstruction>::Iterator insertBeforeIt)
+{
+    m_insertState.block = block;
+    m_insertState.mode = InsertMode::InsertBefore;
+    m_insertState.iterator = insertBeforeIt;
+}
+
+MirBlock *MirEmitterContext::getCurrentBoundBlock() const { return m_insertState.block; }
 
 bool MirEmitterContext::doesTypeExist(size_t typeId) const { return m_idToTypeMap.contains(typeId); }
 
@@ -21,12 +33,12 @@ bool MirEmitterContext::doesTypeExist(const std::string_view &typeName) const { 
 
 MirBlock *MirEmitterContext::createBlock()
 {
-    MirBlock *block = m_blockPool.create<MirBlock>(createId(), m_instructionPool.createSlice<MirInstruction>());
+    MirBlock *block = m_blockPool.create<MirBlock>(createId(), m_instructionPool.createLinkedList<MirInstruction>());
 
     if (m_currentBoundFunction)
     {
         // If we are in a function, append the new block to its blocks too.
-        m_blockPool.appendToSlice(m_currentBoundFunction->getBlocks(), block);
+        m_blockPool.appendToListBack(m_currentBoundFunction->getBlocks(), block);
     }
 
     m_idToBlockMap.insert({ block->getId(), block });
@@ -35,48 +47,88 @@ MirBlock *MirEmitterContext::createBlock()
 
 MirBlock *MirEmitterContext::getBlockFromRef(const MirReference &ref) const
 {
-    if (ref.m_type != MirReferenceType::Block)
+    if (ref.getRefType() != MirReferenceType::Block)
         return nullptr;
 
-    const auto &it = m_idToBlockMap.find(ref.m_refId);
+    auto it = m_idToBlockMap.find(ref.get<MirReference>()->getRefId());
     if (it != m_idToBlockMap.end())
         return it->second;
 
     return nullptr;
 }
 
-MirBlock *MirEmitterContext::getCurrentBoundBlock() const { return m_currentBoundBlock; }
-
 MirId MirEmitterContext::createId() { return m_currentId++; }
 
-MirFunction *MirEmitterContext::createFunction(size_t returnTypeId)
+MirInstruction *MirEmitterContext::createInstruction(MirInstructionOpCode opcode)
 {
-    if (returnTypeId == 0)
+    MirInstruction *instr =
+            m_instructionPool.create<MirInstruction>(opcode, m_operandPool.createLinkedList<MirOperand>());
+
+    // If no block is bound, just return the floating/orphan instruction
+    if (!m_insertState.block)
+        return instr;
+
+    // Insert it into the current block cleanly
+    auto *targetList = m_insertState.block->getInstructions();
+
+    if (m_insertState.mode == InsertMode::Append)
+    {
+        m_instructionPool.appendToListBack(targetList, instr);
+    }
+    else
+    {
+        // Because we always insert BEFORE the iterator, the iterator remains pointing
+        // to the original target. Subsequent emissions will naturally form a correct sequence!
+        m_instructionPool.appendToListBefore(targetList, m_insertState.iterator, instr);
+    }
+
+    return instr;
+}
+
+MirFunction *MirEmitterContext::createFunction(MirType *returnType,
+                                               TypedPoolLinkedList<MirOperand *> *parameters,
+                                               const std::string_view &name)
+{
+    if (!returnType)
     {
         emitError(ErrorSeverity::Fatal,
-                  "Could not create function because return type ID is null",
+                  "Could not create function because return type is null",
                   "MirEmitterContext::createFunction");
         return nullptr;
     }
 
-    TypedPoolSlice<MirBlock> *functionBlockList = m_blockPool.createSlice<MirBlock>();
-    TypedPoolSlice<MirOperand> *functionParameterList = m_functionParameterPool.createSlice<MirOperand>();
+    TypedPoolLinkedList<MirBlock> *functionBlockList = m_blockPool.createLinkedList<MirBlock>();
+
+    if (!parameters)
+        parameters = m_operandPool.createLinkedList<MirOperand *>();
 
     /*
      * We can't use createBlock here because we need to create the block WITHOUT appending it to the current function,
      * if any.
      */
-    MirBlock *entryPoint = m_blockPool.create<MirBlock>(createId(), m_instructionPool.createSlice<MirInstruction>());
-    m_blockPool.appendToSlice(functionBlockList, entryPoint);
+    MirBlock *entryPoint =
+            m_blockPool.create<MirBlock>(createId(), m_instructionPool.createLinkedList<MirInstruction>());
+    m_blockPool.appendToListBack(functionBlockList, entryPoint);
 
-    MirFunction *func = m_functionPool.createAndAppendToSlice<MirFunction>(m_functionList,
-                                                                           entryPoint,
-                                                                           createId(),
-                                                                           returnTypeId,
-                                                                           functionBlockList,
-                                                                           functionParameterList);
+    ConstantArray<char> copiedName = m_namePool.createConstantArray(name.length() + 1); // Include null terminator
+    std::strcpy(copiedName.m_elems, name.data());
+    copiedName.m_elems[name.length()] = '\0'; // Ensure null terminator is included.
+
+    MirFunctionStackFrame *stackFrame = m_stackFramePool.create<MirFunctionStackFrame>(nullptr, &m_stackObjectPool);
+    MirFunction *func = m_functionPool.createAndAppendToListBack<MirFunction>(m_functionList,
+                                                                              entryPoint,
+                                                                              returnType,
+                                                                              stackFrame,
+                                                                              createId(),
+                                                                              functionBlockList,
+                                                                              parameters,
+                                                                              copiedName.m_elems);
+
+    stackFrame->setOwner(func);
 
     m_currentBoundFunction = func;
+    setInsertPoint(entryPoint);
+
     return func;
 }
 
@@ -96,7 +148,7 @@ MirGlobalDataEntry *MirEmitterContext::createGlobalData(const void *data, size_t
     }
     else
     {
-        std::copy_n((char *)data, size, (char *)entry->m_data.m_elems);
+        std::copy_n((const char *)data, size, (char *)entry->m_data.m_elems);
     }
 
     m_idToGlobalDataEntry.insert({ entry->m_entryId, entry });
@@ -144,20 +196,10 @@ MirGlobalDataEntry *MirEmitterContext::getGlobalDataEntryFromId(size_t entryId)
     return nullptr;
 }
 
-MirInstruction *MirEmitterContext::createInstruction(MirInstructionOpCode opcode)
-{
-    MirInstruction *instr = m_instructionPool.create<MirInstruction>(opcode, m_operandPool.createSlice<MirOperand>());
-
-    if (m_currentBoundBlock)
-    {
-        // Automatically bind this instruction to the latest binded block.
-        m_instructionPool.appendToSlice(m_currentBoundBlock->getInstructions(), instr);
-    }
-
-    return instr;
-}
-
-MirType *MirEmitterContext::createType(MirTypeKind kind, TypedPoolSlice<MirType> *types, const std::string_view &name)
+MirType *MirEmitterContext::createType(MirTypeKind kind,
+                                       size_t totalSizeInBytes,
+                                       TypedPoolLinkedList<MirType> *types,
+                                       const std::string_view &name)
 {
     if (name.empty())
     {
@@ -165,13 +207,31 @@ MirType *MirEmitterContext::createType(MirTypeKind kind, TypedPoolSlice<MirType>
         return nullptr;
     }
 
-    MirType *type = m_typePool.create<MirType>(kind, createId(), types, name);
+    MirType *type = m_typePool.create<MirType>(kind, createId(), totalSizeInBytes, types, name);
 
-    m_typePool.appendToSlice(m_typeList, type);
+    m_typePool.appendToListBack(m_typeList, type);
     m_typeNames.insert(name);
     m_idToTypeMap.insert({ type->getId(), type });
 
     return type;
+}
+
+MirType *MirEmitterContext::getIntegerTypeBySize(size_t sizeInBytes)
+{
+    // Iterate through all types registered in the context
+    for (auto it = m_typeList->begin(); it != m_typeList->end(); ++it)
+    {
+        MirType *type = *it;
+        if (type->getKind() == MirTypeKind::Integer && type->getTotalSizeInBytes() == sizeInBytes)
+        {
+            return type;
+        }
+    }
+
+    emitError(ErrorSeverity::Fatal,
+              "Could not find an integer type of the requested size",
+              "MirEmitterContext::getIntegerTypeBySize");
+    return nullptr;
 }
 
 MirType *MirEmitterContext::getMirTypeById(size_t id)
@@ -194,20 +254,6 @@ MirType *MirEmitterContext::getMirTypeById(size_t id)
     return it->second;
 }
 
-MirReference MirEmitterContext::createReference(MirBlock *block)
-{
-    if (!block)
-    {
-        emitError(ErrorSeverity::Fatal,
-                  "Cannot create reference for null block",
-                  "MirEmitterContext::createReferenceForBlock");
-        return {};
-    }
-
-    MirReference ref = { .m_type = MirReferenceType::Block, .m_refId = block->getId() };
-    return ref;
-}
-
 TypedPool *MirEmitterContext::getBlockPool() { return &m_blockPool; }
 
 TypedPool *MirEmitterContext::getFunctionPool() { return &m_functionPool; }
@@ -224,6 +270,6 @@ TypedPool *MirEmitterContext::getTypePool() { return &m_typePool; }
 
 TypedArrayPool<uint8_t> *MirEmitterContext::getEntryDataPool() { return &m_dataPool; }
 
-TypedPoolSlice<MirFunction> *MirEmitterContext::getFunctionList() const { return m_functionList; }
+TypedPoolLinkedList<MirFunction> *MirEmitterContext::getFunctionList() const { return m_functionList; }
 
-TypedPoolSlice<MirType> *MirEmitterContext::getTypeList() const { return m_typeList; }
+TypedPoolLinkedList<MirType> *MirEmitterContext::getTypeList() const { return m_typeList; }

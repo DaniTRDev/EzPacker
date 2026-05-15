@@ -23,4 +23,7 @@
 #include <tommath.h>
 #include <EzCore.h>
 
+using MirId = size_t;
+constexpr MirId MIRID_INVALID = 0;
+
 #endif // EZPACKER_EZMIRCOMMON_H

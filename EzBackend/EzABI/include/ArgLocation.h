@@ -3,13 +3,13 @@
 
 #include "EzABICommon.h"
 
-using PhysicalRegId = uint32_t;
+using PhysicalRegId = size_t;
 using StackOffset = int64_t;
 
 struct PhysicalRegLocation
 {
     PhysicalRegId m_id;
-    size_t m_sizeInBits;
+    size_t m_sizeInBytes;
 };
 
 struct SplitLocation

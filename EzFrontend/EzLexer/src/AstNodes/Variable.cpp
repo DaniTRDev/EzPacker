@@ -1,6 +1,6 @@
 #include "AstNodes/Variable.h"
 
-Variable::Variable(TypedPoolSlice<AstNode> *initializers,
+Variable::Variable(TypedPoolLinkedList<AstNode> *initializers,
                    std::string_view dataType,
                    std::string_view variableName) : m_variableDataType(dataType), m_variableName(variableName)
 {

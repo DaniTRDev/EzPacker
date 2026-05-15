@@ -1,5 +1,4 @@
 #include "Emitter/MirEmitter.h"
-#include <format>
 
 MirEmitter::MirEmitter(MirEmitterContext *ctx) : m_currentBlock(nullptr)
 {
@@ -14,7 +13,6 @@ bool MirEmitter::attachToContext(MirEmitterContext *ctx)
     if (!ctx)
     {
         throw std::runtime_error("Could not attach MirEmitter to given context because it is null");
-        return false;
     }
 
     m_ctx = ctx;
@@ -22,10 +20,10 @@ bool MirEmitter::attachToContext(MirEmitterContext *ctx)
 }
 
 bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instructionMeta,
-                                             TypedPoolSlice<MirOperand> *operands) const
+                                             TypedPoolLinkedList<MirOperand> *operands) const
 {
-    const size_t expectedBaseOperands = instructionMeta.m_operands.size();
-    const std::string &name = instructionMeta.m_name;
+    const size_t expectedBaseOperands = instructionMeta.m_operandConstraints.size();
+    const std::string_view &name = instructionMeta.m_name;
     const size_t totalOperandCount = operands->m_numElems;
 
     // Arity Check
@@ -55,16 +53,13 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
 
     // Helper: Iterators return a pointer to the element in the pool.
     auto isImmediate = [](const MirOperand *op)
-    { return op->getInteger() != nullptr || op->getDouble() != nullptr || op->getBigInteger() != nullptr; };
+    { return op->isOfType<MirInteger>() || op->isOfType<MirDouble>() || op->isOfType<MirConstantPoolRef>(); };
 
     // Validate Type Constraints per Operand
     auto it = operands->begin();
     for (size_t i = 0; i < expectedBaseOperands; ++i)
     {
-        if (!it)
-            break; // Defensive check, should never hit due to m_numElems validation
-
-        const OperandConstraint &constraint = instructionMeta.m_operands[i];
+        const OperandConstraint &constraint = instructionMeta.m_operandConstraints[i];
         MirOperand *op = *it;
 
         if (!op)
@@ -76,12 +71,22 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
         }
 
         bool isValidType = false;
+        ExpectedOperandType allowed = constraint.type;
 
-        if ((constraint.type & ExpectedOperandType::Register) && op->getRegister())
+        // Check against the bitmask
+        if ((allowed & ExpectedOperandType::Register) && op->isOfType<MirRegister>())
             isValidType = true;
-        if ((constraint.type & ExpectedOperandType::Immediate) && isImmediate(op))
+        if ((allowed & ExpectedOperandType::Integer) && op->isOfType<MirInteger>())
             isValidType = true;
-        if ((constraint.type & ExpectedOperandType::Reference) && op->getReference())
+        if ((allowed & ExpectedOperandType::Double) && op->isOfType<MirDouble>())
+            isValidType = true;
+        if ((allowed & ExpectedOperandType::ConstantPoolRef) && op->isOfType<MirConstantPoolRef>())
+            isValidType = true;
+        if ((allowed & ExpectedOperandType::Memory) && op->isOfType<MirMemory>())
+            isValidType = true;
+        if ((allowed & ExpectedOperandType::FrameIndex) && op->isOfType<MirFrameIndex>())
+            isValidType = true;
+        if ((allowed & ExpectedOperandType::Reference) && op->isOfType<MirReference>())
             isValidType = true;
 
         if (!isValidType)
@@ -102,7 +107,7 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
     // Validate Size Safety Rules (Requires at least 2 operands to compare)
     if (totalOperandCount >= 2)
     {
-        uint32_t flags = instructionMeta.m_flags;
+        MirInstructionFlags flags = instructionMeta.m_flags;
 
         // Grab the first two operands using the slice iterator
         auto sizeIter = operands->begin();
@@ -113,7 +118,7 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
         size_t operand1Size = firstOp->getSizeInBytes();
         size_t operand2Size = secondOp->getSizeInBytes();
 
-        if (flags & static_cast<uint32_t>(MirInstructionFlags::SizeMatch))
+        if (flags & MirInstructionFlags::SizeMatch)
         {
             if (operand1Size != operand2Size)
             {
@@ -124,7 +129,7 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
                 return false;
             }
         }
-        else if (flags & static_cast<uint32_t>(MirInstructionFlags::DestLarger))
+        else if (flags & MirInstructionFlags::DestLarger)
         {
             if (operand1Size <= operand2Size)
             {
@@ -137,7 +142,7 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
                 return false;
             }
         }
-        else if (flags & static_cast<uint32_t>(MirInstructionFlags::DestSmaller))
+        else if (flags & MirInstructionFlags::DestSmaller)
         {
             if (operand1Size >= operand2Size)
             {
@@ -163,14 +168,14 @@ MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode)
     return instr;
 }
 
-MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode, const std::initializer_list<MirOperand> &operands)
+MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode, const std::initializer_list<MirOperand *> &operands)
 {
     const MirInstructionMetadata &meta = getMeta(opcode);
 
     // Create the base instruction
     MirInstruction *instr = emit(opcode);
 
-    // Map the incoming operands into the instruction's TypedPoolSlice first
+    // Map the incoming operands into the instruction's TypedPoolLinkedList first
     if (!emitOperands(instr, operands))
     {
         m_ctx->emitError(ErrorSeverity::Fatal, "Could not emit instruction's operands", "MirEmitter::emit");
@@ -189,31 +194,73 @@ MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode, const std::initial
     return instr;
 }
 
-MirRegister MirEmitter::createPhysicalRegister(size_t id, size_t size)
+MirRegister *MirEmitter::createVirtualRegister(MirType *type)
 {
-    MirRegister mirRegister{ false, id, size };
-    return mirRegister;
+    return m_ctx->getOperandPool()->create<MirRegister>(type, true, m_ctx->createId());
 }
 
-MirRegister MirEmitter::createVirtualRegister(size_t size)
+MirRegister *MirEmitter::createPhysicalRegister(MirType *type, size_t id)
 {
-    MirRegister mirRegister{ true, m_ctx->createId(), size };
-    return mirRegister;
+    return m_ctx->getOperandPool()->create<MirRegister>(type, false, id);
 }
 
-void MirEmitter::emitOperandToInstruction(MirInstruction *instr, MirOperand operand)
+MirInteger *MirEmitter::createImmediateInteger(MirType *type, int64_t value)
 {
-    emitOperands(instr, { std::move(operand) });
+    // The pool returns an already-allocated, perfectly constructed MirInteger pointer.
+    return m_ctx->getOperandPool()->create<MirInteger>(type, value);
 }
 
-bool MirEmitter::emitOperands(MirInstruction *instr, const std::initializer_list<MirOperand> &operands)
+MirDouble *MirEmitter::createImmediateDouble(MirType *type, double value)
+{
+    return m_ctx->getOperandPool()->create<MirDouble>(type, value);
+}
+
+MirConstantPoolRef *MirEmitter::createConstantPoolRef(MirType *type, size_t entryId)
+{
+    return m_ctx->getOperandPool()->create<MirConstantPoolRef>(type, entryId);
+}
+
+MirMemory *MirEmitter::createMemoryOperand(MirType *type, MirOperand *base, MirOperand *displ)
+{
+    return m_ctx->getOperandPool()->create<MirMemory>(type, base, displ);
+}
+
+MirFrameIndex *MirEmitter::createFrameIndex(MirType *type, size_t frameId)
+{
+    return m_ctx->getOperandPool()->create<MirFrameIndex>(type, frameId);
+}
+
+MirReference *MirEmitter::createReference(MirBlock *block)
+{
+    if (!block)
+    {
+        m_ctx->emitError(ErrorSeverity::Fatal,
+                         "Cannot create reference for null block",
+                         "MirEmitterContext::createReference");
+        return m_ctx->getOperandPool()->create<MirReference>(nullptr, MirReferenceType::Invalid, 0);
+    }
+
+    return m_ctx->getOperandPool()->create<MirReference>(nullptr, MirReferenceType::Block, block->getId());
+}
+
+void MirEmitter::emitOperandToInstruction(MirInstruction *instr, MirOperand *operand)
+{
+    emitOperands(instr, { operand });
+}
+
+bool MirEmitter::emitOperands(MirInstruction *instr, const std::initializer_list<MirOperand *> &operands)
 {
     TypedPool *operandPool = m_ctx->getOperandPool();
-
     auto instructionOperandList = instr->getOperands();
-    for (auto &operand : operands)
+
+    for (MirOperand *operand : operands)
     {
-        if (!operandPool->createAndAppendToSlice<MirOperand>(instructionOperandList, operand))
+        if (!operand)
+        {
+            return false; // Safety check
+        }
+
+        if (!operandPool->appendToListBack<MirOperand, MirOperand>(instructionOperandList, operand))
         {
             return false;
         }

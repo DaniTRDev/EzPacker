@@ -10,7 +10,7 @@ bool SwitchLowerer::lower(AstNode *node, AstLoweringContext *ctx)
 
     // Only lower once.
     _switch->getSwitchVariable()->accept(ctx->getOwnerLowererVisitor());
-    MirOperand switchVarOperand = ctx->popOperand();
+    MirOperand switchVarOperand = ctx->popOperand().first;
 
     MirBlock *currentCheckerBlock = emitterCtx->createBlock();
     MirBlock *mergeBlock = emitterCtx->createBlock();
@@ -30,7 +30,7 @@ bool SwitchLowerer::lower(AstNode *node, AstLoweringContext *ctx)
 
             // Get the immediate value for this case.
             casted->getCaseValue()->accept(ctx->getOwnerLowererVisitor());
-            MirOperand caseValOperand = ctx->popOperand();
+            MirOperand caseValOperand = ctx->popOperand().first;
 
             emitter->emitCMP(switchVarOperand, caseValOperand);
 

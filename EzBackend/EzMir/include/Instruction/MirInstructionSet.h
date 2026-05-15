@@ -2,252 +2,319 @@
  * @file MirInstructionSet.h
  * @brief X-macro source list containing every MIR opcode definition.
  *
- * Syntax: INSTRUCTION(Name, Category, Operands, Flags)
+ * Syntax: INSTRUCTION(Name, Category, LinearEquivalent, Operands, Flags)
  */
 #ifdef INSTRUCTION
 
 #define OPERAND_CONSTRAINTS(...) { __VA_ARGS__ }
+#define NO_EQUIV { MirInstructionOpCode::INVALID, MirInstructionOpCode::INVALID }
+#define EQUIV(high, low) { MirInstructionOpCode::high, MirInstructionOpCode::low }
 
-INSTRUCTION(INVALID, Invalid, OPERAND_CONSTRAINTS(), None)
+// Helper to keep the flags readable without polluting the global namespace
+#define F(x) MirInstructionFlags::x
+
+INSTRUCTION(INVALID, Invalid, NO_EQUIV, OPERAND_CONSTRAINTS(), F(None))
 
 /* --- ARRAY MANAGEMENT -------------------------------------------------------- */
 INSTRUCTION(GETARR,
             Array,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::Reference, OperandFlag::Read },
+                                { ExpectedOperandType::Register | ExpectedOperandType::AddressSource,
+                                  OperandFlag::Read },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            None)
+            F(None))
 
 INSTRUCTION(SETARR,
             Array,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read },
+            NO_EQUIV,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register | ExpectedOperandType::AddressSource,
+                                  OperandFlag::Read },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read },
-                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            WritesMemory)
+                                { ExpectedOperandType::AnyValue, OperandFlag::Read }),
+            F(WritesMemory))
 
 /* --- DATA MOVEMENT -------------------------------------------------------- */
 INSTRUCTION(MOV,
             DataMovement,
+            EQUIV(MOV, MOV),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            None)
+                                { ExpectedOperandType::AnyValue, OperandFlag::Read }),
+            F(None))
 
+// LEA specifically requests an AddressSource (Memory, FrameIndex, or ConstantPoolRef)
 INSTRUCTION(LEA,
             DataMovement,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::Reference | ExpectedOperandType::RegImm, OperandFlag::Read }),
-            None)
+                                { ExpectedOperandType::AddressSource, OperandFlag::Read }),
+            F(None))
 
 /* --- MEMORY ACCESS -------------------------------------------------------- */
+// LOAD forces a Memory operand as the source
 INSTRUCTION(LOAD,
             Memory,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::Register, OperandFlag::Read },
-                                { ExpectedOperandType::Immediate, OperandFlag::Read }),
-            ReadsMemory)
+                                { ExpectedOperandType::Memory, OperandFlag::Read }),
+            F(ReadsMemory))
 
+// STORE forces a Memory operand as the destination
 INSTRUCTION(STORE,
             Memory,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
-                                { ExpectedOperandType::Immediate, OperandFlag::Read },
-                                { ExpectedOperandType::Register, OperandFlag::Read }),
-            WritesMemory | HasSideEffect)
+            NO_EQUIV,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Memory, OperandFlag::Write },
+                                { ExpectedOperandType::AnyValue, OperandFlag::Read }),
+            F(WritesMemory) | F(HasSideEffect))
 
-INSTRUCTION(CREATE, Memory, OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }), HasSideEffect)
+INSTRUCTION(CREATE,
+            Memory,
+            NO_EQUIV,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
+            F(HasSideEffect))
 
 /* --- ARITHMETIC (ALU) ----------------------------------------------------- */
 INSTRUCTION(ADD,
             Arithmetic,
+            EQUIV(ADC, ADD),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
-/* NEW: Add with Carry (used for multi-register expansion) */
 INSTRUCTION(ADC,
             Arithmetic,
+            EQUIV(ADC, ADC),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | ReadsCPUFlags | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(ReadsCPUFlags) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(SUB,
             Arithmetic,
+            EQUIV(SBB, SUB),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags)
+            F(SizeMatch) | F(WritesCPUFlags))
 
-/* NEW: Subtract with Borrow (used for multi-register expansion) */
 INSTRUCTION(SBB,
             Arithmetic,
+            EQUIV(SBB, SBB),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | ReadsCPUFlags | WritesCPUFlags)
+            F(SizeMatch) | F(ReadsCPUFlags) | F(WritesCPUFlags))
 
 INSTRUCTION(MUL,
             Arithmetic,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(IMUL,
             Arithmetic,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative) | F(TreatAsSigned))
 
 INSTRUCTION(DIV,
             Arithmetic,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags)
+            F(SizeMatch) | F(WritesCPUFlags))
 
 INSTRUCTION(IDIV,
             Arithmetic,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags)
+            F(SizeMatch) | F(WritesCPUFlags) | F(TreatAsSigned))
 
 INSTRUCTION(REM,
             Arithmetic,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags)
+            F(SizeMatch) | F(WritesCPUFlags))
 
 INSTRUCTION(NEG,
             Arithmetic,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite }),
-            WritesCPUFlags)
+            F(WritesCPUFlags))
 
 /* --- BITWISE LOGIC -------------------------------------------------------- */
 INSTRUCTION(AND,
             Bitwise,
+            EQUIV(AND, AND),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(OR,
             Bitwise,
+            EQUIV(OR, OR),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(XOR,
             Bitwise,
+            EQUIV(XOR, XOR),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(NOT,
             Bitwise,
+            EQUIV(NOT, NOT),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite }),
-            WritesCPUFlags)
+            F(WritesCPUFlags))
 
 INSTRUCTION(SHL,
             Bitwise,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            WritesCPUFlags)
+            F(WritesCPUFlags))
 
 INSTRUCTION(SHR,
             Bitwise,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            WritesCPUFlags)
+            F(WritesCPUFlags))
 
 INSTRUCTION(SAR,
             Bitwise,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            WritesCPUFlags)
+            F(WritesCPUFlags) | F(TreatAsSigned))
 
 /* --- CONTROL FLOW --------------------------------------------------------- */
 INSTRUCTION(CMP,
             Compare,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags)
+            F(SizeMatch) | F(WritesCPUFlags))
 
 INSTRUCTION(TEST,
             Compare,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch | WritesCPUFlags | IsCommutative)
+            F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(JMP,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch)
+            F(IsTerminator) | F(IsBranch))
 
 INSTRUCTION(JE,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
+
 INSTRUCTION(JNE,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
+
 INSTRUCTION(JG,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
+
 INSTRUCTION(JGE,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
+
 INSTRUCTION(JL,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
+
 INSTRUCTION(JLE,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
+
 INSTRUCTION(JA,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
+
 INSTRUCTION(JB,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
-            IsTerminator | IsBranch | ReadsCPUFlags)
+            F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(CALL,
             ControlFlow,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference | ExpectedOperandType::Register, OperandFlag::Read }),
-            IsCall | HasSideEffect)
+            F(IsCall) | F(HasSideEffect))
+
 INSTRUCTION(RET,
             ControlFlow,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::RegImm, OperandFlag::Read }),
-            IsTerminator | IsReturn | HasSideEffect)
+            NO_EQUIV,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::AnyValue, OperandFlag::Read }),
+            F(IsTerminator) | F(IsReturn) | F(HasSideEffect))
 
 /* --- TYPE CASTING --------------------------------------------------------- */
 INSTRUCTION(TRUNC,
             Casting,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            DestSmaller)
+            F(DestSmaller))
 
 INSTRUCTION(ZEXT,
             Casting,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            DestLarger)
+            F(DestLarger))
 
 INSTRUCTION(SEXT,
             Casting,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            DestLarger)
+            F(DestLarger))
 
 INSTRUCTION(BITCAST,
             Casting,
+            NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            SizeMatch)
+            F(SizeMatch))
 
 /* --- SYSTEM & SPECIAL ----------------------------------------------------- */
-INSTRUCTION(SYSCALL, System, OPERAND_CONSTRAINTS({ ExpectedOperandType::RegImm, OperandFlag::Read }), HasSideEffect)
-INSTRUCTION(NOP, System, OPERAND_CONSTRAINTS(), None)
-INSTRUCTION(HALT, System, OPERAND_CONSTRAINTS(), IsTerminator | HasSideEffect)
+INSTRUCTION(SYSCALL,
+            System,
+            NO_EQUIV,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::AnyValue, OperandFlag::Read }),
+            F(HasSideEffect))
 
+INSTRUCTION(NOP, System, NO_EQUIV, OPERAND_CONSTRAINTS(), F(None))
+INSTRUCTION(HALT, System, NO_EQUIV, OPERAND_CONSTRAINTS(), F(IsTerminator) | F(HasSideEffect))
+
+#undef F
 #undef OPERAND_CONSTRAINTS
+#undef NO_EQUIV
+#undef EQUIV
+
 #endif // INSTRUCTION

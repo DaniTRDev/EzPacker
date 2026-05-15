@@ -2,22 +2,20 @@
 
 CodeFlowAnalysis::CodeFlowAnalysis(MirEmitter *emitter) : m_emitter(emitter) {}
 
-bool CodeFlowAnalysis::run(MirFunction *func, MirPassManager *pm)
+bool CodeFlowAnalysis::run(TypedPoolLinkedList<class MirBlock> *blockList,
+                           TypedPoolLinkedList<class MirBlock>::Iterator it,
+                           class MirPassManager *passManager)
 {
     m_result.m_successors.clear();
     m_result.m_predecessors.clear();
 
-    TypedPoolSlice<MirBlock> *blocks = func->getBlocks();
-    if (!blocks || blocks->m_numElems == 0)
-        return false;
-    
-    for (auto it = blocks->begin(); it != blocks->end(); ++it)
+    for (auto instrIt = blockList->begin(); instrIt != blockList->end(); ++instrIt)
     {
-        MirBlock *currentBlock = *it;
+        MirBlock *currentBlock = *instrIt;
 
-        TypedPoolSlice<MirInstruction> *instructions = currentBlock->getInstructions();
+        TypedPoolLinkedList<MirInstruction> *instructions = currentBlock->getInstructions();
         MirInstruction *terminator = nullptr;
-        uint32_t terminatorFlags = 0;
+        MirInstructionFlags terminatorFlags = MirInstructionFlags::None;
 
         // Extract last instruction (terminator).
         if (instructions && instructions->m_numElems > 0)
@@ -27,9 +25,9 @@ bool CodeFlowAnalysis::run(MirFunction *func, MirPassManager *pm)
         }
 
         // Query the next block, just in case there's a fallthrough (conditional jump).
-        auto nextIt = it;
+        auto nextIt = instrIt;
         ++nextIt;
-        MirBlock *nextBlock = (nextIt != blocks->end()) ? *nextIt : nullptr;
+        MirBlock *nextBlock = (nextIt != blockList->end()) ? *nextIt : nullptr;
 
         if (terminator && (terminatorFlags & MirInstructionFlags::IsBranch))
         {
@@ -79,10 +77,12 @@ MirBlock *CodeFlowAnalysis::getTargetJumpBlock(const MirInstruction *inst) const
     }
 
     MirOperand *op = inst->getOperands()->get<MirOperand>(0);
-    MirReference *ref = op->getReference();
+    MirReference *ref = op->get<MirReference>();
 
     if (!ref)
         return nullptr;
 
     return m_emitter->getContext()->getBlockFromRef(*ref);
 }
+
+MirPassIterationPlace CodeFlowAnalysis::getIterationPlace() const { return MirPassIterationPlace::Block; }

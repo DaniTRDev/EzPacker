@@ -3,7 +3,7 @@
  * @brief A basic block in the MIR — a straight-line sequence of instructions.
  *
  * Every `MirBlock` has a unique MIR ID and stores its instructions in a
- * `TypedPoolSlice<MirInstruction>` allocated by `MirEmitterContext`.
+ * `TypedPoolLinkedList<MirInstruction>` allocated by `MirEmitterContext`.
  * The block itself does not own the slice memory; it simply points at the
  * arena-managed list that the context appends to whenever it is bound and new
  * instructions are created.
@@ -32,7 +32,7 @@ class MirBlock
      *                     block. The pointer is expected to remain valid for the
      *                     lifetime of the owning context.
      */
-    MirBlock(size_t id, TypedPoolSlice<MirInstruction> *instructions);
+    MirBlock(size_t id, TypedPoolLinkedList<MirInstruction> *instructions);
 
     /**
      * Returns the unique MIR ID assigned to this block.
@@ -45,11 +45,11 @@ class MirBlock
      * The returned slice is the same container that `MirEmitterContext`
      * appends to when this block is currently bound.
      */
-    TypedPoolSlice<MirInstruction> *getInstructions() const;
+    TypedPoolLinkedList<MirInstruction> *getInstructions() const;
 
   private:
     size_t m_id;
-    TypedPoolSlice<MirInstruction> *m_instructions; // Arena-managed linked list of instructions.
+    TypedPoolLinkedList<MirInstruction> *m_instructions; // Arena-managed linked list of instructions.
 };
 
 #endif // EZPACKER_MIRBLOCK_H

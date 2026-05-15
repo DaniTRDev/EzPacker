@@ -1,6 +1,6 @@
 #include "AstNodes/Instruction.h"
 
-Instruction::Instruction(TypedPoolSlice<AstNode> *operands, std::string_view instructionName) :
+Instruction::Instruction(TypedPoolLinkedList<AstNode> *operands, std::string_view instructionName) :
     m_instructionName(instructionName)
 {
     AstNodeContainer::setExpressions(operands);
@@ -21,4 +21,4 @@ const char *Instruction::getAstNodeName() const { return "Instruction"; }
 
 const std::string_view &Instruction::getInstructionName() const { return m_instructionName; }
 
-CallInstruction::CallInstruction(TypedPoolSlice<AstNode> *params) : Instruction(params, "call") {}
+CallInstruction::CallInstruction(TypedPoolLinkedList<AstNode> *params) : Instruction(params, "call") {}

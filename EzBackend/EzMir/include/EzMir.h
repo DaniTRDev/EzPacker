@@ -51,8 +51,10 @@
 
 // ── Operand variant (registers, immediates, memory, references) ─────────────
 #include "Operand/MirOperand.h"
+#include "Operand/MirOperands.h"
 
 // ── Type system primitives ──────────────────────────────────────────────────
 #include "Type/MirType.h"
+#include "Type/MirTypes.h"
 
 #endif // EZPACKER_EZMIR_H

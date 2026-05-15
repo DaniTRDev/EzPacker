@@ -81,7 +81,7 @@ bool TypeCheckVisitor::visit(Instruction *instr)
             return false;
         }
 
-        TypedPoolSlice<AstNode>::Iterator paramIt = callInstr->getExpressions()->begin();
+        TypedPoolLinkedList<AstNode>::Iterator paramIt = callInstr->getExpressions()->begin();
         ++paramIt;
 
         for (size_t i = 1; i < currentCalleeSubTypeCount + 1; i++)

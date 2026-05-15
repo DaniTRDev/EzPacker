@@ -13,7 +13,7 @@ bool ParsingPhase::execute(struct FrontendCompilationUnit *unit)
             std::make_shared<BasicParsingContext>(errorCollector, sourceManager, tokenizer->getTokens());
 
     TypedPool *nodePool = parsingContext->getNodePool();
-    TypedPoolSlice<AstNode> *globalScopeAstNodes = nodePool->createSlice<AstNode>();
+    TypedPoolLinkedList<AstNode> *globalScopeAstNodes = nodePool->createLinkedList<AstNode>();
 
     while (parsingContext->canPeek())
     {
@@ -37,7 +37,7 @@ bool ParsingPhase::execute(struct FrontendCompilationUnit *unit)
             break;
         }
 
-        nodePool->appendToSlice(globalScopeAstNodes, node);
+        nodePool->appendToListBack(globalScopeAstNodes, node);
     }
 
     if (errorCollector->doesCurrentScopeHasFatalErrors())

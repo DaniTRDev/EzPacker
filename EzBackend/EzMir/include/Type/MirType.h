@@ -55,7 +55,11 @@ class MirType
      * @param subTypes Optional child-type slice used by compound kinds.
      * @param name     Human-readable type name kept for diagnostics/debugging.
      */
-    MirType(MirTypeKind kind, size_t id, TypedPoolSlice<MirType> *subTypes, const std::string_view &name);
+    MirType(MirTypeKind kind,
+            size_t id,
+            size_t totalSize,
+            TypedPoolLinkedList<MirType> *subTypes,
+            const std::string_view &name);
 
     /**
      * Returns the high-level kind of this type.
@@ -68,10 +72,16 @@ class MirType
     size_t getId() const;
 
     /**
+     * Returns the total size in bytes of this type.
+     * @return
+     */
+    size_t getTotalSizeInBytes() const;
+
+    /**
      * Returns the child-type slice for compound kinds, or `nullptr` when this
      * type has no subordinate types.
      */
-    TypedPoolSlice<MirType> *getSubTypes() const;
+    TypedPoolLinkedList<MirType> *getSubTypes() const;
 
     /**
      * Returns the human-readable name associated with this type.
@@ -81,10 +91,11 @@ class MirType
     const std::string_view &getName() const;
 
   private:
-    MirTypeKind m_kind;                  // High-level classification of the type.
-    size_t m_id;                         // Unique MIR identifier for this type.
-    TypedPoolSlice<MirType> *m_subTypes; // Optional child types for compound kinds.
-    std::string_view m_name;             // Debug/diagnostic name.
+    MirTypeKind m_kind;                       // High-level classification of the type.
+    size_t m_id;                              // Unique MIR identifier for this type.
+    size_t m_totalSizeInBytes;                // Total size in bytes of this type.
+    TypedPoolLinkedList<MirType> *m_subTypes; // Optional child types for compound kinds.
+    std::string_view m_name;                  // Debug/diagnostic name.
 };
 
 #endif // EZPACKER_MIRTYPE_H

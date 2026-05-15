@@ -19,7 +19,7 @@ AstNode *CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext>
     CallInstruction *node = nullptr;
     StringPool *stringPool = ctx->getStringPool();
     TypedPool *nodePool = ctx->getNodePool();
-    TypedPoolSlice<AstNode> *arguments = nodePool->createSlice<AstNode>();
+    TypedPoolLinkedList<AstNode> *arguments = nodePool->createLinkedList<AstNode>();
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, &instructionToken, _TokenType::Identifier))
     {
@@ -60,7 +60,7 @@ AstNode *CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext>
         return nullptr;
     }
 
-    nodePool->appendToSlice(arguments, callee);
+    nodePool->appendToListBack(arguments, callee);
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::LeftParen))
     {
@@ -88,7 +88,7 @@ AstNode *CallInstructionParser::parse(const std::shared_ptr<BasicParsingContext>
                 return nullptr;
             }
 
-            nodePool->appendToSlice(arguments, argument);
+            nodePool->appendToListBack(arguments, argument);
         } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
         if (!ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::RightParen))
@@ -120,7 +120,7 @@ AstNode *NonCallInstructionParser::parse(const std::shared_ptr<BasicParsingConte
     Instruction *node = nullptr;
     StringPool *stringPool = ctx->getStringPool();
     TypedPool *nodePool = ctx->getNodePool();
-    TypedPoolSlice<AstNode> *operands = nodePool->createSlice<AstNode>();
+    TypedPoolLinkedList<AstNode> *operands = nodePool->createLinkedList<AstNode>();
 
     if (!ctx->consumeIf(ParsingCondition::TokenType, &token, _TokenType::Identifier))
     {
@@ -152,7 +152,7 @@ AstNode *NonCallInstructionParser::parse(const std::shared_ptr<BasicParsingConte
                                ctx->getLastSourceReference());
                 return nullptr;
             }
-            nodePool->appendToSlice(operands, operand);
+            nodePool->appendToListBack(operands, operand);
         } while (ctx->consumeIf(ParsingCondition::TokenType, nullptr, _TokenType::Comma));
 
         // If this place have been reached, this expression can only be an instruction.

@@ -13,6 +13,7 @@ class CodeFlowAnalysisTests : public ::testing::Test
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
     std::shared_ptr<MirEmitterContext> ctx;
+    std::shared_ptr<MirTypes> m_types;
     MirEmitter *emitter;
     MirFunction *func;
     MirPassManager *pm;
@@ -25,7 +26,10 @@ class CodeFlowAnalysisTests : public ::testing::Test
         ctx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(ctx.get());
 
-        func = ctx->createFunction(ctx->createType(MirTypeKind::Void, nullptr, "myType")->getId());
+        m_types = std::make_shared<MirTypes>();
+        m_types->initialize(ctx.get());
+
+        func = ctx->createFunction(m_types->getVoidType(), nullptr, nullptr, "test");
         ctx->bindToBlock(*func->getBlocks()->begin());
 
         pm = new MirPassManager();
@@ -45,7 +49,7 @@ class CodeFlowAnalysisTests : public ::testing::Test
 
 TEST_F(CodeFlowAnalysisTests, EmptyFunctionFails)
 {
-    EXPECT_TRUE(pass->run(func, pm));
+    EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
 }
 
 TEST_F(CodeFlowAnalysisTests, SingleBlock)
@@ -54,7 +58,7 @@ TEST_F(CodeFlowAnalysisTests, SingleBlock)
     ctx->bindToBlock(b1);
     emitter->emitNOP();
 
-    EXPECT_TRUE(pass->run(func, pm));
+    EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
 
     const ControlFlowResult &res = pass->getResult();
     EXPECT_TRUE(res.m_successors.empty());
@@ -67,12 +71,12 @@ TEST_F(CodeFlowAnalysisTests, UnconditionalJump)
     MirBlock *b2 = ctx->createBlock();
 
     ctx->bindToBlock(b1);
-    emitter->emitJMP(ctx->createReference(b2));
+    emitter->emitJMP(emitter->createReference(b2));
 
     ctx->bindToBlock(b2);
     emitter->emitNOP();
 
-    EXPECT_TRUE(pass->run(func, pm));
+    EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
 }
 
 TEST_F(CodeFlowAnalysisTests, MultipleBlocksFallthrough)
@@ -86,7 +90,7 @@ TEST_F(CodeFlowAnalysisTests, MultipleBlocksFallthrough)
     ctx->bindToBlock(b2);
     emitter->emitNOP();
 
-    EXPECT_TRUE(pass->run(func, pm));
+    EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
 }
 
 TEST_F(CodeFlowAnalysisTests, ReturnInstruction)
@@ -94,8 +98,8 @@ TEST_F(CodeFlowAnalysisTests, ReturnInstruction)
     MirBlock *b1 = ctx->createBlock();
     ctx->bindToBlock(b1);
 
-    MirRegister r = emitter->createVirtualRegister(8);
-    emitter->emitRET(MirOperand(r));
+    MirRegister *r = emitter->createVirtualRegister(m_types->getFloat64Type());
+    emitter->emitRET(r);
 
-    EXPECT_TRUE(pass->run(func, pm));
+    EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
 }

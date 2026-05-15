@@ -11,31 +11,31 @@ constexpr size_t ChunkBlockSize = 1024 * 16; // 16KB block size.
 
 struct PoolChunk
 {
-    size_t m_sizeInBytes{ 0 };     // In bytes.
-    size_t m_usedSize{ 0 }; // In bytes.
+    size_t m_sizeInBytes{ 0 }; // In bytes.
+    size_t m_usedSize{ 0 };    // In bytes.
     std::unique_ptr<uint8_t[]> m_data;
 };
 
 // Internal node structure for the doubly-linked list.
-template <typename ElemType> struct TypedPoolNode
+template <typename ElemType> struct TypedPoolLinkedListNode
 {
-    TypedPoolNode *m_next{ nullptr };
-    TypedPoolNode *m_prev{ nullptr }; // <-- Added for backwards iteration
+    TypedPoolLinkedListNode *m_next{ nullptr };
+    TypedPoolLinkedListNode *m_prev{ nullptr }; // <-- Added for backwards iteration
     ElemType *m_object{ nullptr };
 };
 
 // The handle representing a list of objects (Slice).
-template <typename ElemType> struct TypedPoolSlice
+template <typename ElemType> struct TypedPoolLinkedList
 {
     size_t m_numElems{ 0 };
     class TypedPool *m_owner{ nullptr };
-    TypedPoolNode<ElemType> *m_head{ nullptr };
-    TypedPoolNode<ElemType> *m_tail{ nullptr };
+    TypedPoolLinkedListNode<ElemType> *m_head{ nullptr };
+    TypedPoolLinkedListNode<ElemType> *m_tail{ nullptr };
 
     // Standard Forward Iterator (Bidirectional)
     struct Iterator
     {
-        TypedPoolNode<ElemType> *m_curr{ nullptr };
+        TypedPoolLinkedListNode<ElemType> *m_curr{ nullptr };
 
         explicit operator bool() const { return m_curr != nullptr; }
 
@@ -75,12 +75,20 @@ template <typename ElemType> struct TypedPoolSlice
         }
 
         bool operator!=(const Iterator &other) const { return m_curr != other.m_curr; }
+
+        bool operator==(const Iterator &other) const { return m_curr == other.m_curr; }
+
+        /**
+         * Swaps the item of the list this iterator points to.
+         * @param other
+         */
+        void swapItem(const Iterator &other) { m_curr->m_object = other.m_curr->m_object; }
     };
 
     // Reverse Iterator
     struct ReverseIterator
     {
-        TypedPoolNode<ElemType> *m_curr{ nullptr };
+        TypedPoolLinkedListNode<ElemType> *m_curr{ nullptr };
 
         explicit operator bool() const { return m_curr != nullptr; }
 
@@ -105,6 +113,8 @@ template <typename ElemType> struct TypedPoolSlice
         }
 
         bool operator!=(const ReverseIterator &other) const { return m_curr != other.m_curr; }
+
+        bool operator!=(const Iterator &other) const { return m_curr != other.m_curr; }
     };
 
     Iterator begin() const { return Iterator{ m_head }; }
@@ -119,7 +129,7 @@ template <typename ElemType> struct TypedPoolSlice
             return nullptr;
 
         size_t currentId = 0;
-        TypedPoolNode<ElemType> *current = m_head;
+        TypedPoolLinkedListNode<ElemType> *current = m_head;
 
         // Optimization: If index is in the second half, iterate backwards
         if (index > m_numElems / 2)
@@ -149,6 +159,44 @@ template <typename ElemType> struct TypedPoolSlice
 
         return nullptr;
     }
+
+    /**
+     * Iterates over the linked list. If callback returns false, iteration is stopped.
+     * @param startNode
+     * @param callback
+     */
+    void forEach(TypedPoolLinkedList<ElemType>::Iterator begin,
+                 TypedPoolLinkedList<ElemType>::Iterator end,
+                 const std::function<bool(ElemType *elem, size_t pos)> &callback) const
+    {
+        size_t index = 0;
+        Iterator current = begin;
+
+        while (current != end)
+        {
+            if (!callback(*current, index))
+                break;
+
+            ++current;
+            index++;
+        }
+    }
+
+    void forEach(TypedPoolLinkedList<ElemType>::Iterator begin,
+                 TypedPoolLinkedList<ElemType>::Iterator end,
+                 const std::function<bool(TypedPoolLinkedList<ElemType> *list,
+                                          TypedPoolLinkedList<ElemType>::Iterator it)> &callback) const
+    {
+        Iterator current = begin;
+
+        while (current != end)
+        {
+            if (!callback(this, current))
+                break;
+
+            ++current;
+        }
+    }
 };
 
 class TypedPool
@@ -159,75 +207,75 @@ class TypedPool
     TypedPool(const TypedPool &) = delete;
     TypedPool &operator=(const TypedPool &) = delete;
 
-    template <typename ElemType, typename SliceElemType>
-    ElemType *appendToSlice(TypedPoolSlice<SliceElemType> *slice, ElemType *elem)
+    template <typename ElemType, typename LinkedListType>
+    ElemType *appendToListBack(TypedPoolLinkedList<LinkedListType> *list, ElemType *elem)
     {
-        if (!slice || !elem)
+        if (!list || !elem)
             return nullptr;
 
-        TypedPoolNode<SliceElemType> *node = create<TypedPoolNode<SliceElemType>>();
+        TypedPoolLinkedListNode<LinkedListType> *node = create<TypedPoolLinkedListNode<LinkedListType>>();
         node->m_next = nullptr;
-        node->m_object = reinterpret_cast<SliceElemType *>(elem);
+        node->m_object = reinterpret_cast<LinkedListType *>(elem);
 
-        if (slice->m_head == nullptr)
+        if (list->m_head == nullptr)
         {
             node->m_prev = nullptr;
-            slice->m_head = node;
-            slice->m_tail = node;
+            list->m_head = node;
+            list->m_tail = node;
         }
         else
         {
-            node->m_prev = slice->m_tail;
-            slice->m_tail->m_next = node;
-            slice->m_tail = node;
+            node->m_prev = list->m_tail;
+            list->m_tail->m_next = node;
+            list->m_tail = node;
         }
 
-        slice->m_numElems++;
+        list->m_numElems++;
         return elem;
     }
 
-    template <typename ElemType, typename SliceElemType>
-    ElemType *appendToSliceInFront(TypedPoolSlice<SliceElemType> *slice, ElemType *elem)
+    template <typename ElemType, typename LinkedListType>
+    ElemType *appendToListFront(TypedPoolLinkedList<LinkedListType> *list, ElemType *elem)
     {
-        if (!slice || !elem)
+        if (!list || !elem)
             return nullptr;
 
-        TypedPoolNode<SliceElemType> *node = create<TypedPoolNode<SliceElemType>>();
+        TypedPoolLinkedListNode<LinkedListType> *node = create<TypedPoolLinkedListNode<LinkedListType>>();
         node->m_prev = nullptr;
-        node->m_object = reinterpret_cast<SliceElemType *>(elem);
+        node->m_object = reinterpret_cast<LinkedListType *>(elem);
 
-        if (slice->m_head == nullptr)
+        if (list->m_head == nullptr)
         {
             node->m_next = nullptr;
-            slice->m_head = node;
-            slice->m_tail = node;
+            list->m_head = node;
+            list->m_tail = node;
         }
         else
         {
-            node->m_next = slice->m_head;
-            slice->m_head->m_prev = node;
-            slice->m_head = node;
+            node->m_next = list->m_head;
+            list->m_head->m_prev = node;
+            list->m_head = node;
         }
 
-        slice->m_numElems++;
+        list->m_numElems++;
         return elem;
     }
 
     /**
-     * Appends an element into a slice immediately AFTER the node pointed to by the iterator.
+     * Appends an element into a list immediately AFTER the node pointed to by the iterator.
      */
-    template <typename ElemType, typename SliceElemType>
-    ElemType *appendToSliceAfter(TypedPoolSlice<SliceElemType> *slice,
-                                 typename TypedPoolSlice<SliceElemType>::Iterator it,
-                                 ElemType *elem)
+    template <typename ElemType, typename LinkedListType>
+    ElemType *appendToListAfter(TypedPoolLinkedList<LinkedListType> *list,
+                                typename TypedPoolLinkedList<LinkedListType>::Iterator it,
+                                ElemType *elem)
     {
-        if (!slice || !elem || !it.m_curr)
+        if (!list || !elem || !it.m_curr)
             return nullptr;
 
-        TypedPoolNode<SliceElemType> *node = create<TypedPoolNode<SliceElemType>>();
-        node->m_object = reinterpret_cast<SliceElemType *>(elem);
+        TypedPoolLinkedListNode<LinkedListType> *node = create<TypedPoolLinkedListNode<LinkedListType>>();
+        node->m_object = reinterpret_cast<LinkedListType *>(elem);
 
-        TypedPoolNode<SliceElemType> *targetNode = it.m_curr;
+        TypedPoolLinkedListNode<LinkedListType> *targetNode = it.m_curr;
 
         // Wire up the new node
         node->m_prev = targetNode;
@@ -241,30 +289,38 @@ class TypedPool
         else
         {
             // If we inserted after the tail, we are the new tail
-            slice->m_tail = node;
+            list->m_tail = node;
         }
 
         targetNode->m_next = node;
-        slice->m_numElems++;
+        list->m_numElems++;
+        ++it;
 
         return elem;
     }
 
     /**
-     * Appends an element into a slice immediately BEFORE the node pointed to by the iterator.
+     * Appends an element into a list immediately BEFORE the node pointed to by the iterator.
      */
-    template <typename ElemType, typename SliceElemType>
-    ElemType *appendToSliceBefore(TypedPoolSlice<SliceElemType> *slice,
-                                  typename TypedPoolSlice<SliceElemType>::Iterator it,
-                                  ElemType *elem)
+    template <typename ElemType, typename LinkedListType>
+    ElemType *appendToListBefore(TypedPoolLinkedList<LinkedListType> *list,
+                                 typename TypedPoolLinkedList<LinkedListType>::Iterator it,
+                                 ElemType *elem)
     {
-        if (!slice || !elem || !it.m_curr)
+        if (!list || !elem)
             return nullptr;
 
-        TypedPoolNode<SliceElemType> *node = create<TypedPoolNode<SliceElemType>>();
-        node->m_object = reinterpret_cast<SliceElemType *>(elem);
+        // If the iterator is at the end (m_curr == nullptr), inserting BEFORE the end is the exact same as appending to
+        // the BACK of the list.
+        if (!it.m_curr)
+        {
+            return appendToListBack<ElemType, LinkedListType>(list, elem);
+        }
 
-        TypedPoolNode<SliceElemType> *targetNode = it.m_curr;
+        TypedPoolLinkedListNode<LinkedListType> *node = create<TypedPoolLinkedListNode<LinkedListType>>();
+        node->m_object = reinterpret_cast<LinkedListType *>(elem);
+
+        TypedPoolLinkedListNode<LinkedListType> *targetNode = it.m_curr;
 
         // Wire up the new node
         node->m_next = targetNode;
@@ -278,11 +334,11 @@ class TypedPool
         else
         {
             // If we inserted before the head, we are the new head
-            slice->m_head = node;
+            list->m_head = node;
         }
 
         targetNode->m_prev = node;
-        slice->m_numElems++;
+        list->m_numElems++;
 
         return elem;
     }
@@ -324,68 +380,68 @@ class TypedPool
         return reservedPointer;
     }
 
-    template <typename ElemType, typename SliceElemType, typename... Args>
+    template <typename ElemType, typename LinkedListType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
-    ElemType *createAndAppendToSlice(TypedPoolSlice<SliceElemType> *slice, Args &&...args)
+    ElemType *createAndAppendToListBack(TypedPoolLinkedList<LinkedListType> *list, Args &&...args)
     {
-        if (!slice)
+        if (!list)
             return nullptr;
 
         ElemType *elem = create<ElemType>(std::forward<Args>(args)...);
-        return appendToSlice<ElemType, SliceElemType>(slice, elem);
+        return appendToListBack<ElemType, LinkedListType>(list, elem);
     }
 
-    template <typename ElemType, typename SliceElemType, typename... Args>
+    template <typename ElemType, typename LinkedListType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
-    ElemType *createAndAppendToSliceInFront(TypedPoolSlice<SliceElemType> *slice, Args &&...args)
+    ElemType *createAndAppendToListFront(TypedPoolLinkedList<LinkedListType> *list, Args &&...args)
     {
-        if (!slice)
+        if (!list)
             return nullptr;
 
         ElemType *elem = create<ElemType>(std::forward<Args>(args)...);
-        return appendToSliceInFront<ElemType, SliceElemType>(slice, elem);
+        return appendToListFront<ElemType, LinkedListType>(list, elem);
     }
 
-    template <typename ElemType, typename SliceElemType, typename... Args>
+    template <typename ElemType, typename LinkedListType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
-    ElemType *createAndAppendToSliceAfter(TypedPoolSlice<SliceElemType> *slice,
-                                          typename TypedPoolSlice<SliceElemType>::Iterator it,
+    ElemType *createAndAppendToListAfter(TypedPoolLinkedList<LinkedListType> *list,
+                                         typename TypedPoolLinkedList<LinkedListType>::Iterator it,
+                                         Args &&...args)
+    {
+        if (!list)
+            return nullptr;
+
+        ElemType *elem = create<ElemType>(std::forward<Args>(args)...);
+        return appendToListAfter<ElemType, LinkedListType>(list, it, elem);
+    }
+
+    template <typename ElemType, typename LinkedListType, typename... Args>
+        requires(std::is_trivially_destructible_v<ElemType>)
+    ElemType *createAndAppendToListBefore(TypedPoolLinkedList<LinkedListType> *list,
+                                          typename TypedPoolLinkedList<LinkedListType>::Iterator it,
                                           Args &&...args)
     {
-        if (!slice)
+        if (!list)
             return nullptr;
 
         ElemType *elem = create<ElemType>(std::forward<Args>(args)...);
-        return appendToSliceAfter<ElemType, SliceElemType>(slice, it, elem);
-    }
-
-    template <typename ElemType, typename SliceElemType, typename... Args>
-        requires(std::is_trivially_destructible_v<ElemType>)
-    ElemType *createAndAppendToSliceBefore(TypedPoolSlice<SliceElemType> *slice,
-                                           typename TypedPoolSlice<SliceElemType>::Iterator it,
-                                           Args &&...args)
-    {
-        if (!slice)
-            return nullptr;
-
-        ElemType *elem = create<ElemType>(std::forward<Args>(args)...);
-        return appendToSliceBefore<ElemType, SliceElemType>(slice, it, elem);
+        return appendToListBefore<ElemType, LinkedListType>(list, it, elem);
     }
 
     /**
      * Removes the element pointed to by the iterator from the slice.
      * Returns an iterator to the NEXT valid element, allowing safe removal during iteration.
      */
-    template <typename SliceElemType>
-    typename TypedPoolSlice<SliceElemType>::Iterator
-    removeFromSlice(TypedPoolSlice<SliceElemType> *slice, typename TypedPoolSlice<SliceElemType>::Iterator it)
+    template <typename LinkedListType>
+    typename TypedPoolLinkedList<LinkedListType>::Iterator
+    removeFromList(TypedPoolLinkedList<LinkedListType> *list, typename TypedPoolLinkedList<LinkedListType>::Iterator it)
     {
-        if (!slice || !it.m_curr)
-            return typename TypedPoolSlice<SliceElemType>::Iterator{ nullptr };
+        if (!list || !it.m_curr)
+            return typename TypedPoolLinkedList<LinkedListType>::Iterator{ nullptr };
 
-        TypedPoolNode<SliceElemType> *targetNode = it.m_curr;
-        TypedPoolNode<SliceElemType> *nextNode = targetNode->m_next;
-        TypedPoolNode<SliceElemType> *prevNode = targetNode->m_prev;
+        TypedPoolLinkedListNode<LinkedListType> *targetNode = it.m_curr;
+        TypedPoolLinkedListNode<LinkedListType> *nextNode = targetNode->m_next;
+        TypedPoolLinkedListNode<LinkedListType> *prevNode = targetNode->m_prev;
 
         // Wire up the previous node (or update the head if we are removing the first element)
         if (prevNode)
@@ -394,7 +450,7 @@ class TypedPool
         }
         else
         {
-            slice->m_head = nextNode;
+            list->m_head = nextNode;
         }
 
         // Wire up the next node (or update the tail if we are removing the last element)
@@ -404,22 +460,22 @@ class TypedPool
         }
         else
         {
-            slice->m_tail = prevNode;
+            list->m_tail = prevNode;
         }
 
-        slice->m_numElems--;
+        list->m_numElems--;
 
         // Isolate the removed node to prevent accidental traversal bugs
         targetNode->m_next = nullptr;
         targetNode->m_prev = nullptr;
 
         // Return an iterator pointing to the NEXT element
-        return typename TypedPoolSlice<SliceElemType>::Iterator{ nextNode };
+        return typename TypedPoolLinkedList<LinkedListType>::Iterator{ nextNode };
     }
 
-    template <typename ElemType> TypedPoolSlice<ElemType> *createSlice()
+    template <typename ElemType> TypedPoolLinkedList<ElemType> *createLinkedList()
     {
-        return create<TypedPoolSlice<ElemType>>(0, this, nullptr, nullptr);
+        return create<TypedPoolLinkedList<ElemType>>(0, this, nullptr, nullptr);
     }
 
     void deallocate() { m_chunks.clear(); }
@@ -428,7 +484,8 @@ class TypedPool
     void allocateNewChunk(size_t size)
     {
         size_t max = std::max(size, ChunkBlockSize);
-        m_chunks.push_back(PoolChunk{ .m_sizeInBytes = max, .m_usedSize = 0, .m_data = std::make_unique<uint8_t[]>(max) });
+        m_chunks.push_back(
+                PoolChunk{ .m_sizeInBytes = max, .m_usedSize = 0, .m_data = std::make_unique<uint8_t[]>(max) });
     }
 
   protected:

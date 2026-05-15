@@ -5,6 +5,7 @@ bool VariableLowerer::lower(AstNode *node, AstLoweringContext *ctx)
     Variable *var = dynamic_cast<Variable *>(node);
     SymbolAnnotation *symbolAnnot = var->getAnnotation<SymbolAnnotation>();
     Symbol *sym = symbolAnnot->getSymbol();
+    MirType *mirType = ctx->createMirTypeFromSemanticType(sym->getSymbolDataType());
 
     if (sym->getType() == SymbolType::LocalVariable)
     {
@@ -19,7 +20,8 @@ bool VariableLowerer::lower(AstNode *node, AstLoweringContext *ctx)
     else
     {
         // Module or label, emit a reference.
-        ctx->pushOperand(MirReference{ .m_type = MirReferenceType::Function, .m_refId = ctx->getMirIdOfSymbol(sym) });
+        ctx->pushOperand(MirReference{ .m_type = MirReferenceType::Function, .m_refId = ctx->getMirIdOfSymbol(sym) },
+                         mirType);
     }
 
     return true;
@@ -32,7 +34,10 @@ bool VariableLowerer::lowerGlobalVariable(Variable *var, AstLoweringContext *ctx
         // Not in global scope, so this is a reference to a global variable within a code scope.
 
         Symbol *sym = var->getAnnotation<SymbolAnnotation>()->getSymbol();
-        ctx->pushOperand(MirReference{ .m_refId = ctx->getMirIdOfSymbol(sym) });
+        Type *type = sym->getSymbolDataType();
+        MirType *mirType = ctx->createMirTypeFromSemanticType(type);
+
+        ctx->pushOperand(MirReference{ .m_refId = ctx->getMirIdOfSymbol(sym) }, mirType);
 
         return true;
     }
@@ -45,7 +50,7 @@ bool VariableLowerer::lowerGlobalVariable(Variable *var, AstLoweringContext *ctx
     size_t currentAddress = 0;
     std::vector<uint8_t> tempBuffer;
 
-    TypedPoolSlice<AstNode> *initializers = var->getExpressions();
+    TypedPoolLinkedList<AstNode> *initializers = var->getExpressions();
 
     if (varSize != 0)
     {
@@ -108,6 +113,7 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, AstLoweringContext *ctx)
 {
     SymbolAnnotation *symbolAnnot = var->getAnnotation<SymbolAnnotation>();
     Symbol *sym = symbolAnnot->getSymbol();
+    MirType *mirType = ctx->createMirTypeFromSemanticType(sym->getSymbolDataType());
     size_t varSize = static_cast<size_t>(sym->getSymbolDataType()->getUnderlyingTypeSize());
 
     if (ctx->isSymbolLinkedToMir(sym))
@@ -119,7 +125,7 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, AstLoweringContext *ctx)
         }
 
         size_t existingVRegId = ctx->getMirIdOfSymbol(sym);
-        ctx->pushOperand(MirOperand{ MirRegister{ .m_id = existingVRegId, .m_sizeInBytes = varSize / 8 } });
+        ctx->pushOperand(MirOperand{ MirRegister{ .m_id = existingVRegId, .m_sizeInBytes = varSize / 8 } }, mirType);
 
         return true;
     }
@@ -129,7 +135,7 @@ bool VariableLowerer::lowerLocalVariable(Variable *var, AstLoweringContext *ctx)
 
     // Link it so future usages find it.
     ctx->linkSymbolToMirId(sym, vReg.m_id);
-    ctx->pushOperand(MirOperand{ vReg });
+    ctx->pushOperand(MirOperand{ vReg }, mirType);
 
     return true;
 }
@@ -141,6 +147,7 @@ bool VariableLowerer::lowerVariableCast(Variable *var, AstLoweringContext *ctx)
 
     Symbol *sym = symbolAnnot->getSymbol();
     Type *destType = castAnnot->getDataType();
+    MirType *mirDestType = ctx->createMirTypeFromSemanticType(destType);
 
     size_t destTypeSize = static_cast<size_t>(destType->getUnderlyingTypeSize());
     size_t existingVRegId = ctx->getMirIdOfSymbol(sym);
@@ -178,6 +185,6 @@ bool VariableLowerer::lowerVariableCast(Variable *var, AstLoweringContext *ctx)
     }
 
     // Now, push the result register as the operand for this variable usage.
-    ctx->pushOperand(MirOperand{ resultVReg });
+    ctx->pushOperand(MirOperand{ resultVReg }, mirDestType);
     return true;
 }

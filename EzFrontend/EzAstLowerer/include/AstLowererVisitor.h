@@ -73,11 +73,6 @@ class AstLowererVisitor : public SemanticVisitor
      * Lowers a module definition into MIR function/module state.
      */
     bool visit(Module *module) override;
-
-    /**
-     * Lowers a module header, typically parameters and signature metadata.
-     */
-    bool visit(ModuleHeader *header) override;
     
     /**
      * Lowers a switch into its corresponding case condition checker and case body block. Will also handle
