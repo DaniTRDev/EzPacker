@@ -47,7 +47,6 @@ TEST_F(MirEmitterTests, AttachToNullContextFails)
     }
     catch (const std::exception &ex)
     {
-    
     }
 }
 
@@ -72,9 +71,9 @@ TEST_F(MirEmitterTests, EmitNopViaHelperProducesInstruction)
 
 TEST_F(MirEmitterTests, EmitMovWithTwoRegisters)
 {
-    MirRegister dst = emitter->createVirtualRegister(8);
-    MirRegister src = emitter->createVirtualRegister(8);
-    MirInstruction *instr = emitter->emitMOV(MirOperand(dst), MirOperand(src));
+    MirRegister *dst = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirRegister *src = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *instr = emitter->emitMOV(dst, src);
     ASSERT_NE(instr, nullptr);
     EXPECT_EQ(instr->getOpCode(), MirInstructionOpCode::MOV);
     EXPECT_TRUE(instr->hasOperands());
@@ -85,25 +84,25 @@ TEST_F(MirEmitterTests, EmitMovWithTwoRegisters)
 
 TEST_F(MirEmitterTests, CreateRegisterHasUniqueId)
 {
-    MirRegister r1 = emitter->createVirtualRegister(8);
-    MirRegister r2 = emitter->createVirtualRegister(8);
-    EXPECT_NE(r1.m_id, r2.m_id);
-    EXPECT_NE(r1.m_id, MIRID_INVALID);
+    MirRegister *r1 = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirRegister *r2 = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    EXPECT_NE(r1->getRegId(), r2->getRegId());
+    EXPECT_NE(r1->getRegId(), MIRID_INVALID);
 }
 
 TEST_F(MirEmitterTests, RegisterStoressSize)
 {
-    MirRegister r = emitter->createVirtualRegister(4);
-    EXPECT_EQ(r.m_sizeInBytes, 4u);
+    MirRegister *r = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(4));
+    EXPECT_EQ(r->getSizeInBytes(), 4u);
 }
 
 // ─── Additional MirEmitter tests ─────────────────────────────────────────────
 
 TEST_F(MirEmitterTests, EmitAddWithTwoRegisters)
 {
-    MirRegister dst = emitter->createVirtualRegister(8);
-    MirRegister src = emitter->createVirtualRegister(8);
-    MirInstruction *instr = emitter->emitADD(MirOperand(dst), MirOperand(src));
+    MirRegister *dst = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirRegister *src = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *instr = emitter->emitADD(dst, src);
     ASSERT_NE(instr, nullptr);
     EXPECT_EQ(instr->getOpCode(), MirInstructionOpCode::ADD);
     EXPECT_EQ(instr->getOperands()->m_numElems, 2u);
@@ -111,9 +110,9 @@ TEST_F(MirEmitterTests, EmitAddWithTwoRegisters)
 
 TEST_F(MirEmitterTests, EmitSubWithTwoRegisters)
 {
-    MirRegister dst = emitter->createVirtualRegister(8);
-    MirRegister src = emitter->createVirtualRegister(8);
-    MirInstruction *instr = emitter->emitSUB(MirOperand(dst), MirOperand(src));
+    MirRegister *dst = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirRegister *src = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *instr = emitter->emitSUB(dst, src);
     ASSERT_NE(instr, nullptr);
     EXPECT_EQ(instr->getOpCode(), MirInstructionOpCode::SUB);
 }
@@ -127,9 +126,9 @@ TEST_F(MirEmitterTests, EmitHalt)
 
 TEST_F(MirEmitterTests, EmitCmpWithTwoRegisters)
 {
-    MirRegister a = emitter->createVirtualRegister(8);
-    MirRegister b = emitter->createVirtualRegister(8);
-    MirInstruction *instr = emitter->emitCMP(MirOperand(a), MirOperand(b));
+    MirRegister *a = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirRegister *b = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *instr = emitter->emitCMP(a, b);
     ASSERT_NE(instr, nullptr);
     EXPECT_EQ(instr->getOpCode(), MirInstructionOpCode::CMP);
 }
@@ -137,23 +136,23 @@ TEST_F(MirEmitterTests, EmitCmpWithTwoRegisters)
 TEST_F(MirEmitterTests, EmitJmpWithReference)
 {
     MirBlock *target = ctx->createBlock();
-    MirInstruction *instr = emitter->emitJMP(ctx->createReference(target));
+    MirInstruction *instr = emitter->emitJMP(emitter->createBlockRef(target));
     ASSERT_NE(instr, nullptr);
     EXPECT_EQ(instr->getOpCode(), MirInstructionOpCode::JMP);
 }
 
 TEST_F(MirEmitterTests, EmitRetWithRegister)
 {
-    MirRegister r = emitter->createVirtualRegister(8);
-    MirInstruction *instr = emitter->emitRET(MirOperand(r));
+    MirRegister *r = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *instr = emitter->emitRET(r);
     ASSERT_NE(instr, nullptr);
     EXPECT_EQ(instr->getOpCode(), MirInstructionOpCode::RET);
 }
 
 TEST_F(MirEmitterTests, EmitCreateWithRegister)
 {
-    MirRegister r = emitter->createVirtualRegister(8);
-    MirInstruction *instr = emitter->emitCREATE(MirOperand(r));
+    MirRegister *r = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *instr = emitter->emitCREATE(r);
     ASSERT_NE(instr, nullptr);
     EXPECT_EQ(instr->getOpCode(), MirInstructionOpCode::CREATE);
 }
@@ -167,9 +166,9 @@ TEST_F(MirEmitterTests, InstructionHasOperandsFalseForNop)
 
 TEST_F(MirEmitterTests, InstructionHasOperandsTrueForMov)
 {
-    MirRegister dst = emitter->createVirtualRegister(8);
-    MirRegister src = emitter->createVirtualRegister(8);
-    MirInstruction *instr = emitter->emitMOV(MirOperand(dst), MirOperand(src));
+    MirRegister *dst = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirRegister *src = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *instr = emitter->emitMOV(dst, src);
     ASSERT_NE(instr, nullptr);
     EXPECT_TRUE(instr->hasOperands());
 }
@@ -180,70 +179,35 @@ TEST_F(MirEmitterTests, InstructionMetadataOperandCount)
     ASSERT_NE(nop, nullptr);
     EXPECT_EQ(nop->getMetadata().m_operandConstraints.size(), 0u);
 
-    MirRegister dst = emitter->createVirtualRegister(8);
-    MirRegister src = emitter->createVirtualRegister(8);
-    MirInstruction *mov = emitter->emitMOV(MirOperand(dst), MirOperand(src));
+    MirRegister *dst = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirRegister *src = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    MirInstruction *mov = emitter->emitMOV(dst, src);
     ASSERT_NE(mov, nullptr);
     EXPECT_EQ(mov->getMetadata().m_operandConstraints.size(), 2u);
-}
-
-TEST_F(MirEmitterTests, MirOperandRegisterType)
-{
-    MirRegister r = emitter->createVirtualRegister(8);
-    MirOperand op(r);
-    EXPECT_EQ(op.getType(), MirOperandType::Register);
-    ASSERT_NE(op.getRegister(), nullptr);
-    EXPECT_EQ(op.getRegister()->m_id, r.m_id);
-    EXPECT_EQ(op.getRegister()->m_sizeInBytes, 8u);
-}
-
-TEST_F(MirEmitterTests, MirOperandIntegerType)
-{
-    MirOperand op(MirInteger{ 42 });
-    EXPECT_EQ(op.getType(), MirOperandType::Integer);
-    ASSERT_NE(op.getInteger(), nullptr);
-    EXPECT_EQ(op.getInteger()->m_value, 42);
-}
-
-TEST_F(MirEmitterTests, MirOperandDoubleType)
-{
-    MirOperand op(MirDouble{ 3.14 });
-    EXPECT_EQ(op.getType(), MirOperandType::Double);
-    ASSERT_NE(op.getDouble(), nullptr);
-    EXPECT_DOUBLE_EQ(op.getDouble()->m_value, 3.14);
-}
-
-TEST_F(MirEmitterTests, MirOperandReferenceType)
-{
-    MirOperand op(MirReference{ .m_type = MirReferenceType::Block, .m_refId = 99 });
-    EXPECT_EQ(op.getType(), MirOperandType::Reference);
-    ASSERT_NE(op.getReference(), nullptr);
-    EXPECT_EQ(op.getReference()->m_type, MirReferenceType::Block);
-    EXPECT_EQ(op.getReference()->m_refId, 99u);
 }
 
 TEST_F(MirEmitterTests, PushOperandToInstruction)
 {
     MirInstruction *instr = emitter->emitNOP();
     ASSERT_NE(instr, nullptr);
-    MirRegister r = emitter->createVirtualRegister(8);
-    emitter->emitOperandToInstruction(instr, MirOperand(r));
+    MirRegister *r = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    emitter->emitOperandToInstruction(instr, r);
     EXPECT_TRUE(instr->hasOperands());
     EXPECT_EQ(instr->getOperands()->m_numElems, 1u);
 }
 
 TEST_F(MirEmitterTests, CreateRegisterDifferentSizes)
 {
-    MirRegister r1 = emitter->createVirtualRegister(1);
-    MirRegister r2 = emitter->createVirtualRegister(2);
-    MirRegister r4 = emitter->createVirtualRegister(4);
-    MirRegister r8 = emitter->createVirtualRegister(8);
-    EXPECT_EQ(r1.m_sizeInBytes, 1u);
-    EXPECT_EQ(r2.m_sizeInBytes, 2u);
-    EXPECT_EQ(r4.m_sizeInBytes, 4u);
-    EXPECT_EQ(r8.m_sizeInBytes, 8u);
+    MirRegister *r1 = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(1));
+    MirRegister *r2 = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(2));
+    MirRegister *r4 = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(4));
+    MirRegister *r8 = emitter->createVirtualRegister(ctx->getIntegerTypeBySize(8));
+    EXPECT_EQ(r1->getSizeInBytes(), 1u);
+    EXPECT_EQ(r2->getSizeInBytes(), 2u);
+    EXPECT_EQ(r4->getSizeInBytes(), 4u);
+    EXPECT_EQ(r8->getSizeInBytes(), 8u);
     // All unique IDs
-    EXPECT_NE(r1.m_id, r2.m_id);
-    EXPECT_NE(r2.m_id, r4.m_id);
-    EXPECT_NE(r4.m_id, r8.m_id);
+    EXPECT_NE(r1->getRegId(), r2->getRegId());
+    EXPECT_NE(r2->getRegId(), r4->getRegId());
+    EXPECT_NE(r4->getRegId(), r8->getRegId());
 }

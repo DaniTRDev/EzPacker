@@ -8,6 +8,8 @@ MirFunctionStackFrame::MirFunctionStackFrame(MirFunction *owner, TypedPool *stac
     m_stackFrameObjects = stackFrameObjectPool->createLinkedList<StackFrameObject>();
 }
 
+size_t MirFunctionStackFrame::getAllocatedObjectCount() const { return m_stackFrameObjects->m_numElems; }
+
 StackFrameObject *MirFunctionStackFrame::getObjectFromId(MirId id)
 {
     for (auto it = m_stackFrameObjects->begin(); it != m_stackFrameObjects->end(); ++it)
@@ -50,6 +52,11 @@ StackFrameObject *MirFunctionStackFrame::createParam(size_t size, size_t align, 
     obj.m_offset = offset;
 
     return m_stackFrameObjects->m_owner->createAndAppendToListBack<StackFrameObject>(m_stackFrameObjects, obj);
+}
+
+TypedPoolLinkedList<StackFrameObject> *MirFunctionStackFrame::getStackFrameObjects() const
+{
+    return m_stackFrameObjects;
 }
 
 void MirFunctionStackFrame::setOwner(struct MirFunction *owner) { m_owner = owner; }

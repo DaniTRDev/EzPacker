@@ -1,11 +1,9 @@
 #include "ABIDesc.h"
 
 ABIDesc::ABIDesc() :
-    m_endianess(LittleEndian), m_returnValueLoc(), m_stackLayout(0, 0), m_calleeSavedRegs(), m_callerSavedRegs()
+    m_returnValueLoc(), m_stackLayout(0, 0), m_calleeSavedRegs(), m_callerSavedRegs()
 {
 }
-
-const AbiEndianness &ABIDesc::getEndianness() const { return m_endianess; }
 
 const ArgLocation &ABIDesc::getReturnValueLoc() const { return m_returnValueLoc; }
 
@@ -18,8 +16,6 @@ size_t ABIDesc::getRegSizeInBits() const { return m_regSizeInBits; }
 size_t ABIDesc::getStackOffsetSizeInBits() { return m_stackOffsetSizeInBits; }
 
 const StackLayout &ABIDesc::getStackLayout() const { return m_stackLayout; }
-
-void ABIDesc::setEndianness(AbiEndianness endianness) { m_endianess = endianness; }
 
 void ABIDesc::setReturnValueLoc(const ArgLocation &loc) { m_returnValueLoc = loc; }
 

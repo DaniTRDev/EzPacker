@@ -16,7 +16,30 @@ class DummyABIDescLegalizer : public ABIDesc
         setRegSizeInBits(32); // 4 bytes legal size
     }
 
-    ArgLocation getArgLoc(size_t id) const override { return ArgLocation(); }
+    size_t getAbiAlignment(MirType *type) const
+    {
+        if (!type)
+            return 1;
+
+        // Handle Basic Types (Integers, Floats)
+        size_t size = type->getTotalSizeInBytes();
+
+        // Standard rule: basic types align to their own size, capped by the target max.
+        // E.g., size 4 aligns to 4. Size 8 aligns to 8 (or 4 on 32-bit systems).
+        size_t align = size;
+
+        // Ensure it's a power of 2 (rounds up sizes like 3 to 4)
+        align = std::bit_ceil(align); // C++20 feature, or write a quick power-of-2 helper
+        return align;
+    }
+
+    /**
+     * Returns the preferred alignment for the given type.
+     * Used for global variables to optimize CPU cache line fetching.
+     */
+    size_t getPreferredAlignment(MirType *type) const { return getAbiAlignment(type); }
+
+    ArgLocation getArgLoc(size_t id, MirType *type) const override { return ArgLocation(); }
 };
 
 static bool customHandlerCalled = false;
@@ -33,7 +56,6 @@ class TypeLegalizerPassTests : public ::testing::Test
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
     std::shared_ptr<MirEmitterContext> emitterCtx;
-    std::shared_ptr<MirTypes> m_types;
     MirEmitter *emitter;
 
     DummyABIDescLegalizer abi;
@@ -41,7 +63,6 @@ class TypeLegalizerPassTests : public ::testing::Test
     LegalizerActionList *actionList;
     LegalizerHandlerList *handlerList;
     LegalizerContext *legalizerCtx;
-    TypeLegalizerPass *pass;
     MirPassManager *passManager;
 
     void SetUp() override
@@ -51,16 +72,14 @@ class TypeLegalizerPassTests : public ::testing::Test
         emitterCtx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(emitterCtx.get());
 
-        m_types = std::make_shared<MirTypes>();
-        m_types->initialize(emitterCtx.get());
-
-        targetDesc = new TargetDesc(&abi, "DummyTarget");
+        targetDesc = new TargetDesc(&abi, TargetEndianness::LittleEndian, "DummyTarget");
         actionList = new LegalizerActionList();
         handlerList = new LegalizerHandlerList();
-        passManager = new MirPassManager();
 
         legalizerCtx = new LegalizerContext(targetDesc, actionList, handlerList, emitter);
-        pass = new TypeLegalizerPass(legalizerCtx);
+
+        passManager = new MirPassManager();
+        passManager->addPass<TypeLegalizerPass>(legalizerCtx);
 
         ec->beginScope();
         MirBlock *block = emitterCtx->createBlock();
@@ -71,7 +90,6 @@ class TypeLegalizerPassTests : public ::testing::Test
     void TearDown() override
     {
         ec->endScope(ErrorAction::Discard);
-        delete pass;
         delete legalizerCtx;
         delete passManager;
         delete handlerList;
@@ -83,8 +101,8 @@ class TypeLegalizerPassTests : public ::testing::Test
 
 TEST_F(TypeLegalizerPassTests, RunDoesNothingIfNoneAction)
 {
-    MirRegister *dest = emitter->createVirtualRegister(m_types->getInt32Type()); // Legal size
-    MirRegister *src = emitter->createVirtualRegister(m_types->getInt32Type());
+    MirRegister *dest = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt32Type()); // Legal size
+    MirRegister *src = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt32Type());
 
     MirInstruction *instr = emitter->emitMOV(dest, src);
 
@@ -93,14 +111,14 @@ TEST_F(TypeLegalizerPassTests, RunDoesNothingIfNoneAction)
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
 
-    bool modified = pass->run(list, it, passManager);
+    bool modified = passManager->run(list, it, passManager);
     EXPECT_FALSE(modified);
 }
 
 TEST_F(TypeLegalizerPassTests, RunCallsPromoteOperand)
 {
-    MirRegister *dest = emitter->createVirtualRegister(m_types->getInt16Type()); // Illegal small size
-    MirRegister *src = emitter->createVirtualRegister(m_types->getInt16Type());
+    MirRegister *dest = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt16Type()); // Illegal small size
+    MirRegister *src = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt16Type());
 
     MirInstruction *instr = emitter->emitADD(dest, src);
 
@@ -110,7 +128,7 @@ TEST_F(TypeLegalizerPassTests, RunCallsPromoteOperand)
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
 
-    bool modified = pass->run(list, it, passManager);
+    bool modified = passManager->run(list, it, passManager);
     EXPECT_TRUE(modified);
 
     // Check if promotion happened (e.g. TRUNC was appended)
@@ -123,8 +141,8 @@ TEST_F(TypeLegalizerPassTests, RunCallsPromoteOperand)
 
 TEST_F(TypeLegalizerPassTests, RunCallsExpandOperand)
 {
-    MirRegister *dest = emitter->createVirtualRegister(m_types->getInt64Type()); // Illegal large size
-    MirRegister *src = emitter->createVirtualRegister(m_types->getInt64Type());
+    MirRegister *dest = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt64Type()); // Illegal large size
+    MirRegister *src = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt64Type());
 
     MirInstruction *instr = emitter->emitADD(dest, src);
 
@@ -134,7 +152,7 @@ TEST_F(TypeLegalizerPassTests, RunCallsExpandOperand)
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
 
-    bool modified = pass->run(list, it, passManager);
+    bool modified = passManager->run(list, it, passManager);
     EXPECT_TRUE(modified);
 
     // Check if expansion happened (ADD + ADC)
@@ -150,8 +168,8 @@ TEST_F(TypeLegalizerPassTests, RunCallsExpandOperand)
 
 TEST_F(TypeLegalizerPassTests, RunCallsCustomHandler)
 {
-    MirRegister *dest = emitter->createVirtualRegister(m_types->getInt64Type());
-    MirRegister *src = emitter->createVirtualRegister(m_types->getInt64Type());
+    MirRegister *dest = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt64Type());
+    MirRegister *src = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt64Type());
 
     MirInstruction *instr = emitter->emitMUL(dest, src);
 
@@ -161,7 +179,7 @@ TEST_F(TypeLegalizerPassTests, RunCallsCustomHandler)
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
 
-    bool modified = pass->run(list, it, passManager);
+    bool modified = passManager->run(list, it, passManager);
     // Custom handlers return void from the list point of view but may modify. TypeLegalizerPass currently returns true
     // for Custom if it loops and runs handler Wait, the handler returns LegalizerHandlerResult, but the pass checks it?
     // Let's look at `TypeLegalizerPass.cpp`:
@@ -174,11 +192,11 @@ TEST_F(TypeLegalizerPassTests, RunCallsCustomHandler)
 TEST_F(TypeLegalizerPassTests, MixedPromoteAndExpandInSameContext)
 {
     // Instruction 1: Needs expansion
-    MirRegister *dest64 = emitter->createVirtualRegister(m_types->getInt64Type());
+    MirRegister *dest64 = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt64Type());
     MirInstruction *instr1 = emitter->emitADD(dest64, dest64);
 
     // Instruction 2: Needs promotion
-    MirRegister *dest16 = emitter->createVirtualRegister(m_types->getInt16Type());
+    MirRegister *dest16 = emitter->createVirtualRegister(emitterCtx->getTypes()->getInt16Type());
     MirInstruction *instr2 = emitter->emitMOV(dest16, dest16);
 
     actionList->setOperandAction(MirInstructionOpCode::ADD, 64, TargetLegalizerActionType::Action_ExpandOperand);
@@ -188,7 +206,7 @@ TEST_F(TypeLegalizerPassTests, MixedPromoteAndExpandInSameContext)
     auto it1 = list->begin();
 
     // Legalize instr1 (Expand)
-    bool modified1 = pass->run(list, it1, passManager);
+    bool modified1 = passManager->run(list, it1, passManager);
     EXPECT_TRUE(modified1);
 
     // list now has ADD, ADC, MOV
@@ -197,7 +215,7 @@ TEST_F(TypeLegalizerPassTests, MixedPromoteAndExpandInSameContext)
     ++it2; // MOV
 
     // Legalize instr2 (Promote)
-    bool modified2 = pass->run(list, it2, passManager);
+    bool modified2 = passManager->run(list, it2, passManager);
     EXPECT_TRUE(modified2);
 
     // list now has ADD, ADC, MOV, TRUNC

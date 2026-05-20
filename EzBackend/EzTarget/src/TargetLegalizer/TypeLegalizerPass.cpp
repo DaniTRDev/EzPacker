@@ -51,4 +51,6 @@ bool TypeLegalizerPass::run(TypedPoolLinkedList<struct MirInstruction> *instrLis
     return false;
 }
 
+const char *TypeLegalizerPass::getName() const { return "TypeLegalizerPass"; }
+
 MirPassIterationPlace TypeLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Instruction; }

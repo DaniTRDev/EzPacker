@@ -8,9 +8,9 @@ class StringPool : public TypedArrayPool<char>
 {
   public:
     /**
-     * Creates an empty (filled with 0s) string in the pool. LEN MUST NOT INCLUDE NULL TERMINATOR.
-     * @param len
-     * @return std::string_view
+     * @brief Creates an empty (filled with 0s) string in the pool.
+     * @param len Length of the string (MUST NOT INCLUDE NULL TERMINATOR).
+     * @returns A string view of the allocated string.
      */
     std::string_view createConstantString(size_t len)
     {
@@ -22,9 +22,9 @@ class StringPool : public TypedArrayPool<char>
     }
 
     /**
-     * Creates an empty (filled with 0s) string in the pool and the fills it with the given input str.
-     * @param len
-     * @return std::string_view
+     * @brief Creates an empty (filled with 0s) string in the pool and fills it with the given string.
+     * @param from The string to copy into the pool.
+     * @returns A string view of the allocated string.
      */
     std::string_view createConstantString(const std::string &from)
     {

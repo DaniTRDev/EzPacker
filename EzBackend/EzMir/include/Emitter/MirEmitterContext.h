@@ -14,8 +14,8 @@ struct MirGlobalDataEntry
 {
     bool m_isReadOnly;
     bool m_uninitialized;
+    MirType *m_dataType;
     size_t m_entryId;
-    size_t m_dataSize;
     ConstantArray<uint8_t> m_data;
 };
 
@@ -71,21 +71,27 @@ class MirEmitterContext : public ErrorEmitter
 
     MirInstruction *createInstruction(MirInstructionOpCode opcode);
 
-    MirFunction *createFunction(MirType *returnType,
-                                TypedPoolLinkedList<MirOperand*> *parameters,
-                                const std::string_view &name);
+    MirFunction *
+    createFunction(MirType *returnType, TypedPoolLinkedList<MirOperand *> *parameters, const std::string_view &name);
 
-    MirGlobalDataEntry *createGlobalData(const void *data, size_t size, bool isReadOnly = true);
+    /**
+     * Returns a pointer to the function with matching id. Returns nullptr is there wasn't any matches.
+     * @param id
+     * @return
+     */
+    MirFunction *getFunctionById(size_t id) const;
+
+    MirGlobalDataEntry *createGlobalData(const void *data, MirType *type, bool isReadOnly = true);
     MirGlobalDataEntry *createGlobalFloatingPoint(double val);
-    MirGlobalDataEntry *createGlobalInteger(uint64_t val);
+    MirGlobalDataEntry *createGlobalInteger(size_t sizeInBytes, uint64_t val);
     MirGlobalDataEntry *
     createGlobalString(const std::string_view &str, bool includeNullTerminator = true, bool isReadOnly = true);
 
-    MirGlobalDataEntry *getGlobalDataEntryFromId(size_t entryId);
+    MirGlobalDataEntry *getGlobalDataEntryFromId(size_t entryId) const;
 
     MirType *createType(MirTypeKind kind,
                         size_t totalSizeInBytes,
-                        TypedPoolLinkedList<MirType> *types,
+                        TypedPoolLinkedList<MirType> *subTypes,
                         const std::string_view &name);
     /**
      * Finds and returns an integer MirType of the specified size.
@@ -93,7 +99,7 @@ class MirEmitterContext : public ErrorEmitter
      */
     MirType *getIntegerTypeBySize(size_t sizeInBytes);
     MirType *getMirTypeById(size_t id);
-    
+
     TypedPool *getBlockPool();
     TypedPool *getDataEntryPool();
     TypedPool *getFunctionPool();
@@ -106,13 +112,15 @@ class MirEmitterContext : public ErrorEmitter
     TypedPoolLinkedList<MirFunction> *getFunctionList() const;
     TypedPoolLinkedList<MirType> *getTypeList() const;
 
+    std::shared_ptr<class MirTypes> getTypes() const;
+
   private:
     MirId m_currentId;
     MirFunction *m_currentBoundFunction;
-
     InsertState m_insertState;
 
     TypedPool m_blockPool;
+
     TypedPool m_dataEntryPool;
     TypedPool m_functionPool;
     TypedPool m_functionParameterPool;
@@ -121,17 +129,19 @@ class MirEmitterContext : public ErrorEmitter
     TypedPool m_typePool;
     TypedPool m_stackFramePool;
     TypedPool m_stackObjectPool; // Objects inside frames.
-
     TypedArrayPool<uint8_t> m_dataPool;
-    TypedArrayPool<char> m_namePool;
 
+    TypedArrayPool<char> m_namePool;
     TypedPoolLinkedList<MirFunction> *m_functionList;
     TypedPoolLinkedList<MirType> *m_typeList;
 
+    std::map<size_t, MirFunction *> m_blockIdToFunc;
+    std::map<size_t, MirFunction *> m_idToFunctionMap;
     std::map<size_t, MirType *> m_idToTypeMap;
     std::map<size_t, MirBlock *> m_idToBlockMap;
     std::map<size_t, MirGlobalDataEntry *> m_idToGlobalDataEntry;
     std::set<std::string_view> m_typeNames;
+    std::shared_ptr<class MirTypes> m_types;
 };
 
 #endif // EZPACKER_MIREMITTERCONTEXT_H

@@ -33,6 +33,8 @@ class CodeFlowAnalysis : public IMirAnalysisPass
              TypedPoolLinkedList<class MirBlock>::Iterator it,
              class MirPassManager *passManager) override;
 
+    const char *getName() const override;
+    
     /**
      * Returns the result of the analysis.
      * @return

@@ -15,6 +15,13 @@
 #include "MirInstructionDefs.h"
 #include "Operand/MirOperands.h"
 
+/**
+ * Type used to abstract away details about the selected opcode of a mir instruction (happens in instruction selector
+ * pass).
+ */
+using MirTargetInstructionId = uint32_t;
+constexpr MirTargetInstructionId TARGET_INSTR_SELECT_NONE = 0;
+
 class MirInstruction
 {
   public:
@@ -78,6 +85,18 @@ class MirInstruction
     MirInstructionFlags getFlags() const;
 
     /**
+     * Returns the targetId of the instruction. Will only contain a valid value after instruction selection pass.
+     * @return
+     */
+    MirTargetInstructionId getTargetId() const;
+
+    /**
+     * Sets the target instruction ID.
+     * @param id
+     */
+    void setTargetId(MirTargetInstructionId id);
+
+    /**
      * Returns a string representation of the instruction in assembly format.
      * @return std::string
      */
@@ -85,6 +104,7 @@ class MirInstruction
 
   private:
     MirInstructionOpCode m_opcode;
+    MirTargetInstructionId m_targetId;
     TypedPoolLinkedList<MirOperand> *m_operands;
 };
 

@@ -28,7 +28,7 @@ class LivenessAnalysisTests : public ::testing::Test
 
         // createFunction sets the created function as the current bound function in ctx.
         m_types->initialize(ctx.get());
-        func = ctx->createFunction(m_types->getVoidType(), nullptr, nullptr, "test");
+        func = ctx->createFunction(m_types->getVoidType(), nullptr, "test");
 
         pm = new MirPassManager();
 
@@ -92,7 +92,7 @@ TEST_F(LivenessAnalysisTests, UseWithoutDef)
     EXPECT_EQ(itUse->second.size(), 1);
     if (!itUse->second.empty())
     {
-        EXPECT_EQ((*itUse->second.begin()).getRegId(), r1->getRegId());
+        EXPECT_EQ((*itUse->second.begin())->getRegId(), r1->getRegId());
     }
 
     auto itDef = res.m_def.find(b1->getId());
@@ -100,6 +100,6 @@ TEST_F(LivenessAnalysisTests, UseWithoutDef)
     EXPECT_EQ(itDef->second.size(), 1);
     if (!itDef->second.empty())
     {
-        EXPECT_EQ((*itDef->second.begin()).getRegId(), r2->getRegId());
+        EXPECT_EQ((*itDef->second.begin())->getRegId(), r2->getRegId());
     }
 }

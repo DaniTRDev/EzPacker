@@ -38,9 +38,9 @@ template <typename ElemType> class TypedArrayPool : public TypedPool
 {
   public:
     /**
-     * Creates a fixed-size array in the pool.
-     * @param count
-     * @return ElemType*
+     * @brief Creates a fixed-size array in the pool.
+     * @param count The number of elements in the array.
+     * @returns A ConstantArray representing the allocated array.
      */
     ConstantArray<ElemType> createConstantArray(size_t count)
     {
@@ -83,6 +83,12 @@ template <typename ElemType> class TypedArrayPool : public TypedPool
         return ConstantArray{ .m_elems = ptr, .m_numElems = count };
     }
 
+    /**
+     * @brief Creates a fixed-size array in the pool and initializes it with the given data.
+     * @param init A pointer to the data to copy into the array.
+     * @param count The number of elements to copy.
+     * @returns A ConstantArray representing the allocated array.
+     */
     ConstantArray<ElemType> createConstantArray(const void *init, size_t count)
     {
         ConstantArray<ElemType> res = createConstantArray(count);

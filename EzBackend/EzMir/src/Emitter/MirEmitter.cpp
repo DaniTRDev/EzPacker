@@ -1,4 +1,5 @@
 #include "Emitter/MirEmitter.h"
+#include "Type/MirTypes.h"
 
 MirEmitter::MirEmitter(MirEmitterContext *ctx) : m_currentBlock(nullptr)
 {
@@ -16,6 +17,8 @@ bool MirEmitter::attachToContext(MirEmitterContext *ctx)
     }
 
     m_ctx = ctx;
+    LOG_DEBUG("Attached to context", "MirEmitter");
+
     return true;
 }
 
@@ -53,7 +56,7 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
 
     // Helper: Iterators return a pointer to the element in the pool.
     auto isImmediate = [](const MirOperand *op)
-    { return op->isOfType<MirInteger>() || op->isOfType<MirDouble>() || op->isOfType<MirConstantPoolRef>(); };
+    { return op->isOfType<MirInteger>() || op->isOfType<MirDouble>() || (op->isOfType<MirReference>()); };
 
     // Validate Type Constraints per Operand
     auto it = operands->begin();
@@ -79,8 +82,6 @@ bool MirEmitter::areInstructionOperandsLegal(const MirInstructionMetadata &instr
         if ((allowed & ExpectedOperandType::Integer) && op->isOfType<MirInteger>())
             isValidType = true;
         if ((allowed & ExpectedOperandType::Double) && op->isOfType<MirDouble>())
-            isValidType = true;
-        if ((allowed & ExpectedOperandType::ConstantPoolRef) && op->isOfType<MirConstantPoolRef>())
             isValidType = true;
         if ((allowed & ExpectedOperandType::Memory) && op->isOfType<MirMemory>())
             isValidType = true;
@@ -164,6 +165,11 @@ MirEmitterContext *MirEmitter::getContext() const { return m_ctx; }
 
 MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode)
 {
+    LOG_DEBUG(std::format("Emitting instruction opcode: {} (id: {})",
+                          g_MirInstructionSet[opcode].m_name,
+                          static_cast<uint16_t>(opcode)),
+              "MirEmitter");
+
     MirInstruction *instr = m_ctx->createInstruction(opcode);
     return instr;
 }
@@ -176,6 +182,8 @@ MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode, const std::initial
     MirInstruction *instr = emit(opcode);
 
     // Map the incoming operands into the instruction's TypedPoolLinkedList first
+    LOG_DEBUG(std::format(" -- Emitting instruction operands: (count: {})", operands.size()), "MirEmitter");
+
     if (!emitOperands(instr, operands))
     {
         m_ctx->emitError(ErrorSeverity::Fatal, "Could not emit instruction's operands", "MirEmitter::emit");
@@ -191,60 +199,90 @@ MirInstruction *MirEmitter::emit(MirInstructionOpCode opcode, const std::initial
         return nullptr;
     }
 
+    LOG_DEBUG(std::format(" - Emitted Instruction: {}", instr->toString()), "MirEmitter");
     return instr;
 }
 
 MirRegister *MirEmitter::createVirtualRegister(MirType *type)
 {
-    return m_ctx->getOperandPool()->create<MirRegister>(type, true, m_ctx->createId());
+    size_t id = m_ctx->createId();
+    LOG_DEBUG(std::format(" ---- Creating virtual register (id: {}) (type: {})", id, type->getName()), "MirEmitter");
+
+    return m_ctx->getOperandPool()->create<MirRegister>(type, true, id);
 }
 
 MirRegister *MirEmitter::createPhysicalRegister(MirType *type, size_t id)
 {
+    LOG_DEBUG(std::format(" ---- Creating physical register (id: {}) (type: {})", id, type->getName()), "MirEmitter");
     return m_ctx->getOperandPool()->create<MirRegister>(type, false, id);
 }
 
 MirInteger *MirEmitter::createImmediateInteger(MirType *type, int64_t value)
 {
-    // The pool returns an already-allocated, perfectly constructed MirInteger pointer.
+    LOG_DEBUG(std::format(" ---- Creating immediate integer (value: {}) (type: {})", value, type->getName()),
+              "MirEmitter");
     return m_ctx->getOperandPool()->create<MirInteger>(type, value);
 }
 
 MirDouble *MirEmitter::createImmediateDouble(MirType *type, double value)
 {
+    LOG_DEBUG(std::format(" ---- Creating immediate double (value: {}) (type: {})", value, type->getName()),
+              "MirEmitter");
     return m_ctx->getOperandPool()->create<MirDouble>(type, value);
-}
-
-MirConstantPoolRef *MirEmitter::createConstantPoolRef(MirType *type, size_t entryId)
-{
-    return m_ctx->getOperandPool()->create<MirConstantPoolRef>(type, entryId);
 }
 
 MirMemory *MirEmitter::createMemoryOperand(MirType *type, MirOperand *base, MirOperand *displ)
 {
+    LOG_DEBUG(std::format(" ---- Creating MirMemory (base: {}) (offset: {}) (type: {})",
+                          base ? base->toString() : "NO_BASE",
+                          displ ? displ->toString() : "NO_DISPL",
+                          type->getName()),
+              "MirEmitter");
     return m_ctx->getOperandPool()->create<MirMemory>(type, base, displ);
 }
 
 MirFrameIndex *MirEmitter::createFrameIndex(MirType *type, size_t frameId)
 {
+    LOG_DEBUG(std::format(" ---- Creating FrameIndex (id: {}) (type: {})", frameId, type->getName()), "MirEmitter");
     return m_ctx->getOperandPool()->create<MirFrameIndex>(type, frameId);
 }
 
-MirReference *MirEmitter::createReference(MirBlock *block)
+MirReference *MirEmitter::createBlockRef(MirBlock *block)
 {
     if (!block)
     {
         m_ctx->emitError(ErrorSeverity::Fatal,
                          "Cannot create reference for null block",
-                         "MirEmitterContext::createReference");
+                         "MirEmitterContext::createBlockRef");
         return m_ctx->getOperandPool()->create<MirReference>(nullptr, MirReferenceType::Invalid, 0);
     }
 
-    return m_ctx->getOperandPool()->create<MirReference>(nullptr, MirReferenceType::Block, block->getId());
+    MirFunction *func = m_ctx->getFunctionById(block->getId());
+    if (func)
+    {
+        LOG_DEBUG(std::format(" ---- Creating MirReference from function (id: {}) (entryId: {}) (name: {})",
+                              func->getId(),
+                              func->getEntryPoint()->getId(),
+                              func->getName()),
+                  "MirEmitter");
+
+        return m_ctx->getOperandPool()->create<MirReference>(m_ctx->getTypes()->getPtr(func->getReturnType()),
+                                                             MirReferenceType::Function,
+                                                             block->getId());
+    }
+    else
+    {
+        LOG_DEBUG(std::format(" ---- Creating MirReference from block (id: {})", block->getId()), "MirEmitter");
+        return m_ctx->getOperandPool()->create<MirReference>(
+                m_ctx->getTypes()->getPtr(m_ctx->getTypes()->getInt8Type()),
+                MirReferenceType::Block,
+                block->getId());
+    }
 }
 
 void MirEmitter::emitOperandToInstruction(MirInstruction *instr, MirOperand *operand)
 {
+    LOG_DEBUG(std::format(" -- Emitting instruction operand: {}", operand->toString()), "MirEmitter");
     emitOperands(instr, { operand });
 }
 
@@ -264,6 +302,8 @@ bool MirEmitter::emitOperands(MirInstruction *instr, const std::initializer_list
         {
             return false;
         }
+
+        LOG_DEBUG(std::format(" -- Emitting instruction operand: {}", operand->toString()), "MirEmitter");
     }
 
     return true;

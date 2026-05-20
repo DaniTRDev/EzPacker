@@ -4,6 +4,7 @@ set(EZTARGET_FILES_LIST
         "include/TargetDesc.h"
         "include/TargetAbiLowerer/TargetAbiLowererContext.h"
         "include/TargetAbiLowerer/TargetAbiLowererPass.h"
+        "include/TargetInstructionSelector/InstructionSelectionTable.h"
         "include/TargetInstructionSelector/InstructionSelectorContext.h"
         "include/TargetInstructionSelector/InstructionSelectorPass.h"
         "include/TargetLegalizer/AbiLegalizerPass.h"
@@ -13,10 +14,16 @@ set(EZTARGET_FILES_LIST
         "include/TargetLegalizer/TypeLegalizerPass.h"
         "include/TargetLegalizer/StandardLegalizers/ExpandTypeLegalizer.h"
         "include/TargetLegalizer/StandardLegalizers/PromoteTypeLegalizer.h"
+        "include/TargetRegisterAllocator/RegisterAllocatorContext.h"
+        "include/TargetRegisterAllocator/RegisterAllocatorPass.h"
+        "include/TargetStackFrameLowerer/StackFrameLowerer.h"
+        "include/TargetStackFrameLowerer/StackFrameLowererContext.h"
 
         "src/TargetDesc.cpp"
         "src/TargetAbiLowerer/TargetAbiLowererContext.cpp"
         "src/TargetAbiLowerer/TargetAbiLowererPass.cpp"
+        "src/TargetInstructionSelector/InstructionSelectionTable.cpp"
+        "src/TargetInstructionSelector/InstructionSelectorContext.cpp"
         "src/TargetInstructionSelector/InstructionSelectorPass.cpp"
         "src/TargetLegalizer/LegalizerActionList.cpp"
         "src/TargetLegalizer/LegalizerContext.cpp"
@@ -24,6 +31,10 @@ set(EZTARGET_FILES_LIST
         "src/TargetLegalizer/TypeLegalizerPass.cpp"
         "src/TargetLegalizer/StandardLegalizers/ExpandTypeLegalizer.cpp"
         "src/TargetLegalizer/StandardLegalizers/PromoteTypeLegalizer.cpp"
+        "src/TargetRegisterAllocator/RegisterAllocatorContext.cpp"
+        "src/TargetRegisterAllocator/RegisterAllocatorPass.cpp"
+        "src/TargetStackFrameLowerer/StackFrameLowererPass.cpp"
+        "src/TargetStackFrameLowerer/StackFrameLowererContext.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzTarget"
@@ -68,6 +79,27 @@ if (EZPACKER_BUILD_TESTS)
             "EzTarget"
             ""
             "tests/T_TargetAbiLowerer.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_TargetInstructionSelection"
+            "EzTarget"
+            ""
+            "tests/T_TargetInstructionSelection.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_TargetRegisterAllocator"
+            "EzTarget"
+            ""
+            "tests/T_TargetRegisterAllocator.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_TargetStackFrameLowerer"
+            "EzTarget"
+            ""
+            "tests/T_TargetStackFrameLowerer.cpp"
     )
 
 endif ()

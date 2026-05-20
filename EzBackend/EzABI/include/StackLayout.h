@@ -11,27 +11,27 @@ class StackLayout
   public:
     /**
      * @brief Constructs a StackLayout with the given alignment and shadow space.
-     * @param alignment
-     * @param shadowSpace
+     * @param alignment The stack alignment in bytes.
+     * @param shadowSpace The size of the shadow space in bytes.
      */
     StackLayout(size_t alignment, size_t shadowSpace);
 
     /**
-     * Aligns the given address for this stack layout.
-     * @param addr
-     * @return size_t
+     * @brief Aligns the given address for this stack layout.
+     * @param addr The address to align.
+     * @returns The aligned address.
      */
-    size_t alignAddress(size_t addr) const;
+    int64_t alignAddress(int64_t addr) const;
 
     /**
      * @brief Returns the alignment of the stack layout.
-     * @return size_t
+     * @returns The stack alignment in bytes.
      */
     size_t getAlignment() const;
 
     /**
      * @brief Returns the shadow space of the stack layout.
-     * @return size_t
+     * @returns The shadow space size in bytes.
      */
     size_t getShadowSpace() const;
 

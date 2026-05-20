@@ -18,10 +18,10 @@ template <> struct std::hash<MirRegister>
 
 struct LivenessResult
 {
-    std::unordered_map<size_t, std::unordered_set<MirRegister>> m_liveIn;
-    std::unordered_map<size_t, std::unordered_set<MirRegister>> m_liveOut;
-    std::unordered_map<size_t, std::unordered_set<MirRegister>> m_def;
-    std::unordered_map<size_t, std::unordered_set<MirRegister>> m_use;
+    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_liveIn;
+    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_liveOut;
+    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_def;
+    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_use;
 };
 
 class LivenessAnalysis : public IMirAnalysisPass
@@ -45,6 +45,9 @@ class LivenessAnalysis : public IMirAnalysisPass
              TypedPoolLinkedList<class MirBlock>::Iterator it,
              class MirPassManager *passManager) override;
 
+    
+    const char *getName() const override;
+    
     /**
      * Returns the result of the analysis.
      * @return
@@ -73,15 +76,6 @@ class LivenessAnalysis : public IMirAnalysisPass
     void computeGlobalLiveness(TypedPoolLinkedList<class MirBlock> *blockList,
                                TypedPoolLinkedList<class MirBlock>::Iterator it,
                                const ControlFlowResult &cfg);
-
-    /**
-     * Does instruction write into the operand?
-     * @param meta
-     * @param operandIndex
-     * @return
-     */
-    bool isOperandDef(const class MirInstructionMetadata &meta, size_t operandIndex) const;
-
   private:
     LivenessResult m_result;
     MirEmitter *m_emitter;

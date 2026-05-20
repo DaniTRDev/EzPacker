@@ -28,11 +28,6 @@ EzCMK_AddVendor(https://github.com/google/googletest
         GTest
 )
 
-EzCMK_AddVendor(https://github.com/nlohmann/json
-        3cca3ad21012e289d34970e2e3060d255494c548
-        zydis
-)
-
 EzCMK_AddVendor(https://github.com/libtom/libtommath
         994f6df64cc9dd86a4f7994fe0530861470b5fa4
         libtommath

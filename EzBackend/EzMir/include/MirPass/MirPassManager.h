@@ -4,6 +4,7 @@
 #include "EzMirCommon.h"
 #include "IMirPass.h"
 #include "Function/MirFunction.h"
+#include "Printer/MirPrinter.h"
 
 class MirPassManager
 {

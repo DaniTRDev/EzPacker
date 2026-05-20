@@ -29,7 +29,7 @@ class CodeFlowAnalysisTests : public ::testing::Test
         m_types = std::make_shared<MirTypes>();
         m_types->initialize(ctx.get());
 
-        func = ctx->createFunction(m_types->getVoidType(), nullptr, nullptr, "test");
+        func = ctx->createFunction(m_types->getVoidType(), nullptr, "test");
         ctx->bindToBlock(*func->getBlocks()->begin());
 
         pm = new MirPassManager();
@@ -71,7 +71,7 @@ TEST_F(CodeFlowAnalysisTests, UnconditionalJump)
     MirBlock *b2 = ctx->createBlock();
 
     ctx->bindToBlock(b1);
-    emitter->emitJMP(emitter->createReference(b2));
+    emitter->emitJMP(emitter->createBlockRef(b2));
 
     ctx->bindToBlock(b2);
     emitter->emitNOP();

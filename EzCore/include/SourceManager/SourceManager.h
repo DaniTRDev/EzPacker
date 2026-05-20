@@ -30,90 +30,84 @@ class SourceManager
 {
   public:
     /**
-     * Constructs a SourceManager with the given working path. The working path is used to resolve relative paths for
-     * source files.
-     * @param workingPath
+     * @brief Constructs a SourceManager with the given working path.
+     * @param workingPath The working path to resolve relative paths for source files.
      */
     SourceManager(const std::filesystem::path &workingPath);
 
     /**
-     * Checks if a source with the given name already exists in the manager.
-     * @param sourceName
-     * @return bool
+     * @brief Checks if a source with the given name already exists in the manager.
+     * @param sourceName The name of the source to check.
+     * @returns True if the source exists, false otherwise.
      */
     bool doesSourceNameExist(const std::string_view &sourceName) const;
 
     /**
-     * Creates a source reference that can be used to show source content.
-     * @param col
-     * @param length
-     * @param line
-     * @param sourceId
-     * @return SourceReference
+     * @brief Creates a source reference that can be used to show source content.
+     * @param col The column index of the reference.
+     * @param length The length of the reference.
+     * @param line The line index of the reference.
+     * @param sourceId The ID of the source file.
+     * @returns The created SourceReference.
      */
     SourceReference createReference(size_t col, size_t length, size_t line, size_t sourceId);
 
     /**
-     * Creates a source reference that can be used to show source content.
-     * @param col
-     * @param length
-     * @param line
-     * @param sourceFile
-     * @return SourceReference
+     * @brief Creates a source reference that can be used to show source content.
+     * @param col The column index of the reference.
+     * @param length The length of the reference.
+     * @param line The line index of the reference.
+     * @param sourceFile The path of the source file.
+     * @returns The created SourceReference.
      */
     SourceReference createReference(size_t col, size_t length, size_t line, const std::string &sourceFile);
 
     /**
-     * Adds a new source file using given content and name. Returns the ID of the source file, which is a hash of the
-     * name. If a source with the same name already exists, it returns 0, indicating failure to add the source.
-     * @param name
-     * @param content
-     * @return size_t
+     * @brief Adds a new source file using given content and name.
+     * @param name The name of the source file.
+     * @param content The content of the source file.
+     * @returns The ID of the source file, or 0 if a source with the same name already exists.
      */
     size_t addSourceContent(const std::string &name, const std::string &content);
 
     /**
-     * Returns the working path of the source manager.
-     * @return const std::filesystem::path &
+     * @brief Returns the working path of the source manager.
+     * @returns The working path.
      */
     const std::filesystem::path &getWorkingPath() const;
 
     /**
-     * Resolves the given source file path to an absolute path based on the working directory. If the source file is
-     * already an absolute path, it returns it as is. If the source file is a relative path, it combines it with the
-     * working directory to produce an absolute path.
-     * @param sourceFile
-     * @return std::filesystem::path
+     * @brief Resolves the given source file path to an absolute path based on the working directory.
+     * @param sourceFile The path to resolve.
+     * @returns The resolved absolute path.
      */
     std::filesystem::path resolveSourcePath(const std::filesystem::path &sourceFile) const;
 
     /**
-     * Returns the raw line of where this reference was created. Returns true if no reference is given or if it is not
-     * from any known sources.
-     * @param ref
-     * @return std::string
+     * @brief Returns the raw line of where this reference was created.
+     * @param ref The source reference.
+     * @returns The raw line content, or an empty string if not found.
      */
     std::string getRawLineContent(const SourceReference &ref);
 
     /**
-     * Returns the line content of the given reference. This function assumes ref is DEFINED.
-     * @param ref
-     * @return std::string
+     * @brief Returns the line content of the given reference.
+     * @param ref The source reference.
+     * @returns The line content.
      */
     std::string getReferenceContent(const SourceReference &ref);
 
     /**
-     * Returns the source content for the given ID. This is the full content of the source file. If ID is not found, it
-     * returns an empty string.
-     * @param id
-     * @return std::string_view
+     * @brief Returns the source content for the given ID.
+     * @param id The source file ID.
+     * @returns The full content of the source file, or an empty string if not found.
      */
     std::string_view getSourceContent(size_t id) const;
 
     /**
-     * Returns the source name of the given source file id.
-     * @param id
-     * @return const std::string &
+     * @brief Returns the source name of the given source file id.
+     * @param id The source file ID.
+     * @returns The source name.
      */
     std::string_view getSourceName(size_t id) const;
 

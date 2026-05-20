@@ -72,8 +72,8 @@ bool TargetAbiLowererPass::lowerParameters(ABIDesc *abi,
 
     for (auto it = func->getParameters()->begin(); it != func->getParameters()->end(); ++it, index++)
     {
-        ArgLocation loc = abi->getArgLoc(index);
         MirOperand *op = *(*it);
+        ArgLocation loc = abi->getArgLoc(index, op->getMirType());
 
         // Safety check: Parameters at this level are always virtual registers
         if (!op->isOfType<MirRegister>())
@@ -153,8 +153,8 @@ bool TargetAbiLowererPass::lowerCallSite(MirBlock *block,
     while (opIt != operands->end())
     {
         MirOperand *argOp = *opIt;
-        ArgLocation loc = abi->getArgLoc(argIndex);
         MirType *argType = argOp->getMirType();
+        ArgLocation loc = abi->getArgLoc(argIndex, argType);
 
         if (loc.isPhysicalReg())
         {
@@ -239,12 +239,13 @@ bool TargetAbiLowererPass::lowerReturnSite(MirBlock *block,
     }
     else if (loc.isStack())
     {
-        // TODO: Handle hidden return pointers for large structs (sret).
-        // For standard compilers, the caller usually passes a hidden pointer as Arg 0
-        // for large structs, and the callee writes to it.
+        // TODO: Handle hidden return pointers for large structs (sret). Add a new instruction called "sret" or
+        // something.
     }
 
     // Restore insertion point
     emitterCtx->setInsertPoint(block);
     return true;
 }
+
+const char *TargetAbiLowererPass::getName() const { return "TargetAbiLowererPass"; }

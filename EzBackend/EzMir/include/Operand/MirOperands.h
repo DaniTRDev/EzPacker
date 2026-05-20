@@ -12,21 +12,6 @@ enum class MirReferenceType : uint8_t
     Function
 };
 
-class MirConstantPoolRef : public MirOperand
-{
-  public:
-    static constexpr MirOperandType OpKind = MirOperandType::ConstantPoolRef;
-
-    MirConstantPoolRef(MirType *type, size_t constantId) : MirOperand(type), m_constantId(constantId) {}
-
-    size_t getConstantId() const { return m_constantId; }
-    MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("@constant_pool({})", m_constantId); }
-
-  private:
-    size_t m_constantId{ 0 }; // ID of a global data entry containing the payload.
-};
-
 class MirDouble : public MirOperand
 {
   public:
@@ -36,7 +21,7 @@ class MirDouble : public MirOperand
 
     double getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::to_string(m_value); }
+    std::string toString() const override { return std::format("double({})", std::to_string(m_value)); }
 
   private:
     double m_value{ 0.0 }; // Immediate floating-point literal.
@@ -51,7 +36,7 @@ class MirInteger : public MirOperand
 
     int64_t getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::to_string(getValue()); }
+    std::string toString() const override { return std::format("integer({})", std::to_string(m_value)); }
 
   private:
     int64_t m_value{ 0 }; // Immediate signed integer literal.
@@ -76,7 +61,10 @@ class MirReference : public MirOperand
     MirOperandType getType() const override { return OpKind; }
     size_t getRefId() const { return m_refId; }
 
-    std::string toString() const override { return std::format("@ref({})", m_refId); }
+    std::string toString() const override
+    {
+        return std::format("@ref({}) (type: {})", m_refId, getMirType()->getName());
+    }
 
   private:
     MirReferenceType m_refType;
@@ -88,18 +76,30 @@ class MirRegister : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Register;
 
-    MirRegister(MirType *type, bool isVirtual, size_t id) : MirOperand(type), m_virtual(isVirtual), m_id(id) {}
+    MirRegister(MirType *type, bool isVirtual, size_t id, const char *name = nullptr) :
+        MirOperand(type), m_virtual(isVirtual), m_id(id)
+    {
+    }
 
     bool isVirtual() const { return m_virtual; }
     size_t getRegId() const { return m_id; }
     bool operator==(const MirRegister &other) const { return m_id == other.m_id && m_virtual == other.m_virtual; }
 
+    const char *getName() const { return m_name; }
+
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("@reg({})", m_id); }
+    std::string toString() const override
+    {
+        return std::format("@reg (id: {}) (name: {})", m_id, m_name ? m_name : "NO_NAME");
+    }
+
+    void setRegId(size_t id) { m_id = id; }
+    void setVirtual(bool value) { m_virtual = value; }
 
   private:
     bool m_virtual{ true }; // Whether this is a virtual register (true) or a physical register (false).
-    size_t m_id{ 0 };       // Unique register ID.
+    const char *m_name;
+    size_t m_id{ 0 }; // Unique register ID.
 };
 
 class MirFrameIndex : public MirOperand
@@ -111,7 +111,10 @@ class MirFrameIndex : public MirOperand
 
     size_t getFrameId() const { return m_frameId; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("@frame({})", m_frameId); }
+    std::string toString() const override
+    {
+        return std::format("@frame({}) (type: {})", m_frameId, getMirType()->getName());
+    }
 
   private:
     // Used to reference parameters and objects that are saved in a stack frame.
@@ -132,7 +135,9 @@ class MirMemory : public MirOperand
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("@mem({},{})", m_base->toString(), m_displ->toString());
+        return std::format("@mem({},{})",
+                           m_base ? m_base->toString() : "NO_BASE",
+                           m_displ ? m_displ->toString() : "NO_DISPL");
     }
 
   private:

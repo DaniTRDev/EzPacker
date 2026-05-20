@@ -58,6 +58,12 @@ class IMirPass
     }
 
     /**
+     * Returns the name of the pass.
+     * @return
+     */
+    virtual const char *getName() const = 0;
+
+    /**
      * Returns the iteration place. Depending on the place, one callback or the other will be called.
      * @return
      */

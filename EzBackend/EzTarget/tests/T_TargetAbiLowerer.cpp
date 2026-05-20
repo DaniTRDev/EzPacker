@@ -25,8 +25,9 @@ class DummyABIDesc : public ABIDesc
         setReturnValueLoc(argRetLoc);
     }
 
-    ArgLocation getArgLoc(size_t id) const override
+    ArgLocation getArgLoc(size_t id, MirType *type) const override
     {
+        // In this test we don't really care about the type.
         if (m_argLocs.count(id))
         {
             return m_argLocs.at(id);
@@ -38,6 +39,29 @@ class DummyABIDesc : public ABIDesc
 
     void setArgLoc(size_t id, const ArgLocation &loc) { m_argLocs[id] = loc; }
 
+    size_t getAbiAlignment(MirType *type) const
+    {
+        if (!type)
+            return 1;
+
+        // Handle Basic Types (Integers, Floats)
+        size_t size = type->getTotalSizeInBytes();
+
+        // Standard rule: basic types align to their own size, capped by the target max.
+        // E.g., size 4 aligns to 4. Size 8 aligns to 8 (or 4 on 32-bit systems).
+        size_t align = size;
+
+        // Ensure it's a power of 2 (rounds up sizes like 3 to 4)
+        align = std::bit_ceil(align); // C++20 feature, or write a quick power-of-2 helper
+        return align;
+    }
+
+    /**
+     * Returns the preferred alignment for the given type.
+     * Used for global variables to optimize CPU cache line fetching.
+     */
+    size_t getPreferredAlignment(MirType *type) const { return getAbiAlignment(type); }
+
   private:
     std::map<size_t, ArgLocation> m_argLocs;
 };
@@ -48,13 +72,11 @@ class TargetAbiLowererTests : public ::testing::Test
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
     std::shared_ptr<MirEmitterContext> emitterCtx;
-    std::shared_ptr<MirTypes> m_types;
     MirEmitter *emitter;
 
     DummyABIDesc abi;
     TargetDesc *targetDesc;
     TargetAbiLowererContext *lowererCtx;
-    TargetAbiLowererPass *pass;
     MirPassManager *passManager;
 
     void SetUp() override
@@ -64,14 +86,11 @@ class TargetAbiLowererTests : public ::testing::Test
         emitterCtx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(emitterCtx.get());
 
-        m_types = std::make_shared<MirTypes>();
-        m_types->initialize(emitterCtx.get());
-
-        targetDesc = new TargetDesc(&abi, "DummyTarget");
+        targetDesc = new TargetDesc(&abi, TargetEndianness::LittleEndian, "DummyTarget");
         lowererCtx = new TargetAbiLowererContext(emitter, targetDesc);
 
-        pass = new TargetAbiLowererPass(lowererCtx);
         passManager = new MirPassManager();
+        passManager->addPass<TargetAbiLowererPass>(lowererCtx);
 
         ec->beginScope();
     }
@@ -83,7 +102,7 @@ class TargetAbiLowererTests : public ::testing::Test
 
         for (auto it = funcList->begin(); it != funcList->end(); ++it)
         {
-            modified |= pass->run(funcList, it, passManager);
+            modified |= passManager->run(funcList, it, passManager);
         }
 
         return modified;
@@ -93,7 +112,6 @@ class TargetAbiLowererTests : public ::testing::Test
     {
         ec->endScope(ErrorAction::Discard);
         delete passManager;
-        delete pass;
         delete lowererCtx;
         delete targetDesc;
         delete emitter;
@@ -217,15 +235,14 @@ TEST_F(TargetAbiLowererTests, LowersCallSiteArgumentInRegister)
     }
 
     MirFunction *callee = emitterCtx->createFunction(int64Type, nullptr, "callee");
-    MirRegister *param = emitter->createVirtualRegister(m_types->getInt64Type());
+    MirRegister *param = emitter->createVirtualRegister(int64Type);
     callee->appendParameter(param, "a1");
 
     MirFunction *func = emitterCtx->createFunction(int64Type, nullptr, "testFunc");
     MirRegister *arg = emitter->createVirtualRegister(int64Type);
-    emitter->emit(MirInstructionOpCode::CALL, { emitter->createReference(callee->getEntryPoint()), arg });
+    emitter->emit(MirInstructionOpCode::CALL, { emitter->createBlockRef(callee->getEntryPoint()), arg });
 
     auto funcList = emitterCtx->getFunctionList();
-    auto it = funcList->begin();
 
     EXPECT_TRUE(runAbiPass());
 
@@ -288,7 +305,7 @@ TEST_F(TargetAbiLowererTests, LowersCallSiteArgumentOnStack)
     callee->appendParameter(arg, "a1");
 
     MirFunction *func = emitterCtx->createFunction(int64Type, nullptr, "testFunc");
-    emitter->emit(MirInstructionOpCode::CALL, { emitter->createReference(callee->getEntryPoint()), arg });
+    emitter->emit(MirInstructionOpCode::CALL, { emitter->createBlockRef(callee->getEntryPoint()), arg });
 
     auto funcList = emitterCtx->getFunctionList();
     auto it = funcList->begin();
@@ -389,7 +406,7 @@ TEST_F(TargetAbiLowererTests, LowersReturnSite)
 
 TEST_F(TargetAbiLowererTests, VoidReturnIsNotModified)
 {
-    MirType *voidType = m_types->getVoidType();
+    MirType *voidType = emitterCtx->getTypes()->getVoidType();
     if (!voidType)
     {
         voidType = emitterCtx->createType(MirTypeKind::Void, 0, nullptr, "void");

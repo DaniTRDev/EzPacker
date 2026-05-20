@@ -8,6 +8,8 @@
 #include "ErrorCollector/ErrorCollector.h"
 #include "ErrorCollector/ErrorEmitter.h"
 
+#include "LogCollector/LogCollector.h"
+
 #include "Logger/SourceLoggingSink.h"
 
 #include "SourceManager/SourceManager.h"

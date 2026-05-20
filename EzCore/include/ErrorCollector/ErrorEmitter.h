@@ -12,20 +12,19 @@ class ErrorEmitter
 {
   public:
     /**
-     * Creates the emitter with the given collector and source manager.
-     * @param errorCollector
-     * @param sourceManager
+     * @brief Creates the emitter with the given collector and source manager.
+     * @param errorCollector The error collector to emit errors to.
+     * @param sourceManager The source manager to resolve source references.
      */
     ErrorEmitter(const std::shared_ptr<ErrorCollector> &errorCollector,
                  const std::shared_ptr<SourceManager> &sourceManager);
 
     /**
-     * Adds an error to the error collector. By default it just calls ErrorCollector::onError.
-     * Derived classes can extend this functionality.
-     * @param severity
-     * @param message
-     * @param sender
-     * @param sourceRef
+     * @brief Adds an error to the error collector.
+     * @param severity The severity of the error.
+     * @param message The error message.
+     * @param sender The sender of the error.
+     * @param sourceRef The reference to the source code.
      */
     virtual void emitError(ErrorSeverity severity,
                            const std::string &message,
@@ -33,14 +32,14 @@ class ErrorEmitter
                            const SourceReference &sourceRef = {});
 
     /**
-     * Returns the error collector.
-     * @return const std::shared_ptr<ErrorCollector> &
+     * @brief Returns the error collector.
+     * @returns The error collector.
      */
     const std::shared_ptr<ErrorCollector> &getErrorCollector() const;
 
     /**
-     * Returns the source manager.
-     * @return const std::shared_ptr<SourceManager> &
+     * @brief Returns the source manager.
+     * @returns The source manager.
      */
     const std::shared_ptr<SourceManager> &getSourceManager() const;
 

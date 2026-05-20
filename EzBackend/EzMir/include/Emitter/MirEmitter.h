@@ -104,7 +104,7 @@ class MirEmitter
      * @param block
      * @return
      */
-    MirReference *createReference(MirBlock *block);
+    MirReference *createBlockRef(MirBlock *block);
 
     /**
      * Creates an immediate integer operand allocated in the context's operand pool.
@@ -115,12 +115,7 @@ class MirEmitter
      * Creates an immediate double operand allocated in the context's operand pool.
      */
     MirDouble *createImmediateDouble(MirType *type, double value);
-
-    /**
-     * Creates a constant pool reference operand allocated in the context's operand pool.
-     */
-    MirConstantPoolRef *createConstantPoolRef(MirType *type, size_t entryId);
-
+    
     /**
      * Creates a memory access operand allocated in the context's operand pool.
      */

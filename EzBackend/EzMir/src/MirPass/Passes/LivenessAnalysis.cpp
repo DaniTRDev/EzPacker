@@ -21,6 +21,8 @@ bool LivenessAnalysis::run(TypedPoolLinkedList<class MirBlock> *blockList,
     return true;
 }
 
+const char *LivenessAnalysis::getName() const { return "LivenessAnalysis"; }
+
 const LivenessResult &LivenessAnalysis::getResult() const { return m_result; }
 
 void LivenessAnalysis::computeLocalLiveness(TypedPoolLinkedList<class MirBlock> *blockList,
@@ -61,7 +63,7 @@ void LivenessAnalysis::computeLocalLiveness(TypedPoolLinkedList<class MirBlock> 
 
                 if (reg && reg->isVirtual() && (constraint.flags & OperandFlag::Write))
                 {
-                    m_result.m_def[blockId].insert(*reg);
+                    m_result.m_def[blockId].insert(reg);
                 }
             }
 
@@ -83,9 +85,9 @@ void LivenessAnalysis::computeLocalLiveness(TypedPoolLinkedList<class MirBlock> 
                 if (reg && reg->isVirtual() && (constraint.flags & OperandFlag::Read))
                 {
                     // If it is read before being written in this block, it's a use.
-                    if (m_result.m_def[blockId].find(*reg) == m_result.m_def[blockId].end())
+                    if (m_result.m_def[blockId].find(reg) == m_result.m_def[blockId].end())
                     {
-                        m_result.m_use[blockId].insert(*reg);
+                        m_result.m_use[blockId].insert(reg);
                     }
                 }
             }
@@ -107,14 +109,14 @@ void LivenessAnalysis::computeGlobalLiveness(TypedPoolLinkedList<class MirBlock>
         {
             MirBlock *block = *reverseIterator;
             size_t blockId = block->getId();
-            std::unordered_set<MirRegister> newLiveOut;
+            std::unordered_set<MirRegister *> newLiveOut;
 
             auto succIt = cfg.m_successors.find(block);
             if (succIt != cfg.m_successors.end())
             {
                 for (MirBlock *succ : succIt->second)
                 {
-                    for (const MirRegister &reg : m_result.m_liveIn[succ->getId()])
+                    for (MirRegister *reg : m_result.m_liveIn[succ->getId()])
                     {
                         newLiveOut.insert(reg);
                     }
@@ -123,9 +125,9 @@ void LivenessAnalysis::computeGlobalLiveness(TypedPoolLinkedList<class MirBlock>
 
             m_result.m_liveOut[blockId] = newLiveOut;
 
-            std::unordered_set<MirRegister> newLiveIn = m_result.m_use[blockId];
+            std::unordered_set<MirRegister *> newLiveIn = m_result.m_use[blockId];
 
-            for (const MirRegister &reg : m_result.m_liveOut[blockId])
+            for (MirRegister *reg : m_result.m_liveOut[blockId])
             {
                 if (m_result.m_def[blockId].find(reg) == m_result.m_def[blockId].end())
                 {

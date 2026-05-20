@@ -65,6 +65,8 @@ bool CodeFlowAnalysis::run(TypedPoolLinkedList<class MirBlock> *blockList,
     return true;
 }
 
+const char *CodeFlowAnalysis::getName() const { return "CodeFlowAnalysis"; }
+
 const ControlFlowResult &CodeFlowAnalysis::getResult() const { return m_result; }
 
 void CodeFlowAnalysis::addEdge(MirBlock *from, MirBlock *to) {}

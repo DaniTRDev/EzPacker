@@ -5,11 +5,7 @@
 #include "ArgLocation.h"
 #include "StackLayout.h"
 
-enum AbiEndianness
-{
-    LittleEndian,
-    BigEndian
-};
+class MirType; // Forward declaration
 
 class ABIDesc
 {
@@ -18,124 +14,119 @@ class ABIDesc
      * @brief Constructs an ABIDesc with default values.
      */
     ABIDesc();
-
+    
     /**
-     * @brief Get the endianness of the ABI.
-     * @return AbiEndianness The endianness of the ABI.
+     * @brief Returns the strict ABI alignment required for the given type.
+     * @param type The type to check alignment for.
+     * @returns The required alignment in bytes.
      */
-    const AbiEndianness &getEndianness() const;
+    virtual size_t getAbiAlignment(MirType *type) const = 0;
 
     /**
      * @brief Get the location of the return value.
-     * @return const ArgLocation& The location of the return value.
+     * @returns The location of the return value.
      */
     const ArgLocation &getReturnValueLoc() const;
 
     /**
-     * Returns the location of the given argument.
-     * @param id
-     * @return
+     * @brief Returns the location of the given argument.
+     * @param id The argument index.
+     * @param type The type of the argument.
+     * @returns The location where the argument is passed.
      */
-    virtual ArgLocation getArgLoc(size_t id) const = 0;
+    virtual ArgLocation getArgLoc(size_t id, MirType* type) const = 0;
 
     /**
      * @brief Get the location of the stack frame pointer.
-     * @return
+     * @returns The physical register ID of the frame pointer.
      */
     PhysicalRegId getStackFrameReg() const;
 
     /**
-     * Returns the stack register.
-     * @return
+     * @brief Returns the stack register.
+     * @returns The physical register ID of the stack pointer.
      */
     PhysicalRegId getStackReg() const;
 
     /**
      * @brief Get the size of registers in bits.
-     * @return
+     * @returns The register size in bits.
      */
     size_t getRegSizeInBits() const;
 
     /**
-     * Returns the size of the stack offset.
-     * @return size_t
+     * @brief Returns the size of the stack offset.
+     * @returns The stack offset size in bits.
      */
     size_t getStackOffsetSizeInBits();
 
     /**
      * @brief Get the stack layout for the function.
-     * @return
+     * @returns The stack layout structure.
      */
     const StackLayout &getStackLayout() const;
 
     /**
-     * @brief Get the endianness of the ABI.
-     * @param endianness
-     */
-    void setEndianness(AbiEndianness endianness);
-
-    /**
      * @brief Set the location of the return value.
-     * @param loc
+     * @param loc The new location for the return value.
      */
     void setReturnValueLoc(const ArgLocation &loc);
 
     /**
      * @brief Set the stack layout for the function.
-     * @param layout
+     * @param layout The new stack layout.
      */
     void setStackLayout(const StackLayout &layout);
 
     /**
      * @brief Set the list of callee-saved registers.
-     * @param regs
+     * @param regs The vector of physical register IDs.
      */
     void setCalleeSavedRegs(const std::vector<PhysicalRegId> &regs);
 
     /**
      * @brief Set the list of caller-saved registers.
-     * @param regs
+     * @param regs The vector of physical register IDs.
      */
     void setCallerSavedRegs(const std::vector<PhysicalRegId> &regs);
 
     /**
      * @brief Set the size of registers in bits.
-     * @param sizeInBits
+     * @param sizeInBits The register size in bits.
      */
     void setRegSizeInBits(size_t sizeInBits);
 
     /**
      * @brief Set the location of the stack frame pointer.
-     * @param stackFrame
+     * @param stackFrame The physical register ID for the frame pointer.
      */
     void setStackFrame(PhysicalRegId stackFrame);
 
     /**
      * @brief Set the stack offset size in bits.
-     * @param sizeInBits
+     * @param sizeInBits The stack offset size in bits.
      */
     void setStackOffsetSize(size_t sizeInBits);
 
     /**
      * @brief Get the stack pointer register.
-     * @param stackReg
+     * @param stackReg The physical register ID for the stack pointer.
      */
     void setStackReg(PhysicalRegId stackReg);
 
     /**
      * @brief Get the list of callee-saved registers.
-     * @return
+     * @returns The vector of callee-saved physical register IDs.
      */
     const std::vector<PhysicalRegId> &getCalleeSavedRegs() const;
 
     /**
-     * @brief Get the list of calleer-saved registers.
-     * @return
+     * @brief Get the list of caller-saved registers.
+     * @returns The vector of caller-saved physical register IDs.
      */
     const std::vector<PhysicalRegId> &getCallerSavedRegs() const;
 
   private:
-    AbiEndianness m_endianess;
     ArgLocation m_returnValueLoc;
     PhysicalRegId m_stackFrame;
     PhysicalRegId m_stackReg;

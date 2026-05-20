@@ -3,6 +3,11 @@
 
 #include "EzCoreCommon.h"
 
+/**
+ * @brief Converts a given string to lowercase.
+ * @param str The string to convert.
+ * @returns The lowercase string.
+ */
 inline std::string StrToLower(const std::string &str)
 {
     std::string lowerStr;
@@ -12,6 +17,11 @@ inline std::string StrToLower(const std::string &str)
     return lowerStr;
 }
 
+/**
+ * @brief Converts a given string to uppercase.
+ * @param str The string to convert.
+ * @returns The uppercase string.
+ */
 inline std::string StrToUpper(const std::string &str)
 {
     std::string upperStr = str;

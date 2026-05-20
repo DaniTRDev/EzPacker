@@ -65,37 +65,36 @@ class ErrorCollector
 {
   public:
     /**
-     * Returns true if the current scope hast at least 1 fatal error. If there's no scope, false is returned.
-     * @return bool
+     * @brief Checks if the current scope has at least one fatal error.
+     * @returns True if the current scope has fatal errors, false otherwise.
      */
     bool doesCurrentScopeHasFatalErrors();
 
     /**
-     * Adds a subscriber to the collector. Returns the ID of the collector.
-     * @param callback
-     * @param param
-     * @return size_t
+     * @brief Adds a subscriber to the collector.
+     * @param callback The callback function to be called when an error is committed.
+     * @param param A user-defined parameter to be passed to the callback.
+     * @returns The ID of the subscriber.
      */
     size_t addSubscriber(ErrorCollectorSubscriber::CallbackType *callback, void *param);
 
     /**
-     * Begins a scope of errors.
+     * @brief Begins a new scope for errors.
      */
     void beginScope();
 
     /**
-     * Ends the scope and executes the given action. Look at 'ErrorAction' to see what each action does. If there isn't
-     * any scope, an exception is thrown. If the current scope is the top-most scope, errors will be COMMITED.
-     * @param action
+     * @brief Ends the current scope and executes the given action.
+     * @param action The action to perform on the errors in the current scope.
      */
     void endScope(ErrorAction action);
 
     /**
-     * Adds an error to the current scope. If no scope has been begun, an exception is thrown.
-     * @param severity
-     * @param message
-     * @param sender
-     * @param sourceRef
+     * @brief Adds an error to the current scope.
+     * @param severity The severity of the error.
+     * @param message The error message.
+     * @param sender The sender of the error.
+     * @param sourceRef A reference to the source code where the error occurred.
      */
     void onError(ErrorSeverity severity,
                  const std::string &message,

@@ -43,6 +43,12 @@ class MirFunctionStackFrame
     MirFunctionStackFrame(class MirFunction *owner, TypedPool *stackFrameObjectPool);
 
     /**
+     * Returns the allocated object count.
+     * @return
+     */
+    size_t getAllocatedObjectCount() const;
+
+    /**
      * Creates an abstract object in the function stack frame.
      * @param size
      * @param align
@@ -76,11 +82,17 @@ class MirFunctionStackFrame
     StackFrameObject *getObjectFromId(MirId id);
 
     /**
+     * Returns the list of stack frame objects.
+     * @return
+     */
+    TypedPoolLinkedList<StackFrameObject> *getStackFrameObjects() const;
+
+    /**
      * Sets the owner of this stack frame.
      * @param m_owner
      */
     void setOwner(class MirFunction *m_owner);
-    
+
   private:
     class MirFunction *m_owner;
     TypedPoolLinkedList<StackFrameObject> *m_stackFrameObjects;

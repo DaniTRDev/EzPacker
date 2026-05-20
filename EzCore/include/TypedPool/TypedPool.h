@@ -54,6 +54,7 @@ template <typename ElemType> struct TypedPoolLinkedList
         {
             if (m_curr)
                 m_curr = m_curr->m_prev;
+            
             return *this;
         }
 
@@ -79,8 +80,8 @@ template <typename ElemType> struct TypedPoolLinkedList
         bool operator==(const Iterator &other) const { return m_curr == other.m_curr; }
 
         /**
-         * Swaps the item of the list this iterator points to.
-         * @param other
+         * @brief Swaps the item of the list this iterator points to.
+         * @param other The other iterator to swap with.
          */
         void swapItem(const Iterator &other) { m_curr->m_object = other.m_curr->m_object; }
     };
@@ -109,6 +110,8 @@ template <typename ElemType> struct TypedPoolLinkedList
         {
             if (m_curr)
                 m_curr = m_curr->m_next;
+            
+            
             return *this;
         }
 
@@ -123,6 +126,11 @@ template <typename ElemType> struct TypedPoolLinkedList
     ReverseIterator rbegin() const { return ReverseIterator{ m_tail }; }
     ReverseIterator rend() const { return ReverseIterator{ nullptr }; }
 
+    /**
+     * @brief Retrieves an element from the list by its index.
+     * @param index The index of the element to retrieve.
+     * @returns A pointer to the element, or nullptr if the index is out of bounds.
+     */
     template <typename ElementType> ElementType *get(size_t index) const
     {
         if (index >= m_numElems)
@@ -161,9 +169,10 @@ template <typename ElemType> struct TypedPoolLinkedList
     }
 
     /**
-     * Iterates over the linked list. If callback returns false, iteration is stopped.
-     * @param startNode
-     * @param callback
+     * @brief Iterates over the linked list and applies a callback to each element.
+     * @param begin The starting iterator.
+     * @param end The ending iterator.
+     * @param callback The function to apply to each element.
      */
     void forEach(TypedPoolLinkedList<ElemType>::Iterator begin,
                  TypedPoolLinkedList<ElemType>::Iterator end,
@@ -182,6 +191,12 @@ template <typename ElemType> struct TypedPoolLinkedList
         }
     }
 
+    /**
+     * @brief Iterates over the linked list and applies a callback to each iterator.
+     * @param begin The starting iterator.
+     * @param end The ending iterator.
+     * @param callback The function to apply to each iterator.
+     */
     void forEach(TypedPoolLinkedList<ElemType>::Iterator begin,
                  TypedPoolLinkedList<ElemType>::Iterator end,
                  const std::function<bool(TypedPoolLinkedList<ElemType> *list,
@@ -207,6 +222,12 @@ class TypedPool
     TypedPool(const TypedPool &) = delete;
     TypedPool &operator=(const TypedPool &) = delete;
 
+    /**
+     * @brief Appends an existing element to the back of a linked list.
+     * @param list The list to append to.
+     * @param elem The element to append.
+     * @returns The appended element, or nullptr on failure.
+     */
     template <typename ElemType, typename LinkedListType>
     ElemType *appendToListBack(TypedPoolLinkedList<LinkedListType> *list, ElemType *elem)
     {
@@ -234,6 +255,12 @@ class TypedPool
         return elem;
     }
 
+    /**
+     * @brief Appends an existing element to the front of a linked list.
+     * @param list The list to append to.
+     * @param elem The element to append.
+     * @returns The appended element, or nullptr on failure.
+     */
     template <typename ElemType, typename LinkedListType>
     ElemType *appendToListFront(TypedPoolLinkedList<LinkedListType> *list, ElemType *elem)
     {
@@ -262,7 +289,11 @@ class TypedPool
     }
 
     /**
-     * Appends an element into a list immediately AFTER the node pointed to by the iterator.
+     * @brief Inserts an element into a list after the node pointed to by the iterator.
+     * @param list The list to insert into.
+     * @param it The iterator pointing to the node after which to insert.
+     * @param elem The element to insert.
+     * @returns The inserted element, or nullptr on failure.
      */
     template <typename ElemType, typename LinkedListType>
     ElemType *appendToListAfter(TypedPoolLinkedList<LinkedListType> *list,
@@ -300,7 +331,11 @@ class TypedPool
     }
 
     /**
-     * Appends an element into a list immediately BEFORE the node pointed to by the iterator.
+     * @brief Inserts an element into a list before the node pointed to by the iterator.
+     * @param list The list to insert into.
+     * @param it The iterator pointing to the node before which to insert.
+     * @param elem The element to insert.
+     * @returns The inserted element, or nullptr on failure.
      */
     template <typename ElemType, typename LinkedListType>
     ElemType *appendToListBefore(TypedPoolLinkedList<LinkedListType> *list,
@@ -343,6 +378,11 @@ class TypedPool
         return elem;
     }
 
+    /**
+     * @brief Creates a new object in the pool.
+     * @param args Arguments to forward to the object's constructor.
+     * @returns A pointer to the newly created object.
+     */
     template <typename ElemType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
     ElemType *create(Args &&...args)
@@ -380,6 +420,12 @@ class TypedPool
         return reservedPointer;
     }
 
+    /**
+     * @brief Creates a new object and appends it to the back of a linked list.
+     * @param list The list to append to.
+     * @param args Arguments to forward to the object's constructor.
+     * @returns A pointer to the newly created object, or nullptr on failure.
+     */
     template <typename ElemType, typename LinkedListType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
     ElemType *createAndAppendToListBack(TypedPoolLinkedList<LinkedListType> *list, Args &&...args)
@@ -391,6 +437,12 @@ class TypedPool
         return appendToListBack<ElemType, LinkedListType>(list, elem);
     }
 
+    /**
+     * @brief Creates a new object and appends it to the front of a linked list.
+     * @param list The list to append to.
+     * @param args Arguments to forward to the object's constructor.
+     * @returns A pointer to the newly created object, or nullptr on failure.
+     */
     template <typename ElemType, typename LinkedListType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
     ElemType *createAndAppendToListFront(TypedPoolLinkedList<LinkedListType> *list, Args &&...args)
@@ -402,6 +454,13 @@ class TypedPool
         return appendToListFront<ElemType, LinkedListType>(list, elem);
     }
 
+    /**
+     * @brief Creates a new object and inserts it after the specified iterator.
+     * @param list The list to insert into.
+     * @param it The iterator to insert after.
+     * @param args Arguments to forward to the object's constructor.
+     * @returns A pointer to the newly created object, or nullptr on failure.
+     */
     template <typename ElemType, typename LinkedListType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
     ElemType *createAndAppendToListAfter(TypedPoolLinkedList<LinkedListType> *list,
@@ -415,6 +474,13 @@ class TypedPool
         return appendToListAfter<ElemType, LinkedListType>(list, it, elem);
     }
 
+    /**
+     * @brief Creates a new object and inserts it before the specified iterator.
+     * @param list The list to insert into.
+     * @param it The iterator to insert before.
+     * @param args Arguments to forward to the object's constructor.
+     * @returns A pointer to the newly created object, or nullptr on failure.
+     */
     template <typename ElemType, typename LinkedListType, typename... Args>
         requires(std::is_trivially_destructible_v<ElemType>)
     ElemType *createAndAppendToListBefore(TypedPoolLinkedList<LinkedListType> *list,
@@ -429,8 +495,10 @@ class TypedPool
     }
 
     /**
-     * Removes the element pointed to by the iterator from the slice.
-     * Returns an iterator to the NEXT valid element, allowing safe removal during iteration.
+     * @brief Removes the element pointed to by the iterator from the list.
+     * @param list The list to remove from.
+     * @param it The iterator pointing to the element to remove.
+     * @returns An iterator to the next valid element in the list.
      */
     template <typename LinkedListType>
     typename TypedPoolLinkedList<LinkedListType>::Iterator
@@ -473,11 +541,19 @@ class TypedPool
         return typename TypedPoolLinkedList<LinkedListType>::Iterator{ nextNode };
     }
 
+    /**
+     * @brief Creates a new, empty linked list in the pool.
+     * @returns A pointer to the newly created linked list.
+     */
     template <typename ElemType> TypedPoolLinkedList<ElemType> *createLinkedList()
     {
         return create<TypedPoolLinkedList<ElemType>>(0, this, nullptr, nullptr);
     }
 
+    /**
+     * @brief Deallocates all memory used by the pool.
+     * @returns void
+     */
     void deallocate() { m_chunks.clear(); }
 
   protected:

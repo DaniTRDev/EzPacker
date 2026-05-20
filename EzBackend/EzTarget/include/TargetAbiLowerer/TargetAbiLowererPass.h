@@ -69,6 +69,8 @@ class TargetAbiLowererPass : public IMirTransformPass
                          class MirEmitter *emitter,
                          class MirEmitterContext *emitterCtx);
 
+    const char *getName() const override;
+    
   private:
     TargetAbiLowererContext *m_ctx;
 };

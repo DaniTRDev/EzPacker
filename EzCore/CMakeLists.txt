@@ -19,6 +19,7 @@ function(BuildEzCore)
             "include/StringUtils.h"
             "include/ErrorCollector/ErrorCollector.h"
             "include/ErrorCollector/ErrorEmitter.h"
+            "include/LogCollector/LogCollector.h"
             "include/Logger/SourceLoggingSink.h"
             "include/SourceManager/SourceManager.h"
             "include/TypedPool/TypedArrayPool.h"
@@ -27,6 +28,7 @@ function(BuildEzCore)
             "src/MathUtils.cpp"
             "src/ErrorCollector/ErrorCollector.cpp"
             "src/ErrorCollector/ErrorEmitter.cpp"
+            "src/LogCollector/LogCollector.cpp"
             "src/Logger/SourceLogger.cpp"
             "src/SourceManager/SourceManager.cpp"
     )

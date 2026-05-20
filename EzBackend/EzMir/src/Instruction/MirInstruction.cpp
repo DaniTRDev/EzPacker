@@ -22,6 +22,10 @@ TypedPoolLinkedList<MirOperand> *MirInstruction::getOperands() const { return m_
 
 MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
 
+MirTargetInstructionId MirInstruction::getTargetId() const { return m_targetId; }
+
+void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
+
 std::string MirInstruction::toString() const
 {
     std::string res;
@@ -29,7 +33,7 @@ std::string MirInstruction::toString() const
 
     for (auto operand : *m_operands)
     {
-        res += " " + operand->toString();
+        res += " " + operand->toString() + ",";
     }
     return res;
 }

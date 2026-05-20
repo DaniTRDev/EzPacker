@@ -27,6 +27,8 @@ class TypeLegalizerPass : public IMirTransformPass
              TypedPoolLinkedList<class MirInstruction>::Iterator it,
              class MirPassManager *passManager) override;
 
+    const char *getName() const override;
+    
     /**
      * Returns MirPassIterationPlace::Instruction.
      */

@@ -79,10 +79,9 @@ bool StandardLegalizers::expandTypeLegalizer(LegalizerContext *ctx,
                 "StandardLegalizers::expandTypeLegalizer");
         return false;
     }
-
-    // TODO: Ensure your targetDesc/Context has a way to fetch the integer type of half size
+    
     size_t originalSize = instr->getOperands()->get<MirOperand>(0)->getSizeInBytes();
-    MirType *halvedType = nullptr; // e.g., emitterCtx->getIntegerTypeBySize(originalSize / 2);
+    MirType *halvedType = emitterCtx->getIntegerTypeBySize(originalSize / 2);
 
     std::vector<MirOperand *> lowOperands;
     std::vector<MirOperand *> highOperands;

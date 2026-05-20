@@ -26,44 +26,44 @@ class ArgLocation
 {
   public:
     /**
-     * @brief Construct a new Arg Location object for a physical register.
-     * @return bool True if the location is a physical register, false otherwise.
+     * @brief Checks if the location represents a physical register.
+     * @returns True if the location is a physical register, false otherwise.
      */
     bool isPhysicalReg() const;
 
     /**
-     * @brief Construct a new Arg Location object for a split register.
-     * @return bool True if the location is a split register, false otherwise.
+     * @brief Checks if the location represents a split register (multiple registers).
+     * @returns True if the location is a split register, false otherwise.
      */
     bool isSplit() const;
 
     /**
-     * @brief Construct a new Arg Location object for a stack location.
-     * @return bool True if the location is a stack location, false otherwise.
+     * @brief Checks if the location represents a position on the stack.
+     * @returns True if the location is on the stack, false otherwise.
      */
     bool isStack() const;
 
     /**
-     * @brief Get the physical register location of the argument.
-     * @return bool True if the location is a physical register, false otherwise.
+     * @brief Retrieves the physical register location details.
+     * @returns The physical register location.
      */
     const PhysicalRegLocation &getPhysicalLoc() const;
 
     /**
-     * @brief Get the split register location of the argument.
-     * @return bool True if the location is a split register, false otherwise.
+     * @brief Retrieves the split register location details.
+     * @returns The split register location.
      */
     const SplitLocation &getSplitLoc() const;
 
     /**
-     * @brief Get the stack location of the argument.
-     * @return bool True if the location is a stack location, false otherwise.
+     * @brief Retrieves the stack location details.
+     * @returns The stack location.
      */
     const StackLocation &getStackLoc() const;
 
     /**
-     * @brief Construct a new Arg Location object with a physical register location.
-     * @param loc
+     * @brief Sets the internal location variant.
+     * @param loc The new location (physical, split, or stack).
      */
     void setLoc(const std::variant<PhysicalRegLocation, SplitLocation, StackLocation> &loc);
 

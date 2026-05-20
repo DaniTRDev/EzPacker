@@ -11,36 +11,36 @@ class SourceLoggingSink : public LogSink
 {
   public:
     /**
-     * Creates the sink with the given logger.
-     * @param logger
+     * @brief Creates the sink with the given logger.
+     * @param logger The logger to use for this sink.
      */
     SourceLoggingSink(ILogger *logger);
 
     /**
-     * Logs a given error message, adding source reference.
-     * @param msg
-     * @param sourceManager
-     * @param sourceRef
+     * @brief Logs a given error message, adding source reference.
+     * @param msg The log message.
+     * @param sourceManager The source manager to resolve the source reference.
+     * @param sourceRef The reference to the source code.
      */
     virtual void logSourceError(LogMessage msg,
                                 const std::shared_ptr<SourceManager> &sourceManager,
                                 const SourceReference &sourceRef);
 
     /**
-     * Logs a given message, adding source reference.
-     * @param msg
-     * @param sourceManager
-     * @param sourceRef
+     * @brief Logs a given message, adding source reference.
+     * @param msg The log message.
+     * @param sourceManager The source manager to resolve the source reference.
+     * @param sourceRef The reference to the source code.
      */
     virtual void logSourceMessage(LogMessage msg,
                                   const std::shared_ptr<SourceManager> &sourceManager,
                                   const SourceReference &sourceRef);
 
     /**
-     * Logs a given warning message, adding source reference.
-     * @param msg
-     * @param sourceManager
-     * @param sourceRef
+     * @brief Logs a given warning message, adding source reference.
+     * @param msg The log message.
+     * @param sourceManager The source manager to resolve the source reference.
+     * @param sourceRef The reference to the source code.
      */
     virtual void logSourceWarning(LogMessage msg,
                                   const std::shared_ptr<SourceManager> &sourceManager,

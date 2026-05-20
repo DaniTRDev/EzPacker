@@ -8,6 +8,12 @@ class InstructionSelectorPass : public IMirTransformPass
 {
   public:
     /**
+     * Creates the default constructor.
+     * @param ctx
+     */
+    InstructionSelectorPass(InstructionSelectionContext *ctx);
+
+    /**
      * Runs the pass on the given MIR instruction and generates the valid target instruction.
      */
     bool run(TypedPoolLinkedList<class MirInstruction> *instrList,
@@ -20,7 +26,10 @@ class InstructionSelectorPass : public IMirTransformPass
      */
     MirPassIterationPlace getIterationPlace() const override;
 
+    const char *getName() const override;
+    
   private:
+    InstructionSelectionContext *m_ctx;
 };
 
 #endif // EZPACKER_INSTRUCTIONSELECTORPASS_H

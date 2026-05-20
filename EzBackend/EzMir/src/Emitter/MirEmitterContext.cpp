@@ -1,6 +1,5 @@
 #include "Emitter/MirEmitterContext.h"
-#include <cstring>
-#include <algorithm>
+#include "Type/MirTypes.h"
 
 MirEmitterContext::MirEmitterContext(const std::shared_ptr<ErrorCollector> &errorCollector,
                                      const std::shared_ptr<SourceManager> &sourceManager) :
@@ -8,6 +7,9 @@ MirEmitterContext::MirEmitterContext(const std::shared_ptr<ErrorCollector> &erro
 {
     m_functionList = m_functionPool.createLinkedList<MirFunction>();
     m_typeList = m_typePool.createLinkedList<MirType>();
+
+    m_types = std::make_shared<MirTypes>();
+    m_types->initialize(this);
 }
 
 bool MirEmitterContext::setInsertPoint(MirBlock *block)
@@ -34,10 +36,18 @@ bool MirEmitterContext::doesTypeExist(const std::string_view &typeName) const { 
 MirBlock *MirEmitterContext::createBlock()
 {
     MirBlock *block = m_blockPool.create<MirBlock>(createId(), m_instructionPool.createLinkedList<MirInstruction>());
+    LOG_DEBUG(std::format("Creating block (id: {})", block->getId()), "MirEmitterContext");
 
     if (m_currentBoundFunction)
     {
+        size_t blockId = block->getId();
+        m_blockIdToFunc.insert({ blockId, m_currentBoundFunction });
+
         // If we are in a function, append the new block to its blocks too.
+        LOG_DEBUG(std::format("Block appended to function (id: {}) (func: {})",
+                              blockId,
+                              m_currentBoundFunction->getName()),
+                  "MirEmitterContext");
         m_blockPool.appendToListBack(m_currentBoundFunction->getBlocks(), block);
     }
 
@@ -81,6 +91,11 @@ MirInstruction *MirEmitterContext::createInstruction(MirInstructionOpCode opcode
         // to the original target. Subsequent emissions will naturally form a correct sequence!
         m_instructionPool.appendToListBefore(targetList, m_insertState.iterator, instr);
     }
+
+    LOG_DEBUG(std::format("Instruction inserted into block (id: {}) (instr: {})",
+                          m_insertState.block->getId(),
+                          instr->toString()),
+              "MirEmitterContext");
 
     return instr;
 }
@@ -126,19 +141,40 @@ MirFunction *MirEmitterContext::createFunction(MirType *returnType,
 
     stackFrame->setOwner(func);
 
+    LOG_DEBUG(std::format("Creating function (id: {}) (name: {}) (ReturnType: {}) (argCount: {})",
+                          func->getId(),
+                          func->getName(),
+                          func->getReturnType()->getName(),
+                          func->getParameters()->m_numElems),
+              "MirEmitterContext");
+
+    m_blockIdToFunc.insert({ entryPoint->getId(), func });
+    m_idToFunctionMap.insert({ func->getId(), func });
     m_currentBoundFunction = func;
     setInsertPoint(entryPoint);
 
     return func;
 }
 
-MirGlobalDataEntry *MirEmitterContext::createGlobalData(const void *data, size_t size, bool isReadOnly)
+MirFunction *MirEmitterContext::getFunctionById(size_t id) const
 {
+    auto it = m_idToFunctionMap.find(id);
+    if (it == m_idToFunctionMap.end())
+    {
+        it = m_blockIdToFunc.find(id);
+    }
+
+    return it != m_idToFunctionMap.end() ? it->second : nullptr;
+}
+
+MirGlobalDataEntry *MirEmitterContext::createGlobalData(const void *data, MirType *type, bool isReadOnly)
+{
+    size_t size = type->getTotalSizeInBytes();
     MirGlobalDataEntry *entry = getDataEntryPool()->create<MirGlobalDataEntry>();
     entry->m_isReadOnly = isReadOnly;
     entry->m_uninitialized = false;
     entry->m_entryId = createId();
-    entry->m_dataSize = size;
+    entry->m_dataType = type;
     entry->m_data = getEntryDataPool()->createConstantArray(size);
 
     if (!data)
@@ -151,18 +187,26 @@ MirGlobalDataEntry *MirEmitterContext::createGlobalData(const void *data, size_t
         std::copy_n((const char *)data, size, (char *)entry->m_data.m_elems);
     }
 
+    LOG_DEBUG(std::format("Creating global data (id: {}) (type: {}) (size: {}) (initialized: {}) (readOnly: {})",
+                          entry->m_entryId,
+                          entry->m_dataType->getName(),
+                          entry->m_dataType->getTotalSizeInBytes(),
+                          !entry->m_uninitialized,
+                          entry->m_isReadOnly),
+              "MirEmitterContext");
+
     m_idToGlobalDataEntry.insert({ entry->m_entryId, entry });
     return entry;
 }
 
 MirGlobalDataEntry *MirEmitterContext::createGlobalFloatingPoint(double val)
 {
-    return createGlobalData(&val, sizeof(val), true);
+    return createGlobalData(&val, m_types->getFloat64Type(), true);
 }
 
-MirGlobalDataEntry *MirEmitterContext::createGlobalInteger(uint64_t val)
+MirGlobalDataEntry *MirEmitterContext::createGlobalInteger(size_t sizeInBytes, uint64_t val)
 {
-    return createGlobalData(&val, sizeof(val), true);
+    return createGlobalData(&val, getIntegerTypeBySize(sizeInBytes), true);
 }
 
 MirGlobalDataEntry *
@@ -171,10 +215,15 @@ MirEmitterContext::createGlobalString(const std::string_view &str, bool includeN
     size_t totalSize = str.size() + (includeNullTerminator ? 1 : 0);
     MirGlobalDataEntry *entry = getDataEntryPool()->create<MirGlobalDataEntry>();
 
+    TypedPoolLinkedList<MirType> *pointerSubTypes = getTypePool()->createLinkedList<MirType>();
+    getTypePool()->appendToListBack(pointerSubTypes, m_types->getInt8Type());
+
+    MirType *type = createType(MirTypeKind::Pointer, totalSize, pointerSubTypes, "String");
+
     entry->m_isReadOnly = isReadOnly;
     entry->m_uninitialized = false;
     entry->m_entryId = createId();
-    entry->m_dataSize = totalSize;
+    entry->m_dataType = type;
     entry->m_data = getEntryDataPool()->createConstantArray(totalSize);
     std::copy_n(str.data(), str.size(), entry->m_data.m_elems);
 
@@ -183,11 +232,18 @@ MirEmitterContext::createGlobalString(const std::string_view &str, bool includeN
         entry->m_data.m_elems[str.size()] = '\0';
     }
 
+    LOG_DEBUG(std::format("Creating global string '{}' (id: {}) (size: {}) (readonly: {})",
+                          entry->m_entryId,
+                          entry->m_dataType->getName(),
+                          str,
+                          isReadOnly),
+              "MirEmitterContext");
+
     m_idToGlobalDataEntry.insert({ entry->m_entryId, entry });
     return entry;
 }
 
-MirGlobalDataEntry *MirEmitterContext::getGlobalDataEntryFromId(size_t entryId)
+MirGlobalDataEntry *MirEmitterContext::getGlobalDataEntryFromId(size_t entryId) const
 {
     auto it = m_idToGlobalDataEntry.find(entryId);
     if (it != m_idToGlobalDataEntry.end())
@@ -198,7 +254,7 @@ MirGlobalDataEntry *MirEmitterContext::getGlobalDataEntryFromId(size_t entryId)
 
 MirType *MirEmitterContext::createType(MirTypeKind kind,
                                        size_t totalSizeInBytes,
-                                       TypedPoolLinkedList<MirType> *types,
+                                       TypedPoolLinkedList<MirType> *subTypes,
                                        const std::string_view &name)
 {
     if (name.empty())
@@ -207,10 +263,33 @@ MirType *MirEmitterContext::createType(MirTypeKind kind,
         return nullptr;
     }
 
-    MirType *type = m_typePool.create<MirType>(kind, createId(), totalSizeInBytes, types, name);
+    if (m_typeNames.contains(name))
+    {
+        emitError(ErrorSeverity::Fatal,
+                  "Could not create type because a type with the same name already exists",
+                  "MirEmitterContext::createType");
+        return nullptr;
+    }
+
+    if (!subTypes)
+    {
+        subTypes = m_typePool.createLinkedList<MirType>();
+    }
+
+    ConstantArray<char> copiedName = m_namePool.createConstantArray(name.length() + 1); // Include null terminator
+    std::strcpy(copiedName.m_elems, name.data());
+    copiedName.m_elems[name.length()] = '\0'; // Ensure null terminator is included.
+
+    MirType *type = m_typePool.create<MirType>(kind, createId(), totalSizeInBytes, subTypes, copiedName.m_elems);
+    LOG_DEBUG(std::format("Creating type (id: {}) (name: {}) (size: {}) (subTypeCount: {})",
+                          type->getId(),
+                          type->getName(),
+                          type->getTotalSizeInBytes(),
+                          type->getSubTypes()->m_numElems),
+              "MirEmitterContext");
 
     m_typePool.appendToListBack(m_typeList, type);
-    m_typeNames.insert(name);
+    m_typeNames.insert(copiedName.m_elems);
     m_idToTypeMap.insert({ type->getId(), type });
 
     return type;
@@ -273,3 +352,5 @@ TypedArrayPool<uint8_t> *MirEmitterContext::getEntryDataPool() { return &m_dataP
 TypedPoolLinkedList<MirFunction> *MirEmitterContext::getFunctionList() const { return m_functionList; }
 
 TypedPoolLinkedList<MirType> *MirEmitterContext::getTypeList() const { return m_typeList; }
+
+std::shared_ptr<class MirTypes> MirEmitterContext::getTypes() const { return m_types; }

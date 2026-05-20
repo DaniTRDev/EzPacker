@@ -14,7 +14,30 @@ class DummyABIDescExpand : public ABIDesc
         setRegSizeInBits(32); // 4 bytes legal size
     }
 
-    ArgLocation getArgLoc(size_t id) const override { return ArgLocation(); }
+    ArgLocation getArgLoc(size_t id, MirType *type) const override { return ArgLocation(); }
+    
+    size_t getAbiAlignment(MirType *type) const
+    {
+        if (!type)
+            return 1;
+        
+        // Handle Basic Types (Integers, Floats)
+        size_t size = type->getTotalSizeInBytes();
+
+        // Standard rule: basic types align to their own size, capped by the target max.
+        // E.g., size 4 aligns to 4. Size 8 aligns to 8 (or 4 on 32-bit systems).
+        size_t align = size;
+
+        // Ensure it's a power of 2 (rounds up sizes like 3 to 4)
+        align = std::bit_ceil(align); // C++20 feature, or write a quick power-of-2 helper
+        return align;
+    }
+
+    /**
+     * Returns the preferred alignment for the given type.
+     * Used for global variables to optimize CPU cache line fetching.
+     */
+    size_t getPreferredAlignment(MirType *type) const { return getAbiAlignment(type); }
 };
 
 class ExpandTypeLegalizerTests : public ::testing::Test
@@ -38,7 +61,7 @@ class ExpandTypeLegalizerTests : public ::testing::Test
         emitterCtx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(emitterCtx.get());
 
-        targetDesc = new TargetDesc(&abi, "DummyTarget");
+        targetDesc = new TargetDesc(&abi, TargetEndianness::LittleEndian, "DummyTarget");
         actionList = new LegalizerActionList();
         handlerList = new LegalizerHandlerList();
 
@@ -62,10 +85,11 @@ class ExpandTypeLegalizerTests : public ::testing::Test
 
 TEST_F(ExpandTypeLegalizerTests, ExpandAddInstruction)
 {
-    MirRegister dest = emitter->createVirtualRegister(8); // 8 bytes (illegal, needs expansion to 2x 4 bytes)
-    MirRegister src = emitter->createVirtualRegister(8);
+    // 8 bytes (illegal, needs expansion to 2x 4 bytes)
+    MirRegister *dest = emitter->createVirtualRegister(emitter->getContext()->getIntegerTypeBySize(8));
+    MirRegister *src = emitter->createVirtualRegister(emitter->getContext()->getIntegerTypeBySize(8));
 
-    MirInstruction *instr = emitter->emitADD(MirOperand(dest), MirOperand(src));
+    MirInstruction *instr = emitter->emitADD(dest, src);
 
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
@@ -85,7 +109,7 @@ TEST_F(ExpandTypeLegalizerTests, ExpandAddInstruction)
     auto addOperands = (*nextIt)->getOperands();
     EXPECT_EQ(addOperands->m_numElems, 2);
     auto addOpIt = addOperands->begin();
-    EXPECT_EQ((*addOpIt)->getRegister()->m_sizeInBytes, 4);
+    EXPECT_EQ((*addOpIt)->get<MirRegister>()->getSizeInBytes(), 4);
 
     ++nextIt;
     ASSERT_NE(nextIt, newList->end());
@@ -95,15 +119,16 @@ TEST_F(ExpandTypeLegalizerTests, ExpandAddInstruction)
     auto adcOperands = (*nextIt)->getOperands();
     EXPECT_EQ(adcOperands->m_numElems, 2);
     auto adcOpIt = adcOperands->begin();
-    EXPECT_EQ((*adcOpIt)->getRegister()->m_sizeInBytes, 4);
+    EXPECT_EQ((*adcOpIt)->get<MirRegister>()->getSizeInBytes(), 4);
 }
 
 TEST_F(ExpandTypeLegalizerTests, ExpandInstructionWithImmediate)
 {
-    MirRegister dest = emitter->createVirtualRegister(8); // 8 bytes
-    MirInteger imm = { .m_value = 0x123456789ABCDEF0, .m_sizeInBytes = 8 };
+    MirType *type = emitter->getContext()->getIntegerTypeBySize(8);
+    MirRegister *dest = emitter->createVirtualRegister(type); // 8 bytes
+    MirInteger *imm = emitter->createImmediateInteger(type, 0x123456789ABCDEF0);
 
-    MirInstruction *instr = emitter->emitADD(MirOperand(dest), MirOperand(imm));
+    MirInstruction *instr = emitter->emitADD(dest, imm);
 
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
@@ -121,9 +146,9 @@ TEST_F(ExpandTypeLegalizerTests, ExpandInstructionWithImmediate)
     auto addOperands = (*nextIt)->getOperands();
     auto addOpIt = addOperands->begin();
     ++addOpIt; // Get the immediate
-    ASSERT_TRUE((*addOpIt)->isInteger());
-    EXPECT_EQ((*addOpIt)->getInteger()->m_sizeInBytes, 4);
-    EXPECT_EQ(static_cast<uint32_t>((*addOpIt)->getInteger()->m_value), 0x9ABCDEF0);
+    ASSERT_TRUE((*addOpIt)->isOfType<MirInteger>());
+    EXPECT_EQ((*addOpIt)->get<MirInteger>()->getSizeInBytes(), 4);
+    EXPECT_EQ(static_cast<uint32_t>((*addOpIt)->get<MirInteger>()->getValue()), 0x9ABCDEF0);
 
     ++nextIt;
     ASSERT_NE(nextIt, newList->end());
@@ -132,16 +157,16 @@ TEST_F(ExpandTypeLegalizerTests, ExpandInstructionWithImmediate)
     auto adcOperands = (*nextIt)->getOperands();
     auto adcOpIt = adcOperands->begin();
     ++adcOpIt; // Get the immediate
-    ASSERT_TRUE((*adcOpIt)->isInteger());
-    EXPECT_EQ((*adcOpIt)->getInteger()->m_sizeInBytes, 4);
-    EXPECT_EQ(static_cast<uint32_t>((*adcOpIt)->getInteger()->m_value), 0x12345678);
+    ASSERT_TRUE((*adcOpIt)->isOfType<MirInteger>());
+    EXPECT_EQ((*adcOpIt)->get<MirInteger>()->getSizeInBytes(), 4);
+    EXPECT_EQ(static_cast<uint32_t>((*adcOpIt)->get<MirInteger>()->getValue()), 0x12345678);
 }
 
 TEST_F(ExpandTypeLegalizerTests, ExpandInvalidOpcodeTriggersError)
 {
-    MirRegister dest = emitter->createVirtualRegister(8);
+    MirRegister *dest = emitter->createVirtualRegister(emitter->getContext()->getIntegerTypeBySize(8));
     // TRUNC has NO_EQUIV, meaning it doesn't have a linear equivalent to expand to.
-    MirInstruction *instr = emitter->emitTRUNC(MirOperand(dest), MirOperand(dest));
+    MirInstruction *instr = emitter->emitTRUNC(dest, dest);
 
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
@@ -154,9 +179,9 @@ TEST_F(ExpandTypeLegalizerTests, ExpandInvalidOpcodeTriggersError)
 
 TEST_F(ExpandTypeLegalizerTests, ExpandSameRegisterReusesExpansion)
 {
-    MirRegister dest = emitter->createVirtualRegister(8);
+    MirRegister *dest = emitter->createVirtualRegister(emitter->getContext()->getIntegerTypeBySize(8));
     // Both operands use the same register
-    MirInstruction *instr = emitter->emitADD(MirOperand(dest), MirOperand(dest));
+    MirInstruction *instr = emitter->emitADD(dest, dest);
 
     auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
     auto it = list->begin();
@@ -176,7 +201,7 @@ TEST_F(ExpandTypeLegalizerTests, ExpandSameRegisterReusesExpansion)
     ++op2;
 
     // The low part of the register expansion should be the same register ID.
-    EXPECT_EQ((*op1)->getRegister()->m_id, (*op2)->getRegister()->m_id);
+    EXPECT_EQ((*op1)->get<MirRegister>()->getRegId(), (*op2)->get<MirRegister>()->getRegId());
 
     ++nextIt;
     ASSERT_NE(nextIt, newList->end());
@@ -188,5 +213,5 @@ TEST_F(ExpandTypeLegalizerTests, ExpandSameRegisterReusesExpansion)
     ++op2;
 
     // The high part of the register expansion should be the same register ID.
-    EXPECT_EQ((*op1)->getRegister()->m_id, (*op2)->getRegister()->m_id);
+    EXPECT_EQ((*op1)->get<MirRegister>()->getRegId(), (*op2)->get<MirRegister>()->getRegId());
 }

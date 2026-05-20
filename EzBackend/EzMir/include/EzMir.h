@@ -53,6 +53,8 @@
 #include "Operand/MirOperand.h"
 #include "Operand/MirOperands.h"
 
+#include "Printer/MirPrinter.h"
+
 // ── Type system primitives ──────────────────────────────────────────────────
 #include "Type/MirType.h"
 #include "Type/MirTypes.h"

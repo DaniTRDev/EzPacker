@@ -10,9 +10,9 @@
 
 class MirEmitterContextTests : public ::testing::Test
 {
-protected:
+  protected:
     std::shared_ptr<ErrorCollector> ec;
-    std::shared_ptr<SourceManager>  sm;
+    std::shared_ptr<SourceManager> sm;
     std::unique_ptr<MirEmitterContext> ctx;
 
     void SetUp() override
@@ -23,10 +23,7 @@ protected:
         ec->beginScope();
     }
 
-    void TearDown() override
-    {
-        ec->endScope(ErrorAction::Discard);
-    }
+    void TearDown() override { ec->endScope(ErrorAction::Discard); }
 };
 
 // ─── ID creation ─────────────────────────────────────────────────────────────
@@ -53,10 +50,7 @@ TEST_F(MirEmitterContextTests, CreateBlockReturnsNonNull)
     EXPECT_NE(block->getId(), MIRID_INVALID);
 }
 
-TEST_F(MirEmitterContextTests, NewContextHasNoBoundBlock)
-{
-    EXPECT_EQ(ctx->getCurrentBoundBlock(), nullptr);
-}
+TEST_F(MirEmitterContextTests, NewContextHasNoBoundBlock) { EXPECT_EQ(ctx->getCurrentBoundBlock(), nullptr); }
 
 TEST_F(MirEmitterContextTests, BindToBlockSucceeds)
 {
@@ -65,10 +59,7 @@ TEST_F(MirEmitterContextTests, BindToBlockSucceeds)
     EXPECT_EQ(ctx->getCurrentBoundBlock(), block);
 }
 
-TEST_F(MirEmitterContextTests, BindToNullBlockDontFail)
-{
-    EXPECT_TRUE(ctx->bindToBlock(nullptr));
-}
+TEST_F(MirEmitterContextTests, BindToNullBlockDontFail) { EXPECT_TRUE(ctx->bindToBlock(nullptr)); }
 
 TEST_F(MirEmitterContextTests, InstructionIsAddedToBoundBlock)
 {
@@ -85,9 +76,9 @@ TEST_F(MirEmitterContextTests, InstructionIsAddedToBoundBlock)
 TEST_F(MirEmitterContextTests, CreateFunctionReturnsNonNull)
 {
     // We need a valid return type ID.
-    MirType *voidType = ctx->createType(MirTypeKind::Void, nullptr, "void");
+    MirType *voidType = ctx->createType(MirTypeKind::Void, 0, nullptr, "void");
     ASSERT_NE(voidType, nullptr);
-    MirFunction *fn = ctx->createFunction(voidType, nullptr, nullptr, "test");
+    MirFunction *fn = ctx->createFunction(voidType, nullptr, "test");
     ASSERT_NE(fn, nullptr);
     EXPECT_NE(fn->getId(), MIRID_INVALID);
     EXPECT_NE(fn->getEntryPoint(), nullptr);
@@ -95,7 +86,7 @@ TEST_F(MirEmitterContextTests, CreateFunctionReturnsNonNull)
 
 TEST_F(MirEmitterContextTests, CreateFunctionWithInvalidReturnTypeEmitsError)
 {
-    MirFunction *fn = ctx->createFunction(nullptr, nullptr, nullptr, "test");
+    MirFunction *fn = ctx->createFunction(nullptr, nullptr, "test");
     EXPECT_EQ(fn, nullptr);
 }
 
@@ -103,7 +94,7 @@ TEST_F(MirEmitterContextTests, CreateFunctionWithInvalidReturnTypeEmitsError)
 
 TEST_F(MirEmitterContextTests, CreateTypeReturnsNonNull)
 {
-    MirType *t = ctx->createType(MirTypeKind::Integer, nullptr, "i64");
+    MirType *t = ctx->createType(MirTypeKind::Integer, 0, nullptr, "i64");
     ASSERT_NE(t, nullptr);
     EXPECT_EQ(t->getKind(), MirTypeKind::Integer);
     EXPECT_EQ(t->getName(), "i64");
@@ -112,7 +103,7 @@ TEST_F(MirEmitterContextTests, CreateTypeReturnsNonNull)
 
 TEST_F(MirEmitterContextTests, LookupTypeByIdSucceeds)
 {
-    MirType *created = ctx->createType(MirTypeKind::FloatingPoint, nullptr, "double");
+    MirType *created = ctx->createType(MirTypeKind::FloatingPoint, 0, nullptr, "double");
     ASSERT_NE(created, nullptr);
     MirType *looked = ctx->getMirTypeById(created->getId());
     EXPECT_EQ(looked, created);
@@ -126,7 +117,7 @@ TEST_F(MirEmitterContextTests, LookupInvalidIdReturnsNull)
 
 TEST_F(MirEmitterContextTests, CreateTypeWithEmptyNameFails)
 {
-    MirType *t = ctx->createType(MirTypeKind::Integer, nullptr, "");
+    MirType *t = ctx->createType(MirTypeKind::Integer, 0, nullptr, "");
     EXPECT_EQ(t, nullptr);
 }
 
@@ -185,9 +176,9 @@ TEST_F(MirEmitterContextTests, InstructionsGoToCorrectBlock)
 
 TEST_F(MirEmitterContextTests, FunctionHasEntryPointBlock)
 {
-    MirType *voidType = ctx->createType(MirTypeKind::Void, nullptr, "void");
+    MirType *voidType = ctx->createType(MirTypeKind::Void, 0, nullptr, "void");
     ASSERT_NE(voidType, nullptr);
-    MirFunction *fn = ctx->createFunction(voidType, nullptr, nullptr, "test");
+    MirFunction *fn = ctx->createFunction(voidType, nullptr, "test");
     ASSERT_NE(fn, nullptr);
     ASSERT_NE(fn->getEntryPoint(), nullptr);
     ASSERT_NE(fn->getBlocks(), nullptr);
@@ -196,28 +187,22 @@ TEST_F(MirEmitterContextTests, FunctionHasEntryPointBlock)
 
 TEST_F(MirEmitterContextTests, FunctionReturnTypeIdIsStored)
 {
-    MirType *i64Type = ctx->createType(MirTypeKind::Integer, nullptr, "i64");
+    MirType *i64Type = ctx->createType(MirTypeKind::Integer, 8, nullptr, "i64");
     ASSERT_NE(i64Type, nullptr);
-    MirFunction *fn = ctx->createFunction(i64Type, nullptr, nullptr, "test");
+    MirFunction *fn = ctx->createFunction(i64Type, nullptr, "test");
     ASSERT_NE(fn, nullptr);
     EXPECT_EQ(fn->getReturnType()->getId(), i64Type->getId());
 }
 
-TEST_F(MirEmitterContextTests, FunctionParameterPoolAccessible)
-{
-    EXPECT_NE(ctx->getFunctionParameterPool(), nullptr);
-}
+TEST_F(MirEmitterContextTests, FunctionParameterPoolAccessible) { EXPECT_NE(ctx->getFunctionParameterPool(), nullptr); }
 
-TEST_F(MirEmitterContextTests, EntryDataPoolAccessible)
-{
-    EXPECT_NE(ctx->getEntryDataPool(), nullptr);
-}
+TEST_F(MirEmitterContextTests, EntryDataPoolAccessible) { EXPECT_NE(ctx->getEntryDataPool(), nullptr); }
 
 TEST_F(MirEmitterContextTests, CreateMultipleTypesLookupByIdWorks)
 {
-    MirType *t1 = ctx->createType(MirTypeKind::Integer, nullptr, "i8");
-    MirType *t2 = ctx->createType(MirTypeKind::Integer, nullptr, "i16");
-    MirType *t3 = ctx->createType(MirTypeKind::FloatingPoint, nullptr, "float");
+    MirType *t1 = ctx->createType(MirTypeKind::Integer, 1, nullptr, "i8");
+    MirType *t2 = ctx->createType(MirTypeKind::Integer, 2, nullptr, "i16");
+    MirType *t3 = ctx->createType(MirTypeKind::FloatingPoint, 4, nullptr, "float");
     ASSERT_NE(t1, nullptr);
     ASSERT_NE(t2, nullptr);
     ASSERT_NE(t3, nullptr);
@@ -229,7 +214,7 @@ TEST_F(MirEmitterContextTests, CreateMultipleTypesLookupByIdWorks)
 
 TEST_F(MirEmitterContextTests, CreateVoidType)
 {
-    MirType *t = ctx->createType(MirTypeKind::Void, nullptr, "void");
+    MirType *t = ctx->createType(MirTypeKind::Void, 0, nullptr, "void");
     ASSERT_NE(t, nullptr);
     EXPECT_EQ(t->getKind(), MirTypeKind::Void);
     EXPECT_EQ(t->getName(), "void");
@@ -237,15 +222,15 @@ TEST_F(MirEmitterContextTests, CreateVoidType)
 
 TEST_F(MirEmitterContextTests, CreatePointerType)
 {
-    MirType *t = ctx->createType(MirTypeKind::Pointer, nullptr, "ptr");
+    MirType *t = ctx->createType(MirTypeKind::Pointer, 8, nullptr, "ptr");
     ASSERT_NE(t, nullptr);
     EXPECT_EQ(t->getKind(), MirTypeKind::Pointer);
 }
 
 TEST_F(MirEmitterContextTests, FunctionEntryPointIsFirstBlock)
 {
-    MirType *voidType = ctx->createType(MirTypeKind::Void, nullptr, "void");
-    MirFunction *fn = ctx->createFunction(voidType, nullptr, nullptr, "test");
+    MirType *voidType = ctx->createType(MirTypeKind::Void, 0, nullptr, "void");
+    MirFunction *fn = ctx->createFunction(voidType, nullptr, "test");
     ASSERT_NE(fn, nullptr);
     MirBlock *entry = fn->getEntryPoint();
     ASSERT_NE(entry, nullptr);
@@ -253,8 +238,10 @@ TEST_F(MirEmitterContextTests, FunctionEntryPointIsFirstBlock)
     // Assuming the list is ordered by creation/insertion
     // But we can check if it's in the list
     bool found = false;
-    for (auto *b : *fn->getBlocks()) {
-        if (b == entry) {
+    for (auto *b : *fn->getBlocks())
+    {
+        if (b == entry)
+        {
             found = true;
             break;
         }
