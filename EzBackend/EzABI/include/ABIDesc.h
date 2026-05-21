@@ -14,13 +14,6 @@ class ABIDesc
      * @brief Constructs an ABIDesc with default values.
      */
     ABIDesc();
-    
-    /**
-     * @brief Returns the strict ABI alignment required for the given type.
-     * @param type The type to check alignment for.
-     * @returns The required alignment in bytes.
-     */
-    virtual size_t getAbiAlignment(MirType *type) const = 0;
 
     /**
      * @brief Get the location of the return value.
@@ -34,7 +27,13 @@ class ABIDesc
      * @param type The type of the argument.
      * @returns The location where the argument is passed.
      */
-    virtual ArgLocation getArgLoc(size_t id, MirType* type) const = 0;
+    virtual ArgLocation getArgLoc(size_t id, MirType *type) const = 0;
+
+    /**
+     * @brief Returns the name of the ABI.
+     * @return
+     */
+    virtual const char *getName() const = 0;
 
     /**
      * @brief Get the location of the stack frame pointer.
@@ -47,6 +46,13 @@ class ABIDesc
      * @returns The physical register ID of the stack pointer.
      */
     PhysicalRegId getStackReg() const;
+
+    /**
+     * @brief Returns the strict ABI alignment required for the given type.
+     * @param type The type to check alignment for.
+     * @returns The required alignment in bytes.
+     */
+    virtual size_t getAbiAlignment(MirType *type) const = 0;
 
     /**
      * @brief Get the size of registers in bits.

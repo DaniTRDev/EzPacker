@@ -32,6 +32,8 @@ class DummyABIDescExpand : public ABIDesc
         align = std::bit_ceil(align); // C++20 feature, or write a quick power-of-2 helper
         return align;
     }
+    
+    const char *getName() const override { return "DummyAbi"; }
 
     /**
      * Returns the preferred alignment for the given type.

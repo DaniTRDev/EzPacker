@@ -232,10 +232,7 @@ bool TargetAbiLowererPass::lowerReturnSite(MirBlock *block,
 
         // Emit: MOV physRetReg, retValue
         emitter->emit(MirInstructionOpCode::MOV, { physRegOp, retValue });
-
-        // IN-PLACE SWAP: Tell the RET instruction to use the physical register.
-        // This pins the value to the hardware register right as the function exits.
-        operands->begin().m_curr->m_object = physRegOp;
+        operands->m_owner->removeFromList(operands, operands->begin());
     }
     else if (loc.isStack())
     {

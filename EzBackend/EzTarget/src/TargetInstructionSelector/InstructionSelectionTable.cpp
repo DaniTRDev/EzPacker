@@ -20,16 +20,20 @@ bool SelectionRule::matches(MirInstruction *instr) const
             MirOperand *op = *it;
             ExpectedOperandType expectedKind = m_operandKinds[i];
 
-            if ((expectedKind & ExpectedOperandType::Register) && !op->isOfType<MirRegister>())
-                return false;
-            if ((expectedKind & ExpectedOperandType::Integer) && !op->isOfType<MirInteger>())
-                return false;
-            if ((expectedKind & ExpectedOperandType::Double) && !op->isOfType<MirDouble>())
-                return false;
-            if ((expectedKind & ExpectedOperandType::FrameIndex) && !op->isOfType<MirFrameIndex>())
-                return false;
-            if ((expectedKind & ExpectedOperandType::Reference) && !op->isOfType<MirReference>())
-                return false;
+            if ((expectedKind & ExpectedOperandType::Register) && op->isOfType<MirRegister>())
+                continue;
+            if ((expectedKind & ExpectedOperandType::Integer) && op->isOfType<MirInteger>())
+                continue;
+            if ((expectedKind & ExpectedOperandType::Double) && op->isOfType<MirDouble>())
+                continue;
+            if ((expectedKind & ExpectedOperandType::Memory) && op->isOfType<MirMemory>())
+                continue;
+            if ((expectedKind & ExpectedOperandType::FrameIndex) && op->isOfType<MirFrameIndex>())
+                continue;
+            if ((expectedKind & ExpectedOperandType::Reference) && op->isOfType<MirReference>())
+                continue;
+
+            return false; // No match
         }
     }
 

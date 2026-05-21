@@ -1,4 +1,6 @@
 #include "TargetRegisterAllocator/RegisterAllocatorPass.h"
+#include "Instruction/MirInstructionDefs.h"
+#include <algorithm>
 
 void InterferenceGraph::addNode(MirRegister *reg)
 {
@@ -6,7 +8,7 @@ void InterferenceGraph::addNode(MirRegister *reg)
     {
         IGNode node{ reg, {}, -1, false };
 
-        // CRITICAL Pre-color physical registers so they block virtual registers!
+        // CRITICAL: Pre-color physical registers so they block virtual registers!
         if (!reg->isVirtual())
         {
             node.m_color = reg->getRegId();
@@ -28,7 +30,6 @@ void InterferenceGraph::addEdge(MirRegister *a, MirRegister *b)
 
 IGNode &InterferenceGraph::getNode(MirRegister *reg) { return m_nodes[reg]; }
 std::unordered_map<MirRegister *, IGNode> &InterferenceGraph::getNodes() { return m_nodes; }
-
 void InterferenceGraph::clear() { m_nodes.clear(); }
 
 RegisterAllocatorPass::RegisterAllocatorPass(RegisterAllocatorContext *ctx)
@@ -47,12 +48,17 @@ RegisterAllocatorPass::RegisterAllocatorPass(RegisterAllocatorContext *ctx)
     m_k = m_allocatableRegs.size();
 }
 
+size_t RegisterAllocatorPass::getKForType(MirType *type) { return m_k; }
+
 bool RegisterAllocatorPass::run(TypedPoolLinkedList<MirFunction> *funcList,
                                 TypedPoolLinkedList<MirFunction>::Iterator it,
                                 MirPassManager *passManager)
 {
     MirFunction *func = *it;
     bool allocationComplete = false;
+
+    // Clear exempt registers on a fresh function run to prevent stale state
+    m_spillExempt.clear();
 
     while (!allocationComplete)
     {
@@ -64,13 +70,9 @@ bool RegisterAllocatorPass::run(TypedPoolLinkedList<MirFunction> *funcList,
                 passManager->getAnalysis<LivenessAnalysis>(func->getBlocks(), func->getBlocks()->begin(), m_emitter);
         const LivenessResult &liveness = la.getResult();
 
-        // Build Graph
         buildGraph(func, liveness);
-
-        // Simplify & Select
         simplifyAndSelect();
 
-        // Check for Spills
         bool hasSpills = false;
         for (auto &pair : m_graph.getNodes())
         {
@@ -83,7 +85,6 @@ bool RegisterAllocatorPass::run(TypedPoolLinkedList<MirFunction> *funcList,
 
         if (hasSpills)
         {
-            // Rewrite MIR (Insert Loads/Stores) and loop back
             rewriteProgram(func);
         }
         else
@@ -107,8 +108,6 @@ bool RegisterAllocatorPass::run(TypedPoolLinkedList<MirFunction> *funcList,
                     if (reg->isVirtual())
                     {
                         int physicalId = m_graph.getNode(reg).m_color;
-
-                        // Mutate the virtual register into a physical one
                         reg->setRegId(physicalId);
                         reg->setVirtual(false);
                     }
@@ -127,10 +126,8 @@ void RegisterAllocatorPass::buildGraph(MirFunction *func, const LivenessResult &
         MirBlock *block = *blockIt;
         size_t blockId = block->getId();
 
-        // Initialize active live set with liveOut of this block
         std::unordered_set<MirRegister *> liveNow = liveness.m_liveOut.at(blockId);
 
-        // Create a reversed array of instructions
         auto instrList = block->getInstructions();
         std::vector<MirInstruction *> reversedInstrs;
         for (auto instIt = instrList->begin(); instIt != instrList->end(); ++instIt)
@@ -144,7 +141,6 @@ void RegisterAllocatorPass::buildGraph(MirFunction *func, const LivenessResult &
             auto defs = getDefs(instr);
             auto uses = getUses(instr);
 
-            // Add interference edges: defined regs interfere with all currently live regs
             for (MirRegister *def : defs)
             {
                 m_graph.addNode(def);
@@ -154,12 +150,11 @@ void RegisterAllocatorPass::buildGraph(MirFunction *func, const LivenessResult &
                 }
             }
 
-            // Step Liveness backwards
             for (MirRegister *def : defs)
-                liveNow.erase(def); // Defs become dead moving backwards
+                liveNow.erase(def);
 
             for (MirRegister *use : uses)
-                liveNow.insert(use); // Uses become alive moving backwards
+                liveNow.insert(use);
         }
     }
 }
@@ -173,12 +168,10 @@ void RegisterAllocatorPass::simplifyAndSelect()
     {
         bool progress = false;
 
-        // Try to find a node with degree < K that is NOT pre-colored
         for (auto &pair : nodes)
         {
             MirRegister *reg = pair.first;
 
-            // Pre-colored physical registers have infinite degree. Never simplify them.
             if (!reg->isVirtual() || removedNodes.count(reg))
                 continue;
 
@@ -189,7 +182,7 @@ void RegisterAllocatorPass::simplifyAndSelect()
                     activeDegree++;
             }
 
-            if (activeDegree < m_k)
+            if (activeDegree < getKForType(reg->getMirType()))
             {
                 m_selectStack.push(reg);
                 removedNodes.insert(reg);
@@ -198,7 +191,6 @@ void RegisterAllocatorPass::simplifyAndSelect()
             }
         }
 
-        // Optimistic Spilling: Pick the highest degree unremoved node
         if (!progress)
         {
             MirRegister *spillCandidate = nullptr;
@@ -207,7 +199,9 @@ void RegisterAllocatorPass::simplifyAndSelect()
             for (auto &pair : nodes)
             {
                 MirRegister *reg = pair.first;
-                if (!reg->isVirtual() || removedNodes.count(reg))
+
+                // Do not spill registers we just created to resolve previous spills!
+                if (!reg->isVirtual() || removedNodes.count(reg) || m_spillExempt.count(reg))
                     continue;
 
                 size_t activeDegree = 0;
@@ -231,7 +225,7 @@ void RegisterAllocatorPass::simplifyAndSelect()
             }
             else
             {
-                // The only nodes left are pre-colored physical registers. Mark them removed.
+                // Fallback: only pre-colored or exempt nodes left.
                 for (auto &pair : nodes)
                     removedNodes.insert(pair.first);
             }
@@ -296,7 +290,6 @@ bool RegisterAllocatorPass::rewriteProgram(MirFunction *func)
         auto instIt = instrList->begin();
         while (instIt != instrList->end())
         {
-            // CRITICAL: Save the next original instruction NOW, before we insert anything.
             auto nextOriginalIt = instIt;
             ++nextOriginalIt;
 
@@ -306,54 +299,70 @@ bool RegisterAllocatorPass::rewriteProgram(MirFunction *func)
             auto defs = getDefs(instr);
             auto uses = getUses(instr);
 
-            // Track what we've replaced so we don't duplicate loads for 'ADD v1, v1'
-            std::unordered_set<MirRegister *> replacedUses;
+            // Maintain a map of replacements PER instruction
+            std::unordered_map<MirRegister *, MirRegister *> tempRegMap;
+
+            auto getTempReg = [&](MirRegister *origReg)
+            {
+                if (!tempRegMap.contains(origReg))
+                {
+                    MirRegister *t = m_emitter->createVirtualRegister(origReg->getMirType());
+                    m_spillExempt.insert(t); // Protect from future spills
+                    tempRegMap[origReg] = t;
+                }
+                return tempRegMap[origReg];
+            };
 
             // Handle Uses
             for (MirRegister *useReg : uses)
             {
-                if (spillMap.contains(useReg) && !replacedUses.contains(useReg))
+                if (spillMap.contains(useReg))
                 {
-                    replacedUses.insert(useReg);
+                    MirRegister *tempReg = getTempReg(useReg);
                     m_emitterCtx->setInsertPoint(block, instIt);
-
-                    MirRegister *newVReg = m_emitter->createVirtualRegister(useReg->getMirType());
-                    m_emitter->emit(MirInstructionOpCode::LOAD, { newVReg, spillMap[useReg] });
+                    m_emitter->emit(MirInstructionOpCode::LOAD, { tempReg, spillMap[useReg] });
 
                     for (auto opIt = operands->begin(); opIt != operands->end(); ++opIt)
                     {
-                        if (*opIt == useReg)
-                            opIt.m_curr->m_object = newVReg;
+                        MirOperand *op = *opIt;
+                        if (op == useReg)
+                        {
+                            opIt.m_curr->m_object = tempReg;
+                        }
+                        else if (op->isOfType<MirMemory>())
+                        {
+                            MirMemory *mem = op->get<MirMemory>();
+                            if (mem->getBase() == useReg)
+                                opIt.m_curr->m_object = tempReg;
+                        }
                     }
                 }
             }
 
             // Handle Defs
-            std::unordered_set<MirRegister *> replacedDefs;
             for (MirRegister *defReg : defs)
             {
-                if (spillMap.contains(defReg) && !replacedDefs.contains(defReg))
+                if (spillMap.contains(defReg))
                 {
-                    replacedDefs.insert(defReg);
-                    MirRegister *newVReg = m_emitter->createVirtualRegister(defReg->getMirType());
+                    MirRegister *tempReg = getTempReg(defReg);
 
                     for (auto opIt = operands->begin(); opIt != operands->end(); ++opIt)
                     {
-                        if (*opIt == defReg)
-                            opIt.m_curr->m_object = newVReg;
+                        MirOperand *op = *opIt;
+                        if (op == defReg)
+                        {
+                            opIt.m_curr->m_object = tempReg;
+                        }
                     }
 
                     auto insertAfterIt = instIt;
                     ++insertAfterIt;
                     m_emitterCtx->setInsertPoint(block, insertAfterIt);
-
-                    m_emitter->emit(MirInstructionOpCode::STORE, { spillMap[defReg], newVReg });
+                    m_emitter->emit(MirInstructionOpCode::STORE, { spillMap[defReg], tempReg });
                 }
             }
 
             m_emitterCtx->setInsertPoint(block);
-
-            // CRITICAL: Jump safely to the next original instruction, skipping inserted STOREs.
             instIt = nextOriginalIt;
         }
     }
@@ -369,12 +378,33 @@ std::vector<MirRegister *> RegisterAllocatorPass::getDefs(class MirInstruction *
 {
     std::vector<MirRegister *> defs;
     auto operands = instr->getOperands();
+    const auto &metadata = instr->getMetadata();
+
     if (operands->m_numElems > 0)
     {
-        MirOperand *op = operands->get<MirOperand>(0);
-        if (op && op->isOfType<MirRegister>())
-            defs.push_back(op->get<MirRegister>());
+        // Safety check: ensure we actually have operand constraints before reading them
+        if (metadata.m_operandConstraints.size() > 0 && (metadata.m_operandConstraints[0].flags & OperandFlag::Write))
+        {
+            MirOperand *op = operands->get<MirOperand>(0);
+            if (op && op->isOfType<MirRegister>())
+                defs.push_back(op->get<MirRegister>());
+        }
     }
+
+    // Implicit clobbers: A CALL instruction destroys all caller-saved registers.
+    if (instr->getOpCode() == MirInstructionOpCode::CALL)
+    {
+        const auto &callerSaved = m_targetDesc->getABI()->getCallerSavedRegs();
+        MirType *ptrType =
+                m_emitter->getContext()->getIntegerTypeBySize(m_targetDesc->getABI()->getRegSizeInBits() / 8);
+
+        for (PhysicalRegId regId : callerSaved)
+        {
+            MirRegister *physReg = m_emitter->createPhysicalRegister(ptrType, regId);
+            defs.push_back(physReg);
+        }
+    }
+
     return defs;
 }
 
@@ -382,12 +412,14 @@ std::vector<MirRegister *> RegisterAllocatorPass::getUses(class MirInstruction *
 {
     std::vector<MirRegister *> uses;
     auto operands = instr->getOperands();
+    const auto &metadata = instr->getMetadata();
 
     size_t i = 0;
     for (auto it = operands->begin(); it != operands->end(); ++it, ++i)
     {
-        if (instr->getMetadata().m_operandConstraints[i].flags & OperandFlag::Write)
-            continue; // Skip Dest
+        // Safety check to ensure we don't read out of bounds on variadic instructions
+        if (i < metadata.m_operandConstraints.size() && (metadata.m_operandConstraints[i].flags & OperandFlag::Write))
+            continue;
 
         MirOperand *op = *it;
         if (op && op->isOfType<MirRegister>())
@@ -397,8 +429,6 @@ std::vector<MirRegister *> RegisterAllocatorPass::getUses(class MirInstruction *
         else if (op && op->isOfType<MirMemory>())
         {
             MirMemory *mem = op->get<MirMemory>();
-
-            // Track the Base register
             if (mem->getBase() && mem->getBase()->isOfType<MirRegister>())
                 uses.push_back(mem->getBase()->get<MirRegister>());
         }

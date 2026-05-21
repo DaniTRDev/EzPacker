@@ -18,6 +18,8 @@ class DummyABIDesc : public ABIDesc
 
     ArgLocation getArgLoc(size_t id, MirType *type) const override { return ArgLocation(); }
 
+    const char *getName() const override { return "DummyAbi"; }
+
     /**
      * Returns the strict ABI alignment required for the given type.
      * This is used for struct packing, stack frames, and array layouts.

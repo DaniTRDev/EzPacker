@@ -22,6 +22,13 @@ class MirPassManager
         m_passes.push_back(std::make_unique<T>(std::forward<Args>(args)...));
     }
 
+    void clearAll()
+    {
+        m_cachedPasses.clear();
+        m_passes.clear();
+        m_validAnalyses.clear();
+    }
+
     template <typename T, typename IteratedElementType, typename... Args>
     T &getAnalysis(TypedPoolLinkedList<IteratedElementType> *list,
                    TypedPoolLinkedList<IteratedElementType>::Iterator it,

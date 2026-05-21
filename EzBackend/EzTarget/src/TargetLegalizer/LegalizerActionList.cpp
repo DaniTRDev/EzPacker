@@ -1,19 +1,27 @@
 #include "TargetLegalizer/LegalizerActionList.h"
 
-uint8_t LegalizerActionList::getOperandAction(MirInstructionOpCode opcode, MirId typeId) const
+TargetLegalizerActionType LegalizerActionList::getOperandAction(MirInstructionOpCode opcode, MirId typeId) const
 {
-    return m_operandActions[opcode].count(typeId) > 0 ? m_operandActions[opcode].at(typeId)
-                                                      : Action_None;
+    return m_operandActions[opcode].count(typeId) > 0 ? m_operandActions[opcode].at(typeId) : Action_None;
 }
 
-void LegalizerActionList::setOperandAction(MirInstructionOpCode opcode, MirId typeId, uint8_t actionType)
+void LegalizerActionList::setOperandAction(MirInstructionOpCode opcode,
+                                           MirId typeId,
+                                           TargetLegalizerActionType actionType)
 {
-    m_operandActions[opcode].insert({ typeId, actionType });
+    m_operandActions[opcode][typeId] = actionType;
+}
+
+void LegalizerActionList::setOperandAction(MirInstructionOpCode opcode,
+                                           MirType *type,
+                                           TargetLegalizerActionType actionType)
+{
+    setOperandAction(opcode, type->getId(), actionType);
 }
 
 void LegalizerActionList::setOperandActionForClass(MirInstructionCategory instrCategory,
                                                    MirId typeId,
-                                                   uint8_t actionType)
+                                                   TargetLegalizerActionType actionType)
 {
     for (size_t i = 0; i < static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT); i++)
     {
@@ -23,4 +31,11 @@ void LegalizerActionList::setOperandActionForClass(MirInstructionCategory instrC
             setOperandAction(static_cast<MirInstructionOpCode>(i), typeId, actionType);
         }
     }
+}
+
+void LegalizerActionList::setOperandActionForClass(MirInstructionCategory instrCategory,
+                                                   MirType *type,
+                                                   TargetLegalizerActionType actionType)
+{
+    setOperandActionForClass(instrCategory, type->getId(), actionType);
 }

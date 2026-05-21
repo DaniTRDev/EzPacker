@@ -39,6 +39,8 @@ class DummyABIDesc : public ABIDesc
 
     void setArgLoc(size_t id, const ArgLocation &loc) { m_argLocs[id] = loc; }
 
+    const char *getName() const override { return "DummyAbi"; }
+    
     size_t getAbiAlignment(MirType *type) const
     {
         if (!type)

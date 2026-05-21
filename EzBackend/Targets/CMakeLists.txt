@@ -1,1 +1,1 @@
-#add_subdirectory(X64)
+add_subdirectory(X64)

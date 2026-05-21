@@ -13,7 +13,8 @@ struct LegalizerHandlerResult
 class LegalizerHandlerList
 {
   public:
-    using Callback = LegalizerHandlerResult(TypedPoolLinkedList<struct MirInstruction> *instrList,
+    using Callback = LegalizerHandlerResult(MirEmitter *emitter,
+                                            TypedPoolLinkedList<struct MirInstruction> *instrList,
                                             TypedPoolLinkedList<class MirInstruction>::Iterator it);
 
     /**
@@ -23,7 +24,7 @@ class LegalizerHandlerList
      * @param handler
      */
     void addInstructionHandler(MirInstructionOpCode opcode, Callback *handler);
-    
+
     /**
      * Retrieves the list of legalization handlers registered for a specific instruction opcode.
      * @param opcode
@@ -33,7 +34,7 @@ class LegalizerHandlerList
 
   private:
     std::array<std::vector<Callback *>, static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT)> m_instructionHandlers;
-    std::unordered_map<size_t, Callback*> m_otherCallbacks; // Callbacks that are not related to instructions.
+    std::unordered_map<size_t, Callback *> m_otherCallbacks; // Callbacks that are not related to instructions.
 };
 
 #endif // EZPACKER_LEGALIZERHANDLER_H

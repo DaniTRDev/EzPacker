@@ -35,6 +35,8 @@ class AllocatorMockABIDesc : public ABIDesc
         return align;
     }
 
+    const char *getName() const override { return "DummyAbi"; }
+    
     /**
      * Returns the preferred alignment for the given type.
      * Used for global variables to optimize CPU cache line fetching.

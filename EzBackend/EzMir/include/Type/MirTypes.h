@@ -14,6 +14,7 @@ class MirTypes
 
     MirType *getVoidType() const { return m_voidType; }
 
+    MirType *getInt1Type() const { return m_int1Type; }
     MirType *getInt8Type() const { return m_int8Type; }
     MirType *getInt16Type() const { return m_int16Type; }
     MirType *getInt32Type() const { return m_int32Type; }
@@ -32,7 +33,7 @@ class MirTypes
         // Pointers don't have pre adjusted size, depends on architecture.
         auto *subTypes = m_ctx->getTypePool()->createLinkedList<MirType>();
         m_ctx->getTypePool()->appendToListBack(subTypes, srcType);
-        
+
         return m_ctx->createType(MirTypeKind::Pointer, 0, subTypes, std::format("{}*", srcType->getName()));
     }
 
@@ -46,6 +47,7 @@ class MirTypes
 
         m_voidType = m_ctx->createType(MirTypeKind::Void, 0, nullptr, "void");
 
+        m_int1Type = m_ctx->createType(MirTypeKind::Integer, 1, nullptr, "i1");
         m_int8Type = m_ctx->createType(MirTypeKind::Integer, 1, nullptr, "i8");
         m_int16Type = m_ctx->createType(MirTypeKind::Integer, 2, nullptr, "i16");
         m_int32Type = m_ctx->createType(MirTypeKind::Integer, 4, nullptr, "i32");
@@ -60,6 +62,7 @@ class MirTypes
 
     MirType *m_voidType;
 
+    MirType *m_int1Type;
     MirType *m_int8Type;
     MirType *m_int16Type;
     MirType *m_int32Type;

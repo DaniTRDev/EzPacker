@@ -33,6 +33,8 @@ class DummyABIDescLegalizer : public ABIDesc
         return align;
     }
 
+    const char *getName() const override { return "DummyAbi"; }
+
     /**
      * Returns the preferred alignment for the given type.
      * Used for global variables to optimize CPU cache line fetching.
@@ -43,7 +45,8 @@ class DummyABIDescLegalizer : public ABIDesc
 };
 
 static bool customHandlerCalled = false;
-static LegalizerHandlerResult DummyCustomHandler(TypedPoolLinkedList<struct MirInstruction> *instrList,
+static LegalizerHandlerResult DummyCustomHandler(MirEmitter *emitter,
+                                                 TypedPoolLinkedList<struct MirInstruction> *instrList,
                                                  TypedPoolLinkedList<class MirInstruction>::Iterator it)
 {
     customHandlerCalled = true;

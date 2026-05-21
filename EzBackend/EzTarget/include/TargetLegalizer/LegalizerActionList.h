@@ -39,7 +39,7 @@ class LegalizerActionList
      * @param typeId
      * @return
      */
-    uint8_t getOperandAction(MirInstructionOpCode opcode, MirId typeId) const;
+    TargetLegalizerActionType getOperandAction(MirInstructionOpCode opcode, MirId typeId) const;
 
     /**
      * Sets the action for when a specific instruction is found with a specific destination operand type.
@@ -47,7 +47,15 @@ class LegalizerActionList
      * @param typeId
      * @param actionType
      */
-    void setOperandAction(MirInstructionOpCode opcode, MirId typeId, uint8_t actionType);
+    void setOperandAction(MirInstructionOpCode opcode, MirId typeId, TargetLegalizerActionType actionType);
+
+    /**
+     * Sets the action for when a specific instruction is found with a specific destination operand type.
+     * @param opcode
+     * @param type
+     * @param actionType
+     */
+    void setOperandAction(MirInstructionOpCode opcode, MirType *type, TargetLegalizerActionType actionType);
 
     /**
      * Sets the action for when any instruction of a specific category is found with a specific operand type. This will
@@ -56,7 +64,16 @@ class LegalizerActionList
      * @param typeId
      * @param actionType
      */
-    void setOperandActionForClass(MirInstructionCategory instrCategory, MirId typeId, uint8_t actionType);
+    void setOperandActionForClass(MirInstructionCategory instrCategory, MirId typeId, TargetLegalizerActionType actionType);
+
+    /**
+     * Sets the action for when any instruction of a specific category is found with a specific operand type. This will
+     * apply to all instructions of the category.
+     * @param instrCategory
+     * @param type
+     * @param actionType
+     */
+    void setOperandActionForClass(MirInstructionCategory instrCategory, MirType *type, TargetLegalizerActionType actionType);
 
   private:
     /*
@@ -67,7 +84,8 @@ class LegalizerActionList
      * setOperandAction(ADD, i8, Action_PromoteOperand) -> Whenever an ADD instruction is found with an i8 operand, the
      * operand will be promoted.
      */
-    std::array<std::map<size_t, uint8_t>, static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT)> m_operandActions;
+    std::array<std::map<size_t, TargetLegalizerActionType>, static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT)>
+            m_operandActions;
 };
 
 #endif // EZPACKER_LEGALIZERACTIONLIST_H

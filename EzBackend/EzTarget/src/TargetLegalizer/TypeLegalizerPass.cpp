@@ -18,7 +18,8 @@ bool TypeLegalizerPass::run(TypedPoolLinkedList<struct MirInstruction> *instrLis
     for (auto operandIt = operands->begin(); operandIt != operands->end(); ++operandIt, operandId++)
     {
         MirOperand *op = *operandIt;
-        uint8_t actionType = m_ctx->getActionList()->getOperandAction(opcode, op->getSizeInBytes() * 8);
+        TargetLegalizerActionType actionType =
+                m_ctx->getActionList()->getOperandAction(opcode, op->getMirType()->getId());
 
         if (actionType != Action_None)
         {
@@ -28,7 +29,7 @@ bool TypeLegalizerPass::run(TypedPoolLinkedList<struct MirInstruction> *instrLis
                 bool res = false;
                 for (auto handler : m_ctx->getHandlerList()->getInstructionHandlers(opcode))
                 {
-                    res |= handler(instrList, it).m_modified;
+                    res |= handler(emitter, instrList, it).m_error;
                 }
 
                 return res;
@@ -46,6 +47,8 @@ bool TypeLegalizerPass::run(TypedPoolLinkedList<struct MirInstruction> *instrLis
                 }
             }
         }
+
+        return true;
     }
 
     return false;

@@ -22,6 +22,8 @@ class AArch64ABIDesc : public ABIDesc
         setStackFrame(29); // FP
     }
 
+    const char *getName() const override { return "AArch64"; }
+
     ArgLocation getArgLoc(size_t id, MirType *type) const override
     {
         // Simplified: first 8 args in registers X0-X7
@@ -34,12 +36,12 @@ class AArch64ABIDesc : public ABIDesc
         }
         return ArgLocation(); // Others on stack, not handled here
     }
-    
+
     size_t getAbiAlignment(MirType *type) const
     {
         if (!type)
             return 1;
-        
+
         // Handle Basic Types (Integers, Floats)
         size_t size = type->getTotalSizeInBytes();
 
@@ -65,7 +67,8 @@ static bool loadHandlerCalled = false;
 static bool storeHandlerCalled = false;
 
 // --- Custom Handlers ---
-static LegalizerHandlerResult AArch64LoadHandler(TypedPoolLinkedList<struct MirInstruction> *instrList,
+static LegalizerHandlerResult AArch64LoadHandler(MirEmitter *emitter,
+                                                 TypedPoolLinkedList<struct MirInstruction> *instrList,
                                                  TypedPoolLinkedList<class MirInstruction>::Iterator it)
 {
     loadHandlerCalled = true;
@@ -74,13 +77,14 @@ static LegalizerHandlerResult AArch64LoadHandler(TypedPoolLinkedList<struct MirI
     MirOperand *addr = loadInstr->getOperands()->get<MirOperand>(1);
 
     // Replace LOAD with a dummy MOV instruction for test purposes
-    g_emitter->emitMOV(dest, addr);
+    emitter->emitMOV(dest, addr);
     instrList->m_owner->removeFromList(instrList, it);
 
     return { false, true, true };
 }
 
-static LegalizerHandlerResult AArch64StoreHandler(TypedPoolLinkedList<struct MirInstruction> *instrList,
+static LegalizerHandlerResult AArch64StoreHandler(MirEmitter *emitter,
+                                                  TypedPoolLinkedList<struct MirInstruction> *instrList,
                                                   TypedPoolLinkedList<class MirInstruction>::Iterator it)
 {
     storeHandlerCalled = true;
@@ -89,7 +93,7 @@ static LegalizerHandlerResult AArch64StoreHandler(TypedPoolLinkedList<struct Mir
     MirOperand *src = storeInstr->getOperands()->get<MirOperand>(2);
 
     // Replace STORE with a dummy MOV instruction for test purposes
-    g_emitter->emitMOV(addr, src); // Not a valid semantic replacement, just for testing
+    emitter->emitMOV(addr, src); // Not a valid semantic replacement, just for testing
     instrList->m_owner->removeFromList(instrList, it);
 
     return { false, true, true };
@@ -118,7 +122,7 @@ class AArch64FlowTests : public ::testing::Test
         emitterCtx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(emitterCtx.get());
         g_emitter = emitter; // Set global emitter
-        
+
         targetDesc = new TargetDesc(&abi, TargetEndianness::LittleEndian, "AArch64");
         actionList = new LegalizerActionList();
         handlerList = new LegalizerHandlerList();

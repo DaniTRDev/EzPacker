@@ -44,13 +44,15 @@ class RegisterAllocatorPass : public IMirTransformPass
              class MirPassManager *passManager) override;
 
     const char *getName() const override;
-    
+
     MirPassIterationPlace getIterationPlace() const override;
-    
+
   private:
     void buildGraph(class MirFunction *func, const LivenessResult &liveness);
     void simplifyAndSelect();
     bool rewriteProgram(class MirFunction *func);
+
+    size_t getKForType(MirType *type);
 
     // Helpers to extract defined/used registers from an instruction
     std::vector<MirRegister *> getDefs(class MirInstruction *instr);
@@ -68,6 +70,7 @@ class RegisterAllocatorPass : public IMirTransformPass
 
     size_t m_k; // Number of available physical registers
     std::vector<PhysicalRegId> m_allocatableRegs;
+    std::unordered_set<MirRegister*> m_spillExempt;
 };
 
 #endif // EZPACKER_REGISTERALLOCATORPASS_H

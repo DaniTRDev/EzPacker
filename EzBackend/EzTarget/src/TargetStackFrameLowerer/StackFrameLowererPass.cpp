@@ -1,4 +1,80 @@
 #include "TargetStackFrameLowerer/StackFrameLowerer.h"
+#include <unordered_set>
+#include <vector>
+#include <algorithm>
+
+/**
+ * Helper function to replace all abstract FrameIndex memory operands with
+ * physical Base + Displacement operands relative to the Frame Pointer.
+ */
+static void rewriteFrameIndices(MirEmitter *emitter, ABIDesc *abiDesc, MirFunction *func)
+{
+    MirType *ptrType = emitter->getContext()->getIntegerTypeBySize(abiDesc->getRegSizeInBits() / 8);
+    MirRegister *fpReg = emitter->createPhysicalRegister(ptrType, abiDesc->getStackFrameReg());
+    int64_t ptrSize = abiDesc->getRegSizeInBits() / 8;
+
+    auto stackObjList = func->getStackFrame()->getStackFrameObjects();
+
+    for (MirBlock *block : *func->getBlocks())
+    {
+        for (MirInstruction *instr : *block->getInstructions())
+        {
+            auto operands = instr->getOperands();
+            for (auto opIt = operands->begin(); opIt != operands->end(); ++opIt)
+            {
+                MirOperand *op = *opIt;
+                if (op && op->isOfType<MirMemory>())
+                {
+                    MirMemory *mem = op->get<MirMemory>();
+
+                    // Look for memory accesses where the base is a FrameIndex
+                    if (mem->getBase() && mem->getBase()->isOfType<MirFrameIndex>())
+                    {
+                        MirFrameIndex *frameIdx = mem->getBase()->get<MirFrameIndex>();
+
+                        // Look up the specific stack frame object by ID
+                        StackFrameObject *targetObj = nullptr;
+                        for (auto objIt = stackObjList->begin(); objIt != stackObjList->end(); ++objIt)
+                        {
+                            if ((*objIt)->m_id == frameIdx->getFrameId())
+                            {
+                                targetObj = *objIt;
+                                break;
+                            }
+                        }
+
+                        if (!targetObj)
+                            continue;
+
+                        int64_t displacement = 0;
+
+                        // Identify Parameters vs Locals based on the source value.
+                        // Based on your logs, source == 0 is Parameter, source == 2 is Spill.
+                        if (targetObj->m_source == StackFrameObjectSource::Parameter)
+                        {
+                            // PARAMETERS: Reside ABOVE the saved RBP and Return Address.
+                            // Address = RBP + (2 * PtrSize) + LogicalOffset
+                            displacement = targetObj->m_offset + (ptrSize * 2);
+                        }
+                        else
+                        {
+                            // LOCALS & SPILLS: Reside BELOW the physical RBP.
+                            // Address = RBP - (LogicalOffset + Size)
+                            displacement = -(static_cast<int64_t>(targetObj->m_offset + targetObj->m_sizeInBytes));
+                        }
+
+                        // Create the physical immediate displacement
+                        MirInteger *displImm = emitter->createImmediateInteger(ptrType, displacement);
+
+                        // Replace the abstract FrameIndex memory with physical RBP + Displacement
+                        MirMemory *newMem = emitter->createMemoryOperand(mem->getMirType(), fpReg, displImm);
+                        opIt.m_curr->m_object = newMem;
+                    }
+                }
+            }
+        }
+    }
+}
 
 StackFrameLowererPass::StackFrameLowererPass(StackFrameLowererContext *ctx) : m_ctx(ctx) {}
 
@@ -9,131 +85,79 @@ bool StackFrameLowererPass::run(TypedPoolLinkedList<struct MirFunction> *funcLis
     MirFunction *func = *it;
     MirEmitterContext *ctx = m_ctx->getEmitter()->getContext();
 
-    // Calculate stack frame offsets for all StackFrameObjects in the function, and determine the total size of the
-    // stack frame.
+    // 1. Calculate offsets for locals and spills
     if (!calculateStackFrameOffsets(func))
     {
-        // TODO: Show error.
         return false;
     }
 
-    // Insert the Prologue at the very beginning of the Entry Block
+    // 2. Insert the Prologue at the very beginning of the Entry Block
     MirBlock *entryBlock = func->getEntryPoint();
     if (entryBlock->getInstructions()->m_numElems > 0)
-    {
-        // Bind the emitter to insert BEFORE the first instruction
         ctx->setInsertPoint(entryBlock, entryBlock->getInstructions()->begin());
-    }
     else
         ctx->setInsertPoint(entryBlock);
 
-    insertPrologue(); // Emits SUB SP, FP, etc.
+    insertPrologue();
 
-    // Trace every RET instruction to insert the Epilogue
+    // 3. Trace every RET instruction to insert the Epilogue
     for (MirBlock *block : *func->getBlocks())
     {
         auto *instrList = block->getInstructions();
-
-        // Skip empty blocks
         if (instrList->m_numElems == 0)
             continue;
 
         auto *tailNode = instrList->m_tail;
         MirInstruction *lastInstr = tailNode->m_object;
 
-        // Check if the block terminates with a Return
         if (lastInstr->getOpCode() == MirInstructionOpCode::RET)
         {
-            // Construct a forward iterator pointing directly at the RET node
             TypedPoolLinkedList<MirInstruction>::Iterator lastInstrIt{ tailNode };
-
-            // Bind the emitter to insert BEFORE the RET instruction
             ctx->setInsertPoint(block, lastInstrIt);
-
-            // Emits MOV SP, FP; LOAD FP, [SP]; ADD SP, fpSize
             insertEpilogue();
         }
     }
+
+    // 4. CRITICAL: Rewrite all abstract FrameIndices into physical RBP addresses
+    rewriteFrameIndices(m_ctx->getEmitter(), m_ctx->getTargetDesc()->getABI(), func);
 
     return true;
 }
 
 bool StackFrameLowererPass::calculateStackFrameOffsets(MirFunction *func)
 {
-    ABIDesc *abiDesc = m_ctx->getTargetDesc()->getABI();
-    const auto &stackLayout = abiDesc->getStackLayout();
+    auto stackObjList = func->getStackFrame()->getStackFrameObjects();
+    int64_t currentLocalOffset = 0;
 
-    MirFunctionStackFrame *stackFrame = func->getStackFrame();
-    auto stackObjList = stackFrame->getStackFrameObjects();
-
-    // Track intervals of physical stack bytes that are locked down: [StartOffset, EndOffset]
-    std::vector<std::pair<int64_t, int64_t>> reservedIntervals;
-
-    // Process and lock fixed offsets
-    for (auto stackObjIt = stackObjList->begin(); stackObjIt != stackObjList->end(); ++stackObjIt)
+    for (auto objIt = stackObjList->begin(); objIt != stackObjList->end(); ++objIt)
     {
-        StackFrameObject *obj = *stackObjIt;
-        if (obj->m_offset != 0)
-        {
-            int64_t start = obj->m_offset;
-            int64_t end = start + static_cast<int64_t>(obj->m_sizeInBytes);
+        StackFrameObject *obj = *objIt;
 
-            // TODO: Report errors on collisions
-            reservedIntervals.push_back({ start, end });
-        }
-    }
-
-    // Sort intervals by start address to make scanning for free space easy
-    std::sort(reservedIntervals.begin(), reservedIntervals.end());
-
-    // Helper lambda to check if a proposed frame window collides with any fixed objects
-    auto collidesWithReserved = [&](int64_t start, int64_t end)
-    {
-        for (const auto &interval : reservedIntervals)
-        {
-            // Overlap condition: start1 < end2 AND start2 < end1
-            if (start < interval.second && interval.first < end)
-            {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    // Dynamically pack unallocated items
-    int64_t currentOffset = stackLayout.alignAddress(0);
-
-    for (auto stackObjIt = stackObjList->begin(); stackObjIt != stackObjList->end(); ++stackObjIt)
-    {
-        StackFrameObject *obj = *stackObjIt;
-
-        // Skip objects that were already handled in Phase 1
-        if (obj->m_offset != 0)
-        {
+        // Parameters already have fixed positive offsets assigned by the ABI lowerer.
+        // We skip them because they live in a completely different physical area (above RBP).
+        if (obj->m_source == StackFrameObjectSource::Parameter)
             continue;
-        }
 
-        // Keep pushing the object upward until we find a gap that
-        // doesn't collide with fixed layout constraints
-        while (true)
-        {
-            int64_t proposedStart = stackLayout.alignAddress(currentOffset);
-            int64_t proposedEnd = proposedStart + static_cast<int64_t>(obj->m_sizeInBytes);
+        // For locals and spills, pack them sequentially below RBP.
+        // Ensure the offset is aligned to the object's natural size (max 8-byte alignment)
+        int64_t align = obj->m_sizeInBytes;
+        if (align > 8)
+            align = 8;
+        if (align == 0)
+            align = 1;
 
-            if (!collidesWithReserved(proposedStart, proposedEnd))
-            {
-                // We found a safe gap! Assign the finalized physical offset to the MIR object
-                obj->m_offset = proposedStart;
-                currentOffset = proposedEnd;
-                break;
-            }
+        currentLocalOffset = (currentLocalOffset + align - 1) & ~(align - 1);
 
-            // If it collides, step forward by the target's minimal stack alignment unit
-            currentOffset = stackLayout.alignAddress(currentOffset + 1);
-        }
+        // Assign the logical offset (which rewriteFrameIndices will translate to negative)
+        obj->m_offset = currentLocalOffset;
+
+        // Advance by size for the next object
+        currentLocalOffset += obj->m_sizeInBytes;
     }
 
-    m_stackFrameEndOffset = abiDesc->getStackLayout().alignAddress(currentOffset);
+    // ABI strict requirement: Final stack frame size MUST be 16-byte aligned.
+    m_stackFrameEndOffset = (currentLocalOffset + 15) & ~15;
+
     return true;
 }
 
@@ -141,31 +165,26 @@ bool StackFrameLowererPass::insertPrologue()
 {
     ABIDesc *abiDesc = m_ctx->getTargetDesc()->getABI();
     MirEmitter *emitter = m_ctx->getEmitter();
-
     MirType *regType = emitter->getContext()->getIntegerTypeBySize(abiDesc->getRegSizeInBits() / 8);
 
     MirRegister *sp = emitter->createPhysicalRegister(regType, abiDesc->getStackReg());
     MirRegister *fp = emitter->createPhysicalRegister(regType, abiDesc->getStackFrameReg());
-
     int64_t fpSize = abiDesc->getRegSizeInBits() / 8;
 
-    // Allocate space on the stack for the old frame pointer
     MirInteger *fpSizeImm = emitter->createImmediateInteger(regType, fpSize);
-    emitter->emitSUB(sp, fpSizeImm); // sp = sp - fpSize
+    emitter->emitSUB(sp, fpSizeImm);
 
-    // Store the old frame pointer at [SP]
     MirInteger *zeroOffset = emitter->createImmediateInteger(regType, 0);
     MirMemory *mem = emitter->createMemoryOperand(regType, sp, zeroOffset);
     emitter->emitSTORE(mem, fp);
 
-    // 3. Establish the new frame pointer (FP = SP)
     emitter->emitMOV(fp, sp);
 
-    // Allocate the rest of the stack frame for local variables/spills
+    // Only allocate space if we actually have locals/spills
     if (m_stackFrameEndOffset > 0)
     {
         MirInteger *frameSizeImm = emitter->createImmediateInteger(regType, m_stackFrameEndOffset);
-        emitter->emitSUB(sp, frameSizeImm); // sp = sp - localVarsSize
+        emitter->emitSUB(sp, frameSizeImm);
     }
 
     return true;
@@ -175,29 +194,23 @@ bool StackFrameLowererPass::insertEpilogue()
 {
     ABIDesc *abiDesc = m_ctx->getTargetDesc()->getABI();
     MirEmitter *emitter = m_ctx->getEmitter();
-
     MirType *regType = emitter->getContext()->getIntegerTypeBySize(abiDesc->getRegSizeInBits() / 8);
 
     MirRegister *sp = emitter->createPhysicalRegister(regType, abiDesc->getStackReg());
     MirRegister *fp = emitter->createPhysicalRegister(regType, abiDesc->getStackFrameReg());
-
     int64_t fpSize = abiDesc->getRegSizeInBits() / 8;
 
-    // Discard local variables by restoring SP to where the old FP is saved
-    emitter->emitMOV(sp, fp); // sp = fp
+    emitter->emitMOV(sp, fp);
 
-    // Load the caller's frame pointer back from [SP]
     MirInteger *zeroOffset = emitter->createImmediateInteger(regType, 0);
     MirMemory *mem = emitter->createMemoryOperand(regType, sp, zeroOffset);
-    emitter->emitLOAD(fp, mem); // fp = [sp]
+    emitter->emitLOAD(fp, mem);
 
-    // Reclaim the space used by the saved frame pointer
     MirInteger *fpSizeImm = emitter->createImmediateInteger(regType, fpSize);
-    emitter->emitADD(sp, fpSizeImm); // sp = sp + fpSize
+    emitter->emitADD(sp, fpSizeImm);
 
     return true;
 }
 
 MirPassIterationPlace StackFrameLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
-
 const char *StackFrameLowererPass::getName() const { return "StackFrameLowererPass"; }

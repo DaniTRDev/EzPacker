@@ -17,7 +17,6 @@ enum class ExpectedOperandType : uint16_t
     Register = 1 << 0,        // MirRegister
     Integer = 1 << 1,         // MirInteger
     Double = 1 << 2,          // MirDouble
-    ConstantPoolRef = 1 << 3, // MirConstantPoolRef
     Memory = 1 << 4,          // MirMemory
     FrameIndex = 1 << 5,      // MirFrameIndex
     Reference = 1 << 6,       // MirReference (Blocks, Functions)
@@ -31,10 +30,10 @@ enum class ExpectedOperandType : uint16_t
     RegImm = Register | Integer | Double,
 
     // Any kind of memory address source (used for LEA)
-    AddressSource = Memory | FrameIndex | ConstantPoolRef,
+    AddressSource = Memory | FrameIndex,
 
     // Anything that can be read as a value
-    AnyValue = Register | Integer | Double | ConstantPoolRef,
+    AnyValue = Register | Integer | Double,
 
     Any = 0xFFFF
 };
