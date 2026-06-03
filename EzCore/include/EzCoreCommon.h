@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <list>
+#include <memory_resource>
 
 #include <EzLogger.h>
 

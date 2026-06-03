@@ -12,8 +12,4 @@
 
 #include "SourceManager/SourceManager.h"
 
-#include "TypedPool/StringPool.h"
-#include "TypedPool/TypedArrayPool.h"
-#include "TypedPool/TypedPool.h"
-
 #endif // EZCORE_H
