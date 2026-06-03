@@ -17,14 +17,18 @@ function(BuildEzCore)
             "include/EzCoreCommon.h"
             "include/MathUtils.h"
             "include/StringUtils.h"
-            "include/ErrorCollector/ErrorCollector.h"
-            "include/LogCollector/LogCollector.h"
+            "include/Diagnostics/DiagnosticBuilder.h"
+            "include/Diagnostics/DiagnosticCollector.h"
+            "include/Diagnostics/DiagnosticListener.h"
+            "include/Diagnostics/DiagnosticMessage.h"
+            "include/Diagnostics/DiagnosticScope.h"
             "include/SourceManager/SourceManager.h"
 
             "src/MathUtils.cpp"
-            "src/ErrorCollector/ErrorCollector.cpp"
-            "src/ErrorCollector/ErrorEmitter.cpp"
-            "src/LogCollector/LogCollector.cpp"
+            "src/Diagnostics/DiagnosticBuilder.cpp"
+            "src/Diagnostics/DiagnosticCollector.cpp"
+            "src/Diagnostics/DiagnosticMessage.cpp"
+            "src/Diagnostics/DiagnosticScope.cpp"
             "src/SourceManager/SourceManager.cpp"
     )
 

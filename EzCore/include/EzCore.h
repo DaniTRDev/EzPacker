@@ -5,11 +5,6 @@
 #include "MathUtils.h"
 #include "StringUtils.h"
 
-#include "ErrorCollector/ErrorCollector.h"
-#include "ErrorCollector/ErrorEmitter.h"
-
-#include "LogCollector/LogCollector.h"
-
 #include "SourceManager/SourceManager.h"
 
 #endif // EZCORE_H
