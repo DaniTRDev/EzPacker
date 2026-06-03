@@ -22,6 +22,13 @@ struct LineSourceRange
     size_t m_length; // Length of the line (excluding newline)
 };
 
+struct SourceFileEntry
+{
+    std::string name;
+    std::string content;
+    std::vector<LineSourceRange> lines;
+};
+
 /**
  * This class is responsible of debug symbols. It keeps references to the original content of
  * source files and translates references to content from the file.
@@ -69,13 +76,7 @@ class SourceManager
      * @returns The ID of the source file, or 0 if a source with the same name already exists.
      */
     size_t addSourceContent(const std::string &name, const std::string &content);
-
-    /**
-     * @brief Returns the working path of the source manager.
-     * @returns The working path.
-     */
-    const std::filesystem::path &getWorkingPath() const;
-
+    
     /**
      * @brief Resolves the given source file path to an absolute path based on the working directory.
      * @param sourceFile The path to resolve.
@@ -88,14 +89,14 @@ class SourceManager
      * @param ref The source reference.
      * @returns The raw line content, or an empty string if not found.
      */
-    std::string getRawLineContent(const SourceReference &ref);
+    std::string getRawLineContent(const SourceReference &ref) const;
 
     /**
      * @brief Returns the line content of the given reference.
      * @param ref The source reference.
      * @returns The line content.
      */
-    std::string getReferenceContent(const SourceReference &ref);
+    std::string getReferenceContent(const SourceReference &ref) const;
 
     /**
      * @brief Returns the source content for the given ID.
@@ -110,16 +111,11 @@ class SourceManager
      * @returns The source name.
      */
     std::string_view getSourceName(size_t id) const;
-
-  private:
+    
   private:
     std::filesystem::path m_workingPath;
-    // full file path, file content divided in lines.
-    std::map<size_t, std::vector<LineSourceRange>> m_sourceLines;
-    std::map<size_t, std::string> m_sources;
-
-    // id, name
-    std::map<size_t, std::string> m_sourcesNames;
+    std::unordered_map<std::string, size_t> m_pathToIdMap;
+    std::vector<SourceFileEntry> m_sourceFiles;
 };
 
 #endif // EZPACKER_SOURCEMANAGER_H
