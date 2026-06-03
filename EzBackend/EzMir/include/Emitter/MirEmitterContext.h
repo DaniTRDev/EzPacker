@@ -10,21 +10,27 @@
 #include "Function/MirFunction.h"
 #include "Type/MirType.h"
 
+/**
+ * A struct that contains information about global data.
+ */
 struct MirGlobalDataEntry
 {
     bool m_isReadOnly;
     bool m_uninitialized;
+    ConstantArray<uint8_t> m_data;
     MirType *m_dataType;
     size_t m_entryId;
-    ConstantArray<uint8_t> m_data;
 };
 
-// Clean internal state for tracking exactly where instructions go.
+/**
+ * Enumeration that contains the insertion mode that the emitter context will use.
+ */
 enum class InsertMode
 {
-    Append,
-    InsertBefore
+    Append,      // Back.
+    InsertBefore // Before a point.
 };
+
 struct InsertState
 {
     MirBlock *block{ nullptr };
@@ -40,7 +46,7 @@ class MirEmitterContext : public ErrorEmitter
 
     /**
      * Sets the emitter to append instructions to the end of the specified block.
-     * Replaces the old `bindToBlock` logic.
+     * Replaces the old `setInsertPoint` logic.
      * @return `false` when `block` is `nullptr`; otherwise `true`.
      */
     bool setInsertPoint(MirBlock *block);
@@ -50,20 +56,12 @@ class MirEmitterContext : public ErrorEmitter
      * The sequence of emitted instructions will be automatically preserved.
      */
     void setInsertPoint(MirBlock *block, TypedPoolLinkedList<MirInstruction>::Iterator insertBeforeIt);
-
-    /**
-     * Legacy wrapper for backward compatibility.
-     */
-    bool bindToBlock(MirBlock *block) { return setInsertPoint(block); }
-
+    
     /**
      * Returns the block currently bound for instruction emission.
      */
-    MirBlock *getCurrentBoundBlock() const;
-
-    bool doesTypeExist(size_t typeId) const;
-    bool doesTypeExist(const std::string_view &typeName) const;
-
+    MirBlock *getCurrentBlock() const;
+    
     MirBlock *createBlock();
     MirBlock *getBlockFromRef(const MirReference &ref) const;
 
@@ -88,17 +86,6 @@ class MirEmitterContext : public ErrorEmitter
     createGlobalString(const std::string_view &str, bool includeNullTerminator = true, bool isReadOnly = true);
 
     MirGlobalDataEntry *getGlobalDataEntryFromId(size_t entryId) const;
-
-    MirType *createType(MirTypeKind kind,
-                        size_t totalSizeInBytes,
-                        TypedPoolLinkedList<MirType> *subTypes,
-                        const std::string_view &name);
-    /**
-     * Finds and returns an integer MirType of the specified size.
-     * Returns nullptr if no such type has been created yet.
-     */
-    MirType *getIntegerTypeBySize(size_t sizeInBytes);
-    MirType *getMirTypeById(size_t id);
 
     TypedPool *getBlockPool();
     TypedPool *getDataEntryPool();
@@ -126,7 +113,6 @@ class MirEmitterContext : public ErrorEmitter
     TypedPool m_functionParameterPool;
     TypedPool m_instructionPool;
     TypedPool m_operandPool;
-    TypedPool m_typePool;
     TypedPool m_stackFramePool;
     TypedPool m_stackObjectPool; // Objects inside frames.
     TypedArrayPool<uint8_t> m_dataPool;
@@ -137,10 +123,8 @@ class MirEmitterContext : public ErrorEmitter
 
     std::map<size_t, MirFunction *> m_blockIdToFunc;
     std::map<size_t, MirFunction *> m_idToFunctionMap;
-    std::map<size_t, MirType *> m_idToTypeMap;
     std::map<size_t, MirBlock *> m_idToBlockMap;
     std::map<size_t, MirGlobalDataEntry *> m_idToGlobalDataEntry;
-    std::set<std::string_view> m_typeNames;
     std::shared_ptr<class MirTypes> m_types;
 };
 

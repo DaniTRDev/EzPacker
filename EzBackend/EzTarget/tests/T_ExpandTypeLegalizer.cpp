@@ -71,7 +71,7 @@ class ExpandTypeLegalizerTests : public ::testing::Test
 
         ec->beginScope();
         MirBlock *block = emitterCtx->createBlock();
-        emitterCtx->bindToBlock(block);
+        emitterCtx->setInsertPoint(block);
     }
 
     void TearDown() override
@@ -93,14 +93,14 @@ TEST_F(ExpandTypeLegalizerTests, ExpandAddInstruction)
 
     MirInstruction *instr = emitter->emitADD(dest, src);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool result = StandardLegalizers::expandTypeLegalizer(legalizerCtx, list, it);
 
     EXPECT_TRUE(result);
 
-    auto newList = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto newList = emitterCtx->getCurrentBlock()->getInstructions();
 
     // We expect ADD (low) and ADC (high) instructions to be generated, and the original ADD removed.
     auto nextIt = newList->begin();
@@ -132,14 +132,14 @@ TEST_F(ExpandTypeLegalizerTests, ExpandInstructionWithImmediate)
 
     MirInstruction *instr = emitter->emitADD(dest, imm);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool result = StandardLegalizers::expandTypeLegalizer(legalizerCtx, list, it);
 
     EXPECT_TRUE(result);
 
-    auto newList = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto newList = emitterCtx->getCurrentBlock()->getInstructions();
     auto nextIt = newList->begin();
 
     ASSERT_NE(nextIt, newList->end());
@@ -170,7 +170,7 @@ TEST_F(ExpandTypeLegalizerTests, ExpandInvalidOpcodeTriggersError)
     // TRUNC has NO_EQUIV, meaning it doesn't have a linear equivalent to expand to.
     MirInstruction *instr = emitter->emitTRUNC(dest, dest);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool result = StandardLegalizers::expandTypeLegalizer(legalizerCtx, list, it);
@@ -185,13 +185,13 @@ TEST_F(ExpandTypeLegalizerTests, ExpandSameRegisterReusesExpansion)
     // Both operands use the same register
     MirInstruction *instr = emitter->emitADD(dest, dest);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool result = StandardLegalizers::expandTypeLegalizer(legalizerCtx, list, it);
     EXPECT_TRUE(result);
 
-    auto newList = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto newList = emitterCtx->getCurrentBlock()->getInstructions();
     auto nextIt = newList->begin();
 
     ASSERT_NE(nextIt, newList->end());

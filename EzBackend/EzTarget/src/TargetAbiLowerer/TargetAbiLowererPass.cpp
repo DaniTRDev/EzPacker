@@ -189,7 +189,7 @@ bool TargetAbiLowererPass::lowerCallSite(MirBlock *block,
             // Because the argument is safely in memory, it doesn't need to be passed
             // as an operand to the CALL instruction anymore. We remove it from the list.
             // (Note: removeFromList returns the NEXT iterator, making it safe for while-loops)
-            opIt = emitterCtx->getOperandPool()->removeFromList(operands, opIt);
+            opIt = operands->remove(opIt);
             modified = true;
         }
         else if (loc.isSplit())
@@ -232,7 +232,7 @@ bool TargetAbiLowererPass::lowerReturnSite(MirBlock *block,
 
         // Emit: MOV physRetReg, retValue
         emitter->emit(MirInstructionOpCode::MOV, { physRegOp, retValue });
-        operands->m_owner->removeFromList(operands, operands->begin());
+        operands->remove(operands->begin());
     }
     else if (loc.isStack())
     {

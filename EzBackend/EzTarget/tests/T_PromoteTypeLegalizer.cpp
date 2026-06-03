@@ -69,7 +69,7 @@ class PromoteTypeLegalizerTests : public ::testing::Test
 
         ec->beginScope();
         MirBlock *block = ctx->createBlock();
-        ctx->bindToBlock(block);
+        ctx->setInsertPoint(block);
     }
 
     void TearDown() override
@@ -85,7 +85,7 @@ TEST_F(PromoteTypeLegalizerTests, IgnoreLegalSizedRegister)
     MirRegister *r = emitter->createVirtualRegister(emitter->getContext()->getIntegerTypeBySize(8)); // 8 bytes
     MirInstruction *instr = emitter->emitMOV(r, r);
 
-    auto it = ctx->getCurrentBoundBlock()->getInstructions()->begin();
+    auto it = ctx->getCurrentBlock()->getInstructions()->begin();
     auto opIt = instr->getOperands()->begin();
 
     bool modified = StandardLegalizers::promoteTypeLegalizer(emitter, targetDesc, it, opIt, 0);
@@ -98,7 +98,7 @@ TEST_F(PromoteTypeLegalizerTests, PromoteOutputRegister)
             emitter->getContext()->getIntegerTypeBySize(4)); // 4 bytes, smaller than 8 bytes
     MirInstruction *instr = emitter->emitMOV(r, r);
 
-    auto it = ctx->getCurrentBoundBlock()->getInstructions()->begin();
+    auto it = ctx->getCurrentBlock()->getInstructions()->begin();
     auto opIt = instr->getOperands()->begin(); // Destination operand (Write)
 
     bool modified = StandardLegalizers::promoteTypeLegalizer(emitter, targetDesc, it, opIt, 0);
@@ -109,7 +109,7 @@ TEST_F(PromoteTypeLegalizerTests, PromoteOutputRegister)
     // So the list should be MOV, TRUNC.
     auto nextIt = it;
     ++nextIt;
-    EXPECT_NE(nextIt, ctx->getCurrentBoundBlock()->getInstructions()->end());
+    EXPECT_NE(nextIt, ctx->getCurrentBlock()->getInstructions()->end());
     EXPECT_EQ((*nextIt)->getOpCode(), MirInstructionOpCode::TRUNC);
 }
 
@@ -119,7 +119,7 @@ TEST_F(PromoteTypeLegalizerTests, PromoteInputRegister)
             emitter->getContext()->getIntegerTypeBySize(4)); // 4 bytes, smaller than 8 bytes
     MirInstruction *instr = emitter->emitMOV(r, r);
 
-    auto it = ctx->getCurrentBoundBlock()->getInstructions()->begin();
+    auto it = ctx->getCurrentBlock()->getInstructions()->begin();
     auto opIt = instr->getOperands()->begin();
     ++opIt; // Source operand (Input)
 
@@ -129,7 +129,7 @@ TEST_F(PromoteTypeLegalizerTests, PromoteInputRegister)
 
     // We expect an EXT (SEXT or ZEXT) instruction emitted BEFORE this one.
     // So the list should be ZEXT/SEXT, MOV.
-    auto firstIt = ctx->getCurrentBoundBlock()->getInstructions()->begin();
+    auto firstIt = ctx->getCurrentBlock()->getInstructions()->begin();
     EXPECT_NE((*firstIt)->getOpCode(), MirInstructionOpCode::MOV);
     EXPECT_TRUE((*firstIt)->getOpCode() == MirInstructionOpCode::ZEXT ||
                 (*firstIt)->getOpCode() == MirInstructionOpCode::SEXT);
@@ -142,7 +142,7 @@ TEST_F(PromoteTypeLegalizerTests, PromoteImmediate)
 
     MirInstruction *instr = emitter->emitMOV(r, i1); // 4-byte int
 
-    auto it = ctx->getCurrentBoundBlock()->getInstructions()->begin();
+    auto it = ctx->getCurrentBlock()->getInstructions()->begin();
     auto opIt = instr->getOperands()->begin();
     ++opIt; // Source operand
 

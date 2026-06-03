@@ -28,5 +28,5 @@ TypedPoolLinkedList<MirOperand *> *MirFunction::getParameters() { return m_param
 
 void MirFunction::appendParameter(MirRegister *param, const char *name)
 {
-    m_parameters->m_owner->createAndAppendToListBack<MirRegister *>(m_parameters, param);
+    m_parameters->createAndAppendBack(param);
 }

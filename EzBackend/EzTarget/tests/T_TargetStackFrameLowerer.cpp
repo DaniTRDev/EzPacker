@@ -118,7 +118,7 @@ TEST_F(TargetStackFrameLowererTests, CalculatesOffsetsCorrectly)
 
     // Dummy block with RET to satisfy lowerer
     MirBlock *entryBlock = func->getEntryPoint();
-    emitterCtx->bindToBlock(entryBlock);
+    emitterCtx->setInsertPoint(entryBlock);
     emitter->emit(MirInstructionOpCode::RET, {});
 
     EXPECT_TRUE(runPass());
@@ -147,7 +147,7 @@ TEST_F(TargetStackFrameLowererTests, InsertsPrologueAndEpilogue)
     stackFrame->createLocalObject(16, 8);
 
     MirBlock *entryBlock = func->getEntryPoint();
-    emitterCtx->bindToBlock(entryBlock);
+    emitterCtx->setInsertPoint(entryBlock);
     
     MirRegister *vreg = emitter->createVirtualRegister(int64Type);
     emitter->emit(MirInstructionOpCode::MOV, { vreg, vreg }); // Dummy
@@ -200,7 +200,7 @@ TEST_F(TargetStackFrameLowererTests, EpilogueInMultipleBlocks)
     emitter->emit(MirInstructionOpCode::RET, {});
 
     MirBlock *block2 = emitterCtx->createBlock();
-    emitterCtx->bindToBlock(block2);
+    emitterCtx->setInsertPoint(block2);
     emitter->emit(MirInstructionOpCode::RET, {});
 
     EXPECT_TRUE(runPass());

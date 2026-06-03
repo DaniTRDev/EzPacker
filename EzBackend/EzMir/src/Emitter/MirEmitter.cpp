@@ -1,5 +1,5 @@
 #include "Emitter/MirEmitter.h"
-#include "Type/MirTypes.h"
+#include "Type/MirTypeTable.h"
 
 MirEmitter::MirEmitter(MirEmitterContext *ctx) : m_currentBlock(nullptr)
 {
@@ -274,7 +274,7 @@ MirReference *MirEmitter::createBlockRef(MirBlock *block)
     {
         LOG_DEBUG(std::format(" ---- Creating MirReference from block (id: {})", block->getId()), "MirEmitter");
         return m_ctx->getOperandPool()->create<MirReference>(
-                m_ctx->getTypes()->getPtr(m_ctx->getTypes()->getInt8Type()),
+                m_ctx->getTypes()->getPtr(m_ctx->getTypes()->getVoidType()),
                 MirReferenceType::Block,
                 block->getId());
     }
@@ -298,7 +298,7 @@ bool MirEmitter::emitOperands(MirInstruction *instr, const std::initializer_list
             return false; // Safety check
         }
 
-        if (!operandPool->appendToListBack<MirOperand, MirOperand>(instructionOperandList, operand))
+        if (!instructionOperandList->appendBack(operand))
         {
             return false;
         }

@@ -16,15 +16,14 @@ enum class ErrorAction
 
 enum class ErrorSeverity : uint8_t
 {
-    NoError = 0, // It's just an information message.
     Warning = 1, // Not really an error, just something "weird" that the developer may want to know.
 
     Soft = 2, /*
-               * A parser wasn't able to identify the AstNode.
+               * An error that will be shown if a fatal error is risen (as a TRACE).
                */
 
     Fatal = 3 /*
-               * A parser has identified that what's parsing is really its AstNode but it's malformed.
+               * A component reported an error that must abort the execution.
                */
 };
 

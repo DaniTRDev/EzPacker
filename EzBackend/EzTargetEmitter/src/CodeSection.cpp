@@ -15,7 +15,7 @@ bool CodeSection::addReloc(const CodeRelocation &reloc)
         throw std::runtime_error("Internal Compiler Error: Relocation already exists");
     }
 
-    m_relocations->m_owner->createAndAppendToListBack<CodeRelocation>(m_relocations, reloc);
+    m_relocations->createAndAppendBack(reloc);
     return true;
 }
 

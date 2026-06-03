@@ -17,6 +17,7 @@ set(EZMIR_FILES_LIST
         "include/Operand/MirOperands.h"
         "include/Printer/MirPrinter.h"
         "include/Type/MirType.h"
+        "include/Type/MirTypeTable.h"
         "include/MirPass/Passes/CodeFlowAnalysis.h"
         "include/MirPass/Passes/LivenessAnalysis.h"
 
@@ -31,6 +32,7 @@ set(EZMIR_FILES_LIST
         "src/MirPass/Passes/LivenessAnalysis.cpp"
         "src/Printer/MirPrinter.cpp"
         "src/Type/MirType.cpp"
+        "src/Type/MirTypeTable.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzMir"

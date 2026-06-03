@@ -13,7 +13,7 @@ class CodeFlowAnalysisTests : public ::testing::Test
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
     std::shared_ptr<MirEmitterContext> ctx;
-    std::shared_ptr<MirTypes> m_types;
+    std::shared_ptr<MirTypeTable> m_types;
     MirEmitter *emitter;
     MirFunction *func;
     MirPassManager *pm;
@@ -26,11 +26,11 @@ class CodeFlowAnalysisTests : public ::testing::Test
         ctx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(ctx.get());
 
-        m_types = std::make_shared<MirTypes>();
+        m_types = std::make_shared<MirTypeTable>();
         m_types->initialize(ctx.get());
 
         func = ctx->createFunction(m_types->getVoidType(), nullptr, "test");
-        ctx->bindToBlock(*func->getBlocks()->begin());
+        ctx->setInsertPoint(*func->getBlocks()->begin());
 
         pm = new MirPassManager();
         pass = new CodeFlowAnalysis(emitter);
@@ -55,7 +55,7 @@ TEST_F(CodeFlowAnalysisTests, EmptyFunctionFails)
 TEST_F(CodeFlowAnalysisTests, SingleBlock)
 {
     MirBlock *b1 = ctx->createBlock();
-    ctx->bindToBlock(b1);
+    ctx->setInsertPoint(b1);
     emitter->emitNOP();
 
     EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
@@ -70,10 +70,10 @@ TEST_F(CodeFlowAnalysisTests, UnconditionalJump)
     MirBlock *b1 = ctx->createBlock();
     MirBlock *b2 = ctx->createBlock();
 
-    ctx->bindToBlock(b1);
+    ctx->setInsertPoint(b1);
     emitter->emitJMP(emitter->createBlockRef(b2));
 
-    ctx->bindToBlock(b2);
+    ctx->setInsertPoint(b2);
     emitter->emitNOP();
 
     EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
@@ -84,10 +84,10 @@ TEST_F(CodeFlowAnalysisTests, MultipleBlocksFallthrough)
     MirBlock *b1 = ctx->createBlock();
     MirBlock *b2 = ctx->createBlock();
 
-    ctx->bindToBlock(b1);
+    ctx->setInsertPoint(b1);
     emitter->emitNOP(); // Implicit fallthrough to b2
 
-    ctx->bindToBlock(b2);
+    ctx->setInsertPoint(b2);
     emitter->emitNOP();
 
     EXPECT_TRUE(pass->run(func->getBlocks(), func->getBlocks()->begin(), pm));
@@ -96,7 +96,7 @@ TEST_F(CodeFlowAnalysisTests, MultipleBlocksFallthrough)
 TEST_F(CodeFlowAnalysisTests, ReturnInstruction)
 {
     MirBlock *b1 = ctx->createBlock();
-    ctx->bindToBlock(b1);
+    ctx->setInsertPoint(b1);
 
     MirRegister *r = emitter->createVirtualRegister(m_types->getFloat64Type());
     emitter->emitRET(r);

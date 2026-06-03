@@ -26,7 +26,7 @@ class MirEmitterTests : public ::testing::Test
 
         ec->beginScope();
         MirBlock *block = ctx->createBlock();
-        ctx->bindToBlock(block);
+        ctx->setInsertPoint(block);
     }
 
     void TearDown() override

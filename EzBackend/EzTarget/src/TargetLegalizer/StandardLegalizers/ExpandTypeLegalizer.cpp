@@ -68,7 +68,7 @@ bool StandardLegalizers::expandTypeLegalizer(LegalizerContext *ctx,
     MirEmitter *emitter = ctx->getEmitter();
     MirEmitterContext *emitterCtx = emitter->getContext();
     MirInstruction *instr = *it;
-    MirBlock *currentBlock = emitterCtx->getCurrentBoundBlock();
+    MirBlock *currentBlock = emitterCtx->getCurrentBlock();
 
     const auto &linearEquiv = instr->getMetadata().m_linearEquivalent;
     if (linearEquiv.m_high == MirInstructionOpCode::INVALID || linearEquiv.m_low == MirInstructionOpCode::INVALID)
@@ -120,7 +120,7 @@ bool StandardLegalizers::expandTypeLegalizer(LegalizerContext *ctx,
     emitterCtx->setInsertPoint(currentBlock);
 
     // Completely remove the original illegal instruction from the linked list
-    emitterCtx->getInstructionPool()->removeFromList(instrList, it);
+    instrList->remove(it);
 
     return true;
 }

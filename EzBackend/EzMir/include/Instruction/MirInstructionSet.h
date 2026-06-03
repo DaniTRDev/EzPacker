@@ -15,25 +15,6 @@
 
 INSTRUCTION(INVALID, Invalid, NO_EQUIV, OPERAND_CONSTRAINTS(), F(None))
 
-/* --- ARRAY MANAGEMENT -------------------------------------------------------- */
-INSTRUCTION(GETARR,
-            Array,
-            NO_EQUIV,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::Register | ExpectedOperandType::AddressSource,
-                                  OperandFlag::Read },
-                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
-            F(None))
-
-INSTRUCTION(SETARR,
-            Array,
-            NO_EQUIV,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register | ExpectedOperandType::AddressSource,
-                                  OperandFlag::Read },
-                                { ExpectedOperandType::RegImm, OperandFlag::Read },
-                                { ExpectedOperandType::AnyValue, OperandFlag::Read }),
-            F(WritesMemory))
-
 /* --- DATA MOVEMENT -------------------------------------------------------- */
 INSTRUCTION(MOV,
             DataMovement,
@@ -42,7 +23,7 @@ INSTRUCTION(MOV,
                                 { ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(None))
 
-// LEA specifically requests an AddressSource (Memory, FrameIndex, or ConstantPoolRef)
+// LEA specifically requests an AddressSource (Memory or FrameIndex)
 INSTRUCTION(LEA,
             DataMovement,
             NO_EQUIV,

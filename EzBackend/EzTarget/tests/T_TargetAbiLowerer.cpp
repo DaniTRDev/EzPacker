@@ -364,8 +364,7 @@ TEST_F(TargetAbiLowererTests, LowersReturnSite)
         int64Type = emitterCtx->createType(MirTypeKind::Integer, 8, nullptr, "i64");
     }
 
-    MirFunction *func = emitterCtx->createFunction(int64Type,
-                                                   emitterCtx->getOperandPool()->createLinkedList<MirOperand *>(),
+    MirFunction *func = emitterCtx->createFunction(int64Type, emitterCtx->getOperandPool()->linkedList<MirOperand *>(),
                                                    "testFunc");
     MirRegister *retVal = emitter->createVirtualRegister(int64Type);
     emitter->emit(MirInstructionOpCode::RET, { retVal });
@@ -414,11 +413,10 @@ TEST_F(TargetAbiLowererTests, VoidReturnIsNotModified)
         voidType = emitterCtx->createType(MirTypeKind::Void, 0, nullptr, "void");
     }
 
-    MirFunction *func = emitterCtx->createFunction(voidType,
-                                                   emitterCtx->getOperandPool()->createLinkedList<MirOperand *>(),
+    MirFunction *func = emitterCtx->createFunction(voidType, emitterCtx->getOperandPool()->linkedList<MirOperand *>(),
                                                    "testFunc");
     MirBlock *block = emitterCtx->createBlock();
-    emitterCtx->bindToBlock(block);
+    emitterCtx->setInsertPoint(block);
     emitterCtx->getBlockPool()->appendToListBack(func->getBlocks(), block);
 
     emitter->emit(MirInstructionOpCode::RET, {}); // Void return has no operands

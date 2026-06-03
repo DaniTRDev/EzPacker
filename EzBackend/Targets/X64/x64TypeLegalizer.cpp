@@ -34,7 +34,7 @@ static LegalizerHandlerResult handleX86DivAndMul(MirEmitter *emitter,
 
         // Create the `MOV tempReg, imm` instruction
         MirInstruction *movInstr = emitter->emitMOV(tempReg, srcOp);
-        instrList->m_owner->appendToListBefore(instrList, it, movInstr);
+        instrList->appendBefore(it, movInstr);
 
         // Swap the immediate in the DIV/MUL instruction with the new virtual register
         srcIt.m_curr->m_object = tempReg;
@@ -82,7 +82,7 @@ static LegalizerHandlerResult handleX64LargeImmediate(MirEmitter *emitter,
 
                     // The MOV instruction CAN take a true 64-bit immediate in x86_64
                     MirInstruction *movInstr = emitter->emitMOV(tempReg, immOp);
-                    instrList->m_owner->appendToListBefore(instrList, it, movInstr);
+                    instrList->appendBefore(it, movInstr);
 
                     // Replace the immediate in the original instruction
                     opIt.m_curr->m_object = tempReg;
@@ -95,7 +95,7 @@ static LegalizerHandlerResult handleX64LargeImmediate(MirEmitter *emitter,
     return { false, true, modified };
 }
 
-std::shared_ptr<LegalizerActionList> x64TypeLegalizer::getActionList(MirTypes *types)
+std::shared_ptr<LegalizerActionList> x64TypeLegalizer::getActionList(MirTypeTable *types)
 {
     auto ret = std::make_shared<LegalizerActionList>();
 
@@ -147,7 +147,7 @@ std::shared_ptr<LegalizerActionList> x64TypeLegalizer::getActionList(MirTypes *t
     return ret;
 }
 
-std::shared_ptr<LegalizerHandlerList> x64TypeLegalizer::getHandlerList(MirTypes *types)
+std::shared_ptr<LegalizerHandlerList> x64TypeLegalizer::getHandlerList(MirTypeTable *types)
 {
     auto ret = std::make_shared<LegalizerHandlerList>();
 

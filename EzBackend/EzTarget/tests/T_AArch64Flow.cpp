@@ -133,7 +133,7 @@ class AArch64FlowTests : public ::testing::Test
 
         ec->beginScope();
         MirBlock *block = emitterCtx->createBlock();
-        emitterCtx->bindToBlock(block);
+        emitterCtx->setInsertPoint(block);
         loadHandlerCalled = false;
         storeHandlerCalled = false;
     }
@@ -172,7 +172,7 @@ TEST_F(AArch64FlowTests, CustomLoadStoreHandlers)
     emitter->emitSTORE(addr, i2, src);
 
     // Run the legalizer pass
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     bool modified = true;
     while (modified)
     {
@@ -192,7 +192,7 @@ TEST_F(AArch64FlowTests, CustomLoadStoreHandlers)
     EXPECT_TRUE(storeHandlerCalled);
 
     // Verify that the instructions were replaced
-    auto newList = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto newList = emitterCtx->getCurrentBlock()->getInstructions();
 
     ASSERT_EQ(newList->m_numElems, 2);
     auto it = newList->begin();

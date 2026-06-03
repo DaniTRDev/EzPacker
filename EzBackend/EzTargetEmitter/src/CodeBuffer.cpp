@@ -11,12 +11,10 @@ CodeBuffer::createSection(CodeSectionFlags flags, ConstantArray<uint8_t> *data, 
     std::copy_n(name.data(), name.length(), copiedName.m_elems);
     copiedName.m_elems[name.length()] = '\0';
 
-    CodeSection *section = m_sections->m_owner->createAndAppendToListBack<CodeSection>(
-            m_sections,
-            copiedName.m_elems,
-            flags,
-            data,
-            m_relocationPool.createLinkedList<CodeRelocation>());
+    CodeSection *section = m_sections->createAndAppendBack(copiedName.m_elems,
+                                                           flags,
+                                                           data,
+                                                           m_relocationPool.linkedList<CodeRelocation>());
     m_sectionMap[copiedName.m_elems] = section;
 
     return section;

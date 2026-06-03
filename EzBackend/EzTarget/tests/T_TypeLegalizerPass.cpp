@@ -86,7 +86,7 @@ class TypeLegalizerPassTests : public ::testing::Test
 
         ec->beginScope();
         MirBlock *block = emitterCtx->createBlock();
-        emitterCtx->bindToBlock(block);
+        emitterCtx->setInsertPoint(block);
         customHandlerCalled = false;
     }
 
@@ -111,7 +111,7 @@ TEST_F(TypeLegalizerPassTests, RunDoesNothingIfNoneAction)
 
     actionList->setOperandAction(MirInstructionOpCode::MOV, 32, Action_None);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool modified = passManager->run(list, it, passManager);
@@ -128,14 +128,14 @@ TEST_F(TypeLegalizerPassTests, RunCallsPromoteOperand)
     // Set 16-bit to be promoted
     actionList->setOperandAction(MirInstructionOpCode::ADD, 16, TargetLegalizerActionType::Action_PromoteOperand);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool modified = passManager->run(list, it, passManager);
     EXPECT_TRUE(modified);
 
     // Check if promotion happened (e.g. TRUNC was appended)
-    auto newList = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto newList = emitterCtx->getCurrentBlock()->getInstructions();
     auto nextIt = newList->begin();
     ++nextIt;
     ASSERT_NE(nextIt, newList->end());
@@ -152,14 +152,14 @@ TEST_F(TypeLegalizerPassTests, RunCallsExpandOperand)
     // Set 64-bit to be expanded
     actionList->setOperandAction(MirInstructionOpCode::ADD, 64, TargetLegalizerActionType::Action_ExpandOperand);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool modified = passManager->run(list, it, passManager);
     EXPECT_TRUE(modified);
 
     // Check if expansion happened (ADD + ADC)
-    auto newList = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto newList = emitterCtx->getCurrentBlock()->getInstructions();
     auto firstIt = newList->begin();
     auto nextIt = firstIt;
     ++nextIt;
@@ -179,7 +179,7 @@ TEST_F(TypeLegalizerPassTests, RunCallsCustomHandler)
     actionList->setOperandAction(MirInstructionOpCode::MUL, 64, Action_TypeCustom);
     handlerList->addInstructionHandler(MirInstructionOpCode::MUL, DummyCustomHandler);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it = list->begin();
 
     bool modified = passManager->run(list, it, passManager);
@@ -205,7 +205,7 @@ TEST_F(TypeLegalizerPassTests, MixedPromoteAndExpandInSameContext)
     actionList->setOperandAction(MirInstructionOpCode::ADD, 64, TargetLegalizerActionType::Action_ExpandOperand);
     actionList->setOperandAction(MirInstructionOpCode::MOV, 16, TargetLegalizerActionType::Action_PromoteOperand);
 
-    auto list = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto list = emitterCtx->getCurrentBlock()->getInstructions();
     auto it1 = list->begin();
 
     // Legalize instr1 (Expand)
@@ -222,7 +222,7 @@ TEST_F(TypeLegalizerPassTests, MixedPromoteAndExpandInSameContext)
     EXPECT_TRUE(modified2);
 
     // list now has ADD, ADC, MOV, TRUNC
-    auto newList = emitterCtx->getCurrentBoundBlock()->getInstructions();
+    auto newList = emitterCtx->getCurrentBlock()->getInstructions();
     auto finalIt = newList->begin();
 
     EXPECT_EQ((*finalIt)->getOpCode(), MirInstructionOpCode::ADD);

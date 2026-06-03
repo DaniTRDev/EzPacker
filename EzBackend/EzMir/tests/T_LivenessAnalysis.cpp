@@ -13,7 +13,7 @@ class LivenessAnalysisTests : public ::testing::Test
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
     std::shared_ptr<MirEmitterContext> ctx;
-    std::shared_ptr<MirTypes> m_types;
+    std::shared_ptr<MirTypeTable> m_types;
     MirEmitter *emitter;
     MirFunction *func;
     MirPassManager *pm;
@@ -24,7 +24,7 @@ class LivenessAnalysisTests : public ::testing::Test
         sm = std::make_shared<SourceManager>(std::filesystem::current_path());
         ctx = std::make_shared<MirEmitterContext>(ec, sm);
         emitter = new MirEmitter(ctx.get());
-        m_types = std::make_shared<MirTypes>();
+        m_types = std::make_shared<MirTypeTable>();
 
         // createFunction sets the created function as the current bound function in ctx.
         m_types->initialize(ctx.get());
@@ -46,7 +46,7 @@ class LivenessAnalysisTests : public ::testing::Test
 TEST_F(LivenessAnalysisTests, DefAndUseSets)
 {
     MirBlock *b1 = func->getBlocks()->get<MirBlock>(0);
-    ctx->bindToBlock(b1);
+    ctx->setInsertPoint(b1);
 
     MirRegister *r1 = emitter->createVirtualRegister(m_types->getInt64Type()); // To be def
     MirRegister *r2 = emitter->createVirtualRegister(m_types->getInt64Type()); // To be def, then used
@@ -75,7 +75,7 @@ TEST_F(LivenessAnalysisTests, DefAndUseSets)
 TEST_F(LivenessAnalysisTests, UseWithoutDef)
 {
     MirBlock *b1 = func->getBlocks()->get<MirBlock>(0);
-    ctx->bindToBlock(b1);
+    ctx->setInsertPoint(b1);
 
     MirRegister *r1 = emitter->createVirtualRegister(m_types->getInt64Type()); // Used without prior def in block
     MirRegister *r2 = emitter->createVirtualRegister(m_types->getInt64Type());

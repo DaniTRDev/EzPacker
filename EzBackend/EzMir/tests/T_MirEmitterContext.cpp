@@ -50,21 +50,21 @@ TEST_F(MirEmitterContextTests, CreateBlockReturnsNonNull)
     EXPECT_NE(block->getId(), MIRID_INVALID);
 }
 
-TEST_F(MirEmitterContextTests, NewContextHasNoBoundBlock) { EXPECT_EQ(ctx->getCurrentBoundBlock(), nullptr); }
+TEST_F(MirEmitterContextTests, NewContextHasNoBoundBlock) { EXPECT_EQ(ctx->getCurrentBlock(), nullptr); }
 
 TEST_F(MirEmitterContextTests, BindToBlockSucceeds)
 {
     MirBlock *block = ctx->createBlock();
-    EXPECT_TRUE(ctx->bindToBlock(block));
-    EXPECT_EQ(ctx->getCurrentBoundBlock(), block);
+    EXPECT_TRUE(ctx->setInsertPoint(block));
+    EXPECT_EQ(ctx->getCurrentBlock(), block);
 }
 
-TEST_F(MirEmitterContextTests, BindToNullBlockDontFail) { EXPECT_TRUE(ctx->bindToBlock(nullptr)); }
+TEST_F(MirEmitterContextTests, BindToNullBlockDontFail) { EXPECT_TRUE(ctx->setInsertPoint(nullptr)); }
 
 TEST_F(MirEmitterContextTests, InstructionIsAddedToBoundBlock)
 {
     MirBlock *block = ctx->createBlock();
-    ctx->bindToBlock(block);
+    ctx->setInsertPoint(block);
     MirInstruction *instr = ctx->createInstruction(MirInstructionOpCode::NOP);
     ASSERT_NE(instr, nullptr);
     ASSERT_NE(block->getInstructions(), nullptr);
@@ -152,10 +152,10 @@ TEST_F(MirEmitterContextTests, RebindToAnotherBlock)
 {
     MirBlock *b1 = ctx->createBlock();
     MirBlock *b2 = ctx->createBlock();
-    ctx->bindToBlock(b1);
-    EXPECT_EQ(ctx->getCurrentBoundBlock(), b1);
-    ctx->bindToBlock(b2);
-    EXPECT_EQ(ctx->getCurrentBoundBlock(), b2);
+    ctx->setInsertPoint(b1);
+    EXPECT_EQ(ctx->getCurrentBlock(), b1);
+    ctx->setInsertPoint(b2);
+    EXPECT_EQ(ctx->getCurrentBlock(), b2);
 }
 
 TEST_F(MirEmitterContextTests, InstructionsGoToCorrectBlock)
@@ -163,11 +163,11 @@ TEST_F(MirEmitterContextTests, InstructionsGoToCorrectBlock)
     MirBlock *b1 = ctx->createBlock();
     MirBlock *b2 = ctx->createBlock();
 
-    ctx->bindToBlock(b1);
+    ctx->setInsertPoint(b1);
     ctx->createInstruction(MirInstructionOpCode::NOP);
     ctx->createInstruction(MirInstructionOpCode::NOP);
 
-    ctx->bindToBlock(b2);
+    ctx->setInsertPoint(b2);
     ctx->createInstruction(MirInstructionOpCode::NOP);
 
     EXPECT_EQ(b1->getInstructions()->m_numElems, 2u);

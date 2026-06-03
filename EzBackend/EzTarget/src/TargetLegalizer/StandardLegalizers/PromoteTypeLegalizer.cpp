@@ -9,7 +9,7 @@ bool StandardLegalizers::promoteTypeLegalizer(MirEmitter *emitter,
 {
     ABIDesc *abi = targetDesc->getABI();
     MirEmitterContext *emitterCtx = emitter->getContext();
-    MirBlock *currentBlock = emitterCtx->getCurrentBoundBlock();
+    MirBlock *currentBlock = emitterCtx->getCurrentBlock();
 
     MirInstruction *instr = *it;
     MirOperand *op = *operand;

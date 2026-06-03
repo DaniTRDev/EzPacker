@@ -57,6 +57,6 @@
 
 // ── Type system primitives ──────────────────────────────────────────────────
 #include "Type/MirType.h"
-#include "Type/MirTypes.h"
+#include "Type/MirTypeTable.h"
 
 #endif // EZPACKER_EZMIR_H

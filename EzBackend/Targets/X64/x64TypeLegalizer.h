@@ -10,13 +10,13 @@ class x64TypeLegalizer
      * Returns the action list used to legalize a type in x64.
      * @return
      */
-    std::shared_ptr<LegalizerActionList> getActionList(MirTypes *types);
+    std::shared_ptr<LegalizerActionList> getActionList(MirTypeTable *types);
 
     /**
      * Returns the handler list used to legalize a type in x64.
      * @return
      */
-    std::shared_ptr<LegalizerHandlerList> getHandlerList(MirTypes *types);
+    std::shared_ptr<LegalizerHandlerList> getHandlerList(MirTypeTable *types);
 };
 
 #endif // EZPACKER_X64TYPELEGALIZER_H

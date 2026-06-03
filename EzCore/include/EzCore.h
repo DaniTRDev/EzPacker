@@ -10,8 +10,6 @@
 
 #include "LogCollector/LogCollector.h"
 
-#include "Logger/SourceLoggingSink.h"
-
 #include "SourceManager/SourceManager.h"
 
 #include "TypedPool/StringPool.h"
