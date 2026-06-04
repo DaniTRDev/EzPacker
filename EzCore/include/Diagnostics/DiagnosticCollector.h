@@ -28,6 +28,12 @@ class DiagnosticCollector
     DiagnosticBuilder builder(DiagnosticMessageType type, const std::pmr::string &sender);
 
     /**
+     * Adds a listener for diagnostic messages.
+     * @param listener
+     */
+    void addListener(DiagnosticListener *listener);
+
+    /**
      * Begins a new scope with a default action.
      * @param action
      */

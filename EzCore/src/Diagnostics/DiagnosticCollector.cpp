@@ -12,6 +12,8 @@ DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const
     return DiagnosticBuilder(this, type, sender);
 }
 
+void DiagnosticCollector::addListener(DiagnosticListener *listener) { m_listeners.push_back(listener); }
+
 void DiagnosticCollector::beginScope(DiagnosticScopeAction action)
 {
     DiagnosticScope scope(&m_diagScopePool);
@@ -30,7 +32,7 @@ void DiagnosticCollector::endScope()
     }
 
     // Extract the active scope
-    const auto &closingScope = std::move(m_scopes.back());
+    auto closingScope = m_scopes.back();
     m_scopes.pop_back();
 
     switch (closingScope.getAction())
@@ -41,7 +43,7 @@ void DiagnosticCollector::endScope()
             {
                 // Record the message and notify every listener.
 
-                m_messages.push_back(std::move(msg));
+                m_messages.push_back(msg);
                 for (auto *listener : m_listeners)
                 {
                     if (listener)
@@ -85,10 +87,11 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
         throw std::runtime_error("Internal Compiler Error: Tried to push a message to a non-existent scope.");
     }
 
+    DiagnosticScope &scope = m_scopes.back();
     if (m_scopes.size() == 1)
     {
         // Move the message into the permanent record of messages.
-        m_messages.push_back(std::move(m_scopes.back().getMessages().back()));
+        m_messages.push_back(std::move(scope.getMessages().back()));
 
         for (auto &listener : m_listeners)
         {
@@ -97,6 +100,11 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
     }
     else
     {
-        m_scopes.back().appendMessage(std::move(message));
+        scope.appendMessage(std::move(message));
+    }
+
+    if (message.getType() == Diag_Error)
+    {
+        scope.setHasFatalErrors(true);
     }
 }

@@ -41,11 +41,10 @@ class MirFunction
      */
     MirFunction(MirBlock *entryPoint,
                 MirType *returnType,
-                MirFunctionStackFrame *stackFrame,
                 size_t id,
-                TypedPoolLinkedList<MirBlock> *blocks,
-                TypedPoolLinkedList<MirOperand*> *parameters,
-                const char *name);
+                std::pmr::list<MirBlock> *blocks,
+                std::pmr::vector<MirOperand *> *parameters,
+                std::pmr::string name);
 
     /**
      * Returns the name of the function.
@@ -89,7 +88,7 @@ class MirFunction
      * Each element is a `MirOperand` describing one incoming parameter. The
      * exact calling-convention meaning is defined by later lowering stages.
      */
-    TypedPoolLinkedList<MirOperand*> *getParameters();
+    TypedPoolLinkedList<MirOperand *> *getParameters();
 
     /**
      * Appends a parameter to the function.

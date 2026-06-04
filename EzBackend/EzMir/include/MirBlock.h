@@ -32,7 +32,7 @@ class MirBlock
      *                     block. The pointer is expected to remain valid for the
      *                     lifetime of the owning context.
      */
-    MirBlock(size_t id, TypedPoolLinkedList<MirInstruction> *instructions);
+    MirBlock(size_t id, std::pmr::vector<MirInstruction> instructions);
 
     /**
      * Returns the unique MIR ID assigned to this block.

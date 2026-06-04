@@ -32,15 +32,7 @@ class MirInstruction
      * @param operands Arena-managed operand list initially associated with the
      *                 instruction. Emitters append to this list later.
      */
-    explicit MirInstruction(MirInstructionOpCode opcode, TypedPoolLinkedList<MirOperand> *operands);
-
-    /**
-     * Creates an instruction wrapper around an opcode and its operand slice, with a lowered opcode for instruction
-     * selectors to store the result of selection.
-     * @param opcode
-     * @param operands
-     */
-    explicit MirInstruction(size_t opcode, TypedPoolLinkedList<MirOperand> *operands);
+    explicit MirInstruction(MirInstructionOpCode opcode, std::pmr::vector<MirOperand *> operands);
 
     /**
      * Returns `true` when the instruction currently stores at least one
@@ -75,11 +67,6 @@ class MirInstruction
     MirInstructionOpCode getOpCode() const;
 
     /**
-     * Returns the mutable operand slice for this instruction.
-     */
-    TypedPoolLinkedList<MirOperand> *getOperands() const;
-
-    /**
      * Returns the instruction flags from the opcode metadata.
      */
     MirInstructionFlags getFlags() const;
@@ -91,10 +78,21 @@ class MirInstruction
     MirTargetInstructionId getTargetId() const;
 
     /**
+     * Adds an operand to the instruction.
+     * @param operand
+     */
+    void addOperand(const MirOperand &operand);
+
+    /**
      * Sets the target instruction ID.
      * @param id
      */
     void setTargetId(MirTargetInstructionId id);
+
+    /**
+     * Returns the mutable operand slice for this instruction.
+     */
+    std::pmr::vector<MirOperand *> getOperands() const;
 
     /**
      * Returns a string representation of the instruction in assembly format.
@@ -105,7 +103,8 @@ class MirInstruction
   private:
     MirInstructionOpCode m_opcode;
     MirTargetInstructionId m_targetId;
-    TypedPoolLinkedList<MirOperand> *m_operands;
+    SourceReference *m_sourceRef;
+    std::pmr::vector<MirOperand *> m_operands;
 };
 
 #endif // EZPACKER_MIRINSTRUCTION_H

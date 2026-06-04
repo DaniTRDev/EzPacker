@@ -17,15 +17,15 @@ struct MirGlobalDataEntry
 {
     bool m_isReadOnly;
     bool m_uninitialized;
-    ConstantArray<uint8_t> m_data;
+    std::pmr::vector<char> m_data;
     MirType *m_dataType;
     size_t m_entryId;
 };
 
 /**
- * Enumeration that contains the insertion mode that the emitter context will use.
+ * Insertion mode of an insertstate.
  */
-enum class InsertMode
+enum class InsertMode : uint8_t
 {
     Append,      // Back.
     InsertBefore // Before a point.
@@ -35,97 +35,104 @@ struct InsertState
 {
     MirBlock *block{ nullptr };
     InsertMode mode{ InsertMode::Append };
-    TypedPoolLinkedList<MirInstruction>::Iterator iterator{};
+    std::pmr::list<MirInstruction>::iterator iterator{};
 };
 
-class MirEmitterContext : public ErrorEmitter
+class MirEmitterContext
 {
   public:
-    MirEmitterContext(const std::shared_ptr<ErrorCollector> &errorCollector,
-                      const std::shared_ptr<SourceManager> &sourceManager);
+    MirEmitterContext(const std::shared_ptr<DiagnosticCollector> &diagCollector);
+
+    // Disable copy/move constructors to preserve safety across the arena resource references
+    MirEmitterContext(const MirEmitterContext &) = delete;
+    MirEmitterContext &operator=(const MirEmitterContext &) = delete;
 
     /**
-     * Sets the emitter to append instructions to the end of the specified block.
-     * Replaces the old `setInsertPoint` logic.
-     * @return `false` when `block` is `nullptr`; otherwise `true`.
-     */
-    bool setInsertPoint(MirBlock *block);
-
-    /**
-     * Sets the emitter to insert newly created instructions BEFORE the specified iterator.
-     * The sequence of emitted instructions will be automatically preserved.
-     */
-    void setInsertPoint(MirBlock *block, TypedPoolLinkedList<MirInstruction>::Iterator insertBeforeIt);
-    
-    /**
-     * Returns the block currently bound for instruction emission.
-     */
-    MirBlock *getCurrentBlock() const;
-    
-    MirBlock *createBlock();
-    MirBlock *getBlockFromRef(const MirReference &ref) const;
-
-    MirId createId();
-
-    MirInstruction *createInstruction(MirInstructionOpCode opcode);
-
-    MirFunction *
-    createFunction(MirType *returnType, TypedPoolLinkedList<MirOperand *> *parameters, const std::string_view &name);
-
-    /**
-     * Returns a pointer to the function with matching id. Returns nullptr is there wasn't any matches.
-     * @param id
+     * Returns the current insertion point of the context.
      * @return
      */
-    MirFunction *getFunctionById(size_t id) const;
+    const InsertState &getInsertPoint() const;
 
-    MirGlobalDataEntry *createGlobalData(const void *data, MirType *type, bool isReadOnly = true);
-    MirGlobalDataEntry *createGlobalFloatingPoint(double val);
-    MirGlobalDataEntry *createGlobalInteger(size_t sizeInBytes, uint64_t val);
-    MirGlobalDataEntry *
-    createGlobalString(const std::string_view &str, bool includeNullTerminator = true, bool isReadOnly = true);
+    /**
+     * @brief Returns the block currently bound for instruction emission.
+     */
+    MirBlock *getCurrentBlock() const;
 
-    MirGlobalDataEntry *getGlobalDataEntryFromId(size_t entryId) const;
+    /**
+     * Creates a block and appends it to the current function, if any.
+     * @return
+     */
+    MirBlock *createBlock();
 
-    TypedPool *getBlockPool();
-    TypedPool *getDataEntryPool();
-    TypedPool *getFunctionPool();
-    TypedPool *getFunctionParameterPool();
-    TypedPool *getInstructionPool();
-    TypedPool *getOperandPool();
-    TypedArrayPool<uint8_t> *getEntryDataPool();
-    TypedPool *getTypePool();
+    /**
+     * Creates a function with the name, return type and parameters. This function will also allocate a block
+     * inside the function.
+     * @param name
+     * @param returnType
+     * @param params
+     * @return
+     */
+    MirFunction *
+    createFunc(const std::string &name, MirType *returnType, const std::initializer_list<MirRegister *> &params);
 
-    TypedPoolLinkedList<MirFunction> *getFunctionList() const;
-    TypedPoolLinkedList<MirType> *getTypeList() const;
+    /**
+     * Creates an ID within this context. Returns 0 (MIRID_INVALID) if failed.
+     * @return
+     */
+    MirId createId();
 
-    std::shared_ptr<class MirTypes> getTypes() const;
+    /**
+     * Creates an instruction at the current insert state. By default the instruction is empty, operands should be
+     * pushed by the caller manually.
+     * @param opcode
+     * @return
+     */
+    MirInstruction *createInstruction(MirInstructionOpCode opcode);
+
+    /**
+     * Creates an instruction at the current insert state. This function will also append the operands of the
+     * instruction.
+     * @param opcode
+     * @return
+     */
+    MirInstruction *createInstruction(MirInstructionOpCode opcode, const std::initializer_list<MirOperand *> &operands);
+
+    /**
+     * @brief Sets the emitter to append instructions to the end of the specified block.
+     * @return `false` when `block` is `nullptr`; otherwise `true`.
+     */
+    void setInsertPoint(MirBlock *block);
+
+    /**
+     * @brief Sets the emitter to insert newly created instructions BEFORE the specified iterator.
+     * The sequence of emitted instructions will be automatically preserved.
+     */
+    void setInsertPoint(MirBlock *block, std::pmr::list<MirInstruction>::iterator insertBeforeIt);
+
+    /**
+     * Returns an allocator used to allocate complementary resources (global data, types, names, ...).
+     * @return
+     */
+    std::pmr::monotonic_buffer_resource *getGlobalAllocator();
+
+    /**
+     * Returns an allocator related to functions (blocks mainly).
+     * @return
+     */
+    std::pmr::monotonic_buffer_resource *getFuncAllocator();
 
   private:
-    MirId m_currentId;
-    MirFunction *m_currentBoundFunction;
+    MirId m_currentId{ 0 };
     InsertState m_insertState;
 
-    TypedPool m_blockPool;
+    // Pools.
+    std::pmr::monotonic_buffer_resource m_globalResource;
+    std::pmr::monotonic_buffer_resource m_functionResource;
 
-    TypedPool m_dataEntryPool;
-    TypedPool m_functionPool;
-    TypedPool m_functionParameterPool;
-    TypedPool m_instructionPool;
-    TypedPool m_operandPool;
-    TypedPool m_stackFramePool;
-    TypedPool m_stackObjectPool; // Objects inside frames.
-    TypedArrayPool<uint8_t> m_dataPool;
+    std::pmr::list<MirFunction *> m_functions;
+    std::pmr::vector<MirGlobalDataEntry *> m_globalData;
 
-    TypedArrayPool<char> m_namePool;
-    TypedPoolLinkedList<MirFunction> *m_functionList;
-    TypedPoolLinkedList<MirType> *m_typeList;
-
-    std::map<size_t, MirFunction *> m_blockIdToFunc;
-    std::map<size_t, MirFunction *> m_idToFunctionMap;
-    std::map<size_t, MirBlock *> m_idToBlockMap;
-    std::map<size_t, MirGlobalDataEntry *> m_idToGlobalDataEntry;
-    std::shared_ptr<class MirTypes> m_types;
+    std::shared_ptr<DiagnosticCollector> m_diagCollector;
 };
 
 #endif // EZPACKER_MIREMITTERCONTEXT_H

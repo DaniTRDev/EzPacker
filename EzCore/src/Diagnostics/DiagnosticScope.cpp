@@ -14,4 +14,6 @@ void DiagnosticScope::insert(std::pmr::vector<DiagnosticMessage>::const_iterator
 
 void DiagnosticScope::setAction(DiagnosticScopeAction action) { m_action = action; }
 
+void DiagnosticScope::setHasFatalErrors(bool value) { m_hasFatalErrors = value; }
+
 const std::pmr::vector<DiagnosticMessage> &DiagnosticScope::getMessages() const { return m_messages; }

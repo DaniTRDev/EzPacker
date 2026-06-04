@@ -47,6 +47,12 @@ class DiagnosticScope
     void setAction(DiagnosticScopeAction action);
 
     /**
+     * Mark this scope because there was an error somewhere inside it.
+     * @param value
+     */
+    void setHasFatalErrors(bool value);
+
+    /**
      * Returns the list of arena-backed messages.
      * @return
      */

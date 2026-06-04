@@ -130,12 +130,12 @@ std::string SourceManager::getReferenceContent(const SourceReference &ref) const
     return std::format("{}\n{}{}", lineContent, indent, squiggles);
 }
 
-std::string_view SourceManager::getSourceContent(size_t id) const
+std::string SourceManager::getSourceContent(size_t id) const
 {
     return (id < m_sourceFiles.size()) ? m_sourceFiles[id].content : "";
 }
 
-std::string_view SourceManager::getSourceName(size_t id) const
+std::string SourceManager::getSourceName(size_t id) const
 {
     return (id < m_sourceFiles.size()) ? m_sourceFiles[id].name : "";
 }

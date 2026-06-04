@@ -20,6 +20,7 @@ function(BuildEzCore)
             "include/Diagnostics/DiagnosticBuilder.h"
             "include/Diagnostics/DiagnosticCollector.h"
             "include/Diagnostics/DiagnosticListener.h"
+            "include/Diagnostics/DiagnosticLogger.h"
             "include/Diagnostics/DiagnosticMessage.h"
             "include/Diagnostics/DiagnosticScope.h"
             "include/SourceManager/SourceManager.h"
@@ -27,6 +28,7 @@ function(BuildEzCore)
             "src/MathUtils.cpp"
             "src/Diagnostics/DiagnosticBuilder.cpp"
             "src/Diagnostics/DiagnosticCollector.cpp"
+            "src/Diagnostics/DiagnosticLogger.cpp"
             "src/Diagnostics/DiagnosticMessage.cpp"
             "src/Diagnostics/DiagnosticScope.cpp"
             "src/SourceManager/SourceManager.cpp"
@@ -46,11 +48,10 @@ BuildEzCore()
 if (EZPACKER_BUILD_TESTS)
     message(STATUS "Building tests for EzCore")
 
-    #EzPacker_AddTest(
-    #       "T_EzCoreTest"
-    #       ""
-    #       "EzCore"
-    #       ""
-    #       "${CMAKE_CURRENT_SOURCE_DIR}/tests/TestEzCore.cpp"
-    #)
+    EzPacker_AddTest(
+            "T_DiagnosticLogger"
+            "EzCore"
+            ""
+            "tests/T_DiagnosticLogger.cpp"
+    )
 endif ()

@@ -76,7 +76,7 @@ class SourceManager
      * @returns The ID of the source file, or 0 if a source with the same name already exists.
      */
     size_t addSourceContent(const std::string &name, const std::string &content);
-    
+
     /**
      * @brief Resolves the given source file path to an absolute path based on the working directory.
      * @param sourceFile The path to resolve.
@@ -103,15 +103,15 @@ class SourceManager
      * @param id The source file ID.
      * @returns The full content of the source file, or an empty string if not found.
      */
-    std::string_view getSourceContent(size_t id) const;
+    std::string getSourceContent(size_t id) const;
 
     /**
      * @brief Returns the source name of the given source file id.
      * @param id The source file ID.
      * @returns The source name.
      */
-    std::string_view getSourceName(size_t id) const;
-    
+    std::string getSourceName(size_t id) const;
+
   private:
     std::filesystem::path m_workingPath;
     std::unordered_map<std::string, size_t> m_pathToIdMap;
