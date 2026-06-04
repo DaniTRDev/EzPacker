@@ -53,7 +53,7 @@ class PromoteTypeLegalizerTests : public ::testing::Test
   protected:
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
-    std::shared_ptr<MirEmitterContext> ctx;
+    std::shared_ptr<MirBuilderContext> ctx;
     MirEmitter *emitter;
     DummyABIDesc abi;
     TargetDesc *targetDesc;
@@ -62,7 +62,7 @@ class PromoteTypeLegalizerTests : public ::testing::Test
     {
         ec = std::make_shared<ErrorCollector>();
         sm = std::make_shared<SourceManager>(std::filesystem::current_path());
-        ctx = std::make_shared<MirEmitterContext>(ec, sm);
+        ctx = std::make_shared<MirBuilderContext>(ec, sm);
         emitter = new MirEmitter(ctx.get());
 
         targetDesc = new TargetDesc(&abi, TargetEndianness::LittleEndian, "DummyTarget");

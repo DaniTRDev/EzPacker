@@ -1,7 +1,7 @@
 #ifndef EZPACKER_MIRTYPETABLE_H
 #define EZPACKER_MIRTYPETABLE_H
 
-#include "Emitter/MirEmitterContext.h"
+#include "Builder/MirBuilderContext.h"
 
 /**
  * Class used to store the least minimum required types so everything else works.
@@ -9,128 +9,95 @@
 class MirTypeTable
 {
   public:
-    MirTypeTable() = default;
-    ~MirTypeTable() = default;
-
-    MirType *create(MirTypeKind kind,
-                    size_t totalSizeInBytes,
-                    TypedPoolLinkedList<MirType> *subTypes,
-                    const std::string_view &name)
-    {
-        if (name.empty())
-        {
-            emitError(ErrorSeverity::Fatal,
-                      "Could not create type because name is empty",
-                      "MirEmitterContext::createType");
-            return nullptr;
-        }
-
-        if (m_typeNames.contains(name))
-        {
-            emitError(ErrorSeverity::Fatal,
-                      "Could not create type because a type with the same name already exists",
-                      "MirEmitterContext::createType");
-            return nullptr;
-        }
-
-        if (!subTypes)
-        {
-            subTypes = m_typePool.linkedList<MirType>();
-        }
-
-        std::string_view copiedName = m_namePool.createConstantString(name.data());
-        MirType *type = m_typePool.create<MirType>(kind, ++m_currentId, totalSizeInBytes, subTypes, copiedName.data());
-
-        LOG_DEBUG(std::format("Creating type (id: {}) (name: {}) (size: {}) (subTypeCount: {})",
-                              type->getId(),
-                              type->getName(),
-                              type->getTotalSizeInBytes(),
-                              type->getSubTypes()->m_numElems),
-                  "MirEmitterContext");
-
-        m_typeNames.insert(copiedName);
-        m_idToType.insert({ type->getId(), type });
-
-        return type;
-    }
-
     /**
-     * Finds and returns an integer MirType of the specified size.
-     * Returns nullptr if no such type has been created yet.
+     * Creates the type table with the given arena allocator.
+     * @param globalArena
      */
-    MirType *getIntegerTypeBySize(size_t sizeInBytes);
-    
+    MirTypeTable(std::pmr::memory_resource *globalArena);
+
+    // Disable copies to safeguard our arena resource mappings
+    MirTypeTable(const MirTypeTable &) = delete;
+    MirTypeTable &operator=(const MirTypeTable &) = delete;
+
     /**
-     * Returns a MirType out of the given ID.
-     * @param id
+     * Creates a unique base or compound type.
+     * @param kind
+     * @param totalSizeInBytes
+     * @param subTypes
+     * @param name
      * @return
      */
-    MirType *getMirTypeById(size_t id);
-    
+    MirType *create(MirTypeKind kind,
+                    size_t totalSizeInBytes,
+                    std::pmr::vector<MirType *> subTypes,
+                    const std::string_view &name);
+
     /**
-     * Returns a pointer to the given MirType
+     * Interns pointer types. Guarantees that getPtr(T) always returns the exact same type instance pointer.
      * @param srcType
      * @return
      */
-    MirType *getPtr(MirType *srcType)
-    {
-        // Pointers don't have pre adjusted size, depends on architecture.
-        auto *subTypes = m_ctx->getTypePool()->linkedList<MirType>();
-        subTypes->appendBack(srcType);
+    MirType *getPtr(MirType *srcType);
 
-        return create(MirTypeKind::Pointer, 0, subTypes, std::format("{}*", srcType->getName()));
-    }
-    
     /**
-     * Initializes the types in the context.
-     * @param ctx
+     * Interns array types structurally based on size and base element composition.
+     * @param elementType
+     * @param elementCount
+     * @return
      */
-    void initialize(MirEmitterContext *ctx)
-    {
-        m_ctx = ctx;
+    MirType *getArray(MirType *elementType, size_t elementCount);
 
-        m_voidType = create(MirTypeKind::Void, 0, nullptr, "void");
+    /**
+     * Searches the table for the given ID and returns its type, if any. Returns nullptr if type was not created.
+     * @param id
+     * @return
+     */
+    MirType *getMirTypeById(size_t id) const;
 
-        m_int1Type = create(MirTypeKind::Integer, 1, nullptr, "i1");
-        m_int8Type = create(MirTypeKind::Integer, 1, nullptr, "i8");
-        m_int16Type = create(MirTypeKind::Integer, 2, nullptr, "i16");
-        m_int32Type = create(MirTypeKind::Integer, 4, nullptr, "i32");
-        m_int64Type = create(MirTypeKind::Integer, 8, nullptr, "i64");
+    /**
+     * Creates an struct type (if it does not exist). Returns the existing type if it was already created.
+     * @param fieldTypes
+     * @param structName
+     * @return
+     */
+    MirType *getStruct(std::pmr::vector<MirType *> fieldTypes, const std::string_view &structName);
 
-        m_float32Type = create(MirTypeKind::FloatingPoint, 4, nullptr, "f32");
-        m_float64Type = create(MirTypeKind::FloatingPoint, 8, nullptr, "f64");
-    }
-    
-    MirType *getVoidType() const { return m_voidType; }
-    
-    MirType *getInt1Type() const { return m_int1Type; }
-    MirType *getInt8Type() const { return m_int8Type; }
-    MirType *getInt16Type() const { return m_int16Type; }
-    MirType *getInt32Type() const { return m_int32Type; }
-    MirType *getInt64Type() const { return m_int64Type; }
+    // Fast static primitive accessors
+    MirType *getVoidType() const;
 
-    MirType *getFloat32Type() const { return m_float32Type; }
-    MirType *getFloat64Type() const { return m_float64Type; }
+    MirType *getInt1Type() const;
+    MirType *getInt8Type() const;
+    MirType *getInt16Type() const;
+    MirType *getInt32Type() const;
+    MirType *getInt64Type() const;
+    MirType *getFloat32Type() const;
+    MirType *getFloat64Type() const;
+
+    /**
+     * Initializes the type table with the basic primitive types needed: iXX, void and fXX.
+     */
+    void initialize();
 
   private:
-    MirEmitterContext *m_ctx;
-    MirId m_currentId;
+    std::pmr::memory_resource *m_arena;
+    size_t m_currentId{ 0 };
 
-    MirType *m_voidType;
+    // Built-in basic primitives
+    MirType *m_voidType{ nullptr };
+    MirType *m_int1Type{ nullptr };
+    MirType *m_int8Type{ nullptr };
+    MirType *m_int16Type{ nullptr };
+    MirType *m_int32Type{ nullptr };
+    MirType *m_int64Type{ nullptr };
+    MirType *m_float32Type{ nullptr };
+    MirType *m_float64Type{ nullptr };
 
-    MirType *m_int1Type;
-    MirType *m_int8Type;
-    MirType *m_int16Type;
-    MirType *m_int32Type;
-    MirType *m_int64Type;
+    // High performance tracking hashes using PMR mapping blocks
+    std::pmr::unordered_map<std::pmr::string, MirType *> m_typeNames;
+    std::pmr::unordered_map<size_t, MirType *> m_idToType;
 
-    MirType *m_float32Type;
-    MirType *m_float64Type;
-
-    StringPool m_namePool;
-    TypedPool m_typePool;
-    std::set<std::string_view> m_typeNames;
-    std::map<size_t, MirType *> m_idToType;
+    // Interning caches: maps base type to its unique pointer type representation
+    std::pmr::unordered_map<MirType *, MirType *> m_pointerCache;
 };
 
 #endif // EZPACKER_MIRTYPETABLE_H

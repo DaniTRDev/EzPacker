@@ -30,23 +30,28 @@ class MirFunctionStackFrame
 {
   public:
     /**
-     * Default constructor to allow the first layer of MIR not to be concerned about creating the stack frame.
+     * Creates the stack frame of the function with the given object list. This list should be backend by an
+     * arena somewhere and the arena must keep it alive until it's not needed at all.
+     * @param objectList
      */
-    MirFunctionStackFrame(class MirFunction *owner);
-
-    /**
-     * Creates the stack frame for a function. Will use the pool to allocate a self-contained linked list of stack
-     * frame objects.
-     * @param owner
-     * @param stackFrameObjectPool
-     */
-    MirFunctionStackFrame(class MirFunction *owner, TypedPool *stackFrameObjectPool);
+    MirFunctionStackFrame(std::pmr::vector<StackFrameObject*> objectList);
 
     /**
      * Returns the allocated object count.
      * @return
      */
     size_t getAllocatedObjectCount() const;
+
+    /**
+     * Creates a specific stack frame object with the given parameters
+     * @param offset
+     * @param align
+     * @param sizeInBytes
+     * @param source
+     * @return
+     */
+    StackFrameObject *
+    create(int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source);
 
     /**
      * Creates an abstract object in the function stack frame.
@@ -85,17 +90,10 @@ class MirFunctionStackFrame
      * Returns the list of stack frame objects.
      * @return
      */
-    TypedPoolLinkedList<StackFrameObject> *getStackFrameObjects() const;
-
-    /**
-     * Sets the owner of this stack frame.
-     * @param m_owner
-     */
-    void setOwner(class MirFunction *m_owner);
+    const std::pmr::vector<StackFrameObject*> &getStackFrameObjects() const;
 
   private:
-    class MirFunction *m_owner;
-    TypedPoolLinkedList<StackFrameObject> *m_stackFrameObjects;
+    std::pmr::vector<StackFrameObject*> m_stackFrameObjects;
 };
 
 #endif // EZPACKER_MIRFUNCTIONSTACKFRAME_H

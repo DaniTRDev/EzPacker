@@ -1,7 +1,9 @@
 #include "Instruction/MirInstruction.h"
 
-MirInstruction::MirInstruction(MirInstructionOpCode opcode, std::pmr::vector<MirOperand *> operands) :
-    m_opcode(opcode), m_operands(operands)
+MirInstruction::MirInstruction(MirInstructionOpCode opcode,
+                               SourceReference *ref,
+                               std::pmr::vector<MirOperand *> operands) :
+    m_opcode(opcode), m_sourceRef(ref), m_operands(std::move(operands))
 {
 }
 
@@ -22,7 +24,9 @@ MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode(
 
 MirTargetInstructionId MirInstruction::getTargetId() const { return m_targetId; }
 
-void MirInstruction::addOperand(const MirOperand &operand) { m_operands.emplace_back(operand); }
+SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
+
+void MirInstruction::addOperand(MirOperand *operand) { m_operands.push_back(operand); }
 
 void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
 

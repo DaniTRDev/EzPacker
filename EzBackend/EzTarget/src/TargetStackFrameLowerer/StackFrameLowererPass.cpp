@@ -83,7 +83,7 @@ bool StackFrameLowererPass::run(TypedPoolLinkedList<struct MirFunction> *funcLis
                                 struct MirPassManager *passManager)
 {
     MirFunction *func = *it;
-    MirEmitterContext *ctx = m_ctx->getEmitter()->getContext();
+    MirBuilderContext *ctx = m_ctx->getEmitter()->getContext();
 
     // 1. Calculate offsets for locals and spills
     if (!calculateStackFrameOffsets(func))

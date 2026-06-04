@@ -34,7 +34,8 @@ enum class MirTypeKind
     FloatingPoint,
     Pointer,
     Array, // An array of other types.
-    Void
+    Void,
+    Struct
 };
 
 /**
@@ -52,19 +53,27 @@ class MirType
      *
      * @param kind     High-level classification of the type.
      * @param id       Unique MIR ID assigned by the context.
-     * @param subTypes Optional child-type slice used by compound kinds.
      * @param name     Human-readable type name kept for diagnostics/debugging.
+     * @param subTypes Optional child-type slice used by compound kinds.
      */
-    MirType(MirTypeKind kind,
-            size_t id,
-            size_t totalSize,
-            TypedPoolLinkedList<MirType> *subTypes,
-            const std::string_view &name);
+    MirType(MirTypeKind kind, size_t id, size_t totalSize, std::pmr::string name, std::pmr::vector<MirType *> subTypes);
+
+    /**
+     * Returns the array element type if this type is an array, nullptr if not.
+     * @return
+     */
+    MirType *getArrayElementType() const;
 
     /**
      * Returns the high-level kind of this type.
      */
     MirTypeKind getKind() const;
+
+    /**
+     * Returns the array element count of this type. If this type is not an array, it returns 0.
+     * @return
+     */
+    size_t getArrayElementCount() const;
 
     /**
      * Returns the unique MIR ID of this type.
@@ -78,24 +87,23 @@ class MirType
     size_t getTotalSizeInBytes() const;
 
     /**
-     * Returns the child-type slice for compound kinds, or `nullptr` when this
-     * type has no subordinate types.
-     */
-    TypedPoolLinkedList<MirType> *getSubTypes() const;
-
-    /**
      * Returns the human-readable name associated with this type.
      *
      * This name is informational; identity is determined by `getId()`.
      */
-    const std::string_view &getName() const;
+    const std::pmr::string &getName() const;
+
+    /**
+     * Returns the child-type slice for compound kinds, it may be empty.
+     */
+    const std::pmr::vector<MirType *> &getSubTypes() const;
 
   private:
-    MirTypeKind m_kind;                       // High-level classification of the type.
-    size_t m_id;                              // Unique MIR identifier for this type.
-    size_t m_totalSizeInBytes;                // Total size in bytes of this type.
-    TypedPoolLinkedList<MirType> *m_subTypes; // Optional child types for compound kinds.
-    std::string_view m_name;                  // Debug/diagnostic name.
+    MirTypeKind m_kind;                     // High-level classification of the type.
+    size_t m_id;                            // Unique MIR identifier for this type.
+    size_t m_totalSizeInBytes;              // Total size in bytes of this type.
+    std::pmr::string m_name;                // Debug/diagnostic name.
+    std::pmr::vector<MirType *> m_subTypes; // Optional child types for compound kinds.
 };
 
 #endif // EZPACKER_MIRTYPE_H

@@ -2,7 +2,6 @@
 #define EZPACKER_LIVENESSANALYSIS_H
 
 #include "EzMirCommon.h"
-#include "MirPass/IMirAnalysisPass.h"
 #include "CodeFlowAnalysis.h"
 
 template <> struct std::hash<MirRegister>
@@ -16,12 +15,17 @@ template <> struct std::hash<MirRegister>
     }
 };
 
+/**
+ * @brief PMR-backed storage tracking variable lifespans across basic blocks.
+ */
 struct LivenessResult
 {
-    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_liveIn;
-    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_liveOut;
-    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_def;
-    std::unordered_map<size_t, std::unordered_set<MirRegister*>> m_use;
+    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_liveIn;
+    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_liveOut;
+    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_def;
+    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_use;
+
+    LivenessResult(std::pmr::memory_resource *arena) : m_liveIn(arena), m_liveOut(arena), m_def(arena), m_use(arena) {}
 };
 
 class LivenessAnalysis : public IMirAnalysisPass
@@ -30,55 +34,68 @@ class LivenessAnalysis : public IMirAnalysisPass
     ~LivenessAnalysis() override = default;
 
     /**
-     * Creates the liveness analyzer with the given emitter.
-     * @param emitter
+     * @brief Allocates the liveness analyzer maps on the global compilation arena.
      */
-    LivenessAnalysis(MirEmitter *emitter);
+    LivenessAnalysis(std::pmr::memory_resource *globalArena);
 
     /**
-     * Executes the liveness analysis of the given function.
-     * @param func
-     * @param pm
+     * Returns the name of the pass "LivenessAnalysisPass".
      * @return
      */
-    bool run(TypedPoolLinkedList<class MirBlock> *blockList,
-             TypedPoolLinkedList<class MirBlock>::Iterator it,
-             class MirPassManager *passManager) override;
-
-    
     const char *getName() const override;
-    
+
     /**
-     * Returns the result of the analysis.
+     * Returns the result of the pass. The result contains a live interval of the variables of a function.
      * @return
      */
     const LivenessResult &getResult() const;
 
     /**
-     * Returns the iteration place. Depending on the place, one callback or the other will be called.
+     * Returns MirPassIterationPlace::Function.
      * @return
      */
     MirPassIterationPlace getIterationPlace() const override;
 
-  private:
     /**
-     * Computes the local liveness.
-     * @param func
+     * Runs the pass and builds a the live in-out intervals of the variables used in a function.
+     * @param funcList
+     * @param it
+     * @param passManager
+     * @return
      */
-    void computeLocalLiveness(TypedPoolLinkedList<class MirBlock> *blockList,
-                              TypedPoolLinkedList<class MirBlock>::Iterator it);
+    MirPassResult run(std::pmr::list<MirFunction *> &funcList,
+                      std::pmr::list<MirFunction *>::iterator it,
+                      class MirPassManager *passManager) override;
 
     /**
-     * Computes the global liveness.
+     * @brief Explicitly establishes dependency mapping rules.
+     * Guaranteed to compile and run CodeFlowAnalysis prior to executing liveness.
+     */
+    std::vector<std::type_index> getDependencies() const override;
+
+  private:
+    /**
+     * Computes the gloval live-in/live-out set of a function.
      * @param func
      * @param cfg
      */
-    void computeGlobalLiveness(TypedPoolLinkedList<class MirBlock> *blockList,
-                               TypedPoolLinkedList<class MirBlock>::Iterator it,
-                               const ControlFlowResult &cfg);
+    void computeGlobalLiveness(MirFunction *func, const ControlFlowResult &cfg);
+
+    /**
+     * Computes the local def/use of the blocks inside the function.
+     * @param func
+     * @param collector
+     */
+    void computeLocalLiveness(MirFunction *func, const std::shared_ptr<DiagnosticCollector> &collector);
+
+    // Helpers to extract read/written registers out of generic instructions
+    void extractRegistersFromInstruction(MirInstruction *instr,
+                                         std::pmr::unordered_set<MirRegister *> &defs,
+                                         std::pmr::unordered_set<MirRegister *> &uses);
+
   private:
     LivenessResult m_result;
-    MirEmitter *m_emitter;
+    std::pmr::memory_resource *m_arena;
 };
 
 #endif // EZPACKER_LIVENESSANALYSIS_H

@@ -16,6 +16,13 @@ enum class MirPassIterationPlace : uint8_t
     Instruction // The pass runs on each instruction.
 };
 
+struct MirPassResult
+{
+    bool m_modifiedMir{ false }; // Set to true if the pass modified the MIR.
+    bool m_run{ false };         // Set to true if the pass was actually run.
+    bool m_succeeded{ false };   // Set to true of the pass was run and succeeded.
+};
+
 /**
  * Interface used by passes that iterate over the MIR.
  */
@@ -28,33 +35,33 @@ class IMirPass
      * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
      * iterator was NOT modified.
      */
-    virtual bool run(TypedPoolLinkedList<class MirFunction> *funcList,
-                     TypedPoolLinkedList<class MirFunction>::Iterator it,
-                     class MirPassManager *passManager)
+    virtual MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
+                              std::pmr::list<class MirFunction *>::iterator it,
+                              class MirPassManager *passManager)
     {
-        return false;
+        return {};
     }
 
     /**
      * Runs the pass on the given MIR block. Returns false if the list (or the elem inside the iterator) that holds the
      * iterator was NOT modified.
      */
-    virtual bool run(TypedPoolLinkedList<class MirBlock> *blockList,
-                     TypedPoolLinkedList<class MirBlock>::Iterator it,
-                     class MirPassManager *passManager)
+    virtual MirPassResult run(std::pmr::list<class MirBlock *> &blockList,
+                              std::pmr::list<class MirBlock *>::iterator it,
+                              class MirPassManager *passManager)
     {
-        return false;
+        return {};
     }
 
     /**
      * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
      * iterator was NOT modified.
      */
-    virtual bool run(TypedPoolLinkedList<class MirInstruction> *instrList,
-                     TypedPoolLinkedList<class MirInstruction>::Iterator it,
-                     class MirPassManager *passManager)
+    virtual MirPassResult run(std::pmr::list<class MirInstruction *> &instrList,
+                              std::pmr::list<class MirInstruction *>::iterator it,
+                              class MirPassManager *passManager)
     {
-        return false;
+        return {};
     }
 
     /**
@@ -78,7 +85,13 @@ class IMirPass
     /**
      * Called by the pass manager when the pass needs to be reset.
      */
-    virtual void reset() { return; };
+    virtual void reset() {};
+
+    /**
+     * Returns the dependencies linked to this pass (other passes that must be run before this one).
+     * @return
+     */
+    virtual std::vector<std::type_index> getDependencies() const { return {}; }
 };
 
 #endif // EZPACKER_IMIRPASS_H

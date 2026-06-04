@@ -3,8 +3,8 @@
  * @brief A single MIR instruction: opcode + operand list.
  *
  * `MirInstruction` is the executable atom stored inside a `MirBlock`. It owns
- * no heap memory itself; instead, it points at an arena-managed operand slice
- * created by `MirEmitterContext`. The opcode determines how many operands are
+ * no heap memory itself; instead, it points at an arena-managed operand vector
+ * created by `MirBuilderContext`. The opcode determines how many operands are
  * expected and which semantic flags apply, via `MirInstructionMetadata` from
  * the compile-time instruction catalogue.
  */
@@ -26,13 +26,14 @@ class MirInstruction
 {
   public:
     /**
-     * Creates an instruction wrapper around an opcode and its operand slice.
+     * Creates an instruction wrapper around an opcode and its operand list.
      *
      * @param opcode   Opcode describing the operation performed.
+     * @param ref      Source reference of where this instruction was originated.
      * @param operands Arena-managed operand list initially associated with the
      *                 instruction. Emitters append to this list later.
      */
-    explicit MirInstruction(MirInstructionOpCode opcode, std::pmr::vector<MirOperand *> operands);
+    explicit MirInstruction(MirInstructionOpCode opcode, SourceReference *ref, std::pmr::vector<MirOperand *> operands);
 
     /**
      * Returns `true` when the instruction currently stores at least one
@@ -78,10 +79,16 @@ class MirInstruction
     MirTargetInstructionId getTargetId() const;
 
     /**
+     * Returns the source reference of this instruction.
+     * @return
+     */
+    SourceReference *getSourceRef() const;
+
+    /**
      * Adds an operand to the instruction.
      * @param operand
      */
-    void addOperand(const MirOperand &operand);
+    void addOperand(MirOperand *operand);
 
     /**
      * Sets the target instruction ID.
@@ -106,5 +113,7 @@ class MirInstruction
     SourceReference *m_sourceRef;
     std::pmr::vector<MirOperand *> m_operands;
 };
+
+
 
 #endif // EZPACKER_MIRINSTRUCTION_H

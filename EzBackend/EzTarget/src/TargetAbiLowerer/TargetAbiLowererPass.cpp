@@ -8,7 +8,7 @@ bool TargetAbiLowererPass::run(TypedPoolLinkedList<class MirFunction> *funcList,
                                class MirPassManager *passManager)
 {
     MirEmitter *emitter = m_ctx->getEmitter();
-    MirEmitterContext *emitterContext = emitter->getContext();
+    MirBuilderContext *emitterContext = emitter->getContext();
     MirFunction *func = *it;
     TargetDesc *targetDesc = m_ctx->getTargetDesc();
     ABIDesc *abi = targetDesc->getABI();
@@ -54,7 +54,7 @@ MirPassIterationPlace TargetAbiLowererPass::getIterationPlace() const { return M
 
 bool TargetAbiLowererPass::lowerParameters(ABIDesc *abi,
                                            MirEmitter *emitter,
-                                           MirEmitterContext *emitterCtx,
+                                           MirBuilderContext *emitterCtx,
                                            MirFunction *func)
 {
     MirBlock *funcEntryPoint = func->getEntryPoint();
@@ -130,7 +130,7 @@ bool TargetAbiLowererPass::lowerCallSite(MirBlock *block,
                                          TypedPoolLinkedList<MirInstruction>::Iterator it,
                                          ABIDesc *abi,
                                          MirEmitter *emitter,
-                                         MirEmitterContext *emitterCtx)
+                                         MirBuilderContext *emitterCtx)
 {
     MirInstruction *callInstr = *it;
     auto operands = callInstr->getOperands();
@@ -210,7 +210,7 @@ bool TargetAbiLowererPass::lowerReturnSite(MirBlock *block,
                                            TypedPoolLinkedList<MirInstruction>::Iterator it,
                                            ABIDesc *abi,
                                            MirEmitter *emitter,
-                                           MirEmitterContext *emitterCtx)
+                                           MirBuilderContext *emitterCtx)
 {
     MirInstruction *retInstr = *it;
     auto operands = retInstr->getOperands();

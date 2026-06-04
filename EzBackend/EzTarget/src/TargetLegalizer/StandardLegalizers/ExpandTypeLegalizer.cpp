@@ -66,7 +66,7 @@ bool StandardLegalizers::expandTypeLegalizer(LegalizerContext *ctx,
                                              TypedPoolLinkedList<class MirInstruction>::Iterator it)
 {
     MirEmitter *emitter = ctx->getEmitter();
-    MirEmitterContext *emitterCtx = emitter->getContext();
+    MirBuilderContext *emitterCtx = emitter->getContext();
     MirInstruction *instr = *it;
     MirBlock *currentBlock = emitterCtx->getCurrentBlock();
 

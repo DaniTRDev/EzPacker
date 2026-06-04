@@ -14,7 +14,7 @@
  *   - `MirBlock`: ordered instruction list representing one basic block.
  *   - `MirFunction`: entry block plus block/parameter lists for one callable
  *     unit.
- *   - `MirEmitterContext`: owning arena context that allocates and links MIR
+ *   - `MirBuilderContext`: owning arena context that allocates and links MIR
  *     objects.
  *   - `MirEmitter`: convenience API for emitting instructions into the bound
  *     block.
@@ -27,14 +27,17 @@
 #include "EzMirCommon.h"
 
 // ── Emitters (block/instruction builders & global data) ─────────────────────
-#include "Emitter/MirEmitter.h"
-#include "Emitter/MirEmitterContext.h"
+#include "Builder/MirBuilder.h"
+#include "Builder/MirBuilderContext.h"
 
 // ── Function container ──────────────────────────────────────────────────────
 #include "Function/MirFunction.h"
+#include "Function/MirFunctionBuilder.h"
+#include "Function/MirFunctionStackFrame.h"
 
 // ── Instructions & opcode catalogue ─────────────────────────────────────────
 #include "Instruction/MirInstruction.h"
+#include "Instruction//MirInstructionBuilder.h"
 #include "Instruction/MirInstructionDefs.h"
 #include "Instruction/MirInstructionSet.h"
 
@@ -47,10 +50,12 @@
 #include "MirPass/Passes/LivenessAnalysis.h"
 
 // ── Basic block ─────────────────────────────────────────────────────────────
-#include "MirBlock.h"
+#include "Block/MirBlock.h"
+#include "Block/MirBlockBuilder.h"
 
 // ── Operand variant (registers, immediates, memory, references) ─────────────
 #include "Operand/MirOperand.h"
+#include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 
 #include "Printer/MirPrinter.h"

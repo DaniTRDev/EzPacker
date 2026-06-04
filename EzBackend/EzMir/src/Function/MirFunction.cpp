@@ -1,18 +1,17 @@
 #include "Function/MirFunction.h"
 
 MirFunction::MirFunction(MirBlock *entryPoint,
-                         MirType *returnType,
                          MirFunctionStackFrame *stackFrame,
+                         MirType *returnType,
                          size_t id,
-                         TypedPoolLinkedList<MirBlock> *blocks,
-                         TypedPoolLinkedList<MirOperand *> *parameters,
-                         const char *name) :
-    m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType), m_id(id), m_blocks(blocks),
-    m_parameters(parameters), m_name(name)
+                         SourceReference *sourceRef,
+                         std::pmr::list<MirBlock *> blocks,
+                         std::pmr::list<MirFuncParam *> parameters,
+                         std::pmr::string name) :
+    m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType), m_id(id), m_sourceRef(sourceRef),
+    m_blocks(std::move(blocks)), m_parameters(std::move(parameters)), m_name(std::move(name))
 {
 }
-
-const char *MirFunction::getName() { return m_name; }
 
 MirBlock *MirFunction::getEntryPoint() { return m_entryPoint; }
 
@@ -22,11 +21,10 @@ size_t MirFunction::getId() { return m_id; }
 
 MirType *MirFunction::getReturnType() { return m_returnType; }
 
-TypedPoolLinkedList<MirBlock> *MirFunction::getBlocks() { return m_blocks; }
+SourceReference *MirFunction::getSourceRef() const { return m_sourceRef; }
 
-TypedPoolLinkedList<MirOperand *> *MirFunction::getParameters() { return m_parameters; }
+std::pmr::list<MirBlock *> &MirFunction::getBlocks() { return m_blocks; }
 
-void MirFunction::appendParameter(MirRegister *param, const char *name)
-{
-    m_parameters->createAndAppendBack(param);
-}
+std::pmr::list<MirFuncParam *> &MirFunction::getParameters() { return m_parameters; }
+
+const std::pmr::string &MirFunction::getName() { return m_name; }

@@ -11,17 +11,21 @@
  *   - and the operand list describing its parameters.
  *
  * The function does not own these slices directly; they are allocated and
- * maintained by `MirEmitterContext`. When a function is the currently active
- * function inside the context, newly created blocks are appended to its block
- * list automatically.
+ * maintained by `MirBuilderContext`.
  */
 #ifndef EZPACKER_MIRFUNCTION_H
 #define EZPACKER_MIRFUNCTION_H
 
 #include "EzMirCommon.h"
-#include "MirBlock.h"
+#include "Block/MirBlock.h"
 #include "Type/MirType.h"
 #include "MirFunctionStackFrame.h"
+
+struct MirFuncParam
+{
+    MirRegister *m_reg;
+    std::pmr::string m_name;
+};
 
 /**
  * Important: Parameters MUST BE VIRTUAL/PHYSICAL REGISTERS.
@@ -33,24 +37,22 @@ class MirFunction
      * Creates a function wrapper over arena-managed MIR data structures.
      *
      * @param entryPoint    First block executed when the function starts.
-     * @param id            Unique MIR ID for the function itself.
+     * @param stackFrame    A stack frame object that describes this function's stack frame.
      * @param returnType    MIR type describing the function's return value.
+     * @param id            Unique MIR ID for the function itself.
+     * @param sourceRef     Source reference that originated this function.
      * @param blocks        Ordered block slice belonging to the function.
      * @param parameters    Slice of parameter operands in declaration order.
      * @param name
      */
     MirFunction(MirBlock *entryPoint,
+                MirFunctionStackFrame *stackFrame,
                 MirType *returnType,
                 size_t id,
-                std::pmr::list<MirBlock> *blocks,
-                std::pmr::vector<MirOperand *> *parameters,
+                SourceReference *sourceRef,
+                std::pmr::list<MirBlock *> blocks,
+                std::pmr::list<MirFuncParam *> parameters,
                 std::pmr::string name);
-
-    /**
-     * Returns the name of the function.
-     * @return
-     */
-    const char *getName();
 
     /**
      * Returns the function entry block.
@@ -75,37 +77,43 @@ class MirFunction
     size_t getId();
 
     /**
+     * Returns the source reference that created this function.
+     * @return
+     */
+    SourceReference *getSourceRef() const;
+
+    /**
      * Returns the mutable list of blocks that belong to this function.
      *
      * The list always contains the entry point as its first block right after
-     * `MirEmitterContext::createFunction()` succeeds.
+     * `MirBuilderContext::createFunction()` succeeds.
      */
-    TypedPoolLinkedList<MirBlock> *getBlocks();
+    std::pmr::list<MirBlock *> &getBlocks();
 
     /**
-     * Returns the parameter list for this function.
+     * Returns the MUTABLE parameter list for this function.
      *
-     * Each element is a `MirOperand` describing one incoming parameter. The
+     * Each element is a `MirFuncParam*` describing one incoming parameter. The
      * exact calling-convention meaning is defined by later lowering stages.
      */
-    TypedPoolLinkedList<MirOperand *> *getParameters();
+    std::pmr::list<MirFuncParam *> &getParameters();
 
     /**
-     * Appends a parameter to the function.
-     * @param param
-     * @param paramType
-     * @param name
+     * Returns the name of the function.
+     * @return
      */
-    void appendParameter(MirRegister *param, const char *name);
+    const std::pmr::string &getName();
 
   private:
     MirBlock *m_entryPoint;
     MirFunctionStackFrame *m_stackFrame;
     MirType *m_returnType;
     size_t m_id;
-    TypedPoolLinkedList<MirBlock> *m_blocks; // Arena-managed blocks belonging to this function.
-    TypedPoolLinkedList<MirOperand *> *m_parameters;
-    const char *m_name;
+    SourceReference *m_sourceRef;
+
+    std::pmr::list<MirBlock *> m_blocks; // Arena-managed blocks belonging to this function.
+    std::pmr::list<MirFuncParam *> m_parameters;
+    std::pmr::string m_name;
 };
 
 #endif // EZPACKER_MIRFUNCTION_H

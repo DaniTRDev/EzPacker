@@ -2,6 +2,8 @@
 #define EZPACKER_MIRPASSMANAGER_H
 
 #include "EzMirCommon.h"
+#include "IMirAnalysisPass.h"
+#include "IMirTransformPass.h"
 #include "IMirPass.h"
 #include "Function/MirFunction.h"
 #include "Printer/MirPrinter.h"
@@ -10,89 +12,105 @@ class MirPassManager
 {
   public:
     /**
-     * Adds the given pass to the list.
-     * @tparam T
-     * @tparam Args
-     * @param args
+     * Creates the pass manager and links it to the given arena.
+     * @param globalArena
+     * @param diagCollector
+     */
+    MirPassManager(std::pmr::memory_resource *globalArena, std::shared_ptr<DiagnosticCollector> diagCollector);
+
+    /**
+     * @brief Stashes a pass into the blueprint registry. It won't be ordered yet.
      */
     template <typename T, typename... Args>
-        requires(std::is_base_of<IMirPass, T>::value)
+        requires(std::is_base_of_v<IMirPass, T>)
     void addPass(Args &&...args)
     {
-        m_passes.push_back(std::make_unique<T>(std::forward<Args>(args)...));
+        auto passId = std::type_index(typeid(T));
+        m_passesBlueprint[passId] = std::make_unique<T>(std::forward<Args>(args)...);
     }
 
-    void clearAll()
-    {
-        m_cachedPasses.clear();
-        m_passes.clear();
-        m_validAnalyses.clear();
-    }
+    /**
+     * Calculates the pipeline needed to run all the passes that have been pushed.
+     */
+    void generatePipeline();
 
-    template <typename T, typename IteratedElementType, typename... Args>
-    T &getAnalysis(TypedPoolLinkedList<IteratedElementType> *list,
-                   TypedPoolLinkedList<IteratedElementType>::Iterator it,
-                   Args &&...args)
+    template <typename AnalysisPass>
+        requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
+    AnalysisPass *getAnalysis(std::pmr::list<class MirFunction *> &functionList)
     {
-        std::type_index typeId = std::type_index(typeid(T));
+        std::type_index typeId = std::type_index(typeid(AnalysisPass));
 
-        // If the result is available and was not invalidated, return it.
-        if (m_validAnalyses.contains(typeId))
+        // Check if the analysis pass has already run and its cached result is valid
+        auto it = m_validAnalyses.find(typeId);
+        if (it != m_validAnalyses.end())
         {
-            return *static_cast<T *>(m_validAnalyses[typeId]);
+            return static_cast<AnalysisPass *>(it->second);
         }
 
-        // If no analysis result exists, create its pass and run it in-place.
-        auto analysisPass = std::make_unique<T>(std::forward<Args...>(args)...);
-        if (analysisPass->getPassType() != MirPassType::Analysis)
+        // Not found in cache. Lookup the pass instance inside the blueprint registry
+        auto blueprintIt = m_passesBlueprint.find(typeId);
+        AnalysisPass *passInstance = nullptr;
+
+        if (blueprintIt != m_passesBlueprint.end())
         {
-            throw std::runtime_error("Attempted to require a Transform pass inside an Analysis");
+            // Use the pre-registered pass instance from the blueprint graph
+            passInstance = static_cast<AnalysisPass *>(blueprintIt->second.get());
+        }
+        else
+        {
+            m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirPassManager")
+                    << "Tried to run a pass that has not been previously added";
+            throw std::runtime_error("");
         }
 
-        analysisPass->run(list, it, this);
+        MirPassResult result = runPass(passInstance, functionList);
+        if (result.m_run && result.m_succeeded)
+        {
+            // Cache the pointer so future passes can access it instantly without re-running
+            m_validAnalyses[typeId] = passInstance;
+        }
 
-        T *passPtr = analysisPass.get();
-        m_validAnalyses[typeId] = passPtr;
-
-        m_cachedPasses.push_back(std::move(analysisPass));
-
-        return *passPtr;
+        return passInstance;
     }
 
     /**
-     * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
-     * iterator was modified.
+     * Runs the generated pipeline (by generatePipeline) on the given function list.
+     * @param codeModule
      */
-    bool run(TypedPoolLinkedList<class MirFunction> *funcList,
-             TypedPoolLinkedList<class MirFunction>::Iterator it,
-             class MirPassManager *passManager);
+    void runPipeline(std::pmr::list<class MirFunction *> &functionList);
 
     /**
-     * Runs the pass on the given MIR block. Returns false if the list (or the elem inside the iterator) that holds the
-     * iterator was modified.
+     * Returns the diag collector linked to this pass manager.
+     * @return
      */
-    bool run(TypedPoolLinkedList<class MirBlock> *blockList,
-             TypedPoolLinkedList<class MirBlock>::Iterator it,
-             class MirPassManager *passManager);
-
-    /**
-     * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
-     * iterator was modified.
-     */
-    bool run(TypedPoolLinkedList<class MirInstruction> *instrList,
-             TypedPoolLinkedList<class MirInstruction>::Iterator it,
-             class MirPassManager *passManager);
-
-    void invalidateAllAnalyses()
-    {
-        m_validAnalyses.clear();
-        m_cachedPasses.clear();
-    }
+    const std::shared_ptr<DiagnosticCollector> &getDiagCollector() const;
 
   private:
-    std::map<std::type_index, IMirPass *> m_validAnalyses;
-    std::vector<std::unique_ptr<IMirPass>> m_cachedPasses;
-    std::vector<std::unique_ptr<IMirPass>> m_passes;
+    /**
+     * Tries to form a valid pass execution pipeline satisfying the dependencies of each pass.
+     * @param passId
+     * @param resolved
+     * @param seenInCurrentPath
+     */
+    void resolveDependencies(std::type_index passId,
+                             std::unordered_set<std::type_index> &resolved,
+                             std::unordered_set<std::type_index> &seenInCurrentPath);
+
+    /**
+     * Runs a pass on the given place depending on its iteration type.
+     * @param pass
+     * @return
+     */
+    MirPassResult runPass(IMirPass *pass, std::pmr::list<class MirFunction *> &functionList);
+
+  private:
+    std::pmr::unordered_map<std::type_index, IMirPass *>
+            m_validAnalyses; // Analysis passes that have been run and have returned data.
+    std::pmr::unordered_map<std::type_index, std::unique_ptr<IMirPass>>
+            m_passesBlueprint; // Links an index to its pass.
+    std::pmr::vector<IMirPass *>
+            m_executionPipeline; // An ordered list of passes that guarantees that every dep is resolved.
+    std::shared_ptr<DiagnosticCollector> m_diagCollector;
 };
 
 #endif // EZPACKER_MIRPASSMANAGER_H

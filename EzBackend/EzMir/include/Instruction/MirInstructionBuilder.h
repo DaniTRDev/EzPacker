@@ -2,34 +2,81 @@
 #define EZPACKER_MIRINSTRUCTIONBUILDER_H
 
 #include "EzCoreCommon.h"
-#include "Emitter/MirEmitterContext.h"
+#include "Builder/MirBuilder.h"
+#include "Builder/MirBuilderContext.h"
+#include "Printer/MirPrinter.h"
 
-class MirInstructionBuilder
+enum class InsertionType : uint8_t
+{
+    Append,      // Back.
+    InsertBefore // Before a point.
+};
+
+/**
+ * Structure that contains information about where the instruction produced by a builder should be stored.
+ */
+struct MirInstructionInsertionPoint
+{
+    InsertionType m_type;
+    MirBlock *m_block;
+    std::pmr::list<MirInstruction *>::iterator m_iterator{};
+};
+
+class MirInstructionBuilder : public MirBuilder<MirInstruction>
 {
   public:
     /**
-     * Creates the builder with the given targetBlock, ctx and opcode.
-     * @param targetBlock
+     * Creates the builder with the given ctx, insertion point and opcode.
      * @param ctx
-     * @param opcode
+     * @param insertionPoint
      */
-    MirInstructionBuilder(MirEmitterContext *ctx, MirInstructionOpCode opcode);
+    MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint *insertionPoint);
 
     /**
-     * Pushes the built instruction into the context.
+     * Flushes the content of the builder.
+     */
+    ~MirInstructionBuilder() override;
+
+    /**
+     * Pushes the built instruction into the context at the given insertion point.
      */
     void flush();
+
+    /**
+     * Builds an instruction with the given opcode.
+     * @param opcode
+     * @return
+     */
+    MirInstruction *build(MirInstructionOpCode opcode, SourceReference *ref);
 
     /**
      * Overload of the '<<' operator that allows pushing operands easily.
      * @param operand
      * @return
      */
-    MirInstructionBuilder &operator<<(const MirOperand &operand);
+    MirInstructionBuilder &operator<<(MirOperand *operand);
+
+// Define the macro to generate a method for each instruction
+#define INSTRUCTION(NAME, category, linearEq, ops, flags)                                                              \
+    template <typename... OperandTypes> MirInstruction *NAME(SourceReference *sourceRef, OperandTypes &&...operands)   \
+    {                                                                                                                  \
+        std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
+        MirInstruction *instr = build(MirInstructionOpCode::NAME, sourceRef);                                          \
+                                                                                                                       \
+        for (auto &op : operandList)                                                                                   \
+        {                                                                                                              \
+            this->operator<<(op);                                                                                      \
+        }                                                                                                              \
+                                                                                                                       \
+        return instr;                                                                                                  \
+    } // Include the file again to expand the macros
+
+#include "Instruction/MirInstructionSet.h"
+#undef INSTRUCTION
 
   private:
-    MirEmitterContext *m_ctx;
-    MirInstruction *m_instr;
+    MirBuilderContext *m_ctx;
+    MirInstructionInsertionPoint *m_insertionPoint;
 };
 
 #endif // EZPACKER_MIRINSTRUCTIONBUILDER_H

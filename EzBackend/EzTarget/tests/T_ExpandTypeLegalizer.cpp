@@ -47,7 +47,7 @@ class ExpandTypeLegalizerTests : public ::testing::Test
   protected:
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
-    std::shared_ptr<MirEmitterContext> emitterCtx;
+    std::shared_ptr<MirBuilderContext> emitterCtx;
     MirEmitter *emitter;
 
     DummyABIDescExpand abi;
@@ -60,7 +60,7 @@ class ExpandTypeLegalizerTests : public ::testing::Test
     {
         ec = std::make_shared<ErrorCollector>();
         sm = std::make_shared<SourceManager>(std::filesystem::current_path());
-        emitterCtx = std::make_shared<MirEmitterContext>(ec, sm);
+        emitterCtx = std::make_shared<MirBuilderContext>(ec, sm);
         emitter = new MirEmitter(emitterCtx.get());
 
         targetDesc = new TargetDesc(&abi, TargetEndianness::LittleEndian, "DummyTarget");

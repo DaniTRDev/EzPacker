@@ -243,7 +243,7 @@ asmjit::Operand x64Emitter::getAsmjitOperandFromMirOperand(MirOperand *operand, 
 
         case MirOperandType::FrameIndex:
         {
-            // By the time we reach the Emitter, all FrameIndices should have been
+            // By the time we reach the Builder, all FrameIndices should have been
             // converted into MirMemory operands (e.g., [RSP + offset]) by the StackFrameLowerer.
             throw std::runtime_error(
                     "Internal Compiler Error: FrameIndex survived to emission phase. Run StackFrameLowerer first.");

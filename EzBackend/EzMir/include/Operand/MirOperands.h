@@ -17,7 +17,7 @@ class MirDouble : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Double;
 
-    MirDouble(MirType *type, double value) : MirOperand(type), m_value(value) {}
+    MirDouble(MirType *type, double value, SourceReference *ref) : MirOperand(type, ref), m_value(value) {}
 
     double getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
@@ -32,7 +32,7 @@ class MirInteger : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Integer;
 
-    MirInteger(MirType *type, int64_t value) : MirOperand(type), m_value(value) {}
+    MirInteger(MirType *type, int64_t value, SourceReference *ref) : MirOperand(type, ref), m_value(value) {}
 
     int64_t getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
@@ -47,8 +47,8 @@ class MirReference : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Reference;
 
-    MirReference(MirType *type, MirReferenceType refType, size_t refId) :
-        MirOperand(type), m_refType(refType), m_refId(refId)
+    MirReference(MirType *type, MirReferenceType refType, size_t refId, SourceReference *ref) :
+        MirOperand(type, ref), m_refType(refType), m_refId(refId)
     {
     }
 
@@ -76,8 +76,8 @@ class MirRegister : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Register;
 
-    MirRegister(MirType *type, bool isVirtual, size_t id, const char *name = nullptr) :
-        MirOperand(type), m_virtual(isVirtual), m_id(id)
+    MirRegister(MirType *type, bool isVirtual, size_t id, SourceReference *ref, const char *name = nullptr) :
+        MirOperand(type, ref), m_virtual(isVirtual), m_id(id)
     {
     }
 
@@ -107,7 +107,7 @@ class MirFrameIndex : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::FrameIndex;
 
-    MirFrameIndex(MirType *type, size_t frameId) : MirOperand(type), m_frameId(frameId) {}
+    MirFrameIndex(MirType *type, size_t frameId, SourceReference *ref) : MirOperand(type, ref), m_frameId(frameId) {}
 
     size_t getFrameId() const { return m_frameId; }
     MirOperandType getType() const override { return OpKind; }
@@ -127,7 +127,10 @@ class MirMemory : public MirOperand
     static constexpr MirOperandType OpKind = MirOperandType::Memory;
 
     // The 'type' passed to the base constructor represents the size of what's being accessed.
-    MirMemory(MirType *type, MirOperand *base, MirOperand *displ) : MirOperand(type), m_base(base), m_displ(displ) {}
+    MirMemory(MirType *type, MirOperand *base, MirOperand *displ, SourceReference *ref) :
+        MirOperand(type, ref), m_base(base), m_displ(displ)
+    {
+    }
 
     MirOperand *getBase() const { return m_base; }
     MirOperand *getDisplacement() const { return m_displ; }

@@ -1,0 +1,43 @@
+#ifndef EZPACKER_MIRBLOCKBUILDER_H
+#define EZPACKER_MIRBLOCKBUILDER_H
+
+#include "EzCoreCommon.h"
+#include "Builder/MirBuilder.h"
+#include "Builder/MirBuilderContext.h"
+#include "Instruction/MirInstructionBuilder.h"
+
+class MirBlockBuilder : public MirBuilder<MirBlock>
+{
+  public:
+    /**
+     * Creates a block builder attached to the given function.
+     * @param ctx
+     */
+    MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner);
+
+    /**
+     * Flushes the block.
+     */
+    ~MirBlockBuilder() override;
+
+    /**
+     * Builds a block returns it.
+     * @param sourceRef
+     * @return
+     */
+    MirBlock *build(SourceReference *sourceRef);
+
+    /**
+     * Returns an instruction builder linked to the current block and context.
+     * @param opcode
+     * @return
+     */
+    MirInstructionBuilder instrBuilder();
+
+  private:
+    MirBuilderContext *m_ctx;
+    MirFunction *m_owner;
+    MirInstructionInsertionPoint m_insertPoint; // The insertion point of the created block.
+};
+
+#endif // EZPACKER_MIRBLOCKBUILDER_H

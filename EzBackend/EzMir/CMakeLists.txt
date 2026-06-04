@@ -1,9 +1,10 @@
 set(EZMIR_FILES_LIST
         "include/EzMir.h"
         "include/EzMirCommon.h"
-        "include/MirBlock.h"
-        "include/Emitter/MirEmitter.h"
-        "include/Emitter/MirEmitterContext.h"
+        "include/Block/MirBlock.h"
+        "include/Block/MirBlockBuilder.h"
+        "include/Builder/MirBuilder.h"
+        "include/Builder/MirBuilderContext.h"
         "include/Instruction/MirInstructionDefs.h"
         "include/Instruction/MirInstruction.h"
         "include/Instruction/MirInstructionBuilder.h"
@@ -13,8 +14,10 @@ set(EZMIR_FILES_LIST
         "include/MirPass/IMirTransformPass.h"
         "include/MirPass/MirPassManager.h"
         "include/Function/MirFunction.h"
+        "include/Function/MirFunctionBuilder.h"
         "include/Function/MirFunctionStackFrame.h"
         "include/Operand/MirOperand.h"
+        "include/Operand/MirOperandBuilder.h"
         "include/Operand/MirOperands.h"
         "include/Printer/MirPrinter.h"
         "include/Type/MirType.h"
@@ -22,17 +25,19 @@ set(EZMIR_FILES_LIST
         "include/MirPass/Passes/CodeFlowAnalysis.h"
         "include/MirPass/Passes/LivenessAnalysis.h"
 
-        "src/MirBlock.cpp"
-        "src/Emitter/MirEmitter.cpp"
-        "src/Emitter/MirEmitterContext.cpp"
+        "src/Block/MirBlock.cpp"
+        "src/Block/MirBlockBuilder.cpp"
+        "src/Builder/MirBuilderContext.cpp"
         "src/Instruction/MirInstructionBuilder.cpp"
         "src/Instruction/MirInstruction.cpp"
         "src/Function/MirFunction.cpp"
+        "src/Function/MirFunctionBuilder.cpp"
         "src/Function/MirFunctionStackFrame.cpp"
         "src/MirPass/MirPassManager.cpp"
         "src/MirPass/Passes/CodeFlowAnalysis.cpp"
         "src/MirPass/Passes/LivenessAnalysis.cpp"
         "src/Operand/MirOperand.cpp"
+        "src/Operand/MirOperandBuilder.cpp"
         "src/Printer/MirPrinter.cpp"
         "src/Type/MirType.cpp"
         "src/Type/MirTypeTable.cpp"
@@ -47,18 +52,10 @@ EzCMK_ConfigureLib(NAME "EzMir"
 if (EZPACKER_BUILD_TESTS)
     message(STATUS "Building tests for EzMir")
 
-    EzPacker_AddTest(
-            "T_MirEmitterContext"
-            "EzMir"
-            ""
-            "tests/T_MirEmitterContext.cpp"
-    )
-
-    EzPacker_AddTest(
-            "T_MirEmitter"
-            "EzMir"
-            ""
-            "tests/T_MirEmitter.cpp"
+    EzCMK_ConfigureLib(NAME "EzMirTestSuite"
+            FILE_LIST "tests/MirTestSuite.cpp;tests/MirTestSuite.h"
+            PRECOMPILED_HEADER "tests/MirTestSuite.h"
+            LINKED_LIBRARIES "EzMir"
     )
 
     EzPacker_AddTest(

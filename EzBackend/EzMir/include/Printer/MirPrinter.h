@@ -18,6 +18,8 @@ class MirPrinter
 
     std::string printToString(MirInstruction *function) const;
 
+    std::string printToString(MirOperand *operand) const;
+    
   private:
 };
 

@@ -1,0 +1,87 @@
+#include "Builder/MirBuilderContext.h"
+#include "Type/MirTypeTable.h"
+
+MirBuilderContext::MirBuilderContext(const std::shared_ptr<DiagnosticCollector> &diagCollector) :
+    m_currentId(1), m_globalResource(), m_functionResource(&m_globalResource), m_functions(&m_globalResource),
+    m_functionIdToFunc(&m_globalResource), m_blockIdToBlock(&m_globalResource), m_globalData(&m_globalResource),
+    m_diagCollector(diagCollector)
+{
+}
+
+bool MirBuilderContext::appendBlock(MirBlock *block)
+{
+    if (!block)
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirEmitterCtx")
+                << "Could not append block because it is invalid";
+        return false;
+    }
+
+    auto it = m_blockIdToBlock.find(block->getId());
+    if (it != m_blockIdToBlock.end())
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirEmitterCtx")
+                << "Could not append block because it was already appended";
+        return false;
+    }
+
+    m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirEmitterCtx")
+            << std::pmr::string(std::format("Appended block with id: {})", block->getId()));
+
+    m_blockIdToBlock.insert({ block->getId(), block });
+    return true;
+}
+
+bool MirBuilderContext::appendFunction(MirFunction *func)
+{
+    if (!func)
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirEmitterCtx")
+                << "Could not append function because it is invalid";
+        return false;
+    }
+
+    auto it = m_functionIdToFunc.find(func->getId());
+    if (it != m_functionIdToFunc.end())
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirEmitterCtx")
+                << "Could not append function because it was already appended";
+        return false;
+    }
+
+    m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirEmitterCtx")
+            << std::pmr::string(std::format("Appended function: {} (id: {})", func->getName(), func->getId()));
+
+    m_functionIdToFunc.insert({ func->getId(), func });
+    return true;
+}
+
+MirId MirBuilderContext::createId() { return m_currentId++; }
+
+MirBlock *MirBuilderContext::getBlockById(size_t id) const
+{
+    auto it = m_blockIdToBlock.find(id);
+    if (it != m_blockIdToBlock.end())
+    {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+MirFunction *MirBuilderContext::getFuncById(size_t id) const
+{
+    auto it = m_functionIdToFunc.find(id);
+    if (it != m_functionIdToFunc.end())
+    {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return &m_globalResource; }
+
+std::pmr::monotonic_buffer_resource *MirBuilderContext::getFuncAllocator() { return &m_functionResource; }
+
+const std::shared_ptr<DiagnosticCollector> &MirBuilderContext::getDiagCollector() { return m_diagCollector; }

@@ -1,36 +1,57 @@
 #include "Instruction/MirInstructionBuilder.h"
 
-MirInstructionBuilder::MirInstructionBuilder(MirEmitterContext *ctx, MirInstructionOpCode opcode) : m_ctx(ctx)
+MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint *insertionPoint) :
+    m_ctx(ctx), m_insertionPoint(insertionPoint)
+{
+}
+
+MirInstructionBuilder::~MirInstructionBuilder() { flush(); }
+
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode, SourceReference *ref)
 {
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
     std::pmr::polymorphic_allocator<MirInstruction> alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    m_instr = alloc.allocate(1);
-    alloc.construct(m_instr, opcode, std::pmr::vector<MirOperand *>(arena));
+    MirInstruction *instr = alloc.allocate(1);
+    alloc.construct(instr, opcode, ref, std::pmr::vector<MirOperand *>(arena));
+
+    auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
+    builder << ref << "Built instruction: " << std::pmr::string(MirPrinter().printToString(instr));
+
+    setBuildResult(instr);
+    return instr;
 }
 
 void MirInstructionBuilder::flush()
 {
-    if (m_ctx && m_instr)
+    MirInstruction *instr = getBuiltObj();
+    if (m_ctx && instr)
     {
-        auto point = m_ctx->getInsertPoint();
-        if (point.mode == InsertMode::Append)
+        if (m_insertionPoint->m_type == InsertionType::Append)
         {
-            point.block->getInstructions().push_back(std::move(*m_instr));
+            m_insertionPoint->m_block->getInstructions().push_back(instr);
         }
         else
         {
-            point.block->getInstructions().insert(point.iterator, std::move(*m_instr));
+            m_insertionPoint->m_block->getInstructions().insert(m_insertionPoint->m_iterator, instr);
         }
-
-        m_ctx = nullptr;
-        m_instr = nullptr;
     }
+
+    MirBuilder::flush();
 }
 
-MirInstructionBuilder &MirInstructionBuilder::operator<<(const MirOperand &operand)
+MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
 {
-    m_instr->addOperand(operand);
+    if (!isBuilt() || !operand)
+    {
+        throw std::runtime_error("Internal Compiler Error: The instruction is not built or the operand is not valid");
+    }
+
+    auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
+    builder << operand->getSourceRef();
+    builder << "Appended operand to instruction: " << std::pmr::string(MirPrinter().printToString(operand));
+
+    getBuiltObj()->addOperand(operand);
     return *this;
 }

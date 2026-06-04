@@ -1,62 +1,54 @@
 #include "Function/MirFunctionStackFrame.h"
 
-MirFunctionStackFrame::MirFunctionStackFrame(MirFunction *owner) : m_owner(owner), m_stackFrameObjects(nullptr) {}
-
-MirFunctionStackFrame::MirFunctionStackFrame(MirFunction *owner, TypedPool *stackFrameObjectPool) :
-    MirFunctionStackFrame(owner)
+MirFunctionStackFrame::MirFunctionStackFrame(std::pmr::vector<StackFrameObject *> stackFrameObjs) :
+    m_stackFrameObjects(std::move(stackFrameObjs))
 {
-    m_stackFrameObjects = stackFrameObjectPool->linkedList<StackFrameObject>();
 }
 
-size_t MirFunctionStackFrame::getAllocatedObjectCount() const { return m_stackFrameObjects->m_numElems; }
+size_t MirFunctionStackFrame::getAllocatedObjectCount() const { return m_stackFrameObjects.size(); }
 
-StackFrameObject *MirFunctionStackFrame::getObjectFromId(MirId id)
+StackFrameObject *
+MirFunctionStackFrame::create(int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source)
 {
-    for (auto it = m_stackFrameObjects->begin(); it != m_stackFrameObjects->end(); ++it)
-    {
-        StackFrameObject *obj = *it;
-        if (obj->m_id == id)
-        {
-            return obj;
-        }
-    }
-    return nullptr;
+    std::pmr::memory_resource *arena = m_stackFrameObjects.get_allocator().resource();
+    std::pmr::polymorphic_allocator<StackFrameObject> objAlloc(arena);
+
+    StackFrameObject *obj = objAlloc.allocate(1);
+    obj->m_offset = offset;
+    obj->m_align = align;
+    obj->m_id = m_stackFrameObjects.size();
+    obj->m_sizeInBytes = sizeInBytes;
+    obj->m_source = source;
+
+    m_stackFrameObjects.emplace_back(obj);
+    return m_stackFrameObjects.back();
 }
 
 StackFrameObject *MirFunctionStackFrame::createLocalObject(size_t size, size_t align)
 {
-    StackFrameObject obj;
-    obj.m_sizeInBytes = size;
-    obj.m_align = align;
-    obj.m_source = StackFrameObjectSource::Variable;
-
-    return m_stackFrameObjects->createAndAppendBack(obj);
+    return create(0, align, size, StackFrameObjectSource::Variable);
 }
 
 StackFrameObject *MirFunctionStackFrame::createSpill(size_t size, size_t align)
 {
-    StackFrameObject obj;
-    obj.m_sizeInBytes = size;
-    obj.m_align = align;
-    obj.m_source = StackFrameObjectSource::Spill;
-
-    return m_stackFrameObjects->createAndAppendBack(obj);
+    return create(0, align, size, StackFrameObjectSource::Spill);
 }
 
 StackFrameObject *MirFunctionStackFrame::createParam(size_t size, size_t align, int64_t offset)
 {
-    StackFrameObject obj;
-    obj.m_sizeInBytes = size;
-    obj.m_align = align;
-    obj.m_source = StackFrameObjectSource::Parameter;
-    obj.m_offset = offset;
-
-    return m_stackFrameObjects->createAndAppendBack(obj);
+    return create(offset, align, size, StackFrameObjectSource::Parameter);
 }
 
-TypedPoolLinkedList<StackFrameObject> *MirFunctionStackFrame::getStackFrameObjects() const
+StackFrameObject *MirFunctionStackFrame::getObjectFromId(MirId id)
+{
+    if (id < m_stackFrameObjects.size())
+    {
+        return m_stackFrameObjects[id];
+    }
+    return nullptr;
+}
+
+const std::pmr::vector<StackFrameObject *> &MirFunctionStackFrame::getStackFrameObjects() const
 {
     return m_stackFrameObjects;
 }
-
-void MirFunctionStackFrame::setOwner(struct MirFunction *owner) { m_owner = owner; }

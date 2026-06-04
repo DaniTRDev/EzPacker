@@ -12,7 +12,7 @@ class CodeFlowAnalysisTests : public ::testing::Test
   protected:
     std::shared_ptr<ErrorCollector> ec;
     std::shared_ptr<SourceManager> sm;
-    std::shared_ptr<MirEmitterContext> ctx;
+    std::shared_ptr<MirBuilderContext> ctx;
     std::shared_ptr<MirTypeTable> m_types;
     MirEmitter *emitter;
     MirFunction *func;
@@ -23,7 +23,7 @@ class CodeFlowAnalysisTests : public ::testing::Test
     {
         ec = std::make_shared<ErrorCollector>();
         sm = std::make_shared<SourceManager>(std::filesystem::current_path());
-        ctx = std::make_shared<MirEmitterContext>(ec, sm);
+        ctx = std::make_shared<MirBuilderContext>(ec, sm);
         emitter = new MirEmitter(ctx.get());
 
         m_types = std::make_shared<MirTypeTable>();
