@@ -12,3 +12,5 @@ SourceReference *MirBlock::getSourceRef() const { return m_sourceRef; }
 std::pmr::list<MirInstruction *> &MirBlock::getInstructions() { return m_instructions; }
 
 const std::pmr::list<MirInstruction *> &MirBlock::getInstructions() const { return m_instructions; }
+
+std::pmr::list<MirInstruction *> *MirBlock::getInstructionsPtr() { return &m_instructions; }

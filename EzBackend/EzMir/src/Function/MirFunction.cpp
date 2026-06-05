@@ -39,6 +39,8 @@ SourceReference *MirFunction::getSourceRef() const { return m_sourceRef; }
 
 std::pmr::list<MirBlock *> &MirFunction::getBlocks() { return m_blocks; }
 
+std::pmr::list<MirBlock *> *MirFunction::getBlocksPtr() { return &m_blocks; }
+
 std::pmr::list<MirFuncParam *> &MirFunction::getParameters() { return m_parameters; }
 
 const std::pmr::string &MirFunction::getName() { return m_name; }

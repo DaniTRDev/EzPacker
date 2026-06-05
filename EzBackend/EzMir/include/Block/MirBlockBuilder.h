@@ -16,6 +16,12 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
     MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock *> *owner);
 
     /**
+     * Creates a block builder attached to the given block list.
+     * @param ctx
+     */
+    MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner);
+
+    /**
      * Flushes the block.
      */
     ~MirBlockBuilder() override;

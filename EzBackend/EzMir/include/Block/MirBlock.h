@@ -39,6 +39,12 @@ class MirBlock
      * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
      */
     const std::pmr::list<MirInstruction *> &getInstructions() const;
+    
+    /**
+     * Returns a pointer to the MUTABLE list of instructions.
+     * @return
+     */
+    std::pmr::list<MirInstruction *> *getInstructionsPtr();
 
   private:
     size_t m_id;

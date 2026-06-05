@@ -53,7 +53,7 @@ class MirFunction
                 std::pmr::list<MirBlock *> blocks,
                 std::pmr::list<MirFuncParam *> parameters,
                 std::pmr::string name);
-    
+
     /**
      * Returns the MirBlock owned by this function that matches the given ID, if no case is found nullptr is returned.
      * @param id
@@ -96,6 +96,14 @@ class MirFunction
      * `MirBuilderContext::createFunction()` succeeds.
      */
     std::pmr::list<MirBlock *> &getBlocks();
+
+    /**
+     * Returns a pointer to the mutable list of blocks that belong to this function.
+     *
+     * The list always contains the entry point as its first block right after
+     * `MirBuilderContext::createFunction()` succeeds.
+     */
+    std::pmr::list<MirBlock *> *getBlocksPtr();
 
     /**
      * Returns the MUTABLE parameter list for this function.

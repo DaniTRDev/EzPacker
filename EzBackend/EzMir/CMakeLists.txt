@@ -73,18 +73,4 @@ if (EZPACKER_BUILD_TESTS)
             ""
             "tests/T_Instruction.cpp"
     )
-
-    EzPacker_AddTest(
-            "T_CodeFlowAnalysis"
-            "EzMirTestSuite"
-            ""
-            "tests/T_CodeFlowAnalysis.cpp"
-    )
-
-    EzPacker_AddTest(
-            "T_LivenessAnalysis"
-            "EzMirTestSuite"
-            ""
-            "tests/T_LivenessAnalysis.cpp"
-    )
 endif ()

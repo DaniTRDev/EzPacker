@@ -19,3 +19,39 @@ TEST_F(InstrTest, SimpleBuild)
     verifier.operandVerifier(0).verifyRegister(getTypeTable()->getInt8Type(), false, 1);
     verifier.operandVerifier(1).verifyRegister(getTypeTable()->getInt16Type(), false, 2);
 }
+
+TEST_F(InstrTest, TargetIdSelected)
+{
+    MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
+    MirOperandBuilder oBuilder(getBuilderCtx());
+
+    MirRegister *op1 = oBuilder.build<MirRegister>(getTypeTable()->getInt8Type(), false, 1, nullptr, "testReg1");
+    MirRegister *op2 = oBuilder.build<MirRegister>(getTypeTable()->getInt16Type(), false, 2, nullptr, "testReg2");
+    MirInstruction *instr = iBuilder.ADD(op1, op2);
+    instr->setTargetId(10);
+
+    MirInstructionVerifier verifier(instr);
+
+    verifier.operandCount(2).opcode(MirInstructionOpCode::ADD).targetId(10);
+    verifier.operandVerifier(0).verifyRegister(getTypeTable()->getInt8Type(), false, 1);
+    verifier.operandVerifier(1).verifyRegister(getTypeTable()->getInt16Type(), false, 2);
+}
+
+TEST_F(InstrTest, Multiple)
+{
+    MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
+    MirOperandBuilder oBuilder(getBuilderCtx());
+
+    iBuilder.NOP();
+    iBuilder.NOP();
+    iBuilder.NOP();
+    iBuilder.NOP();
+    iBuilder.NOP();
+
+    MirBlockInstructionQuery query(getTestInsertionPoint()->m_block);
+    query.forEach([](MirInstruction *instr)
+            {
+                MirInstructionVerifier verifier(instr);
+                verifier.operandCount(0).opcode(MirInstructionOpCode::NOP).targetId(MIRID_INVALID);
+            });
+}

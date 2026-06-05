@@ -4,6 +4,11 @@ MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock
 {
 }
 
+MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) :
+    MirBlockBuilder(ctx, owner->getBlocksPtr())
+{
+}
+
 MirBlockBuilder::~MirBlockBuilder() { MirBuilder::flush(); }
 
 MirBlock *MirBlockBuilder::build(SourceReference *sourceRef)
