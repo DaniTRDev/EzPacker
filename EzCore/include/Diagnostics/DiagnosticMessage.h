@@ -26,7 +26,7 @@ class DiagnosticMessage
 {
   public:
     friend class DiagnosticBuilder; // Ensure the builder has access to private methods of this class.
-    
+
     /**
      * Returns the type of the diagnostic message.
      * @return
@@ -50,7 +50,7 @@ class DiagnosticMessage
      * Appends the string to the main message of the diagnostic.
      * @param mainMsg
      */
-    void addMainMsg(const std::pmr::string &str);
+    void addMainMsg(const std::string_view &str);
 
     /**
      * Sets the primary source reference.
@@ -62,7 +62,7 @@ class DiagnosticMessage
      * Sets the sender of the diagnostic message.
      * @param sender
      */
-    void setSender(const std::pmr::string &sender);
+    void setSender(const std::string_view &sender);
 
     /**
      * Sets the type of the diagnostic message.
@@ -80,13 +80,13 @@ class DiagnosticMessage
      * Returns the main message.
      * @return
      */
-    const std::pmr::string &getMainMsg() const;
+    std::string_view getMainMsg() const;
 
     /**
      * Returns the sender of the message.
      * @return
      */
-    const std::pmr::string &getSender() const;
+    std::string_view getSender() const;
 
   private:
     /**
@@ -99,18 +99,20 @@ class DiagnosticMessage
      * after executing this constructor IS ALLOWED.
      *
      * This constructor is made private because a message is going to be built using a builder.
+     * @param arena Used to create permanent copies of strings.
      * @param type
      * @param primarySourceRef
      * @param mainMsg
      * @param sender
      * @param notes
      */
-    DiagnosticMessage(DiagnosticMessageType type,
+    DiagnosticMessage(
+                      DiagnosticMessageType type,
                       SourceReference *primarySourceRef,
-                      const std::pmr::string &mainMsg,
-                      const std::pmr::string &sender,
+                      const std::string_view &mainMsg,
+                      const std::string_view &sender,
                       const std::list<DiagnosticNote> &notes = {});
-    
+
   private:
     DiagnosticMessageType m_type;
     SourceReference *m_primarySourceRef; // A reference to the parent scope/object that executed a traverse operation

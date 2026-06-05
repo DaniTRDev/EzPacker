@@ -52,6 +52,7 @@
 // ── Basic block ─────────────────────────────────────────────────────────────
 #include "Block/MirBlock.h"
 #include "Block/MirBlockBuilder.h"
+#include "Block/MirBlockInstructionQuery.h"
 
 // ── Operand variant (registers, immediates, memory, references) ─────────────
 #include "Operand/MirOperand.h"

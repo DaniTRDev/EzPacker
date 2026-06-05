@@ -8,7 +8,7 @@
 #include "EzMirCommon.h"
 #include "Block/MirBlock.h"
 #include "Function/MirFunction.h"
-#include "Type/MirType.h"
+#include "Type/MirTypeTable.h"
 
 /**
  * A struct that contains information about global data.
@@ -25,7 +25,16 @@ struct MirGlobalDataEntry
 class MirBuilderContext
 {
   public:
-    MirBuilderContext(const std::shared_ptr<DiagnosticCollector> &diagCollector);
+    /**
+     * Builds the context with the given type table.
+     * @param globalArena Used to store general data, names, ...
+     * @param funcArena Used to store functions, blocks, instructions, operands, ...
+     * @param diagCollector
+     * @param typeTable
+     */
+    MirBuilderContext(std::pmr::monotonic_buffer_resource *globalArena,
+                      const std::shared_ptr<DiagnosticCollector> &diagCollector,
+                      const std::shared_ptr<MirTypeTable> &typeTable);
 
     // Disable copy/move constructors to preserve safety across the arena resource references
     MirBuilderContext(const MirBuilderContext &) = delete;
@@ -85,12 +94,18 @@ class MirBuilderContext
      */
     const std::shared_ptr<DiagnosticCollector> &getDiagCollector();
 
+    /**
+     * Returns the type table attached to this context.
+     * @return
+     */
+    const std::shared_ptr<MirTypeTable> &getTypeTable();
+
   private:
     MirId m_currentId{ 0 };
 
     // Pools.
-    std::pmr::monotonic_buffer_resource m_globalResource;
-    std::pmr::monotonic_buffer_resource m_functionResource;
+    std::pmr::monotonic_buffer_resource *m_globalResource;
+    std::pmr::monotonic_buffer_resource *m_functionResource;
 
     std::pmr::list<MirFunction *> m_functions;
     std::pmr::map<size_t, MirFunction *> m_functionIdToFunc; // Used to search for functions.
@@ -99,6 +114,7 @@ class MirBuilderContext
     std::pmr::vector<MirGlobalDataEntry *> m_globalData;
 
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
+    std::shared_ptr<MirTypeTable> m_typeTable;
 };
 
 #endif // EZPACKER_MIRBUILDERCONTEXT_H

@@ -3,7 +3,7 @@
 MirInstruction::MirInstruction(MirInstructionOpCode opcode,
                                SourceReference *ref,
                                std::pmr::vector<MirOperand *> operands) :
-    m_opcode(opcode), m_sourceRef(ref), m_operands(std::move(operands))
+    m_opcode(opcode), m_targetId(MIRID_INVALID), m_sourceRef(ref), m_operands(std::move(operands))
 {
 }
 

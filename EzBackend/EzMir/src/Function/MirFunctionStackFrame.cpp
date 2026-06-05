@@ -11,9 +11,9 @@ StackFrameObject *
 MirFunctionStackFrame::create(int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source)
 {
     std::pmr::memory_resource *arena = m_stackFrameObjects.get_allocator().resource();
-    std::pmr::polymorphic_allocator<StackFrameObject> objAlloc(arena);
+    std::pmr::polymorphic_allocator objAlloc(arena);
 
-    StackFrameObject *obj = objAlloc.allocate(1);
+    StackFrameObject *obj = objAlloc.new_object<StackFrameObject>();
     obj->m_offset = offset;
     obj->m_align = align;
     obj->m_id = m_stackFrameObjects.size();

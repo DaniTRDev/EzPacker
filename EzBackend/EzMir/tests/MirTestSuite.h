@@ -8,7 +8,7 @@
  * Class used to defined a generic verifier.
  * @tparam T
  */
-template <typename TestedObjType, typename ParentClass> class MirVerifier
+template <typename TestedObjType> class MirVerifier
 {
   public:
     /**
@@ -33,7 +33,61 @@ template <typename TestedObjType, typename ParentClass> class MirVerifier
     TestedObjType *m_testedObj;
 };
 
-class MirOperandVerifier : public MirVerifier<MirOperand, MirOperandVerifier>
+/**
+ * Class used to verify the properties of a MirType.
+ */
+class MirTypeVerifier : public MirVerifier<MirType>
+{
+  public:
+    /**
+     * Creates the verifier attached to the given type.
+     * @param type
+     */
+    MirTypeVerifier(MirType *type);
+
+    /**
+     * Checks if the type has the given ID.
+     * @param id
+     * @return
+     */
+    MirTypeVerifier &id(size_t id);
+
+    /**
+     * Checks if type's name matches the one given.
+     * @param name
+     * @return
+     */
+    MirTypeVerifier &name(const std::string_view &name);
+
+    /**
+     * Checks if type's kind matches the one given.
+     * @param kind
+     * @return
+     */
+    MirTypeVerifier &typeKind(MirTypeKind kind);
+
+    /**
+     * Checks if the type's kind is an array and if it's of given type.
+     * @param type
+     * @return
+     */
+    MirTypeVerifier &arrayType(MirType *type);
+
+    /**
+     * Iterates over this type' subtypes and check they match the given list. If there's a nullptr in the list, type
+     * will be skipped.
+     * @param types
+     * @return
+     */
+    MirTypeVerifier &subTypes(const std::vector<MirType *> &types);
+
+  private:
+};
+
+/**
+ * Class used to verify the content/properties of MirOperand.
+ */
+class MirOperandVerifier : public MirVerifier<MirOperand>
 {
   public:
     /**
@@ -43,11 +97,10 @@ class MirOperandVerifier : public MirVerifier<MirOperand, MirOperandVerifier>
     MirOperandVerifier(MirOperand *testedOperand);
 
     /**
-     * Asserts if the tested operand's mir type is not equal to expectedType.
-     * @param expectedType
+     * Returns a MirType verifier.
      * @return
      */
-    MirOperandVerifier &mirType(MirType *expectedType);
+    MirTypeVerifier mirTypeVerifier();
 
     /**
      * Asserts if the tested operand type is not equal to expectedType.
@@ -57,18 +110,22 @@ class MirOperandVerifier : public MirVerifier<MirOperand, MirOperandVerifier>
     MirOperandVerifier &type(MirOperandType expectedType);
 
     /**
-     * Verifies that the operand is a double and that its value matches val.
+     * Verifies that the operand is a double, that its value matches val and its type matches type (if type is not
+     * nullptr).
+     * @param doubleType
      * @param val
      * @return
      */
-    MirOperandVerifier &verifyDouble(double val);
+    MirOperandVerifier &verifyDouble(MirType *doubleType, double val);
 
     /**
-     * Verifies that the operand is an integer and that its value matches val.
+     * Verifies that the operand is an integer, that its value matches val and its type matches type(if type is not
+     * nullptr).
+     * @param floatType
      * @param val
      * @return
      */
-    MirOperandVerifier &verifyInteger(int64_t val);
+    MirOperandVerifier &verifyInteger(MirType *intType, int64_t val);
 
     /**
      * Verifies that the operand is a reference, with a particular id and type. If refId == MIRID_INVALID,
@@ -109,7 +166,10 @@ class MirOperandVerifier : public MirVerifier<MirOperand, MirOperandVerifier>
     MirOperandVerifier &verifyMemory(MirType *mirType, MirRegister *base, MirInteger *displ);
 };
 
-class MirInstructionVerifier : public MirVerifier<MirInstruction, MirInstructionVerifier>
+/**
+ * Class used to verify the content/properties of a MirInstruction and its MirOperands.
+ */
+class MirInstructionVerifier : public MirVerifier<MirInstruction>
 {
   public:
     /**
@@ -146,6 +206,150 @@ class MirInstructionVerifier : public MirVerifier<MirInstruction, MirInstruction
      * @return
      */
     MirOperandVerifier operandVerifier(size_t operandIndex);
+
+  private:
+};
+
+/**
+ * Class used to verify the content/properties of a MirBlock and its MirInstructions.
+ */
+class MirBlockVerifier : public MirVerifier<MirBlock>
+{
+  public:
+    /**
+     *  Creates the verifier and attaches it to the given block.
+     * @param block
+     */
+    MirBlockVerifier(MirBlock *block);
+
+    /**
+     * Expects the block to have the given ID.
+     * @param id
+     * @return
+     */
+    MirBlockVerifier &id(size_t id);
+
+    /**
+     * Verifies that this block has exactly count instructions.
+     * @return
+     */
+    MirBlockVerifier &instrCount(size_t count);
+
+    /**
+     * Verifies that there are exactly count instructions that matches the given opcode.
+     * @param count
+     * @param instr
+     * @return
+     */
+    MirBlockVerifier &instrCountOfType(size_t count, MirInstructionOpCode opcode);
+
+  private:
+};
+
+/**
+ * Class used to verify the content/properties of a MirFunction and its MirBlocks.
+ */
+class MirFunctionVerifier : public MirVerifier<MirFunction>
+{
+  public:
+    /**
+     * Creates the verifier attached to the given function.
+     * @param func
+     */
+    MirFunctionVerifier(MirFunction *func);
+
+    /**
+     * Expects the function's id to match the given one.
+     * @return
+     */
+    MirFunctionVerifier &id(size_t id);
+
+    /**
+     * Expects the function's name to match the given one.
+     * @return
+     */
+    MirFunctionVerifier &name(const std::string_view &name);
+
+    /**
+     * Expects the function's block count match the given one.
+     * @return
+     */
+    MirFunctionVerifier &blockCount(size_t count);
+
+    /**
+     * Creates a verifier for the given block index. This is the MIRID of the block, this function will also check that
+     * the given block is present before creating the block verifier.
+     * @param id
+     * @return
+     */
+    MirBlockVerifier blockVerifier(size_t id);
+};
+
+/**
+ * Class used to contain helper methods related to creation/destruction of needed objects in common test scenarios.
+ */
+class MirTestSuite
+{
+  public:
+    /**
+     * Returns the builder context used by this test.
+     * @return
+     */
+    MirBuilderContext *getBuilderCtx();
+
+    /**
+     * Returns the TEST function.
+     * @return
+     */
+    MirFunction *getTestFunc();
+
+    /**
+     * Returns the insertion point of the first block of the TEST function.
+     * @return
+     */
+    MirInstructionInsertionPoint *getTestInsertionPoint();
+
+    /**
+     * Returns the type table.
+     * @return
+     */
+    MirTypeTable *getTypeTable();
+
+    /**
+     * Creates all the needed context pointers in a basic state for a test. It also creates 1 void "TEST" function,
+     * without parameters.
+     * @param workingPath
+     */
+    void create(const std::filesystem::path &workingPath);
+
+    /**
+     * Frees everything of this test suite.
+     */
+    void destroy();
+
+  private:
+    MirFunction *m_testFunction; // Pre-created function used to be able to create quick tests easily.
+    MirInstructionInsertionPoint m_insertPoint;
+    std::pmr::monotonic_buffer_resource m_arena;
+    std::shared_ptr<DiagnosticCollector> m_diagCollector;
+    std::shared_ptr<DiagnosticLogger> m_diagLogger;
+    std::shared_ptr<MirBuilderContext> m_builderCtx;
+    std::shared_ptr<MirTypeTable> m_typeTable;
+    std::shared_ptr<SourceManager> m_sourceManager;
+};
+
+class MirTestSuiteAsGtest : public MirTestSuite, public ::testing::Test
+{
+  public:
+    /**
+     * Calls MirTestSuite::create.
+     */
+    void SetUp() override;
+
+    /**
+     * Calls MirTestSuite::destroy.
+     */
+    void TearDown() override;
 
   private:
 };

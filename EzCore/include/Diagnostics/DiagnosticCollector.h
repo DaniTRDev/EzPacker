@@ -25,7 +25,7 @@ class DiagnosticCollector
      * @param sender
      * @return
      */
-    DiagnosticBuilder builder(DiagnosticMessageType type, const std::pmr::string &sender);
+    DiagnosticBuilder builder(DiagnosticMessageType type, const std::string_view &sender);
 
     /**
      * Adds a listener for diagnostic messages.

@@ -1,18 +1,3 @@
-/**
- * @file MirBlock.h
- * @brief A basic block in the MIR — a straight-line sequence of instructions.
- *
- * Every `MirBlock` has a unique MIR ID and stores its instructions in a
- * `TypedPoolLinkedList<MirInstruction>` allocated by `MirBuilderContext`.
- * The block itself does not own the slice memory; it simply points at the
- * arena-managed list that the context appends to whenever it is bound and new
- * instructions are created.
- *
- * `MirBlock` is intentionally small: it models only the ordered instruction
- * list and the block identifier. Control-flow meaning comes from the final
- * instruction(s) stored in the block, typically a terminator such as `JMP`,
- * conditional branch, `RET`, or `HALT`.
- */
 #ifndef EZPACKER_MIRBLOCK_H
 #define EZPACKER_MIRBLOCK_H
 
@@ -48,6 +33,12 @@ class MirBlock
      * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
      */
     std::pmr::list<MirInstruction *> &getInstructions();
+
+    /**
+     * Returns the inmutable instruction slice for this block.
+     * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
+     */
+    const std::pmr::list<MirInstruction *> &getInstructions() const;
 
   private:
     size_t m_id;

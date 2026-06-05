@@ -7,17 +7,26 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstruct
 
 MirInstructionBuilder::~MirInstructionBuilder() { flush(); }
 
-MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode, SourceReference *ref)
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
+                                             SourceReference *ref,
+                                             const std::initializer_list<MirOperand *> &operands)
 {
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
-    std::pmr::polymorphic_allocator<MirInstruction> alloc(arena);
+    std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    MirInstruction *instr = alloc.allocate(1);
-    alloc.construct(instr, opcode, ref, std::pmr::vector<MirOperand *>(arena));
+    MirInstruction *instr = alloc.new_object<MirInstruction>(opcode, ref, std::pmr::vector<MirOperand *>(arena));
+    if (instr && operands.size() != 0)
+    {
+        for (auto &op : operands)
+        {
+            instr->addOperand(op);
+        }
+    }
 
     auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
-    builder << ref << "Built instruction: " << std::pmr::string(MirPrinter().printToString(instr));
+    builder << ref << "Built instruction";
+    builder.appendNote(std::pmr::string(MirPrinter().printToString(instr)), nullptr);
 
     setBuildResult(instr);
     return instr;

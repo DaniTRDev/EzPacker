@@ -14,12 +14,12 @@
 enum class ExpectedOperandType : uint16_t
 {
     None = 0,
-    Register = 1 << 0,        // MirRegister
-    Integer = 1 << 1,         // MirInteger
-    Double = 1 << 2,          // MirDouble
-    Memory = 1 << 4,          // MirMemory
-    FrameIndex = 1 << 5,      // MirFrameIndex
-    Reference = 1 << 6,       // MirReference (Blocks, Functions)
+    Register = 1 << 0,   // MirRegister
+    Integer = 1 << 1,    // MirInteger
+    Double = 1 << 2,     // MirDouble
+    Memory = 1 << 4,     // MirMemory
+    FrameIndex = 1 << 5, // MirFrameIndex
+    Reference = 1 << 6,  // MirReference (Blocks, Functions)
 
     // --- Composite Helper Masks ---
 
@@ -111,7 +111,6 @@ inline constexpr bool operator&(MirInstructionFlags a, MirInstructionFlags b)
 enum class MirInstructionCategory : uint8_t
 {
     Invalid = 0,
-    Array,
     DataMovement,
     Memory,
     Arithmetic,
@@ -123,11 +122,15 @@ enum class MirInstructionCategory : uint8_t
 };
 
 inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2Str = {
-    { MirInstructionCategory::Invalid, "Invalid" },           { MirInstructionCategory::Array, "Array" },
-    { MirInstructionCategory::DataMovement, "DataMovement" }, { MirInstructionCategory::Memory, "Memory" },
-    { MirInstructionCategory::Arithmetic, "Arithmetic" },     { MirInstructionCategory::Bitwise, "Bitwise" },
-    { MirInstructionCategory::Compare, "Compare" },           { MirInstructionCategory::ControlFlow, "ControlFlow" },
-    { MirInstructionCategory::Casting, "Casting" },           { MirInstructionCategory::System, "System" }
+    { MirInstructionCategory::Invalid, "Invalid" },
+    { MirInstructionCategory::DataMovement, "DataMovement" },
+    { MirInstructionCategory::Memory, "Memory" },
+    { MirInstructionCategory::Arithmetic, "Arithmetic" },
+    { MirInstructionCategory::Bitwise, "Bitwise" },
+    { MirInstructionCategory::Compare, "Compare" },
+    { MirInstructionCategory::ControlFlow, "ControlFlow" },
+    { MirInstructionCategory::Casting, "Casting" },
+    { MirInstructionCategory::System, "System" }
 };
 
 // --- OpCode Generation ---

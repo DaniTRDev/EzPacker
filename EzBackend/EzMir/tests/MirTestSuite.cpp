@@ -1,31 +1,86 @@
 #include "MirTestSuite.h"
 
+MirTypeVerifier::MirTypeVerifier(MirType *type) : MirVerifier(type) {}
+
+MirTypeVerifier &MirTypeVerifier::id(size_t id)
+{
+    EXPECT_EQ(getTestedObj()->getId(), id);
+    return *this;
+}
+
+MirTypeVerifier &MirTypeVerifier::name(const std::string_view &name)
+{
+    EXPECT_EQ(getTestedObj()->getName(), name);
+    return *this;
+}
+
+MirTypeVerifier &MirTypeVerifier::typeKind(MirTypeKind kind)
+{
+    EXPECT_EQ(getTestedObj()->getKind(), kind);
+    return *this;
+}
+
+MirTypeVerifier &MirTypeVerifier::arrayType(MirType *type)
+{
+    EXPECT_NE(getTestedObj()->getArrayElementType(), nullptr);
+    EXPECT_EQ(getTestedObj()->getArrayElementType()->getId(), type->getId());
+    return *this;
+}
+
+MirTypeVerifier &MirTypeVerifier::subTypes(const std::vector<MirType *> &types)
+{
+    const auto &typeList = getTestedObj()->getSubTypes();
+    EXPECT_EQ(types.size(), typeList.size());
+
+    for (size_t i = 0; i < types.size(); i++)
+    {
+        if (types[i] != nullptr)
+        {
+            // Tracks which specific subtype element failed within the array match
+            SCOPED_TRACE("MirTypeVerifier::subTypes - Comparing subtype index " + std::to_string(i));
+            EXPECT_EQ(types[i]->getId(), typeList[i]->getId());
+        }
+    }
+
+    return *this;
+}
+
 MirOperandVerifier::MirOperandVerifier(MirOperand *testedOperand) : MirVerifier(testedOperand) {}
 
-MirOperandVerifier &MirOperandVerifier::mirType(MirType *expectedType)
+MirTypeVerifier MirOperandVerifier::mirTypeVerifier()
 {
-    EXPECT_NE(getTestedObj()->getMirType(), expectedType);
-    return *this;
+    EXPECT_NE(getTestedObj()->getMirType(), nullptr);
+    return MirTypeVerifier(getTestedObj()->getMirType());
 }
 
 MirOperandVerifier &MirOperandVerifier::type(MirOperandType expectedType)
 {
-    EXPECT_NE(getTestedObj()->getType(), expectedType);
+    EXPECT_EQ(getTestedObj()->getType(), expectedType);
     return *this;
 }
 
-MirOperandVerifier &MirOperandVerifier::verifyDouble(double val)
+MirOperandVerifier &MirOperandVerifier::verifyDouble(MirType *doubleType, double val)
 {
     type(MirOperandType::Double);
     EXPECT_EQ(m_testedObj->get<MirDouble>()->getValue(), val);
 
+    if (doubleType)
+    {
+        EXPECT_EQ(m_testedObj->get<MirDouble>()->getMirType()->getId(), doubleType->getId());
+    }
+
     return *this;
 }
 
-MirOperandVerifier &MirOperandVerifier::verifyInteger(int64_t val)
+MirOperandVerifier &MirOperandVerifier::verifyInteger(MirType *intType, int64_t val)
 {
     type(MirOperandType::Integer);
     EXPECT_EQ(m_testedObj->get<MirInteger>()->getValue(), val);
+
+    if (intType)
+    {
+        EXPECT_EQ(m_testedObj->get<MirInteger>()->getMirType()->getId(), intType->getId());
+    }
 
     return *this;
 }
@@ -101,14 +156,24 @@ MirOperandVerifier &MirOperandVerifier::verifyMemory(MirType *mirType, MirRegist
 
     if (base)
     {
-        MirOperandVerifier baseVerifier(mem->getBase());
-        baseVerifier.verifyRegister(base->getMirType(), base->isVirtual(), base->getRegId());
+        SCOPED_TRACE("MirOperandVerifier::verifyMemory - Verifying Base Register");
+        EXPECT_NE(mem->getBase(), nullptr);
+        if (mem->getBase() != nullptr)
+        {
+            MirOperandVerifier baseVerifier(mem->getBase());
+            baseVerifier.verifyRegister(base->getMirType(), base->isVirtual(), base->getRegId());
+        }
     }
 
-    if (base)
+    if (displ)
     {
-        MirOperandVerifier baseVerifier(mem->getDisplacement());
-        baseVerifier.verifyInteger(displ->getValue());
+        SCOPED_TRACE("MirOperandVerifier::verifyMemory - Verifying Displacement Value");
+        EXPECT_NE(mem->getDisplacement(), nullptr);
+        if (mem->getDisplacement() != nullptr)
+        {
+            MirOperandVerifier baseVerifier(mem->getDisplacement());
+            baseVerifier.verifyInteger(nullptr, displ->getValue());
+        }
     }
 
     return *this;
@@ -137,6 +202,118 @@ MirInstructionVerifier &MirInstructionVerifier::targetId(MirTargetInstructionId 
 MirOperandVerifier MirInstructionVerifier::operandVerifier(size_t operandIndex)
 {
     MirInstruction *instr = getTestedObj();
+    // Tells you which exact index went out of bounds or failed within the sequence
+    SCOPED_TRACE("MirInstructionVerifier::operandVerifier - Index: " + std::to_string(operandIndex));
+
     EXPECT_FALSE(instr->getOperands().size() <= operandIndex);
     return MirOperandVerifier(instr->getOperands()[operandIndex]);
+}
+
+MirBlockVerifier::MirBlockVerifier(MirBlock *block) : MirVerifier(block) {}
+
+MirBlockVerifier &MirBlockVerifier::id(size_t id)
+{
+    EXPECT_EQ(getTestedObj()->getId(), id);
+    return *this;
+}
+
+MirBlockVerifier &MirBlockVerifier::instrCount(size_t count)
+{
+    EXPECT_EQ(getTestedObj()->getInstructions().size(), count);
+    return *this;
+}
+
+MirBlockVerifier &MirBlockVerifier::instrCountOfType(size_t count, MirInstructionOpCode opcode)
+{
+    size_t counted = 0;
+    for (auto instr : getTestedObj()->getInstructions())
+    {
+        if (instr->getOpCode() == opcode)
+            counted++;
+    }
+
+    // Identifies the instruction type context during a counting failure
+    SCOPED_TRACE("MirBlockVerifier::instrCountOfType - Matching OpCode: " + std::to_string(static_cast<int>(opcode)));
+    EXPECT_EQ(counted, count);
+    return *this;
+}
+
+MirFunctionVerifier::MirFunctionVerifier(MirFunction *func) : MirVerifier(func) {}
+
+MirFunctionVerifier &MirFunctionVerifier::id(size_t id)
+{
+    EXPECT_EQ(getTestedObj()->getId(), id);
+    return *this;
+}
+
+MirFunctionVerifier &MirFunctionVerifier::name(const std::string_view &name)
+{
+    EXPECT_EQ(getTestedObj()->getName(), name);
+    return *this;
+}
+
+MirFunctionVerifier &MirFunctionVerifier::blockCount(size_t count)
+{
+    EXPECT_EQ(getTestedObj()->getBlocks().size(), count);
+    return *this;
+}
+
+MirBlockVerifier MirFunctionVerifier::blockVerifier(size_t id)
+{
+    // Highlights which basic block lookup caused the crash or validation mismatch
+    SCOPED_TRACE("MirFunctionVerifier::blockVerifier - Looking up Block MIR ID: " + std::to_string(id));
+
+    MirBlock *block = getTestedObj()->getBlock(id);
+    EXPECT_NE(block, nullptr);
+
+    return MirBlockVerifier(block);
+}
+
+MirBuilderContext *MirTestSuite::getBuilderCtx() { return m_builderCtx.get(); }
+
+MirFunction *MirTestSuite::getTestFunc() { return m_testFunction; }
+
+MirInstructionInsertionPoint *MirTestSuite::getTestInsertionPoint() { return &m_insertPoint; }
+
+MirTypeTable *MirTestSuite::getTypeTable() { return m_typeTable.get(); }
+
+void MirTestSuite::create(const std::filesystem::path &workingPath)
+{
+    m_diagCollector = std::make_shared<DiagnosticCollector>();
+    m_builderCtx = std::make_shared<MirBuilderContext>(&m_arena, m_diagCollector, m_typeTable);
+    m_typeTable = std::make_shared<MirTypeTable>(&m_arena);
+    m_sourceManager = std::make_shared<SourceManager>(workingPath);
+    m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
+
+    m_diagCollector->addListener(m_diagLogger.get());
+    m_typeTable->initialize();
+    m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->getVoidType(), nullptr, {}, "TEST");
+
+    if (!m_testFunction)
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirTestSuite")
+                << "The creation of the test function failed!";
+    }
+
+    m_insertPoint = { .m_type = InsertionType::Append, .m_block = m_testFunction->getEntryPoint(), .m_iterator = {} };
+}
+
+void MirTestSuite::destroy()
+{
+    m_builderCtx.reset();
+    m_typeTable.reset();
+    m_sourceManager.reset();
+    m_diagCollector.reset();
+}
+
+void MirTestSuiteAsGtest::SetUp()
+{
+    MirTestSuite::create(std::filesystem::current_path());
+    Test::SetUp();
+}
+
+void MirTestSuiteAsGtest::TearDown()
+{
+    MirTestSuite::destroy();
+    Test::TearDown();
 }

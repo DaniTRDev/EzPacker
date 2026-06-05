@@ -1,7 +1,8 @@
 #ifndef EZPACKER_MIRTYPETABLE_H
 #define EZPACKER_MIRTYPETABLE_H
 
-#include "Builder/MirBuilderContext.h"
+#include "EzCoreCommon.h"
+#include "MirType.h"
 
 /**
  * Class used to store the least minimum required types so everything else works.

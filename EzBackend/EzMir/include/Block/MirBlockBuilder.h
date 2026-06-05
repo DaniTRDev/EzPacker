@@ -10,10 +10,10 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
 {
   public:
     /**
-     * Creates a block builder attached to the given function.
+     * Creates a block builder attached to the given owning list.
      * @param ctx
      */
-    MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner);
+    MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock *> *owner);
 
     /**
      * Flushes the block.
@@ -36,7 +36,7 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
 
   private:
     MirBuilderContext *m_ctx;
-    MirFunction *m_owner;
+    std::pmr::list<MirBlock *> *m_owner;
     MirInstructionInsertionPoint m_insertPoint; // The insertion point of the created block.
 };
 

@@ -5,6 +5,7 @@ set(EZMIR_FILES_LIST
         "include/Block/MirBlockBuilder.h"
         "include/Builder/MirBuilder.h"
         "include/Builder/MirBuilderContext.h"
+        "include/Block/MirBlockInstructionQuery.h"
         "include/Instruction/MirInstructionDefs.h"
         "include/Instruction/MirInstruction.h"
         "include/Instruction/MirInstructionBuilder.h"
@@ -27,6 +28,7 @@ set(EZMIR_FILES_LIST
 
         "src/Block/MirBlock.cpp"
         "src/Block/MirBlockBuilder.cpp"
+        "src/Block/MirBlockInstructionQuery.cpp"
         "src/Builder/MirBuilderContext.cpp"
         "src/Instruction/MirInstructionBuilder.cpp"
         "src/Instruction/MirInstruction.cpp"
@@ -59,15 +61,29 @@ if (EZPACKER_BUILD_TESTS)
     )
 
     EzPacker_AddTest(
+            "T_Operand"
+            "EzMirTestSuite"
+            ""
+            "tests/T_Operand.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_Instruction"
+            "EzMirTestSuite"
+            ""
+            "tests/T_Instruction.cpp"
+    )
+
+    EzPacker_AddTest(
             "T_CodeFlowAnalysis"
-            "EzMir"
+            "EzMirTestSuite"
             ""
             "tests/T_CodeFlowAnalysis.cpp"
     )
 
     EzPacker_AddTest(
             "T_LivenessAnalysis"
-            "EzMir"
+            "EzMirTestSuite"
             ""
             "tests/T_LivenessAnalysis.cpp"
     )

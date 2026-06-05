@@ -7,7 +7,7 @@ DiagnosticCollector::DiagnosticCollector()
     m_scopes.emplace_back(&m_diagScopePool); // Ensure there's at least 1 scope available.
 }
 
-DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const std::pmr::string &sender)
+DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const std::string_view &sender)
 {
     return DiagnosticBuilder(this, type, sender);
 }
@@ -90,17 +90,17 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
     DiagnosticScope &scope = m_scopes.back();
     if (m_scopes.size() == 1)
     {
-        // Move the message into the permanent record of messages.
-        m_messages.push_back(std::move(scope.getMessages().back()));
-
         for (auto &listener : m_listeners)
         {
             listener->onDiag(message);
         }
+        
+        // Move the message into the permanent record of messages.
+        m_messages.push_back(message);
     }
     else
     {
-        scope.appendMessage(std::move(message));
+        scope.appendMessage(message);
     }
 
     if (message.getType() == Diag_Error)

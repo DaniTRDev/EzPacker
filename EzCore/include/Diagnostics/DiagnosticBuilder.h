@@ -24,7 +24,7 @@ class DiagnosticBuilder
      * Creates the builder, builds a simple diagnostic message and attaches it to a collector.
      * @param collector
      */
-    DiagnosticBuilder(class DiagnosticCollector *collector, DiagnosticMessageType type, const std::pmr::string &sender);
+    DiagnosticBuilder(class DiagnosticCollector *collector, DiagnosticMessageType type, const std::string_view &sender);
 
     /**
      * When this object is destroyed, the message is flushed into the collector.
@@ -45,7 +45,7 @@ class DiagnosticBuilder
      * @param sender
      * @return
      */
-    DiagnosticBuilder &build(DiagnosticMessageType type, const std::pmr::string &sender);
+    DiagnosticBuilder &build(DiagnosticMessageType type, const std::string_view &sender);
 
     /**
      * Operator used to append a string into the main message.

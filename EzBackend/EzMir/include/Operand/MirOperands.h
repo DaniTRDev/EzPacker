@@ -77,7 +77,7 @@ class MirRegister : public MirOperand
     static constexpr MirOperandType OpKind = MirOperandType::Register;
 
     MirRegister(MirType *type, bool isVirtual, size_t id, SourceReference *ref, const char *name = nullptr) :
-        MirOperand(type, ref), m_virtual(isVirtual), m_id(id)
+        MirOperand(type, ref), m_virtual(isVirtual), m_id(id), m_name(name)
     {
     }
 

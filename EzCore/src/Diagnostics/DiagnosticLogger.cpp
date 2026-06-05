@@ -15,7 +15,9 @@ void DiagnosticLogger::onDiag(const DiagnosticMessage &msg)
     log.add("[{}] ", senderStr);
     logType(log, msg.getType());
     log.add(" {}\n", mainMsgStr);
-    logSourceRef(log, *msg.getPrimarySourceRef());
+
+    if (msg.getPrimarySourceRef())
+        logSourceRef(log, *msg.getPrimarySourceRef());
 
     for (const auto &note : msg.getNotes())
     {

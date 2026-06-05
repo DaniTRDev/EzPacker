@@ -1,10 +1,12 @@
 #include "Builder/MirBuilderContext.h"
 #include "Type/MirTypeTable.h"
 
-MirBuilderContext::MirBuilderContext(const std::shared_ptr<DiagnosticCollector> &diagCollector) :
-    m_currentId(1), m_globalResource(), m_functionResource(&m_globalResource), m_functions(&m_globalResource),
-    m_functionIdToFunc(&m_globalResource), m_blockIdToBlock(&m_globalResource), m_globalData(&m_globalResource),
-    m_diagCollector(diagCollector)
+MirBuilderContext::MirBuilderContext(std::pmr::monotonic_buffer_resource *globalArena,
+                                     const std::shared_ptr<DiagnosticCollector> &diagCollector,
+                                     const std::shared_ptr<MirTypeTable> &typeTable) :
+    m_currentId(1), m_globalResource(globalArena), m_functionResource(m_globalResource), m_functions(m_globalResource),
+    m_functionIdToFunc(m_globalResource), m_blockIdToBlock(m_globalResource), m_globalData(m_globalResource),
+    m_diagCollector(diagCollector), m_typeTable(typeTable)
 {
 }
 
@@ -26,7 +28,7 @@ bool MirBuilderContext::appendBlock(MirBlock *block)
     }
 
     m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirEmitterCtx")
-            << std::pmr::string(std::format("Appended block with id: {})", block->getId()));
+            << std::pmr::string(std::format("Appended block with id: {}", block->getId()));
 
     m_blockIdToBlock.insert({ block->getId(), block });
     return true;
@@ -80,8 +82,10 @@ MirFunction *MirBuilderContext::getFuncById(size_t id) const
     return nullptr;
 }
 
-std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return &m_globalResource; }
+std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
 
-std::pmr::monotonic_buffer_resource *MirBuilderContext::getFuncAllocator() { return &m_functionResource; }
+std::pmr::monotonic_buffer_resource *MirBuilderContext::getFuncAllocator() { return m_functionResource; }
 
 const std::shared_ptr<DiagnosticCollector> &MirBuilderContext::getDiagCollector() { return m_diagCollector; }
+
+const std::shared_ptr<MirTypeTable> &MirBuilderContext::getTypeTable() { return m_typeTable; }

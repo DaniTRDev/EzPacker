@@ -53,6 +53,13 @@ class MirFunction
                 std::pmr::list<MirBlock *> blocks,
                 std::pmr::list<MirFuncParam *> parameters,
                 std::pmr::string name);
+    
+    /**
+     * Returns the MirBlock owned by this function that matches the given ID, if no case is found nullptr is returned.
+     * @param id
+     * @return
+     */
+    MirBlock *getBlock(size_t id);
 
     /**
      * Returns the function entry block.
@@ -113,6 +120,7 @@ class MirFunction
 
     std::pmr::list<MirBlock *> m_blocks; // Arena-managed blocks belonging to this function.
     std::pmr::list<MirFuncParam *> m_parameters;
+    std::pmr::map<size_t, MirBlock *> m_blockIdToBlock;
     std::pmr::string m_name;
 };
 

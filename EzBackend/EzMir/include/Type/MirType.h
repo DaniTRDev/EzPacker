@@ -13,6 +13,7 @@
  *   - `Pointer`
  *   - `Array`
  *   - `Void`
+ *   - `Struct`
  *
  * `subTypes` is used only when a kind needs extra type structure. In the
  * current implementation this is primarily intended for compound/container

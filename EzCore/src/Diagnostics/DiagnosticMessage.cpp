@@ -2,8 +2,8 @@
 
 DiagnosticMessage::DiagnosticMessage(DiagnosticMessageType type,
                                      SourceReference *primarySourceRef,
-                                     const std::pmr::string &mainMsg,
-                                     const std::pmr::string &sender,
+                                     const std::string_view &mainMsg,
+                                     const std::string_view &sender,
                                      const std::list<DiagnosticNote> &notes) :
     m_type(type), m_primarySourceRef(primarySourceRef), m_mainMessage(mainMsg), m_sender(sender), m_notes(notes)
 {
@@ -15,16 +15,19 @@ SourceReference *DiagnosticMessage::getPrimarySourceRef() const { return m_prima
 
 void DiagnosticMessage::addNote(const DiagnosticNote &note) { m_notes.push_back(note); }
 
-void DiagnosticMessage::addMainMsg(const std::pmr::string &str) { m_mainMessage += str; }
+void DiagnosticMessage::addMainMsg(const std::string_view &str) { m_mainMessage += str; }
 
 void DiagnosticMessage::setPrimarySourceRef(SourceReference *sourceRef) { m_primarySourceRef = sourceRef; }
 
-void DiagnosticMessage::setSender(const std::pmr::string &sender) { m_sender = sender; }
+void DiagnosticMessage::setSender(const std::string_view &sender)
+{
+    m_sender = sender;
+}
 
 void DiagnosticMessage::setType(DiagnosticMessageType type) { m_type = type; }
 
 const std::list<DiagnosticNote> &DiagnosticMessage::getNotes() const { return m_notes; }
 
-const std::pmr::string &DiagnosticMessage::getMainMsg() const { return m_mainMessage; }
+std::string_view DiagnosticMessage::getMainMsg() const { return m_mainMessage; }
 
-const std::pmr::string &DiagnosticMessage::getSender() const { return m_sender; }
+std::string_view DiagnosticMessage::getSender() const { return m_sender; }

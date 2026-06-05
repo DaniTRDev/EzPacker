@@ -5,7 +5,7 @@ DiagnosticBuilder::DiagnosticBuilder(struct DiagnosticCollector *collector) : m_
 
 DiagnosticBuilder::DiagnosticBuilder(struct DiagnosticCollector *collector,
                                      DiagnosticMessageType type,
-                                     const std::pmr::string &sender) : DiagnosticBuilder(collector)
+                                     const std::string_view &sender) : DiagnosticBuilder(collector)
 {
     build(type, sender);
 }
@@ -18,7 +18,7 @@ DiagnosticBuilder &DiagnosticBuilder::appendNote(const std::pmr::string &message
     return *this;
 }
 
-DiagnosticBuilder &DiagnosticBuilder::build(DiagnosticMessageType type, const std::pmr::string &sender)
+DiagnosticBuilder &DiagnosticBuilder::build(DiagnosticMessageType type, const std::string_view &sender)
 {
     m_message.setType(type);
     m_message.setSender(sender);

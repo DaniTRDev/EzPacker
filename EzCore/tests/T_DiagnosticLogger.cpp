@@ -1,7 +1,7 @@
 #include "EzCore.h"
 #include <gtest/gtest.h>
 
-class BasicTokenizerTestFixture : public ::testing::Test
+class DiagTest : public ::testing::Test
 {
   protected:
     void SetUp() override
@@ -9,7 +9,7 @@ class BasicTokenizerTestFixture : public ::testing::Test
         m_sourceManager = std::make_unique<SourceManager>(std::filesystem::current_path());
         m_diagLogger = std::make_unique<DiagnosticLogger>(m_sourceManager.get());
         m_diagCollector = std::make_unique<DiagnosticCollector>();
-        
+
         m_diagCollector->addListener(m_diagLogger.get());
 
         std::string mockSourceCode = "#include <stdio.h>\n"
@@ -36,7 +36,7 @@ class BasicTokenizerTestFixture : public ::testing::Test
     std::unique_ptr<SourceManager> m_sourceManager;
 };
 
-TEST_F(BasicTokenizerTestFixture, BasicErrorDiagnostic)
+TEST_F(DiagTest, BasicErrorDiagnostic)
 {
     // Let's create a primary reference pointing to the assignment expression operator '='
     // Column index 16 (0-based tracking)

@@ -30,13 +30,12 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     OperandType *build(Args &&...args)
     {
         std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
-        std::pmr::polymorphic_allocator<OperandType> alloc(arena);
+        std::pmr::polymorphic_allocator alloc(arena);
 
         // Construct in-place, passing the arena down to the instruction's internal PMR vector
-        OperandType *op = alloc.allocate(1);
-        alloc.construct(op, std::forward<Args>(args)...);
+        OperandType *op = alloc.template new_object<OperandType>(std::forward<Args>(args)...);
+        setBuildResult(static_cast<MirOperand *>(op));
 
-        setBuildResult((MirOperand *)op);
         return op;
     }
 
