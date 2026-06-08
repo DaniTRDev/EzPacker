@@ -33,6 +33,58 @@ template <typename TestedObjType> class MirVerifier
     TestedObjType *m_testedObj;
 };
 
+template <typename TestedPassObjType, typename OwnerObj>
+    requires(std::is_base_of<MirPass, TestedPassObjType>::value)
+class MirPassVerifier : public MirVerifier<TestedPassObjType>
+{
+  public:
+    /**
+     * Creates the verifier and links it to a pass object. At the time of performing verify actions, the object should
+     * have been executed.
+     * @param obj
+     */
+    MirPassVerifier(TestedPassObjType *obj) : MirVerifier<TestedPassObjType>(obj) {}
+
+    /**
+     * Checks if the given pass has been executed.
+     * @return
+     */
+    OwnerObj &executed()
+    {
+        MirPass *pass = MirVerifier<TestedPassObjType>::getTestedObj();
+        EXPECT_NE(pass->getResult(), nullptr);
+        EXPECT_TRUE(pass->getResult()->m_executed);
+
+        return *static_cast<OwnerObj *>(pass);
+    }
+
+    /**
+     * Checks if the given pass has modified the IR.
+     * @return
+     */
+    OwnerObj &mirModified()
+    {
+        MirPass *pass = MirVerifier<TestedPassObjType>::getTestedObj();
+        EXPECT_NE(pass->getResult(), nullptr);
+        EXPECT_TRUE(pass->getResult()->m_modifiedMir);
+
+        return *static_cast<OwnerObj *>(this);
+    }
+
+    /**
+     * Checks if the given pass threw any error during execution.
+     * @return
+     */
+    OwnerObj &succeeded()
+    {
+        MirPass *pass = MirVerifier<TestedPassObjType>::getTestedObj();
+        EXPECT_NE(pass->getResult(), nullptr);
+        EXPECT_TRUE(pass->getResult()->m_succeeded);
+
+        return *static_cast<OwnerObj *>(this);
+    }
+};
+
 /**
  * Class used to verify the properties of a MirType.
  */
@@ -246,6 +298,38 @@ class MirBlockVerifier : public MirVerifier<MirBlock>
   private:
 };
 
+class MirFunctionStackFrameVerifier : public MirVerifier<MirFunctionStackFrame>
+{
+  public:
+    /**
+     * Creates the verifier linked to the given stack frame.
+     * @param stackFrame
+     */
+    MirFunctionStackFrameVerifier(MirFunctionStackFrame *stackFrame);
+
+    /**
+     * Checks the given stack frame object to match the given parameters. If offset == -1, align ==
+     * -1, sizeInBytes == 0, or source is Invalid, the specific parameter won't be checked. If id == MIRID_INVALID, then
+     * this function WON'T check anything.
+     * @param offset
+     * @param align
+     * @param sizeInBytes
+     * @param source
+     * @return
+     */
+    MirFunctionStackFrameVerifier &
+    checkStackFrameObj(size_t id, int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source);
+
+    /**
+     * Checks if there are exactly "count" stack objects in the current frame.
+     * @param count
+     * @return
+     */
+    MirFunctionStackFrameVerifier &stackFrameObjCount(size_t count);
+
+  private:
+};
+
 /**
  * Class used to verify the content/properties of a MirFunction and its MirBlocks.
  */
@@ -257,6 +341,20 @@ class MirFunctionVerifier : public MirVerifier<MirFunction>
      * @param func
      */
     MirFunctionVerifier(MirFunction *func);
+
+    /**
+     * Creates a verifier for the given block index. This is the MIRID of the block, this function will also check that
+     * the given block is present before creating the block verifier.
+     * @param id
+     * @return
+     */
+    MirBlockVerifier blockVerifier(size_t id);
+
+    /**
+     * Expects the function's block count match the given one.
+     * @return
+     */
+    MirFunctionVerifier &blockCount(size_t count);
 
     /**
      * Expects the function's id to match the given one.
@@ -271,18 +369,25 @@ class MirFunctionVerifier : public MirVerifier<MirFunction>
     MirFunctionVerifier &name(const std::string_view &name);
 
     /**
-     * Expects the function's block count match the given one.
+     * Checks if the function has count parameters.
+     * @param count
      * @return
      */
-    MirFunctionVerifier &blockCount(size_t count);
+    MirFunctionVerifier &paramCount(size_t count);
 
     /**
-     * Creates a verifier for the given block index. This is the MIRID of the block, this function will also check that
-     * the given block is present before creating the block verifier.
-     * @param id
+     * Checks if the given type list matches the parameter types. If an element from the input list is set to
+     * MIRID_INVALID, that item will be skipped.
+     * @param expectedParamTypeList
      * @return
      */
-    MirBlockVerifier blockVerifier(size_t id);
+    MirFunctionVerifier &paramType(const std::vector<size_t> &expectedParamTypeList);
+
+    /**
+     * Returns a verifier for the function's stack frame.
+     * @return
+     */
+    MirFunctionStackFrameVerifier stackFrameVerifier();
 };
 
 /**
@@ -308,6 +413,12 @@ class MirTestSuite
      * @return
      */
     MirInstructionInsertionPoint *getTestInsertionPoint();
+
+    /**
+     * Returns a printer linked to the test context.
+     * @return
+     */
+    MirPrinter getPrinter();
 
     /**
      * Returns the type table.
@@ -336,6 +447,80 @@ class MirTestSuite
     std::shared_ptr<MirBuilderContext> m_builderCtx;
     std::shared_ptr<MirTypeTable> m_typeTable;
     std::shared_ptr<SourceManager> m_sourceManager;
+};
+
+/**
+ * This class is used when testing the results of the CodeFlowAnalysis pass. It provides a high-level API used to
+ * quick-test the pass.
+ */
+class CodeFlowAnalysisVerifier : public MirPassVerifier<CodeFlowAnalysis, CodeFlowAnalysisVerifier>
+{
+  public:
+    /**
+     * Creates the flow analysis verifier and attach it to an object. At the time of calling internal verifiers, ensure
+     * the pass has results.
+     * @param analysis
+     * @param ctx
+     */
+    CodeFlowAnalysisVerifier(CodeFlowAnalysis *analysis, MirBuilderContext *ctx);
+
+    /**
+     * Checks if the given block exits the flow (return, which causes 0 successors).
+     * @param blockId
+     * @return
+     */
+    CodeFlowAnalysisVerifier &exitBlock(size_t blockId);
+
+    /**
+     * Checks if the block with 'fromId' has a predecessor 'toId' (same as checking if 'toId' has a successor 'fromId').
+     * @param to
+     * @param from
+     * @return
+     */
+    CodeFlowAnalysisVerifier &predecessor(size_t toId, size_t fromId);
+
+    /**
+     * Checks if predecessor count of the target block matches the given count.
+     * @param blockId
+     * @param count
+     * @return
+     */
+    CodeFlowAnalysisVerifier &predecessorCount(size_t blockId, size_t count);
+
+    /**
+     * Checks if there's a path between 'start' and 'end'.
+     * @param blockId
+     * @param count
+     * @return
+     */
+    CodeFlowAnalysisVerifier &reachable(size_t start, size_t end);
+
+    /**
+     * Checks if the block with 'fromId' has a successor 'toId'.
+     * @param from
+     * @param to
+     * @return
+     */
+    CodeFlowAnalysisVerifier &successor(size_t fromId, size_t toId);
+
+    /**
+     * Checks if successor count of the target block matches the given count.
+     * @param blockId
+     * @param count
+     * @return
+     */
+    CodeFlowAnalysisVerifier &successorCount(size_t blockId, size_t count);
+
+    /**
+     * Asserts that a block is dead / completely stranded from the flow.
+     * @param start
+     * @param end
+     * @return
+     */
+    CodeFlowAnalysisVerifier &unreachable(size_t start, size_t end);
+
+  private:
+    MirBuilderContext *m_ctx;
 };
 
 class MirTestSuiteAsGtest : public MirTestSuite, public ::testing::Test

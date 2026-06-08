@@ -1,6 +1,6 @@
-#include "MirPass/Passes/LivenessAnalysis.h"
+#include "MirPasses/Passes/LivenessAnalysis.h"
 
-static std::string formatRegisterSet(const std::pmr::unordered_set<MirRegister *> &regSet)
+static std::string formatRegisterSet(MirBuilderContext *ctx, const std::pmr::unordered_set<size_t> &regSet)
 {
     if (regSet.empty())
         return "{}";
@@ -8,19 +8,24 @@ static std::string formatRegisterSet(const std::pmr::unordered_set<MirRegister *
     std::ostringstream ss;
     ss << "{ ";
     bool first = true;
-    for (const auto *reg : regSet)
+    for (size_t regId : regSet)
     {
+        MirRegister *reg = ctx->getRegisterById(regId);
+
         if (!first)
             ss << ", ";
         // Format virtual registers as %v0, %v1 and physical ones as %r0, %p1
-        ss << (reg->isVirtual() ? "%v" : "%p") << reg->getRegId();
+
+        ss << MirPrinter::printToString(reg);
+
         first = false;
     }
     ss << " }";
     return ss.str();
 }
 
-LivenessAnalysis::LivenessAnalysis(std::pmr::memory_resource *globalArena) : m_arena(globalArena), m_result(globalArena)
+LivenessAnalysis::LivenessAnalysis(MirBuilderContext *ctx) :
+    m_result(ctx->getGlobalAllocator()), m_ctx(ctx), m_arena(ctx->getGlobalAllocator())
 {
 }
 
@@ -55,24 +60,27 @@ MirPassResult LivenessAnalysis::run(std::pmr::list<MirFunction *> &funcList,
 
     for (auto &block : func->getBlocks())
     {
+        size_t blockId = block->getId();
         log.appendNote(std::pmr::string(std::format("Block ID {}:", block->getId())), nullptr);
 
-        log.appendNote(std::pmr::string(std::format("  Local  DEF: {}", formatRegisterSet(m_result.m_def[block]))),
-                       nullptr);
-
-        log.appendNote(std::pmr::string(std::format("  Local  USE: {}", formatRegisterSet(m_result.m_use[block]))),
-                       nullptr);
-
         log.appendNote(
-                std::pmr::string(std::format("  Global LIVE-IN:  {}", formatRegisterSet(m_result.m_liveIn[block]))),
+                std::pmr::string(std::format("  Local  DEF: {}", formatRegisterSet(m_ctx, m_result.m_def[blockId]))),
                 nullptr);
 
         log.appendNote(
-                std::pmr::string(std::format("  Global LIVE-OUT: {}", formatRegisterSet(m_result.m_liveOut[block]))),
+                std::pmr::string(std::format("  Local  USE: {}", formatRegisterSet(m_ctx, m_result.m_use[blockId]))),
                 nullptr);
+
+        log.appendNote(std::pmr::string(std::format("  Global LIVE-IN:  {}",
+                                                    formatRegisterSet(m_ctx, m_result.m_liveIn[blockId]))),
+                       nullptr);
+
+        log.appendNote(std::pmr::string(std::format("  Global LIVE-OUT: {}",
+                                                    formatRegisterSet(m_ctx, m_result.m_liveOut[blockId]))),
+                       nullptr);
     }
 
-    return { .m_modifiedMir = false, .m_run = true, .m_succeeded = true };
+    return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
 std::vector<std::type_index> LivenessAnalysis::getDependencies() const
@@ -96,17 +104,18 @@ void LivenessAnalysis::computeGlobalLiveness(MirFunction *func, const ControlFlo
         for (auto blockIt = blocks.rbegin(); blockIt != blocks.rend(); ++blockIt)
         {
             MirBlock *block = (*blockIt);
+            size_t blockId = block->getId();
 
-            auto &liveIn = m_result.m_liveIn[block];
-            auto &liveOut = m_result.m_liveOut[block];
-            const auto &defs = m_result.m_def[block];
-            const auto &uses = m_result.m_use[block];
+            auto &liveIn = m_result.m_liveIn[blockId];
+            auto &liveOut = m_result.m_liveOut[blockId];
+            const auto &defs = m_result.m_def[blockId];
+            const auto &uses = m_result.m_use[blockId];
 
             // Equation 1: LiveOut[B] = Union of LiveIn[S] for all Successors S
-            std::pmr::unordered_set<MirRegister *> newLiveOut(m_arena);
-            if (cfg.m_successors.contains(block))
+            std::pmr::unordered_set<size_t> newLiveOut(m_arena);
+            if (cfg.m_successors.contains(block->getId()))
             {
-                for (MirBlock *succ : cfg.m_successors.at(block))
+                for (size_t succ : cfg.m_successors.at(block->getId()))
                 {
                     const auto &succLiveIn = m_result.m_liveIn.at(succ);
                     newLiveOut.insert(succLiveIn.begin(), succLiveIn.end());
@@ -120,8 +129,8 @@ void LivenessAnalysis::computeGlobalLiveness(MirFunction *func, const ControlFlo
             }
 
             // Equation 2: LiveIn[B] = Use[B] Union (LiveOut[B] Except Def[B])
-            std::pmr::unordered_set<MirRegister *> newLiveIn(uses.begin(), uses.end());
-            for (auto *reg : liveOut)
+            std::pmr::unordered_set<size_t> newLiveIn(uses.begin(), uses.end());
+            for (size_t reg : liveOut)
             {
                 if (!defs.contains(reg))
                 {
@@ -151,24 +160,25 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func, const std::shared
     for (auto &block : func->getBlocks())
     {
         // Allocate PMR sets bound directly to our high-speed compilation arena
-        m_result.m_def[block] = std::pmr::unordered_set<MirRegister *>(m_arena);
-        m_result.m_use[block] = std::pmr::unordered_set<MirRegister *>(m_arena);
-        m_result.m_liveIn[block] = std::pmr::unordered_set<MirRegister *>(m_arena);
-        m_result.m_liveOut[block] = std::pmr::unordered_set<MirRegister *>(m_arena);
+        size_t blockId = block->getId();
+        m_result.m_def[blockId] = std::pmr::unordered_set<size_t>(m_arena);
+        m_result.m_use[blockId] = std::pmr::unordered_set<size_t>(m_arena);
+        m_result.m_liveIn[blockId] = std::pmr::unordered_set<size_t>(m_arena);
+        m_result.m_liveOut[blockId] = std::pmr::unordered_set<size_t>(m_arena);
 
-        auto &defs = m_result.m_def[block];
-        auto &uses = m_result.m_use[block];
+        auto &defs = m_result.m_def[blockId];
+        auto &uses = m_result.m_use[blockId];
 
         // Process block variables from front to back to isolate local definitions vs first uses
         for (const auto &instr : block->getInstructions())
         {
-            std::pmr::unordered_set<MirRegister *> localDefs(m_arena);
-            std::pmr::unordered_set<MirRegister *> localUses(m_arena);
+            std::pmr::unordered_set<size_t> localDefs(m_arena);
+            std::pmr::unordered_set<size_t> localUses(m_arena);
 
             extractRegistersFromInstruction(instr, localDefs, localUses);
 
             // An operand is a local 'use' if it's read before being overwritten in the block
-            for (auto *reg : localUses)
+            for (size_t reg : localUses)
             {
                 if (!defs.contains(reg))
                 {
@@ -177,7 +187,7 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func, const std::shared
             }
 
             // An operand is a local 'def' if it's written to before being read in the block
-            for (auto *reg : localDefs)
+            for (size_t reg : localDefs)
             {
                 defs.insert(reg);
             }
@@ -192,8 +202,8 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func, const std::shared
 }
 
 void LivenessAnalysis::extractRegistersFromInstruction(MirInstruction *instr,
-                                                       std::pmr::unordered_set<MirRegister *> &defs,
-                                                       std::pmr::unordered_set<MirRegister *> &uses)
+                                                       std::pmr::unordered_set<size_t> &defs,
+                                                       std::pmr::unordered_set<size_t> &uses)
 {
     // Loop over instruction operands and sort them into definitions or uses
     // based on instruction metadata or flags.
@@ -205,13 +215,14 @@ void LivenessAnalysis::extractRegistersFromInstruction(MirInstruction *instr,
 
         if (MirRegister *reg = op->get<MirRegister>())
         {
+            size_t regId = reg->getRegId();
             if (instr->getMetadata().m_operandConstraints[i].flags & OperandFlag::Write)
             {
-                defs.insert(reg);
+                defs.insert(regId);
             }
             else
             {
-                uses.insert(reg);
+                uses.insert(regId);
             }
         }
     }

@@ -6,7 +6,7 @@ MirFunction::MirFunction(MirBlock *entryPoint,
                          size_t id,
                          SourceReference *sourceRef,
                          std::pmr::list<MirBlock *> blocks,
-                         std::pmr::list<MirFuncParam *> parameters,
+                         std::pmr::list<MirRegister *> parameters,
                          std::pmr::string name) :
     m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType), m_id(id), m_sourceRef(sourceRef),
     m_blocks(std::move(blocks)), m_parameters(std::move(parameters)),
@@ -41,6 +41,6 @@ std::pmr::list<MirBlock *> &MirFunction::getBlocks() { return m_blocks; }
 
 std::pmr::list<MirBlock *> *MirFunction::getBlocksPtr() { return &m_blocks; }
 
-std::pmr::list<MirFuncParam *> &MirFunction::getParameters() { return m_parameters; }
+std::pmr::list<MirRegister *> &MirFunction::getParameters() { return m_parameters; }
 
 const std::pmr::string &MirFunction::getName() { return m_name; }

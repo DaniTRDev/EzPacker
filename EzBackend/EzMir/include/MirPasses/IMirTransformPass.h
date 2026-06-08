@@ -2,9 +2,9 @@
 #define EZPACKER_IMIRTRANSFORMPASS_H
 
 #include "EzMirCommon.h"
-#include "IMirPass.h"
+#include "MirPass.h"
 
-class IMirTransformPass : public IMirPass
+class IMirTransformPass : public MirPass
 {
   public:
     virtual ~IMirTransformPass() = default;

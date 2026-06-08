@@ -3,6 +3,7 @@
 
 #include "EzMirCommon.h"
 #include "Function/MirFunction.h"
+#include "Builder/MirBuilderContext.h"
 
 class MirPrinter
 {
@@ -12,15 +13,13 @@ class MirPrinter
      * @param function
      * @return
      */
-    std::string printToString(MirFunction *function) const;
+    static std::string printToString(MirFunction *function);
 
-    std::string printToString(MirBlock *function) const;
+    static std::string printToString(MirBlock *function);
 
-    std::string printToString(MirInstruction *function) const;
+    static std::string printToString(MirInstruction *function);
 
-    std::string printToString(MirOperand *operand) const;
-    
-  private:
+    static std::string printToString(MirOperand *operand);
 };
 
 #endif // EZPACKER_MIRPRINTER_H

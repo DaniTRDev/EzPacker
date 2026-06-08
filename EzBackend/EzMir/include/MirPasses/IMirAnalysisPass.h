@@ -2,9 +2,9 @@
 #define EZPACKER_IMIRANALYSISPASS_H
 
 #include "EzMirCommon.h"
-#include "IMirPass.h"
+#include "MirPass.h"
 
-class IMirAnalysisPass : public IMirPass
+class IMirAnalysisPass : public MirPass
 {
   public:
     virtual ~IMirAnalysisPass() = default;

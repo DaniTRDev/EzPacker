@@ -5,8 +5,6 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstruct
 {
 }
 
-MirInstructionBuilder::~MirInstructionBuilder() { flush(); }
-
 MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::initializer_list<MirOperand *> &operands)
@@ -28,14 +26,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     builder << ref << "Built instruction";
     builder.appendNote(std::pmr::string(MirPrinter().printToString(instr)), nullptr);
 
-    setBuildResult(instr);
-    return instr;
-}
-
-void MirInstructionBuilder::flush()
-{
-    MirInstruction *instr = getBuiltObj();
-    if (m_ctx && instr)
+    if (instr)
     {
         if (m_insertionPoint->m_type == InsertionType::Append)
         {
@@ -47,7 +38,8 @@ void MirInstructionBuilder::flush()
         }
     }
 
-    MirBuilder::flush();
+    setBuildResult(instr);
+    return instr;
 }
 
 MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)

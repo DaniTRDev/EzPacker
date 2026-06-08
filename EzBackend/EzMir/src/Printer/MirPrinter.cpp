@@ -1,7 +1,7 @@
 #include "Printer/MirPrinter.h"
 #include <format>
 
-std::string MirPrinter::printToString(MirFunction *function) const
+std::string MirPrinter::printToString(MirFunction *function)
 {
     std::string result = std::format("{:#^50}\n", " Function Dump ");
 
@@ -16,12 +16,10 @@ std::string MirPrinter::printToString(MirFunction *function) const
     bool firstParam = true;
     for (auto param : function->getParameters())
     {
-        MirOperand *operand = param->m_reg;
-
         if (!firstParam)
             result += ", ";
 
-        result += operand->toString();
+        result += param->toString();
         firstParam = false;
     }
     result += '\n';
@@ -53,7 +51,7 @@ std::string MirPrinter::printToString(MirFunction *function) const
     return result;
 }
 
-std::string MirPrinter::printToString(MirBlock *block) const
+std::string MirPrinter::printToString(MirBlock *block)
 {
     // Indent block headers slightly
     std::string result = std::format("  Block(id: {}):\n", block->getId());
@@ -67,7 +65,7 @@ std::string MirPrinter::printToString(MirBlock *block) const
     return result;
 }
 
-std::string MirPrinter::printToString(MirInstruction *instr) const
+std::string MirPrinter::printToString(MirInstruction *instr)
 {
     // Indent instructions to sit visually "inside" the block
     std::string result = std::format("    {}", instr->getMetadata().m_name);
@@ -92,4 +90,4 @@ std::string MirPrinter::printToString(MirInstruction *instr) const
     return result;
 }
 
-std::string MirPrinter::printToString(MirOperand *operand) const { return operand->toString(); }
+std::string MirPrinter::printToString(MirOperand *operand) { return operand->toString(); }

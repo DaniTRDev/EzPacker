@@ -82,6 +82,16 @@ MirFunction *MirBuilderContext::getFuncById(size_t id) const
     return nullptr;
 }
 
+MirRegister *MirBuilderContext::getRegisterById(size_t id) const
+{
+    auto it = m_registerIdToRegister.find(id);
+    
+    if (it != m_registerIdToRegister.end())
+        return it->second;
+
+    return nullptr;
+}
+
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
 
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getFuncAllocator() { return m_functionResource; }

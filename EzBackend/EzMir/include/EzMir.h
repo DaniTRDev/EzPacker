@@ -42,12 +42,12 @@
 #include "Instruction/MirInstructionSet.h"
 
 // ── Generic passes ──────────────────────────────────────────────────────────
-#include "MirPass/IMirAnalysisPass.h"
-#include "MirPass/IMirPass.h"
-#include "MirPass/IMirTransformPass.h"
-#include "MirPass/MirPassManager.h"
-#include "MirPass/Passes/CodeFlowAnalysis.h"
-#include "MirPass/Passes/LivenessAnalysis.h"
+#include "MirPasses/IMirAnalysisPass.h"
+#include "MirPasses/MirPass.h"
+#include "MirPasses/IMirTransformPass.h"
+#include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/CodeFlowAnalysis.h"
+#include "MirPasses/Passes/LivenessAnalysis.h"
 
 // ── Basic block ─────────────────────────────────────────────────────────────
 #include "Block/MirBlock.h"

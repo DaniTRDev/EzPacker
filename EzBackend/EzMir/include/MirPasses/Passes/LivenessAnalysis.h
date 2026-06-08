@@ -20,10 +20,11 @@ template <> struct std::hash<MirRegister>
  */
 struct LivenessResult
 {
-    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_liveIn;
-    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_liveOut;
-    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_def;
-    std::pmr::unordered_map<MirBlock *, std::pmr::unordered_set<MirRegister *>> m_use;
+    // Block Id, register Id.
+    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_liveIn;
+    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_liveOut;
+    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_def;
+    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_use;
 
     LivenessResult(std::pmr::memory_resource *arena) : m_liveIn(arena), m_liveOut(arena), m_def(arena), m_use(arena) {}
 };
@@ -36,7 +37,7 @@ class LivenessAnalysis : public IMirAnalysisPass
     /**
      * @brief Allocates the liveness analyzer maps on the global compilation arena.
      */
-    LivenessAnalysis(std::pmr::memory_resource *globalArena);
+    LivenessAnalysis(MirBuilderContext *ctx);
 
     /**
      * Returns the name of the pass "LivenessAnalysisPass".
@@ -90,11 +91,12 @@ class LivenessAnalysis : public IMirAnalysisPass
 
     // Helpers to extract read/written registers out of generic instructions
     void extractRegistersFromInstruction(MirInstruction *instr,
-                                         std::pmr::unordered_set<MirRegister *> &defs,
-                                         std::pmr::unordered_set<MirRegister *> &uses);
+                                         std::pmr::unordered_set<size_t> &defs,
+                                         std::pmr::unordered_set<size_t> &uses);
 
   private:
     LivenessResult m_result;
+    MirBuilderContext *m_ctx;
     std::pmr::memory_resource *m_arena;
 };
 

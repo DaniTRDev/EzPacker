@@ -10,10 +10,10 @@ set(EZMIR_FILES_LIST
         "include/Instruction/MirInstruction.h"
         "include/Instruction/MirInstructionBuilder.h"
         "include/Instruction/MirInstructionSet.h"
-        "include/MirPass/IMirAnalysisPass.h"
-        "include/MirPass/IMirPass.h"
-        "include/MirPass/IMirTransformPass.h"
-        "include/MirPass/MirPassManager.h"
+        "include/MirPasses/IMirAnalysisPass.h"
+        "include/MirPasses/IMirTransformPass.h"
+        "include/MirPasses/MirPass.h"
+        "include/MirPasses/MirPassManager.h"
         "include/Function/MirFunction.h"
         "include/Function/MirFunctionBuilder.h"
         "include/Function/MirFunctionStackFrame.h"
@@ -23,8 +23,8 @@ set(EZMIR_FILES_LIST
         "include/Printer/MirPrinter.h"
         "include/Type/MirType.h"
         "include/Type/MirTypeTable.h"
-        "include/MirPass/Passes/CodeFlowAnalysis.h"
-        "include/MirPass/Passes/LivenessAnalysis.h"
+        "include/MirPasses/Passes/CodeFlowAnalysis.h"
+        "include/MirPasses/Passes/LivenessAnalysis.h"
 
         "src/Block/MirBlock.cpp"
         "src/Block/MirBlockBuilder.cpp"
@@ -35,9 +35,10 @@ set(EZMIR_FILES_LIST
         "src/Function/MirFunction.cpp"
         "src/Function/MirFunctionBuilder.cpp"
         "src/Function/MirFunctionStackFrame.cpp"
-        "src/MirPass/MirPassManager.cpp"
-        "src/MirPass/Passes/CodeFlowAnalysis.cpp"
-        "src/MirPass/Passes/LivenessAnalysis.cpp"
+        "src/MirPasses/MirPass.cpp"
+        "src/MirPasses/MirPassManager.cpp"
+        "src/MirPasses/Passes/CodeFlowAnalysis.cpp"
+        "src/MirPasses/Passes/LivenessAnalysis.cpp"
         "src/Operand/MirOperand.cpp"
         "src/Operand/MirOperandBuilder.cpp"
         "src/Printer/MirPrinter.cpp"
@@ -72,5 +73,26 @@ if (EZPACKER_BUILD_TESTS)
             "EzMirTestSuite"
             ""
             "tests/T_Instruction.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_Block"
+            "EzMirTestSuite"
+            ""
+            "tests/T_Block.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_Function"
+            "EzMirTestSuite"
+            ""
+            "tests/T_Function.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_CodeFlowPass"
+            "EzMirTestSuite"
+            ""
+            "tests/T_CodeFlowPass.cpp"
     )
 endif ()

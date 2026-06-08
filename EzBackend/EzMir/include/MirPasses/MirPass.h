@@ -1,5 +1,5 @@
-#ifndef EZPACKER_IMIRPASS_H
-#define EZPACKER_IMIRPASS_H
+#ifndef EZPACKER_MIRPASS_H
+#define EZPACKER_MIRPASS_H
 
 #include "EzMirCommon.h"
 
@@ -19,17 +19,17 @@ enum class MirPassIterationPlace : uint8_t
 struct MirPassResult
 {
     bool m_modifiedMir{ false }; // Set to true if the pass modified the MIR.
-    bool m_run{ false };         // Set to true if the pass was actually run.
+    bool m_executed{ false };         // Set to true if the pass was actually run.
     bool m_succeeded{ false };   // Set to true of the pass was run and succeeded.
 };
 
 /**
  * Interface used by passes that iterate over the MIR.
  */
-class IMirPass
+class MirPass
 {
   public:
-    virtual ~IMirPass() = default;
+    virtual ~MirPass() = default;
 
     /**
      * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
@@ -77,6 +77,12 @@ class IMirPass
     virtual MirPassIterationPlace getIterationPlace() const = 0;
 
     /**
+     * Returns the last result of this pass.
+     * @return
+     */
+    MirPassResult *getResult();
+
+    /**
      * Returns the pass type.
      * @return
      */
@@ -88,10 +94,19 @@ class IMirPass
     virtual void reset() {};
 
     /**
+     * Sets the result of the pass (by copying the value, it does not store the pointer).
+     * @param result
+     */
+    void setResult(MirPassResult *result);
+
+    /**
      * Returns the dependencies linked to this pass (other passes that must be run before this one).
      * @return
      */
     virtual std::vector<std::type_index> getDependencies() const { return {}; }
+
+  private:
+    MirPassResult m_result;
 };
 
-#endif // EZPACKER_IMIRPASS_H
+#endif // EZPACKER_MIRPASS_H

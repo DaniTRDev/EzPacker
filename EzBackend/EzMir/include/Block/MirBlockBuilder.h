@@ -20,12 +20,7 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
      * @param ctx
      */
     MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner);
-
-    /**
-     * Flushes the block.
-     */
-    ~MirBlockBuilder() override;
-
+    
     /**
      * Builds a block returns it.
      * @param sourceRef

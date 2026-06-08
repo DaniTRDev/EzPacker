@@ -238,6 +238,48 @@ MirBlockVerifier &MirBlockVerifier::instrCountOfType(size_t count, MirInstructio
     return *this;
 }
 
+MirFunctionStackFrameVerifier::MirFunctionStackFrameVerifier(MirFunctionStackFrame *stackFrame) :
+    MirVerifier(stackFrame)
+{
+}
+
+MirFunctionStackFrameVerifier &MirFunctionStackFrameVerifier::checkStackFrameObj(
+        size_t id, int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source)
+{
+    StackFrameObject *stackFrame = getTestedObj()->getObjectFromId(id);
+    if (!stackFrame)
+    {
+        return *this;
+    }
+
+    if (offset != -1)
+    {
+        EXPECT_EQ(stackFrame->m_offset, offset);
+    }
+
+    if (offset != -1)
+    {
+        EXPECT_EQ(stackFrame->m_align, align);
+    }
+
+    if (offset != -1)
+    {
+        EXPECT_EQ(stackFrame->m_sizeInBytes, sizeInBytes);
+    }
+
+    if (source != StackFrameObjectSource::Invalid)
+    {
+        EXPECT_EQ(stackFrame->m_source, source);
+    }
+
+    return *this;
+}
+MirFunctionStackFrameVerifier &MirFunctionStackFrameVerifier::stackFrameObjCount(size_t count)
+{
+    EXPECT_EQ(getTestedObj()->getAllocatedObjectCount(), count);
+    return *this;
+}
+
 MirFunctionVerifier::MirFunctionVerifier(MirFunction *func) : MirVerifier(func) {}
 
 MirFunctionVerifier &MirFunctionVerifier::id(size_t id)
@@ -269,19 +311,194 @@ MirBlockVerifier MirFunctionVerifier::blockVerifier(size_t id)
     return MirBlockVerifier(block);
 }
 
+MirFunctionVerifier &MirFunctionVerifier::paramCount(size_t count)
+{
+    EXPECT_EQ(getTestedObj()->getParameters().size(), count);
+    return *this;
+}
+
+MirFunctionVerifier &MirFunctionVerifier::paramType(const std::vector<size_t> &expectedParamTypeList)
+{
+    const auto &params = getTestedObj()->getParameters();
+    paramCount(expectedParamTypeList.size());
+
+    auto it = params.begin();
+    for (size_t i = 0; i < expectedParamTypeList.size(); i++, it++)
+    {
+        size_t expectedTypeId = expectedParamTypeList[i];
+        if (expectedTypeId != MIRID_INVALID)
+        {
+            MirRegister *reg = (*it);
+            EXPECT_NE(reg, nullptr);
+            EXPECT_EQ(reg->getMirType()->getId(), expectedTypeId);
+        }
+    }
+
+    return *this;
+}
+MirFunctionStackFrameVerifier MirFunctionVerifier::stackFrameVerifier()
+{
+    return MirFunctionStackFrameVerifier(getTestedObj()->getStackFrame());
+}
+
+CodeFlowAnalysisVerifier::CodeFlowAnalysisVerifier(CodeFlowAnalysis *analysis, MirBuilderContext *ctx) :
+    m_ctx(ctx), MirPassVerifier(analysis)
+{
+}
+
+CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::predecessor(size_t toId, size_t fromId)
+{
+    const auto &res = getTestedObj()->getResult();
+    auto it = res.m_predecessors.find(toId);
+
+    EXPECT_TRUE(res.m_predecessors.contains(fromId));
+    return *this;
+}
+
+CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::predecessorCount(size_t blockId, size_t count)
+{
+    const auto &res = getTestedObj()->getResult();
+    auto it = res.m_predecessors.find(blockId);
+
+    EXPECT_NE(it, res.m_predecessors.end());
+    EXPECT_EQ(it->second.size(), count);
+
+    return *this;
+}
+
+CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::reachable(size_t start, size_t end)
+{
+    const auto &res = getTestedObj()->getResult();
+
+    // Lambda for Depth-First Search traversal
+    // We use a tracking set passed by reference to handle cycles safely
+    std::function<bool(size_t, size_t, std::unordered_set<size_t> &)> dfs =
+            [&res, &dfs](size_t current, size_t target, std::unordered_set<size_t> &visited) -> bool
+    {
+        // We found our target destination block
+        if (current == target)
+            return true;
+
+        // We hit a block we've already evaluated (prevents infinite loop in cycles)
+        if (visited.count(current))
+            return false;
+
+        // Mark current block as processed
+        visited.insert(current);
+
+        // Look up successors for the current block
+        auto it = res.m_successors.find(current);
+        if (it == res.m_successors.end())
+            return false; // Dead end / Sink block
+
+        // Recursively check all outgoing control flow branches
+        for (const auto &successor : it->second)
+        {
+            // If any path leads to the target block, cascade a success back up
+            if (dfs(successor, target, visited))
+                return true;
+        }
+
+        return false;
+    };
+
+    std::unordered_set<size_t> visited;
+    bool isReachable = dfs(start, end, visited);
+
+    EXPECT_TRUE(isReachable) << "Block " << end << " is expected to be reachable from Block " << start
+                             << ", but no continuous path was found.";
+
+    return *this;
+}
+CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::successor(size_t fromId, size_t toId)
+{
+    const auto &res = getTestedObj()->getResult();
+    auto it = res.m_successors.find(fromId);
+
+    EXPECT_TRUE(it->second.contains(toId));
+    return *this;
+}
+
+CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::successorCount(size_t blockId, size_t count)
+{
+    const auto &res = getTestedObj()->getResult();
+    auto it = res.m_successors.find(blockId);
+
+    EXPECT_NE(it, res.m_successors.end());
+    EXPECT_EQ(it->second.size(), count);
+
+    return *this;
+}
+
+CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::unreachable(size_t start, size_t end)
+{
+    const auto &res = getTestedObj()->getResult();
+
+    // Lambda for Depth-First Search traversal
+    // We use a tracking set passed by reference to handle cycles safely
+    std::function<bool(size_t, size_t, std::unordered_set<size_t> &)> dfs =
+            [&res, &dfs](size_t current, size_t target, std::unordered_set<size_t> &visited) -> bool
+    {
+        // We found our target destination block
+        if (current == target)
+            return true;
+
+        // We hit a block we've already evaluated (prevents infinite loop in cycles)
+        if (visited.count(current))
+            return false;
+
+        // Mark current block as processed
+        visited.insert(current);
+
+        // Look up successors for the current block
+        auto it = res.m_successors.find(current);
+        if (it == res.m_successors.end())
+            return false; // Dead end / Sink block
+
+        // Recursively check all outgoing control flow branches
+        for (const auto &successor : it->second)
+        {
+            // If any path leads to the target block, cascade a success back up
+            if (dfs(successor, target, visited))
+                return true;
+        }
+
+        return false;
+    };
+
+    std::unordered_set<size_t> visited;
+    bool isReachable = dfs(start, end, visited);
+
+    EXPECT_FALSE(isReachable) << "Block " << end << " is expected to be unreachable from Block " << start;
+    return *this;
+}
+
+CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::exitBlock(size_t blockId)
+{
+    const auto &res = getTestedObj()->getResult();
+    auto it = res.m_successors.find(blockId);
+
+    EXPECT_NE(it, res.m_successors.end());
+    EXPECT_EQ(it->second.size(), 0);
+
+    return *this;
+}
+
 MirBuilderContext *MirTestSuite::getBuilderCtx() { return m_builderCtx.get(); }
 
 MirFunction *MirTestSuite::getTestFunc() { return m_testFunction; }
 
 MirInstructionInsertionPoint *MirTestSuite::getTestInsertionPoint() { return &m_insertPoint; }
 
+MirPrinter MirTestSuite::getPrinter() { return MirPrinter(); }
+
 MirTypeTable *MirTestSuite::getTypeTable() { return m_typeTable.get(); }
 
 void MirTestSuite::create(const std::filesystem::path &workingPath)
 {
     m_diagCollector = std::make_shared<DiagnosticCollector>();
-    m_builderCtx = std::make_shared<MirBuilderContext>(&m_arena, m_diagCollector, m_typeTable);
     m_typeTable = std::make_shared<MirTypeTable>(&m_arena);
+    m_builderCtx = std::make_shared<MirBuilderContext>(&m_arena, m_diagCollector, m_typeTable);
     m_sourceManager = std::make_shared<SourceManager>(workingPath);
     m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
 
@@ -295,7 +512,11 @@ void MirTestSuite::create(const std::filesystem::path &workingPath)
                 << "The creation of the test function failed!";
     }
 
-    m_insertPoint = { .m_type = InsertionType::Append, .m_block = m_testFunction->getEntryPoint(), .m_iterator = {} };
+    MirBlock *entryPoint = m_testFunction->getEntryPoint();
+
+    m_insertPoint = { .m_type = InsertionType::Append,
+                      .m_block = entryPoint,
+                      .m_iterator = entryPoint->getInstructions().begin() };
 }
 
 void MirTestSuite::destroy()

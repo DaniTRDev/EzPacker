@@ -76,8 +76,8 @@ class MirRegister : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Register;
 
-    MirRegister(MirType *type, bool isVirtual, size_t id, SourceReference *ref, const char *name = nullptr) :
-        MirOperand(type, ref), m_virtual(isVirtual), m_id(id), m_name(name)
+    MirRegister(MirType *type, bool isVirtual, size_t id, SourceReference *ref, std::pmr::string name = "") :
+        MirOperand(type, ref), m_virtual(isVirtual), m_id(id), m_name(std::move(name))
     {
     }
 
@@ -85,12 +85,17 @@ class MirRegister : public MirOperand
     size_t getRegId() const { return m_id; }
     bool operator==(const MirRegister &other) const { return m_id == other.m_id && m_virtual == other.m_virtual; }
 
-    const char *getName() const { return m_name; }
+    const std::pmr::string &getName() const { return m_name; }
 
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("@reg (id: {}) (name: {})", m_id, m_name ? m_name : "NO_NAME");
+        if (!m_name.empty())
+        {
+            return std::format("{}.name={}", isVirtual() ? "%v" : "%p", m_name);
+        }
+
+        return std::format("{}.id={}", isVirtual() ? "%v" : "%p", m_id);
     }
 
     void setRegId(size_t id) { m_id = id; }
@@ -98,8 +103,8 @@ class MirRegister : public MirOperand
 
   private:
     bool m_virtual{ true }; // Whether this is a virtual register (true) or a physical register (false).
-    const char *m_name;
-    size_t m_id{ 0 }; // Unique register ID.
+    size_t m_id{ 0 };       // Unique register ID.
+    std::pmr::string m_name;
 };
 
 class MirFrameIndex : public MirOperand

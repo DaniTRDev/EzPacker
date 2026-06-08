@@ -3,16 +3,16 @@
 
 #include "EzMirCommon.h"
 #include "Builder/MirBuilderContext.h"
-#include "MirPass/IMirAnalysisPass.h"
-#include "MirPass/MirPassManager.h"
+#include "MirPasses/IMirAnalysisPass.h"
+#include "MirPasses/MirPassManager.h"
 
 /**
  * @brief High-performance PMR-backed snapshot of a function's control flow graph.
  */
 struct ControlFlowResult
 {
-    std::pmr::unordered_map<MirBlock *, std::pmr::vector<MirBlock *>> m_successors;
-    std::pmr::unordered_map<MirBlock *, std::pmr::vector<MirBlock *>> m_predecessors;
+    std::pmr::unordered_map<size_t, std::pmr::set<size_t>> m_successors;
+    std::pmr::unordered_map<size_t, std::pmr::set<size_t>> m_predecessors;
 
     ControlFlowResult(std::pmr::memory_resource *arena) : m_successors(arena), m_predecessors(arena) {}
 };

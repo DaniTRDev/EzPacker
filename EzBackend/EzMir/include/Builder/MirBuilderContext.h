@@ -77,6 +77,13 @@ class MirBuilderContext
     MirId createId();
 
     /**
+     * Returns the register that has the given ID. If no match is found, nullptr is returned.
+     * @param id
+     * @return
+     */
+    MirRegister *getRegisterById(size_t id) const;
+
+    /**
      * Returns an allocator used to allocate complementary resources (global data, types, names, maps...).
      * @return
      */
@@ -110,6 +117,7 @@ class MirBuilderContext
     std::pmr::list<MirFunction *> m_functions;
     std::pmr::map<size_t, MirFunction *> m_functionIdToFunc; // Used to search for functions.
     std::pmr::map<size_t, MirBlock *> m_blockIdToBlock;      // Used to search for blocks.
+    std::pmr::map<size_t, MirRegister *> m_registerIdToRegister;
 
     std::pmr::vector<MirGlobalDataEntry *> m_globalData;
 

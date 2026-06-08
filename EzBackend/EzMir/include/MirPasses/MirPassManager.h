@@ -4,7 +4,7 @@
 #include "EzMirCommon.h"
 #include "IMirAnalysisPass.h"
 #include "IMirTransformPass.h"
-#include "IMirPass.h"
+#include "MirPass.h"
 #include "Function/MirFunction.h"
 #include "Printer/MirPrinter.h"
 
@@ -22,7 +22,7 @@ class MirPassManager
      * @brief Stashes a pass into the blueprint registry. It won't be ordered yet.
      */
     template <typename T, typename... Args>
-        requires(std::is_base_of_v<IMirPass, T>)
+        requires(std::is_base_of_v<MirPass, T>)
     void addPass(Args &&...args)
     {
         auto passId = std::type_index(typeid(T));
@@ -64,7 +64,7 @@ class MirPassManager
         }
 
         MirPassResult result = runPass(passInstance, functionList);
-        if (result.m_run && result.m_succeeded)
+        if (result.m_executed && result.m_succeeded)
         {
             // Cache the pointer so future passes can access it instantly without re-running
             m_validAnalyses[typeId] = passInstance;
@@ -101,14 +101,14 @@ class MirPassManager
      * @param pass
      * @return
      */
-    MirPassResult runPass(IMirPass *pass, std::pmr::list<class MirFunction *> &functionList);
+    MirPassResult runPass(MirPass *pass, std::pmr::list<class MirFunction *> &functionList);
 
   private:
-    std::pmr::unordered_map<std::type_index, IMirPass *>
+    std::pmr::unordered_map<std::type_index, MirPass *>
             m_validAnalyses; // Analysis passes that have been run and have returned data.
-    std::pmr::unordered_map<std::type_index, std::unique_ptr<IMirPass>>
+    std::pmr::unordered_map<std::type_index, std::unique_ptr<MirPass>>
             m_passesBlueprint; // Links an index to its pass.
-    std::pmr::vector<IMirPass *>
+    std::pmr::vector<MirPass *>
             m_executionPipeline; // An ordered list of passes that guarantees that every dep is resolved.
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
 };

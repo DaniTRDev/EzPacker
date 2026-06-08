@@ -24,21 +24,6 @@ MirFunctionStackFrame::create(int64_t offset, size_t align, size_t sizeInBytes, 
     return m_stackFrameObjects.back();
 }
 
-StackFrameObject *MirFunctionStackFrame::createLocalObject(size_t size, size_t align)
-{
-    return create(0, align, size, StackFrameObjectSource::Variable);
-}
-
-StackFrameObject *MirFunctionStackFrame::createSpill(size_t size, size_t align)
-{
-    return create(0, align, size, StackFrameObjectSource::Spill);
-}
-
-StackFrameObject *MirFunctionStackFrame::createParam(size_t size, size_t align, int64_t offset)
-{
-    return create(offset, align, size, StackFrameObjectSource::Parameter);
-}
-
 StackFrameObject *MirFunctionStackFrame::getObjectFromId(MirId id)
 {
     if (id < m_stackFrameObjects.size())

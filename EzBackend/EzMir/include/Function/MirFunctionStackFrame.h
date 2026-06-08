@@ -5,6 +5,7 @@
 
 enum class StackFrameObjectSource : uint8_t
 {
+    Invalid = 0,
     Parameter, // The object comes from a parameter.
     Variable,  // The object comes from a variable.
     Spill      // The object comes from a spill.
@@ -34,7 +35,7 @@ class MirFunctionStackFrame
      * arena somewhere and the arena must keep it alive until it's not needed at all.
      * @param objectList
      */
-    MirFunctionStackFrame(std::pmr::vector<StackFrameObject*> objectList);
+    MirFunctionStackFrame(std::pmr::vector<StackFrameObject *> objectList);
 
     /**
      * Returns the allocated object count.
@@ -50,34 +51,7 @@ class MirFunctionStackFrame
      * @param source
      * @return
      */
-    StackFrameObject *
-    create(int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source);
-
-    /**
-     * Creates an abstract object in the function stack frame.
-     * @param size
-     * @param align
-     * @return
-     */
-    StackFrameObject *createLocalObject(size_t size, size_t align);
-
-    /**
-     * Creates an abstract object in the function stack frame.
-     * @param size
-     * @param align
-     * @return
-     */
-    StackFrameObject *createSpill(size_t size, size_t align);
-
-    /**
-     * Creates a parameter at the given offset. This is the only object whose offset is known at creation-time as this
-     * is directly dictated by ABI.
-     * @param size
-     * @param align
-     * @param offset
-     * @return
-     */
-    StackFrameObject *createParam(size_t size, size_t align, int64_t offset);
+    StackFrameObject *create(int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source);
 
     /**
      * Returns a stack frame object out of an ID, if it was not found, nullptr is returned.
@@ -90,10 +64,10 @@ class MirFunctionStackFrame
      * Returns the list of stack frame objects.
      * @return
      */
-    const std::pmr::vector<StackFrameObject*> &getStackFrameObjects() const;
+    const std::pmr::vector<StackFrameObject *> &getStackFrameObjects() const;
 
   private:
-    std::pmr::vector<StackFrameObject*> m_stackFrameObjects;
+    std::pmr::vector<StackFrameObject *> m_stackFrameObjects;
 };
 
 #endif // EZPACKER_MIRFUNCTIONSTACKFRAME_H

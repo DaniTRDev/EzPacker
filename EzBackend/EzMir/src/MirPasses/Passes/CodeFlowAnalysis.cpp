@@ -1,4 +1,4 @@
-#include "MirPass/Passes/CodeFlowAnalysis.h"
+#include "MirPasses/Passes/CodeFlowAnalysis.h"
 
 CodeFlowAnalysis::CodeFlowAnalysis(MirBuilderContext *ctx) :
     m_ctx(ctx), m_arena(ctx->getGlobalAllocator()), m_result(ctx->getGlobalAllocator())
@@ -33,10 +33,10 @@ MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
         MirBlock *currentBlock = *blockIt;
 
         // Ensure our maps are initialized for every block, even terminal ones with zero edges
-        if (!m_result.m_successors.contains(currentBlock))
-            m_result.m_successors[currentBlock] = std::pmr::vector<MirBlock *>(m_arena);
-        if (!m_result.m_predecessors.contains(currentBlock))
-            m_result.m_predecessors[currentBlock] = std::pmr::vector<MirBlock *>(m_arena);
+        if (!m_result.m_successors.contains(currentBlock->getId()))
+            m_result.m_successors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
+        if (!m_result.m_predecessors.contains(currentBlock->getId()))
+            m_result.m_predecessors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
 
         const auto &instructions = currentBlock->getInstructions();
         const MirInstruction *terminator = nullptr;
@@ -101,7 +101,7 @@ MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
     }
 
     // Analysis passes never mutate bytecode layouts
-    return { .m_modifiedMir = false, .m_run = true, .m_succeeded = true };
+    return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
 MirBlock *CodeFlowAnalysis::getTargetJumpBlock(const MirInstruction *inst) const
@@ -127,15 +127,15 @@ void CodeFlowAnalysis::addEdge(MirBlock *from, MirBlock *to)
         return;
 
     // Defensive check: Guard against duplicate edge tracking records inside our vectors
-    auto &successors = m_result.m_successors[from];
-    if (std::find(successors.begin(), successors.end(), to) == successors.end())
+    auto &successors = m_result.m_successors[from->getId()];
+    if (successors.find(to->getId()) == successors.end())
     {
-        successors.push_back(to);
+        successors.insert(to->getId());
     }
 
-    auto &predecessors = m_result.m_predecessors[to];
-    if (std::find(predecessors.begin(), predecessors.end(), from) == predecessors.end())
+    auto &predecessors = m_result.m_predecessors[to->getId()];
+    if (predecessors.find(from->getId()) == predecessors.end())
     {
-        predecessors.push_back(from);
+        predecessors.insert(from->getId());
     }
 }

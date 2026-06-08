@@ -33,17 +33,7 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
     MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint *insertionPoint);
 
     /**
-     * Flushes the content of the builder.
-     */
-    ~MirInstructionBuilder() override;
-
-    /**
-     * Pushes the built instruction into the context at the given insertion point.
-     */
-    void flush();
-
-    /**
-     * Builds an instruction with the given opcode.
+     * Builds an instruction with the given opcode and inserts it with the insert point information.
      * @param opcode
      * @param ref
      * @param operands

@@ -15,11 +15,6 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirOperandBuilder(MirBuilderContext *ctx);
 
     /**
-     * Flushes the operand.
-     */
-    ~MirOperandBuilder() override;
-
-    /**
      * Creates the operand with the given context and args. OperandType must be a sub type of MirOperand.
      * @param ctx
      * @tparam OperandType

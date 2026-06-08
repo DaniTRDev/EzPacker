@@ -2,14 +2,19 @@
 
 MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock *> *owner) : m_ctx(ctx), m_owner(owner)
 {
+    if (!owner->empty())
+    {
+        MirBlock *targetBlock = owner->back();
+        m_insertPoint = { .m_type = InsertionType::Append,
+                          .m_block = targetBlock,
+                          .m_iterator = targetBlock->getInstructions().begin() };
+    }
 }
 
 MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) :
     MirBlockBuilder(ctx, owner->getBlocksPtr())
 {
 }
-
-MirBlockBuilder::~MirBlockBuilder() { MirBuilder::flush(); }
 
 MirBlock *MirBlockBuilder::build(SourceReference *sourceRef)
 {
@@ -27,6 +32,7 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef)
         m_insertPoint = { .m_type = InsertionType::Append,
                           .m_block = block,
                           .m_iterator = block->getInstructions().begin() };
+
         m_owner->push_back(block); // Append the block to the owner function.
 
         setBuildResult(block);

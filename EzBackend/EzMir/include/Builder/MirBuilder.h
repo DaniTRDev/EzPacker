@@ -9,7 +9,7 @@
 template <typename T> class MirBuilder
 {
   public:
-    virtual ~MirBuilder() { flush(); };
+    virtual ~MirBuilder() {};
 
     bool isBuilt() const { return m_builtObj != nullptr; }
 
@@ -20,10 +20,9 @@ template <typename T> class MirBuilder
     T *getBuiltObj() { return m_builtObj; }
 
     /**
-     * Flushes the builder and sets the built obj to nullptr.
+     * Sets the built result object.
+     * @param obj
      */
-    virtual void flush() { m_builtObj = nullptr; }
-
     void setBuildResult(T *obj) { m_builtObj = obj; }
 
   private:

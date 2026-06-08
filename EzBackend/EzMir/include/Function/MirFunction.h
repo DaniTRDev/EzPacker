@@ -21,12 +21,6 @@
 #include "Type/MirType.h"
 #include "MirFunctionStackFrame.h"
 
-struct MirFuncParam
-{
-    MirRegister *m_reg;
-    std::pmr::string m_name;
-};
-
 /**
  * Important: Parameters MUST BE VIRTUAL/PHYSICAL REGISTERS.
  */
@@ -51,7 +45,7 @@ class MirFunction
                 size_t id,
                 SourceReference *sourceRef,
                 std::pmr::list<MirBlock *> blocks,
-                std::pmr::list<MirFuncParam *> parameters,
+                std::pmr::list<MirRegister *> parameters,
                 std::pmr::string name);
 
     /**
@@ -111,7 +105,7 @@ class MirFunction
      * Each element is a `MirFuncParam*` describing one incoming parameter. The
      * exact calling-convention meaning is defined by later lowering stages.
      */
-    std::pmr::list<MirFuncParam *> &getParameters();
+    std::pmr::list<MirRegister *> &getParameters();
 
     /**
      * Returns the name of the function.
@@ -127,7 +121,7 @@ class MirFunction
     SourceReference *m_sourceRef;
 
     std::pmr::list<MirBlock *> m_blocks; // Arena-managed blocks belonging to this function.
-    std::pmr::list<MirFuncParam *> m_parameters;
+    std::pmr::list<MirRegister *> m_parameters;
     std::pmr::map<size_t, MirBlock *> m_blockIdToBlock;
     std::pmr::string m_name;
 };

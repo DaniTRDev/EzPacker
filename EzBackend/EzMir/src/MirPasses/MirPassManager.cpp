@@ -1,4 +1,4 @@
-#include "MirPass/MirPassManager.h"
+#include "MirPasses/MirPassManager.h"
 
 MirPassManager::MirPassManager(std::pmr::memory_resource *globalArena,
                                std::shared_ptr<DiagnosticCollector> diagCollector) :
@@ -15,7 +15,7 @@ void MirPassManager::runPipeline(std::pmr::list<MirFunction *> &functionList)
         generatePipeline();
     }
 
-    for (IMirPass *pass : m_executionPipeline)
+    for (MirPass *pass : m_executionPipeline)
     {
         // If it's a transform pass, clean up cached analyses to protect against stale data
         if (pass->getPassType() == MirPassType::Transform)
@@ -23,7 +23,8 @@ void MirPassManager::runPipeline(std::pmr::list<MirFunction *> &functionList)
             m_validAnalyses.clear();
         }
 
-        runPass(pass, functionList);
+        MirPassResult result = runPass(pass, functionList);
+        pass->setResult(&result);
     }
 }
 
@@ -85,7 +86,7 @@ void MirPassManager::resolveDependencies(std::type_index passId,
 
 const std::shared_ptr<DiagnosticCollector> &MirPassManager::getDiagCollector() const { return m_diagCollector; }
 
-MirPassResult MirPassManager::runPass(IMirPass *pass, std::pmr::list<MirFunction *> &functionList)
+MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction *> &functionList)
 {
     m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager")
             << std::pmr::string(std::format("Running pass {}", pass->getName()));
@@ -135,7 +136,7 @@ MirPassResult MirPassManager::runPass(IMirPass *pass, std::pmr::list<MirFunction
 
     auto builder = m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager");
     builder << "Pass result";
-    builder.appendNote(std::pmr::string(std::format("Executed: {}", result.m_run)), nullptr);
+    builder.appendNote(std::pmr::string(std::format("Executed: {}", result.m_executed)), nullptr);
     builder.appendNote(std::pmr::string(std::format("Succeeded: {}", result.m_succeeded)), nullptr);
     builder.appendNote(std::pmr::string(std::format("Modified Mir: {}", result.m_modifiedMir)), nullptr);
 
