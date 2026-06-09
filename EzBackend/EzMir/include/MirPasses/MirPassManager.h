@@ -21,12 +21,14 @@ class MirPassManager
     /**
      * @brief Stashes a pass into the blueprint registry. It won't be ordered yet.
      */
-    template <typename T, typename... Args>
-        requires(std::is_base_of_v<MirPass, T>)
-    void addPass(Args &&...args)
+    template <typename PassType, typename... Args>
+        requires(std::is_base_of_v<MirPass, PassType>)
+    PassType *addPass(Args &&...args)
     {
-        auto passId = std::type_index(typeid(T));
-        m_passesBlueprint[passId] = std::make_unique<T>(std::forward<Args>(args)...);
+        auto passId = std::type_index(typeid(PassType));
+        m_passesBlueprint[passId] = std::make_unique<PassType>(std::forward<Args>(args)...);
+
+        return static_cast<PassType *>(m_passesBlueprint[passId].get());
     }
 
     /**
@@ -34,48 +36,29 @@ class MirPassManager
      */
     void generatePipeline();
 
+    /**
+     * @brief Lazy-loads, executes, and caches an analysis pass on demand.
+     */
     template <typename AnalysisPass>
         requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
     AnalysisPass *getAnalysis(std::pmr::list<class MirFunction *> &functionList)
     {
-        std::type_index typeId = std::type_index(typeid(AnalysisPass));
+        std::type_index passId = std::type_index(typeid(AnalysisPass));
 
-        // Check if the analysis pass has already run and its cached result is valid
-        auto it = m_validAnalyses.find(typeId);
-        if (it != m_validAnalyses.end())
+        // Cache Hit: Return the valid analysis instantly
+        if (m_validAnalyses.contains(passId))
         {
-            return static_cast<AnalysisPass *>(it->second);
+            return static_cast<AnalysisPass *>(m_validAnalyses[passId]);
         }
 
-        // Not found in cache. Lookup the pass instance inside the blueprint registry
-        auto blueprintIt = m_passesBlueprint.find(typeId);
-        AnalysisPass *passInstance = nullptr;
-
-        if (blueprintIt != m_passesBlueprint.end())
-        {
-            // Use the pre-registered pass instance from the blueprint graph
-            passInstance = static_cast<AnalysisPass *>(blueprintIt->second.get());
-        }
-        else
-        {
-            m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirPassManager")
-                    << "Tried to run a pass that has not been previously added";
-            throw std::runtime_error("");
-        }
-
-        MirPassResult result = runPass(passInstance, functionList);
-        if (result.m_executed && result.m_succeeded)
-        {
-            // Cache the pointer so future passes can access it instantly without re-running
-            m_validAnalyses[typeId] = passInstance;
-        }
-
-        return passInstance;
+        // Cache Miss: Query the non-templated backend engine to run and cache dynamically
+        MirPass *executedPass = runAnalysisById(passId, functionList);
+        return static_cast<AnalysisPass *>(executedPass);
     }
 
     /**
      * Runs the generated pipeline (by generatePipeline) on the given function list.
-     * @param codeModule
+     * @param functionList
      */
     void runPipeline(std::pmr::list<class MirFunction *> &functionList);
 
@@ -86,6 +69,11 @@ class MirPassManager
     const std::shared_ptr<DiagnosticCollector> &getDiagCollector() const;
 
   private:
+    /**
+     * Internal implementation helper to resolve and execute an analysis pass by type_index.
+     */
+    MirPass *runAnalysisById(std::type_index passId, std::pmr::list<class MirFunction *> &functionList);
+
     /**
      * Tries to form a valid pass execution pipeline satisfying the dependencies of each pass.
      * @param passId
@@ -104,12 +92,11 @@ class MirPassManager
     MirPassResult runPass(MirPass *pass, std::pmr::list<class MirFunction *> &functionList);
 
   private:
-    std::pmr::unordered_map<std::type_index, MirPass *>
-            m_validAnalyses; // Analysis passes that have been run and have returned data.
-    std::pmr::unordered_map<std::type_index, std::unique_ptr<MirPass>>
-            m_passesBlueprint; // Links an index to its pass.
-    std::pmr::vector<MirPass *>
-            m_executionPipeline; // An ordered list of passes that guarantees that every dep is resolved.
+    std::pmr::unordered_map<std::type_index, MirPass *> m_validAnalyses;
+    std::pmr::unordered_map<std::type_index, std::unique_ptr<MirPass>> m_passesBlueprint;
+    std::pmr::vector<MirPass *> m_executionPipeline;
+    // Storage to keep pass results alive safely in memory, preventing dangling pointer references
+    std::pmr::unordered_map<std::type_index, MirPassResult> m_savedResults;
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
 };
 

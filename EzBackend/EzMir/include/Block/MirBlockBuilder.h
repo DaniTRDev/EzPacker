@@ -24,9 +24,10 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
     /**
      * Builds a block returns it.
      * @param sourceRef
+     * @param name
      * @return
      */
-    MirBlock *build(SourceReference *sourceRef);
+    MirBlock *build(SourceReference *sourceRef, const std::pmr::string &name);
 
     /**
      * Returns an instruction builder linked to the current block and context.

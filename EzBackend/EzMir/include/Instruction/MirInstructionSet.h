@@ -6,6 +6,13 @@
  */
 #ifdef INSTRUCTION
 
+// This code is needed not to collide with gtest's TEST macro.
+#ifdef TEST
+#define BG_TEST_WAS_DEFINED
+#pragma push_macro("TEST")
+#undef TEST
+#endif
+
 #define OPERAND_CONSTRAINTS(...) { __VA_ARGS__ }
 #define NO_EQUIV { MirInstructionOpCode::INVALID, MirInstructionOpCode::INVALID }
 #define EQUIV(high, low) { MirInstructionOpCode::high, MirInstructionOpCode::low }
@@ -297,5 +304,10 @@ INSTRUCTION(HALT, System, NO_EQUIV, OPERAND_CONSTRAINTS(), F(IsTerminator) | F(H
 #undef OPERAND_CONSTRAINTS
 #undef NO_EQUIV
 #undef EQUIV
+
+#ifdef BG_TEST_WAS_DEFINED
+#pragma pop_macro("TEST")
+#undef BG_TEST_WAS_DEFINED
+#endif
 
 #endif // INSTRUCTION

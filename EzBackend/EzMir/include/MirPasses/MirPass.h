@@ -19,7 +19,7 @@ enum class MirPassIterationPlace : uint8_t
 struct MirPassResult
 {
     bool m_modifiedMir{ false }; // Set to true if the pass modified the MIR.
-    bool m_executed{ false };         // Set to true if the pass was actually run.
+    bool m_executed{ false };    // Set to true if the pass was actually run.
     bool m_succeeded{ false };   // Set to true of the pass was run and succeeded.
 };
 
@@ -87,6 +87,11 @@ class MirPass
      * @return
      */
     virtual MirPassType getPassType() const = 0;
+
+    /**
+     * Prints the pass result to the diag collector.
+     */
+    virtual void printResult() const = 0;
 
     /**
      * Called by the pass manager when the pass needs to be reset.

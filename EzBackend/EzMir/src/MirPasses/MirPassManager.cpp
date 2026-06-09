@@ -3,13 +3,13 @@
 MirPassManager::MirPassManager(std::pmr::memory_resource *globalArena,
                                std::shared_ptr<DiagnosticCollector> diagCollector) :
     m_validAnalyses(globalArena), m_passesBlueprint(globalArena), m_executionPipeline(globalArena),
-    m_diagCollector(std::move(diagCollector))
+    m_savedResults(globalArena), m_diagCollector(std::move(diagCollector))
 {
 }
 
 void MirPassManager::runPipeline(std::pmr::list<MirFunction *> &functionList)
 {
-    // Ensure compilation has been executed at least once
+    // Ensure compilation pipeline has been calculated at least once
     if (m_executionPipeline.empty() && !m_passesBlueprint.empty())
     {
         generatePipeline();
@@ -17,15 +17,51 @@ void MirPassManager::runPipeline(std::pmr::list<MirFunction *> &functionList)
 
     for (MirPass *pass : m_executionPipeline)
     {
-        // If it's a transform pass, clean up cached analyses to protect against stale data
+        // Pipeline loop only processes Transform / Optimization passes sequentially
         if (pass->getPassType() == MirPassType::Transform)
         {
+            // Clean up cached analyses to protect against stale data mutations
             m_validAnalyses.clear();
-        }
+            m_savedResults.clear();
 
-        MirPassResult result = runPass(pass, functionList);
-        pass->setResult(&result);
+            auto passId = std::type_index(typeid(*pass));
+            m_savedResults[passId] = runPass(pass, functionList);
+            pass->setResult(&m_savedResults[passId]);
+        }
     }
+}
+
+MirPass *MirPassManager::runAnalysisById(std::type_index passId, std::pmr::list<class MirFunction *> &functionList)
+{
+    // Cache Check (handles downstream nested dependencies)
+    if (m_validAnalyses.contains(passId))
+    {
+        return m_validAnalyses[passId];
+    }
+
+    auto it = m_passesBlueprint.find(passId);
+    if (it == m_passesBlueprint.end())
+    {
+        throw std::runtime_error(
+                "Internal Compiler Error: Missing pass dependency implementation in blueprint registry.");
+    }
+
+    MirPass *analysisPass = it->second.get();
+
+    // Recursively resolve and cache all upstream prerequisites through the manager framework
+    for (const auto &depId : analysisPass->getDependencies())
+    {
+        runAnalysisById(depId, functionList);
+    }
+
+    // Run the analysis and safely persist the result inside our map storage
+    m_savedResults[passId] = runPass(analysisPass, functionList);
+    analysisPass->setResult(&m_savedResults[passId]);
+
+    // Validate cache entry tracking
+    m_validAnalyses[passId] = analysisPass;
+
+    return analysisPass;
 }
 
 void MirPassManager::generatePipeline()
@@ -35,11 +71,15 @@ void MirPassManager::generatePipeline()
 
     m_executionPipeline.clear();
     std::unordered_set<std::type_index> resolved;
-    std::unordered_set<std::type_index> seenInCurrentPath; // For cycle detection
+    std::unordered_set<std::type_index> seenInCurrentPath;
 
     for (const auto &[passId, passPtr] : m_passesBlueprint)
     {
-        resolveDependencies(passId, resolved, seenInCurrentPath);
+        // Analysis passes are excluded from the static array loop; they invoke on-demand
+        if (passPtr->getPassType() == MirPassType::Transform)
+        {
+            resolveDependencies(passId, resolved, seenInCurrentPath);
+        }
     }
 
     auto builder = m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager");
@@ -55,11 +95,10 @@ void MirPassManager::resolveDependencies(std::type_index passId,
                                          std::unordered_set<std::type_index> &resolved,
                                          std::unordered_set<std::type_index> &seenInCurrentPath)
 {
-    // 1. If already processed and added to the execution list, skip
     if (resolved.contains(passId))
         return;
 
-    // 2. Circular Dependency Validation Guard
+    // Circular Dependency Validation Guard
     if (seenInCurrentPath.contains(passId))
     {
         throw std::runtime_error("Fatal Compiler Error: Circular dependency detected in Pass Pipeline registry!");
@@ -71,7 +110,6 @@ void MirPassManager::resolveDependencies(std::type_index passId,
         throw std::runtime_error("Fatal Compiler Error: Missing pass dependency implementation in blueprint registry.");
     }
 
-    // 3. Trace deeper into the graph
     seenInCurrentPath.insert(passId);
     for (const auto &depId : it->second->getDependencies())
     {
@@ -79,7 +117,6 @@ void MirPassManager::resolveDependencies(std::type_index passId,
     }
     seenInCurrentPath.erase(passId); // Backtrack
 
-    // 4. Dependee is fully resolved. Safe to append Depender!
     resolved.insert(passId);
     m_executionPipeline.push_back(it->second.get());
 }
@@ -104,7 +141,6 @@ MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction 
                     result = pass->run(blockList, block, this);
                 }
             }
-
             break;
         }
         case MirPassIterationPlace::Function:
@@ -129,7 +165,6 @@ MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction 
                     }
                 }
             }
-
             break;
         }
     }
@@ -140,5 +175,6 @@ MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction 
     builder.appendNote(std::pmr::string(std::format("Succeeded: {}", result.m_succeeded)), nullptr);
     builder.appendNote(std::pmr::string(std::format("Modified Mir: {}", result.m_modifiedMir)), nullptr);
 
+    pass->printResult();
     return result;
 }

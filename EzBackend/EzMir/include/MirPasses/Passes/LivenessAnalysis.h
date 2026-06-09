@@ -69,11 +69,11 @@ class LivenessAnalysis : public IMirAnalysisPass
                       class MirPassManager *passManager) override;
 
     /**
-     * @brief Explicitly establishes dependency mapping rules.
-     * Guaranteed to compile and run CodeFlowAnalysis prior to executing liveness.
+     * Prints the result of the liveness analysis. It shows the def/use set of variables of each block and the global
+     * live in/out graph.
      */
-    std::vector<std::type_index> getDependencies() const override;
-
+    void printResult() const override;
+    
   private:
     /**
      * Computes the gloval live-in/live-out set of a function.

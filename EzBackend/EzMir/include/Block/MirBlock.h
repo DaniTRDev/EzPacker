@@ -14,8 +14,12 @@ class MirBlock
      * produced by `MirBuilderContext::createId()`.
      * @param sourceRef Source reference that originated this block.
      * @param instructions Arena-managed instruction slice associated with this block.
+     * @param name
      */
-    MirBlock(size_t id, SourceReference *sourceRef, std::pmr::list<MirInstruction *> instructions);
+    MirBlock(size_t id,
+             SourceReference *sourceRef,
+             std::pmr::list<MirInstruction *> instructions,
+             const std::pmr::string &name = "");
 
     /**
      * Returns the unique MIR ID assigned to this block.
@@ -39,17 +43,24 @@ class MirBlock
      * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
      */
     const std::pmr::list<MirInstruction *> &getInstructions() const;
-    
+
     /**
      * Returns a pointer to the MUTABLE list of instructions.
      * @return
      */
     std::pmr::list<MirInstruction *> *getInstructionsPtr();
 
+    /**
+     * Returns the name of the block, if any.
+     * @return
+     */
+    const std::pmr::string &getName() const;
+
   private:
     size_t m_id;
     SourceReference *m_sourceRef;
     std::pmr::list<MirInstruction *> m_instructions; // Arena-managed linked list of instructions.
+    std::pmr::string m_name;
 };
 
 #endif // EZPACKER_MIRBLOCK_H

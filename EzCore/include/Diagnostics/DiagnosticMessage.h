@@ -106,8 +106,7 @@ class DiagnosticMessage
      * @param sender
      * @param notes
      */
-    DiagnosticMessage(
-                      DiagnosticMessageType type,
+    DiagnosticMessage(DiagnosticMessageType type,
                       SourceReference *primarySourceRef,
                       const std::string_view &mainMsg,
                       const std::string_view &sender,
@@ -115,11 +114,11 @@ class DiagnosticMessage
 
   private:
     DiagnosticMessageType m_type;
-    SourceReference *m_primarySourceRef; // A reference to the parent scope/object that executed a traverse operation
-                                         // and created a diagnostic in any of its sub-steps.
-    std::list<DiagnosticNote> m_notes;   // List ensure O(1) appends/removes (linked list).
-    std::pmr::string m_mainMessage;      // The main message of the diagnostic.
-    std::pmr::string m_sender;           // The component that sent the diagnostic.
+    SourceReference *m_primarySourceRef{ nullptr }; // A reference to the parent scope/object that executed a traverse
+                                                    // operation and created a diagnostic in any of its sub-steps.
+    std::list<DiagnosticNote> m_notes{};            // List ensure O(1) appends/removes (linked list).
+    std::pmr::string m_mainMessage;                 // The main message of the diagnostic.
+    std::pmr::string m_sender;                      // The component that sent the diagnostic.
 };
 
 #endif // EZPACKER_DIAGNOSTICMESSAGE_H

@@ -22,7 +22,7 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType,
             funcStackFrameAlloc.new_object<MirFunctionStackFrame>(std::pmr::vector<StackFrameObject *>(arena));
 
     MirBlockBuilder builder(m_ctx, &blocks);
-    MirBlock *entryPoint = builder.build(sourceRef);
+    MirBlock *entryPoint = builder.build(sourceRef, "entryPoint");
     MirFunction *func = funcAlloc.new_object<MirFunction>(entryPoint,
                                                           stackFrame,
                                                           returnType,
@@ -34,7 +34,7 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType,
 
     auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirFunctionBuilder");
     diagBuilder << sourceRef << std::pmr::string(std::format("Built func with id: {}", func->getId()));
-    diagBuilder.appendNote(std::pmr::string(MirPrinter().printToString(func)), sourceRef);
+    diagBuilder.appendNote(std::pmr::string(MirPrinter().printToString(func, MirPrinterDetail::Detailed)), sourceRef);
 
     if (!m_ctx->appendFunction(func))
     {
@@ -65,7 +65,7 @@ StackFrameObject *MirFunctionBuilder::buildLocalStackObj(size_t size, size_t ali
     SourceReference *ref = func->getSourceRef();
 
     auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirFunctionBuilder");
-    diagBuilder << ref << std::pmr::string(std::format("func.name={}.id={}", func->getName(), func->getId()));
+    diagBuilder << ref << std::pmr::string(std::format("%func.name={}.id={}", func->getName(), func->getId()));
     diagBuilder.appendNote(std::pmr::string(std::format("%lsto.id={}", obj->m_id)), nullptr);
 
     return obj;
@@ -82,7 +82,7 @@ StackFrameObject *MirFunctionBuilder::buildStackSpill(size_t size, size_t align)
     SourceReference *ref = func->getSourceRef();
 
     auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirFunctionBuilder");
-    diagBuilder << ref << std::pmr::string(std::format("func.name={}.id={}", func->getName(), func->getId()));
+    diagBuilder << ref << std::pmr::string(std::format("%func.name={}.id={}", func->getName(), func->getId()));
     diagBuilder.appendNote(std::pmr::string(std::format("%lsts.id={}", obj->m_id)), nullptr);
 
     return obj;
@@ -99,7 +99,7 @@ StackFrameObject *MirFunctionBuilder::buildStackParam(size_t size, size_t align,
     SourceReference *ref = func->getSourceRef();
 
     auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirFunctionBuilder");
-    diagBuilder << ref << std::pmr::string(std::format("func.name={}.id={}", func->getName(), func->getId()));
+    diagBuilder << ref << std::pmr::string(std::format("%func.name={}.id={}", func->getName(), func->getId()));
     diagBuilder.appendNote(std::pmr::string(std::format("%lstp.id={}.offset={}", obj->m_id, obj->m_offset)), nullptr);
 
     return obj;

@@ -1,7 +1,7 @@
 #ifndef EZPACKER_MIRINSTRUCTIONBUILDER_H
 #define EZPACKER_MIRINSTRUCTIONBUILDER_H
 
-#include "EzCoreCommon.h"
+#include "EzMirCommon.h"
 #include "Builder/MirBuilder.h"
 #include "Builder/MirBuilderContext.h"
 #include "Printer/MirPrinter.h"
@@ -30,7 +30,19 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
      * @param ctx
      * @param insertionPoint
      */
-    MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint *insertionPoint);
+    MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint);
+
+    /**
+     * Creates an instruction builder linked to a block at a specic position, the insertion order can be also set.
+     * @param ctx
+     * @param block
+     * @param type
+     * @param it
+     */
+    MirInstructionBuilder(MirBuilderContext *ctx,
+                          MirBlock *block,
+                          InsertionType type,
+                          std::pmr::list<MirInstruction *>::iterator it);
 
     /**
      * Builds an instruction with the given opcode and inserts it with the insert point information.
@@ -74,9 +86,11 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
 #include "Instruction/MirInstructionSet.h"
 #undef INSTRUCTION
 
+    void setInsertionPoin(MirInstructionInsertionPoint insertionPoint);
+
   private:
     MirBuilderContext *m_ctx;
-    MirInstructionInsertionPoint *m_insertionPoint;
+    MirInstructionInsertionPoint m_insertionPoint;
 };
 
 #endif // EZPACKER_MIRINSTRUCTIONBUILDER_H

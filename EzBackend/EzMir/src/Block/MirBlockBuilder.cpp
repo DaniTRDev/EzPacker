@@ -16,13 +16,14 @@ MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) :
 {
 }
 
-MirBlock *MirBlockBuilder::build(SourceReference *sourceRef)
+MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::string &name)
 {
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, std::pmr::list<MirInstruction *>(alloc));
+    MirBlock *block =
+            alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, std::pmr::list<MirInstruction *>(alloc), name);
 
     m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirBlockBuilder")
             << sourceRef << std::pmr::string(std::format("Built block with id: {}", block->getId()));
@@ -42,4 +43,4 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef)
     return nullptr;
 }
 
-MirInstructionBuilder MirBlockBuilder::instrBuilder() { return MirInstructionBuilder(m_ctx, &m_insertPoint); }
+MirInstructionBuilder MirBlockBuilder::instrBuilder() { return MirInstructionBuilder(m_ctx, m_insertPoint); }

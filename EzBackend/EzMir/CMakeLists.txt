@@ -46,6 +46,18 @@ set(EZMIR_FILES_LIST
         "src/Type/MirTypeTable.cpp"
 )
 
+set(MIRTESTSUITE_FILES_LIST
+        "tests/MirTestSuite/MirTestSuite.h"
+        "tests/MirTestSuite/Verifiers/CodeFlowPassVerifier.h"
+        "tests/MirTestSuite/Verifiers/LivenessPassVerifier.h"
+        "tests/MirTestSuite/Verifiers/MirCoreVerifiers.h"
+
+        "tests/MirTestSuite/MirTestSuite.cpp"
+        "tests/MirTestSuite/Verifiers/CodeFlowPassVerifier.cpp"
+        "tests/MirTestSuite/Verifiers/LivenessPassVerifier.cpp"
+        "tests/MirTestSuite/Verifiers/MirCoreVerifiers.cpp"
+)
+
 EzCMK_ConfigureLib(NAME "EzMir"
         FILE_LIST ${EZMIR_FILES_LIST}
         PRECOMPILED_HEADER "include/EzMirCommon.h"
@@ -56,8 +68,8 @@ if (EZPACKER_BUILD_TESTS)
     message(STATUS "Building tests for EzMir")
 
     EzCMK_ConfigureLib(NAME "EzMirTestSuite"
-            FILE_LIST "tests/MirTestSuite.cpp;tests/MirTestSuite.h"
-            PRECOMPILED_HEADER "tests/MirTestSuite.h"
+            FILE_LIST ${MIRTESTSUITE_FILES_LIST}
+            PRECOMPILED_HEADER "tests/MirTestSuite/Verifiers/MirCoreVerifiers.h"
             LINKED_LIBRARIES "EzMir"
     )
 
@@ -94,5 +106,12 @@ if (EZPACKER_BUILD_TESTS)
             "EzMirTestSuite"
             ""
             "tests/T_CodeFlowPass.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_LivenessAnalysis"
+            "EzMirTestSuite"
+            ""
+            "tests/T_LivenessAnalysis.cpp"
     )
 endif ()

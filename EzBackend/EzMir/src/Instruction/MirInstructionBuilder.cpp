@@ -1,7 +1,15 @@
 #include "Instruction/MirInstructionBuilder.h"
 
-MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint *insertionPoint) :
-    m_ctx(ctx), m_insertionPoint(insertionPoint)
+MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint) :
+    m_ctx(ctx), m_insertionPoint(std::move(insertionPoint))
+{
+}
+
+MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
+                                             MirBlock *block,
+                                             InsertionType type,
+                                             std::pmr::list<MirInstruction *>::iterator it) :
+    m_ctx(ctx), m_insertionPoint(MirInstructionInsertionPoint{ .m_type = type, .m_block = block, .m_iterator = it })
 {
 }
 
@@ -24,17 +32,17 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
 
     auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
     builder << ref << "Built instruction";
-    builder.appendNote(std::pmr::string(MirPrinter().printToString(instr)), nullptr);
+    builder.appendNote(std::pmr::string(MirPrinter().printToString(instr, MirPrinterDetail::Detailed)), nullptr);
 
     if (instr)
     {
-        if (m_insertionPoint->m_type == InsertionType::Append)
+        if (m_insertionPoint.m_type == InsertionType::Append)
         {
-            m_insertionPoint->m_block->getInstructions().push_back(instr);
+            m_insertionPoint.m_block->getInstructions().push_back(instr);
         }
         else
         {
-            m_insertionPoint->m_block->getInstructions().insert(m_insertionPoint->m_iterator, instr);
+            m_insertionPoint.m_block->getInstructions().insert(m_insertionPoint.m_iterator, instr);
         }
     }
 
@@ -55,4 +63,9 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
 
     getBuiltObj()->addOperand(operand);
     return *this;
+}
+
+void MirInstructionBuilder::setInsertionPoin(MirInstructionInsertionPoint insertionPoint)
+{
+    m_insertionPoint = std::move(insertionPoint);
 }

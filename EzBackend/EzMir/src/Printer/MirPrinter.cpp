@@ -1,12 +1,12 @@
 #include "Printer/MirPrinter.h"
 #include <format>
 
-std::string MirPrinter::printToString(MirFunction *function)
+std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail detail)
 {
     std::string result = std::format("{:#^50}\n", " Function Dump ");
 
     // Print header
-    result += std::format("{} {} (param count: {})\n",
+    result += std::format("%func.return={}.name={}.paramCount={}\n",
                           function->getReturnType()->getName(),
                           function->getName(),
                           function->getParameters().size());
@@ -24,53 +24,66 @@ std::string MirPrinter::printToString(MirFunction *function)
     }
     result += '\n';
 
-    // Stack frame (Fixed spacing/delimiters)
-    result += " - Stack Frame: ";
-    bool firstFrame = true;
-    for (StackFrameObject *frameObj : function->getStackFrame()->getStackFrameObjects())
+    if (detail == MirPrinterDetail::Detailed)
     {
-        if (!firstFrame)
-            result += " | ";
+        // Stack frame (Fixed spacing/delimiters)
+        result += " - Stack Frame: ";
+        bool firstFrame = true;
+        for (StackFrameObject *frameObj : function->getStackFrame()->getStackFrameObjects())
+        {
+            if (!firstFrame)
+                result += " | ";
 
-        result += std::format("Frame(id: {}, size: {}, source: {}, offset: {:#X})",
-                              frameObj->m_id,
-                              frameObj->m_sizeInBytes,
-                              static_cast<uint8_t>(frameObj->m_source),
-                              frameObj->m_offset);
-        firstFrame = false;
-    }
-    result += '\n';
+            result += std::format("%frame.id={}.size={}.src={}.offset={:#X})",
+                                  frameObj->m_id,
+                                  frameObj->m_sizeInBytes,
+                                  static_cast<uint8_t>(frameObj->m_source),
+                                  frameObj->m_offset);
+            firstFrame = false;
+        }
+        result += '\n';
 
-    // Cascade into Blocks
-    for (MirBlock *block : function->getBlocks())
-    {
-        result += printToString(block);
+        // Cascade into Blocks
+        for (MirBlock *block : function->getBlocks())
+        {
+            result += printToString(block, detail);
+        }
     }
 
     result += std::format("{:#^50}\n", " End Function Dump ");
     return result;
 }
 
-std::string MirPrinter::printToString(MirBlock *block)
+std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
 {
     // Indent block headers slightly
-    std::string result = std::format("  Block(id: {}):\n", block->getId());
+    std::string result;
 
-    // Cascade into Instructions
-    for (MirInstruction *instr : block->getInstructions())
+    if (!block->getName().empty())
+        result = std::format("  %block.name={}", block->getName());
+    else
+        result = std::format("  %block.id={}", block->getId());
+
+    result += std::format(".instrCount={}\n", block->getInstructions().size());
+
+    if (detail == MirPrinterDetail::Detailed)
     {
-        result += printToString(instr);
+        // Cascade into Instructions
+        for (MirInstruction *instr : block->getInstructions())
+        {
+            result += printToString(instr, detail);
+        }
     }
 
     return result;
 }
 
-std::string MirPrinter::printToString(MirInstruction *instr)
+std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail detail)
 {
     // Indent instructions to sit visually "inside" the block
     std::string result = std::format("    {}", instr->getMetadata().m_name);
 
-    // Print operands (e.g., "MOV @reg(1), @int(5)")
+    // Print operands
     auto operands = instr->getOperands();
     if (operands.size() > 0)
     {

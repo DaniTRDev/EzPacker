@@ -1,7 +1,7 @@
 #ifndef EZPACKER_MIRBLOCKINSTRUCTIONQUERY_H
 #define EZPACKER_MIRBLOCKINSTRUCTIONQUERY_H
 
-#include "EzCoreCommon.h"
+#include "EzMirCommon.h"
 #include "MirBlock.h"
 
 namespace InstructionQuery

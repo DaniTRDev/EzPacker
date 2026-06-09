@@ -57,6 +57,11 @@ class CodeFlowAnalysis : public IMirAnalysisPass
                       std::pmr::list<MirFunction *>::iterator it,
                       class MirPassManager *passManager) override;
 
+    /**
+     * For every block processed in after calling run, it prints its predecessors and successors.
+     */
+    void printResult() const override;
+
   private:
     void addEdge(MirBlock *from, MirBlock *to);
     MirBlock *getTargetJumpBlock(const MirInstruction *inst) const;

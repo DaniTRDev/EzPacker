@@ -1,7 +1,7 @@
 #ifndef EZPACKER_MIRBUILDER_H
 #define EZPACKER_MIRBUILDER_H
 
-#include "EzCoreCommon.h"
+#include "EzMirCommon.h"
 
 /*
  * Interface used to abstract away common details about builders.

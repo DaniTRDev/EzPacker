@@ -5,11 +5,7 @@
 #ifndef EZPACKER_MIRINSTRUCTIONDEFS_H
 #define EZPACKER_MIRINSTRUCTIONDEFS_H
 
-#include <cstdint>
-#include <string>
-#include <vector>
-#include <map>
-#include <initializer_list>
+#include "EzMirCommon.h"
 
 enum class ExpectedOperandType : uint16_t
 {

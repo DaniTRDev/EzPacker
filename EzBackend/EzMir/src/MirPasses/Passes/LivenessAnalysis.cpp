@@ -1,27 +1,19 @@
 #include "MirPasses/Passes/LivenessAnalysis.h"
 
-static std::string formatRegisterSet(MirBuilderContext *ctx, const std::pmr::unordered_set<size_t> &regSet)
+std::string printMirRegMap(MirBuilderContext *ctx,
+                           const std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> &map)
 {
-    if (regSet.empty())
-        return "{}";
-
-    std::ostringstream ss;
-    ss << "{ ";
-    bool first = true;
-    for (size_t regId : regSet)
+    std::string res;
+    for (auto &[blockId, defs] : map)
     {
-        MirRegister *reg = ctx->getRegisterById(regId);
-
-        if (!first)
-            ss << ", ";
-        // Format virtual registers as %v0, %v1 and physical ones as %r0, %p1
-
-        ss << MirPrinter::printToString(reg);
-
-        first = false;
+        res += MirPrinter::printToString(ctx->getBlockById(blockId), MirPrinterDetail::General);
+        for (auto &def : defs)
+        {
+            res += "   " + MirPrinter::printToString(ctx->getRegisterById(def)) + "\n";
+        }
     }
-    ss << " }";
-    return ss.str();
+
+    return res;
 }
 
 LivenessAnalysis::LivenessAnalysis(MirBuilderContext *ctx) :
@@ -54,42 +46,28 @@ MirPassResult LivenessAnalysis::run(std::pmr::list<MirFunction *> &funcList,
 
     // Solve global fixed-point backward equations across our CFG topology paths
     computeGlobalLiveness(func, cfg);
-
-    auto log = diag->builder(DiagnosticMessageType::Diag_Debug, getName());
-    log << std::pmr::string(std::format("Final Liveness Analysis Matrix for Function '{}':", func->getName()));
-
-    for (auto &block : func->getBlocks())
-    {
-        size_t blockId = block->getId();
-        log.appendNote(std::pmr::string(std::format("Block ID {}:", block->getId())), nullptr);
-
-        log.appendNote(
-                std::pmr::string(std::format("  Local  DEF: {}", formatRegisterSet(m_ctx, m_result.m_def[blockId]))),
-                nullptr);
-
-        log.appendNote(
-                std::pmr::string(std::format("  Local  USE: {}", formatRegisterSet(m_ctx, m_result.m_use[blockId]))),
-                nullptr);
-
-        log.appendNote(std::pmr::string(std::format("  Global LIVE-IN:  {}",
-                                                    formatRegisterSet(m_ctx, m_result.m_liveIn[blockId]))),
-                       nullptr);
-
-        log.appendNote(std::pmr::string(std::format("  Global LIVE-OUT: {}",
-                                                    formatRegisterSet(m_ctx, m_result.m_liveOut[blockId]))),
-                       nullptr);
-    }
-
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
-std::vector<std::type_index> LivenessAnalysis::getDependencies() const
+void LivenessAnalysis::printResult() const
 {
-    return { std::type_index(typeid(CodeFlowAnalysis)) };
+    const auto &res = getResult();
+    auto diag = m_ctx->getDiagCollector();
+
+    auto log = diag->builder(DiagnosticMessageType::Diag_Debug, getName());
+    log << "Final Liveness Analysis Matrix";
+
+    log.appendNote(std::string("Def\n").append(printMirRegMap(m_ctx, res.m_def)).c_str(), nullptr);
+    log.appendNote(std::string("Use\n").append(printMirRegMap(m_ctx, res.m_use)).c_str(), nullptr);
+    log.appendNote(std::string("LiveIn\n").append(printMirRegMap(m_ctx, res.m_liveIn)).c_str(), nullptr);
+    log.appendNote(std::string("LiveOut\n").append(printMirRegMap(m_ctx, res.m_liveOut)).c_str(), nullptr);
 }
 
 void LivenessAnalysis::computeGlobalLiveness(MirFunction *func, const ControlFlowResult &cfg)
 {
+    m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, getName())
+            << "Analyzing global variable generation rules (live IN / OUT calculation)...";
+
     auto &blocks = func->getBlocks();
     bool changed = true;
     size_t iterations = 0;
@@ -192,12 +170,6 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func, const std::shared
                 defs.insert(reg);
             }
         }
-
-        auto log = collector->builder(DiagnosticMessageType::Diag_Trace, getName());
-        log << std::pmr::string(std::format("    Block ID {:2}: Locally Def'd={}, Locally Used={}",
-                                            block->getId(),
-                                            defs.size(),
-                                            uses.size()));
     }
 }
 
@@ -205,22 +177,30 @@ void LivenessAnalysis::extractRegistersFromInstruction(MirInstruction *instr,
                                                        std::pmr::unordered_set<size_t> &defs,
                                                        std::pmr::unordered_set<size_t> &uses)
 {
-    // Loop over instruction operands and sort them into definitions or uses
-    // based on instruction metadata or flags.
+    // Retrieve the static metadata constraints for this specific opcode
+    const MirInstructionMetadata &meta = getMeta(instr->getOpCode());
+
     for (size_t i = 0; i < instr->getOperands().size(); ++i)
     {
-        MirOperand *op = instr->getOperands()[i];
-        if (!op)
-            continue;
+        // Guard against matching more operands than we have metadata constraints for
+        if (i >= meta.m_operandConstraints.size())
+            break;
 
+        MirOperand *op = instr->getOperands()[i];
         if (MirRegister *reg = op->get<MirRegister>())
         {
             size_t regId = reg->getRegId();
-            if (instr->getMetadata().m_operandConstraints[i].flags & OperandFlag::Write)
+            OperandFlag flags = meta.m_operandConstraints[i].flags;
+
+            // Check if the metadata says this operand position writes
+            if (flags & OperandFlag::Write)
             {
                 defs.insert(regId);
             }
-            else
+
+            // Check if the metadata says this operand position reads
+            // (Note: ReadWrite flags will correctly hit BOTH blocks)
+            if (flags & OperandFlag::Read)
             {
                 uses.insert(regId);
             }

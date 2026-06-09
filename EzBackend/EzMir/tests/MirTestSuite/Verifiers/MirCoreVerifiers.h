@@ -1,8 +1,8 @@
-#ifndef EZPACKER_MIRTESTSUITE_H
-#define EZPACKER_MIRTESTSUITE_H
+#ifndef EZPACKER_MIRCOREVERIFIERS_H
+#define EZPACKER_MIRCOREVERIFIERS_H
 
-#include "EzMir.h"
 #include "gtest/gtest.h"
+#include "EzMir.h"
 
 /**
  * Class used to defined a generic verifier.
@@ -51,11 +51,11 @@ class MirPassVerifier : public MirVerifier<TestedPassObjType>
      */
     OwnerObj &executed()
     {
-        MirPass *pass = MirVerifier<TestedPassObjType>::getTestedObj();
+        MirPass *pass = this->getTestedObj();
         EXPECT_NE(pass->getResult(), nullptr);
         EXPECT_TRUE(pass->getResult()->m_executed);
 
-        return *static_cast<OwnerObj *>(pass);
+        return *static_cast<OwnerObj *>(this);
     }
 
     /**
@@ -64,7 +64,7 @@ class MirPassVerifier : public MirVerifier<TestedPassObjType>
      */
     OwnerObj &mirModified()
     {
-        MirPass *pass = MirVerifier<TestedPassObjType>::getTestedObj();
+        MirPass *pass = this->getTestedObj();
         EXPECT_NE(pass->getResult(), nullptr);
         EXPECT_TRUE(pass->getResult()->m_modifiedMir);
 
@@ -77,7 +77,7 @@ class MirPassVerifier : public MirVerifier<TestedPassObjType>
      */
     OwnerObj &succeeded()
     {
-        MirPass *pass = MirVerifier<TestedPassObjType>::getTestedObj();
+        MirPass *pass = this->getTestedObj();
         EXPECT_NE(pass->getResult(), nullptr);
         EXPECT_TRUE(pass->getResult()->m_succeeded);
 
@@ -390,153 +390,4 @@ class MirFunctionVerifier : public MirVerifier<MirFunction>
     MirFunctionStackFrameVerifier stackFrameVerifier();
 };
 
-/**
- * Class used to contain helper methods related to creation/destruction of needed objects in common test scenarios.
- */
-class MirTestSuite
-{
-  public:
-    /**
-     * Returns the builder context used by this test.
-     * @return
-     */
-    MirBuilderContext *getBuilderCtx();
-
-    /**
-     * Returns the TEST function.
-     * @return
-     */
-    MirFunction *getTestFunc();
-
-    /**
-     * Returns the insertion point of the first block of the TEST function.
-     * @return
-     */
-    MirInstructionInsertionPoint *getTestInsertionPoint();
-
-    /**
-     * Returns a printer linked to the test context.
-     * @return
-     */
-    MirPrinter getPrinter();
-
-    /**
-     * Returns the type table.
-     * @return
-     */
-    MirTypeTable *getTypeTable();
-
-    /**
-     * Creates all the needed context pointers in a basic state for a test. It also creates 1 void "TEST" function,
-     * without parameters.
-     * @param workingPath
-     */
-    void create(const std::filesystem::path &workingPath);
-
-    /**
-     * Frees everything of this test suite.
-     */
-    void destroy();
-
-  private:
-    MirFunction *m_testFunction; // Pre-created function used to be able to create quick tests easily.
-    MirInstructionInsertionPoint m_insertPoint;
-    std::pmr::monotonic_buffer_resource m_arena;
-    std::shared_ptr<DiagnosticCollector> m_diagCollector;
-    std::shared_ptr<DiagnosticLogger> m_diagLogger;
-    std::shared_ptr<MirBuilderContext> m_builderCtx;
-    std::shared_ptr<MirTypeTable> m_typeTable;
-    std::shared_ptr<SourceManager> m_sourceManager;
-};
-
-/**
- * This class is used when testing the results of the CodeFlowAnalysis pass. It provides a high-level API used to
- * quick-test the pass.
- */
-class CodeFlowAnalysisVerifier : public MirPassVerifier<CodeFlowAnalysis, CodeFlowAnalysisVerifier>
-{
-  public:
-    /**
-     * Creates the flow analysis verifier and attach it to an object. At the time of calling internal verifiers, ensure
-     * the pass has results.
-     * @param analysis
-     * @param ctx
-     */
-    CodeFlowAnalysisVerifier(CodeFlowAnalysis *analysis, MirBuilderContext *ctx);
-
-    /**
-     * Checks if the given block exits the flow (return, which causes 0 successors).
-     * @param blockId
-     * @return
-     */
-    CodeFlowAnalysisVerifier &exitBlock(size_t blockId);
-
-    /**
-     * Checks if the block with 'fromId' has a predecessor 'toId' (same as checking if 'toId' has a successor 'fromId').
-     * @param to
-     * @param from
-     * @return
-     */
-    CodeFlowAnalysisVerifier &predecessor(size_t toId, size_t fromId);
-
-    /**
-     * Checks if predecessor count of the target block matches the given count.
-     * @param blockId
-     * @param count
-     * @return
-     */
-    CodeFlowAnalysisVerifier &predecessorCount(size_t blockId, size_t count);
-
-    /**
-     * Checks if there's a path between 'start' and 'end'.
-     * @param blockId
-     * @param count
-     * @return
-     */
-    CodeFlowAnalysisVerifier &reachable(size_t start, size_t end);
-
-    /**
-     * Checks if the block with 'fromId' has a successor 'toId'.
-     * @param from
-     * @param to
-     * @return
-     */
-    CodeFlowAnalysisVerifier &successor(size_t fromId, size_t toId);
-
-    /**
-     * Checks if successor count of the target block matches the given count.
-     * @param blockId
-     * @param count
-     * @return
-     */
-    CodeFlowAnalysisVerifier &successorCount(size_t blockId, size_t count);
-
-    /**
-     * Asserts that a block is dead / completely stranded from the flow.
-     * @param start
-     * @param end
-     * @return
-     */
-    CodeFlowAnalysisVerifier &unreachable(size_t start, size_t end);
-
-  private:
-    MirBuilderContext *m_ctx;
-};
-
-class MirTestSuiteAsGtest : public MirTestSuite, public ::testing::Test
-{
-  public:
-    /**
-     * Calls MirTestSuite::create.
-     */
-    void SetUp() override;
-
-    /**
-     * Calls MirTestSuite::destroy.
-     */
-    void TearDown() override;
-
-  private:
-};
-
-#endif // EZPACKER_MIRTESTSUITE_H
+#endif // EZPACKER_MIRCOREVERIFIERS_H

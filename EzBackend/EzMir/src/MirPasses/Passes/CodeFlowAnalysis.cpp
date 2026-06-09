@@ -38,29 +38,23 @@ MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
         if (!m_result.m_predecessors.contains(currentBlock->getId()))
             m_result.m_predecessors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
 
-        const auto &instructions = currentBlock->getInstructions();
-        const MirInstruction *terminator = nullptr;
-        MirInstructionFlags terminatorFlags = MirInstructionFlags::None;
-
-        if (!instructions.empty())
-        {
-            terminator = instructions.back();
-            terminatorFlags = terminator->getFlags();
-        }
-
-        // Identify fallback path coordinates
+        // Identify fallback path coordinates (the next sequential block in code layout)
         auto nextIt = blockIt;
         ++nextIt;
         MirBlock *nextBlock = (nextIt != blockList.end()) ? (*nextIt) : nullptr;
 
-        // Process Graph Topologies depending on instruction termination rules
-        if (terminator && (static_cast<uint8_t>(terminatorFlags) & static_cast<uint8_t>(MirInstructionFlags::IsBranch)))
-        {
-            MirBlock *jumpTarget = getTargetJumpBlock(terminator);
+        const auto &instructions = currentBlock->getInstructions();
+        bool hasUnconditionalJump = false;
+        bool isReturnBlock = false;
 
-            if ((static_cast<uint8_t>(terminatorFlags) & static_cast<uint8_t>(MirInstructionFlags::ReadsCPUFlags)) == 0)
+        // Scan through all instructions to process multiple branches inside the same basic block
+        for (const MirInstruction *inst : instructions)
+        {
+            MirInstructionFlags flags = inst->getFlags();
+            if (flags & MirInstructionFlags::IsBranch)
             {
-                // Unconditional Jump Edge
+                MirBlock *jumpTarget = getTargetJumpBlock(inst);
+
                 if (jumpTarget)
                 {
                     addEdge(currentBlock, jumpTarget);
@@ -68,31 +62,36 @@ MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
                 else
                 {
                     auto log = diag->builder(DiagnosticMessageType::Diag_Warning, getName());
-                    log << "Unconditional branch lacks a valid Target Basic Block reference layout frame.";
+                    log << "Branch instruction lacks a valid Target Basic Block reference layout frame.";
+                }
+
+                // If it's an unconditional branch (does NOT read CPU flags), no subsequent
+                // instructions in this block can execute.
+                if ((flags & MirInstructionFlags::ReadsCPUFlags) == 0)
+                {
+                    hasUnconditionalJump = true;
+                    break;
                 }
             }
-            else
+            else if (flags & MirInstructionFlags::IsReturn)
             {
-                // Conditional Jump Edge (Maps BOTH target path and fallback natural line)
-                if (jumpTarget)
-                    addEdge(currentBlock, jumpTarget);
-                if (nextBlock)
-                    addEdge(currentBlock, nextBlock);
-            }
-        }
-        else if (terminator &&
-                 (static_cast<uint8_t>(terminatorFlags) & static_cast<uint8_t>(MirInstructionFlags::IsReturn)))
-        {
-            // Terminal block - explicitly consumes code tracking tracks cleanly
-            {
+                isReturnBlock = true;
+
                 auto log = diag->builder(DiagnosticMessageType::Diag_Debug, getName());
                 log << std::pmr::string(
                         std::format("Found leaf node function exit terminal at Block ID: {}", currentBlock->getId()));
+
+                break; // Return statements instantly terminate block evaluation
             }
         }
-        else
+
+        // Natural code fallthrough logic:
+        // If the block didn't end with an unconditional jump or a return statement,
+        // it falls through to the next sequential block in memory layout.
+        if (!hasUnconditionalJump && !isReturnBlock)
         {
-            // Natural code fallthrough sequence execution
+            // Note: If the block had a conditional branch, the 'true' path was handled
+            // inside the loop above, and this adds the 'false' (fallthrough) path.
             if (nextBlock)
             {
                 addEdge(currentBlock, nextBlock);
@@ -102,6 +101,58 @@ MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
 
     // Analysis passes never mutate bytecode layouts
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
+}
+
+void CodeFlowAnalysis::printResult() const
+{
+    const auto &result = getResult();
+    auto diag = m_ctx->getDiagCollector();
+
+    {
+        auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
+        log << std::pmr::string(std::format("CodeFlowAnalysis SUCCESSOR list:"));
+
+        for (auto &[blockId, successors] : result.m_successors)
+        {
+            std::string succeededBy =
+                    MirPrinter::printToString(m_ctx->getBlockById(blockId), MirPrinterDetail::General);
+
+            for (auto &successor : successors)
+            {
+                succeededBy +=
+                        " " + MirPrinter::printToString(m_ctx->getBlockById(successor), MirPrinterDetail::General);
+            }
+
+            if (successors.empty())
+            {
+                succeededBy += "   empty\n";
+            }
+
+            log.appendNote(succeededBy.data(), nullptr);
+        }
+    }
+
+    {
+        auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
+        log << std::pmr::string(std::format("CodeFlowAnalysis PREDECESSOR list:"));
+
+        for (auto &[blockId, predecessors] : result.m_predecessors)
+        {
+            std::string precededBy = MirPrinter::printToString(m_ctx->getBlockById(blockId), MirPrinterDetail::General);
+            for (auto &predecessor : predecessors)
+            {
+                precededBy +=
+                        " " + MirPrinter::printToString(m_ctx->getBlockById(predecessor), MirPrinterDetail::General);
+            }
+
+            if (predecessors.empty())
+            {
+                precededBy += "   empty\n";
+            }
+
+            log.appendNote(precededBy.c_str(), nullptr);
+        }
+    }
 }
 
 MirBlock *CodeFlowAnalysis::getTargetJumpBlock(const MirInstruction *inst) const

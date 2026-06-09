@@ -1,7 +1,7 @@
 #ifndef EZPACKER_MIRFUNCTIONBUILDER_H
 #define EZPACKER_MIRFUNCTIONBUILDER_H
 
-#include "EzCoreCommon.h"
+#include "EzMirCommon.h"
 #include "Block/MirBlockBuilder.h"
 #include "Builder/MirBuilder.h"
 #include "Builder/MirBuilderContext.h"

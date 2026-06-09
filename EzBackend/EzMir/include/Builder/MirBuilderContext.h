@@ -55,6 +55,13 @@ class MirBuilderContext
     bool appendFunction(MirFunction *func);
 
     /**
+     * Appends a register to the context. Returns true if succeeded.
+     * @param reg
+     * @return
+     */
+    bool appendRegister(MirRegister *reg);
+
+    /**
      * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr is the
      * ID is not found.
      * @param id
@@ -82,6 +89,12 @@ class MirBuilderContext
      * @return
      */
     MirRegister *getRegisterById(size_t id) const;
+
+    /**
+     * Returns the MUTABLE list of functions that have been built in this context.
+     * @return
+     */
+    std::pmr::list<MirFunction *> &getFunctions();
 
     /**
      * Returns an allocator used to allocate complementary resources (global data, types, names, maps...).

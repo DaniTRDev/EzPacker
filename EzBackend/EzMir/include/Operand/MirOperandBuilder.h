@@ -1,7 +1,7 @@
 #ifndef EZPACKER_MIROPERANDBUILDER_H
 #define EZPACKER_MIROPERANDBUILDER_H
 
-#include "EzCoreCommon.h"
+#include "EzMirCommon.h"
 #include "Builder/MirBuilder.h"
 #include "Builder/MirBuilderContext.h"
 
@@ -30,6 +30,12 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
         // Construct in-place, passing the arena down to the instruction's internal PMR vector
         OperandType *op = alloc.template new_object<OperandType>(std::forward<Args>(args)...);
         setBuildResult(static_cast<MirOperand *>(op));
+
+        if constexpr (std::is_same<OperandType, MirRegister>::value)
+        {
+            // If the operand is a register, ensure we add it to the register list of the context.
+            m_ctx->appendRegister(op);
+        }
 
         return op;
     }

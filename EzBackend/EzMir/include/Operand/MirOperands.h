@@ -21,7 +21,7 @@ class MirDouble : public MirOperand
 
     double getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("double({})", std::to_string(m_value)); }
+    std::string toString() const override { return std::format("%double.value={}", std::to_string(m_value)); }
 
   private:
     double m_value{ 0.0 }; // Immediate floating-point literal.
@@ -36,7 +36,7 @@ class MirInteger : public MirOperand
 
     int64_t getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("integer({})", std::to_string(m_value)); }
+    std::string toString() const override { return std::format("%int.value={}", std::to_string(m_value)); }
 
   private:
     int64_t m_value{ 0 }; // Immediate signed integer literal.
@@ -63,7 +63,21 @@ class MirReference : public MirOperand
 
     std::string toString() const override
     {
-        return std::format("@ref({}) (type: {})", m_refId, getMirType()->getName());
+        std::string src = "INVALID";
+        if (isBlock())
+        {
+            src = "block";
+        }
+        else if (isDataEntry())
+        {
+            src = "data";
+        }
+        else if (isFunction())
+        {
+            src = "func";
+        }
+
+        return std::format("%ref.id={}.mirType={}.src={}", m_refId, getMirType()->getName(), src);
     }
 
   private:
@@ -118,7 +132,7 @@ class MirFrameIndex : public MirOperand
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("@frame({}) (type: {})", m_frameId, getMirType()->getName());
+        return std::format("%frame.id={}.mirType={}", m_frameId, getMirType()->getName());
     }
 
   private:
@@ -143,9 +157,9 @@ class MirMemory : public MirOperand
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("@mem({},{})",
-                           m_base ? m_base->toString() : "NO_BASE",
-                           m_displ ? m_displ->toString() : "NO_DISPL");
+        return std::format("%mem.base={}.index={}",
+                           m_base ? m_base->toString() : "",
+                           m_displ ? m_displ->toString() : "");
     }
 
   private:

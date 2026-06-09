@@ -37,7 +37,7 @@
 
 // ── Instructions & opcode catalogue ─────────────────────────────────────────
 #include "Instruction/MirInstruction.h"
-#include "Instruction//MirInstructionBuilder.h"
+#include "Instruction/MirInstructionBuilder.h"
 #include "Instruction/MirInstructionDefs.h"
 #include "Instruction/MirInstructionSet.h"
 
