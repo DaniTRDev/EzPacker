@@ -32,7 +32,7 @@ inline std::map<MirOperandType, std::string> g_MirOperandType2Str = {
     { MirOperandType::Invalid, "Invalid" },   { MirOperandType::Double, "Double" },
     { MirOperandType::Integer, "Integer" },   { MirOperandType::Reference, "Reference" },
     { MirOperandType::Register, "Register" }, { MirOperandType::FrameIndex, "FrameIndex" },
-    { MirOperandType::Memory, "Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
+    { MirOperandType::Memory, "MirCat_Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
 };
 
 class MirOperand

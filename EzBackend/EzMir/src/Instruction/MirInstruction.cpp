@@ -26,7 +26,7 @@ MirTargetInstructionId MirInstruction::getTargetId() const { return m_targetId; 
 
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 
-void MirInstruction::addOperand(MirOperand *operand) { m_operands.push_back(operand); }
+void MirInstruction::addOperand(const MirOperand *operand) { m_operands.push_back((MirOperand *)operand); }
 
 void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
 

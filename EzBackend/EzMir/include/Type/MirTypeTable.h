@@ -62,15 +62,13 @@ class MirTypeTable
      * @return
      */
     MirType *getStruct(std::pmr::vector<MirType *> fieldTypes, const std::string_view &structName);
-
-    // Fast static primitive accessors
+    
     MirType *getVoidType() const;
-
     MirType *getInt1Type() const;
-    MirType *getInt8Type() const;
-    MirType *getInt16Type() const;
-    MirType *getInt32Type() const;
-    MirType *getInt64Type() const;
+    MirType *i8() const;
+    MirType *i16() const;
+    MirType *i32() const;
+    MirType *i64() const;
     MirType *getFloat32Type() const;
     MirType *getFloat64Type() const;
 

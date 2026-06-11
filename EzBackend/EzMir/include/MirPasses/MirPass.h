@@ -32,8 +32,10 @@ class MirPass
     virtual ~MirPass() = default;
 
     /**
-     * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
-     * iterator was NOT modified.
+     * Runs the pass on the given MIR func.
+     * @param funcList
+     * @param it
+     * @param passManager
      */
     virtual MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
                               std::pmr::list<class MirFunction *>::iterator it,
@@ -43,8 +45,10 @@ class MirPass
     }
 
     /**
-     * Runs the pass on the given MIR block. Returns false if the list (or the elem inside the iterator) that holds the
-     * iterator was NOT modified.
+     * Runs the pass on the given MIR block.
+     * @param blockList
+     * @param it
+     * @param passManager
      */
     virtual MirPassResult run(std::pmr::list<class MirBlock *> &blockList,
                               std::pmr::list<class MirBlock *>::iterator it,
@@ -54,8 +58,10 @@ class MirPass
     }
 
     /**
-     * Runs the pass on the given MIR func. Returns false if the list (or the elem inside the iterator) that holds the
-     * iterator was NOT modified.
+     * Runs the pass on the given MIR func.
+     * @param instrList
+     * @param it
+     * @param passManager
      */
     virtual MirPassResult run(std::pmr::list<class MirInstruction *> &instrList,
                               std::pmr::list<class MirInstruction *>::iterator it,

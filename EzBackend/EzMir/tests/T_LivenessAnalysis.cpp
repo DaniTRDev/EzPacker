@@ -11,7 +11,7 @@ class LivenessAnalysisTest : public MirTestSuiteAsGtest
     MirRegister *createInt32Reg(std::string_view name)
     {
         return MirOperandBuilder(getBuilderCtx())
-                .build<MirRegister>(getTypeTable()->getInt32Type(),
+                .build<MirRegister>(getTypeTable()->i32(),
                                     true,
                                     getBuilderCtx()->createId(),
                                     nullptr,
@@ -35,7 +35,7 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     MirRegister *v0 = createInt32Reg("v0");
     MirRegister *v1 = createInt32Reg("v1");
     MirRegister *v2 = createInt32Reg("v2");
-    MirInteger *imm10 = opBuilder.build<MirInteger>(getTypeTable()->getInt32Type(), 10, nullptr);
+    MirInteger *imm10 = opBuilder.build<MirInteger>(getTypeTable()->i32(), 10, nullptr);
 
     // Sequence:
     // 1. MOV %v0, 10      -> DEF: %v0
@@ -88,14 +88,14 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
 
     MirRegister *v0 = createInt32Reg("v0");
     MirRegister *vCond = createInt32Reg("vCond");
-    MirInteger *imm5 = opBuilder.build<MirInteger>(getTypeTable()->getInt32Type(), 5, nullptr);
+    MirInteger *imm5 = opBuilder.build<MirInteger>(getTypeTable()->i32(), 5, nullptr);
 
     // Entry Block: Define %v0, define condition, branch
     MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::Append, .m_block = entryPoint };
     MirInstructionBuilder entryBuilder(ctx, entryIP);
     entryBuilder.MOV(v0, imm5);
     entryBuilder.CMP(vCond, imm5);
-    entryBuilder.JE(opBuilder.build<MirReference>(getTypeTable()->getInt8Type(),
+    entryBuilder.JE(opBuilder.build<MirReference>(getTypeTable()->i8(),
                                                   MirReferenceType::Block,
                                                   thenBlock->getId(),
                                                   nullptr));
@@ -105,7 +105,7 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
     MirInstructionInsertionPoint thenIP{ .m_type = InsertionType::Append, .m_block = thenBlock };
     MirInstructionBuilder thenBuilder(ctx, thenIP);
     thenBuilder.MOV(createInt32Reg("unused1"), v0);
-    thenBuilder.JMP(opBuilder.build<MirReference>(getTypeTable()->getInt8Type(),
+    thenBuilder.JMP(opBuilder.build<MirReference>(getTypeTable()->i8(),
                                                   MirReferenceType::Block,
                                                   mergeBlock->getId(),
                                                   nullptr));
@@ -114,7 +114,7 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
     MirInstructionInsertionPoint elseIP{ .m_type = InsertionType::Append, .m_block = elseBlock };
     MirInstructionBuilder elseBuilder(ctx, elseIP);
     elseBuilder.MOV(createInt32Reg("unused2"), imm5);
-    elseBuilder.JMP(opBuilder.build<MirReference>(getTypeTable()->getInt8Type(),
+    elseBuilder.JMP(opBuilder.build<MirReference>(getTypeTable()->i8(),
                                                   MirReferenceType::Block,
                                                   mergeBlock->getId(),
                                                   nullptr));
@@ -154,7 +154,7 @@ TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
     MirInstructionBuilder builder(ctx, entryIP);
 
     MirRegister *v0 = createInt32Reg("v0");
-    MirInteger *imm1 = opBuilder.build<MirInteger>(getTypeTable()->getInt32Type(), 1, nullptr);
+    MirInteger *imm1 = opBuilder.build<MirInteger>(getTypeTable()->i32(), 1, nullptr);
 
     // Sequence:
     // 1. ADD %v0, 1 -> Because ADD destination is ReadWrite, this reads %v0 BEFORE rewriting it.

@@ -4,7 +4,7 @@
  */
 #include <gtest/gtest.h>
 #include <EzTarget.h>
-#include <EzMir.h>
+#include "EzMir.h"
 #include <TargetStackFrameLowerer/StackFrameLowerer.h>
 #include <TargetStackFrameLowerer/StackFrameLowererContext.h>
 #include <filesystem>

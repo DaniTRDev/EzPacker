@@ -88,7 +88,7 @@ class MirInstruction
      * Adds an operand to the instruction.
      * @param operand
      */
-    void addOperand(MirOperand *operand);
+    void addOperand(const MirOperand *operand);
 
     /**
      * Sets the target instruction ID.
@@ -113,7 +113,5 @@ class MirInstruction
     SourceReference *m_sourceRef;
     std::pmr::vector<MirOperand *> m_operands;
 };
-
-
 
 #endif // EZPACKER_MIRINSTRUCTION_H

@@ -14,8 +14,8 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
 }
 
 MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
-                                             SourceReference *ref,
-                                             const std::initializer_list<MirOperand *> &operands)
+                                                SourceReference *ref,
+                                                const std::initializer_list<MirOperand *> &operands)
 {
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
@@ -24,7 +24,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     MirInstruction *instr = alloc.new_object<MirInstruction>(opcode, ref, std::pmr::vector<MirOperand *>(arena));
     if (instr && operands.size() != 0)
     {
-        for (auto &op : operands)
+        for (MirOperand *op : operands)
         {
             instr->addOperand(op);
         }

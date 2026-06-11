@@ -9,14 +9,14 @@ TEST_F(OperandTest, Integer)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->getInt8Type(), 0xDE, nullptr))
-            .verifyInteger(getTypeTable()->getInt8Type(), 0xDE);
+    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->i8(), 0xDE, nullptr))
+            .verifyInteger(getTypeTable()->i8(), 0xDE);
 
-    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->getInt16Type(), 0xDEAD, nullptr))
-            .verifyInteger(getTypeTable()->getInt16Type(), 0xDEAD);
+    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->i16(), 0xDEAD, nullptr))
+            .verifyInteger(getTypeTable()->i16(), 0xDEAD);
 
-    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->getInt32Type(), 0xDEADC0DE, nullptr))
-            .verifyInteger(getTypeTable()->getInt32Type(), 0xDEADC0DE);
+    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->i32(), 0xDEADC0DE, nullptr))
+            .verifyInteger(getTypeTable()->i32(), 0xDEADC0DE);
 }
 
 TEST_F(OperandTest, Double)
@@ -88,8 +88,8 @@ TEST_F(OperandTest, Memory)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirRegister *base = builder.build<MirRegister>(getTypeTable()->getInt8Type(), false, 1, nullptr);
-    MirInteger *displ = builder.build<MirInteger>(getTypeTable()->getInt8Type(), 0xDE, nullptr);
+    MirRegister *base = builder.build<MirRegister>(getTypeTable()->i8(), false, 1, nullptr);
+    MirInteger *displ = builder.build<MirInteger>(getTypeTable()->i8(), 0xDE, nullptr);
 
     MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->getFloat32Type(), base, displ, nullptr))
             .verifyMemory(getTypeTable()->getFloat32Type(), base, displ);

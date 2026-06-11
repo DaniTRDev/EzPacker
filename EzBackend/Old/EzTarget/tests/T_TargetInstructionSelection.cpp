@@ -4,7 +4,7 @@
  */
 #include <gtest/gtest.h>
 #include <EzTarget.h>
-#include <EzMir.h>
+#include "EzMir.h"
 #include <TargetInstructionSelector/InstructionSelectorPass.h>
 #include <TargetInstructionSelector/InstructionSelectionTable.h>
 #include <TargetInstructionSelector/InstructionSelectorContext.h>

@@ -20,161 +20,161 @@
 // Helper to keep the flags readable without polluting the global namespace
 #define F(x) MirInstructionFlags::x
 
-INSTRUCTION(INVALID, Invalid, NO_EQUIV, OPERAND_CONSTRAINTS(), F(None))
+INSTRUCTION(INVALID, MirCat_Invalid, NO_EQUIV, OPERAND_CONSTRAINTS(), F(None))
 
 /* --- DATA MOVEMENT -------------------------------------------------------- */
 INSTRUCTION(MOV,
-            DataMovement,
+            MirCat_DataMovement,
             EQUIV(MOV, MOV),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(None))
 
-// LEA specifically requests an AddressSource (Memory or FrameIndex)
+// LEA specifically requests an AddressSource (MirCat_Memory or FrameIndex)
 INSTRUCTION(LEA,
-            DataMovement,
+            MirCat_DataMovement,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::AddressSource, OperandFlag::Read }),
             F(None))
 
 /* --- MEMORY ACCESS -------------------------------------------------------- */
-// LOAD forces a Memory operand as the source
+// LOAD forces a MirCat_Memory operand as the source
 INSTRUCTION(LOAD,
-            Memory,
+            MirCat_Memory,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::Memory, OperandFlag::Read }),
+                                { ExpectedOperandType::MirCat_Memory, OperandFlag::Read }),
             F(ReadsMemory))
 
-// STORE forces a Memory operand as the destination
+// STORE forces a MirCat_Memory operand as the destination
 INSTRUCTION(STORE,
-            Memory,
+            MirCat_Memory,
             NO_EQUIV,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Memory, OperandFlag::Write },
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::MirCat_Memory, OperandFlag::Write },
                                 { ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(WritesMemory) | F(HasSideEffect))
 
 INSTRUCTION(CREATE,
-            Memory,
+            MirCat_Memory,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
             F(HasSideEffect))
 
 /* --- ARITHMETIC (ALU) ----------------------------------------------------- */
 INSTRUCTION(ADD,
-            Arithmetic,
+            MirCat_Arithmetic,
             EQUIV(ADC, ADD),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(ADC,
-            Arithmetic,
+            MirCat_Arithmetic,
             EQUIV(ADC, ADC),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(ReadsCPUFlags) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(SUB,
-            Arithmetic,
+            MirCat_Arithmetic,
             EQUIV(SBB, SUB),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags))
 
 INSTRUCTION(SBB,
-            Arithmetic,
+            MirCat_Arithmetic,
             EQUIV(SBB, SBB),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(ReadsCPUFlags) | F(WritesCPUFlags))
 
 INSTRUCTION(MUL,
-            Arithmetic,
+            MirCat_Arithmetic,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(IMUL,
-            Arithmetic,
+            MirCat_Arithmetic,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative) | F(TreatAsSigned))
 
 INSTRUCTION(DIV,
-            Arithmetic,
+            MirCat_Arithmetic,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags))
 
 INSTRUCTION(IDIV,
-            Arithmetic,
+            MirCat_Arithmetic,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(TreatAsSigned))
 
 INSTRUCTION(REM,
-            Arithmetic,
+            MirCat_Arithmetic,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags))
 
 INSTRUCTION(NEG,
-            Arithmetic,
+            MirCat_Arithmetic,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite }),
             F(WritesCPUFlags))
 
 /* --- BITWISE LOGIC -------------------------------------------------------- */
 INSTRUCTION(AND,
-            Bitwise,
+            MirCat_Bitwise,
             EQUIV(AND, AND),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(OR,
-            Bitwise,
+            MirCat_Bitwise,
             EQUIV(OR, OR),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(XOR,
-            Bitwise,
+            MirCat_Bitwise,
             EQUIV(XOR, XOR),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(NOT,
-            Bitwise,
+            MirCat_Bitwise,
             EQUIV(NOT, NOT),
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite }),
             F(WritesCPUFlags))
 
 INSTRUCTION(SHL,
-            Bitwise,
+            MirCat_Bitwise,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(WritesCPUFlags))
 
 INSTRUCTION(SHR,
-            Bitwise,
+            MirCat_Bitwise,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(WritesCPUFlags))
 
 INSTRUCTION(SAR,
-            Bitwise,
+            MirCat_Bitwise,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
@@ -182,109 +182,109 @@ INSTRUCTION(SAR,
 
 /* --- CONTROL FLOW --------------------------------------------------------- */
 INSTRUCTION(CMP,
-            Compare,
+            MirCat_Compare,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags))
 
 INSTRUCTION(TEST,
-            Compare,
+            MirCat_Compare,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(SizeMatch) | F(WritesCPUFlags) | F(IsCommutative))
 
 INSTRUCTION(JMP,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch))
 
 INSTRUCTION(JE,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(JNE,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(JG,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(JGE,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(JL,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(JLE,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(JA,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(JB,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference, OperandFlag::Read }),
             F(IsTerminator) | F(IsBranch) | F(ReadsCPUFlags))
 
 INSTRUCTION(CALL,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference | ExpectedOperandType::Register, OperandFlag::Read }),
             F(IsCall) | F(HasSideEffect))
 
 INSTRUCTION(RET,
-            ControlFlow,
+            MirCat_ControlFlow,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(IsTerminator) | F(IsReturn) | F(HasSideEffect))
 
 /* --- TYPE CASTING --------------------------------------------------------- */
 INSTRUCTION(TRUNC,
-            Casting,
+            MirCat_Casting,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(DestSmaller))
 
 INSTRUCTION(ZEXT,
-            Casting,
+            MirCat_Casting,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(DestLarger))
 
 INSTRUCTION(SEXT,
-            Casting,
+            MirCat_Casting,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
             F(DestLarger))
 
 INSTRUCTION(BITCAST,
-            Casting,
+            MirCat_Casting,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::RegImm, OperandFlag::Read }),
@@ -292,13 +292,13 @@ INSTRUCTION(BITCAST,
 
 /* --- SYSTEM & SPECIAL ----------------------------------------------------- */
 INSTRUCTION(SYSCALL,
-            System,
+            MirCat_System,
             NO_EQUIV,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(HasSideEffect))
 
-INSTRUCTION(NOP, System, NO_EQUIV, OPERAND_CONSTRAINTS(), F(None))
-INSTRUCTION(HALT, System, NO_EQUIV, OPERAND_CONSTRAINTS(), F(IsTerminator) | F(HasSideEffect))
+INSTRUCTION(NOP, MirCat_System, NO_EQUIV, OPERAND_CONSTRAINTS(), F(None))
+INSTRUCTION(HALT, MirCat_System, NO_EQUIV, OPERAND_CONSTRAINTS(), F(IsTerminator) | F(HasSideEffect))
 
 #undef F
 #undef OPERAND_CONSTRAINTS

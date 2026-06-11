@@ -3,4 +3,14 @@
 
 #include "EzTripleCommon.h"
 
+#include "CallLoweringState.h"
+
+#include "Descriptors/ABIDesc.h"
+#include "Descriptors/ArgumentLocationDesc.h"
+#include "Descriptors/CallingConvDesc.h"
+
+#include "Legalizer/LegalizeAction.h"
+#include "Legalizer/MirLegalizer.h"
+#include "Legalizer/MirLegalizerPass.h"
+
 #endif // EZPACKER_EZTRIPLE_H

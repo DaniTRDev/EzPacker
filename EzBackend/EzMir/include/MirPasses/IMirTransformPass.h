@@ -8,9 +8,9 @@ class IMirTransformPass : public MirPass
 {
   public:
     virtual ~IMirTransformPass() = default;
-    
+
     /**
-     * Returns 'MirPassType::Analysis' for this pass.
+     * Returns 'MirPassType::Transform' for this pass.
      * @return
      */
     MirPassType getPassType() const override { return MirPassType::Transform; }

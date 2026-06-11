@@ -5,9 +5,14 @@ set(EZTRIPLE_FILES_LIST
         "include/Descriptors/ABIDesc.h"
         "include/Descriptors/ArgumentLocationDesc.h"
         "include/Descriptors/CallingConvDesc.h"
+        "include/Legalizer/LegalizeAction.h"
+        "include/Legalizer/MirLegalizer.h"
+        "include/Legalizer/MirLegalizerPass.h"
 
         "src/CallLoweringState.cpp"
         "src/Descriptors/ArgumentLocation.cpp"
+        "src/Legalizer/MirLegalizer.cpp"
+        "src/Legalizer/MirLegalizerPass.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzTriple"

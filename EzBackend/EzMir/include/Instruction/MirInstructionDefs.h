@@ -104,29 +104,29 @@ inline constexpr bool operator&(MirInstructionFlags a, MirInstructionFlags b)
             static_cast<std::underlying_type_t<MirInstructionFlags>>(b)) != 0;
 }
 
-enum class MirInstructionCategory : uint8_t
+enum MirInstructionCategory : uint8_t
 {
-    Invalid = 0,
-    DataMovement,
-    Memory,
-    Arithmetic,
-    Bitwise,
-    Compare,
-    ControlFlow,
-    Casting,
-    System
+    MirCat_Invalid = 0,
+    MirCat_DataMovement,
+    MirCat_Memory,
+    MirCat_Arithmetic,
+    MirCat_Bitwise,
+    MirCat_Compare,
+    MirCat_ControlFlow,
+    MirCat_Casting,
+    MirCat_System
 };
 
 inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2Str = {
-    { MirInstructionCategory::Invalid, "Invalid" },
-    { MirInstructionCategory::DataMovement, "DataMovement" },
-    { MirInstructionCategory::Memory, "Memory" },
-    { MirInstructionCategory::Arithmetic, "Arithmetic" },
-    { MirInstructionCategory::Bitwise, "Bitwise" },
-    { MirInstructionCategory::Compare, "Compare" },
-    { MirInstructionCategory::ControlFlow, "ControlFlow" },
-    { MirInstructionCategory::Casting, "Casting" },
-    { MirInstructionCategory::System, "System" }
+    { MirCat_Invalid, "MirCat_Invalid" },
+    { MirCat_DataMovement, "MirCat_DataMovement" },
+    { MirCat_Memory, "MirCat_Memory" },
+    { MirCat_Arithmetic, "MirCat_Arithmetic" },
+    { MirCat_Bitwise, "MirCat_Bitwise" },
+    { MirCat_Compare, "MirCat_Compare" },
+    { MirCat_ControlFlow, "MirCat_ControlFlow" },
+    { MirCat_Casting, "MirCat_Casting" },
+    { MirCat_System, "MirCat_System" }
 };
 
 // --- OpCode Generation ---

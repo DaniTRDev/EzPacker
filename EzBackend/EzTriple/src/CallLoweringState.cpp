@@ -24,7 +24,7 @@ int64_t CallLoweringState::allocateStackSlot(size_t sizeBytes, size_t alignmentB
         return m_currentStackOffset;
 
     // Align the running stack offset up to the requested boundary mask requirement.
-    // Standard Bitwise Formula: (offset + align - 1) & ~(align - 1)
+    // Standard MirCat_Bitwise Formula: (offset + align - 1) & ~(align - 1)
     // Example: offset = 4, alignmentBytes = 8 -> (4 + 7) & ~7 -> 11 & 0xFFFFFFF8 = 8.
     m_currentStackOffset = (m_currentStackOffset + alignmentBytes - 1) & ~(alignmentBytes - 1);
     int64_t assignedOffset = m_currentStackOffset;

@@ -4,7 +4,7 @@
 #include "EzTripleCommon.h"
 
 /**
- * Class used to define target-dependant restrictions enforced by the OS or the system.
+ * Class used to define target-dependant restrictions enforced by the OS.
  */
 class ABIDesc
 {
