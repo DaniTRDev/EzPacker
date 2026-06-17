@@ -59,14 +59,32 @@ MirOperandVerifier &MirOperandVerifier::type(MirOperandType expectedType)
     return *this;
 }
 
-MirOperandVerifier &MirOperandVerifier::verifyDouble(MirType *doubleType, double val)
+MirOperandVerifier &MirOperandVerifier::verifyDouble(double val)
 {
-    type(MirOperandType::Double);
-    EXPECT_EQ(m_testedObj->get<MirDouble>()->getValue(), val);
+    type(MirOperandType::FloatingPoint);
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue().compare(std::to_string(val)) == 0);
+    EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getName(), "f64");
 
-    if (doubleType)
+    return *this;
+}
+
+MirOperandVerifier &MirOperandVerifier::verifyFloat(float val)
+{
+    type(MirOperandType::FloatingPoint);
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue().compare(std::to_string(val)) == 0);
+    EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getName(), "f32");
+
+    return *this;
+}
+
+MirOperandVerifier &MirOperandVerifier::verifyFloatAnySize(MirType *floatType, const std::string &val)
+{
+    type(MirOperandType::FloatingPoint);
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue().compare(val) == 0);
+
+    if (floatType)
     {
-        EXPECT_EQ(m_testedObj->get<MirDouble>()->getMirType()->getId(), doubleType->getId());
+        EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getId(), floatType->getId());
     }
 
     return *this;

@@ -14,14 +14,17 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
 }
 
 MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
-                                                SourceReference *ref,
-                                                const std::initializer_list<MirOperand *> &operands)
+                                             SourceReference *ref,
+                                             const std::initializer_list<MirOperand *> &operands)
 {
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    MirInstruction *instr = alloc.new_object<MirInstruction>(opcode, ref, std::pmr::vector<MirOperand *>(arena));
+    MirInstruction *instr = alloc.new_object<MirInstruction>(m_insertionPoint.m_block,
+                                                             opcode,
+                                                             ref,
+                                                             std::pmr::vector<MirOperand *>(arena));
     if (instr && operands.size() != 0)
     {
         for (MirOperand *op : operands)
@@ -36,7 +39,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
 
     if (instr)
     {
-        if (m_insertionPoint.m_type == InsertionType::Append)
+        if (m_insertionPoint.m_type == InsertionType::InsertAfter)
         {
             m_insertionPoint.m_block->getInstructions().push_back(instr);
         }
@@ -65,7 +68,14 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
     return *this;
 }
 
-void MirInstructionBuilder::setInsertionPoin(MirInstructionInsertionPoint insertionPoint)
+void MirInstructionBuilder::setInsertionPoint(MirInstructionInsertionPoint insertionPoint)
 {
     m_insertionPoint = std::move(insertionPoint);
+}
+
+void MirInstructionBuilder::setInsertionPoint(MirBlock *block,
+                                              InsertionType type,
+                                              std::pmr::list<MirInstruction *>::iterator it)
+{
+    m_insertionPoint = MirInstructionInsertionPoint{ .m_type = type, .m_block = block, .m_iterator = it };
 }

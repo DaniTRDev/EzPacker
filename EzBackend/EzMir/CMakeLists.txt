@@ -47,15 +47,15 @@ set(EZMIR_FILES_LIST
 )
 
 set(MIRTESTSUITE_FILES_LIST
-        "tests/MirTestSuite/MirTestSuite.h"
-        "tests/MirTestSuite/Verifiers/CodeFlowPassVerifier.h"
-        "tests/MirTestSuite/Verifiers/LivenessPassVerifier.h"
-        "tests/MirTestSuite/Verifiers/MirCoreVerifiers.h"
+        "tests/EzMirTestSuite/EzMirTestSuite.h"
+        "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.h"
+        "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.h"
+        "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.h"
 
-        "tests/MirTestSuite/MirTestSuite.cpp"
-        "tests/MirTestSuite/Verifiers/CodeFlowPassVerifier.cpp"
-        "tests/MirTestSuite/Verifiers/LivenessPassVerifier.cpp"
-        "tests/MirTestSuite/Verifiers/MirCoreVerifiers.cpp"
+        "tests/EzMirTestSuite/EzMirTestSuite.cpp"
+        "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.cpp"
+        "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.cpp"
+        "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzMir"
@@ -69,8 +69,9 @@ if (EZPACKER_BUILD_TESTS)
 
     EzCMK_ConfigureLib(NAME "EzMirTestSuite"
             FILE_LIST ${MIRTESTSUITE_FILES_LIST}
-            PRECOMPILED_HEADER "tests/MirTestSuite/Verifiers/MirCoreVerifiers.h"
+            PRECOMPILED_HEADER "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.h"
             LINKED_LIBRARIES "EzMir"
+            INCLUDED_DIRS "tests/EzMirTestSuite"
     )
 
     EzPacker_AddTest(

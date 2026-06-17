@@ -1,8 +1,10 @@
 set(EZAMD64_TRIPLE_FILES_LIST
         "include/Amd64.h"
         "include/Amd64Legalizer.h"
+        "include/Descriptors/Amd64TargetDesc.h"
 
         "src/Amd64Legalizer.cpp"
+        "src/Descriptors/Amd64TargetDesc.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzTriple_Amd64"

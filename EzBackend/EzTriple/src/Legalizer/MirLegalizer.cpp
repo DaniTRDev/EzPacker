@@ -1,31 +1,8 @@
 #include "Legalizer/MirLegalizer.h"
 
-MirLegalizer::MirLegalizer(DiagnosticCollector *diagnosticCollector) : m_diagnosticCollector(diagnosticCollector) {}
-
-LegalizeActionResult MirLegalizer::executeAction(std::pmr::list<class MirInstruction *> &instrList,
-                                                 std::pmr::list<class MirInstruction *>::iterator it,
-                                                 LegalizeAction *action)
+MirLegalizer::MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc) :
+    m_ctx(ctx), m_targetDesc(targetDesc), m_promoteScalarAct(ctx, targetDesc)
 {
-    MirInstruction *instr = *it;
-
-    if (action == MIRLEGALIZE_NO_ACTION)
-    {
-        auto log = m_diagnosticCollector->builder(Diag_Trace, "MirLegalizer");
-        log << "LEGAL";
-        log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(), instr->getSourceRef());
-
-        return { .m_executed = true, .m_succeeded = true, .m_mirChanged = false };
-    }
-    else if (!action)
-    {
-        auto log = m_diagnosticCollector->builder(Diag_Error, "MirLegalizer");
-        log << "Invalid action given for the instruction";
-        log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(), instr->getSourceRef());
-
-        return { .m_executed = false, .m_succeeded = false, .m_mirChanged = false };
-    }
-
-    return action->run(instrList, it);
 }
 
 LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::pmr::vector<MirOperand *> &operands)
@@ -36,26 +13,36 @@ LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::
 
     for (const auto &rule : it->second)
     {
-        if (rule.m_expectedOperandTypes.size() != operands.size())
+        if (matchOperands(rule, operands))
         {
-            continue;
+            return rule.m_action;
+        }
+    }
+
+    for (MirOperand *op : operands)
+    {
+        MirType *type = op->getMirType();
+        MirType *legalType = m_targetDesc->getNearestLegalType(type);
+
+        if (!legalType)
+        {
+            auto log = m_ctx->getDiagCollector()->builder(Diag_Error, "MirLegalizer");
+            log << "Legalizer doesn't know what rule to apply for operand";
+            log.appendNote(MirPrinter::printToString(op).c_str(), op->getSourceRef());
+
+            return nullptr;
         }
 
-        LegalizeAction *action = rule.m_action;
-        for (size_t i = 0; i < operands.size(); i++)
+        if (legalType->getTotalSizeInBits() > type->getTotalSizeInBits())
         {
-            size_t expectedType = rule.m_expectedOperandTypes[i];
-            size_t operandType = operands[i]->getMirType()->getId();
-
-            if (expectedType != operandType)
-            {
-                action = nullptr;
-                break;
-            }
+            // Promotion.
+            return &m_promoteScalarAct;
         }
-
-        if (action != nullptr)
-            return action;
+        else if (legalType->getTotalSizeInBits() < type->getTotalSizeInBits())
+        {
+            // Expansion.
+            return nullptr; // TO BE DONE. TODO
+        }
     }
 
     return nullptr;
@@ -87,6 +74,29 @@ void MirLegalizer::addRuleForCategory(LegalizeAction *action,
     for (auto &meta : g_MirInstructionSet)
     {
         if (meta.m_category == category)
-            addRule(action, meta.m_opcode, std::move(expectedOperandTypes));
+            addRule(action, meta.m_opcode, expectedOperandTypes);
     }
+}
+
+bool MirLegalizer::matchOperands(const LegalizationRule &rule, const std::pmr::vector<MirOperand *> &operands)
+{
+    if (rule.m_expectedOperandTypes.size() != operands.size())
+    {
+        return false;
+    }
+
+    bool matched = true;
+    for (size_t i = 0; i < operands.size(); i++)
+    {
+        size_t expectedType = rule.m_expectedOperandTypes[i];
+        size_t operandType = operands[i]->getMirType()->getId();
+
+        if (expectedType != MIRID_INVALID && expectedType != operandType)
+        {
+            matched = false;
+            break;
+        }
+    }
+
+    return matched;
 }

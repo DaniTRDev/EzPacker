@@ -10,7 +10,7 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
                                     std::pmr::list<struct MirBlock *>::iterator it,
                                     struct MirPassManager *passManager)
 {
-    bool modified = false, executed = false, succeeded = true;
+    bool modified = false, succeeded = true;
     MirBlock *currentBlock = *it;
     auto &instructions = currentBlock->getInstructions();
 
@@ -20,11 +20,23 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
         MirInstruction *instr = *instrIt;
         LegalizeAction *action = m_legalizer->getAction(instr->getOpCode(), instr->getOperands());
 
-        if (action)
+        if (action == MIRLEGALIZE_NO_ACTION)
         {
-            executed = true;
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass")
-                    << std::format("Executing action {}", action->getName()).c_str();
+            auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass");
+            log << "LEGAL";
+            log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(), instr->getSourceRef());
+        }
+        else if (action == nullptr)
+        {
+            auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass");
+            log << "Could not get action for instr";
+            log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(), instr->getSourceRef());
+        }
+        else
+        {
+            auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass");
+            log << std::format("Illegal Instruction, applying {}", action->getName()).c_str();
+            log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(), instr->getSourceRef());
 
             LegalizeActionResult actionRes = action->run(instructions, instrIt);
 
@@ -41,7 +53,7 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
         }
     }
 
-    return { .m_modifiedMir = modified, .m_executed = executed, .m_succeeded = succeeded };
+    return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = succeeded };
 }
 
 MirPassIterationPlace MirLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Block; }

@@ -1,9 +1,10 @@
 #include "Instruction/MirInstruction.h"
 
-MirInstruction::MirInstruction(MirInstructionOpCode opcode,
+MirInstruction::MirInstruction(class MirBlock *owner,
+                               MirInstructionOpCode opcode,
                                SourceReference *ref,
                                std::pmr::vector<MirOperand *> operands) :
-    m_opcode(opcode), m_targetId(MIRID_INVALID), m_sourceRef(ref), m_operands(std::move(operands))
+    m_owner(owner), m_opcode(opcode), m_targetId(MIRID_INVALID), m_sourceRef(ref), m_operands(std::move(operands))
 {
 }
 
@@ -18,6 +19,8 @@ const MirInstructionLinearEquivalent &MirInstruction::getLinearEquivalent() cons
     return getMetadata().m_linearEquivalent;
 }
 
+class MirBlock *MirInstruction::getOwner() { return m_owner; }
+
 MirInstructionOpCode MirInstruction::getOpCode() const { return m_opcode; }
 
 MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
@@ -30,7 +33,9 @@ void MirInstruction::addOperand(const MirOperand *operand) { m_operands.push_bac
 
 void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
 
-std::pmr::vector<MirOperand *> MirInstruction::getOperands() const { return m_operands; }
+const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
+
+std::pmr::vector<MirOperand *> &MirInstruction::getOperands() { return m_operands; }
 
 std::string MirInstruction::toString() const
 {

@@ -36,13 +36,10 @@ TEST_F(TestCodeFlowPass, Test1Successor)
     MirOperandBuilder operandBuilder(ctx);
 
     // Set up the insertion flow to terminate the entry block with a JMP to the successor
-    MirInstructionInsertionPoint ip{ .m_type = InsertionType::Append, .m_block = entryPoint };
+    MirInstructionInsertionPoint ip{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
     MirInstructionBuilder instrBuilder(ctx, ip);
 
-    instrBuilder.JMP(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                        MirReferenceType::Block,
-                                                        successor->getId(),
-                                                        nullptr));
+    instrBuilder.JMP(operandBuilder.buildRef(successor));
 
     CodeFlowAnalysis *pass = runPass<CodeFlowAnalysis>(ctx);
     CodeFlowAnalysisVerifier verifier(pass, ctx);
@@ -78,44 +75,30 @@ TEST_F(TestCodeFlowPass, TestLowLevelConditionalBranch)
     MirBlock *elseBlock = blockBuilder.build(nullptr, "");
     MirBlock *mergeBlock = blockBuilder.build(nullptr, "");
 
-    MirRegister *op1 =
-            operandBuilder.build<MirRegister>(typeTable->i32(), true, ctx->createId(), nullptr, "reg1");
-    MirRegister *op2 =
-            operandBuilder.build<MirRegister>(typeTable->i32(), true, ctx->createId(), nullptr, "reg2");
+    MirRegister *op1 = operandBuilder.buildVReg(typeTable->i32(), "reg1");
+    MirRegister *op2 = operandBuilder.buildVReg(typeTable->i32(), "reg2");
 
     // Populate Entry Block: CMP -> JNE -> JMP
-    MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::Append, .m_block = entryPoint };
+    MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
     MirInstructionBuilder entryBuilder(ctx, entryIP);
 
     // Evaluate comparison (updates virtual status flags)
     entryBuilder.CMP(op1, op2);
 
     // If Not Equal, jump to the else block
-    entryBuilder.JNE(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                        MirReferenceType::Block,
-                                                        elseBlock->getId(),
-                                                        nullptr));
+    entryBuilder.JNE(operandBuilder.buildRef(elseBlock));
 
     // Otherwise, unconditionally jump to the then block
-    entryBuilder.JMP(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                        MirReferenceType::Block,
-                                                        thenBlock->getId(),
-                                                        nullptr));
+    entryBuilder.JMP(operandBuilder.buildRef(thenBlock));
 
-    // 2. Populate 'Then' and 'Else' Blocks to route to Merge
-    MirInstructionInsertionPoint thenIP{ .m_type = InsertionType::Append, .m_block = thenBlock };
+    // Populate 'Then' and 'Else' Blocks to route to Merge
+    MirInstructionInsertionPoint thenIP{ .m_type = InsertionType::InsertAfter, .m_block = thenBlock };
     MirInstructionBuilder thenBuilder(ctx, thenIP);
-    thenBuilder.JMP(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                       MirReferenceType::Block,
-                                                       mergeBlock->getId(),
-                                                       nullptr));
+    thenBuilder.JMP(operandBuilder.buildRef(mergeBlock));
 
-    MirInstructionInsertionPoint elseIP{ .m_type = InsertionType::Append, .m_block = elseBlock };
+    MirInstructionInsertionPoint elseIP{ .m_type = InsertionType::InsertAfter, .m_block = elseBlock };
     MirInstructionBuilder elseBuilder(ctx, elseIP);
-    elseBuilder.JMP(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                       MirReferenceType::Block,
-                                                       mergeBlock->getId(),
-                                                       nullptr));
+    elseBuilder.JMP(operandBuilder.buildRef(mergeBlock));
 
     // Run and Verify Analysis
     CodeFlowAnalysis *pass = runPass<CodeFlowAnalysis>(ctx);
@@ -146,36 +129,26 @@ TEST_F(TestCodeFlowPass, TestLowLevelLoop)
     MirBlock *loopExit = blockBuilder.build(nullptr, "exit");
 
     // Fall straight through from entry to the loop evaluation header
-    MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::Append, .m_block = entryPoint };
+    MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
     MirInstructionBuilder entryBuilder(ctx, entryIP);
-    entryBuilder.JMP(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                        MirReferenceType::Block,
-                                                        loopHeader->getId(),
-                                                        nullptr));
+    entryBuilder.JMP(operandBuilder.buildRef(loopHeader));
 
     // Loop Header: CMP -> JE (to exit) -> [Implicit Fallthrough to Body]
-    MirRegister *counter =
-            operandBuilder.build<MirRegister>(typeTable->i32(), true, ctx->createId(), nullptr, "i");
-    MirInteger *limit = operandBuilder.build<MirInteger>(typeTable->i32(), 10, nullptr);
+    MirRegister *counter = operandBuilder.buildVReg(typeTable->i32(), "i");
+    MirInteger *limit = operandBuilder.buildInt(typeTable->i32(), 10);
 
-    MirInstructionInsertionPoint headerIP{ .m_type = InsertionType::Append, .m_block = loopHeader };
+    MirInstructionInsertionPoint headerIP{ .m_type = InsertionType::InsertAfter, .m_block = loopHeader };
     MirInstructionBuilder headerBuilder(ctx, headerIP);
 
     headerBuilder.CMP(counter, limit);
     // Path 1 (Explicit Branch): If counter == limit, jump out of the loop
-    headerBuilder.JE(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                        MirReferenceType::Block,
-                                                        loopExit->getId(),
-                                                        nullptr));
+    headerBuilder.JE(operandBuilder.buildRef(loopExit));
     // Path 2 (Implicit Fallthrough): Falls into loopBody because it's next in the block list layout
 
     // Loop Body: Contains explicit backedge jump to loop header
-    MirInstructionInsertionPoint bodyIP{ .m_type = InsertionType::Append, .m_block = loopBody };
+    MirInstructionInsertionPoint bodyIP{ .m_type = InsertionType::InsertAfter, .m_block = loopBody };
     MirInstructionBuilder bodyBuilder(ctx, bodyIP);
-    bodyBuilder.JMP(operandBuilder.build<MirReference>(typeTable->i8(),
-                                                       MirReferenceType::Block,
-                                                       loopHeader->getId(),
-                                                       nullptr));
+    bodyBuilder.JMP(operandBuilder.buildRef(loopHeader));
 
     // Execute Dataflow Pipeline Verification
     CodeFlowAnalysis *pass = runPass<CodeFlowAnalysis>(ctx);

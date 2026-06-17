@@ -7,9 +7,17 @@ std::string printMirRegMap(MirBuilderContext *ctx,
     for (auto &[blockId, defs] : map)
     {
         res += MirPrinter::printToString(ctx->getBlockById(blockId), MirPrinterDetail::General);
-        for (auto &def : defs)
+
+        if (defs.empty())
         {
-            res += "   " + MirPrinter::printToString(ctx->getRegisterById(def)) + "\n";
+            res += "   empty\n";
+        }
+        else
+        {
+            for (auto &def : defs)
+            {
+                res += "   " + MirPrinter::printToString(ctx->getRegisterById(def)) + "\n";
+            }
         }
     }
 

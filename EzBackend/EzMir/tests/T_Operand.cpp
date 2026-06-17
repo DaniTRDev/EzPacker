@@ -1,5 +1,5 @@
 #include <gtest/gtest.h> // Ensure the IDE recognises this file as a gtest source.
-#include "MirTestSuite.h"
+#include "MirTestSuite/MirTestSuite.h"
 
 class OperandTest : public MirTestSuiteAsGtest
 {
@@ -9,13 +9,11 @@ TEST_F(OperandTest, Integer)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->i8(), 0xDE, nullptr))
-            .verifyInteger(getTypeTable()->i8(), 0xDE);
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i8(), 0xDE)).verifyInteger(getTypeTable()->i8(), 0xDE);
 
-    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->i16(), 0xDEAD, nullptr))
-            .verifyInteger(getTypeTable()->i16(), 0xDEAD);
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i16(), 0xDEAD)).verifyInteger(getTypeTable()->i16(), 0xDEAD);
 
-    MirOperandVerifier(builder.build<MirInteger>(getTypeTable()->i32(), 0xDEADC0DE, nullptr))
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i32(), 0xDEADC0DE))
             .verifyInteger(getTypeTable()->i32(), 0xDEADC0DE);
 }
 
@@ -23,80 +21,94 @@ TEST_F(OperandTest, Double)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.build<MirDouble>(getTypeTable()->getFloat32Type(), 3.141516f, nullptr))
-            .verifyDouble(getTypeTable()->getFloat32Type(), 3.141516f);
+    MirOperandVerifier(builder.buildFloat(3.141516, nullptr)).verifyDouble(3.141516);
+    MirOperandVerifier(builder.buildFloat(1.14151617, nullptr)).verifyDouble(1.14151617);
+}
 
-    MirOperandVerifier(builder.build<MirDouble>(getTypeTable()->getFloat64Type(), 3.141516, nullptr))
-            .verifyDouble(getTypeTable()->getFloat64Type(), 3.141516);
+TEST_F(OperandTest, Float)
+{
+    MirOperandBuilder builder(getBuilderCtx());
+
+    MirOperandVerifier(builder.buildFloat(3.141516f)).verifyFloat(3.141516f);
+    MirOperandVerifier(builder.buildFloat(2.141516f)).verifyFloat(2.141516f);
+}
+
+TEST_F(OperandTest, FloatAnySize)
+{
+    MirType *bigFloat = getTypeTable()->create(MirTypeKind::FloatingPoint, 128, {}, "f128");
+    MirOperandBuilder builder(getBuilderCtx());
+
+    MirOperandVerifier(builder.buildFloat(bigFloat, "2.7182818284590452353602874713526625"))
+            .verifyFloatAnySize(bigFloat, "2.7182818284590452353602874713526625");
+    MirOperandVerifier(builder.buildFloat(bigFloat, "2.7182818284590452353602874713526625"))
+            .verifyFloatAnySize(bigFloat, "2.7182818284590452353602874713526625");
 }
 
 TEST_F(OperandTest, Reference)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(
-            builder.build<MirReference>(getTypeTable()->getFloat32Type(), MirReferenceType::Block, 1, nullptr))
-            .verifyReference(1, MirReferenceType::Block)
+    MirOperandVerifier(builder.buildRef(getTestFunc()->getEntryPoint()))
+            .verifyReference(MIRID_INVALID, MirReferenceType::Block)
             .mirTypeVerifier()
-            .id(getTypeTable()->getFloat32Type()->getId());
+            .id(getTypeTable()->getPtr(getTypeTable()->getVoidType())->getId());
 
-    MirOperandVerifier(
-            builder.build<MirReference>(getTypeTable()->getFloat32Type(), MirReferenceType::Function, 1, nullptr))
-            .verifyReference(1, MirReferenceType::Function)
+    MirOperandVerifier(builder.buildRef(getTestFunc()))
+            .verifyReference(MIRID_INVALID, MirReferenceType::Function)
             .mirTypeVerifier()
-            .id(getTypeTable()->getFloat32Type()->getId());
+            .id(getTypeTable()->getPtr(getTypeTable()->getVoidType())->getId());
 
-    MirOperandVerifier(
-            builder.build<MirReference>(getTypeTable()->getFloat32Type(), MirReferenceType::DataEntry, 1, nullptr))
-            .verifyReference(1, MirReferenceType::DataEntry)
+    // We don't have any global variable, that's why we need to manually build it.
+    MirOperandVerifier(builder.build<MirReference>(getTypeTable()->f32(), MirReferenceType::DataEntry, 1, nullptr))
+            .verifyReference(MIRID_INVALID, MirReferenceType::DataEntry)
             .mirTypeVerifier()
-            .id(getTypeTable()->getFloat32Type()->getId());
+            .id(getTypeTable()->f32()->getId());
 }
 
 TEST_F(OperandTest, Register)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.build<MirRegister>(getTypeTable()->getFloat32Type(), false, 1, nullptr))
-            .verifyRegister(getTypeTable()->getFloat32Type(), false, 1);
+    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f32()))
+            .verifyRegister(getTypeTable()->f32(), false, MIRID_INVALID);
 
-    MirOperandVerifier(builder.build<MirRegister>(getTypeTable()->getFloat32Type(), true, 1, nullptr))
-            .verifyRegister(getTypeTable()->getFloat32Type(), true, 1);
+    MirOperandVerifier(builder.buildVReg(getTypeTable()->f32()))
+            .verifyRegister(getTypeTable()->f32(), true, MIRID_INVALID);
 
-    MirOperandVerifier(builder.build<MirRegister>(getTypeTable()->getFloat64Type(), false, 1, nullptr))
-            .verifyRegister(getTypeTable()->getFloat64Type(), false, 1);
+    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f64()))
+            .verifyRegister(getTypeTable()->f64(), false, MIRID_INVALID);
 
-    MirOperandVerifier(builder.build<MirRegister>(getTypeTable()->getFloat64Type(), false, 2, nullptr))
-            .verifyRegister(getTypeTable()->getFloat64Type(), false, 2);
+    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f64()))
+            .verifyRegister(getTypeTable()->f64(), false, MIRID_INVALID);
 }
 
 TEST_F(OperandTest, FrameIndex)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.build<MirFrameIndex>(getTypeTable()->getFloat32Type(), 1, nullptr))
-            .verifyFrameIndex(getTypeTable()->getFloat32Type(), 1);
+    MirOperandVerifier(builder.build<MirFrameIndex>(getTypeTable()->f32(), 1, nullptr))
+            .verifyFrameIndex(getTypeTable()->f32(), 1);
 
-    MirOperandVerifier(builder.build<MirFrameIndex>(getTypeTable()->getFloat64Type(), 1, nullptr))
-            .verifyFrameIndex(getTypeTable()->getFloat64Type(), 1);
+    MirOperandVerifier(builder.build<MirFrameIndex>(getTypeTable()->f64(), 1, nullptr))
+            .verifyFrameIndex(getTypeTable()->f64(), 1);
 
-    MirOperandVerifier(builder.build<MirFrameIndex>(getTypeTable()->getFloat32Type(), 2, nullptr))
-            .verifyFrameIndex(getTypeTable()->getFloat32Type(), 2);
+    MirOperandVerifier(builder.build<MirFrameIndex>(getTypeTable()->f32(), 2, nullptr))
+            .verifyFrameIndex(getTypeTable()->f32(), 2);
 }
 
 TEST_F(OperandTest, Memory)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirRegister *base = builder.build<MirRegister>(getTypeTable()->i8(), false, 1, nullptr);
-    MirInteger *displ = builder.build<MirInteger>(getTypeTable()->i8(), 0xDE, nullptr);
+    MirRegister *base = builder.buildVReg(getTypeTable()->i8());
+    MirInteger *displ = builder.buildInt(getTypeTable()->i8(), 0xDE);
 
-    MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->getFloat32Type(), base, displ, nullptr))
-            .verifyMemory(getTypeTable()->getFloat32Type(), base, displ);
+    MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->f32(), base, displ, nullptr))
+            .verifyMemory(getTypeTable()->f32(), base, displ);
 
-    MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->getFloat32Type(), nullptr, displ, nullptr))
-            .verifyMemory(getTypeTable()->getFloat32Type(), nullptr, displ);
+    MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->f32(), nullptr, displ, nullptr))
+            .verifyMemory(getTypeTable()->f32(), nullptr, displ);
 
-    MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->getFloat32Type(), base, nullptr, nullptr))
-            .verifyMemory(getTypeTable()->getFloat32Type(), base, nullptr);
+    MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->f32(), base, nullptr, nullptr))
+            .verifyMemory(getTypeTable()->f32(), base, nullptr);
 }

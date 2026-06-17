@@ -61,7 +61,7 @@ TEST_F(DiagTest, BasicErrorDiagnostic)
         m_diagCollector->builder(Diag_Error, "TypeChecker")
                 << &assignmentOpRef << "Incompatible types when assigning to type 'int' from type 'const char*'";
 
-        // Append a supplemental contextual note highlighting the exact literal mismatch
+        // InsertAfter a supplemental contextual note highlighting the exact literal mismatch
         m_diagCollector->builder(Diag_Warning, "TypeChecker")
                 .appendNote("String literal value cannot be implicitly promoted to scalar integers",
                             &invalidStringLiteralRef);

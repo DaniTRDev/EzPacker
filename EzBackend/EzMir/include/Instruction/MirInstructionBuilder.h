@@ -8,7 +8,7 @@
 
 enum class InsertionType : uint8_t
 {
-    Append,      // Back.
+    InsertAfter, // After a point.
     InsertBefore // Before a point.
 };
 
@@ -86,7 +86,19 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
 #include "Instruction/MirInstructionSet.h"
 #undef INSTRUCTION
 
-    void setInsertionPoin(MirInstructionInsertionPoint insertionPoint);
+    /**
+     * Sets the insertion point for the builder.
+     * @param insertionPoint
+     */
+    void setInsertionPoint(MirInstructionInsertionPoint insertionPoint);
+
+    /**
+     * Sets the insertion point for the builder.
+     * @param block
+     * @param type
+     * @param it
+     */
+    void setInsertionPoint(MirBlock *block, InsertionType type, std::pmr::list<MirInstruction *>::iterator it);
 
   private:
     MirBuilderContext *m_ctx;

@@ -26,14 +26,18 @@ class MirInstruction
 {
   public:
     /**
-     * Creates an instruction wrapper around an opcode and its operand list.
+     * Creates an instruction wrapper around an opcode and its operand list inside an owning block.
      *
+     * @param owner
      * @param opcode   Opcode describing the operation performed.
      * @param ref      Source reference of where this instruction was originated.
      * @param operands Arena-managed operand list initially associated with the
      *                 instruction. Emitters append to this list later.
      */
-    explicit MirInstruction(MirInstructionOpCode opcode, SourceReference *ref, std::pmr::vector<MirOperand *> operands);
+    explicit MirInstruction(class MirBlock *owner,
+                            MirInstructionOpCode opcode,
+                            SourceReference *ref,
+                            std::pmr::vector<MirOperand *> operands);
 
     /**
      * Returns `true` when the instruction currently stores at least one
@@ -46,6 +50,12 @@ class MirInstruction
      * @return
      */
     bool isSigned() const;
+
+    /**
+     * Returns the owner block of this instruction.
+     * @return
+     */
+    class MirBlock *getOwner();
 
     /**
      * Returns the linear equivalent of this instruction. If this instruction does not have any linear equivalent,
@@ -97,9 +107,14 @@ class MirInstruction
     void setTargetId(MirTargetInstructionId id);
 
     /**
+     * Returns the immutable operand slice for this instruction.
+     */
+    const std::pmr::vector<MirOperand *> &getOperands() const;
+    
+    /**
      * Returns the mutable operand slice for this instruction.
      */
-    std::pmr::vector<MirOperand *> getOperands() const;
+    std::pmr::vector<MirOperand *> &getOperands();
 
     /**
      * Returns a string representation of the instruction in assembly format.
@@ -108,6 +123,7 @@ class MirInstruction
     std::string toString() const;
 
   private:
+    class MirBlock *m_owner;
     MirInstructionOpCode m_opcode;
     MirTargetInstructionId m_targetId;
     SourceReference *m_sourceRef;

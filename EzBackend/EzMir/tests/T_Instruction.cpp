@@ -1,5 +1,5 @@
 #include <gtest/gtest.h> // Ensure the IDE recognises this file as a gtest source.
-#include "MirTestSuite.h"
+#include "MirTestSuite/MirTestSuite.h"
 
 class InstrTest : public MirTestSuiteAsGtest
 {
@@ -10,14 +10,14 @@ TEST_F(InstrTest, SimpleBuild)
     MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
     MirOperandBuilder oBuilder(getBuilderCtx());
 
-    MirRegister *op1 = oBuilder.build<MirRegister>(getTypeTable()->i8(), false, 1, nullptr, "testReg1");
-    MirRegister *op2 = oBuilder.build<MirRegister>(getTypeTable()->i16(), false, 2, nullptr, "testReg2");
+    MirRegister *op1 = oBuilder.buildVReg(getTypeTable()->i8(), "testReg1");
+    MirRegister *op2 = oBuilder.buildVReg(getTypeTable()->i16(), "testReg2");
 
     MirInstructionVerifier verifier(iBuilder.ADD(op1, op2));
 
     verifier.operandCount(2).opcode(MirInstructionOpCode::ADD).targetId(MIRID_INVALID);
-    verifier.operandVerifier(0).verifyRegister(getTypeTable()->i8(), false, 1);
-    verifier.operandVerifier(1).verifyRegister(getTypeTable()->i16(), false, 2);
+    verifier.operandVerifier(0).verifyRegister(getTypeTable()->i8(), true, MIRID_INVALID);
+    verifier.operandVerifier(1).verifyRegister(getTypeTable()->i16(), true, MIRID_INVALID);
 }
 
 TEST_F(InstrTest, TargetIdSelected)
@@ -25,16 +25,16 @@ TEST_F(InstrTest, TargetIdSelected)
     MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
     MirOperandBuilder oBuilder(getBuilderCtx());
 
-    MirRegister *op1 = oBuilder.build<MirRegister>(getTypeTable()->i8(), false, 1, nullptr, "testReg1");
-    MirRegister *op2 = oBuilder.build<MirRegister>(getTypeTable()->i16(), false, 2, nullptr, "testReg2");
+    MirRegister *op1 = oBuilder.buildVReg(getTypeTable()->i8(), "testReg1");
+    MirRegister *op2 = oBuilder.buildVReg(getTypeTable()->i16(), "testReg2");
     MirInstruction *instr = iBuilder.ADD(op1, op2);
     instr->setTargetId(10);
 
     MirInstructionVerifier verifier(instr);
 
     verifier.operandCount(2).opcode(MirInstructionOpCode::ADD).targetId(10);
-    verifier.operandVerifier(0).verifyRegister(getTypeTable()->i8(), false, 1);
-    verifier.operandVerifier(1).verifyRegister(getTypeTable()->i16(), false, 2);
+    verifier.operandVerifier(0).verifyRegister(getTypeTable()->i8(), true, MIRID_INVALID);
+    verifier.operandVerifier(1).verifyRegister(getTypeTable()->i16(), true, MIRID_INVALID);
 }
 
 TEST_F(InstrTest, Multiple)
@@ -48,8 +48,9 @@ TEST_F(InstrTest, Multiple)
     iBuilder.NOP();
     iBuilder.NOP();
 
-    MirBlockInstructionQuery query(getTestInsertionPoint()->m_block);
-    query.forEach([](MirInstruction *instr)
+    MirBlockInstructionQuery query(getTestInsertionPoint().m_block);
+    query.forEach(
+            [](MirInstruction *instr)
             {
                 MirInstructionVerifier verifier(instr);
                 verifier.operandCount(0).opcode(MirInstructionOpCode::NOP).targetId(MIRID_INVALID);

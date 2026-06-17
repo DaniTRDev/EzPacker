@@ -15,7 +15,6 @@ function(BuildEzCore)
     add_library("EzCore" ${EZCORE_BUILD_TYPE}
             "include/EzCore.h"
             "include/EzCoreCommon.h"
-            "include/MathUtils.h"
             "include/StringUtils.h"
             "include/Diagnostics/DiagnosticBuilder.h"
             "include/Diagnostics/DiagnosticCollector.h"
@@ -25,7 +24,6 @@ function(BuildEzCore)
             "include/Diagnostics/DiagnosticScope.h"
             "include/SourceManager/SourceManager.h"
 
-            "src/MathUtils.cpp"
             "src/Diagnostics/DiagnosticBuilder.cpp"
             "src/Diagnostics/DiagnosticCollector.cpp"
             "src/Diagnostics/DiagnosticLogger.cpp"

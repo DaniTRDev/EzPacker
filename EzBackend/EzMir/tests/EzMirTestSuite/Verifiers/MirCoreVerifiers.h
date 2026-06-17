@@ -168,7 +168,25 @@ class MirOperandVerifier : public MirVerifier<MirOperand>
      * @param val
      * @return
      */
-    MirOperandVerifier &verifyDouble(MirType *doubleType, double val);
+    MirOperandVerifier &verifyDouble(double val);
+
+    /**
+     * Verifies that the operand is a float, that its value matches val and its type matches type (if type is not
+     * nullptr).
+     * @param doubleType
+     * @param val
+     * @return
+     */
+    MirOperandVerifier &verifyFloat(float val);
+
+    /**
+     * Verifies that the operand is a float, that its value matches val and its type matches type (if type is not
+     * nullptr). This method is exposed to test any given-length float.
+     * @param doubleType
+     * @param val
+     * @return
+     */
+    MirOperandVerifier &verifyFloatAnySize(MirType *floatType, const std::string &val);
 
     /**
      * Verifies that the operand is an integer, that its value matches val and its type matches type(if type is not

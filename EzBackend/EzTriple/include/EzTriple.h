@@ -5,9 +5,12 @@
 
 #include "CallLoweringState.h"
 
+#include "DefaultLegalizerActions/PromoteScalarAction.h"
+
 #include "Descriptors/ABIDesc.h"
 #include "Descriptors/ArgumentLocationDesc.h"
 #include "Descriptors/CallingConvDesc.h"
+#include "Descriptors/TargetDesc.h"
 
 #include "Legalizer/LegalizeAction.h"
 #include "Legalizer/MirLegalizer.h"

@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "MirTestSuite.h"
+#include "MirTestSuite/MirTestSuite.h"
 
 class BlockTest : public MirTestSuiteAsGtest
 {
@@ -9,7 +9,7 @@ class BlockTest : public MirTestSuiteAsGtest
 TEST_F(BlockTest, AddBlock)
 {
     MirBlockBuilder builder(getBuilderCtx(), getTestFunc());
-    MirBlock *block = builder.build(nullptr); // Block 1.
+    MirBlock *block = builder.build(); // Block 1.
 
     MirBlockVerifier verifier(block);
     verifier.instrCount(0);
@@ -27,9 +27,8 @@ TEST_F(BlockTest, AddBlockAndInstructionBeforeCreatingBlock)
     MirInstructionBuilder instrBuilder = blockBuilder.instrBuilder();
 
     // add i8 %reg1, i8 %reg2
-    instrBuilder.ADD(
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr),
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr));
+    instrBuilder.ADD(MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()),
+                     MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()));
 
     MirBlock *block1 = getTestFunc()->getEntryPoint(), *block2 = blockBuilder.build(nullptr);
     MirBlockVerifier verifier1(block1), verifier2(block2);
@@ -49,15 +48,13 @@ TEST_F(BlockTest, AddBlockAndInstructionAfterCreatingBlock)
 
     MirBuilderContext *ctx = getBuilderCtx();
     MirBlockBuilder blockBuilder(ctx, getTestFunc());
-    MirInstructionBuilder instrBuilder = blockBuilder.instrBuilder();
 
-    MirBlock *block1 = getTestFunc()->getEntryPoint(), *block2 = blockBuilder.build(nullptr);
+    MirBlock *block1 = getTestFunc()->getEntryPoint(), *block2 = blockBuilder.build();
     MirBlockVerifier verifier1(block1), verifier2(block2);
 
     // add i8 %reg1, i8 %reg2
-    instrBuilder.ADD(
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr),
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr));
+    blockBuilder.instrBuilder().ADD(MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()),
+                                    MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()));
 
     verifier1.instrCount(0);
 
@@ -77,16 +74,15 @@ TEST_F(BlockTest, AddBlockAndInstructionOnBothBloks)
     MirInstructionBuilder instrBuilder = blockBuilder.instrBuilder();
 
     // sub i8 %reg1, i8 %reg2
-    instrBuilder.SUB(
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr),
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr));
+    instrBuilder.SUB(MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()),
+                     MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()));
 
-    MirBlock *block1 = getTestFunc()->getEntryPoint(), *block2 = blockBuilder.build(nullptr);
+    MirBlock *block1 = getTestFunc()->getEntryPoint(), *block2 = blockBuilder.build();
 
     // add i8 %reg3, i8 %reg4
-    instrBuilder.ADD(
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr),
-            MirOperandBuilder(ctx).build<MirRegister>(getTypeTable()->i8(), false, MIRID_INVALID, nullptr));
+    instrBuilder = blockBuilder.instrBuilder();
+    instrBuilder.ADD(MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()),
+                     MirOperandBuilder(ctx).buildVReg(getTypeTable()->i8()));
 
     MirBlockVerifier verifier1(block1), verifier2(block2);
 

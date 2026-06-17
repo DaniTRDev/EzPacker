@@ -57,7 +57,8 @@ class MirPassManager
     }
 
     /**
-     * Runs the generated pipeline (by generatePipeline) on the given function list.
+     * Runs the generated pipeline (by generatePipeline) on the given function list. Only TRANSFORM passes will be
+     * executed, analysis passes will be run ONLY if they are required by any of the transform passes.
      * @param functionList
      */
     void runPipeline(std::pmr::list<class MirFunction *> &functionList);
@@ -85,7 +86,7 @@ class MirPassManager
                              std::unordered_set<std::type_index> &seenInCurrentPath);
 
     /**
-     * Runs a pass on the given place depending on its iteration type.
+     * Runs a TRANSFORMATION pass on the given place depending on its iteration type.
      * @param pass
      * @return
      */

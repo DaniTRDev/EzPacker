@@ -6,7 +6,7 @@ MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena) :
 }
 
 MirType *MirTypeTable::create(MirTypeKind kind,
-                              size_t totalSizeInBytes,
+                              size_t totalSizeInBits,
                               std::pmr::vector<MirType *> subTypes,
                               const std::string_view &name)
 {
@@ -20,12 +20,11 @@ MirType *MirTypeTable::create(MirTypeKind kind,
         return it->second; // Type safety: return existing canonical type match
     }
 
+    size_t assignedId = ++m_currentId;
+
     // Allocate our node container explicitly out of the stable global metadata resource arena
     std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
-    MirType *uniqueType = alloc.allocate(1);
-
-    size_t assignedId = ++m_currentId;
-    alloc.construct(uniqueType, kind, assignedId, totalSizeInBytes, lookupName, std::move(subTypes));
+    MirType *uniqueType = alloc.new_object<MirType>(kind, assignedId, totalSizeInBits, lookupName, std::move(subTypes));
 
     // Store in our fast global indexing maps
     m_typeNames[lookupName] = uniqueType;
@@ -118,18 +117,18 @@ MirType *MirTypeTable::i16() const { return m_int16Type; }
 MirType *MirTypeTable::i32() const { return m_int32Type; }
 MirType *MirTypeTable::i64() const { return m_int64Type; }
 
-MirType *MirTypeTable::getFloat32Type() const { return m_float32Type; }
+MirType *MirTypeTable::f32() const { return m_float32Type; }
 
-MirType *MirTypeTable::getFloat64Type() const { return m_float64Type; }
+MirType *MirTypeTable::f64() const { return m_float64Type; }
 
 void MirTypeTable::initialize()
 {
     m_voidType = create(MirTypeKind::Void, 0, {}, "void");
     m_int1Type = create(MirTypeKind::Integer, 1, {}, "i1");
-    m_int8Type = create(MirTypeKind::Integer, 1, {}, "i8");
-    m_int16Type = create(MirTypeKind::Integer, 2, {}, "i16");
-    m_int32Type = create(MirTypeKind::Integer, 4, {}, "i32");
-    m_int64Type = create(MirTypeKind::Integer, 8, {}, "i64");
-    m_float32Type = create(MirTypeKind::FloatingPoint, 4, {}, "f32");
-    m_float64Type = create(MirTypeKind::FloatingPoint, 8, {}, "f64");
+    m_int8Type = create(MirTypeKind::Integer, 8, {}, "i8");
+    m_int16Type = create(MirTypeKind::Integer, 16, {}, "i16");
+    m_int32Type = create(MirTypeKind::Integer, 32, {}, "i32");
+    m_int64Type = create(MirTypeKind::Integer, 64, {}, "i64");
+    m_float32Type = create(MirTypeKind::FloatingPoint, 32, {}, "f32");
+    m_float64Type = create(MirTypeKind::FloatingPoint, 64, {}, "f64");
 }

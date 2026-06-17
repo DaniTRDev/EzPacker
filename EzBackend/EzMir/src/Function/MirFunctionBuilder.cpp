@@ -5,16 +5,16 @@ MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_p
 MirBlockBuilder MirFunctionBuilder::blockBuilder() { return MirBlockBuilder(m_ctx, &getBuiltObj()->getBlocks()); }
 
 MirFunction *MirFunctionBuilder::build(MirType *returnType,
-                                       SourceReference *sourceRef,
+                                       const std::pmr::string &name,
                                        const std::pmr::list<MirRegister *> &parameters,
-                                       const std::pmr::string &name)
+                                       SourceReference *sourceRef)
 {
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
     std::pmr::polymorphic_allocator<MirFunction> funcAlloc(arena);
     std::pmr::polymorphic_allocator<MirFunctionStackFrame> funcStackFrameAlloc(arena);
     std::pmr::list<MirBlock *> blocks(arena);
 
-    // Append given parameters to the ones already registered.
+    // InsertAfter given parameters to the ones already registered.
     m_parameters.insert(m_parameters.end(), parameters.begin(), parameters.end());
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
@@ -46,10 +46,10 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType,
 }
 
 MirFunctionBuilder &
-MirFunctionBuilder::buildParam(MirType *type, SourceReference *sourceRef, const std::pmr::string &name)
+MirFunctionBuilder::buildParam(MirType *type, const std::pmr::string &name, SourceReference *sourceRef)
 {
     MirOperandBuilder builder(m_ctx);
-    m_parameters.push_back(builder.build<MirRegister>(type, false, m_ctx->createId(), sourceRef, name));
+    m_parameters.push_back(builder.buildVReg(type, name, sourceRef));
 
     return *this;
 }

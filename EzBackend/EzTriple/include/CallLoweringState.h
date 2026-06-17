@@ -14,7 +14,7 @@ class CallLoweringState
     CallLoweringState(ABIDesc *abi);
     
     /**
-     * @brief Grants read-only access to the underlying platform ABI description details.
+     * @brief Returns the descriptor of the ABI this call state is linked to.
      */
     ABIDesc *getABI() const;
     
@@ -37,13 +37,13 @@ class CallLoweringState
     int64_t getStackOffset() const;
     
     /**
-     * Consumes a FPR.
+     * Consumes 'count' FPRs.
      * @param count
      */
     void consumeFprs(size_t count);
     
     /**
-     * Consumes a GPR.
+     * Consumes 'count' GPRs.
      * @param count
      */
     void consumeGprs(size_t count);

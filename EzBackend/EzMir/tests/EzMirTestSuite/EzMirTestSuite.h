@@ -1,5 +1,5 @@
-#ifndef EZPACKER_MIRTESTSUITE_H
-#define EZPACKER_MIRTESTSUITE_H
+#ifndef EZPACKER_EZMIRTESTSUITE_H
+#define EZPACKER_EZMIRTESTSUITE_H
 
 #include "Verifiers/MirCoreVerifiers.h"
 #include "Verifiers/CodeFlowPassVerifier.h"
@@ -8,7 +8,7 @@
 /**
  * Class used to contain helper methods related to creation/destruction of needed objects in common test scenarios.
  */
-class MirTestSuite
+class EzMirTestSuite
 {
   public:
     /**
@@ -33,20 +33,29 @@ class MirTestSuite
      * Returns the insertion point of the first block of the TEST function.
      * @return
      */
-    MirInstructionInsertionPoint *getTestInsertionPoint();
+    const MirInstructionInsertionPoint &getTestInsertionPoint();
 
     /**
      * Runs the given pass.
      * @param pass
      * @return
      */
-    template <typename PassType, typename... Args> PassType *runPass(Args &&...args)
+    template <typename PassType, typename... Args>
+        requires(std::is_base_of<MirPass, PassType>::value)
+    PassType *runPass(Args &&...args)
     {
         MirPassManager *passManager = getPassManager();
-        PassType *pass = passManager->addPass<PassType, Args...>(std::forward<Args>(args)...);
+        PassType *pass = (PassType *)passManager->addPass<PassType, Args...>(std::forward<Args>(args)...);
 
-        passManager->generatePipeline();
-        passManager->runPipeline(getFunctions());
+        if (pass->getPassType() == MirPassType::Analysis)
+        {
+            pass = passManager->getAnalysis<PassType>(getFunctions());
+        }
+        else
+        {
+            passManager->generatePipeline();
+            passManager->runPipeline(getFunctions());
+        }
 
         return pass;
     }
@@ -93,20 +102,20 @@ class MirTestSuite
     std::shared_ptr<SourceManager> m_sourceManager;
 };
 
-class MirTestSuiteAsGtest : public MirTestSuite, public ::testing::Test
+class MirTestSuiteAsGtest : public EzMirTestSuite, public ::testing::Test
 {
   public:
     /**
-     * Calls MirTestSuite::create.
+     * Calls EzMirTestSuite::create.
      */
     void SetUp() override;
 
     /**
-     * Calls MirTestSuite::destroy.
+     * Calls EzMirTestSuite::destroy.
      */
     void TearDown() override;
 
   private:
 };
 
-#endif // EZPACKER_MIRTESTSUITE_H
+#endif // EZPACKER_EZMIRTESTSUITE_H

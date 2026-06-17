@@ -19,20 +19,20 @@
 enum class MirOperandType : uint8_t
 {
     Invalid = 0,
-    Double,     // Immediate double.
-    Integer,    // Immediate integer.
-    Reference,  // A reference to a block, a function or data.
-    Register,   // A physical or virtual register.
-    FrameIndex, // Used to reference parameters and objects that are saved in a stack frame.
-    Memory,     // Used to dereference addresses.
+    FloatingPoint, // Immediate floating point value.
+    Integer,       // Immediate integer.
+    Reference,     // A reference to a block, a function or data.
+    Register,      // A physical or virtual register.
+    FrameIndex,    // Used to reference parameters and objects that are saved in a stack frame.
+    Memory,        // Used to access addresses.
     MaxOperandType
 };
 
 inline std::map<MirOperandType, std::string> g_MirOperandType2Str = {
-    { MirOperandType::Invalid, "Invalid" },   { MirOperandType::Double, "Double" },
+    { MirOperandType::Invalid, "Invalid" },   { MirOperandType::FloatingPoint, "FloatingPoint" },
     { MirOperandType::Integer, "Integer" },   { MirOperandType::Reference, "Reference" },
     { MirOperandType::Register, "Register" }, { MirOperandType::FrameIndex, "FrameIndex" },
-    { MirOperandType::Memory, "MirCat_Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
+    { MirOperandType::Memory, "Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
 };
 
 class MirOperand
@@ -68,6 +68,12 @@ class MirOperand
      * @return
      */
     SourceReference *getSourceRef() const;
+
+    /**
+     * Sets the MirType of the operand.
+     * @param type
+     */
+    void setMirType(MirType *type);
 
     /**
      * Returns a string representation of the operand.

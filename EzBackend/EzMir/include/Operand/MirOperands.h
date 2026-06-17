@@ -4,6 +4,10 @@
 #include "EzMirCommon.h"
 #include "MirOperand.h"
 
+/**
+ * Constructors are made private to ensure that operands are created using MirOperandBuilder.
+ */
+
 enum class MirReferenceType : uint8_t
 {
     Invalid = 0,
@@ -12,19 +16,28 @@ enum class MirReferenceType : uint8_t
     Function
 };
 
-class MirDouble : public MirOperand
+class MirFloat : public MirOperand
 {
   public:
-    static constexpr MirOperandType OpKind = MirOperandType::Double;
+    static constexpr MirOperandType OpKind = MirOperandType::FloatingPoint;
 
-    MirDouble(MirType *type, double value, SourceReference *ref) : MirOperand(type, ref), m_value(value) {}
+    MirFloat(MirType *type, std::pmr::string value, SourceReference *ref) :
+        MirOperand(type, ref), m_value(std::move(value))
+    {
+    }
 
-    double getValue() const { return m_value; }
+    const std::pmr::string &getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("%double.value={}", std::to_string(m_value)); }
+    std::string toString() const override
+    {
+        return std::format("%float.value={}.type={}", m_value, getMirType()->getName());
+    }
 
   private:
-    double m_value{ 0.0 }; // Immediate floating-point literal.
+    std::pmr::string m_value; /*
+                               * Immediate floating-point literal that can have any given precision (dictated by
+                               * underlying MirType)
+                               */
 };
 
 class MirInteger : public MirOperand
@@ -36,10 +49,13 @@ class MirInteger : public MirOperand
 
     int64_t getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("%int.value={}", std::to_string(m_value)); }
+    std::string toString() const override
+    {
+        return std::format("%int.value={}.type={}", m_value, getMirType()->getName());
+    }
 
   private:
-    int64_t m_value{ 0 }; // Immediate signed integer literal.
+    int64_t m_value{ 0 };
 };
 
 class MirReference : public MirOperand
@@ -162,6 +178,7 @@ class MirMemory : public MirOperand
                            m_displ ? m_displ->toString() : "");
     }
 
+  private:
   private:
     MirOperand *m_base;
     MirOperand *m_displ;

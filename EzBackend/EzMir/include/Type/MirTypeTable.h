@@ -23,13 +23,13 @@ class MirTypeTable
     /**
      * Creates a unique base or compound type.
      * @param kind
-     * @param totalSizeInBytes
+     * @param totalSizeInBits
      * @param subTypes
      * @param name
      * @return
      */
     MirType *create(MirTypeKind kind,
-                    size_t totalSizeInBytes,
+                    size_t totalSizeInBits,
                     std::pmr::vector<MirType *> subTypes,
                     const std::string_view &name);
 
@@ -62,15 +62,15 @@ class MirTypeTable
      * @return
      */
     MirType *getStruct(std::pmr::vector<MirType *> fieldTypes, const std::string_view &structName);
-    
+
     MirType *getVoidType() const;
     MirType *getInt1Type() const;
     MirType *i8() const;
     MirType *i16() const;
     MirType *i32() const;
     MirType *i64() const;
-    MirType *getFloat32Type() const;
-    MirType *getFloat64Type() const;
+    MirType *f32() const;
+    MirType *f64() const;
 
     /**
      * Initializes the type table with the basic primitive types needed: iXX, void and fXX.

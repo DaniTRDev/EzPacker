@@ -28,13 +28,14 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
      * Builds a function over arena-managed MIR data structures.
      *
      * @param returnType    MIR type describing the function's return value.
-     * @param parameters    Slice of parameter operands in declaration order.
      * @param name
+     * @param parameters    Slice of parameter operands in declaration order.
+     * @param sourceRef
      */
     MirFunction *build(MirType *returnType,
-                       SourceReference *sourceRef,
-                       const std::pmr::list<MirRegister *> &parameters,
-                       const std::pmr::string &name);
+                       const std::pmr::string &name = "",
+                       const std::pmr::list<MirRegister *> &parameters = {},
+                       SourceReference *sourceRef = nullptr);
 
     /**
      * Creates an abstract object in the function stack frame.
@@ -65,11 +66,12 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
     /**
      * Adds a parameter into the FUTURE function that's going to be built.
      * @param type
-     * @param sourceRef
      * @param name
+     * @param sourceRef
      * @return
      */
-    MirFunctionBuilder &buildParam(MirType *type, SourceReference *sourceRef, const std::pmr::string &name);
+    MirFunctionBuilder &
+    buildParam(MirType *type, const std::pmr::string &name = "", SourceReference *sourceRef = nullptr);
 
   private:
     MirBuilderContext *m_ctx;

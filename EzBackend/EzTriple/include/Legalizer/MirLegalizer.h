@@ -3,6 +3,7 @@
 
 #include "EzTripleCommon.h"
 #include "LegalizeAction.h"
+#include "DefaultLegalizerActions/PromoteScalarAction.h"
 
 struct LegalizationRule
 {
@@ -21,26 +22,19 @@ class MirLegalizer
 {
   public:
     /**
-     * Creates the legalizer with the given diagnostics collector attached.
+     * Creates the legalizer with the given ctx and target descriptor attached.
      * @param diagnosticCollector
+     * @param targetDesc
      */
-    MirLegalizer(DiagnosticCollector *diagnosticCollector);
+    MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc);
 
     /**
-     * Executes an action in an instruction and returns the result. This method SUPPOSES that getAction was called
-     * before and returned the 'action' pointer correctly.
-     * @param instrList
-     * @param it
-     * @param action
-     * @return
-     */
-    LegalizeActionResult executeAction(std::pmr::list<class MirInstruction *> &instrList,
-                                       std::pmr::list<class MirInstruction *>::iterator it,
-                                       LegalizeAction *action);
-
-    /**
-     * Gets the action for a specific combo of opcode + operands types. Returns MIRLEGALIZE_NO_ACTION if the legalizer
-     * mark this combo as LEGAL.
+     * Gets the specific action (set through addRule) for a specific combo of opcode + operands types. Returns
+     * MIRLEGALIZE_NO_ACTION if the legalizer mark this combo as LEGAL.
+     *
+     * If there's no action set for this combo, a default action will try to be invoked:
+     *  - Promotion
+     *  - Expansion
      * @param opcode
      * @param operands
      * @return
@@ -66,7 +60,21 @@ class MirLegalizer
                             std::vector<size_t> expectedOperandTypes);
 
   private:
-    DiagnosticCollector *m_diagnosticCollector;
+    /**
+     * Returns true if the given opcode and set of operands matches the given rule's restrictions.
+     * @param rule
+     * @param operands
+     * @return
+     */
+    bool matchOperands(const LegalizationRule &rule, const std::pmr::vector<MirOperand *> &operands);
+
+  private:
+    // Define the default actions linked to the target and context.
+    PromoteScalarAction m_promoteScalarAct;
+
+  private:
+    MirBuilderContext *m_ctx;
+    TargetDesc *m_targetDesc;
     // Make searches faster by sorting the rules based on the opcode.
     std::map<MirInstructionOpCode, std::vector<LegalizationRule>> m_rules;
 };

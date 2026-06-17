@@ -10,26 +10,28 @@
 enum class ExpectedOperandType : uint16_t
 {
     None = 0,
-    Register = 1 << 0,   // MirRegister
-    Integer = 1 << 1,    // MirInteger
-    Double = 1 << 2,     // MirDouble
-    Memory = 1 << 4,     // MirMemory
-    FrameIndex = 1 << 5, // MirFrameIndex
-    Reference = 1 << 6,  // MirReference (Blocks, Functions)
+    Register = 1 << 0,      // MirRegister
+    Integer = 1 << 1,       // MirInteger
+    FloatingPoint = 1 << 2, // MirDouble
+    Memory = 1 << 4,        // MirMemory
+    FrameIndex = 1 << 5,    // MirFrameIndex
+    Reference = 1 << 6,     // MirReference (Blocks, Functions)
 
     // --- Composite Helper Masks ---
 
     // Standard Immediate (Raw numbers)
-    Immediate = Integer | Double,
+    Immediate = Integer | FloatingPoint,
 
     // Register or Immediate (Standard ALU inputs)
-    RegImm = Register | Integer | Double,
+    RegIntImm = Register | Integer,
+    RegFloatImm = Register | FloatingPoint,
+    RegImm = RegIntImm | RegFloatImm,
 
     // Any kind of memory address source (used for LEA)
     AddressSource = Memory | FrameIndex,
 
     // Anything that can be read as a value
-    AnyValue = Register | Integer | Double,
+    AnyValue = Register | Integer | FloatingPoint,
 
     Any = 0xFFFF
 };

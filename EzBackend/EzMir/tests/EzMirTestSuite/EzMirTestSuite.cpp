@@ -1,18 +1,18 @@
-#include "MirTestSuite.h"
+#include "EzMirTestSuite.h"
 
-MirBuilderContext *MirTestSuite::getBuilderCtx() { return m_builderCtx.get(); }
+MirBuilderContext *EzMirTestSuite::getBuilderCtx() { return m_builderCtx.get(); }
 
-MirFunction *MirTestSuite::getTestFunc() { return m_testFunction; }
+MirFunction *EzMirTestSuite::getTestFunc() { return m_testFunction; }
 
-MirInstructionInsertionPoint *MirTestSuite::getTestInsertionPoint() { return &m_insertPoint; }
+const MirInstructionInsertionPoint &EzMirTestSuite::getTestInsertionPoint() { return m_insertPoint; }
 
-MirPassManager *MirTestSuite::getPassManager() { return m_passManager.get(); }
+MirPassManager *EzMirTestSuite::getPassManager() { return m_passManager.get(); }
 
-MirPrinter MirTestSuite::getPrinter() { return MirPrinter(); }
+MirPrinter EzMirTestSuite::getPrinter() { return MirPrinter(); }
 
-MirTypeTable *MirTestSuite::getTypeTable() { return m_typeTable.get(); }
+MirTypeTable *EzMirTestSuite::getTypeTable() { return m_typeTable.get(); }
 
-void MirTestSuite::create(const std::filesystem::path &workingPath)
+void EzMirTestSuite::create(const std::filesystem::path &workingPath)
 {
     m_diagCollector = std::make_shared<DiagnosticCollector>();
     m_typeTable = std::make_shared<MirTypeTable>(&m_arena);
@@ -23,22 +23,22 @@ void MirTestSuite::create(const std::filesystem::path &workingPath)
 
     m_diagCollector->addListener(m_diagLogger.get());
     m_typeTable->initialize();
-    m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->getVoidType(), nullptr, {}, "TEST");
+    m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->getVoidType(), "TEST");
 
     if (!m_testFunction)
     {
-        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirTestSuite")
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "EzMirTestSuite")
                 << "The creation of the test function failed!";
     }
 
     MirBlock *entryPoint = m_testFunction->getEntryPoint();
 
-    m_insertPoint = { .m_type = InsertionType::Append,
+    m_insertPoint = { .m_type = InsertionType::InsertAfter,
                       .m_block = entryPoint,
                       .m_iterator = entryPoint->getInstructions().begin() };
 }
 
-void MirTestSuite::destroy()
+void EzMirTestSuite::destroy()
 {
     m_builderCtx.reset();
     m_typeTable.reset();
@@ -46,16 +46,16 @@ void MirTestSuite::destroy()
     m_diagCollector.reset();
 }
 
-std::pmr::list<MirFunction *> &MirTestSuite::getFunctions() { return m_builderCtx->getFunctions(); }
+std::pmr::list<MirFunction *> &EzMirTestSuite::getFunctions() { return m_builderCtx->getFunctions(); }
 
 void MirTestSuiteAsGtest::SetUp()
 {
-    MirTestSuite::create(std::filesystem::current_path());
+    EzMirTestSuite::create(std::filesystem::current_path());
     Test::SetUp();
 }
 
 void MirTestSuiteAsGtest::TearDown()
 {
-    MirTestSuite::destroy();
+    EzMirTestSuite::destroy();
     Test::TearDown();
 }
