@@ -74,15 +74,15 @@ class EzMirTestSuite
 
     /**
      * Creates all the needed context pointers in a basic state for a test. It also creates 1 void "TEST" function,
-     * without parameters.
+     * without parameters. Might be overriden by parent classes, but THEY MUST CALL THIS METHOD.
      * @param workingPath
      */
-    void create(const std::filesystem::path &workingPath);
+    virtual void create(const std::filesystem::path &workingPath);
 
     /**
-     * Frees everything of this test suite.
+     * Frees everything of this test suite. Might be overriden by parent classes, but THEY MUST CALL THIS METHOD.
      */
-    void destroy();
+    virtual void destroy();
 
     /**
      * Returns the MUTABLE function list.

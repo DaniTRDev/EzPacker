@@ -2,23 +2,26 @@
 #define EZPACKER_AMD64LEGALIZER_H
 
 #include "Amd64.h"
+#include "Descriptors/Amd64TargetDesc.h"
+#include "Type/MirType.h"
 
 class Amd64Legalizer
 {
   public:
     /**
      * @brief Creates a fully configured MirLegalizer populated with the AMD64 rule table matrix.
+     * @param targetDesc The target description of the AMD64 architecture.
      * @param ctx The builder context used to fetch type tables and register references.
      * @return A unique pointer to a configured, ready-to-use MirLegalizer instance.
      */
-    static std::unique_ptr<MirLegalizer> create(MirBuilderContext *ctx);
+    static std::unique_ptr<MirLegalizer> create(Amd64TargetDesc *targetDesc, MirBuilderContext *ctx);
 
     /**
      * @brief Returns the native sizes allowed for this architecture.
      * @param ctx The builder context used to fetch the type system references.
-     * @return A vector of size_t type IDs containing the natively supported scalar types (i8, i16, i32, i64).
+     * @return A vector of MirType* containing the natively supported scalar types (i8, i16, i32, i64).
      */
-    const std::vector<size_t> getNativeSizes(MirBuilderContext *ctx) const;
+    const std::vector<MirType*> getNativeSizes(MirBuilderContext *ctx) const;
 
   private:
     /**

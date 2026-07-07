@@ -1,5 +1,5 @@
 #include <gtest/gtest.h> // Ensure the IDE recognises this file as a gtest source.
-#include "MirTestSuite/MirTestSuite.h"
+#include "EzMirTestSuite/EzMirTestSuite.h"
 
 class OperandTest : public MirTestSuiteAsGtest
 {

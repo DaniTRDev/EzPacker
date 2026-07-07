@@ -1,7 +1,8 @@
 #ifndef EZPACKER_PROMOTESCALARACTIONVERIFIER_H
 #define EZPACKER_PROMOTESCALARACTIONVERIFIER_H
 
-#include "EzTripleTestSuite.h"
+#include "EzTriple.h"
+#include "EzMirTestSuite.h"
 
 class PromoteScalarActionVerifier : public MirVerifier<PromoteScalarAction>
 {

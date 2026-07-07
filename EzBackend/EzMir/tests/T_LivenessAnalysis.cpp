@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "MirTestSuite/MirTestSuite.h"
+#include "EzMirTestSuite/EzMirTestSuite.h"
 
 /**
  * This test defines certain special operations to make the creation of tests easier.

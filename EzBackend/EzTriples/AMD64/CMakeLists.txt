@@ -14,12 +14,12 @@ EzCMK_ConfigureLib(NAME "EzTriple_Amd64"
         INCLUDED_DIRS "include")
 
 if (EZPACKER_BUILD_TESTS)
-    message(STATUS "Building tests for EzTriple_Amd64")
+  message(STATUS "Building tests for EzTriple_Amd64")
 
-    #EzPacker_AddTest(
-    #        "T_LivenessAnalysis"
-    #        "EzMirTestSuite"
-    #        ""
-    #        "tests/T_LivenessAnalysis.cpp"
-    #)
+  EzPacker_AddTest(
+            "T_Amd64ScalarPromotionAction"
+            "EzTriple_Amd64"
+            "EzTripleTestSuite"
+            "tests/T_Amd64ScalarPromotionAction.cpp"
+    )
 endif ()

@@ -1,4 +1,6 @@
 #include "DefaultLegalizerActions/PromoteScalarAction.h"
+#include "Diagnostics/DiagnosticMessage.h"
+#include "Operand/MirOperands.h"
 
 PromoteScalarAction::PromoteScalarAction(MirBuilderContext *ctx, TargetDesc *target) : m_ctx(ctx), m_target(target) {}
 
@@ -9,8 +11,17 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
 {
     MirInstruction *instr = *it;
     auto &operands = instr->getOperands();
-    bool modifiedMir = false, _signed = instr->isSigned();
+    bool modifiedMir = false;
+    bool _signed = instr->isSigned();
     MirOperandBuilder opBuilder(m_ctx);
+
+    /*
+     * We use a separate builder for 'InsertAfter'. To make sure multiple truncates append
+     * correctly after 'instr', we insert immediately after 'it'.
+     */
+
+    MirInstructionBuilder insertBeforeBuilder(m_ctx, instr->getOwner(), InsertionType::InsertBefore, it);
+    MirInstructionBuilder insertAfterBuilder(m_ctx, instr->getOwner(), InsertionType::InsertAfter, it);
 
     for (size_t i = 0; i < operands.size(); i++)
     {
@@ -22,69 +33,63 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
         if (!promotedType)
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "PromoteScalarAction")
-                    << "Unknown promotion type for operand" << operand->getSourceRef();
+                << "Unknown promotion type for operand" << operand->getSourceRef();
 
             return { .m_executed = true, .m_succeeded = false, .m_mirChanged = modifiedMir };
         }
 
         if (origType->getId() == promotedType->getId())
         {
-            // Given operand was legal.
+            // Already legal
             continue;
         }
 
-        auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction");
-        log << "Promoting operand" << operand->getSourceRef();
-        log.appendNote(
-                std::format("source type = {} -> dest type = {}", origType->getName(), promotedType->getName()).c_str(),
-                nullptr);
+        modifiedMir = true;
 
-        MirInstructionBuilder builder(m_ctx, instr->getOwner(), InsertionType::InsertBefore, it);
-        MirRegister *targetReg = nullptr, *promotedReg = nullptr;
-
-        // Scr operand (read).
         if (operand->isOfType<MirRegister>())
         {
-            targetReg = operand->get<MirRegister>();
-            promotedReg = opBuilder.buildVReg(promotedType, targetReg->getName() + "_promoted");
+            MirRegister *targetReg = operand->get<MirRegister>();
+            MirRegister *promotedReg = opBuilder.buildVReg(promotedType, targetReg->getName() + "_promoted");
 
-            if (origType->getKind() == MirTypeKind::Integer)
+            m_ctx->getDiagCollector()->builder(Diag_Error, "PromoteScalarAction")
+                << std::format("Promoting {} to {}", targetReg->toString(), promotedReg->toString()).c_str()
+                << targetReg->getSourceRef();
+
+            // Handle Input (Read / ReadWrite)
+            if (constraint.flags & OperandFlag::Read)
             {
-                if (_signed)
+                if (origType->getKind() == MirTypeKind::Integer)
                 {
-                    // If signed, insert a signed extension (SEXT).
-                    builder.SEXT(promotedReg, targetReg);
+                    if (_signed)
+                        insertBeforeBuilder.SEXT(promotedReg, targetReg);
+                    else
+                        insertBeforeBuilder.ZEXT(promotedReg, targetReg);
                 }
                 else
                 {
-                    // If not signed, insert a non-signed extension (ZEXT).
-                    builder.ZEXT(promotedReg, targetReg);
+                    insertBeforeBuilder.FPEXT(promotedReg, targetReg);
                 }
             }
-            else
-            {
-                // Register contains a floating point value, insert an FP ext.
-                builder.FPEXT(promotedReg, targetReg);
-            }
 
-            // Update the affected register.
+            // Substitute operand in the current instruction
             operands[i] = promotedReg;
+
+            // Handle Output (Write / ReadWrite)
+            if (constraint.flags & OperandFlag::Write)
+            {
+                MirInteger *imm = opBuilder.buildInt(promotedType, promotedType->getTotalSizeInBits());
+                insertAfterBuilder.TRUNC(targetReg, imm);
+            }
         }
         else if (operand->isOfType<MirInteger>() || operand->isOfType<MirFloat>())
         {
-            // For immediate integers and floats, we just update the internal type.
+            m_ctx->getDiagCollector()->builder(Diag_Error, "PromoteScalarAction")
+                << std::format("Promoting {} to {}", operand->toString(), promotedType->getName()).c_str()
+                << operand->getSourceRef();
+
+            // Immediates don't need extensions inserted, just update type tracking
             operand->setMirType(promotedType);
         }
-
-        if (constraint.flags & OperandFlag::Write)
-        {
-            // Dest operand, truncate it after the execution of the instruction.
-            MirInteger *truncSizeImm = opBuilder.buildInt(m_ctx->getTypeTable()->i8(), origType->getTotalSizeInBits());
-            builder.setInsertionPoint(instr->getOwner(), InsertionType::InsertAfter, it);
-            builder.TRUNC(promotedReg, truncSizeImm);
-        }
-
-        modifiedMir = true;
     }
 
     return { .m_executed = true, .m_succeeded = true, .m_mirChanged = modifiedMir };

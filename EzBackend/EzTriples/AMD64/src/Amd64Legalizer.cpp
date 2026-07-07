@@ -1,8 +1,8 @@
 #include "Amd64Legalizer.h"
 
-std::unique_ptr<MirLegalizer> Amd64Legalizer::create(MirBuilderContext *ctx)
+std::unique_ptr<MirLegalizer> Amd64Legalizer::create(Amd64TargetDesc *targetDesc, MirBuilderContext *ctx)
 {
-    std::unique_ptr<MirLegalizer> legalizer = std::make_unique<MirLegalizer>(ctx->getDiagCollector().get());
+    std::unique_ptr<MirLegalizer> legalizer = std::make_unique<MirLegalizer>(ctx, targetDesc);
 
     Amd64Legalizer instance;
     instance.addDataMovement(ctx, legalizer.get());
@@ -17,10 +17,10 @@ std::unique_ptr<MirLegalizer> Amd64Legalizer::create(MirBuilderContext *ctx)
     return legalizer;
 }
 
-const std::vector<size_t> Amd64Legalizer::getNativeSizes(MirBuilderContext *ctx) const
+const std::vector<MirType*> Amd64Legalizer::getNativeSizes(MirBuilderContext *ctx) const
 {
     const auto &t = ctx->getTypeTable();
-    return { t->i8()->getId(), t->i16()->getId(), t->i32()->getId(), t->i64()->getId() };
+    return { t->i8(), t->i16(), t->i32(), t->i64() };
 }
 
 void Amd64Legalizer::addDataMovement(MirBuilderContext *ctx, MirLegalizer *legalizer)
@@ -60,13 +60,14 @@ void Amd64Legalizer::addArithmetic(MirBuilderContext *ctx, MirLegalizer *legaliz
 {
     const auto &sizes = getNativeSizes(ctx);
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
-    
+
     // x64 natively supports 8, 16, 32, and 64-bit scalar operations.
     // Category mapping registers ADD, ADC, SUB, SBB, MUL, IMUL, DIV, IDIV, REM, NEG.
     // FloatingPoint-operand matching assumes { DestReg, SrcOperand }
 
-    for (size_t sizeId : sizes)
+    for (const auto& type : sizes)
     {
+        size_t sizeId = type->getId();
         legalizer->addRuleForCategory(legal, MirCat_Arithmetic, { sizeId, sizeId });
         // For unary operators like NEG which only have 1 operand:
         legalizer->addRule(legal, MirInstructionOpCode::NEG, { sizeId });
@@ -78,8 +79,9 @@ void Amd64Legalizer::addBitwise(MirBuilderContext *ctx, MirLegalizer *legalizer)
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
     const auto &sizes = getNativeSizes(ctx);
 
-    for (size_t sizeId : sizes)
+    for (const auto& type : sizes)
     {
+        size_t sizeId = type->getId();
         // AND, OR, XOR, SHL, SHR, SAR
         legalizer->addRuleForCategory(legal, MirCat_Bitwise, { sizeId, sizeId });
         // NOT is Unary
@@ -91,9 +93,10 @@ void Amd64Legalizer::addCompare(MirBuilderContext *ctx, MirLegalizer *legalizer)
 {
     const auto &sizes = getNativeSizes(ctx);
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
-    
-    for (size_t sizeId : sizes)
+
+    for (const auto& type : sizes)
     {
+        size_t sizeId = type->getId();
         // CMP and TEST check two operands of identical size.
         legalizer->addRuleForCategory(legal, MirCat_Compare, { sizeId, sizeId });
     }
@@ -117,22 +120,24 @@ void Amd64Legalizer::addCasting(MirBuilderContext *ctx, MirLegalizer *legalizer)
 
     // Format: { DestType, SrcType }
     // Loop through combinations to permit valid structural legalizations
-    for (size_t dest : sizes)
+    for (const auto& dest : sizes)
     {
-        for (size_t src : sizes)
+        size_t destId = dest->getId();
+        for (const auto& src : sizes)
         {
-            if (dest > src)
+            size_t srcId = src->getId();
+            if (dest->getTotalSizeInBits() > src->getTotalSizeInBits())
             {
-                legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { dest, src });
-                legalizer->addRule(legal, MirInstructionOpCode::SEXT, { dest, src });
+                legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { destId, srcId });
+                legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, srcId });
             }
-            else if (dest < src)
+            else if (dest->getTotalSizeInBits() < src->getTotalSizeInBits())
             {
-                legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { dest, src });
+                legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, srcId });
             }
             else
             {
-                legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { dest, src });
+                legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, srcId });
             }
         }
     }

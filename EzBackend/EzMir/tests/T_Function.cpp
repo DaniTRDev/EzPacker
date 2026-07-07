@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "MirTestSuite/MirTestSuite.h"
+#include "EzMirTestSuite/EzMirTestSuite.h"
 
 class FunctionTest : public MirTestSuiteAsGtest
 {

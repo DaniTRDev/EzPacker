@@ -32,18 +32,12 @@ EzCMK_ConfigureLib(NAME "EzTriple"
         INCLUDED_DIRS "include")
 
 if (EZPACKER_BUILD_TESTS)
-    message(STATUS "Building tests for EzTriple")
+  message(STATUS "Building tests for EzTriple")
 
-    EzCMK_ConfigureLib(NAME "EzTripleTestSuite"
+  EzCMK_ConfigureLib(NAME "EzTripleTestSuite"
             FILE_LIST ${TRIPLETESTSUITE_FILES_LIST}
             PRECOMPILED_HEADER "tests/EzTripleTestSuite/EzTripleTestSuite.h"
             LINKED_LIBRARIES "EzTriple;EzMirTestSuite"
-    )
-
-    EzPacker_AddTest(
-            "T_PromoteScalarAction"
-            "EzTripleTestSuite"
-            ""
-            "tests/T_PromoteScalarAction.cpp"
+            INCLUDED_DIRS "tests/EzTripleTestSuite"
     )
 endif ()
