@@ -33,7 +33,7 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
         if (!promotedType)
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "PromoteScalarAction")
-                << "Unknown promotion type for operand" << operand->getSourceRef();
+                    << "Unknown promotion type for operand" << operand->getSourceRef();
 
             return { .m_executed = true, .m_succeeded = false, .m_mirChanged = modifiedMir };
         }
@@ -51,9 +51,9 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
             MirRegister *targetReg = operand->get<MirRegister>();
             MirRegister *promotedReg = opBuilder.buildVReg(promotedType, targetReg->getName() + "_promoted");
 
-            m_ctx->getDiagCollector()->builder(Diag_Error, "PromoteScalarAction")
-                << std::format("Promoting {} to {}", targetReg->toString(), promotedReg->toString()).c_str()
-                << targetReg->getSourceRef();
+            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                    << std::format("Promoting {} to {}", targetReg->toString(), promotedReg->toString()).c_str()
+                    << targetReg->getSourceRef();
 
             // Handle Input (Read / ReadWrite)
             if (constraint.flags & OperandFlag::Read)
@@ -77,15 +77,15 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
             // Handle Output (Write / ReadWrite)
             if (constraint.flags & OperandFlag::Write)
             {
-                MirInteger *imm = opBuilder.buildInt(promotedType, promotedType->getTotalSizeInBits());
-                insertAfterBuilder.TRUNC(targetReg, imm);
+                MirInteger *imm = opBuilder.buildInt(m_ctx->getTypeTable()->i8(), origType->getTotalSizeInBits());
+                insertAfterBuilder.TRUNC(promotedReg, imm);
             }
         }
         else if (operand->isOfType<MirInteger>() || operand->isOfType<MirFloat>())
         {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "PromoteScalarAction")
-                << std::format("Promoting {} to {}", operand->toString(), promotedType->getName()).c_str()
-                << operand->getSourceRef();
+            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                    << std::format("Promoting {} to {}", operand->toString(), promotedType->getName()).c_str()
+                    << operand->getSourceRef();
 
             // Immediates don't need extensions inserted, just update type tracking
             operand->setMirType(promotedType);

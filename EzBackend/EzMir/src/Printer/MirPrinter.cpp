@@ -3,7 +3,7 @@
 
 std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail detail)
 {
-    std::string result = std::format("{:#^50}\n", " Function Dump ");
+    std::string result = std::format("\n{:#^50}\n", " Function Dump ");
 
     // Print header
     result += std::format("%func.return={}.name={}.paramCount={}\n",
@@ -12,12 +12,12 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
                           function->getParameters().size());
 
     // Parameters
-    result += " - Params: ";
+    result += " - Params: \n\t";
     bool firstParam = true;
     for (auto param : function->getParameters())
     {
         if (!firstParam)
-            result += ", ";
+            result += "\n\t";
 
         result += param->toString();
         firstParam = false;
@@ -27,12 +27,12 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
     if (detail == MirPrinterDetail::Detailed)
     {
         // Stack frame (Fixed spacing/delimiters)
-        result += " - Stack Frame: ";
+        result += " - Stack Frame: \n\t";
         bool firstFrame = true;
         for (StackFrameObject *frameObj : function->getStackFrame()->getStackFrameObjects())
         {
             if (!firstFrame)
-                result += " | ";
+                result += "\n\t";
 
             result += std::format("%frame.id={}.size={}.src={}.offset={:#X})",
                                   frameObj->m_id,
@@ -44,10 +44,12 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
         result += '\n';
 
         // Cascade into Blocks
+        result += " - Block list: \n";
         for (MirBlock *block : function->getBlocks())
         {
-            result += printToString(block, detail);
+            result += printToString(block, detail) + '\n';
         }
+        result += '\n';
     }
 
     result += std::format("{:#^50}\n", " End Function Dump ");
@@ -60,9 +62,9 @@ std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
     std::string result;
 
     if (!block->getName().empty())
-        result = std::format("  %block.name={}", block->getName());
+        result = std::format("%block.name={}", block->getName());
     else
-        result = std::format("  %block.id={}", block->getId());
+        result = std::format("%block.id={}", block->getId());
 
     result += std::format(".instrCount={}\n", block->getInstructions().size());
 
@@ -80,8 +82,7 @@ std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
 
 std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail detail)
 {
-    // Indent instructions to sit visually "inside" the block
-    std::string result = std::format("    {}", instr->getMetadata().m_name);
+    std::string result = std::format("{}", instr->getMetadata().m_name);
 
     // Print operands
     auto operands = instr->getOperands();

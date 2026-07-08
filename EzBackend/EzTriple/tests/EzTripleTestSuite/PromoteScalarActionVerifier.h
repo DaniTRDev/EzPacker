@@ -4,15 +4,15 @@
 #include "EzTriple.h"
 #include "EzMirTestSuite.h"
 
-class PromoteScalarActionVerifier : public MirVerifier<PromoteScalarAction>
+class PromoteScalarActionVerifier : public MirPassVerifier<MirLegalizerPass, PromoteScalarActionVerifier>
 {
   public:
     /**
-     * Creates the verifier with the given builder ctx and action.
+     * Creates the verifier with the given builder ctx and pass.
      * @param ctx
-     * @param action
+     * @param pass
      */
-    PromoteScalarActionVerifier(MirBuilderContext *ctx, PromoteScalarAction *action);
+    PromoteScalarActionVerifier(MirBuilderContext *ctx, MirLegalizerPass *pass);
 
     /**
      * Sets the target block to the one given, any subsequent call to the verify methods will use this block.
@@ -38,13 +38,11 @@ class PromoteScalarActionVerifier : public MirVerifier<PromoteScalarAction>
      * Works more or less as verifyExtension but this verifier checks that the DEST operand (the one being written to)
      * is truncated.
      * @param index
-     * @param opcode
-     * @param origType
      * @param newType
+     * @param origType
      * @return
      */
-    PromoteScalarActionVerifier &
-    verifyExtensionTruncation(size_t index, MirInstructionOpCode opcode, MirType *origType, MirType *newType);
+    PromoteScalarActionVerifier &verifyExtensionTruncation(size_t index, MirType *newType, MirType *origType);
 
   private:
     MirBlock *m_targetBlock;

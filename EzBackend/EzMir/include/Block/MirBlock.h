@@ -22,6 +22,13 @@ class MirBlock
              const std::pmr::string &name = "");
 
     /**
+     * Returns the instruction at given index. If index is out of bounds or invalid, nullptr is returned.
+     * @param index
+     * @return
+     */
+    MirInstruction *at(size_t index);
+
+    /**
      * Returns the unique MIR ID assigned to this block.
      */
     size_t getId() const;

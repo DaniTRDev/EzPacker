@@ -1,7 +1,7 @@
 #include "PromoteScalarActionVerifier.h"
 
-PromoteScalarActionVerifier::PromoteScalarActionVerifier(MirBuilderContext *ctx, PromoteScalarAction *action) :
-    m_ctx(ctx), MirVerifier(action)
+PromoteScalarActionVerifier::PromoteScalarActionVerifier(MirBuilderContext *ctx, MirLegalizerPass *pass) :
+    m_ctx(ctx), MirPassVerifier(pass)
 {
 }
 
@@ -37,10 +37,8 @@ PromoteScalarActionVerifier &PromoteScalarActionVerifier::verifyExtension(size_t
     return *this;
 }
 
-PromoteScalarActionVerifier &PromoteScalarActionVerifier::verifyExtensionTruncation(size_t index,
-                                                                                    MirInstructionOpCode opcode,
-                                                                                    MirType *origType,
-                                                                                    MirType *newType)
+PromoteScalarActionVerifier &
+PromoteScalarActionVerifier::verifyExtensionTruncation(size_t index, MirType *newType, MirType *origType)
 {
     auto &instructions = m_targetBlock->getInstructions();
     EXPECT_LT(index, instructions.size()) << "Instruction index out of bounds.";
@@ -57,7 +55,7 @@ PromoteScalarActionVerifier &PromoteScalarActionVerifier::verifyExtensionTruncat
     verifier.operandVerifier(0).type(MirOperandType::Register).mirTypeVerifier().id(newType->getId());
 
     // Operand 1: How many bits to TRUNC, must match newType's bit size.
-    verifier.operandVerifier(1).type(MirOperandType::Integer).verifyInteger(nullptr, newType->getTotalSizeInBits());
+    verifier.operandVerifier(1).type(MirOperandType::Integer).verifyInteger(nullptr, origType->getTotalSizeInBits());
 
     return *this;
 }

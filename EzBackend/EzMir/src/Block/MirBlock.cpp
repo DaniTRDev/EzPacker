@@ -8,6 +8,17 @@ MirBlock::MirBlock(size_t id,
 {
 }
 
+MirInstruction *MirBlock::at(size_t index)
+{
+    if (index >= m_instructions.size())
+        return nullptr;
+
+    auto it = m_instructions.begin();
+    std::advance(it, index);
+
+    return *it;
+}
+
 size_t MirBlock::getId() const { return m_id; }
 
 SourceReference *MirBlock::getSourceRef() const { return m_sourceRef; }

@@ -119,13 +119,12 @@ void CodeFlowAnalysis::printResult() const
 
             for (auto &successor : successors)
             {
-                succeededBy +=
-                        " " + MirPrinter::printToString(m_ctx->getBlockById(successor), MirPrinterDetail::General);
+                succeededBy += MirPrinter::printToString(m_ctx->getBlockById(successor), MirPrinterDetail::General);
             }
 
             if (successors.empty())
             {
-                succeededBy += "   empty\n";
+                succeededBy += "empty\n";
             }
 
             log.appendNote(succeededBy.data(), nullptr);
@@ -141,13 +140,12 @@ void CodeFlowAnalysis::printResult() const
             std::string precededBy = MirPrinter::printToString(m_ctx->getBlockById(blockId), MirPrinterDetail::General);
             for (auto &predecessor : predecessors)
             {
-                precededBy +=
-                        " " + MirPrinter::printToString(m_ctx->getBlockById(predecessor), MirPrinterDetail::General);
+                precededBy += MirPrinter::printToString(m_ctx->getBlockById(predecessor), MirPrinterDetail::General);
             }
 
             if (predecessors.empty())
             {
-                precededBy += "   empty\n";
+                precededBy += "empty\n";
             }
 
             log.appendNote(precededBy.c_str(), nullptr);

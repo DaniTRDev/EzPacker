@@ -64,7 +64,7 @@ class MirTypeTable
     MirType *getStruct(std::pmr::vector<MirType *> fieldTypes, const std::string_view &structName);
 
     MirType *getVoidType() const;
-    MirType *getInt1Type() const;
+    MirType *i1() const;
     MirType *i8() const;
     MirType *i16() const;
     MirType *i32() const;

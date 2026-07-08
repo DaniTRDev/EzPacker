@@ -30,7 +30,7 @@ class MirFloat : public MirOperand
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("%float.value={}.type={}", m_value, getMirType()->getName());
+        return std::format("{} %float.value={}", getMirType()->getName(), m_value);
     }
 
   private:
@@ -49,10 +49,7 @@ class MirInteger : public MirOperand
 
     int64_t getValue() const { return m_value; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override
-    {
-        return std::format("%int.value={}.type={}", m_value, getMirType()->getName());
-    }
+    std::string toString() const override { return std::format("{} %int.value={}", getMirType()->getName(), m_value); }
 
   private:
     int64_t m_value{ 0 };
@@ -93,7 +90,7 @@ class MirReference : public MirOperand
             src = "func";
         }
 
-        return std::format("%ref.id={}.mirType={}.src={}", m_refId, getMirType()->getName(), src);
+        return std::format("{} %ref.id={}.src={}", getMirType()->getName(), m_refId, src);
     }
 
   private:
@@ -122,10 +119,10 @@ class MirRegister : public MirOperand
     {
         if (!m_name.empty())
         {
-            return std::format("{}.name={}", isVirtual() ? "%v" : "%p", m_name);
+            return std::format("{} {}.name={}", getMirType()->getName(), isVirtual() ? "%v" : "%p", m_name);
         }
 
-        return std::format("{}.id={}", isVirtual() ? "%v" : "%p", m_id);
+        return std::format("{} {}.id={}", getMirType()->getName(), isVirtual() ? "%v" : "%p", m_id);
     }
 
     void setRegId(size_t id) { m_id = id; }
@@ -146,10 +143,7 @@ class MirFrameIndex : public MirOperand
 
     size_t getFrameId() const { return m_frameId; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override
-    {
-        return std::format("%frame.id={}.mirType={}", m_frameId, getMirType()->getName());
-    }
+    std::string toString() const override { return std::format("{} %frame.id={}", getMirType()->getName(), m_frameId); }
 
   private:
     // Used to reference parameters and objects that are saved in a stack frame.
@@ -173,12 +167,12 @@ class MirMemory : public MirOperand
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("%mem.base={}.index={}",
+        return std::format("{} %mem.base={}.index={}",
+                           getMirType()->getName(),
                            m_base ? m_base->toString() : "",
                            m_displ ? m_displ->toString() : "");
     }
 
-  private:
   private:
     MirOperand *m_base;
     MirOperand *m_displ;

@@ -1,6 +1,6 @@
 #ifndef EZCORE_COMMON_H
 #define EZCORE_COMMON_H
-// EzCore Precompiled Header
+
 #include <memory>
 #include <vector>
 #include <string>
@@ -11,6 +11,9 @@
 #include <memory>
 #include <list>
 #include <memory_resource>
+
+#include <tommath.h>
+#include <tomfloat.h>
 
 #include <EzLogger.h>
 

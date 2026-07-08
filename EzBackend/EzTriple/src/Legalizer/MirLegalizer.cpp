@@ -8,14 +8,15 @@ MirLegalizer::MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc) :
 LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::pmr::vector<MirOperand *> &operands)
 {
     auto it = m_rules.find(opcode);
-    if (it == m_rules.end())
-        return nullptr;
-
-    for (const auto &rule : it->second)
+    if (it != m_rules.end())
     {
-        if (matchOperands(rule, operands))
+
+        for (const auto &rule : it->second)
         {
-            return rule.m_action;
+            if (matchOperands(rule, operands))
+            {
+                return rule.m_action;
+            }
         }
     }
 
@@ -45,7 +46,7 @@ LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::
         }
     }
 
-    return nullptr;
+    return MIRLEGALIZE_NO_ACTION;
 }
 
 void MirLegalizer::addRule(LegalizeAction *action,

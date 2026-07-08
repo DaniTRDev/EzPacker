@@ -33,6 +33,11 @@ EzCMK_AddVendor(https://github.com/libtom/libtommath
         libtommath
 )
 
+EzCMK_AddVendor(https://github.com/libtom/libtomfloat
+        e7812b59bbe10030f27e721c295535278dd09335
+        libtomfloat
+)
+
 EzCMK_AddVendor(https://github.com/glfw/glfw
         master
         glfw
@@ -46,3 +51,7 @@ FetchContent_Declare(imgui
 FetchContent_MakeAvailable(imgui)
 
 find_package(OpenGL REQUIRED)
+
+# Now add the CMake scripts to manually built non-compatible projects
+
+include("${CMAKE_CURRENT_LIST_DIR}/LibTomFloat.cmake")

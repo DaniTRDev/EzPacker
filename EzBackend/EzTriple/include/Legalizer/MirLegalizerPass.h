@@ -37,9 +37,15 @@ class MirLegalizerPass : public IMirTransformPass
                       std::pmr::list<class MirBlock *>::iterator it,
                       class MirPassManager *passManager) override;
 
+    /**
+     * Prints the pass result to the diag collector. In this case, it just prints the modified blocks.
+     */
+    void printResult() const override;
+
   private:
     MirBuilderContext *m_ctx;
     MirLegalizer *m_legalizer;
+    std::list<MirBlock *> m_modifiedBlocks;
 };
 
 #endif // EZPACKER_MIRLEGALIZERPASS_H

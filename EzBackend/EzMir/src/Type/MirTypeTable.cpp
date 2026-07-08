@@ -111,7 +111,7 @@ MirType *MirTypeTable::getStruct(std::pmr::vector<MirType *> fieldTypes, const s
 }
 
 MirType *MirTypeTable::getVoidType() const { return m_voidType; }
-MirType *MirTypeTable::getInt1Type() const { return m_int1Type; }
+MirType *MirTypeTable::i1() const { return m_int1Type; }
 MirType *MirTypeTable::i8() const { return m_int8Type; }
 MirType *MirTypeTable::i16() const { return m_int16Type; }
 MirType *MirTypeTable::i32() const { return m_int32Type; }

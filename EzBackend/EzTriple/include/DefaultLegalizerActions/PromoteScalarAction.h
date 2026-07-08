@@ -5,6 +5,12 @@
 #include "Descriptors/TargetDesc.h"
 #include "Legalizer/LegalizeAction.h"
 
+/**
+ * This action will PROMOTE  a type. Promotion means that a smaller non-supported type gets promoted into a bigger type
+ * that is actually supported by the target architecture.
+ *
+ * This is done by inserting ZEXT/SEXT/FPEXT/TRUNC instructions and modifying the operands of the affected instructions.
+ */
 class PromoteScalarAction : public LegalizeAction
 {
   public:
@@ -16,7 +22,7 @@ class PromoteScalarAction : public LegalizeAction
     PromoteScalarAction(MirBuilderContext *ctx, TargetDesc *target);
 
     /**
-     * Returns "Promote"
+     * Returns "PromoteScalarAction"
      * @return
      */
     const char *getName() override;

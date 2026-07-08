@@ -47,8 +47,9 @@ class EzMirTestSuite
         MirPassManager *passManager = getPassManager();
         PassType *pass = (PassType *)passManager->addPass<PassType, Args...>(std::forward<Args>(args)...);
 
-        if (pass->getPassType() == MirPassType::Analysis)
+        if constexpr (std::is_base_of<IMirAnalysisPass, PassType>::value)
         {
+            // We can't use passManager->getAnalysis due to templates needed to be resolved at compile time.
             pass = passManager->getAnalysis<PassType>(getFunctions());
         }
         else
@@ -71,6 +72,34 @@ class EzMirTestSuite
      * @return
      */
     MirTypeTable *getTypeTable();
+
+    /**
+     * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-register.
+     * @param destOperType
+     * @param srcOperType
+     */
+    void addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType);
+
+    /**
+     * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-immediate(int).
+     * @param opcode
+     * @param destOperType
+     * @param srcOperType
+     * @param srcValue
+     */
+    void addTestInstructionRegIntImm(MirInstructionOpCode opcode,
+                                     MirType *destOperType,
+                                     MirType *srcOperType,
+                                     int64_t srcValue);
+
+    /**
+     * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-immediate(float).
+     * @param opcode
+     * @param destOperType
+     * @param srcOperType
+     * @param srcValue
+     */
+    void addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue);
 
     /**
      * Creates all the needed context pointers in a basic state for a test. It also creates 1 void "TEST" function,

@@ -10,13 +10,13 @@ std::string printMirRegMap(MirBuilderContext *ctx,
 
         if (defs.empty())
         {
-            res += "   empty\n";
+            res += "\tempty\n";
         }
         else
         {
             for (auto &def : defs)
             {
-                res += "   " + MirPrinter::printToString(ctx->getRegisterById(def)) + "\n";
+                res += "\t" + MirPrinter::printToString(ctx->getRegisterById(def)) + "\n";
             }
         }
     }
@@ -69,6 +69,7 @@ void LivenessAnalysis::printResult() const
     log.appendNote(std::string("Use\n").append(printMirRegMap(m_ctx, res.m_use)).c_str(), nullptr);
     log.appendNote(std::string("LiveIn\n").append(printMirRegMap(m_ctx, res.m_liveIn)).c_str(), nullptr);
     log.appendNote(std::string("LiveOut\n").append(printMirRegMap(m_ctx, res.m_liveOut)).c_str(), nullptr);
+    log.flush();
 }
 
 void LivenessAnalysis::computeGlobalLiveness(MirFunction *func, const ControlFlowResult &cfg)

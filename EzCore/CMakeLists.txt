@@ -22,6 +22,8 @@ function(BuildEzCore)
             "include/Diagnostics/DiagnosticLogger.h"
             "include/Diagnostics/DiagnosticMessage.h"
             "include/Diagnostics/DiagnosticScope.h"
+            "include/FlexNumber/FlexFloat.h"
+            "include/FlexNumber/FlexInt.h"
             "include/SourceManager/SourceManager.h"
 
             "src/Diagnostics/DiagnosticBuilder.cpp"
@@ -29,6 +31,8 @@ function(BuildEzCore)
             "src/Diagnostics/DiagnosticLogger.cpp"
             "src/Diagnostics/DiagnosticMessage.cpp"
             "src/Diagnostics/DiagnosticScope.cpp"
+            "src/FlexNumber/FlexFloat.cpp"
+            "src/FlexNumber/FlexInt.cpp"
             "src/SourceManager/SourceManager.cpp"
     )
 
@@ -36,7 +40,7 @@ function(BuildEzCore)
     target_precompile_headers(EzCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/EzCoreCommon.h")
 
     # Add include directories and link dependencies
-    target_link_libraries(EzCore PUBLIC EzLogger gtest gtest_main)
+    target_link_libraries(EzCore PUBLIC EzLogger gtest gtest_main libtomfloat::tomfloat)
     target_include_directories(EzCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${gtest_build_include_dirs})
 endfunction()
 

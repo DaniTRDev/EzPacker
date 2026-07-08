@@ -37,6 +37,7 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
             auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass");
             log << std::format("Illegal Instruction, applying {}", action->getName()).c_str();
             log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(), instr->getSourceRef());
+            log.flush();
 
             LegalizeActionResult actionRes = action->run(instructions, instrIt);
 
@@ -49,6 +50,7 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
             if (actionRes.m_mirChanged)
             {
                 modified = true;
+                m_modifiedBlocks.push_back(currentBlock);
             }
         }
     }
@@ -57,3 +59,15 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
 }
 
 MirPassIterationPlace MirLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Block; }
+
+void MirLegalizerPass::printResult() const
+{
+    auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirLegalizerPass");
+    log << std::format("Printing legalization result").c_str();
+
+    for (auto &block : m_modifiedBlocks)
+    {
+        std::string str = MirPrinter::printToString(block, MirPrinterDetail::Detailed);
+        log.appendNote(str.c_str(), block->getSourceRef());
+    }
+}

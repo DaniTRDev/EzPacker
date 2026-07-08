@@ -14,10 +14,13 @@ void DiagnosticLogger::onDiag(const DiagnosticMessage &msg)
 
     log.add("[{}] ", senderStr);
     logType(log, msg.getType());
-    log.add(" {}\n", mainMsgStr);
+    log.add(" {}", mainMsgStr);
 
     if (msg.getPrimarySourceRef())
+    {
+        log.add("\n");
         logSourceRef(log, *msg.getPrimarySourceRef());
+    }
 
     for (const auto &note : msg.getNotes())
     {
@@ -31,7 +34,7 @@ void DiagnosticLogger::logNote(LogMessage &msg, const DiagnosticNote &note)
 {
     std::string noteContentStr(note.m_noteContent.begin(), note.m_noteContent.end());
 
-    msg.add("  note: ").colorize(Colors::magenta);
+    msg.add("\n\tnote: ").colorize(Colors::magenta);
     msg.add("{}", noteContentStr);
 
     if (note.m_sourceRef && note.m_sourceRef->m_valid)
