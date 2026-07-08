@@ -1,52 +1,34 @@
-# EzCore CMake build configuration
+set(EZCORE_FILES_LIST
+        "include/EzCore.h"
+        "include/EzCoreCommon.h"
+        "include/StringUtils.h"
+        "include/Diagnostics/DiagnosticBuilder.h"
+        "include/Diagnostics/DiagnosticCollector.h"
+        "include/Diagnostics/DiagnosticListener.h"
+        "include/Diagnostics/DiagnosticLogger.h"
+        "include/Diagnostics/DiagnosticMessage.h"
+        "include/Diagnostics/DiagnosticScope.h"
+        "include/FlexNumber/FlexFloat.h"
+        "include/FlexNumber/FlexInt.h"
+        "include/SourceManager/SourceManager.h"
 
-function(GetLibraryBuildType out)
-    if (EZPACKER_BUILD_STATIC)
-        set(${out} "STATIC" PARENT_SCOPE)
-    else ()
-        set(${out} "SHARED" PARENT_SCOPE)
-    endif ()
-endfunction()
+        "src/Diagnostics/DiagnosticBuilder.cpp"
+        "src/Diagnostics/DiagnosticCollector.cpp"
+        "src/Diagnostics/DiagnosticLogger.cpp"
+        "src/Diagnostics/DiagnosticMessage.cpp"
+        "src/Diagnostics/DiagnosticScope.cpp"
+        "src/FlexNumber/FlexFloat.cpp"
+        "src/FlexNumber/FlexInt.cpp"
+        "src/SourceManager/SourceManager.cpp"
+)
 
-function(BuildEzCore)
-    GetLibraryBuildType(EZCORE_BUILD_TYPE)
-    message(STATUS "Building EzCore as ${EZCORE_BUILD_TYPE}")
+EzCMK_ConfigureLib(NAME "EzCore"
+        FILE_LIST ${EZCORE_FILES_LIST}
+        PRECOMPILED_HEADER "include/EzCoreCommon.h"
+        LINKED_LIBRARIES "EzLogger;libtommath;libtomfloat::tomfloat;gtest;GTest::gtest_main"
+        INCLUDED_DIRS "include;${gtest_build_include_dirs}"
+)
 
-    add_library("EzCore" ${EZCORE_BUILD_TYPE}
-            "include/EzCore.h"
-            "include/EzCoreCommon.h"
-            "include/StringUtils.h"
-            "include/Diagnostics/DiagnosticBuilder.h"
-            "include/Diagnostics/DiagnosticCollector.h"
-            "include/Diagnostics/DiagnosticListener.h"
-            "include/Diagnostics/DiagnosticLogger.h"
-            "include/Diagnostics/DiagnosticMessage.h"
-            "include/Diagnostics/DiagnosticScope.h"
-            "include/FlexNumber/FlexFloat.h"
-            "include/FlexNumber/FlexInt.h"
-            "include/SourceManager/SourceManager.h"
-
-            "src/Diagnostics/DiagnosticBuilder.cpp"
-            "src/Diagnostics/DiagnosticCollector.cpp"
-            "src/Diagnostics/DiagnosticLogger.cpp"
-            "src/Diagnostics/DiagnosticMessage.cpp"
-            "src/Diagnostics/DiagnosticScope.cpp"
-            "src/FlexNumber/FlexFloat.cpp"
-            "src/FlexNumber/FlexInt.cpp"
-            "src/SourceManager/SourceManager.cpp"
-    )
-
-    # Set precompiled header
-    target_precompile_headers(EzCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/EzCoreCommon.h")
-
-    # Add include directories and link dependencies
-    target_link_libraries(EzCore PUBLIC EzLogger gtest gtest_main libtomfloat::tomfloat)
-    target_include_directories(EzCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${gtest_build_include_dirs})
-endfunction()
-
-BuildEzCore()
-
-# Add tests
 if (EZPACKER_BUILD_TESTS)
     message(STATUS "Building tests for EzCore")
 

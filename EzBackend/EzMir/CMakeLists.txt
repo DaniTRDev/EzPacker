@@ -61,7 +61,7 @@ set(MIRTESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzMir"
         FILE_LIST ${EZMIR_FILES_LIST}
         PRECOMPILED_HEADER "include/EzMirCommon.h"
-        LINKED_LIBRARIES "EzCore;libtommath"
+        LINKED_LIBRARIES "EzCore"
         INCLUDED_DIRS "include")
 
 if (EZPACKER_BUILD_TESTS)
