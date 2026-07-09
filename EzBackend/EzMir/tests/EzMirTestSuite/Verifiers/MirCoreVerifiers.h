@@ -180,8 +180,8 @@ class MirOperandVerifier : public MirVerifier<MirOperand>
     MirOperandVerifier &verifyFloat(float val);
 
     /**
-     * Verifies that the operand is a float, that its value matches val and its type matches type (if type is not
-     * nullptr). This method is exposed to test any given-length float.
+     * Verifies that the operand is a float, that its value matches val and its type matches type. This method is
+     * exposed to test any given-length float.
      * @param doubleType
      * @param val
      * @return
@@ -196,6 +196,14 @@ class MirOperandVerifier : public MirVerifier<MirOperand>
      * @return
      */
     MirOperandVerifier &verifyInteger(MirType *intType, int64_t val);
+
+    /**
+     * Verifies that the operand is an integer, that its value matches val and its type matches type.
+     * @param floatType
+     * @param val
+     * @return
+     */
+    MirOperandVerifier &verifyInteger(MirType *intType, const FlexInt &val);
 
     /**
      * Verifies that the operand is a reference, with a particular id and type. If refId == MIRID_INVALID,

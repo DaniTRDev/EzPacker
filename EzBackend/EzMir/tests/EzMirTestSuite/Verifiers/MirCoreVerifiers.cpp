@@ -62,7 +62,7 @@ MirOperandVerifier &MirOperandVerifier::type(MirOperandType expectedType)
 MirOperandVerifier &MirOperandVerifier::verifyDouble(double val)
 {
     type(MirOperandType::FloatingPoint);
-    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue().compare(std::to_string(val)) == 0);
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue() == FlexFloat(val, 64));
     EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getName(), "f64");
 
     return *this;
@@ -71,7 +71,7 @@ MirOperandVerifier &MirOperandVerifier::verifyDouble(double val)
 MirOperandVerifier &MirOperandVerifier::verifyFloat(float val)
 {
     type(MirOperandType::FloatingPoint);
-    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue().compare(std::to_string(val)) == 0);
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue() == FlexFloat(val, 32));
     EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getName(), "f32");
 
     return *this;
@@ -80,17 +80,26 @@ MirOperandVerifier &MirOperandVerifier::verifyFloat(float val)
 MirOperandVerifier &MirOperandVerifier::verifyFloatAnySize(MirType *floatType, const std::string &val)
 {
     type(MirOperandType::FloatingPoint);
-    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue().compare(val) == 0);
-
-    if (floatType)
-    {
-        EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getId(), floatType->getId());
-    }
+    EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getId(), floatType->getId());
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue() == FlexFloat(val, floatType->getTotalSizeInBits()));
 
     return *this;
 }
 
 MirOperandVerifier &MirOperandVerifier::verifyInteger(MirType *intType, int64_t val)
+{
+    type(MirOperandType::Integer);
+    EXPECT_EQ(m_testedObj->get<MirInteger>()->getValue(), val);
+
+    if (intType)
+    {
+        EXPECT_EQ(m_testedObj->get<MirInteger>()->getMirType()->getId(), intType->getId());
+    }
+
+    return *this;
+}
+
+MirOperandVerifier &MirOperandVerifier::verifyInteger(MirType *intType, const FlexInt &val)
 {
     type(MirOperandType::Integer);
     EXPECT_EQ(m_testedObj->get<MirInteger>()->getValue(), val);

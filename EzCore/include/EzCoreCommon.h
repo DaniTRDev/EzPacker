@@ -11,9 +11,17 @@
 #include <memory>
 #include <list>
 #include <memory_resource>
+#include <cmath>
 
 #include <tommath.h>
-#include <tomfloat.h>
+
+extern "C"
+{
+    namespace libbf
+    {
+#include <libbf.h>
+    };
+};
 
 #include <EzLogger.h>
 

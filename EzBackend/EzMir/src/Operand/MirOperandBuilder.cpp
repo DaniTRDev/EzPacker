@@ -4,12 +4,12 @@ MirOperandBuilder::MirOperandBuilder(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
 MirFloat *MirOperandBuilder::buildFloat(float value, SourceReference *ref)
 {
-    return build<MirFloat>(m_ctx->getTypeTable()->f32(), std::to_string(value).c_str(), ref);
+    return build<MirFloat>(m_ctx->getTypeTable()->f32(), FlexFloat(value, 32), ref);
 }
 
 MirFloat *MirOperandBuilder::buildFloat(double value, SourceReference *ref)
 {
-    return build<MirFloat>(m_ctx->getTypeTable()->f64(), std::to_string(value).c_str(), ref);
+    return build<MirFloat>(m_ctx->getTypeTable()->f64(), FlexFloat(value, 64), ref);
 }
 
 MirFloat *MirOperandBuilder::buildFloat(MirType *type, std::pmr::string value, SourceReference *ref)
@@ -21,12 +21,24 @@ MirFloat *MirOperandBuilder::buildFloat(MirType *type, std::pmr::string value, S
         return nullptr;
     }
 
-    return build<MirFloat>(type, std::move(value).c_str(), ref);
+    return build<MirFloat>(type, FlexFloat(value, type->getTotalSizeInBits()), ref);
 }
 
 MirInteger *MirOperandBuilder::buildInt(MirType *type, int64_t value, SourceReference *ref)
 {
-    return build<MirInteger>(type, value, ref);
+    return build<MirInteger>(type, FlexInt(value), ref);
+}
+
+MirInteger *MirOperandBuilder::buildInt(MirType *type, std::pmr::string value, SourceReference *ref)
+{
+    if (type->getKind() != MirTypeKind::Integer)
+    {
+        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                << "Given float type is not an int type" << ref;
+        return nullptr;
+    }
+
+    return build<MirInteger>(type, FlexInt(value, type->getTotalSizeInBits()), ref);
 }
 
 MirRegister *MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReference *ref)

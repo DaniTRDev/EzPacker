@@ -49,6 +49,14 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirInteger *buildInt(MirType *type, int64_t value, SourceReference *ref = nullptr);
 
     /**
+     * Creates an integer with the given value.
+     * @param type
+     * @param value
+     * @return
+     */
+    MirInteger *buildInt(MirType *type, std::pmr::string value, SourceReference *ref = nullptr);
+    
+    /**
      * Creates a virtual register with the given type, name and source reference.
      * @param type
      * @param name

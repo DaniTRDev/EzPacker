@@ -31,6 +31,7 @@ if (EZPACKER_BUILD_TESTS)
     EzCMK_EnableTestsForCurrentProject()
 endif ()
 
+add_subdirectory(LibBf) # https://bellard.org/libbf/
 add_subdirectory(EzCore)
 #add_subdirectory(EzFrontend)
 add_subdirectory(EzBackend)

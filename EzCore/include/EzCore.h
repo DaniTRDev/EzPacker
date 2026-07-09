@@ -12,6 +12,9 @@
 #include "Diagnostics/DiagnosticMessage.h"
 #include "Diagnostics/DiagnosticScope.h"
 
+#include "FlexNumber/FlexFloat.h"
+#include "FlexNumber/FlexInt.h"
+
 #include "SourceManager/SourceManager.h"
 
 #endif // EZCORE_H

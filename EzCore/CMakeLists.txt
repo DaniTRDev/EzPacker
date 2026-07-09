@@ -25,7 +25,7 @@ set(EZCORE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzCore"
         FILE_LIST ${EZCORE_FILES_LIST}
         PRECOMPILED_HEADER "include/EzCoreCommon.h"
-        LINKED_LIBRARIES "EzLogger;libtommath;libtomfloat::tomfloat;gtest;GTest::gtest_main"
+        LINKED_LIBRARIES "EzLogger;libtommath;LibBF;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include;${gtest_build_include_dirs}"
 )
 

@@ -21,23 +21,17 @@ class MirFloat : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::FloatingPoint;
 
-    MirFloat(MirType *type, std::pmr::string value, SourceReference *ref) :
-        MirOperand(type, ref), m_value(std::move(value))
-    {
-    }
+    MirFloat(MirType *type, FlexFloat value, SourceReference *ref) : MirOperand(type, ref), m_float(std::move(value)) {}
 
-    const std::pmr::string &getValue() const { return m_value; }
+    const FlexFloat &getValue() const { return m_float; }
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("{} %float.value={}", getMirType()->getName(), m_value);
+        return std::format("{} %float.value={}", getMirType()->getName(), m_float.toString());
     }
 
   private:
-    std::pmr::string m_value; /*
-                               * Immediate floating-point literal that can have any given precision (dictated by
-                               * underlying MirType)
-                               */
+    FlexFloat m_float;
 };
 
 class MirInteger : public MirOperand
@@ -45,14 +39,17 @@ class MirInteger : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Integer;
 
-    MirInteger(MirType *type, int64_t value, SourceReference *ref) : MirOperand(type, ref), m_value(value) {}
+    MirInteger(MirType *type, FlexInt value, SourceReference *ref) : MirOperand(type, ref), m_int(std::move(value)) {}
 
-    int64_t getValue() const { return m_value; }
+    const FlexInt &getValue() const { return m_int; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("{} %int.value={}", getMirType()->getName(), m_value); }
+    std::string toString() const override
+    {
+        return std::format("{} %int.value={}", getMirType()->getName(), m_int.toString());
+    }
 
   private:
-    int64_t m_value{ 0 };
+    FlexInt m_int;
 };
 
 class MirReference : public MirOperand
