@@ -8,6 +8,7 @@ set(EZTRIPLE_FILES_LIST
         "include/Descriptors/ArgumentLocationDesc.h"
         "include/Descriptors/CallingConvDesc.h"
         "include/Descriptors/TargetDesc.h"
+        "include/ExpansionRecipe/ExpansionRecipe.h"
         "include/Legalizer/LegalizeAction.h"
         "include/Legalizer/MirLegalizer.h"
         "include/Legalizer/MirLegalizerPass.h"
@@ -21,10 +22,12 @@ set(EZTRIPLE_FILES_LIST
 )
 
 set(TRIPLETESTSUITE_FILES_LIST
+        "tests/EzTripleTestSuite/ExpandScalarActionVerifier.h"
         "tests/EzTripleTestSuite/EzTripleTargetDescriptor.h"
         "tests/EzTripleTestSuite/EzTripleTestSuite.h"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.h"
 
+        "tests/EzTripleTestSuite/ExpandScalarActionVerifier.cpp"
         "tests/EzTripleTestSuite/EzTripleTestSuite.cpp"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.cpp"
 )

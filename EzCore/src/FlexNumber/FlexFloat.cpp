@@ -23,7 +23,7 @@ FlexFloat::FlexFloat(const FlexFloat &other) : FlexFloat(other.getBitSize())
     }
 }
 
-FlexFloat::FlexFloat(float value, size_t bitWidth) : FlexFloat(bitWidth)
+FlexFloat::FlexFloat(float value) : FlexFloat(size_t(32))
 {
     if (std::isnan(value))
     {
@@ -36,7 +36,7 @@ FlexFloat::FlexFloat(float value, size_t bitWidth) : FlexFloat(bitWidth)
     }
 }
 
-FlexFloat::FlexFloat(double value, size_t bitWidth) : FlexFloat(bitWidth)
+FlexFloat::FlexFloat(double value) : FlexFloat(size_t(64))
 {
     if (std::isnan(value))
     {

@@ -16,6 +16,7 @@ enum class ExpectedOperandType : uint16_t
     Memory = 1 << 4,        // MirMemory
     FrameIndex = 1 << 5,    // MirFrameIndex
     Reference = 1 << 6,     // MirReference (Blocks, Functions)
+    RuntimeSymbol = 1 << 7, // MirRuntimeSymbol. Used to identify an address that's exported by the RT library.
 
     // --- Composite Helper Masks ---
 
@@ -34,12 +35,6 @@ enum class ExpectedOperandType : uint16_t
     AnyValue = Register | Integer | FloatingPoint,
 
     Any = 0xFFFF
-};
-
-inline std::map<ExpectedOperandType, std::string> g_ExpectedOperandType2Str = {
-    { ExpectedOperandType::None, "None" },           { ExpectedOperandType::Register, "Register" },
-    { ExpectedOperandType::Immediate, "Immediate" }, { ExpectedOperandType::Reference, "Reference" },
-    { ExpectedOperandType::RegImm, "RegImm" },       { ExpectedOperandType::Any, "Any" }
 };
 
 inline constexpr ExpectedOperandType operator|(ExpectedOperandType a, ExpectedOperandType b)
@@ -134,7 +129,7 @@ inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2St
 // --- OpCode Generation ---
 enum MirInstructionOpCode : uint16_t
 {
-#define INSTRUCTION(name, category, linearEquivalent, operands, flags) name,
+#define INSTRUCTION(name, category, operands, flags) name,
 #include "MirInstructionSet.h"
 #undef INSTRUCTION
     OPCODE_COUNT
@@ -153,20 +148,17 @@ struct MirInstructionLinearEquivalent
 struct MirInstructionMetadata
 {
     MirInstructionCategory m_category;
-    MirInstructionLinearEquivalent m_linearEquivalent;
     MirInstructionOpCode m_opcode;
     MirInstructionFlags m_flags;
     std::string_view m_name;
     std::vector<OperandConstraint> m_operandConstraints;
 
     MirInstructionMetadata(MirInstructionCategory category,
-                           MirInstructionLinearEquivalent linearEquivalent,
                            MirInstructionOpCode opcode,
                            MirInstructionFlags flag,
                            std::string_view name,
                            std::initializer_list<OperandConstraint> operands) :
-        m_category(category), m_linearEquivalent(linearEquivalent), m_opcode(opcode), m_flags(flag),
-        m_name(std::move(name)), m_operandConstraints(operands)
+        m_category(category), m_opcode(opcode), m_flags(flag), m_name(std::move(name)), m_operandConstraints(operands)
     {
     }
 };
@@ -175,14 +167,14 @@ extern std::string StrToLower(const std::string &str);
 
 // --- Metadata Arrays ---
 inline const MirInstructionMetadata g_MirInstructionSet[] = {
-#define INSTRUCTION(name, category, linearEquivalent, operands, flags)                                                 \
-    MirInstructionMetadata(MirInstructionCategory::category, linearEquivalent, name, flags, #name, operands),
+#define INSTRUCTION(name, category, operands, flags)                                                                   \
+    MirInstructionMetadata(MirInstructionCategory::category, name, flags, #name, operands),
 #include "MirInstructionSet.h"
 #undef INSTRUCTION
 };
 
 inline std::map<std::string, MirInstructionOpCode> g_String2MirInstruction = {
-#define INSTRUCTION(name, category, linearEquivalent, operands, flags) { #name, name },
+#define INSTRUCTION(name, category, operands, flags) { #name, name },
 #include "MirInstructionSet.h"
 #undef INSTRUCTION
 };

@@ -100,6 +100,15 @@ class EzMirTestSuite
      * @param srcValue
      */
     void addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue);
+    
+    /**
+     * Adds an instruction USING THE CURRENT INSERTION POINT, of the form register-memory. The memory operand
+     * has BOTH base and displacement.
+     * @param opcode
+     * @param destOperType
+     * @param srcOperType
+     */
+    void addTestInstructionRegMem(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType, const FlexInt &displacement);
 
     /**
      * Creates all the needed context pointers in a basic state for a test. It also creates 1 void "TEST" function,

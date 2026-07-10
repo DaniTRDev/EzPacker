@@ -95,6 +95,25 @@ class MirReference : public MirOperand
     size_t m_refId{ 0 }; // Generic MIR reference ID (block, function, data entry, ...).
 };
 
+class MirRuntimeSymbol : public MirOperand
+{
+  public:
+    static constexpr MirOperandType OpKind = MirOperandType::RuntimeSymbol;
+
+    MirRuntimeSymbol(MirType *type, std::pmr::string name, SourceReference *ref) :
+        MirOperand(type, ref), m_symbolName(std::move(name))
+    {
+    }
+
+    MirOperandType getType() const override { return OpKind; }
+    
+    const std::pmr::string &getSymbolName() const { return m_symbolName; }
+    std::string toString() const override { return std::format("%rt.{}", m_symbolName); }
+
+  private:
+    std::pmr::string m_symbolName;
+};
+
 class MirRegister : public MirOperand
 {
   public:
@@ -153,13 +172,13 @@ class MirMemory : public MirOperand
     static constexpr MirOperandType OpKind = MirOperandType::Memory;
 
     // The 'type' passed to the base constructor represents the size of what's being accessed.
-    MirMemory(MirType *type, MirOperand *base, MirOperand *displ, SourceReference *ref) :
+    MirMemory(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref) :
         MirOperand(type, ref), m_base(base), m_displ(displ)
     {
     }
 
-    MirOperand *getBase() const { return m_base; }
-    MirOperand *getDisplacement() const { return m_displ; }
+    MirRegister *getBase() const { return m_base; }
+    MirInteger *getDisplacement() const { return m_displ; }
 
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
@@ -171,8 +190,8 @@ class MirMemory : public MirOperand
     }
 
   private:
-    MirOperand *m_base;
-    MirOperand *m_displ;
+    MirRegister *m_base;
+    MirInteger *m_displ;
 };
 
 #endif // EZPACKER_MIROPERANDS_H

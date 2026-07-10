@@ -82,6 +82,13 @@ TEST_F(OperandTest, Register)
             .verifyRegister(getTypeTable()->f64(), false, MIRID_INVALID);
 }
 
+TEST_F(OperandTest, RuntimeSymbol)
+{
+    MirOperandBuilder builder(getBuilderCtx());
+
+    MirOperandVerifier(builder.buildRtSymbol("mySymbol")).verifyRuntimeSymbol("mySymbol");
+}
+
 TEST_F(OperandTest, FrameIndex)
 {
     MirOperandBuilder builder(getBuilderCtx());

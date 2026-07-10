@@ -28,16 +28,14 @@ class FlexFloat
     /**
      * Initializes the container and sets a standard single-precision hardware float value into it.
      * @param value Real value to store.
-     * @param bitWidth Target width configuration space.
      */
-    explicit FlexFloat(float value, size_t bitWidth);
+    explicit FlexFloat(float value);
 
     /**
      * Initializes the container and sets a standard double-precision hardware float value into it.
      * @param value Real value to store.
-     * @param bitWidth Target width configuration space.
      */
-    explicit FlexFloat(double value, size_t bitWidth);
+    explicit FlexFloat(double value);
 
     /**
      * Initializes the container and parses a safe string slice into a floating-point number using the given base radix.

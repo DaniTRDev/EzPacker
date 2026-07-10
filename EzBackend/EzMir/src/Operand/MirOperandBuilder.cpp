@@ -2,14 +2,9 @@
 
 MirOperandBuilder::MirOperandBuilder(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
-MirFloat *MirOperandBuilder::buildFloat(float value, SourceReference *ref)
+MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref)
 {
-    return build<MirFloat>(m_ctx->getTypeTable()->f32(), FlexFloat(value, 32), ref);
-}
-
-MirFloat *MirOperandBuilder::buildFloat(double value, SourceReference *ref)
-{
-    return build<MirFloat>(m_ctx->getTypeTable()->f64(), FlexFloat(value, 64), ref);
+    return build<MirFloat>(type, value, ref);
 }
 
 MirFloat *MirOperandBuilder::buildFloat(MirType *type, std::pmr::string value, SourceReference *ref)
@@ -24,9 +19,9 @@ MirFloat *MirOperandBuilder::buildFloat(MirType *type, std::pmr::string value, S
     return build<MirFloat>(type, FlexFloat(value, type->getTotalSizeInBits()), ref);
 }
 
-MirInteger *MirOperandBuilder::buildInt(MirType *type, int64_t value, SourceReference *ref)
+MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, SourceReference *ref)
 {
-    return build<MirInteger>(type, FlexInt(value), ref);
+    return build<MirInteger>(type, value, ref);
 }
 
 MirInteger *MirOperandBuilder::buildInt(MirType *type, std::pmr::string value, SourceReference *ref)
@@ -39,6 +34,17 @@ MirInteger *MirOperandBuilder::buildInt(MirType *type, std::pmr::string value, S
     }
 
     return build<MirInteger>(type, FlexInt(value, type->getTotalSizeInBits()), ref);
+}
+
+MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref)
+{
+    return build<MirMemory>(type, base, displ, ref);
+}
+
+MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const FlexInt &displ, SourceReference *ref)
+{
+    auto &t = m_ctx->getTypeTable();
+    return build<MirMemory>(type, base, build<MirInteger>(t->i64(), displ, nullptr), ref);
 }
 
 MirRegister *MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReference *ref)
@@ -73,4 +79,12 @@ MirReference *MirOperandBuilder::buildRef(MirGlobalDataEntry *entry, SourceRefer
     MirType *ptr = t->getPtr(entry->m_dataType);
 
     return build<MirReference>(ptr, MirReferenceType::DataEntry, entry->m_entryId, ref);
+}
+
+MirRuntimeSymbol *MirOperandBuilder::buildRtSymbol(std::pmr::string symbolName, SourceReference *ref)
+{
+    const auto &t = m_ctx->getTypeTable();
+    MirType *ptr = t->getPtr(t->getVoidType());
+
+    return build<MirRuntimeSymbol>(ptr, std::move(symbolName), ref);
 }

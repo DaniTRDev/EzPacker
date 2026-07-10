@@ -1,7 +1,7 @@
 #include "Legalizer/MirLegalizer.h"
 
 MirLegalizer::MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc) :
-    m_ctx(ctx), m_targetDesc(targetDesc), m_promoteScalarAct(ctx, targetDesc)
+    m_ctx(ctx), m_targetDesc(targetDesc), m_expandScalarAct(ctx, targetDesc), m_promoteScalarAct(ctx, targetDesc)
 {
 }
 
@@ -42,7 +42,7 @@ LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::
         else if (legalType->getTotalSizeInBits() < type->getTotalSizeInBits())
         {
             // Expansion.
-            return nullptr; // TO BE DONE. TODO
+            return &m_expandScalarAct;
         }
     }
 

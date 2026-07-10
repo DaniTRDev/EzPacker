@@ -4,6 +4,21 @@ Amd64TargetDesc::Amd64TargetDesc(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
 const char *Amd64TargetDesc::getName() const { return "Amd64"; }
 
+const ExpansionRecipe *Amd64TargetDesc::getExpansionRecipes() { return GET_EXPANSION_RECIPES(AMD64); }
+
+const class ExpansionRecipe *const Amd64TargetDesc::getExpansionRecipeForInstr(MirInstructionOpCode opcode)
+{
+    const auto recipes = getExpansionRecipes();
+    for (size_t i = 0; i < getExpansionRecipesSize(); i++)
+    {
+        const auto recipe = &recipes[i];
+        if (recipe->m_target == opcode)
+            return recipe;
+    }
+
+    return nullptr;
+}
+
 MirType *Amd64TargetDesc::getNearestLegalType(MirType *type)
 {
     const auto &t = m_ctx->getTypeTable();
@@ -37,3 +52,5 @@ MirType *Amd64TargetDesc::getNearestLegalType(MirType *type)
 
     return nullptr;
 }
+
+size_t Amd64TargetDesc::getExpansionRecipesSize() { return GET_EXPANSION_RECIPES_SIZE(AMD64); }

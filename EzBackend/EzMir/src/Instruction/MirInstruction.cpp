@@ -14,11 +14,6 @@ bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstru
 
 const MirInstructionMetadata &MirInstruction::getMetadata() const { return getMeta(getOpCode()); }
 
-const MirInstructionLinearEquivalent &MirInstruction::getLinearEquivalent() const
-{
-    return getMetadata().m_linearEquivalent;
-}
-
 class MirBlock *MirInstruction::getOwner() { return m_owner; }
 
 MirInstructionOpCode MirInstruction::getOpCode() const { return m_opcode; }
@@ -30,6 +25,8 @@ MirTargetInstructionId MirInstruction::getTargetId() const { return m_targetId; 
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 
 void MirInstruction::addOperand(const MirOperand *operand) { m_operands.push_back((MirOperand *)operand); }
+
+void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
 
 void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
 

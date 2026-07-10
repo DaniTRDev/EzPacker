@@ -225,6 +225,14 @@ class MirOperandVerifier : public MirVerifier<MirOperand>
     MirOperandVerifier &verifyRegister(MirType *mirType, bool isVirtual, size_t id);
 
     /**
+     * Verifies that the operand is a MirRuntimeSymbol and that if symbolName is not empty, it will also check if it's
+     * symbol name matches the one given.
+     * @param symbolName
+     * @return
+     */
+    MirOperandVerifier &verifyRuntimeSymbol(const std::string &symbolName);
+
+    /**
      * Verifies that the operand is a frame index, with a particular mirType and id. If mirType is nullptr it won't
      * be checked. If ID is MIRID_INVALID, the ID won't be checked.
      * @param mirType
@@ -235,7 +243,7 @@ class MirOperandVerifier : public MirVerifier<MirOperand>
 
     /**
      * Verifies that the operand is a memory operand and that its base and displ matches the ones given. If mirType is
-     * nullptr it won't be checked. Same happens with base and displacement.
+     * nullptr it won't be checked. Same happens with base and m_displ.
      * @param mirType
      * @param base
      * @param displ

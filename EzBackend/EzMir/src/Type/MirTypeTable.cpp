@@ -90,6 +90,28 @@ MirType *MirTypeTable::getArray(MirType *elementType, size_t elementCount)
     return newArrayType;
 }
 
+MirType *MirTypeTable::getIntegerTypeBySize(size_t sizeInBits) const
+{
+    MirType *result = nullptr;
+    for (auto &[id, type] : m_idToType)
+    {
+        if (type->getKind() != MirTypeKind::Integer)
+            continue;
+
+        size_t typeSize = type->getTotalSizeInBits();
+        if (typeSize >= sizeInBits)
+        {
+            // If we don't have a match yet, or if this type is a tighter fit
+            if (!result || typeSize < result->getTotalSizeInBits())
+            {
+                result = type;
+            }
+        }
+    }
+
+    return result;
+}
+
 MirType *MirTypeTable::getMirTypeById(size_t id) const
 {
     auto it = m_idToType.find(id);
@@ -116,9 +138,11 @@ MirType *MirTypeTable::i8() const { return m_int8Type; }
 MirType *MirTypeTable::i16() const { return m_int16Type; }
 MirType *MirTypeTable::i32() const { return m_int32Type; }
 MirType *MirTypeTable::i64() const { return m_int64Type; }
+MirType *MirTypeTable::i128() const { return m_int128Type; }
+MirType *MirTypeTable::i256() const { return m_int256Type; }
+
 
 MirType *MirTypeTable::f32() const { return m_float32Type; }
-
 MirType *MirTypeTable::f64() const { return m_float64Type; }
 
 void MirTypeTable::initialize()
@@ -129,6 +153,9 @@ void MirTypeTable::initialize()
     m_int16Type = create(MirTypeKind::Integer, 16, {}, "i16");
     m_int32Type = create(MirTypeKind::Integer, 32, {}, "i32");
     m_int64Type = create(MirTypeKind::Integer, 64, {}, "i64");
+    m_int128Type = create(MirTypeKind::Integer, 128, {}, "i128");
+    m_int256Type = create(MirTypeKind::Integer, 256, {}, "i256");
+    
     m_float32Type = create(MirTypeKind::FloatingPoint, 32, {}, "f32");
     m_float64Type = create(MirTypeKind::FloatingPoint, 64, {}, "f64");
 }

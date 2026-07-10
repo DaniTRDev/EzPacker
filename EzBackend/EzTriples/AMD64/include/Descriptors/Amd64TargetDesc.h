@@ -2,6 +2,7 @@
 #define EZPACKER_AMD64TARGETDESC_H
 
 #include "Amd64.h"
+#include "Amd64ExpansionRecipes.h"
 
 class Amd64TargetDesc : public TargetDesc
 {
@@ -17,6 +18,18 @@ class Amd64TargetDesc : public TargetDesc
      * @return
      */
     const char *getName() const override;
+
+    /**
+     * Returns the expansion recipes for AMD64.
+     * @return
+     */
+    const ExpansionRecipe *getExpansionRecipes() override;
+
+    /**
+     * Returns the expansion recipe for the given instruction in AMD64.
+     * @return
+     */
+    const class ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) override;
 
     /**
      * Returns the nearest compatible type for the given type. If the type is already legal, it is returned as-is. If no
@@ -36,6 +49,12 @@ class Amd64TargetDesc : public TargetDesc
      * @return
      */
     MirType *getNearestLegalType(MirType *type) override;
+
+    /**
+     * Returns the expansion recipes array size for AMD64.
+     * @return
+     */
+    size_t getExpansionRecipesSize() override;
 
   private:
     MirBuilderContext *m_ctx;

@@ -131,7 +131,7 @@ class FlexInt
      * @return
      */
     bool operator<=(const FlexInt &other) const;
-
+    
     /**
      * Compares this against other and returns true if this is equal to other.
      * @param other

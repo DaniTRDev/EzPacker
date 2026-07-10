@@ -18,6 +18,18 @@ class TargetDesc
     virtual const char *getName() const = 0;
 
     /**
+     * Returns the expansion recipes for this target.
+     * @return
+     */
+    virtual const class ExpansionRecipe *getExpansionRecipes() = 0;
+
+    /**
+     * Returns the expansion recipe for the given instruction in this target.
+     * @return
+     */
+    virtual const class ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) = 0;
+
+    /**
      * Returns the nearest compatible type for the given type. If the type is already legal, it is returned as-is. If no
      * type can be used, nullptr will be returned.
      *
@@ -29,6 +41,12 @@ class TargetDesc
      * @return
      */
     virtual MirType *getNearestLegalType(MirType *type) = 0;
+
+    /**
+     * Returns the expansion recipes array size.
+     * @return
+     */
+    virtual size_t getExpansionRecipesSize() = 0;
 };
 
 #endif // EZPACKER_TARGETDESC_H

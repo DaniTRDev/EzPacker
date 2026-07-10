@@ -35,7 +35,47 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
 
     auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
     builder << ref << "Built instruction";
-    builder.appendNote(std::pmr::string(MirPrinter().printToString(instr, MirPrinterDetail::Detailed)), nullptr);
+    builder.appendNote(std::pmr::string(MirPrinter::printToString(instr, MirPrinterDetail::Detailed)), nullptr);
+
+    if (instr)
+    {
+        if (m_insertionPoint.m_type == InsertionType::InsertAfter)
+        {
+            m_insertionPoint.m_block->getInstructions().push_back(instr);
+        }
+        else
+        {
+            m_insertionPoint.m_block->getInstructions().insert(m_insertionPoint.m_iterator, instr);
+        }
+    }
+
+    setBuildResult(instr);
+    return instr;
+}
+
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
+                                             SourceReference *ref,
+                                             const std::vector<MirOperand *> &operands)
+{
+    std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
+    std::pmr::polymorphic_allocator alloc(arena);
+
+    // Construct in-place, passing the arena down to the instruction's internal PMR vector
+    MirInstruction *instr = alloc.new_object<MirInstruction>(m_insertionPoint.m_block,
+                                                             opcode,
+                                                             ref,
+                                                             std::pmr::vector<MirOperand *>(arena));
+    if (instr && !operands.empty())
+    {
+        for (MirOperand *op : operands)
+        {
+            instr->addOperand(op);
+        }
+    }
+
+    auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
+    builder << ref << "Built instruction";
+    builder.appendNote(std::pmr::string(MirPrinter::printToString(instr, MirPrinterDetail::Detailed)), nullptr);
 
     if (instr)
     {
@@ -62,7 +102,7 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
 
     auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
     builder << operand->getSourceRef();
-    builder << "Appended operand to instruction: " << std::pmr::string(MirPrinter().printToString(operand));
+    builder << "Appended operand to instruction: " << std::pmr::string(MirPrinter::printToString(operand));
 
     getBuiltObj()->addOperand(operand);
     return *this;

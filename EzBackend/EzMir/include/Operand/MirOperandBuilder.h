@@ -15,20 +15,13 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirOperandBuilder(MirBuilderContext *ctx);
 
     /**
-     * Returns a float with the given 32-bit value.
+     * Returns a float with the given floating point value.
+     * @param type
      * @param value
      * @param ref
      * @return
      */
-    MirFloat *buildFloat(float value, SourceReference *ref = nullptr);
-
-    /**
-     * Returns a float with the given 64-bit value.
-     * @param value
-     * @param ref
-     * @return
-     */
-    MirFloat *buildFloat(double value, SourceReference *ref = nullptr);
+    MirFloat *buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref = nullptr);
 
     /**
      * Returns a float with the given value. This function WILL check that the given type is indeed a floating
@@ -46,7 +39,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @param value
      * @return
      */
-    MirInteger *buildInt(MirType *type, int64_t value, SourceReference *ref = nullptr);
+    MirInteger *buildInt(MirType *type, const FlexInt &value, SourceReference *ref = nullptr);
 
     /**
      * Creates an integer with the given value.
@@ -55,7 +48,27 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @return
      */
     MirInteger *buildInt(MirType *type, std::pmr::string value, SourceReference *ref = nullptr);
-    
+
+    /**
+     * Builds a memory operand out of the given parameters.
+     * @param type
+     * @param base
+     * @param displ
+     * @param ref
+     * @return
+     */
+    MirMemory *buildMem(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref = nullptr);
+
+    /**
+     * Builds a memory operand out of the given parameters. A MirInteger is built out of the given displ int.
+     * @param type
+     * @param base
+     * @param displ
+     * @param ref
+     * @return
+     */
+    MirMemory *buildMem(MirType *type, MirRegister *base, const FlexInt &displ, SourceReference *ref = nullptr);
+
     /**
      * Creates a virtual register with the given type, name and source reference.
      * @param type
@@ -96,6 +109,15 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @param ref
      */
     MirReference *buildRef(MirGlobalDataEntry *entry, SourceReference *ref = nullptr);
+
+    /**
+     * Builds a runtime symbol that will later be resolved by the backend. A runtime symbol is a symbol that
+     * has been defined within the runtime library.
+     * @param symbolName
+     * @param ref
+     * @return
+     */
+    MirRuntimeSymbol *buildRtSymbol(std::pmr::string symbolName, SourceReference *ref = nullptr);
 
     /**
      * Creates the operand with the given context and args. OperandType must be a sub type of MirOperand.

@@ -23,16 +23,22 @@ enum class MirOperandType : uint8_t
     Integer,       // Immediate integer.
     Reference,     // A reference to a block, a function or data.
     Register,      // A physical or virtual register.
+    RuntimeSymbol, // A symbol that's defined in the runtime library.
     FrameIndex,    // Used to reference parameters and objects that are saved in a stack frame.
     Memory,        // Used to access addresses.
     MaxOperandType
 };
 
 inline std::map<MirOperandType, std::string> g_MirOperandType2Str = {
-    { MirOperandType::Invalid, "Invalid" },   { MirOperandType::FloatingPoint, "FloatingPoint" },
-    { MirOperandType::Integer, "Integer" },   { MirOperandType::Reference, "Reference" },
-    { MirOperandType::Register, "Register" }, { MirOperandType::FrameIndex, "FrameIndex" },
-    { MirOperandType::Memory, "Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
+    { MirOperandType::Invalid, "Invalid" },
+    { MirOperandType::FloatingPoint, "FloatingPoint" },
+    { MirOperandType::Integer, "Integer" },
+    { MirOperandType::Reference, "Reference" },
+    { MirOperandType::Register, "Register" },
+    { MirOperandType::RuntimeSymbol, "RuntimeSymbol" },
+    { MirOperandType::FrameIndex, "FrameIndex" },
+    { MirOperandType::Memory, "Memory" },
+    { MirOperandType::MaxOperandType, "MaxOperandType" }
 };
 
 class MirOperand

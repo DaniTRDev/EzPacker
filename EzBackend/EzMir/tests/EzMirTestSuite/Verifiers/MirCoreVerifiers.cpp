@@ -62,7 +62,7 @@ MirOperandVerifier &MirOperandVerifier::type(MirOperandType expectedType)
 MirOperandVerifier &MirOperandVerifier::verifyDouble(double val)
 {
     type(MirOperandType::FloatingPoint);
-    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue() == FlexFloat(val, 64));
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue() == FlexFloat(val));
     EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getName(), "f64");
 
     return *this;
@@ -71,7 +71,7 @@ MirOperandVerifier &MirOperandVerifier::verifyDouble(double val)
 MirOperandVerifier &MirOperandVerifier::verifyFloat(float val)
 {
     type(MirOperandType::FloatingPoint);
-    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue() == FlexFloat(val, 32));
+    EXPECT_TRUE(m_testedObj->get<MirFloat>()->getValue() == FlexFloat(val));
     EXPECT_EQ(m_testedObj->get<MirFloat>()->getMirType()->getName(), "f32");
 
     return *this;
@@ -147,6 +147,17 @@ MirOperandVerifier &MirOperandVerifier::verifyRegister(MirType *mirType, bool is
     {
         EXPECT_EQ(reg->getRegId(), id);
     }
+
+    return *this;
+}
+
+MirOperandVerifier &MirOperandVerifier::verifyRuntimeSymbol(const std::string &symbolName)
+{
+    type(MirOperandType::RuntimeSymbol);
+    MirRuntimeSymbol *sym = getTestedObj()->get<MirRuntimeSymbol>();
+
+    if (!symbolName.empty())
+        EXPECT_STREQ(symbolName.c_str(), sym->getSymbolName().c_str());
 
     return *this;
 }

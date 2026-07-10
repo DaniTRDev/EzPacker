@@ -19,6 +19,21 @@ class EzTripleTargetDesc : public TargetDesc
     const char *getName() const override { return "EzTripleTargetDesc"; }
 
     /**
+     * Returns the expansion recipes for this target.
+     * @return
+     */
+    const class ExpansionRecipe *getExpansionRecipes() override { return nullptr; }
+
+    /**
+     * Returns the expansion recipe for the given instruction in this target.
+     * @return
+     */
+    const class ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) override
+    {
+        return nullptr;
+    }
+
+    /**
      * This function mimics the x64 target description.
      * @param type
      * @return
@@ -56,6 +71,8 @@ class EzTripleTargetDesc : public TargetDesc
 
         return nullptr;
     }
+
+    size_t getExpansionRecipesSize() override { return 0; }
 
   private:
     MirBuilderContext *m_ctx;

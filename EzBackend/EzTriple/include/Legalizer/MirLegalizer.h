@@ -4,6 +4,7 @@
 #include "EzTripleCommon.h"
 #include "LegalizeAction.h"
 #include "DefaultLegalizerActions/PromoteScalarAction.h"
+#include "DefaultLegalizerActions/ExpandScalarAction.h"
 
 struct LegalizationRule
 {
@@ -70,6 +71,7 @@ class MirLegalizer
 
   private:
     // Define the default actions linked to the target and context.
+    ExpandScalarAction m_expandScalarAct;
     PromoteScalarAction m_promoteScalarAct;
 
   private:

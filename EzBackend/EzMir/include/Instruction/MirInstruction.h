@@ -101,6 +101,12 @@ class MirInstruction
     void addOperand(const MirOperand *operand);
 
     /**
+     * Sets or switched the opcode of the instruction.
+     * @param opcode
+     */
+    void setOpcode(MirInstructionOpCode opcode);
+
+    /**
      * Sets the target instruction ID.
      * @param id
      */
@@ -110,7 +116,7 @@ class MirInstruction
      * Returns the immutable operand slice for this instruction.
      */
     const std::pmr::vector<MirOperand *> &getOperands() const;
-    
+
     /**
      * Returns the mutable operand slice for this instruction.
      */

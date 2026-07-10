@@ -4,6 +4,7 @@
 #include "EzTripleCommon.h"
 #include "Descriptors/TargetDesc.h"
 #include "Legalizer/LegalizeAction.h"
+#include "ExpansionRecipe/ExpansionRecipe.h"
 
 /**
  * This action will expand an unsupported bigger type into smaller supported types. This expansion fully depends on the

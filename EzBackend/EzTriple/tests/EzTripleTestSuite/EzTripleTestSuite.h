@@ -4,6 +4,7 @@
 #include "EzTriple.h"
 #include "EzMirTestSuite.h"
 #include "EzTripleTargetDescriptor.h"
+#include "ExpandScalarActionVerifier.h"
 #include "PromoteScalarActionVerifier.h"
 
 /**

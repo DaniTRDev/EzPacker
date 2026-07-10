@@ -74,7 +74,25 @@ void EzMirTestSuite::addTestInstructionRegFloatImm(MirInstructionOpCode opcode, 
     MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
     MirOperandBuilder opBuilder(getBuilderCtx());
 
-    builder.build(opcode, nullptr, { opBuilder.buildVReg(destOperType, "testDest"), opBuilder.buildFloat(srcValue) });
+    builder.build(opcode,
+                  nullptr,
+                  { opBuilder.buildVReg(destOperType, "testDest"),
+                    opBuilder.buildFloat(getTypeTable()->f32(), FlexFloat(srcValue)) });
+}
+
+void EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode opcode,
+                                              MirType *destOperType,
+                                              MirType *srcOperType,
+                                              const FlexInt &displacement)
+{
+    MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
+    MirOperandBuilder opBuilder(getBuilderCtx());
+
+    builder.build(
+            opcode,
+            nullptr,
+            { opBuilder.buildVReg(destOperType, "testDest"),
+              opBuilder.buildMem(srcOperType, opBuilder.buildVReg(getTypeTable()->i64(), "testBase"), displacement) });
 }
 
 std::pmr::list<MirFunction *> &EzMirTestSuite::getFunctions() { return m_builderCtx->getFunctions(); }

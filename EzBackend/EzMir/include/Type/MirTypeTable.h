@@ -49,6 +49,13 @@ class MirTypeTable
     MirType *getArray(MirType *elementType, size_t elementCount);
 
     /**
+     * Returns the first integer type that can hold the given bit size.
+     * @param sizeInBits
+     * @return
+     */
+    MirType *getIntegerTypeBySize(size_t sizeInBits) const;
+
+    /**
      * Searches the table for the given ID and returns its type, if any. Returns nullptr if type was not created.
      * @param id
      * @return
@@ -69,6 +76,9 @@ class MirTypeTable
     MirType *i16() const;
     MirType *i32() const;
     MirType *i64() const;
+    MirType *i128() const;
+    MirType *i256() const;
+
     MirType *f32() const;
     MirType *f64() const;
 
@@ -88,6 +98,9 @@ class MirTypeTable
     MirType *m_int16Type{ nullptr };
     MirType *m_int32Type{ nullptr };
     MirType *m_int64Type{ nullptr };
+    MirType *m_int128Type{ nullptr };
+    MirType *m_int256Type{ nullptr };
+
     MirType *m_float32Type{ nullptr };
     MirType *m_float64Type{ nullptr };
 
