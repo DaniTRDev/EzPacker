@@ -46,7 +46,7 @@ class MirBlock
     std::pmr::list<MirInstruction *> &getInstructions();
 
     /**
-     * Returns the inmutable instruction slice for this block.
+     * Returns the immutable instruction slice for this block.
      * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
      */
     const std::pmr::list<MirInstruction *> &getInstructions() const;
