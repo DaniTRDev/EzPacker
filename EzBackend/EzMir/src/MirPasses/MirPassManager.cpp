@@ -132,6 +132,14 @@ MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction 
     MirPassResult result{};
     switch (pass->getIterationPlace())
     {
+        case MirPassIterationPlace::Function:
+        {
+            for (auto func = functionList.begin(); func != functionList.end(); func++)
+            {
+                result = pass->run(functionList, func, this);
+            }
+            break;
+        }
         case MirPassIterationPlace::Block:
         {
             for (auto func : functionList)
@@ -141,14 +149,6 @@ MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction 
                 {
                     result = pass->run(blockList, block, this);
                 }
-            }
-            break;
-        }
-        case MirPassIterationPlace::Function:
-        {
-            for (auto func = functionList.begin(); func != functionList.end(); func++)
-            {
-                result = pass->run(functionList, func, this);
             }
             break;
         }

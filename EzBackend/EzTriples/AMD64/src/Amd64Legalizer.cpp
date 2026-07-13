@@ -17,7 +17,7 @@ std::unique_ptr<MirLegalizer> Amd64Legalizer::create(Amd64TargetDesc *targetDesc
     return legalizer;
 }
 
-const std::vector<MirType*> Amd64Legalizer::getNativeSizes(MirBuilderContext *ctx) const
+const std::vector<MirType *> Amd64Legalizer::getNativeSizes(MirBuilderContext *ctx) const
 {
     const auto &t = ctx->getTypeTable();
     return { t->i8(), t->i16(), t->i32(), t->i64() };
@@ -65,7 +65,7 @@ void Amd64Legalizer::addArithmetic(MirBuilderContext *ctx, MirLegalizer *legaliz
     // Category mapping registers ADD, ADC, SUB, SBB, MUL, IMUL, DIV, IDIV, REM, NEG.
     // FloatingPoint-operand matching assumes { DestReg, SrcOperand }
 
-    for (const auto& type : sizes)
+    for (const auto &type : sizes)
     {
         size_t sizeId = type->getId();
         legalizer->addRuleForCategory(legal, MirCat_Arithmetic, { sizeId, sizeId });
@@ -79,7 +79,7 @@ void Amd64Legalizer::addBitwise(MirBuilderContext *ctx, MirLegalizer *legalizer)
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
     const auto &sizes = getNativeSizes(ctx);
 
-    for (const auto& type : sizes)
+    for (const auto &type : sizes)
     {
         size_t sizeId = type->getId();
         // AND, OR, XOR, SHL, SHR, SAR
@@ -94,7 +94,7 @@ void Amd64Legalizer::addCompare(MirBuilderContext *ctx, MirLegalizer *legalizer)
     const auto &sizes = getNativeSizes(ctx);
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
-    for (const auto& type : sizes)
+    for (const auto &type : sizes)
     {
         size_t sizeId = type->getId();
         // CMP and TEST check two operands of identical size.
@@ -118,28 +118,15 @@ void Amd64Legalizer::addCasting(MirBuilderContext *ctx, MirLegalizer *legalizer)
     const auto &sizes = getNativeSizes(ctx);
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
-    // Format: { DestType, SrcType }
-    // Loop through combinations to permit valid structural legalizations
-    for (const auto& dest : sizes)
+    // Extension instructions must act as a bridge between illegal and legal types, we need to legal them on every SRC
+    // case.
+    for (const auto &dest : sizes)
     {
         size_t destId = dest->getId();
-        for (const auto& src : sizes)
-        {
-            size_t srcId = src->getId();
-            if (dest->getTotalSizeInBits() > src->getTotalSizeInBits())
-            {
-                legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { destId, srcId });
-                legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, srcId });
-            }
-            else if (dest->getTotalSizeInBits() < src->getTotalSizeInBits())
-            {
-                legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, srcId });
-            }
-            else
-            {
-                legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, srcId });
-            }
-        }
+        legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { destId, MIRID_INVALID });
+        legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, MIRID_INVALID });
+        legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, MIRID_INVALID });
+        legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, MIRID_INVALID });
     }
 }
 

@@ -89,7 +89,7 @@ MirOperandVerifier &MirOperandVerifier::verifyFloatAnySize(MirType *floatType, c
 MirOperandVerifier &MirOperandVerifier::verifyInteger(MirType *intType, int64_t val)
 {
     type(MirOperandType::Integer);
-    EXPECT_EQ(m_testedObj->get<MirInteger>()->getValue(), val);
+    EXPECT_EQ(m_testedObj->get<MirInteger>()->getValue(), FlexInt(val));
 
     if (intType)
     {

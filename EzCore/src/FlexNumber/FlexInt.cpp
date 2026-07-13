@@ -1,75 +1,100 @@
 #include "FlexNumber/FlexInt.h"
 #include <stdexcept>
 #include <algorithm>
+#include <string>
 
-FlexInt::FlexInt(size_t bitWidth) : m_bitWidth(bitWidth), m_isSigned(false), m_lastErr(MP_OKAY)
+FlexInt::FlexInt(const FlexInt &other)
 {
     if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
         throw std::bad_alloc();
-}
 
-FlexInt::FlexInt(const FlexInt &other) : FlexInt(other.getBitSize())
-{
     m_isSigned = other.m_isSigned;
+    m_bitWidth = other.m_bitWidth;
+
     if (m_lastErr = mp_copy(&other.m_number, &m_number); m_lastErr != MP_OKAY)
         throw std::runtime_error("Could not create a copy of FlexInt");
 }
 
-FlexInt::FlexInt(uint32_t value, size_t bitWidth) : FlexInt(bitWidth)
+FlexInt::FlexInt(uint32_t value, size_t bitWidth)
 {
+    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
+        throw std::bad_alloc();
+
     m_isSigned = false;
+    m_bitWidth = bitWidth;
+
     mp_set_ul(&m_number, value);
     clampToTwosComplement();
 }
 
-FlexInt::FlexInt(uint64_t value, size_t bitWidth) : FlexInt(bitWidth)
+FlexInt::FlexInt(uint64_t value, size_t bitWidth)
 {
+    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
+        throw std::bad_alloc();
+
     m_isSigned = false;
+    m_bitWidth = bitWidth;
+
     mp_set_u64(&m_number, value);
     clampToTwosComplement();
 }
 
-FlexInt::FlexInt(int32_t value, size_t bitWidth) : FlexInt(bitWidth)
+FlexInt::FlexInt(int32_t value, size_t bitWidth)
 {
+    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
+        throw std::bad_alloc();
+
     m_isSigned = true;
+    m_bitWidth = bitWidth;
+
     mp_set_l(&m_number, value);
     clampToTwosComplement();
 }
 
-FlexInt::FlexInt(int64_t value, size_t bitWidth) : FlexInt(bitWidth)
+FlexInt::FlexInt(int64_t value, size_t bitWidth)
 {
+    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
+        throw std::bad_alloc();
+
     m_isSigned = true;
+    m_bitWidth = bitWidth;
+
     mp_set_i64(&m_number, value);
     clampToTwosComplement();
 }
 
-FlexInt::FlexInt(const std::string_view &numberStr, size_t bitWidth, size_t radix) : FlexInt(bitWidth)
+FlexInt::FlexInt(const std::string_view &numberStr, size_t bitWidth, bool _signed, size_t radix)
 {
-    if (numberStr.empty() || radix < 2)
+    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
+        throw std::bad_alloc();
+
+    if (numberStr.empty() || radix < 2 || radix > 64)
     {
-        throw std::runtime_error("Could not decode number because it is invalid or radix is not valid");
+        throw std::runtime_error("Could not decode number because it is invalid or radix is out of bounds");
     }
 
-    // Explicitly scan for leading negative sign token to deduce sign state
-    // Skip optional leading whitespace or positive signs if necessary
-    size_t scanIdx = 0;
-    while (scanIdx < numberStr.size() && (numberStr[scanIdx] == ' ' || numberStr[scanIdx] == '\t'))
+    size_t scanIdx = numberStr.find_first_not_of(" \t");
+    if (scanIdx == std::string_view::npos)
     {
-        scanIdx++;
+        throw std::runtime_error("Empty or whitespace-only string passed to FlexInt");
     }
 
-    if (scanIdx < numberStr.size() && numberStr[scanIdx] == '-')
+    m_bitWidth = bitWidth;
+    m_isSigned = _signed;
+
+    // Build a safe, stripped working copy of the numeric string
+    std::string safeStr(numberStr.substr(scanIdx));
+
+    // Strip out common C-style hexadecimal prefix tags before submitting to LibTomMath
+    if (radix == 16 && safeStr.size() > 2 && safeStr[0] == '0' && (safeStr[1] == 'x' || safeStr[1] == 'X'))
     {
-        m_isSigned = true;
-    }
-    else
-    {
-        m_isSigned = false;
+        safeStr = safeStr.substr(2);
     }
 
-    if (m_lastErr = mp_read_radix(&m_number, numberStr.data(), int(radix)); m_lastErr != MP_OKAY)
+    if (m_lastErr = mp_read_radix(&m_number, safeStr.c_str(), int(radix)); m_lastErr != MP_OKAY)
     {
-        throw std::runtime_error("Error while decoding number from string");
+        throw std::runtime_error("Error while decoding number from string: LibTomMath error " +
+                                 std::to_string(m_lastErr));
     }
 
     clampToTwosComplement();
@@ -128,11 +153,33 @@ bool FlexInt::operator<=(const FlexInt &other) const
 
 bool FlexInt::operator==(const FlexInt &other) const
 {
-    if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
+    if (m_bitWidth == other.m_bitWidth && m_isSigned == other.m_isSigned)
     {
-        throw std::runtime_error("Mismatched target types in FlexInt comparison");
+        return mp_cmp(&m_number, &other.m_number) == MP_EQ;
     }
-    return mp_cmp(&m_number, &other.m_number) == MP_EQ;
+
+    bool thisNeg = this->isNeg();
+    bool otherNeg = other.isNeg();
+
+    if (thisNeg != otherNeg)
+    {
+        return false;
+    }
+
+    if (!thisNeg && !otherNeg)
+    {
+        return mp_cmp(&m_number, &other.m_number) == MP_EQ;
+    }
+
+    FlexInt cloneThis(*this);
+    FlexInt cloneOther(other);
+
+    size_t targetWidth = std::max(m_bitWidth, other.m_bitWidth);
+
+    cloneThis.extend(targetWidth, true);
+    cloneOther.extend(targetWidth, true);
+
+    return mp_cmp(&cloneThis.m_number, &cloneOther.m_number) == MP_EQ;
 }
 bool FlexInt::operator!=(const FlexInt &other) const { return !(*this == other); }
 
@@ -144,15 +191,11 @@ FlexInt FlexInt::getHighHalf()
     }
 
     size_t splitWidth = m_bitWidth / 2;
-
-    // The high part inherits the signedness of the parent block to track signs accurately
-    FlexInt highPart(splitWidth);
+    FlexInt highPart(0ULL, splitWidth);
     highPart.m_isSigned = m_isSigned;
 
-    // Shift right to extract the high bits: highPart = m_number >> splitWidth
     if (mp_isneg(&m_number) == MP_YES)
     {
-        // Handle two's complement sign bit preservation for logical shifting compatibility
         mp_int fullRange, tempNum;
         if (mp_init_multi(&fullRange, &tempNum, nullptr) == MP_OKAY)
         {
@@ -169,7 +212,6 @@ FlexInt FlexInt::getHighHalf()
         m_lastErr = mp_div_2d(&m_number, static_cast<int>(splitWidth), &highPart.m_number, nullptr);
     }
 
-    // Convert back into signed territory if the high part's own sign bit is now up
     if (highPart.m_isSigned)
     {
         mp_int signBit, halfRange;
@@ -187,6 +229,7 @@ FlexInt FlexInt::getHighHalf()
 
     return highPart;
 }
+
 FlexInt FlexInt::getLowHalf()
 {
     if (m_bitWidth % 2 != 0)
@@ -195,12 +238,9 @@ FlexInt FlexInt::getLowHalf()
     }
 
     size_t splitWidth = m_bitWidth / 2;
-
-    // Create an uninitialized FlexInt configured to half the size and explicitly unsigned
-    FlexInt lowPart(splitWidth);
+    FlexInt lowPart(0ULL, splitWidth);
     lowPart.m_isSigned = false;
 
-    // Compute extraction mask: (1 << splitWidth) - 1
     mp_int mask;
     if (mp_init(&mask) != MP_OKAY)
     {
@@ -210,7 +250,6 @@ FlexInt FlexInt::getLowHalf()
     m_lastErr = mp_2expt(&mask, static_cast<int>(splitWidth));
     m_lastErr = mp_decr(&mask);
 
-    // If the original internal value is negative, we evaluate its raw bits in positive space first
     if (mp_isneg(&m_number) == MP_YES)
     {
         mp_int fullRange, tempNum;
@@ -311,6 +350,50 @@ FlexInt &FlexInt::operator%=(const FlexInt &other)
 
 size_t FlexInt::getBitSize() const { return m_bitWidth; }
 
+void FlexInt::extend(size_t newBitSize, bool isSigned)
+{
+    if (newBitSize < m_bitWidth)
+    {
+        throw std::bad_alloc();
+    }
+
+    if (newBitSize == m_bitWidth)
+    {
+        m_isSigned = isSigned;
+        clampToTwosComplement();
+        return;
+    }
+
+    bool wasNegative = (mp_isneg(&m_number) == MP_YES);
+    size_t oldWidth = m_bitWidth;
+
+    m_bitWidth = newBitSize;
+    m_isSigned = isSigned;
+
+    if (wasNegative)
+    {
+        if (isSigned)
+        {
+            clampToTwosComplement();
+        }
+        else
+        {
+            mp_int fullRange;
+            if (m_lastErr = mp_init(&fullRange); m_lastErr == MP_OKAY)
+            {
+                m_lastErr = mp_2expt(&fullRange, static_cast<int>(oldWidth));
+                m_lastErr = mp_add(&m_number, &fullRange, &m_number);
+                mp_clear(&fullRange);
+            }
+            clampToTwosComplement();
+        }
+    }
+    else
+    {
+        clampToTwosComplement();
+    }
+}
+
 std::pmr::vector<uint8_t> FlexInt::dump(bool bigEndian, std::pmr::memory_resource *alloc)
 {
     size_t byteSize = (m_bitWidth + 7) / 8;
@@ -325,7 +408,6 @@ std::pmr::vector<uint8_t> FlexInt::dump(bool bigEndian, std::pmr::memory_resourc
         throw std::bad_alloc();
     }
 
-    // Force the infinite sign-magnitude value into raw unsigned bits
     if (mp_isneg(&m_number) == MP_YES)
     {
         mp_int fullRange;
@@ -342,13 +424,10 @@ std::pmr::vector<uint8_t> FlexInt::dump(bool bigEndian, std::pmr::memory_resourc
         m_lastErr = mp_copy(&m_number, &targetBits);
     }
 
-    // Export absolute bits to Big-Endian raw binary format
     size_t writtenBitsSize = mp_ubin_size(&targetBits);
 
     if (writtenBitsSize > 0)
     {
-        // Use a lightweight local stack buffer if it fits, avoiding allocation altogether,
-        // otherwise fall back to a temporary PMR vector on the same allocator.
         uint8_t stackBuf[128];
         uint8_t *rawBeBytesPtr = stackBuf;
         std::pmr::vector<uint8_t> dynamicTempBuf(alloc);
@@ -361,7 +440,6 @@ std::pmr::vector<uint8_t> FlexInt::dump(bool bigEndian, std::pmr::memory_resourc
 
         m_lastErr = mp_to_ubin(&targetBits, rawBeBytesPtr, writtenBitsSize, nullptr);
 
-        // Copy raw bits into our standardized fixed-width buffer (right-aligned)
         size_t offset = (byteSize >= writtenBitsSize) ? (byteSize - writtenBitsSize) : 0;
         size_t copyBytes = std::min(byteSize, writtenBitsSize);
 
@@ -372,12 +450,7 @@ std::pmr::vector<uint8_t> FlexInt::dump(bool bigEndian, std::pmr::memory_resourc
 
     mp_clear(&targetBits);
 
-    bool hostBigEndian = false;
-#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    hostBigEndian = true;
-#endif
-
-    if (bigEndian != hostBigEndian)
+    if (!bigEndian)
     {
         std::reverse(buffer.begin(), buffer.end());
     }
@@ -397,17 +470,13 @@ void FlexInt::clampToTwosComplement()
         throw std::bad_alloc();
     }
 
-    // fullRange = 2^(bitWidth)
     m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
 
-    // modMask = 2^(bitWidth) - 1
     m_lastErr = mp_copy(&fullRange, &modMask);
     m_lastErr = mp_decr(&modMask);
 
-    // Dynamic evaluation boundary configuration based on type properties
     if (m_isSigned)
     {
-        // Signed Target Bounds: [-2^(W-1), 2^(W-1) - 1]
         m_lastErr = mp_2expt(&maxVal, static_cast<int>(m_bitWidth - 1));
         m_lastErr = mp_decr(&maxVal);
 
@@ -416,7 +485,6 @@ void FlexInt::clampToTwosComplement()
     }
     else
     {
-        // Unsigned Target Bounds: [0, 2^W - 1]
         m_lastErr = mp_copy(&modMask, &maxVal);
         mp_set(&minVal, 0);
     }
@@ -424,7 +492,6 @@ void FlexInt::clampToTwosComplement()
     bool overflowDetected = (mp_cmp(&m_number, &maxVal) == MP_GT);
     bool underflowDetected = (mp_cmp(&m_number, &minVal) == MP_LT);
 
-    // Two's Complement Register Truncation Execution Loop
     if (overflowDetected || underflowDetected)
     {
         if (mp_isneg(&m_number) == MP_YES)
@@ -434,7 +501,6 @@ void FlexInt::clampToTwosComplement()
         }
         m_lastErr = mp_and(&m_number, &modMask, &m_number);
 
-        // Signed numbers re-assert sign flags into raw values if the MSB is up
         if (m_isSigned)
         {
             mp_int signBit;
@@ -474,12 +540,18 @@ std::string FlexInt::toString(size_t radix) const
     }
 
     std::string res;
-    res.reserve(size);
-    lastErr = mp_to_radix(&m_number, res.data(), size, NULL, radix);
+    res.resize(size);
 
-    if (m_lastErr != MP_OKAY)
+    lastErr = mp_to_radix(&m_number, res.data(), size, NULL, int(radix));
+
+    if (lastErr != MP_OKAY)
     {
         return "ERROR";
+    }
+
+    if (!res.empty() && res.back() == '\0')
+    {
+        res.pop_back();
     }
 
     return res;

@@ -249,7 +249,24 @@ FlexFloat FlexFloat::getLowHalf() const
     return lowPart;
 }
 
-// Updated serialization to support arbitrary-length structural exports safely
+void FlexFloat::extend(size_t newBitSize)
+{
+    if (newBitSize < m_bitWidth)
+    {
+        throw std::runtime_error("FlexFloat::extend cannot be used to down-cast precision widths.");
+    }
+
+    if (newBitSize == m_bitWidth)
+        return;
+
+    // Update internal tracking bit dimension
+    m_bitWidth = newBitSize;
+
+    // Force LibBF to realign, scale, and re-round its internal significand/mantissa bounds
+    // to match the newly requested target width precision step (e.g., 24 bits -> 53 bits).
+    clampToFloatBounds();
+}
+
 std::pmr::vector<uint8_t> FlexFloat::dump(bool bigEndian, std::pmr::memory_resource *alloc)
 {
     size_t byteSize = (m_bitWidth + 7) / 8;

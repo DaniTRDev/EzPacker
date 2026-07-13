@@ -33,17 +33,7 @@ class PromoteScalarActionVerifier : public MirPassVerifier<MirLegalizerPass, Pro
      */
     PromoteScalarActionVerifier &
     verifyExtension(size_t index, MirInstructionOpCode opcode, MirType *origType, MirType *newType);
-
-    /**
-     * Works more or less as verifyExtension but this verifier checks that the DEST operand (the one being written to)
-     * is truncated.
-     * @param index
-     * @param newType
-     * @param origType
-     * @return
-     */
-    PromoteScalarActionVerifier &verifyExtensionTruncation(size_t index, MirType *newType, MirType *origType);
-
+    
   private:
     MirBlock *m_targetBlock;
     MirBuilderContext *m_ctx;

@@ -20,20 +20,7 @@ void EzTripleTestSuite::addRuleForCategory(LegalizeAction *action,
     m_legalizer->addRuleForCategory(action, category, expectedOperandTypes);
 }
 
-void EzTripleTestSuite::create(const std::filesystem::path &workingPath)
-{
-    EzMirTestSuite::create(workingPath);
-
-    if (!m_targetDesc)
-    {
-        m_targetDesc = std::make_shared<EzTripleTargetDesc>(getBuilderCtx());
-
-        getBuilderCtx()->getDiagCollector()->builder(Diag_Debug, "EzTripleTestSuite")
-                << std::format("Using default target descriptor: {}", m_targetDesc->getName()).c_str();
-    }
-
-    m_legalizer = std::make_shared<MirLegalizer>(getBuilderCtx(), m_targetDesc.get());
-}
+void EzTripleTestSuite::create(const std::filesystem::path &workingPath) { EzMirTestSuite::create(workingPath); }
 
 void EzTripleTestSuite::destroy()
 {
@@ -41,16 +28,30 @@ void EzTripleTestSuite::destroy()
     EzMirTestSuite::destroy();
 }
 
-void EzTripleTestSuite::setTargetDesc(TargetDesc *desc) { m_targetDesc = std::shared_ptr<TargetDesc>(desc); }
-
 void MirTripleTestSuiteAsGtest::SetUp()
 {
     Test::SetUp();
     EzTripleTestSuite::create(std::filesystem::current_path());
+
+    m_targetDesc = createTargetDesc();
+    m_legalizer = createTargetLegalizer();
+
+    getBuilderCtx()->getDiagCollector()->builder(Diag_Debug, "EzTripleTestSuite")
+            << std::format("Using target descriptor: {}", m_targetDesc->getName()).c_str();
 }
 
 void MirTripleTestSuiteAsGtest::TearDown()
 {
     EzTripleTestSuite::destroy();
     Test::TearDown();
+}
+
+std::shared_ptr<TargetDesc> MirTripleTestSuiteAsGtest::createTargetDesc()
+{
+    return std::make_shared<EzTripleTargetDesc>(getBuilderCtx());
+}
+
+std::shared_ptr<MirLegalizer> MirTripleTestSuiteAsGtest::createTargetLegalizer()
+{
+    return std::make_shared<MirLegalizer>(getBuilderCtx(), getTargetDesc());
 }

@@ -135,7 +135,7 @@ TEST_F(TestCodeFlowPass, TestLowLevelLoop)
 
     // Loop Header: CMP -> JE (to exit) -> [Implicit Fallthrough to Body]
     MirRegister *counter = operandBuilder.buildVReg(typeTable->i32(), "i");
-    MirInteger *limit = operandBuilder.buildInt(typeTable->i32(), 10);
+    MirInteger *limit = operandBuilder.buildInt(typeTable->i32(), FlexInt(10));
 
     MirInstructionInsertionPoint headerIP{ .m_type = InsertionType::InsertAfter, .m_block = loopHeader };
     MirInstructionBuilder headerBuilder(ctx, headerIP);

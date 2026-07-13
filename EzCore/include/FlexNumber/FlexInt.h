@@ -11,12 +11,6 @@ class FlexInt
 {
   public:
     /**
-     * Initializes the container of the number and clamps it to a bid width. If the container could not be initialized,
-     * it throws std::bad_alloc.
-     */
-    FlexInt(size_t bitWidth);
-
-    /**
      * Creates a DEEP copy of other.
      * @param other
      */
@@ -28,7 +22,7 @@ class FlexInt
      * @param value
      * @param bitWidth
      */
-    explicit FlexInt(uint32_t value, size_t bitWidth);
+    explicit FlexInt(uint32_t value, size_t bitWidth = 32);
 
     /**
      * Initializes the container and sets an unsigned int64 value into it. If the container could not be initialized, it
@@ -36,7 +30,7 @@ class FlexInt
      * @param value
      * @param bitWidth
      */
-    explicit FlexInt(uint64_t value, size_t bitWidth);
+    explicit FlexInt(uint64_t value, size_t bitWidth = 64);
 
     /**
      * Initializes the container and sets an signed int32 value into it. If the container could not be initialized, it
@@ -44,7 +38,7 @@ class FlexInt
      * @param value
      * @param bitWidth
      */
-    explicit FlexInt(int32_t value, size_t bitWidth);
+    explicit FlexInt(int32_t value, size_t bitWidth = 32);
 
     /**
      * Initializes the container and sets an signed int64 value into it. If the container could not be initialized, it
@@ -52,16 +46,17 @@ class FlexInt
      * @param value
      * @param bitWidth
      */
-    explicit FlexInt(int64_t value, size_t bitWidth);
+    explicit FlexInt(int64_t value, size_t bitWidth = 64);
 
     /**
      * Initializes the container and converts the string to a number using the given base. If the number starts with
      * a '-' it will be treat as a signed integer, if it doesn't it will be unsigned.
      * @param numberStr
      * @param bitWidth
+     * @param _signed
      * @param radix
      */
-    FlexInt(const std::string_view &numberStr, size_t bitWidth, size_t radix = 10);
+    FlexInt(const std::string_view &numberStr, size_t bitWidth, bool _signed, size_t radix = 10);
 
     /**
      * Clears the container of the number and destroys the object.
@@ -131,7 +126,7 @@ class FlexInt
      * @return
      */
     bool operator<=(const FlexInt &other) const;
-    
+
     /**
      * Compares this against other and returns true if this is equal to other.
      * @param other
@@ -247,6 +242,14 @@ class FlexInt
      * @return
      */
     size_t getBitSize() const;
+
+    /**
+     * Extends the value to the given bitsize and sign. If newBitSize is smaller than current bit size,
+     * a bad_alloc exception is thrown.
+     * @param newBitSize
+     * @param isSigned
+     */
+    void extend(size_t newBitSize, bool isSigned);
 
     /**
      * Dumps the number into a binary-encoded byte array. If alloc is provided, the resulting vector will be allocated

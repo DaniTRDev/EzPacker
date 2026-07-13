@@ -1,11 +1,30 @@
 #include "EzTripleTestSuite.h"
+#include "Descriptors/Amd64TargetDesc.h"
+#include "Amd64Legalizer.h"
 
 class TestAmd64ScalarExpanstionAction : public MirTripleTestSuiteAsGtest
 {
   public:
+    /**
+     * Creates a target Amd64TargetDesc and returns it.
+     * @return
+     */
+    std::shared_ptr<MirLegalizer> createTargetLegalizer() override
+    {
+        return Amd64Legalizer::create((Amd64TargetDesc *)getTargetDesc(), getBuilderCtx());
+    }
+
+    /**
+     * Creates a target MirLegalizer with x64 legalization rules and returns it.
+     * @return
+     */
+    std::shared_ptr<TargetDesc> createTargetDesc() override
+    {
+        return std::make_shared<Amd64TargetDesc>(getBuilderCtx());
+    }
 };
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddInline)
+TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddRegReg)
 {
     /**
      * Input:
@@ -16,8 +35,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddInline)
      *  ADC i64 %dest_hi, i64 %src_hi
      */
     const auto *t = getTypeTable();
-    MirType *i128 = t->i128();
-    MirType *i64 = t->i64();
+    MirType *i128 = t->i128(), *i64 = t->i64();
 
     // Build the initial illegal wide state
     addTestInstructionRegReg(MirInstructionOpCode::ADD, i128, i128);
@@ -28,10 +46,10 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddInline)
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
 
-    // 1. Verify that the sequence was flattened into exactly our 2-operand math steps
+    // Verify that the sequence was flattened into exactly our 2-operand math steps
     expandVerifier.expectInstructionSequence({ MirInstructionOpCode::ADD, MirInstructionOpCode::ADC });
 
-    // 2. Validate low and high operand components to ensure proper register type splitting
+    // Validate low and high operand components to ensure proper register type splitting
     MirInstructionVerifier lowAddVerifier(block->at(0));
     lowAddVerifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
     lowAddVerifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
@@ -41,17 +59,128 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddInline)
     highAdcVerifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitUnsignedDivRuntimeCall)
+TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitAddRegImm)
+{
+    /**
+     * Input:
+     *  ADD i256 %dest, i256 0xBA50B51C48B0AD923D18198EC90D2F08FF9FB76E997408E473A37C572B714B52
+     *
+     * Should be expanded into a 2-operand inline carry chain:
+     * FIRST ITERATION
+     *  ADD i128 %dest_lo, i128 0xFF9FB76E997408E473A37C572B714B52
+     *  ADC i128 %dest_hi, i128 0xBA50B51C48B0AD923D18198EC90D2F08
+     *
+     * SECOND ITERATION
+     *  ADD i64 %dest_lo_lo, i64 0x73A37C572B714B52
+     *  ADC i64 %dest_lo_high, i64 0xFF9FB76E997408E4
+     *  ADC i64 %dest_hi_lo, i64 0x3D18198EC90D2F08
+     *  ADC i64 %dest_hi_hi, i64 0xBA50B51C48B0AD92
+     */
+    const auto *t = getTypeTable();
+    MirType *i256 = t->i256(), *i64 = t->i64();
+
+    // Build the initial illegal wide state
+    addTestInstructionRegIntImm(
+            MirInstructionOpCode::ADD,
+            i256,
+            i256,
+            FlexInt("BA50B51C48B0AD923D18198EC90D2F08FF9FB76E997408E473A37C572B714B52", 256, false, 16));
+
+    MirBlock *block = getTestFunc()->getEntryPoint();
+    MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+
+    ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
+    expandVerifier.beginBlock(block);
+
+    // Verify that the sequence was flattened into exactly our 2-operand math steps
+    expandVerifier.expectInstructionSequence({ MirInstructionOpCode::ADD,
+                                               MirInstructionOpCode::ADC,
+                                               MirInstructionOpCode::ADC,
+                                               MirInstructionOpCode::ADC });
+
+    // Validate low and high operand components to ensure proper register type splitting
+    MirInstructionVerifier lowLowAddVerifier(block->at(0));
+    lowLowAddVerifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    lowLowAddVerifier.operandVerifier(1).verifyInteger(i64, FlexInt("73A37C572B714B52", 64, false, 16));
+
+    MirInstructionVerifier lowHighAdc1Verifier(block->at(1));
+    lowHighAdc1Verifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    lowHighAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("FF9FB76E997408E4", 64, false, 16));
+
+    MirInstructionVerifier highLowAdc1Verifier(block->at(2));
+    highLowAdc1Verifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    highLowAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("3D18198EC90D2F08", 64, false, 16));
+
+    MirInstructionVerifier highHighAdc1Verifier(block->at(3));
+    highHighAdc1Verifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    highHighAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("BA50B51C48B0AD92", 64, false, 16));
+}
+
+TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddRegRegAndReuse)
+{
+    /**
+     * Input:
+     *  ADD i128 %dest, i128 %src
+     *  SUB i128 %dest2, i128 %src
+     *
+     * Should be expanded into a 2-operand inline carry chain:
+     *  ADD i64 %dest_lo, i64 %src_lo
+     *  ADC i64 %dest_hi, i64 %src_hi
+
+     *  SUB i64 %dest2_lo, i64 %src_lo
+     *  SBB i64 %dest2_hi, i64 %src_hi
+     */
+    const auto *t = getTypeTable();
+    MirType *i128 = t->i128(), *i64 = t->i64();
+
+    // Build the initial illegal wide state
+    auto instr1 = addTestInstructionRegReg(MirInstructionOpCode::ADD, i128, i128);
+    auto instr2 = addTestInstructionRegReg(MirInstructionOpCode::SUB, i128, i128);
+
+    instr2->getOperands()[1] = instr1->getOperands()[1]; // Ensure instr 2 uses same src operand.
+
+    MirBlock *block = getTestFunc()->getEntryPoint();
+    MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+
+    ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
+    expandVerifier.beginBlock(block);
+
+    // Verify that the sequence was flattened into exactly our 2-operand math steps
+    expandVerifier.expectInstructionSequence({ MirInstructionOpCode::ADD,
+                                               MirInstructionOpCode::ADC,
+                                               MirInstructionOpCode::SUB,
+                                               MirInstructionOpCode::SBB });
+
+    // Validate low and high operand components to ensure proper register type splitting
+    MirInstructionVerifier lowAdd1Verifier(block->at(0));
+    lowAdd1Verifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    lowAdd1Verifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
+
+    MirInstructionVerifier highAdc1Verifier(block->at(1));
+    highAdc1Verifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    highAdc1Verifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
+
+    // Validate low and high operand components to ensure proper register type splitting
+    MirInstructionVerifier lowAddVerifier(block->at(2));
+    lowAddVerifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    lowAddVerifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
+
+    MirInstructionVerifier highAdc2Verifier(block->at(3));
+    highAdc2Verifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    highAdc2Verifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
+}
+
+TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitUDivRegReg)
 {
     /**
      * Input:
      *  DIV i128 %dest, i128 %src
      *
-     * Should be lowered via your EMIT_CALL layout into a standard runtime branch hook:
+     * Should be lowered via EMIT_CALL into a runtime call:
      *  CALL @__udivti3, %dest_lo, %dest_hi, %src_lo, %src_hi
      */
     const auto *t = getTypeTable();
-    MirType *i128 = t->getIntegerTypeBySize(128);
+    MirType *i128 = t->i128();
 
     addTestInstructionRegReg(MirInstructionOpCode::DIV, i128, i128);
 
@@ -66,7 +195,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitUnsignedDivRuntimeCall)
     expandVerifier.verifyRuntimeCallSymbol(0, "__udivti3");
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitMemoryLoadStride)
+TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitLoadRegMem)
 {
     /**
      * Input:
@@ -77,14 +206,14 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitMemoryLoadStride)
      *  LOAD i64 %dest_hi, [mem_addr + 8]  (8-byte offset for half chunk stride)
      */
     const auto *t = getTypeTable();
-    MirType *i128 = t->getIntegerTypeBySize(128);
-    MirType *i64 = t->getIntegerTypeBySize(64);
+    MirType *i128 = t->i128(), *i64 = t->i64();
 
     // Build wide input memory address load frame
-    addTestInstructionRegMem(MirInstructionOpCode::LOAD, i128, i128, 0);
+    addTestInstructionRegMem(MirInstructionOpCode::LOAD, i128, i128, FlexInt(0, 64));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
     MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirOperandBuilder opBuilder(getBuilderCtx());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
@@ -93,10 +222,54 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitMemoryLoadStride)
 
     // Verify that instruction index 1 correctly applies the +8 byte offset layout stride
     MirInstructionVerifier highLoadVerifier(block->at(1));
+    MirInteger *displ8 = opBuilder.buildInt(i64, FlexInt(8, 64));
 
     // Check destination operand is the split 64-bit upper virtual register
     highLoadVerifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    highLoadVerifier.operandVerifier(1).verifyMemory(i64, nullptr, displ8);
+}
 
-    // Check address operand tracks the +8 offset displacement
-    highLoadVerifier.operandVerifier(1).type(MirOperandType::Memory);
+TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitLoadRegMem)
+{
+    /**
+     * Input:
+     *  LOAD i256 %dest, [mem_addr]
+     *
+     * Should be expanded into consecutive 64-bit chunk extractions with relative strides:
+     * FIRST ITERATION:
+     *  LOAD i256 %dest_lo, [mem_addr + 0]
+     *  LOAD i256 %dest_hi, [mem_addr + 16]  (16-byte offset for half chunk stride)
+     * SECOND ITERATION:
+     *  LOAD i64 %dest_lo_lo, [mem_addr + 0]
+     *  LOAD i64 %dest_lo_hi, [mem_addr + 8]
+     *  LOAD i64 %dest_hi_lo, [mem_addr + 16]
+     *  LOAD i64 %dest_hi_hi, [mem_addr + 24]
+     */
+    const auto *t = getTypeTable();
+    MirType *i256 = t->i256(), *i64 = t->i64();
+
+    // Build wide input memory address load frame
+    addTestInstructionRegMem(MirInstructionOpCode::LOAD, i256, i256, FlexInt(0, 64));
+
+    MirBlock *block = getTestFunc()->getEntryPoint();
+    MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirOperandBuilder opBuilder(getBuilderCtx());
+
+    ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
+    expandVerifier.beginBlock(block);
+
+    expandVerifier.expectInstructionSequence({ MirInstructionOpCode::LOAD,
+                                               MirInstructionOpCode::LOAD,
+                                               MirInstructionOpCode::LOAD,
+                                               MirInstructionOpCode::LOAD });
+
+    for (size_t i = 0; i < 4; i++)
+    {
+        MirInstructionVerifier highLoadVerifier(block->at(i));
+        MirInteger *displ = opBuilder.buildInt(i64, FlexInt(int64_t(i * 8)));
+
+        // Check destination operand is the split 64-bit upper virtual register
+        highLoadVerifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+        highLoadVerifier.operandVerifier(1).verifyMemory(i64, nullptr, displ);
+    }
 }

@@ -81,6 +81,7 @@ class MirTypeTable
 
     MirType *f32() const;
     MirType *f64() const;
+    MirType *f128() const;
 
     /**
      * Initializes the type table with the basic primitive types needed: iXX, void and fXX.
@@ -103,6 +104,7 @@ class MirTypeTable
 
     MirType *m_float32Type{ nullptr };
     MirType *m_float64Type{ nullptr };
+    MirType *m_float128Type{ nullptr };
 
     // High performance tracking hashes using PMR mapping blocks
     std::pmr::unordered_map<std::pmr::string, MirType *> m_typeNames;

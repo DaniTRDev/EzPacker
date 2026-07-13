@@ -141,9 +141,9 @@ MirType *MirTypeTable::i64() const { return m_int64Type; }
 MirType *MirTypeTable::i128() const { return m_int128Type; }
 MirType *MirTypeTable::i256() const { return m_int256Type; }
 
-
 MirType *MirTypeTable::f32() const { return m_float32Type; }
 MirType *MirTypeTable::f64() const { return m_float64Type; }
+MirType *MirTypeTable::f128() const { return m_float128Type; }
 
 void MirTypeTable::initialize()
 {
@@ -155,7 +155,8 @@ void MirTypeTable::initialize()
     m_int64Type = create(MirTypeKind::Integer, 64, {}, "i64");
     m_int128Type = create(MirTypeKind::Integer, 128, {}, "i128");
     m_int256Type = create(MirTypeKind::Integer, 256, {}, "i256");
-    
+
     m_float32Type = create(MirTypeKind::FloatingPoint, 32, {}, "f32");
     m_float64Type = create(MirTypeKind::FloatingPoint, 64, {}, "f64");
+    m_float128Type = create(MirTypeKind::FloatingPoint, 128, {}, "f128");
 }

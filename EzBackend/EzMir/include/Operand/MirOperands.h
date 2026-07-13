@@ -23,7 +23,7 @@ class MirFloat : public MirOperand
 
     MirFloat(MirType *type, FlexFloat value, SourceReference *ref) : MirOperand(type, ref), m_float(std::move(value)) {}
 
-    const FlexFloat &getValue() const { return m_float; }
+    FlexFloat &getValue() { return m_float; }
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
@@ -39,13 +39,13 @@ class MirInteger : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Integer;
 
-    MirInteger(MirType *type, FlexInt value, SourceReference *ref) : MirOperand(type, ref), m_int(std::move(value)) {}
+    MirInteger(MirType *type, FlexInt value, SourceReference *ref) : MirOperand(type, ref), m_int(value) {}
 
-    const FlexInt &getValue() const { return m_int; }
+    FlexInt &getValue() { return m_int; }
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("{} %int.value={}", getMirType()->getName(), m_int.toString());
+        return std::format("{} %int.value={}", getMirType()->getName(), m_int.toString(16));
     }
 
   private:
@@ -106,7 +106,7 @@ class MirRuntimeSymbol : public MirOperand
     }
 
     MirOperandType getType() const override { return OpKind; }
-    
+
     const std::pmr::string &getSymbolName() const { return m_symbolName; }
     std::string toString() const override { return std::format("%rt.{}", m_symbolName); }
 
@@ -183,7 +183,7 @@ class MirMemory : public MirOperand
     MirOperandType getType() const override { return OpKind; }
     std::string toString() const override
     {
-        return std::format("{} %mem.base={}.index={}",
+        return std::format("{} %mem.base={}.displ={}",
                            getMirType()->getName(),
                            m_base ? m_base->toString() : "",
                            m_displ ? m_displ->toString() : "");

@@ -31,7 +31,7 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     MirRegister *v0 = createInt32Reg("v0");
     MirRegister *v1 = createInt32Reg("v1");
     MirRegister *v2 = createInt32Reg("v2");
-    MirInteger *imm10 = opBuilder.buildInt(getTypeTable()->i32(), 10);
+    MirInteger *imm10 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(10));
 
     // Sequence:
     // 1. MOV %v0, 10      -> DEF: %v0
@@ -84,7 +84,7 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
 
     MirRegister *v0 = createInt32Reg("v0");
     MirRegister *vCond = createInt32Reg("vCond");
-    MirInteger *imm5 = opBuilder.buildInt(getTypeTable()->i32(), 5);
+    MirInteger *imm5 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(5));
 
     // Entry Block: Define %v0, define condition, branch
     MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
@@ -141,7 +141,7 @@ TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
     MirInstructionBuilder builder(ctx, entryIP);
 
     MirRegister *v0 = createInt32Reg("v0");
-    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), 1);
+    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
 
     // Sequence:
     // 1. ADD %v0, 1 -> Because ADD destination is ReadWrite, this reads %v0 BEFORE rewriting it.

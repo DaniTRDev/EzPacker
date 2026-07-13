@@ -78,7 +78,7 @@ class EzMirTestSuite
      * @param destOperType
      * @param srcOperType
      */
-    void addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType);
+    MirInstruction *addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType);
 
     /**
      * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-immediate(int).
@@ -87,10 +87,10 @@ class EzMirTestSuite
      * @param srcOperType
      * @param srcValue
      */
-    void addTestInstructionRegIntImm(MirInstructionOpCode opcode,
-                                     MirType *destOperType,
-                                     MirType *srcOperType,
-                                     int64_t srcValue);
+    MirInstruction *addTestInstructionRegIntImm(MirInstructionOpCode opcode,
+                                                MirType *destOperType,
+                                                MirType *srcOperType,
+                                                FlexInt srcValue);
 
     /**
      * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-immediate(float).
@@ -99,8 +99,8 @@ class EzMirTestSuite
      * @param srcOperType
      * @param srcValue
      */
-    void addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue);
-    
+    MirInstruction *addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue);
+
     /**
      * Adds an instruction USING THE CURRENT INSERTION POINT, of the form register-memory. The memory operand
      * has BOTH base and displacement.
@@ -108,7 +108,10 @@ class EzMirTestSuite
      * @param destOperType
      * @param srcOperType
      */
-    void addTestInstructionRegMem(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType, const FlexInt &displacement);
+    MirInstruction *addTestInstructionRegMem(MirInstructionOpCode opcode,
+                                             MirType *destOperType,
+                                             MirType *srcOperType,
+                                             const FlexInt &displacement);
 
     /**
      * Creates all the needed context pointers in a basic state for a test. It also creates 1 void "TEST" function,

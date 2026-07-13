@@ -9,11 +9,12 @@ TEST_F(OperandTest, Integer)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.buildInt(getTypeTable()->i8(), 0xDE)).verifyInteger(getTypeTable()->i8(), 0xDE);
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i8(), FlexInt(0xDE))).verifyInteger(getTypeTable()->i8(), 0xDE);
 
-    MirOperandVerifier(builder.buildInt(getTypeTable()->i16(), 0xDEAD)).verifyInteger(getTypeTable()->i16(), 0xDEAD);
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i16(), FlexInt(0xDEAD)))
+            .verifyInteger(getTypeTable()->i16(), 0xDEAD);
 
-    MirOperandVerifier(builder.buildInt(getTypeTable()->i32(), 0xDEADC0DE))
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i32(), FlexInt(0xDEADC0DE)))
             .verifyInteger(getTypeTable()->i32(), 0xDEADC0DE);
 }
 
@@ -21,16 +22,17 @@ TEST_F(OperandTest, Double)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.buildFloat(3.141516, nullptr)).verifyDouble(3.141516);
-    MirOperandVerifier(builder.buildFloat(1.14151617, nullptr)).verifyDouble(1.14151617);
+    MirOperandVerifier(builder.buildFloat(getTypeTable()->f64(), FlexFloat(3.141516), nullptr)).verifyDouble(3.141516);
+    MirOperandVerifier(builder.buildFloat(getTypeTable()->f64(), FlexFloat(1.14151617), nullptr))
+            .verifyDouble(1.14151617);
 }
 
 TEST_F(OperandTest, Float)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.buildFloat(3.141516f)).verifyFloat(3.141516f);
-    MirOperandVerifier(builder.buildFloat(2.141516f)).verifyFloat(2.141516f);
+    MirOperandVerifier(builder.buildFloat(getTypeTable()->f32(), FlexFloat(3.141516f))).verifyFloat(3.141516f);
+    MirOperandVerifier(builder.buildFloat(getTypeTable()->f32(), FlexFloat(2.141516f))).verifyFloat(2.141516f);
 }
 
 TEST_F(OperandTest, FloatAnySize)
@@ -38,9 +40,10 @@ TEST_F(OperandTest, FloatAnySize)
     MirType *bigFloat = getTypeTable()->create(MirTypeKind::FloatingPoint, 128, {}, "f128");
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.buildFloat(bigFloat, "2.7182818284590452353602874713526625"))
+    MirOperandVerifier(builder.buildFloat(bigFloat, FlexFloat("2.7182818284590452353602874713526625", 128, 10)))
             .verifyFloatAnySize(bigFloat, "2.7182818284590452353602874713526625");
-    MirOperandVerifier(builder.buildFloat(bigFloat, "2.7182818284590452353602874713526625"))
+
+    MirOperandVerifier(builder.buildFloat(bigFloat, FlexFloat("2.7182818284590452353602874713526625", 128)))
             .verifyFloatAnySize(bigFloat, "2.7182818284590452353602874713526625");
 }
 
@@ -108,7 +111,7 @@ TEST_F(OperandTest, Memory)
     MirOperandBuilder builder(getBuilderCtx());
 
     MirRegister *base = builder.buildVReg(getTypeTable()->i8());
-    MirInteger *displ = builder.buildInt(getTypeTable()->i8(), 0xDE);
+    MirInteger *displ = builder.buildInt(getTypeTable()->i8(), FlexInt(0xDE));
 
     MirOperandVerifier(builder.build<MirMemory>(getTypeTable()->f32(), base, displ, nullptr))
             .verifyMemory(getTypeTable()->f32(), base, displ);

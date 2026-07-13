@@ -192,6 +192,13 @@ class FlexFloat
     size_t getBitSize() const;
 
     /**
+     * Extends the float value to the new bit size. If it is smaller than the previous, a std::bad_alloc exception
+     * is thrown.
+     * @param newBitSize
+     */
+    void extend(size_t newBitSize);
+
+    /**
      * Dumps the arbitrary floating point number into an IEEE-754 or custom layout byte array profile.
      * Standard hardware lengths (32-bit/64-bit) match IEEE layouts perfectly, while larger styles serialize
      * structural backing components down natively.

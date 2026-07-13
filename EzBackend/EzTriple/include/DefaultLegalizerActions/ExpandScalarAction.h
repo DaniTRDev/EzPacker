@@ -42,6 +42,7 @@ class ExpandScalarAction : public LegalizeAction
   private:
     MirBuilderContext *m_ctx;
     TargetDesc *m_target;
+    std::map<size_t, std::pair<MirRegister *, MirRegister *>> m_expandMap; // orig, <low, high>
 };
 
 #endif // EZPACKER_EXPANDSCALARACTION_H

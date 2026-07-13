@@ -10,11 +10,6 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
     MirInstruction *instr = *it;
     auto &operands = instr->getOperands();
 
-    m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-            << std::format("Evaluating instruction '{}' for potential wide type expansion", instr->getMetadata().m_name)
-                       .c_str()
-            << instr->getSourceRef();
-
     const ExpansionRecipe *recipe = m_target->getExpansionRecipeForInstr(instr->getOpCode());
     if (!recipe)
     {
@@ -31,9 +26,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
     MirType *halfType = typeTable->getIntegerTypeBySize(fullType->getTotalSizeInBits() / 2);
 
     m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-            << std::format("Expanding wide type '{}' down to lane halves of '{}'",
-                           fullType->getName(),
-                           halfType->getName())
+            << std::format("Expanding wide type '{}' into halves of '{}'", fullType->getName(), halfType->getName())
                        .c_str()
             << instr->getSourceRef();
 
@@ -43,12 +36,36 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
     if (operands[0]->isOfType<MirRegister>())
     {
         MirRegister *dest = operands[0]->get<MirRegister>();
-        destLo = opBuilder.buildVReg(halfType, dest->getName() + "_lo", dest->getSourceRef());
-        destHi = opBuilder.buildVReg(halfType, dest->getName() + "_hi", dest->getSourceRef());
+        auto destIt = m_expandMap.find(dest->getRegId());
 
-        m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                << std::format("Split destination register '{}' into wide register pair", dest->getName()).c_str()
-                << dest->getSourceRef();
+        if (destIt != m_expandMap.end())
+        {
+            destLo = destIt->second.first;
+            destHi = destIt->second.second;
+
+            m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                    << std::format("Reusing split dst register '{}', '{}' and '{}'",
+                                   dest->getName(),
+                                   destLo->get<MirRegister>()->getName(),
+                                   destHi->get<MirRegister>()->getName())
+                               .c_str()
+                    << dest->getSourceRef();
+        }
+        else
+        {
+            destLo = opBuilder.buildVReg(halfType, dest->getName() + "_lo", dest->getSourceRef());
+            destHi = opBuilder.buildVReg(halfType, dest->getName() + "_hi", dest->getSourceRef());
+
+            m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                    << std::format("Split dst register '{}' into '{}' and '{}'",
+                                   dest->getName(),
+                                   destLo->get<MirRegister>()->getName(),
+                                   destHi->get<MirRegister>()->getName())
+                               .c_str()
+                    << dest->getSourceRef();
+
+            m_expandMap[dest->getRegId()] = std::make_pair((MirRegister *)destLo, (MirRegister *)destHi);
+        }
     }
 
     // Source (Operand 1) splitting
@@ -58,19 +75,43 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         if (source->isOfType<MirRegister>())
         {
             MirRegister *r = source->get<MirRegister>();
-            if (r->getMirType()->getTotalSizeInBits() > halfType->getTotalSizeInBits())
+            auto srcIt = m_expandMap.find(r->getRegId());
+
+            if (srcIt != m_expandMap.end())
             {
-                srcLo = opBuilder.buildVReg(halfType, r->getName() + "_lo", source->getSourceRef());
-                srcHi = opBuilder.buildVReg(halfType, r->getName() + "_hi", source->getSourceRef());
+                srcLo = srcIt->second.first;
+                srcHi = srcIt->second.second;
 
                 m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                        << std::format("Split source register '{}' into wide register pair", r->getName()).c_str()
-                        << source->getSourceRef();
+                        << std::format("Reusing split src register '{}', '{}' and '{}'",
+                                       r->getName(),
+                                       srcLo->get<MirRegister>()->getName(),
+                                       srcHi->get<MirRegister>()->getName())
+                                   .c_str()
+                        << r->getSourceRef();
             }
             else
             {
-                srcLo = source;
-                srcHi = nullptr;
+                if (r->getMirType()->getTotalSizeInBits() > halfType->getTotalSizeInBits())
+                {
+                    srcLo = opBuilder.buildVReg(halfType, r->getName() + "_lo", source->getSourceRef());
+                    srcHi = opBuilder.buildVReg(halfType, r->getName() + "_hi", source->getSourceRef());
+
+                    m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                            << std::format("Split scr register '{}' into '{}' and '{}'",
+                                           r->getName(),
+                                           srcLo->get<MirRegister>()->getName(),
+                                           srcHi->get<MirRegister>()->getName())
+                                       .c_str()
+                            << source->getSourceRef();
+
+                    m_expandMap[r->getRegId()] = std::make_pair((MirRegister *)srcLo, (MirRegister *)srcHi);
+                }
+                else
+                {
+                    srcLo = source;
+                    srcHi = nullptr;
+                }
             }
         }
         else if (source->isOfType<MirInteger>())
@@ -80,7 +121,11 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
             srcHi = opBuilder.buildInt(halfType, val.getHighHalf(), source->getSourceRef());
 
             m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                    << std::format("Split wide integer literal value '{}'", source->toString()).c_str()
+                    << std::format("Split integer literal value '{}' into '{}' and '{}'",
+                                   source->toString(),
+                                   srcLo->get<MirInteger>()->getValue().toString(16),
+                                   srcHi->get<MirInteger>()->getValue().toString(16))
+                               .c_str()
                     << source->getSourceRef();
         }
         else if (source->isOfType<MirFloat>())
@@ -109,7 +154,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
             {
                 tempsHi[idx] = opBuilder.buildVReg(halfType, std::format("t{}_hi", idx).c_str(), instr->getSourceRef());
                 m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                        << std::format("Allocated temporary high workspace virtual register 't{}_hi'", idx).c_str()
+                        << std::format("Allocated temporary high virtual register 't{}_hi'", idx).c_str()
                         << instr->getSourceRef();
             }
             return tempsHi[idx];
@@ -120,7 +165,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
             {
                 tempsLo[idx] = opBuilder.buildVReg(halfType, std::format("t{}_lo", idx).c_str(), instr->getSourceRef());
                 m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                        << std::format("Allocated temporary low workspace virtual register 't{}_lo'", idx).c_str()
+                        << std::format("Allocated temporary low virtual register 't{}_lo'", idx).c_str()
                         << instr->getSourceRef();
             }
             return tempsLo[idx];
@@ -182,20 +227,22 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                     int64_t stride = factor * (halfType->getTotalSizeInBits() / 8);
                     int64_t finalOffset = stride + recipeOp.memVal.m_displ;
 
+                    m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                            << std::format("Split mem operand '{}' into '{}'", baseOp->toString(), finalOffset).c_str()
+                            << baseOp->getSourceRef();
+
                     if (baseOp && baseOp->isOfType<MirMemory>())
                     {
                         MirMemory *origMem = baseOp->get<MirMemory>();
                         FlexInt displ = origMem->getDisplacement()->getValue();
 
-                        resolvedOp = opBuilder.buildMem(origMem->getMirType(),
+                        resolvedOp = opBuilder.buildMem(halfType,
                                                         origMem->getBase(),
-                                                        displ + FlexInt(finalOffset),
+                                                        FlexInt(finalOffset) + displ,
                                                         origMem->getSourceRef());
                     }
                     else
                     {
-                        // Verified correct per invariant: baseOp is guaranteed to evaluate safely to a virtual register
-                        // here
                         resolvedOp = opBuilder.buildMem(halfType,
                                                         baseOp->get<MirRegister>(),
                                                         FlexInt(finalOffset),
@@ -214,8 +261,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         if (!expInstr.m_rtLibraryCall.empty())
         {
             m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                    << std::format("Injecting runtime support library call boundary to '{}'", expInstr.m_rtLibraryCall)
-                               .c_str()
+                    << std::format("Injecting RT call to '{}'", expInstr.m_rtLibraryCall).c_str()
                     << instr->getSourceRef();
 
             newOps.insert(newOps.begin(),

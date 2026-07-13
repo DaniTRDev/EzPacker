@@ -2,6 +2,7 @@ set(EZTRIPLE_FILES_LIST
         "include/CallLoweringState.h"
         "include/EzTriple.h"
         "include/EzTripleCommon.h"
+        "include/AbiLowerer/AbiLowererPass.h"
         "include/DefaultLegalizerActions/ExpandScalarAction.h"
         "include/DefaultLegalizerActions/PromoteScalarAction.h"
         "include/Descriptors/ABIDesc.h"
@@ -14,6 +15,7 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/MirLegalizerPass.h"
 
         "src/CallLoweringState.cpp"
+        "src/AbiLowerer/AbiLowererPass.cpp"
         "src/DefaultLegalizerActions/ExpandScalarAction.cpp"
         "src/DefaultLegalizerActions/PromoteScalarAction.cpp"
         "src/Descriptors/ArgumentLocation.cpp"

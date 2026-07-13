@@ -46,49 +46,53 @@ void EzMirTestSuite::destroy()
     m_diagCollector.reset();
 }
 
-void EzMirTestSuite::addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType)
+MirInstruction *
+EzMirTestSuite::addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType)
 {
     MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
     MirOperandBuilder opBuilder(getBuilderCtx());
 
-    builder.build(opcode,
-                  nullptr,
-                  { opBuilder.buildVReg(destOperType, "testDest"), opBuilder.buildVReg(srcOperType, "testScr") });
+    return builder.build(
+            opcode,
+            nullptr,
+            { opBuilder.buildVReg(destOperType, "testDest"), opBuilder.buildVReg(srcOperType, "testScr") });
 }
 
-void EzMirTestSuite::addTestInstructionRegIntImm(MirInstructionOpCode opcode,
-                                                 MirType *destOperType,
-                                                 MirType *srcOperType,
-                                                 int64_t srcValue)
+MirInstruction *EzMirTestSuite::addTestInstructionRegIntImm(MirInstructionOpCode opcode,
+                                                            MirType *destOperType,
+                                                            MirType *srcOperType,
+                                                            FlexInt srcValue)
 {
     MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
     MirOperandBuilder opBuilder(getBuilderCtx());
 
-    builder.build(opcode,
-                  nullptr,
-                  { opBuilder.buildVReg(destOperType, "testDest"), opBuilder.buildInt(srcOperType, srcValue) });
+    return builder.build(
+            opcode,
+            nullptr,
+            { opBuilder.buildVReg(destOperType, "testDest"), opBuilder.buildInt(srcOperType, FlexInt(srcValue)) });
 }
 
-void EzMirTestSuite::addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue)
+MirInstruction *
+EzMirTestSuite::addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue)
 {
     MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
     MirOperandBuilder opBuilder(getBuilderCtx());
 
-    builder.build(opcode,
-                  nullptr,
-                  { opBuilder.buildVReg(destOperType, "testDest"),
-                    opBuilder.buildFloat(getTypeTable()->f32(), FlexFloat(srcValue)) });
+    return builder.build(opcode,
+                         nullptr,
+                         { opBuilder.buildVReg(destOperType, "testDest"),
+                           opBuilder.buildFloat(getTypeTable()->f32(), FlexFloat(srcValue)) });
 }
 
-void EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode opcode,
-                                              MirType *destOperType,
-                                              MirType *srcOperType,
-                                              const FlexInt &displacement)
+MirInstruction *EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode opcode,
+                                                         MirType *destOperType,
+                                                         MirType *srcOperType,
+                                                         const FlexInt &displacement)
 {
     MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
     MirOperandBuilder opBuilder(getBuilderCtx());
 
-    builder.build(
+    return builder.build(
             opcode,
             nullptr,
             { opBuilder.buildVReg(destOperType, "testDest"),

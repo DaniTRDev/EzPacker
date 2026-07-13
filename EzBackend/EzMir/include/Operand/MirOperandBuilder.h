@@ -22,17 +22,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @return
      */
     MirFloat *buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref = nullptr);
-
-    /**
-     * Returns a float with the given value. This function WILL check that the given type is indeed a floating
-     * point type and will: return nullptr if it's not and send an error to the diagnostic collector.
-     * @param type
-     * @param value
-     * @param ref
-     * @return
-     */
-    MirFloat *buildFloat(MirType *type, std::pmr::string value, SourceReference *ref = nullptr);
-
+    
     /**
      * Creates an integer with the given value.
      * @param type
@@ -40,15 +30,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @return
      */
     MirInteger *buildInt(MirType *type, const FlexInt &value, SourceReference *ref = nullptr);
-
-    /**
-     * Creates an integer with the given value.
-     * @param type
-     * @param value
-     * @return
-     */
-    MirInteger *buildInt(MirType *type, std::pmr::string value, SourceReference *ref = nullptr);
-
+    
     /**
      * Builds a memory operand out of the given parameters.
      * @param type

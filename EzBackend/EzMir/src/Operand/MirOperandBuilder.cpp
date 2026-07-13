@@ -7,33 +7,9 @@ MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, S
     return build<MirFloat>(type, value, ref);
 }
 
-MirFloat *MirOperandBuilder::buildFloat(MirType *type, std::pmr::string value, SourceReference *ref)
-{
-    if (type->getKind() != MirTypeKind::FloatingPoint)
-    {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                << "Given float type is not a float type" << ref;
-        return nullptr;
-    }
-
-    return build<MirFloat>(type, FlexFloat(value, type->getTotalSizeInBits()), ref);
-}
-
 MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, SourceReference *ref)
 {
     return build<MirInteger>(type, value, ref);
-}
-
-MirInteger *MirOperandBuilder::buildInt(MirType *type, std::pmr::string value, SourceReference *ref)
-{
-    if (type->getKind() != MirTypeKind::Integer)
-    {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                << "Given float type is not an int type" << ref;
-        return nullptr;
-    }
-
-    return build<MirInteger>(type, FlexInt(value, type->getTotalSizeInBits()), ref);
 }
 
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref)

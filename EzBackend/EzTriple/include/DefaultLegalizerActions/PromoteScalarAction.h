@@ -39,6 +39,7 @@ class PromoteScalarAction : public LegalizeAction
   private:
     MirBuilderContext *m_ctx;
     TargetDesc *m_target;
+    std::map<size_t, MirRegister *> m_promotionMap; // Map used to store promoted registers.
 };
 
 #endif // EZPACKER_PROMOTESCALARACTION_H

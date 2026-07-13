@@ -14,14 +14,7 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
     bool modifiedMir = false;
     bool _signed = instr->isSigned();
     MirOperandBuilder opBuilder(m_ctx);
-
-    /*
-     * We use a separate builder for 'InsertAfter'. To make sure multiple truncates append
-     * correctly after 'instr', we insert immediately after 'it'.
-     */
-
     MirInstructionBuilder insertBeforeBuilder(m_ctx, instr->getOwner(), InsertionType::InsertBefore, it);
-    MirInstructionBuilder insertAfterBuilder(m_ctx, instr->getOwner(), InsertionType::InsertAfter, it);
 
     for (size_t i = 0; i < operands.size(); i++)
     {
@@ -48,15 +41,43 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
 
         if (operand->isOfType<MirRegister>())
         {
-            MirRegister *targetReg = operand->get<MirRegister>();
-            MirRegister *promotedReg = opBuilder.buildVReg(promotedType, targetReg->getName() + "_promoted");
+            bool newPromotion = false;
+            MirRegister *targetReg = operand->get<MirRegister>(), *promotedReg = nullptr;
+            auto promotedIt = m_promotionMap.find(targetReg->getRegId());
 
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
-                    << std::format("Promoting {} to {}", targetReg->toString(), promotedReg->toString()).c_str()
-                    << targetReg->getSourceRef();
+            if (promotedIt != m_promotionMap.end())
+            {
+                promotedReg = promotedIt->second;
+                m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                        << std::format("Reusing promotion of register '{}' to '{}'",
+                                       targetReg->toString(),
+                                       promotedReg->toString())
+                                   .c_str()
+                        << targetReg->getSourceRef();
+            }
+            else
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                        << std::format("Promoting register '{}' from '{}' to '{}'",
+                                       targetReg->getName(),
+                                       origType->getName(),
+                                       promotedType->getName())
+                                   .c_str()
+                        << targetReg->getSourceRef();
+
+                promotedReg = opBuilder.buildVReg(promotedType, targetReg->getName() + "_promoted");
+                m_promotionMap[targetReg->getRegId()] = promotedReg;
+                newPromotion = true;
+            }
 
             // Handle Input (Read / ReadWrite)
-            if (constraint.flags & OperandFlag::Read)
+            /*
+             * We must inject an extension instruction *before* the current instruction to safely widen the incoming
+             * narrow data into its legal size container.
+             *
+             * Only insert the needed extend instructions 1 time in the very first use of the register.
+             */
+            if ((constraint.flags & OperandFlag::Read) && newPromotion)
             {
                 if (origType->getKind() == MirTypeKind::Integer)
                 {
@@ -71,23 +92,36 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
                 }
             }
 
-            // Substitute operand in the current instruction
             operands[i] = promotedReg;
-
-            // Handle Output (Write / ReadWrite)
-            if (constraint.flags & OperandFlag::Write)
-            {
-                MirInteger *imm = opBuilder.buildInt(m_ctx->getTypeTable()->i8(), origType->getTotalSizeInBits());
-                insertAfterBuilder.TRUNC(promotedReg, imm);
-            }
         }
-        else if (operand->isOfType<MirInteger>() || operand->isOfType<MirFloat>())
+        else if (operand->isOfType<MirInteger>())
         {
+            auto *intImm = operand->get<MirInteger>();
+
             m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
-                    << std::format("Promoting {} to {}", operand->toString(), promotedType->getName()).c_str()
+                    << std::format("Promoting immediate integer '{}' from {} to {}",
+                                   intImm->toString(),
+                                   origType->getName(),
+                                   promotedType->getName())
+                               .c_str()
                     << operand->getSourceRef();
 
-            // Immediates don't need extensions inserted, just update type tracking
+            // Force the underlying value to sign-extend or zero-extend to match the promotion.
+            intImm->getValue().extend(promotedType->getTotalSizeInBits(), _signed);
+            operand->setMirType(promotedType); // Update MIR's type to ackwnoledge type change.
+        }
+        else if (operand->isOfType<MirFloat>())
+        {
+            auto *floatImm = operand->get<MirFloat>();
+
+            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                    << std::format("Promoting immediate float '{}' to '{}'",
+                                   floatImm->toString(),
+                                   promotedType->getName())
+                               .c_str()
+                    << operand->getSourceRef();
+
+            floatImm->getValue().extend(promotedType->getTotalSizeInBits());
             operand->setMirType(promotedType);
         }
     }

@@ -45,6 +45,7 @@ class MirLegalizerPass : public IMirTransformPass
   private:
     MirBuilderContext *m_ctx;
     MirLegalizer *m_legalizer;
+    std::set<size_t> m_modifiedBlockSet; // Used to push a block exactly ONCE to the list.
     std::list<MirBlock *> m_modifiedBlocks;
 };
 

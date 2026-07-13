@@ -22,6 +22,9 @@ LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::
 
     for (MirOperand *op : operands)
     {
+        if (op->isOfType<MirReference>() || op->isOfType<MirRuntimeSymbol>())
+            continue; // This ensures that call arguments are also processed.
+
         MirType *type = op->getMirType();
         MirType *legalType = m_targetDesc->getNearestLegalType(type);
 

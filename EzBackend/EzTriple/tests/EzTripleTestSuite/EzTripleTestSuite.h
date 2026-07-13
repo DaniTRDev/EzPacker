@@ -61,12 +61,19 @@ class EzTripleTestSuite : public EzMirTestSuite
     virtual void destroy() override;
 
     /**
-     * Sets the target descriptor for this test suite.
-     * @param desc
+     * Creates a target legalizer and returns it. This call must be done after the target description has already been
+     * created.
+     * @return
      */
-    void setTargetDesc(TargetDesc *desc);
+    virtual std::shared_ptr<MirLegalizer> createTargetLegalizer() = 0;
 
-  private:
+    /**
+     * Creates a target description and returns it.
+     * @return
+     */
+    virtual std::shared_ptr<TargetDesc> createTargetDesc() = 0;
+
+  protected:
     std::shared_ptr<TargetDesc> m_targetDesc;
     std::shared_ptr<MirLegalizer> m_legalizer;
 };
@@ -83,6 +90,21 @@ class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Te
      * Calls EzMirTestSuite::destroy.
      */
     void TearDown() override;
+
+    /**
+     * Creates a default-empty MirLegalizer and returns it. This call must be done after the target description has
+     * already been created. Parent classes can still override this method to inject
+     * their own target description.
+     * @return
+     */
+    virtual std::shared_ptr<MirLegalizer> createTargetLegalizer() override;
+
+    /**
+     * Creates a target EzTripleTargetDesc and returns it. Parent classes can still override this method to inject
+     * their own target description.
+     * @return
+     */
+    virtual std::shared_ptr<TargetDesc> createTargetDesc() override;
 };
 
 #endif // EZPACKER_EZTRIPLETESTSUITE_H

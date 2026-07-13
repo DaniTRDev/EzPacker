@@ -36,26 +36,3 @@ PromoteScalarActionVerifier &PromoteScalarActionVerifier::verifyExtension(size_t
 
     return *this;
 }
-
-PromoteScalarActionVerifier &
-PromoteScalarActionVerifier::verifyExtensionTruncation(size_t index, MirType *newType, MirType *origType)
-{
-    auto &instructions = m_targetBlock->getInstructions();
-    EXPECT_LT(index, instructions.size()) << "Instruction index out of bounds.";
-
-    auto it = instructions.begin();
-    std::advance(it, index);
-    MirInstruction *instr = *it;
-
-    // Ensure it is structurally a TRUNC instruction
-    auto verifier = MirInstructionVerifier(instr);
-    verifier.opcode(MirInstructionOpCode::TRUNC).operandCount(2);
-
-    // Operand 0: Destination register (it is the promoted legal register).
-    verifier.operandVerifier(0).type(MirOperandType::Register).mirTypeVerifier().id(newType->getId());
-
-    // Operand 1: How many bits to TRUNC, must match newType's bit size.
-    verifier.operandVerifier(1).type(MirOperandType::Integer).verifyInteger(nullptr, origType->getTotalSizeInBits());
-
-    return *this;
-}
