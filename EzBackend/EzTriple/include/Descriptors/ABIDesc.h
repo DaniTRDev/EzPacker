@@ -30,18 +30,6 @@ class ABIDesc
      * @return
      */
     virtual size_t getTypeAlignment(MirType *type) const = 0;
-
-    /**
-     * Returns the stack alignment needed BEFORE a call.
-     * @return
-     */
-    virtual size_t getStackAlignment() const = 0;
-
-    /**
-     * Returns the shadown space needed BEFORE a call.
-     * @return
-     */
-    virtual size_t getShadowSpaceSize() const = 0;
 };
 
 #endif // EZPACKER_ABIDESC_H

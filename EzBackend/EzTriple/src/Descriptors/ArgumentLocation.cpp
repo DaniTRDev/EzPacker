@@ -10,16 +10,17 @@ ArgumentLocationDesc
 ArgumentLocationDesc::Indirect(bool byVal, size_t size, std::variant<PhysicalRegId, int64_t> ptrStorage)
 {
     return ArgumentLocationDesc(ArgLocationType::Indirect,
-                            IndirectLoc{ .m_isByVal = byVal, .m_size = size, .m_pointerStorage = ptrStorage });
+                                IndirectLoc{ .m_isByVal = byVal, .m_size = size, .m_pointerStorage = ptrStorage });
 }
-ArgumentLocationDesc ArgumentLocationDesc::Split(std::vector<RegLoc> regs)
+ArgumentLocationDesc ArgumentLocationDesc::Split(const std::vector<SplitPiece> &pieces)
 {
-    return ArgumentLocationDesc(ArgLocationType::Split, SplitLoc{ .m_parts = std::move(regs) });
+    return ArgumentLocationDesc(ArgLocationType::Split, SplitLoc{ .m_parts = std::move(pieces) });
 }
 
 ArgumentLocationDesc ArgumentLocationDesc::Stack(int64_t offset, size_t sizeInBytes)
 {
-    return ArgumentLocationDesc(ArgLocationType::Stack, StackLoc{ .m_frameOffset = offset, .m_sizeBytes = sizeInBytes });
+    return ArgumentLocationDesc(ArgLocationType::Stack,
+                                StackLoc{ .m_frameOffset = offset, .m_sizeBytes = sizeInBytes });
 }
 
 ArgLocationType ArgumentLocationDesc::getType() const { return m_type; }
@@ -52,6 +53,6 @@ const StackLoc &ArgumentLocationDesc::getStack() const
 {
     if (m_type != ArgLocationType::Indirect)
         throw std::runtime_error("ArgumentLocationDesc: Attempted to get Stack from invalid variant state.");
-    
+
     return std::get<StackLoc>(m_storage);
 }

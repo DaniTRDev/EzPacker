@@ -4,7 +4,7 @@
 #include "EzTripleCommon.h"
 
 /**
- * Interface used to store target-dependent information that is not managed by the OS.
+ * Interface used to store target-dependent information (CPU-level).
  */
 class TargetDesc
 {

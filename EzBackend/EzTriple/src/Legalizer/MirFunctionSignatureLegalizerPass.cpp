@@ -30,7 +30,7 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(std::pmr::list<MirFunction 
         builder.POP_ARG(param->getSourceRef(), param);
     }
 
-    func->getParameters().clear(); // Clear the parameter list from the function.
+    // Don't clear the function parameters, might be of use for future passes to have a quick way of getting params.
     return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = succeeded };
 }
 

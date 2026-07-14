@@ -24,9 +24,35 @@ struct StackLoc
     size_t m_sizeBytes;
 };
 
+/**
+ * A structure might be returned in registers depending on the types of the fields.
+ *
+ * Example:
+ * struct MyStruct
+ * {
+ *      int x;
+ *      float y;
+ * };
+ * FOR x ->
+ * SplitLoc[0].m_regId = GPR
+ * SplitLoc[0].m_sizeBytes = 4
+ * SplitLoc[0]. m_offsetInParam = 0
+ *
+ * FOR y ->
+ * SplitLoc[1].m_regId = FPR
+ * SplitLoc[1].m_sizeBytes = 4
+ * SplitLoc[1]. m_offsetInParam = 4
+ */
+struct SplitPiece
+{
+    PhysicalRegId m_regId;
+    size_t m_sizeBytes;
+    size_t m_offsetInParam; // Byte offset from the start of the user's variable
+};
+
 struct SplitLoc
 {
-    std::vector<RegLoc> m_parts;
+    std::vector<SplitPiece> m_parts;
 };
 
 struct IndirectLoc
@@ -69,7 +95,7 @@ class ArgumentLocationDesc
      * @param regs
      * @return
      */
-    static ArgumentLocationDesc Split(std::vector<RegLoc> regs);
+    static ArgumentLocationDesc Split(const std::vector<SplitPiece> &pieces);
 
     /**
      * Creates a stack location with the given parameters.

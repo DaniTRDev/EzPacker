@@ -1,34 +1,60 @@
 #include "CallLoweringState.h"
 
-CallLoweringState::CallLoweringState(ABIDesc *abi) :
-    m_abi(abi), m_allocatedFprs(0), m_allocatedGprs(0), m_currentStackOffset(0)
+CallLoweringState::CallLoweringState(ABIDesc *abi,
+                                     const std::list<PhysicalRegId> &usableGprs,
+                                     const std::list<PhysicalRegId> &usableFprs) :
+    m_abi(abi), m_currentStackOffset(0), m_usableFprs(usableFprs), m_usableGprs(usableGprs)
 {
 }
 
 ABIDesc *CallLoweringState::getABI() const { return m_abi; }
 
-size_t CallLoweringState::getFprCount() const { return m_allocatedFprs; }
+bool CallLoweringState::allocateGpr(PhysicalRegId &outReg)
+{
+    if (m_usableGprs.empty())
+        return false;
 
-size_t CallLoweringState::getGprCount() const { return m_allocatedGprs; }
+    outReg = m_usableGprs.front();
+    m_usableGprs.pop_front();
+    m_allocatedGprs.push_back(outReg); // Tracks it as used
+
+    return true;
+}
+
+bool CallLoweringState::allocateFpr(PhysicalRegId &outReg)
+{
+    if (m_usableFprs.empty())
+        return false;
+
+    outReg = m_usableFprs.front();
+    m_usableFprs.pop_front();
+    m_allocatedFprs.push_back(outReg); // Tracks it as used
+
+    return true;
+}
+
+size_t CallLoweringState::getUsableFprCount() const { return m_usableFprs.size(); }
+
+size_t CallLoweringState::getUsableGprCount() const { return m_usableGprs.size(); }
+
+size_t CallLoweringState::getUsedFprCount() const { return m_allocatedFprs.size(); }
+
+size_t CallLoweringState::getUsedGprCount() const { return m_allocatedGprs.size(); }
 
 int64_t CallLoweringState::getStackOffset() const { return m_currentStackOffset; }
 
-void CallLoweringState::consumeFprs(size_t count) { m_allocatedFprs += count; }
-
-void CallLoweringState::consumeGprs(size_t count) { m_allocatedGprs += count; }
-
 int64_t CallLoweringState::allocateStackSlot(size_t sizeBytes, size_t alignmentBytes)
 {
-    // Ensure non-sized parameters doesn't affect the allocation (void types).
+    // Ensure non-sized parameters don't affect the allocation (void types).
     if (sizeBytes == 0)
         return m_currentStackOffset;
 
-    // Align the running stack offset up to the requested boundary mask requirement.
+    // Align the stack offset up to the requested alignment.
     // Example: offset = 4, alignmentBytes = 8 -> (4 + 7) & ~7 -> 11 & 0xFFFFFFF8 = 8.
-    m_currentStackOffset = (m_currentStackOffset + alignmentBytes - 1) & ~(alignmentBytes - 1);
+    m_currentStackOffset = (m_currentStackOffset + int64_t(alignmentBytes) - 1) & ~(alignmentBytes - 1);
     int64_t assignedOffset = m_currentStackOffset;
 
-    // Advance the frame cursor state by the allocated type footprint size
+    // Advance the frame cursor state by the allocated type size.
     m_currentStackOffset += static_cast<int64_t>(sizeBytes);
     return assignedOffset;
 }
