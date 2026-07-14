@@ -13,7 +13,8 @@ enum class MirReferenceType : uint8_t
     Invalid = 0,
     Block,
     DataEntry,
-    Function
+    Function,
+    StructField
 };
 
 class MirFloat : public MirOperand
@@ -52,19 +53,28 @@ class MirInteger : public MirOperand
     FlexInt m_int;
 };
 
+/**
+ * Types of references and what means each argument:
+ *  - Block -> refId = id of the MirBlock referenced. Offset = 0.
+ *  - DataEntry -> refId = id of the MirGlobalDataEntry referenced. Offset = Offset of the data entry.
+ *  - Function -> refId = id of the MirFunction referenced. Offset = 0.
+ *  - StructField -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
+ *  field.
+ */
 class MirReference : public MirOperand
 {
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Reference;
 
-    MirReference(MirType *type, MirReferenceType refType, size_t refId, SourceReference *ref) :
-        MirOperand(type, ref), m_refType(refType), m_refId(refId)
+    MirReference(MirType *type, MirReferenceType refType, size_t refId, size_t offset, SourceReference *ref) :
+        MirOperand(type, ref), m_refType(refType), m_refId(refId), m_offset(offset)
     {
     }
 
     bool isBlock() const { return m_refType == MirReferenceType::Block; }
     bool isDataEntry() const { return m_refType == MirReferenceType::DataEntry; }
     bool isFunction() const { return m_refType == MirReferenceType::Function; }
+    bool isStructField() const { return m_refType == MirReferenceType::StructField; }
     bool isInvalid() const { return m_refType == MirReferenceType::Invalid; }
 
     MirReferenceType getRefType() const { return m_refType; }
@@ -86,13 +96,19 @@ class MirReference : public MirOperand
         {
             src = "func";
         }
+        else if (isStructField())
+        {
+            src = "struct";
+            return std::format("{} %ref.id={}.src={}.off={}", getMirType()->getName(), m_refId, src, m_offset);
+        }
 
         return std::format("{} %ref.id={}.src={}", getMirType()->getName(), m_refId, src);
     }
 
   private:
     MirReferenceType m_refType;
-    size_t m_refId{ 0 }; // Generic MIR reference ID (block, function, data entry, ...).
+    size_t m_refId{ 0 };
+    size_t m_offset{ 0 };
 };
 
 class MirRuntimeSymbol : public MirOperand
