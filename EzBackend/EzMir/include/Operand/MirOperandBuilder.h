@@ -22,7 +22,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @return
      */
     MirFloat *buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref = nullptr);
-    
+
     /**
      * Creates an integer with the given value.
      * @param type
@@ -30,7 +30,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @return
      */
     MirInteger *buildInt(MirType *type, const FlexInt &value, SourceReference *ref = nullptr);
-    
+
     /**
      * Builds a memory operand out of the given parameters.
      * @param type
@@ -90,7 +90,14 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * @param entry
      * @param ref
      */
-    MirReference *buildRef(MirGlobalDataEntry *entry, SourceReference *ref = nullptr);
+    MirReference *buildRef(MirGlobalDataEntry *entry, size_t offset, SourceReference *ref = nullptr);
+
+    /**
+     * Creates a reference to the given struct field.
+     * @param structPtr
+     * @param field
+     */
+    MirReference *buildRef(MirRegister *structPtr, class MirStructField *field, SourceReference *ref = nullptr);
 
     /**
      * Builds a runtime symbol that will later be resolved by the backend. A runtime symbol is a symbol that
