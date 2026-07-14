@@ -97,6 +97,12 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
 #undef INSTRUCTION
 
     /**
+     * Changes the insertion type of the current insertion point.
+     * @param type
+     */
+    void changeInsertionType(InsertionType type);
+    
+    /**
      * Sets the insertion point for the builder.
      * @param insertionPoint
      */

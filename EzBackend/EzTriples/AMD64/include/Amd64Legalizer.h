@@ -21,16 +21,29 @@ class Amd64Legalizer
      * @param ctx The builder context used to fetch the type system references.
      * @return A vector of MirType* containing the natively supported scalar types (i8, i16, i32, i64).
      */
-    const std::vector<MirType*> getNativeSizes(MirBuilderContext *ctx) const;
+    const std::vector<MirType *> getNativeSizes(MirBuilderContext *ctx) const;
 
   private:
     /**
      * @brief Configures data movement rules:
      * - MOV:
-     * reg{8, 16, 32, 64}, imm{8, 16, 32, 64}.
-     * reg{8, 16, 32, 64}, reg{8, 16, 32, 64}.
+     * reg{8, 16, 32, 64}, imm{8, 16, 32, 64}
+     * reg{8, 16, 32, 64}, reg{8, 16, 32, 64}
+     *
      * - LEA:
      * reg{8, 16, 32, 64}, mem
+     *
+     * - PUSH_ARG:
+     * reg/imm{8, 16, 32, 64}
+     *
+     * - POP_ARG:
+     * reg{8, 16, 32, 64}
+     *
+     * PUSH_RET:
+     * reg/imm{8, 16, 32, 64}
+     *
+     * POP_RET:
+     * reg{8, 16, 32, 64}
      */
     void addDataMovement(MirBuilderContext *ctx, MirLegalizer *legalizer);
 

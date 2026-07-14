@@ -1,6 +1,6 @@
 #include "ExpandScalarActionVerifier.h"
 
-ExpandScalarActionVerifier::ExpandScalarActionVerifier(MirBuilderContext *ctx, MirLegalizerPass *pass) :
+ExpandScalarActionVerifier::ExpandScalarActionVerifier(MirBuilderContext *ctx, MirBlockLegalizerPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
 {
 }

@@ -1,10 +1,18 @@
-#ifndef EZPACKER_MIRLEGALIZERPASS_H
-#define EZPACKER_MIRLEGALIZERPASS_H
+#ifndef EZPACKER_MIRFUNCTIONSIGNATURELEGALIZERPASS_H
+#define EZPACKER_MIRFUNCTIONSIGNATURELEGALIZERPASS_H
 
 #include "EzTripleCommon.h"
 #include "MirLegalizer.h"
 
-class MirLegalizerPass : public IMirTransformPass
+/**
+ * This pass will perform 2 actions:
+ * - It will convert a function's parameters list into a set of POP_ARG instructions that can be affected by
+ * promotion/expansion, ...
+ *
+ * - It will convert return instructions within the function into a sequence of SET_RET that will be consumed by
+ * GET_RET.
+ */
+class MirFunctionSignatureLegalizerPass : public IMirTransformPass
 {
   public:
     /**
@@ -12,10 +20,10 @@ class MirLegalizerPass : public IMirTransformPass
      * @param ctx
      * @param legalizer
      */
-    MirLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer);
+    MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer);
 
     /**
-     * Returns "MirLegalizerPass".
+     * Returns "MirFunctionSignatureLegalizerPass".
      * @return
      */
     const char *getName() const override;
@@ -27,14 +35,13 @@ class MirLegalizerPass : public IMirTransformPass
     MirPassIterationPlace getIterationPlace() const override;
 
     /**
-     * Runs the pass on every instruction inside the given block. It will check if the given pair of instruction and
-     * operands throw a match against the legalizer rule table.
-     * @param blockList
+     * Runs the pass on the given function.
+     * @param funcList
      * @param it
      * @param passManager
      */
-    MirPassResult run(std::pmr::list<class MirBlock *> &blockList,
-                      std::pmr::list<class MirBlock *>::iterator it,
+    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
+                      std::pmr::list<class MirFunction *>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**
@@ -49,4 +56,4 @@ class MirLegalizerPass : public IMirTransformPass
     std::list<MirBlock *> m_modifiedBlocks;
 };
 
-#endif // EZPACKER_MIRLEGALIZERPASS_H
+#endif // EZPACKER_MIRFUNCTIONSIGNATURELEGALIZERPASS_H

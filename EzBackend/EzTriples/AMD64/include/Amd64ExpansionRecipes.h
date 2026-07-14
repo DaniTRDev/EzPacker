@@ -10,6 +10,26 @@ EMIT_INST(MOV, Expansion::D_LO, Expansion::S0_LO)
 EMIT_INST(MOV, Expansion::D_HI, Expansion::S0_HI)
 END_RECIPE
 
+RECIPE_FOR(PUSH_ARG)
+EMIT_INST(PUSH_ARG, Expansion::D_LO, Expansion::S0_LO)
+EMIT_INST(PUSH_ARG, Expansion::D_HI, Expansion::S0_HI)
+END_RECIPE
+
+RECIPE_FOR(POP_ARG)
+EMIT_INST(POP_ARG, Expansion::D_LO, Expansion::S0_LO)
+EMIT_INST(POP_ARG, Expansion::D_HI, Expansion::S0_HI)
+END_RECIPE
+
+RECIPE_FOR(PUSH_RET)
+EMIT_INST(PUSH_RET, Expansion::D_LO, Expansion::S0_LO)
+EMIT_INST(PUSH_RET, Expansion::D_HI, Expansion::S0_HI)
+END_RECIPE
+
+RECIPE_FOR(POP_RET)
+EMIT_INST(POP_RET, Expansion::D_LO, Expansion::S0_LO)
+EMIT_INST(POP_RET, Expansion::D_HI, Expansion::S0_HI)
+END_RECIPE
+
 /* --- MEMORY ACCESS -------------------------------------------------------- */
 
 // Sequentially load low chunk from base address, then high chunk with a stride offset

@@ -8,8 +8,6 @@ const MirInstructionInsertionPoint &EzMirTestSuite::getTestInsertionPoint() { re
 
 MirPassManager *EzMirTestSuite::getPassManager() { return m_passManager.get(); }
 
-MirPrinter EzMirTestSuite::getPrinter() { return MirPrinter(); }
-
 MirTypeTable *EzMirTestSuite::getTypeTable() { return m_typeTable.get(); }
 
 void EzMirTestSuite::create(const std::filesystem::path &workingPath)

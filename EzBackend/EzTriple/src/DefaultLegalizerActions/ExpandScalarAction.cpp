@@ -69,10 +69,14 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
     }
 
     // Source (Operand 1) splitting
-    if (operands.size() > 1)
+    bool singleOperand = operands.size() == 1;
+    if (operands.size() > 1 || singleOperand)
     {
-        MirOperand *source = operands[1];
-        if (source->isOfType<MirRegister>())
+        /**
+         * For single operand instructions, the only operand might be an immediate. In that case we need to cover it.
+         */
+        MirOperand *source = singleOperand ? operands[0] : operands[1];
+        if (source->isOfType<MirRegister>() && !singleOperand)
         {
             MirRegister *r = source->get<MirRegister>();
             auto srcIt = m_expandMap.find(r->getRegId());

@@ -81,7 +81,8 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     {
         if (m_insertionPoint.m_type == InsertionType::InsertAfter)
         {
-            m_insertionPoint.m_block->getInstructions().push_back(instr);
+            auto nextIt = std::next(m_insertionPoint.m_iterator);
+            m_insertionPoint.m_block->getInstructions().insert(nextIt, instr);
         }
         else
         {
@@ -107,6 +108,8 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
     getBuiltObj()->addOperand(operand);
     return *this;
 }
+
+void MirInstructionBuilder::changeInsertionType(InsertionType type) { m_insertionPoint.m_type = type; }
 
 void MirInstructionBuilder::setInsertionPoint(MirInstructionInsertionPoint insertionPoint)
 {

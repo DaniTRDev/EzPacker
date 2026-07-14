@@ -1,6 +1,6 @@
 #include "PromoteScalarActionVerifier.h"
 
-PromoteScalarActionVerifier::PromoteScalarActionVerifier(MirBuilderContext *ctx, MirLegalizerPass *pass) :
+PromoteScalarActionVerifier::PromoteScalarActionVerifier(MirBuilderContext *ctx, MirBlockLegalizerPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
 {
 }
@@ -18,6 +18,8 @@ PromoteScalarActionVerifier &PromoteScalarActionVerifier::verifyExtension(size_t
                                                                           MirType *origType,
                                                                           MirType *newType)
 {
+    EXPECT_NE(m_targetBlock, nullptr);
+
     auto &instructions = m_targetBlock->getInstructions();
     EXPECT_LT(index, instructions.size()) << "Instruction index out of bounds.";
 

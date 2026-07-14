@@ -5,7 +5,11 @@
 
 #include "CallLoweringState.h"
 
+#include "AbiLowerer/AbiLowererPass.h"
+
 #include "DefaultLegalizerActions/ExpandScalarAction.h"
+#include "DefaultLegalizerActions/LegalizeCallAction.h"
+#include "DefaultLegalizerActions/LegalizeReturnAction.h"
 #include "DefaultLegalizerActions/PromoteScalarAction.h"
 
 #include "Descriptors/ABIDesc.h"
@@ -17,6 +21,7 @@
 
 #include "Legalizer/LegalizeAction.h"
 #include "Legalizer/MirLegalizer.h"
-#include "Legalizer/MirLegalizerPass.h"
+#include "Legalizer/MirBlockLegalizerPass.h"
+#include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 
 #endif // EZPACKER_EZTRIPLE_H

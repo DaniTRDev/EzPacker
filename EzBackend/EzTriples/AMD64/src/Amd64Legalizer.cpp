@@ -28,7 +28,6 @@ void Amd64Legalizer::addDataMovement(MirBuilderContext *ctx, MirLegalizer *legal
     const auto &t = ctx->getTypeTable();
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
-    // MOV and LEA are completely legal natively across all 4 scalar sizes.
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i8()->getId(), MIRID_INVALID });
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i16()->getId(), MIRID_INVALID });
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i32()->getId(), MIRID_INVALID });

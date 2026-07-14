@@ -4,7 +4,7 @@
 #include "EzTriple.h"
 #include "EzMirTestSuite.h"
 
-class ExpandScalarActionVerifier : public MirPassVerifier<MirLegalizerPass, ExpandScalarActionVerifier>
+class ExpandScalarActionVerifier : public MirPassVerifier<MirBlockLegalizerPass, ExpandScalarActionVerifier>
 {
   public:
     /**
@@ -12,7 +12,7 @@ class ExpandScalarActionVerifier : public MirPassVerifier<MirLegalizerPass, Expa
      * @param ctx
      * @param pass
      */
-    ExpandScalarActionVerifier(MirBuilderContext *ctx, MirLegalizerPass *pass);
+    ExpandScalarActionVerifier(MirBuilderContext *ctx, MirBlockLegalizerPass *pass);
 
     /**
      * Sets the target block to the one given, any subsequent call to the verify methods will use this block.

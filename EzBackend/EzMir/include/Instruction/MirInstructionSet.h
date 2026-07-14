@@ -33,6 +33,27 @@ INSTRUCTION(LEA,
                                 { ExpectedOperandType::AddressSource, OperandFlag::Read }),
             F(None))
 
+INSTRUCTION(PUSH_ARG,
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read }),
+            F(HasSideEffect))
+
+INSTRUCTION(POP_ARG,
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
+            F(HasSideEffect))
+
+INSTRUCTION(PUSH_RET,
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
+            F(HasSideEffect))
+
+INSTRUCTION(POP_RET,
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Integer, OperandFlag::Read },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
+            F(HasSideEffect))
+
 /* --- MEMORY ACCESS -------------------------------------------------------- */
 // LOAD forces a MirCat_Memory operand as the source
 INSTRUCTION(LOAD,
@@ -215,7 +236,8 @@ INSTRUCTION(JB,
 
 INSTRUCTION(CALL,
             MirCat_ControlFlow,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Reference | ExpectedOperandType::Register |
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
+                                { ExpectedOperandType::Reference | ExpectedOperandType::Register |
                                           ExpectedOperandType::RuntimeSymbol,
                                   OperandFlag::Read }),
             F(IsCall) | F(HasSideEffect))

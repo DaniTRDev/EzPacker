@@ -62,12 +62,6 @@ class EzMirTestSuite
     }
 
     /**
-     * Returns a printer linked to the test context.
-     * @return
-     */
-    MirPrinter getPrinter();
-
-    /**
      * Returns the type table.
      * @return
      */

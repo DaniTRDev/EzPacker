@@ -48,6 +48,8 @@ class MirFunction
                 std::pmr::list<MirRegister *> parameters,
                 std::pmr::string name);
 
+    
+    
     /**
      * Returns the MirBlock owned by this function that matches the given ID, if no case is found nullptr is returned.
      * @param id

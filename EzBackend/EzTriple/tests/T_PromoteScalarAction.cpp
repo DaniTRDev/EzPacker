@@ -45,7 +45,7 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitRegSrc)
     addTestInstructionRegReg(MirInstructionOpCode::ADD, t->i32(), t->i1());
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     PromoteScalarActionVerifier promoteVerifier(getBuilderCtx(), pass);
 
     // The main ADD instruction is pushed down to index 1 by the injected ZEXT
@@ -75,7 +75,7 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitImmSrc)
     MirBlock *block = getTestFunc()->getEntryPoint();
     MirInstructionVerifier instrVerifier(block->at(0));
 
-    runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+    runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
 
     instrVerifier.operandVerifier(0).verifyRegister(t->i32(), true, MIRID_INVALID);
     instrVerifier.operandVerifier(1).verifyInteger(t->i8(),
@@ -97,7 +97,7 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitRegSrcDest)
     addTestInstructionRegReg(MirInstructionOpCode::ADD, t->i1(), t->i1());
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     PromoteScalarActionVerifier promoteVerifier(getBuilderCtx(), pass);
 
     // Main ADD instruction sits at index 2 after both injected ZEXT calculations
@@ -126,7 +126,7 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitRegDestImmSrc)
     addTestInstructionRegIntImm(MirInstructionOpCode::ADD, t->i1(), t->i1(), FlexInt(uint32_t(1), 1));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     PromoteScalarActionVerifier promoteVerifier(getBuilderCtx(), pass);
 
     // The main ADD instruction sits exactly at index 1
@@ -159,7 +159,7 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitRegSrcAndSecondUse)
     instr2->getOperands()[1] = instr->getOperands()[1]; // Ensure src operands are the same.
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirLegalizerPass *pass = runPass<MirLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     PromoteScalarActionVerifier promoteVerifier(getBuilderCtx(), pass);
 
     promoteVerifier.beginBlock(block);
@@ -177,4 +177,56 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitRegSrcAndSecondUse)
     instr2Verifier.opcode(MirInstructionOpCode::SUB);
     instr2Verifier.operandVerifier(0).verifyRegister(t->i64(), true, MIRID_INVALID);
     instr2Verifier.operandVerifier(1).verifyRegister(t->i8(), true, MIRID_INVALID); // Now reads wide promoted register
+}
+
+TEST_F(TestPromoteScalarAct, PromoteSingleBitCallImm)
+{
+    /**
+     * Input:
+     *  CALL void* %testFunc, i1 1
+     *
+     * Should be transformed into (No extension instructions needed for literals):
+     *  PUSH_ARG i8 1
+     *  CALL void* %testFunc
+     */
+    const auto *t = getTypeTable();
+    MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
+    MirOperandBuilder opBuilder(getBuilderCtx());
+
+    builder.CALL(opBuilder.buildRef(getTestFunc()), opBuilder.buildInt(t->i1(), FlexInt(0, 1)));
+
+    MirBlock *block = getTestFunc()->getEntryPoint();
+
+    runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+
+    MirInstructionVerifier instrVerifier(block->at(0));
+    instrVerifier.operandVerifier(0).verifyInteger(t->i8(), FlexInt(0, 1)); // Literal matches promoted target width
+}
+
+TEST_F(TestPromoteScalarAct, PromoteSingleBitCallReg)
+{
+    /**
+     * Input:
+     *  CALL void* %testFunc, i1 %reg
+     *
+     * Should be transformed into:
+     *  ZEXT %reg_promoted, %reg
+     *  PUSH_ARG i8 %reg_promoted
+     *  CALL void* %testFunc
+     */
+    const auto *t = getTypeTable();
+    MirBlock *block = getTestFunc()->getEntryPoint();
+    MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
+    MirOperandBuilder opBuilder(getBuilderCtx());
+
+    builder.CALL(opBuilder.buildRef(getTestFunc()), opBuilder.buildVReg(t->i1(), "testParam"));
+
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    PromoteScalarActionVerifier promoteVerifier(getBuilderCtx(), pass);
+    MirInstructionVerifier instrVerifier(block->at(1));
+
+    promoteVerifier.beginBlock(block);
+    promoteVerifier.beginBlock(getTestFunc()->getEntryPoint());
+    promoteVerifier.verifyExtension(0, MirInstructionOpCode::ZEXT, t->i1(), t->i8());
+    instrVerifier.operandVerifier(0).verifyRegister(t->i8(), true, MIRID_INVALID);
 }

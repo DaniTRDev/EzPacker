@@ -4,12 +4,13 @@
 #include "EzTripleCommon.h"
 #include "LegalizeAction.h"
 #include "DefaultLegalizerActions/PromoteScalarAction.h"
+#include "DefaultLegalizerActions/LegalizeCallAction.h"
+#include "DefaultLegalizerActions/LegalizeReturnAction.h"
 #include "DefaultLegalizerActions/ExpandScalarAction.h"
 
 struct LegalizationRule
 {
     LegalizeAction *m_action;
-    MirInstructionOpCode m_opcode;
     std::vector<size_t> m_expectedOperandTypes; /**
                                                  * List of MirType id's that are expected for this instruction. Only
                                                  * the types specified here will be checked. If id == MIRID_INVALID,
@@ -23,7 +24,7 @@ class MirLegalizer
 {
   public:
     /**
-     * Creates the legalizer with the given ctx and target descriptor attached.
+     * Creates the legalizer with the given builder ctx and target descriptor attached.
      * @param diagnosticCollector
      * @param targetDesc
      */
@@ -36,6 +37,8 @@ class MirLegalizer
      * If there's no action set for this combo, a default action will try to be invoked:
      *  - Promotion
      *  - Expansion
+     *  - LegalizeCall, ONLY FOR CALL INSTRUCTIONS (with at least 1 parameter).
+     *  - LegalizeReturn, ONLY FOR RETURN INSTRUCTIONS (with at least 1 returned value).
      * @param opcode
      * @param operands
      * @return
@@ -72,6 +75,8 @@ class MirLegalizer
   private:
     // Define the default actions linked to the target and context.
     ExpandScalarAction m_expandScalarAct;
+    LegalizeCallAction m_legalizeCallAct;
+    LegalizeReturnAction m_legalizeRetAct;
     PromoteScalarAction m_promoteScalarAct;
 
   private:

@@ -1,14 +1,15 @@
-#include "Legalizer/MirLegalizerPass.h"
+#include "Legalizer/MirBlockLegalizerPass.h"
 
-MirLegalizerPass::MirLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer) : m_ctx(ctx), m_legalizer(legalizer)
+MirBlockLegalizerPass::MirBlockLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer) :
+    m_ctx(ctx), m_legalizer(legalizer)
 {
 }
 
-const char *MirLegalizerPass::getName() const { return "MirLegalizerPass"; }
+const char *MirBlockLegalizerPass::getName() const { return "MirBlockLegalizerPass"; }
 
-MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
-                                    std::pmr::list<struct MirBlock *>::iterator it,
-                                    struct MirPassManager *passManager)
+MirPassResult MirBlockLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
+                                         std::pmr::list<struct MirBlock *>::iterator it,
+                                         struct MirPassManager *passManager)
 {
     bool modifiedRes = false, modifiedThisIt = false, succeeded = true;
     MirBlock *currentBlock = *it;
@@ -25,21 +26,21 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
 
             if (action == MIRLEGALIZE_NO_ACTION)
             {
-                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass");
+                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
                 log << "LEGAL";
                 log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
                                instr->getSourceRef());
             }
             else if (action == nullptr)
             {
-                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass");
+                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
                 log << "Could not get action for instr";
                 log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
                                instr->getSourceRef());
             }
             else
             {
-                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizerPass");
+                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
                 log << std::format("Illegal Instruction, applying {}", action->getName()).c_str();
                 log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
                                instr->getSourceRef());
@@ -75,12 +76,12 @@ MirPassResult MirLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
     return { .m_modifiedMir = modifiedRes, .m_executed = true, .m_succeeded = succeeded };
 }
 
-MirPassIterationPlace MirLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Block; }
+MirPassIterationPlace MirBlockLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Block; }
 
-void MirLegalizerPass::printResult() const
+void MirBlockLegalizerPass::printResult() const
 {
-    auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirLegalizerPass");
-    log << std::format("Printing legalization result").c_str();
+    auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirBlockLegalizerPass");
+    log << std::format("Printing block legalization result").c_str();
 
     for (auto &block : m_modifiedBlocks)
     {
