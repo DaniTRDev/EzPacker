@@ -188,7 +188,7 @@ FlexInt FlexInt::getHighHalf()
     }
 
     size_t splitWidth = m_bitWidth / 2;
-    FlexInt highPart(0ULL, splitWidth);
+    FlexInt highPart(uint64_t(0), splitWidth);
     highPart.m_isSigned = m_isSigned;
 
     if (mp_isneg(&m_number) == MP_YES)
@@ -235,7 +235,7 @@ FlexInt FlexInt::getLowHalf()
     }
 
     size_t splitWidth = m_bitWidth / 2;
-    FlexInt lowPart(0ULL, splitWidth);
+    FlexInt lowPart(uint64_t(0), splitWidth);
     lowPart.m_isSigned = false;
 
     mp_int mask;
