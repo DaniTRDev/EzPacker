@@ -1,7 +1,4 @@
 #include "FlexNumber/FlexInt.h"
-#include <stdexcept>
-#include <algorithm>
-#include <string>
 
 FlexInt::FlexInt(const FlexInt &other)
 {
