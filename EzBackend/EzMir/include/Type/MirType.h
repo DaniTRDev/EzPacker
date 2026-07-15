@@ -10,7 +10,7 @@ enum class MirTypeKind
     Integer,
     FloatingPoint,
     Pointer,
-    Array, // An array of other type.
+    Array, // An array of other type. Ex: i32 arr[3];
     Void
 };
 

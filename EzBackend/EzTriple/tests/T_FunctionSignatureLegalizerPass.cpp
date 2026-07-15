@@ -64,7 +64,12 @@ TEST_F(TestLegalizeCallAct, TestCall1Arg)
     std::pmr::list<MirRegister *> paramList = { opBuilder.buildVReg(t->i8()) };
 
     MirFunctionBuilder functionBuilder(getBuilderCtx());
-    MirFunction *func = functionBuilder.build(t->i8(), "testFunc", paramList);
+    for(auto param : paramList)
+    {
+        functionBuilder.buildParam(param);
+    }
+
+    MirFunction *func = functionBuilder.build(t->i8(), "testFunc");
 
     MirInstructionBuilder builder(getBuilderCtx(),
                                   func->getEntryPoint(),
@@ -104,7 +109,12 @@ TEST_F(TestLegalizeCallAct, TestCall4Arg)
                                                 opBuilder.buildVReg(t->i64()) };
 
     MirFunctionBuilder functionBuilder(getBuilderCtx());
-    MirFunction *func = functionBuilder.build(t->i8(), "testFunc", paramList);
+    for(auto param : paramList)
+    {
+        functionBuilder.buildParam(param);
+    }
+
+    MirFunction *func = functionBuilder.build(t->i8(), "testFunc");
 
     MirInstructionBuilder builder(getBuilderCtx(),
                                   func->getEntryPoint(),

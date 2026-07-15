@@ -1,6 +1,9 @@
 #include "Function/MirFunctionBuilder.h"
 
-MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_parameters(ctx->getFuncAllocator()), m_owner(nullptr) {}
+MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) :
+    m_ctx(ctx), m_parameters(ctx->getFuncAllocator()), m_owner(nullptr)
+{
+}
 
 MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::vector<MirFunction *> *owner) :
     MirFunctionBuilder(ctx)
@@ -21,21 +24,15 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
     return MirBlockBuilder(m_ctx, obj->getBlocksPtr());
 }
 
-MirFunction *MirFunctionBuilder::build(MirType *returnType,
-                                       const std::pmr::string &name,
-                                       const std::pmr::list<MirRegister *> &parameters,
-                                       SourceReference *sourceRef)
+MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::string &name, SourceReference *sourceRef)
 {
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
     std::pmr::polymorphic_allocator<MirFunction> funcAlloc(arena);
     std::pmr::polymorphic_allocator<MirFunctionStackFrame> funcStackFrameAlloc(arena);
     std::pmr::list<MirBlock *> blocks(arena);
 
-    // InsertAfter given parameters to the ones already registered.
-    m_parameters.insert(m_parameters.end(), parameters.begin(), parameters.end());
-
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    MirFunctionStackFrame *stackFrame =
+    auto stackFrame =
             funcStackFrameAlloc.new_object<MirFunctionStackFrame>(std::pmr::vector<StackFrameObject *>(arena));
 
     MirBlockBuilder builder(m_ctx, &blocks);
@@ -73,6 +70,12 @@ MirFunctionBuilder::buildParam(MirType *type, const std::pmr::string &name, Sour
     MirOperandBuilder builder(m_ctx);
     m_parameters.push_back(builder.buildVReg(type, name, sourceRef));
 
+    return *this;
+}
+
+MirFunctionBuilder &MirFunctionBuilder::buildParam(MirRegister *param)
+{
+    m_parameters.push_back(param);
     return *this;
 }
 

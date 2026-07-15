@@ -36,13 +36,9 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
      *
      * @param returnType    MIR type describing the function's return value.
      * @param name
-     * @param parameters    Slice of parameter operands in declaration order.
      * @param sourceRef
      */
-    MirFunction *build(MirType *returnType,
-                       const std::pmr::string &name = "",
-                       const std::pmr::list<MirRegister *> &parameters = {},
-                       SourceReference *sourceRef = nullptr);
+    MirFunction *build(MirType *returnType, const std::pmr::string &name = "", SourceReference *sourceRef = nullptr);
 
     /**
      * Creates an abstract object in the function stack frame.
@@ -61,7 +57,8 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
     StackFrameObject *buildStackSpill(size_t size, size_t align);
 
     /**
-     * Creates a parameter at the given offset. This is the only object whose offset is known at creation-time.
+     * Creates a parameter at the given offset in the function stack frame. This is the only object whose offset is
+     * known at creation-time.
      * @param size
      * @param align
      * @param offset
@@ -70,7 +67,7 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
     StackFrameObject *buildStackParam(size_t size, size_t align, int64_t offset);
 
     /**
-     * Adds a parameter into the FUTURE function that's going to be built.
+     * Adds a parameter into the FUTURE function that's going to be built. This does not affect the stack frame.
      * @param type
      * @param name
      * @param sourceRef
@@ -78,6 +75,12 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
      */
     MirFunctionBuilder &
     buildParam(MirType *type, const std::pmr::string &name = "", SourceReference *sourceRef = nullptr);
+
+    /**
+     * Appends the given already-built parameter into the function.
+     * @param param
+     */
+    MirFunctionBuilder &buildParam(MirRegister *param);
 
   private:
     MirBuilderContext *m_ctx;
