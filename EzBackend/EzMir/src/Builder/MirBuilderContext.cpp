@@ -1,11 +1,10 @@
 #include "Builder/MirBuilderContext.h"
 #include "Type/MirTypeTable.h"
 
-MirBuilderContext::MirBuilderContext(IMirTargetTypeLayout *typeLayout,
-                                     std::pmr::monotonic_buffer_resource *globalArena,
+MirBuilderContext::MirBuilderContext(std::pmr::monotonic_buffer_resource *globalArena,
                                      const std::shared_ptr<DiagnosticCollector> &diagCollector,
                                      const std::shared_ptr<MirTypeTable> &typeTable) :
-    m_currentId(1), m_typeLayout(typeLayout), m_globalResource(globalArena), m_functionResource(m_globalResource),
+    m_currentId(1), m_globalResource(globalArena), m_functionResource(m_globalResource), m_functions(m_globalResource),
     m_blockIdToBlock(m_globalResource), m_classIdToClass(m_globalResource), m_functionIdToFunc(m_globalResource),
     m_globalData(m_globalResource), m_diagCollector(diagCollector), m_typeTable(typeTable)
 {
@@ -76,6 +75,7 @@ bool MirBuilderContext::appendFunction(MirFunction *func)
         return false;
     }
 
+    m_functions.push_back(func);
     m_functionIdToFunc.insert({ func->getId(), func });
     m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext")
             << std::pmr::string(std::format("Appended function: {} (id: {})", func->getName(), func->getId()));
@@ -106,8 +106,6 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
 
     return true;
 }
-
-IMirTargetTypeLayout *MirBuilderContext::getTypeLayout() const { return m_typeLayout; }
 
 MirId MirBuilderContext::createId() { return m_currentId++; }
 
@@ -146,6 +144,8 @@ MirRegister *MirBuilderContext::getRegisterById(size_t id) const
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
 
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getFuncAllocator() { return m_functionResource; }
+
+std::pmr::list<MirFunction *> &MirBuilderContext::getFunctions() { return m_functions; }
 
 const std::shared_ptr<DiagnosticCollector> &MirBuilderContext::getDiagCollector() { return m_diagCollector; }
 

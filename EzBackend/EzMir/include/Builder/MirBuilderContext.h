@@ -29,14 +29,12 @@ class MirBuilderContext
   public:
     /**
      * Builds the context with the given type table.
-     * @param typeLayout
      * @param globalArena Used to store general data, names, ...
      * @param funcArena Used to store functions, blocks, instructions, operands, ...
      * @param diagCollector
      * @param typeTable
      */
-    MirBuilderContext(IMirTargetTypeLayout *typeLayout,
-                      std::pmr::monotonic_buffer_resource *globalArena,
+    MirBuilderContext(std::pmr::monotonic_buffer_resource *globalArena,
                       const std::shared_ptr<DiagnosticCollector> &diagCollector,
                       const std::shared_ptr<MirTypeTable> &typeTable);
 
@@ -71,12 +69,6 @@ class MirBuilderContext
      * @return
      */
     bool appendRegister(MirRegister *reg);
-
-    /**
-     * Returns the target type layout linked to this context.
-     * @return
-     */
-    IMirTargetTypeLayout *getTypeLayout() const;
 
     /**
      * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr is the
@@ -120,6 +112,12 @@ class MirBuilderContext
     std::pmr::monotonic_buffer_resource *getFuncAllocator();
 
     /**
+     * Returns the MUTABLE function list that were built in this context. Used internally by the pass manager.
+     * @return
+     */
+    std::pmr::list<MirFunction *> &getFunctions();
+
+    /**
      * Returns the diagnostic collector.
      * @return
      */
@@ -132,12 +130,13 @@ class MirBuilderContext
     const std::shared_ptr<MirTypeTable> &getTypeTable();
 
   private:
-    IMirTargetTypeLayout *m_typeLayout;
     MirId m_currentId{ 0 };
 
     // Pools.
     std::pmr::monotonic_buffer_resource *m_globalResource;
     std::pmr::monotonic_buffer_resource *m_functionResource;
+
+    std::pmr::list<MirFunction *> m_functions;
 
     std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
     std::pmr::map<MirId, MirClass *> m_classIdToClass;          // Used to search for classes.

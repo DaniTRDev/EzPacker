@@ -18,10 +18,10 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
     MirFunctionBuilder(MirBuilderContext *ctx);
 
     /**
-     * Creates the function builder linked to an owning list container.
+     * Creates the function builder linked to an owner vector container.
      * @param ctx
      */
-    MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::list<MirFunction *> *owner);
+    MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::vector<MirFunction *> *owner);
 
     /**
      * Returns a block builder attached to the current function. If this function HAS NOT been built, an invalid
@@ -81,8 +81,8 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
 
   private:
     MirBuilderContext *m_ctx;
-    std::pmr::list<MirFunction *> *m_owner;
     std::pmr::list<MirRegister *> m_parameters;
+    std::pmr::vector<MirFunction *> *m_owner;
 };
 
 #endif // EZPACKER_MIRFUNCTIONBUILDER_H

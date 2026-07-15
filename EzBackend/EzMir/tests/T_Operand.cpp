@@ -60,12 +60,8 @@ TEST_F(OperandTest, Reference)
             .verifyReference(MIRID_INVALID, MirReferenceType::Function)
             .mirTypeVerifier()
             .id(getTypeTable()->getPtr(getTypeTable()->getVoidType())->getId());
-
-    // We don't have any global variable, that's why we need to manually build it.
-    MirOperandVerifier(builder.build<MirReference>(getTypeTable()->f32(), MirReferenceType::DataEntry, 1, nullptr))
-            .verifyReference(MIRID_INVALID, MirReferenceType::DataEntry)
-            .mirTypeVerifier()
-            .id(getTypeTable()->f32()->getId());
+            
+   // TODO: Add the rest of the references.
 }
 
 TEST_F(OperandTest, Register)

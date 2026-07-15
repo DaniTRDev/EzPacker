@@ -3,12 +3,23 @@
 
 #include "EzMirCommon.h"
 #include "Function/MirFunction.h"
+#include "Type/MirType.h"
+#include <vector>
 
 struct MirClassField
 {
+    class MirClass *m_owner{ nullptr };
     MirType *m_type{ nullptr };
-    int64_t m_offset{ -1 }; // Calculated after the class has been fully created.
+    int64_t m_offset{ -1 }; // Calculated after the class has been fully created and the resolution pass has been executed.
+    size_t m_id{ size_t(-1) };
     std::pmr::string m_name{};
+};
+
+struct MirClassMethod
+{
+    class MirClass *m_owner{ nullptr };
+    MirFunction *m_func{ nullptr };
+    size_t m_id{ size_t(-1) };
 };
 
 /**
@@ -26,6 +37,7 @@ class MirClass
      * @param id
      * @param type
      * @param name
+     * @param fieldNameToField
      * @param fields
      * @param vTable
      * @param sourceRef
@@ -34,8 +46,9 @@ class MirClass
              MirId id,
              MirType *type,
              const std::pmr::string &name,
-             std::pmr::vector<MirClassField> fields,
-             std::pmr::vector<MirFunction *> vTable,
+             std::pmr::map<std::pmr::string, MirClassField*> fieldNameToField,
+             std::pmr::vector<MirClassField*> fields,
+             std::pmr::vector<MirClassMethod *> vTable,
              SourceReference *sourceRef = nullptr);
 
     /**
@@ -43,6 +56,34 @@ class MirClass
      * @return
      */
     MirClass *getParentClass() const;
+
+    /**
+     * Returns the field with the given index. If no field exists, a nullptr is returned.
+     * @param index
+     * @return MirClassField*
+     */
+    MirClassField *getFieldById(size_t index) const;
+
+    /**
+     * Searches in the field list for the given name. Returns the matching field or nullptr if not found.
+     * @param name
+     * @return
+     */
+    MirClassField *getFieldByName(const std::string_view &name) const;
+
+    /**
+     * Returns the method with the given index. If no method exists, a nullptr is returned.
+     * @param index
+     * @return
+     */
+    MirClassMethod *getMethodById(size_t index) const;
+
+    /**
+     * Returns the method that matches the full signature: return type, arguments types and name.
+     * @param returnType
+     * @return
+     */
+    MirClassMethod *getMethodBySignature(MirType *returnType, std::vector<MirType*> argsTypes, const std::string_view &name) const;
 
     /**
      * Returns the ID of this class.
@@ -63,19 +104,6 @@ class MirClass
     SourceReference *getSourceRef() const;
 
     /**
-     * Appends a field to the class.
-     * @param type
-     * @param name
-     */
-    void appendField(MirType *type, const std::pmr::string &name);
-
-    /**
-     * Appends a method to the class.
-     * @param func
-     */
-    void appendMethod(MirFunction *func);
-
-    /**
      * Returns the name of the class.
      * @return
      */
@@ -85,19 +113,13 @@ class MirClass
      * Returns an immutable list of fields.
      * @return
      */
-    const std::pmr::vector<MirClassField> &getFields() const;
-
-    /**
-     * Returns a pointer to the MUTABLE list of fields.
-     * @return
-     */
-    std::pmr::vector<MirClassField> *getFieldsPtr();
+    const std::pmr::vector<MirClassField*> &getFields() const;
 
     /**
      * Returns the VTable for this class.
      * @return
      */
-    const std::pmr::vector<MirFunction *> &getVTable() const;
+    const std::pmr::vector<MirClassMethod *> &getVTable() const;
 
   private:
     MirClass *m_parentClass; // Used for inheritance.
@@ -105,8 +127,9 @@ class MirClass
     MirType *m_type;
     SourceReference *m_sourceRef;
     std::pmr::string m_name;
-    std::pmr::vector<MirClassField> m_fields;
-    std::pmr::vector<MirFunction *> m_vTable;
+    std::pmr::map<std::pmr::string, MirClassField*> m_fieldNameToField; // Fast search by name.
+    std::pmr::vector<MirClassField*> m_fields;
+    std::pmr::vector<MirClassMethod *> m_vTable;
 };
 
 #endif // EZPACKER_MIRCLASS_H

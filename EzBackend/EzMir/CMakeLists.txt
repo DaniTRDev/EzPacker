@@ -52,11 +52,13 @@ set(EZMIR_FILES_LIST
 
 set(MIRTESTSUITE_FILES_LIST
         "tests/EzMirTestSuite/EzMirTestSuite.h"
+        "tests/EzMirTestSuite/TestTargetTypeLayout.h"
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.h"
         "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.h"
         "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.h"
 
         "tests/EzMirTestSuite/EzMirTestSuite.cpp"
+        "tests/EzMirTestSuite/TestTargetTypeLayout.cpp"
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.cpp"

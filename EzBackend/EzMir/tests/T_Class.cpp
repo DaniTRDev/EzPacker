@@ -1,111 +1,109 @@
 #include <gtest/gtest.h>
 #include "EzMirTestSuite/EzMirTestSuite.h"
-#include "Printer/MirPrinter.h" // For verifying printer integration optionally
-
-// TODO: Finish.
 
 class ClassTest : public MirTestSuiteAsGtest
 {
   public:
   protected:
-    // Helper to fetch the test target type layout
-    IMirTargetTypeLayout *getLayout() { return getBuilderCtx()->getTypeTable()->getTypeLayout(); }
 };
 
-// 1. Tests a standard base class with no parent
-TEST_F(ClassTest, TestBaseClassSimpleLayout)
+// 1. Verifies that a base class with no parent builds correctly with standard fields.
+TEST_F(ClassTest, TestBaseClassSimpleCreation)
 {
     MirBuilderContext *ctx = getBuilderCtx();
     MirTypeTable *types = getTypeTable();
 
-    // Field configuration: i32 (4 bytes), Pointer (8 bytes assuming 64-bit target)
-    MirType *i32Type = types->i32();
-    MirType *ptrType = types->getPtr(types->i8());
+    MirClassBuilder builder(ctx);
+    builder.appendField(types->i32(), "m_id");
+    builder.appendField(types->getPtr(types->i8()), "m_namePtr");
 
-    // Construct the class instance
-    std::pmr::vector<MirType *> fields({ i32Type, ptrType }, getGlobalArena());
-    MirType *classType = types->getClass(fields, "MyBaseClass");
+    MirClass *baseClass = builder.build(nullptr, "BaseClass");
 
-    // Retrieve or instantiate your class object wrapper
-    // (Assuming MirClass maps directly to/is generated from its Type Struct)
-    MirClass *baseClass = getMirClassRegistry()->createClass("MyBaseClass", classType);
-    baseClass->addField("m_id", i32Type, 0x8);   // 8-byte offset after vptr
-    baseClass->addField("m_ptr", ptrType, 0x10); // Aligned to 8-byte boundary
-
-    // Verify properties
+    // Verify properties using our custom Class verifier
     MirClassVerifier(baseClass)
-            .className("MyBaseClass")
+            .className("BaseClass")
             .parentClass(nullptr)
-            .classType(classType)
-            .fieldCount(2)
-            .verifyField(0, "m_id", i32Type, 0x8)
-            .verifyField(1, "m_ptr", ptrType, 0x10)
+            .fieldCount(2) // No vTable field expected because no virtual methods were appended
+            .verifyField(0, "m_id", types->i32())
+            .verifyField(1, "m_namePtr", types->getPtr(types->i8()))
             .vTableSize(0);
+
+    // Verify lookup by name API functions directly
+    EXPECT_NE(baseClass->getFieldByName("m_id"), nullptr);
+    EXPECT_EQ(baseClass->getFieldByName("m_id")->m_id, 0);
+    EXPECT_EQ(baseClass->getFieldByName("nonExistent"), nullptr);
 }
 
-// 2. Tests struct/class alignment & tail-padding rules via the TypeTable directly
-TEST_F(ClassTest, TestClassAlignmentAndPadding)
-{
-    MirTypeTable *types = getTypeTable();
-
-    // Configuration: i8 (1 byte), i64 (8 bytes), i8 (1 byte)
-    // Expected Layout:
-    // [0-7]   : vptr (8 bytes)
-    // [8]     : i8 Field
-    // [9-15]  : Padding (to align the i64 to an 8-byte boundary)
-    // [16-23] : i64 Field
-    // [24]    : i8 Field
-    // [25-31] : Tail padding to round up the structure size to a multiple of 8 (max alignment)
-    // Expected Size: 32 bytes (256 bits)
-    std::pmr::vector<MirType *> fields({ types->i8(), types->i64(), types->i8() }, getGlobalArena());
-    MirType *classType = types->getClass(fields, "PaddedClass");
-
-    EXPECT_EQ(classType->getTotalSizeInBytes(), 32);
-    EXPECT_EQ(classType->getTotalSizeInBits(), 256);
-}
-
-// 3. Tests Single Inheritance with layout verification and VTable slot inheritance
-TEST_F(ClassTest, TestSingleInheritanceVTableOverriding)
+// 2. Verifies that adding a method forces the automatic injection of a "vTable" field at offset 0.
+TEST_F(ClassTest, TestClassWithVTableFieldGeneration)
 {
     MirBuilderContext *ctx = getBuilderCtx();
     MirTypeTable *types = getTypeTable();
 
-    // Create a dummy Base class
-    std::pmr::vector<MirType *> baseFields({ types->i32() }, getGlobalArena());
-    MirType *baseType = types->getClass(baseFields, "Base");
-    MirClass *baseClass = getMirClassRegistry()->createClass("Base", baseType);
+    MirFunctionBuilder funcBuilder(ctx);
+    MirFunction *mockFunc = funcBuilder.build(types->getVoidType(), "virtualFunc");
 
-    // Create dummy base functions for the VTable
-    MirFunctionBuilder fBuilder(ctx);
-    MirFunction *baseFunc1 = fBuilder.build(types->getVoidType(), "foo");
-    MirFunction *baseFunc2 = fBuilder.build(types->getVoidType(), "bar");
+    MirClassBuilder builder(ctx);
+    builder.appendField(types->i64(), "m_data");
+    builder.appendMethod(mockFunc);
 
-    baseClass->addVTableSlot(baseFunc1); // Slot 0
-    baseClass->addVTableSlot(baseFunc2); // Slot 1
+    MirClass *vClass = builder.build(nullptr, "VirtualClass");
 
-    // Verify Base Class
-    MirClassVerifier(baseClass).className("Base").vTableSize(2).vTableSlot(0, baseFunc1).vTableSlot(1, baseFunc2);
+    // Because a method was added, the builder prepends the "vTable" field array pointer first.
+    MirClassVerifier(vClass)
+            .className("VirtualClass")
+            .fieldCount(2)
+            .verifyField(0, "vTable", nullptr) // Underlying VTable array pointer field
+            .verifyField(1, "m_data", types->i64())
+            .vTableSize(1)
+            .vTableSlot(0, mockFunc);
+}
 
-    // Create a Derived class inheriting from Base
-    std::pmr::vector<MirType *> derivedFields({ types->i32(), types->i64() }, getGlobalArena());
-    MirType *derivedType = types->getClass(derivedFields, "Derived");
-    MirClass *derivedClass = getMirClassRegistry()->createClass("Derived", derivedType, baseClass);
+// 3. Verifies single inheritance, field preservation, and method overriding.
+TEST_F(ClassTest, TestSingleInheritanceAndMethodOverriding)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirTypeTable *types = getTypeTable();
+    MirFunctionBuilder funcBuilder(ctx);
 
-    // Overridden method replacing baseFunc2 (Slot 1), and a new custom method (Slot 2)
-    MirFunction *derivedOverrideFunc = fBuilder.build(types->getVoidType(), "bar_overridden");
-    MirFunction *derivedNewFunc = fBuilder.build(types->getVoidType(), "baz_new");
+    // Create the Base parent layout
+    MirFunction *baseFoo = funcBuilder.build(types->getVoidType(), "foo");
+    MirFunction *baseBar = funcBuilder.build(types->i32(), "bar");
 
-    derivedClass->addVTableSlot(baseFunc1);           // Slot 0 (inherited)
-    derivedClass->addVTableSlot(derivedOverrideFunc); // Slot 1 (overridden!)
-    derivedClass->addVTableSlot(derivedNewFunc);      // Slot 2 (appended!)
+    MirClassBuilder baseBuilder(ctx);
+    baseBuilder.appendField(types->i32(), "m_baseVal");
+    baseBuilder.appendMethod(baseFoo);
+    baseBuilder.appendMethod(baseBar);
+    MirClass *parentClass = baseBuilder.build(nullptr, "Parent");
 
-    // Verify Derived Class structural invariants
-    MirClassVerifier(derivedClass)
-            .className("Derived")
-            .parentClass(baseClass)
-            .classType(derivedType)
-            .vTableSize(3)
-            .vTableSlot(0, baseFunc1)           // Unchanged
-            .vTableSlot(1, derivedOverrideFunc) // Overridden
-            .vTableSlot(2, derivedNewFunc);     // Added
+    // Create the Derived child layout
+    // We want to override 'bar' (matching return type + name + parameter bounds)
+    MirFunction *derivedBarOverride = funcBuilder.build(types->i32(), "bar");
+    MirFunction *derivedNewFunc = funcBuilder.build(types->getVoidType(), "baz");
+
+    MirClassBuilder childBuilder(ctx);
+    childBuilder.appendField(types->f64(), "m_childVal");
+    childBuilder.appendMethod(derivedBarOverride); // This should overwrite parent's slot in-place!
+    childBuilder.appendMethod(derivedNewFunc);     // This should be appended to the end.
+
+    MirClass *childClass = childBuilder.build(parentClass, "Child");
+
+    // Verify Child structural layout constraints
+    MirClassVerifier(childClass)
+            .className("Child")
+            .parentClass(parentClass)
+            .fieldCount(3) // 1. vTable, 2. m_baseVal (inherited), 3. m_childVal (new)
+            .verifyField(0, "vTable", nullptr)
+            .verifyField(1, "m_baseVal", types->i32())
+            .verifyField(2, "m_childVal", types->f64())
+            .vTableSize(3)                     // foo (inherited), bar (overridden), baz (new)
+            .vTableSlot(0, baseFoo)            // Inherited completely unchanged from Parent
+            .vTableSlot(1, derivedBarOverride) // Overwritten safely inside slot 1
+            .vTableSlot(2, derivedNewFunc);    // Appended at slot 2
+
+    // Test getMethodBySignature API lookup routine
+    MirClassMethod *lookupResult = childClass->getMethodBySignature(types->i32(), {}, "bar");
+    ASSERT_NE(lookupResult, nullptr);
+    EXPECT_EQ(lookupResult->m_func, derivedBarOverride);
+    EXPECT_EQ(lookupResult->m_id, 1); // Confirms VTable ID is locked to slot 1
 }

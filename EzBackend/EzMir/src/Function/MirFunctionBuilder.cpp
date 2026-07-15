@@ -1,8 +1,8 @@
 #include "Function/MirFunctionBuilder.h"
 
-MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_parameters(ctx->getFuncAllocator()) {}
+MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_parameters(ctx->getFuncAllocator()), m_owner(nullptr) {}
 
-MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::list<MirFunction *> *owner) :
+MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::vector<MirFunction *> *owner) :
     MirFunctionBuilder(ctx)
 {
     m_owner = owner;

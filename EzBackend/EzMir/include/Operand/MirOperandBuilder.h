@@ -4,6 +4,7 @@
 #include "EzMirCommon.h"
 #include "Builder/MirBuilder.h"
 #include "Builder/MirBuilderContext.h"
+#include "Class/MirClass.h"
 
 class MirOperandBuilder : public MirBuilder<MirOperand>
 {
@@ -93,11 +94,18 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirReference *buildRef(MirGlobalDataEntry *entry, size_t offset, SourceReference *ref = nullptr);
 
     /**
-     * Creates a reference to the given struct field.
-     * @param structPtr
+     * Creates a reference to the given class field.
+     * @param classPtr
      * @param field
      */
-    MirReference *buildRef(MirRegister *structPtr, class MirStructField *field, SourceReference *ref = nullptr);
+    MirReference *buildRef(MirRegister *classPtr, MirClassField *field, SourceReference *ref = nullptr);
+
+    /**
+     * Creates a reference to the given class method.
+     * @param classPtr
+     * @param field
+     */
+    MirReference *buildRef(MirRegister *classPtr, MirClassMethod *method, SourceReference *ref = nullptr);
 
     /**
      * Builds a runtime symbol that will later be resolved by the backend. A runtime symbol is a symbol that

@@ -4,6 +4,7 @@
 #include "EzMirCommon.h"
 #include "Builder/MirBuilder.h"
 #include "Builder/MirBuilderContext.h"
+#include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
 
 class MirClassBuilder : public MirBuilder<MirClass>
@@ -16,46 +17,14 @@ class MirClassBuilder : public MirBuilder<MirClass>
     MirClassBuilder(MirBuilderContext *ctx);
 
     /**
-     * Builds a class WITHOUT a parent (non-derived class). It will set appended fields (through appendField) and
-     * methods (through methodBuilder) FIRST, fields and methods given in parameters will be appended AFTER.
-     * @param name
-     * @param fields
-     * @param methods
-     * @param sourceRef
-     * @return
-     */
-    MirClass *build(const std::pmr::string &name,
-                    const std::pmr::vector<MirClassField> &fields,
-                    const std::pmr::vector<MirFunction *> &methods,
-                    SourceReference *sourceRef = nullptr);
-
-    /**
-     * Builds a class WITH a parent (derived class). It will set parent fields and methods FIRST, appended fields
-     * (through appendField) and methods (through methodBuilder) AFTER, fields and methods given in parameters will be
-     * appended AFTER.
+     * Builds a class WITH or WITHOUT a parent (derived class). It will set parent fields and methods FIRST, appended fields
+     * (through appendField) and methods (through methodBuilder) AFTER.
      * @param parent
      * @param name
-     * @param fields
-     * @param methods
      * @param sourceRef
      * @return
      */
-    MirClass *buildDerived(MirClass *parent,
-                           const std::pmr::string &name,
-                           const std::pmr::vector<MirClassField> &fields,
-                           const std::pmr::vector<MirFunction *> &methods,
-                           SourceReference *sourceRef = nullptr);
-
-    /**
-     * Returns a function builder that is attached to this class. This means:
-     *  - Resulting function will be pushed into this class's vTable.
-     *  - First argument will be set as a this pointer.
-     *
-     *  To call this method, the class MUST have been built. If it wasn't, an error is set to the diag collector and
-     *  an INVALID function builder is returned.
-     * @return
-     */
-    MirFunctionBuilder methodBuilder();
+    MirClass *build(MirClass *parent, const std::pmr::string &name, SourceReference *sourceRef = nullptr);
 
     /**
      * Appends a field to the class.
@@ -64,10 +33,15 @@ class MirClassBuilder : public MirBuilder<MirClass>
      */
     void appendField(MirType *type, const std::pmr::string &name);
 
+    /**
+     * Appends a method to the class vTable. It is responsible for the caller to setup a THIS pointer to the class.
+     */
+    void appendMethod(MirFunction *method);
+
   private:
     MirBuilderContext *m_ctx;
-    std::pmr::vector<MirClassField> m_fields;
-    std::pmr::list<MirFunction *> m_vTable;
+    std::pmr::vector<MirClassField*> m_fields;
+    std::pmr::vector<MirClassMethod *> m_vTable;
 };
 
 #endif // EZPACKER_MIRCLASSBUILDER_H

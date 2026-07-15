@@ -25,17 +25,17 @@ std::string MirPrinter::printToString(MirClass *_class, MirPrinterDetail detail)
     }
     else
     {
-        for (const auto &field : _class->getFields())
+        for (auto &field : _class->getFields())
         {
             result += std::format("\t%field.name={}.type={}.offset={:#X}\n",
-                                  field.m_name,
-                                  field.m_type->getName(),
-                                  field.m_offset);
+                                  field->m_name,
+                                  field->m_type->getName(),
+                                  field->m_offset);
         }
     }
 
     result += " - VTable Layout:\n";
-    const auto &vTable = _class->getVTable();
+    auto &vTable = _class->getVTable();
     if (vTable.empty())
     {
         result += "\t<None/Empty>\n";
@@ -44,7 +44,7 @@ std::string MirPrinter::printToString(MirClass *_class, MirPrinterDetail detail)
     {
         for (size_t i = 0; i < vTable.size(); ++i)
         {
-            MirFunction *func = vTable[i];
+            MirFunction *func = vTable[i]->m_func;
 
             if (detail == MirPrinterDetail::Detailed)
             {

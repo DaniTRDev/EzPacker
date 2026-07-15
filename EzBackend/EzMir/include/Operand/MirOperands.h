@@ -14,7 +14,8 @@ enum class MirReferenceType : uint8_t
     Block,
     DataEntry,
     Function,
-    StructField
+    ClassField,
+    ClassMethod
 };
 
 class MirFloat : public MirOperand
@@ -58,8 +59,10 @@ class MirInteger : public MirOperand
  *  - Block -> refId = id of the MirBlock referenced. Offset = 0.
  *  - DataEntry -> refId = id of the MirGlobalDataEntry referenced. Offset = Offset of the data entry.
  *  - Function -> refId = id of the MirFunction referenced. Offset = 0.
- *  - StructField -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
+ *  - ClassField -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
  *  field.
+ * - ClassMethod -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
+ *  method.
  */
 class MirReference : public MirOperand
 {
@@ -74,7 +77,8 @@ class MirReference : public MirOperand
     bool isBlock() const { return m_refType == MirReferenceType::Block; }
     bool isDataEntry() const { return m_refType == MirReferenceType::DataEntry; }
     bool isFunction() const { return m_refType == MirReferenceType::Function; }
-    bool isStructField() const { return m_refType == MirReferenceType::StructField; }
+    bool isClassField() const { return m_refType == MirReferenceType::ClassField; }
+    bool isClassMethod() const { return m_refType == MirReferenceType::ClassMethod; }
     bool isInvalid() const { return m_refType == MirReferenceType::Invalid; }
 
     MirReferenceType getRefType() const { return m_refType; }
@@ -96,10 +100,15 @@ class MirReference : public MirOperand
         {
             src = "func";
         }
-        else if (isStructField())
+        else if (isClassField())
         {
-            src = "struct";
-            return std::format("{} %ref.id={}.src={}.off={}", getMirType()->getName(), m_refId, src, m_offset);
+            src = "classField";
+            return std::format("{} %class.id={}.src={}.fieldId={}", getMirType()->getName(), m_refId, src, m_offset);
+        }
+        else if (isClassMethod())
+        {
+            src = "classMethod";
+            return std::format("{} %class.id={}.src={}.methodId={}", getMirType()->getName(), m_refId, src, m_offset);
         }
 
         return std::format("{} %ref.id={}.src={}", getMirType()->getName(), m_refId, src);

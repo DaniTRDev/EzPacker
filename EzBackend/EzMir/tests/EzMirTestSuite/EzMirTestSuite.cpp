@@ -13,7 +13,8 @@ MirTypeTable *EzMirTestSuite::getTypeTable() { return m_typeTable.get(); }
 void EzMirTestSuite::create(const std::filesystem::path &workingPath)
 {
     m_diagCollector = std::make_shared<DiagnosticCollector>();
-    m_typeTable = std::make_shared<MirTypeTable>(&m_arena);
+    m_typeLayout = createTypeLayout();
+    m_typeTable = std::make_shared<MirTypeTable>(m_typeLayout.get(), &m_arena);
     m_builderCtx = std::make_shared<MirBuilderContext>(&m_arena, m_diagCollector, m_typeTable);
     m_sourceManager = std::make_shared<SourceManager>(workingPath);
     m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
@@ -97,7 +98,15 @@ MirInstruction *EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode op
               opBuilder.buildMem(srcOperType, opBuilder.buildVReg(getTypeTable()->i64(), "testBase"), displacement) });
 }
 
-std::pmr::list<MirFunction *> &EzMirTestSuite::getFunctions() { return m_builderCtx->getFunctions(); }
+std::pmr::list<MirFunction*> &EzMirTestSuite::getFunctions()
+{
+    return getBuilderCtx()->getFunctions();
+}
+
+std::shared_ptr<IMirTargetTypeLayout> EzMirTestSuite::createTypeLayout()
+{
+    return std::make_shared<TestTargetTypeLayout>();
+}
 
 void MirTestSuiteAsGtest::SetUp()
 {

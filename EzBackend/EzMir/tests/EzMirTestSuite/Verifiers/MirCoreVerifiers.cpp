@@ -433,14 +433,14 @@ MirClassVerifier &MirClassVerifier::verifyField(size_t fieldIdx,
         EXPECT_LT(fieldIdx, fields.size()) << "Field index out of bounds on class " << m_testedObj->getName();
 
         const auto &field = fields[fieldIdx];
-        EXPECT_EQ(field.m_name, expectedName);
+        EXPECT_EQ(field->m_name, expectedName);
         if (expectedType)
         {
-            EXPECT_EQ(field.m_type, expectedType);
+            EXPECT_EQ(field->m_type, expectedType);
         }
         if (expectedOffset != -1)
         {
-            EXPECT_EQ(field.m_offset, static_cast<uint64_t>(expectedOffset));
+            EXPECT_EQ(field->m_offset, static_cast<uint64_t>(expectedOffset));
         }
     }
     return *this;
@@ -463,7 +463,7 @@ MirClassVerifier &MirClassVerifier::vTableSlot(size_t slotIndex, MirFunction *ex
     {
         const auto &vTable = m_testedObj->getVTable();
         EXPECT_LT(slotIndex, vTable.size()) << "VTable slot index out of bounds on class " << m_testedObj->getName();
-        EXPECT_EQ(vTable[slotIndex], expectedFunc);
+        EXPECT_EQ(vTable[slotIndex]->m_func->getId(), expectedFunc->getId());
     }
     return *this;
 }

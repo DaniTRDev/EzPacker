@@ -57,13 +57,20 @@ MirReference *MirOperandBuilder::buildRef(MirGlobalDataEntry *entry, size_t offs
     return build<MirReference>(ptr, MirReferenceType::DataEntry, entry->m_entryId, offset, ref);
 }
 
-MirReference *MirOperandBuilder::buildRef(MirRegister *structPtr, struct MirStructField *field, SourceReference *ref)
+MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassField *field, SourceReference *ref)
 {
-    // TODO
     auto &t = m_ctx->getTypeTable();
-    MirType *fieldPtrType = t->getPtr(field->m_dataType);
+    MirType *fieldPtrType = t->getPtr(field->m_type);
 
-    return build<MirReference>(fieldPtrType, MirReferenceType::StructField, structPtr->getRegId(), field->getId(), ref);
+    return build<MirReference>(fieldPtrType, MirReferenceType::ClassField, classPtr->getRegId(), field->m_id, ref);
+}
+
+MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassMethod *method, SourceReference *ref)
+{
+    auto &t = m_ctx->getTypeTable();
+    MirType *fieldPtrType = t->getPtr(method->m_func->getReturnType());
+
+    return build<MirReference>(fieldPtrType, MirReferenceType::ClassMethod, classPtr->getRegId(), method->m_id, ref);
 }
 
 MirRuntimeSymbol *MirOperandBuilder::buildRtSymbol(std::pmr::string symbolName, SourceReference *ref)
