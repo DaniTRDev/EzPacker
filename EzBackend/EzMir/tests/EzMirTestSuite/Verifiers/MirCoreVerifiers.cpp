@@ -378,3 +378,92 @@ MirFunctionStackFrameVerifier MirFunctionVerifier::stackFrameVerifier()
 {
     return MirFunctionStackFrameVerifier(getTestedObj()->getStackFrame());
 }
+
+MirClassVerifier::MirClassVerifier(MirClass *_class) : MirVerifier<MirClass>(_class) {}
+
+MirClassVerifier &MirClassVerifier::className(const std::string_view &expectedName)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getName(), expectedName);
+    }
+    return *this;
+}
+
+MirClassVerifier &MirClassVerifier::classType(MirType *expectedType)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getType(), expectedType);
+    }
+    return *this;
+}
+
+MirClassVerifier &MirClassVerifier::parentClass(MirClass *expectedParent)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getParentClass(), expectedParent);
+    }
+    return *this;
+}
+
+MirClassVerifier &MirClassVerifier::fieldCount(size_t count)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getFields().size(), count);
+    }
+    return *this;
+}
+
+MirClassVerifier &MirClassVerifier::verifyField(size_t fieldIdx,
+                                                const std::string_view &expectedName,
+                                                MirType *expectedType,
+                                                int64_t expectedOffset)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        const auto &fields = m_testedObj->getFields();
+        EXPECT_LT(fieldIdx, fields.size()) << "Field index out of bounds on class " << m_testedObj->getName();
+
+        const auto &field = fields[fieldIdx];
+        EXPECT_EQ(field.m_name, expectedName);
+        if (expectedType)
+        {
+            EXPECT_EQ(field.m_type, expectedType);
+        }
+        if (expectedOffset != -1)
+        {
+            EXPECT_EQ(field.m_offset, static_cast<uint64_t>(expectedOffset));
+        }
+    }
+    return *this;
+}
+
+MirClassVerifier &MirClassVerifier::vTableSize(size_t expectedSlotCount)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getVTable().size(), expectedSlotCount);
+    }
+    return *this;
+}
+
+MirClassVerifier &MirClassVerifier::vTableSlot(size_t slotIndex, MirFunction *expectedFunc)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        const auto &vTable = m_testedObj->getVTable();
+        EXPECT_LT(slotIndex, vTable.size()) << "VTable slot index out of bounds on class " << m_testedObj->getName();
+        EXPECT_EQ(vTable[slotIndex], expectedFunc);
+    }
+    return *this;
+}

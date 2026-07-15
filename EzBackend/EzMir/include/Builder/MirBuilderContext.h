@@ -7,7 +7,9 @@
 
 #include "EzMirCommon.h"
 #include "Block/MirBlock.h"
+#include "Class/MirClass.h"
 #include "Function/MirFunction.h"
+#include "Type/IMirTargetTypeLayout.h"
 #include "Type/MirTypeTable.h"
 
 /**
@@ -27,12 +29,14 @@ class MirBuilderContext
   public:
     /**
      * Builds the context with the given type table.
+     * @param typeLayout
      * @param globalArena Used to store general data, names, ...
      * @param funcArena Used to store functions, blocks, instructions, operands, ...
      * @param diagCollector
      * @param typeTable
      */
-    MirBuilderContext(std::pmr::monotonic_buffer_resource *globalArena,
+    MirBuilderContext(IMirTargetTypeLayout *typeLayout,
+                      std::pmr::monotonic_buffer_resource *globalArena,
                       const std::shared_ptr<DiagnosticCollector> &diagCollector,
                       const std::shared_ptr<MirTypeTable> &typeTable);
 
@@ -48,6 +52,13 @@ class MirBuilderContext
     bool appendBlock(MirBlock *block);
 
     /**
+     * Appends the class to the context. Returns true if succeeded.
+     * @param block
+     * @return
+     */
+    bool appendClass(MirClass *_class);
+
+    /**
      * Appends the function to the context. Returns true if succeeded.
      * @param func
      * @return
@@ -60,6 +71,12 @@ class MirBuilderContext
      * @return
      */
     bool appendRegister(MirRegister *reg);
+
+    /**
+     * Returns the target type layout linked to this context.
+     * @return
+     */
+    IMirTargetTypeLayout *getTypeLayout() const;
 
     /**
      * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr is the
@@ -91,12 +108,6 @@ class MirBuilderContext
     MirRegister *getRegisterById(size_t id) const;
 
     /**
-     * Returns the MUTABLE list of functions that have been built in this context.
-     * @return
-     */
-    std::pmr::list<MirFunction *> &getFunctions();
-
-    /**
      * Returns an allocator used to allocate complementary resources (global data, types, names, maps...).
      * @return
      */
@@ -121,16 +132,17 @@ class MirBuilderContext
     const std::shared_ptr<MirTypeTable> &getTypeTable();
 
   private:
+    IMirTargetTypeLayout *m_typeLayout;
     MirId m_currentId{ 0 };
 
     // Pools.
     std::pmr::monotonic_buffer_resource *m_globalResource;
     std::pmr::monotonic_buffer_resource *m_functionResource;
 
-    std::pmr::list<MirFunction *> m_functions;
-    std::pmr::map<size_t, MirFunction *> m_functionIdToFunc; // Used to search for functions.
-    std::pmr::map<size_t, MirBlock *> m_blockIdToBlock;      // Used to search for blocks.
-    std::pmr::map<size_t, MirRegister *> m_registerIdToRegister;
+    std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
+    std::pmr::map<MirId, MirClass *> m_classIdToClass;          // Used to search for classes.
+    std::pmr::map<MirId, MirFunction *> m_functionIdToFunc;     // Used to search for functions.
+    std::pmr::map<MirId, MirRegister *> m_registerIdToRegister; // Used to search for registers.
 
     std::pmr::vector<MirGlobalDataEntry *> m_globalData;
 

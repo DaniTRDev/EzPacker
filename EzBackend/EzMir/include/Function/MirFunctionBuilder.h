@@ -12,13 +12,20 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
 {
   public:
     /**
-     * Craetes the function builder with the given context.
+     * Creates the function builder with the given context.
      * @param ctx
      */
     MirFunctionBuilder(MirBuilderContext *ctx);
 
     /**
-     * Returns a block builder attached to the current function.
+     * Creates the function builder linked to an owning list container.
+     * @param ctx
+     */
+    MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::list<MirFunction *> *owner);
+
+    /**
+     * Returns a block builder attached to the current function. If this function HAS NOT been built, an invalid
+     * block builder is returned and a diagnostic error is pushed.
      * @param sourceRef
      * @return
      */
@@ -54,8 +61,7 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
     StackFrameObject *buildStackSpill(size_t size, size_t align);
 
     /**
-     * Creates a parameter at the given offset. This is the only object whose offset is known at creation-time as this
-     * is directly dictated by ABI.
+     * Creates a parameter at the given offset. This is the only object whose offset is known at creation-time.
      * @param size
      * @param align
      * @param offset
@@ -75,6 +81,7 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
 
   private:
     MirBuilderContext *m_ctx;
+    std::pmr::list<MirFunction *> *m_owner;
     std::pmr::list<MirRegister *> m_parameters;
 };
 

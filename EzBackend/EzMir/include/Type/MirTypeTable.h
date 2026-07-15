@@ -3,25 +3,29 @@
 
 #include "EzCoreCommon.h"
 #include "MirType.h"
+#include "IMirTargetTypeLayout.h"
 
 /**
  * Class used to store the least minimum required types so everything else works.
+ *
+ * IMPORTANT: When created, types are aligned using the given target type layout.
  */
 class MirTypeTable
 {
   public:
     /**
-     * Creates the type table with the given arena allocator.
+     * Creates the type table with the given target type layout and arena allocator.
+     * @param typeLayout
      * @param globalArena
      */
-    MirTypeTable(std::pmr::memory_resource *globalArena);
+    MirTypeTable(IMirTargetTypeLayout *typeLayout, std::pmr::memory_resource *globalArena);
 
     // Disable copies to safeguard our arena resource mappings
     MirTypeTable(const MirTypeTable &) = delete;
     MirTypeTable &operator=(const MirTypeTable &) = delete;
 
     /**
-     * Creates a unique base or compound type.
+     * Creates a unique base or compound type. If there was an error while creating the type nullptr is returned.
      * @param kind
      * @param totalSizeInBits
      * @param subTypes
@@ -32,6 +36,15 @@ class MirTypeTable
                     size_t totalSizeInBits,
                     std::pmr::vector<MirType *> subTypes,
                     const std::string_view &name);
+
+    /**
+     * Creates a class type (if it does not exist). Returns the existing type if it was already created or nullptr if
+     * there was any error.
+     * @param fieldTypes
+     * @param name
+     * @return
+     */
+    MirType *getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &name);
 
     /**
      * Interns pointer types. Guarantees that getPtr(T) always returns the exact same type instance pointer.
@@ -62,14 +75,6 @@ class MirTypeTable
      */
     MirType *getMirTypeById(size_t id) const;
 
-    /**
-     * Creates an struct type (if it does not exist). Returns the existing type if it was already created.
-     * @param fieldTypes
-     * @param structName
-     * @return
-     */
-    MirType *getStruct(std::pmr::vector<MirType *> fieldTypes, const std::string_view &structName);
-
     MirType *getVoidType() const;
     MirType *i1() const;
     MirType *i8() const;
@@ -89,7 +94,7 @@ class MirTypeTable
     void initialize();
 
   private:
-    std::pmr::memory_resource *m_arena;
+    IMirTargetTypeLayout *m_typeLayout{ nullptr };
     size_t m_currentId{ 0 };
 
     // Built-in basic primitives
@@ -105,6 +110,8 @@ class MirTypeTable
     MirType *m_float32Type{ nullptr };
     MirType *m_float64Type{ nullptr };
     MirType *m_float128Type{ nullptr };
+
+    std::pmr::memory_resource *m_arena;
 
     // High performance tracking hashes using PMR mapping blocks
     std::pmr::unordered_map<std::pmr::string, MirType *> m_typeNames;

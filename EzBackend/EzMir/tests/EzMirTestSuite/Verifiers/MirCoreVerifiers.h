@@ -424,4 +424,74 @@ class MirFunctionVerifier : public MirVerifier<MirFunction>
     MirFunctionStackFrameVerifier stackFrameVerifier();
 };
 
+/**
+ * Class used to verify the properties of a MirClass (including inheritance, fields, and VTable layout).
+ */
+class MirClassVerifier : public MirVerifier<MirClass>
+{
+  public:
+    /**
+     * Creates the verifier attached to the given class.
+     * @param _class
+     */
+    MirClassVerifier(MirClass *_class);
+
+    /**
+     * Verifies that the class name matches the expected name.
+     * @param expectedName
+     * @return
+     */
+    MirClassVerifier &className(const std::string_view &expectedName);
+
+    /**
+     * Verifies that the class's underlying MirType matches the expected type.
+     * @param expectedType
+     * @return
+     */
+    MirClassVerifier &classType(MirType *expectedType);
+
+    /**
+     * Verifies that the class has an expected parent class.
+     * Pass nullptr to verify that the class is a root base class.
+     * @param expectedParent
+     * @return
+     */
+    MirClassVerifier &parentClass(MirClass *expectedParent);
+
+    /**
+     * Verifies that the class contains exactly the expected number of fields.
+     * @param count
+     * @return
+     */
+    MirClassVerifier &fieldCount(size_t count);
+
+    /**
+     * Verifies the details of a specific class field by index.
+     * @param fieldIdx Index of the field in layout order
+     * @param expectedName Expected string name of the field
+     * @param expectedType Expected type pointer
+     * @param expectedOffset Expected byte offset (if -1, offset check is ignored)
+     * @return
+     */
+    MirClassVerifier &verifyField(size_t fieldIdx,
+                                  const std::string_view &expectedName,
+                                  MirType *expectedType,
+                                  int64_t expectedOffset = -1);
+
+    /**
+     * Verifies that the VTable has exactly the expected size (virtual function slot count).
+     * @param expectedSlotCount
+     * @return
+     */
+    MirClassVerifier &vTableSize(size_t expectedSlotCount);
+
+    /**
+     * Verifies that a specific slot in the class's VTable points to the expected function.
+     * @param slotIndex
+     * @param expectedFunc
+     * @return
+     */
+    MirClassVerifier &vTableSlot(size_t slotIndex, MirFunction *expectedFunc);
+};
+
 #endif // EZPACKER_MIRCOREVERIFIERS_H

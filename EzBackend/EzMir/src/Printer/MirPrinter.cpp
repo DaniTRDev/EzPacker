@@ -1,5 +1,81 @@
 #include "Printer/MirPrinter.h"
-#include <format>
+
+std::string MirPrinter::printToString(MirClass *_class, MirPrinterDetail detail)
+{
+    if (!_class)
+        return "";
+
+    std::string result = std::format("\n{:#^50}\n", " Class Dump ");
+
+    std::string parentInfo = "";
+    if (_class->getParentClass() != nullptr)
+    {
+        parentInfo = std::format(".parent={}", _class->getParentClass()->getName());
+    }
+
+    result += std::format("%class.name={}.size={}{}\n",
+                          _class->getName(),
+                          _class->getType()->getTotalSizeInBytes(),
+                          parentInfo);
+
+    result += " - Fields:\n";
+    if (_class->getFields().empty())
+    {
+        result += "\t<None>\n";
+    }
+    else
+    {
+        for (const auto &field : _class->getFields())
+        {
+            result += std::format("\t%field.name={}.type={}.offset={:#X}\n",
+                                  field.m_name,
+                                  field.m_type->getName(),
+                                  field.m_offset);
+        }
+    }
+
+    result += " - VTable Layout:\n";
+    const auto &vTable = _class->getVTable();
+    if (vTable.empty())
+    {
+        result += "\t<None/Empty>\n";
+    }
+    else
+    {
+        for (size_t i = 0; i < vTable.size(); ++i)
+        {
+            MirFunction *func = vTable[i];
+
+            if (detail == MirPrinterDetail::Detailed)
+            {
+                // Detailed print dumps signature: ret Type class::name(param types)
+                std::string paramsStr = "";
+                bool firstParam = true;
+                for (auto param : func->getParameters())
+                {
+                    if (!firstParam)
+                        paramsStr += ", ";
+                    paramsStr += param->getMirType()->getName();
+                    firstParam = false;
+                }
+                result += std::format("\t[Slot {}] {} {}::{}({})\n",
+                                      i,
+                                      func->getReturnType()->getName(),
+                                      _class->getName(),
+                                      func->getName(),
+                                      paramsStr);
+            }
+            else // MirPrinterDetail::General
+            {
+                // General print only dumps method slot names
+                result += std::format("\t[Slot {}] {}::{}\n", i, _class->getName(), func->getName());
+            }
+        }
+    }
+
+    result += std::format("{:#^50}\n", " End Class Dump ");
+    return result;
+}
 
 std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail detail)
 {

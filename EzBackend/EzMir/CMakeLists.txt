@@ -3,9 +3,11 @@ set(EZMIR_FILES_LIST
         "include/EzMirCommon.h"
         "include/Block/MirBlock.h"
         "include/Block/MirBlockBuilder.h"
+        "include/Block/MirBlockInstructionQuery.h"
         "include/Builder/MirBuilder.h"
         "include/Builder/MirBuilderContext.h"
-        "include/Block/MirBlockInstructionQuery.h"
+        "include/Class/MirClass.h"
+        "include/Class/MirClassBuilder.h"
         "include/Instruction/MirInstructionDefs.h"
         "include/Instruction/MirInstruction.h"
         "include/Instruction/MirInstructionBuilder.h"
@@ -30,6 +32,8 @@ set(EZMIR_FILES_LIST
         "src/Block/MirBlockBuilder.cpp"
         "src/Block/MirBlockInstructionQuery.cpp"
         "src/Builder/MirBuilderContext.cpp"
+        "src/Class/MirClass.cpp"
+        "src/Class/MirClassBuilder.cpp"
         "src/Instruction/MirInstructionBuilder.cpp"
         "src/Instruction/MirInstruction.cpp"
         "src/Function/MirFunction.cpp"
@@ -93,6 +97,13 @@ if (EZPACKER_BUILD_TESTS)
             "EzMirTestSuite"
             ""
             "tests/T_Block.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_Class"
+            "EzMirTestSuite"
+            ""
+            "tests/T_Class.cpp"
     )
 
     EzPacker_AddTest(

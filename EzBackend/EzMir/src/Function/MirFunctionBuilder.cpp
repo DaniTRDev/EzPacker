@@ -2,7 +2,24 @@
 
 MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_parameters(ctx->getFuncAllocator()) {}
 
-MirBlockBuilder MirFunctionBuilder::blockBuilder() { return MirBlockBuilder(m_ctx, &getBuiltObj()->getBlocks()); }
+MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::list<MirFunction *> *owner) :
+    MirFunctionBuilder(ctx)
+{
+    m_owner = owner;
+}
+
+MirBlockBuilder MirFunctionBuilder::blockBuilder()
+{
+    MirFunction *obj = getBuiltObj();
+    if (!obj)
+    {
+        m_ctx->getDiagCollector()->builder(Diag_Error, "MirFunctionBuilder")
+                << "Can't create block builder from non-built function";
+        return MirBlockBuilder(nullptr, (MirFunction *)nullptr); // Ambiguous call if cast is not set.
+    }
+
+    return MirBlockBuilder(m_ctx, obj->getBlocksPtr());
+}
 
 MirFunction *MirFunctionBuilder::build(MirType *returnType,
                                        const std::pmr::string &name,
@@ -32,13 +49,18 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType,
                                                           m_parameters,
                                                           name);
 
-    auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirFunctionBuilder");
-    diagBuilder << sourceRef << std::pmr::string(std::format("Built func with id: {}", func->getId()));
-    diagBuilder.appendNote(std::pmr::string(MirPrinter().printToString(func, MirPrinterDetail::Detailed)), sourceRef);
+    auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirFunctionBuilder");
+    diagBuilder << std::pmr::string(std::format("Built func with id: {}", func->getId()));
+    diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(func, MirPrinterDetail::Detailed)), sourceRef);
 
     if (!m_ctx->appendFunction(func))
     {
         return nullptr;
+    }
+
+    if (m_owner)
+    {
+        m_owner->push_back(func);
     }
 
     setBuildResult(func);

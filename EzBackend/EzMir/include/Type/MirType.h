@@ -1,28 +1,3 @@
-/**
- * @file MirType.h
- * @brief Lightweight, self-contained type representation for the MIR layer.
- *
- * `MirType` is intentionally decoupled from semantic-layer type objects. It
- * captures just enough information for MIR construction and later lowering:
- * a kind (`MirTypeKind`), a unique MIR ID, an optional slice of child types,
- * and a debug-friendly name.
- *
- * The currently supported kinds are:
- *   - `Integer`
- *   - `FloatingPoint`
- *   - `Pointer`
- *   - `Array`
- *   - `Void`
- *   - `Struct`
- *
- * `subTypes` is used only when a kind needs extra type structure. In the
- * current implementation this is primarily intended for compound/container
- * forms such as arrays or pointer targets; primitive and `Void` types usually
- * leave it null.
- *
- * This class should remain trivially destructible so it can live in arena
- * storage without custom lifetime management.
- */
 #ifndef EZPACKER_MIRTYPE_H
 #define EZPACKER_MIRTYPE_H
 
@@ -31,12 +6,12 @@
 enum class MirTypeKind
 {
     Invalid = 0,
+    Class,
     Integer,
     FloatingPoint,
     Pointer,
-    Array, // An array of other types.
-    Void,
-    Struct
+    Array, // An array of other type.
+    Void
 };
 
 /**
@@ -58,7 +33,11 @@ class MirType
      * @param name     Human-readable type name kept for diagnostics/debugging.
      * @param subTypes Optional child-type slice used by compound kinds.
      */
-    MirType(MirTypeKind kind, size_t id, size_t totalSizeInBits, std::pmr::string name, std::pmr::vector<MirType *> subTypes);
+    MirType(MirTypeKind kind,
+            size_t id,
+            size_t totalSizeInBits,
+            std::pmr::string name,
+            std::pmr::vector<MirType *> subTypes);
 
     /**
      * Returns the array element type if this type is an array, nullptr if not.
@@ -87,7 +66,7 @@ class MirType
      * @return
      */
     size_t getTotalSizeInBits() const;
-    
+
     /**
      * Returns the total size in bytes of this type.
      * @return
@@ -109,7 +88,7 @@ class MirType
   private:
     MirTypeKind m_kind;                     // High-level classification of the type.
     size_t m_id;                            // Unique MIR identifier for this type.
-    size_t m_totalSizeInBits;              // Total size in bytes of this type.
+    size_t m_totalSizeInBits;               // Total size in bytes of this type.
     std::pmr::string m_name;                // Debug/diagnostic name.
     std::pmr::vector<MirType *> m_subTypes; // Optional child types for compound kinds.
 };

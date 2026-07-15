@@ -73,7 +73,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
         }
     }
 
-    auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirInstructionBuilder");
+    auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirInstructionBuilder");
     builder << ref << "Built instruction";
     builder.appendNote(std::pmr::string(MirPrinter::printToString(instr, MirPrinterDetail::Detailed)), nullptr);
 

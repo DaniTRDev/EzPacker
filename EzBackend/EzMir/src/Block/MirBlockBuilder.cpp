@@ -25,7 +25,7 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
     MirBlock *block =
             alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, std::pmr::list<MirInstruction *>(alloc), name);
 
-    m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Trace, "MirBlockBuilder")
+    m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirBlockBuilder")
             << sourceRef << std::pmr::string(std::format("Built block with id: {}", block->getId()));
 
     if (m_ctx->appendBlock(block))

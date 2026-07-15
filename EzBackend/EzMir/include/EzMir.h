@@ -1,34 +1,20 @@
-/**
- * @file EzMir.h
- * @brief Umbrella header for the EzMir library (Mid-level Intermediate Representation).
- *
- * Including this header gives access to the full public EzMir API. The module
- * models a compiler IR that sits between higher-level semantic analysis and
- * later lowering/code-generation stages.
- *
- * Main building blocks:
- *   - `MirType`: self-contained MIR type descriptors identified by MIR IDs.
- *   - `MirOperand`: variant payloads used as instruction arguments.
- *   - `MirInstruction`: opcode + operand slice, with metadata derived from the
- *     instruction catalogue.
- *   - `MirBlock`: ordered instruction list representing one basic block.
- *   - `MirFunction`: entry block plus block/parameter lists for one callable
- *     unit.
- *   - `MirBuilderContext`: owning arena context that allocates and links MIR
- *     objects.
- *   - `MirEmitter`: convenience API for emitting instructions into the bound
- *     block.
- *   - `MirGlobalDataEmitter`: convenience API for emitting context-owned
- *     global data blobs and literals.
- */
 #ifndef EZPACKER_EZMIR_H
 #define EZPACKER_EZMIR_H
 
 #include "EzMirCommon.h"
 
+// ── Block container ─────────────────────────────────────────────────────────
+#include "Block/MirBlock.h"
+#include "Block/MirBlockBuilder.h"
+#include "Block/MirBlockInstructionQuery.h"
+
 // ── Emitters (block/instruction builders & global data) ─────────────────────
 #include "Builder/MirBuilder.h"
 #include "Builder/MirBuilderContext.h"
+
+// ── Class container ─────────────────────────────────────────────────────────
+#include "Class/MirClass.h"
+#include "Class/MirClassBuilder.h"
 
 // ── Function container ──────────────────────────────────────────────────────
 #include "Function/MirFunction.h"
@@ -62,6 +48,7 @@
 #include "Printer/MirPrinter.h"
 
 // ── Type system primitives ──────────────────────────────────────────────────
+#include "Type/IMirTargetTypeLayout.h"
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 

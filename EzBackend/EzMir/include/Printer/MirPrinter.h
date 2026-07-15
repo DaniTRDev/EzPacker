@@ -15,9 +15,19 @@ class MirPrinter
 {
   public:
     /**
+     * Prints all the information about a class, including its parent type (if any).
+     * If detail is set to General, method names and field will be printed.
+     * If detail is set to Detailed, method signatures and fields will be printed.
+     * @param _class
+     * @param detail
+     * @return
+     */
+    static std::string printToString(MirClass *_class, MirPrinterDetail detail);
+
+    /**
      * Prints all the information about a function, including the stack frame, parameters, blocks and instructions.
      * If detail is set to General, only the header, param count, stack frame obj count and block count will be printed.
-     * If detail is set to detailed, the entire function will be printed including blocks and instructions inside
+     * If detail is set to Detailed, the entire function will be printed including blocks and instructions inside
      * blocks.
      * @param function
      * @param detail
@@ -26,8 +36,9 @@ class MirPrinter
     static std::string printToString(MirFunction *function, MirPrinterDetail detail);
 
     /**
-     * Prints all the information about a block. If detail is set to general, only block id and instruction count is
-     * shown. If detail is set to detailed, instructions will also be printed.
+     * Prints all the information about a block.
+     * If detail is set to General, only block id and instruction count is shown.
+     * If detail is set to Detailed, instructions will also be printed.
      * @param block
      * @param detail
      * @return
@@ -35,8 +46,9 @@ class MirPrinter
     static std::string printToString(MirBlock *block, MirPrinterDetail detail);
 
     /**
-     * Prints information about an instruction. If detail is set to general, only OPCODE will be shown. If detail is set
-     * to detailed, operands will also be printed.
+     * Prints information about an instruction.
+     * If detail is set to General, only OPCODE will be shown.
+     * If detail is set to Detailed, operands will also be printed.
      * @param instr
      * @param detail
      * @return

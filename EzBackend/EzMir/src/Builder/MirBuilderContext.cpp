@@ -1,12 +1,13 @@
 #include "Builder/MirBuilderContext.h"
 #include "Type/MirTypeTable.h"
 
-MirBuilderContext::MirBuilderContext(std::pmr::monotonic_buffer_resource *globalArena,
+MirBuilderContext::MirBuilderContext(IMirTargetTypeLayout *typeLayout,
+                                     std::pmr::monotonic_buffer_resource *globalArena,
                                      const std::shared_ptr<DiagnosticCollector> &diagCollector,
                                      const std::shared_ptr<MirTypeTable> &typeTable) :
-    m_currentId(1), m_globalResource(globalArena), m_functionResource(m_globalResource), m_functions(m_globalResource),
-    m_functionIdToFunc(m_globalResource), m_blockIdToBlock(m_globalResource), m_globalData(m_globalResource),
-    m_diagCollector(diagCollector), m_typeTable(typeTable)
+    m_currentId(1), m_typeLayout(typeLayout), m_globalResource(globalArena), m_functionResource(m_globalResource),
+    m_blockIdToBlock(m_globalResource), m_classIdToClass(m_globalResource), m_functionIdToFunc(m_globalResource),
+    m_globalData(m_globalResource), m_diagCollector(diagCollector), m_typeTable(typeTable)
 {
 }
 
@@ -34,6 +35,30 @@ bool MirBuilderContext::appendBlock(MirBlock *block)
     return true;
 }
 
+bool MirBuilderContext::appendClass(MirClass *_class)
+{
+    if (!_class)
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirBuilderContext")
+                << "Could not append class because it is invalid";
+        return false;
+    }
+
+    auto it = m_classIdToClass.find(_class->getId());
+    if (it != m_classIdToClass.end())
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirBuilderContext")
+                << "Could not append class because it was already appended";
+        return false;
+    }
+
+    m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext")
+            << std::pmr::string(std::format("Appended class with id: {}", _class->getId()));
+
+    m_classIdToClass.insert({ _class->getId(), _class });
+    return true;
+}
+
 bool MirBuilderContext::appendFunction(MirFunction *func)
 {
     if (!func)
@@ -51,7 +76,6 @@ bool MirBuilderContext::appendFunction(MirFunction *func)
         return false;
     }
 
-    m_functions.push_back(func);
     m_functionIdToFunc.insert({ func->getId(), func });
     m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext")
             << std::pmr::string(std::format("Appended function: {} (id: {})", func->getName(), func->getId()));
@@ -82,6 +106,8 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
 
     return true;
 }
+
+IMirTargetTypeLayout *MirBuilderContext::getTypeLayout() const { return m_typeLayout; }
 
 MirId MirBuilderContext::createId() { return m_currentId++; }
 
@@ -116,8 +142,6 @@ MirRegister *MirBuilderContext::getRegisterById(size_t id) const
 
     return nullptr;
 }
-
-std::pmr::list<MirFunction *> &MirBuilderContext::getFunctions() { return m_functions; }
 
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
 

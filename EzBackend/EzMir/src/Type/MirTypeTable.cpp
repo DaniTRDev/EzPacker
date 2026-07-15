@@ -1,7 +1,8 @@
 #include "Type/MirTypeTable.h"
 
-MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena) :
-    m_arena(globalArena), m_typeNames(globalArena), m_idToType(globalArena), m_pointerCache(globalArena)
+MirTypeTable::MirTypeTable(IMirTargetTypeLayout *typeLayout, std::pmr::memory_resource *globalArena) :
+    m_typeLayout(typeLayout), m_arena(globalArena), m_typeNames(globalArena), m_idToType(globalArena),
+    m_pointerCache(globalArena)
 {
 }
 
@@ -11,7 +12,9 @@ MirType *MirTypeTable::create(MirTypeKind kind,
                               const std::string_view &name)
 {
     if (name.empty())
-        throw std::runtime_error("Compiler Failure: Type initialization requires a valid diagnostic name.");
+    {
+        return nullptr;
+    }
 
     std::pmr::string lookupName(name, m_arena);
     auto it = m_typeNames.find(lookupName);
@@ -33,6 +36,59 @@ MirType *MirTypeTable::create(MirTypeKind kind,
     return uniqueType;
 }
 
+MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &structName)
+{
+    if (structName.empty())
+    {
+        return nullptr;
+    }
+
+    // Check if the type is already interned
+    std::pmr::string lookupName(structName, m_arena);
+    auto it = m_typeNames.find(lookupName);
+    if (it != m_typeNames.end())
+    {
+        return it->second;
+    }
+
+    size_t currentOffsetInBytes = 0;
+    size_t maxAlignmentInBytes = 1;
+
+    for (const auto *fieldType : fieldTypes)
+    {
+        if (!fieldType)
+            continue;
+
+        size_t fieldAlignment = m_typeLayout->getTypeAlignmentInBytes(fieldType);
+        size_t fieldSize = m_typeLayout->getTypeSizeInBytes(fieldType);
+
+        // Keep track of the largest alignment requirement in the struct
+        if (fieldAlignment > maxAlignmentInBytes)
+        {
+            maxAlignmentInBytes = fieldAlignment;
+        }
+
+        // Align the current offset to the field's alignment requirement
+        if (currentOffsetInBytes % fieldAlignment != 0)
+        {
+            currentOffsetInBytes += (fieldAlignment - (currentOffsetInBytes % fieldAlignment));
+        }
+
+        // Advance by the field's size
+        currentOffsetInBytes += fieldSize;
+    }
+
+    // Pad the final class/struct size to make it a multiple of the max alignment
+    if (currentOffsetInBytes % maxAlignmentInBytes != 0)
+    {
+        currentOffsetInBytes += (maxAlignmentInBytes - (currentOffsetInBytes % maxAlignmentInBytes));
+    }
+
+    // Convert bytes to bits for storing in the canonical MirType record
+    size_t totalSizeInBits = currentOffsetInBytes * 8;
+    return create(MirTypeKind::Class, totalSizeInBits, std::move(fieldTypes), structName);
+}
+
 MirType *MirTypeTable::getPtr(MirType *srcType)
 {
     if (!srcType)
@@ -45,8 +101,7 @@ MirType *MirTypeTable::getPtr(MirType *srcType)
         return it->second;
     }
 
-    // Assuming a 64-bit compilation target backend environment layout
-    constexpr size_t pointerSizeInBytes = 8;
+    size_t pointerSizeInBytes = m_typeLayout->getPointerSizeInBytes();
 
     std::pmr::vector<MirType *> childTarget({ srcType }, m_arena);
     std::string formattedName = std::format("{}*", srcType->getName());
@@ -74,7 +129,7 @@ MirType *MirTypeTable::getArray(MirType *elementType, size_t elementCount)
         return it->second; // Return the existing type.
     }
 
-    size_t totalSizeInBytes = elementType->getTotalSizeInBytes() * elementCount;
+    size_t totalSizeInBytes = m_typeLayout->getTypeSizeInBytes(elementType) * elementCount;
     std::pmr::vector<MirType *> childType({ elementType }, m_arena);
 
     // Instantiate and construct the unique Array type record on the global arena
@@ -116,20 +171,6 @@ MirType *MirTypeTable::getMirTypeById(size_t id) const
 {
     auto it = m_idToType.find(id);
     return (it != m_idToType.end()) ? it->second : nullptr;
-}
-
-MirType *MirTypeTable::getStruct(std::pmr::vector<MirType *> fieldTypes, const std::string_view &structName)
-{
-    // Calculate total size based on type alignment rules
-    size_t totalSize = 0;
-    for (auto *field : fieldTypes)
-    {
-        // Simple alignment rule: align to field size
-        totalSize = (totalSize + (field->getTotalSizeInBytes() - 1)) & ~(field->getTotalSizeInBytes() - 1);
-        totalSize += field->getTotalSizeInBytes();
-    }
-
-    return create(MirTypeKind::Struct, totalSize, std::move(fieldTypes), structName);
 }
 
 MirType *MirTypeTable::getVoidType() const { return m_voidType; }
