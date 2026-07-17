@@ -9,6 +9,7 @@ enum class MirTypeKind
     Class,
     Integer,
     FloatingPoint,
+    Function,
     Pointer,
     Array, // An array of other type. Ex: i32 arr[3];
     Void
@@ -44,6 +45,11 @@ class MirType
      * @return
      */
     MirType *getArrayElementType() const;
+
+    /**
+     * Returns the MirType that this type points to. If this type is not a pointer, will return nullptr.
+     */
+    MirType *getPointedType() const;
 
     /**
      * Returns the high-level kind of this type.

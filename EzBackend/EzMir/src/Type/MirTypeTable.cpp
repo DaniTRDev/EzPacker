@@ -89,6 +89,51 @@ MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, c
     return create(MirTypeKind::Class, totalSizeInBits, std::move(fieldTypes), structName);
 }
 
+MirType *MirTypeTable::getFuncType(MirType *returnType,
+                                   const std::pmr::list<MirRegister *> &parameters,
+                                   const std::string_view &funcName)
+{
+    if (!returnType)
+    {
+        return nullptr;
+    }
+
+    // Build a unique structural signature string for interning: "ReturnType(Param1,Param2,...)"
+    // Example: "i32(i64,f32*)"
+    auto structuralSignature = returnType->getName();
+    structuralSignature += "(";
+
+    std::pmr::vector<MirType *> subTypes(m_arena);
+    subTypes.reserve(parameters.size() + 1);
+    subTypes.push_back(returnType);
+
+    for (auto &param : parameters)
+    {
+        MirType *paramType = param->getMirType();
+        subTypes.push_back(paramType);
+
+        if (subTypes.size() > 2)
+        {
+            structuralSignature += ",";
+        }
+        structuralSignature += paramType->getName();
+    }
+    structuralSignature += ")";
+
+    std::pmr::string lookupKey(structuralSignature, m_arena);
+    auto it = m_typeNames.find(lookupKey);
+    if (it != m_typeNames.end())
+    {
+        return it->second; // Return existing identical functional signature match
+    }
+
+    // Functional symbols lower down to standard machine code pointer blocks
+    size_t pointerSizeInBits = m_typeLayout->getPointerSizeInBytes() * 8;
+
+    // Instantiate the unique type record using the structural signature as its name identifier
+    return create(MirTypeKind::Function, pointerSizeInBits, std::move(subTypes), lookupKey);
+}
+
 MirType *MirTypeTable::getPtr(MirType *srcType)
 {
     if (!srcType)

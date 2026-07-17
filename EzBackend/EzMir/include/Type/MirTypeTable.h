@@ -4,6 +4,7 @@
 #include "EzCoreCommon.h"
 #include "MirType.h"
 #include "IMirTargetTypeLayout.h"
+#include "Operand/MirOperands.h"
 
 /**
  * Class used to store the least minimum required types so everything else works.
@@ -45,6 +46,15 @@ class MirTypeTable
      * @return
      */
     MirType *getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &name);
+
+    /**
+     * Creates a function type with the given parameters. This function will CREATE only if it wasn't added before, if it was the existing type is returned.
+     * @param returnType
+     * @param parameters
+     * @param name
+     * @return
+     */
+    MirType *getFuncType(MirType* returnType, const std::pmr::list<MirRegister *> &parameters, const std::string_view &funcName);
 
     /**
      * Interns pointer types. Guarantees that getPtr(T) always returns the exact same type instance pointer.

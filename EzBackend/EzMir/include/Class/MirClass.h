@@ -6,19 +6,22 @@
 #include "Type/MirType.h"
 #include <vector>
 
+// The offset is calculated after the class has been fully created and the resolution pass has been executed.
 struct MirClassField
 {
     class MirClass *m_owner{ nullptr };
     MirType *m_type{ nullptr };
-    int64_t m_offset{ -1 }; // Calculated after the class has been fully created and the resolution pass has been executed.
+    int64_t m_offset{ -1 };
     size_t m_id{ size_t(-1) };
     std::pmr::string m_name{};
 };
 
+// The offset is calculated after the class has been fully created and the resolution pass has been executed.
 struct MirClassMethod
 {
     class MirClass *m_owner{ nullptr };
     MirFunction *m_func{ nullptr };
+    int64_t m_offset{ -1 };
     size_t m_id{ size_t(-1) };
 };
 
@@ -46,8 +49,8 @@ class MirClass
              MirId id,
              MirType *type,
              const std::pmr::string &name,
-             std::pmr::map<std::pmr::string, MirClassField*> fieldNameToField,
-             std::pmr::vector<MirClassField*> fields,
+             std::pmr::map<std::pmr::string, MirClassField *> fieldNameToField,
+             std::pmr::vector<MirClassField *> fields,
              std::pmr::vector<MirClassMethod *> vTable,
              SourceReference *sourceRef = nullptr);
 
@@ -83,7 +86,8 @@ class MirClass
      * @param returnType
      * @return
      */
-    MirClassMethod *getMethodBySignature(MirType *returnType, std::vector<MirType*> argsTypes, const std::string_view &name) const;
+    MirClassMethod *
+    getMethodBySignature(MirType *returnType, std::vector<MirType *> argsTypes, const std::string_view &name) const;
 
     /**
      * Returns the ID of this class.
@@ -113,7 +117,7 @@ class MirClass
      * Returns an immutable list of fields.
      * @return
      */
-    const std::pmr::vector<MirClassField*> &getFields() const;
+    const std::pmr::vector<MirClassField *> &getFields() const;
 
     /**
      * Returns the VTable for this class.
@@ -127,8 +131,8 @@ class MirClass
     MirType *m_type;
     SourceReference *m_sourceRef;
     std::pmr::string m_name;
-    std::pmr::map<std::pmr::string, MirClassField*> m_fieldNameToField; // Fast search by name.
-    std::pmr::vector<MirClassField*> m_fields;
+    std::pmr::map<std::pmr::string, MirClassField *> m_fieldNameToField; // Fast search by name.
+    std::pmr::vector<MirClassField *> m_fields;
     std::pmr::vector<MirClassMethod *> m_vTable;
 };
 

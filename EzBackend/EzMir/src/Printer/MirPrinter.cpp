@@ -106,10 +106,11 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
     std::string result = std::format("\n{:#^50}\n", " Function Dump ");
 
     // Print header
-    result += std::format("%func.return={}.name={}.paramCount={}\n",
+    result += std::format("%func.return={}.name={}.paramCount={}\nType:{}\n",
                           function->getReturnType()->getName(),
                           function->getName(),
-                          function->getParameters().size());
+                          function->getParameters().size(),
+                          function->getType()->getName());
 
     // Parameters
     result += " - Params: \n\t";

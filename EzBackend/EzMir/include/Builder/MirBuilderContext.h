@@ -66,12 +66,24 @@ class MirBuilderContext
     bool appendRegister(MirRegister *reg);
 
     /**
-     * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr is the
+     * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr if the
      * ID is not found.
      * @param id
      * @return
      */
     MirBlock *getBlockById(MirId id) const;
+
+    /**
+     * Searches in the context for the given class ID and returns a pointer to it, if exists. Returns nullptr if the ID
+     * is not found.
+     */
+    MirClass *getClassById(MirId id) const;
+
+    /**
+     * Searches in the context for the given type ID and returns the class linked to it, if exists. Returns nullptr if
+     * the ID is not found.
+     */
+    MirClass *getClassByTypeId(MirId id) const;
 
     /**
      * Searches in the context for the given function ID and returns a pointer to the function, if exists. Returns
@@ -142,6 +154,7 @@ class MirBuilderContext
 
     std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
     std::pmr::map<MirId, MirClass *> m_classIdToClass;          // Used to search for classes.
+    std::pmr::map<MirId, MirClass *> m_typeIdToClass;           // Used to search for classes using their type.
     std::pmr::map<MirId, MirFunction *> m_functionIdToFunc;     // Used to search for functions.
     std::pmr::map<MirId, MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
     std::pmr::map<MirId, MirRegister *> m_registerIdToRegister; // Used to search for registers.

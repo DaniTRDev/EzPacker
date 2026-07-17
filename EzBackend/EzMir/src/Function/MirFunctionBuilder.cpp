@@ -26,6 +26,7 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
 
 MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::string &name, SourceReference *sourceRef)
 {
+    const auto &t = m_ctx->getTypeTable();
     std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
     std::pmr::polymorphic_allocator<MirFunction> funcAlloc(arena);
     std::pmr::polymorphic_allocator<MirFunctionStackFrame> funcStackFrameAlloc(arena);
@@ -34,12 +35,14 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
     auto stackFrame =
             funcStackFrameAlloc.new_object<MirFunctionStackFrame>(std::pmr::vector<StackFrameObject *>(arena));
+    MirType *funcType = t->getFuncType(returnType, m_parameters, name);
 
     MirBlockBuilder builder(m_ctx, &blocks);
     MirBlock *entryPoint = builder.build(sourceRef, "entryPoint");
     MirFunction *func = funcAlloc.new_object<MirFunction>(entryPoint,
                                                           stackFrame,
                                                           returnType,
+                                                          funcType,
                                                           m_ctx->createId(),
                                                           sourceRef,
                                                           blocks,

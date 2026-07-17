@@ -6,8 +6,7 @@ MirBuilderContext::MirBuilderContext(std::pmr::monotonic_buffer_resource *global
                                      const std::shared_ptr<MirTypeTable> &typeTable) :
     m_currentId(1), m_globalResource(globalArena), m_functionResource(m_globalResource), m_functions(m_globalResource),
     m_blockIdToBlock(m_globalResource), m_classIdToClass(m_globalResource), m_functionIdToFunc(m_globalResource),
-    m_globalVarIdToGVar(m_globalResource), m_diagCollector(diagCollector),
-    m_typeTable(typeTable)
+    m_globalVarIdToGVar(m_globalResource), m_diagCollector(diagCollector), m_typeTable(typeTable)
 {
 }
 
@@ -55,6 +54,7 @@ bool MirBuilderContext::appendClass(MirClass *_class)
     m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext")
             << std::pmr::string(std::format("Appended class with id: {}", _class->getId()));
 
+    m_typeIdToClass.insert({ _class->getType()->getId(), _class });
     m_classIdToClass.insert({ _class->getId(), _class });
     return true;
 }
@@ -137,6 +137,28 @@ MirBlock *MirBuilderContext::getBlockById(MirId id) const
 {
     auto it = m_blockIdToBlock.find(id);
     if (it != m_blockIdToBlock.end())
+    {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+MirClass *MirBuilderContext::getClassById(MirId id) const
+{
+    auto it = m_classIdToClass.find(id);
+    if (it != m_classIdToClass.end())
+    {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+MirClass *MirBuilderContext::getClassByTypeId(MirId id) const
+{
+    auto it = m_typeIdToClass.find(id);
+    if (it != m_typeIdToClass.end())
     {
         return it->second;
     }

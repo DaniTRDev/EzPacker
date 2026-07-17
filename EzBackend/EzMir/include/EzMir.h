@@ -38,6 +38,7 @@
 #include "MirPasses/MirPassManager.h"
 #include "MirPasses/Passes/CodeFlowAnalysis.h"
 #include "MirPasses/Passes/LivenessAnalysis.h"
+#include "MirPasses/Passes/RelativeReferenceLowerer.h"
 
 // ── Basic block ─────────────────────────────────────────────────────────────
 #include "Block/MirBlock.h"

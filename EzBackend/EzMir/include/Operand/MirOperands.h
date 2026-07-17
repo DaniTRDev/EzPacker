@@ -4,10 +4,6 @@
 #include "EzMirCommon.h"
 #include "MirOperand.h"
 
-/**
- * Constructors are made private to ensure that operands are created using MirOperandBuilder.
- */
-
 enum class MirReferenceType : uint8_t
 {
     Invalid = 0,
@@ -29,9 +25,11 @@ class MirFloat : public MirOperand
 
     FlexFloat &getValue() { return m_float; }
     MirOperandType getType() const override { return OpKind; }
+
     std::string toString() const override
     {
-        return std::format("{} %float.value={}", getMirType()->getName(), m_float.toString());
+        // Output format: f32 3.14159
+        return std::format("{} {}", getMirType()->getName(), m_float.toString());
     }
 
   private:
@@ -47,9 +45,11 @@ class MirInteger : public MirOperand
 
     FlexInt &getValue() { return m_int; }
     MirOperandType getType() const override { return OpKind; }
+
     std::string toString() const override
     {
-        return std::format("{} %int.value={}", getMirType()->getName(), m_int.toString(16));
+        // Output format: i32 0x2A
+        return std::format("{} {}", getMirType()->getName(), m_int.toString(16));
     }
 
   private:
@@ -71,7 +71,8 @@ class MirConstantArray : public MirOperand
 
     std::string toString() const override
     {
-        std::string res = std::format("{}[", getMirType()->getName());
+        // Output format: i32[3] [i32 0x1, i32 0x2, i32 0x3]
+        std::string res = std::format("{} [", getMirType()->getName());
         for (size_t i = 0; i < m_elements.size(); ++i)
         {
             if (i > 0)
@@ -82,21 +83,9 @@ class MirConstantArray : public MirOperand
     }
 
   private:
-    std::pmr::vector<MirOperand *> m_elements; // Elements must be Float or Integer types
+    std::pmr::vector<MirOperand *> m_elements;
 };
 
-/**
- * Types of references and what means each argument:
- *  - Block -> refId = id of the MirBlock referenced. Offset = 0.
- *  - GlobalArrayElem -> refId = id of the MirGlobalVar that holds the array. Offset = accessed element.
- *  - GlobalVar -> refId = id of the MirGlobalVar referenced. Offset = Index of accessed byte from the element.
- *  - Function -> refId = id of the MirFunction referenced. Offset = 0.
- *  - ClassField -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
- *  field.
- * - ClassMethod -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
- *  method.
- * - ConstantArrayElement -> refId = id of the MirRegister that holds the start of the array. Offset = elem accessed.
- */
 class MirReference : public MirOperand
 {
   public:
@@ -119,40 +108,31 @@ class MirReference : public MirOperand
     MirReferenceType getRefType() const { return m_refType; }
     MirOperandType getType() const override { return OpKind; }
     size_t getRefId() const { return m_refId; }
+    size_t getOffset() const { return m_offset; }
 
     std::string toString() const override
     {
-        std::string src = "INVALID";
-        if (isBlock())
-        {
-            src = "block";
-        }
-        else if (isGlobalArrayElem())
-        {
-            src = "golbalArrayElem";
-        }
-        else if (isGlobalVar())
-        {
-            src = "globalVar";
-        }
-        else if (isFunction())
-        {
-            src = "func";
-        }
-        else if (isClassField())
-        {
-            src = "classField";
-        }
-        else if (isClassMethod())
-        {
-            src = "classMethod";
-        }
-        else if (isConstantArrayElem())
-        {
-            src = "constantArray";
-        }
+        auto typePrefix = getMirType()->getName();
 
-        return std::format("{} %ref.id={}.src={}.offId={}", getMirType()->getName(), m_refId, src, m_offset);
+        switch (m_refType)
+        {
+            case MirReferenceType::Block:
+                return std::format("label %block_{}", m_refId);
+            case MirReferenceType::GlobalVar:
+                return std::format("{} @global_{}+{}", typePrefix, m_refId, m_offset);
+            case MirReferenceType::GlobalArrayElem:
+                return std::format("{} @global_{}[{}]", typePrefix, m_refId, m_offset);
+            case MirReferenceType::Function:
+                return std::format("{} @func_{}", typePrefix, m_refId);
+            case MirReferenceType::ClassField:
+                return std::format("{} %v{}.field_{}", typePrefix, m_refId, m_offset);
+            case MirReferenceType::ClassMethod:
+                return std::format("{} %v{}.method_{}", typePrefix, m_refId, m_offset);
+            case MirReferenceType::ConstantArrayElement:
+                return std::format("{} %v{}[{}]", typePrefix, m_refId, m_offset);
+            default:
+                return std::format("{} <invalid_ref>", typePrefix);
+        }
     }
 
   private:
@@ -172,9 +152,13 @@ class MirRuntimeSymbol : public MirOperand
     }
 
     MirOperandType getType() const override { return OpKind; }
-
     const std::pmr::string &getSymbolName() const { return m_symbolName; }
-    std::string toString() const override { return std::format("%rt.{}", m_symbolName); }
+
+    std::string toString() const override
+    {
+        // Output format: @rt_memcpy
+        return std::format("@rt_{}", m_symbolName);
+    }
 
   private:
     std::pmr::string m_symbolName;
@@ -193,26 +177,25 @@ class MirRegister : public MirOperand
     bool isVirtual() const { return m_virtual; }
     size_t getRegId() const { return m_id; }
     bool operator==(const MirRegister &other) const { return m_id == other.m_id && m_virtual == other.m_virtual; }
-
     const std::pmr::string &getName() const { return m_name; }
-
     MirOperandType getType() const override { return OpKind; }
+
     std::string toString() const override
     {
+        char prefix = m_virtual ? 'v' : 'p';
         if (!m_name.empty())
         {
-            return std::format("{} {}.name={}", getMirType()->getName(), isVirtual() ? "%v" : "%p", m_name);
+            return std::format("%{}{}({})", prefix, m_id, m_name);
         }
-
-        return std::format("{} {}.id={}", getMirType()->getName(), isVirtual() ? "%v" : "%p", m_id);
+        return std::format("%{}{}", prefix, m_id);
     }
 
     void setRegId(size_t id) { m_id = id; }
     void setVirtual(bool value) { m_virtual = value; }
 
   private:
-    bool m_virtual{ true }; // Whether this is a virtual register (true) or a physical register (false).
-    size_t m_id{ 0 };       // Unique register ID.
+    bool m_virtual{ true };
+    size_t m_id{ 0 };
     std::pmr::string m_name;
 };
 
@@ -225,10 +208,14 @@ class MirFrameIndex : public MirOperand
 
     size_t getFrameId() const { return m_frameId; }
     MirOperandType getType() const override { return OpKind; }
-    std::string toString() const override { return std::format("{} %frame.id={}", getMirType()->getName(), m_frameId); }
+
+    std::string toString() const override
+    {
+        // Output format: [stack#3]
+        return std::format("[stack#{}]", m_frameId);
+    }
 
   private:
-    // Used to reference parameters and objects that are saved in a stack frame.
     size_t m_frameId{ 0 };
 };
 
@@ -237,7 +224,6 @@ class MirMemory : public MirOperand
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Memory;
 
-    // The 'type' passed to the base constructor represents the size of what's being accessed.
     MirMemory(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref) :
         MirOperand(type, ref), m_base(base), m_displ(displ)
     {
@@ -245,14 +231,20 @@ class MirMemory : public MirOperand
 
     MirRegister *getBase() const { return m_base; }
     MirInteger *getDisplacement() const { return m_displ; }
-
     MirOperandType getType() const override { return OpKind; }
+
     std::string toString() const override
     {
-        return std::format("{} %mem.base={}.displ={}",
-                           getMirType()->getName(),
-                           m_base ? m_base->toString() : "",
-                           m_displ ? m_displ->toString() : "");
+        std::string baseStr = m_base ? m_base->toString() : "0";
+
+        if (m_displ && !m_displ->getValue().isZero())
+        {
+            // Output format: qword ptr [%v0 + 0x10]
+            return std::format("ptr [{} + {}]", baseStr, m_displ->getValue().toString(16));
+        }
+
+        // Output format: qword ptr [%v0]
+        return std::format("ptr [{}]", baseStr);
     }
 
   private:

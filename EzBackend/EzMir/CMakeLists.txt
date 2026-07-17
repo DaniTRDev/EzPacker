@@ -29,6 +29,7 @@ set(EZMIR_FILES_LIST
         "include/Type/MirTypeTable.h"
         "include/MirPasses/Passes/CodeFlowAnalysis.h"
         "include/MirPasses/Passes/LivenessAnalysis.h"
+        "include/MirPasses/Passes/RelativeReferenceLowerer.h"
 
         "src/Block/MirBlock.cpp"
         "src/Block/MirBlockBuilder.cpp"
@@ -47,6 +48,7 @@ set(EZMIR_FILES_LIST
         "src/MirPasses/MirPassManager.cpp"
         "src/MirPasses/Passes/CodeFlowAnalysis.cpp"
         "src/MirPasses/Passes/LivenessAnalysis.cpp"
+        "src/MirPasses/Passes/RelativeReferenceLowerer.cpp"
         "src/Operand/MirOperand.cpp"
         "src/Operand/MirOperandBuilder.cpp"
         "src/Printer/MirPrinter.cpp"
@@ -60,12 +62,14 @@ set(MIRTESTSUITE_FILES_LIST
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.h"
         "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.h"
         "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.h"
+        "tests/EzMirTestSuite/Verifiers/RelativeReferenceLowererVerifier.h"
 
         "tests/EzMirTestSuite/EzMirTestSuite.cpp"
         "tests/EzMirTestSuite/TestTargetTypeLayout.cpp"
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.cpp"
+        "tests/EzMirTestSuite/Verifiers/RelativeReferenceLowererVerifier.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzMir"
@@ -138,5 +142,12 @@ if (EZPACKER_BUILD_TESTS)
             "EzMirTestSuite"
             ""
             "tests/T_LivenessAnalysis.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_RelativeReferenceLowerer"
+            "EzMirTestSuite"
+            ""
+            "tests/T_RelativeReferenceLowerer.cpp"
     )
 endif ()

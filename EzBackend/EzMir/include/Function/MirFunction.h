@@ -33,6 +33,7 @@ class MirFunction
      * @param entryPoint    First block executed when the function starts.
      * @param stackFrame    A stack frame object that describes this function's stack frame.
      * @param returnType    MIR type describing the function's return value.
+     * @param type
      * @param id            Unique MIR ID for the function itself.
      * @param sourceRef     Source reference that originated this function.
      * @param blocks        Ordered block slice belonging to the function.
@@ -42,42 +43,46 @@ class MirFunction
     MirFunction(MirBlock *entryPoint,
                 MirFunctionStackFrame *stackFrame,
                 MirType *returnType,
+                MirType *type,
                 MirId id,
                 SourceReference *sourceRef,
                 std::pmr::list<MirBlock *> blocks,
                 std::pmr::list<MirRegister *> parameters,
                 std::pmr::string name);
 
-    
-    
     /**
      * Returns the MirBlock owned by this function that matches the given ID, if no case is found nullptr is returned.
      * @param id
      * @return
      */
-    MirBlock *getBlock(size_t id);
+    MirBlock *getBlock(size_t id) const;
 
     /**
      * Returns the function entry block.
      */
-    MirBlock *getEntryPoint();
+    MirBlock *getEntryPoint() const;
 
     /**
      * Returns the stack frame linked to this object.
      * @return
      */
-    MirFunctionStackFrame *getStackFrame();
+    MirFunctionStackFrame *getStackFrame() const;
 
     /**
      * Returns the return type of the function.
      * @return
      */
-    MirType *getReturnType();
+    MirType *getReturnType() const;
+
+    /**
+     * Returns the type of this function.
+     */
+    MirType *getType() const;
 
     /**
      * Returns the unique MIR ID assigned to this function.
      */
-    MirId getId();
+    MirId getId() const;
 
     /**
      * Returns the source reference that created this function.
@@ -119,6 +124,7 @@ class MirFunction
     MirBlock *m_entryPoint;
     MirFunctionStackFrame *m_stackFrame;
     MirType *m_returnType;
+    MirType *m_type;
     MirId m_id;
     SourceReference *m_sourceRef;
 

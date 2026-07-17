@@ -153,7 +153,7 @@ MirReference *MirOperandBuilder::buildRef(MirBlock *block, SourceReference *ref)
 MirReference *MirOperandBuilder::buildRef(MirFunction *func, SourceReference *ref)
 {
     auto &t = m_ctx->getTypeTable();
-    MirType *ptr = t->getPtr(func->getReturnType());
+    MirType *ptr = t->getPtr(func->getType());
 
     return build<MirReference>(ptr, MirReferenceType::Function, func->getId(), 0, ref);
 }

@@ -4,6 +4,7 @@
 #include "Verifiers/MirCoreVerifiers.h"
 #include "Verifiers/CodeFlowPassVerifier.h"
 #include "Verifiers/LivenessPassVerifier.h"
+#include "Verifiers/RelativeReferenceLowererVerifier.h"
 #include "TestTargetTypeLayout.h"
 
 /**

@@ -162,7 +162,7 @@ MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction 
                     auto instrList = (*block)->getInstructions();
                     for (auto instr = instrList.begin(); instr != instrList.end(); instr++)
                     {
-                        result = pass->run(blockList, block, this);
+                        result = pass->run(instrList, instr, this);
                     }
                 }
             }

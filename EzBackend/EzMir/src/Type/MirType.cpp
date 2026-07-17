@@ -15,6 +15,15 @@ MirType *MirType::getArrayElementType() const
     return nullptr;
 }
 
+MirType *MirType::getPointedType() const
+{
+    if (m_kind == MirTypeKind::Pointer && !m_subTypes.empty())
+    {
+        return m_subTypes[0];
+    }
+    return nullptr;
+}
+
 MirTypeKind MirType::getKind() const { return m_kind; }
 
 size_t MirType::getArrayElementCount() const

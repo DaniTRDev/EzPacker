@@ -3,13 +3,14 @@
 MirFunction::MirFunction(MirBlock *entryPoint,
                          MirFunctionStackFrame *stackFrame,
                          MirType *returnType,
+                         MirType *type,
                          MirId id,
                          SourceReference *sourceRef,
                          std::pmr::list<MirBlock *> blocks,
                          std::pmr::list<MirRegister *> parameters,
                          std::pmr::string name) :
-    m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType), m_id(id), m_sourceRef(sourceRef),
-    m_blocks(std::move(blocks)), m_parameters(std::move(parameters)),
+    m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType), m_type(type), m_id(id),
+    m_sourceRef(sourceRef), m_blocks(std::move(blocks)), m_parameters(std::move(parameters)),
     m_blockIdToBlock(m_blocks.get_allocator().resource()), m_name(std::move(name))
 {
     for (auto &block : m_blocks)
@@ -18,7 +19,7 @@ MirFunction::MirFunction(MirBlock *entryPoint,
     }
 }
 
-MirBlock *MirFunction::getBlock(MirId id)
+MirBlock *MirFunction::getBlock(MirId id) const
 {
     auto it = m_blockIdToBlock.find(id);
     if (it != m_blockIdToBlock.end())
@@ -27,13 +28,15 @@ MirBlock *MirFunction::getBlock(MirId id)
     return nullptr;
 }
 
-MirBlock *MirFunction::getEntryPoint() { return m_entryPoint; }
+MirBlock *MirFunction::getEntryPoint() const { return m_entryPoint; }
 
-MirFunctionStackFrame *MirFunction::getStackFrame() { return m_stackFrame; }
+MirFunctionStackFrame *MirFunction::getStackFrame() const { return m_stackFrame; }
 
-MirId MirFunction::getId() { return m_id; }
+MirId MirFunction::getId() const { return m_id; }
 
-MirType *MirFunction::getReturnType() { return m_returnType; }
+MirType *MirFunction::getReturnType() const { return m_returnType; }
+
+MirType *MirFunction::getType() const { return m_type; }
 
 SourceReference *MirFunction::getSourceRef() const { return m_sourceRef; }
 

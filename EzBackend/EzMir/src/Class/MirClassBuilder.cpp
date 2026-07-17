@@ -140,6 +140,11 @@ MirClass *MirClassBuilder::build(MirClass *parent, const std::pmr::string &name,
 
     diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(_class, MirPrinterDetail::Detailed)), sourceRef);
 
+    if (!m_ctx->appendClass(_class))
+    {
+        return nullptr;
+    }
+
     setBuildResult(_class);
     return _class;
 }
@@ -162,5 +167,5 @@ void MirClassBuilder::appendMethod(MirFunction *method)
     std::pmr::polymorphic_allocator<MirClassMethod> alloc(arena);
 
     m_vTable.push_back(alloc.new_object<MirClassMethod>(
-            MirClassMethod{ .m_owner = nullptr, .m_func = method, .m_id = m_vTable.size() }));
+            MirClassMethod{ .m_owner = nullptr, .m_func = method, .m_offset = -1, .m_id = m_vTable.size() }));
 }
