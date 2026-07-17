@@ -15,6 +15,16 @@ class MirPrinter
 {
   public:
     /**
+     * Prints all the information about a block.
+     * If detail is set to General, only block id and instruction count is shown.
+     * If detail is set to Detailed, instructions will also be printed.
+     * @param block
+     * @param detail
+     * @return
+     */
+    static std::string printToString(MirBlock *block, MirPrinterDetail detail);
+
+    /**
      * Prints all the information about a class, including its parent type (if any).
      * If detail is set to General, method names and field will be printed.
      * If detail is set to Detailed, method signatures and fields will be printed.
@@ -36,14 +46,14 @@ class MirPrinter
     static std::string printToString(MirFunction *function, MirPrinterDetail detail);
 
     /**
-     * Prints all the information about a block.
-     * If detail is set to General, only block id and instruction count is shown.
-     * If detail is set to Detailed, instructions will also be printed.
-     * @param block
+     * Prints all the information about a global variable, including its linkage, type and constness.
+     * If detail is set to General, initialization data is skipped (only emptyness or filled will be shown).
+     * If detail is set to Detailed, the init data is printed in HEX format.
+     * @param _class
      * @param detail
      * @return
      */
-    static std::string printToString(MirBlock *block, MirPrinterDetail detail);
+    static std::string printToString(MirGlobalVar *var, MirPrinterDetail detail);
 
     /**
      * Prints information about an instruction.

@@ -43,4 +43,14 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
     return nullptr;
 }
 
-MirInstructionBuilder MirBlockBuilder::instrBuilder() { return MirInstructionBuilder(m_ctx, m_insertPoint); }
+MirInstructionBuilder MirBlockBuilder::instrBuilder()
+{
+    if (!getBuiltObj())
+    {
+        m_ctx->getDiagCollector()->builder(Diag_Error, "MirBlockBuilder")
+                << "Can't create an instruction builder for a block if block was not built";
+        return MirInstructionBuilder(nullptr, {});
+    }
+
+    return MirInstructionBuilder(m_ctx, m_insertPoint);
+}

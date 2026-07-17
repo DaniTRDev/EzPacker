@@ -145,6 +145,28 @@ MirType *MirTypeTable::getArray(MirType *elementType, size_t elementCount)
     return newArrayType;
 }
 
+MirType *MirTypeTable::getFloatingTypeBySize(size_t sizeInBits) const
+{
+    MirType *result = nullptr;
+    for (auto &[id, type] : m_idToType)
+    {
+        if (type->getKind() != MirTypeKind::FloatingPoint)
+            continue;
+
+        size_t typeSize = type->getTotalSizeInBits();
+        if (typeSize >= sizeInBits)
+        {
+            // If we don't have a match yet, or if this type is a tighter fit
+            if (!result || typeSize < result->getTotalSizeInBits())
+            {
+                result = type;
+            }
+        }
+    }
+
+    return result;
+}
+
 MirType *MirTypeTable::getIntegerTypeBySize(size_t sizeInBits) const
 {
     MirType *result = nullptr;

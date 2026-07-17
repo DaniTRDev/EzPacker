@@ -5,6 +5,7 @@
 #include "Builder/MirBuilder.h"
 #include "Builder/MirBuilderContext.h"
 #include "Class/MirClass.h"
+#include "GlobalVar/MirGlobalVar.h"
 
 class MirOperandBuilder : public MirBuilder<MirOperand>
 {
@@ -16,7 +17,22 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirOperandBuilder(MirBuilderContext *ctx);
 
     /**
-     * Returns a float with the given floating point value.
+     * This function will build a constant array with the given element type. Will check if the elements have the same
+     * type as elemType and will return nullptr if there's a mismatch.
+     * @param elemType
+     * @param elems
+     * @param ref
+     */
+    MirConstantArray *
+    buildConstantArray(MirType *elemType, const std::vector<MirOperand *> &elems, SourceReference *ref = nullptr);
+
+    /**
+     * Returns a float operand with the given floating point value. If the value's bit-width is smaller than given
+     * type's, it will be extended and a warning will be thrown. If it is greater, given MirType will be
+     * extended to the closest available and a warning will be thrown; if no mir type is available an error will be
+     * thrown.
+     *
+     * If given type is not a floating type, an error will be thrown and nullptr will be returned.
      * @param type
      * @param value
      * @param ref
@@ -25,7 +41,12 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirFloat *buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref = nullptr);
 
     /**
-     * Creates an integer with the given value.
+     * Returns an integer operand with the given value. If the value's bit-width is smaller than given
+     * type's, it will be z-extended (non-signed) and a warning will be thrown. If it is greater, given MirType will be
+     * extended to the closest available and a warning will be thrown; if no mir type is available an error will be
+     * thrown.
+     *
+     * If given type is not an integer type, an error will be thrown and nullptr will be returned.
      * @param type
      * @param value
      * @return
@@ -71,6 +92,13 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirRegister *buildPhysReg(MirType *type, std::pmr::string name = "", SourceReference *ref = nullptr);
 
     /**
+     * Creates an indexed reference to a specific element within a global array variable.
+     * @param var The global variable target (must hold an Array type kind).
+     * @param elementIndex The specific element index array slot accessed (e.g., array[5]).
+     */
+    MirReference *buildArrayElemRef(MirGlobalVar *var, size_t elementIndex, SourceReference *ref = nullptr);
+
+    /**
      * Creates a reference to the given block.
      * @param block
      * @param ref
@@ -87,11 +115,11 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirReference *buildRef(MirFunction *func, SourceReference *ref = nullptr);
 
     /**
-     * Creates a reference to the given data entry
-     * @param entry
+     * Creates a reference to a global variable at given offset.
+     * @param var
      * @param ref
      */
-    MirReference *buildRef(MirGlobalDataEntry *entry, size_t offset, SourceReference *ref = nullptr);
+    MirReference *buildRef(MirGlobalVar *var, size_t offset, SourceReference *ref = nullptr);
 
     /**
      * Creates a reference to the given class field.

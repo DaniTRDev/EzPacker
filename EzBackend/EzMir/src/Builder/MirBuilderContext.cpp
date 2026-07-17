@@ -6,7 +6,8 @@ MirBuilderContext::MirBuilderContext(std::pmr::monotonic_buffer_resource *global
                                      const std::shared_ptr<MirTypeTable> &typeTable) :
     m_currentId(1), m_globalResource(globalArena), m_functionResource(m_globalResource), m_functions(m_globalResource),
     m_blockIdToBlock(m_globalResource), m_classIdToClass(m_globalResource), m_functionIdToFunc(m_globalResource),
-    m_globalData(m_globalResource), m_diagCollector(diagCollector), m_typeTable(typeTable)
+    m_globalVarIdToGVar(m_globalResource), m_diagCollector(diagCollector),
+    m_typeTable(typeTable)
 {
 }
 
@@ -83,6 +84,29 @@ bool MirBuilderContext::appendFunction(MirFunction *func)
     return true;
 }
 
+bool MirBuilderContext::appendGlobalVar(MirGlobalVar *globalVar)
+{
+    if (!globalVar)
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirBuilderContext")
+                << "Could not append global variable because it is invalid";
+        return false;
+    }
+
+    auto it = m_globalVarIdToGVar.find(globalVar->getId());
+    if (it != m_globalVarIdToGVar.end())
+    {
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirBuilderContext")
+                << "Could not append global variable because it was already appended";
+        return false;
+    }
+
+    m_globalVarIdToGVar.insert({ globalVar->getId(), globalVar });
+    m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext") << std::pmr::string(
+            std::format("Appended global var: {} (id: {})", globalVar->getName(), globalVar->getId()));
+    return true;
+}
+
 bool MirBuilderContext::appendRegister(MirRegister *reg)
 {
     if (!reg)
@@ -109,7 +133,7 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
 
 MirId MirBuilderContext::createId() { return m_currentId++; }
 
-MirBlock *MirBuilderContext::getBlockById(size_t id) const
+MirBlock *MirBuilderContext::getBlockById(MirId id) const
 {
     auto it = m_blockIdToBlock.find(id);
     if (it != m_blockIdToBlock.end())
@@ -120,7 +144,7 @@ MirBlock *MirBuilderContext::getBlockById(size_t id) const
     return nullptr;
 }
 
-MirFunction *MirBuilderContext::getFuncById(size_t id) const
+MirFunction *MirBuilderContext::getFuncById(MirId id) const
 {
     auto it = m_functionIdToFunc.find(id);
     if (it != m_functionIdToFunc.end())
@@ -131,7 +155,18 @@ MirFunction *MirBuilderContext::getFuncById(size_t id) const
     return nullptr;
 }
 
-MirRegister *MirBuilderContext::getRegisterById(size_t id) const
+MirGlobalVar *MirBuilderContext::getGVarById(MirId id) const
+{
+    auto it = m_globalVarIdToGVar.find(id);
+    if (it != m_globalVarIdToGVar.end())
+    {
+        return it->second;
+    }
+
+    return nullptr;
+}
+
+MirRegister *MirBuilderContext::getRegisterById(MirId id) const
 {
     auto it = m_registerIdToRegister.find(id);
 

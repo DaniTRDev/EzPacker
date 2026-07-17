@@ -9,13 +9,13 @@ TEST_F(OperandTest, Integer)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.buildInt(getTypeTable()->i8(), FlexInt(0xDE))).verifyInteger(getTypeTable()->i8(), 0xDE);
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i8(), FlexInt(uint32_t(0xDE), 8))).verifyInteger(getTypeTable()->i8(), FlexInt(uint32_t(0xDE), 8));
 
-    MirOperandVerifier(builder.buildInt(getTypeTable()->i16(), FlexInt(0xDEAD)))
-            .verifyInteger(getTypeTable()->i16(), 0xDEAD);
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i16(), FlexInt(uint32_t(0xDEAD), 16)))
+            .verifyInteger(getTypeTable()->i16(), uint32_t(0xDEAD));
 
-    MirOperandVerifier(builder.buildInt(getTypeTable()->i32(), FlexInt(0xDEADC0DE)))
-            .verifyInteger(getTypeTable()->i32(), 0xDEADC0DE);
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i32(), FlexInt(uint32_t(0xDEADC0DE))))
+            .verifyInteger(getTypeTable()->i32(), uint32_t(0xDEADC0DE));
 }
 
 TEST_F(OperandTest, Double)

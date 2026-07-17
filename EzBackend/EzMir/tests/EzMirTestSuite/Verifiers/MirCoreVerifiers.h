@@ -425,6 +425,67 @@ class MirFunctionVerifier : public MirVerifier<MirFunction>
 };
 
 /**
+ * Class used to verify the properties of a MirGlobalVar.
+ */
+class MirGlobalVarVerifier : public MirVerifier<MirGlobalVar>
+{
+  public:
+    /**
+     * Creates the verifier attached to the given global variable.
+     * @param globalVar
+     */
+    MirGlobalVarVerifier(MirGlobalVar *globalVar);
+
+    /**
+     * Checks if the global variable has the expected ID.
+     * @param expectedId
+     * @return
+     */
+    MirGlobalVarVerifier &id(MirId expectedId);
+
+    /**
+     * Checks if the global variable's name matches the expected one.
+     * @param expectedName
+     * @return
+     */
+    MirGlobalVarVerifier &name(const std::string_view &expectedName);
+
+    /**
+     * Checks if the global variable's type matches the expected type.
+     * @param expectedType
+     * @return
+     */
+    MirGlobalVarVerifier &type(MirType *expectedType);
+
+    /**
+     * Verifies whether the global variable is constant (read-only).
+     * @param expectedConstant
+     * @return
+     */
+    MirGlobalVarVerifier &constant(bool expectedConstant);
+
+    /**
+     * Checks if the global variable matches the expected linkage.
+     * @param expectedLinkage
+     * @return
+     */
+    MirGlobalVarVerifier &linkage(MirGlobalVarLinkage expectedLinkage);
+
+    /**
+     * Verifies that the initializer matches the one given.
+     * @param initializer
+     * @return
+     */
+    MirGlobalVarVerifier &initializer(MirOperand *initializer);
+
+    /**
+     * Helper to verify that the global variable is zero-initialized (has empty initialization data).
+     * @return
+     */
+    MirGlobalVarVerifier &zeroInitialized();
+};
+
+/**
  * Class used to verify the properties of a MirClass (including inheritance, fields, and VTable layout).
  */
 class MirClassVerifier : public MirVerifier<MirClass>

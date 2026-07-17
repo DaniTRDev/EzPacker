@@ -42,7 +42,7 @@ class MirFunction
     MirFunction(MirBlock *entryPoint,
                 MirFunctionStackFrame *stackFrame,
                 MirType *returnType,
-                size_t id,
+                MirId id,
                 SourceReference *sourceRef,
                 std::pmr::list<MirBlock *> blocks,
                 std::pmr::list<MirRegister *> parameters,
@@ -77,7 +77,7 @@ class MirFunction
     /**
      * Returns the unique MIR ID assigned to this function.
      */
-    size_t getId();
+    MirId getId();
 
     /**
      * Returns the source reference that created this function.
@@ -119,12 +119,12 @@ class MirFunction
     MirBlock *m_entryPoint;
     MirFunctionStackFrame *m_stackFrame;
     MirType *m_returnType;
-    size_t m_id;
+    MirId m_id;
     SourceReference *m_sourceRef;
 
     std::pmr::list<MirBlock *> m_blocks; // Arena-managed blocks belonging to this function.
     std::pmr::list<MirRegister *> m_parameters;
-    std::pmr::map<size_t, MirBlock *> m_blockIdToBlock;
+    std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;
     std::pmr::string m_name;
 };
 

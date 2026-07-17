@@ -20,9 +20,9 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
      * @param ctx
      */
     MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner);
-    
+
     /**
-     * Builds a block returns it.
+     * Builds a block returns it. This function does not change owner.
      * @param sourceRef
      * @param name
      * @return
@@ -30,7 +30,8 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
     MirBlock *build(SourceReference *sourceRef = nullptr, const std::pmr::string &name = "");
 
     /**
-     * Returns an instruction builder linked to the current block and context.
+     * Returns an instruction builder linked to the current block and context. This needs "build" to have been called,
+     * will push a diagnostic error if not and will return an invalid builder.
      * @param opcode
      * @return
      */

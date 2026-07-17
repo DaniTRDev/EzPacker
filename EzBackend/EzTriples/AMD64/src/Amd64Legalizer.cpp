@@ -52,7 +52,7 @@ void Amd64Legalizer::addMemory(MirBuilderContext *ctx, MirLegalizer *legalizer)
     legalizer->addRule(legal, MirInstructionOpCode::LOAD, { t->i64()->getId(), MIRID_INVALID });
 
     // CREATE (Stack allocation / Alloca): Destination gets pointer size (i64 on x64)
-    legalizer->addRule(legal, MirInstructionOpCode::CREATE, { t->i64()->getId() });
+    legalizer->addRule(legal, MirInstructionOpCode::ALLOC, { t->i64()->getId() });
 }
 
 void Amd64Legalizer::addArithmetic(MirBuilderContext *ctx, MirLegalizer *legalizer)

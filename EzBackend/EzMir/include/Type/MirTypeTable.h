@@ -62,6 +62,13 @@ class MirTypeTable
     MirType *getArray(MirType *elementType, size_t elementCount);
 
     /**
+     * Returns the first floating-point type that can hold the given bit size.
+     * @param sizeInBits
+     * @return
+     */
+    MirType *getFloatingTypeBySize(size_t sizeInBits) const;
+
+    /**
      * Returns the first integer type that can hold the given bit size.
      * @param sizeInBits
      * @return

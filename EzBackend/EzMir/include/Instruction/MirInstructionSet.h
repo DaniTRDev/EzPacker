@@ -1,9 +1,3 @@
-/**
- * @file MirInstructionSet.h
- * @brief X-macro source list containing every MIR opcode definition.
- *
- * Syntax: INSTRUCTION(Name, Category, Operands, Flags)
- */
 #ifdef INSTRUCTION
 
 // This code is needed not to collide with gtest's TEST macro.
@@ -13,7 +7,10 @@
 #undef TEST
 #endif
 
-#define OPERAND_CONSTRAINTS(...) { __VA_ARGS__ }
+#define OPERAND_CONSTRAINTS(...)                                                                                       \
+    {                                                                                                                  \
+        __VA_ARGS__                                                                                                    \
+    }
 // Helper to keep the flags readable without polluting the global namespace
 #define F(x) MirInstructionFlags::x
 
@@ -69,7 +66,7 @@ INSTRUCTION(STORE,
                                 { ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(WritesMemory) | F(HasSideEffect))
 
-INSTRUCTION(CREATE,
+INSTRUCTION(ALLOC,
             MirCat_Memory,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
             F(HasSideEffect))

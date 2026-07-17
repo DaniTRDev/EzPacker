@@ -379,6 +379,83 @@ MirFunctionStackFrameVerifier MirFunctionVerifier::stackFrameVerifier()
     return MirFunctionStackFrameVerifier(getTestedObj()->getStackFrame());
 }
 
+MirGlobalVarVerifier::MirGlobalVarVerifier(MirGlobalVar *globalVar) : MirVerifier<MirGlobalVar>(globalVar) {}
+
+MirGlobalVarVerifier &MirGlobalVarVerifier::id(MirId expectedId)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getId(), expectedId);
+    }
+    return *this;
+}
+
+MirGlobalVarVerifier &MirGlobalVarVerifier::name(const std::string_view &expectedName)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getName(), expectedName);
+    }
+    return *this;
+}
+
+MirGlobalVarVerifier &MirGlobalVarVerifier::type(MirType *expectedType)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getType(), expectedType);
+    }
+    return *this;
+}
+
+MirGlobalVarVerifier &MirGlobalVarVerifier::constant(bool expectedConstant)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->isConstant(), expectedConstant);
+    }
+    return *this;
+}
+
+MirGlobalVarVerifier &MirGlobalVarVerifier::linkage(MirGlobalVarLinkage expectedLinkage)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(m_testedObj->getLinkage(), expectedLinkage);
+    }
+    return *this;
+}
+
+MirGlobalVarVerifier &MirGlobalVarVerifier::initializer(MirOperand *initializer)
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_EQ(initializer->getType(), m_testedObj->getInitializer()->getType())
+                << "Initializer type mismatch for global variable " << m_testedObj->getName();
+
+        EXPECT_EQ(initializer->getMirType(), m_testedObj->getInitializer()->getMirType())
+                << "Initializer mir type mismatch for global variable " << m_testedObj->getName();
+    }
+    return *this;
+}
+
+MirGlobalVarVerifier &MirGlobalVarVerifier::zeroInitialized()
+{
+    EXPECT_NE(m_testedObj, nullptr);
+    if (m_testedObj)
+    {
+        EXPECT_TRUE(m_testedObj->getInitializer() == nullptr)
+                << "Expected global variable " << m_testedObj->getName() << " to be zero-initialized (empty initData).";
+    }
+    return *this;
+}
+
 MirClassVerifier::MirClassVerifier(MirClass *_class) : MirVerifier<MirClass>(_class) {}
 
 MirClassVerifier &MirClassVerifier::className(const std::string_view &expectedName)

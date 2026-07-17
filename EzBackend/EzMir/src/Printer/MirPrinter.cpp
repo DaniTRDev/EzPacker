@@ -1,5 +1,29 @@
 #include "Printer/MirPrinter.h"
 
+std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
+{
+    // Indent block headers slightly
+    std::string result;
+
+    if (!block->getName().empty())
+        result = std::format("%block.name={}", block->getName());
+    else
+        result = std::format("%block.id={}", block->getId());
+
+    result += std::format(".instrCount={}\n", block->getInstructions().size());
+
+    if (detail == MirPrinterDetail::Detailed)
+    {
+        // Cascade into Instructions
+        for (MirInstruction *instr : block->getInstructions())
+        {
+            result += printToString(instr, detail);
+        }
+    }
+
+    return result;
+}
+
 std::string MirPrinter::printToString(MirClass *_class, MirPrinterDetail detail)
 {
     if (!_class)
@@ -132,24 +156,45 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
     return result;
 }
 
-std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
+std::string MirPrinter::printToString(MirGlobalVar *globalVar, MirPrinterDetail detail)
 {
-    // Indent block headers slightly
-    std::string result;
+    if (!globalVar)
+        return "";
 
-    if (!block->getName().empty())
-        result = std::format("%block.name={}", block->getName());
-    else
-        result = std::format("%block.id={}", block->getId());
-
-    result += std::format(".instrCount={}\n", block->getInstructions().size());
-
-    if (detail == MirPrinterDetail::Detailed)
+    std::string linkageStr = "unknown";
+    switch (globalVar->getLinkage())
     {
-        // Cascade into Instructions
-        for (MirInstruction *instr : block->getInstructions())
+        case MirGlobalVarLinkage::External:
+            linkageStr = "external";
+            break;
+        case MirGlobalVarLinkage::Internal:
+            linkageStr = "internal";
+            break;
+        case MirGlobalVarLinkage::Weak:
+            linkageStr = "weak";
+            break;
+    }
+
+    std::string result = std::format("%gVar.name={}.id={}.type={}.linkage={}.constant={}\n",
+                                     globalVar->getName(),
+                                     globalVar->getId(),
+                                     globalVar->getType()->getName(),
+                                     linkageStr,
+                                     globalVar->isConstant() ? "true" : "false");
+
+    // Check the new structured initializer expression tree pointer
+    MirOperand *initOperand = globalVar->getInitializer();
+    if (!initOperand)
+    {
+        result += "  Initializer  : zero-initialized";
+    }
+    else
+    {
+        result += "  Initializer  : initialized";
+
+        if (detail == MirPrinterDetail::Detailed)
         {
-            result += printToString(instr, detail);
+            result += std::format("    Initializer data: {}\n", initOperand->toString());
         }
     }
 
@@ -158,7 +203,7 @@ std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
 
 std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail detail)
 {
-    std::string result = std::format("{}", instr->getMetadata().m_name);
+    std::string result = std::format("  {:<12}", instr->getMetadata().m_name);
 
     // Print operands
     auto operands = instr->getOperands();

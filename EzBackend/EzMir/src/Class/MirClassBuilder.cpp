@@ -140,6 +140,7 @@ MirClass *MirClassBuilder::build(MirClass *parent, const std::pmr::string &name,
 
     diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(_class, MirPrinterDetail::Detailed)), sourceRef);
 
+    setBuildResult(_class);
     return _class;
 }
 

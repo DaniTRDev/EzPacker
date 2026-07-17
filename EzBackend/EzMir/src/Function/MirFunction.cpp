@@ -3,7 +3,7 @@
 MirFunction::MirFunction(MirBlock *entryPoint,
                          MirFunctionStackFrame *stackFrame,
                          MirType *returnType,
-                         size_t id,
+                         MirId id,
                          SourceReference *sourceRef,
                          std::pmr::list<MirBlock *> blocks,
                          std::pmr::list<MirRegister *> parameters,
@@ -18,7 +18,7 @@ MirFunction::MirFunction(MirBlock *entryPoint,
     }
 }
 
-MirBlock *MirFunction::getBlock(size_t id)
+MirBlock *MirFunction::getBlock(MirId id)
 {
     auto it = m_blockIdToBlock.find(id);
     if (it != m_blockIdToBlock.end())
@@ -31,7 +31,7 @@ MirBlock *MirFunction::getEntryPoint() { return m_entryPoint; }
 
 MirFunctionStackFrame *MirFunction::getStackFrame() { return m_stackFrame; }
 
-size_t MirFunction::getId() { return m_id; }
+MirId MirFunction::getId() { return m_id; }
 
 MirType *MirFunction::getReturnType() { return m_returnType; }
 

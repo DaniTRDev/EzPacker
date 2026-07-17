@@ -12,10 +12,12 @@ enum class MirReferenceType : uint8_t
 {
     Invalid = 0,
     Block,
-    DataEntry,
+    GlobalArrayElem,
+    GlobalVar,
     Function,
     ClassField,
-    ClassMethod
+    ClassMethod,
+    ConstantArrayElement
 };
 
 class MirFloat : public MirOperand
@@ -54,15 +56,46 @@ class MirInteger : public MirOperand
     FlexInt m_int;
 };
 
+class MirConstantArray : public MirOperand
+{
+  public:
+    static constexpr MirOperandType OpKind = MirOperandType::ConstantArray;
+
+    MirConstantArray(MirType *arrayType, std::pmr::vector<MirOperand *> elements, SourceReference *ref) :
+        MirOperand(arrayType, ref), m_elements(std::move(elements))
+    {
+    }
+
+    const std::pmr::vector<MirOperand *> &getElements() const { return m_elements; }
+    MirOperandType getType() const override { return OpKind; }
+
+    std::string toString() const override
+    {
+        std::string res = std::format("{}[", getMirType()->getName());
+        for (size_t i = 0; i < m_elements.size(); ++i)
+        {
+            if (i > 0)
+                res += ", ";
+            res += m_elements[i]->toString();
+        }
+        return res + "]";
+    }
+
+  private:
+    std::pmr::vector<MirOperand *> m_elements; // Elements must be Float or Integer types
+};
+
 /**
  * Types of references and what means each argument:
  *  - Block -> refId = id of the MirBlock referenced. Offset = 0.
- *  - DataEntry -> refId = id of the MirGlobalDataEntry referenced. Offset = Offset of the data entry.
+ *  - GlobalArrayElem -> refId = id of the MirGlobalVar that holds the array. Offset = accessed element.
+ *  - GlobalVar -> refId = id of the MirGlobalVar referenced. Offset = Index of accessed byte from the element.
  *  - Function -> refId = id of the MirFunction referenced. Offset = 0.
  *  - ClassField -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
  *  field.
  * - ClassMethod -> refId = id of the MirRegister that holds the start of the structure. Offset = Id of the accessed
  *  method.
+ * - ConstantArrayElement -> refId = id of the MirRegister that holds the start of the array. Offset = elem accessed.
  */
 class MirReference : public MirOperand
 {
@@ -75,10 +108,12 @@ class MirReference : public MirOperand
     }
 
     bool isBlock() const { return m_refType == MirReferenceType::Block; }
-    bool isDataEntry() const { return m_refType == MirReferenceType::DataEntry; }
+    bool isGlobalArrayElem() const { return m_refType == MirReferenceType::GlobalArrayElem; }
+    bool isGlobalVar() const { return m_refType == MirReferenceType::GlobalVar; }
     bool isFunction() const { return m_refType == MirReferenceType::Function; }
     bool isClassField() const { return m_refType == MirReferenceType::ClassField; }
     bool isClassMethod() const { return m_refType == MirReferenceType::ClassMethod; }
+    bool isConstantArrayElem() const { return m_refType == MirReferenceType::ConstantArrayElement; }
     bool isInvalid() const { return m_refType == MirReferenceType::Invalid; }
 
     MirReferenceType getRefType() const { return m_refType; }
@@ -92,9 +127,13 @@ class MirReference : public MirOperand
         {
             src = "block";
         }
-        else if (isDataEntry())
+        else if (isGlobalArrayElem())
         {
-            src = "data";
+            src = "golbalArrayElem";
+        }
+        else if (isGlobalVar())
+        {
+            src = "globalVar";
         }
         else if (isFunction())
         {
@@ -103,15 +142,17 @@ class MirReference : public MirOperand
         else if (isClassField())
         {
             src = "classField";
-            return std::format("{} %class.id={}.src={}.fieldId={}", getMirType()->getName(), m_refId, src, m_offset);
         }
         else if (isClassMethod())
         {
             src = "classMethod";
-            return std::format("{} %class.id={}.src={}.methodId={}", getMirType()->getName(), m_refId, src, m_offset);
+        }
+        else if (isConstantArrayElem())
+        {
+            src = "constantArray";
         }
 
-        return std::format("{} %ref.id={}.src={}", getMirType()->getName(), m_refId, src);
+        return std::format("{} %ref.id={}.src={}.offId={}", getMirType()->getName(), m_refId, src, m_offset);
     }
 
   private:

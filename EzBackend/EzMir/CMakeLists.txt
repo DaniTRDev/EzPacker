@@ -19,6 +19,8 @@ set(EZMIR_FILES_LIST
         "include/Function/MirFunction.h"
         "include/Function/MirFunctionBuilder.h"
         "include/Function/MirFunctionStackFrame.h"
+        "include/GlobalVar/MirGlobalVar.h"
+        "include/GlobalVar/MirGlobalVarBuilder.h"
         "include/Operand/MirOperand.h"
         "include/Operand/MirOperandBuilder.h"
         "include/Operand/MirOperands.h"
@@ -39,6 +41,8 @@ set(EZMIR_FILES_LIST
         "src/Function/MirFunction.cpp"
         "src/Function/MirFunctionBuilder.cpp"
         "src/Function/MirFunctionStackFrame.cpp"
+        "src/GlobalVar/MirGlobalVar.cpp"
+        "src/GlobalVar/MirGlobalVarBuilder.cpp"
         "src/MirPasses/MirPass.cpp"
         "src/MirPasses/MirPassManager.cpp"
         "src/MirPasses/Passes/CodeFlowAnalysis.cpp"
@@ -113,6 +117,13 @@ if (EZPACKER_BUILD_TESTS)
             "EzMirTestSuite"
             ""
             "tests/T_Function.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_GlobalVar"
+            "EzMirTestSuite"
+            ""
+            "tests/T_GlobalVar.cpp"
     )
 
     EzPacker_AddTest(

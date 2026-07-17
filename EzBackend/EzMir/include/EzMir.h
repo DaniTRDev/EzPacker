@@ -21,6 +21,10 @@
 #include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionStackFrame.h"
 
+// ── Global variable container ───────────────────────────────────────────────
+#include "GlobalVar/MirGlobalVar.h"
+#include "GlobalVar/MirGlobalVarBuilder.h"
+
 // ── Instructions & opcode catalogue ─────────────────────────────────────────
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"

@@ -9,20 +9,9 @@
 #include "Block/MirBlock.h"
 #include "Class/MirClass.h"
 #include "Function/MirFunction.h"
+#include "GlobalVar/MirGlobalVar.h"
 #include "Type/IMirTargetTypeLayout.h"
 #include "Type/MirTypeTable.h"
-
-/**
- * A struct that contains information about global data.
- */
-struct MirGlobalDataEntry
-{
-    bool m_isReadOnly;
-    bool m_uninitialized;
-    std::pmr::vector<char> m_data;
-    MirType *m_dataType;
-    size_t m_entryId;
-};
 
 class MirBuilderContext
 {
@@ -64,6 +53,12 @@ class MirBuilderContext
     bool appendFunction(MirFunction *func);
 
     /**
+     * Appends a global variable to the context. Returns true if succeeded.
+     * @param globalVar
+     */
+    bool appendGlobalVar(MirGlobalVar *globalVar);
+
+    /**
      * Appends a register to the context. Returns true if succeeded.
      * @param reg
      * @return
@@ -76,7 +71,7 @@ class MirBuilderContext
      * @param id
      * @return
      */
-    MirBlock *getBlockById(size_t id) const;
+    MirBlock *getBlockById(MirId id) const;
 
     /**
      * Searches in the context for the given function ID and returns a pointer to the function, if exists. Returns
@@ -84,7 +79,14 @@ class MirBuilderContext
      * @param id
      * @return
      */
-    MirFunction *getFuncById(size_t id) const;
+    MirFunction *getFuncById(MirId id) const;
+
+    /**
+     * Searches in the context for a global variable with the given index. If it exists, it is returned. Returns nullptr
+     * if not found.
+     * @param id
+     */
+    MirGlobalVar *getGVarById(MirId id) const;
 
     /**
      * Creates an ID within this context. Returns 0 (MIRID_INVALID) if failed.
@@ -141,9 +143,8 @@ class MirBuilderContext
     std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
     std::pmr::map<MirId, MirClass *> m_classIdToClass;          // Used to search for classes.
     std::pmr::map<MirId, MirFunction *> m_functionIdToFunc;     // Used to search for functions.
+    std::pmr::map<MirId, MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
     std::pmr::map<MirId, MirRegister *> m_registerIdToRegister; // Used to search for registers.
-
-    std::pmr::vector<MirGlobalDataEntry *> m_globalData;
 
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
     std::shared_ptr<MirTypeTable> m_typeTable;
