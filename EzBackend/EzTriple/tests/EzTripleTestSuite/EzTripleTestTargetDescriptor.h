@@ -2,27 +2,28 @@
 #define EZPACKER_EZTRIPLETARGETDESCRIPTOR_H
 
 #include "Descriptors/TargetDesc.h"
+#include "EzTripleTestExpansionRecipe.h"
 
 /**
  * This class acts a simple target descriptor that is already defined. Its purpose is just to acts as an already-defined
  * descriptor for tests.
  */
-class EzTripleTargetDesc : public TargetDesc
+class EzTripleTestTargetDesc : public TargetDesc
 {
   public:
-    EzTripleTargetDesc(MirBuilderContext *ctx) { m_ctx = ctx; }
+    EzTripleTestTargetDesc(MirBuilderContext *ctx) { m_ctx = ctx; }
 
     /**
      * Returns "EzTripleTargetDesc"
      * @return
      */
-    const char *getName() const override { return "EzTripleTargetDesc"; }
+    const char *getName() const override { return "EzTripleTestTargetDesc"; }
 
     /**
      * Returns the expansion recipes for this target.
      * @return
      */
-    const class ExpansionRecipe *getExpansionRecipes() override { return nullptr; }
+    const class ExpansionRecipe *getExpansionRecipes() override { return GET_EXPANSION_RECIPES(EzTripleTest); }
 
     /**
      * Returns the expansion recipe for the given instruction in this target.
@@ -76,7 +77,7 @@ class EzTripleTargetDesc : public TargetDesc
         return nullptr;
     }
 
-    size_t getExpansionRecipesSize() override { return 0; }
+    size_t getExpansionRecipesSize() override { return GET_EXPANSION_RECIPES_SIZE(EzTripleTest); }
 
   private:
     MirBuilderContext *m_ctx;

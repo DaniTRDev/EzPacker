@@ -26,8 +26,9 @@ set(EZTRIPLE_FILES_LIST
 
 set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.h"
-        "tests/EzTripleTestSuite/EzTripleTargetDescriptor.h"
+        "tests/EzTripleTestSuite/EzTripleTestExpansionRecipe.h"
         "tests/EzTripleTestSuite/EzTripleTestSuite.h"
+        "tests/EzTripleTestSuite/EzTripleTestTargetDescriptor.h"
         "tests/EzTripleTestSuite/FuncSignaturePassVerifier.h"
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.h"
         "tests/EzTripleTestSuite/LegalizeReturnActionVerifier.h"

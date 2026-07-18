@@ -48,7 +48,7 @@ void MirTripleTestSuiteAsGtest::TearDown()
 
 std::shared_ptr<TargetDesc> MirTripleTestSuiteAsGtest::createTargetDesc()
 {
-    return std::make_shared<EzTripleTargetDesc>(getBuilderCtx());
+    return std::make_shared<EzTripleTestTargetDesc>(getBuilderCtx());
 }
 
 std::shared_ptr<MirLegalizer> MirTripleTestSuiteAsGtest::createTargetLegalizer()

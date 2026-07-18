@@ -56,7 +56,13 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
      */
     MirFunctionBuilder &buildParam(MirRegister *param);
 
+    /**
+     * Sets this function's calling convention.
+     */
+    MirFunctionBuilder &setCallingConvention(CallingConvDesc *cc);
+
   private:
+    CallingConvDesc *m_callingConv;
     MirBuilderContext *m_ctx;
     std::pmr::list<MirRegister *> m_parameters;
     std::pmr::vector<MirFunction *> *m_owner;

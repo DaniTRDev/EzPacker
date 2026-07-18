@@ -53,6 +53,11 @@ class CallingConvDesc
     virtual bool isCalleeCleanup() const = 0;
 
     /**
+     * Returns the name of the calling convention.
+     */
+    virtual const char *getName() const = 0;
+
+    /**
      * Returns the stack alignment needed BEFORE a call.
      * @return
      */

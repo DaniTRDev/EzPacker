@@ -39,7 +39,8 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
 
     MirBlockBuilder builder(m_ctx, &blocks);
     MirBlock *entryPoint = builder.build(sourceRef, "entryPoint");
-    MirFunction *func = funcAlloc.new_object<MirFunction>(entryPoint,
+    MirFunction *func = funcAlloc.new_object<MirFunction>(m_callingConv,
+                                                          entryPoint,
                                                           stackFrame,
                                                           returnType,
                                                           funcType,
@@ -52,6 +53,16 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
     auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirFunctionBuilder");
     diagBuilder << std::pmr::string(std::format("Built func with id: {}", func->getId()));
     diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(func, MirPrinterDetail::Detailed)), sourceRef);
+
+    if (!m_callingConv)
+    {
+        m_callingConv = m_ctx->getDefaultCallingConvention();
+        diagBuilder.appendNote(std::format("Using calling convention: {}", m_callingConv->getName()).c_str(), nullptr);
+    }
+    else
+    {
+        diagBuilder.appendNote(std::format("Using calling convention: {}", m_callingConv->getName()).c_str(), nullptr);
+    }
 
     if (!m_ctx->appendFunction(func))
     {
@@ -79,5 +90,11 @@ MirFunctionBuilder::buildParam(MirType *type, const std::pmr::string &name, Sour
 MirFunctionBuilder &MirFunctionBuilder::buildParam(MirRegister *param)
 {
     m_parameters.push_back(param);
+    return *this;
+}
+
+MirFunctionBuilder &MirFunctionBuilder::setCallingConvention(CallingConvDesc *cc)
+{
+    m_callingConv = cc;
     return *this;
 }

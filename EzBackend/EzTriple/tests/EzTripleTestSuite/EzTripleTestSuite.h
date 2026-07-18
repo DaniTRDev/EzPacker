@@ -103,7 +103,7 @@ class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Te
     virtual std::shared_ptr<MirLegalizer> createTargetLegalizer() override;
 
     /**
-     * Creates a target EzTripleTargetDesc and returns it. Parent classes can still override this method to inject
+     * Creates a target EzTripleTestTargetDesc and returns it. Parent classes can still override this method to inject
      * their own target description.
      * @return
      */

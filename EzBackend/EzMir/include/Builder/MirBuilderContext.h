@@ -18,12 +18,14 @@ class MirBuilderContext
   public:
     /**
      * Builds the context with the given type table.
+     * @param defaultCallingConv
      * @param globalArena Used to store general data, names, ...
      * @param funcArena Used to store functions, blocks, instructions, operands, ...
      * @param diagCollector
      * @param typeTable
      */
-    MirBuilderContext(std::pmr::monotonic_buffer_resource *globalArena,
+    MirBuilderContext(CallingConvDesc *defaultCallingConv,
+                      std::pmr::monotonic_buffer_resource *globalArena,
                       const std::shared_ptr<DiagnosticCollector> &diagCollector,
                       const std::shared_ptr<MirTypeTable> &typeTable);
 
@@ -64,6 +66,11 @@ class MirBuilderContext
      * @return
      */
     bool appendRegister(MirRegister *reg);
+
+    /**
+     * Returns the default calling convention for a function.
+     */
+    CallingConvDesc *getDefaultCallingConvention() const;
 
     /**
      * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr if the
@@ -154,6 +161,7 @@ class MirBuilderContext
     const std::shared_ptr<MirTypeTable> &getTypeTable();
 
   private:
+    CallingConvDesc *m_defaultCallingConv; // Default calling convention used when building functions.
     MirId m_currentId{ 0 };
 
     // Pools.

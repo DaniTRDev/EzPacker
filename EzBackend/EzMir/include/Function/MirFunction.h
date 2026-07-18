@@ -20,6 +20,7 @@
 #include "Block/MirBlock.h"
 #include "Type/MirType.h"
 #include "MirFunctionStackFrame.h"
+#include "CallingConvDesc.h"
 
 /**
  * Important: Parameters MUST BE VIRTUAL/PHYSICAL REGISTERS.
@@ -30,6 +31,7 @@ class MirFunction
     /**
      * Creates a function wrapper over arena-managed MIR data structures.
      *
+     * @param callingConv
      * @param entryPoint    First block executed when the function starts.
      * @param stackFrame    A stack frame object that describes this function's stack frame.
      * @param returnType    MIR type describing the function's return value.
@@ -40,7 +42,8 @@ class MirFunction
      * @param parameters    Slice of parameter operands in declaration order.
      * @param name
      */
-    MirFunction(MirBlock *entryPoint,
+    MirFunction(CallingConvDesc *callingConv,
+                MirBlock *entryPoint,
                 MirFunctionStackFrame *stackFrame,
                 MirType *returnType,
                 MirType *type,
