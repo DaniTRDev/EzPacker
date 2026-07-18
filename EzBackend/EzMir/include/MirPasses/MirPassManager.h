@@ -37,31 +37,29 @@ class MirPassManager
     void generatePipeline();
 
     /**
-     * @brief Lazy-loads, executes, and caches an analysis pass on demand.
+     * @brief Lazy-loads, executes, and caches an analysis pass utilizing the given context.
      */
     template <typename AnalysisPass>
         requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
-    AnalysisPass *getAnalysis(std::pmr::list<class MirFunction *> &functionList)
+    AnalysisPass *getAnalysis(MirBuilderContext *ctx)
     {
         std::type_index passId = std::type_index(typeid(AnalysisPass));
 
-        // Cache Hit: Return the valid analysis instantly
         if (m_validAnalyses.contains(passId))
         {
             return static_cast<AnalysisPass *>(m_validAnalyses[passId]);
         }
 
-        // Cache Miss: Query the non-templated backend engine to run and cache dynamically
-        MirPass *executedPass = runAnalysisById(passId, functionList);
+        MirPass *executedPass = runAnalysisById(passId, ctx);
         return static_cast<AnalysisPass *>(executedPass);
     }
 
     /**
-     * Runs the generated pipeline (by generatePipeline) on the given function list. Only TRANSFORM passes will be
+     * Runs the generated pipeline (by generatePipeline) on the given context. Only TRANSFORM passes will be
      * executed, analysis passes will be run ONLY if they are required by any of the transform passes.
      * @param functionList
      */
-    void runPipeline(std::pmr::list<class MirFunction *> &functionList);
+    void runPipeline(MirBuilderContext *ctx);
 
     /**
      * Returns the diag collector linked to this pass manager.
@@ -72,8 +70,10 @@ class MirPassManager
   private:
     /**
      * Internal implementation helper to resolve and execute an analysis pass by type_index.
+     * @param passId
+     * @param ctx
      */
-    MirPass *runAnalysisById(std::type_index passId, std::pmr::list<class MirFunction *> &functionList);
+    MirPass *runAnalysisById(std::type_index passId, MirBuilderContext *ctx);
 
     /**
      * Tries to form a valid pass execution pipeline satisfying the dependencies of each pass.
@@ -88,9 +88,10 @@ class MirPassManager
     /**
      * Runs a TRANSFORMATION pass on the given place depending on its iteration type.
      * @param pass
+     * @param ctx
      * @return
      */
-    MirPassResult runPass(MirPass *pass, std::pmr::list<class MirFunction *> &functionList);
+    MirPassResult runPass(MirPass *pass, MirBuilderContext *ctx);
 
   private:
     std::pmr::unordered_map<std::type_index, MirPass *> m_validAnalyses;

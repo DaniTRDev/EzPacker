@@ -56,6 +56,8 @@ bool MirBuilderContext::appendClass(MirClass *_class)
 
     m_typeIdToClass.insert({ _class->getType()->getId(), _class });
     m_classIdToClass.insert({ _class->getId(), _class });
+    m_classes.push_back(_class);
+
     return true;
 }
 
@@ -104,6 +106,8 @@ bool MirBuilderContext::appendGlobalVar(MirGlobalVar *globalVar)
     m_globalVarIdToGVar.insert({ globalVar->getId(), globalVar });
     m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext") << std::pmr::string(
             std::format("Appended global var: {} (id: {})", globalVar->getName(), globalVar->getId()));
+    m_globalVars.push_back(globalVar);
+
     return true;
 }
 
@@ -202,7 +206,11 @@ std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { r
 
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getFuncAllocator() { return m_functionResource; }
 
+std::pmr::list<MirClass *> &MirBuilderContext::getClasses() { return m_classes; }
+
 std::pmr::list<MirFunction *> &MirBuilderContext::getFunctions() { return m_functions; }
+
+std::pmr::list<MirGlobalVar *> &MirBuilderContext::getGlobalVars() { return m_globalVars; }
 
 const std::shared_ptr<DiagnosticCollector> &MirBuilderContext::getDiagCollector() { return m_diagCollector; }
 

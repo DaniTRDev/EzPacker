@@ -7,31 +7,18 @@ MirPassManager::MirPassManager(std::pmr::memory_resource *globalArena,
 {
 }
 
-void MirPassManager::runPipeline(std::pmr::list<MirFunction *> &functionList)
+void MirPassManager::runPipeline(MirBuilderContext *ctx)
 {
-    // Ensure compilation pipeline has been calculated at least once
-    if (m_executionPipeline.empty() && !m_passesBlueprint.empty())
-    {
-        generatePipeline();
-    }
-
     for (MirPass *pass : m_executionPipeline)
     {
-        // Pipeline loop only processes Transform / Optimization passes sequentially
         if (pass->getPassType() == MirPassType::Transform)
         {
-            // Clean up cached analyses to protect against stale data mutations
-            m_validAnalyses.clear();
-            m_savedResults.clear();
-
-            auto passId = std::type_index(typeid(*pass));
-            m_savedResults[passId] = runPass(pass, functionList);
-            pass->setResult(&m_savedResults[passId]);
+            runPass(pass, ctx);
         }
     }
 }
 
-MirPass *MirPassManager::runAnalysisById(std::type_index passId, std::pmr::list<class MirFunction *> &functionList)
+MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderContext *ctx)
 {
     // Cache Check (handles downstream nested dependencies)
     if (m_validAnalyses.contains(passId))
@@ -51,11 +38,11 @@ MirPass *MirPassManager::runAnalysisById(std::type_index passId, std::pmr::list<
     // Recursively resolve and cache all upstream prerequisites through the manager framework
     for (const auto &depId : analysisPass->getDependencies())
     {
-        runAnalysisById(depId, functionList);
+        runAnalysisById(depId, ctx);
     }
 
     // Run the analysis and safely persist the result inside our map storage
-    m_savedResults[passId] = runPass(analysisPass, functionList);
+    m_savedResults[passId] = runPass(analysisPass, ctx);
     analysisPass->setResult(&m_savedResults[passId]);
 
     // Validate cache entry tracking
@@ -123,46 +110,99 @@ void MirPassManager::resolveDependencies(std::type_index passId,
 
 const std::shared_ptr<DiagnosticCollector> &MirPassManager::getDiagCollector() const { return m_diagCollector; }
 
-MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction *> &functionList)
+MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
 {
     auto log = m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager");
     log << std::pmr::string(std::format("Running pass {}", pass->getName()));
     log.flush();
+    MirPassResult combinedResult{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
+    pass->reset();
 
-    MirPassResult result{};
+    auto &functionList = ctx->getFunctions();
+    auto &classList = ctx->getClasses();
+    auto &globalList = ctx->getGlobalVars();
+
     switch (pass->getIterationPlace())
     {
+        case MirPassIterationPlace::Class:
+        {
+            for (auto *cls : classList)
+            {
+                MirPassResult r = pass->run(cls, this);
+                combinedResult.m_modifiedMir |= r.m_modifiedMir;
+                if (!r.m_succeeded)
+                {
+                    combinedResult.m_succeeded = false;
+                    break;
+                }
+            }
+            break;
+        }
+        case MirPassIterationPlace::GlobalVariable:
+        {
+            for (auto *globalVar : globalList)
+            {
+                MirPassResult r = pass->run(globalVar, this);
+                combinedResult.m_modifiedMir |= r.m_modifiedMir;
+                if (!r.m_succeeded)
+                {
+                    combinedResult.m_succeeded = false;
+                    break;
+                }
+            }
+            break;
+        }
         case MirPassIterationPlace::Function:
         {
-            for (auto func = functionList.begin(); func != functionList.end(); func++)
+            for (auto it = functionList.begin(); it != functionList.end(); ++it)
             {
-                result = pass->run(functionList, func, this);
+                MirPassResult r = pass->run(functionList, it, this);
+                combinedResult.m_modifiedMir |= r.m_modifiedMir;
+                if (!r.m_succeeded)
+                {
+                    combinedResult.m_succeeded = false;
+                    break;
+                }
             }
             break;
         }
         case MirPassIterationPlace::Block:
         {
-            for (auto func : functionList)
+            for (auto *func : functionList)
             {
-                auto blockList = func->getBlocks();
-                for (auto block = blockList.begin(); block != blockList.end(); block++)
+                auto &blocks = func->getBlocks();
+                for (auto it = blocks.begin(); it != blocks.end(); ++it)
                 {
-                    result = pass->run(blockList, block, this);
+                    MirPassResult r = pass->run(blocks, it, this);
+                    combinedResult.m_modifiedMir |= r.m_modifiedMir;
+                    if (!r.m_succeeded)
+                    {
+                        combinedResult.m_succeeded = false;
+                        break;
+                    }
                 }
             }
             break;
         }
         case MirPassIterationPlace::Instruction:
         {
-            for (auto func : functionList)
+            // TODO: Encapsulate instruction and make multiple passes in the same instruction to avoid re-iterating.
+            for (auto *func : functionList)
             {
-                auto blockList = func->getBlocks();
-                for (auto block = blockList.begin(); block != blockList.end(); block++)
+                for (auto *block : func->getBlocks())
                 {
-                    auto instrList = (*block)->getInstructions();
-                    for (auto instr = instrList.begin(); instr != instrList.end(); instr++)
+                    auto &instructions = block->getInstructions();
+                    for (auto it = instructions.begin(); it != instructions.end();)
                     {
-                        result = pass->run(instrList, instr, this);
+                        auto nextIt = std::next(it);
+                        MirPassResult r = pass->run(instructions, it, this);
+                        combinedResult.m_modifiedMir |= r.m_modifiedMir;
+                        if (!r.m_succeeded)
+                        {
+                            combinedResult.m_succeeded = false;
+                            break;
+                        }
+                        it = nextIt;
                     }
                 }
             }
@@ -170,13 +210,17 @@ MirPassResult MirPassManager::runPass(MirPass *pass, std::pmr::list<MirFunction 
         }
     }
 
+    pass->setResult(&combinedResult);
+    m_savedResults[std::type_index(typeid(*pass))] = combinedResult;
+
     auto builder = m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager");
     builder << "Pass result";
-    builder.appendNote(std::pmr::string(std::format("Executed: {}", result.m_executed)), nullptr);
-    builder.appendNote(std::pmr::string(std::format("Succeeded: {}", result.m_succeeded)), nullptr);
-    builder.appendNote(std::pmr::string(std::format("Modified Mir: {}", result.m_modifiedMir)), nullptr);
+    builder.appendNote(std::pmr::string(std::format("Executed: {}", combinedResult.m_executed)), nullptr);
+    builder.appendNote(std::pmr::string(std::format("Succeeded: {}", combinedResult.m_succeeded)), nullptr);
+    builder.appendNote(std::pmr::string(std::format("Modified Mir: {}", combinedResult.m_modifiedMir)), nullptr);
     builder.flush();
 
     pass->printResult();
-    return result;
+
+    return combinedResult;
 }

@@ -45,7 +45,7 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     getPassManager()->addPass<LivenessAnalysis>(ctx);
     getPassManager()->addPass<CodeFlowAnalysis>(ctx);
 
-    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(getFunctions());
+    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(ctx);
     LivenessAnalysisVerifier verifier(pass);
 
     verifier.executed().succeeded();
@@ -115,7 +115,7 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
     getPassManager()->addPass<LivenessAnalysis>(ctx);
     getPassManager()->addPass<CodeFlowAnalysis>(ctx);
 
-    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(getFunctions());
+    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(ctx);
     LivenessAnalysisVerifier verifier(pass);
 
     verifier.executed().succeeded();
@@ -151,7 +151,7 @@ TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
     getPassManager()->addPass<LivenessAnalysis>(ctx);
     getPassManager()->addPass<CodeFlowAnalysis>(ctx);
 
-    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(getFunctions());
+    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(ctx);
     LivenessAnalysisVerifier verifier(pass);
 
     verifier.executed().succeeded();

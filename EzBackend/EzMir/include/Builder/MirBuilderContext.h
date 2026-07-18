@@ -126,10 +126,20 @@ class MirBuilderContext
     std::pmr::monotonic_buffer_resource *getFuncAllocator();
 
     /**
+     * Returns the MUTABLE classes list that were built using this context. Used internally by the pass manager.
+     */
+    std::pmr::list<MirClass *> &getClasses();
+
+    /**
      * Returns the MUTABLE function list that were built in this context. Used internally by the pass manager.
      * @return
      */
     std::pmr::list<MirFunction *> &getFunctions();
+
+    /**
+     * Returns the MUTABLE global variable list that were built using this context. Used internally by the pass manager.
+     */
+    std::pmr::list<MirGlobalVar *> &getGlobalVars();
 
     /**
      * Returns the diagnostic collector.
@@ -150,7 +160,9 @@ class MirBuilderContext
     std::pmr::monotonic_buffer_resource *m_globalResource;
     std::pmr::monotonic_buffer_resource *m_functionResource;
 
-    std::pmr::list<MirFunction *> m_functions;
+    std::pmr::list<MirClass *> m_classes;        // Used to quickly iterate over defined classes.
+    std::pmr::list<MirFunction *> m_functions;   // Used to quickly iterate over defined functions.
+    std::pmr::list<MirGlobalVar *> m_globalVars; // Used to quickly iterate over defined global variables.
 
     std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
     std::pmr::map<MirId, MirClass *> m_classIdToClass;          // Used to search for classes.

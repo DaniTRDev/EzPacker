@@ -47,7 +47,7 @@ MirPassResult LivenessAnalysis::run(std::pmr::list<MirFunction *> &funcList,
     }
 
     // Recover the pre-computed Control Flow Graph directly from the Pass Manager cache
-    const auto &cfg = passManager->getAnalysis<CodeFlowAnalysis>(funcList)->getResult();
+    const auto &cfg = passManager->getAnalysis<CodeFlowAnalysis>(m_ctx)->getResult();
 
     // Initialize and extract block-local Gen (Use) and Kill (Def) sets
     computeLocalLiveness(func, diag);

@@ -9,7 +9,8 @@ TEST_F(OperandTest, Integer)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.buildInt(getTypeTable()->i8(), FlexInt(uint32_t(0xDE), 8))).verifyInteger(getTypeTable()->i8(), FlexInt(uint32_t(0xDE), 8));
+    MirOperandVerifier(builder.buildInt(getTypeTable()->i8(), FlexInt(uint32_t(0xDE), 8)))
+            .verifyInteger(getTypeTable()->i8(), FlexInt(uint32_t(0xDE), 8));
 
     MirOperandVerifier(builder.buildInt(getTypeTable()->i16(), FlexInt(uint32_t(0xDEAD), 16)))
             .verifyInteger(getTypeTable()->i16(), uint32_t(0xDEAD));
@@ -49,19 +50,18 @@ TEST_F(OperandTest, FloatAnySize)
 
 TEST_F(OperandTest, Reference)
 {
+    // We need to make builders be saved in variables, otherways the debugger doesn't know what's going on and can't see
+    // the value of each variable properly. Seems to be a bug that only affects VSCode...
     MirOperandBuilder builder(getBuilderCtx());
+    MirType *funcType = getTestFunc()->getType();
 
-    MirOperandVerifier(builder.buildRef(getTestFunc()->getEntryPoint()))
-            .verifyReference(MIRID_INVALID, MirReferenceType::Block)
-            .mirTypeVerifier()
-            .id(getTypeTable()->getPtr(getTypeTable()->getVoidType())->getId());
+    MirOperandVerifier op1(builder.buildRef(getTestFunc()->getEntryPoint()));
+    op1.verifyReference(MIRID_INVALID, MirReferenceType::Block);
+    op1.mirTypeVerifier().id(getTypeTable()->getPtr(getTypeTable()->getVoidType())->getId());
 
-    MirOperandVerifier(builder.buildRef(getTestFunc()))
-            .verifyReference(MIRID_INVALID, MirReferenceType::Function)
-            .mirTypeVerifier()
-            .id(getTypeTable()->getPtr(getTypeTable()->getVoidType())->getId());
-            
-   // TODO: Add the rest of the references.
+    MirOperandVerifier op2(builder.buildRef(getTestFunc()));
+    op2.verifyReference(MIRID_INVALID, MirReferenceType::Function);
+    op2.mirTypeVerifier().id(getTypeTable()->getPtr(funcType)->getId());
 }
 
 TEST_F(OperandTest, Register)
