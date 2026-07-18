@@ -37,8 +37,8 @@ class MirLegalizer
      * If there's no action set for this combo, a default action will try to be invoked:
      *  - Promotion
      *  - Expansion
-     *  - LegalizeCall, ONLY FOR CALL INSTRUCTIONS (with at least 1 parameter).
-     *  - LegalizeReturn, ONLY FOR RETURN INSTRUCTIONS (with at least 1 returned value).
+     *  - LegalizeCall, ONLY FOR CALL INSTRUCTIONS.
+     *  - LegalizeReturn, ONLY FOR RETURN INSTRUCTIONS.
      * @param opcode
      * @param operands
      * @return

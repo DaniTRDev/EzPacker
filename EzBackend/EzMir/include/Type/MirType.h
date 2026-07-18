@@ -12,7 +12,8 @@ enum class MirTypeKind
     Function,
     Pointer,
     Array, // An array of other type. Ex: i32 arr[3];
-    Void
+    Void,
+    BindingToken // Used to bind things. Like PUSH_ARGS to a CALL, PUSH_RET to a RET, ...
 };
 
 /**

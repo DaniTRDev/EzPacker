@@ -49,6 +49,10 @@ MirType *Amd64TargetDesc::getNearestLegalType(MirType *type)
          */
         return t->f64();
     }
+    else if (type->getKind() == MirTypeKind::BindingToken)
+    {
+        return type;
+    }
 
     return nullptr;
 }

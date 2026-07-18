@@ -44,6 +44,11 @@ class MirTypeTable
                     const std::string_view &name);
 
     /**
+     * Returns a type that is only used to bind things, see more at MirTypeKind.
+     */
+    MirType *getBindingToken() const;
+
+    /**
      * Creates a class type (if it does not exist). Returns the existing type if it was already created or nullptr if
      * there was any error.
      * @param fieldTypes
@@ -120,6 +125,8 @@ class MirTypeTable
   private:
     IMirTargetTypeLayout *m_typeLayout{ nullptr };
     size_t m_currentId{ 0 };
+
+    MirType *m_bindingToken{ nullptr };
 
     // Built-in basic primitives
     MirType *m_voidType{ nullptr };

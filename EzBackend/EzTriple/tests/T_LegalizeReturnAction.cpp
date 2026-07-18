@@ -16,10 +16,13 @@ class TestLegalizeReturnAct : public MirTripleTestSuiteAsGtest
                                          getTypeTable()->i32(),
                                          getTypeTable()->i64() };
 
+        // Ensure the mock rule matcher handles the new tokenized signature format.
+        // PUSH_RET now strictly expects: [i64 token, payloadType]
+        size_t tokenTypeId = getTypeTable()->getBindingToken()->getId();
         for (const auto &dest : sizes)
         {
             size_t destId = dest->getId();
-            legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { tokenTypeId, destId });
         }
 
         return legalizer;
@@ -42,6 +45,7 @@ TEST_F(TestLegalizeReturnAct, TestEmptyRet)
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeReturnActionVerifier verifier(getBuilderCtx(), pass);
 
+    // Void returns require no modifications and remain empty.
     verifier.verifyRetPush(func->getEntryPoint()->getInstructions().begin(), nullptr);
 }
 

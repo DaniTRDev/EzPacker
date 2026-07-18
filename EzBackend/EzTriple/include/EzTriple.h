@@ -5,7 +5,7 @@
 
 #include "CallLoweringState.h"
 
-#include "AbiLowerer/AbiLowererPass.h"
+#include "AbiLowerer/ReturnAbiLowererPass.h"
 
 #include "DefaultLegalizerActions/ExpandScalarAction.h"
 #include "DefaultLegalizerActions/LegalizeCallAction.h"

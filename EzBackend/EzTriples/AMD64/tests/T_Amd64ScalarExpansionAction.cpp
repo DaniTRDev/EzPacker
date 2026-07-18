@@ -66,9 +66,9 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitCallReg)
      *  call %testFunc, i128 %param1
      *
      * Should be expanded into a 2-operand inline carry chain:
-     *  PUSH_ARG i64 %dest_lo, i64 %src_lo
-     *  PUSH_ARG i64 %dest_hi, i64 %src_hi
-     *  call %testFunc
+     *  PUSH_ARG __bindToken %token, i64 %src_lo
+     *  PUSH_ARG __bindToken %token, i64 %src_hi
+     *  call __bindToken %token, %testFunc
      */
     const auto *t = getTypeTable();
     MirType *i128 = t->i128(), *i64 = t->i64();
@@ -88,10 +88,10 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitCallReg)
 
     // Validate low and high operand components to ensure proper register type splitting
     MirInstructionVerifier lowPushVerifier(block->at(0));
-    lowPushVerifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    lowPushVerifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
 
     MirInstructionVerifier highPushVerifier(block->at(1));
-    highPushVerifier.operandVerifier(0).verifyRegister(i64, true, MIRID_INVALID);
+    highPushVerifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
 }
 
 TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitCallImm)
@@ -101,11 +101,11 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitCallImm)
      *  call %testFunc, i256 0xBA50B51C48B0AD923D18198EC90D2F08FF9FB76E997408E473A37C572B714B52
      *
      * Should be expanded into a 2-operand inline carry chain:
-     *  PUSH_ARG i64 0x73A37C572B714B52
-     *  PUSH_ARG i64 0xFF9FB76E997408E4
-     *  PUSH_ARG i64 0x3D18198EC90D2F08
-     *  PUSH_ARG i64 0xBA50B51C48B0AD92
-     *  call %testFunc
+     *  PUSH_ARG __bindToken %token, i64 0x73A37C572B714B52
+     *  PUSH_ARG __bindToken %token, i64 0xFF9FB76E997408E4
+     *  PUSH_ARG __bindToken %token, i64 0x3D18198EC90D2F08
+     *  PUSH_ARG __bindToken %token, i64 0xBA50B51C48B0AD92
+     *  call __bindToken %token, %testFunc
      */
     const auto *t = getTypeTable();
     MirType *i256 = t->i256(), *i64 = t->i64();
@@ -131,16 +131,16 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitCallImm)
 
     // Validate low and high operand components to ensure proper register type splitting
     MirInstructionVerifier lowLowAddVerifier(block->at(0));
-    lowLowAddVerifier.operandVerifier(0).verifyInteger(i64, FlexInt("73A37C572B714B52", 64, false, 16));
+    lowLowAddVerifier.operandVerifier(1).verifyInteger(i64, FlexInt("73A37C572B714B52", 64, false, 16));
 
     MirInstructionVerifier lowHighAdc1Verifier(block->at(1));
-    lowHighAdc1Verifier.operandVerifier(0).verifyInteger(i64, FlexInt("FF9FB76E997408E4", 64, false, 16));
+    lowHighAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("FF9FB76E997408E4", 64, false, 16));
 
     MirInstructionVerifier highLowAdc1Verifier(block->at(2));
-    highLowAdc1Verifier.operandVerifier(0).verifyInteger(i64, FlexInt("3D18198EC90D2F08", 64, false, 16));
+    highLowAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("3D18198EC90D2F08", 64, false, 16));
 
     MirInstructionVerifier highHighAdc1Verifier(block->at(3));
-    highHighAdc1Verifier.operandVerifier(0).verifyInteger(i64, FlexInt("BA50B51C48B0AD92", 64, false, 16));
+    highHighAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("BA50B51C48B0AD92", 64, false, 16));
 }
 
 TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitAddRegImm)
@@ -261,7 +261,11 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitUDivRegReg)
      *  DIV i128 %dest, i128 %src
      *
      * Should be lowered via EMIT_CALL into a runtime call:
-     *  CALL @__udivti3, %dest_lo, %dest_hi, %src_lo, %src_hi
+     *  PUSH_ARG __bindToken %token, i64 %dest_lo
+     *  PUSH_ARG __bindToken %token, i64 %dest_high
+     *  PUSH_ARG __bindToken %token, i64 src_lo
+     *  PUSH_ARG __bindToken %token, i64 src_hi
+     *  CALL __bindToken %token, @__udivti3
      */
     const auto *t = getTypeTable();
     MirType *i128 = t->i128();
@@ -274,15 +278,13 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitUDivRegReg)
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
 
-    // Verify it emits a single call node and links precisely to the GCC/LLVM ABI runtime symbol
+    // Verify it emits a single call node and links precisely to the GCC/LLVM ABI runtime symbol.
     expandVerifier.expectInstructionSequence({ MirInstructionOpCode::PUSH_ARG,
                                                MirInstructionOpCode::PUSH_ARG,
                                                MirInstructionOpCode::PUSH_ARG,
                                                MirInstructionOpCode::PUSH_ARG,
-                                               MirInstructionOpCode::PUSH_ARG,
-                                               MirInstructionOpCode::PUSH_ARG,
                                                MirInstructionOpCode::CALL });
-    expandVerifier.verifyRuntimeCallSymbol(6, "__udivti3");
+    expandVerifier.verifyRuntimeCallSymbol(4, "__udivti3");
 }
 
 TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitLoadRegMem)

@@ -185,9 +185,9 @@ class MirRegister : public MirOperand
         char prefix = m_virtual ? 'v' : 'p';
         if (!m_name.empty())
         {
-            return std::format("%{}{}({})", prefix, m_id, m_name);
+            return std::format("{} %{}{}({})", getMirType()->getName(), prefix, m_id, m_name);
         }
-        return std::format("%{}{}", prefix, m_id);
+        return std::format("{} %{}{}", getMirType()->getName(), prefix, m_id);
     }
 
     void setRegId(size_t id) { m_id = id; }

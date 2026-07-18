@@ -15,6 +15,8 @@ class TestPromoteScalarAct : public MirTripleTestSuiteAsGtest
                                          getTypeTable()->i16(),
                                          getTypeTable()->i32(),
                                          getTypeTable()->i64() };
+                                         
+        size_t tokenTypeId = getTypeTable()->getBindingToken()->getId();
 
         // Extension instructions must act as a bridge between illegal and legal types, we need to legal them on every
         // SRC case.
@@ -25,6 +27,9 @@ class TestPromoteScalarAct : public MirTripleTestSuiteAsGtest
             legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, MIRID_INVALID });
             legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, MIRID_INVALID });
             legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { tokenTypeId, destId });
         }
 
         return legalizer;
@@ -186,8 +191,8 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitCallImm)
      *  CALL void* %testFunc, i1 1
      *
      * Should be transformed into (No extension instructions needed for literals):
-     *  PUSH_ARG i8 1
-     *  CALL void* %testFunc
+     *  PUSH_ARG __bindingToken %bindingToken, i8 1
+     *  CALL __bindingToken %bindingToken, void* %testFunc
      */
     const auto *t = getTypeTable();
     MirInstructionBuilder builder(getBuilderCtx(), getTestInsertionPoint());
@@ -200,7 +205,8 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitCallImm)
     runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
 
     MirInstructionVerifier instrVerifier(block->at(0));
-    instrVerifier.operandVerifier(0).verifyInteger(t->i8(), FlexInt(0, 1)); // Literal matches promoted target width
+    instrVerifier.operandVerifier(0).verifyRegister(t->getBindingToken(), true, MIRID_INVALID);
+    instrVerifier.operandVerifier(1).verifyInteger(t->i8(), FlexInt(0, 1)); // Literal matches promoted target width
 }
 
 TEST_F(TestPromoteScalarAct, PromoteSingleBitCallReg)
@@ -211,8 +217,8 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitCallReg)
      *
      * Should be transformed into:
      *  ZEXT %reg_promoted, %reg
-     *  PUSH_ARG i8 %reg_promoted
-     *  CALL void* %testFunc
+     *  PUSH_ARG __bindingToken %bindingToken, i8 %reg_promoted
+     *  CALL __bindingToken %bindingToken, void* %testFunc
      */
     const auto *t = getTypeTable();
     MirBlock *block = getTestFunc()->getEntryPoint();
@@ -228,5 +234,6 @@ TEST_F(TestPromoteScalarAct, PromoteSingleBitCallReg)
     promoteVerifier.beginBlock(block);
     promoteVerifier.beginBlock(getTestFunc()->getEntryPoint());
     promoteVerifier.verifyExtension(0, MirInstructionOpCode::ZEXT, t->i1(), t->i8());
-    instrVerifier.operandVerifier(0).verifyRegister(t->i8(), true, MIRID_INVALID);
+    instrVerifier.operandVerifier(0).verifyRegister(t->getBindingToken(), true, MIRID_INVALID);
+    instrVerifier.operandVerifier(1).verifyRegister(t->i8(), true, MIRID_INVALID);
 }

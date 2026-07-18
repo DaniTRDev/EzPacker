@@ -13,16 +13,21 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
     const ExpansionRecipe *recipe = m_target->getExpansionRecipeForInstr(instr->getOpCode());
     if (!recipe)
     {
-        // Per your specifications, marks execution as completed even when falling through with no matching recipe
         return { .m_executed = true, .m_succeeded = true, .m_mirChanged = false };
     }
 
+    const auto &typeTable = m_ctx->getTypeTable();
     MirOperandBuilder opBuilder(m_ctx);
     MirInstructionBuilder insertBeforeBuilder(m_ctx, instr->getOwner(), InsertionType::InsertBefore, it);
 
-    // Compute operand width partitions (e.g., 128-bit splits down to 64-bit halves)
-    const auto &typeTable = m_ctx->getTypeTable();
-    MirType *fullType = operands[0]->getMirType();
+    // Identify tokenized context boundaries
+    bool op0IsToken =
+            (operands.size() > 0) && (operands[0]->getMirType()->getId() == typeTable->getBindingToken()->getId());
+
+    // Select the true payload operand to calculate the proper target width partitions
+    // For PUSH_ARG / PUSH_RET, the payload to be expanded is at index 1.
+    size_t payloadIdx = op0IsToken ? 1 : 0;
+    MirType *fullType = operands[payloadIdx]->getMirType();
     MirType *halfType = typeTable->getIntegerTypeBySize(fullType->getTotalSizeInBits() / 2);
 
     m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
@@ -30,53 +35,67 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                        .c_str()
             << instr->getSourceRef();
 
-    // Decompose operands (dest at 0 and source at 1).
     MirOperand *destLo = nullptr, *destHi = nullptr, *srcLo = nullptr, *srcHi = nullptr;
 
-    if (operands[0]->isOfType<MirRegister>())
+    // Dest / Primary Operand Splitting
+    if (!op0IsToken)
     {
-        MirRegister *dest = operands[0]->get<MirRegister>();
-        auto destIt = m_expandMap.find(dest->getRegId());
-
-        if (destIt != m_expandMap.end())
+        if (operands[0]->isOfType<MirRegister>())
         {
-            destLo = destIt->second.first;
-            destHi = destIt->second.second;
+            MirRegister *dest = operands[0]->get<MirRegister>();
+            auto destIt = m_expandMap.find(dest->getRegId());
 
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                    << std::format("Reusing split dst register '{}', '{}' and '{}'",
-                                   dest->getName(),
-                                   destLo->get<MirRegister>()->getName(),
-                                   destHi->get<MirRegister>()->getName())
-                               .c_str()
-                    << dest->getSourceRef();
+            if (destIt != m_expandMap.end())
+            {
+                destLo = destIt->second.first;
+                destHi = destIt->second.second;
+
+                m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                        << std::format("Reusing split dst register '{}', '{}' and '{}'",
+                                       dest->getName(),
+                                       destLo->get<MirRegister>()->getName(),
+                                       destHi->get<MirRegister>()->getName())
+                                   .c_str()
+                        << dest->getSourceRef();
+            }
+            else
+            {
+                destLo = opBuilder.buildVReg(halfType, dest->getName() + "_lo", dest->getSourceRef());
+                destHi = opBuilder.buildVReg(halfType, dest->getName() + "_hi", dest->getSourceRef());
+
+                m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                        << std::format("Split dst register '{}' into '{}' and '{}'",
+                                       dest->getName(),
+                                       destLo->get<MirRegister>()->getName(),
+                                       destHi->get<MirRegister>()->getName())
+                                   .c_str()
+                        << dest->getSourceRef();
+
+                m_expandMap[dest->getRegId()] = std::make_pair((MirRegister *)destLo, (MirRegister *)destHi);
+            }
         }
         else
         {
-            destLo = opBuilder.buildVReg(halfType, dest->getName() + "_lo", dest->getSourceRef());
-            destHi = opBuilder.buildVReg(halfType, dest->getName() + "_hi", dest->getSourceRef());
-
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                    << std::format("Split dst register '{}' into '{}' and '{}'",
-                                   dest->getName(),
-                                   destLo->get<MirRegister>()->getName(),
-                                   destHi->get<MirRegister>()->getName())
-                               .c_str()
-                    << dest->getSourceRef();
-
-            m_expandMap[dest->getRegId()] = std::make_pair((MirRegister *)destLo, (MirRegister *)destHi);
+            destLo = operands[0];
         }
     }
-
-    // Source (Operand 1) splitting
-    bool singleOperand = operands.size() == 1;
-    if (operands.size() > 1 || singleOperand)
+    else
     {
-        /**
-         * For single operand instructions, the only operand might be an immediate. In that case we need to cover it.
-         */
-        MirOperand *source = singleOperand ? operands[0] : operands[1];
-        if (source->isOfType<MirRegister>() && !singleOperand)
+        // Token operations (like PUSH_ARG) do not have a traditional "destination payload register"
+        // being mutated; Operand 0 is preserved intact as the tracking token.
+        destLo = operands[0];
+    }
+
+    // Source Operand Splitting
+    // If it's a token operation, the value payload sits at index 1 (treated as Source 0 here).
+    size_t sourceIdx = op0IsToken ? 1 : 1;
+    bool singleOperand = !op0IsToken && (operands.size() == 1);
+
+    if (op0IsToken || operands.size() > 1 || singleOperand)
+    {
+        MirOperand *source = singleOperand ? operands[0] : operands[sourceIdx];
+
+        if (source->isOfType<MirRegister>())
         {
             MirRegister *r = source->get<MirRegister>();
             auto srcIt = m_expandMap.find(r->getRegId());
@@ -136,7 +155,6 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "ExpandScalarAction")
                     << "Can't expand floating point instructions" << instr->getSourceRef();
-
             return { .m_executed = true, .m_succeeded = false, .m_mirChanged = false };
         }
         else
@@ -146,7 +164,6 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         }
     }
 
-    // Lazy Allocation Pools for managing Temporaries (Clean stack context instantiation)
     MirOperand *tempsLo[3] = { nullptr, nullptr, nullptr };
     MirOperand *tempsHi[3] = { nullptr, nullptr, nullptr };
 
@@ -157,9 +174,6 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
             if (!tempsHi[idx])
             {
                 tempsHi[idx] = opBuilder.buildVReg(halfType, std::format("t{}_hi", idx).c_str(), instr->getSourceRef());
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                        << std::format("Allocated temporary high virtual register 't{}_hi'", idx).c_str()
-                        << instr->getSourceRef();
             }
             return tempsHi[idx];
         }
@@ -168,9 +182,6 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
             if (!tempsLo[idx])
             {
                 tempsLo[idx] = opBuilder.buildVReg(halfType, std::format("t{}_lo", idx).c_str(), instr->getSourceRef());
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                        << std::format("Allocated temporary low virtual register 't{}_lo'", idx).c_str()
-                        << instr->getSourceRef();
             }
             return tempsLo[idx];
         }
@@ -187,10 +198,11 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
             switch (recipeOp.kind)
             {
                 case ExpansionOperandKind::DestLow:
-                    resolvedOp = destLo;
+                    resolvedOp = destLo; // Points to the unaltered callToken on systemic nodes
                     break;
                 case ExpansionOperandKind::DestHigh:
-                    resolvedOp = destHi;
+                    // Guard against putting a null high operand into token sequences
+                    resolvedOp = op0IsToken ? nullptr : destHi;
                     break;
                 case ExpansionOperandKind::Src0Low:
                     resolvedOp = srcLo;
@@ -227,19 +239,13 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                 {
                     MirOperand *baseOp = (recipeOp.memVal.m_baseKind == ExpansionOperandKind::Src0Low) ? srcLo : destLo;
                     int32_t factor = recipeOp.memVal.m_scaleHalfSizeFactor;
-
                     int64_t stride = factor * (halfType->getTotalSizeInBits() / 8);
                     int64_t finalOffset = stride + recipeOp.memVal.m_displ;
-
-                    m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                            << std::format("Split mem operand '{}' into '{}'", baseOp->toString(), finalOffset).c_str()
-                            << baseOp->getSourceRef();
 
                     if (baseOp && baseOp->isOfType<MirMemory>())
                     {
                         MirMemory *origMem = baseOp->get<MirMemory>();
                         FlexInt displ = origMem->getDisplacement()->getValue();
-
                         resolvedOp = opBuilder.buildMem(halfType,
                                                         origMem->getBase(),
                                                         FlexInt(finalOffset) + displ,
@@ -254,8 +260,6 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                     }
                     break;
                 }
-                default:
-                    break;
             }
 
             if (resolvedOp)
@@ -264,10 +268,6 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
 
         if (!expInstr.m_rtLibraryCall.empty())
         {
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                    << std::format("Injecting RT call to '{}'", expInstr.m_rtLibraryCall).c_str()
-                    << instr->getSourceRef();
-
             newOps.insert(newOps.begin(),
                           opBuilder.buildRtSymbol(expInstr.m_rtLibraryCall.data(), instr->getSourceRef()));
         }
@@ -275,7 +275,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         insertBeforeBuilder.build(expInstr.m_instr, instr->getSourceRef(), newOps);
     }
 
-    // Clean up stream context by eliminating the un-expanded target node
+    // Erase original unexpanded instruction
     instrList.erase(it);
     return { .m_executed = true, .m_succeeded = true, .m_mirChanged = true };
 }

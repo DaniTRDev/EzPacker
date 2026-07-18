@@ -26,12 +26,25 @@ const std::vector<MirType *> Amd64Legalizer::getNativeSizes(MirBuilderContext *c
 void Amd64Legalizer::addDataMovement(MirBuilderContext *ctx, MirLegalizer *legalizer)
 {
     const auto &t = ctx->getTypeTable();
+    const auto &sizes = getNativeSizes(ctx);
+
+    // Explicit token type ID used to group lowered stack / calling convention boundary lifecycles
+    size_t tokenTypeId = t->getBindingToken()->getId();
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i8()->getId(), MIRID_INVALID });
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i16()->getId(), MIRID_INVALID });
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i32()->getId(), MIRID_INVALID });
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i64()->getId(), MIRID_INVALID });
+
+    for (auto &dest : sizes)
+    {
+        size_t destId = dest->getId();
+        // Modernized token-bound signatures: [Token, PayloadType]
+        legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
+        legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
+        legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { tokenTypeId, destId });
+    }
 }
 
 void Amd64Legalizer::addMemory(MirBuilderContext *ctx, MirLegalizer *legalizer)
@@ -61,9 +74,6 @@ void Amd64Legalizer::addArithmetic(MirBuilderContext *ctx, MirLegalizer *legaliz
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
     // x64 natively supports 8, 16, 32, and 64-bit scalar operations.
-    // Category mapping registers ADD, ADC, SUB, SBB, MUL, IMUL, DIV, IDIV, REM, NEG.
-    // FloatingPoint-operand matching assumes { DestReg, SrcOperand }
-
     for (const auto &type : sizes)
     {
         size_t sizeId = type->getId();
@@ -104,12 +114,16 @@ void Amd64Legalizer::addCompare(MirBuilderContext *ctx, MirLegalizer *legalizer)
 void Amd64Legalizer::addControlFlow(MirBuilderContext *ctx, MirLegalizer *legalizer)
 {
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
+    size_t tokenTypeId = ctx->getTypeTable()->getBindingToken()->getId();
 
     // Jumps, Branches (JE, JNE, etc.) take a reference.
     legalizer->addRuleForCategory(legal, MirCat_ControlFlow, { MIRID_INVALID });
 
-    // CALL can take a Reference/Symbol or a register (i64 function pointer).
-    legalizer->addRule(legal, MirInstructionOpCode::CALL, { MIRID_INVALID });
+    // Legal calls and returns explicitly target the system tracking token registration rule.
+    // CALL layout: [Token, Callee]
+    legalizer->addRule(legal, MirInstructionOpCode::CALL, { tokenTypeId, MIRID_INVALID });
+    // RET layout:  [Token]
+    legalizer->addRule(legal, MirInstructionOpCode::RET, { tokenTypeId });
 }
 
 void Amd64Legalizer::addCasting(MirBuilderContext *ctx, MirLegalizer *legalizer)
@@ -117,8 +131,6 @@ void Amd64Legalizer::addCasting(MirBuilderContext *ctx, MirLegalizer *legalizer)
     const auto &sizes = getNativeSizes(ctx);
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
-    // Extension instructions must act as a bridge between illegal and legal types, we need to legal them on every SRC
-    // case.
     for (const auto &dest : sizes)
     {
         size_t destId = dest->getId();

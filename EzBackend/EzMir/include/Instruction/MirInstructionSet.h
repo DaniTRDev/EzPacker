@@ -32,7 +32,14 @@ INSTRUCTION(LEA,
 
 INSTRUCTION(PUSH_ARG,
             MirCat_DataMovement,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read }),
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
+            F(HasSideEffect))
+
+INSTRUCTION(PUSH_RET,
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
             F(HasSideEffect))
 
 INSTRUCTION(POP_ARG,
@@ -40,15 +47,10 @@ INSTRUCTION(POP_ARG,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
             F(HasSideEffect))
 
-INSTRUCTION(PUSH_RET,
-            MirCat_DataMovement,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
-            F(HasSideEffect))
-
 INSTRUCTION(POP_RET,
             MirCat_DataMovement,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Integer, OperandFlag::Read },
-                                { ExpectedOperandType::Register, OperandFlag::Read }),
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
+                                { ExpectedOperandType::Register, OperandFlag::Write }),
             F(HasSideEffect))
 
 /* --- MEMORY ACCESS -------------------------------------------------------- */

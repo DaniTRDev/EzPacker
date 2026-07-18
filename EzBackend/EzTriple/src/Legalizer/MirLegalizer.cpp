@@ -22,44 +22,40 @@ LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::
 
     if (opcode == MirInstructionOpCode::CALL)
     {
-        // Case 1: [Callee] (Void function call -> size == 1)
-        // Case 2: [Token, Callee] (Function returning a value -> size == 2)
-        // Anything larger than 2 operands means arguments or destination registers haven't been popped out yet.
-        if (operands.size() > 2)
+        // A fully legalized call always looks like: [Token, Callee] (Exactly 2 operands).
+        if (operands.size() != 2)
         {
             return &m_legalizeCallAct;
         }
 
-        // [DestReg, Callee] (un-legalized, 0-argument call with return)
-        // Or it could be [TokenReg, Callee] (fully legalized call with return value).
-        if (operands.size() == 2)
+        // Even with exactly 2 operands, it could still be an un-legalized call
+        // with 1 parameter and no return value: [Callee, Arg0].
+        // We verify that Operand 0 is a tracking token (Virtual/Physical register).
+        if (operands[0]->isOfType<MirRegister>() &&
+            operands[0]->get<MirRegister>()->getMirType()->getKind() == MirTypeKind::BindingToken)
         {
-            // If the first operand is a Register, it's the returnt token, meaning it has already been legalized.
-            if (operands[0]->isOfType<MirRegister>())
-            {
-                return MIRLEGALIZE_NO_ACTION;
-            }
-
-            // If operands[0] is NOT a destination register (e.g., it's a direct reference/symbol),
-            // then a size of 2 means [Callee, Arg0], which definitely needs legalization.
-            return &m_legalizeCallAct;
+            return MIRLEGALIZE_NO_ACTION;
         }
 
-        // If size is exactly 1 ([Callee]), it's a fully legalized void call.
-        return MIRLEGALIZE_NO_ACTION;
+        return &m_legalizeCallAct;
     }
     else if (opcode == MirInstructionOpCode::RET)
     {
-        if (!operands.empty())
+        // A fully legalized RET instruction now holds exactly 1 tracking token: [retToken (type is BindingToken)]
+        if (operands.size() == 1 && operands[0]->isOfType<MirRegister>() &&
+            operands[0]->get<MirRegister>()->getMirType()->getKind() == MirTypeKind::BindingToken)
         {
-            // Only return the action for RET that don't have been legalized yet.
-            return &m_legalizeRetAct;
-        }
-        else
-        {
-            // This call is already legal.
             return MIRLEGALIZE_NO_ACTION;
         }
+
+        // If it has operands that aren't a single token register (e.g., [Value]), legalize it.
+        if (!operands.empty())
+        {
+            return &m_legalizeRetAct;
+        }
+
+        // Void return with 0 operands is inherently legal.
+        return MIRLEGALIZE_NO_ACTION;
     }
 
     for (MirOperand *op : operands)

@@ -56,6 +56,11 @@ MirType *MirTypeTable::create(MirTypeKind kind,
     return uniqueType;
 }
 
+MirType *MirTypeTable::getBindingToken() const
+{
+    return m_bindingToken;
+}
+
 MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &structName)
 {
     if (structName.empty())
@@ -287,4 +292,6 @@ void MirTypeTable::initialize()
     m_float32Type = create(MirTypeKind::FloatingPoint, 32, {}, "f32");
     m_float64Type = create(MirTypeKind::FloatingPoint, 64, {}, "f64");
     m_float128Type = create(MirTypeKind::FloatingPoint, 128, {}, "f128");
+
+    m_bindingToken = create(MirTypeKind::BindingToken, 0, std::pmr::vector<MirType *>{ m_arena }, "__bindToken");
 }

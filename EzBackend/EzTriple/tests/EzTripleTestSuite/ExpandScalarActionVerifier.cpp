@@ -36,7 +36,7 @@ ExpandScalarActionVerifier &ExpandScalarActionVerifier::verifyRuntimeCallSymbol(
     EXPECT_NE(instr, nullptr);
 
     MirInstructionVerifier verifier(instr);
-    verifier.opcode(MirInstructionOpCode::CALL).operandVerifier(0).verifyRuntimeSymbol(expectedSymbolName);
+    verifier.opcode(MirInstructionOpCode::CALL).operandVerifier(1).verifyRuntimeSymbol(expectedSymbolName);
 
     return *this;
 }

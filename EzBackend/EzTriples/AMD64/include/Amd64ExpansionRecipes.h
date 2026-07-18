@@ -12,22 +12,22 @@ END_RECIPE
 
 RECIPE_FOR(PUSH_ARG)
 EMIT_INST(PUSH_ARG, Expansion::D_LO, Expansion::S0_LO)
-EMIT_INST(PUSH_ARG, Expansion::D_HI, Expansion::S0_HI)
+EMIT_INST(PUSH_ARG, Expansion::D_LO, Expansion::S0_HI)
 END_RECIPE
 
 RECIPE_FOR(POP_ARG)
 EMIT_INST(POP_ARG, Expansion::D_LO, Expansion::S0_LO)
-EMIT_INST(POP_ARG, Expansion::D_HI, Expansion::S0_HI)
+EMIT_INST(POP_ARG, Expansion::D_LO, Expansion::S0_HI)
 END_RECIPE
 
 RECIPE_FOR(PUSH_RET)
 EMIT_INST(PUSH_RET, Expansion::D_LO, Expansion::S0_LO)
-EMIT_INST(PUSH_RET, Expansion::D_HI, Expansion::S0_HI)
+EMIT_INST(PUSH_RET, Expansion::D_LO, Expansion::S0_HI)
 END_RECIPE
 
 RECIPE_FOR(POP_RET)
 EMIT_INST(POP_RET, Expansion::D_LO, Expansion::S0_LO)
-EMIT_INST(POP_RET, Expansion::D_HI, Expansion::S0_HI)
+EMIT_INST(POP_RET, Expansion::D_LO, Expansion::S0_HI)
 END_RECIPE
 
 /* --- MEMORY ACCESS -------------------------------------------------------- */
@@ -72,56 +72,26 @@ END_RECIPE
 
 // Wide Multiplications: Safely routed to the runtime math library
 RECIPE_FOR(MUL)
-EMIT_RT_CALL("__multi3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__multi3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 RECIPE_FOR(IMUL)
-EMIT_RT_CALL("__multi3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__multi3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 // Unsigned Division: D = D / S0
 RECIPE_FOR(DIV)
-EMIT_RT_CALL("__udivti3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__udivti3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 // Signed Division: D = D / S0
 RECIPE_FOR(IDIV)
-EMIT_RT_CALL("__divti3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__divti3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 // Remainder/Modulo: D = D % S0
 RECIPE_FOR(REM)
-EMIT_RT_CALL("__umodti3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__umodti3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 // Two's complement bitwise negation + 1 bit injection to simulate wide negation
@@ -157,33 +127,15 @@ END_RECIPE
 /* --- SHIFTS --- */
 
 RECIPE_FOR(SHL)
-EMIT_RT_CALL("__ashlti3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__ashlti3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 RECIPE_FOR(SHR)
-EMIT_RT_CALL("__lshrti3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__lshrti3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 RECIPE_FOR(SAR)
-EMIT_RT_CALL("__ashrti3",
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::D_LO,
-             Expansion::D_HI,
-             Expansion::S0_LO,
-             Expansion::S0_HI)
+EMIT_RT_CALL("__ashrti3", Expansion::D_LO, Expansion::D_HI, Expansion::S0_LO, Expansion::S0_HI)
 END_RECIPE
 
 /* --- COMPARISONS ---------------------------------------------------------- */

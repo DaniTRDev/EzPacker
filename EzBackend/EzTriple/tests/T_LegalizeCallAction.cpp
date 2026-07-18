@@ -13,13 +13,14 @@ class TestLegalizeCallAct : public MirTripleTestSuiteAsGtest
                                          getTypeTable()->i32(),
                                          getTypeTable()->i64() };
 
-        // Ensure the legalizer loop considers PUSH_ARG and POP_RET instructions legal
-        // to prevent false alarms during verification loops
+        // Ensure the legalizer loop considers PUSH_ARG and POP_RET instructions legal.
+        // Both now use a tracking token (BindingToken) as their first operand.
+        size_t tokenTypeId = getTypeTable()->getBindingToken()->getId();
         for (const auto &dest : sizes)
         {
             size_t destId = dest->getId();
-            legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { destId, MIRID_INVALID });
-            legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { MIRID_INVALID, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
         }
 
         return legalizer;
@@ -39,14 +40,17 @@ TEST_F(TestLegalizeCallAct, TestNoArgsVoid)
                                   func->getEntryPoint()->getInstructions().begin());
 
     // Build VOID Call (Operand 0 points directly to callee because there is no return reg)
-    auto callRef = opBuilder.buildRef(func->getEntryPoint());
+    auto callRef = opBuilder.buildRef(func);
     builder.CALL(callRef);
+
+    // Capture original state layout for verification tracking: [Callee]
+    std::vector<MirOperand *> expectedOrigOperands{ callRef };
 
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
-    // Assert: No PUSH_ARGs, CALL truncated, No POP_RET
-    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), {}, nullptr);
+    // Assert: No PUSH_ARGs, CALL truncated to [Token, Callee], No POP_RET
+    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), expectedOrigOperands, nullptr);
 }
 
 TEST_F(TestLegalizeCallAct, Test1ArgVoid)
@@ -64,23 +68,22 @@ TEST_F(TestLegalizeCallAct, Test1ArgVoid)
                                   InsertionType::InsertAfter,
                                   func->getEntryPoint()->getInstructions().begin());
 
-    // Prepare the single argument value
-    std::vector<MirOperand *> operands{ opBuilder.buildInt(t->i8(), FlexInt(42, 8)) };
+    // Prepare the layout: [Callee, Arg0]
+    auto callRef = opBuilder.buildRef(func);
+    std::vector<MirOperand *> expectedOrigOperands{ callRef, opBuilder.buildInt(t->i8(), FlexInt(42, 8)) };
 
     // Build a VOID CALL. The first operand is the Callee Target Reference.
-    // There is no return destination register.
-    auto callInstr = builder.CALL(opBuilder.buildRef(func));
-    for (auto op : operands)
+    auto callInstr = builder.CALL(expectedOrigOperands[0]);
+    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
     {
-        callInstr->getOperands().push_back(op);
+        callInstr->getOperands().push_back(expectedOrigOperands[i]);
     }
 
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
-    // We expect exactly one PUSH_ARG for our argument, followed by the CALL instruction truncated to [Callee], and NO
-    // POP_RET instruction.
-    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), operands, nullptr);
+    // We expect exactly one token-bound PUSH_ARG for our argument, followed by the CALL instruction truncated.
+    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), expectedOrigOperands, nullptr);
 }
 
 TEST_F(TestLegalizeCallAct, Test1ArgWithReturn)
@@ -100,21 +103,24 @@ TEST_F(TestLegalizeCallAct, Test1ArgWithReturn)
 
     // Original return destination register
     MirRegister *destReg = opBuilder.buildVReg(t->i8(), "returnDest");
-    std::vector<MirOperand *> operands{ opBuilder.buildInt(t->i8(), FlexInt(1, 8)) };
 
-    // Build:  CALL %destReg, %func, %arg
-    auto callInstr = builder.CALL(destReg);
-    callInstr->getOperands().push_back(opBuilder.buildRef(func)); // Callee
-    for (auto op : operands)
+    // Prepare the complete baseline call array layout: [DestReg, Callee, Arg0]
+    std::vector<MirOperand *> expectedOrigOperands{ destReg,
+                                                    opBuilder.buildRef(func),
+                                                    opBuilder.buildInt(t->i8(), FlexInt(1, 8)) };
+
+    // Build: CALL %destReg, %func, %arg
+    auto callInstr = builder.CALL(expectedOrigOperands[0]);
+    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
     {
-        callInstr->getOperands().push_back(op);
+        callInstr->getOperands().push_back(expectedOrigOperands[i]);
     }
 
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
-    // Assert: PUSH_ARG %arg, CALL %token, callee, followed by POP_RET %token, %destReg
-    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), operands, destReg);
+    // Assert: PUSH_ARG %token, %arg, CALL %token, callee, followed by POP_RET %token, %destReg
+    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), expectedOrigOperands, destReg);
 }
 
 TEST_F(TestLegalizeCallAct, Test5ArgWithReturn)
@@ -136,22 +142,25 @@ TEST_F(TestLegalizeCallAct, Test5ArgWithReturn)
                                   func->getEntryPoint()->getInstructions().begin());
 
     MirRegister *destReg = opBuilder.buildVReg(t->i16(), "returnDest");
-    std::vector<MirOperand *> operands{ opBuilder.buildInt(t->i8(), FlexInt(1, 8)),
-                                        opBuilder.buildInt(t->i16(), FlexInt(2, 16)),
-                                        opBuilder.buildInt(t->i32(), FlexInt(3, 32)),
-                                        opBuilder.buildVReg(t->i64()),
-                                        opBuilder.buildVReg(t->i8()) };
 
-    auto callInstr = builder.CALL(destReg);
-    callInstr->getOperands().push_back(opBuilder.buildRef(func));
-    for (auto op : operands)
+    // Prepare complete vector layout: [DestReg, Callee, Arg0, Arg1, Arg2, Arg3, Arg4]
+    std::vector<MirOperand *> expectedOrigOperands{ destReg,
+                                                    opBuilder.buildRef(func),
+                                                    opBuilder.buildInt(t->i8(), FlexInt(1, 8)),
+                                                    opBuilder.buildInt(t->i16(), FlexInt(2, 16)),
+                                                    opBuilder.buildInt(t->i32(), FlexInt(3, 32)),
+                                                    opBuilder.buildVReg(t->i64()),
+                                                    opBuilder.buildVReg(t->i8()) };
+
+    auto callInstr = builder.CALL(expectedOrigOperands[0]);
+    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
     {
-        callInstr->getOperands().push_back(op);
+        callInstr->getOperands().push_back(expectedOrigOperands[i]);
     }
 
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
-    // Assert the exact sequence including all 5 PUSH_ARGS, token assignment, and final POP_RET
-    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), operands, destReg);
+    // Assert the exact token-bound sequence across all 5 parameter push nodes and pop return.
+    verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), expectedOrigOperands, destReg);
 }
