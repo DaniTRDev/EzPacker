@@ -1,8 +1,13 @@
 #include "Type/MirType.h"
 
-MirType::MirType(
-        MirTypeKind kind, size_t id, size_t totalSize, std::pmr::string name, std::pmr::vector<MirType *> subTypes) :
-    m_kind(kind), m_id(id), m_totalSizeInBits(totalSize), m_subTypes(subTypes), m_name(name)
+MirType::MirType(MirTypeKind kind,
+                 size_t id,
+                 size_t maxAlignmentInBytes,
+                 size_t totalSize,
+                 std::pmr::string name,
+                 std::pmr::vector<MirType *> subTypes) :
+    m_kind(kind), m_id(id), m_maxAlignmentInBytes(maxAlignmentInBytes), m_totalSizeInBits(totalSize),
+    m_subTypes(subTypes), m_name(name)
 {
 }
 
@@ -37,6 +42,8 @@ size_t MirType::getArrayElementCount() const
 }
 
 size_t MirType::getId() const { return m_id; }
+
+size_t MirType::getMaxAlignmentInBytes() const { return m_maxAlignmentInBytes; }
 
 size_t MirType::getTotalSizeInBits() const { return m_totalSizeInBits; }
 

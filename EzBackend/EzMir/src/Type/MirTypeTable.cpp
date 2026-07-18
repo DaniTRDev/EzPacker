@@ -6,6 +6,8 @@ MirTypeTable::MirTypeTable(IMirTargetTypeLayout *typeLayout, std::pmr::memory_re
 {
 }
 
+IMirTargetTypeLayout *MirTypeTable::getTargetTypeLayout() const { return m_typeLayout; }
+
 MirType *MirTypeTable::create(MirTypeKind kind,
                               size_t totalSizeInBits,
                               std::pmr::vector<MirType *> subTypes,
@@ -20,16 +22,34 @@ MirType *MirTypeTable::create(MirTypeKind kind,
     auto it = m_typeNames.find(lookupName);
     if (it != m_typeNames.end())
     {
-        return it->second; // Type safety: return existing canonical type match
+        return it->second;
     }
 
     size_t assignedId = ++m_currentId;
 
+    // Allocate a temporary dummy node record to fetch target-specific alignment layouts
+    // Primitive fields don't have sub-types populated yet, so we query based on kind + size
+    size_t alignmentInBytes = 1;
+    if (kind == MirTypeKind::Integer || kind == MirTypeKind::FloatingPoint || kind == MirTypeKind::Void)
+    {
+        // Allocate space mapping primitive target metrics
+        MirType tempPrimitive(kind, assignedId, 1, totalSizeInBits, lookupName, {});
+        alignmentInBytes = m_typeLayout->getTypeAlignmentInBytes(&tempPrimitive);
+    }
+    else if (kind == MirTypeKind::Pointer || kind == MirTypeKind::Function)
+    {
+        alignmentInBytes = m_typeLayout->getPointerSizeInBytes();
+    }
+
     // Allocate our node container explicitly out of the stable global metadata resource arena
     std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
-    MirType *uniqueType = alloc.new_object<MirType>(kind, assignedId, totalSizeInBits, lookupName, std::move(subTypes));
+    MirType *uniqueType = alloc.new_object<MirType>(kind,
+                                                    assignedId,
+                                                    alignmentInBytes,
+                                                    totalSizeInBits,
+                                                    lookupName,
+                                                    std::move(subTypes));
 
-    // Store in our fast global indexing maps
     m_typeNames[lookupName] = uniqueType;
     m_idToType[assignedId] = uniqueType;
 
@@ -43,7 +63,6 @@ MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, c
         return nullptr;
     }
 
-    // Check if the type is already interned
     std::pmr::string lookupName(structName, m_arena);
     auto it = m_typeNames.find(lookupName);
     if (it != m_typeNames.end())
@@ -62,31 +81,40 @@ MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, c
         size_t fieldAlignment = m_typeLayout->getTypeAlignmentInBytes(fieldType);
         size_t fieldSize = m_typeLayout->getTypeSizeInBytes(fieldType);
 
-        // Keep track of the largest alignment requirement in the struct
         if (fieldAlignment > maxAlignmentInBytes)
         {
             maxAlignmentInBytes = fieldAlignment;
         }
 
-        // Align the current offset to the field's alignment requirement
         if (currentOffsetInBytes % fieldAlignment != 0)
         {
             currentOffsetInBytes += (fieldAlignment - (currentOffsetInBytes % fieldAlignment));
         }
 
-        // Advance by the field's size
         currentOffsetInBytes += fieldSize;
     }
 
-    // Pad the final class/struct size to make it a multiple of the max alignment
     if (currentOffsetInBytes % maxAlignmentInBytes != 0)
     {
         currentOffsetInBytes += (maxAlignmentInBytes - (currentOffsetInBytes % maxAlignmentInBytes));
     }
 
-    // Convert bytes to bits for storing in the canonical MirType record
     size_t totalSizeInBits = currentOffsetInBytes * 8;
-    return create(MirTypeKind::Class, totalSizeInBits, std::move(fieldTypes), structName);
+
+    // Custom allocation route bypasses 'create' to pass the explicitly calculated struct layout properties directly
+    size_t assignedId = ++m_currentId;
+    std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
+    MirType *newClassType = alloc.new_object<MirType>(MirTypeKind::Class,
+                                                      assignedId,
+                                                      maxAlignmentInBytes,
+                                                      totalSizeInBits,
+                                                      lookupName,
+                                                      std::move(fieldTypes));
+
+    m_typeNames[lookupName] = newClassType;
+    m_idToType[assignedId] = newClassType;
+
+    return newClassType;
 }
 
 MirType *MirTypeTable::getFuncType(MirType *returnType,
@@ -98,8 +126,6 @@ MirType *MirTypeTable::getFuncType(MirType *returnType,
         return nullptr;
     }
 
-    // Build a unique structural signature string for interning: "ReturnType(Param1,Param2,...)"
-    // Example: "i32(i64,f32*)"
     auto structuralSignature = returnType->getName();
     structuralSignature += "(";
 
@@ -109,6 +135,8 @@ MirType *MirTypeTable::getFuncType(MirType *returnType,
 
     for (auto &param : parameters)
     {
+        if (!param)
+            continue;
         MirType *paramType = param->getMirType();
         subTypes.push_back(paramType);
 
@@ -124,13 +152,10 @@ MirType *MirTypeTable::getFuncType(MirType *returnType,
     auto it = m_typeNames.find(lookupKey);
     if (it != m_typeNames.end())
     {
-        return it->second; // Return existing identical functional signature match
+        return it->second;
     }
 
-    // Functional symbols lower down to standard machine code pointer blocks
     size_t pointerSizeInBits = m_typeLayout->getPointerSizeInBytes() * 8;
-
-    // Instantiate the unique type record using the structural signature as its name identifier
     return create(MirTypeKind::Function, pointerSizeInBits, std::move(subTypes), lookupKey);
 }
 
@@ -139,7 +164,6 @@ MirType *MirTypeTable::getPtr(MirType *srcType)
     if (!srcType)
         return nullptr;
 
-    // Check type cache map first (Interning check)
     auto it = m_pointerCache.find(srcType);
     if (it != m_pointerCache.end())
     {
@@ -147,13 +171,12 @@ MirType *MirTypeTable::getPtr(MirType *srcType)
     }
 
     size_t pointerSizeInBytes = m_typeLayout->getPointerSizeInBytes();
-
     std::pmr::vector<MirType *> childTarget({ srcType }, m_arena);
     std::string formattedName = std::format("{}*", srcType->getName());
 
-    MirType *newPointerType = create(MirTypeKind::Pointer, pointerSizeInBytes, std::move(childTarget), formattedName);
+    MirType *newPointerType =
+            create(MirTypeKind::Pointer, pointerSizeInBytes * 8, std::move(childTarget), formattedName);
 
-    // Save inside cache table for future deduplication lookups
     m_pointerCache[srcType] = newPointerType;
     return newPointerType;
 }
@@ -163,26 +186,27 @@ MirType *MirTypeTable::getArray(MirType *elementType, size_t elementCount)
     if (!elementType)
         return nullptr;
 
-    // Generate string signature for this array shape: "i32[10]" or "i8*[4]".
     std::string arraySignature = std::format("{}[{}]", elementType->getName(), elementCount);
     std::pmr::string lookupName(arraySignature, m_arena);
 
-    // Check type names cache to see if this exact array shape already exists (Interning check).
     auto it = m_typeNames.find(lookupName);
     if (it != m_typeNames.end())
     {
-        return it->second; // Return the existing type.
+        return it->second;
     }
 
     size_t totalSizeInBytes = m_typeLayout->getTypeSizeInBytes(elementType) * elementCount;
+    size_t alignmentInBytes = m_typeLayout->getTypeAlignmentInBytes(elementType); // Arrays match element alignment
     std::pmr::vector<MirType *> childType({ elementType }, m_arena);
 
-    // Instantiate and construct the unique Array type record on the global arena
     std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
-    MirType *newArrayType = alloc.allocate(1);
-
     size_t assignedId = ++m_currentId;
-    alloc.construct(newArrayType, MirTypeKind::Array, assignedId, totalSizeInBytes, lookupName, std::move(childType));
+    MirType *newArrayType = alloc.new_object<MirType>(MirTypeKind::Array,
+                                                      assignedId,
+                                                      alignmentInBytes,
+                                                      totalSizeInBytes * 8,
+                                                      lookupName,
+                                                      std::move(childType));
 
     m_typeNames[lookupName] = newArrayType;
     m_idToType[assignedId] = newArrayType;
@@ -201,14 +225,12 @@ MirType *MirTypeTable::getFloatingTypeBySize(size_t sizeInBits) const
         size_t typeSize = type->getTotalSizeInBits();
         if (typeSize >= sizeInBits)
         {
-            // If we don't have a match yet, or if this type is a tighter fit
             if (!result || typeSize < result->getTotalSizeInBits())
             {
                 result = type;
             }
         }
     }
-
     return result;
 }
 
@@ -223,14 +245,12 @@ MirType *MirTypeTable::getIntegerTypeBySize(size_t sizeInBits) const
         size_t typeSize = type->getTotalSizeInBits();
         if (typeSize >= sizeInBits)
         {
-            // If we don't have a match yet, or if this type is a tighter fit
             if (!result || typeSize < result->getTotalSizeInBits())
             {
                 result = type;
             }
         }
     }
-
     return result;
 }
 

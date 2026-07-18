@@ -27,6 +27,7 @@ set(EZMIR_FILES_LIST
         "include/Printer/MirPrinter.h"
         "include/Type/MirType.h"
         "include/Type/MirTypeTable.h"
+        "include/MirPasses/Passes/ClassOffsetResolver.h"
         "include/MirPasses/Passes/CodeFlowAnalysis.h"
         "include/MirPasses/Passes/LivenessAnalysis.h"
         "include/MirPasses/Passes/RelativeReferenceLowerer.h"
@@ -46,6 +47,7 @@ set(EZMIR_FILES_LIST
         "src/GlobalVar/MirGlobalVarBuilder.cpp"
         "src/MirPasses/MirPass.cpp"
         "src/MirPasses/MirPassManager.cpp"
+        "src/MirPasses/Passes/ClassOffsetResolver.cpp"
         "src/MirPasses/Passes/CodeFlowAnalysis.cpp"
         "src/MirPasses/Passes/LivenessAnalysis.cpp"
         "src/MirPasses/Passes/RelativeReferenceLowerer.cpp"
@@ -59,6 +61,7 @@ set(EZMIR_FILES_LIST
 set(MIRTESTSUITE_FILES_LIST
         "tests/EzMirTestSuite/EzMirTestSuite.h"
         "tests/EzMirTestSuite/TestTargetTypeLayout.h"
+        "tests/EzMirTestSuite/Verifiers/ClassOffsetResolverVerifier.h"
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.h"
         "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.h"
         "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.h"
@@ -66,6 +69,7 @@ set(MIRTESTSUITE_FILES_LIST
 
         "tests/EzMirTestSuite/EzMirTestSuite.cpp"
         "tests/EzMirTestSuite/TestTargetTypeLayout.cpp"
+        "tests/EzMirTestSuite/Verifiers/ClassOffsetResolverVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/LivenessPassVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/MirCoreVerifiers.cpp"
@@ -114,6 +118,13 @@ if (EZPACKER_BUILD_TESTS)
             "EzMirTestSuite"
             ""
             "tests/T_Class.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_ClassOffsetResolver"
+            "EzMirTestSuite"
+            ""
+            "tests/T_ClassOffsetResolver.cpp"
     )
 
     EzPacker_AddTest(

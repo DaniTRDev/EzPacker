@@ -26,6 +26,11 @@ class MirTypeTable
     MirTypeTable &operator=(const MirTypeTable &) = delete;
 
     /**
+     * Returns the target type layout used by this type table.
+     */
+    IMirTargetTypeLayout *getTargetTypeLayout() const;
+
+    /**
      * Creates a unique base or compound type. If there was an error while creating the type nullptr is returned.
      * @param kind
      * @param totalSizeInBits
@@ -48,13 +53,15 @@ class MirTypeTable
     MirType *getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &name);
 
     /**
-     * Creates a function type with the given parameters. This function will CREATE only if it wasn't added before, if it was the existing type is returned.
+     * Creates a function type with the given parameters. This function will CREATE only if it wasn't added before, if
+     * it was the existing type is returned.
      * @param returnType
      * @param parameters
      * @param name
      * @return
      */
-    MirType *getFuncType(MirType* returnType, const std::pmr::list<MirRegister *> &parameters, const std::string_view &funcName);
+    MirType *
+    getFuncType(MirType *returnType, const std::pmr::list<MirRegister *> &parameters, const std::string_view &funcName);
 
     /**
      * Interns pointer types. Guarantees that getPtr(T) always returns the exact same type instance pointer.

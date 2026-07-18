@@ -1,6 +1,7 @@
 #ifndef EZPACKER_EZMIRTESTSUITE_H
 #define EZPACKER_EZMIRTESTSUITE_H
 
+#include "Verifiers/ClassOffsetResolverVerifier.h"
 #include "Verifiers/MirCoreVerifiers.h"
 #include "Verifiers/CodeFlowPassVerifier.h"
 #include "Verifiers/LivenessPassVerifier.h"

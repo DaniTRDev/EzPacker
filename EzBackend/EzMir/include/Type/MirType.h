@@ -30,12 +30,14 @@ class MirType
      *
      * @param kind     High-level classification of the type.
      * @param id       Unique MIR ID assigned by the context.
+     * @param maxAlignmentInBytes
      * @param totalSizeInBits
      * @param name     Human-readable type name kept for diagnostics/debugging.
      * @param subTypes Optional child-type slice used by compound kinds.
      */
     MirType(MirTypeKind kind,
             size_t id,
+            size_t maxAlignmentInBytes,
             size_t totalSizeInBits,
             std::pmr::string name,
             std::pmr::vector<MirType *> subTypes);
@@ -68,6 +70,11 @@ class MirType
     size_t getId() const;
 
     /**
+     * Returns the max alignment of this type.
+     */
+    size_t getMaxAlignmentInBytes() const;
+
+    /**
      * Returns the total size in bits of this type.
      * @return
      */
@@ -94,6 +101,7 @@ class MirType
   private:
     MirTypeKind m_kind;                     // High-level classification of the type.
     size_t m_id;                            // Unique MIR identifier for this type.
+    size_t m_maxAlignmentInBytes;           // Total alignment in bytes of this type.
     size_t m_totalSizeInBits;               // Total size in bytes of this type.
     std::pmr::string m_name;                // Debug/diagnostic name.
     std::pmr::vector<MirType *> m_subTypes; // Optional child types for compound kinds.

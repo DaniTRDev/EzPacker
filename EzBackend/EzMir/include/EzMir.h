@@ -36,6 +36,7 @@
 #include "MirPasses/MirPass.h"
 #include "MirPasses/IMirTransformPass.h"
 #include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/ClassOffsetResolver.h"
 #include "MirPasses/Passes/CodeFlowAnalysis.h"
 #include "MirPasses/Passes/LivenessAnalysis.h"
 #include "MirPasses/Passes/RelativeReferenceLowerer.h"
