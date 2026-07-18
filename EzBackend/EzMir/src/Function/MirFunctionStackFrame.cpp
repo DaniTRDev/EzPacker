@@ -7,6 +7,21 @@ MirFunctionStackFrame::MirFunctionStackFrame(std::pmr::vector<StackFrameObject *
 
 size_t MirFunctionStackFrame::getAllocatedObjectCount() const { return m_stackFrameObjects.size(); }
 
+StackFrameObject *MirFunctionStackFrame::createLocalStackObj(size_t size, size_t align)
+{
+    return create(0, align, size, StackFrameObjectSource::Variable);
+}
+
+StackFrameObject *MirFunctionStackFrame::createStackSpill(size_t size, size_t align)
+{
+    return create(0, align, size, StackFrameObjectSource::Spill);
+}
+
+StackFrameObject *MirFunctionStackFrame::createStackParam(size_t size, size_t align, int64_t offset)
+{
+    return create(offset, align, size, StackFrameObjectSource::Parameter);
+}
+
 StackFrameObject *
 MirFunctionStackFrame::create(int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source)
 {

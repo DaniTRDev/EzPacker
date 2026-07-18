@@ -44,6 +44,32 @@ class MirFunctionStackFrame
     size_t getAllocatedObjectCount() const;
 
     /**
+     * Creates an object in the function's stack frame.
+     * @param size
+     * @param align
+     * @return
+     */
+    StackFrameObject *createLocalStackObj(size_t size, size_t align);
+
+    /**
+     * Creates an object resulting of a spill in the function's stack frame.
+     * @param size
+     * @param align
+     * @return
+     */
+    StackFrameObject *createStackSpill(size_t size, size_t align);
+
+    /**
+     * Creates a parameter at the given offset in the function stack frame. This is the only object whose offset is
+     * known at creation-time. This is used internally by low-level backend passes.
+     * @param size
+     * @param align
+     * @param offset
+     * @return
+     */
+    StackFrameObject *createStackParam(size_t size, size_t align, int64_t offset);
+
+    /**
      * Creates a specific stack frame object with the given parameters
      * @param offset
      * @param align

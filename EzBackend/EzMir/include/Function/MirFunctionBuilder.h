@@ -41,32 +41,6 @@ class MirFunctionBuilder : public MirBuilder<MirFunction>
     MirFunction *build(MirType *returnType, const std::pmr::string &name = "", SourceReference *sourceRef = nullptr);
 
     /**
-     * Creates an abstract object in the function stack frame.
-     * @param size
-     * @param align
-     * @return
-     */
-    StackFrameObject *buildLocalStackObj(size_t size, size_t align);
-
-    /**
-     * Creates an abstract object in the function stack frame.
-     * @param size
-     * @param align
-     * @return
-     */
-    StackFrameObject *buildStackSpill(size_t size, size_t align);
-
-    /**
-     * Creates a parameter at the given offset in the function stack frame. This is the only object whose offset is
-     * known at creation-time.
-     * @param size
-     * @param align
-     * @param offset
-     * @return
-     */
-    StackFrameObject *buildStackParam(size_t size, size_t align, int64_t offset);
-
-    /**
      * Adds a parameter into the FUTURE function that's going to be built. This does not affect the stack frame.
      * @param type
      * @param name

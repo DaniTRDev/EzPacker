@@ -61,7 +61,7 @@ TEST_F(FunctionTest, TestFunc1LocalStackObj)
     size_t i8Size = i8->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = builder.buildLocalStackObj(i8Size, i8Size);
+    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8Size, i8Size);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
@@ -81,8 +81,8 @@ TEST_F(FunctionTest, TestFuncNLocalStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = builder.buildLocalStackObj(i8Size, i8Size),
-                     *obj2 = builder.buildLocalStackObj(i16Size, i16Size);
+    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8Size, i8Size),
+                     *obj2 = func->getStackFrame()->createLocalStackObj(i16Size, i16Size);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
@@ -107,7 +107,7 @@ TEST_F(FunctionTest, TestFunc1Spill1StackObj)
     size_t i8Size = i8->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = builder.buildStackSpill(i8Size, i8Size);
+    StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8Size, i8Size);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
@@ -127,7 +127,8 @@ TEST_F(FunctionTest, TestFunc1SpillNStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = builder.buildStackSpill(i8Size, i8Size), *obj2 = builder.buildStackSpill(i16Size, i16Size);
+    StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8Size, i8Size),
+                     *obj2 = func->getStackFrame()->createStackSpill(i16Size, i16Size);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
@@ -152,9 +153,9 @@ TEST_F(FunctionTest, TestFunc1ParameterNStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = builder.buildStackParam(i8Size, i8Size, 0),
-                     *obj2 = builder.buildStackParam(i16Size, i16Size, 2),
-                     *obj3 = builder.buildStackParam(i16Size, i16Size, 4);
+    StackFrameObject *obj = func->getStackFrame()->createStackParam(i8Size, i8Size, 0),
+                     *obj2 = func->getStackFrame()->createStackParam(i16Size, i16Size, 2),
+                     *obj3 = func->getStackFrame()->createStackParam(i16Size, i16Size, 4);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
