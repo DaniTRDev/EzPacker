@@ -1,13 +1,10 @@
-#include "CallLoweringState.h"
+#include "Function/CallLoweringState.h"
 
-CallLoweringState::CallLoweringState(ABIDesc *abi,
-                                     const std::list<PhysicalRegId> &usableGprs,
+CallLoweringState::CallLoweringState(const std::list<PhysicalRegId> &usableGprs,
                                      const std::list<PhysicalRegId> &usableFprs) :
-    m_abi(abi), m_currentStackOffset(0), m_usableFprs(usableFprs), m_usableGprs(usableGprs)
+    m_currentStackOffset(0), m_usableFprs(usableFprs), m_usableGprs(usableGprs)
 {
 }
-
-ABIDesc *CallLoweringState::getABI() const { return m_abi; }
 
 bool CallLoweringState::allocateGpr(PhysicalRegId &outReg)
 {

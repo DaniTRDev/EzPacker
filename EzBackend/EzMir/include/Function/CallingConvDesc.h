@@ -1,7 +1,7 @@
 #ifndef EZPACKER_CALLINGCONVDESC_H
 #define EZPACKER_CALLINGCONVDESC_H
 
-#include "EzTripleCommon.h"
+#include "EzMirCommon.h"
 #include "ArgumentLocationDesc.h"
 #include "CallLoweringState.h"
 
@@ -12,7 +12,7 @@
  * Example of why it is needed:
  * Imagine 1 integer arg: The CallingConvDesc would ask the CallLoweringState how many integer
  * registers are currently used, if less than available a register location will be return; if no integer register is
- * available, it a stack location will be returned.
+ * available, a stack location will be returned.
  */
 class CallingConvDesc
 {

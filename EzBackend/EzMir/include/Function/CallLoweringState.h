@@ -1,26 +1,19 @@
 #ifndef EZPACKER_CALLLOWERINGSTATE_H
 #define EZPACKER_CALLLOWERINGSTATE_H
 
-#include "EzTripleCommon.h"
-#include "Descriptors/ABIDesc.h"
+#include "EzMirCommon.h"
+#include "ArgumentLocationDesc.h"
 
 class CallLoweringState
 {
   public:
     /**
-     * Creates the state with the given ABI and usable registers (int and float).
-     * @param abiDesc
+     * Creates the state with the given usable registers (int and float).
      * @param usableGprs
      * @param usableFprs
      */
-    CallLoweringState(ABIDesc *abi,
-                      const std::list<PhysicalRegId> &usableGprs,
+    CallLoweringState(const std::list<PhysicalRegId> &usableGprs,
                       const std::list<PhysicalRegId> &usableFprs);
-
-    /**
-     * @brief Returns the descriptor of the ABI this call state is linked to.
-     */
-    ABIDesc *getABI() const;
 
     /**
      * Attempts to allocate the next available General Purpose Register.
@@ -76,7 +69,6 @@ class CallLoweringState
     int64_t allocateStackSlot(size_t sizeBytes, size_t alignmentBytes);
 
   private:
-    ABIDesc *m_abi;
     int64_t m_currentStackOffset; // Current parameter stack frame offset (in bytes)
 
     // Pool of usable registers.

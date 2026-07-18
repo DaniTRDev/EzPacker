@@ -1,4 +1,4 @@
-#include "Descriptors/ArgumentLocationDesc.h"
+#include "Function/ArgumentLocationDesc.h"
 
 ArgumentLocationDesc::ArgumentLocationDesc(ArgLocationType type, StorageT storage) : m_type(type), m_storage(storage) {}
 

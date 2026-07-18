@@ -1,5 +1,4 @@
 set(EZTRIPLE_FILES_LIST
-        "include/CallLoweringState.h"
         "include/EzTriple.h"
         "include/EzTripleCommon.h"
         "include/AbiLowerer/ReturnAbiLowererPass.h"
@@ -8,8 +7,6 @@ set(EZTRIPLE_FILES_LIST
         "include/DefaultLegalizerActions/LegalizeReturnAction.h"
         "include/DefaultLegalizerActions/PromoteScalarAction.h"
         "include/Descriptors/ABIDesc.h"
-        "include/Descriptors/ArgumentLocationDesc.h"
-        "include/Descriptors/CallingConvDesc.h"
         "include/Descriptors/TargetDesc.h"
         "include/ExpansionRecipe/ExpansionRecipe.h"
         "include/Legalizer/LegalizeAction.h"
@@ -17,13 +14,11 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/MirFunctionSignatureLegalizerPass.h"
         "include/Legalizer/MirLegalizer.h"
 
-        "src/CallLoweringState.cpp"
         "src/AbiLowerer/ReturnAbiLowererPass.cpp"
         "src/DefaultLegalizerActions/ExpandScalarAction.cpp"
         "src/DefaultLegalizerActions/LegalizeCallAction.cpp"
         "src/DefaultLegalizerActions/LegalizeReturnAction.cpp"
         "src/DefaultLegalizerActions/PromoteScalarAction.cpp"
-        "src/Descriptors/ArgumentLocation.cpp"
         "src/Legalizer/MirBlockLegalizerPass.cpp"
         "src/Legalizer/MirFunctionSignatureLegalizerPass.cpp"
         "src/Legalizer/MirLegalizer.cpp"

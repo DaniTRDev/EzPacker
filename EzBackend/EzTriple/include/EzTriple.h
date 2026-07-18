@@ -3,8 +3,6 @@
 
 #include "EzTripleCommon.h"
 
-#include "CallLoweringState.h"
-
 #include "AbiLowerer/ReturnAbiLowererPass.h"
 
 #include "DefaultLegalizerActions/ExpandScalarAction.h"
@@ -13,8 +11,6 @@
 #include "DefaultLegalizerActions/PromoteScalarAction.h"
 
 #include "Descriptors/ABIDesc.h"
-#include "Descriptors/ArgumentLocationDesc.h"
-#include "Descriptors/CallingConvDesc.h"
 #include "Descriptors/TargetDesc.h"
 
 #include "ExpansionRecipe/ExpansionRecipe.h"

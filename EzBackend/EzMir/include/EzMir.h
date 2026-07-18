@@ -17,6 +17,9 @@
 #include "Class/MirClassBuilder.h"
 
 // ── Function container ──────────────────────────────────────────────────────
+#include "Function/ArgumentLocationDesc.h"
+#include "Function/CallingConvDesc.h"
+#include "Function/CallLoweringState.h"
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionStackFrame.h"
