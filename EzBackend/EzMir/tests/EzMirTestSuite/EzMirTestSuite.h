@@ -7,6 +7,7 @@
 #include "Verifiers/LivenessPassVerifier.h"
 #include "Verifiers/RelativeReferenceLowererVerifier.h"
 #include "TestTargetTypeLayout.h"
+#include "TestCallingConvention.h"
 
 /**
  * Class used to contain helper methods related to creation/destruction of needed objects in common test scenarios.
@@ -125,18 +126,25 @@ class EzMirTestSuite
     /**
      * Returns the function list out of the current context.
      */
-    std::pmr::list<MirFunction*> &getFunctions();
+    std::pmr::list<MirFunction *> &getFunctions();
 
     /**
-     * Creates the target type layout used to define aligned types and returns it. Made it virtual so upper tests can return their own layout if needed.
-     * By default it returns TestTargetTypeLayout.
+     * Creates the target type layout used to define aligned types and returns it. Made it virtual so upper tests can
+     * return their own layout if needed. By default it returns TestTargetTypeLayout.
      */
     virtual std::shared_ptr<IMirTargetTypeLayout> createTypeLayout();
+
+    /**
+     * Creates the default calling convention and returns it. Made it virtual so upper tests can
+     * return their own layout if needed. By default it returns TestCallingConvention.
+     */
+    virtual std::shared_ptr<CallingConvDesc> createDefaultCallingConv();
 
   private:
     MirFunction *m_testFunction; // Pre-created function used to be able to create quick tests easily.
     MirInstructionInsertionPoint m_insertPoint;
     std::pmr::monotonic_buffer_resource m_arena;
+    std::shared_ptr<CallingConvDesc> m_callingConv; // Default calling conv given to builder ctx.
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
     std::shared_ptr<DiagnosticLogger> m_diagLogger;
     std::shared_ptr<IMirTargetTypeLayout> m_typeLayout;

@@ -1,7 +1,7 @@
 #include "Function/MirFunctionBuilder.h"
 
 MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) :
-    m_ctx(ctx), m_parameters(ctx->getFuncAllocator()), m_owner(nullptr)
+    m_callingConv(nullptr), m_ctx(ctx), m_parameters(ctx->getFuncAllocator()), m_owner(nullptr)
 {
 }
 

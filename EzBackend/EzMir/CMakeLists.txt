@@ -65,6 +65,7 @@ set(EZMIR_FILES_LIST
 
 set(MIRTESTSUITE_FILES_LIST
         "tests/EzMirTestSuite/EzMirTestSuite.h"
+        "tests/EzMirTestSuite/TestCallingConvention.h"
         "tests/EzMirTestSuite/TestTargetTypeLayout.h"
         "tests/EzMirTestSuite/Verifiers/ClassOffsetResolverVerifier.h"
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.h"
@@ -73,6 +74,7 @@ set(MIRTESTSUITE_FILES_LIST
         "tests/EzMirTestSuite/Verifiers/RelativeReferenceLowererVerifier.h"
 
         "tests/EzMirTestSuite/EzMirTestSuite.cpp"
+        "tests/EzMirTestSuite/TestCallingConvention.cpp"
         "tests/EzMirTestSuite/TestTargetTypeLayout.cpp"
         "tests/EzMirTestSuite/Verifiers/ClassOffsetResolverVerifier.cpp"
         "tests/EzMirTestSuite/Verifiers/CodeFlowPassVerifier.cpp"

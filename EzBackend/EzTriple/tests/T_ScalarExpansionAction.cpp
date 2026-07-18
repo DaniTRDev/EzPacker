@@ -1,30 +1,42 @@
 #include "EzTripleTestSuite.h"
-#include "Descriptors/Amd64TargetDesc.h"
-#include "Amd64Legalizer.h"
 
-class TestAmd64ScalarExpanstionAction : public MirTripleTestSuiteAsGtest
+class TestScalarExpanstionAction : public MirTripleTestSuiteAsGtest
 {
   public:
     /**
-     * Creates a target Amd64TargetDesc and returns it.
+     * Creates a simple legalizer.
      * @return
      */
     std::shared_ptr<MirLegalizer> createTargetLegalizer() override
     {
-        return Amd64Legalizer::create((Amd64TargetDesc *)getTargetDesc(), getBuilderCtx());
-    }
+        auto legalizer = MirTripleTestSuiteAsGtest::createTargetLegalizer();
+        LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
+        std::vector<MirType *> sizes = { getTypeTable()->i8(),
+                                         getTypeTable()->i16(),
+                                         getTypeTable()->i32(),
+                                         getTypeTable()->i64() };
 
-    /**
-     * Creates a target MirLegalizer with x64 legalization rules and returns it.
-     * @return
-     */
-    std::shared_ptr<TargetDesc> createTargetDesc() override
-    {
-        return std::make_shared<Amd64TargetDesc>(getBuilderCtx());
+        size_t tokenTypeId = getTypeTable()->getBindingToken()->getId();
+
+        // Extension instructions must act as a bridge between illegal and legal types, we need to legal them on every
+        // SRC case.
+        for (const auto &dest : sizes)
+        {
+            size_t destId = dest->getId();
+            legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { tokenTypeId, destId });
+        }
+
+        return legalizer;
     }
 };
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddRegReg)
+TEST_F(TestScalarExpanstionAction, Expand128BitAddRegReg)
 {
     /**
      * Input:
@@ -59,7 +71,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddRegReg)
     highAdcVerifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitCallReg)
+TEST_F(TestScalarExpanstionAction, Expand128BitCallReg)
 {
     /**
      * Input:
@@ -94,7 +106,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitCallReg)
     highPushVerifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitCallImm)
+TEST_F(TestScalarExpanstionAction, Expand256BitCallImm)
 {
     /**
      * Input:
@@ -143,7 +155,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitCallImm)
     highHighAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("BA50B51C48B0AD92", 64, false, 16));
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitAddRegImm)
+TEST_F(TestScalarExpanstionAction, Expand256BitAddRegImm)
 {
     /**
      * Input:
@@ -200,7 +212,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitAddRegImm)
     highHighAdc1Verifier.operandVerifier(1).verifyInteger(i64, FlexInt("BA50B51C48B0AD92", 64, false, 16));
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddRegRegAndReuse)
+TEST_F(TestScalarExpanstionAction, Expand128BitAddRegRegAndReuse)
 {
     /**
      * Input:
@@ -254,7 +266,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitAddRegRegAndReuse)
     highAdc2Verifier.operandVerifier(1).verifyRegister(i64, true, MIRID_INVALID);
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitUDivRegReg)
+TEST_F(TestScalarExpanstionAction, Expand128BitUDivRegReg)
 {
     /**
      * Input:
@@ -287,7 +299,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitUDivRegReg)
     expandVerifier.verifyRuntimeCallSymbol(4, "__udivti3");
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitLoadRegMem)
+TEST_F(TestScalarExpanstionAction, Expand128BitLoadRegMem)
 {
     /**
      * Input:
@@ -321,7 +333,7 @@ TEST_F(TestAmd64ScalarExpanstionAction, Expand128BitLoadRegMem)
     highLoadVerifier.operandVerifier(1).verifyMemory(i64, nullptr, displ8);
 }
 
-TEST_F(TestAmd64ScalarExpanstionAction, Expand256BitLoadRegMem)
+TEST_F(TestScalarExpanstionAction, Expand256BitLoadRegMem)
 {
     /**
      * Input:

@@ -54,6 +54,11 @@ class MirFunction
                 std::pmr::string name);
 
     /**
+     * Returns the calling convention of this function.
+     */
+    CallingConvDesc *getCallingConv() const;
+
+    /**
      * Returns the MirBlock owned by this function that matches the given ID, if no case is found nullptr is returned.
      * @param id
      * @return
@@ -124,6 +129,7 @@ class MirFunction
     const std::pmr::string &getName();
 
   private:
+    CallingConvDesc *m_callingConv;
     MirBlock *m_entryPoint;
     MirFunctionStackFrame *m_stackFrame;
     MirType *m_returnType;

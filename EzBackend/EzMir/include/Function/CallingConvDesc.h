@@ -4,6 +4,7 @@
 #include "EzMirCommon.h"
 #include "ArgumentLocationDesc.h"
 #include "CallLoweringState.h"
+#include "Type/MirType.h"
 
 /**
  * Class used as a book to know where function arguments and returns should be placed. Since this information CAN'T be

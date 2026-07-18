@@ -3,6 +3,7 @@
 
 #include "EzTriple.h"
 
+// Behaves as AMD64.
 DEFINE_EXPANSION_RECIPES(EzTripleTest)
 
 /* --- DATA MOVEMENT -------------------------------------------------------- */

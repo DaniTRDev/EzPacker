@@ -3,7 +3,7 @@
 
 #include "EzTriple.h"
 #include "EzMirTestSuite.h"
-#include "EzTripleTargetDescriptor.h"
+#include "EzTripleTestTargetDescriptor.h"
 #include "ExpandScalarActionVerifier.h"
 #include "FuncSignaturePassVerifier.h"
 #include "LegalizeCallActionVerifier.h"
@@ -13,9 +13,6 @@
 /**
  * This class is used as a common entry point for triple tests. It takes 2 template parameters to be able to define
  * the current architecture we are compiling in.
- *
- * IMPORTANT: For every tested case, the top-most test class MUST call setTargetDesc to set the descriptor of the
- * target. If the target desc is not set, the DEFAULT descriptor will be used (EzTripleTargetDescriptor.h).
  */
 class EzTripleTestSuite : public EzMirTestSuite
 {

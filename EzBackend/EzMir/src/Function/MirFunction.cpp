@@ -1,6 +1,7 @@
 #include "Function/MirFunction.h"
 
-MirFunction::MirFunction(MirBlock *entryPoint,
+MirFunction::MirFunction(CallingConvDesc *callingConv,
+                         MirBlock *entryPoint,
                          MirFunctionStackFrame *stackFrame,
                          MirType *returnType,
                          MirType *type,
@@ -9,8 +10,8 @@ MirFunction::MirFunction(MirBlock *entryPoint,
                          std::pmr::list<MirBlock *> blocks,
                          std::pmr::list<MirRegister *> parameters,
                          std::pmr::string name) :
-    m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType), m_type(type), m_id(id),
-    m_sourceRef(sourceRef), m_blocks(std::move(blocks)), m_parameters(std::move(parameters)),
+    m_callingConv(callingConv), m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType),
+    m_type(type), m_id(id), m_sourceRef(sourceRef), m_blocks(std::move(blocks)), m_parameters(std::move(parameters)),
     m_blockIdToBlock(m_blocks.get_allocator().resource()), m_name(std::move(name))
 {
     for (auto &block : m_blocks)

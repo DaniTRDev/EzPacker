@@ -1,5 +1,5 @@
-#ifndef EZPACKER_EZTRIPLETARGETDESCRIPTOR_H
-#define EZPACKER_EZTRIPLETARGETDESCRIPTOR_H
+#ifndef EZPACKER_EZTRIPLETESTTARGETDESCRIPTOR_H
+#define EZPACKER_EZTRIPLETESTTARGETDESCRIPTOR_H
 
 #include "Descriptors/TargetDesc.h"
 #include "EzTripleTestExpansionRecipe.h"
@@ -31,6 +31,14 @@ class EzTripleTestTargetDesc : public TargetDesc
      */
     const class ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) override
     {
+        const auto recipes = getExpansionRecipes();
+        for (size_t i = 0; i < getExpansionRecipesSize(); i++)
+        {
+            const auto recipe = &recipes[i];
+            if (recipe->m_target == opcode)
+                return recipe;
+        }
+
         return nullptr;
     }
 
@@ -83,4 +91,4 @@ class EzTripleTestTargetDesc : public TargetDesc
     MirBuilderContext *m_ctx;
 };
 
-#endif // EZPACKER_EZTRIPLETARGETDESCRIPTOR_H
+#endif // EZPACKER_EZTRIPLETESTTARGETDESCRIPTOR_H

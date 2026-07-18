@@ -85,4 +85,11 @@ if (EZPACKER_BUILD_TESTS)
             ""
             "tests/T_FunctionSignatureLegalizerPass.cpp"
     )
+
+     EzPacker_AddTest(
+            "T_ScalarExpansionAction"
+            "EzTripleTestSuite"
+            ""
+            "tests/T_ScalarExpansionAction.cpp"
+    )
 endif ()

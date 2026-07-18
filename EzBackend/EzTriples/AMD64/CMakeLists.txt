@@ -17,11 +17,4 @@ EzCMK_ConfigureLib(NAME "EzTriple_Amd64"
 
 if (EZPACKER_BUILD_TESTS)
     message(STATUS "Building tests for EzTriple_Amd64")
-
-    EzPacker_AddTest(
-            "T_Amd64ScalarExpansionAction"
-            "EzTriple_Amd64"
-            "EzTripleTestSuite"
-            "tests/T_Amd64ScalarExpansionAction.cpp"
-    )
 endif ()
