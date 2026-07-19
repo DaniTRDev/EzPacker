@@ -4,23 +4,33 @@
 class TestLegalizeCallAct : public MirTripleTestSuiteAsGtest
 {
   public:
+    /**
+     * Creates a simple legalizer.
+     * @return
+     */
     std::shared_ptr<MirLegalizer> createTargetLegalizer() override
     {
         auto legalizer = MirTripleTestSuiteAsGtest::createTargetLegalizer();
         LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
-        std::vector<MirType *> sizes = { getTypeTable()->i8(),
-                                         getTypeTable()->i16(),
-                                         getTypeTable()->i32(),
-                                         getTypeTable()->i64() };
+        std::vector<size_t> sizes = { getTypeTable()->i8()->getId(),
+                                      getTypeTable()->i16()->getId(),
+                                      getTypeTable()->i32()->getId(),
+                                      getTypeTable()->i64()->getId(),
+                                      MIRLEGALIZE_POINTER_TYPE };
 
-        // Ensure the legalizer loop considers PUSH_ARG and POP_RET instructions legal.
-        // Both now use a tracking token (BindingToken) as their first operand.
         size_t tokenTypeId = getTypeTable()->getBindingToken()->getId();
-        for (const auto &dest : sizes)
+
+        // Extension instructions must act as a bridge between illegal and legal types, we need to legal them on every
+        // SRC case.
+        for (const auto &destId : sizes)
         {
-            size_t destId = dest->getId();
+            legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, MIRID_INVALID });
             legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
             legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { tokenTypeId, destId });
         }
 
         return legalizer;
@@ -163,4 +173,44 @@ TEST_F(TestLegalizeCallAct, Test5ArgWithReturn)
 
     // Assert the exact token-bound sequence across all 5 parameter push nodes and pop return.
     verifier.verifyCallSequence(func->getEntryPoint()->getInstructions().begin(), expectedOrigOperands, destReg);
+}
+
+TEST_F(TestLegalizeCallAct, TestSretCallLegalization)
+{
+    const auto &t = getTypeTable();
+    MirOperandBuilder opBuilder(getBuilderCtx());
+    MirFunctionBuilder functionBuilder(getBuilderCtx());
+
+    // Force a type that triggers the SRET path (wider than 64 bits)
+    MirType *wideStructType = t->i128();
+
+    functionBuilder.buildParam(t->i32(), "userArg0");
+    MirFunction *func = functionBuilder.build(wideStructType);
+
+    MirInstructionBuilder builder(getBuilderCtx(),
+                                  func->getEntryPoint(),
+                                  InsertionType::InsertAfter,
+                                  func->getEntryPoint()->getInstructions().begin());
+
+    // Virtual destination register where the high-level code expects the output struct payload
+    MirRegister *destReg = opBuilder.buildVReg(wideStructType, "sret_dest_var");
+
+    // The original standard high-level layout array: [destReg, calleeRef, userArg0]
+    std::vector<MirOperand *> expectedOrigOperands{ destReg,
+                                                    opBuilder.buildRef(func),
+                                                    opBuilder.buildInt(t->i32(), FlexInt(77, 32)) };
+
+    // Build standard high-level CALL: CALL %destReg, %func, %arg
+    auto callInstr = builder.CALL(expectedOrigOperands[0]);
+    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
+    {
+        callInstr->getOperands().push_back(expectedOrigOperands[i]);
+    }
+
+    // Execute the legalizer pass over the block stream
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
+
+    // Assert: ALLOC, PUSH_ARG sret_ptr, PUSH_ARG user_arg, CALL call_token, callee (No POP_RET)
+    verifier.verifySretCallSequence(func->getEntryPoint()->getInstructions().begin(), expectedOrigOperands);
 }

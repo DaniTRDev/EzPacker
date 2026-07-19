@@ -19,9 +19,9 @@ class Amd64Legalizer
     /**
      * @brief Returns the native sizes allowed for this architecture.
      * @param ctx The builder context used to fetch the type system references.
-     * @return A vector of MirType* containing the natively supported scalar types (i8, i16, i32, i64).
+     * @return A vector of MirType* containing the natively supported scalar types (i8, i16, i32, i64. pointer type (internal represented as i64)).
      */
-    const std::vector<MirType *> getNativeSizes(MirBuilderContext *ctx) const;
+    const std::vector<size_t> getNativeSizes(MirBuilderContext *ctx) const;
 
   private:
     /**

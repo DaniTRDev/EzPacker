@@ -11,17 +11,24 @@ class TestLegalizeReturnAct : public MirTripleTestSuiteAsGtest
     {
         auto legalizer = MirTripleTestSuiteAsGtest::createTargetLegalizer();
         LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
-        std::vector<MirType *> sizes = { getTypeTable()->i8(),
-                                         getTypeTable()->i16(),
-                                         getTypeTable()->i32(),
-                                         getTypeTable()->i64() };
+        std::vector<size_t> sizes = { getTypeTable()->i8()->getId(),
+                                      getTypeTable()->i16()->getId(),
+                                      getTypeTable()->i32()->getId(),
+                                      getTypeTable()->i64()->getId(),
+                                      MIRLEGALIZE_POINTER_TYPE };
 
-        // Ensure the mock rule matcher handles the new tokenized signature format.
-        // PUSH_RET now strictly expects: [i64 token, payloadType]
         size_t tokenTypeId = getTypeTable()->getBindingToken()->getId();
-        for (const auto &dest : sizes)
+
+        // Extension instructions must act as a bridge between illegal and legal types, we need to legal them on every
+        // SRC case.
+        for (const auto &destId : sizes)
         {
-            size_t destId = dest->getId();
+            legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
+            legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
             legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { tokenTypeId, destId });
         }
 

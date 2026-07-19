@@ -68,17 +68,15 @@ TEST_F(OperandTest, Register)
 {
     MirOperandBuilder builder(getBuilderCtx());
 
-    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f32()))
-            .verifyRegister(getTypeTable()->f32(), false, MIRID_INVALID);
+    MirOperandVerifier(builder.buildVReg(getTypeTable()->f32()))
+            .verifyRegister(getTypeTable()->f32(), true, MIRID_INVALID);
 
     MirOperandVerifier(builder.buildVReg(getTypeTable()->f32()))
             .verifyRegister(getTypeTable()->f32(), true, MIRID_INVALID);
 
-    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f64()))
-            .verifyRegister(getTypeTable()->f64(), false, MIRID_INVALID);
+    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f64(), 3)).verifyRegister(getTypeTable()->f64(), false, 3);
 
-    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f64()))
-            .verifyRegister(getTypeTable()->f64(), false, MIRID_INVALID);
+    MirOperandVerifier(builder.buildPhysReg(getTypeTable()->f64(), 4)).verifyRegister(getTypeTable()->f64(), false, 4);
 }
 
 TEST_F(OperandTest, RuntimeSymbol)

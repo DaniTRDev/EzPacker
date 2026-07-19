@@ -17,10 +17,10 @@ std::unique_ptr<MirLegalizer> Amd64Legalizer::create(Amd64TargetDesc *targetDesc
     return legalizer;
 }
 
-const std::vector<MirType *> Amd64Legalizer::getNativeSizes(MirBuilderContext *ctx) const
+const std::vector<size_t> Amd64Legalizer::getNativeSizes(MirBuilderContext *ctx) const
 {
     const auto &t = ctx->getTypeTable();
-    return { t->i8(), t->i16(), t->i32(), t->i64() };
+    return { t->i8()->getId(), t->i16()->getId(), t->i32()->getId(), t->i64()->getId(), MIRLEGALIZE_POINTER_TYPE };
 }
 
 void Amd64Legalizer::addDataMovement(MirBuilderContext *ctx, MirLegalizer *legalizer)
@@ -37,9 +37,8 @@ void Amd64Legalizer::addDataMovement(MirBuilderContext *ctx, MirLegalizer *legal
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i32()->getId(), MIRID_INVALID });
     legalizer->addRuleForCategory(legal, MirCat_DataMovement, { t->i64()->getId(), MIRID_INVALID });
 
-    for (auto &dest : sizes)
+    for (auto &destId : sizes)
     {
-        size_t destId = dest->getId();
         // Modernized token-bound signatures: [Token, PayloadType]
         legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
         legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
@@ -65,7 +64,7 @@ void Amd64Legalizer::addMemory(MirBuilderContext *ctx, MirLegalizer *legalizer)
     legalizer->addRule(legal, MirInstructionOpCode::LOAD, { t->i64()->getId(), MIRID_INVALID });
 
     // CREATE (Stack allocation / Alloca): Destination gets pointer size (i64 on x64)
-    legalizer->addRule(legal, MirInstructionOpCode::ALLOC, { t->i64()->getId() });
+    legalizer->addRule(legal, MirInstructionOpCode::ALLOC, { MIRLEGALIZE_TYPE_POINTER });
 }
 
 void Amd64Legalizer::addArithmetic(MirBuilderContext *ctx, MirLegalizer *legalizer)
@@ -74,9 +73,8 @@ void Amd64Legalizer::addArithmetic(MirBuilderContext *ctx, MirLegalizer *legaliz
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
     // x64 natively supports 8, 16, 32, and 64-bit scalar operations.
-    for (const auto &type : sizes)
+    for (const auto &sizeId : sizes)
     {
-        size_t sizeId = type->getId();
         legalizer->addRuleForCategory(legal, MirCat_Arithmetic, { sizeId, sizeId });
         // For unary operators like NEG which only have 1 operand:
         legalizer->addRule(legal, MirInstructionOpCode::NEG, { sizeId });
@@ -88,9 +86,8 @@ void Amd64Legalizer::addBitwise(MirBuilderContext *ctx, MirLegalizer *legalizer)
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
     const auto &sizes = getNativeSizes(ctx);
 
-    for (const auto &type : sizes)
+    for (const auto &sizeId : sizes)
     {
-        size_t sizeId = type->getId();
         // AND, OR, XOR, SHL, SHR, SAR
         legalizer->addRuleForCategory(legal, MirCat_Bitwise, { sizeId, sizeId });
         // NOT is Unary
@@ -103,9 +100,8 @@ void Amd64Legalizer::addCompare(MirBuilderContext *ctx, MirLegalizer *legalizer)
     const auto &sizes = getNativeSizes(ctx);
     LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
 
-    for (const auto &type : sizes)
+    for (const auto &sizeId : sizes)
     {
-        size_t sizeId = type->getId();
         // CMP and TEST check two operands of identical size.
         legalizer->addRuleForCategory(legal, MirCat_Compare, { sizeId, sizeId });
     }

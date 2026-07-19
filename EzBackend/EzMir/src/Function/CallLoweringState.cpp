@@ -1,7 +1,7 @@
 #include "Function/CallLoweringState.h"
 
-CallLoweringState::CallLoweringState(const std::list<PhysicalRegId> &usableGprs,
-                                     const std::list<PhysicalRegId> &usableFprs) :
+CallLoweringState::CallLoweringState(const std::vector<PhysicalRegId> &usableGprs,
+                                     const std::vector<PhysicalRegId> &usableFprs) :
     m_currentStackOffset(0), m_usableFprs(usableFprs), m_usableGprs(usableGprs)
 {
 }
@@ -12,7 +12,7 @@ bool CallLoweringState::allocateGpr(PhysicalRegId &outReg)
         return false;
 
     outReg = m_usableGprs.front();
-    m_usableGprs.pop_front();
+    m_usableGprs.erase(m_usableGprs.begin());
     m_allocatedGprs.push_back(outReg); // Tracks it as used
 
     return true;
@@ -24,7 +24,7 @@ bool CallLoweringState::allocateFpr(PhysicalRegId &outReg)
         return false;
 
     outReg = m_usableFprs.front();
-    m_usableFprs.pop_front();
+    m_usableFprs.erase(m_usableFprs.begin());
     m_allocatedFprs.push_back(outReg); // Tracks it as used
 
     return true;

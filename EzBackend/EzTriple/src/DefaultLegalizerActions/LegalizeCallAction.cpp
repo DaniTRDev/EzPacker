@@ -18,11 +18,34 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
      * First operand = return place / destination.
      */
     MirOperand *returnDest = operands[0];
+    MirType *retType = returnDest->getMirType();
 
-    // Every call now gets a unique call token to group its argument/return lifecycle.
+    MirFunction *func = instr->getOwner()->getOwner();
+    CallingConvDesc *cc = func->getCallingConv();
+    bool isSretCall = cc && !cc->canReturnInRegs(retType);
+
+    // Every call gets a unique call token to group its argument/return lifecycle.
     MirRegister *callToken = opBuilder.buildVReg(m_ctx->getTypeTable()->getBindingToken());
+    MirRegister *sretAddrReg = nullptr;
 
-    if (returnDest->isOfType<MirRegister>())
+    if (isSretCall)
+    {
+        // We need to allocate the data before actually passing it.
+        MirType *ptrType = m_ctx->getTypeTable()->getPtr(retType);
+        sretAddrReg = opBuilder.buildVReg(ptrType, "sret_alloc_ptr", instr->getSourceRef());
+
+        builder.ALLOC(instr->getSourceRef(), sretAddrReg);
+        auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "LegalizeCallAction");
+        diag << instr->getSourceRef() << "Moving CALL result value to SRET (indirect) pointer";
+        diag.appendNote("Target func: " + func->getName(), func->getSourceRef());
+        diag.appendNote("SRET ptr: " + sretAddrReg->getName(), instr->getSourceRef());
+
+        // Since this call uses SRET, the actual destination register receives data indirectly.
+        // Convert the CALL node to a tokenized tracking format.
+        operands[0] = callToken;
+        modifiedMir = true;
+    }
+    else if (returnDest->isOfType<MirRegister>())
     {
         // Insert POP_RET AFTER THE CALL, structurally tied to this call's token.
         builder.changeInsertionType(InsertionType::InsertAfter);
@@ -35,8 +58,7 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
     }
     else
     {
-        // For void functions or direct callee links, insert the callToken as an explicit operand at the beginning of
-        // the CALL's operand storage array.
+        // For void functions, place the callToken at index 0.
         operands.insert(operands.begin(), callToken);
         modifiedMir = true;
     }
@@ -45,10 +67,16 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
     // and the high-level call arguments begin at index 2.
     size_t startingId = 2;
 
-    // Insert PUSH_ARG instructions BEFORE THE CALL, each referencing the tracking token.
+    // Inject the implicit SRET pointer argument if required by the ABI
+    if (isSretCall && sretAddrReg)
+    {
+        builder.PUSH_ARG(instr->getSourceRef(), callToken, sretAddrReg);
+        modifiedMir = true;
+    }
+
+    // Insert PUSH_ARG instructions BEFORE THE CALL for all user arguments
     for (size_t i = startingId; i < operands.size(); ++i)
     {
-        // PUSH_ARG syntax updated to accept: (sourceRef, callToken, argValue)
         builder.PUSH_ARG(instr->getSourceRef(), callToken, operands[i]);
         modifiedMir = true;
     }

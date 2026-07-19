@@ -5,7 +5,7 @@
 
 /**
  * @class TestCallingConvention
- * @brief An adversarial, torture-test calling convention ("ChaosConv") designed to stress-test
+ * @brief A torture-test calling convention ("TestCallingConv") designed to stress-test
  * compiler lowering passes before moving to a production target architecture.
  *
  * Enforces strict alignment, intentional allocation discontinuities, and forced type slicing
@@ -15,13 +15,14 @@ class TestCallingConvention : public CallingConvDesc
 {
   public:
     /**
-     * Creates the calling convention by populating callee saved registers and caller saved registers.
-     * Sets up a small pool of volatile and preserved registers to force quick spills.
+     * Creates the calling convention by populating callee-saved and caller-saved register vectors.
+     * Sets up a small, highly restricted pool of volatile and preserved registers across
+     * both GPR and FPR spaces to trigger early spilling and slicing constraints.
      */
     TestCallingConvention();
 
     /**
-     * Returns the name identifying this testing ABI configuration ("TestCallingConvention").
+     * Returns the name identifying this testing ABI configuration ("TestCallingConv").
      */
     const char *getName() const override;
 
@@ -61,18 +62,35 @@ class TestCallingConvention : public CallingConvDesc
     size_t getShadowSpaceSize() const override;
 
     /**
-     * Gets the collection of target platform registers that must be preserved across frame calls.
+     * Returns the list of General Purpose Registers (GPRs) that must be preserved by the callee.
+     * @return Reference to the callee-saved GPR vector.
      */
-    const std::vector<PhysicalRegId> &getCalleeSavedRegs() const override;
+    const std::vector<PhysicalRegId> &getCalleeSavedGPRegs() const override;
 
     /**
-     * Gets the collection of target platform registers considered volatile across call bounds.
+     * Returns the list of Floating Point Registers (FPRs) that must be preserved by the callee.
+     * @return Reference to the callee-saved FPR vector.
      */
-    const std::vector<PhysicalRegId> &getCallerSavedRegs() const override;
+    const std::vector<PhysicalRegId> &getCalleeSavedFPRegs() const override;
+
+    /**
+     * Returns the list of General Purpose Registers (GPRs) that must be preserved by the caller.
+     * @return Reference to the caller-saved GPR vector.
+     */
+    const std::vector<PhysicalRegId> &getCallerSavedGPRegs() const override;
+
+    /**
+     * Returns the list of Floating Point Registers (FPRs) that must be preserved by the caller.
+     * @return Reference to the caller-saved FPR vector.
+     */
+    const std::vector<PhysicalRegId> &getCallerSavedFPRegs() const override;
 
   private:
-    std::vector<PhysicalRegId> m_callerSaved;
-    std::vector<PhysicalRegId> m_calleeSaved;
+    std::vector<PhysicalRegId> m_gprCallerSaved; ///< Volatile General Purpose Registers
+    std::vector<PhysicalRegId> m_fprCallerSaved; ///< Volatile Floating Point Registers
+
+    std::vector<PhysicalRegId> m_gprCalleeSaved; ///< Non-volatile General Purpose Registers
+    std::vector<PhysicalRegId> m_fprCalleeSaved; ///< Non-volatile Floating Point Registers
 };
 
 #endif // EZPACKER_TESTCALLINGCONVENTION_H

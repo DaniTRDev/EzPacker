@@ -12,8 +12,7 @@ class CallLoweringState
      * @param usableGprs
      * @param usableFprs
      */
-    CallLoweringState(const std::list<PhysicalRegId> &usableGprs,
-                      const std::list<PhysicalRegId> &usableFprs);
+    CallLoweringState(const std::vector<PhysicalRegId> &usableGprs, const std::vector<PhysicalRegId> &usableFprs);
 
     /**
      * Attempts to allocate the next available General Purpose Register.
@@ -72,8 +71,8 @@ class CallLoweringState
     int64_t m_currentStackOffset; // Current parameter stack frame offset (in bytes)
 
     // Pool of usable registers.
-    std::list<PhysicalRegId> m_usableFprs;
-    std::list<PhysicalRegId> m_usableGprs;
+    std::vector<PhysicalRegId> m_usableFprs;
+    std::vector<PhysicalRegId> m_usableGprs;
 
     // Record of registers allocated during this lowering state
     std::vector<PhysicalRegId> m_allocatedFprs;

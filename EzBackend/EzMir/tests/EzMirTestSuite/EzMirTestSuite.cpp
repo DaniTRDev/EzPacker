@@ -25,6 +25,9 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
     m_typeTable->initialize();
     m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->getVoidType(), "TEST");
 
+    m_diagCollector->builder(DiagnosticMessageType::Diag_Debug, "EzMirTestSuite")
+            << "Using default calling convention: " << m_callingConv->getName();
+
     if (!m_testFunction)
     {
         m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "EzMirTestSuite")

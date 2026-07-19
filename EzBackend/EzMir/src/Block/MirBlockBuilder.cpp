@@ -1,6 +1,7 @@
 #include "Block/MirBlockBuilder.h"
 
-MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock *> *owner) : m_ctx(ctx), m_owner(owner)
+MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock *> *owner) :
+    m_ctx(ctx), m_owner(owner), m_ownerFunc(nullptr)
 {
     if (!owner->empty())
     {
@@ -14,6 +15,7 @@ MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock
 MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) :
     MirBlockBuilder(ctx, owner->getBlocksPtr())
 {
+    m_ownerFunc = owner;
 }
 
 MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::string &name)
@@ -22,8 +24,11 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    MirBlock *block =
-            alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, std::pmr::list<MirInstruction *>(alloc), name);
+    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(),
+                                                 sourceRef,
+                                                 std::pmr::list<MirInstruction *>(alloc),
+                                                 m_ownerFunc,
+                                                 name);
 
     m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirBlockBuilder")
             << sourceRef << std::pmr::string(std::format("Built block with id: {}", block->getId()));

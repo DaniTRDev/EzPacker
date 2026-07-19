@@ -83,13 +83,15 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirRegister *buildVReg(MirType *type, std::pmr::string name = "", SourceReference *ref = nullptr);
 
     /**
-     * Creates a physical register with the given type, name and source reference.
+     * Creates a physical register with the given type, physical ID, name and source reference.
      * @param type
+     * @param physId
      * @param name
      * @param ref
      * @return
      */
-    MirRegister *buildPhysReg(MirType *type, std::pmr::string name = "", SourceReference *ref = nullptr);
+    MirRegister *
+    buildPhysReg(MirType *type, PhysicalRegId physId, std::pmr::string name = "", SourceReference *ref = nullptr);
 
     /**
      * Creates an indexed reference to a specific element within a global array variable.

@@ -3,8 +3,9 @@
 MirBlock::MirBlock(size_t id,
                    SourceReference *sourceRef,
                    std::pmr::list<MirInstruction *> instructions,
+                   class MirFunction *owner,
                    const std::pmr::string &name) :
-    m_id(id), m_sourceRef(sourceRef), m_instructions(std::move(instructions)), m_name(name)
+    m_owner(owner), m_id(id), m_sourceRef(sourceRef), m_instructions(std::move(instructions)), m_name(name)
 {
 }
 
@@ -19,9 +20,13 @@ MirInstruction *MirBlock::at(size_t index)
     return *it;
 }
 
+class MirFunction *MirBlock::getOwner() const { return m_owner; }
+
 size_t MirBlock::getId() const { return m_id; }
 
 SourceReference *MirBlock::getSourceRef() const { return m_sourceRef; }
+
+void MirBlock::setOwner(MirFunction *func) { m_owner = func; }
 
 std::pmr::list<MirInstruction *> &MirBlock::getInstructions() { return m_instructions; }
 

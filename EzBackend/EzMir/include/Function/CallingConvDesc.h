@@ -71,16 +71,28 @@ class CallingConvDesc
     virtual size_t getShadowSpaceSize() const = 0;
 
     /**
-     * Returns the list of registers that must be preserved by the callee.
+     * Returns the list of GPR registers that must be preserved by the callee.
      * @return
      */
-    virtual const std::vector<PhysicalRegId> &getCalleeSavedRegs() const = 0;
+    virtual const std::vector<PhysicalRegId> &getCalleeSavedGPRegs() const = 0;
 
     /**
-     * Returns the list of registers that needs to be preserved by the caller.
+     * Returns the list of FPR registers that must be preserved by the callee.
      * @return
      */
-    virtual const std::vector<PhysicalRegId> &getCallerSavedRegs() const = 0;
+    virtual const std::vector<PhysicalRegId> &getCalleeSavedFPRegs() const = 0;
+
+    /**
+     * Returns the list of GPR registers that needs to be preserved by the caller.
+     * @return
+     */
+    virtual const std::vector<PhysicalRegId> &getCallerSavedGPRegs() const = 0;
+
+    /**
+     * Returns the list of FPR registers that needs to be preserved by the caller.
+     * @return
+     */
+    virtual const std::vector<PhysicalRegId> &getCallerSavedFPRegs() const = 0;
 };
 
 #endif // EZPACKER_CALLINGCONVDESC_H

@@ -20,7 +20,12 @@ LegalizeAction *MirLegalizer::getAction(MirInstructionOpCode opcode, const std::
         }
     }
 
-    if (opcode == MirInstructionOpCode::CALL)
+    if (opcode == MirInstructionOpCode::ALLOC)
+    {
+        // Allocs are used to create temporal space for objects / arrays. We don't need to legalise them.
+        return MIRLEGALIZE_NO_ACTION;
+    }
+    else if (opcode == MirInstructionOpCode::CALL)
     {
         // A fully legalized call always looks like: [Token, Callee] (Exactly 2 operands).
         if (operands.size() != 2)
@@ -125,8 +130,20 @@ bool MirLegalizer::matchOperands(const LegalizationRule &rule, const std::pmr::v
     bool matched = true;
     for (size_t i = 0; i < operands.size(); i++)
     {
+        MirType *operandMirType = operands[i]->getMirType();
         size_t expectedType = rule.m_expectedOperandTypes[i];
-        size_t operandType = operands[i]->getMirType()->getId();
+        size_t operandType = operandMirType->getId();
+
+        if (expectedType == MIRLEGALIZE_POINTER_TYPE)
+        {
+            if (operandMirType->getKind() != MirTypeKind::Pointer)
+            {
+                matched = false;
+                break;
+            }
+
+            continue;
+        }
 
         if (expectedType != MIRID_INVALID && expectedType != operandType)
         {

@@ -11,15 +11,15 @@ class TestLegalizeCallAct : public MirTripleTestSuiteAsGtest
     {
         auto legalizer = MirTripleTestSuiteAsGtest::createTargetLegalizer();
         LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
-        std::vector<MirType *> sizes = { getTypeTable()->i8(),
-                                         getTypeTable()->i16(),
-                                         getTypeTable()->i32(),
-                                         getTypeTable()->i64() };
+        std::vector<size_t> sizes = { getTypeTable()->i8()->getId(),
+                                      getTypeTable()->i16()->getId(),
+                                      getTypeTable()->i32()->getId(),
+                                      getTypeTable()->i64()->getId(),
+                                      MIRLEGALIZE_POINTER_TYPE };
 
         for (const auto &dest : sizes)
         {
-            size_t destId = dest->getId();
-            legalizer->addRule(legal, MirInstructionOpCode::POP_ARG, { destId, MIRID_INVALID });
+            legalizer->addRule(legal, MirInstructionOpCode::POP_ARG, { dest, MIRID_INVALID });
         }
 
         return legalizer;
@@ -64,7 +64,7 @@ TEST_F(TestLegalizeCallAct, TestCall1Arg)
     std::pmr::list<MirRegister *> paramList = { opBuilder.buildVReg(t->i8()) };
 
     MirFunctionBuilder functionBuilder(getBuilderCtx());
-    for(auto param : paramList)
+    for (auto param : paramList)
     {
         functionBuilder.buildParam(param);
     }
@@ -109,7 +109,7 @@ TEST_F(TestLegalizeCallAct, TestCall4Arg)
                                                 opBuilder.buildVReg(t->i64()) };
 
     MirFunctionBuilder functionBuilder(getBuilderCtx());
-    for(auto param : paramList)
+    for (auto param : paramList)
     {
         functionBuilder.buildParam(param);
     }

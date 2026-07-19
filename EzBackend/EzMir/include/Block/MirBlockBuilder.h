@@ -16,7 +16,7 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
     MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock *> *owner);
 
     /**
-     * Creates a block builder attached to the given block list.
+     * Creates a block builder attached to the given func.
      * @param ctx
      */
     MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner);
@@ -39,6 +39,7 @@ class MirBlockBuilder : public MirBuilder<MirBlock>
 
   private:
     MirBuilderContext *m_ctx;
+    MirFunction *m_ownerFunc;
     std::pmr::list<MirBlock *> *m_owner;
     MirInstructionInsertionPoint m_insertPoint; // The insertion point of the created block.
 };

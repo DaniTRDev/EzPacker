@@ -2,10 +2,14 @@
 
 TestCallingConvention::TestCallingConvention()
 {
-    // Setup a small, volatile pool for stress-testing
-    // Assuming physical register IDs 1-3 are GPRs, 4-5 are FPRs for your test target
-    m_callerSaved = { PhysicalRegId(1), PhysicalRegId(2), PhysicalRegId(4) };
-    m_calleeSaved = { PhysicalRegId(3), PhysicalRegId(5) };
+    // Populate distinct, constrained register pools for robust stress-testing.
+    // GPRs: 1, 2 (Caller-saved/Volatile), 3 (Callee-saved/Preserved)
+    m_gprCallerSaved = { PhysicalRegId(1), PhysicalRegId(2) };
+    m_gprCalleeSaved = { PhysicalRegId(3) };
+
+    // FPRs: 4 (Caller-saved/Volatile), 5 (Callee-saved/Preserved)
+    m_fprCallerSaved = { PhysicalRegId(4) };
+    m_fprCalleeSaved = { PhysicalRegId(5) };
 }
 
 const char *TestCallingConvention::getName() const { return "TestCallingConvention"; }
@@ -69,16 +73,16 @@ ArgumentLocationDesc TestCallingConvention::getReturnLoc(MirType *type, CallLowe
 
     if (!canReturnInRegs(type))
     {
-        // Indirect SRET pointer assignment: Expect it in GPR 1 (e.g., RAX equivalent)
+        // Indirect SRET pointer assignment: Expect it in GPR 1 (matching pool boundary)
         return ArgumentLocationDesc::Indirect(true, sizeBytes, PhysicalRegId(1));
     }
 
     if (type->getKind() == MirTypeKind::FloatingPoint)
     {
-        return ArgumentLocationDesc::Reg(PhysicalRegId(4), sizeBytes); // Fixed return FPR
+        return ArgumentLocationDesc::Reg(PhysicalRegId(4), sizeBytes); // Fixed return FPR (Volatile Pool)
     }
 
-    return ArgumentLocationDesc::Reg(PhysicalRegId(1), sizeBytes); // Fixed return GPR
+    return ArgumentLocationDesc::Reg(PhysicalRegId(1), sizeBytes); // Fixed return GPR (Volatile Pool)
 }
 
 bool TestCallingConvention::canReturnInRegs(MirType *type) const
@@ -92,5 +96,10 @@ bool TestCallingConvention::isCalleeCleanup() const { return false; }
 size_t TestCallingConvention::getStackAlignment() const { return 32; }
 size_t TestCallingConvention::getShadowSpaceSize() const { return 24; }
 
-const std::vector<PhysicalRegId> &TestCallingConvention::getCalleeSavedRegs() const { return m_calleeSaved; }
-const std::vector<PhysicalRegId> &TestCallingConvention::getCallerSavedRegs() const { return m_callerSaved; }
+const std::vector<PhysicalRegId> &TestCallingConvention::getCalleeSavedGPRegs() const { return m_gprCalleeSaved; }
+
+const std::vector<PhysicalRegId> &TestCallingConvention::getCalleeSavedFPRegs() const { return m_fprCalleeSaved; }
+
+const std::vector<PhysicalRegId> &TestCallingConvention::getCallerSavedGPRegs() const { return m_gprCallerSaved; }
+
+const std::vector<PhysicalRegId> &TestCallingConvention::getCallerSavedFPRegs() const { return m_fprCallerSaved; }

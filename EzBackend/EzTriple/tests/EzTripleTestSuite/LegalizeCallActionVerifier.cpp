@@ -84,3 +84,61 @@ LegalizeCallActionVerifier::verifyCallSequence(std::pmr::list<MirInstruction *>:
 
     return *this;
 }
+
+LegalizeCallActionVerifier &
+LegalizeCallActionVerifier::verifySretCallSequence(std::pmr::list<MirInstruction *>::iterator startIt,
+                                                   const std::vector<MirOperand *> &origOperands)
+{
+    // The original layout configuration is expected to match: [DestReg, CalleeTarget, UserArgs...]
+    EXPECT_GE(origOperands.size(), 2)
+            << "SRET source signature vector needs at least a Dest and Callee target reference.";
+
+    MirOperand *highLevelDest = origOperands[0];
+    MirOperand *calleeRef = origOperands[1];
+
+    auto it = startIt;
+
+    // 1. Verify the temporary allocation block for the structural output footprint
+    MirInstruction *allocInstr = *it;
+    EXPECT_EQ(allocInstr->getOpCode(), MirInstructionOpCode::ALLOC)
+            << "SRET lowering sequence must initiate by emitting a stack frame ALLOC node!";
+
+    MirRegister *sretAllocPtr = allocInstr->getOperands()[0]->get<MirRegister>();
+    EXPECT_TRUE(sretAllocPtr->getMirType()->getKind() == MirTypeKind::Pointer)
+            << "The ALLOC node destination must define a valid pointer handle tracking type.";
+
+    // 2. Advance to verify the implicit address token pointer PUSH_ARG node
+    ++it;
+    MirInstruction *implicitPush = *it;
+    EXPECT_EQ(implicitPush->getOpCode(), MirInstructionOpCode::PUSH_ARG)
+            << "Missing primary argument PUSH_ARG matching the hidden SRET reference address.";
+
+    MirRegister *callToken = implicitPush->getOperands()[0]->get<MirRegister>();
+    EXPECT_EQ(implicitPush->getOperands()[1], sretAllocPtr)
+            << "The implicit PUSH_ARG must forward the register assigned by our ALLOC marker.";
+
+    // 3. Verify user arguments are mapped to sequential PUSH_ARG instructions bound to the identical callToken
+    for (size_t i = 2; i < origOperands.size(); ++i)
+    {
+        ++it;
+        MirInstruction *userPush = *it;
+        EXPECT_EQ(userPush->getOpCode(), MirInstructionOpCode::PUSH_ARG);
+        EXPECT_EQ(userPush->getOperands()[0]->get<MirRegister>(), callToken)
+                << "User arguments must utilize the identical binding call token.";
+        EXPECT_EQ(userPush->getOperands()[1], origOperands[i])
+                << "Mismatched argument payload passed into the linearized push sequence stream.";
+    }
+
+    // 4. Verify the terminal CALL instruction layout structure adjustment
+    ++it;
+    MirInstruction *callInstr = *it;
+    EXPECT_EQ(callInstr->getOpCode(), MirInstructionOpCode::CALL);
+    EXPECT_EQ(callInstr->getOperands()[0]->get<MirRegister>(), callToken)
+            << "The CALL operation operand 0 must capture the grouping tracking token.";
+    EXPECT_EQ(callInstr->getOperands()[1], calleeRef)
+            << "Mismatched callee reference target identifier bound into structural execution.";
+    EXPECT_EQ(callInstr->getOperands().size(), 2)
+            << "The internalized CALL layout must contain strictly 2 tracking values post legalization pruning.";
+
+    return *this;
+}

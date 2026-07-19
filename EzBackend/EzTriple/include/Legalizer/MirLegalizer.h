@@ -19,6 +19,7 @@ struct LegalizationRule
 };
 
 inline LegalizeAction *MIRLEGALIZE_NO_ACTION = reinterpret_cast<LegalizeAction *>(-1);
+inline MirId MIRLEGALIZE_POINTER_TYPE = static_cast<MirId>(-1); // Used to make the legalizer detect pointer types.
 
 class MirLegalizer
 {
@@ -46,7 +47,10 @@ class MirLegalizer
     LegalizeAction *getAction(MirInstructionOpCode opcode, const std::pmr::vector<MirOperand *> &operands);
 
     /**
-     * Adds a rule that executes an action on a match.
+     * Adds a rule that executes an action on a match. If any element of expectedOperandTypes is:
+     *  - MIRID_INVALID, this operand will be skipped.
+     *  - MIRLEGALIZE_POINTER_TYPE, this operand will only return a match if the type is a pointer type, no matter the
+     *    pointee.
      * @param action
      * @param opcode
      * @param expectedOperandTypes
@@ -54,7 +58,7 @@ class MirLegalizer
     void addRule(LegalizeAction *action, MirInstructionOpCode opcode, std::vector<size_t> expectedOperandTypes);
 
     /**
-     * Adds a rule for EVERY INSTRUCTION inside the category.
+     * Adds a rule for EVERY INSTRUCTION inside the category. See addRule for more information.
      * @param action
      * @param category
      * @param expectedOperandTypes

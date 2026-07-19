@@ -8,18 +8,25 @@ class MirBlock
 {
   public:
     /**
-     * Creates a block wrapper around an existing instruction slice.
+     * Creates a block wrapper around an existing instruction slice. A block may or may not have a function owner.
      *
      * @param id Unique MIR ID for this block. `0` is reserved as invalid by convention, so callers typically pass an ID
      * produced by `MirBuilderContext::createId()`.
      * @param sourceRef Source reference that originated this block.
      * @param instructions Arena-managed instruction slice associated with this block.
+     * @param owner
      * @param name
      */
     MirBlock(size_t id,
              SourceReference *sourceRef,
              std::pmr::list<MirInstruction *> instructions,
+             class MirFunction *owner = nullptr,
              const std::pmr::string &name = "");
+
+    /**
+     * Returns the owner of this block.
+     */
+    class MirFunction *getOwner() const;
 
     /**
      * Returns the instruction at given index. If index is out of bounds or invalid, nullptr is returned.
@@ -38,6 +45,11 @@ class MirBlock
      * @return
      */
     SourceReference *getSourceRef() const;
+
+    /**
+     * Sets the owning function of this block.
+     */
+    void setOwner(MirFunction *func);
 
     /**
      * Returns the mutable instruction slice for this block.
@@ -64,6 +76,7 @@ class MirBlock
     const std::pmr::string &getName() const;
 
   private:
+    class MirFunction *m_owner;
     size_t m_id;
     SourceReference *m_sourceRef;
     std::pmr::list<MirInstruction *> m_instructions; // Arena-managed linked list of instructions.

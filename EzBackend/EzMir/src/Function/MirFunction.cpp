@@ -20,6 +20,8 @@ MirFunction::MirFunction(CallingConvDesc *callingConv,
     }
 }
 
+CallingConvDesc *MirFunction::getCallingConv() const { return m_callingConv; }
+
 MirBlock *MirFunction::getBlock(MirId id) const
 {
     auto it = m_blockIdToBlock.find(id);

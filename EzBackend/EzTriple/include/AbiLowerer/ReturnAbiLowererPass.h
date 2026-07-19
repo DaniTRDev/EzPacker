@@ -2,7 +2,6 @@
 #define EZPACKER_RETURNABILOWERERPASS_H
 
 #include "EzTripleCommon.h"
-#include "Descriptors/ABIDesc.h"
 
 /**
  * This pass lowers the return chain (PUSH_RET/RET) into phyiscal places using target's ABI and calling convention.
@@ -22,20 +21,20 @@ class ReturnAbiLowerer : public IMirTransformPass
     const char *getName() const override;
 
     /**
-     * Returns MirPassIterationPlace::Block.
+     * Returns MirPassIterationPlace::Function.
      * @return
      */
     MirPassIterationPlace getIterationPlace() const override;
 
     /**
-     * Runs the pass in the given block and returns the result.
-     * @param instrList
+     * Runs the pass in the given function and returns the result.
+     * @param funcList
      * @param it
      * @param passManager
      * @return
      */
-    MirPassResult run(std::pmr::list<MirBlock *> &funcList,
-                      std::pmr::list<MirBlock *>::iterator it,
+    MirPassResult run(std::pmr::list<MirFunction *> &funcList,
+                      std::pmr::list<MirFunction *>::iterator it,
                       MirPassManager *passManager) override;
 
     /**
@@ -44,6 +43,24 @@ class ReturnAbiLowerer : public IMirTransformPass
     void printResult() const override;
 
   private:
+    /**
+     * Process the given block of PUSH_RET instructions and modifies it to follow CallingConvention's guidelines.
+     * @param cc
+     * @param targetBlock
+     * @param func
+     * @param retType
+     * @param it
+     * @param retBlock
+     */
+    bool processReturnBlock(CallingConvDesc *cc,
+                            MirBlock *targetBlock,
+                            MirFunction *func,
+                            MirType *retType,
+                            std::pmr::list<MirInstruction *>::iterator it,
+                            std::pmr::vector<MirInstruction *> &retBlock);
+
+  private:
+    MirBuilderContext *m_ctx;
 };
 
 #endif // EZPACKER_RETURNABILOWERERPASS_H

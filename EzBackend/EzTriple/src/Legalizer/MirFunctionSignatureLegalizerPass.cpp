@@ -24,6 +24,20 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(std::pmr::list<MirFunction 
                                   entryPoint,
                                   InsertionType::InsertBefore,
                                   entryPoint->getInstructions().begin());
+    MirOperandBuilder opBuilder(m_ctx);
+
+    CallingConvDesc *cc = func->getCallingConv();
+    if (!cc->canReturnInRegs(func->getReturnType()))
+    {
+        // Allocate a hidden, implicit pointer register. This will store the memory address supplied by the caller where
+        // we write the output struct.
+        MirType *ptrType = m_ctx->getTypeTable()->getPtr(func->getReturnType());
+        MirRegister *sretPtrParam = opBuilder.buildVReg(ptrType, "sret_ptr", func->getSourceRef());
+
+        // Prepend this implicit argument directly to the front of the declaration parameter slice
+        func->getParameters().push_front(sretPtrParam);
+        modified = true;
+    }
 
     for (MirRegister *param : func->getParameters())
     {

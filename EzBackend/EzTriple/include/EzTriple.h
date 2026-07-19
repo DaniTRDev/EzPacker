@@ -10,7 +10,6 @@
 #include "DefaultLegalizerActions/LegalizeReturnAction.h"
 #include "DefaultLegalizerActions/PromoteScalarAction.h"
 
-#include "Descriptors/ABIDesc.h"
 #include "Descriptors/TargetDesc.h"
 
 #include "ExpansionRecipe/ExpansionRecipe.h"

@@ -6,7 +6,6 @@ set(EZTRIPLE_FILES_LIST
         "include/DefaultLegalizerActions/LegalizeCallAction.h"
         "include/DefaultLegalizerActions/LegalizeReturnAction.h"
         "include/DefaultLegalizerActions/PromoteScalarAction.h"
-        "include/Descriptors/ABIDesc.h"
         "include/Descriptors/TargetDesc.h"
         "include/ExpansionRecipe/ExpansionRecipe.h"
         "include/Legalizer/LegalizeAction.h"

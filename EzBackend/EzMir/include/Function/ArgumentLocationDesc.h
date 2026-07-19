@@ -38,6 +38,7 @@ struct StackLoc
  *      int x;
  *      float y;
  * };
+ * 
  * FOR x ->
  * SplitLoc[0].m_regId = GPR
  * SplitLoc[0].m_sizeBytes = 4
