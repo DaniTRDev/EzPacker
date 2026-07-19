@@ -15,6 +15,7 @@
 #include "ExpansionRecipe/ExpansionRecipe.h"
 
 #include "Legalizer/LegalizeAction.h"
+#include "Legalizer/LegalizeRuleBuilder.h"
 #include "Legalizer/MirLegalizer.h"
 #include "Legalizer/MirBlockLegalizerPass.h"
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"

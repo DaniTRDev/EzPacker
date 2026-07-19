@@ -4,6 +4,7 @@
 #include "EzTriple.h"
 #include "EzMirTestSuite.h"
 #include "EzTripleTestTargetDescriptor.h"
+#include "EzTripleTestLegalizer.h"
 #include "ExpandScalarActionVerifier.h"
 #include "FuncSignaturePassVerifier.h"
 #include "LegalizeCallActionVerifier.h"
@@ -28,26 +29,6 @@ class EzTripleTestSuite : public EzMirTestSuite
      * @return TargetLegalizerType*
      */
     MirLegalizer *getLegalizer() const;
-
-    /**
-     * Adds a rule that executes an action on a match for the test legalizer. It internally uses MirLegalizer's method,
-     * exposed for convenience.
-     * @param action
-     * @param opcode
-     * @param expectedOperandTypes
-     */
-    void addRule(LegalizeAction *action, MirInstructionOpCode opcode, std::vector<size_t> expectedOperandTypes);
-
-    /**
-     * Adds a rule for EVERY INSTRUCTION inside the category. It internally uses MirLegalizer's method, exposed for
-     * convenience.
-     * @param action
-     * @param category
-     * @param expectedOperandTypes
-     */
-    void addRuleForCategory(LegalizeAction *action,
-                            MirInstructionCategory category,
-                            std::vector<size_t> expectedOperandTypes);
 
     /**
      * Creates common pointers used in test cases. Also calls EzMirTestSuite::create.

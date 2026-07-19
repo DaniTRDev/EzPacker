@@ -9,6 +9,7 @@ set(EZTRIPLE_FILES_LIST
         "include/Descriptors/TargetDesc.h"
         "include/ExpansionRecipe/ExpansionRecipe.h"
         "include/Legalizer/LegalizeAction.h"
+        "include/Legalizer/LegalizeRuleBuilder.h"
         "include/Legalizer/MirBlockLegalizerPass.h"
         "include/Legalizer/MirFunctionSignatureLegalizerPass.h"
         "include/Legalizer/MirLegalizer.h"
@@ -18,6 +19,7 @@ set(EZTRIPLE_FILES_LIST
         "src/DefaultLegalizerActions/LegalizeCallAction.cpp"
         "src/DefaultLegalizerActions/LegalizeReturnAction.cpp"
         "src/DefaultLegalizerActions/PromoteScalarAction.cpp"
+        "src/Legalizer/LegalizeRuleBuilder.cpp"
         "src/Legalizer/MirBlockLegalizerPass.cpp"
         "src/Legalizer/MirFunctionSignatureLegalizerPass.cpp"
         "src/Legalizer/MirLegalizer.cpp"
@@ -26,6 +28,7 @@ set(EZTRIPLE_FILES_LIST
 set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.h"
         "tests/EzTripleTestSuite/EzTripleTestExpansionRecipe.h"
+        "tests/EzTripleTestSuite/EzTripleTestLegalizer.h"
         "tests/EzTripleTestSuite/EzTripleTestSuite.h"
         "tests/EzTripleTestSuite/EzTripleTestTargetDescriptor.h"
         "tests/EzTripleTestSuite/FuncSignaturePassVerifier.h"
@@ -34,6 +37,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.h"
 
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.cpp"
+        "tests/EzTripleTestSuite/EzTripleTestLegalizer.cpp"
         "tests/EzTripleTestSuite/EzTripleTestSuite.cpp"
         "tests/EzTripleTestSuite/FuncSignaturePassVerifier.cpp"
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.cpp"

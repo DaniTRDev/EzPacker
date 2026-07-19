@@ -22,16 +22,16 @@ MirPassResult MirBlockLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
         for (; instrIt != instructions.end(); instrIt++)
         {
             MirInstruction *instr = *instrIt;
-            LegalizeAction *action = m_legalizer->getAction(instr->getOpCode(), instr->getOperands());
+            LegalizeAction *action = m_legalizer->getAction(instr);
 
-            if (action == MIRLEGALIZE_NO_ACTION)
+            if (action == LegalAction)
             {
                 auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
                 log << "LEGAL";
                 log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
                                instr->getSourceRef());
             }
-            else if (action == nullptr)
+            else if (action == IlegalAction)
             {
                 auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
                 log << "Could not get action for instr";

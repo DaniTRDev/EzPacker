@@ -3,27 +3,6 @@
 class TestLegalizeCallAct : public MirTripleTestSuiteAsGtest
 {
   public:
-    /**
-     * Creates a simple legalizer.
-     * @return
-     */
-    std::shared_ptr<MirLegalizer> createTargetLegalizer() override
-    {
-        auto legalizer = MirTripleTestSuiteAsGtest::createTargetLegalizer();
-        LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
-        std::vector<size_t> sizes = { getTypeTable()->i8()->getId(),
-                                      getTypeTable()->i16()->getId(),
-                                      getTypeTable()->i32()->getId(),
-                                      getTypeTable()->i64()->getId(),
-                                      MIRLEGALIZE_POINTER_TYPE };
-
-        for (const auto &dest : sizes)
-        {
-            legalizer->addRule(legal, MirInstructionOpCode::POP_ARG, { dest, MIRID_INVALID });
-        }
-
-        return legalizer;
-    }
 };
 
 TEST_F(TestLegalizeCallAct, TestCallNoArgs)

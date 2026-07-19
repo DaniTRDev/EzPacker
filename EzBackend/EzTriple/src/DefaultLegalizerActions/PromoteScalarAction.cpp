@@ -25,10 +25,10 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
 
         if (!promotedType)
         {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "PromoteScalarAction")
-                    << "Unknown promotion type for operand" << operand->getSourceRef();
+            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                    << "Unknown promotion type for operand, skipping" << operand->getSourceRef();
 
-            return { .m_executed = true, .m_succeeded = false, .m_mirChanged = modifiedMir };
+            continue;
         }
 
         if (origType->getId() == promotedType->getId())

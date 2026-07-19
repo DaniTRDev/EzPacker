@@ -3,23 +3,30 @@
 
 #include "EzTripleCommon.h"
 #include "LegalizeAction.h"
-#include "DefaultLegalizerActions/PromoteScalarAction.h"
+#include "DefaultLegalizerActions/ExpandScalarAction.h"
 #include "DefaultLegalizerActions/LegalizeCallAction.h"
 #include "DefaultLegalizerActions/LegalizeReturnAction.h"
-#include "DefaultLegalizerActions/ExpandScalarAction.h"
+#include "DefaultLegalizerActions/PromoteScalarAction.h"
 
-struct LegalizationRule
+/**
+ * This struct contains what's going to be checked to apply a legalization rule or not. This might be expanded in a
+ * future to take in account more things.
+ */
+struct LegalizeRuleOperand
 {
-    LegalizeAction *m_action;
-    std::vector<size_t> m_expectedOperandTypes; /**
-                                                 * List of MirType id's that are expected for this instruction. Only
-                                                 * the types specified here will be checked. If id == MIRID_INVALID,
-                                                 * it will be skipped.
-                                                 */
+    MirBuilderContext *m_ctx{ nullptr };
+    MirInstruction *m_instr{ nullptr };
 };
 
-inline LegalizeAction *MIRLEGALIZE_NO_ACTION = reinterpret_cast<LegalizeAction *>(-1);
-inline MirId MIRLEGALIZE_POINTER_TYPE = static_cast<MirId>(-1); // Used to make the legalizer detect pointer types.
+using LegalizeRulePredicate = std::function<bool(const LegalizeRuleOperand &op)>;
+inline LegalizeAction *LegalAction = reinterpret_cast<LegalizeAction *>(0);
+inline LegalizeAction *IlegalAction = reinterpret_cast<LegalizeAction *>(-1);
+
+struct LegalizeRule
+{
+    LegalizeAction *m_act; // Executed if m_predicate returns true.
+    LegalizeRulePredicate m_predicate;
+};
 
 class MirLegalizer
 {
@@ -32,49 +39,38 @@ class MirLegalizer
     MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc);
 
     /**
-     * Gets the specific action (set through addRule) for a specific combo of opcode + operands types. Returns
-     * MIRLEGALIZE_NO_ACTION if the legalizer mark this combo as LEGAL.
-     *
-     * If there's no action set for this combo, a default action will try to be invoked:
-     *  - Promotion
-     *  - Expansion
-     *  - LegalizeCall, ONLY FOR CALL INSTRUCTIONS.
-     *  - LegalizeReturn, ONLY FOR RETURN INSTRUCTIONS.
-     * @param opcode
-     * @param operands
-     * @return
+     * Returns a pointer to the expand scalar action.
      */
-    LegalizeAction *getAction(MirInstructionOpCode opcode, const std::pmr::vector<MirOperand *> &operands);
+    ExpandScalarAction *getExpandScalarAction();
 
     /**
-     * Adds a rule that executes an action on a match. If any element of expectedOperandTypes is:
-     *  - MIRID_INVALID, this operand will be skipped.
-     *  - MIRLEGALIZE_POINTER_TYPE, this operand will only return a match if the type is a pointer type, no matter the
-     *    pointee.
-     * @param action
-     * @param opcode
-     * @param expectedOperandTypes
+     * Gets the specific action for a specific instruction.
+     * Returns:
+     *  - LegalAction if the legalizer mark this instruction as LEGAL.
+     *  - IlegalAction if the legalizer doesn't know what to do with this instruction.
+     *  - Another action if the legalizer knows how to transform this illegal instruction into a legal one.
      */
-    void addRule(LegalizeAction *action, MirInstructionOpCode opcode, std::vector<size_t> expectedOperandTypes);
+    LegalizeAction *getAction(MirInstruction *instr);
 
     /**
-     * Adds a rule for EVERY INSTRUCTION inside the category. See addRule for more information.
-     * @param action
-     * @param category
-     * @param expectedOperandTypes
+     * Returns the action used to legalize calls.
      */
-    void addRuleForCategory(LegalizeAction *action,
-                            MirInstructionCategory category,
-                            std::vector<size_t> expectedOperandTypes);
+    LegalizeCallAction *getCallAct();
 
-  private:
     /**
-     * Returns true if the given opcode and set of operands matches the given rule's restrictions.
-     * @param rule
-     * @param operands
-     * @return
+     * Returns the action used to legalize returns.
      */
-    bool matchOperands(const LegalizationRule &rule, const std::pmr::vector<MirOperand *> &operands);
+    LegalizeReturnAction *getReturnAct();
+
+    /**
+     * Returns a pointer to the promote scalar action.
+     */
+    PromoteScalarAction *getPromoteScalarAction();
+
+    /**
+     * Sets the rules of an opcode. This will OVERWRITE any other set of rules.
+     */
+    void addRule(MirInstructionOpCode opcode, std::pmr::vector<LegalizeRule> rules);
 
   private:
     // Define the default actions linked to the target and context.
@@ -86,8 +82,9 @@ class MirLegalizer
   private:
     MirBuilderContext *m_ctx;
     TargetDesc *m_targetDesc;
+
     // Make searches faster by sorting the rules based on the opcode.
-    std::map<MirInstructionOpCode, std::vector<LegalizationRule>> m_rules;
+    std::map<MirInstructionOpCode, std::pmr::vector<LegalizeRule>> m_rules;
 };
 
 #endif // EZPACKER_MIRLEGALIZER_H

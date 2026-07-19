@@ -3,37 +3,6 @@
 class TestPromoteScalarAct : public MirTripleTestSuiteAsGtest
 {
   public:
-    /**
-     * Creates a simple legalizer.
-     * @return
-     */
-    std::shared_ptr<MirLegalizer> createTargetLegalizer() override
-    {
-        auto legalizer = MirTripleTestSuiteAsGtest::createTargetLegalizer();
-        LegalizeAction *legal = MIRLEGALIZE_NO_ACTION;
-        std::vector<size_t> sizes = { getTypeTable()->i8()->getId(),
-                                      getTypeTable()->i16()->getId(),
-                                      getTypeTable()->i32()->getId(),
-                                      getTypeTable()->i64()->getId(),
-                                      MIRLEGALIZE_POINTER_TYPE };
-
-        size_t tokenTypeId = getTypeTable()->getBindingToken()->getId();
-
-        // Extension instructions must act as a bridge between illegal and legal types, we need to legal them on every
-        // SRC case.
-        for (const auto &destId : sizes)
-        {
-            legalizer->addRule(legal, MirInstructionOpCode::ZEXT, { destId, MIRID_INVALID });
-            legalizer->addRule(legal, MirInstructionOpCode::SEXT, { destId, MIRID_INVALID });
-            legalizer->addRule(legal, MirInstructionOpCode::TRUNC, { destId, MIRID_INVALID });
-            legalizer->addRule(legal, MirInstructionOpCode::BITCAST, { destId, MIRID_INVALID });
-            legalizer->addRule(legal, MirInstructionOpCode::PUSH_ARG, { tokenTypeId, destId });
-            legalizer->addRule(legal, MirInstructionOpCode::POP_RET, { tokenTypeId, destId });
-            legalizer->addRule(legal, MirInstructionOpCode::PUSH_RET, { tokenTypeId, destId });
-        }
-
-        return legalizer;
-    }
 };
 
 TEST_F(TestPromoteScalarAct, PromoteSingleBitRegSrc)

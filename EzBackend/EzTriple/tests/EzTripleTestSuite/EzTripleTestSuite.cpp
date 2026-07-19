@@ -4,22 +4,6 @@ TargetDesc *EzTripleTestSuite::getTargetDesc() const { return m_targetDesc.get()
 
 MirLegalizer *EzTripleTestSuite::getLegalizer() const { return m_legalizer.get(); }
 
-void EzTripleTestSuite::addRule(LegalizeAction *action,
-                                MirInstructionOpCode opcode,
-                                std::vector<size_t> expectedOperandTypes)
-{
-    EXPECT_NE(m_legalizer.get(), nullptr);
-    m_legalizer->addRule(action, opcode, std::move(expectedOperandTypes));
-}
-
-void EzTripleTestSuite::addRuleForCategory(LegalizeAction *action,
-                                           MirInstructionCategory category,
-                                           std::vector<size_t> expectedOperandTypes)
-{
-    EXPECT_NE(m_legalizer.get(), nullptr);
-    m_legalizer->addRuleForCategory(action, category, expectedOperandTypes);
-}
-
 void EzTripleTestSuite::create(const std::filesystem::path &workingPath) { EzMirTestSuite::create(workingPath); }
 
 void EzTripleTestSuite::destroy()
@@ -53,5 +37,8 @@ std::shared_ptr<TargetDesc> MirTripleTestSuiteAsGtest::createTargetDesc()
 
 std::shared_ptr<MirLegalizer> MirTripleTestSuiteAsGtest::createTargetLegalizer()
 {
-    return std::make_shared<MirLegalizer>(getBuilderCtx(), getTargetDesc());
+    std::shared_ptr<MirLegalizer> legalizer = std::make_shared<MirLegalizer>(getBuilderCtx(), getTargetDesc());
+    EzTripleTestLegalizer::create(getBuilderCtx(), legalizer.get());
+
+    return legalizer;
 }

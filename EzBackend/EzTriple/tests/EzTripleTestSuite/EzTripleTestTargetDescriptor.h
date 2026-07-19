@@ -77,10 +77,6 @@ class EzTripleTestTargetDesc : public TargetDesc
              */
             return t->f64();
         }
-        else if (type->getKind() == MirTypeKind::BindingToken)
-        {
-            return type;
-        }
 
         return nullptr;
     }
