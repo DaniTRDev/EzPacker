@@ -4,7 +4,7 @@
 #include "EzTriple.h"
 #include "EzMirTestSuite.h"
 
-class ReturnAbiLowererVerifier : public MirPassVerifier<ReturnAbiLowerer, ReturnAbiLowererVerifier>
+class ReturnAbiLowererVerifier : public MirPassVerifier<FunctionAbiLowererPass, ReturnAbiLowererVerifier>
 {
   public:
     /**
@@ -12,7 +12,7 @@ class ReturnAbiLowererVerifier : public MirPassVerifier<ReturnAbiLowerer, Return
      * @param ctx
      * @param pass
      */
-    ReturnAbiLowererVerifier(MirBuilderContext *ctx, ReturnAbiLowerer *pass);
+    ReturnAbiLowererVerifier(MirBuilderContext *ctx, FunctionAbiLowererPass *pass);
 
     /**
      * Verifies that the return path at retIt was correctly lowered into ABI-compliant physical boundaries.

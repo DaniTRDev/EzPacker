@@ -1,12 +1,13 @@
 #include "Type/MirType.h"
 
 MirType::MirType(MirTypeKind kind,
+                 class MirTypeTable *owner,
                  size_t id,
                  size_t maxAlignmentInBytes,
                  size_t totalSize,
                  std::pmr::string name,
                  std::pmr::vector<MirType *> subTypes) :
-    m_kind(kind), m_id(id), m_maxAlignmentInBytes(maxAlignmentInBytes), m_totalSizeInBits(totalSize),
+    m_kind(kind), m_owner(owner), m_id(id), m_maxAlignmentInBytes(maxAlignmentInBytes), m_totalSizeInBits(totalSize),
     m_subTypes(subTypes), m_name(name)
 {
 }
@@ -30,6 +31,8 @@ MirType *MirType::getPointedType() const
 }
 
 MirTypeKind MirType::getKind() const { return m_kind; }
+
+class MirTypeTable *MirType::getOwner() const { return m_owner; }
 
 size_t MirType::getArrayElementCount() const
 {

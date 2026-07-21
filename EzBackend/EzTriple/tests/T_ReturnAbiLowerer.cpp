@@ -5,9 +5,6 @@ class TestReturnAbiLowererPass : public MirTripleTestSuiteAsGtest
   public:
 };
 
-// =========================================================================
-// 1. VOID RETURN TEST
-// =========================================================================
 TEST_F(TestReturnAbiLowererPass, LowerVoidReturn)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
@@ -23,17 +20,13 @@ TEST_F(TestReturnAbiLowererPass, LowerVoidReturn)
     MirRegister *retToken = oBuilder.buildVReg(t->getBindingToken());
     iBuilder.RET(retToken);
 
-    // Run ReturnAbiLowererPass
-    ReturnAbiLowerer *pass = runPass<ReturnAbiLowerer>(getBuilderCtx());
+    FunctionAbiLowererPass *pass = runPass<FunctionAbiLowererPass>(getBuilderCtx());
 
     // Verify: PUSH_RET erased, RET standardized to 0 operands
     ReturnAbiLowererVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyLoweredReturn(func->getEntryPoint(), {});
 }
 
-// =========================================================================
-// 2. DIRECT GPR RETURN TEST (i32 -> GPR 1)
-// =========================================================================
 TEST_F(TestReturnAbiLowererPass, LowerDirectGprReturn)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
@@ -52,8 +45,7 @@ TEST_F(TestReturnAbiLowererPass, LowerDirectGprReturn)
     iBuilder.PUSH_RET(retToken, valReg);
     iBuilder.RET(retToken);
 
-    // Run ReturnAbiLowererPass
-    ReturnAbiLowerer *pass = runPass<ReturnAbiLowerer>(getBuilderCtx());
+    FunctionAbiLowererPass *pass = runPass<FunctionAbiLowererPass>(getBuilderCtx());
 
     // Verify: PUSH_RET erased, MOV physReg(1), retVal inserted before RET
     ReturnAbiLowererVerifier verifier(getBuilderCtx(), pass);
@@ -81,17 +73,13 @@ TEST_F(TestReturnAbiLowererPass, LowerDirectFprReturn)
     iBuilder.PUSH_RET(retToken, fpValReg);
     iBuilder.RET(retToken);
 
-    // Run ReturnAbiLowererPass
-    ReturnAbiLowerer *pass = runPass<ReturnAbiLowerer>(getBuilderCtx());
+    FunctionAbiLowererPass *pass = runPass<FunctionAbiLowererPass>(getBuilderCtx());
 
     // Verify: MOV physReg(4), fpRetVal inserted before RET
     ReturnAbiLowererVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyLoweredReturn(func->getEntryPoint(), { fpValReg });
 }
 
-// =========================================================================
-// 4. INDIRECT SRET STRUCT RETURN TEST (> 64-bit -> sretPtr in Param 0)
-// =========================================================================
 TEST_F(TestReturnAbiLowererPass, LowerIndirectSretReturn)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
@@ -123,17 +111,13 @@ TEST_F(TestReturnAbiLowererPass, LowerIndirectSretReturn)
     iBuilder.PUSH_RET(retToken, sretPtrParam);
     iBuilder.RET(retToken);
 
-    // Run ReturnAbiLowererPass
-    ReturnAbiLowerer *pass = runPass<ReturnAbiLowerer>(getBuilderCtx());
+    FunctionAbiLowererPass *pass = runPass<FunctionAbiLowererPass>(getBuilderCtx());
 
     // Verify: PUSH_RET erased, STORE confirmed, and copyOnReg (GPR 1) handled if requested
     ReturnAbiLowererVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyLoweredReturn(func->getEntryPoint(), { largeValReg });
 }
 
-// =========================================================================
-// 5. MULTI-BLOCK RETURN PATHS TEST
-// =========================================================================
 TEST_F(TestReturnAbiLowererPass, LowerMultipleReturnBlocks)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
@@ -166,8 +150,7 @@ TEST_F(TestReturnAbiLowererPass, LowerMultipleReturnBlocks)
     elseBuilder.PUSH_RET(token2, val2);
     elseBuilder.RET(token2);
 
-    // Run ReturnAbiLowererPass across the function
-    ReturnAbiLowerer *pass = runPass<ReturnAbiLowerer>(getBuilderCtx());
+    FunctionAbiLowererPass *pass = runPass<FunctionAbiLowererPass>(getBuilderCtx());
 
     // Verify both blocks independently
     ReturnAbiLowererVerifier verifier(getBuilderCtx(), pass);

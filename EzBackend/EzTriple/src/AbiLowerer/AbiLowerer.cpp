@@ -1,0 +1,261 @@
+#include "AbiLowerer/AbiLowerer.h"
+
+AbiLowerer::AbiLowerer(MirBuilderContext *ctx) : m_ctx(ctx) {}
+
+bool AbiLowerer::processReturnBlock(CallingConvDesc *cc,
+                                    MirBlock *targetBlock,
+                                    MirFunction *func,
+                                    MirType *retType,
+                                    std::pmr::list<MirInstruction *>::iterator it,
+                                    std::pmr::vector<MirInstruction *> &retBlock)
+{
+    MirInstruction *retInstr = *it;
+    if (func->getReturnType()->getKind() == MirTypeKind::Void)
+    {
+        // Void methods do not need anything.
+        retInstr->getOperands().clear(); // Clear the operands of the return (binding token).
+
+        return true;
+    }
+
+    CallLoweringState st(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    ArgumentLocationDesc loc = cc->getReturnLoc(retType, &st);
+    MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
+    MirOperandBuilder oBuilder(m_ctx);
+
+    switch (loc.getType())
+    {
+        case ArgLocationType::Register:
+        {
+            // Standard non-expanded or single-register.
+            const RegLoc &reg = loc.getReg();
+            if (retBlock.size() != 1)
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Error, "ReturnAbiLowerer")
+                        << retInstr->getSourceRef()
+                        << "Calling convention expects a single register location but multiple accumulated chunks were "
+                           "encountered.";
+                return false;
+            }
+
+            MirOperand *srcVal = retBlock.front()->getOperands()[1];
+            MirRegister *destVal =
+                    oBuilder.buildPhysReg(srcVal->getMirType(), reg.m_regId, "ret", srcVal->getSourceRef());
+
+            iBuilder.MOV(destVal, srcVal);
+            break;
+        }
+        case ArgLocationType::Split:
+        {
+            const SplitLoc &split = loc.getSplit();
+
+            // Case A: The upstream scalar expander already split this wide value into distinct, smaller sequential
+            // PUSH_RET nodes.
+            if (retBlock.size() <= split.m_parts.size())
+            {
+                for (size_t p = 0; p < split.m_parts.size(); ++p)
+                {
+                    MirOperand *sliceVal = retBlock[p]->getOperands()[1];
+                    MirRegister *destVal = oBuilder.buildPhysReg(sliceVal->getMirType(),
+                                                                 split.m_parts[p].m_regId,
+                                                                 "ret",
+                                                                 sliceVal->getSourceRef());
+
+                    iBuilder.MOV(destVal, sliceVal);
+                }
+            }
+            // Case B: The value hasn't been expanded, but the ABI requires it split across registers.
+            else if (retBlock.size() == 1)
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Error, "ReturnAbiLowerer")
+                        << retBlock.front()->getSourceRef()
+                        << "Calling convention dictates this value must be split across registers, but it hasn't been "
+                           "expanded during previous scalar legalization passes.";
+                return false;
+            }
+            else
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Error, "ReturnAbiLowerer")
+                        << retInstr->getSourceRef()
+                        << "Mismatched push count encountered for physical register split rules.";
+                return false;
+            }
+            break;
+        }
+        case ArgLocationType::Indirect:
+        {
+            // Struct Return (SRET): Write out data directly into the caller-provided address pointer space.
+            const IndirectLoc &indirect = loc.getIndirect();
+
+            if (func->getParameters().empty())
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Error, "ReturnAbiLowerer")
+                        << retInstr->getSourceRef()
+                        << "Indirect return requested, but the parameter list is empty. SRET pointer argument is "
+                           "missing.";
+                return false;
+            }
+
+            MirRegister *sretPtrReg = func->getParameters().front();
+
+            if (indirect.m_copyOnReg)
+            {
+                auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "ReturnAbiLowerer");
+                diag << sretPtrReg->getSourceRef() << "Indirect return needs CopyOnReg:";
+                diag.appendNote(std::format("Target register ID: {}", indirect.m_pointerStorage).c_str(), nullptr);
+
+                MirRegister *phys = oBuilder.buildPhysReg(sretPtrReg->getMirType(),
+                                                          indirect.m_pointerStorage,
+                                                          "copyReg",
+                                                          sretPtrReg->getSourceRef());
+                iBuilder.MOV(sretPtrReg->getSourceRef(), phys, sretPtrReg);
+            }
+
+            break;
+        }
+        default:
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "ReturnAbiLowerer")
+                    << retInstr->getSourceRef() << "Unsupported target return assignment location strategy requested.";
+            return false;
+        }
+    }
+
+    retInstr->getOperands().clear(); // Clear the operands of the return.
+    return true;
+}
+
+bool AbiLowerer::processCallBlock(CallingConvDesc *cc,
+                                  MirBlock *targetBlock,
+                                  MirFunction *func,
+                                  MirType *retType,
+                                  std::pmr::list<MirInstruction *>::iterator it,
+                                  std::pmr::vector<MirInstruction *> &pushArgs)
+{
+    MirInstruction *callInstr = *it;
+    MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
+    MirOperandBuilder oBuilder(m_ctx);
+
+    // Track state of used physical registers & stack offsets during parameter assignment
+    CallLoweringState callState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+
+    /*
+     * If the called function returns a value indirectly (e.g., large struct), the caller must allocate space on its
+     * stack and pass a hidden first argument. This has already been done by the CallLegalizer, what it needs to be done
+     * is to transform the actual PUSH_ARG bind, largetType %largeTypePtr into a mov arg0, largePtr.
+     */
+
+    for (size_t argIdx = 0; argIdx < pushArgs.size(); ++argIdx)
+    {
+        MirInstruction *pushArgInstr = pushArgs[argIdx];
+        MirOperand *argVal = pushArgInstr->getOperands()[1];
+        MirType *argType = argVal->getMirType();
+
+        // Query Calling Convention for parameter placement
+        ArgumentLocationDesc argLoc = cc->getArgLoc(argType, &callState);
+
+        switch (argLoc.getType())
+        {
+            case ArgLocationType::Register:
+            {
+                const RegLoc &reg = argLoc.getReg();
+                MirRegister *physReg = oBuilder.buildPhysReg(argType,
+                                                             reg.m_regId,
+                                                             std::format("arg{}", argIdx).c_str(),
+                                                             pushArgInstr->getSourceRef());
+
+                // Emit: MOV physReg, argVal
+                iBuilder.MOV(physReg, argVal);
+                break;
+            }
+
+            case ArgLocationType::Split:
+            {
+                MirRegister *argReg = argVal->get<MirRegister>();
+                if (!argReg)
+                {
+                    m_ctx->getDiagCollector()->builder(Diag_Error, "AbiLowerer")
+                            << pushArgInstr->getSourceRef() << "Can't lower split variables that are not registers";
+                    return false;
+                }
+
+                const SplitLoc &split = argLoc.getSplit();
+                for (size_t p = 0; p < split.m_parts.size(); ++p)
+                {
+                    const SplitPiece &piece = split.m_parts[p];
+
+                    // Build destination physical register for this split chunk
+                    const auto &t = m_ctx->getTypeTable();
+                    MirType *ptr = t->getPtr(piece.m_type);
+                    MirRegister *physReg = oBuilder.buildPhysReg(ptr,
+                                                                 piece.m_regId,
+                                                                 std::format("splitArg{}", argIdx).c_str(),
+                                                                 pushArgInstr->getSourceRef());
+                    MirMemory *mem = oBuilder.buildMem(ptr,
+                                                       argReg,
+                                                       FlexInt(piece.m_offsetInParam),
+                                                       pushArgInstr->getSourceRef());
+                    iBuilder.LOAD(pushArgInstr->getSourceRef(), physReg, mem);
+                }
+                break;
+            }
+
+            case ArgLocationType::Indirect:
+            {
+                const IndirectLoc &indirect = argLoc.getIndirect();
+
+                if (indirect.m_isByVal)
+                {
+                    StackFrameObject *byValObj = func->getStackFrame()->createLocalStackObj(argType);
+                    MirOperand *byValAddr = oBuilder.buildRef(byValObj, pushArgInstr->getSourceRef());
+
+                    // Store value into the stack copy
+                    iBuilder.STORE(byValAddr, argVal);
+
+                    // Pass pointer to the stack copy in the target physical register
+                    MirRegister *physReg = oBuilder.buildPhysReg(byValAddr->getMirType(),
+                                                                 indirect.m_pointerStorage,
+                                                                 std::format("byValArgPtr{}", argIdx).c_str(),
+                                                                 pushArgInstr->getSourceRef());
+                    iBuilder.MOV(physReg, byValAddr);
+                }
+                else
+                {
+                    // Direct pointer pass. This case should not trigger as this is a regular Register loc, but just in
+                    // case.
+                    MirRegister *physReg = oBuilder.buildPhysReg(argType,
+                                                                 indirect.m_pointerStorage,
+                                                                 std::format("indirectArgPtr{}", argIdx).c_str(),
+                                                                 pushArgInstr->getSourceRef());
+                    iBuilder.MOV(physReg, argVal);
+                }
+                break;
+            }
+
+            case ArgLocationType::Stack:
+            {
+                const StackLoc &stack = argLoc.getStack();
+
+                // Allocate slot in outgoing parameter stack frame
+                StackFrameObject *stackParamObj = func->getStackFrame()->createStackParam(argType, stack.m_frameOffset);
+                MirOperand *stackParamAddr = oBuilder.buildRef(stackParamObj, pushArgInstr->getSourceRef());
+
+                // Store value to outgoing stack argument area
+                iBuilder.STORE(stackParamAddr, argVal);
+                break;
+            }
+
+            default:
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Error, "AbiLowerer")
+                        << pushArgInstr->getSourceRef() << "Unsupported argument location strategy requested.";
+                return false;
+            }
+        }
+    }
+
+    // Clear token binding operands from the CALL instruction so it becomes a standard MIR call.
+    callInstr->getOperands().clear();
+
+    return true;
+}

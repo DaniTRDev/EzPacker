@@ -1,7 +1,8 @@
 set(EZTRIPLE_FILES_LIST
         "include/EzTriple.h"
         "include/EzTripleCommon.h"
-        "include/AbiLowerer/ReturnAbiLowererPass.h"
+        "include/AbiLowerer/AbiLowerer.h"
+        "include/AbiLowerer/FunctionAbiLowererPass.h"
         "include/DefaultLegalizerActions/ExpandScalarAction.h"
         "include/DefaultLegalizerActions/LegalizeCallAction.h"
         "include/DefaultLegalizerActions/LegalizeReturnAction.h"
@@ -14,7 +15,8 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/MirFunctionSignatureLegalizerPass.h"
         "include/Legalizer/MirLegalizer.h"
 
-        "src/AbiLowerer/ReturnAbiLowererPass.cpp"
+        "src/AbiLowerer/AbiLowerer.cpp"
+        "src/AbiLowerer/FunctionAbiLowererPass.cpp"
         "src/DefaultLegalizerActions/ExpandScalarAction.cpp"
         "src/DefaultLegalizerActions/LegalizeCallAction.cpp"
         "src/DefaultLegalizerActions/LegalizeReturnAction.cpp"
@@ -26,6 +28,7 @@ set(EZTRIPLE_FILES_LIST
 )
 
 set(TRIPLETESTSUITE_FILES_LIST
+        "tests/EzTripleTestSuite/CallAbiLowererVerifier.h"
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.h"
         "tests/EzTripleTestSuite/EzTripleTestExpansionRecipe.h"
         "tests/EzTripleTestSuite/EzTripleTestLegalizer.h"
@@ -37,6 +40,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.h"
         "tests/EzTripleTestSuite/ReturnAbiLowererVerifier.h"
 
+        "tests/EzTripleTestSuite/CallAbiLowererVerifier.cpp"
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.cpp"
         "tests/EzTripleTestSuite/EzTripleTestLegalizer.cpp"
         "tests/EzTripleTestSuite/EzTripleTestSuite.cpp"
@@ -103,5 +107,12 @@ if (EZPACKER_BUILD_TESTS)
             "EzTripleTestSuite"
             ""
             "tests/T_ReturnAbiLowerer.cpp"
+    )
+
+        EzPacker_AddTest(
+            "T_CallAbiLowerer"
+            "EzTripleTestSuite"
+            ""
+            "tests/T_CallAbiLowerer.cpp"
     )
 endif ()

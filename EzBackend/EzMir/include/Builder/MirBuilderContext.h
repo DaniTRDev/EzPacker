@@ -61,7 +61,8 @@ class MirBuilderContext
     bool appendGlobalVar(MirGlobalVar *globalVar);
 
     /**
-     * Appends a register to the context. Returns true if succeeded.
+     * Appends a register to the context. Returns true if succeeded. ONLY VIRTUAL REGISTERS, Physical registers will not
+     * be appended at all.
      * @param reg
      * @return
      */

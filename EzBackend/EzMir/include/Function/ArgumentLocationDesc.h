@@ -56,7 +56,7 @@ struct StackLoc
 struct SplitPiece
 {
     PhysicalRegId m_regId;
-    size_t m_sizeBytes;
+    class MirType *m_type;
     size_t m_offsetInParam; // Byte offset from the start of the user's variable
 };
 

@@ -30,6 +30,7 @@ class MirType
      * Constructs a MIR type descriptor.
      *
      * @param kind     High-level classification of the type.
+     * @param owner
      * @param id       Unique MIR ID assigned by the context.
      * @param maxAlignmentInBytes
      * @param totalSizeInBits
@@ -37,6 +38,7 @@ class MirType
      * @param subTypes Optional child-type slice used by compound kinds.
      */
     MirType(MirTypeKind kind,
+            class MirTypeTable *owner,
             size_t id,
             size_t maxAlignmentInBytes,
             size_t totalSizeInBits,
@@ -58,6 +60,11 @@ class MirType
      * Returns the high-level kind of this type.
      */
     MirTypeKind getKind() const;
+
+    /**
+     * Returns the owner of this type.
+     */
+    class MirTypeTable *getOwner() const;
 
     /**
      * Returns the array element count of this type. If this type is not an array, it returns 0.
@@ -100,7 +107,8 @@ class MirType
     const std::pmr::vector<MirType *> &getSubTypes() const;
 
   private:
-    MirTypeKind m_kind;                     // High-level classification of the type.
+    MirTypeKind m_kind; // High-level classification of the type.
+    class MirTypeTable *m_owner;
     size_t m_id;                            // Unique MIR identifier for this type.
     size_t m_maxAlignmentInBytes;           // Total alignment in bytes of this type.
     size_t m_totalSizeInBits;               // Total size in bytes of this type.

@@ -5,6 +5,7 @@
 #include "EzMirTestSuite.h"
 #include "EzTripleTestTargetDescriptor.h"
 #include "EzTripleTestLegalizer.h"
+#include "CallAbiLowererVerifier.h"
 #include "ExpandScalarActionVerifier.h"
 #include "FuncSignaturePassVerifier.h"
 #include "LegalizeCallActionVerifier.h"

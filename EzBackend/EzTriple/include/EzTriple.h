@@ -3,7 +3,8 @@
 
 #include "EzTripleCommon.h"
 
-#include "AbiLowerer/ReturnAbiLowererPass.h"
+#include "AbiLowerer/AbiLowerer.h"
+#include "AbiLowerer/FunctionAbiLowererPass.h"
 
 #include "DefaultLegalizerActions/ExpandScalarAction.h"
 #include "DefaultLegalizerActions/LegalizeCallAction.h"

@@ -33,7 +33,7 @@ MirType *MirTypeTable::create(MirTypeKind kind,
     if (kind == MirTypeKind::Integer || kind == MirTypeKind::FloatingPoint || kind == MirTypeKind::Void)
     {
         // Allocate space mapping primitive target metrics
-        MirType tempPrimitive(kind, assignedId, 1, totalSizeInBits, lookupName, {});
+        MirType tempPrimitive(kind, this, assignedId, 1, totalSizeInBits, lookupName, {});
         alignmentInBytes = m_typeLayout->getTypeAlignmentInBytes(&tempPrimitive);
     }
     else if (kind == MirTypeKind::Pointer || kind == MirTypeKind::Function)
@@ -44,6 +44,7 @@ MirType *MirTypeTable::create(MirTypeKind kind,
     // Allocate our node container explicitly out of the stable global metadata resource arena
     std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
     MirType *uniqueType = alloc.new_object<MirType>(kind,
+                                                    this,
                                                     assignedId,
                                                     alignmentInBytes,
                                                     totalSizeInBits,
@@ -56,10 +57,7 @@ MirType *MirTypeTable::create(MirTypeKind kind,
     return uniqueType;
 }
 
-MirType *MirTypeTable::getBindingToken() const
-{
-    return m_bindingToken;
-}
+MirType *MirTypeTable::getBindingToken() const { return m_bindingToken; }
 
 MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &structName)
 {
@@ -110,6 +108,7 @@ MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, c
     size_t assignedId = ++m_currentId;
     std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
     MirType *newClassType = alloc.new_object<MirType>(MirTypeKind::Class,
+                                                      this,
                                                       assignedId,
                                                       maxAlignmentInBytes,
                                                       totalSizeInBits,
@@ -207,6 +206,7 @@ MirType *MirTypeTable::getArray(MirType *elementType, size_t elementCount)
     std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
     size_t assignedId = ++m_currentId;
     MirType *newArrayType = alloc.new_object<MirType>(MirTypeKind::Array,
+                                                      this,
                                                       assignedId,
                                                       alignmentInBytes,
                                                       totalSizeInBytes * 8,

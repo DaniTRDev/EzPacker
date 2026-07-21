@@ -122,18 +122,21 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
         return false;
     }
 
-    auto it = m_registerIdToRegister.find(reg->getRegId());
-    if (it != m_registerIdToRegister.end())
+    if (reg->isVirtual())
     {
-        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirBuilderContext")
-                << "Could not append register because it was already appended";
-        return false;
+        auto it = m_registerIdToRegister.find(reg->getRegId());
+        if (it != m_registerIdToRegister.end())
+        {
+            m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "MirBuilderContext")
+                    << "Could not append register because it was already appended";
+            return false;
+        }
+
+        m_registerIdToRegister.insert({ reg->getRegId(), reg });
+        m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext")
+                << std::pmr::string(std::format("Appended register: {} (id: {})", reg->getName(), reg->getRegId()));
     }
-
-    m_registerIdToRegister.insert({ reg->getRegId(), reg });
-    m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext")
-            << std::pmr::string(std::format("Appended register: {} (id: {})", reg->getName(), reg->getRegId()));
-
+    
     return true;
 }
 

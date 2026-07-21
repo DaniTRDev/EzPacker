@@ -1,6 +1,6 @@
 #include "ReturnAbiLowererVerifier.h"
 
-ReturnAbiLowererVerifier::ReturnAbiLowererVerifier(MirBuilderContext *ctx, ReturnAbiLowerer *pass) :
+ReturnAbiLowererVerifier::ReturnAbiLowererVerifier(MirBuilderContext *ctx, FunctionAbiLowererPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
 {
 }
