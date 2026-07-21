@@ -16,8 +16,9 @@ class LegalizeReturnActionVerifier : public MirPassVerifier<MirBlockLegalizerPas
 
     /**
      * Verifies that the return operands are correctly legalized for the given instruction.
-     * @param retStartIt
-     * @param origOperands
+     * Account for direct returns, indirect (SRET) returns, and void returns.
+     * @param retStartIt Iterator pointing to the start of the legalized sequence (STORE/PUSH_RET or RET)
+     * @param origOperand The original return operand passed into RET before legalization
      * @return
      */
     LegalizeReturnActionVerifier &verifyRetPush(std::pmr::list<MirInstruction *>::iterator retStartIt,

@@ -192,7 +192,7 @@ void EzTripleTestLegalizer::create(MirBuilderContext *ctx, MirLegalizer *legaliz
                     })
             .custom(
                     [tokenTypeId](const LegalizeRuleOperand &op) {
-                        return !op.m_instr->getOperands().empty() &&
+                        return op.m_instr->getOperands().empty() ||
                                 op.m_instr->getOperands()[0]->getMirType()->getId() != tokenTypeId;
                     },
                     legalizer->getReturnAct())

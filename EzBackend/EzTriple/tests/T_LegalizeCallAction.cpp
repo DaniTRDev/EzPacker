@@ -52,11 +52,7 @@ TEST_F(TestLegalizeCallAct, Test1ArgVoid)
     std::vector<MirOperand *> expectedOrigOperands{ callRef, opBuilder.buildInt(t->i8(), FlexInt(42, 8)) };
 
     // Build a VOID CALL. The first operand is the Callee Target Reference.
-    auto callInstr = builder.CALL(expectedOrigOperands[0]);
-    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
-    {
-        callInstr->getOperands().push_back(expectedOrigOperands[i]);
-    }
+    auto callInstr = builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1]);
 
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
@@ -89,12 +85,7 @@ TEST_F(TestLegalizeCallAct, Test1ArgWithReturn)
                                                     opBuilder.buildInt(t->i8(), FlexInt(1, 8)) };
 
     // Build: CALL %destReg, %func, %arg
-    auto callInstr = builder.CALL(expectedOrigOperands[0]);
-    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
-    {
-        callInstr->getOperands().push_back(expectedOrigOperands[i]);
-    }
-
+    auto callInstr = builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1], expectedOrigOperands[2]);
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
@@ -131,11 +122,13 @@ TEST_F(TestLegalizeCallAct, Test5ArgWithReturn)
                                                     opBuilder.buildVReg(t->i64()),
                                                     opBuilder.buildVReg(t->i8()) };
 
-    auto callInstr = builder.CALL(expectedOrigOperands[0]);
-    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
-    {
-        callInstr->getOperands().push_back(expectedOrigOperands[i]);
-    }
+    auto callInstr = builder.CALL(expectedOrigOperands[0],
+                                  expectedOrigOperands[1],
+                                  expectedOrigOperands[2],
+                                  expectedOrigOperands[3],
+                                  expectedOrigOperands[4],
+                                  expectedOrigOperands[5],
+                                  expectedOrigOperands[6]);
 
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
@@ -170,11 +163,7 @@ TEST_F(TestLegalizeCallAct, TestSretCallLegalization)
                                                     opBuilder.buildInt(t->i32(), FlexInt(77, 32)) };
 
     // Build standard high-level CALL: CALL %destReg, %func, %arg
-    auto callInstr = builder.CALL(expectedOrigOperands[0]);
-    for (size_t i = 1; i < expectedOrigOperands.size(); ++i)
-    {
-        callInstr->getOperands().push_back(expectedOrigOperands[i]);
-    }
+    auto callInstr = builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1], expectedOrigOperands[2]);
 
     // Execute the legalizer pass over the block stream
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
