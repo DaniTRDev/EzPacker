@@ -138,6 +138,14 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     MirReference *buildRef(MirRegister *classPtr, MirClassMethod *method, SourceReference *ref = nullptr);
 
     /**
+     * Creates a reference to the given stack frame object.
+     * @param obj
+     * @param ref
+     * @return
+     */
+    MirReference *buildRef(StackFrameObject *obj, SourceReference *ref = nullptr);
+
+    /**
      * Builds a runtime symbol that will later be resolved by the backend. A runtime symbol is a symbol that
      * has been defined within the runtime library.
      * @param symbolName

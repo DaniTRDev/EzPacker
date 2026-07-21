@@ -73,8 +73,8 @@ ArgumentLocationDesc TestCallingConvention::getReturnLoc(MirType *type, CallLowe
 
     if (!canReturnInRegs(type))
     {
-        // Indirect SRET pointer assignment: Expect it in GPR 1 (matching pool boundary)
-        return ArgumentLocationDesc::Indirect(true, sizeBytes, PhysicalRegId(1));
+        // Indirect SRET pointer assignment: Expect it in GPR 1
+        return ArgumentLocationDesc::Indirect(true, true, sizeBytes, PhysicalRegId(1));
     }
 
     if (type->getKind() == MirTypeKind::FloatingPoint)

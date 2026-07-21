@@ -21,7 +21,7 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
         return MirBlockBuilder(nullptr, (MirFunction *)nullptr); // Ambiguous call if cast is not set.
     }
 
-    return MirBlockBuilder(m_ctx, obj->getBlocksPtr());
+    return MirBlockBuilder(m_ctx, obj);
 }
 
 MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::string &name, SourceReference *sourceRef)
@@ -56,7 +56,7 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
                                                           name);
 
     entryPoint->setOwner(func);
-    
+
     auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirFunctionBuilder");
     diagBuilder << std::pmr::string(std::format("Built func with id: {}", func->getId()));
     diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(func, MirPrinterDetail::Detailed)), sourceRef);

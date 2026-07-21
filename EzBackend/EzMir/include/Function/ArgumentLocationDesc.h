@@ -23,6 +23,10 @@ struct RegLoc
     size_t m_sizeBytes;
 };
 
+/**
+ * Returns the starting offset at which the argument / value should be put. This is important because allows a high
+ * level return treatment without thinking on expansions.
+ */
 struct StackLoc
 {
     int64_t m_frameOffset;
@@ -38,7 +42,7 @@ struct StackLoc
  *      int x;
  *      float y;
  * };
- * 
+ *
  * FOR x ->
  * SplitLoc[0].m_regId = GPR
  * SplitLoc[0].m_sizeBytes = 4
@@ -64,10 +68,11 @@ struct SplitLoc
 struct IndirectLoc
 {
     bool m_isByVal;
+    bool m_copyOnReg; // Should the return ptr be copied into the return register?
     size_t m_size;
 
     // The pointer to the data is either in a register OR sitting on the incoming stack slot area
-    std::variant<PhysicalRegId, int64_t> m_pointerStorage;
+    PhysicalRegId m_pointerStorage;
 };
 
 /**
@@ -90,11 +95,12 @@ class ArgumentLocationDesc
     /**
      * Creates an indirect location with the given parameters.
      * @param byVal
+     * @param copyOnReg
      * @param size
      * @param ptrStorage
      * @return
      */
-    static ArgumentLocationDesc Indirect(bool byVal, size_t size, std::variant<PhysicalRegId, int64_t> ptrStorage);
+    static ArgumentLocationDesc Indirect(bool byVal, bool copyOnReg, size_t size, PhysicalRegId ptrStorage);
 
     /**
      * Creates a split location with the given parameters.

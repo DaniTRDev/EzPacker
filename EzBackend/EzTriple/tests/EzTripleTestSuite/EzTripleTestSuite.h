@@ -10,6 +10,7 @@
 #include "LegalizeCallActionVerifier.h"
 #include "LegalizeReturnActionVerifier.h"
 #include "PromoteScalarActionVerifier.h"
+#include "ReturnAbiLowererVerifier.h"
 
 /**
  * This class is used as a common entry point for triple tests. It takes 2 template parameters to be able to define

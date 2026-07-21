@@ -13,6 +13,7 @@ enum class MirReferenceType : uint8_t
     Function,
     ClassField,
     ClassMethod,
+    StackFrameObject,
     ConstantArrayElement
 };
 
@@ -103,6 +104,7 @@ class MirReference : public MirOperand
     bool isClassField() const { return m_refType == MirReferenceType::ClassField; }
     bool isClassMethod() const { return m_refType == MirReferenceType::ClassMethod; }
     bool isConstantArrayElem() const { return m_refType == MirReferenceType::ConstantArrayElement; }
+    bool isStackFrameObject() const { return m_refType == MirReferenceType::StackFrameObject; }
     bool isInvalid() const { return m_refType == MirReferenceType::Invalid; }
 
     MirReferenceType getRefType() const { return m_refType; }
@@ -130,6 +132,8 @@ class MirReference : public MirOperand
                 return std::format("{} %v{}.method_{}", typePrefix, m_refId, m_offset);
             case MirReferenceType::ConstantArrayElement:
                 return std::format("{} %v{}[{}]", typePrefix, m_refId, m_offset);
+            case MirReferenceType::StackFrameObject:
+                return std::format("{} %stack{}[{}]", typePrefix, m_refId, m_offset);
             default:
                 return std::format("{} <invalid_ref>", typePrefix);
         }

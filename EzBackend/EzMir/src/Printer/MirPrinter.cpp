@@ -135,9 +135,9 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
             if (!firstFrame)
                 result += "\n\t";
 
-            result += std::format("%frame.id={}.size={}.src={}.offset={:#X})",
+            result += std::format("{} %frame.id={}.src={}.offset={:#X})",
+                                  frameObj->m_type->getName(),
                                   frameObj->m_id,
-                                  frameObj->m_sizeInBytes,
                                   static_cast<uint8_t>(frameObj->m_source),
                                   frameObj->m_offset);
             firstFrame = false;

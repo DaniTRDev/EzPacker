@@ -2,6 +2,7 @@
 #define EZPACKER_MIRFUNCTIONSTACKFRAME_H
 
 #include "EzMirCommon.h"
+#include "Type/MirType.h"
 
 enum class StackFrameObjectSource : uint8_t
 {
@@ -18,9 +19,8 @@ struct StackFrameObject
 {
     // Filled by the prologue/epilogue pass. Or if it's an ABI-enforced offset (like for parameters).
     int64_t m_offset{ 0 };
-    size_t m_align{ 0 };
-    size_t m_id{ 0 };
-    size_t m_sizeInBytes{ 0 };
+    MirType *m_type;
+    size_t m_id;
     StackFrameObjectSource m_source;
 };
 
@@ -44,12 +44,11 @@ class MirFunctionStackFrame
     size_t getAllocatedObjectCount() const;
 
     /**
-     * Creates an object in the function's stack frame.
-     * @param size
-     * @param align
+     * Creates a local object in the function's stack frame.
+     * @param type
      * @return
      */
-    StackFrameObject *createLocalStackObj(size_t size, size_t align);
+    StackFrameObject *createLocalStackObj(MirType *type);
 
     /**
      * Creates an object resulting of a spill in the function's stack frame.
@@ -57,7 +56,7 @@ class MirFunctionStackFrame
      * @param align
      * @return
      */
-    StackFrameObject *createStackSpill(size_t size, size_t align);
+    StackFrameObject *createStackSpill(MirType *type);
 
     /**
      * Creates a parameter at the given offset in the function stack frame. This is the only object whose offset is
@@ -67,7 +66,7 @@ class MirFunctionStackFrame
      * @param offset
      * @return
      */
-    StackFrameObject *createStackParam(size_t size, size_t align, int64_t offset);
+    StackFrameObject *createStackParam(MirType *type, int64_t offset);
 
     /**
      * Creates a specific stack frame object with the given parameters
@@ -77,7 +76,7 @@ class MirFunctionStackFrame
      * @param source
      * @return
      */
-    StackFrameObject *create(int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source);
+    StackFrameObject *create(int64_t offset, MirType *type, StackFrameObjectSource source);
 
     /**
      * Returns a stack frame object out of an ID, if it was not found, nullptr is returned.

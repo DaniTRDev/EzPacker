@@ -35,6 +35,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.h"
         "tests/EzTripleTestSuite/LegalizeReturnActionVerifier.h"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.h"
+        "tests/EzTripleTestSuite/ReturnAbiLowererVerifier.h"
 
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.cpp"
         "tests/EzTripleTestSuite/EzTripleTestLegalizer.cpp"
@@ -43,6 +44,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.cpp"
         "tests/EzTripleTestSuite/LegalizeReturnActionVerifier.cpp"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.cpp"
+        "tests/EzTripleTestSuite/ReturnAbiLowererVerifier.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzTriple"
@@ -94,5 +96,12 @@ if (EZPACKER_BUILD_TESTS)
             "EzTripleTestSuite"
             ""
             "tests/T_ScalarExpansionAction.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_ReturnAbiLowerer"
+            "EzTripleTestSuite"
+            ""
+            "tests/T_ReturnAbiLowerer.cpp"
     )
 endif ()

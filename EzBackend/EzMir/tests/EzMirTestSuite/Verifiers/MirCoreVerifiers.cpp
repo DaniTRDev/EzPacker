@@ -281,28 +281,22 @@ MirFunctionStackFrameVerifier::MirFunctionStackFrameVerifier(MirFunctionStackFra
 {
 }
 
-MirFunctionStackFrameVerifier &MirFunctionStackFrameVerifier::checkStackFrameObj(
-        size_t id, int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source)
+MirFunctionStackFrameVerifier &MirFunctionStackFrameVerifier::checkStackFrameObj(size_t id,
+                                                                                 int64_t offset,
+                                                                                 MirType *type,
+                                                                                 StackFrameObjectSource source)
 {
     StackFrameObject *stackFrame = getTestedObj()->getObjectFromId(id);
-    if (!stackFrame)
-    {
-        return *this;
-    }
+    EXPECT_NE(stackFrame, nullptr);
 
     if (offset != -1)
     {
         EXPECT_EQ(stackFrame->m_offset, offset);
     }
 
-    if (offset != -1)
+    if (type != nullptr)
     {
-        EXPECT_EQ(stackFrame->m_align, align);
-    }
-
-    if (offset != -1)
-    {
-        EXPECT_EQ(stackFrame->m_sizeInBytes, sizeInBytes);
+        EXPECT_EQ(stackFrame->m_type->getId(), type->getId());
     }
 
     if (source != StackFrameObjectSource::Invalid)

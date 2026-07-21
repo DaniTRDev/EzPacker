@@ -342,17 +342,16 @@ class MirFunctionStackFrameVerifier : public MirVerifier<MirFunctionStackFrame>
     MirFunctionStackFrameVerifier(MirFunctionStackFrame *stackFrame);
 
     /**
-     * Checks the given stack frame object to match the given parameters. If offset == -1, align ==
-     * -1, sizeInBytes == 0, or source is Invalid, the specific parameter won't be checked. If id == MIRID_INVALID, then
-     * this function WON'T check anything.
+     * Checks the given stack frame object to match the given parameters. If offset == -1, it won't be checked, if type
+     * == nullptr, it won't be checked and if source is invalid, it won't be checked.
+     * @param id
      * @param offset
-     * @param align
-     * @param sizeInBytes
+     * @param type
      * @param source
      * @return
      */
     MirFunctionStackFrameVerifier &
-    checkStackFrameObj(size_t id, int64_t offset, size_t align, size_t sizeInBytes, StackFrameObjectSource source);
+    checkStackFrameObj(size_t id, int64_t offset, MirType *type, StackFrameObjectSource source);
 
     /**
      * Checks if there are exactly "count" stack objects in the current frame.

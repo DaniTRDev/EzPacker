@@ -183,6 +183,14 @@ MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassMethod 
     return build<MirReference>(fieldPtrType, MirReferenceType::ClassMethod, classPtr->getRegId(), method->m_id, ref);
 }
 
+MirReference *MirOperandBuilder::buildRef(StackFrameObject *obj, SourceReference *ref)
+{
+    auto &t = m_ctx->getTypeTable();
+    MirType *fieldPtrType = t->getPtr(obj->m_type);
+
+    return build<MirReference>(fieldPtrType, MirReferenceType::StackFrameObject, obj->m_id, 0, ref);
+}
+
 MirRuntimeSymbol *MirOperandBuilder::buildRtSymbol(std::pmr::string symbolName, SourceReference *ref)
 {
     const auto &t = m_ctx->getTypeTable();

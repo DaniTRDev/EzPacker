@@ -61,13 +61,13 @@ TEST_F(FunctionTest, TestFunc1LocalStackObj)
     size_t i8Size = i8->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8Size, i8Size);
+    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
 
     stackFrameVerifier.stackFrameObjCount(1);
-    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, obj->m_align, obj->m_sizeInBytes, obj->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, i8, obj->m_source);
 }
 
 TEST_F(FunctionTest, TestFuncNLocalStackObj)
@@ -81,19 +81,15 @@ TEST_F(FunctionTest, TestFuncNLocalStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8Size, i8Size),
-                     *obj2 = func->getStackFrame()->createLocalStackObj(i16Size, i16Size);
+    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8),
+                     *obj2 = func->getStackFrame()->createLocalStackObj(i16);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
 
     stackFrameVerifier.stackFrameObjCount(2);
-    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, obj->m_align, obj->m_sizeInBytes, obj->m_source);
-    stackFrameVerifier.checkStackFrameObj(obj2->m_id,
-                                          obj2->m_offset,
-                                          obj2->m_align,
-                                          obj2->m_sizeInBytes,
-                                          obj2->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, i8, obj->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj2->m_id, obj2->m_offset, i16, obj2->m_source);
 }
 
 TEST_F(FunctionTest, TestFunc1Spill1StackObj)
@@ -107,13 +103,13 @@ TEST_F(FunctionTest, TestFunc1Spill1StackObj)
     size_t i8Size = i8->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8Size, i8Size);
+    StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
 
     stackFrameVerifier.stackFrameObjCount(1);
-    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, obj->m_align, obj->m_sizeInBytes, obj->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, i8, obj->m_source);
 }
 
 TEST_F(FunctionTest, TestFunc1SpillNStackObj)
@@ -127,19 +123,15 @@ TEST_F(FunctionTest, TestFunc1SpillNStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8Size, i8Size),
-                     *obj2 = func->getStackFrame()->createStackSpill(i16Size, i16Size);
+    StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8),
+                     *obj2 = func->getStackFrame()->createStackSpill(i16);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
 
     stackFrameVerifier.stackFrameObjCount(2);
-    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, obj->m_align, obj->m_sizeInBytes, obj->m_source);
-    stackFrameVerifier.checkStackFrameObj(obj2->m_id,
-                                          obj2->m_offset,
-                                          obj2->m_align,
-                                          obj2->m_sizeInBytes,
-                                          obj2->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, i8, obj->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj2->m_id, obj2->m_offset, i16, obj2->m_source);
 }
 
 TEST_F(FunctionTest, TestFunc1ParameterNStackObj)
@@ -153,23 +145,15 @@ TEST_F(FunctionTest, TestFunc1ParameterNStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createStackParam(i8Size, i8Size, 0),
-                     *obj2 = func->getStackFrame()->createStackParam(i16Size, i16Size, 2),
-                     *obj3 = func->getStackFrame()->createStackParam(i16Size, i16Size, 4);
+    StackFrameObject *obj = func->getStackFrame()->createStackParam(i8, 0),
+                     *obj2 = func->getStackFrame()->createStackParam(i16, 2),
+                     *obj3 = func->getStackFrame()->createStackParam(i16, 4);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
 
     stackFrameVerifier.stackFrameObjCount(3);
-    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, obj->m_align, obj->m_sizeInBytes, obj->m_source);
-    stackFrameVerifier.checkStackFrameObj(obj2->m_id,
-                                          obj2->m_offset,
-                                          obj2->m_align,
-                                          obj2->m_sizeInBytes,
-                                          obj2->m_source);
-    stackFrameVerifier.checkStackFrameObj(obj3->m_id,
-                                          obj3->m_offset,
-                                          obj3->m_align,
-                                          obj3->m_sizeInBytes,
-                                          obj3->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj->m_id, obj->m_offset, i8, obj->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj2->m_id, obj2->m_offset, i16, obj2->m_source);
+    stackFrameVerifier.checkStackFrameObj(obj3->m_id, obj3->m_offset, i16, obj3->m_source);
 }
