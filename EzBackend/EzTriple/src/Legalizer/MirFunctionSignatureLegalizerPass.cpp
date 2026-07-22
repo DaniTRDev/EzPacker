@@ -39,12 +39,14 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(std::pmr::list<MirFunction 
         modified = true;
     }
 
+    MirRegister *token = opBuilder.buildVReg(m_ctx->getTypeTable()->getBindingToken());
     for (MirRegister *param : func->getParameters())
     {
-        builder.POP_ARG(param->getSourceRef(), param);
+        builder.POP_ARG(param->getSourceRef(), token, param);
     }
 
     // Don't clear the function parameters, might be of use for future passes to have a quick way of getting params.
+    builder.END_ARG(func->getSourceRef(), token);
     return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = succeeded };
 }
 

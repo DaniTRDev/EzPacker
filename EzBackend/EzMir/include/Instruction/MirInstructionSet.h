@@ -37,7 +37,13 @@ INSTRUCTION(PUSH_RET,
 
 INSTRUCTION(POP_ARG,
             MirCat_DataMovement,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
+                                { ExpectedOperandType::Register, OperandFlag::Write }),
+            F(HasSideEffect))
+
+INSTRUCTION(END_ARG,
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read }),
             F(HasSideEffect))
 
 INSTRUCTION(POP_RET,

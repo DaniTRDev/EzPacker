@@ -133,7 +133,7 @@ class MirReference : public MirOperand
             case MirReferenceType::ConstantArrayElement:
                 return std::format("{} %v{}[{}]", typePrefix, m_refId, m_offset);
             case MirReferenceType::StackFrameObject:
-                return std::format("{} %stack{}[{}]", typePrefix, m_refId, m_offset);
+                return std::format("{} %stack[{}]", typePrefix, m_refId);
             default:
                 return std::format("{} <invalid_ref>", typePrefix);
         }

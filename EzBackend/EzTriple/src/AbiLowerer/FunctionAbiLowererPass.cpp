@@ -73,10 +73,38 @@ MirPassResult FunctionAbiLowererPass::run(std::pmr::list<MirFunction *> &funcLis
                 ++instrIt;
                 continue;
             }
+            else if (op == MirInstructionOpCode::POP_ARG)
+            {
+                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
+                auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
+                                                            UnloweredBlockType::FunctionArgs,
+                                                            m_ctx->getGlobalAllocator());
+                mapIt->second.m_pushList.push_back(instr);
+
+                instrIt = instructions.erase(instrIt);
+                modifiedMir = true;
+                continue;
+            }
+            else if (op == MirInstructionOpCode::END_ARG)
+            {
+                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
+                auto [mapIt, _] =
+                        pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Return, m_ctx->getGlobalAllocator());
+
+                mapIt->second.m_targetBlock = block;
+                mapIt->second.m_termIt = instrIt;
+                mapIt->second.m_terminated = true;
+
+                ++instrIt;
+                continue;
+            }
 
             ++instrIt;
         }
     }
+
+    // If a token matches the function's ID, it represents the arguments of the function. They need to be lowered like
+    // parameters but the other way around.
 
     for (auto &[tokenId, block] : pendingBlocks)
     {
@@ -86,7 +114,7 @@ MirPassResult FunctionAbiLowererPass::run(std::pmr::list<MirFunction *> &funcLis
         if (!block.m_terminated)
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "ReturnAbiLowerer")
-                    << errRef << "Block to lower (CALL/RET) did not have proper terminator";
+                    << errRef << "Block to lower (CALL/RET/ARGS) did not have proper terminator";
             return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
         }
 
@@ -107,12 +135,17 @@ MirPassResult FunctionAbiLowererPass::run(std::pmr::list<MirFunction *> &funcLis
         }
         else if (block.m_type == UnloweredBlockType::Call)
         {
-            if (!abiLowerer.processCallBlock(cc,
-                                             block.m_targetBlock,
-                                             func,
-                                             func->getReturnType(),
-                                             block.m_termIt,
-                                             block.m_pushList))
+            if (!abiLowerer.processCallBlock(cc, block.m_targetBlock, func, block.m_termIt, block.m_pushList))
+            {
+                return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
+            }
+
+            modifiedMir = true;
+            m_loweredBlocks.push_back(std::move(block));
+        }
+        else if (block.m_type == UnloweredBlockType::FunctionArgs)
+        {
+            if (!abiLowerer.processFunctionArguments(cc, block.m_targetBlock, func, block.m_termIt, block.m_pushList))
             {
                 return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
             }
@@ -132,7 +165,9 @@ void FunctionAbiLowererPass::printResult() const
 
     for (auto &block : m_loweredBlocks)
     {
-        diag.appendNote("Lowered block in function", (*block.m_termIt)->getSourceRef());
+        if (block.m_type != UnloweredBlockType::FunctionArgs)
+            diag.appendNote("Lowered block in function", (*block.m_termIt)->getSourceRef());
+
         diag.appendNote(std::format("Block content: {}",
                                     MirPrinter::printToString(block.m_targetBlock, MirPrinterDetail::Detailed))
                                 .c_str(),

@@ -8,6 +8,7 @@
 #include "CallAbiLowererVerifier.h"
 #include "ExpandScalarActionVerifier.h"
 #include "FuncSignaturePassVerifier.h"
+#include "FunctionParametersAbiLowererVerifier.h"
 #include "LegalizeCallActionVerifier.h"
 #include "LegalizeReturnActionVerifier.h"
 #include "PromoteScalarActionVerifier.h"

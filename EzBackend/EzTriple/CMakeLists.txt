@@ -35,6 +35,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/EzTripleTestSuite.h"
         "tests/EzTripleTestSuite/EzTripleTestTargetDescriptor.h"
         "tests/EzTripleTestSuite/FuncSignaturePassVerifier.h"
+        "tests/EzTripleTestSuite/FunctionParametersAbiLowererVerifier.h"
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.h"
         "tests/EzTripleTestSuite/LegalizeReturnActionVerifier.h"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.h"
@@ -45,6 +46,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/EzTripleTestLegalizer.cpp"
         "tests/EzTripleTestSuite/EzTripleTestSuite.cpp"
         "tests/EzTripleTestSuite/FuncSignaturePassVerifier.cpp"
+        "tests/EzTripleTestSuite/FunctionParametersAbiLowererVerifier.cpp"
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.cpp"
         "tests/EzTripleTestSuite/LegalizeReturnActionVerifier.cpp"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.cpp"
@@ -109,10 +111,17 @@ if (EZPACKER_BUILD_TESTS)
             "tests/T_ReturnAbiLowerer.cpp"
     )
 
-        EzPacker_AddTest(
+    EzPacker_AddTest(
             "T_CallAbiLowerer"
             "EzTripleTestSuite"
             ""
             "tests/T_CallAbiLowerer.cpp"
+    )
+
+EzPacker_AddTest(
+            "T_FunctionParametersAbiLowerer"
+            "EzTripleTestSuite"
+            ""
+            "tests/T_FunctionParametersAbiLowerer.cpp"
     )
 endif ()

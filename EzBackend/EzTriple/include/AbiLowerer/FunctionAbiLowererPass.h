@@ -7,7 +7,8 @@
 enum class UnloweredBlockType
 {
     Return = 0,
-    Call
+    Call,
+    FunctionArgs
 };
 
 /**
@@ -16,6 +17,9 @@ enum class UnloweredBlockType
  *
  * A call block is formed by a set of PUSH_ARG and a final CALL instruction. These instructions are all bound to a
  * binding token. This design allows non-ordered argument pushes.
+ *
+ * A function signature block is a set of POP_ARG and a final END_ARG instructions. These instructions are all bound to
+ * a binding token. This design allows non-ordered argument pops.
  */
 struct UnloweredBlock
 {
