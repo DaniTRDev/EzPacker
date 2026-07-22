@@ -79,7 +79,19 @@ MirPassResult FunctionAbiLowererPass::run(std::pmr::list<MirFunction *> &funcLis
                 auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
                                                             UnloweredBlockType::FunctionArgs,
                                                             m_ctx->getGlobalAllocator());
-                mapIt->second.m_pushList.push_back(instr);
+                mapIt->second.m_popList.push_back(instr);
+
+                instrIt = instructions.erase(instrIt);
+                modifiedMir = true;
+                continue;
+            }
+            else if (op == MirInstructionOpCode::POP_RET)
+            {
+                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
+                auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
+                                                            UnloweredBlockType::FunctionArgs,
+                                                            m_ctx->getGlobalAllocator());
+                mapIt->second.m_popList.push_back(instr);
 
                 instrIt = instructions.erase(instrIt);
                 modifiedMir = true;
@@ -140,12 +152,17 @@ MirPassResult FunctionAbiLowererPass::run(std::pmr::list<MirFunction *> &funcLis
                 return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
             }
 
+            if (!abiLowerer.processCallReturnBlock(cc, block.m_targetBlock, func, block.m_termIt, block.m_popList))
+            {
+                return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
+            }
+
             modifiedMir = true;
             m_loweredBlocks.push_back(std::move(block));
         }
         else if (block.m_type == UnloweredBlockType::FunctionArgs)
         {
-            if (!abiLowerer.processFunctionArguments(cc, block.m_targetBlock, func, block.m_termIt, block.m_pushList))
+            if (!abiLowerer.processFunctionArguments(cc, block.m_targetBlock, func, block.m_termIt, block.m_popList))
             {
                 return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
             }

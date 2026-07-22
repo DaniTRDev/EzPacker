@@ -42,6 +42,19 @@ class AbiLowerer
                           std::pmr::vector<MirInstruction *> &pushArgs);
 
     /**
+     * Process the given block of POP_RET instructions and modifies it to follow CallingConvention's guidelines.
+     * @param cc
+     * @param targetBlock
+     * @param func
+     * @param it
+     * @param pushArgs
+     */
+    bool processCallReturnBlock(CallingConvDesc *cc,
+                                MirBlock *targetBlock,
+                                MirFunction *func,
+                                std::pmr::list<MirInstruction *>::iterator it,
+                                std::pmr::vector<MirInstruction *> &popRet);
+    /**
      * Process the given block of PUSH_ARG+CALL instructions and modifies it to follow CallingConvention's guidelines.
      * @param cc
      * @param targetBlock

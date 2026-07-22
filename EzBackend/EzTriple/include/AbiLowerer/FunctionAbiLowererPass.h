@@ -27,10 +27,11 @@ struct UnloweredBlock
     MirBlock *m_targetBlock{ nullptr }; // In which block was the final termination instruction.
     UnloweredBlockType m_type;
     std::pmr::list<MirInstruction *>::iterator m_termIt{}; // Iterator pointing to the instruction to the terminator..
-    std::pmr::vector<MirInstruction *> m_pushList;         // List used to store all the PUSH_RET/PUSH_ARG.
+    std::pmr::vector<MirInstruction *> m_pushList{}; // List used to store all the PUSH_RET/PUSH_ARG.
+    std::pmr::vector<MirInstruction *> m_popList{}; // List used to store all the POP_RET/POP_ARG.
 
     explicit UnloweredBlock(UnloweredBlockType type, std::pmr::polymorphic_allocator<std::byte> alloc) :
-        m_type(type), m_pushList(alloc)
+        m_type(type), m_pushList(alloc), m_popList(alloc)
     {
     }
 };

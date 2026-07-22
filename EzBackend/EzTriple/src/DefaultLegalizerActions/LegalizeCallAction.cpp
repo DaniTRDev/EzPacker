@@ -32,7 +32,7 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
     {
         // We need to allocate the data before actually passing it.
         MirType *ptrType = m_ctx->getTypeTable()->getPtr(retType);
-        sretAddrReg = opBuilder.buildVReg(ptrType, "sret_alloc_ptr", instr->getSourceRef());
+        sretAddrReg = opBuilder.buildVReg(ptrType, "sRetPtr", instr->getSourceRef());
 
         builder.ALLOC(instr->getSourceRef(), sretAddrReg);
         auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "LegalizeCallAction");

@@ -19,6 +19,14 @@ class CallAbiLowererVerifier : public MirPassVerifier<FunctionAbiLowererPass, Ca
      */
     CallAbiLowererVerifier &verifyLoweredCall(MirBlock *targetBlock, const std::vector<MirOperand *> &origPushArgs);
 
+    /**
+     * Verifies that after the call of the given target block, there is a POP_RET instructions that retrieves the return
+     * value of the called function.
+     * @param targetBlock
+     * @param origRet
+     */
+    CallAbiLowererVerifier &verifyLoweredCallReturn(MirBlock *targetBlock, MirOperand *origRet);
+
   private:
     MirBuilderContext *m_ctx;
 };

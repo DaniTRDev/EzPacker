@@ -259,6 +259,126 @@ bool AbiLowerer::processCallBlock(CallingConvDesc *cc,
     return true;
 }
 
+bool AbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
+                                        MirBlock *targetBlock,
+                                        MirFunction *func,
+                                        std::pmr::list<MirInstruction *>::iterator it,
+                                        std::pmr::vector<MirInstruction *> &popRets)
+{
+
+    // If the called function produces no return value (or no POP_RET was bound), there is nothing to lower.
+    if (popRets.empty())
+    {
+        return true;
+    }
+
+    MirInstruction *callInstr = *it;
+
+    // Insert return value extraction instructions AFTER the CALL instruction
+    auto insertIt = std::next(it);
+    MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, insertIt);
+    MirOperandBuilder oBuilder(m_ctx);
+
+    // Call state for querying the return location according to ABI rules
+    CallLoweringState callState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+
+    for (size_t retIdx = 0; retIdx < popRets.size(); ++retIdx)
+    {
+        MirInstruction *popRetInstr = popRets[retIdx];
+        MirOperand *destVal = popRetInstr->getOperands()[1];
+        MirType *retType = destVal->getMirType();
+
+        // Query Calling Convention for return value location
+        ArgumentLocationDesc retLoc = cc->getReturnLoc(retType, &callState);
+
+        switch (retLoc.getType())
+        {
+            case ArgLocationType::Register:
+            {
+                const RegLoc &reg = retLoc.getReg();
+                MirRegister *physReg = oBuilder.buildPhysReg(retType,
+                                                             reg.m_regId,
+                                                             std::format("call_ret{}", retIdx).c_str(),
+                                                             popRetInstr->getSourceRef());
+
+                // Emit: MOV destVReg, physReg (Extract physical return register into virtual register)
+                iBuilder.MOV(destVal, physReg);
+                break;
+            }
+
+            case ArgLocationType::Split:
+            {
+                MirRegister *destReg = destVal->get<MirRegister>();
+                if (!destReg)
+                {
+                    m_ctx->getDiagCollector()->builder(Diag_Error, "AbiLowerer")
+                            << popRetInstr->getSourceRef()
+                            << "Can't lower split return value into a non-register destination";
+                    return false;
+                }
+
+                const SplitLoc &split = retLoc.getSplit();
+
+                // Upstream scalar legalizer might have expanded POP_RET into separate chunks
+                if (popRets.size() <= split.m_parts.size())
+                {
+                    for (size_t p = 0; p < split.m_parts.size(); ++p)
+                    {
+                        const SplitPiece &piece = split.m_parts[p];
+                        MirType *pieceType = piece.m_type ? piece.m_type : m_ctx->getTypeTable()->i32();
+
+                        MirRegister *physReg = oBuilder.buildPhysReg(pieceType,
+                                                                     piece.m_regId,
+                                                                     std::format("call_splitRet{}", retIdx).c_str(),
+                                                                     popRetInstr->getSourceRef());
+
+                        // Store incoming physical return chunk into struct byte offset
+                        FlexInt pieceOffset(static_cast<int64_t>(piece.m_offsetInParam));
+                        MirMemory *mem = oBuilder.buildMem(m_ctx->getTypeTable()->getPtr(pieceType),
+                                                           destReg,
+                                                           pieceOffset,
+                                                           popRetInstr->getSourceRef());
+
+                        iBuilder.STORE(mem, physReg);
+                    }
+                }
+                else
+                {
+                    m_ctx->getDiagCollector()->builder(Diag_Error, "AbiLowerer")
+                            << popRetInstr->getSourceRef()
+                            << "Mismatched POP_RET count encountered for physical register split return rules.";
+                    return false;
+                }
+                break;
+            }
+
+            case ArgLocationType::Indirect:
+            {
+                const IndirectLoc &indirect = retLoc.getIndirect();
+
+                // Physical register containing the pointer to the indirect return storage (or return pointer register)
+                MirRegister *physReg = oBuilder.buildPhysReg(m_ctx->getTypeTable()->getPtr(retType),
+                                                             indirect.m_pointerStorage,
+                                                             std::format("call_indirectRetPtr{}", retIdx).c_str(),
+                                                             popRetInstr->getSourceRef());
+
+                // Move indirect return address/data pointer into target virtual register
+                iBuilder.MOV(destVal, physReg);
+                break;
+            }
+
+            default:
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Error, "AbiLowerer")
+                        << popRetInstr->getSourceRef() << "Unsupported call return location strategy requested.";
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 bool AbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                                           MirBlock *targetBlock,
                                           MirFunction *func,

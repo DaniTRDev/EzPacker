@@ -203,3 +203,127 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
 
     return *this;
 }
+
+CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCallReturn(MirBlock *targetBlock, MirOperand *origRet)
+{
+    MirFunction *func = targetBlock->getOwner();
+    CallingConvDesc *cc = func->getCallingConv();
+
+    auto &instructions = targetBlock->getInstructions();
+    EXPECT_FALSE(instructions.empty()) << "Target block must not be empty.";
+
+    // 1. Ensure no POP_RET instructions remain anywhere in the block
+    for (const MirInstruction *instr : instructions)
+    {
+        EXPECT_NE(instr->getOpCode(), MirInstructionOpCode::POP_RET)
+                << "POP_RET instruction was not erased during processCallReturnBlock execution.";
+    }
+
+    // If there was no expected return operand (void or void call), we are done
+    if (!origRet)
+    {
+        return *this;
+    }
+
+    // 2. Locate the CALL instruction
+    auto callIt = instructions.end();
+    for (auto it = instructions.begin(); it != instructions.end(); ++it)
+    {
+        if ((*it)->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            callIt = it;
+            break;
+        }
+    }
+
+    EXPECT_NE(callIt, instructions.end()) << "Could not find CALL instruction in target block.";
+
+    // Extraction instructions must begin immediately AFTER the CALL
+    auto postCallIt = std::next(callIt);
+    EXPECT_NE(postCallIt, instructions.end())
+            << "Expected return lowering instructions after CALL, but reached block end.";
+
+    CallLoweringState verifyState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    MirType *retType = origRet->getMirType();
+    ArgumentLocationDesc retLoc = cc->getReturnLoc(retType, &verifyState);
+
+    switch (retLoc.getType())
+    {
+        case ArgLocationType::Register:
+        {
+            const RegLoc &reg = retLoc.getReg();
+            MirInstruction *movInstr = *postCallIt++;
+
+            MirInstructionVerifier(movInstr).opcode(MirInstructionOpCode::MOV).operandCount(2);
+
+            // Operand 0: Virtual register receiving the return value
+            EXPECT_EQ(movInstr->getOperands()[0], origRet) << "MOV destination mismatch for call return value.";
+
+            // Operand 1: Physical register providing the return value (e.g., RAX / XMM0)
+            EXPECT_TRUE(movInstr->getOperands()[1]->isOfType<MirRegister>())
+                    << "MOV source must be a physical register for call return.";
+            MirRegister *srcReg = movInstr->getOperands()[1]->get<MirRegister>();
+            EXPECT_FALSE(srcReg->isVirtual()) << "Return register must be physical.";
+            EXPECT_EQ(srcReg->getRegId(), reg.m_regId) << "Physical return register ID mismatch.";
+            break;
+        }
+
+        case ArgLocationType::Split:
+        {
+            const SplitLoc &split = retLoc.getSplit();
+            MirRegister *destReg = origRet->get<MirRegister>();
+            EXPECT_NE(destReg, nullptr) << "Split return destination operand must be a register.";
+
+            for (size_t p = 0; p < split.m_parts.size(); ++p)
+            {
+                const SplitPiece &piece = split.m_parts[p];
+                EXPECT_NE(postCallIt, instructions.end()) << "Missing instruction for split return part " << p;
+                MirInstruction *storeInstr = *postCallIt++;
+
+                MirInstructionVerifier(storeInstr).opcode(MirInstructionOpCode::STORE).operandCount(2);
+
+                // Operand 0: Memory destination [destReg + offset]
+                EXPECT_TRUE(storeInstr->getOperands()[0]->isOfType<MirMemory>())
+                        << "STORE destination must be a memory operand for split return part " << p;
+                auto *memOp = storeInstr->getOperands()[0]->get<MirMemory>();
+                EXPECT_EQ(memOp->getBase(), destReg) << "Base register mismatch for split return store at part " << p;
+                EXPECT_EQ(memOp->getDisplacement()->getValue(), FlexInt(piece.m_offsetInParam))
+                        << "Byte offset mismatch for split return store at part " << p;
+
+                // Operand 1: Incoming physical return register chunk
+                EXPECT_TRUE(storeInstr->getOperands()[1]->isOfType<MirRegister>())
+                        << "STORE source must be a physical register for split return part " << p;
+                MirRegister *srcReg = storeInstr->getOperands()[1]->get<MirRegister>();
+                EXPECT_FALSE(srcReg->isVirtual());
+                EXPECT_EQ(srcReg->getRegId(), piece.m_regId)
+                        << "Split physical return register ID mismatch at part " << p;
+            }
+            break;
+        }
+
+        case ArgLocationType::Indirect:
+        {
+            const IndirectLoc &indirect = retLoc.getIndirect();
+            MirInstruction *movInstr = *postCallIt++;
+
+            MirInstructionVerifier(movInstr).opcode(MirInstructionOpCode::MOV).operandCount(2);
+
+            // Operand 0: Virtual register receiving the indirect return pointer
+            EXPECT_EQ(movInstr->getOperands()[0], origRet) << "Indirect return MOV destination mismatch.";
+
+            // Operand 1: Incoming physical register holding the indirect pointer
+            EXPECT_TRUE(movInstr->getOperands()[1]->isOfType<MirRegister>())
+                    << "Indirect return MOV source must be a physical register.";
+            MirRegister *srcReg = movInstr->getOperands()[1]->get<MirRegister>();
+            EXPECT_FALSE(srcReg->isVirtual());
+            EXPECT_EQ(srcReg->getRegId(), indirect.m_pointerStorage)
+                    << "Indirect return pointer physical register ID mismatch.";
+            break;
+        }
+
+        default:
+            EXPECT_TRUE(false) << "Unhandled ArgLocationType during verifyLoweredCallReturn.";
+    }
+
+    return *this;
+}
