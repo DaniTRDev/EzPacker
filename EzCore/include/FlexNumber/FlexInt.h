@@ -94,6 +94,11 @@ class FlexInt
     bool isPositive() const;
 
     /**
+     * Returns true if this is a signed number.
+     */
+    bool isSigned() const;
+
+    /**
      * Returns true if this number is zero.
      * @return
      */

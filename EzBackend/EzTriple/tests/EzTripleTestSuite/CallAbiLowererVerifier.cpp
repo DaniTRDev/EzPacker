@@ -37,8 +37,8 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
     EXPECT_NE(callIt, instructions.end()) << "Could not find CALL instruction in target block.";
     MirInstruction *callInstr = *callIt;
 
-    // Verify CALL instruction was standardized (token binding operands cleared)
-    MirInstructionVerifier(callInstr).operandCount(0);
+    // Verify CALL instruction was standardized (token binding operand cleared, just callee ref)
+    MirInstructionVerifier(callInstr).operandCount(1);
 
     CallLoweringState callState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
 

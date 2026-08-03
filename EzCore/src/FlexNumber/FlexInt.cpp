@@ -109,6 +109,8 @@ bool FlexInt::isOdd() const { return mp_isodd(&m_number) == MP_YES; }
 
 bool FlexInt::isPositive() const { return !isNeg() && !isZero(); }
 
+bool FlexInt::isSigned() const { return m_isSigned; }
+
 bool FlexInt::isZero() const { return mp_iszero(&m_number) == MP_YES; }
 
 bool FlexInt::operator>(const FlexInt &other) const

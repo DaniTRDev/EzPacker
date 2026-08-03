@@ -254,7 +254,7 @@ bool AbiLowerer::processCallBlock(CallingConvDesc *cc,
     }
 
     // Clear token binding operands from the CALL instruction so it becomes a standard MIR call.
-    callInstr->getOperands().clear();
+    callInstr->getOperands().erase(callInstr->getOperands().begin());
 
     return true;
 }
