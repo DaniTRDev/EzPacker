@@ -37,7 +37,7 @@ std::shared_ptr<TargetDesc> MirTripleTestSuiteAsGtest::createTargetDesc()
 
 std::shared_ptr<MirLegalizer> MirTripleTestSuiteAsGtest::createTargetLegalizer()
 {
-    std::shared_ptr<MirLegalizer> legalizer = std::make_shared<MirLegalizer>(getBuilderCtx(), getTargetDesc());
+    std::shared_ptr<MirLegalizer> legalizer = std::make_shared<MirLegalizer>(getBuilderCtx());
     EzTripleTestLegalizer::create(getBuilderCtx(), legalizer.get());
 
     return legalizer;

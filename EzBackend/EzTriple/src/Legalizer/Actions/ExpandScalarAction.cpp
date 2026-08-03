@@ -1,24 +1,24 @@
-#include "DefaultLegalizerActions/ExpandScalarAction.h"
+#include "Legalizer/Actions/ExpandScalarAction.h"
 
-ExpandScalarAction::ExpandScalarAction(MirBuilderContext *ctx, TargetDesc *target) : m_ctx(ctx), m_target(target) {}
-
-const char *ExpandScalarAction::getName() { return "ExpandScalarAction"; }
-
-LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &instrList,
-                                             std::pmr::list<struct MirInstruction *>::iterator it)
+namespace LegalizeActions
 {
+LegalizationResult ExpandScalar(LegalizeCtx &ctx)
+{
+    auto it = ctx.m_it;
+    MirBuilderContext *builderCtx = ctx.m_ctx;
     MirInstruction *instr = *it;
     auto &operands = instr->getOperands();
+    auto &expandMap = ctx.m_expandMap;
 
-    const ExpansionRecipe *recipe = m_target->getExpansionRecipeForInstr(instr->getOpCode());
+    const ExpansionRecipe *recipe = ctx.m_targetDesc->getExpansionRecipeForInstr(instr->getOpCode());
     if (!recipe)
     {
-        return { .m_executed = true, .m_succeeded = true, .m_mirChanged = false };
+        return LegalizationResult::AlreadyLegal;
     }
 
-    const auto &typeTable = m_ctx->getTypeTable();
-    MirOperandBuilder opBuilder(m_ctx);
-    MirInstructionBuilder insertBeforeBuilder(m_ctx, instr->getOwner(), InsertionType::InsertBefore, it);
+    const auto &typeTable = builderCtx->getTypeTable();
+    MirOperandBuilder opBuilder(builderCtx);
+    MirInstructionBuilder insertBeforeBuilder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
 
     // Identify tokenized context boundaries
     bool op0IsToken =
@@ -30,7 +30,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
     MirType *fullType = operands[payloadIdx]->getMirType();
     MirType *halfType = typeTable->getIntegerTypeBySize(fullType->getTotalSizeInBits() / 2);
 
-    m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+    builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
             << std::format("Expanding wide type '{}' into halves of '{}'", fullType->getName(), halfType->getName())
                        .c_str()
             << instr->getSourceRef();
@@ -43,14 +43,14 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         if (operands[0]->isOfType<MirRegister>())
         {
             MirRegister *dest = operands[0]->get<MirRegister>();
-            auto destIt = m_expandMap.find(dest->getRegId());
+            auto destIt = expandMap.find(dest->getRegId());
 
-            if (destIt != m_expandMap.end())
+            if (destIt != expandMap.end())
             {
                 destLo = destIt->second.first;
                 destHi = destIt->second.second;
 
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
                         << std::format("Reusing split dst register '{}', '{}' and '{}'",
                                        dest->getName(),
                                        destLo->get<MirRegister>()->getName(),
@@ -63,7 +63,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                 destLo = opBuilder.buildVReg(halfType, dest->getName() + "_lo", dest->getSourceRef());
                 destHi = opBuilder.buildVReg(halfType, dest->getName() + "_hi", dest->getSourceRef());
 
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
                         << std::format("Split dst register '{}' into '{}' and '{}'",
                                        dest->getName(),
                                        destLo->get<MirRegister>()->getName(),
@@ -71,7 +71,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                                    .c_str()
                         << dest->getSourceRef();
 
-                m_expandMap[dest->getRegId()] = std::make_pair((MirRegister *)destLo, (MirRegister *)destHi);
+                expandMap[dest->getRegId()] = std::make_pair((MirRegister *)destLo, (MirRegister *)destHi);
             }
         }
         else
@@ -98,14 +98,14 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         if (source->isOfType<MirRegister>())
         {
             MirRegister *r = source->get<MirRegister>();
-            auto srcIt = m_expandMap.find(r->getRegId());
+            auto srcIt = expandMap.find(r->getRegId());
 
-            if (srcIt != m_expandMap.end())
+            if (srcIt != expandMap.end())
             {
                 srcLo = srcIt->second.first;
                 srcHi = srcIt->second.second;
 
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
                         << std::format("Reusing split src register '{}', '{}' and '{}'",
                                        r->getName(),
                                        srcLo->get<MirRegister>()->getName(),
@@ -120,7 +120,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                     srcLo = opBuilder.buildVReg(halfType, r->getName() + "_lo", source->getSourceRef());
                     srcHi = opBuilder.buildVReg(halfType, r->getName() + "_hi", source->getSourceRef());
 
-                    m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+                    builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
                             << std::format("Split scr register '{}' into '{}' and '{}'",
                                            r->getName(),
                                            srcLo->get<MirRegister>()->getName(),
@@ -128,7 +128,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
                                        .c_str()
                             << source->getSourceRef();
 
-                    m_expandMap[r->getRegId()] = std::make_pair((MirRegister *)srcLo, (MirRegister *)srcHi);
+                    expandMap[r->getRegId()] = std::make_pair((MirRegister *)srcLo, (MirRegister *)srcHi);
                 }
                 else
                 {
@@ -143,7 +143,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
             srcLo = opBuilder.buildInt(halfType, val.getLowHalf(), source->getSourceRef());
             srcHi = opBuilder.buildInt(halfType, val.getHighHalf(), source->getSourceRef());
 
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
+            builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
                     << std::format("Split integer literal value '{}' into '{}' and '{}'",
                                    source->toString(),
                                    srcLo->get<MirInteger>()->getValue().toString(16),
@@ -153,9 +153,9 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
         }
         else if (source->isOfType<MirFloat>())
         {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "ExpandScalarAction")
+            builderCtx->getDiagCollector()->builder(Diag_Error, "ExpandScalarAction")
                     << "Can't expand floating point instructions" << instr->getSourceRef();
-            return { .m_executed = true, .m_succeeded = false, .m_mirChanged = false };
+            return LegalizationResult::LegalizationError;
         }
         else
         {
@@ -276,6 +276,7 @@ LegalizeActionResult ExpandScalarAction::run(std::pmr::list<MirInstruction *> &i
     }
 
     // Erase original unexpanded instruction
-    instrList.erase(it);
-    return { .m_executed = true, .m_succeeded = true, .m_mirChanged = true };
+    ctx.m_instrList->erase(it);
+    return LegalizationResult::Legalized;
 }
+} // namespace LegalizeActions

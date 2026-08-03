@@ -1,12 +1,6 @@
 # CMake configurator for https://bellard.org/libbf/
 
 set(LIBBF_FILES_LIST
-        "include/cutils.h"
-        "include/libbf.h"
-        "include/list.h"
-        "include/softfp.h"
-        "include/softfp_template.h"
-        "include/softfp_template_icvt.h"
 
         "src/cutils.c"
         "src/libbf.c"

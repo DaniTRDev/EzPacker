@@ -22,7 +22,7 @@ TEST_F(TestScalarExpanstionAction, Expand128BitAddRegReg)
     addTestInstructionRegReg(MirInstructionOpCode::ADD, i128, i128);
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
@@ -59,7 +59,7 @@ TEST_F(TestScalarExpanstionAction, Expand128BitCallReg)
     builder.CALL(opBuilder.buildRef(getTestFunc()), opBuilder.buildVReg(i128, "testParam"));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
@@ -99,7 +99,7 @@ TEST_F(TestScalarExpanstionAction, Expand256BitCallImm)
                          FlexInt("BA50B51C48B0AD923D18198EC90D2F08FF9FB76E997408E473A37C572B714B52", 256, false, 16)));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
@@ -152,7 +152,7 @@ TEST_F(TestScalarExpanstionAction, Expand256BitAddRegImm)
             FlexInt("BA50B51C48B0AD923D18198EC90D2F08FF9FB76E997408E473A37C572B714B52", 256, false, 16));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
@@ -205,7 +205,7 @@ TEST_F(TestScalarExpanstionAction, Expand128BitAddRegRegAndReuse)
     instr2->getOperands()[1] = instr1->getOperands()[1]; // Ensure instr 2 uses same src operand.
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
@@ -254,7 +254,7 @@ TEST_F(TestScalarExpanstionAction, Expand128BitUDivRegReg)
     addTestInstructionRegReg(MirInstructionOpCode::DIV, i128, i128);
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
     expandVerifier.beginBlock(block);
@@ -285,7 +285,7 @@ TEST_F(TestScalarExpanstionAction, Expand128BitLoadRegMem)
     addTestInstructionRegMem(MirInstructionOpCode::LOAD, i128, i128, FlexInt(0, 64));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
     MirOperandBuilder opBuilder(getBuilderCtx());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);
@@ -325,7 +325,7 @@ TEST_F(TestScalarExpanstionAction, Expand256BitLoadRegMem)
     addTestInstructionRegMem(MirInstructionOpCode::LOAD, i256, i256, FlexInt(0, 64));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
     MirOperandBuilder opBuilder(getBuilderCtx());
 
     ExpandScalarActionVerifier expandVerifier(getBuilderCtx(), pass);

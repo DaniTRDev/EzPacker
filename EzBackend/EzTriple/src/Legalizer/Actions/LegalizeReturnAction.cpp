@@ -1,23 +1,22 @@
-#include "DefaultLegalizerActions/LegalizeReturnAction.h"
+#include "Legalizer/Actions/LegalizeReturnAction.h"
 
-LegalizeReturnAction::LegalizeReturnAction(MirBuilderContext *ctx) : m_ctx(ctx) {}
-
-const char *LegalizeReturnAction::getName() { return "LegalizeReturnAction"; }
-
-LegalizeActionResult LegalizeReturnAction::run(std::pmr::list<MirInstruction *> &instrList,
-                                               std::pmr::list<struct MirInstruction *>::iterator it)
+namespace LegalizeActions
 {
+LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
+{
+    auto it = ctx.m_it;
+    MirBuilderContext *builderCtx = ctx.m_ctx;
     MirInstruction *instr = *it;
     auto &operands = instr->getOperands();
 
     MirBlock *owningBlock = instr->getOwner();
     MirFunction *owningFunc = owningBlock->getOwner();
     CallingConvDesc *cc = owningFunc->getCallingConv();
-    MirInstructionBuilder insertBeforeBuilder(m_ctx, owningBlock, InsertionType::InsertBefore, it);
-    MirOperandBuilder opBuilder(m_ctx);
+    MirInstructionBuilder insertBeforeBuilder(builderCtx, owningBlock, InsertionType::InsertBefore, it);
+    MirOperandBuilder opBuilder(builderCtx);
 
     // Create a unique return tracking token (virtual register)
-    MirRegister *retToken = opBuilder.buildVReg(m_ctx->getTypeTable()->getBindingToken());
+    MirRegister *retToken = opBuilder.buildVReg(builderCtx->getTypeTable()->getBindingToken());
 
     // For non-void functions.
     if (!operands.empty())
@@ -30,7 +29,7 @@ LegalizeActionResult LegalizeReturnAction::run(std::pmr::list<MirInstruction *> 
             // By convention the sretPtr is stored in the first parameter, ALWAYS.
             MirRegister *sretPtr = owningFunc->getParameters().front();
 
-            auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "LegalizeReturnAction");
+            auto diag = builderCtx->getDiagCollector()->builder(Diag_Trace, "LegalizeReturnAction");
             diag << returnVal->getSourceRef() << "Function's returns expects an SRET, moving it";
             diag.appendNote(MirPrinter::printToString(sretPtr).c_str(), sretPtr->getSourceRef());
             diag.appendNote(MirPrinter::printToString(owningFunc, MirPrinterDetail::General).c_str(),
@@ -61,5 +60,6 @@ LegalizeActionResult LegalizeReturnAction::run(std::pmr::list<MirInstruction *> 
         operands.push_back(retToken);
     }
 
-    return { .m_executed = true, .m_succeeded = true, .m_mirChanged = true };
+    return LegalizationResult::Legalized;
 }
+}; // namespace LegalizeActions

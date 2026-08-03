@@ -51,6 +51,13 @@ class FlexFloat
     ~FlexFloat();
 
     /**
+     * Returns true if this number fits in a container of the given bitsize.
+     * @param bitWidth
+     * @return
+     */
+    bool fitsIn(size_t bitWidth) const;
+
+    /**
      * Returns true if a allocation panic or memory out-of-bounds flag occurred within the underlying library state.
      * @return true on internal memory exhaustion.
      */

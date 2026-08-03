@@ -1,45 +1,42 @@
 #include "Legalizer/MirLegalizer.h"
 
-MirLegalizer::MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc) :
-    m_ctx(ctx), m_targetDesc(targetDesc), m_expandScalarAct(ctx, targetDesc), m_legalizeCallAct(ctx),
-    m_legalizeRetAct(ctx), m_promoteScalarAct(ctx, targetDesc)
-{
-}
+MirLegalizer::MirLegalizer(MirBuilderContext *ctx) : m_ctx(ctx), m_rules(m_ctx->getGlobalAllocator()) {}
 
-ExpandScalarAction *MirLegalizer::getExpandScalarAction() { return &m_expandScalarAct; }
-
-LegalizeAction *MirLegalizer::getAction(MirInstruction *instr)
+LegalizationResult MirLegalizer::legalize(LegalizeCtx &ctx)
 {
     // Look up the registered rule sequence for this specific opcode
+    MirInstruction *instr = *ctx.m_it;
     auto it = m_rules.find(instr->getOpCode());
     if (it == m_rules.end())
     {
         // No explicit rules registered; fall back to the default error/unsupported handler
-        return IlegalAction;
+        return LegalizationResult::NoRule;
     }
-
-    LegalizeRuleOperand op{ .m_ctx = m_ctx, .m_instr = instr };
 
     // Evaluate rules in insertion order (First-Match Wins Strategy)
     for (const auto &rule : it->second)
     {
-        if (rule.m_predicate(op))
+        if (rule.m_predicate(ctx))
         {
-            return rule.m_act;
+            auto diag = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirLegalizer");
+            diag << "Executing legalization action";
+            diag.appendNote(std::format("Action name: {}", rule.m_name).c_str(), nullptr);
+            diag.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
+                            instr->getSourceRef());
+            diag.flush();
+
+            return rule.m_act(ctx);
         }
     }
 
     // Revert to fallback if none of the rule filters matched the instruction layout context
-    return IlegalAction;
+    return LegalizationResult::NoRule;
 }
 
-LegalizeCallAction *MirLegalizer::getCallAct() { return &m_legalizeCallAct; }
-
-LegalizeReturnAction *MirLegalizer::getReturnAct() { return &m_legalizeRetAct; }
-
-PromoteScalarAction *MirLegalizer::getPromoteScalarAction() { return &m_promoteScalarAct; }
-
-void MirLegalizer::addRule(MirInstructionOpCode opcode, std::pmr::vector<LegalizeRule> rules)
+void MirLegalizer::addRule(bool priority, MirInstructionOpCode opcode, const LegalizeRule &rule)
 {
-    m_rules[opcode] = std::move(rules);
+    if (priority)
+        m_rules[opcode].insert(m_rules[opcode].begin(), rule);
+    else
+        m_rules[opcode].push_back(rule);
 }

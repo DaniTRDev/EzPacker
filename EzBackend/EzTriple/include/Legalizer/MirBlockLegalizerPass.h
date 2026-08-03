@@ -8,11 +8,9 @@ class MirBlockLegalizerPass : public IMirTransformPass
 {
   public:
     /**
-     * Creates the pass linked to the given legalizer and builder context.
-     * @param ctx
-     * @param legalizer
+     * Creates the pass linked to the given legalizer, builder context adn target description.
      */
-    MirBlockLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer);
+    MirBlockLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer, TargetDesc *targetDesc);
 
     /**
      * Returns "MirBlockLegalizerPass".
@@ -43,10 +41,11 @@ class MirBlockLegalizerPass : public IMirTransformPass
     void printResult() const override;
 
   private:
+    LegalizeCtx m_legalizeCtx;
     MirBuilderContext *m_ctx;
     MirLegalizer *m_legalizer;
-    std::set<size_t> m_modifiedBlockSet; // Used to push a block exactly ONCE to the list.
-    std::list<MirBlock *> m_modifiedBlocks;
+    std::pmr::set<size_t> m_modifiedBlockSet; // Used to push a block exactly ONCE to the list.
+    std::pmr::list<MirBlock *> m_modifiedBlocks;
 };
 
 #endif // EZPACKER_MIRBLOCKLEGALIZERPASS_H

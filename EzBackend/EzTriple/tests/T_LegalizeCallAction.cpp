@@ -25,7 +25,7 @@ TEST_F(TestLegalizeCallAct, TestNoArgsVoid)
     // Capture original state layout for verification tracking: [Callee]
     std::vector<MirOperand *> expectedOrigOperands{ callRef };
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
     // Assert: No PUSH_ARGs, CALL truncated to [Token, Callee], No POP_RET
@@ -54,7 +54,7 @@ TEST_F(TestLegalizeCallAct, Test1ArgVoid)
     // Build a VOID CALL. The first operand is the Callee Target Reference.
     auto callInstr = builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1]);
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
     // We expect exactly one token-bound PUSH_ARG for our argument, followed by the CALL instruction truncated.
@@ -86,7 +86,7 @@ TEST_F(TestLegalizeCallAct, Test1ArgWithReturn)
 
     // Build: CALL %destReg, %func, %arg
     auto callInstr = builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1], expectedOrigOperands[2]);
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
     // Assert: PUSH_ARG %token, %arg, CALL %token, callee, followed by POP_RET %token, %destReg
@@ -130,7 +130,7 @@ TEST_F(TestLegalizeCallAct, Test5ArgWithReturn)
                                   expectedOrigOperands[5],
                                   expectedOrigOperands[6]);
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
     // Assert the exact token-bound sequence across all 5 parameter push nodes and pop return.
@@ -166,7 +166,7 @@ TEST_F(TestLegalizeCallAct, TestSretCallLegalization)
     auto callInstr = builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1], expectedOrigOperands[2]);
 
     // Execute the legalizer pass over the block stream
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
     // Assert: ALLOC, PUSH_ARG sret_ptr, PUSH_ARG user_arg, CALL call_token, callee (No POP_RET)

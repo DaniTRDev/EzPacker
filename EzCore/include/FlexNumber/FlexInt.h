@@ -64,6 +64,14 @@ class FlexInt
     ~FlexInt();
 
     /**
+     * Returns true if this number fits in a container of the given bitSize and signedess.
+     * @param bitSize
+     * @param _signed
+     * @return
+     */
+    bool fitsIn(size_t bitSize, bool _signed);
+    
+    /**
      * Returns true if this number threw an error somewhere during its uses.
      * @return
      */

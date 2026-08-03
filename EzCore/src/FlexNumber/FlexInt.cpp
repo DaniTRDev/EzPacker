@@ -99,6 +99,51 @@ FlexInt::FlexInt(const std::string_view &numberStr, size_t bitWidth, bool _signe
 
 FlexInt::~FlexInt() { mp_clear(&m_number); }
 
+bool FlexInt::fitsIn(size_t bitSize, bool _signed)
+{
+    if (bitSize == 0)
+    {
+        return false;
+    }
+    
+    mp_int maxVal, minVal;
+    if (mp_init_multi(&maxVal, &minVal, nullptr) != MP_OKAY)
+    {
+        return false;
+    }
+
+    if (_signed)
+    {
+        // Signed bounds:
+        // maxVal = 2^(bitSize - 1) - 1
+        // minVal = -2^(bitSize - 1)
+        if (mp_2expt(&maxVal, static_cast<int>(bitSize - 1)) != MP_OKAY || mp_decr(&maxVal) != MP_OKAY ||
+            mp_2expt(&minVal, static_cast<int>(bitSize - 1)) != MP_OKAY || mp_neg(&minVal, &minVal) != MP_OKAY)
+        {
+            mp_clear_multi(&maxVal, &minVal, nullptr);
+            return false;
+        }
+    }
+    else
+    {
+        // Unsigned bounds:
+        // maxVal = 2^bitSize - 1
+        // minVal = 0
+        if (mp_2expt(&maxVal, static_cast<int>(bitSize)) != MP_OKAY || mp_decr(&maxVal) != MP_OKAY)
+        {
+            mp_clear_multi(&maxVal, &minVal, nullptr);
+            return false;
+        }
+        mp_zero(&minVal);
+    }
+
+    // Check bounds: minVal <= m_number && m_number <= maxVal
+    bool fits = (mp_cmp(&m_number, &minVal) != MP_LT) && (mp_cmp(&m_number, &maxVal) != MP_GT);
+
+    mp_clear_multi(&maxVal, &minVal, nullptr);
+    return fits;
+}
+
 bool FlexInt::hasError() const { return m_lastErr != MP_OKAY; }
 
 bool FlexInt::isEven() const { return mp_iseven(&m_number) == MP_YES; }

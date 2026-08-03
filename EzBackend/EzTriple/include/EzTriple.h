@@ -6,16 +6,24 @@
 #include "AbiLowerer/AbiLowerer.h"
 #include "AbiLowerer/FunctionAbiLowererPass.h"
 
-#include "DefaultLegalizerActions/ExpandScalarAction.h"
-#include "DefaultLegalizerActions/LegalizeCallAction.h"
-#include "DefaultLegalizerActions/LegalizeReturnAction.h"
-#include "DefaultLegalizerActions/PromoteScalarAction.h"
+#include "Legalizer/Actions/ExpandScalarAction.h"
+#include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeReturnAction.h"
+#include "Legalizer/Actions/PromoteScalarAction.h"
 
 #include "Descriptors/TargetDesc.h"
 
 #include "ExpansionRecipe/ExpansionRecipe.h"
 
-#include "Legalizer/LegalizeAction.h"
+#include "InstructionSelector/InstructionSelectionPredicates.h"
+#include "InstructionSelector/InstructionSelectionRuleBuilder.h"
+#include "InstructionSelector/MirInstructionSelector.h"
+#include "InstructionSelector/MirInstructionSelectorPass.h"
+
+#include "Legalizer/Actions/ExpandScalarAction.h"
+#include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeReturnAction.h"
+#include "Legalizer/Actions/PromoteScalarAction.h"
 #include "Legalizer/LegalizeRuleBuilder.h"
 #include "Legalizer/MirLegalizer.h"
 #include "Legalizer/MirBlockLegalizerPass.h"

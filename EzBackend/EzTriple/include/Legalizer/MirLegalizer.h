@@ -2,29 +2,37 @@
 #define EZPACKER_MIRLEGALIZER_H
 
 #include "EzTripleCommon.h"
-#include "LegalizeAction.h"
-#include "DefaultLegalizerActions/ExpandScalarAction.h"
-#include "DefaultLegalizerActions/LegalizeCallAction.h"
-#include "DefaultLegalizerActions/LegalizeReturnAction.h"
-#include "DefaultLegalizerActions/PromoteScalarAction.h"
+#include "Descriptors/TargetDesc.h"
 
 /**
- * This struct contains what's going to be checked to apply a legalization rule or not. This might be expanded in a
- * future to take in account more things.
+ * This struct contains what's going to be checked to apply a legalization rule or not as well as context-dependant
+ * assets that need to be passed down different actions.
  */
-struct LegalizeRuleOperand
+struct LegalizeCtx
 {
     MirBuilderContext *m_ctx{ nullptr };
-    MirInstruction *m_instr{ nullptr };
+    TargetDesc *m_targetDesc{ nullptr };
+    std::pmr::list<MirInstruction *> *m_instrList{ nullptr };
+    std::pmr::list<MirInstruction *>::iterator m_it;
+    std::pmr::map<size_t, MirRegister *> m_promotionMap;                        // Map used to store promoted registers.
+    std::pmr::map<size_t, std::pair<MirRegister *, MirRegister *>> m_expandMap; // orig, <low, high>
 };
 
-using LegalizeRulePredicate = std::function<bool(const LegalizeRuleOperand &op)>;
-inline LegalizeAction *LegalAction = reinterpret_cast<LegalizeAction *>(0);
-inline LegalizeAction *IlegalAction = reinterpret_cast<LegalizeAction *>(-1);
+enum class LegalizationResult : uint8_t
+{
+    AlreadyLegal,     // The instruction was already legal.
+    NoRule,           // The legalizer does not know how to legalize this instruction.
+    Legalized,        // The instruction was legalized successfully.
+    LegalizationError // There was an error during legalization in a particular action.
+};
+
+using LegalizeRulePredicate = std::function<bool(const LegalizeCtx &ctx)>;
+using LegalizeRuleAction = std::function<LegalizationResult(LegalizeCtx &ctx)>;
 
 struct LegalizeRule
 {
-    LegalizeAction *m_act; // Executed if m_predicate returns true.
+    const char *m_name;       // Debugging purposes.
+    LegalizeRuleAction m_act; // Executed if m_predicate returns true.
     LegalizeRulePredicate m_predicate;
 };
 
@@ -36,55 +44,27 @@ class MirLegalizer
      * @param diagnosticCollector
      * @param targetDesc
      */
-    MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc);
+    MirLegalizer(MirBuilderContext *ctx);
 
     /**
-     * Returns a pointer to the expand scalar action.
+     * Tries to legalize the instruction at ctx->instr. It will try one by one each rule and the first predicate that
+     * evaluates to true is the one whose action will be executed.
+     * @return
      */
-    ExpandScalarAction *getExpandScalarAction();
+    LegalizationResult legalize(LegalizeCtx &ctx);
 
     /**
-     * Gets the specific action for a specific instruction.
-     * Returns:
-     *  - LegalAction if the legalizer mark this instruction as LEGAL.
-     *  - IlegalAction if the legalizer doesn't know what to do with this instruction.
-     *  - Another action if the legalizer knows how to transform this illegal instruction into a legal one.
+     * Appends a rule for an opcode.
+     * If priority is set to true, it will be appended in the FRONT.
+     * If priority is set to false, it will be appended in the BACK.
      */
-    LegalizeAction *getAction(MirInstruction *instr);
-
-    /**
-     * Returns the action used to legalize calls.
-     */
-    LegalizeCallAction *getCallAct();
-
-    /**
-     * Returns the action used to legalize returns.
-     */
-    LegalizeReturnAction *getReturnAct();
-
-    /**
-     * Returns a pointer to the promote scalar action.
-     */
-    PromoteScalarAction *getPromoteScalarAction();
-
-    /**
-     * Sets the rules of an opcode. This will OVERWRITE any other set of rules.
-     */
-    void addRule(MirInstructionOpCode opcode, std::pmr::vector<LegalizeRule> rules);
-
-  private:
-    // Define the default actions linked to the target and context.
-    ExpandScalarAction m_expandScalarAct;
-    LegalizeCallAction m_legalizeCallAct;
-    LegalizeReturnAction m_legalizeRetAct;
-    PromoteScalarAction m_promoteScalarAct;
+    void addRule(bool priority, MirInstructionOpCode opcode, const LegalizeRule &rule);
 
   private:
     MirBuilderContext *m_ctx;
-    TargetDesc *m_targetDesc;
 
     // Make searches faster by sorting the rules based on the opcode.
-    std::map<MirInstructionOpCode, std::pmr::vector<LegalizeRule>> m_rules;
+    std::pmr::map<MirInstructionOpCode, std::pmr::vector<LegalizeRule>> m_rules;
 };
 
 #endif // EZPACKER_MIRLEGALIZER_H

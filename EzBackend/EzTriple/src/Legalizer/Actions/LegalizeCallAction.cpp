@@ -1,18 +1,16 @@
-#include "DefaultLegalizerActions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeCallAction.h"
 
-LegalizeCallAction::LegalizeCallAction(MirBuilderContext *ctx) : m_ctx(ctx) {}
-
-const char *LegalizeCallAction::getName() { return "LegalizeCallAction"; }
-
-LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &instrList,
-                                             std::pmr::list<struct MirInstruction *>::iterator it)
+namespace LegalizeActions
 {
+LegalizationResult LegalizeCall(LegalizeCtx &ctx)
+{
+    auto it = ctx.m_it;
+    MirBuilderContext *builderCtx = ctx.m_ctx;
     MirInstruction *instr = *it;
     auto &operands = instr->getOperands();
-    bool modifiedMir = false;
 
-    MirInstructionBuilder builder(m_ctx, instr->getOwner(), InsertionType::InsertBefore, it);
-    MirOperandBuilder opBuilder(m_ctx);
+    MirInstructionBuilder builder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
+    MirOperandBuilder opBuilder(builderCtx);
 
     /*
      * First operand = return place / destination.
@@ -25,17 +23,17 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
     bool isSretCall = cc && !cc->canReturnInRegs(retType);
 
     // Every call gets a unique call token to group its argument/return lifecycle.
-    MirRegister *callToken = opBuilder.buildVReg(m_ctx->getTypeTable()->getBindingToken());
+    MirRegister *callToken = opBuilder.buildVReg(builderCtx->getTypeTable()->getBindingToken());
     MirRegister *sretAddrReg = nullptr;
 
     if (isSretCall)
     {
         // We need to allocate the data before actually passing it.
-        MirType *ptrType = m_ctx->getTypeTable()->getPtr(retType);
+        MirType *ptrType = builderCtx->getTypeTable()->getPtr(retType);
         sretAddrReg = opBuilder.buildVReg(ptrType, "sRetPtr", instr->getSourceRef());
 
         builder.ALLOC(instr->getSourceRef(), sretAddrReg);
-        auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "LegalizeCallAction");
+        auto diag = builderCtx->getDiagCollector()->builder(Diag_Trace, "LegalizeCallAction");
         diag << instr->getSourceRef() << "Moving CALL result value to SRET (indirect) pointer";
         diag.appendNote("Target func: " + func->getName(), func->getSourceRef());
         diag.appendNote("SRET ptr: " + sretAddrReg->getName(), instr->getSourceRef());
@@ -43,7 +41,6 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
         // Since this call uses SRET, the actual destination register receives data indirectly.
         // Convert the CALL node to a tokenized tracking format.
         operands[0] = callToken;
-        modifiedMir = true;
     }
     else if (returnDest->isOfType<MirRegister>())
     {
@@ -54,13 +51,11 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
 
         // Swap the target return destination inside the CALL with our tracking token.
         operands[0] = callToken;
-        modifiedMir = true;
     }
     else
     {
         // For void functions, place the callToken at index 0.
         operands.insert(operands.begin(), callToken);
-        modifiedMir = true;
     }
 
     // Since we've standardized the layout, the callee reference sits at index 1,
@@ -71,18 +66,17 @@ LegalizeActionResult LegalizeCallAction::run(std::pmr::list<MirInstruction *> &i
     if (isSretCall && sretAddrReg)
     {
         builder.PUSH_ARG(instr->getSourceRef(), callToken, sretAddrReg);
-        modifiedMir = true;
     }
 
     // Insert PUSH_ARG instructions BEFORE THE CALL for all user arguments
     for (size_t i = startingId; i < operands.size(); ++i)
     {
         builder.PUSH_ARG(instr->getSourceRef(), callToken, operands[i]);
-        modifiedMir = true;
     }
 
     // Clear the high-level parameter list out of the core CALL instruction.
     // It now only tracks: [callToken, calleeTarget]
     operands.erase(operands.begin() + int64_t(startingId), operands.end());
-    return { .m_executed = true, .m_succeeded = true, .m_mirChanged = modifiedMir };
+    return LegalizationResult::Legalized;
 }
+}; // namespace LegalizeActions

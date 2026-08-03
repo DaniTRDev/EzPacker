@@ -1,7 +1,15 @@
 #include "Legalizer/MirBlockLegalizerPass.h"
 
-MirBlockLegalizerPass::MirBlockLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer) :
-    m_ctx(ctx), m_legalizer(legalizer)
+MirBlockLegalizerPass::MirBlockLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer, TargetDesc *targetDesc) :
+    m_ctx(ctx), m_legalizer(legalizer), m_modifiedBlockSet(ctx->getGlobalAllocator()),
+    m_modifiedBlocks(ctx->getGlobalAllocator()),
+    m_legalizeCtx(LegalizeCtx{
+            .m_ctx = ctx,
+            .m_targetDesc = targetDesc,
+            .m_instrList = {},
+            .m_it = {},
+            .m_promotionMap = std::pmr::map<size_t, MirRegister *>(ctx->getGlobalAllocator()),
+            .m_expandMap = std::pmr::map<size_t, std::pair<MirRegister *, MirRegister *>>(ctx->getGlobalAllocator()) })
 {
 }
 
@@ -19,42 +27,30 @@ MirPassResult MirBlockLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
     {
         modifiedThisIt = false;
         auto instrIt = instructions.begin();
+        m_legalizeCtx.m_instrList = currentBlock->getInstructionsPtr();
+
         for (; instrIt != instructions.end(); instrIt++)
         {
+            m_legalizeCtx.m_it = instrIt;
             MirInstruction *instr = *instrIt;
-            LegalizeAction *action = m_legalizer->getAction(instr);
+            LegalizationResult res = m_legalizer->legalize(m_legalizeCtx);
 
-            if (action == LegalAction)
+            switch (res)
             {
-                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
-                log << "LEGAL";
-                log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
-                               instr->getSourceRef());
-            }
-            else if (action == IlegalAction)
-            {
-                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
-                log << "Could not get action for instr";
-                log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
-                               instr->getSourceRef());
-            }
-            else
-            {
-                auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
-                log << std::format("Illegal Instruction, applying {}", action->getName()).c_str();
-                log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
-                               instr->getSourceRef());
-                log.flush();
-
-                LegalizeActionResult actionRes = action->run(instructions, instrIt);
-
-                if (!actionRes.m_succeeded)
+                case LegalizationResult::AlreadyLegal:
                 {
-                    succeeded = false;
-                    break;
+                    continue;
                 }
+                case LegalizationResult::NoRule:
+                {
+                    auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
+                    log << "No legalization rule defined for instruction";
+                    log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
+                                   instr->getSourceRef());
 
-                if (actionRes.m_mirChanged)
+                    return { .m_modifiedMir = modifiedRes, .m_executed = true, .m_succeeded = false };
+                };
+                case LegalizationResult::Legalized:
                 {
                     modifiedThisIt = true;
                     if (!m_modifiedBlockSet.contains(currentBlock->getId()))
@@ -62,7 +58,17 @@ MirPassResult MirBlockLegalizerPass::run(std::pmr::list<MirBlock *> &blockList,
                         m_modifiedBlocks.push_back(currentBlock);
                         m_modifiedBlockSet.insert(currentBlock->getId());
                     }
+                    break;
                 }
+                case LegalizationResult::LegalizationError:
+                {
+                    auto log = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirBlockLegalizerPass");
+                    log << "Error during instruction legalization";
+                    log.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
+                                   instr->getSourceRef());
+
+                    return { .m_modifiedMir = modifiedRes, .m_executed = true, .m_succeeded = false };
+                };
             }
         }
 

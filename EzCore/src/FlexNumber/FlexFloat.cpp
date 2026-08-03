@@ -79,6 +79,55 @@ FlexFloat::~FlexFloat()
     libbf::bf_context_end(&m_bfCtx);
 }
 
+bool FlexFloat::fitsIn(size_t bitWidth) const
+{
+    if (bitWidth == 0)
+    {
+        return false;
+    }
+
+    // NaN and Infinities are representable in valid float layouts of any width
+    if (libbf::bf_is_nan(&m_number) || !libbf::bf_is_finite(&m_number))
+    {
+        return true;
+    }
+
+    // Zero fits in any floating-point target size
+    if (libbf::bf_is_zero(&m_number))
+    {
+        return true;
+    }
+
+    // Checking standard target widths (32-bit single, 64-bit double) for faster times.
+    double currentVal;
+    libbf::bf_get_float64(&m_number, &currentVal, libbf::BF_RNDN);
+
+    if (bitWidth <= 32)
+    {
+        // Check if value exceeds IEEE 754 single-precision (binary32) bounds
+        double maxFloat = static_cast<double>(std::numeric_limits<float>::max());
+        return (currentVal >= -maxFloat && currentVal <= maxFloat);
+    }
+
+    if (bitWidth <= 64)
+    {
+        // Check if value exceeds IEEE 754 double-precision (binary64) bounds
+        // If it converted to infinite double via libbf_get_float64, it exceeds f64
+        return !std::isinf(currentVal);
+    }
+
+    // For arbitrary precision (>64 bits), construct a temporary FlexFloat context
+    // and round to target precision to verify it doesn't overflow to infinity.
+    FlexFloat tempCopy(*this);
+    tempCopy.m_bitWidth = bitWidth;
+
+    // Attempt rounding to target precision bits
+    libbf::bf_round(&tempCopy.m_number, tempCopy.getPrecBits(), libbf::BF_RNDN);
+
+    // If rounding yields infinity, the value was too large for bitWidth
+    return libbf::bf_is_finite(&tempCopy.m_number);
+}
+
 bool FlexFloat::hasError() const { return (m_lastErr & BF_ST_MEM_ERROR) != 0; }
 
 bool FlexFloat::isNeg() const { return m_number.sign != 0 && !libbf::bf_is_nan(&m_number); }

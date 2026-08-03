@@ -1,31 +1,30 @@
-#include "DefaultLegalizerActions/PromoteScalarAction.h"
+#include "Legalizer/Actions/PromoteScalarAction.h"
 #include "Diagnostics/DiagnosticMessage.h"
 #include "Operand/MirOperands.h"
 
-PromoteScalarAction::PromoteScalarAction(MirBuilderContext *ctx, TargetDesc *target) : m_ctx(ctx), m_target(target) {}
-
-const char *PromoteScalarAction::getName() { return "PromoteScalar"; }
-
-LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &instrList,
-                                              std::pmr::list<class MirInstruction *>::iterator it)
+namespace LegalizeActions
 {
+LegalizationResult PromoteScalar(LegalizeCtx &ctx)
+{
+    auto it = ctx.m_it;
+    auto &promotionMap = ctx.m_promotionMap;
+    MirBuilderContext *builderCtx = ctx.m_ctx;
     MirInstruction *instr = *it;
     auto &operands = instr->getOperands();
-    bool modifiedMir = false;
     bool _signed = instr->isSigned();
-    MirOperandBuilder opBuilder(m_ctx);
-    MirInstructionBuilder insertBeforeBuilder(m_ctx, instr->getOwner(), InsertionType::InsertBefore, it);
+    MirOperandBuilder opBuilder(builderCtx);
+    MirInstructionBuilder insertBeforeBuilder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
 
     for (size_t i = 0; i < operands.size(); i++)
     {
         MirOperand *operand = operands[i];
         MirType *origType = operand->getMirType();
-        MirType *promotedType = m_target->getNearestLegalType(origType);
+        MirType *promotedType = ctx.m_targetDesc->getNearestLegalType(origType);
         OperandConstraint constraint = instr->getMetadata().m_operandConstraints[i];
 
         if (!promotedType)
         {
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+            builderCtx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
                     << "Unknown promotion type for operand, skipping" << operand->getSourceRef();
 
             continue;
@@ -37,18 +36,16 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
             continue;
         }
 
-        modifiedMir = true;
-
         if (operand->isOfType<MirRegister>())
         {
             bool newPromotion = false;
             MirRegister *targetReg = operand->get<MirRegister>(), *promotedReg = nullptr;
-            auto promotedIt = m_promotionMap.find(targetReg->getRegId());
+            auto promotedIt = promotionMap.find(targetReg->getRegId());
 
-            if (promotedIt != m_promotionMap.end())
+            if (promotedIt != promotionMap.end())
             {
                 promotedReg = promotedIt->second;
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                builderCtx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
                         << std::format("Reusing promotion of register '{}' to '{}'",
                                        targetReg->toString(),
                                        promotedReg->toString())
@@ -57,7 +54,7 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
             }
             else
             {
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+                builderCtx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
                         << std::format("Promoting register '{}' from '{}' to '{}'",
                                        targetReg->getName(),
                                        origType->getName(),
@@ -66,7 +63,7 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
                         << targetReg->getSourceRef();
 
                 promotedReg = opBuilder.buildVReg(promotedType, targetReg->getName() + "_promoted");
-                m_promotionMap[targetReg->getRegId()] = promotedReg;
+                promotionMap[targetReg->getRegId()] = promotedReg;
                 newPromotion = true;
             }
 
@@ -98,7 +95,7 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
         {
             auto *intImm = operand->get<MirInteger>();
 
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+            builderCtx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
                     << std::format("Promoting immediate integer '{}' from {} to {}",
                                    intImm->toString(),
                                    origType->getName(),
@@ -114,7 +111,7 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
         {
             auto *floatImm = operand->get<MirFloat>();
 
-            m_ctx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
+            builderCtx->getDiagCollector()->builder(Diag_Trace, "PromoteScalarAction")
                     << std::format("Promoting immediate float '{}' to '{}'",
                                    floatImm->toString(),
                                    promotedType->getName())
@@ -126,5 +123,6 @@ LegalizeActionResult PromoteScalarAction::run(std::pmr::list<MirInstruction *> &
         }
     }
 
-    return { .m_executed = true, .m_succeeded = true, .m_mirChanged = modifiedMir };
+    return LegalizationResult::Legalized;
 }
+}; // namespace LegalizeActions
