@@ -4,7 +4,8 @@
 #include "EzMirCommon.h"
 
 /**
- * Simple type used to abstract the register ID field as this may change in a future.
+ * Simple type used to abstract the register ID field as this may change in a future. THIS WILL COLLIDE
+ * WITH MirId!
  */
 using PhysicalRegId = size_t;
 
@@ -55,7 +56,7 @@ struct StackLoc
  */
 struct SplitPiece
 {
-    PhysicalRegId m_regId;
+    PhysicalRegId m_reg;
     class MirType *m_type;
     size_t m_offsetInParam; // Byte offset from the start of the user's variable
 };
@@ -86,11 +87,11 @@ class ArgumentLocationDesc
 
     /**
      * Creates a register location with the given parameters.
-     * @param regId
+     * @param reg
      * @param sizeInBytes
      * @return
      */
-    static ArgumentLocationDesc Reg(PhysicalRegId regId, size_t sizeInBytes);
+    static ArgumentLocationDesc Reg(PhysicalRegId reg, size_t sizeInBytes);
 
     /**
      * Creates an indirect location with the given parameters.

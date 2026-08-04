@@ -10,7 +10,10 @@ MirPassResult RegisterAllocatorPass::run(std::pmr::list<class MirFunction *> &fu
                                          std::pmr::list<class MirFunction *>::iterator it,
                                          class MirPassManager *passManager)
 {
-    return IMirTransformPass::run(funcList, it, passManager);
+    MirFunction *func = *it;
+
+
+    return { .m_modifiedMir = true, .m_executed = true, .m_succeeded = true };
 }
 
 void RegisterAllocatorPass::printResult() const {}

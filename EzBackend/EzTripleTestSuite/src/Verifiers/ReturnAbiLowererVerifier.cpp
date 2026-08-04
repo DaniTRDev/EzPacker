@@ -75,7 +75,7 @@ ReturnAbiLowererVerifier &ReturnAbiLowererVerifier::verifyLoweredReturn(MirBlock
 
                 MirRegister *destReg = movInstr->getOperands()[0]->get<MirRegister>();
                 EXPECT_FALSE(destReg->isVirtual()) << "Split MOV destination must be a physical register.";
-                EXPECT_EQ(destReg->getRegId(), split.m_parts[p].m_regId)
+                EXPECT_EQ(destReg->getRegId(), split.m_parts[p].m_reg)
                         << "Split physical register ID mismatch at part " << p;
 
                 EXPECT_EQ(movInstr->getOperands()[1], origValues[p])

@@ -136,7 +136,7 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
         m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirBuilderContext")
                 << std::pmr::string(std::format("Appended register: {} (id: {})", reg->getName(), reg->getRegId()));
     }
-    
+
     return true;
 }
 

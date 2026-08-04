@@ -4,27 +4,16 @@
 #include "EzMirCommon.h"
 #include "CodeFlowAnalysis.h"
 
-template <> struct std::hash<MirRegister>
-{
-    std::size_t operator()(const MirRegister &reg) const noexcept
-    {
-        // Combine id and virtual flag.
-        std::size_t h1 = std::hash<size_t>{}(reg.getRegId());
-        std::size_t h2 = std::hash<bool>{}(reg.isVirtual());
-        return h1 ^ (h2 << 1);
-    }
-};
-
 /**
  * @brief PMR-backed storage tracking variable lifespans across basic blocks.
  */
 struct LivenessResult
 {
-    // Block Id, register Id.
-    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_liveIn;
-    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_liveOut;
-    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_def;
-    std::pmr::unordered_map<size_t, std::pmr::unordered_set<size_t>> m_use;
+    // Block Id, <RegisterRef>.
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<RegisterRef>> m_liveIn;
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<RegisterRef>> m_liveOut;
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<RegisterRef>> m_def;
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<RegisterRef>> m_use;
 
     LivenessResult(std::pmr::memory_resource *arena) : m_liveIn(arena), m_liveOut(arena), m_def(arena), m_use(arena) {}
 };
@@ -73,7 +62,7 @@ class LivenessAnalysis : public IMirAnalysisPass
      * live in/out graph.
      */
     void printResult() const override;
-    
+
   private:
     /**
      * Computes the gloval live-in/live-out set of a function.
@@ -88,11 +77,6 @@ class LivenessAnalysis : public IMirAnalysisPass
      * @param collector
      */
     void computeLocalLiveness(MirFunction *func, const std::shared_ptr<DiagnosticCollector> &collector);
-
-    // Helpers to extract read/written registers out of generic instructions
-    void extractRegistersFromInstruction(MirInstruction *instr,
-                                         std::pmr::unordered_set<size_t> &defs,
-                                         std::pmr::unordered_set<size_t> &uses);
 
   private:
     LivenessResult m_result;

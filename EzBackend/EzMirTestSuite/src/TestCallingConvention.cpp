@@ -4,10 +4,10 @@ TestCallingConvention::TestCallingConvention()
 {
     // Populate distinct, highly constrained register pools for stress-testing lowering passes.
     // Volatile GPR pool: {1, 2}, Preserved GPR pool: {3}
-    m_gprCallerSaved = { PhysicalRegId(1), PhysicalRegId(2) };
     m_gprCalleeSaved = { PhysicalRegId(3) };
 
-    // Volatile FPR pool: {4}, Preserved FPR pool: {5}
+    // Volatile FPR pool: {4}, Preserved FPR pool: {5}PhysicalRegId
+    // rSaved = { PhysicalRegId(1), PhysicalRegId(2) };
     m_fprCallerSaved = { PhysicalRegId(4) };
     m_fprCalleeSaved = { PhysicalRegId(5) };
 }
@@ -144,9 +144,6 @@ size_t TestCallingConvention::getShadowSpaceSize() const
 }
 
 const std::vector<PhysicalRegId> &TestCallingConvention::getCalleeSavedGPRegs() const { return m_gprCalleeSaved; }
-
 const std::vector<PhysicalRegId> &TestCallingConvention::getCalleeSavedFPRegs() const { return m_fprCalleeSaved; }
-
 const std::vector<PhysicalRegId> &TestCallingConvention::getCallerSavedGPRegs() const { return m_gprCallerSaved; }
-
 const std::vector<PhysicalRegId> &TestCallingConvention::getCallerSavedFPRegs() const { return m_fprCallerSaved; }

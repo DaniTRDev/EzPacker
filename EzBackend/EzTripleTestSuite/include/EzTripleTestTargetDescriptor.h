@@ -23,13 +23,13 @@ class EzTripleTestTargetDesc : public TargetDesc
      * Returns the expansion recipes for this target.
      * @return
      */
-    const class ExpansionRecipe *getExpansionRecipes() override { return GET_EXPANSION_RECIPES(EzTripleTest); }
+    const ExpansionRecipe *getExpansionRecipes() override { return GET_EXPANSION_RECIPES(EzTripleTest); }
 
     /**
      * Returns the expansion recipe for the given instruction in this target.
      * @return
      */
-    const class ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) override
+    const ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) override
     {
         const auto recipes = getExpansionRecipes();
         for (size_t i = 0; i < getExpansionRecipesSize(); i++)

@@ -27,6 +27,7 @@ set(EZMIR_FILES_LIST
         "include/Operand/MirOperand.h"
         "include/Operand/MirOperandBuilder.h"
         "include/Operand/MirOperands.h"
+        "include/Operand/MirRegisterReference.h"
         "include/Printer/MirPrinter.h"
         "include/Type/MirType.h"
         "include/Type/MirTypeTable.h"

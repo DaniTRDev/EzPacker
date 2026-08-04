@@ -63,13 +63,6 @@ class MirInstruction
     class MirBlock *getOwner();
 
     /**
-     * Returns the linear equivalent of this instruction. If this instruction does not have any linear equivalent,
-     * a pair of INVALID, INVALID is returned.
-     * @return
-     */
-    const MirInstructionLinearEquivalent &getLinearEquivalent() const;
-
-    /**
      * Returns the metadata entry associated with this instruction's opcode.
      *
      * The metadata contains the printable opcode name, expected operand count,
@@ -100,7 +93,7 @@ class MirInstruction
     SourceReference *getSourceRef() const;
 
     /**
-     * Adds an operand to the instruction.
+     * Adds an operand to the instruction. This will set m_cachedDefinedRegisters and m_cachedUsedRegisters to false.
      * @param operand
      */
     void addOperand(const MirOperand *operand);
@@ -123,9 +116,20 @@ class MirInstruction
     const std::pmr::vector<MirOperand *> &getOperands() const;
 
     /**
-     * Returns the mutable operand slice for this instruction.
+     * Returns the mutable operand slice for this instruction. This will set m_cachedDefinedRegisters and
+     * m_cachedUsedRegisters to false.
      */
     std::pmr::vector<MirOperand *> &getOperands();
+
+    /**
+     * Returns the registers defined (written) by this instruction.
+     */
+    const std::pmr::vector<RegisterRef> &getDefinedRegisters();
+
+    /**
+     * Returns the registers used (read) by this instruction.
+     */
+    const std::pmr::vector<RegisterRef> &getUsedRegisters();
 
     /**
      * Returns a string representation of the instruction in assembly format.
@@ -134,11 +138,15 @@ class MirInstruction
     std::string toString() const;
 
   private:
+    bool m_cachedDefinedRegisters;
+    bool m_cachedUsedRegisters;
     class MirBlock *m_owner;
     MirInstructionOpCode m_opcode;
     MirTargetInstructionId m_targetId;
     SourceReference *m_sourceRef;
     std::pmr::vector<MirOperand *> m_operands;
+    std::pmr::vector<RegisterRef> m_definedRegisters;
+    std::pmr::vector<RegisterRef> m_usedRegisters;
 };
 
 #endif // EZPACKER_MIRINSTRUCTION_H

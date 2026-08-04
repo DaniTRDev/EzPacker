@@ -55,7 +55,6 @@ class RegisterAllocatorPass : public IMirTransformPass
 
   private:
     MirBuilderContext *m_ctx;
-    std::pmr::map<MirId, RegisterAllocatorResult> m_results;
 };
 
 #endif // EZPACKER_REGISTERALLOCATORPASS_H

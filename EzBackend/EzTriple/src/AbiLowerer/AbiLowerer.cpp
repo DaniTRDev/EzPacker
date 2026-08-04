@@ -57,7 +57,7 @@ bool AbiLowerer::processReturnBlock(CallingConvDesc *cc,
                 {
                     MirOperand *sliceVal = pushRets[p]->getOperands()[1];
                     MirRegister *destVal = oBuilder.buildPhysReg(sliceVal->getMirType(),
-                                                                 split.m_parts[p].m_regId,
+                                                                 split.m_parts[p].m_reg,
                                                                  "ret",
                                                                  sliceVal->getSourceRef());
 
@@ -187,7 +187,7 @@ bool AbiLowerer::processCallBlock(CallingConvDesc *cc,
                     const auto &t = m_ctx->getTypeTable();
                     MirType *ptr = t->getPtr(piece.m_type);
                     MirRegister *physReg = oBuilder.buildPhysReg(ptr,
-                                                                 piece.m_regId,
+                                                                 piece.m_reg,
                                                                  std::format("splitArg{}", argIdx).c_str(),
                                                                  pushArgInstr->getSourceRef());
                     MirMemory *mem = oBuilder.buildMem(ptr,
@@ -272,8 +272,6 @@ bool AbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
         return true;
     }
 
-    MirInstruction *callInstr = *it;
-
     // Insert return value extraction instructions AFTER the CALL instruction
     auto insertIt = std::next(it);
     MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, insertIt);
@@ -328,7 +326,7 @@ bool AbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
                         MirType *pieceType = piece.m_type ? piece.m_type : m_ctx->getTypeTable()->i32();
 
                         MirRegister *physReg = oBuilder.buildPhysReg(pieceType,
-                                                                     piece.m_regId,
+                                                                     piece.m_reg,
                                                                      std::format("call_splitRet{}", retIdx).c_str(),
                                                                      popRetInstr->getSourceRef());
 
@@ -391,7 +389,6 @@ bool AbiLowerer::processFunctionArguments(CallingConvDesc *cc,
         return true;
     }
 
-    MirInstruction *endArgInstr = *it;
     MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
     MirOperandBuilder oBuilder(m_ctx);
 
@@ -441,7 +438,7 @@ bool AbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                     // Read incoming physical register chunk
                     MirType *pieceType = piece.m_type;
                     MirRegister *physReg = oBuilder.buildPhysReg(pieceType,
-                                                                 piece.m_regId,
+                                                                 piece.m_reg,
                                                                  std::format("in_splitArg{}", argIdx).c_str(),
                                                                  popArgInstr->getSourceRef());
 

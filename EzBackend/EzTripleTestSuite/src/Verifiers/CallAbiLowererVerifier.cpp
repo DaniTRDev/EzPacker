@@ -126,7 +126,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
                             << "LOAD destination must be a register for split part " << p;
                     MirRegister *destReg = loadInstr->getOperands()[0]->get<MirRegister>();
                     EXPECT_FALSE(destReg->isVirtual());
-                    EXPECT_EQ(destReg->getRegId(), piece.m_regId)
+                    EXPECT_EQ(destReg->getRegId(), piece.m_reg)
                             << "Split physical register ID mismatch at part " << p;
 
                     // Operand 1: Memory operand reading at offset
@@ -295,7 +295,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCallReturn(MirBlock
                         << "STORE source must be a physical register for split return part " << p;
                 MirRegister *srcReg = storeInstr->getOperands()[1]->get<MirRegister>();
                 EXPECT_FALSE(srcReg->isVirtual());
-                EXPECT_EQ(srcReg->getRegId(), piece.m_regId)
+                EXPECT_EQ(srcReg->getRegId(), piece.m_reg)
                         << "Split physical return register ID mismatch at part " << p;
             }
             break;

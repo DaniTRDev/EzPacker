@@ -3,6 +3,7 @@
 
 #include "EzMirCommon.h"
 #include "ArgumentLocationDesc.h"
+#include "Operand/MirOperands.h"
 
 class CallLoweringState
 {

@@ -227,3 +227,9 @@ std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail de
 }
 
 std::string MirPrinter::printToString(MirOperand *operand) { return operand->toString(); }
+
+std::string MirPrinter::printToString(const RegisterRef &ref)
+{
+    char prefix = ref.isVirtual() ? 'v' : 'p';
+    return std::format("%{}{}", prefix, ref.getId());
+}

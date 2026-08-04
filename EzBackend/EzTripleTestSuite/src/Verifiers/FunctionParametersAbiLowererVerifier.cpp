@@ -107,7 +107,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
                             << "STORE source must be a physical register for split part " << p;
                     MirRegister *srcReg = storeInstr->getOperands()[1]->get<MirRegister>();
                     EXPECT_FALSE(srcReg->isVirtual());
-                    EXPECT_EQ(srcReg->getRegId(), piece.m_regId) << "Split physical register ID mismatch at part " << p;
+                    EXPECT_EQ(srcReg->getRegId(), piece.m_reg) << "Split physical register ID mismatch at part " << p;
                 }
                 break;
             }

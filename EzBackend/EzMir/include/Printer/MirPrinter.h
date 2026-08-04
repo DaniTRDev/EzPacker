@@ -71,6 +71,13 @@ class MirPrinter
      * @return
      */
     static std::string printToString(MirOperand *operand);
+
+    /**
+     * Prints the information of a reference to a register.
+     * @param operand
+     * @return
+     */
+    static std::string printToString(const RegisterRef &ref);
 };
 
 #endif // EZPACKER_MIRPRINTER_H

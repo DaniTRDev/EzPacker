@@ -61,8 +61,7 @@ class MirBuilderContext
     bool appendGlobalVar(MirGlobalVar *globalVar);
 
     /**
-     * Appends a register to the context. Returns true if succeeded. ONLY VIRTUAL REGISTERS, Physical registers will not
-     * be appended at all.
+     * Appends a register to the context. Returns true if succeeded. This function will skip physical registers.
      * @param reg
      * @return
      */
@@ -179,6 +178,7 @@ class MirBuilderContext
     std::pmr::map<MirId, MirFunction *> m_functionIdToFunc;     // Used to search for functions.
     std::pmr::map<MirId, MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
     std::pmr::map<MirId, MirRegister *> m_registerIdToRegister; // Used to search for registers.
+    std::pmr::map<MirId, PhysicalRegId> m_virtualRegIdToPhysical;
 
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
     std::shared_ptr<MirTypeTable> m_typeTable;

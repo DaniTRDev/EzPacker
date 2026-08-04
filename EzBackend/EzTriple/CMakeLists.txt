@@ -19,6 +19,7 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/MirBlockLegalizerPass.h"
         "include/Legalizer/MirFunctionSignatureLegalizerPass.h"
         "include/Legalizer/MirLegalizer.h"
+        "include/RegisterAllocator/RegisterAllocator.h"
         "include/RegisterAllocator/RegisterAllocatorPass.h"
 
         "src/AbiLowerer/AbiLowerer.cpp"
@@ -37,6 +38,7 @@ set(EZTRIPLE_FILES_LIST
         "src/Legalizer/MirBlockLegalizerPass.cpp"
         "src/Legalizer/MirFunctionSignatureLegalizerPass.cpp"
         "src/Legalizer/MirLegalizer.cpp"
+        "src/RegisterAllocator/RegisterAllocator.cpp"
         "src/RegisterAllocator/RegisterAllocatorPass.cpp"
 )
 

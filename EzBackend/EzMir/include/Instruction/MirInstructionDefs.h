@@ -135,15 +135,6 @@ enum MirInstructionOpCode : uint16_t
     OPCODE_COUNT
 };
 
-/**
- * This structure contains information about how an instruction can be substituted into 2 smaller instructions.
- */
-struct MirInstructionLinearEquivalent
-{
-    MirInstructionOpCode m_high;
-    MirInstructionOpCode m_low;
-};
-
 // --- Metadata Structure ---
 struct MirInstructionMetadata
 {
