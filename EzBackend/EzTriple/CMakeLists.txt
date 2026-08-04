@@ -5,6 +5,7 @@ set(EZTRIPLE_FILES_LIST
         "include/AbiLowerer/FunctionAbiLowererPass.h"
         "include/Descriptors/TargetDesc.h"
         "include/ExpansionRecipe/ExpansionRecipe.h"
+        "include/InstructionSelector/Actions/ManualSelectAction.h"
         "include/InstructionSelector/InstructionSelectionPredicates.h"
         "include/InstructionSelector/InstructionSelectionRuleBuilder.h"
         "include/InstructionSelector/MirInstructionSelector.h"
@@ -21,6 +22,7 @@ set(EZTRIPLE_FILES_LIST
 
         "src/AbiLowerer/AbiLowerer.cpp"
         "src/AbiLowerer/FunctionAbiLowererPass.cpp"
+        "src/InstructionSelector/Actions/ManualSelectAction.cpp"
         "src/InstructionSelector/InstructionSelectionPredicates.cpp"
         "src/InstructionSelector/InstructionSelectionRuleBuilder.cpp"
         "src/InstructionSelector/MirInstructionSelector.cpp"
@@ -40,11 +42,14 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/CallAbiLowererVerifier.h"
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.h"
         "tests/EzTripleTestSuite/EzTripleTestExpansionRecipe.h"
+        "tests/EzTripleTestSuite/EzTripleTestInstructionSet.h"
         "tests/EzTripleTestSuite/EzTripleTestLegalizer.h"
+        "tests/EzTripleTestSuite/EzTripleTestSelector.h"
         "tests/EzTripleTestSuite/EzTripleTestSuite.h"
         "tests/EzTripleTestSuite/EzTripleTestTargetDescriptor.h"
         "tests/EzTripleTestSuite/FuncSignaturePassVerifier.h"
         "tests/EzTripleTestSuite/FunctionParametersAbiLowererVerifier.h"
+        "tests/EzTripleTestSuite/InstructionSelectorPassVerifier.h"
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.h"
         "tests/EzTripleTestSuite/LegalizeReturnActionVerifier.h"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.h"
@@ -53,9 +58,11 @@ set(TRIPLETESTSUITE_FILES_LIST
         "tests/EzTripleTestSuite/CallAbiLowererVerifier.cpp"
         "tests/EzTripleTestSuite/ExpandScalarActionVerifier.cpp"
         "tests/EzTripleTestSuite/EzTripleTestLegalizer.cpp"
+        "tests/EzTripleTestSuite/EzTripleTestSelector.cpp"
         "tests/EzTripleTestSuite/EzTripleTestSuite.cpp"
         "tests/EzTripleTestSuite/FuncSignaturePassVerifier.cpp"
         "tests/EzTripleTestSuite/FunctionParametersAbiLowererVerifier.cpp"
+        "tests/EzTripleTestSuite/InstructionSelectorPassVerifier.cpp"
         "tests/EzTripleTestSuite/LegalizeCallActionVerifier.cpp"
         "tests/EzTripleTestSuite/LegalizeReturnActionVerifier.cpp"
         "tests/EzTripleTestSuite/PromoteScalarActionVerifier.cpp"
@@ -104,6 +111,13 @@ if (EZPACKER_BUILD_TESTS)
             "EzTripleTestSuite"
             ""
             "tests/T_FunctionSignatureLegalizerPass.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_InstructionSelectorPass"
+            "EzTripleTestSuite"
+            ""
+            "tests/T_InstructionSelectorPass.cpp"
     )
 
     EzPacker_AddTest(

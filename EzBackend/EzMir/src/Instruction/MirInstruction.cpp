@@ -12,6 +12,8 @@ bool MirInstruction::hasOperands() const { return !m_operands.empty(); }
 
 bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstructionFlags::TreatAsSigned; }
 
+const char *MirInstruction::getOpCodeName() const { return getMetadata().m_name.data(); }
+
 const MirInstructionMetadata &MirInstruction::getMetadata() const { return getMeta(getOpCode()); }
 
 class MirBlock *MirInstruction::getOwner() { return m_owner; }

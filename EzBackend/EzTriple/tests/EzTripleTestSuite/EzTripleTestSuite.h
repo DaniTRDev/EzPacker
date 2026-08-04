@@ -5,10 +5,12 @@
 #include "EzMirTestSuite.h"
 #include "EzTripleTestTargetDescriptor.h"
 #include "EzTripleTestLegalizer.h"
+#include "EzTripleTestSelector.h"
 #include "CallAbiLowererVerifier.h"
 #include "ExpandScalarActionVerifier.h"
 #include "FuncSignaturePassVerifier.h"
 #include "FunctionParametersAbiLowererVerifier.h"
+#include "InstructionSelectorPassVerifier.h"
 #include "LegalizeCallActionVerifier.h"
 #include "LegalizeReturnActionVerifier.h"
 #include "PromoteScalarActionVerifier.h"
@@ -29,9 +31,15 @@ class EzTripleTestSuite : public EzMirTestSuite
 
     /**
      * Returns a pointer to the legalizer of the selected triple.
-     * @return TargetLegalizerType*
+     * @return MirLegalizer*
      */
     MirLegalizer *getLegalizer() const;
+
+    /**
+     * Returns a pointer to the instruction selector of the selected triple.
+     * @return MirInstructionSelector*
+     */
+    MirInstructionSelector *getInstrSelector() const;
 
     /**
      * Creates common pointers used in test cases. Also calls EzMirTestSuite::create.
@@ -52,6 +60,12 @@ class EzTripleTestSuite : public EzMirTestSuite
     virtual std::shared_ptr<MirLegalizer> createTargetLegalizer() = 0;
 
     /**
+     * Creates a target instruction selector and returns it.
+     * @return
+     */
+    virtual std::shared_ptr<MirInstructionSelector> createInstructionSelector() = 0;
+
+    /**
      * Creates a target description and returns it.
      * @return
      */
@@ -60,6 +74,7 @@ class EzTripleTestSuite : public EzMirTestSuite
   protected:
     std::shared_ptr<TargetDesc> m_targetDesc;
     std::shared_ptr<MirLegalizer> m_legalizer;
+    std::shared_ptr<MirInstructionSelector> m_instructionSelector;
 };
 
 class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Test
@@ -76,12 +91,18 @@ class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Te
     void TearDown() override;
 
     /**
-     * Creates a default-empty MirLegalizer and returns it. This call must be done after the target description has
-     * already been created. Parent classes can still override this method to inject
-     * their own target description.
+     * Creates a default MirLegalizer (EzTripleTestLegalizer) and returns it. This call must be done after the target
+     * description has already been created. Parent classes can still override this method to inject their own target
+     * description.
      * @return
      */
     virtual std::shared_ptr<MirLegalizer> createTargetLegalizer() override;
+
+    /**
+     * Creates a default MirInstructionSelector (EzTripleTestSelector) and returns it.
+     * @return
+     */
+    virtual std::shared_ptr<MirInstructionSelector> createInstructionSelector() override;
 
     /**
      * Creates a target EzTripleTestTargetDesc and returns it. Parent classes can still override this method to inject

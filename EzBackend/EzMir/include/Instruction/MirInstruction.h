@@ -19,8 +19,7 @@
  * Type used to abstract away details about the selected opcode of a mir instruction (happens in instruction selector
  * pass).
  */
-using MirTargetInstructionId = uint32_t;
-constexpr MirTargetInstructionId TARGET_INSTR_SELECT_NONE = 0;
+using MirTargetInstructionId = MirId;
 
 class MirInstruction
 {
@@ -50,6 +49,12 @@ class MirInstruction
      * @return
      */
     bool isSigned() const;
+
+    /**
+     * Returns the name of the opcode (using metadata).
+     * @return
+     */
+    const char *getOpCodeName() const;
 
     /**
      * Returns the owner block of this instruction.

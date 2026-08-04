@@ -1,5 +1,3 @@
 add_subdirectory(EzMir)
 add_subdirectory(EzTriple)
 add_subdirectory(EzTriples)
-#add_subdirectory(EzTargetEmitter)
-#add_subdirectory(Targets)

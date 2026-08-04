@@ -117,7 +117,7 @@ class MirPass
     /**
      * Prints the pass result to the diag collector.
      */
-    virtual void printResult() const = 0;
+    virtual void printResult() const {};
 
     /**
      * Called by the pass manager when the pass needs to be reset.

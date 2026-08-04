@@ -467,20 +467,8 @@ bool AbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                                                              std::format("in_indirectPtr{}", argIdx).c_str(),
                                                              popArgInstr->getSourceRef());
 
-                if (indirect.m_isByVal)
-                {
-                    // Copy-by-value: Read through indirect pointer into local stack frame allocation
-                    StackFrameObject *localObj = func->getStackFrame()->createLocalStackObj(argType);
-                    MirOperand *localRef = oBuilder.buildRef(localObj, popArgInstr->getSourceRef());
-
-                    // Load through physReg pointer into destVal/local memory
-                    iBuilder.MOV(destVal, physReg);
-                }
-                else
-                {
-                    // Direct pointer: Copy incoming physical pointer into destination virtual register
-                    iBuilder.MOV(destVal, physReg);
-                }
+                // Direct pointer: Copy incoming physical pointer into destination virtual register
+                iBuilder.MOV(destVal, physReg);
                 break;
             }
 

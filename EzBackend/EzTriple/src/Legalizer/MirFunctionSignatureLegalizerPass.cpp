@@ -49,5 +49,3 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(std::pmr::list<MirFunction 
     builder.END_ARG(func->getSourceRef(), token);
     return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = succeeded };
 }
-
-void MirFunctionSignatureLegalizerPass::printResult() const {}

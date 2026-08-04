@@ -20,12 +20,11 @@ MirPassResult MirInstructionSelectorPass::run(std::pmr::list<MirBlock *> &blockL
     do
     {
         modifiedThisIt = false;
-        auto instrIt = instructions.begin();
-        SelectionContext selectCtx{ .m_ctx = m_ctx, .m_instrList = instructions, .m_it = instrIt };
+        SelectionContext selectCtx{ .m_ctx = m_ctx, .m_instrList = instructions, .m_it = instructions.begin() };
 
-        for (; instrIt != instructions.end(); instrIt++)
+        for (; selectCtx.m_it != instructions.end(); selectCtx.m_it++)
         {
-            MirInstruction *instr = *instrIt;
+            MirInstruction *instr = *selectCtx.m_it;
             SelectionResult selectionResult = m_selector->select(selectCtx);
             switch (selectionResult)
             {

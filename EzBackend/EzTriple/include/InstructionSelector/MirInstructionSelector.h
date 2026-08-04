@@ -11,6 +11,7 @@ struct SelectionContext
     MirBuilderContext *m_ctx;
     std::pmr::list<MirInstruction *> &m_instrList;
     std::pmr::list<MirInstruction *>::iterator m_it;
+    std::pmr::map<MirInstructionOpCode, MirTargetInstructionId> m_directSelectionTable;
 };
 
 enum class SelectionResult : uint8_t
@@ -28,11 +29,9 @@ enum class SelectionResult : uint8_t
 using InstructionSelPred = std::function<bool(const SelectionContext &ctx)>;
 
 /**
- * This function is able to insert pre/post instructions within the current selected instruction. The given builder
- * is set to build AFTER the instruction that's going to be selected.
+ * This function is able to insert pre/post instructions within the current selected instruction.
  */
-using InstructionSelAction =
-        std::function<SelectionResult(MirInstructionBuilder &builder, const SelectionContext &ctx)>;
+using InstructionSelAction = std::function<SelectionResult(SelectionContext &ctx)>;
 
 struct InstructionSelectionRule
 {
@@ -56,7 +55,7 @@ class MirInstructionSelector
      * evaluates to true is the one whose action will be executed.
      * @return
      */
-    SelectionResult select(const SelectionContext &ctx);
+    SelectionResult select(SelectionContext &ctx);
 
     /**
      * Adds a selection rule for the given opcode.

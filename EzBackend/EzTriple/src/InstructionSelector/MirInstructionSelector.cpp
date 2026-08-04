@@ -2,7 +2,7 @@
 
 MirInstructionSelector::MirInstructionSelector(MirBuilderContext *ctx) : m_selectionRules(ctx->getGlobalAllocator()) {}
 
-SelectionResult MirInstructionSelector::select(const SelectionContext &ctx)
+SelectionResult MirInstructionSelector::select(SelectionContext &ctx)
 {
     MirInstruction *instr = *ctx.m_it;
     if (instr->getTargetId() != MIRID_INVALID)
@@ -20,13 +20,11 @@ SelectionResult MirInstructionSelector::select(const SelectionContext &ctx)
         {
             auto diag = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirInstructionSelector");
             diag << "Executing selection action" << instr->getSourceRef();
-            diag.appendNote(std::format("Action name: ", rule.m_name).c_str(), nullptr);
+            diag.appendNote(std::format("Action name: {}", rule.m_name).c_str(), nullptr);
             diag.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
                             instr->getSourceRef());
             diag.flush();
-
-            MirInstructionBuilder builder(ctx.m_ctx, instr->getOwner(), InsertionType::InsertAfter, ctx.m_it);
-            return rule.m_act(builder, ctx);
+            return rule.m_act(ctx);
         }
     }
     return SelectionResult::NoRule;

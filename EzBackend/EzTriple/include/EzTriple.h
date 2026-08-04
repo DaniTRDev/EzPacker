@@ -15,6 +15,7 @@
 
 #include "ExpansionRecipe/ExpansionRecipe.h"
 
+#include "InstructionSelector/Actions/ManualSelectAction.h"
 #include "InstructionSelector/InstructionSelectionPredicates.h"
 #include "InstructionSelector/InstructionSelectionRuleBuilder.h"
 #include "InstructionSelector/MirInstructionSelector.h"
