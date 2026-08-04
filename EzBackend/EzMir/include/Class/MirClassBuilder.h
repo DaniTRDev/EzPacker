@@ -17,8 +17,8 @@ class MirClassBuilder : public MirBuilder<MirClass>
     MirClassBuilder(MirBuilderContext *ctx);
 
     /**
-     * Builds a class WITH or WITHOUT a parent (derived class). It will set parent fields and methods FIRST, appended fields
-     * (through appendField) and methods (through methodBuilder) AFTER.
+     * Builds a class WITH or WITHOUT a parent (derived class). It will set parent fields and methods FIRST, appended
+     * fields (through appendField) and methods (through methodBuilder) AFTER.
      * @param parent
      * @param name
      * @param sourceRef
@@ -38,9 +38,16 @@ class MirClassBuilder : public MirBuilder<MirClass>
      */
     void appendMethod(MirFunction *method);
 
+    /**
+     * Sets the constructor of this class. If called multiple times, the constructor will be overridden.
+     * @param constructor
+     */
+    void setConstructor(MirFunction *constructor);
+
   private:
     MirBuilderContext *m_ctx;
-    std::pmr::vector<MirClassField*> m_fields;
+    MirClassMethod *m_constructor;
+    std::pmr::vector<MirClassField *> m_fields;
     std::pmr::vector<MirClassMethod *> m_vTable;
 };
 

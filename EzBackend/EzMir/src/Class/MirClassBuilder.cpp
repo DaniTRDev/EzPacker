@@ -59,6 +59,13 @@ MirClass *MirClassBuilder::build(MirClass *parent, const std::pmr::string &name,
         m_fields.push_back(newField);
     }
 
+    if (m_constructor)
+    {
+        // Push the constructor of THIS class AFTER the parent's fields.
+        m_vTable.push_back(std::move(m_constructor));
+        m_constructor = nullptr;
+    }
+
     // Merge new methods into the VTable and handle overrides safely.
     for (auto *newMethod : newMethods)
     {
@@ -210,4 +217,18 @@ void MirClassBuilder::appendMethod(MirFunction *method)
 
     m_vTable.push_back(alloc.new_object<MirClassMethod>(
             MirClassMethod{ .m_owner = nullptr, .m_func = method, .m_offset = -1, .m_id = m_vTable.size() }));
+}
+
+void MirClassBuilder::setConstructor(MirFunction *constructor)
+{
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
+    std::pmr::polymorphic_allocator<MirClassMethod> alloc(arena);
+
+    if (constructor)
+    {
+        alloc.delete_object(m_constructor);
+    }
+
+    m_constructor = alloc.new_object<MirClassMethod>(
+            MirClassMethod{ .m_owner = nullptr, .m_func = constructor, .m_offset = -1, .m_id = 0 });
 }
