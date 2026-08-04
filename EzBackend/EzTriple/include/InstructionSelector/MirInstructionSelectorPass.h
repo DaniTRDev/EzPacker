@@ -3,6 +3,9 @@
 
 #include "EzTripleCommon.h"
 #include "MirInstructionSelector.h"
+#include "AbiLowerer/FunctionAbiLowererPass.h"
+#include "Legalizer/MirBlockLegalizerPass.h"
+#include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 
 class MirInstructionSelectorPass : public IMirTransformPass
 {
@@ -36,6 +39,11 @@ class MirInstructionSelectorPass : public IMirTransformPass
     MirPassResult run(std::pmr::list<MirBlock *> &blockList,
                       std::pmr::list<MirBlock *>::iterator it,
                       MirPassManager *passManager) override;
+
+    /**
+     * This pass depends on: MirBlockLegalizerPass, MirFunctionSignatureLegalizerPass and FunctionAbiLowererPass.
+     */
+    std::vector<std::type_index> getDependencies() const override;
 
   private:
     MirBuilderContext *m_ctx;

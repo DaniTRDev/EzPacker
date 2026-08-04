@@ -53,7 +53,6 @@ class EzMirTestSuite
 
         if constexpr (std::is_base_of<IMirAnalysisPass, PassType>::value)
         {
-            // We can't use passManager->getAnalysis due to templates needed to be resolved at compile time.
             pass = passManager->getAnalysis<PassType>(getBuilderCtx());
         }
         else

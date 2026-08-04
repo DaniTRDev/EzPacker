@@ -1,6 +1,6 @@
 #include "Class/MirClassBuilder.h"
 
-MirClassBuilder::MirClassBuilder(MirBuilderContext *ctx) : m_ctx(ctx) {}
+MirClassBuilder::MirClassBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_constructor(nullptr) {}
 
 MirClass *MirClassBuilder::build(MirClass *parent, const std::pmr::string &name, SourceReference *sourceRef)
 {

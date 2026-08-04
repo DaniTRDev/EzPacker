@@ -19,19 +19,23 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
     m_builderCtx = std::make_shared<MirBuilderContext>(m_callingConv.get(), &m_arena, m_diagCollector, m_typeTable);
     m_sourceManager = std::make_shared<SourceManager>(workingPath);
     m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
+
     m_passManager = std::make_shared<MirPassManager>(&m_arena, m_diagCollector);
+    m_passManager->setTestMode();
 
     m_diagCollector->addListener(m_diagLogger.get());
     m_typeTable->initialize();
     m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->getVoidType(), "TEST");
 
-    m_diagCollector->builder(DiagnosticMessageType::Diag_Debug, "EzMirTestSuite")
+    m_diagCollector->builder(Diag_Debug, "EzMirTestSuite")
+            << "Created pass manager in test mode (skip dependency resolution)";
+
+    m_diagCollector->builder(Diag_Debug, "EzMirTestSuite")
             << "Using default calling convention: " << m_callingConv->getName();
 
     if (!m_testFunction)
     {
-        m_diagCollector->builder(DiagnosticMessageType::Diag_Error, "EzMirTestSuite")
-                << "The creation of the test function failed!";
+        m_diagCollector->builder(Diag_Error, "EzMirTestSuite") << "The creation of the test function failed!";
     }
 
     MirBlock *entryPoint = m_testFunction->getEntryPoint();

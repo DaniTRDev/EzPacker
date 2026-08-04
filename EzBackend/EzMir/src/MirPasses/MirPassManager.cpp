@@ -18,6 +18,8 @@ void MirPassManager::runPipeline(MirBuilderContext *ctx)
     }
 }
 
+void MirPassManager::setTestMode() { m_testMode = true; }
+
 MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderContext *ctx)
 {
     // Cache Check (handles downstream nested dependencies)
@@ -29,8 +31,7 @@ MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderConte
     auto it = m_passesBlueprint.find(passId);
     if (it == m_passesBlueprint.end())
     {
-        throw std::runtime_error(
-                "Internal Compiler Error: Missing pass dependency implementation in blueprint registry.");
+        throw std::runtime_error("Internal Compiler Error: Missing pass dependency in pass list");
     }
 
     MirPass *analysisPass = it->second.get();
@@ -53,8 +54,7 @@ MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderConte
 
 void MirPassManager::generatePipeline()
 {
-    m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager")
-            << "Calculating pass dependency pipeline";
+    m_diagCollector->builder(Diag_Trace, "MirPassManager") << "Calculating pass dependency pipeline";
 
     m_executionPipeline.clear();
     std::unordered_set<std::type_index> resolved;
@@ -85,24 +85,27 @@ void MirPassManager::resolveDependencies(std::type_index passId,
     if (resolved.contains(passId))
         return;
 
-    // Circular Dependency Validation Guard
+    // Circular Dependency Guard
     if (seenInCurrentPath.contains(passId))
     {
-        throw std::runtime_error("Fatal Compiler Error: Circular dependency detected in Pass Pipeline registry!");
+        throw std::runtime_error("Fatal Compiler Error: Circular dependency detected in Pass Pipeline!");
     }
 
     auto it = m_passesBlueprint.find(passId);
     if (it == m_passesBlueprint.end())
     {
-        throw std::runtime_error("Fatal Compiler Error: Missing pass dependency implementation in blueprint registry.");
+        throw std::runtime_error("Fatal Compiler Error: Missing pass dependency in Pass list");
     }
 
-    seenInCurrentPath.insert(passId);
-    for (const auto &depId : it->second->getDependencies())
+    if (!m_testMode)
     {
-        resolveDependencies(depId, resolved, seenInCurrentPath);
+        seenInCurrentPath.insert(passId);
+        for (const auto &depId : it->second->getDependencies())
+        {
+            resolveDependencies(depId, resolved, seenInCurrentPath);
+        }
+        seenInCurrentPath.erase(passId); // Backtrack
     }
-    seenInCurrentPath.erase(passId); // Backtrack
 
     resolved.insert(passId);
     m_executionPipeline.push_back(it->second.get());
@@ -112,7 +115,7 @@ const std::shared_ptr<DiagnosticCollector> &MirPassManager::getDiagCollector() c
 
 MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
 {
-    auto log = m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager");
+    auto log = m_diagCollector->builder(Diag_Trace, "MirPassManager");
     log << std::pmr::string(std::format("Running pass {}", pass->getName()));
     log.flush();
     MirPassResult combinedResult{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
@@ -213,7 +216,7 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
     pass->setResult(&combinedResult);
     m_savedResults[std::type_index(typeid(*pass))] = combinedResult;
 
-    auto builder = m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager");
+    auto builder = m_diagCollector->builder(Diag_Trace, "MirPassManager");
     builder << "Pass result";
     builder.appendNote(std::pmr::string(std::format("Executed: {}", combinedResult.m_executed)), nullptr);
     builder.appendNote(std::pmr::string(std::format("Succeeded: {}", combinedResult.m_succeeded)), nullptr);

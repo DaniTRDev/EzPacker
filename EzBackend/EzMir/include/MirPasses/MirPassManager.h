@@ -62,6 +62,11 @@ class MirPassManager
     void runPipeline(MirBuilderContext *ctx);
 
     /**
+     * When called, the pass manager enters in test mode, making it NOT RESOLVE dependencies.
+     */
+    void setTestMode();
+
+    /**
      * Returns the diag collector linked to this pass manager.
      * @return
      */
@@ -94,6 +99,7 @@ class MirPassManager
     MirPassResult runPass(MirPass *pass, MirBuilderContext *ctx);
 
   private:
+    bool m_testMode;
     std::pmr::unordered_map<std::type_index, MirPass *> m_validAnalyses;
     std::pmr::unordered_map<std::type_index, std::unique_ptr<MirPass>> m_passesBlueprint;
     std::pmr::vector<MirPass *> m_executionPipeline;

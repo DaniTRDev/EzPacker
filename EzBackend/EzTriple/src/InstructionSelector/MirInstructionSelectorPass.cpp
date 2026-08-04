@@ -68,3 +68,10 @@ MirPassResult MirInstructionSelectorPass::run(std::pmr::list<MirBlock *> &blockL
 
     return { .m_modifiedMir = modifiedRes, .m_executed = true, .m_succeeded = true };
 }
+
+std::vector<std::type_index> MirInstructionSelectorPass::getDependencies() const
+{
+    return { std::type_index(typeid(MirBlockLegalizerPass)),
+             std::type_index(typeid(MirFunctionSignatureLegalizerPass)),
+             std::type_index(typeid(FunctionAbiLowererPass)) };
+}
