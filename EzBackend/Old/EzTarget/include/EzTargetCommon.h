@@ -1,7 +1,0 @@
-#ifndef EZPACKER_EZTARGETCOMMON_H
-#define EZPACKER_EZTARGETCOMMON_H
-
-#include "EzMir.h"
-#include "EzABI.h"
-
-#endif // EZPACKER_EZTARGETCOMMON_H
