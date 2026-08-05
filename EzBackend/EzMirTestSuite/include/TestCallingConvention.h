@@ -15,9 +15,12 @@
  *   - Callee-Saved FPRs (Preserved):  { 5 }
  *
  * Frame & Alignment constraints:
- *   - Mandatory pre-call stack alignment: 32 bytes
- *   - Shadow / Home space size:          24 bytes
- *   - Cleanup strategy:                  Caller cleanup (`isCalleeCleanup() == false`)
+ *   - Stack growing:                       DOWNWARDS
+ *   - Mandatory pre-call stack alignment:  32 bytes
+ *   - Shadow / Home space size:            24 bytes
+ *   - Cleanup strategy:                    Caller cleanup (`isCalleeCleanup() == false`)
+ *   - Stack frame register:                { 6 }
+ *   - Stack pointer register:              { 7 }
  */
 class TestCallingConvention : public CallingConvDesc
 {
@@ -87,6 +90,26 @@ class TestCallingConvention : public CallingConvDesc
      * @return `false` indicating caller-side stack cleanup (e.g., CDECL / System V).
      */
     bool isCalleeCleanup() const override;
+
+    /**
+     * Returns true.
+     */
+    bool doesStackGrowsDownwards() const override { return true; }
+
+    /**
+     * Returns true true.
+     */
+    bool hasFramePointer(const class MirFunction *func) const override;
+
+    /**
+     * Returns the frame pointer register used by this calling convention (e.g., RBP / FP).
+     */
+    RegisterRef getFramePointerReg() const override;
+
+    /**
+     * Returns the stack pointer register used by this calling convention (e.g., RSP / SP).
+     */
+    RegisterRef getStackPointerReg() const override;
 
     /**
      * Returns the mandatory pre-call stack boundary alignment requirement.

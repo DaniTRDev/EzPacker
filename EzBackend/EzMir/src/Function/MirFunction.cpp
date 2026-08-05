@@ -18,6 +18,8 @@ MirFunction::MirFunction(CallingConvDesc *callingConv,
     {
         m_blockIdToBlock.insert({ block->getId(), block });
     }
+
+    m_usedCalleeSavedRegs = std::pmr::vector<RegisterRef>(m_blocks.get_allocator().resource());
 }
 
 CallingConvDesc *MirFunction::getCallingConv() const { return m_callingConv; }
@@ -43,6 +45,8 @@ MirType *MirFunction::getType() const { return m_type; }
 
 SourceReference *MirFunction::getSourceRef() const { return m_sourceRef; }
 
+void MirFunction::addCalleeSavedRegUse(const RegisterRef &reg) { m_usedCalleeSavedRegs.push_back(reg); }
+
 std::pmr::list<MirBlock *> &MirFunction::getBlocks() { return m_blocks; }
 
 std::pmr::list<MirBlock *> *MirFunction::getBlocksPtr() { return &m_blocks; }
@@ -50,3 +54,5 @@ std::pmr::list<MirBlock *> *MirFunction::getBlocksPtr() { return &m_blocks; }
 std::pmr::list<MirRegister *> &MirFunction::getParameters() { return m_parameters; }
 
 const std::pmr::string &MirFunction::getName() { return m_name; }
+
+const std::pmr::vector<RegisterRef> &MirFunction::getUsedCalleeSavedRegs() const { return m_usedCalleeSavedRegs; }

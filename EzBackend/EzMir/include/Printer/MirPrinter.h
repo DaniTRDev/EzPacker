@@ -78,6 +78,13 @@ class MirPrinter
      * @return
      */
     static std::string printToString(const RegisterRef &ref);
+
+    /**
+     * Prints the information of a stack frame object.
+     * @param operand
+     * @return
+     */
+    static std::string printToString(const StackFrameObject *obj);
 };
 
 #endif // EZPACKER_MIRPRINTER_H

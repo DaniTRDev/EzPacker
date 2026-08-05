@@ -9,6 +9,7 @@ enum class RegisterRefClass : uint8_t
     Invalid = 0,
     GPR,
     FPR,
+    FRAME,
     MAX_REF_TYPE // Used to iterate over this enum
 };
 

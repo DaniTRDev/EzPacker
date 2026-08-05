@@ -135,6 +135,21 @@ bool TestCallingConvention::isCalleeCleanup() const
     return false; // Caller-managed stack argument cleanup
 }
 
+bool TestCallingConvention::hasFramePointer(const class MirFunction *func) const
+{
+    return true;
+}
+
+RegisterRef TestCallingConvention::getFramePointerReg() const
+{
+    return RegisterRef::preg(RegisterRefClass::FRAME, 6);
+}
+
+RegisterRef TestCallingConvention::getStackPointerReg() const
+{
+    return RegisterRef::preg(RegisterRefClass::FRAME, 7);
+}
+
 size_t TestCallingConvention::getStackAlignment() const
 {
     return 32; // Enforce 32-byte alignment boundary before CALL

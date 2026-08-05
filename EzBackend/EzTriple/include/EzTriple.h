@@ -15,6 +15,9 @@
 
 #include "ExpansionRecipe/ExpansionRecipe.h"
 
+#include "FrameLowerer/MirFrameLowerer.h"
+#include "FrameLowerer/MirFrameLowererPass.h"
+
 #include "InstructionSelector/Actions/ManualSelectAction.h"
 #include "InstructionSelector/InstructionSelectionPredicates.h"
 #include "InstructionSelector/InstructionSelectionRuleBuilder.h"

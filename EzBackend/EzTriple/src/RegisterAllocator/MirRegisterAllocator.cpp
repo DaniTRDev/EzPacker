@@ -222,7 +222,19 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx &ctx)
 
         if (assignedPhysReg.has_value())
         {
-            ctx.m_allocatedRegs[node] = assignedPhysReg.value();
+            const auto &calleeSaved = ctx.m_targetFunction->getCallingConv()->getCalleeSavedRegs(node.getClass());
+            const auto &physRef = assignedPhysReg.value();
+
+            for (auto &reg : calleeSaved)
+            {
+                if (reg == physRef)
+                {
+                    ctx.m_targetFunction->addCalleeSavedRegUse(reg);
+                    break;
+                }
+            }
+
+            ctx.m_allocatedRegs[node] = physRef;
             ctx.m_removedNodes.erase(node);
         }
         else
@@ -268,7 +280,6 @@ void MirRegisterAllocator::evaluateInterferenceGraphDegree(RegisterAllocatorCtx 
 void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx &ctx)
 {
     MirFunction *func = ctx.m_targetFunction;
-
     for (MirBlock *block : func->getBlocks())
     {
         for (MirInstruction *inst : block->getInstructions())

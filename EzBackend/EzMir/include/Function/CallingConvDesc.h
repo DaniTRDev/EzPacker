@@ -53,9 +53,24 @@ class CallingConvDesc
     virtual bool isCalleeCleanup() const = 0;
 
     /**
+     * Returns true if stack grows downwards.
+     */
+    virtual bool doesStackGrowsDownwards() const = 0;
+
+    /**
      * Returns the name of the calling convention.
      */
     virtual const char *getName() const = 0;
+
+    /**
+     * Returns the frame pointer register used by this calling convention (e.g., RBP / FP).
+     */
+    virtual RegisterRef getFramePointerReg() const = 0;
+
+    /**
+     * Returns the stack pointer register used by this calling convention (e.g., RSP / SP).
+     */
+    virtual RegisterRef getStackPointerReg() const = 0;
 
     /**
      * Returns the stack alignment needed BEFORE a call.
@@ -68,6 +83,11 @@ class CallingConvDesc
      * @return
      */
     virtual size_t getShadowSpaceSize() const = 0;
+
+    /**
+     * Returns true if frame pointers (RBP/FP) are required for the given function.
+     */
+    virtual bool hasFramePointer(const class MirFunction *func) const = 0;
 
     /**
      * Returns the list of registers of the given class that must be preserved by the callee.

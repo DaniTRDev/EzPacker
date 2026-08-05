@@ -8,6 +8,7 @@
 #include "EzTripleTestSelector.h"
 #include "Verifiers/CallAbiLowererVerifier.h"
 #include "Verifiers/ExpandScalarActionVerifier.h"
+#include "Verifiers/FrameLowererPassVerifier.h"
 #include "Verifiers/FuncSignaturePassVerifier.h"
 #include "Verifiers/FunctionParametersAbiLowererVerifier.h"
 #include "Verifiers/InstructionSelectorPassVerifier.h"

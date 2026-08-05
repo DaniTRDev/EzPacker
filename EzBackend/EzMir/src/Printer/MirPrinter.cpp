@@ -136,11 +136,7 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
             if (!firstFrame)
                 result += "\n\t";
 
-            result += std::format("{} %frame.id={}.src={}.offset={:#X})",
-                                  frameObj->m_type->getName(),
-                                  frameObj->m_id,
-                                  static_cast<uint8_t>(frameObj->m_source),
-                                  frameObj->m_offset);
+            result += printToString(frameObj);
             firstFrame = false;
         }
         result += '\n';
@@ -233,4 +229,13 @@ std::string MirPrinter::printToString(const RegisterRef &ref)
 {
     char prefix = ref.isVirtual() ? 'v' : 'p';
     return std::format("%{}{}", prefix, ref.getId());
+}
+
+std::string MirPrinter::printToString(const StackFrameObject *obj)
+{
+    return std::format("{} %frame.id={}.src={}.offset={:#X})",
+                       obj->m_type->getName(),
+                       obj->m_id,
+                       static_cast<uint8_t>(obj->m_source),
+                       obj->m_offset);
 }

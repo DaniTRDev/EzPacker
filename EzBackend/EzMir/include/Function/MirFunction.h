@@ -99,6 +99,12 @@ class MirFunction
     SourceReference *getSourceRef() const;
 
     /**
+     * Adds a callee-saved register that this function is using. If the register is already present, it will be
+     * dupplicated.
+     */
+    void addCalleeSavedRegUse(const RegisterRef &reg);
+
+    /**
      * Returns the mutable list of blocks that belong to this function.
      *
      * The list always contains the entry point as its first block right after
@@ -123,6 +129,11 @@ class MirFunction
     std::pmr::list<MirRegister *> &getParameters();
 
     /**
+     * Returns the list of callee-saved register consumed by this function.
+     */
+    const std::pmr::vector<RegisterRef> &getUsedCalleeSavedRegs() const;
+
+    /**
      * Returns the name of the function.
      * @return
      */
@@ -140,7 +151,11 @@ class MirFunction
     std::pmr::list<MirBlock *> m_blocks;
     std::pmr::list<MirRegister *> m_parameters;
     std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;
+
     std::pmr::string m_name;
+
+    // Set filled by RegisterAllocatorPass that contains which callee-saved registers were consume by this function.
+    std::pmr::vector<RegisterRef> m_usedCalleeSavedRegs;
 };
 
 #endif // EZPACKER_MIRFUNCTION_H

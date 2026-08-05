@@ -53,18 +53,26 @@ INSTRUCTION(POP_RET,
             F(HasSideEffect))
 
 /* --- MEMORY ACCESS -------------------------------------------------------- */
-// LOAD forces a MirCat_Memory operand as the source
 INSTRUCTION(LOAD,
             MirCat_Memory,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
                                 { ExpectedOperandType::Memory, OperandFlag::Read }),
             F(ReadsMemory))
 
-// STORE forces a MirCat_Memory operand as the destination
 INSTRUCTION(STORE,
             MirCat_Memory,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Memory, OperandFlag::Write },
                                 { ExpectedOperandType::AnyValue, OperandFlag::Read }),
+            F(WritesMemory) | F(HasSideEffect))
+
+INSTRUCTION(PUSH,
+            MirCat_Memory,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read }),
+            F(ReadsMemory))
+
+INSTRUCTION(POP,
+            MirCat_Memory,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Memory, OperandFlag::Write }),
             F(WritesMemory) | F(HasSideEffect))
 
 INSTRUCTION(ALLOC,

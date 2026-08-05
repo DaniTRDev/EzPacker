@@ -30,6 +30,16 @@ class TargetDesc
     virtual const class ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) = 0;
 
     /**
+     * Returns the frame lowerer for this target.
+     */
+    virtual class MirFrameLowerer *getFrameLowerer() = 0;
+
+    /**
+     * Returns the displacement's type of a memory operand.
+     */
+    virtual MirType *getMemOperandDisplacementType() = 0;
+
+    /**
      * Returns the nearest compatible type for the given type. If the type is already legal, it is returned as-is. If no
      * type can be used, nullptr will be returned.
      *
@@ -47,6 +57,11 @@ class TargetDesc
      * @return
      */
     virtual size_t getExpansionRecipesSize() = 0;
+
+    /**
+     * Returns the size in bytes of a standard stack slot (e.g., 8 for 64-bit targets, 4 for 32-bit).
+     */
+    virtual size_t getStackSlotSize() const = 0;
 
     /**
      * Returns a list with the available registers of a specific class.
