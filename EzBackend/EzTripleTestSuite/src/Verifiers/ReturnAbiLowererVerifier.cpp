@@ -32,7 +32,7 @@ ReturnAbiLowererVerifier &ReturnAbiLowererVerifier::verifyLoweredReturn(MirBlock
         return *this;
     }
 
-    CallLoweringState st(cc, m_ctx);
+    CallLoweringState st(cc, m_ctx, func);
     ArgumentLocationDesc loc = cc->getReturnLoc(retType, &st);
 
     switch (loc.getType())

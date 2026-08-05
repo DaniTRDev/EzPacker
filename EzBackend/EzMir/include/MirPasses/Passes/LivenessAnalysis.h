@@ -63,7 +63,11 @@ class LivenessAnalysis : public IMirAnalysisPass
      */
     void printResult() const override;
 
-  private:
+    /**
+     * Resets the result of the pass.
+     */
+    void reset() override;
+private:
     /**
      * Computes the gloval live-in/live-out set of a function.
      * @param func

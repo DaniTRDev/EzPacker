@@ -3,6 +3,8 @@ set(EZTRIPLE_FILES_LIST
         "include/EzTripleCommon.h"
         "include/AbiLowerer/AbiLowerer.h"
         "include/AbiLowerer/FunctionAbiLowererPass.h"
+        "include/FrameLowerer/FrameLowerer.h"
+        "include/FrameLowerer/FrameLowererPass.h"
         "include/Descriptors/TargetDesc.h"
         "include/ExpansionRecipe/ExpansionRecipe.h"
         "include/InstructionSelector/Actions/ManualSelectAction.h"
@@ -24,6 +26,8 @@ set(EZTRIPLE_FILES_LIST
 
         "src/AbiLowerer/AbiLowerer.cpp"
         "src/AbiLowerer/FunctionAbiLowererPass.cpp"
+        "src/FrameLowerer/FrameLowerer.cpp"
+        "src/FrameLowerer/FrameLowererPass.cpp"
         "src/InstructionSelector/Actions/ManualSelectAction.cpp"
         "src/InstructionSelector/InstructionSelectionPredicates.cpp"
         "src/InstructionSelector/InstructionSelectionRuleBuilder.cpp"

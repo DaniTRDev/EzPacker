@@ -17,9 +17,9 @@ StackFrameObject *MirFunctionStackFrame::createStackSpill(MirType *type)
     return create(0, type, StackFrameObjectSource::Spill);
 }
 
-StackFrameObject *MirFunctionStackFrame::createStackParam(MirType *type, int64_t offset)
+StackFrameObject *MirFunctionStackFrame::createStackParam(MirType *type)
 {
-    return create(offset, type, StackFrameObjectSource::Parameter);
+    return create(0, type, StackFrameObjectSource::Parameter);
 }
 
 StackFrameObject *MirFunctionStackFrame::create(int64_t offset, MirType *type, StackFrameObjectSource source)
@@ -46,7 +46,4 @@ StackFrameObject *MirFunctionStackFrame::getObjectFromId(MirId id)
     return nullptr;
 }
 
-const std::pmr::vector<StackFrameObject *> &MirFunctionStackFrame::getStackFrameObjects() const
-{
-    return m_stackFrameObjects;
-}
+const std::pmr::vector<StackFrameObject *> &MirFunctionStackFrame::getObjects() const { return m_stackFrameObjects; }

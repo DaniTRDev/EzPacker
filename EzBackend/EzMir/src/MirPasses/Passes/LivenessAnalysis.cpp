@@ -72,6 +72,14 @@ void LivenessAnalysis::printResult() const
     log.flush();
 }
 
+void LivenessAnalysis::reset()
+{
+    m_result.m_def.clear();
+    m_result.m_use.clear();
+    m_result.m_liveIn.clear();
+    m_result.m_liveOut.clear();
+}
+
 void LivenessAnalysis::computeGlobalLiveness(MirFunction *func, const ControlFlowResult &cfg)
 {
     m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, getName())
@@ -139,14 +147,8 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func, const std::shared
     collector->builder(DiagnosticMessageType::Diag_Debug, getName())
             << "Analyzing block-local variable generation rules (USE / DEF calculation)...";
 
-    m_result.m_liveIn.clear();
-    m_result.m_liveOut.clear();
-    m_result.m_def.clear();
-    m_result.m_use.clear();
-
     for (auto &block : func->getBlocks())
     {
-        // Allocate PMR sets bound directly to our high-speed compilation arena
         size_t blockId = block->getId();
         m_result.m_def[blockId] = std::pmr::unordered_set<RegisterRef>(m_arena);
         m_result.m_use[blockId] = std::pmr::unordered_set<RegisterRef>(m_arena);
@@ -156,13 +158,13 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func, const std::shared
         auto &defs = m_result.m_def[blockId];
         auto &uses = m_result.m_use[blockId];
 
-        // Process block variables from front to back to isolate local definitions vs first uses
         for (const auto &instr : block->getInstructions())
         {
+            // Note: getDefinedRegisters() and getUsedRegisters() return std::pmr::vector<RegisterRef>
             const auto &localDefs = instr->getDefinedRegisters();
             const auto &localUses = instr->getUsedRegisters();
 
-            // An operand is a local 'use' if it's read before being overwritten in the block
+            // Any register used before being defined in this block belongs in 'uses' (Gen)
             for (const auto &regRef : localUses)
             {
                 if (!defs.contains(regRef))
@@ -171,7 +173,7 @@ void LivenessAnalysis::computeLocalLiveness(MirFunction *func, const std::shared
                 }
             }
 
-            // An operand is a local 'def' if it's written to before being read in the block
+            // Any register defined in this block belongs in 'defs' (Kill)
             for (const auto &regRef : localDefs)
             {
                 defs.insert(regRef);

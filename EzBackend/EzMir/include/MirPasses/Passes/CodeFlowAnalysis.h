@@ -62,6 +62,11 @@ class CodeFlowAnalysis : public IMirAnalysisPass
      */
     void printResult() const override;
 
+    /**
+     * Resets the result of the pass.
+     */
+    void reset() override;
+
   private:
     void addEdge(MirBlock *from, MirBlock *to);
     MirBlock *getTargetJumpBlock(const MirInstruction *inst) const;

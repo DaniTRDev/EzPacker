@@ -39,13 +39,26 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
 
     if (instr)
     {
-        if (m_insertionPoint.m_type == InsertionType::InsertAfter)
+        auto &instructions = m_insertionPoint.m_block->getInstructions();
+
+        if (instructions.empty())
         {
-            m_insertionPoint.m_block->getInstructions().push_back(instr);
+            instructions.push_back(instr);
         }
-        else
+        else if (m_insertionPoint.m_type == InsertionType::InsertAfter)
         {
-            m_insertionPoint.m_block->getInstructions().insert(m_insertionPoint.m_iterator, instr);
+            // If m_iterator is instructions.end(), target the last element
+            auto targetIt = (m_insertionPoint.m_iterator == instructions.end()) ? std::prev(instructions.end())
+                                                                                : m_insertionPoint.m_iterator;
+
+            // std::next(targetIt) handles inserting after the last element (becomes instructions.end())
+            instructions.insert(std::next(targetIt), instr);
+        }
+        else // InsertionType::InsertBefore
+        {
+            // Standard insert before. If m_iterator == instructions.begin(),
+            // it naturally inserts as the new first element.
+            instructions.insert(m_insertionPoint.m_iterator, instr);
         }
     }
 

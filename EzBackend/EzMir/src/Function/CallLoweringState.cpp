@@ -1,8 +1,7 @@
 #include "Function/CallLoweringState.h"
 
-CallLoweringState::CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx) :
-    m_callingConv(cc), m_currentStackOffset(0), m_allocatedRegs(ctx->getGlobalAllocator()),
-    m_usableRegs(ctx->getGlobalAllocator())
+CallLoweringState::CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx, MirFunction *func) :
+    m_callingConv(cc), m_func(func), m_allocatedRegs(ctx->getGlobalAllocator()), m_usableRegs(ctx->getGlobalAllocator())
 
 {
     for (size_t i = static_cast<uint8_t>(RegisterRefClass::Invalid) + 1;
@@ -44,22 +43,7 @@ size_t CallLoweringState::getUsedRegCount(RegisterRefClass regClass) const
     return (it != m_allocatedRegs.end()) ? it->second.size() : 0;
 }
 
-int64_t CallLoweringState::getStackOffset() const { return m_currentStackOffset; }
-
-int64_t CallLoweringState::allocateStackSlot(size_t sizeBytes, size_t alignmentBytes)
+StackFrameObject *CallLoweringState::allocateStack(MirType *type) const
 {
-    if (sizeBytes == 0)
-        return m_currentStackOffset;
-
-    // Align stack offset to requested byte alignment boundary
-    if (alignmentBytes > 1)
-    {
-        m_currentStackOffset = (m_currentStackOffset + static_cast<int64_t>(alignmentBytes) - 1) &
-                ~(static_cast<int64_t>(alignmentBytes) - 1);
-    }
-
-    int64_t assignedOffset = m_currentStackOffset;
-    m_currentStackOffset += static_cast<int64_t>(sizeBytes);
-
-    return assignedOffset;
+    return m_func->getStackFrame()->createStackParam(type);
 }

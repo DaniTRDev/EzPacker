@@ -3,6 +3,7 @@
 
 #include "EzMirCommon.h"
 #include "Operand/MirRegisterReference.h"
+#include "MirFunctionStackFrame.h"
 
 /**
  * Simple type used to abstract the register ID field as this may change in a future. THIS WILL COLLIDE
@@ -26,13 +27,12 @@ struct RegLoc
 };
 
 /**
- * Returns the starting offset at which the argument / value should be put. This is important because allows a high
- * level return treatment without thinking on expansions.
+ * Returns the stack object at which the argument is going to be placed.
  */
 struct StackLoc
 {
-    int64_t m_frameOffset;
     size_t m_sizeBytes;
+    StackFrameObject *m_object;
 };
 
 /**
@@ -113,11 +113,8 @@ class ArgumentLocationDesc
 
     /**
      * Creates a stack location with the given parameters.
-     * @param offset
-     * @param sizeInBytes
-     * @return
      */
-    static ArgumentLocationDesc Stack(int64_t offset, size_t sizeInBytes);
+    static ArgumentLocationDesc Stack(size_t sizeInBytes, StackFrameObject *object);
 
     /**
      * Returns the type of the location.

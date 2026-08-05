@@ -22,10 +22,6 @@ MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
         log << std::pmr::string(std::format("Computing Control Flow Graph (CFG) topology for: '{}'", func->getName()));
     }
 
-    // Reset old tracking arrays safely
-    m_result.m_successors.clear();
-    m_result.m_predecessors.clear();
-
     auto &blockList = func->getBlocks();
 
     for (auto blockIt = blockList.begin(); blockIt != blockList.end(); ++blockIt)
@@ -151,6 +147,12 @@ void CodeFlowAnalysis::printResult() const
             log.appendNote(precededBy.c_str(), nullptr);
         }
     }
+}
+
+void CodeFlowAnalysis::reset()
+{
+    m_result.m_successors.clear();
+    m_result.m_predecessors.clear();
 }
 
 MirBlock *CodeFlowAnalysis::getTargetJumpBlock(const MirInstruction *inst) const

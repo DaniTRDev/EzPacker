@@ -1,100 +1,95 @@
 #include "RegisterAllocator/MirRegisterAllocator.h"
 
+#include <algorithm>
+#include <cmath>
+#include <deque>
+#include <limits>
 #include <ranges>
 
 bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, RegisterAllocatorCtx &ctx)
 {
     const auto &blockList = ctx.m_targetFunction->getBlocks();
-    MirFunction *targetFunc = ctx.m_targetFunction;
 
     for (MirBlock *block : blockList)
     {
         size_t blockId = block->getId();
-        std::pmr::unordered_set<RegisterRef> live = liveness->m_liveOut[blockId];
+        const auto &liveOutSet = liveness->m_liveOut[blockId];
 
-        // Ensure all registers live at the exit of the block have nodes in G
+        std::pmr::unordered_set<RegisterRef> live(liveOutSet.begin(),
+                                                  liveOutSet.end(),
+                                                  liveOutSet.size(),
+                                                  ctx.m_allocator);
+
         for (RegisterRef regRef : live)
         {
             addNode(regRef, ctx);
         }
 
-        // Iterate backwards through instructions in the block
         const auto &instructions = block->getInstructions();
         for (auto it = instructions.rbegin(); it != instructions.rend(); ++it)
         {
             MirInstruction *inst = *it;
+            const auto &defs = inst->getDefinedRegisters();
+            const auto &uses = inst->getUsedRegisters();
 
-            // Extract defined and used registers for this instruction
-            // (Replace these calls with your actual instruction API, e.g., inst->getDefs(), inst->getUses())
-            std::pmr::vector<RegisterRef> defs = inst->getDefinedRegisters();
-            const std::pmr::vector<RegisterRef> &uses = inst->getUsedRegisters();
-
-            // Check if instruction is a register-to-register MOVE (u = v)
-            const auto &operands = inst->getOperands();
-
-            bool isMove = (inst->getOpCode() == MOV);
-            bool isCall = inst->getOpCode() == CALL;
-
-            if (isCall)
-            {
-                for (size_t i = static_cast<uint8_t>(RegisterRefClass::Invalid) + 1;
-                     i < static_cast<uint8_t>(RegisterRefClass::MAX_REF_TYPE);
-                     i++)
-                {
-                    const auto &callerSavedRegs =
-                            targetFunc->getCallingConv()->getCallerSavedRegs(static_cast<RegisterRefClass>(i));
-
-                    for (auto &reg : callerSavedRegs)
-                        defs.push_back(reg);
-                }
-            }
-
-            // Add interferences for defined registers
-            for (const auto &defRegRef : defs)
+            // Add nodes and interference edges for DEFs
+            for (const RegisterRef &defRegRef : defs)
             {
                 addNode(defRegRef, ctx);
+                auto &neighbors = ctx.m_iGraph[defRegRef];
 
-                for (const auto &liveRegRef : live)
+                for (const RegisterRef &liveRegRef : live)
                 {
-                    // Special case for MOVE inst (u <- v): u and v do NOT interfere simply because
-                    // v is live at the def of u.
-                    if (isMove)
+                    if (defRegRef != liveRegRef)
                     {
-                        MirRegister *src = operands[1]->get<MirRegister>();
-                        if (src && liveRegRef == src->getRef())
-                            continue;
+                        neighbors.insert(liveRegRef);
+                        ctx.m_iGraph[liveRegRef].insert(defRegRef);
                     }
-
-                    addEdge(defRegRef, liveRegRef, ctx);
                 }
             }
 
-            // Update live set for preceding instructions:
-            // Remove DEFs (they are dead before this point unless used previously)
-            for (const auto &defRegRef : defs)
+            // Erase DEFs from live set
+            for (const RegisterRef &defRegRef : defs)
             {
                 live.erase(defRegRef);
             }
 
-            // Add USEs (they become live before this instruction)
-            for (const auto &useRegRef : uses)
+            // Add USEs to live set
+            for (const RegisterRef &useRegRef : uses)
             {
                 addNode(useRegRef, ctx);
                 live.insert(useRegRef);
             }
         }
     }
-
     return true;
 }
 
 bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
 {
+    // Cache target register counts per class to avoid repetitive targetDesc lookups
+    std::pmr::unordered_map<RegisterRefClass, size_t> colorLimits(ctx.m_allocator);
     size_t totalVirtualNodes = 0;
-    for (const auto &node : ctx.m_iGraph | std::views::keys)
+
+    for (const auto &[node, neighbors] : ctx.m_iGraph)
     {
         if (node.isVirtual())
+        {
             totalVirtualNodes++;
+            colorLimits.try_emplace(node.getClass(), ctx.m_targetDesc->getAvailableRegisters(node.getClass()).size());
+        }
+    }
+
+    // Work queue for fast O(1) retrieval of low-degree nodes
+    std::pmr::vector<RegisterRef> lowDegreeQueue(ctx.m_allocator);
+    lowDegreeQueue.reserve(totalVirtualNodes);
+
+    for (const auto &[node, deg] : ctx.m_degree)
+    {
+        if (node.isVirtual() && deg < colorLimits[node.getClass()])
+        {
+            lowDegreeQueue.push_back(node);
+        }
     }
 
     const auto &unspillable = ctx.m_unspillableRegs;
@@ -104,14 +99,13 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
         RegisterRef candidate;
         bool foundCandidate = false;
 
-        // Try to find ANY virtual node with degree < K (including unspillable ones)
-        for (const auto &node : ctx.m_iGraph | std::views::keys)
+        // O(1) Pop from low-degree work queue
+        while (!lowDegreeQueue.empty())
         {
-            if (node.isPhysical() || ctx.m_removedNodes.contains(node))
-                continue;
+            RegisterRef node = lowDegreeQueue.back();
+            lowDegreeQueue.pop_back();
 
-            const auto &availableColors = ctx.m_targetDesc->getAvailableRegisters(node.getClass());
-            if (ctx.m_degree[node] < availableColors.size())
+            if (!ctx.m_removedNodes.contains(node))
             {
                 candidate = node;
                 foundCandidate = true;
@@ -119,37 +113,34 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
             }
         }
 
-        // Chaitin-Briggs Optimistic Spill: If no node has degree < K,
-        // Select a spill candidate ONLY from SPILLABLE nodes (exclude unspillable)
         if (!foundCandidate)
         {
-            double minCost = std::numeric_limits<double>::max();
+            double minCostRatio = std::numeric_limits<double>::max();
 
-            for (const auto &node : ctx.m_iGraph | std::views::keys)
+            for (const auto &[node, neighbors] : ctx.m_iGraph)
             {
                 if (node.isPhysical() || ctx.m_removedNodes.contains(node) || unspillable.contains(node))
-                    continue; // Skip unspillable nodes ONLY during forced spill selection
+                    continue;
 
-                double degree = static_cast<double>(ctx.m_degree[node]);
-                double staticSpillCost = 1.0;
-                double cost = staticSpillCost / std::max(1.0, degree);
+                double deg = static_cast<double>(ctx.m_degree[node]);
+                double rawCost = calculateSpillCost(node, ctx);
+                double costRatio = rawCost / std::max(1.0, deg);
 
-                if (cost < minCost)
+                if (costRatio < minCostRatio)
                 {
-                    minCost = cost;
+                    minCostRatio = costRatio;
                     candidate = node;
                     foundCandidate = true;
                 }
             }
         }
 
-        // Emergency fallback: If constrained by unspillable nodes with degree >= K,
-        // force simplify them to avoid deadlocking the compiler.
+        // Emergency fallback for unspillable constraints
         if (!foundCandidate)
         {
-            for (const auto &node : ctx.m_iGraph | std::views::keys)
+            for (const auto &[node, neighbors] : ctx.m_iGraph)
             {
-                if (!node.isPhysical() && !ctx.m_removedNodes.contains(node))
+                if (node.isVirtual() && !ctx.m_removedNodes.contains(node))
                 {
                     candidate = node;
                     foundCandidate = true;
@@ -158,18 +149,25 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
             }
         }
 
-        // Remove selected candidate and push onto select stack
+        // Process removal
         ctx.m_removedNodes.insert(candidate);
         ctx.m_selectStack.push_back(candidate);
 
-        // Update neighbors' active degree
+        // Update active degree of neighbors and push newly simplified neighbors to worklist
         for (const RegisterRef &neighbor : ctx.m_iGraph[candidate])
         {
-            if (!ctx.m_removedNodes.contains(neighbor))
+            if (neighbor.isVirtual() && !ctx.m_removedNodes.contains(neighbor))
             {
                 if (ctx.m_degree[neighbor] > 0 && ctx.m_degree[neighbor] != std::numeric_limits<size_t>::max())
                 {
+                    size_t oldDeg = ctx.m_degree[neighbor];
                     ctx.m_degree[neighbor]--;
+
+                    size_t K = colorLimits[neighbor.getClass()];
+                    if (oldDeg == K && ctx.m_degree[neighbor] < K)
+                    {
+                        lowDegreeQueue.push_back(neighbor);
+                    }
                 }
             }
         }
@@ -180,53 +178,62 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
 
 bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx &ctx)
 {
-    std::pmr::unordered_set<RegisterRef> spilledNodes(ctx.m_ctx->getGlobalAllocator());
+    std::pmr::unordered_set<RegisterRef> spilledNodes(ctx.m_allocator);
+    std::vector<bool> usedColorsBitset;
 
-    // Pop nodes off the select stack in reverse order of removal
     while (!ctx.m_selectStack.empty())
     {
         RegisterRef node = ctx.m_selectStack.back();
         ctx.m_selectStack.pop_back();
 
-        std::pmr::unordered_set<RegisterRef> usedColors(ctx.m_ctx->getGlobalAllocator());
+        const auto &availableColors = ctx.m_targetDesc->getAvailableRegisters(node.getClass());
+        usedColorsBitset.assign(availableColors.size(), false);
 
-        // Gather physical colors used by active neighbors
+        // Gather colors used by assigned neighbors
         for (const RegisterRef &neighbor : ctx.m_iGraph[node])
         {
             if (ctx.m_removedNodes.contains(neighbor))
-                continue; // Neighbor hasn't been assigned or is removed
+                continue;
 
             auto it = ctx.m_allocatedRegs.find(neighbor);
             if (it != ctx.m_allocatedRegs.end())
             {
-                usedColors.insert(it->second);
+                const RegisterRef &assignedColor = it->second;
+                for (size_t i = 0; i < availableColors.size(); ++i)
+                {
+                    if (availableColors[i] == assignedColor)
+                    {
+                        usedColorsBitset[i] = true;
+                        break;
+                    }
+                }
             }
         }
 
-        const auto &availableColors = ctx.m_targetDesc->getAvailableRegisters(node.getClass());
-
         std::optional<RegisterRef> assignedPhysReg;
-        for (const auto &physReg : availableColors)
+        for (size_t i = 0; i < availableColors.size(); ++i)
         {
-            if (!usedColors.contains(physReg))
+            if (!usedColorsBitset[i])
             {
-                assignedPhysReg = physReg;
+                assignedPhysReg = availableColors[i];
                 break;
             }
         }
 
         if (assignedPhysReg.has_value())
         {
-            const auto &physRes = assignedPhysReg.value();
-            ctx.m_allocatedRegs[node] = physRes;
+            ctx.m_allocatedRegs[node] = assignedPhysReg.value();
             ctx.m_removedNodes.erase(node);
         }
         else
         {
-            // Optimistic coloring failed — node must be spilled to stack memory
-            auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirRegisterAllocator");
-            log << "Spilling register to stack";
-            log.appendNote(std::format("Spilled register: {}", MirPrinter::printToString(node)).c_str(), nullptr);
+            if (ctx.m_unspillableRegs.contains(node))
+            {
+                auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Error, "MirRegisterAllocator");
+                log << "Unspillable temporary register ran out of colors during select!";
+                log.appendNote(std::format("Register: {}", MirPrinter::printToString(node)).c_str(), nullptr);
+                return false;
+            }
 
             spilledNodes.insert(node);
         }
@@ -248,7 +255,6 @@ void MirRegisterAllocator::evaluateInterferenceGraphDegree(RegisterAllocatorCtx 
     {
         if (node.isPhysical())
         {
-            // Pre-colored physical nodes have infinite degree so they are never removed
             ctx.m_degree[node] = std::numeric_limits<size_t>::max();
             ctx.m_allocatedRegs[node] = node;
         }
@@ -262,13 +268,14 @@ void MirRegisterAllocator::evaluateInterferenceGraphDegree(RegisterAllocatorCtx 
 void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx &ctx)
 {
     MirFunction *func = ctx.m_targetFunction;
-    MirOperandBuilder opBuilder(ctx.m_ctx);
 
     for (MirBlock *block : func->getBlocks())
     {
         for (MirInstruction *inst : block->getInstructions())
         {
+            bool modified = false;
             auto &operands = inst->getOperands();
+
             for (size_t i = 0; i < operands.size(); ++i)
             {
                 if (!operands[i]->isOfType<MirRegister>())
@@ -277,38 +284,74 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx &ctx)
                 MirRegister *regOp = operands[i]->get<MirRegister>();
                 RegisterRef regRef = regOp->getRef();
 
-                // If this is a virtual register, replace operand with physical register singleton
                 if (regRef.isVirtual())
                 {
                     auto it = ctx.m_allocatedRegs.find(regRef);
                     if (it != ctx.m_allocatedRegs.end())
                     {
-                        RegisterRef physRef = it->second;
-
-                        auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirRegisterAllocator");
-                        log << "Allocated physical register";
-                        log.appendNote(std::format("Virtual register: {}", MirPrinter::printToString(regRef)).c_str(),
-                                       nullptr);
-                        log.appendNote(std::format("Physical register: {}", MirPrinter::printToString(physRef)).c_str(),
-                                       nullptr);
-
-                        // Mutate or replace virtual register operand with physical register handle
-                        regOp->setRef(physRef);
-                        inst->invalidateCachedUsedAndDefs();
+                        regOp->setRef(it->second);
+                        modified = true;
                     }
                 }
+            }
+
+            if (modified)
+            {
+                inst->invalidateCachedUsedAndDefs();
             }
         }
     }
 }
 
+bool MirRegisterAllocator::isRematerializable(MirRegister *vreg, MirInstruction *definingInst)
+{
+    if (!vreg || !definingInst)
+        return false;
+
+    if (definingInst->getOpCode() == MOV)
+    {
+        const auto &operands = definingInst->getOperands();
+        if (operands.size() >= 2)
+        {
+            MirOperand *src = operands[1];
+            return src->isOfType<MirInteger>() || src->isOfType<MirFloat>();
+        }
+    }
+
+    return false;
+}
+
+double MirRegisterAllocator::calculateSpillCost(RegisterRef node, RegisterAllocatorCtx &ctx)
+{
+    double totalCost = 0.0;
+
+    for (MirBlock *block : ctx.m_targetFunction->getBlocks())
+    {
+        size_t loopDepth = 0; // TODO: Populated by LoopAnalysis pass
+        double weight = std::pow(10.0, static_cast<double>(loopDepth));
+
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            for (const auto &use : inst->getUsedRegisters())
+            {
+                if (use == node)
+                    totalCost += 1.0 * weight;
+            }
+            for (const auto &def : inst->getDefinedRegisters())
+            {
+                if (def == node)
+                    totalCost += 1.0 * weight;
+            }
+        }
+    }
+
+    return totalCost;
+}
+
 void MirRegisterAllocator::addEdge(const RegisterRef &u, const RegisterRef &v, RegisterAllocatorCtx &ctx)
 {
     if (u == v)
-        return; // Prevent self-loops
-
-    addNode(u, ctx);
-    addNode(v, ctx);
+        return;
 
     ctx.m_iGraph[u].insert(v);
     ctx.m_iGraph[v].insert(u);
@@ -325,37 +368,52 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
     MirFunction *func = ctx.m_targetFunction;
     MirFunctionStackFrame *stackFrame = func->getStackFrame();
 
+    // Map defining instructions for virtual registers to evaluate rematerialization
+    std::pmr::unordered_map<RegisterRef, MirInstruction *> definingInstMap(ctx.m_allocator);
+    for (MirBlock *block : func->getBlocks())
+    {
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            for (const auto &def : inst->getDefinedRegisters())
+            {
+                if (def.isVirtual())
+                {
+                    definingInstMap[def] = inst;
+                }
+            }
+        }
+    }
+
+    // Allocate stack spill slots ONLY for non-rematerializable spilled registers
     for (const RegisterRef &spillRegRef : spilledNodes)
     {
         if (ctx.m_spilledRegs.contains(spillRegRef))
             continue;
 
         MirRegister *vreg = ctx.m_ctx->getRegisterById(spillRegRef.getId());
-        MirType *regType = vreg->getMirType();
-        StackFrameObject *spillSlot = stackFrame->createStackSpill(regType);
-        ctx.m_spilledRegs[spillRegRef] = spillSlot;
+        MirInstruction *defInst = definingInstMap[spillRegRef];
+
+        if (!isRematerializable(vreg, defInst))
+        {
+            MirType *regType = vreg->getMirType();
+            StackFrameObject *spillSlot = stackFrame->createStackSpill(regType);
+            ctx.m_spilledRegs[spillRegRef] = spillSlot;
+        }
     }
 
     for (MirBlock *block : func->getBlocks())
     {
-        // Snapshot the original instruction array so insertions don't disrupt iteration
-        auto origInstructions = block->getInstructions();
-
-        for (MirInstruction *inst : origInstructions)
+        auto &origInstructions = block->getInstructions();
+        for (auto it = origInstructions.begin(); it != origInstructions.end(); ++it)
         {
+            MirInstruction *inst = *it;
             const auto &operandConsts = inst->getMetadata().m_operandConstraints;
             SourceReference *srcRef = inst->getSourceRef();
             MirOperandBuilder opBuilder(ctx.m_ctx);
 
-            // Locate current iterator position inside the live block instructions
-            auto &instructions = block->getInstructions();
-            auto instIt = std::find(instructions.begin(), instructions.end(), inst);
-            if (instIt == instructions.end())
-                continue;
-
             auto &operands = inst->getOperands();
 
-            // --- HANDLE USES (LOAD) ---
+            // --- USES (LOAD / REMATERIALIZE) ---
             for (size_t i = 0; i < operands.size(); ++i)
             {
                 if (!operands[i]->isOfType<MirRegister>())
@@ -366,24 +424,37 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
 
                 if (spilledNodes.contains(usedRef))
                 {
-                    if ((operandConsts[i].flags & OperandFlag::Read) == 0)
+                    if (i >= operandConsts.size() || (operandConsts[i].flags & OperandFlag::Read) == 0)
                         continue;
 
-                    StackFrameObject *spillSlot = ctx.m_spilledRegs[usedRef];
                     MirType *regType = usedReg->getMirType();
-
                     MirRegister *reloadVReg = opBuilder.buildVReg(regType, "spill_reload", srcRef);
-                    MirReference *spillSlotRef = opBuilder.buildRef(spillSlot, srcRef);
+                    MirInstructionBuilder insertBeforeBuilder(ctx.m_ctx, block, InsertionType::InsertBefore, it);
 
-                    MirInstructionBuilder insertBeforeBuilder(ctx.m_ctx, block, InsertionType::InsertBefore, instIt);
-                    insertBeforeBuilder.LOAD(srcRef, reloadVReg, spillSlotRef);
+                    MirInstruction *defInst = definingInstMap[usedRef];
+                    if (isRematerializable(usedReg, defInst))
+                    {
+                        // Rematerialization: Re-execute the immediate MOV inline instead of reading memory!
+                        MirOperand *constVal = defInst->getOperands()[1];
+                        MirInstruction *rematInst = insertBeforeBuilder.MOV(srcRef, reloadVReg, constVal);
+                        rematInst->invalidateCachedUsedAndDefs();
+                    }
+                    else
+                    {
+                        // Standard Spill Reload from Stack
+                        StackFrameObject *spillSlot = ctx.m_spilledRegs[usedRef];
+                        MirReference *spillSlotRef = opBuilder.buildRef(spillSlot, srcRef);
+
+                        MirInstruction *loadInst = insertBeforeBuilder.LOAD(srcRef, reloadVReg, spillSlotRef);
+                        loadInst->invalidateCachedUsedAndDefs();
+                    }
 
                     operands[i] = reloadVReg;
-                    inst->invalidateCachedUsedAndDefs();
+                    ctx.m_unspillableRegs.insert(reloadVReg->getRef());
                 }
             }
 
-            // --- HANDLE DEFS (STORE) ---
+            // --- DEFS (STORE / REMATERIALIZATION BYPASS) ---
             for (size_t i = 0; i < operands.size(); ++i)
             {
                 if (!operands[i]->isOfType<MirRegister>())
@@ -394,8 +465,15 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
 
                 if (spilledNodes.contains(defRef))
                 {
-                    if ((operandConsts[i].flags & OperandFlag::Write) == 0)
+                    if (i >= operandConsts.size() || (operandConsts[i].flags & OperandFlag::Write) == 0)
                         continue;
+
+                    MirInstruction *defInst = definingInstMap[defRef];
+                    if (isRematerializable(defReg, defInst))
+                    {
+                        // Skip emitting STORE to stack memory completely for rematerializable constants!
+                        continue;
+                    }
 
                     StackFrameObject *spillSlot = ctx.m_spilledRegs[defRef];
                     MirType *regType = defReg->getMirType();
@@ -404,12 +482,15 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
                     MirReference *spillSlotRef = opBuilder.buildRef(spillSlot, srcRef);
 
                     operands[i] = spillVReg;
-                    inst->invalidateCachedUsedAndDefs();
+                    ctx.m_unspillableRegs.insert(spillVReg->getRef());
 
-                    MirInstructionBuilder insertAfterBuilder(ctx.m_ctx, block, InsertionType::InsertAfter, instIt);
-                    insertAfterBuilder.STORE(srcRef, spillSlotRef, spillVReg);
+                    MirInstructionBuilder insertAfterBuilder(ctx.m_ctx, block, InsertionType::InsertAfter, it);
+                    MirInstruction *storeInst = insertAfterBuilder.STORE(srcRef, spillSlotRef, spillVReg);
+                    storeInst->invalidateCachedUsedAndDefs();
                 }
             }
+
+            inst->invalidateCachedUsedAndDefs();
         }
     }
 }

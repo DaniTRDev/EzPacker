@@ -68,8 +68,7 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
         }
         else
         {
-            int64_t offset = callState->allocateStackSlot(sizeBytes, alignment);
-            return ArgumentLocationDesc::Stack(offset, sizeBytes);
+            return ArgumentLocationDesc::Stack(sizeBytes, callState->allocateStack(type));
         }
     }
 
@@ -82,8 +81,7 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
             callState->getUsedRegCount(RegisterRefClass::GPR) + callState->getUsedRegCount(RegisterRefClass::FPR);
     if (totalAllocatedRegs % 2 == 0)
     {
-        int64_t offset = callState->allocateStackSlot(sizeBytes, alignment);
-        return ArgumentLocationDesc::Stack(offset, sizeBytes);
+        return ArgumentLocationDesc::Stack(sizeBytes, callState->allocateStack(type));
     }
 
     // -------------------------------------------------------------------------
@@ -102,8 +100,7 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
     // Rule 4: Exhaustion Spill Fallback
     // -------------------------------------------------------------------------
     // Fallback when register pools are full: allocate an aligned outgoing stack parameter slot.
-    int64_t offset = callState->allocateStackSlot(sizeBytes, alignment);
-    return ArgumentLocationDesc::Stack(offset, sizeBytes);
+    return ArgumentLocationDesc::Stack(sizeBytes, callState->allocateStack(type));
 }
 
 ArgumentLocationDesc TestCallingConvention::getReturnLoc(MirType *type, CallLoweringState *callState)

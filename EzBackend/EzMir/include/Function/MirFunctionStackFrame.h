@@ -17,7 +17,7 @@ enum class StackFrameObjectSource : uint8_t
  */
 struct StackFrameObject
 {
-    // Filled by the prologue/epilogue pass. Or if it's an ABI-enforced offset (like for parameters).
+    // Filled by the prologue/epilogue pass (frame lowerer).
     int64_t m_offset{ 0 };
     MirType *m_type;
     size_t m_id;
@@ -59,14 +59,12 @@ class MirFunctionStackFrame
     StackFrameObject *createStackSpill(MirType *type);
 
     /**
-     * Creates a parameter at the given offset in the function stack frame. This is the only object whose offset is
-     * known at creation-time. This is used internally by low-level backend passes.
+     * Creates a parameter in the function stack frame.
      * @param size
      * @param align
-     * @param offset
      * @return
      */
-    StackFrameObject *createStackParam(MirType *type, int64_t offset);
+    StackFrameObject *createStackParam(MirType *type);
 
     /**
      * Creates a specific stack frame object with the given parameters
@@ -89,7 +87,7 @@ class MirFunctionStackFrame
      * Returns the list of stack frame objects.
      * @return
      */
-    const std::pmr::vector<StackFrameObject *> &getStackFrameObjects() const;
+    const std::pmr::vector<StackFrameObject *> &getObjects() const;
 
   private:
     std::pmr::vector<StackFrameObject *> m_stackFrameObjects;

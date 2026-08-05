@@ -18,7 +18,7 @@ bool AbiLowerer::processReturnBlock(CallingConvDesc *cc,
         return true;
     }
 
-    CallLoweringState st(cc, m_ctx);
+    CallLoweringState st(cc, m_ctx, func);
     ArgumentLocationDesc loc = cc->getReturnLoc(retType, &st);
     MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
     MirOperandBuilder oBuilder(m_ctx);
@@ -137,7 +137,7 @@ bool AbiLowerer::processCallBlock(CallingConvDesc *cc,
     MirOperandBuilder oBuilder(m_ctx);
 
     // Track state of used physical registers & stack offsets during parameter assignment
-    CallLoweringState callState(cc, m_ctx);
+    CallLoweringState callState(cc, m_ctx, func);
 
     /*
      * If the called function returns a value indirectly (e.g., large struct), the caller must allocate space on its
@@ -235,10 +235,7 @@ bool AbiLowerer::processCallBlock(CallingConvDesc *cc,
             case ArgLocationType::Stack:
             {
                 const StackLoc &stack = argLoc.getStack();
-
-                // Allocate slot in outgoing parameter stack frame
-                StackFrameObject *stackParamObj = func->getStackFrame()->createStackParam(argType, stack.m_frameOffset);
-                MirOperand *stackParamAddr = oBuilder.buildRef(stackParamObj, pushArgInstr->getSourceRef());
+                MirOperand *stackParamAddr = oBuilder.buildRef(stack.m_object, pushArgInstr->getSourceRef());
 
                 // Store value to outgoing stack argument area
                 iBuilder.STORE(stackParamAddr, argVal);
@@ -279,7 +276,7 @@ bool AbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
     MirOperandBuilder oBuilder(m_ctx);
 
     // Call state for querying the return location according to ABI rules
-    CallLoweringState callState(cc, m_ctx);
+    CallLoweringState callState(cc, m_ctx, func);
 
     for (size_t retIdx = 0; retIdx < popRets.size(); ++retIdx)
     {
@@ -394,7 +391,7 @@ bool AbiLowerer::processFunctionArguments(CallingConvDesc *cc,
     MirOperandBuilder oBuilder(m_ctx);
 
     // Track state of physical register allocations and incoming stack slot offsets
-    CallLoweringState callState(cc, m_ctx);
+    CallLoweringState callState(cc, m_ctx, func);
 
     for (size_t argIdx = 0; argIdx < popArgs.size(); ++argIdx)
     {
@@ -475,9 +472,7 @@ bool AbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                 const StackLoc &stack = argLoc.getStack();
 
                 // Parameter sits in incoming stack frame slot
-                StackFrameObject *incomingStackObj =
-                        func->getStackFrame()->createStackParam(argType, stack.m_frameOffset);
-                MirOperand *stackRef = oBuilder.buildRef(incomingStackObj, popArgInstr->getSourceRef());
+                MirOperand *stackRef = oBuilder.buildRef(stack.m_object, popArgInstr->getSourceRef());
 
                 // Read value from stack slot into virtual register
                 iBuilder.LOAD(destVal, stackRef);

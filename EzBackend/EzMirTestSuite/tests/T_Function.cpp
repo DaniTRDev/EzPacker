@@ -145,9 +145,9 @@ TEST_F(FunctionTest, TestFunc1ParameterNStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createStackParam(i8, 0),
-                     *obj2 = func->getStackFrame()->createStackParam(i16, 2),
-                     *obj3 = func->getStackFrame()->createStackParam(i16, 4);
+    StackFrameObject *obj = func->getStackFrame()->createStackParam(i8),
+                     *obj2 = func->getStackFrame()->createStackParam(i16),
+                     *obj3 = func->getStackFrame()->createStackParam(i16);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();

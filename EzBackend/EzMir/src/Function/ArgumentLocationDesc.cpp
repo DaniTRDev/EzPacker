@@ -19,10 +19,9 @@ ArgumentLocationDesc ArgumentLocationDesc::Split(const std::vector<SplitPiece> &
     return ArgumentLocationDesc(ArgLocationType::Split, SplitLoc{ .m_parts = std::move(pieces) });
 }
 
-ArgumentLocationDesc ArgumentLocationDesc::Stack(int64_t offset, size_t sizeInBytes)
+ArgumentLocationDesc ArgumentLocationDesc::Stack(size_t sizeInBytes, StackFrameObject *object)
 {
-    return ArgumentLocationDesc(ArgLocationType::Stack,
-                                StackLoc{ .m_frameOffset = offset, .m_sizeBytes = sizeInBytes });
+    return ArgumentLocationDesc(ArgLocationType::Stack, StackLoc{ .m_sizeBytes = sizeInBytes, .m_object = object });
 }
 
 ArgLocationType ArgumentLocationDesc::getType() const { return m_type; }

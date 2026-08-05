@@ -14,7 +14,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateBasicVirtualRegisters)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
     MirFunctionBuilder funcBuilder(getBuilderCtx());
-    MirFunction *func = funcBuilder.build(t->getVoidType());
+    MirFunction *func = funcBuilder.build(t->getVoidType(), "AllocateBasicVirtualRegisters");
 
     MirBlock *entryBlock = func->getEntryPoint();
     MirInstructionBuilder iBuilder(getBuilderCtx(),
@@ -34,11 +34,29 @@ TEST_F(TestRegisterAllocatorPass, AllocateBasicVirtualRegisters)
     iBuilder.MOV(v1, oBuilder.buildInt(t->i32(), FlexInt(20, 32)));
     iBuilder.ADD(v0, v1);
 
+    // Build allocator context to verify graph properties directly
+    RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
+
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
+    // Populate context to run graph assertions
+    LivenessAnalysis liveness(getBuilderCtx());
+    std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
+    funcList.push_back(func);
+    auto it = funcList.begin();
+    liveness.run(funcList, it, getPassManager());
+    LivenessResult livenessRes = liveness.getResult();
+
+    getRegisterAllocator()->buildInterferenceGraph(&livenessRes, ctx);
+    getRegisterAllocator()->evaluateInterferenceGraphDegree(ctx);
+    getRegisterAllocator()->simplify(ctx);
+    getRegisterAllocator()->selectColors(ctx);
+
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyNoVirtualRegistersRemain(func->getBlocks());
+    verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
+            .verifyAllocationMappingComplete(ctx)
+            .verifyNoInterferenceConflicts(ctx);
 }
 
 // =========================================================================
@@ -48,7 +66,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateMixedGprAndFprRegisters)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
     MirFunctionBuilder funcBuilder(getBuilderCtx());
-    MirFunction *func = funcBuilder.build(t->getVoidType());
+    MirFunction *func = funcBuilder.build(t->getVoidType(), "AllocateMixedGprAndFprRegisters");
 
     MirBlock *entryBlock = func->getEntryPoint();
     MirInstructionBuilder iBuilder(getBuilderCtx(),
@@ -72,11 +90,27 @@ TEST_F(TestRegisterAllocatorPass, AllocateMixedGprAndFprRegisters)
     iBuilder.MOV(floatReg1, floatReg0);
     iBuilder.ADD(floatReg1, floatReg0);
 
+    RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
+
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
+    LivenessAnalysis liveness(getBuilderCtx());
+    std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
+    funcList.push_back(func);
+    auto it = funcList.begin();
+    liveness.run(funcList, it, getPassManager());
+    LivenessResult livenessRes = liveness.getResult();
+
+    getRegisterAllocator()->buildInterferenceGraph(&livenessRes, ctx);
+    getRegisterAllocator()->evaluateInterferenceGraphDegree(ctx);
+    getRegisterAllocator()->simplify(ctx);
+    getRegisterAllocator()->selectColors(ctx);
+
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyNoVirtualRegistersRemain(func->getBlocks());
+    verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
+            .verifyAllocationMappingComplete(ctx)
+            .verifyNoInterferenceConflicts(ctx);
 }
 
 // =========================================================================
@@ -86,7 +120,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateAcrossCallInstruction)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
     MirFunctionBuilder funcBuilder(getBuilderCtx());
-    MirFunction *func = funcBuilder.build(t->getVoidType());
+    MirFunction *func = funcBuilder.build(t->getVoidType(), "AllocateAcrossCallInstruction");
 
     MirBlock *entryBlock = func->getEntryPoint();
     MirInstructionBuilder iBuilder(getBuilderCtx(),
@@ -106,21 +140,37 @@ TEST_F(TestRegisterAllocatorPass, AllocateAcrossCallInstruction)
     iBuilder.CALL(calleeTarget);
     iBuilder.ADD(liveAcross, oBuilder.buildInt(t->i32(), FlexInt(50, 32)));
 
+    RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
+
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
+    LivenessAnalysis liveness(getBuilderCtx());
+    std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
+    funcList.push_back(func);
+    auto it = funcList.begin();
+    liveness.run(funcList, it, getPassManager());
+    LivenessResult livenessRes = liveness.getResult();
+
+    getRegisterAllocator()->buildInterferenceGraph(&livenessRes, ctx);
+    getRegisterAllocator()->evaluateInterferenceGraphDegree(ctx);
+    getRegisterAllocator()->simplify(ctx);
+    getRegisterAllocator()->selectColors(ctx);
+
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyNoVirtualRegistersRemain(func->getBlocks());
+    verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
+            .verifyAllocationMappingComplete(ctx)
+            .verifyNoInterferenceConflicts(ctx);
 }
 
 // =========================================================================
-// 4. REGISTER EXHAUSTION AND SPILL CODE INSERTION
+// 4. REMATERIALIZATION OPTIMIZATION (IMMEDIATES REMATERIALIZED INLINE)
 // =========================================================================
-TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRewrite)
+TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRematerialization)
 {
     const auto &t = getBuilderCtx()->getTypeTable();
     MirFunctionBuilder funcBuilder(getBuilderCtx());
-    MirFunction *func = funcBuilder.build(t->getVoidType());
+    MirFunction *func = funcBuilder.build(t->getVoidType(), "ForceRematerializationTest");
 
     MirBlock *entryBlock = func->getEntryPoint();
     MirInstructionBuilder iBuilder(getBuilderCtx(),
@@ -129,7 +179,6 @@ TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRewrite)
                                    entryBlock->getInstructions().begin());
     MirOperandBuilder oBuilder(getBuilderCtx());
 
-    // Allocate high volume of concurrent virtual registers to force spilling
     constexpr size_t numVRegs = 5;
     std::vector<MirRegister *> vregs;
     vregs.reserve(numVRegs);
@@ -141,8 +190,6 @@ TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRewrite)
         iBuilder.MOV(v, oBuilder.buildInt(t->i32(), FlexInt(static_cast<int32_t>(i + 1), 32)));
     }
 
-    // Force overlapping live ranges for all created registers by accumulating them
-    // (2-operand ISA: accum = accum + vregs[i])
     MirRegister *accum = oBuilder.buildVReg(t->i32(), "accum");
     iBuilder.MOV(accum, oBuilder.buildInt(t->i32(), FlexInt(0, 32)));
 
@@ -151,9 +198,97 @@ TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRewrite)
         iBuilder.ADD(accum, vregs[i]);
     }
 
+    RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
+
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
+    LivenessAnalysis liveness(getBuilderCtx());
+    std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
+    funcList.push_back(func);
+    auto it = funcList.begin();
+    liveness.run(funcList, it, getPassManager());
+    LivenessResult livenessRes = liveness.getResult();
+
+    getRegisterAllocator()->buildInterferenceGraph(&livenessRes, ctx);
+    getRegisterAllocator()->evaluateInterferenceGraphDegree(ctx);
+    getRegisterAllocator()->simplify(ctx);
+    getRegisterAllocator()->selectColors(ctx);
+
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyNoVirtualRegistersRemain(func->getBlocks());
+    verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
+            .verifyAllocationMappingComplete(ctx)
+            .verifyNoInterferenceConflicts(ctx);
+
+    // Verify rematerialization optimization: zero stack spill slots created!
+    EXPECT_EQ(func->getStackFrame()->getObjects().size(), 0);
+}
+
+// =========================================================================
+// 5. STACK MEMORY SPILLING (NON-REMATERIALIZABLE COMPUTED VALUES)
+// =========================================================================
+TEST_F(TestRegisterAllocatorPass, ForceMemorySpillingForNonRematerializableValues)
+{
+    const auto &t = getBuilderCtx()->getTypeTable();
+    MirFunctionBuilder funcBuilder(getBuilderCtx());
+    MirFunction *func = funcBuilder.build(t->getVoidType(), "ForceStackSpillTest");
+
+    MirBlock *entryBlock = func->getEntryPoint();
+    MirInstructionBuilder iBuilder(getBuilderCtx(),
+                                   entryBlock,
+                                   InsertionType::InsertAfter,
+                                   entryBlock->getInstructions().begin());
+    MirOperandBuilder oBuilder(getBuilderCtx());
+
+    // Base value dynamically computed via ADD (non-rematerializable)
+    MirRegister *baseVal = oBuilder.buildVReg(t->i32(), "baseVal");
+    iBuilder.MOV(baseVal, oBuilder.buildInt(t->i32(), FlexInt(10, 32)));
+    iBuilder.ADD(baseVal, oBuilder.buildInt(t->i32(), FlexInt(5, 32)));
+
+    constexpr size_t numVRegs = 5;
+    std::vector<MirRegister *> vregs;
+    vregs.reserve(numVRegs);
+
+    for (size_t i = 0; i < numVRegs; ++i)
+    {
+        MirRegister *v = oBuilder.buildVReg(t->i32(), std::format("dyn_v{}", std::to_string(i)).c_str());
+        vregs.push_back(v);
+        iBuilder.MOV(v, baseVal);
+        iBuilder.ADD(v, oBuilder.buildInt(t->i32(), FlexInt(static_cast<int32_t>(i + 1), 32)));
+    }
+
+    MirRegister *accum = oBuilder.buildVReg(t->i32(), "accum");
+    iBuilder.MOV(accum, oBuilder.buildInt(t->i32(), FlexInt(0, 32)));
+
+    for (size_t i = 0; i < numVRegs; ++i)
+    {
+        iBuilder.ADD(accum, vregs[i]);
+    }
+
+    RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
+
+    MirRegisterAllocatorPass *pass =
+            runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
+
+    LivenessAnalysis liveness(getBuilderCtx());
+    std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
+    funcList.push_back(func);
+    auto it = funcList.begin();
+    liveness.run(funcList, it, getPassManager());
+    LivenessResult livenessRes = liveness.getResult();
+
+    getRegisterAllocator()->buildInterferenceGraph(&livenessRes, ctx);
+    getRegisterAllocator()->evaluateInterferenceGraphDegree(ctx);
+    getRegisterAllocator()->simplify(ctx);
+
+    // Force selection and spilling on context
+    getRegisterAllocator()->selectColors(ctx);
+
+    RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
+    verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
+            .verifyAllocationMappingComplete(ctx)
+            .verifyNoInterferenceConflicts(ctx)
+            .verifySpillingCorrectness(ctx, func->getBlocks());
+
+    EXPECT_GT(func->getStackFrame()->getObjects().size(), 0);
 }

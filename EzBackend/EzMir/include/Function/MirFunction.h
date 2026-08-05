@@ -137,7 +137,7 @@ class MirFunction
     MirId m_id;
     SourceReference *m_sourceRef;
 
-    std::pmr::list<MirBlock *> m_blocks; // Arena-managed blocks belonging to this function.
+    std::pmr::list<MirBlock *> m_blocks;
     std::pmr::list<MirRegister *> m_parameters;
     std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;
     std::pmr::string m_name;

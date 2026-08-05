@@ -12,7 +12,7 @@ class CallLoweringState
     /**
      * Creates the state with the given calling convention and context.
      */
-    CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx);
+    CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx, MirFunction *func);
 
     /**
      * Attempts to allocate the next available register of the given class. Returns true if succeded and false if
@@ -33,23 +33,13 @@ class CallLoweringState
     size_t getUsedRegCount(RegisterRefClass refClass) const;
 
     /**
-     * Returns the current stack offset.
-     * @return
+     * Allocates an abstract stack slot in the target function.
      */
-    int64_t getStackOffset() const;
-
-    /**
-     * @brief Dynamically allocates space on the incoming/outgoing parameter stack,
-     * ensuring data properties line up with target alignment rules.
-     * @param sizeBytes The data type footprint size.
-     * @param alignmentBytes The strict data structure boundary layout mask.
-     * @return The starting memory offset byte position relative to the stack frame anchor.
-     */
-    int64_t allocateStackSlot(size_t sizeBytes, size_t alignmentBytes);
+    StackFrameObject *allocateStack(MirType *type) const;
 
   private:
     CallingConvDesc *m_callingConv;
-    int64_t m_currentStackOffset; // Current parameter stack frame offset (in bytes)
+    MirFunction *m_func;
 
     // Record of registers allocated during this lowering state
     std::pmr::unordered_map<RegisterRefClass, std::pmr::vector<RegisterRef>> m_allocatedRegs;

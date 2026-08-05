@@ -40,7 +40,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
     // Verify CALL instruction was standardized (token binding operand cleared, just callee ref)
     MirInstructionVerifier(callInstr).operandCount(1);
 
-    CallLoweringState callState(cc, m_ctx);
+    CallLoweringState callState(cc, m_ctx, func);
 
     // Compute expected instruction count inserted right before CALL
     size_t expectedPrepInstrs = 0;
@@ -77,7 +77,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
     }
 
     // Reset CallLoweringState to walk the parameters symmetrically
-    CallLoweringState verifyState(cc, m_ctx);
+    CallLoweringState verifyState(cc, m_ctx, func);
 
     // 3. Verify parameter setup instructions in order
     for (size_t argIdx = 0; argIdx < origPushArgs.size(); ++argIdx)
@@ -242,7 +242,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCallReturn(MirBlock
     EXPECT_NE(postCallIt, instructions.end())
             << "Expected return lowering instructions after CALL, but reached block end.";
 
-    CallLoweringState verifyState(cc, m_ctx);
+    CallLoweringState verifyState(cc, m_ctx, func);
     MirType *retType = origRet->getMirType();
     ArgumentLocationDesc retLoc = cc->getReturnLoc(retType, &verifyState);
 

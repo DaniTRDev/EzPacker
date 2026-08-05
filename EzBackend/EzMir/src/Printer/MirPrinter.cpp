@@ -10,7 +10,8 @@ std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
     else
         result = std::format("%block.id={}", block->getId());
 
-    result += std::format(".instrCount={}\n", block->getInstructions().size());
+    result += std::format(".instrCount={}", block->getInstructions().size());
+    result += std::format(".owner={}\n", block->getOwner()->getName());
 
     if (detail == MirPrinterDetail::Detailed)
     {
@@ -130,7 +131,7 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
         // Stack frame (Fixed spacing/delimiters)
         result += " - Stack Frame: \n\t";
         bool firstFrame = true;
-        for (StackFrameObject *frameObj : function->getStackFrame()->getStackFrameObjects())
+        for (StackFrameObject *frameObj : function->getStackFrame()->getObjects())
         {
             if (!firstFrame)
                 result += "\n\t";

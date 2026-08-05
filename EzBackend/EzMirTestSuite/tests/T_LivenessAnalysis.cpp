@@ -24,8 +24,7 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     MirOperandBuilder opBuilder(ctx);
 
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
-    MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
-    MirInstructionBuilder builder(ctx, entryIP);
+    MirInstructionBuilder builder(ctx, getTestInsertionPoint());
 
     // Setup 3 variables
     MirRegister *v0 = createInt32Reg("v0");
@@ -89,27 +88,32 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
     MirInteger *imm5 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(5));
 
     // Entry Block: Define %v0, define condition, branch
-    MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
-    MirInstructionBuilder entryBuilder(ctx, entryIP);
+    MirInstructionBuilder entryBuilder(ctx, getTestInsertionPoint());
     entryBuilder.MOV(v0, imm5);
     entryBuilder.CMP(vCond, imm5);
     entryBuilder.JE(opBuilder.buildRef(thenBlock));
     // Fallthrough to elseBlock automatically
 
     // Then Block: Reads %v0
-    MirInstructionInsertionPoint thenIP{ .m_type = InsertionType::InsertAfter, .m_block = thenBlock };
+    MirInstructionInsertionPoint thenIP{ .m_type = InsertionType::InsertAfter,
+                                         .m_block = thenBlock,
+                                         .m_iterator = thenBlock->getInstructions().begin() };
     MirInstructionBuilder thenBuilder(ctx, thenIP);
     thenBuilder.MOV(createInt32Reg("unused1"), v0);
     thenBuilder.JMP(opBuilder.buildRef(mergeBlock));
 
     // Else Block: Overwrites or ignores %v0 completely (Does NOT use it)
-    MirInstructionInsertionPoint elseIP{ .m_type = InsertionType::InsertAfter, .m_block = elseBlock };
+    MirInstructionInsertionPoint elseIP{ .m_type = InsertionType::InsertAfter,
+                                         .m_block = elseBlock,
+                                         .m_iterator = elseBlock->getInstructions().begin() };
     MirInstructionBuilder elseBuilder(ctx, elseIP);
     elseBuilder.MOV(createInt32Reg("unused2"), imm5);
     elseBuilder.JMP(opBuilder.buildRef(mergeBlock));
 
     // Merge Block: Clean exit
-    MirInstructionInsertionPoint mergeIP{ .m_type = InsertionType::InsertAfter, .m_block = mergeBlock };
+    MirInstructionInsertionPoint mergeIP{ .m_type = InsertionType::InsertAfter,
+                                          .m_block = mergeBlock,
+                                          .m_iterator = mergeBlock->getInstructions().begin() };
     MirInstructionBuilder mergeBuilder(ctx, mergeIP);
     mergeBuilder.RET(imm5);
 
@@ -139,8 +143,7 @@ TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
     MirOperandBuilder opBuilder(ctx);
 
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
-    MirInstructionInsertionPoint entryIP{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
-    MirInstructionBuilder builder(ctx, entryIP);
+    MirInstructionBuilder builder(ctx, getTestInsertionPoint());
 
     MirRegister *v0 = createInt32Reg("v0");
     MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));

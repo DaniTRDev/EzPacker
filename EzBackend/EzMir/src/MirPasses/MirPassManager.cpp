@@ -7,7 +7,13 @@ MirPassManager::MirPassManager(std::pmr::memory_resource *globalArena,
 {
 }
 
-void MirPassManager::invalidateAnalysis() { m_validAnalyses.clear(); }
+void MirPassManager::invalidateAnalysis()
+{
+    for (auto &analysis : m_validAnalyses)
+        analysis.second->reset();
+
+    m_validAnalyses.clear();
+}
 
 void MirPassManager::runPipeline(MirBuilderContext *ctx)
 {
@@ -140,6 +146,8 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                     combinedResult.m_succeeded = false;
                     break;
                 }
+
+                invalidateAnalysis();
             }
             break;
         }
@@ -154,6 +162,8 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                     combinedResult.m_succeeded = false;
                     break;
                 }
+
+                invalidateAnalysis();
             }
             break;
         }
@@ -168,6 +178,8 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                     combinedResult.m_succeeded = false;
                     break;
                 }
+
+                invalidateAnalysis();
             }
             break;
         }
@@ -185,6 +197,8 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                         combinedResult.m_succeeded = false;
                         break;
                     }
+
+                    invalidateAnalysis();
                 }
             }
             break;
@@ -208,6 +222,7 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                             break;
                         }
                         it = nextIt;
+                        invalidateAnalysis();
                     }
                 }
             }

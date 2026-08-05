@@ -85,6 +85,17 @@ class MirRegisterAllocator
 
   private:
     /**
+     * Returns true if the given virtual register's value can be rematerialized without using the virtual register at
+     * all.
+     */
+    bool isRematerializable(MirRegister *vreg, MirInstruction *definingInst);
+
+    /**
+     * Calculates the spill cost of a given node.
+     */
+    double calculateSpillCost(RegisterRef node, RegisterAllocatorCtx &ctx);
+
+    /**
      * Adds an undirected edge between U and V.
      */
     void addEdge(const RegisterRef &u, const RegisterRef &v, RegisterAllocatorCtx &ctx);

@@ -21,7 +21,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
                 << "POP_ARG instruction was not erased during processFunctionArguments execution.";
     }
 
-    CallLoweringState verifyState(cc, m_ctx);
+    CallLoweringState verifyState(cc, m_ctx, func);
 
     // Compute expected instruction count inserted at the top of the entry block
     size_t expectedPrepInstrs = 0;
@@ -49,7 +49,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
 
     // 2. Start checking from the very first instruction in the entry block
     auto prepIt = instructions.begin();
-    CallLoweringState walkState(cc, m_ctx);
+    CallLoweringState walkState(cc, m_ctx, func);
 
     // 3. Verify incoming parameter setup instructions in order
     for (size_t argIdx = 0; argIdx < origPopArgs.size(); ++argIdx)

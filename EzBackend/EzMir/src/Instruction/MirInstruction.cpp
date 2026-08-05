@@ -54,6 +54,9 @@ std::pmr::vector<MirOperand *> &MirInstruction::getOperands()
     m_cachedDefinedRegisters = false;
     m_cachedUsedRegisters = false;
 
+    m_definedRegisters.clear();
+    m_usedRegisters.clear();
+
     return m_operands;
 }
 
