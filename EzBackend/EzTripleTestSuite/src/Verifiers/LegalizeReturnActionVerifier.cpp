@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/LegalizeReturnActionVerifier.h"
+#include "Verifiers/LegalizeReturnActionVerifier.h"
 
 LegalizeReturnActionVerifier::LegalizeReturnActionVerifier(MirBuilderContext *ctx, MirBlockLegalizerPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)

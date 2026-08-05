@@ -7,6 +7,10 @@
 /**
  * This class acts a simple target descriptor that is already defined. Its purpose is just to acts as an already-defined
  * descriptor for tests.
+ *
+ * Defined registers:
+ *  GPRs: { 1, 2, 3 }
+ *  FPRs (Volatile): { 4, 5 }
  */
 class EzTripleTestTargetDesc : public TargetDesc
 {
@@ -82,6 +86,33 @@ class EzTripleTestTargetDesc : public TargetDesc
     }
 
     size_t getExpansionRecipesSize() override { return GET_EXPANSION_RECIPES_SIZE(EzTripleTest); }
+
+    /**
+     * Returns the available registers for the given class.
+     */
+    std::pmr::vector<RegisterRef> getAvailableRegisters(RegisterRefClass refClass) override
+    {
+        switch (refClass)
+        {
+            case RegisterRefClass::GPR:
+            {
+                return std::pmr::vector<RegisterRef>({ RegisterRef::preg(RegisterRefClass::GPR, 1),
+                                                       RegisterRef::preg(RegisterRefClass::GPR, 2),
+                                                       RegisterRef::preg(RegisterRefClass::GPR, 3) },
+                                                     m_ctx->getGlobalAllocator());
+            }
+            case RegisterRefClass::FPR:
+            {
+                return std::pmr::vector<RegisterRef>(
+                        { RegisterRef::preg(RegisterRefClass::FPR, 4), RegisterRef::preg(RegisterRefClass::FPR, 5) },
+                        m_ctx->getGlobalAllocator());
+            }
+            default:
+            {
+                throw std::runtime_error("Unsupported register class");
+            }
+        }
+    }
 
   private:
     MirBuilderContext *m_ctx;

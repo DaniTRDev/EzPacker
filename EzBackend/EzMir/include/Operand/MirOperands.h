@@ -31,7 +31,7 @@ class MirFloat : public MirOperand
     std::string toString() const override
     {
         // Output format: f32 3.14159
-        return std::format("{} {}", getMirType()->getName(), m_float.toString());
+        return std::format("{} {}", getMirType()->getName(), m_float.toString(10));
     }
 
   private:
@@ -175,17 +175,16 @@ class MirRegister : public MirOperand
     static constexpr MirOperandType OpKind = MirOperandType::Register;
 
     MirRegister(MirType *type, bool isVirtual, size_t id, SourceReference *ref, std::pmr::string name = "") :
-        MirOperand(type, ref), m_ref(id, isVirtual), m_name(std::move(name))
+        MirOperand(type, ref), m_ref(RegisterRef::fromType(type, id, isVirtual)), m_name(std::move(name))
     {
     }
 
-    RegisterRef getRef() const { return m_ref; }
     bool isVirtual() const { return m_ref.isVirtual(); }
-    size_t getRegId() const { return m_ref.getId(); }
-
     bool operator==(const MirRegister &other) const { return m_ref == other.m_ref; }
-    const std::pmr::string &getName() const { return m_name; }
     MirOperandType getType() const override { return OpKind; }
+    RegisterRef getRef() const { return m_ref; }
+    size_t getRegId() const { return m_ref.getId(); }
+    void setRef(RegisterRef ref) { m_ref = ref; }
 
     std::string toString() const override
     {
@@ -197,8 +196,7 @@ class MirRegister : public MirOperand
         return std::format("{} %{}{}", getMirType()->getName(), prefix, m_ref.getId());
     }
 
-    void setRegId(size_t id) { m_ref = RegisterRef(id, m_ref.isVirtual()); }
-    void setVirtual(bool value) { m_ref = RegisterRef(m_ref.getId(), value); }
+    const std::pmr::string &getName() const { return m_name; }
 
   private:
     RegisterRef m_ref;

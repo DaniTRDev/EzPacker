@@ -41,6 +41,12 @@ void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode;
 
 void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
 
+void MirInstruction::invalidateCachedUsedAndDefs()
+{
+    m_cachedDefinedRegisters = false;
+    m_cachedUsedRegisters = false;
+}
+
 const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
 
 std::pmr::vector<MirOperand *> &MirInstruction::getOperands()

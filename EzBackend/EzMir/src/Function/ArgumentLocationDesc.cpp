@@ -2,11 +2,11 @@
 
 ArgumentLocationDesc::ArgumentLocationDesc(ArgLocationType type, StorageT storage) : m_type(type), m_storage(storage) {}
 
-ArgumentLocationDesc ArgumentLocationDesc::Reg(PhysicalRegId regId, size_t sizeInBytes)
+ArgumentLocationDesc ArgumentLocationDesc::Reg(RegisterRef regId, size_t sizeInBytes)
 {
-    return ArgumentLocationDesc(ArgLocationType::Register, RegLoc{ .m_regId = regId, .m_sizeBytes = sizeInBytes });
+    return ArgumentLocationDesc(ArgLocationType::Register, RegLoc{ .m_ref = regId, .m_sizeBytes = sizeInBytes });
 }
-ArgumentLocationDesc ArgumentLocationDesc::Indirect(bool byVal, bool copyOnReg, size_t size, PhysicalRegId ptrStorage)
+ArgumentLocationDesc ArgumentLocationDesc::Indirect(bool byVal, bool copyOnReg, size_t size, RegisterRef ptrStorage)
 {
     return ArgumentLocationDesc(ArgLocationType::Indirect,
                                 IndirectLoc{ .m_isByVal = byVal,

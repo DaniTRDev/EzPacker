@@ -2,7 +2,7 @@
 #define EZPACKER_FUNCTIONARGABILOWERERVERIFIER_H
 
 #include "EzTriple.h"
-#include "../../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 
 class FunctionAbiLowererPass;
 

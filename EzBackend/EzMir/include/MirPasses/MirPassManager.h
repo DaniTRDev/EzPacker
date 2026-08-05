@@ -55,6 +55,11 @@ class MirPassManager
     }
 
     /**
+     * Invalidates the analysis stored.
+     */
+    void invalidateAnalysis();
+
+    /**
      * Runs the generated pipeline (by generatePipeline) on the given context. Only TRANSFORM passes will be
      * executed, analysis passes will be run ONLY if they are required by any of the transform passes.
      * @param functionList

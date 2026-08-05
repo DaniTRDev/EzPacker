@@ -47,6 +47,11 @@ class TargetDesc
      * @return
      */
     virtual size_t getExpansionRecipesSize() = 0;
+
+    /**
+     * Returns a list with the available registers of a specific class.
+     */
+    virtual std::pmr::vector<RegisterRef> getAvailableRegisters(RegisterRefClass refClass) = 0;
 };
 
 #endif // EZPACKER_TARGETDESC_H

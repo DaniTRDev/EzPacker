@@ -27,7 +27,7 @@ class TestCallingConvention : public CallingConvDesc
      * restricted pools across GPRs {1, 2, 3} and FPRs {4, 5} to trigger early register
      * exhaustion, stack spills, and register clobbering.
      */
-    TestCallingConvention();
+    TestCallingConvention(MirBuilderContext *ctx);
 
     /**
      * Returns the identifying name of this testing ABI ("TestCallingConvention").
@@ -101,35 +101,19 @@ class TestCallingConvention : public CallingConvDesc
     size_t getShadowSpaceSize() const override;
 
     /**
-     * Returns the vector of callee-saved (non-volatile) General Purpose Registers.
-     * @return Const reference to vector containing GPR 3.
+     * Returns the vector of callee-saved (non-volatile) registers of the given class.
      */
-    const std::vector<PhysicalRegId> &getCalleeSavedGPRegs() const override;
+    const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(RegisterRefClass refClass) const override;
 
     /**
-     * Returns the vector of callee-saved (non-volatile) Floating Point Registers.
-     * @return Const reference to vector containing FPR 5.
+     * Returns the vector of caller-saved (volatile) registers of the given class.
      */
-    const std::vector<PhysicalRegId> &getCalleeSavedFPRegs() const override;
-
-    /**
-     * Returns the vector of caller-saved (volatile) General Purpose Registers.
-     * @return Const reference to vector containing GPRs {1, 2}.
-     */
-    const std::vector<PhysicalRegId> &getCallerSavedGPRegs() const override;
-
-    /**
-     * Returns the vector of caller-saved (volatile) Floating Point Registers.
-     * @return Const reference to vector containing FPR 4.
-     */
-    const std::vector<PhysicalRegId> &getCallerSavedFPRegs() const override;
+    const std::pmr::vector<RegisterRef> &getCallerSavedRegs(RegisterRefClass refClass) const override;
 
   private:
-    std::vector<PhysicalRegId> m_gprCallerSaved; ///< Volatile GPRs: {1, 2}
-    std::vector<PhysicalRegId> m_fprCallerSaved; ///< Volatile FPRs: {4}
-
-    std::vector<PhysicalRegId> m_gprCalleeSaved; ///< Preserved GPRs: {3}
-    std::vector<PhysicalRegId> m_fprCalleeSaved; ///< Preserved FPRs: {5}
+    MirBuilderContext *m_ctx;
+    std::pmr::unordered_map<RegisterRefClass, std::pmr::vector<RegisterRef>> m_calleeSavedRegs;
+    std::pmr::unordered_map<RegisterRefClass, std::pmr::vector<RegisterRef>> m_callerSavedRegs;
 };
 
 #endif // EZPACKER_TESTCALLINGCONVENTION_H

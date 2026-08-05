@@ -1,4 +1,4 @@
-#include "../include/EzTripleTestSuite.h"
+#include "EzTripleTestSuite.h"
 using namespace EzTripleTestInstructionSet;
 
 class TestMirInstructionSelectorPass : public MirTripleTestSuiteAsGtest

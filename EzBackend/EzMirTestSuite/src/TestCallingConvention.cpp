@@ -1,15 +1,27 @@
 #include "TestCallingConvention.h"
 
-TestCallingConvention::TestCallingConvention()
+TestCallingConvention::TestCallingConvention(MirBuilderContext *ctx) : m_ctx(ctx)
 {
-    // Populate distinct, highly constrained register pools for stress-testing lowering passes.
-    // Volatile GPR pool: {1, 2}, Preserved GPR pool: {3}
-    m_gprCalleeSaved = { PhysicalRegId(3) };
+    m_calleeSavedRegs = std::pmr::unordered_map<RegisterRefClass, std::pmr::vector<RegisterRef>>(
+            { { RegisterRefClass::GPR,
+                std::pmr::vector<RegisterRef>({ RegisterRef::preg(RegisterRefClass::GPR, 3) },
+                                              m_ctx->getGlobalAllocator()) },
+              { RegisterRefClass::FPR,
+                std::pmr::vector<RegisterRef>({ RegisterRef::preg(RegisterRefClass::FPR, 5) },
+                                              m_ctx->getGlobalAllocator()) } },
+            0,
+            m_ctx->getGlobalAllocator());
 
-    // Volatile FPR pool: {4}, Preserved FPR pool: {5}PhysicalRegId
-    // rSaved = { PhysicalRegId(1), PhysicalRegId(2) };
-    m_fprCallerSaved = { PhysicalRegId(4) };
-    m_fprCalleeSaved = { PhysicalRegId(5) };
+    m_callerSavedRegs = std::pmr::unordered_map<RegisterRefClass, std::pmr::vector<RegisterRef>>(
+            { { RegisterRefClass::GPR,
+                std::pmr::vector<RegisterRef>(
+                        { RegisterRef::preg(RegisterRefClass::GPR, 1), RegisterRef::preg(RegisterRefClass::GPR, 2) },
+                        m_ctx->getGlobalAllocator()) },
+              { RegisterRefClass::FPR,
+                std::pmr::vector<RegisterRef>({ RegisterRef::preg(RegisterRefClass::FPR, 4) },
+                                              m_ctx->getGlobalAllocator()) } },
+            0,
+            m_ctx->getGlobalAllocator());
 }
 
 const char *TestCallingConvention::getName() const { return "TestCallingConvention"; }
@@ -26,8 +38,8 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
     // A. 64-bit values (8 bytes): Forced to split into two 32-bit GPRs
     if (sizeBytes == 8)
     {
-        PhysicalRegId regLo, regHi;
-        if (callState->allocateGpr(regLo) && callState->allocateGpr(regHi))
+        RegisterRef regLo, regHi;
+        if (callState->allocate(RegisterRefClass::GPR, regLo) && callState->allocate(RegisterRefClass::GPR, regHi))
         {
             std::vector<SplitPiece> pieces = {
                 { regLo, type->getOwner()->i32(), 0 }, // Low 32 bits at offset 0
@@ -39,8 +51,8 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
     // B. 32-bit values (4 bytes): Directly assigned to a single GPR if available
     else if (sizeBytes == 4)
     {
-        PhysicalRegId reg;
-        if (callState->allocateGpr(reg))
+        RegisterRef reg;
+        if (callState->allocate(RegisterRefClass::GPR, reg))
         {
             return ArgumentLocationDesc::Reg(reg, sizeBytes);
         }
@@ -49,8 +61,8 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
     // Passes a pointer in a GPR if available; otherwise allocates a stack slot for the pointer address.
     else if (sizeBytes == 32)
     {
-        PhysicalRegId ptrDest;
-        if (callState->allocateGpr(ptrDest))
+        RegisterRef ptrDest;
+        if (callState->allocate(RegisterRefClass::GPR, ptrDest))
         {
             return ArgumentLocationDesc::Indirect(true, false, sizeBytes, ptrDest);
         }
@@ -66,7 +78,8 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
     // -------------------------------------------------------------------------
     // If the total count of currently allocated registers (GPRs + FPRs) is EVEN,
     // force this parameter to the stack to test non-contiguous register utilization routines.
-    size_t totalAllocatedRegs = callState->getUsedGprCount() + callState->getUsedFprCount();
+    size_t totalAllocatedRegs =
+            callState->getUsedRegCount(RegisterRefClass::GPR) + callState->getUsedRegCount(RegisterRefClass::FPR);
     if (totalAllocatedRegs % 2 == 0)
     {
         int64_t offset = callState->allocateStackSlot(sizeBytes, alignment);
@@ -76,21 +89,13 @@ ArgumentLocationDesc TestCallingConvention::getArgLoc(MirType *type, CallLowerin
     // -------------------------------------------------------------------------
     // Rule 3: Standard Register Allocation Fallback
     // -------------------------------------------------------------------------
-    if (type->getKind() == MirTypeKind::FloatingPoint)
+    RegisterRefClass targetClass =
+            (type->getKind() == MirTypeKind::FloatingPoint) ? RegisterRefClass::FPR : RegisterRefClass::GPR;
+
+    RegisterRef reg;
+    if (callState->allocate(targetClass, reg))
     {
-        PhysicalRegId fpr;
-        if (callState->allocateFpr(fpr))
-        {
-            return ArgumentLocationDesc::Reg(fpr, sizeBytes);
-        }
-    }
-    else
-    {
-        PhysicalRegId gpr;
-        if (callState->allocateGpr(gpr))
-        {
-            return ArgumentLocationDesc::Reg(gpr, sizeBytes);
-        }
+        return ArgumentLocationDesc::Reg(reg, sizeBytes);
     }
 
     // -------------------------------------------------------------------------
@@ -109,17 +114,17 @@ ArgumentLocationDesc TestCallingConvention::getReturnLoc(MirType *type, CallLowe
     // Lower as an Indirect SRET pointer (byVal=true, copyOnReg=true) passed in GPR 1.
     if (!canReturnInRegs(type))
     {
-        return ArgumentLocationDesc::Indirect(true, true, sizeBytes, PhysicalRegId(1));
+        return ArgumentLocationDesc::Indirect(true, true, sizeBytes, RegisterRef::preg(RegisterRefClass::GPR, 1));
     }
 
     // Floating-point scalar returns -> Volatile FPR 4
     if (type->getKind() == MirTypeKind::FloatingPoint)
     {
-        return ArgumentLocationDesc::Reg(PhysicalRegId(4), sizeBytes);
+        return ArgumentLocationDesc::Reg(RegisterRef::preg(RegisterRefClass::FPR, 4), sizeBytes);
     }
 
     // All other scalar returns (GPR) -> Volatile GPR 1
-    return ArgumentLocationDesc::Reg(PhysicalRegId(1), sizeBytes);
+    return ArgumentLocationDesc::Reg(RegisterRef::preg(RegisterRefClass::GPR, 1), sizeBytes);
 }
 
 bool TestCallingConvention::canReturnInRegs(MirType *type) const
@@ -143,7 +148,18 @@ size_t TestCallingConvention::getShadowSpaceSize() const
     return 24; // Allocate 24 bytes of shadow/home area
 }
 
-const std::vector<PhysicalRegId> &TestCallingConvention::getCalleeSavedGPRegs() const { return m_gprCalleeSaved; }
-const std::vector<PhysicalRegId> &TestCallingConvention::getCalleeSavedFPRegs() const { return m_fprCalleeSaved; }
-const std::vector<PhysicalRegId> &TestCallingConvention::getCallerSavedGPRegs() const { return m_gprCallerSaved; }
-const std::vector<PhysicalRegId> &TestCallingConvention::getCallerSavedFPRegs() const { return m_fprCallerSaved; }
+const std::pmr::vector<RegisterRef> &TestCallingConvention::getCalleeSavedRegs(RegisterRefClass refClass) const
+{
+    if (auto it = m_calleeSavedRegs.find(refClass); it != m_calleeSavedRegs.end())
+        return it->second;
+
+    throw std::out_of_range("Invalid callee saved register class");
+}
+
+const std::pmr::vector<RegisterRef> &TestCallingConvention::getCallerSavedRegs(RegisterRefClass refClass) const
+{
+    if (auto it = m_callerSavedRegs.find(refClass); it != m_callerSavedRegs.end())
+        return it->second;
+
+    throw std::out_of_range("Invalid caller saved register class");
+}

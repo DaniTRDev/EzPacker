@@ -2,7 +2,7 @@
 #define EZPACKER_RETURNABILOWERERVERIFIER_H
 
 #include "EzTriple.h"
-#include "../../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 
 class ReturnAbiLowererVerifier : public MirPassVerifier<FunctionAbiLowererPass, ReturnAbiLowererVerifier>
 {

@@ -2,56 +2,35 @@
 #define EZPACKER_CALLLOWERINGSTATE_H
 
 #include "EzMirCommon.h"
-#include "ArgumentLocationDesc.h"
+#include "CallingConvDesc.h"
+#include "Builder/MirBuilderContext.h"
 #include "Operand/MirOperands.h"
 
 class CallLoweringState
 {
   public:
     /**
-     * Creates the state with the given usable registers (int and float).
-     * @param usableGprs
-     * @param usableFprs
+     * Creates the state with the given calling convention and context.
      */
-    CallLoweringState(const std::vector<PhysicalRegId> &usableGprs, const std::vector<PhysicalRegId> &usableFprs);
+    CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx);
 
     /**
-     * Attempts to allocate the next available General Purpose Register.
-     * @param outReg Set to the allocated register if successful.
-     * @return true if a register was successfully allocated, false if none are left.
+     * Attempts to allocate the next available register of the given class. Returns true if succeded and false if
+     * no register is available.
      */
-    bool allocateGpr(PhysicalRegId &outReg);
+    bool allocate(RegisterRefClass refClass, RegisterRef &reg);
 
     /**
-     * Attempts to allocate the next available Floating Point Register.
-     * @param outReg Set to the allocated register if successful.
-     * @return true if a register was successfully allocated, false if none are left.
-     */
-    bool allocateFpr(PhysicalRegId &outReg);
-
-    /**
-     * Returns the count of available Floating Point Registers for the call.
+     * Returns the count of available registers of the given class type for the call.
      * @return
      */
-    size_t getUsableFprCount() const;
+    size_t getUsableRegCount(RegisterRefClass refClass) const;
 
     /**
-     * Returns the count of available General Purpose Registers for the call.
+     * Returns the count of used registers of the given class type for the call so far.
      * @return
      */
-    size_t getUsableGprCount() const;
-
-    /**
-     * Returns the count of used Floating Point Registers for the call so far.
-     * @return
-     */
-    size_t getUsedFprCount() const;
-
-    /**
-     * Returns the count of used General Purpose Registers for the call so far.
-     * @return
-     */
-    size_t getUsedGprCount() const;
+    size_t getUsedRegCount(RegisterRefClass refClass) const;
 
     /**
      * Returns the current stack offset.
@@ -69,15 +48,14 @@ class CallLoweringState
     int64_t allocateStackSlot(size_t sizeBytes, size_t alignmentBytes);
 
   private:
+    CallingConvDesc *m_callingConv;
     int64_t m_currentStackOffset; // Current parameter stack frame offset (in bytes)
 
-    // Pool of usable registers.
-    std::vector<PhysicalRegId> m_usableFprs;
-    std::vector<PhysicalRegId> m_usableGprs;
-
     // Record of registers allocated during this lowering state
-    std::vector<PhysicalRegId> m_allocatedFprs;
-    std::vector<PhysicalRegId> m_allocatedGprs;
+    std::pmr::unordered_map<RegisterRefClass, std::pmr::vector<RegisterRef>> m_allocatedRegs;
+
+    // Record of usable registers by this call lowering state machine.
+    std::pmr::unordered_map<RegisterRefClass, std::pmr::vector<RegisterRef>> m_usableRegs;
 };
 
 #endif // EZPACKER_CALLLOWERINGSTATE_H

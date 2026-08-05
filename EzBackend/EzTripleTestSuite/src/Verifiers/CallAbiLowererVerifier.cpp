@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/CallAbiLowererVerifier.h"
+#include "Verifiers/CallAbiLowererVerifier.h"
 
 CallAbiLowererVerifier::CallAbiLowererVerifier(MirBuilderContext *ctx, FunctionAbiLowererPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
@@ -40,7 +40,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
     // Verify CALL instruction was standardized (token binding operand cleared, just callee ref)
     MirInstructionVerifier(callInstr).operandCount(1);
 
-    CallLoweringState callState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    CallLoweringState callState(cc, m_ctx);
 
     // Compute expected instruction count inserted right before CALL
     size_t expectedPrepInstrs = 0;
@@ -77,7 +77,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
     }
 
     // Reset CallLoweringState to walk the parameters symmetrically
-    CallLoweringState verifyState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    CallLoweringState verifyState(cc, m_ctx);
 
     // 3. Verify parameter setup instructions in order
     for (size_t argIdx = 0; argIdx < origPushArgs.size(); ++argIdx)
@@ -100,7 +100,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
                         << "MOV destination must be a register for argument " << argIdx;
                 MirRegister *destReg = movInstr->getOperands()[0]->get<MirRegister>();
                 EXPECT_FALSE(destReg->isVirtual()) << "Destination register must be physical for argument " << argIdx;
-                EXPECT_EQ(destReg->getRegId(), reg.m_regId)
+                EXPECT_EQ(destReg->getRef(), reg.m_ref)
                         << "Physical register ID mismatch for register argument " << argIdx;
 
                 // Operand 1: Original argument value payload
@@ -126,8 +126,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
                             << "LOAD destination must be a register for split part " << p;
                     MirRegister *destReg = loadInstr->getOperands()[0]->get<MirRegister>();
                     EXPECT_FALSE(destReg->isVirtual());
-                    EXPECT_EQ(destReg->getRegId(), piece.m_reg)
-                            << "Split physical register ID mismatch at part " << p;
+                    EXPECT_EQ(destReg->getRef(), piece.m_reg) << "Split physical register ID mismatch at part " << p;
 
                     // Operand 1: Memory operand reading at offset
                     EXPECT_TRUE(loadInstr->getOperands()[1]->isOfType<MirMemory>())
@@ -160,7 +159,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
 
                     MirRegister *destReg = movInstr->getOperands()[0]->get<MirRegister>();
                     EXPECT_FALSE(destReg->isVirtual());
-                    EXPECT_EQ(destReg->getRegId(), indirect.m_pointerStorage)
+                    EXPECT_EQ(destReg->getRef(), indirect.m_pointerStorage)
                             << "ByVal pointer storage physical register mismatch.";
                 }
                 else
@@ -171,7 +170,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCall(MirBlock *targ
 
                     MirRegister *destReg = movInstr->getOperands()[0]->get<MirRegister>();
                     EXPECT_FALSE(destReg->isVirtual());
-                    EXPECT_EQ(destReg->getRegId(), indirect.m_pointerStorage);
+                    EXPECT_EQ(destReg->getRef(), indirect.m_pointerStorage);
                     EXPECT_EQ(movInstr->getOperands()[1], argVal);
                 }
                 break;
@@ -243,7 +242,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCallReturn(MirBlock
     EXPECT_NE(postCallIt, instructions.end())
             << "Expected return lowering instructions after CALL, but reached block end.";
 
-    CallLoweringState verifyState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    CallLoweringState verifyState(cc, m_ctx);
     MirType *retType = origRet->getMirType();
     ArgumentLocationDesc retLoc = cc->getReturnLoc(retType, &verifyState);
 
@@ -264,7 +263,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCallReturn(MirBlock
                     << "MOV source must be a physical register for call return.";
             MirRegister *srcReg = movInstr->getOperands()[1]->get<MirRegister>();
             EXPECT_FALSE(srcReg->isVirtual()) << "Return register must be physical.";
-            EXPECT_EQ(srcReg->getRegId(), reg.m_regId) << "Physical return register ID mismatch.";
+            EXPECT_EQ(srcReg->getRef(), reg.m_ref) << "Physical return register ID mismatch.";
             break;
         }
 
@@ -295,7 +294,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCallReturn(MirBlock
                         << "STORE source must be a physical register for split return part " << p;
                 MirRegister *srcReg = storeInstr->getOperands()[1]->get<MirRegister>();
                 EXPECT_FALSE(srcReg->isVirtual());
-                EXPECT_EQ(srcReg->getRegId(), piece.m_reg)
+                EXPECT_EQ(srcReg->getRef(), piece.m_reg)
                         << "Split physical return register ID mismatch at part " << p;
             }
             break;
@@ -316,7 +315,7 @@ CallAbiLowererVerifier &CallAbiLowererVerifier::verifyLoweredCallReturn(MirBlock
                     << "Indirect return MOV source must be a physical register.";
             MirRegister *srcReg = movInstr->getOperands()[1]->get<MirRegister>();
             EXPECT_FALSE(srcReg->isVirtual());
-            EXPECT_EQ(srcReg->getRegId(), indirect.m_pointerStorage)
+            EXPECT_EQ(srcReg->getRef(), indirect.m_pointerStorage)
                     << "Indirect return pointer physical register ID mismatch.";
             break;
         }

@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/ReturnAbiLowererVerifier.h"
+#include "Verifiers/ReturnAbiLowererVerifier.h"
 
 ReturnAbiLowererVerifier::ReturnAbiLowererVerifier(MirBuilderContext *ctx, FunctionAbiLowererPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
@@ -32,7 +32,7 @@ ReturnAbiLowererVerifier &ReturnAbiLowererVerifier::verifyLoweredReturn(MirBlock
         return *this;
     }
 
-    CallLoweringState st(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    CallLoweringState st(cc, m_ctx);
     ArgumentLocationDesc loc = cc->getReturnLoc(retType, &st);
 
     switch (loc.getType())
@@ -51,7 +51,7 @@ ReturnAbiLowererVerifier &ReturnAbiLowererVerifier::verifyLoweredReturn(MirBlock
                     << "MOV destination must be a physical register.";
             MirRegister *destReg = movInstr->getOperands()[0]->get<MirRegister>();
             EXPECT_FALSE(destReg->isVirtual()) << "MOV destination register must be physical.";
-            EXPECT_EQ(destReg->getRegId(), loc.getReg().m_regId)
+            EXPECT_EQ(destReg->getRef(), loc.getReg().m_ref)
                     << "Physical register ID does not match calling convention return register.";
 
             // Operand 1: Original return payload value
@@ -75,7 +75,7 @@ ReturnAbiLowererVerifier &ReturnAbiLowererVerifier::verifyLoweredReturn(MirBlock
 
                 MirRegister *destReg = movInstr->getOperands()[0]->get<MirRegister>();
                 EXPECT_FALSE(destReg->isVirtual()) << "Split MOV destination must be a physical register.";
-                EXPECT_EQ(destReg->getRegId(), split.m_parts[p].m_reg)
+                EXPECT_EQ(destReg->getRef(), split.m_parts[p].m_reg)
                         << "Split physical register ID mismatch at part " << p;
 
                 EXPECT_EQ(movInstr->getOperands()[1], origValues[p])
@@ -118,10 +118,10 @@ ReturnAbiLowererVerifier &ReturnAbiLowererVerifier::verifyLoweredReturn(MirBlock
                 MirInstructionVerifier(copyMovInstr).opcode(MirInstructionOpCode::MOV).operandCount(2);
 
                 MirRegister *destReg = copyMovInstr->getOperands()[0]->get<MirRegister>();
-                PhysicalRegId targetPhysReg = indirect.m_pointerStorage;
+                RegisterRef targetPhysReg = indirect.m_pointerStorage;
 
                 EXPECT_FALSE(destReg->isVirtual());
-                EXPECT_EQ(destReg->getRegId(), targetPhysReg);
+                EXPECT_EQ(destReg->getRef(), targetPhysReg);
                 EXPECT_EQ(copyMovInstr->getOperands()[1], sretPtrReg);
             }
             break;

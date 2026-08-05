@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/InstructionSelectorPassVerifier.h"
+#include "Verifiers/InstructionSelectorPassVerifier.h"
 
 InstructionSelectorPassVerifier::InstructionSelectorPassVerifier(MirBuilderContext *ctx,
                                                                  MirInstructionSelectorPass *pass) :

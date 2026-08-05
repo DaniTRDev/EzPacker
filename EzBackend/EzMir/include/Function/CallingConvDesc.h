@@ -3,7 +3,6 @@
 
 #include "EzMirCommon.h"
 #include "ArgumentLocationDesc.h"
-#include "CallLoweringState.h"
 #include "Type/MirType.h"
 
 /**
@@ -25,7 +24,7 @@ class CallingConvDesc
      * @param callState
      * @return
      */
-    virtual ArgumentLocationDesc getArgLoc(MirType *type, CallLoweringState *callState) = 0;
+    virtual ArgumentLocationDesc getArgLoc(MirType *type, class CallLoweringState *callState) = 0;
 
     /**
      * Returns the location of where the result of a function should be placed. Depends on the call state.
@@ -33,7 +32,7 @@ class CallingConvDesc
      * @param callState
      * @return
      */
-    virtual ArgumentLocationDesc getReturnLoc(MirType *type, CallLoweringState *callState) = 0;
+    virtual ArgumentLocationDesc getReturnLoc(MirType *type, class CallLoweringState *callState) = 0;
 
     /**
      * Returns true if the given type can be returned in register(s). This is useful because in the same target,
@@ -71,28 +70,16 @@ class CallingConvDesc
     virtual size_t getShadowSpaceSize() const = 0;
 
     /**
-     * Returns the list of GPR registers that must be preserved by the callee.
+     * Returns the list of registers of the given class that must be preserved by the callee.
      * @return
      */
-    virtual const std::vector<PhysicalRegId> &getCalleeSavedGPRegs() const = 0;
-
-    /**
-     * Returns the list of FPR registers that must be preserved by the callee.
-     * @return
-     */
-    virtual const std::vector<PhysicalRegId> &getCalleeSavedFPRegs() const = 0;
+    virtual const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(RegisterRefClass refClass) const = 0;
 
     /**
      * Returns the list of GPR registers that needs to be preserved by the caller.
      * @return
      */
-    virtual const std::vector<PhysicalRegId> &getCallerSavedGPRegs() const = 0;
-
-    /**
-     * Returns the list of FPR registers that needs to be preserved by the caller.
-     * @return
-     */
-    virtual const std::vector<PhysicalRegId> &getCallerSavedFPRegs() const = 0;
+    virtual const std::pmr::vector<RegisterRef> &getCallerSavedRegs(RegisterRefClass refClass) const = 0;
 };
 
 #endif // EZPACKER_CALLINGCONVDESC_H

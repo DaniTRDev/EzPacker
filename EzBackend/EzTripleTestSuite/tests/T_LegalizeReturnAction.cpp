@@ -1,5 +1,4 @@
-#include "../include/EzTripleTestSuite.h"
-#include "../include/Verifiers/LegalizeReturnActionVerifier.h"
+#include "EzTripleTestSuite.h"
 
 class TestLegalizeReturnAct : public MirTripleTestSuiteAsGtest
 {

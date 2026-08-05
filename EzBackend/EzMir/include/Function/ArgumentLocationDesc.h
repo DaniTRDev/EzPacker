@@ -2,6 +2,7 @@
 #define EZPACKER_ARGUMENTLOCATIONDESC_H
 
 #include "EzMirCommon.h"
+#include "Operand/MirRegisterReference.h"
 
 /**
  * Simple type used to abstract the register ID field as this may change in a future. THIS WILL COLLIDE
@@ -20,7 +21,7 @@ enum class ArgLocationType
 
 struct RegLoc
 {
-    PhysicalRegId m_regId;
+    RegisterRef m_ref;
     size_t m_sizeBytes;
 };
 
@@ -56,7 +57,7 @@ struct StackLoc
  */
 struct SplitPiece
 {
-    PhysicalRegId m_reg;
+    RegisterRef m_reg;
     class MirType *m_type;
     size_t m_offsetInParam; // Byte offset from the start of the user's variable
 };
@@ -73,7 +74,7 @@ struct IndirectLoc
     size_t m_size;
 
     // The pointer to the data is either in a register OR sitting on the incoming stack slot area
-    PhysicalRegId m_pointerStorage;
+    RegisterRef m_pointerStorage;
 };
 
 /**
@@ -91,7 +92,7 @@ class ArgumentLocationDesc
      * @param sizeInBytes
      * @return
      */
-    static ArgumentLocationDesc Reg(PhysicalRegId reg, size_t sizeInBytes);
+    static ArgumentLocationDesc Reg(RegisterRef reg, size_t sizeInBytes);
 
     /**
      * Creates an indirect location with the given parameters.
@@ -101,7 +102,7 @@ class ArgumentLocationDesc
      * @param ptrStorage
      * @return
      */
-    static ArgumentLocationDesc Indirect(bool byVal, bool copyOnReg, size_t size, PhysicalRegId ptrStorage);
+    static ArgumentLocationDesc Indirect(bool byVal, bool copyOnReg, size_t size, RegisterRef ptrStorage);
 
     /**
      * Creates a split location with the given parameters.

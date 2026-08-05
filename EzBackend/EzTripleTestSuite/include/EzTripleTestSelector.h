@@ -2,7 +2,7 @@
 #define EZPACKER_EZTRIPLETESTSELECTOR_H
 
 #include "EzTriple.h"
-#include "../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 #include "EzTripleTestInstructionSet.h"
 
 class EzTripleTestSelector

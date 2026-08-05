@@ -2,7 +2,7 @@
 #define EZPACKER_EZTRIPLETESTSUITE_H
 
 #include "EzTriple.h"
-#include "../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 #include "EzTripleTestTargetDescriptor.h"
 #include "EzTripleTestLegalizer.h"
 #include "EzTripleTestSelector.h"
@@ -14,6 +14,7 @@
 #include "Verifiers/LegalizeCallActionVerifier.h"
 #include "Verifiers/LegalizeReturnActionVerifier.h"
 #include "Verifiers/PromoteScalarActionVerifier.h"
+#include "Verifiers/RegisterAllocatorPassVerifier.h"
 #include "Verifiers/ReturnAbiLowererVerifier.h"
 
 /**
@@ -40,6 +41,11 @@ class EzTripleTestSuite : public EzMirTestSuite
      * @return MirInstructionSelector*
      */
     MirInstructionSelector *getInstrSelector() const;
+
+    /**
+     * Returns a pointer to the register allocator of the selected triple.
+     */
+    MirRegisterAllocator *getRegisterAllocator() const;
 
     /**
      * Creates common pointers used in test cases. Also calls EzMirTestSuite::create.
@@ -71,10 +77,17 @@ class EzTripleTestSuite : public EzMirTestSuite
      */
     virtual std::shared_ptr<TargetDesc> createTargetDesc() = 0;
 
+    /**
+     * Creates a register allocator and returns it.
+     * @return
+     */
+    virtual std::shared_ptr<MirRegisterAllocator> createRegisterAllocator() = 0;
+
   protected:
     std::shared_ptr<TargetDesc> m_targetDesc;
     std::shared_ptr<MirLegalizer> m_legalizer;
     std::shared_ptr<MirInstructionSelector> m_instructionSelector;
+    std::shared_ptr<MirRegisterAllocator> m_registerAllocator;
 };
 
 class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Test
@@ -110,6 +123,11 @@ class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Te
      * @return
      */
     virtual std::shared_ptr<TargetDesc> createTargetDesc() override;
+
+    /**
+     * Creates a default MirRegisterAllocator and returns it.
+     */
+    virtual std::shared_ptr<MirRegisterAllocator> createRegisterAllocator() override;
 };
 
 #endif // EZPACKER_EZTRIPLETESTSUITE_H

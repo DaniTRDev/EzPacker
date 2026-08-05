@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/FunctionParametersAbiLowererVerifier.h"
+#include "Verifiers/FunctionParametersAbiLowererVerifier.h"
 
 FunctionArgAbiLowererVerifier::FunctionArgAbiLowererVerifier(MirBuilderContext *ctx, FunctionAbiLowererPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
@@ -21,7 +21,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
                 << "POP_ARG instruction was not erased during processFunctionArguments execution.";
     }
 
-    CallLoweringState verifyState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    CallLoweringState verifyState(cc, m_ctx);
 
     // Compute expected instruction count inserted at the top of the entry block
     size_t expectedPrepInstrs = 0;
@@ -49,7 +49,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
 
     // 2. Start checking from the very first instruction in the entry block
     auto prepIt = instructions.begin();
-    CallLoweringState walkState(cc->getCallerSavedGPRegs(), cc->getCallerSavedFPRegs());
+    CallLoweringState walkState(cc, m_ctx);
 
     // 3. Verify incoming parameter setup instructions in order
     for (size_t argIdx = 0; argIdx < origPopArgs.size(); ++argIdx)
@@ -76,7 +76,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
                         << "MOV source must be a physical register for parameter " << argIdx;
                 MirRegister *srcReg = movInstr->getOperands()[1]->get<MirRegister>();
                 EXPECT_FALSE(srcReg->isVirtual()) << "Source register must be physical for parameter " << argIdx;
-                EXPECT_EQ(srcReg->getRegId(), reg.m_regId) << "Physical register ID mismatch for parameter " << argIdx;
+                EXPECT_EQ(srcReg->getRef(), reg.m_ref) << "Physical register ID mismatch for parameter " << argIdx;
                 break;
             }
 
@@ -107,7 +107,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
                             << "STORE source must be a physical register for split part " << p;
                     MirRegister *srcReg = storeInstr->getOperands()[1]->get<MirRegister>();
                     EXPECT_FALSE(srcReg->isVirtual());
-                    EXPECT_EQ(srcReg->getRegId(), piece.m_reg) << "Split physical register ID mismatch at part " << p;
+                    EXPECT_EQ(srcReg->getRef(), piece.m_reg) << "Split physical register ID mismatch at part " << p;
                 }
                 break;
             }
@@ -129,7 +129,7 @@ FunctionArgAbiLowererVerifier::verifyLoweredFunctionArguments(MirBlock *entryBlo
                         << "Indirect MOV source must be a physical register.";
                 MirRegister *srcReg = movInstr->getOperands()[1]->get<MirRegister>();
                 EXPECT_FALSE(srcReg->isVirtual());
-                EXPECT_EQ(srcReg->getRegId(), indirect.m_pointerStorage)
+                EXPECT_EQ(srcReg->getRef(), indirect.m_pointerStorage)
                         << "Indirect pointer storage physical register mismatch for parameter " << argIdx;
                 break;
             }

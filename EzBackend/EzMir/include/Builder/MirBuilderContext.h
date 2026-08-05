@@ -121,6 +121,11 @@ class MirBuilderContext
     MirRegister *getRegisterById(size_t id) const;
 
     /**
+     * Sets the default calling convention.
+     */
+    void setDefaultCallingConvention(CallingConvDesc *defaultCallingConv);
+
+    /**
      * Returns an allocator used to allocate complementary resources (global data, types, names, maps...).
      * @return
      */

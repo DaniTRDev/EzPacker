@@ -13,6 +13,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "include/Verifiers/LegalizeCallActionVerifier.h"
         "include/Verifiers/LegalizeReturnActionVerifier.h"
         "include/Verifiers/PromoteScalarActionVerifier.h"
+        "include/Verifiers/RegisterAllocatorPassVerifier.h"
         "include/Verifiers/ReturnAbiLowererVerifier.h"
 
         "src/EzTripleTestLegalizer.cpp"
@@ -26,6 +27,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "src/Verifiers/LegalizeCallActionVerifier.cpp"
         "src/Verifiers/LegalizeReturnActionVerifier.cpp"
         "src/Verifiers/PromoteScalarActionVerifier.cpp"
+        "src/Verifiers/RegisterAllocatorPassVerifier.cpp"
         "src/Verifiers/ReturnAbiLowererVerifier.cpp"
 )
 
@@ -33,7 +35,7 @@ EzCMK_ConfigureLib(NAME "EzTripleTestSuite"
         FILE_LIST ${TRIPLETESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER "include/EzTripleTestSuite.h"
         LINKED_LIBRARIES "EzTriple;EzMirTestSuite"
-        INCLUDED_DIRS "include/EzTripleTestSuite"
+        INCLUDED_DIRS "include/"
 )
 
 EzPacker_AddTest(
@@ -55,6 +57,13 @@ EzPacker_AddTest(
         "EzTripleTestSuite"
         ""
         "tests/T_PromoteScalarAction.cpp"
+)
+
+EzPacker_AddTest(
+        "T_RegisterAllocatorPass"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_RegisterAllocatorPass.cpp"
 )
 
 EzPacker_AddTest(

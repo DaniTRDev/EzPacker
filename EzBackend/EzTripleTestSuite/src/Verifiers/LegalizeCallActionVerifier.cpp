@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/LegalizeCallActionVerifier.h"
+#include "Verifiers/LegalizeCallActionVerifier.h"
 LegalizeCallActionVerifier::LegalizeCallActionVerifier(MirBuilderContext *ctx, MirBlockLegalizerPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
 {

@@ -1,24 +1,17 @@
 #ifndef EZPACKER_REGISTERALLOCATORPASS_H
 #define EZPACKER_REGISTERALLOCATORPASS_H
 
-#include "EzTriple.h"
+#include "EzTripleCommon.h"
+#include "MirRegisterAllocator.h"
+#include "InstructionSelector/MirInstructionSelectorPass.h"
 
-struct RegisterAllocatorResult
-{
-    // Map that links a virtual register to its assigned physical register.
-    std::pmr::map<MirId, MirRegister *> m_allocatedRegisters;
-
-    // Map that assigns a virtual register to its spilled memory location.
-    std::pmr::map<MirId, StackFrameObject *> m_spilledRegisters;
-};
-
-class RegisterAllocatorPass : public IMirTransformPass
+class MirRegisterAllocatorPass : public IMirTransformPass
 {
   public:
     /**
-     * Creates the pass linked to the given builder context.
+     * Creates the pass linked to the given builder context, register allocator, and target descriptor.
      */
-    RegisterAllocatorPass(MirBuilderContext *ctx);
+    MirRegisterAllocatorPass(MirBuilderContext *ctx, MirRegisterAllocator *regAllocator, TargetDesc *targetDesc);
 
     /**
      * Returns "RegisterAllocatorPass".
@@ -55,6 +48,9 @@ class RegisterAllocatorPass : public IMirTransformPass
 
   private:
     MirBuilderContext *m_ctx;
+    MirRegisterAllocator *m_regAllocator;
+    TargetDesc *m_targetDesc;
+    std::pmr::vector<MirFunction *> m_resolvedFunctions;
 };
 
 #endif // EZPACKER_REGISTERALLOCATORPASS_H

@@ -11,7 +11,6 @@ struct SelectionContext
     MirBuilderContext *m_ctx;
     std::pmr::list<MirInstruction *> &m_instrList;
     std::pmr::list<MirInstruction *>::iterator m_it;
-    std::pmr::map<MirInstructionOpCode, MirTargetInstructionId> m_directSelectionTable;
 };
 
 enum class SelectionResult : uint8_t

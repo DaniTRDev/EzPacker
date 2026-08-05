@@ -6,6 +6,8 @@ MirLegalizer *EzTripleTestSuite::getLegalizer() const { return m_legalizer.get()
 
 MirInstructionSelector *EzTripleTestSuite::getInstrSelector() const { return m_instructionSelector.get(); }
 
+MirRegisterAllocator *EzTripleTestSuite::getRegisterAllocator() const { return m_registerAllocator.get(); }
+
 void EzTripleTestSuite::create(const std::filesystem::path &workingPath) { EzMirTestSuite::create(workingPath); }
 
 void EzTripleTestSuite::destroy()
@@ -22,6 +24,7 @@ void MirTripleTestSuiteAsGtest::SetUp()
     m_targetDesc = createTargetDesc();
     m_legalizer = createTargetLegalizer();
     m_instructionSelector = createInstructionSelector();
+    m_registerAllocator = createRegisterAllocator();
 
     getBuilderCtx()->getDiagCollector()->builder(Diag_Debug, "EzTripleTestSuite")
             << std::format("Using target descriptor: {}", m_targetDesc->getName()).c_str();
@@ -36,6 +39,11 @@ void MirTripleTestSuiteAsGtest::TearDown()
 std::shared_ptr<TargetDesc> MirTripleTestSuiteAsGtest::createTargetDesc()
 {
     return std::make_shared<EzTripleTestTargetDesc>(getBuilderCtx());
+}
+
+std::shared_ptr<MirRegisterAllocator> MirTripleTestSuiteAsGtest::createRegisterAllocator()
+{
+    return std::make_shared<MirRegisterAllocator>();
 }
 
 std::shared_ptr<MirInstructionSelector> MirTripleTestSuiteAsGtest::createInstructionSelector()

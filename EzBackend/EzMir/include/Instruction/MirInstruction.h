@@ -111,6 +111,11 @@ class MirInstruction
     void setTargetId(MirTargetInstructionId id);
 
     /**
+     * Invalidates cached uses and defs by setting the booleans to false.
+     */
+    void invalidateCachedUsedAndDefs();
+
+    /**
      * Returns the immutable operand slice for this instruction.
      */
     const std::pmr::vector<MirOperand *> &getOperands() const;

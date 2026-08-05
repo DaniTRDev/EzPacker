@@ -2,84 +2,84 @@
 
 LivenessAnalysisVerifier::LivenessAnalysisVerifier(LivenessAnalysis *pass) : MirPassVerifier(pass) {}
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::localDef(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::localDef(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_def.find(blockId);
 
     EXPECT_NE(it, res.m_def.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(refClass, regId)));
 
     return *this;
 }
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLocalDef(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLocalDef(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_def.find(blockId);
 
     EXPECT_NE(it, res.m_def.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(refClass, regId)));
     return *this;
 }
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::localUse(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::localUse(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_use.find(blockId);
 
     EXPECT_NE(it, res.m_use.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(refClass, regId)));
     return *this;
 }
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLocalUse(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLocalUse(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_use.find(blockId);
 
     EXPECT_NE(it, res.m_use.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(refClass, regId)));
     return *this;
 }
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::liveIn(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::liveIn(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_liveIn.find(blockId);
 
     EXPECT_NE(it, res.m_liveIn.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(refClass, regId)));
     return *this;
 }
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLiveIn(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLiveIn(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_liveIn.find(blockId);
 
     EXPECT_NE(it, res.m_liveIn.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(refClass, regId)));
     return *this;
 }
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::liveOut(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::liveOut(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_liveOut.find(blockId);
 
     EXPECT_NE(it, res.m_liveOut.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(refClass, regId)));
     return *this;
 }
 
-LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLiveOut(size_t blockId, size_t regId)
+LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLiveOut(size_t blockId, RegisterRefClass refClass, size_t regId)
 {
     const auto &res = getTestedObj()->getResult();
     auto it = res.m_liveOut.find(blockId);
 
     EXPECT_NE(it, res.m_liveOut.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(refClass, regId)));
     return *this;
 }
 

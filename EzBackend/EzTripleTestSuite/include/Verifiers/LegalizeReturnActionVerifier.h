@@ -2,7 +2,7 @@
 #define EZPACKER_LEGALIZERETURNACTIONVERIFIER_H
 
 #include "EzTriple.h"
-#include "../../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 
 class LegalizeReturnActionVerifier : public MirPassVerifier<MirBlockLegalizerPass, LegalizeReturnActionVerifier>
 {

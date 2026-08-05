@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/FuncSignaturePassVerifier.h"
+#include "Verifiers/FuncSignaturePassVerifier.h"
 
 FuncSignaturePassVerifier::FuncSignaturePassVerifier(MirBuilderContext *ctx, MirFunctionSignatureLegalizerPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)

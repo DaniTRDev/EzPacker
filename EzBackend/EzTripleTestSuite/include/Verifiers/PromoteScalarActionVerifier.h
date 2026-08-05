@@ -2,7 +2,7 @@
 #define EZPACKER_PROMOTESCALARACTIONVERIFIER_H
 
 #include "EzTriple.h"
-#include "../../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 
 class PromoteScalarActionVerifier : public MirPassVerifier<MirBlockLegalizerPass, PromoteScalarActionVerifier>
 {

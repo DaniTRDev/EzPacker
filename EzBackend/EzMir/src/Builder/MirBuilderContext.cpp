@@ -209,6 +209,11 @@ MirRegister *MirBuilderContext::getRegisterById(MirId id) const
     return nullptr;
 }
 
+void MirBuilderContext::setDefaultCallingConvention(CallingConvDesc *defaultCallingConv)
+{
+    m_defaultCallingConv = defaultCallingConv;
+}
+
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
 
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getFuncAllocator() { return m_functionResource; }

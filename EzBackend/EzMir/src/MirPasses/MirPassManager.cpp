@@ -2,10 +2,12 @@
 
 MirPassManager::MirPassManager(std::pmr::memory_resource *globalArena,
                                std::shared_ptr<DiagnosticCollector> diagCollector) :
-    m_validAnalyses(globalArena), m_passesBlueprint(globalArena), m_executionPipeline(globalArena),
+    m_testMode(false), m_validAnalyses(globalArena), m_passesBlueprint(globalArena), m_executionPipeline(globalArena),
     m_savedResults(globalArena), m_diagCollector(std::move(diagCollector))
 {
 }
+
+void MirPassManager::invalidateAnalysis() { m_validAnalyses.clear(); }
 
 void MirPassManager::runPipeline(MirBuilderContext *ctx)
 {

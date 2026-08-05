@@ -17,56 +17,56 @@ class LivenessAnalysisVerifier : public MirPassVerifier<LivenessAnalysis, Livene
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &localDef(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &localDef(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Verifies that a specific register is NOT present in a block's Local DEF set.
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &notLocalDef(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &notLocalDef(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Verifies that a specific register is present in a block's Local USE set.
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &localUse(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &localUse(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Verifies that a specific register is NOT present in a block's Local USE set.
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &notLocalUse(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &notLocalUse(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Verifies that a register is alive when entering a specific basic block.
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &liveIn(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &liveIn(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Verifies that a register is NOT alive when entering a specific basic block.
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &notLiveIn(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &notLiveIn(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Verifies that a register is alive when exiting a specific basic block.
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &liveOut(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &liveOut(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Verifies that a register is NOT alive when exiting a specific basic block.
      * @param blockId
      * @param regId
      */
-    LivenessAnalysisVerifier &notLiveOut(size_t blockId, size_t regId);
+    LivenessAnalysisVerifier &notLiveOut(size_t blockId, RegisterRefClass refClass, size_t regId);
 
     /**
      * Asserts the exact count of items in the Live-In set of a block.

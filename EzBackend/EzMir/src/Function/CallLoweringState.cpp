@@ -1,57 +1,65 @@
 #include "Function/CallLoweringState.h"
 
-CallLoweringState::CallLoweringState(const std::vector<PhysicalRegId> &usableGprs,
-                                     const std::vector<PhysicalRegId> &usableFprs) :
-    m_currentStackOffset(0), m_usableFprs(usableFprs), m_usableGprs(usableGprs)
+CallLoweringState::CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx) :
+    m_callingConv(cc), m_currentStackOffset(0), m_allocatedRegs(ctx->getGlobalAllocator()),
+    m_usableRegs(ctx->getGlobalAllocator())
+
 {
+    for (size_t i = static_cast<uint8_t>(RegisterRefClass::Invalid) + 1;
+         i < static_cast<uint8_t>(RegisterRefClass::MAX_REF_TYPE);
+         i++)
+    {
+        const auto &callerSavedRegs = cc->getCallerSavedRegs(static_cast<RegisterRefClass>(i));
+        m_usableRegs[static_cast<RegisterRefClass>(i)] = callerSavedRegs;
+    }
 }
 
-bool CallLoweringState::allocateGpr(PhysicalRegId &outReg)
+bool CallLoweringState::allocate(RegisterRefClass regClass, RegisterRef &outReg)
 {
-    if (m_usableGprs.empty())
+    auto it = m_usableRegs.find(regClass);
+    if (it == m_usableRegs.end() || it->second.empty())
+    {
         return false;
+    }
 
-    outReg = m_usableGprs.front();
-    m_usableGprs.erase(m_usableGprs.begin());
-    m_allocatedGprs.push_back(outReg); // Tracks it as used
+    auto &pool = it->second;
+    outReg = pool.front();
+
+    // Shift allocated register out of usable pool into allocated pool
+    pool.erase(pool.begin());
+    m_allocatedRegs[regClass].push_back(outReg);
 
     return true;
 }
 
-bool CallLoweringState::allocateFpr(PhysicalRegId &outReg)
+size_t CallLoweringState::getUsableRegCount(RegisterRefClass regClass) const
 {
-    if (m_usableFprs.empty())
-        return false;
-
-    outReg = m_usableFprs.front();
-    m_usableFprs.erase(m_usableFprs.begin());
-    m_allocatedFprs.push_back(outReg); // Tracks it as used
-
-    return true;
+    auto it = m_usableRegs.find(regClass);
+    return (it != m_usableRegs.end()) ? it->second.size() : 0;
 }
 
-size_t CallLoweringState::getUsableFprCount() const { return m_usableFprs.size(); }
-
-size_t CallLoweringState::getUsableGprCount() const { return m_usableGprs.size(); }
-
-size_t CallLoweringState::getUsedFprCount() const { return m_allocatedFprs.size(); }
-
-size_t CallLoweringState::getUsedGprCount() const { return m_allocatedGprs.size(); }
+size_t CallLoweringState::getUsedRegCount(RegisterRefClass regClass) const
+{
+    auto it = m_allocatedRegs.find(regClass);
+    return (it != m_allocatedRegs.end()) ? it->second.size() : 0;
+}
 
 int64_t CallLoweringState::getStackOffset() const { return m_currentStackOffset; }
 
 int64_t CallLoweringState::allocateStackSlot(size_t sizeBytes, size_t alignmentBytes)
 {
-    // Ensure non-sized parameters don't affect the allocation (void types).
     if (sizeBytes == 0)
         return m_currentStackOffset;
 
-    // Align the stack offset up to the requested alignment.
-    // Example: offset = 4, alignmentBytes = 8 -> (4 + 7) & ~7 -> 11 & 0xFFFFFFF8 = 8.
-    m_currentStackOffset = (m_currentStackOffset + int64_t(alignmentBytes) - 1) & ~(alignmentBytes - 1);
-    int64_t assignedOffset = m_currentStackOffset;
+    // Align stack offset to requested byte alignment boundary
+    if (alignmentBytes > 1)
+    {
+        m_currentStackOffset = (m_currentStackOffset + static_cast<int64_t>(alignmentBytes) - 1) &
+                ~(static_cast<int64_t>(alignmentBytes) - 1);
+    }
 
-    // Advance the frame cursor state by the allocated type size.
+    int64_t assignedOffset = m_currentStackOffset;
     m_currentStackOffset += static_cast<int64_t>(sizeBytes);
+
     return assignedOffset;
 }

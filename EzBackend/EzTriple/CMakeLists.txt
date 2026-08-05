@@ -19,8 +19,8 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/MirBlockLegalizerPass.h"
         "include/Legalizer/MirFunctionSignatureLegalizerPass.h"
         "include/Legalizer/MirLegalizer.h"
-        "include/RegisterAllocator/RegisterAllocator.h"
-        "include/RegisterAllocator/RegisterAllocatorPass.h"
+        "include/RegisterAllocator/MirRegisterAllocator.h"
+        "include/RegisterAllocator/MirRegisterAllocatorPass.h"
 
         "src/AbiLowerer/AbiLowerer.cpp"
         "src/AbiLowerer/FunctionAbiLowererPass.cpp"
@@ -38,8 +38,8 @@ set(EZTRIPLE_FILES_LIST
         "src/Legalizer/MirBlockLegalizerPass.cpp"
         "src/Legalizer/MirFunctionSignatureLegalizerPass.cpp"
         "src/Legalizer/MirLegalizer.cpp"
-        "src/RegisterAllocator/RegisterAllocator.cpp"
-        "src/RegisterAllocator/RegisterAllocatorPass.cpp"
+        "src/RegisterAllocator/MirRegisterAllocator.cpp"
+        "src/RegisterAllocator/MirRegisterAllocatorPass.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzTriple"

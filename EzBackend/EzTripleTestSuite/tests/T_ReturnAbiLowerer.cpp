@@ -1,4 +1,4 @@
-#include "../include/EzTripleTestSuite.h"
+#include "EzTripleTestSuite.h"
 
 class TestReturnAbiLowererPass : public MirTripleTestSuiteAsGtest
 {

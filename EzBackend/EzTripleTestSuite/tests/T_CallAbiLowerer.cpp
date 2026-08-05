@@ -1,5 +1,4 @@
-#include "../include/EzTripleTestSuite.h"
-#include "../include/Verifiers/CallAbiLowererVerifier.h"
+#include "EzTripleTestSuite.h"
 
 class TestCallAbiLowererPass : public MirTripleTestSuiteAsGtest
 {

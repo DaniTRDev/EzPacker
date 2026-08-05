@@ -1,7 +1,7 @@
 #ifndef EZPACKER_INSTRUCTIONSELECTORPASSVERIFIER_H
 #define EZPACKER_INSTRUCTIONSELECTORPASSVERIFIER_H
 
-#include "../../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 #include "EzTriple.h"
 
 class InstructionSelectorPassVerifier

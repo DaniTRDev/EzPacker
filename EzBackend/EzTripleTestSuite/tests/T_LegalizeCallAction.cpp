@@ -1,5 +1,4 @@
-#include "../include/EzTripleTestSuite.h"
-#include <gtest/gtest.h>
+#include "EzTripleTestSuite.h"
 
 class TestLegalizeCallAct : public MirTripleTestSuiteAsGtest
 {

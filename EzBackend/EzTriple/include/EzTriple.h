@@ -30,4 +30,7 @@
 #include "Legalizer/MirBlockLegalizerPass.h"
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 
+#include "RegisterAllocator/MirRegisterAllocator.h"
+#include "RegisterAllocator/MirRegisterAllocatorPass.h"
+
 #endif // EZPACKER_EZTRIPLE_H

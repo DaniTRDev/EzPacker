@@ -2,7 +2,7 @@
 #define EZPACKER_CALLABILOWERERVERIFIER_H
 
 #include "AbiLowerer/AbiLowerer.h"
-#include "../../../EzMirTestSuite/include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 
 class CallAbiLowererVerifier : public MirPassVerifier<FunctionAbiLowererPass, CallAbiLowererVerifier>
 {

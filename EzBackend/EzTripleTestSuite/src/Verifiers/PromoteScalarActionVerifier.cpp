@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/PromoteScalarActionVerifier.h"
+#include "Verifiers/PromoteScalarActionVerifier.h"
 
 PromoteScalarActionVerifier::PromoteScalarActionVerifier(MirBuilderContext *ctx, MirBlockLegalizerPass *pass) :
     m_ctx(ctx), MirPassVerifier(pass)
