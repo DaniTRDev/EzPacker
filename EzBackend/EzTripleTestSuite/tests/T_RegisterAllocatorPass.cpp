@@ -41,7 +41,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateBasicVirtualRegisters)
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
     // Populate context to run graph assertions
-    LivenessAnalysis liveness(getBuilderCtx());
+    LivenessAnalysisPass liveness(getBuilderCtx());
     std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
     funcList.push_back(func);
     auto it = funcList.begin();
@@ -95,7 +95,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateMixedGprAndFprRegisters)
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
-    LivenessAnalysis liveness(getBuilderCtx());
+    LivenessAnalysisPass liveness(getBuilderCtx());
     std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
     funcList.push_back(func);
     auto it = funcList.begin();
@@ -145,7 +145,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateAcrossCallInstruction)
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
-    LivenessAnalysis liveness(getBuilderCtx());
+    LivenessAnalysisPass liveness(getBuilderCtx());
     std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
     funcList.push_back(func);
     auto it = funcList.begin();
@@ -203,7 +203,7 @@ TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRematerializatio
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
-    LivenessAnalysis liveness(getBuilderCtx());
+    LivenessAnalysisPass liveness(getBuilderCtx());
     std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
     funcList.push_back(func);
     auto it = funcList.begin();
@@ -270,7 +270,7 @@ TEST_F(TestRegisterAllocatorPass, ForceMemorySpillingForNonRematerializableValue
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
-    LivenessAnalysis liveness(getBuilderCtx());
+    LivenessAnalysisPass liveness(getBuilderCtx());
     std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
     funcList.push_back(func);
     auto it = funcList.begin();

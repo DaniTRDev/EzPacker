@@ -126,12 +126,12 @@ class TestCallingConvention : public CallingConvDesc
     /**
      * Returns the vector of callee-saved (non-volatile) registers of the given class.
      */
-    const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(RegisterRefClass refClass) const override;
+    const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(RegisterRefClass refClass) override;
 
     /**
      * Returns the vector of caller-saved (volatile) registers of the given class.
      */
-    const std::pmr::vector<RegisterRef> &getCallerSavedRegs(RegisterRefClass refClass) const override;
+    const std::pmr::vector<RegisterRef> &getCallerSavedRegs(RegisterRefClass refClass) override;
 
   private:
     MirBuilderContext *m_ctx;

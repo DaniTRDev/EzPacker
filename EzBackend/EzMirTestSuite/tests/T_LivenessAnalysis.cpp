@@ -41,10 +41,10 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     builder.RET(v1);
 
     // Run Analysis. This pass is added and then run because it is an ANALYSIS pass.
-    getPassManager()->addPass<LivenessAnalysis>(ctx);
-    getPassManager()->addPass<CodeFlowAnalysis>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
 
-    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(ctx);
+    LivenessAnalysisPass *pass = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx);
     LivenessAnalysisVerifier verifier(pass);
 
     verifier.executed().succeeded();
@@ -118,10 +118,10 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
     mergeBuilder.RET(imm5);
 
     // Run Dataflow Pipelines
-    getPassManager()->addPass<LivenessAnalysis>(ctx);
-    getPassManager()->addPass<CodeFlowAnalysis>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
 
-    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(ctx);
+    LivenessAnalysisPass *pass = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx);
     LivenessAnalysisVerifier verifier(pass);
 
     verifier.executed().succeeded();
@@ -153,10 +153,10 @@ TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
     //                  Therefore, %v0 is a local USE, and its value must flow from outside this block.
     builder.ADD(v0, imm1);
 
-    getPassManager()->addPass<LivenessAnalysis>(ctx);
-    getPassManager()->addPass<CodeFlowAnalysis>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
 
-    LivenessAnalysis *pass = getPassManager()->getAnalysis<LivenessAnalysis>(ctx);
+    LivenessAnalysisPass *pass = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx);
     LivenessAnalysisVerifier verifier(pass);
 
     verifier.executed().succeeded();

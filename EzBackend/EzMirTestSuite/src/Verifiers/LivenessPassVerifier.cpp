@@ -1,6 +1,6 @@
 #include "../../include/Verifiers/LivenessPassVerifier.h"
 
-LivenessAnalysisVerifier::LivenessAnalysisVerifier(LivenessAnalysis *pass) : MirPassVerifier(pass) {}
+LivenessAnalysisVerifier::LivenessAnalysisVerifier(LivenessAnalysisPass *pass) : MirPassVerifier(pass) {}
 
 LivenessAnalysisVerifier &LivenessAnalysisVerifier::localDef(size_t blockId, RegisterRefClass refClass, size_t regId)
 {

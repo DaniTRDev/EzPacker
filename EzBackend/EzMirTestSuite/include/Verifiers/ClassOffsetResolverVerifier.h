@@ -2,17 +2,17 @@
 #define EZPACKER_CLASSOFFSETRESOLVERVERIFIER_H
 
 #include "MirCoreVerifiers.h"
-#include "MirPasses/Passes/ClassOffsetResolver.h"
+#include "MirPasses/Passes/ClassOffsetResolverPass.h"
 
-class ClassOffsetResolverVerifier : public MirPassVerifier<ClassOffsetResolver, ClassOffsetResolverVerifier>
+class ClassOffsetResolverVerifier : public MirPassVerifier<ClassOffsetResolverPass, ClassOffsetResolverVerifier>
 {
   public:
     /**
-     * Creates the verifier for the ClassOffsetResolver pass.
+     * Creates the verifier for the ClassOffsetResolverPass pass.
      * @param pass The executed pass object.
      * @param ctx The current compilation builder context.
      */
-    ClassOffsetResolverVerifier(ClassOffsetResolver *pass, MirBuilderContext *ctx);
+    ClassOffsetResolverVerifier(ClassOffsetResolverPass *pass, MirBuilderContext *ctx);
 
     /**
      * Verifies that the total size in bytes of a resolved class matches expectations.

@@ -3,14 +3,14 @@
 
 #include "MirCoreVerifiers.h"
 
-class LivenessAnalysisVerifier : public MirPassVerifier<LivenessAnalysis, LivenessAnalysisVerifier>
+class LivenessAnalysisVerifier : public MirPassVerifier<LivenessAnalysisPass, LivenessAnalysisVerifier>
 {
   public:
     /**
      * Creates the verifier and links it to the given liveness pass.
      * @param pass
      */
-    LivenessAnalysisVerifier(LivenessAnalysis *pass);
+    LivenessAnalysisVerifier(LivenessAnalysisPass *pass);
 
     /**
      * Verifies that a specific register is present in a block's Local DEF set.

@@ -1,6 +1,6 @@
 #include "../../include/Verifiers/ClassOffsetResolverVerifier.h"
 
-ClassOffsetResolverVerifier::ClassOffsetResolverVerifier(ClassOffsetResolver *pass, MirBuilderContext *ctx) :
+ClassOffsetResolverVerifier::ClassOffsetResolverVerifier(ClassOffsetResolverPass *pass, MirBuilderContext *ctx) :
     MirPassVerifier(pass), m_ctx(ctx)
 {
 }

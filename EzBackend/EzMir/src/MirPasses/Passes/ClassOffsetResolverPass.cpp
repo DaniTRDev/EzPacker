@@ -1,12 +1,12 @@
-#include "MirPasses/Passes/ClassOffsetResolver.h"
+#include "MirPasses/Passes/ClassOffsetResolverPass.h"
 
-ClassOffsetResolver::ClassOffsetResolver(MirBuilderContext *ctx) : m_ctx(ctx) {}
+ClassOffsetResolverPass::ClassOffsetResolverPass(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
-const char *ClassOffsetResolver::getName() const { return "ClassOffsetResolverPass"; }
+const char *ClassOffsetResolverPass::getName() const { return "ClassOffsetResolverPass"; }
 
-MirPassIterationPlace ClassOffsetResolver::getIterationPlace() const { return MirPassIterationPlace::Class; }
+MirPassIterationPlace ClassOffsetResolverPass::getIterationPlace() const { return MirPassIterationPlace::Class; }
 
-MirPassResult ClassOffsetResolver::run(MirClass *_class, MirPassManager *passManager)
+MirPassResult ClassOffsetResolverPass::run(MirClass *_class, MirPassManager *passManager)
 {
     MirPassResult res{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
     if (!_class)
@@ -74,7 +74,7 @@ MirPassResult ClassOffsetResolver::run(MirClass *_class, MirPassManager *passMan
     return res;
 }
 
-void ClassOffsetResolver::printResult() const
+void ClassOffsetResolverPass::printResult() const
 {
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirBlockLegalizerPass");
     log << std::format("Printing class offser resolver result:").c_str();

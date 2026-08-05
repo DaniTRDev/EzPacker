@@ -135,20 +135,11 @@ bool TestCallingConvention::isCalleeCleanup() const
     return false; // Caller-managed stack argument cleanup
 }
 
-bool TestCallingConvention::hasFramePointer(const class MirFunction *func) const
-{
-    return true;
-}
+bool TestCallingConvention::hasFramePointer(const class MirFunction *func) const { return true; }
 
-RegisterRef TestCallingConvention::getFramePointerReg() const
-{
-    return RegisterRef::preg(RegisterRefClass::FRAME, 6);
-}
+RegisterRef TestCallingConvention::getFramePointerReg() const { return RegisterRef::preg(RegisterRefClass::FRAME, 6); }
 
-RegisterRef TestCallingConvention::getStackPointerReg() const
-{
-    return RegisterRef::preg(RegisterRefClass::FRAME, 7);
-}
+RegisterRef TestCallingConvention::getStackPointerReg() const { return RegisterRef::preg(RegisterRefClass::FRAME, 7); }
 
 size_t TestCallingConvention::getStackAlignment() const
 {
@@ -160,18 +151,20 @@ size_t TestCallingConvention::getShadowSpaceSize() const
     return 24; // Allocate 24 bytes of shadow/home area
 }
 
-const std::pmr::vector<RegisterRef> &TestCallingConvention::getCalleeSavedRegs(RegisterRefClass refClass) const
+const std::pmr::vector<RegisterRef> &TestCallingConvention::getCalleeSavedRegs(RegisterRefClass refClass)
 {
     if (auto it = m_calleeSavedRegs.find(refClass); it != m_calleeSavedRegs.end())
         return it->second;
 
-    throw std::out_of_range("Invalid callee saved register class");
+    m_calleeSavedRegs[refClass] = {};
+    return m_calleeSavedRegs[refClass];
 }
 
-const std::pmr::vector<RegisterRef> &TestCallingConvention::getCallerSavedRegs(RegisterRefClass refClass) const
+const std::pmr::vector<RegisterRef> &TestCallingConvention::getCallerSavedRegs(RegisterRefClass refClass)
 {
     if (auto it = m_callerSavedRegs.find(refClass); it != m_callerSavedRegs.end())
         return it->second;
 
-    throw std::out_of_range("Invalid caller saved register class");
+    m_callerSavedRegs[refClass] = {};
+    return m_calleeSavedRegs[refClass];
 }

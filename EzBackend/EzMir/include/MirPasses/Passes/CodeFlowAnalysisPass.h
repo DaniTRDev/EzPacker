@@ -17,16 +17,16 @@ struct ControlFlowResult
     ControlFlowResult(std::pmr::memory_resource *arena) : m_successors(arena), m_predecessors(arena) {}
 };
 
-class CodeFlowAnalysis : public IMirAnalysisPass
+class CodeFlowAnalysisPass : public IMirAnalysisPass
 {
   public:
-    virtual ~CodeFlowAnalysis() override = default;
+    virtual ~CodeFlowAnalysisPass() override = default;
 
     /**
      * Creates the analyzer with the given context.
      * @param ctx
      */
-    CodeFlowAnalysis(MirBuilderContext *ctx);
+    CodeFlowAnalysisPass(MirBuilderContext *ctx);
 
     /**
      * Returns "CodeFlowAnalysisPass".

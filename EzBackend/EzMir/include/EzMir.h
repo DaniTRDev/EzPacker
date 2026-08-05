@@ -39,10 +39,10 @@
 #include "MirPasses/MirPass.h"
 #include "MirPasses/IMirTransformPass.h"
 #include "MirPasses/MirPassManager.h"
-#include "MirPasses/Passes/ClassOffsetResolver.h"
-#include "MirPasses/Passes/CodeFlowAnalysis.h"
-#include "MirPasses/Passes/LivenessAnalysis.h"
-#include "MirPasses/Passes/RelativeReferenceLowerer.h"
+#include "MirPasses/Passes/ClassOffsetResolverPass.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
+#include "MirPasses/Passes/LivenessAnalysisPass.h"
+#include "MirPasses/Passes/RelativeReferenceLowererPass.h"
 
 // ── Basic block ─────────────────────────────────────────────────────────────
 #include "Block/MirBlock.h"

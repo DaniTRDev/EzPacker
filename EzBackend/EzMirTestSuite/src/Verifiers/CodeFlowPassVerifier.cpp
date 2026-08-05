@@ -1,6 +1,6 @@
 #include "../../include/Verifiers/CodeFlowPassVerifier.h"
 
-CodeFlowAnalysisVerifier::CodeFlowAnalysisVerifier(CodeFlowAnalysis *analysis, MirBuilderContext *ctx) :
+CodeFlowAnalysisVerifier::CodeFlowAnalysisVerifier(CodeFlowAnalysisPass *analysis, MirBuilderContext *ctx) :
     m_ctx(ctx), MirPassVerifier(analysis)
 {
 }

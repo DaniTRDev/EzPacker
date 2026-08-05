@@ -12,7 +12,7 @@ TEST_F(TestCodeFlowPass, TestFuncDoesNotHaveSuccessorsOrPredecessors)
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
     size_t entryPointId = entryPoint->getId();
 
-    CodeFlowAnalysis *pass = runPass<CodeFlowAnalysis>(ctx);
+    CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
     CodeFlowAnalysisVerifier verifier(pass, ctx);
 
     // Verify metadata invariants provided by the base Pass framework first
@@ -41,7 +41,7 @@ TEST_F(TestCodeFlowPass, Test1Successor)
 
     instrBuilder.JMP(operandBuilder.buildRef(successor));
 
-    CodeFlowAnalysis *pass = runPass<CodeFlowAnalysis>(ctx);
+    CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
     CodeFlowAnalysisVerifier verifier(pass, ctx);
 
     // Assert structural evaluation completeness
@@ -104,7 +104,7 @@ TEST_F(TestCodeFlowPass, TestLowLevelConditionalBranch)
     elseBuilder.JMP(operandBuilder.buildRef(mergeBlock));
 
     // Run and Verify Analysis
-    CodeFlowAnalysis *pass = runPass<CodeFlowAnalysis>(ctx);
+    CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
     CodeFlowAnalysisVerifier verifier(pass, ctx);
 
     verifier.executed().succeeded();
@@ -157,7 +157,7 @@ TEST_F(TestCodeFlowPass, TestLowLevelLoop)
     bodyBuilder.JMP(operandBuilder.buildRef(loopHeader));
 
     // Execute Dataflow Pipeline Verification
-    CodeFlowAnalysis *pass = runPass<CodeFlowAnalysis>(ctx);
+    CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
     CodeFlowAnalysisVerifier verifier(pass, ctx);
 
     verifier.executed().succeeded();

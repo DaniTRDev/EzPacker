@@ -19,7 +19,7 @@ TEST_F(TestClassOffsetResolver, TestBaseClassSimpleLayoutResolution)
     size_t classId = baseClass->getId();
 
     // Run our new layout compilation pass on the context state
-    ClassOffsetResolver *pass = runPass<ClassOffsetResolver>(ctx);
+    ClassOffsetResolverPass *pass = runPass<ClassOffsetResolverPass>(ctx);
     ClassOffsetResolverVerifier verifier(pass, ctx);
 
     verifier.executed().succeeded().mirModified();
@@ -49,7 +49,7 @@ TEST_F(TestClassOffsetResolver, TestVirtualClassLayoutWithVTableSlot)
     MirClass *vClass = builder.build(nullptr, "VirtualClass");
     size_t classId = vClass->getId();
 
-    ClassOffsetResolver *pass = runPass<ClassOffsetResolver>(ctx);
+    ClassOffsetResolverPass *pass = runPass<ClassOffsetResolverPass>(ctx);
     ClassOffsetResolverVerifier verifier(pass, ctx);
 
     verifier.executed().succeeded().mirModified();
@@ -94,7 +94,7 @@ TEST_F(TestClassOffsetResolver, TestSingleInheritanceLayoutResolution)
     size_t childId = childClass->getId();
 
     // Execute the layout compiler pass
-    ClassOffsetResolver *pass = runPass<ClassOffsetResolver>(ctx);
+    ClassOffsetResolverPass *pass = runPass<ClassOffsetResolverPass>(ctx);
     ClassOffsetResolverVerifier verifier(pass, ctx);
 
     verifier.executed().succeeded().mirModified();

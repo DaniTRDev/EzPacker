@@ -4,10 +4,10 @@
 #include "MirCoreVerifiers.h"
 
 /**
- * This class is used when testing the results of the CodeFlowAnalysis pass. It provides a high-level API used to
+ * This class is used when testing the results of the CodeFlowAnalysisPass pass. It provides a high-level API used to
  * quick-test the pass.
  */
-class CodeFlowAnalysisVerifier : public MirPassVerifier<CodeFlowAnalysis, CodeFlowAnalysisVerifier>
+class CodeFlowAnalysisVerifier : public MirPassVerifier<CodeFlowAnalysisPass, CodeFlowAnalysisVerifier>
 {
   public:
     /**
@@ -16,7 +16,7 @@ class CodeFlowAnalysisVerifier : public MirPassVerifier<CodeFlowAnalysis, CodeFl
      * @param analysis
      * @param ctx
      */
-    CodeFlowAnalysisVerifier(CodeFlowAnalysis *analysis, MirBuilderContext *ctx);
+    CodeFlowAnalysisVerifier(CodeFlowAnalysisPass *analysis, MirBuilderContext *ctx);
 
     /**
      * Checks if the given block exits the flow (return, which causes 0 successors).

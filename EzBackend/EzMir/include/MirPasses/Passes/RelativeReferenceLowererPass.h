@@ -22,16 +22,16 @@
  *  - GlobalVar (needs the address of the global variable)
  *  - Function (needs the address of the function)
  */
-class RelativeReferenceLowerer : public IMirTransformPass
+class RelativeReferenceLowererPass : public IMirTransformPass
 {
   public:
     /**
      * Creates the pass with the given context.
      */
-    RelativeReferenceLowerer(MirBuilderContext *ctx);
+    RelativeReferenceLowererPass(MirBuilderContext *ctx);
 
     /**
-     * Returns the name of the pass "RelativeReferenceLowerer".
+     * Returns the name of the pass "RelativeReferenceLowererPass".
      * @return
      */
     const char *getName() const override;

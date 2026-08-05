@@ -93,13 +93,13 @@ class CallingConvDesc
      * Returns the list of registers of the given class that must be preserved by the callee.
      * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(RegisterRefClass refClass) const = 0;
+    virtual const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(RegisterRefClass refClass) = 0;
 
     /**
      * Returns the list of GPR registers that needs to be preserved by the caller.
      * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getCallerSavedRegs(RegisterRefClass refClass) const = 0;
+    virtual const std::pmr::vector<RegisterRef> &getCallerSavedRegs(RegisterRefClass refClass) = 0;
 };
 
 #endif // EZPACKER_CALLINGCONVDESC_H

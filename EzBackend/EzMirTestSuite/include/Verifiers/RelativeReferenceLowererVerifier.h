@@ -2,14 +2,14 @@
 #define EZPACKER_RELATIVEREFERENCEVERIFIER_H
 
 #include "MirCoreVerifiers.h"
-#include "MirPasses/Passes/RelativeReferenceLowerer.h"
+#include "MirPasses/Passes/RelativeReferenceLowererPass.h"
 
 class RelativeReferenceLowererVerifier
-    : public MirPassVerifier<RelativeReferenceLowerer, RelativeReferenceLowererVerifier>
+    : public MirPassVerifier<RelativeReferenceLowererPass, RelativeReferenceLowererVerifier>
 {
   public:
-    RelativeReferenceLowererVerifier(RelativeReferenceLowerer *pass, MirBuilderContext *ctx) :
-        MirPassVerifier<RelativeReferenceLowerer, RelativeReferenceLowererVerifier>(pass), m_ctx(ctx)
+    RelativeReferenceLowererVerifier(RelativeReferenceLowererPass *pass, MirBuilderContext *ctx) :
+        MirPassVerifier<RelativeReferenceLowererPass, RelativeReferenceLowererVerifier>(pass), m_ctx(ctx)
     {
     }
 

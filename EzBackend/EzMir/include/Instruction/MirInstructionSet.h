@@ -80,6 +80,12 @@ INSTRUCTION(ALLOC,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
             F(HasSideEffect))
 
+INSTRUCTION(DALLOC,
+            MirCat_Memory,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
+            F(HasSideEffect))
+
 /* --- ARITHMETIC (ALU) ----------------------------------------------------- */
 INSTRUCTION(ADD,
             MirCat_Arithmetic,

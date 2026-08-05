@@ -32,7 +32,7 @@ MirPassResult MirRegisterAllocatorPass::run(std::pmr::list<class MirFunction *> 
         ctx.m_degree.clear();
         ctx.m_iGraph.clear();
 
-        LivenessAnalysis *livenessAnalysis = passManager->getAnalysis<LivenessAnalysis>(m_ctx);
+        LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
         LivenessResult result = livenessAnalysis->getResult();
 
         if (!m_regAllocator->buildInterferenceGraph(&result, ctx))

@@ -1,17 +1,17 @@
-#include "MirPasses/Passes/CodeFlowAnalysis.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 
-CodeFlowAnalysis::CodeFlowAnalysis(MirBuilderContext *ctx) :
+CodeFlowAnalysisPass::CodeFlowAnalysisPass(MirBuilderContext *ctx) :
     m_ctx(ctx), m_arena(ctx->getGlobalAllocator()), m_result(ctx->getGlobalAllocator())
 {
 }
 
-const char *CodeFlowAnalysis::getName() const { return "CodeFlowAnalysis"; }
+const char *CodeFlowAnalysisPass::getName() const { return "CodeFlowAnalysisPass"; }
 
-const ControlFlowResult &CodeFlowAnalysis::getResult() const { return m_result; }
+const ControlFlowResult &CodeFlowAnalysisPass::getResult() const { return m_result; }
 
-MirPassIterationPlace CodeFlowAnalysis::getIterationPlace() const { return MirPassIterationPlace::Function; }
+MirPassIterationPlace CodeFlowAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
+MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
                                     std::pmr::list<struct MirFunction *>::iterator it,
                                     class MirPassManager *passManager)
 {
@@ -99,14 +99,14 @@ MirPassResult CodeFlowAnalysis::run(std::pmr::list<MirFunction *> &funcList,
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
-void CodeFlowAnalysis::printResult() const
+void CodeFlowAnalysisPass::printResult() const
 {
     const auto &result = getResult();
     auto diag = m_ctx->getDiagCollector();
 
     {
         auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
-        log << std::pmr::string(std::format("CodeFlowAnalysis SUCCESSOR list:"));
+        log << std::pmr::string(std::format("CodeFlowAnalysisPass SUCCESSOR list:"));
 
         for (auto &[blockId, successors] : result.m_successors)
         {
@@ -129,7 +129,7 @@ void CodeFlowAnalysis::printResult() const
 
     {
         auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
-        log << std::pmr::string(std::format("CodeFlowAnalysis PREDECESSOR list:"));
+        log << std::pmr::string(std::format("CodeFlowAnalysisPass PREDECESSOR list:"));
 
         for (auto &[blockId, predecessors] : result.m_predecessors)
         {
@@ -149,13 +149,13 @@ void CodeFlowAnalysis::printResult() const
     }
 }
 
-void CodeFlowAnalysis::reset()
+void CodeFlowAnalysisPass::reset()
 {
     m_result.m_successors.clear();
     m_result.m_predecessors.clear();
 }
 
-MirBlock *CodeFlowAnalysis::getTargetJumpBlock(const MirInstruction *inst) const
+MirBlock *CodeFlowAnalysisPass::getTargetJumpBlock(const MirInstruction *inst) const
 {
     if (!inst || inst->getOperands().empty())
         return nullptr;
@@ -172,7 +172,7 @@ MirBlock *CodeFlowAnalysis::getTargetJumpBlock(const MirInstruction *inst) const
     return m_ctx->getBlockById(ref->getRefId());
 }
 
-void CodeFlowAnalysis::addEdge(MirBlock *from, MirBlock *to)
+void CodeFlowAnalysisPass::addEdge(MirBlock *from, MirBlock *to)
 {
     if (!from || !to)
         return;

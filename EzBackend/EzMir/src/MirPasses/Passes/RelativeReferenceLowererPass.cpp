@@ -1,12 +1,12 @@
-#include "MirPasses/Passes/RelativeReferenceLowerer.h"
+#include "MirPasses/Passes/RelativeReferenceLowererPass.h"
 
-RelativeReferenceLowerer::RelativeReferenceLowerer(MirBuilderContext *ctx) : m_ctx(ctx) {}
+RelativeReferenceLowererPass::RelativeReferenceLowererPass(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
-const char *RelativeReferenceLowerer::getName() const { return "RelativeReferenceLowererPass"; }
+const char *RelativeReferenceLowererPass::getName() const { return "RelativeReferenceLowererPass"; }
 
-MirPassIterationPlace RelativeReferenceLowerer::getIterationPlace() const { return MirPassIterationPlace::Instruction; }
+MirPassIterationPlace RelativeReferenceLowererPass::getIterationPlace() const { return MirPassIterationPlace::Instruction; }
 
-MirPassResult RelativeReferenceLowerer::run(std::pmr::list<MirInstruction *> &instrList,
+MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *> &instrList,
                                             std::pmr::list<MirInstruction *>::iterator it,
                                             class MirPassManager *passManager)
 {
@@ -125,4 +125,4 @@ MirPassResult RelativeReferenceLowerer::run(std::pmr::list<MirInstruction *> &in
     return res;
 }
 
-void RelativeReferenceLowerer::printResult() const {}
+void RelativeReferenceLowererPass::printResult() const {}

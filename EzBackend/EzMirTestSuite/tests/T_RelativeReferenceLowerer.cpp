@@ -39,7 +39,7 @@ TEST_F(TestRelativeReferenceLowerer, TestConstantArrayElementLowering)
     instrBuilder.LOAD(destReg, symbolicArrayRef);
 
     // 3. Execute the pass using the test suite's native runPass framework
-    RelativeReferenceLowerer *pass = runPass<RelativeReferenceLowerer>(ctx);
+    RelativeReferenceLowererPass *pass = runPass<RelativeReferenceLowererPass>(ctx);
     RelativeReferenceLowererVerifier verifier(pass, ctx);
 
     // 4. Fluent verifier assertions check lower transformations perfectly
@@ -90,7 +90,7 @@ TEST_F(TestRelativeReferenceLowerer, TestClassFieldReferenceLowering)
     ib.LOAD(destReg, fieldRef);
 
     // 3. Run Lowerer
-    RelativeReferenceLowerer *pass = runPass<RelativeReferenceLowerer>(ctx);
+    RelativeReferenceLowererPass *pass = runPass<RelativeReferenceLowererPass>(ctx);
 
     // 4. Verify memory lowering
     RelativeReferenceLowererVerifier(pass, ctx).executed().succeeded().mirModified().verifyInstruction(
@@ -135,7 +135,7 @@ TEST_F(TestRelativeReferenceLowerer, TestClassMethodReferenceLowering)
     ib.CALL(methodRef);
 
     // 3. Run Lowerer
-    RelativeReferenceLowerer *pass = runPass<RelativeReferenceLowerer>(ctx);
+    RelativeReferenceLowererPass *pass = runPass<RelativeReferenceLowererPass>(ctx);
 
     // 4. Verify lowering to function pointer memory access
     MirType *ptrToFunc = types->getPtr(method->getType());

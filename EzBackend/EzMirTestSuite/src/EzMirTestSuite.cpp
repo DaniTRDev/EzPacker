@@ -36,8 +36,8 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
             << "Using default calling convention: " << m_callingConv->getName();
 
     m_diagCollector->builder(Diag_Debug, "EzMirTestSuite") << "Adding common passes to pass manager";
-    m_passManager->addPass<CodeFlowAnalysis>(getBuilderCtx());
-    m_passManager->addPass<LivenessAnalysis>(getBuilderCtx());
+    m_passManager->addPass<CodeFlowAnalysisPass>(getBuilderCtx());
+    m_passManager->addPass<LivenessAnalysisPass>(getBuilderCtx());
 
     if (!m_testFunction)
     {

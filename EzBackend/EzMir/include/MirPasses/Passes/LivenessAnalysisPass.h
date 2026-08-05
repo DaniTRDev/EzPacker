@@ -2,7 +2,7 @@
 #define EZPACKER_LIVENESSANALYSIS_H
 
 #include "EzMirCommon.h"
-#include "CodeFlowAnalysis.h"
+#include "CodeFlowAnalysisPass.h"
 
 /**
  * @brief PMR-backed storage tracking variable lifespans across basic blocks.
@@ -18,15 +18,15 @@ struct LivenessResult
     LivenessResult(std::pmr::memory_resource *arena) : m_liveIn(arena), m_liveOut(arena), m_def(arena), m_use(arena) {}
 };
 
-class LivenessAnalysis : public IMirAnalysisPass
+class LivenessAnalysisPass : public IMirAnalysisPass
 {
   public:
-    ~LivenessAnalysis() override = default;
+    ~LivenessAnalysisPass() override = default;
 
     /**
      * @brief Allocates the liveness analyzer maps on the global compilation arena.
      */
-    LivenessAnalysis(MirBuilderContext *ctx);
+    LivenessAnalysisPass(MirBuilderContext *ctx);
 
     /**
      * Returns the name of the pass "LivenessAnalysisPass".

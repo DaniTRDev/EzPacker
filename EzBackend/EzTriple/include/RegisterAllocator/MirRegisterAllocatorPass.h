@@ -42,7 +42,7 @@ class MirRegisterAllocatorPass : public IMirTransformPass
     void printResult() const override;
 
     /**
-     * This pass depends on instruction selection and LivenessAnalysis.
+     * This pass depends on instruction selection and LivenessAnalysisPass.
      */
     std::vector<std::type_index> getDependencies() const override;
 
