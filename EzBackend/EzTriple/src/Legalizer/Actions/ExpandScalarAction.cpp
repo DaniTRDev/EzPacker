@@ -1,4 +1,7 @@
 #include "Legalizer/Actions/ExpandScalarAction.h"
+#include "Legalizer/Expand/MirExpansionRuleRegistry.h"
+#include <unordered_map>
+#include <format>
 
 namespace LegalizeActions
 {
@@ -10,34 +13,42 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
     auto &operands = instr->getOperands();
     auto &expandMap = ctx.m_expandMap;
 
-    const ExpansionRecipe *recipe = ctx.m_targetDesc->getExpansionRecipeForInstr(instr->getOpCode());
-    if (!recipe)
+    const auto &typeTable = builderCtx->getTypeTable();
+
+    // 1. Context Boundaries & Payload Identification
+    bool op0IsToken =
+            (!operands.empty()) && (operands[0]->getMirType()->getId() == typeTable->getBindingToken()->getId());
+
+    size_t payloadIdx = op0IsToken ? 1 : 0;
+    MirType *fullType = operands[payloadIdx]->getMirType();
+    MirType *halfType = typeTable->getIntegerTypeBySize(fullType->getTotalSizeInBits() / 2);
+
+    // 2. Query Rule Registry via ExpansionContext
+    ExpansionContext expCtx{ .m_expandedType = halfType, .m_fullType = fullType, .m_it = it };
+
+    MirExpansionRuleRegistry *ruleRegistry = ctx.m_targetDesc->getExpansionRegistry();
+    if (!ruleRegistry)
     {
         return LegalizationResult::AlreadyLegal;
     }
 
-    const auto &typeTable = builderCtx->getTypeTable();
-    MirOperandBuilder opBuilder(builderCtx);
-    MirInstructionBuilder insertBeforeBuilder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
-
-    // Identify tokenized context boundaries
-    bool op0IsToken =
-            (operands.size() > 0) && (operands[0]->getMirType()->getId() == typeTable->getBindingToken()->getId());
-
-    // Select the true payload operand to calculate the proper target width partitions
-    // For PUSH_ARG / PUSH_RET, the payload to be expanded is at index 1.
-    size_t payloadIdx = op0IsToken ? 1 : 0;
-    MirType *fullType = operands[payloadIdx]->getMirType();
-    MirType *halfType = typeTable->getIntegerTypeBySize(fullType->getTotalSizeInBits() / 2);
+    ExpansionRule *rule = ruleRegistry->getRule(expCtx);
+    if (!rule)
+    {
+        return LegalizationResult::AlreadyLegal;
+    }
 
     builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
             << std::format("Expanding wide type '{}' into halves of '{}'", fullType->getName(), halfType->getName())
                        .c_str()
             << instr->getSourceRef();
 
+    MirOperandBuilder opBuilder(builderCtx);
+    MirInstructionBuilder insertBeforeBuilder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
+
     MirOperand *destLo = nullptr, *destHi = nullptr, *srcLo = nullptr, *srcHi = nullptr;
 
-    // Dest / Primary Operand Splitting
+    // 3. Destination Operand Splitting
     if (!op0IsToken)
     {
         if (operands[0]->isOfType<MirRegister>())
@@ -81,13 +92,11 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
     }
     else
     {
-        // Token operations (like PUSH_ARG) do not have a traditional "destination payload register"
-        // being mutated; Operand 0 is preserved intact as the tracking token.
+        // Preserve binding token intact
         destLo = operands[0];
     }
 
-    // Source Operand Splitting
-    // If it's a token operation, the value payload sits at index 1 (treated as Source 0 here).
+    // 4. Source Operand Splitting
     size_t sourceIdx = op0IsToken ? 1 : 1;
     bool singleOperand = !op0IsToken && (operands.size() == 1);
 
@@ -121,7 +130,7 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
                     srcHi = opBuilder.buildVReg(halfType, r->getName() + "_hi", source->getSourceRef());
 
                     builderCtx->getDiagCollector()->builder(Diag_Trace, "ExpandScalarAction")
-                            << std::format("Split scr register '{}' into '{}' and '{}'",
+                            << std::format("Split src register '{}' into '{}' and '{}'",
                                            r->getName(),
                                            srcLo->get<MirRegister>()->getName(),
                                            srcHi->get<MirRegister>()->getName())
@@ -164,30 +173,27 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
         }
     }
 
-    MirOperand *tempsLo[3] = { nullptr, nullptr, nullptr };
-    MirOperand *tempsHi[3] = { nullptr, nullptr, nullptr };
+    // 5. Unbounded Temporal Register Allocation Map
+    // Key formula: (id << 1) | (isHigh ? 1 : 0)
+    std::unordered_map<uint64_t, MirOperand *> temporalRegs;
 
-    auto getTempRegister = [&](size_t idx, bool high) -> MirOperand *
+    auto getTemporalRegister = [&](size_t id, bool isHigh) -> MirOperand *
     {
-        if (high)
+        uint64_t key = (static_cast<uint64_t>(id) << 1) | (isHigh ? 1 : 0);
+        auto tempIt = temporalRegs.find(key);
+        if (tempIt != temporalRegs.end())
         {
-            if (!tempsHi[idx])
-            {
-                tempsHi[idx] = opBuilder.buildVReg(halfType, std::format("t{}_hi", idx).c_str(), instr->getSourceRef());
-            }
-            return tempsHi[idx];
+            return tempIt->second;
         }
-        else
-        {
-            if (!tempsLo[idx])
-            {
-                tempsLo[idx] = opBuilder.buildVReg(halfType, std::format("t{}_lo", idx).c_str(), instr->getSourceRef());
-            }
-            return tempsLo[idx];
-        }
+
+        std::string name = std::format("t{}_{}", id, isHigh ? "hi" : "lo");
+        MirOperand *vReg = opBuilder.buildVReg(halfType, name.c_str(), instr->getSourceRef());
+        temporalRegs[key] = vReg;
+        return vReg;
     };
 
-    for (const auto &expInstr : recipe->m_expandSequence)
+    // 6. Sentence Interpretation Loop
+    for (const auto &expInstr : rule->m_instructions)
     {
         std::vector<MirOperand *> newOps;
         newOps.reserve(expInstr.m_operands.size());
@@ -195,52 +201,42 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
         for (const auto &recipeOp : expInstr.m_operands)
         {
             MirOperand *resolvedOp = nullptr;
-            switch (recipeOp.kind)
+            switch (recipeOp.m_type)
             {
-                case ExpansionOperandKind::DestLow:
-                    resolvedOp = destLo; // Points to the unaltered callToken on systemic nodes
+                case ExpansionOperandType::DestLow:
+                    resolvedOp = destLo;
                     break;
-                case ExpansionOperandKind::DestHigh:
-                    // Guard against putting a null high operand into token sequences
+                case ExpansionOperandType::DestHigh:
                     resolvedOp = op0IsToken ? nullptr : destHi;
                     break;
-                case ExpansionOperandKind::Src0Low:
+                case ExpansionOperandType::SrcLow:
                     resolvedOp = srcLo;
                     break;
-                case ExpansionOperandKind::Src0High:
+                case ExpansionOperandType::SrcHigh:
                     resolvedOp = srcHi;
                     break;
-                case ExpansionOperandKind::TemporalLow0:
-                    resolvedOp = getTempRegister(0, false);
+
+                case ExpansionOperandType::Temporal:
+                    resolvedOp = getTemporalRegister(recipeOp.m_tempOperand.m_id, recipeOp.m_tempOperand.m_high);
                     break;
-                case ExpansionOperandKind::TemporalHigh0:
-                    resolvedOp = getTempRegister(0, true);
-                    break;
-                case ExpansionOperandKind::TemporalLow1:
-                    resolvedOp = getTempRegister(1, false);
-                    break;
-                case ExpansionOperandKind::TemporalHigh1:
-                    resolvedOp = getTempRegister(1, true);
-                    break;
-                case ExpansionOperandKind::TemporalLow2:
-                    resolvedOp = getTempRegister(2, false);
-                    break;
-                case ExpansionOperandKind::TemporalHigh2:
-                    resolvedOp = getTempRegister(2, true);
-                    break;
-                case ExpansionOperandKind::IntImm:
+
+                case ExpansionOperandType::IntImm:
                     resolvedOp = opBuilder.buildInt(halfType, recipeOp.intVal);
                     break;
-                case ExpansionOperandKind::FloatImm:
+
+                case ExpansionOperandType::FloatImm:
                     resolvedOp = opBuilder.buildFloat(halfType, recipeOp.floatVal);
                     break;
 
-                case ExpansionOperandKind::MemoryHalfOffset:
+                case ExpansionOperandType::MemoryHalfOffset:
                 {
-                    MirOperand *baseOp = (recipeOp.memVal.m_baseKind == ExpansionOperandKind::Src0Low) ? srcLo : destLo;
-                    int32_t factor = recipeOp.memVal.m_scaleHalfSizeFactor;
-                    int64_t stride = factor * (halfType->getTotalSizeInBits() / 8);
-                    int64_t finalOffset = stride + recipeOp.memVal.m_displ;
+                    MirOperand *baseOp =
+                            (recipeOp.m_memOperand.m_base == ExpansionOperandType::SrcLow) ? srcLo : destLo;
+
+                    // Linear stride offset: factor * sizeof(halfType) + displacement
+                    int64_t halfSizeInBytes = static_cast<int64_t>(halfType->getTotalSizeInBits() / 8);
+                    int64_t stride = recipeOp.m_memOperand.m_scaleHalfFactor * halfSizeInBytes;
+                    int64_t finalOffset = stride + recipeOp.m_memOperand.m_displ;
 
                     if (baseOp && baseOp->isOfType<MirMemory>())
                     {
@@ -251,7 +247,7 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
                                                         FlexInt(finalOffset) + displ,
                                                         origMem->getSourceRef());
                     }
-                    else
+                    else if (baseOp)
                     {
                         resolvedOp = opBuilder.buildMem(halfType,
                                                         baseOp->get<MirRegister>(),
@@ -263,16 +259,18 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
             }
 
             if (resolvedOp)
+            {
                 newOps.push_back(resolvedOp);
+            }
         }
 
         if (!expInstr.m_rtLibraryCall.empty())
         {
             newOps.insert(newOps.begin(),
-                          opBuilder.buildRtSymbol(expInstr.m_rtLibraryCall.data(), instr->getSourceRef()));
+                          opBuilder.buildRtSymbol(expInstr.m_rtLibraryCall.c_str(), instr->getSourceRef()));
         }
 
-        insertBeforeBuilder.build(expInstr.m_instr, instr->getSourceRef(), newOps);
+        insertBeforeBuilder.build(expInstr.m_opcode, instr->getSourceRef(), newOps);
     }
 
     // Erase original unexpanded instruction

@@ -1,5 +1,5 @@
 set(TRIPLETESTSUITE_FILES_LIST
-        "include/EzTripleTestExpansionRecipe.h"
+        "include/EzTripleTestExpansionRegistry.h"
         "include/EzTripleTestFrameLowerer.h"
         "include/EzTripleTestInstructionSet.h"
         "include/EzTripleTestLegalizer.h"
@@ -18,6 +18,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "include/Verifiers/RegisterAllocatorPassVerifier.h"
         "include/Verifiers/ReturnAbiLowererVerifier.h"
 
+        "src/EzTripleTestExpansionRegistry.cpp"
         "src/EzTripleTestFrameLowerer.cpp"
         "src/EzTripleTestLegalizer.cpp"
         "src/EzTripleTestSelector.cpp"

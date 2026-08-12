@@ -2,7 +2,7 @@
 #define EZPACKER_EZTRIPLETESTTARGETDESCRIPTOR_H
 
 #include "Descriptors/TargetDesc.h"
-#include "EzTripleTestExpansionRecipe.h"
+#include "EzTripleTestExpansionRegistry.h"
 #include "EzTripleTestFrameLowerer.h"
 
 /**
@@ -21,7 +21,7 @@ class EzTripleTestTargetDesc : public TargetDesc
 {
   public:
     /**
-     * Creates the target descriptor with the given context.
+     * Creates the target descriptor with the given context and expansion rule registry.
      */
     EzTripleTestTargetDesc(MirBuilderContext *ctx);
 
@@ -31,14 +31,10 @@ class EzTripleTestTargetDesc : public TargetDesc
     const char *getName() const override;
 
     /**
-     * Returns the expansion recipes for this target.
+     * Returns the expansion registry used during expand action. It fills the registry with
+     * EzTripleTestExpansionRegistry::create()
      */
-    const ExpansionRecipe *getExpansionRecipes() override;
-
-    /**
-     * Returns the expansion recipe for the given instruction in this target.
-     */
-    const ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) override;
+    MirExpansionRuleRegistry *getExpansionRegistry() override;
 
     /**
      * Returns the frame lowerer for this target.
@@ -56,11 +52,6 @@ class EzTripleTestTargetDesc : public TargetDesc
     MirType *getNearestLegalType(MirType *type) override;
 
     /**
-     * Returns the size of the expansion recipe array.
-     */
-    size_t getExpansionRecipesSize() override;
-
-    /**
      * Returns the size in bytes of a standard stack slot (4).
      */
     size_t getStackSlotSize() const override;
@@ -73,6 +64,7 @@ class EzTripleTestTargetDesc : public TargetDesc
   private:
     MirBuilderContext *m_ctx;
     std::shared_ptr<EzTripleTestFrameLowerer> m_frameLowerer;
+    std::shared_ptr<MirExpansionRuleRegistry> m_expansionRegistry;
 };
 
 #endif // EZPACKER_EZTRIPLETESTTARGETDESCRIPTOR_H

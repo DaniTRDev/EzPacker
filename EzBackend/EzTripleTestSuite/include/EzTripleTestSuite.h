@@ -73,22 +73,22 @@ class EzTripleTestSuite : public EzMirTestSuite
     virtual std::shared_ptr<MirInstructionSelector> createInstructionSelector() = 0;
 
     /**
-     * Creates a target description and returns it.
-     * @return
-     */
-    virtual std::shared_ptr<TargetDesc> createTargetDesc() = 0;
-
-    /**
      * Creates a register allocator and returns it.
      * @return
      */
     virtual std::shared_ptr<MirRegisterAllocator> createRegisterAllocator() = 0;
 
+    /**
+     * Creates a target description and returns it.
+     * @return
+     */
+    virtual std::shared_ptr<TargetDesc> createTargetDesc() = 0;
+
   protected:
-    std::shared_ptr<TargetDesc> m_targetDesc;
     std::shared_ptr<MirLegalizer> m_legalizer;
     std::shared_ptr<MirInstructionSelector> m_instructionSelector;
     std::shared_ptr<MirRegisterAllocator> m_registerAllocator;
+    std::shared_ptr<TargetDesc> m_targetDesc;
 };
 
 class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Test

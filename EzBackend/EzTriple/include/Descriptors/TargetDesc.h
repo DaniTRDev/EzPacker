@@ -18,16 +18,9 @@ class TargetDesc
     virtual const char *getName() const = 0;
 
     /**
-     * Returns the expansion recipes for this target.
-     * @return
+     * Returns the expansion registry used during expand action.
      */
-    virtual const class ExpansionRecipe *getExpansionRecipes() = 0;
-
-    /**
-     * Returns the expansion recipe for the given instruction in this target.
-     * @return
-     */
-    virtual const class ExpansionRecipe *const getExpansionRecipeForInstr(MirInstructionOpCode opcode) = 0;
+    virtual class MirExpansionRuleRegistry *getExpansionRegistry() = 0;
 
     /**
      * Returns the frame lowerer for this target.
@@ -51,12 +44,6 @@ class TargetDesc
      * @return
      */
     virtual MirType *getNearestLegalType(MirType *type) = 0;
-
-    /**
-     * Returns the expansion recipes array size.
-     * @return
-     */
-    virtual size_t getExpansionRecipesSize() = 0;
 
     /**
      * Returns the size in bytes of a standard stack slot (e.g., 8 for 64-bit targets, 4 for 32-bit).

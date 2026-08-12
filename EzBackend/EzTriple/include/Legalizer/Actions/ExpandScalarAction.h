@@ -3,7 +3,7 @@
 
 #include "EzTripleCommon.h"
 #include "Descriptors/TargetDesc.h"
-#include "ExpansionRecipe/ExpansionRecipe.h"
+#include "Legalizer/Expand/MirExpansionRuleRegistry.h"
 #include "Legalizer/MirLegalizer.h"
 
 namespace LegalizeActions

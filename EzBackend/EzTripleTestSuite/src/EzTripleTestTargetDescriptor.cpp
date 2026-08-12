@@ -4,24 +4,14 @@ EzTripleTestTargetDesc::EzTripleTestTargetDesc(MirBuilderContext *ctx)
 {
     m_ctx = ctx;
     m_frameLowerer = std::make_shared<EzTripleTestFrameLowerer>();
+    m_expansionRegistry = std::make_shared<MirExpansionRuleRegistry>(ctx);
+
+    EzTripleTestExpansionRegistry::create(m_expansionRegistry.get());
 }
 
 const char *EzTripleTestTargetDesc::getName() const { return "EzTripleTestTargetDesc"; }
 
-const ExpansionRecipe *EzTripleTestTargetDesc::getExpansionRecipes() { return GET_EXPANSION_RECIPES(EzTripleTest); }
-
-const ExpansionRecipe *const EzTripleTestTargetDesc::getExpansionRecipeForInstr(MirInstructionOpCode opcode)
-{
-    const auto recipes = getExpansionRecipes();
-    for (size_t i = 0; i < getExpansionRecipesSize(); i++)
-    {
-        const auto recipe = &recipes[i];
-        if (recipe->m_target == opcode)
-            return recipe;
-    }
-
-    return nullptr;
-}
+MirExpansionRuleRegistry *EzTripleTestTargetDesc::getExpansionRegistry() { return m_expansionRegistry.get(); }
 
 MirFrameLowerer *EzTripleTestTargetDesc::getFrameLowerer() { return m_frameLowerer.get(); }
 
@@ -60,8 +50,6 @@ MirType *EzTripleTestTargetDesc::getNearestLegalType(MirType *type)
 
     return nullptr;
 }
-
-size_t EzTripleTestTargetDesc::getExpansionRecipesSize() { return GET_EXPANSION_RECIPES_SIZE(EzTripleTest); }
 
 size_t EzTripleTestTargetDesc::getStackSlotSize() const { return 4; }
 
