@@ -2,14 +2,11 @@
 
 FlexInt::FlexInt(const FlexInt &other)
 {
-    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
+    if (m_lastErr = mp_init_copy(&m_number, &other.m_number); m_lastErr != MP_OKAY)
         throw std::bad_alloc();
 
     m_isSigned = other.m_isSigned;
     m_bitWidth = other.m_bitWidth;
-
-    if (m_lastErr = mp_copy(&other.m_number, &m_number); m_lastErr != MP_OKAY)
-        throw std::runtime_error("Could not create a copy of FlexInt");
 }
 
 FlexInt::FlexInt(uint32_t value, size_t bitWidth)
@@ -99,13 +96,23 @@ FlexInt::FlexInt(const std::string_view &numberStr, size_t bitWidth, bool _signe
 
 FlexInt::~FlexInt() { mp_clear(&m_number); }
 
+FlexInt &FlexInt::operator=(const FlexInt &other)
+{
+    if (m_lastErr = mp_init_copy(&m_number, &other.m_number); m_lastErr != MP_OKAY)
+        throw std::bad_alloc();
+
+    m_isSigned = other.m_isSigned;
+    m_bitWidth = other.m_bitWidth;
+    return *this;
+}
+
 bool FlexInt::fitsIn(size_t bitSize, bool _signed)
 {
     if (bitSize == 0)
     {
         return false;
     }
-    
+
     mp_int maxVal, minVal;
     if (mp_init_multi(&maxVal, &minVal, nullptr) != MP_OKAY)
     {

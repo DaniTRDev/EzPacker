@@ -79,6 +79,17 @@ FlexFloat::~FlexFloat()
     libbf::bf_context_end(&m_bfCtx);
 }
 
+FlexFloat &FlexFloat::operator=(const FlexFloat &other)
+{
+    m_lastErr = libbf::bf_set(&m_number, &other.m_number);
+    if (m_lastErr & BF_ST_MEM_ERROR)
+    {
+        throw std::bad_alloc();
+    }
+
+    return *this;
+}
+
 bool FlexFloat::fitsIn(size_t bitWidth) const
 {
     if (bitWidth == 0)

@@ -59,6 +59,11 @@ class FlexInt
     FlexInt(const std::string_view &numberStr, size_t bitWidth, bool _signed, size_t radix = 10);
 
     /**
+     * Copies other into this.
+     */
+    FlexInt &operator=(const FlexInt &other);
+
+    /**
      * Clears the container of the number and destroys the object.
      */
     ~FlexInt();
@@ -70,7 +75,7 @@ class FlexInt
      * @return
      */
     bool fitsIn(size_t bitSize, bool _signed);
-    
+
     /**
      * Returns true if this number threw an error somewhere during its uses.
      * @return

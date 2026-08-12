@@ -51,6 +51,11 @@ class FlexFloat
     ~FlexFloat();
 
     /**
+     * Copies other into this.
+     */
+    FlexFloat &operator=(const FlexFloat &other);
+
+    /**
      * Returns true if this number fits in a container of the given bitsize.
      * @param bitWidth
      * @return
