@@ -27,6 +27,25 @@ MirPassResult MirFrameLowererPass::run(std::pmr::list<MirFunction *> &funcList,
     FrameLowererCtx ctx(m_ctx, func, m_targetDesc, m_ctx->getGlobalAllocator());
     MirFrameLowerer *lowerer = m_targetDesc->getFrameLowerer();
 
+    // Scan for ALLOC/DEALLOC instructions and lower them.
+    for (MirBlock *block : func->getBlocks())
+    {
+        auto &instrList = block->getInstructions();
+        auto it = instrList.begin();
+        while (it != instrList.end())
+        {
+            MirInstruction *instr = *it;
+            ctx.m_allocIt = it;
+
+            if (instr->getOpCode() == MirInstructionOpCode::ALLOC)
+                lowerer->lowerAlloc(ctx);
+            else if (instr->getOpCode() == MirInstructionOpCode::DALLOC)
+                lowerer->lowerDAlloc(ctx);
+
+            it++;
+        }
+    }
+
     // Compute frame dimensions and local object offsets
     // Insert function entry prologue (PUSH FP, callee-saved pushes, SUB SP)
     // Insert function exit epilogue (ADD SP, callee-saved pops, POP FP) before return instructions

@@ -10,6 +10,7 @@
  */
 struct FrameLayout
 {
+    bool m_hasDynamicAllocs{ false };
     size_t calleeSavedAreaSize = 0; ///< Total size (in bytes) occupied by pushed callee-saved registers.
     size_t totalFrameSize = 0;      ///< Total aligned stack payload size allocated during the prologue.
 };
@@ -25,6 +26,8 @@ struct FrameLowererCtx
     MirFunction *m_targetFunc; ///< Function being processed.
     TargetDesc *m_targetDesc;  ///< Hardware target descriptor containing the TargetFrameLowering implementation.
 
+    std::pmr::list<MirInstruction *>::iterator
+            m_allocIt; ///< Iterator pointing to an ALLOC/DALLOC instruction. Used by lowerAlloc/lowerDAlloc.
     std::pmr::memory_resource *m_allocator; ///< Memory allocator for temporary layout data structures.
 
     FrameLowererCtx(MirBuilderContext *ctx,
@@ -44,9 +47,14 @@ struct FrameLowererCtx
  * its own frame lowerer.
  *
  * Execution flow:
- * 1. Calculate final frame layout and stack object offsets.
- * 2. Emit target-specific function prologue at the entry block.
- * 3. Emit target-specific function epilogue before all return instructions.
+ * 1. Lower every ALLOC instruction.
+ * 2. Lower every DALLOC instruction.
+ * 3. Calculate final frame layout and stack object offsets.
+ * 4. Emit target-specific function prologue at the entry block.
+ * 5. Emit target-specific function epilogue before all return instructions.
+ *
+ * The methods in this class are all virtual so a tricky target can lower the frame as it likes without using the
+ * predefined code at all.
  */
 class MirFrameLowerer
 {
@@ -54,7 +62,7 @@ class MirFrameLowerer
     /**
      * Runs the frame lowering pipeline on the provided function context.
      */
-    void calculateFrameLayout(FrameLowererCtx &ctx);
+    virtual void calculateFrameLayout(FrameLowererCtx &ctx);
 
     /**
      * Inserts the prologue of the function. calculateFrameLayout must have been called before.
@@ -67,9 +75,34 @@ class MirFrameLowerer
     virtual void insertEpilogue(FrameLowererCtx &ctx) = 0;
 
     /**
+     * Lowers an ALLOC instruction. This must be called BEFORE calculateFrameLayout.
+     * This function will create a new static stack object and push it to the function's stack frame.
+     *
+     * It will replace the ALLOC instruction with a LEA.
+     */
+    virtual void lowerAlloc(FrameLowererCtx &ctx);
+
+    /**
+     * Lowers a DALLOC instruction by emitting a series of instructions. This will force the function to use a frame
+     * pointer, even if it means using a scratch register. This function is also highly dependant on the target, that's
+     * why each target needs to define how to properly lower the dynamic alloc.
+     *
+     * Emitted instructions in the place of the DALLOC:
+     * sub sp, allocSize
+     * and sp, alignment
+     * mov type %dest, sp.
+     *
+     * And, in the return blocks of the function:
+     * pop Callee Saved Regs
+     * mov sp, fp
+     * ret
+     */
+    virtual void lowerDAlloc(FrameLowererCtx &ctx) = 0;
+
+    /**
      * Lowers each reference to a stack frame object into a MirMemory as FP/SP + offset.
      */
-    void lowerStackObjectReferences(FrameLowererCtx &ctx);
+    virtual void lowerStackObjectReferences(FrameLowererCtx &ctx);
 };
 
 #endif // EZPACKER_MIRFRAMELOWERER_H

@@ -7,7 +7,7 @@ MirFunctionStackFrame::MirFunctionStackFrame(std::pmr::vector<StackFrameObject *
 
 size_t MirFunctionStackFrame::getAllocatedObjectCount() const { return m_stackFrameObjects.size(); }
 
-StackFrameObject *MirFunctionStackFrame::createLocalStackObj(MirType *type)
+StackFrameObject *MirFunctionStackFrame::createStaticStackObj(MirType *type)
 {
     return create(0, type, StackFrameObjectSource::Variable);
 }

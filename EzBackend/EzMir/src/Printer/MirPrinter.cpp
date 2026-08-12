@@ -233,9 +233,25 @@ std::string MirPrinter::printToString(const RegisterRef &ref)
 
 std::string MirPrinter::printToString(const StackFrameObject *obj)
 {
-    return std::format("{} %frame.id={}.src={}.offset={:#X})",
-                       obj->m_type->getName(),
-                       obj->m_id,
-                       static_cast<uint8_t>(obj->m_source),
-                       obj->m_offset);
+    std::string src = "invalid";
+    switch (obj->m_source)
+    {
+        case StackFrameObjectSource::Parameter:
+        {
+            src = "parameter";
+            break;
+        }
+        case StackFrameObjectSource::Spill:
+        {
+            src = "spill";
+            break;
+        }
+        case StackFrameObjectSource::Variable:
+        {
+            src = "variable";
+            break;
+        }
+    }
+
+    return std::format("{} %frame.id={}.src={}.offset={:#X})", obj->m_type->getName(), obj->m_id, src, obj->m_offset);
 }

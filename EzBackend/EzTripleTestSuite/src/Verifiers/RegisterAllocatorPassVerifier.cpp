@@ -119,3 +119,33 @@ RegisterAllocatorPassVerifier::verifySpillingCorrectness(const RegisterAllocator
 
     return *this;
 }
+
+RegisterAllocatorPassVerifier &
+RegisterAllocatorPassVerifier::verifyReservedRegistersNotAssigned(const RegisterAllocatorCtx &allocCtx)
+{
+    for (const auto &[node, assignedPhysReg] : allocCtx.m_allocatedRegs)
+    {
+        // Only check virtual register nodes that received an allocation
+        if (node.isVirtual())
+        {
+            EXPECT_FALSE(allocCtx.m_reservedRegs.contains(assignedPhysReg))
+                    << "Virtual register %v" << node.getId() << " was illegally assigned reserved physical register %p"
+                    << assignedPhysReg.getId() << "!";
+        }
+    }
+    return *this;
+}
+
+RegisterAllocatorPassVerifier &
+RegisterAllocatorPassVerifier::verifyFramePointerReservedOnDAlloc(const RegisterAllocatorCtx &allocCtx)
+{
+    if (allocCtx.m_needsFramePointer && allocCtx.m_targetFunction->getCallingConv())
+    {
+        RegisterRef fpReg = allocCtx.m_targetFunction->getCallingConv()->getFramePointerReg();
+
+        EXPECT_TRUE(allocCtx.m_reservedRegs.contains(fpReg))
+                << "Function requires a Frame Pointer (m_needsFramePointer is true), but the FP register %p"
+                << fpReg.getId() << " was not present in m_reservedRegs!";
+    }
+    return *this;
+}

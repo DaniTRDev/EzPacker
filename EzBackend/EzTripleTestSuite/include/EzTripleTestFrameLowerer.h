@@ -15,6 +15,11 @@ class EzTripleTestFrameLowerer : public MirFrameLowerer
      * Inserts the epilogue of the function. calculateFrameLayout must have been called before.
      */
     void insertEpilogue(FrameLowererCtx &ctx) override;
+
+    /**
+     * Look at MirFrameLowerer::lowerDAlloc to know what this method is supposed to do.
+     */
+    void lowerDAlloc(FrameLowererCtx &ctx) override;
 };
 
 #endif // EZTRIPLETESTFRAMELOWERER_H

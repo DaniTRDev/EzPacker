@@ -1,14 +1,17 @@
 #include "RegisterAllocator/MirRegisterAllocator.h"
 
-#include <algorithm>
-#include <cmath>
-#include <deque>
-#include <limits>
-#include <ranges>
-
 bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, RegisterAllocatorCtx &ctx)
 {
-    const auto &blockList = ctx.m_targetFunction->getBlocks();
+    MirFunction *func = ctx.m_targetFunction;
+    CallingConvDesc *cc = func->getCallingConv();
+
+    // Check if ABI mandates frame pointer.
+    if (cc && cc->hasFramePointer(func))
+    {
+        ctx.m_needsFramePointer = true;
+    }
+
+    const auto &blockList = func->getBlocks();
 
     for (MirBlock *block : blockList)
     {
@@ -31,6 +34,13 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             MirInstruction *inst = *it;
             const auto &defs = inst->getDefinedRegisters();
             const auto &uses = inst->getUsedRegisters();
+
+            if (inst->getOpCode() == MirInstructionOpCode::DALLOC)
+            {
+                auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Debug, "MirRegisterAllocator");
+                log << "Found DALLOC in function, marking FP requirement" << inst->getSourceRef();
+                ctx.m_needsFramePointer = true;
+            }
 
             // Add nodes and interference edges for DEFs
             for (const RegisterRef &defRegRef : defs)
@@ -62,6 +72,14 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             }
         }
     }
+
+    // Reserve physical Frame Pointer register if required
+    if (ctx.m_needsFramePointer && cc)
+    {
+        RegisterRef fpReg = cc->getFramePointerReg();
+        ctx.m_reservedRegs.insert(fpReg);
+    }
+
     return true;
 }
 
@@ -76,7 +94,21 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
         if (node.isVirtual())
         {
             totalVirtualNodes++;
-            colorLimits.try_emplace(node.getClass(), ctx.m_targetDesc->getAvailableRegisters(node.getClass()).size());
+            if (!colorLimits.contains(node.getClass()))
+            {
+                const auto &available = ctx.m_targetDesc->getAvailableRegisters(node.getClass());
+                size_t usableCount = 0;
+
+                // Subtract reserved physical registers (e.g. FP) from availability threshold K
+                for (const RegisterRef &physReg : available)
+                {
+                    if (!ctx.m_reservedRegs.contains(physReg))
+                    {
+                        usableCount++;
+                    }
+                }
+                colorLimits[node.getClass()] = usableCount;
+            }
         }
     }
 
@@ -188,6 +220,15 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx &ctx)
 
         const auto &availableColors = ctx.m_targetDesc->getAvailableRegisters(node.getClass());
         usedColorsBitset.assign(availableColors.size(), false);
+
+        // Permanently lock out physical registers that are reserved (such as Frame Pointer)
+        for (size_t i = 0; i < availableColors.size(); ++i)
+        {
+            if (ctx.m_reservedRegs.contains(availableColors[i]))
+            {
+                usedColorsBitset[i] = true;
+            }
+        }
 
         // Gather colors used by assigned neighbors
         for (const RegisterRef &neighbor : ctx.m_iGraph[node])
@@ -445,19 +486,16 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
                     MirInstruction *defInst = definingInstMap[usedRef];
                     if (isRematerializable(usedReg, defInst))
                     {
-                        // Rematerialization: Re-execute the immediate MOV inline instead of reading memory!
+                        // Rematerialization: Re-execute the immediate MOV inline instead of reading memory.
                         MirOperand *constVal = defInst->getOperands()[1];
-                        MirInstruction *rematInst = insertBeforeBuilder.MOV(srcRef, reloadVReg, constVal);
-                        rematInst->invalidateCachedUsedAndDefs();
+                        insertBeforeBuilder.MOV(srcRef, reloadVReg, constVal);
                     }
                     else
                     {
                         // Standard Spill Reload from Stack
                         StackFrameObject *spillSlot = ctx.m_spilledRegs[usedRef];
                         MirReference *spillSlotRef = opBuilder.buildRef(spillSlot, srcRef);
-
-                        MirInstruction *loadInst = insertBeforeBuilder.LOAD(srcRef, reloadVReg, spillSlotRef);
-                        loadInst->invalidateCachedUsedAndDefs();
+                        insertBeforeBuilder.LOAD(srcRef, reloadVReg, spillSlotRef);
                     }
 
                     operands[i] = reloadVReg;
@@ -496,8 +534,7 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
                     ctx.m_unspillableRegs.insert(spillVReg->getRef());
 
                     MirInstructionBuilder insertAfterBuilder(ctx.m_ctx, block, InsertionType::InsertAfter, it);
-                    MirInstruction *storeInst = insertAfterBuilder.STORE(srcRef, spillSlotRef, spillVReg);
-                    storeInst->invalidateCachedUsedAndDefs();
+                    insertAfterBuilder.STORE(srcRef, spillSlotRef, spillVReg);
                 }
             }
 

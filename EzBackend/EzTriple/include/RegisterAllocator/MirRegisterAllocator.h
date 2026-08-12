@@ -6,6 +6,7 @@
 
 struct RegisterAllocatorCtx
 {
+    bool m_needsFramePointer; // Does the function needs a mandatory FP (dynamic alloc found)?
     MirBuilderContext *m_ctx;
     MirFunction *m_targetFunction;
     TargetDesc *m_targetDesc;
@@ -15,7 +16,6 @@ struct RegisterAllocatorCtx
 
     /**
      * Stack of nodes removed during simplify, popped in reverse during select phase.
-     * Changed to vector for standard LIFO performance.
      */
     std::pmr::vector<RegisterRef> m_selectStack;
 
@@ -23,6 +23,9 @@ struct RegisterAllocatorCtx
      * Nodes currently removed from the active graph during simplification.
      */
     std::pmr::unordered_set<RegisterRef> m_removedNodes;
+
+    // A set of registers that are reserved and CAN'T be used during allocation.
+    std::pmr::unordered_set<RegisterRef> m_reservedRegs;
 
     // First = Virtual Register. Second = Assigned Physical Register.
     std::pmr::unordered_map<RegisterRef, RegisterRef> m_allocatedRegs;
@@ -47,9 +50,9 @@ struct RegisterAllocatorCtx
                                   MirFunction *targetFunction,
                                   TargetDesc *targetDesc,
                                   std::pmr::memory_resource *alloc) :
-        m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc), m_allocator(alloc),
-        m_selectStack(alloc), m_removedNodes(alloc), m_allocatedRegs(alloc), m_degree(alloc), m_spilledRegs(alloc),
-        m_iGraph(alloc), m_unspillableRegs(alloc)
+        m_needsFramePointer(false), m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc),
+        m_allocator(alloc), m_selectStack(alloc), m_removedNodes(alloc), m_reservedRegs(alloc), m_allocatedRegs(alloc),
+        m_degree(alloc), m_spilledRegs(alloc), m_iGraph(alloc), m_unspillableRegs(alloc)
     {
     }
 };

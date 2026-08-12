@@ -61,7 +61,7 @@ TEST_F(FunctionTest, TestFunc1LocalStackObj)
     size_t i8Size = i8->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8);
+    StackFrameObject *obj = func->getStackFrame()->createStaticStackObj(i8);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();
@@ -81,8 +81,8 @@ TEST_F(FunctionTest, TestFuncNLocalStackObj)
     size_t i8Size = i8->getTotalSizeInBytes(), i16Size = i16->getTotalSizeInBytes();
 
     MirFunction *func = builder.build(i8, "myFunc");
-    StackFrameObject *obj = func->getStackFrame()->createLocalStackObj(i8),
-                     *obj2 = func->getStackFrame()->createLocalStackObj(i16);
+    StackFrameObject *obj = func->getStackFrame()->createStaticStackObj(i8),
+                     *obj2 = func->getStackFrame()->createStaticStackObj(i16);
 
     MirFunctionVerifier verifier(func);
     MirFunctionStackFrameVerifier stackFrameVerifier = verifier.stackFrameVerifier();

@@ -206,7 +206,7 @@ bool AbiLowerer::processCallBlock(CallingConvDesc *cc,
 
                 if (indirect.m_isByVal)
                 {
-                    StackFrameObject *byValObj = func->getStackFrame()->createLocalStackObj(argType);
+                    StackFrameObject *byValObj = func->getStackFrame()->createStaticStackObj(argType);
                     MirOperand *byValAddr = oBuilder.buildRef(byValObj, pushArgInstr->getSourceRef());
 
                     // Store value into the stack copy

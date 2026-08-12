@@ -23,6 +23,12 @@ INSTRUCTION(MOV,
                                 { ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(None))
 
+INSTRUCTION(LEA,
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
+                                { ExpectedOperandType::AddressSource, OperandFlag::Read }),
+            F(None))
+
 INSTRUCTION(PUSH_ARG,
             MirCat_DataMovement,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },

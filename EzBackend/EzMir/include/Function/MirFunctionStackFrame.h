@@ -48,7 +48,7 @@ class MirFunctionStackFrame
      * @param type
      * @return
      */
-    StackFrameObject *createLocalStackObj(MirType *type);
+    StackFrameObject *createStaticStackObj(MirType *type);
 
     /**
      * Creates an object resulting of a spill in the function's stack frame.
@@ -68,11 +68,6 @@ class MirFunctionStackFrame
 
     /**
      * Creates a specific stack frame object with the given parameters
-     * @param offset
-     * @param align
-     * @param sizeInBytes
-     * @param source
-     * @return
      */
     StackFrameObject *create(int64_t offset, MirType *type, StackFrameObjectSource source);
 

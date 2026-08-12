@@ -36,7 +36,7 @@ TEST_F(TestFrameLowererPass, LowerEmptyLeafFunction)
 
     verifier.verifyPrologue(func, layout);
     verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func);
+    verifier.verifyStackReferencesLowered(func, layout);
 }
 
 // =========================================================================
@@ -52,8 +52,8 @@ TEST_F(TestFrameLowererPass, LowerFunctionWithLocalVariablesAndSpills)
     EXPECT_NE(frame, nullptr);
 
     // Allocate stack objects for local variables and spill slots
-    StackFrameObject *var0 = frame->createLocalStackObj(t->i32());
-    StackFrameObject *var1 = frame->createLocalStackObj(t->i64());
+    StackFrameObject *var0 = frame->createStaticStackObj(t->i32());
+    StackFrameObject *var1 = frame->createStaticStackObj(t->i64());
     StackFrameObject *spill0 = frame->createStackSpill(t->f64());
 
     MirInstructionBuilder iBuilder(getBuilderCtx(),
@@ -88,7 +88,7 @@ TEST_F(TestFrameLowererPass, LowerFunctionWithLocalVariablesAndSpills)
     verifier.verifyPrologue(func, layout);
     verifier.verifyEpilogue(func, layout);
     // Ensure all MirReference::StackFrameObject operands were converted into concrete MirMemory [FP/SP + offset]
-    verifier.verifyStackReferencesLowered(func);
+    verifier.verifyStackReferencesLowered(func, layout);
 }
 
 // =========================================================================
@@ -129,7 +129,7 @@ TEST_F(TestFrameLowererPass, LowerCalleeSavedRegisters)
     // - Epilogue pops reg1 before RET
     verifier.verifyPrologue(func, layout);
     verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func);
+    verifier.verifyStackReferencesLowered(func, layout);
 }
 
 // =========================================================================
@@ -160,7 +160,7 @@ TEST_F(TestFrameLowererPass, LowerMultipleReturnBlocks)
     MirOperandBuilder oBuilder(getBuilderCtx());
 
     // Allocate local object to force stack layout generation
-    func->getStackFrame()->createLocalStackObj(t->i64());
+    func->getStackFrame()->createStaticStackObj(t->i64());
 
     // Branch to then / else
     MirRegister *condReg = oBuilder.buildVReg(t->i1(), "cond");
@@ -180,7 +180,7 @@ TEST_F(TestFrameLowererPass, LowerMultipleReturnBlocks)
     verifier.verifyPrologue(func, layout);
     // Epilogue must be injected before RET in BOTH thenBlock and elseBlock
     verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func);
+    verifier.verifyStackReferencesLowered(func, layout);
 }
 
 // =========================================================================
@@ -202,7 +202,7 @@ TEST_F(TestFrameLowererPass, LowerComplexStackLayout)
     // Create multiple stack objects to simulate a large frame payload
     for (size_t i = 0; i < 16; ++i)
     {
-        frame->createLocalStackObj(t->i64());
+        frame->createStaticStackObj(t->i64());
     }
 
     MirInstructionBuilder iBuilder(getBuilderCtx(),
@@ -228,5 +228,53 @@ TEST_F(TestFrameLowererPass, LowerComplexStackLayout)
 
     verifier.verifyPrologue(func, layout);
     verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func);
+    verifier.verifyStackReferencesLowered(func, layout);
+}
+
+// =========================================================================
+// DYNAMIC ALLOCATION (DALLOC) LOWERING TEST
+// =========================================================================
+TEST_F(TestFrameLowererPass, LowerDynamicStackAllocation)
+{
+    const auto &t = getBuilderCtx()->getTypeTable();
+    MirFunctionBuilder funcBuilder(getBuilderCtx());
+    MirFunction *func = funcBuilder.build(t->getVoidType(), "LowerDynamicStackAllocation");
+
+    MirBlock *entryBlock = func->getEntryPoint();
+    MirInstructionBuilder iBuilder(getBuilderCtx(),
+                                   entryBlock,
+                                   InsertionType::InsertAfter,
+                                   entryBlock->getInstructions().begin());
+    MirOperandBuilder oBuilder(getBuilderCtx());
+
+    // Allocate virtual registers for dynamic size & pointer destination
+    MirRegister *dynPtr = oBuilder.buildVReg(t->getPtr(t->i32()), "dynPtr");
+    MirRegister *runtimeSize = oBuilder.buildVReg(t->i32(), "runtimeSize");
+
+    // Initialize runtime size variable (e.g. MOV %runtimeSize, 128)
+    iBuilder.MOV(runtimeSize, oBuilder.buildInt(t->i32(), FlexInt(128, 32)));
+
+    // Emit DALLOC instruction: %dynPtr = DALLOC %runtimeSize
+    iBuilder.DALLOC(dynPtr, runtimeSize);
+
+    // Emit a dummy RET instruction to close the block
+    iBuilder.RET();
+
+    // 1. Run Register Allocator Pass (Flags func->setHasDynamicAlloca(true) and reserves FP)
+    runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
+
+    // 2. Run Frame Lowerer Pass (Lowers DALLOC, calculates layout, inserts Prologue/Epilogue)
+    MirFrameLowererPass *framePass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
+    const FrameLayout &layout = framePass->getResult().m_layouts.at(func);
+
+    // 3. Verify Frame Lowerer execution using the updated verifiers
+    FrameLowererPassVerifier verifier(getBuilderCtx(), framePass);
+    verifier.verifyDAllocLowered(func, layout)
+            .verifyPrologue(func, layout)
+            .verifyEpilogue(func, layout)
+            .verifyStackReferencesLowered(func, layout);
+
+    // 4. Assert structural invariants
+    EXPECT_TRUE(layout.m_hasDynamicAllocs);
+    EXPECT_EQ(entryBlock->getInstructions().back()->getOpCode(), MirInstructionOpCode::RET);
 }

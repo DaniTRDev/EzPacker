@@ -40,7 +40,13 @@ class FrameLowererPassVerifier : public MirPassVerifier<MirFrameLowererPass, Fra
      * @param func Target function to verify.
      * @return Reference to self for method chaining.
      */
-    FrameLowererPassVerifier &verifyStackReferencesLowered(MirFunction *func);
+    FrameLowererPassVerifier &verifyStackReferencesLowered(MirFunction *func, const FrameLayout &layout);
+
+    /**
+     * Asserts that no DALLOC instructions remain, size alignment / SUB SP sequence was emitted,
+     * and that the function has enforce-FP flagged.
+     */
+    FrameLowererPassVerifier &verifyDAllocLowered(MirFunction *func, const FrameLayout &layout);
 
   private:
     MirBuilderContext *m_ctx;

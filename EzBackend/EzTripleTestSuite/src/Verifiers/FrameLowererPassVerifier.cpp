@@ -20,8 +20,10 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyPrologue(MirFunction *
     RegisterRef fpRegRef = cc->getFramePointerReg();
     RegisterRef spRegRef = cc->getStackPointerReg();
 
+    const bool useFramePointer = cc->hasFramePointer(func) || layout.m_hasDynamicAllocs;
+
     // 1. Verify Frame Pointer Setup: PUSH FP -> MOV FP, SP
-    if (cc->hasFramePointer(func))
+    if (useFramePointer)
     {
         EXPECT_NE(instIt, instructions.end()) << "Expected PUSH FP instruction in prologue.";
         MirInstruction *pushFpInstr = *instIt++;
@@ -45,16 +47,20 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyPrologue(MirFunction *
 
     // 2. Verify Callee-Saved Physical Register Pushes
     const auto &usedCalleeSaved = func->getUsedCalleeSavedRegs();
-    for (size_t i = 0; i < usedCalleeSaved.size(); ++i)
+    for (const auto &regRef : usedCalleeSaved)
     {
-        EXPECT_NE(instIt, instructions.end()) << "Expected PUSH instruction for callee-saved register at index " << i;
+        // Skip FP as it was explicitly verified in Step 1
+        if (useFramePointer && regRef == fpRegRef)
+            continue;
+
+        EXPECT_NE(instIt, instructions.end())
+                << "Expected PUSH instruction for callee-saved register %p" << regRef.getId();
         MirInstruction *pushInstr = *instIt++;
         MirInstructionVerifier(pushInstr).opcode(MirInstructionOpCode::PUSH).operandCount(1);
 
         MirRegister *pushedReg = pushInstr->getOperands()[0]->get<MirRegister>();
         EXPECT_FALSE(pushedReg->isVirtual()) << "Callee-saved register must be physical.";
-
-        EXPECT_EQ(pushedReg->getRef(), usedCalleeSaved[i]) << "Callee-saved register push mismatch at index " << i;
+        EXPECT_EQ(pushedReg->getRef(), regRef) << "Callee-saved register push mismatch.";
     }
 
     // 3. Verify Stack Payload Allocation: SUB SP, stackAllocSize
@@ -96,6 +102,7 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyEpilogue(MirFunction *
     const auto &usedCalleeSaved = func->getUsedCalleeSavedRegs();
     size_t stackAllocSize = layout.totalFrameSize - layout.calleeSavedAreaSize;
 
+    const bool useFramePointer = cc->hasFramePointer(func) || layout.m_hasDynamicAllocs;
     bool returnFound = false;
 
     for (MirBlock *block : func->getBlocks())
@@ -112,11 +119,30 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyEpilogue(MirFunction *
 
             // Compute expected instruction count before return
             size_t expectedEpilogueInstrs = 0;
-            if (stackAllocSize > 0)
-                expectedEpilogueInstrs += 1;                  // ADD SP, stackAllocSize (or MOV scratch + ADD)
-            expectedEpilogueInstrs += usedCalleeSaved.size(); // POP callee-saved
-            if (cc->hasFramePointer(func))
+
+            if (layout.m_hasDynamicAllocs)
+            {
+                // Dynamic Allocs: MOV SP, FP or LEA SP, [FP + offset]
+                expectedEpilogueInstrs += 1;
+            }
+            else if (stackAllocSize > 0)
+            {
+                // Fixed Frame: ADD SP, stackAllocSize
+                expectedEpilogueInstrs += 1;
+            }
+
+            // Callee-saved registers (excluding FP if already pushed/popped separately)
+            for (const auto &regRef : usedCalleeSaved)
+            {
+                if (useFramePointer && regRef == fpRegRef)
+                    continue;
+                expectedEpilogueInstrs += 1;
+            }
+
+            if (useFramePointer)
+            {
                 expectedEpilogueInstrs += 1; // POP FP
+            }
 
             // Move iterator back to the start of the epilogue sequence
             for (size_t i = 0; i < expectedEpilogueInstrs; ++i)
@@ -125,19 +151,24 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyEpilogue(MirFunction *
                 --prepIt;
             }
 
-            // 1. Verify Stack Payload Deallocation: ADD SP, stackAllocSize
-            if (stackAllocSize > 0)
+            // 1. Verify Stack Pointer Restoration (ADD SP, imm OR MOV/LEA SP, FP)
+            if (layout.m_hasDynamicAllocs || stackAllocSize > 0)
             {
-                MirInstruction *addInstr = *prepIt++;
-                MirInstructionVerifier(addInstr).opcode(MirInstructionOpCode::ADD).operandCount(2);
+                MirInstruction *spRestInstr = *prepIt++;
+                MirInstructionOpCode op = spRestInstr->getOpCode();
+                EXPECT_TRUE(op == MirInstructionOpCode::MOV || op == MirInstructionOpCode::LEA)
+                        << "Dynamic alloca epilogue must restore SP via MOV or LEA from FP.";
 
-                MirRegister *spReg = addInstr->getOperands()[0]->get<MirRegister>();
-                EXPECT_EQ(spReg->getRef(), spRegRef) << "ADD destination register must be stack pointer.";
+                MirRegister *spReg = spRestInstr->getOperands()[0]->get<MirRegister>();
+                EXPECT_EQ(spReg->getRef(), spRegRef) << "SP restoration destination register must be stack pointer.";
             }
 
             // 2. Verify Callee-Saved Registers Popped in REVERSE Order
             for (auto regIt = usedCalleeSaved.rbegin(); regIt != usedCalleeSaved.rend(); ++regIt)
             {
+                if (useFramePointer && *regIt == fpRegRef)
+                    continue;
+
                 MirInstruction *popInstr = *prepIt++;
                 MirInstructionVerifier(popInstr).opcode(MirInstructionOpCode::POP).operandCount(1);
 
@@ -147,7 +178,7 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyEpilogue(MirFunction *
             }
 
             // 3. Verify Frame Pointer Restoration: POP FP
-            if (cc->hasFramePointer(func))
+            if (useFramePointer)
             {
                 MirInstruction *popFpInstr = *prepIt++;
                 MirInstructionVerifier(popFpInstr).opcode(MirInstructionOpCode::POP).operandCount(1);
@@ -165,12 +196,14 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyEpilogue(MirFunction *
     return *this;
 }
 
-FrameLowererPassVerifier &FrameLowererPassVerifier::verifyStackReferencesLowered(MirFunction *func)
+FrameLowererPassVerifier &FrameLowererPassVerifier::verifyStackReferencesLowered(MirFunction *func,
+                                                                                 const FrameLayout &layout)
 {
     CallingConvDesc *cc = func->getCallingConv();
     EXPECT_NE(cc, nullptr);
 
-    RegisterRef expectedBaseReg = cc->hasFramePointer(func) ? cc->getFramePointerReg() : cc->getStackPointerReg();
+    const bool useFramePointer = cc->hasFramePointer(func) || layout.m_hasDynamicAllocs;
+    RegisterRef expectedBaseReg = useFramePointer ? cc->getFramePointerReg() : cc->getStackPointerReg();
 
     for (MirBlock *block : func->getBlocks())
     {
@@ -195,6 +228,59 @@ FrameLowererPassVerifier &FrameLowererPassVerifier::verifyStackReferencesLowered
                     const auto *memOp = op->get<MirMemory>();
                     EXPECT_EQ(memOp->getBase()->getRef(), expectedBaseReg)
                             << "Memory operand base register mismatch in instruction '" << instr->toString() << "'";
+                }
+            }
+        }
+    }
+
+    return *this;
+}
+
+FrameLowererPassVerifier &FrameLowererPassVerifier::verifyDAllocLowered(MirFunction *func, const FrameLayout &layout)
+{
+    CallingConvDesc *cc = func->getCallingConv();
+    EXPECT_NE(cc, nullptr) << "Function must have a valid CallingConvDesc.";
+
+    RegisterRef spRegRef = cc->getStackPointerReg();
+    RegisterRef fpRegRef = cc->getFramePointerReg();
+
+    for (MirBlock *block : func->getBlocks())
+    {
+        for (const MirInstruction *instr : block->getInstructions())
+        {
+            // 1. Assert NO DALLOC instructions remain in any basic block
+            EXPECT_NE(instr->getOpCode(), MirInstructionOpCode::DALLOC)
+                    << "Instruction in block #" << block->getId()
+                    << " still contains unlowered DALLOC opcode after FrameLowererPass!";
+
+            // 2. Validate SUB SP sequence (emitted for lowered dynamic allocations)
+            if (instr->getOpCode() == MirInstructionOpCode::SUB)
+            {
+                const auto &operands = instr->getOperands();
+                if (!operands.empty() && operands[0]->isOfType<MirRegister>())
+                {
+                    const auto *destReg = operands[0]->get<MirRegister>();
+                    if (destReg->getRef() == spRegRef)
+                    {
+                        // If SP is subtracted dynamically, function MUST have hasDynamicAlloca() flagged
+                        EXPECT_TRUE(layout.m_hasDynamicAllocs)
+                                << "Dynamic SUB SP instruction detected, but func->hasDynamicAlloca() is false!";
+                    }
+                }
+            }
+
+            // 3. Verify memory base registers use FP when hasDynamicAlloca() is true
+            if (layout.m_hasDynamicAllocs)
+            {
+                for (const MirOperand *op : instr->getOperands())
+                {
+                    if (op->isOfType<MirMemory>())
+                    {
+                        const auto *memOp = op->get<MirMemory>();
+                        EXPECT_EQ(memOp->getBase()->getRef(), fpRegRef)
+                                << "Memory operand in block #" << block->getId()
+                                << " uses SP instead of FP in a function with dynamic allocations!";
+                    }
                 }
             }
         }

@@ -1,6 +1,4 @@
 #include "EzTripleTestSuite.h"
-#include "../include/Verifiers/RegisterAllocatorPassVerifier.h"
-#include "RegisterAllocator/MirRegisterAllocatorPass.h"
 
 class TestRegisterAllocatorPass : public MirTripleTestSuiteAsGtest
 {
@@ -56,7 +54,9 @@ TEST_F(TestRegisterAllocatorPass, AllocateBasicVirtualRegisters)
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
             .verifyAllocationMappingComplete(ctx)
-            .verifyNoInterferenceConflicts(ctx);
+            .verifyNoInterferenceConflicts(ctx)
+            .verifyReservedRegistersNotAssigned(ctx)
+            .verifyFramePointerReservedOnDAlloc(ctx);
 }
 
 // =========================================================================
@@ -110,7 +110,9 @@ TEST_F(TestRegisterAllocatorPass, AllocateMixedGprAndFprRegisters)
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
             .verifyAllocationMappingComplete(ctx)
-            .verifyNoInterferenceConflicts(ctx);
+            .verifyNoInterferenceConflicts(ctx)
+            .verifyReservedRegistersNotAssigned(ctx)
+            .verifyFramePointerReservedOnDAlloc(ctx);
 }
 
 // =========================================================================
@@ -160,7 +162,9 @@ TEST_F(TestRegisterAllocatorPass, AllocateAcrossCallInstruction)
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
             .verifyAllocationMappingComplete(ctx)
-            .verifyNoInterferenceConflicts(ctx);
+            .verifyNoInterferenceConflicts(ctx)
+            .verifyReservedRegistersNotAssigned(ctx)
+            .verifyFramePointerReservedOnDAlloc(ctx);
 }
 
 // =========================================================================
@@ -218,7 +222,9 @@ TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRematerializatio
     RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
             .verifyAllocationMappingComplete(ctx)
-            .verifyNoInterferenceConflicts(ctx);
+            .verifyNoInterferenceConflicts(ctx)
+            .verifyReservedRegistersNotAssigned(ctx)
+            .verifyFramePointerReservedOnDAlloc(ctx);
 
     // Verify rematerialization optimization: zero stack spill slots created!
     EXPECT_EQ(func->getStackFrame()->getObjects().size(), 0);
@@ -288,7 +294,58 @@ TEST_F(TestRegisterAllocatorPass, ForceMemorySpillingForNonRematerializableValue
     verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
             .verifyAllocationMappingComplete(ctx)
             .verifyNoInterferenceConflicts(ctx)
-            .verifySpillingCorrectness(ctx, func->getBlocks());
+            .verifySpillingCorrectness(ctx, func->getBlocks())
+            .verifyReservedRegistersNotAssigned(ctx)
+            .verifyFramePointerReservedOnDAlloc(ctx);
 
     EXPECT_GT(func->getStackFrame()->getObjects().size(), 0);
+}
+
+// =========================================================================
+// 6. FRAME POINTER RESERVATION ON DYNAMIC ALLOCATION (DALLOC)
+// =========================================================================
+TEST_F(TestRegisterAllocatorPass, ForceFramePointerReservationOnDAlloc)
+{
+    const auto &t = getBuilderCtx()->getTypeTable();
+    MirFunctionBuilder funcBuilder(getBuilderCtx());
+    MirFunction *func = funcBuilder.build(t->getVoidType(), "ForceFramePointerReservationOnDAlloc");
+
+    MirBlock *entryBlock = func->getEntryPoint();
+    MirInstructionBuilder iBuilder(getBuilderCtx(),
+                                   entryBlock,
+                                   InsertionType::InsertAfter,
+                                   entryBlock->getInstructions().begin());
+    MirOperandBuilder oBuilder(getBuilderCtx());
+
+    MirRegister *dynPtr = oBuilder.buildVReg(t->getPtr(t->i32()), "dynPtr");
+    MirOperand *allocSize = oBuilder.buildInt(t->i32(), FlexInt(64, 32));
+
+    // Emit DALLOC instruction
+    iBuilder.DALLOC(dynPtr, allocSize);
+
+    RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
+
+    MirRegisterAllocatorPass *pass =
+            runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
+
+    LivenessAnalysisPass liveness(getBuilderCtx());
+    std::pmr::list<MirFunction *> funcList(getBuilderCtx()->getGlobalAllocator());
+    funcList.push_back(func);
+    auto it = funcList.begin();
+    liveness.run(funcList, it, getPassManager());
+    LivenessResult livenessRes = liveness.getResult();
+
+    getRegisterAllocator()->buildInterferenceGraph(&livenessRes, ctx);
+    getRegisterAllocator()->evaluateInterferenceGraphDegree(ctx);
+    getRegisterAllocator()->simplify(ctx);
+    getRegisterAllocator()->selectColors(ctx);
+
+    RegisterAllocatorPassVerifier verifier(getBuilderCtx(), pass);
+    verifier.verifyNoVirtualRegistersRemain(func->getBlocks())
+            .verifyAllocationMappingComplete(ctx)
+            .verifyNoInterferenceConflicts(ctx)
+            .verifyReservedRegistersNotAssigned(ctx)
+            .verifyFramePointerReservedOnDAlloc(ctx);
+
+    EXPECT_TRUE(ctx.m_needsFramePointer);
 }

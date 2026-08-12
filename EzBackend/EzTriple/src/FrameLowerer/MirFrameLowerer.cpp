@@ -50,8 +50,46 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
 
     auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
     log << "Calculated stack frame layout" << func->getSourceRef();
-    log.appendNote(std::format("Calle save size: {:X}", layout.calleeSavedAreaSize).c_str(), func->getSourceRef());
+    log.appendNote(std::format("Callee save size: {:X}", layout.calleeSavedAreaSize).c_str(), func->getSourceRef());
     log.appendNote(std::format("Total size: {:X}", layout.totalFrameSize).c_str(), func->getSourceRef());
+}
+
+void MirFrameLowerer::lowerAlloc(FrameLowererCtx &ctx)
+{
+    MirInstruction *instr = *ctx.m_allocIt;
+    if (instr->getOpCode() != MirInstructionOpCode::ALLOC)
+    {
+        ctx.m_ctx->getDiagCollector()->builder(Diag_Error, "MirFrameLowerer")
+                << "Given AllocLowererCtx does not have a valid ALLOC instruction";
+        return;
+    }
+
+    MirFunction *func = ctx.m_targetFunc;
+    MirOperand *dst = instr->getOperands()[0];
+    MirType *allocTypePtr = dst->getMirType();
+    MirType *allocType = allocTypePtr->getPointedType();
+
+    StackFrameObject *obj = func->getStackFrame()->createStaticStackObj(allocType);
+    MirInstructionBuilder iBuilder(ctx.m_ctx,
+                                   instr->getOwner(),
+                                   InsertionType::InsertBefore,
+                                   instr->getOwner()->getInstructions().begin());
+    MirOperandBuilder oBuilder(ctx.m_ctx);
+
+    MirInstruction *newInstr = iBuilder.LEA(instr->getSourceRef(), dst, oBuilder.buildRef(obj, instr->getSourceRef()));
+
+    auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
+    log << "Lowered ALLOC in function" << func->getSourceRef();
+    log.appendNote(
+            std::format("Original instr: {}", MirPrinter::printToString(instr, MirPrinterDetail::Detailed)).c_str(),
+            instr->getSourceRef());
+    log.appendNote(std::format("Assigned stack obj: {}", MirPrinter::printToString(obj)).c_str(),
+                   instr->getSourceRef());
+    log.appendNote(
+            std::format("New instr: {}", MirPrinter::printToString(newInstr, MirPrinterDetail::Detailed)).c_str(),
+            newInstr->getSourceRef());
+
+    instr->getOwner()->getInstructions().erase(ctx.m_allocIt);
 }
 
 void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
@@ -112,7 +150,7 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
                 }
             }
 
-            // Invalidate register allocation / use-def caches if operands were rewritten
+            // Invalidate use-def caches if operands were rewritten
             if (instructionModified)
             {
                 inst->invalidateCachedUsedAndDefs();
