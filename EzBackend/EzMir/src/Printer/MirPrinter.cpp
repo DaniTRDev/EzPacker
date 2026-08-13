@@ -220,7 +220,7 @@ std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail de
         }
     }
 
-    std::string result = std::format("  {:<12}{}", tier, instr->getMetadata().m_name);
+    std::string result = std::format("  {:<4}{:<12}", tier, instr->getMetadata().m_name);
 
     // Print operands
     auto operands = instr->getOperands();
