@@ -55,7 +55,7 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
     build(MirInstructionOpCode opcode, SourceReference *ref, const std::initializer_list<MirOperand *> &operands = {});
 
     /**
-     * Builds an instruction with the given opcode and inserts it with the insert point information.
+     * Builds an instruction with the given opcode, operands and inserts it with the insert point information.
      * @param opcode
      * @param ref
      * @param operands
@@ -65,6 +65,16 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
     build(MirInstructionOpCode opcode, SourceReference *ref, const std::vector<MirOperand *> &operands = {});
 
     /**
+     * Builds an instruction with the given opcode, operands and inserts it with the insert point information.
+     * @param opcode
+     * @param ref
+     * @param operands
+     * @return
+     */
+    MirInstruction *
+    build(MirInstructionOpCode opcode, SourceReference *ref, const std::pmr::vector<MirOperand *> &operands);
+
+    /**
      * Overload of the '<<' operator that allows pushing operands easily.
      * @param operand
      * @return
@@ -72,7 +82,7 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
     MirInstructionBuilder &operator<<(MirOperand *operand);
 
 // Define the macro to generate a method for each instruction. This one makes possible attaching a source ref.
-#define INSTRUCTION(NAME, category, ops, flags)                                                                        \
+#define INSTRUCTION(NAME, tier, category, ops, flags)                                                                  \
     template <typename... OperandTypes> MirInstruction *NAME(SourceReference *sourceRef, OperandTypes &&...operands)   \
     {                                                                                                                  \
         std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
@@ -84,7 +94,7 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
 #include "Instruction/MirInstructionSet.h"
 #undef INSTRUCTION
 
-#define INSTRUCTION(NAME, category, ops, flags)                                                                        \
+#define INSTRUCTION(NAME, tier, category, ops, flags)                                                                  \
     template <typename... OperandTypes> MirInstruction *NAME(OperandTypes &&...operands)                               \
     {                                                                                                                  \
         std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
@@ -101,7 +111,7 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
      * @param type
      */
     void changeInsertionType(InsertionType type);
-    
+
     /**
      * Sets the insertion point for the builder.
      * @param insertionPoint

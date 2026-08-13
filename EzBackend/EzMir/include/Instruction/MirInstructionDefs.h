@@ -1,7 +1,3 @@
-/**
- * @file MirInstructionDefs.h
- * @brief Compile-time instruction catalogue: opcodes, flags, categories, and metadata.
- */
 #ifndef EZPACKER_MIRINSTRUCTIONDEFS_H
 #define EZPACKER_MIRINSTRUCTIONDEFS_H
 
@@ -126,10 +122,18 @@ inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2St
     { MirCat_System, "MirCat_System" }
 };
 
+enum class MirInstructionTier : uint8_t
+{
+    HighLevel,    // Standard IR opcodes emitted by the frontend/IRBuilder (ADD, SUB, CALL, RET, etc.)
+    PassInternal, // Intermediate lowering opcodes generated/consumed by passes (PUSH_ARG, POP_ARG, PUSH_RET, POP_RET,
+                  // etc.)
+    TargetLow     // Target-selected hardware pseudo-opcodes emitted during ISel (TARGET_INST, etc.)
+};
+
 // --- OpCode Generation ---
 enum MirInstructionOpCode : uint16_t
 {
-#define INSTRUCTION(name, category, operands, flags) name,
+#define INSTRUCTION(name, tier, category, operands, flags) name,
 #include "MirInstructionSet.h"
 #undef INSTRUCTION
     OPCODE_COUNT
@@ -140,16 +144,19 @@ struct MirInstructionMetadata
 {
     MirInstructionCategory m_category;
     MirInstructionOpCode m_opcode;
+    MirInstructionTier m_tier;
     MirInstructionFlags m_flags;
     std::string_view m_name;
     std::vector<OperandConstraint> m_operandConstraints;
 
     MirInstructionMetadata(MirInstructionCategory category,
                            MirInstructionOpCode opcode,
+                           MirInstructionTier tier,
                            MirInstructionFlags flag,
                            std::string_view name,
                            std::initializer_list<OperandConstraint> operands) :
-        m_category(category), m_opcode(opcode), m_flags(flag), m_name(std::move(name)), m_operandConstraints(operands)
+        m_category(category), m_opcode(opcode), m_tier(tier), m_flags(flag), m_name(std::move(name)),
+        m_operandConstraints(operands)
     {
     }
 };
@@ -158,14 +165,14 @@ extern std::string StrToLower(const std::string &str);
 
 // --- Metadata Arrays ---
 inline const MirInstructionMetadata g_MirInstructionSet[] = {
-#define INSTRUCTION(name, category, operands, flags)                                                                   \
-    MirInstructionMetadata(MirInstructionCategory::category, name, flags, #name, operands),
+#define INSTRUCTION(name, tier, category, operands, flags)                                                             \
+    MirInstructionMetadata(MirInstructionCategory::category, name, tier, flags, #name, operands),
 #include "MirInstructionSet.h"
 #undef INSTRUCTION
 };
 
 inline std::map<std::string, MirInstructionOpCode> g_String2MirInstruction = {
-#define INSTRUCTION(name, category, operands, flags) { #name, name },
+#define INSTRUCTION(name, tier, category, operands, flags) { #name, name },
 #include "MirInstructionSet.h"
 #undef INSTRUCTION
 };

@@ -13,6 +13,11 @@ MirInstruction::MirInstruction(class MirBlock *owner,
 
 bool MirInstruction::hasOperands() const { return !m_operands.empty(); }
 
+bool MirInstruction::isSelected() const
+{
+    return m_opcode == MirInstructionOpCode::TARGET_INST && m_targetId != MIRID_INVALID;
+}
+
 bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstructionFlags::TreatAsSigned; }
 
 const char *MirInstruction::getOpCodeName() const { return getMetadata().m_name.data(); }
@@ -23,6 +28,8 @@ class MirBlock *MirInstruction::getOwner() { return m_owner; }
 
 MirInstructionOpCode MirInstruction::getOpCode() const { return m_opcode; }
 
+MirInstructionTier MirInstruction::getTier() const { return getMetadata().m_tier; }
+
 MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
 
 MirTargetInstructionId MirInstruction::getTargetId() const { return m_targetId; }
@@ -32,20 +39,24 @@ SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 void MirInstruction::addOperand(const MirOperand *operand)
 {
     m_operands.push_back((MirOperand *)operand);
-
-    m_cachedDefinedRegisters = false;
-    m_cachedUsedRegisters = false;
+    invalidateCachedUsedAndDefs();
 }
-
-void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
-
-void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
 
 void MirInstruction::invalidateCachedUsedAndDefs()
 {
     m_cachedDefinedRegisters = false;
     m_cachedUsedRegisters = false;
 }
+
+void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
+
+void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands)
+{
+    m_operands = operands;
+    invalidateCachedUsedAndDefs();
+}
+
+void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
 
 const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
 

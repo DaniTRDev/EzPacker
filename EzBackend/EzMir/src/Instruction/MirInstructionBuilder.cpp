@@ -107,6 +107,41 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     return instr;
 }
 
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
+                                             SourceReference *ref,
+                                             const std::pmr::vector<MirOperand *> &operands)
+{
+    std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
+    std::pmr::polymorphic_allocator alloc(arena);
+
+    // Construct in-place, passing the arena down to the instruction's internal PMR vector
+    MirInstruction *instr = alloc.new_object<MirInstruction>(m_insertionPoint.m_block,
+                                                             opcode,
+                                                             ref,
+                                                             std::pmr::vector<MirOperand *>(arena));
+    instr->setOperands(operands);
+
+    auto builder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirInstructionBuilder");
+    builder << ref << "Built instruction";
+    builder.appendNote(std::pmr::string(MirPrinter::printToString(instr, MirPrinterDetail::Detailed)), nullptr);
+
+    if (instr)
+    {
+        if (m_insertionPoint.m_type == InsertionType::InsertAfter)
+        {
+            auto nextIt = std::next(m_insertionPoint.m_iterator);
+            m_insertionPoint.m_block->getInstructions().insert(nextIt, instr);
+        }
+        else
+        {
+            m_insertionPoint.m_block->getInstructions().insert(m_insertionPoint.m_iterator, instr);
+        }
+    }
+
+    setBuildResult(instr);
+    return instr;
+}
+
 MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
 {
     if (!isBuilt() || !operand)

@@ -201,7 +201,26 @@ std::string MirPrinter::printToString(MirGlobalVar *globalVar, MirPrinterDetail 
 
 std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail detail)
 {
-    std::string result = std::format("  {:<12}", instr->getMetadata().m_name);
+    std::string_view tier = "HL";
+    switch (instr->getTier())
+    {
+        case MirInstructionTier::HighLevel:
+        {
+            break;
+        }
+        case MirInstructionTier::PassInternal:
+        {
+            tier = "INT";
+            break;
+        }
+        case MirInstructionTier::TargetLow:
+        {
+            tier = "TL";
+            break;
+        }
+    }
+
+    std::string result = std::format("  {:<12}{}", tier, instr->getMetadata().m_name);
 
     // Print operands
     auto operands = instr->getOperands();

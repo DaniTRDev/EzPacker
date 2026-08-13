@@ -45,6 +45,12 @@ class MirInstruction
     bool hasOperands() const;
 
     /**
+     * Returns true if this instruction is selected: m_opcode == MirInstructionOpCode::TARGET_INST AND m_targetId !=
+     * MIRID_INVALID.
+     */
+    bool isSelected() const;
+
+    /**
      * Returns `true` when the instruction's opcode is marked as signed in its metadata flags.
      * @return
      */
@@ -76,6 +82,11 @@ class MirInstruction
     MirInstructionOpCode getOpCode() const;
 
     /**
+     * Returns the tier of the instruction.
+     */
+    MirInstructionTier getTier() const;
+
+    /**
      * Returns the instruction flags from the opcode metadata.
      */
     MirInstructionFlags getFlags() const;
@@ -99,6 +110,11 @@ class MirInstruction
     void addOperand(const MirOperand *operand);
 
     /**
+     * Invalidates cached uses and defs by setting the booleans to false.
+     */
+    void invalidateCachedUsedAndDefs();
+
+    /**
      * Sets or switched the opcode of the instruction.
      * @param opcode
      */
@@ -111,9 +127,12 @@ class MirInstruction
     void setTargetId(MirTargetInstructionId id);
 
     /**
-     * Invalidates cached uses and defs by setting the booleans to false.
+     * Replaces the operands of this instruction with the ones given. Also invalidates cached defined and used
+     * registers.
+     *
+     * Caller must ensure that the resource that allocated operands is alive when using this object.
      */
-    void invalidateCachedUsedAndDefs();
+    void setOperands(const std::pmr::vector<MirOperand *> &operands);
 
     /**
      * Returns the immutable operand slice for this instruction.

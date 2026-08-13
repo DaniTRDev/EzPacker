@@ -20,6 +20,7 @@ InstructionSelectorPassVerifier &InstructionSelectorPassVerifier::verifyInstruct
     MirInstruction *instr = *it;
 
     EXPECT_NE(instr, nullptr) << "Instruction at index " << instructionIndex << " must not be null.";
+    EXPECT_TRUE(instr->isSelected()) << "Instruction at index " << instructionIndex << " is not selected";
     EXPECT_NE(instr->getTargetId(), MIRID_INVALID) << "Instruction at index " << instructionIndex << " ("
                                                    << instr->getOpCodeName() << ") does not have a target ID assigned.";
     EXPECT_EQ(instr->getTargetId(), expectedTargetId)

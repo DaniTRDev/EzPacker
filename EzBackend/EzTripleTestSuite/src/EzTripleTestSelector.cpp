@@ -1,4 +1,4 @@
-#include "../include/EzTripleTestSelector.h"
+#include "EzTripleTestSelector.h"
 
 void EzTripleTestSelector::create(MirBuilderContext *ctx, MirInstructionSelector *selector)
 {
@@ -50,10 +50,7 @@ void EzTripleTestSelector::create(MirBuilderContext *ctx, MirInstructionSelector
     ADD_RULE("store_f64", MirInstructionOpCode::STORE, ISelPreds::operandMirType(1, f64), TargetInst::MOVSDmr);
 
     // ALLOC
-    ADD_RULE("alloc_ptr",
-             MirInstructionOpCode::ALLOC,
-             ISelPreds::operandType(0, MirOperandType::Register),
-             TargetInst::LEA64r);
+    // Alloc WILL BE lowered during MirFrameLowererPass.
 
     // =========================================================================
     // 2. ARITHMETIC & LOGIC (ALU)
@@ -124,69 +121,24 @@ void EzTripleTestSelector::create(MirBuilderContext *ctx, MirInstructionSelector
     // =========================================================================
     auto catchAllPred = [](const SelectionContext &) -> bool { return true; };
 
-    builder.begin("jmp", MirInstructionOpCode::JMP)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JMP))
-            .dump();
-    builder.begin("je", MirInstructionOpCode::JE)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JE))
-            .dump();
-    builder.begin("jne", MirInstructionOpCode::JNE)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JNE))
-            .dump();
-    builder.begin("jg", MirInstructionOpCode::JG)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JG))
-            .dump();
-    builder.begin("jge", MirInstructionOpCode::JGE)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JGE))
-            .dump();
-    builder.begin("jl", MirInstructionOpCode::JL)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JL))
-            .dump();
-    builder.begin("jle", MirInstructionOpCode::JLE)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JLE))
-            .dump();
-    builder.begin("ja", MirInstructionOpCode::JA)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JA))
-            .dump();
-    builder.begin("jb", MirInstructionOpCode::JB)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::JB))
-            .dump();
+    ADD_RULE("jmp", MirInstructionOpCode::JMP, catchAllPred, TargetInst::JMP);
+    ADD_RULE("je", MirInstructionOpCode::JE, catchAllPred, TargetInst::JE);
+    ADD_RULE("jne", MirInstructionOpCode::JNE, catchAllPred, TargetInst::JNE);
+    ADD_RULE("jg", MirInstructionOpCode::JG, catchAllPred, TargetInst::JG);
+    ADD_RULE("jge", MirInstructionOpCode::JGE, catchAllPred, TargetInst::JGE);
+    ADD_RULE("jl", MirInstructionOpCode::JL, catchAllPred, TargetInst::JL);
+    ADD_RULE("jle", MirInstructionOpCode::JLE, catchAllPred, TargetInst::JLE);
+    ADD_RULE("ja", MirInstructionOpCode::JA, catchAllPred, TargetInst::JA);
+    ADD_RULE("jb", MirInstructionOpCode::JB, catchAllPred, TargetInst::JB);
 
-    ADD_RULE("push_arg", MirInstructionOpCode::PUSH_ARG, ISelPreds::operandMirType(1, i64), TargetInst::PUSH64r);
-    ADD_RULE("push_ret", MirInstructionOpCode::PUSH_RET, ISelPreds::operandMirType(1, i64), TargetInst::PUSH64r);
-    ADD_RULE("pop_arg", MirInstructionOpCode::POP_ARG, ISelPreds::operandMirType(1, i64), TargetInst::POP64r);
-    ADD_RULE("pop_ret", MirInstructionOpCode::POP_RET, ISelPreds::operandMirType(1, i64), TargetInst::POP64r);
+    ADD_RULE("push64", MirInstructionOpCode::PUSH, ISelPreds::operandMirType(1, i64), TargetInst::PUSH64r);
+    ADD_RULE("pop64", MirInstructionOpCode::POP, ISelPreds::operandMirType(1, i64), TargetInst::POP64r);
 
-    builder.begin("call", MirInstructionOpCode::CALL)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::CALL))
-            .dump();
-    builder.begin("ret", MirInstructionOpCode::RET)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::RET))
-            .dump();
-
-    builder.begin("nop", MirInstructionOpCode::NOP)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::NOP))
-            .dump();
-    builder.begin("halt", MirInstructionOpCode::HALT)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::HLT))
-            .dump();
-    builder.begin("syscall", MirInstructionOpCode::SYSCALL)
-            .pred(catchAllPred)
-            .act(SelectorActions::ManualAction(TargetInst::SYSCALL))
-            .dump();
+    ADD_RULE("call", MirInstructionOpCode::CALL, catchAllPred, TargetInst::CALL);
+    ADD_RULE("ret", MirInstructionOpCode::RET, catchAllPred, TargetInst::RET);
+    ADD_RULE("nop", MirInstructionOpCode::NOP, catchAllPred, TargetInst::NOP);
+    ADD_RULE("halt", MirInstructionOpCode::HALT, catchAllPred, TargetInst::HLT);
+    ADD_RULE("syscall", MirInstructionOpCode::SYSCALL, catchAllPred, TargetInst::SYSCALL);
 
 #undef ADD_RULE
 }
