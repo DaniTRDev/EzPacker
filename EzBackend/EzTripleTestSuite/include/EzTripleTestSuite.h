@@ -20,6 +20,11 @@ class EzTripleTestSuite : public EzMirTestSuite
 {
   public:
     /**
+     * Returns the target binary descriptor used for the test suite.
+     */
+    TargetBinaryDesc *getTargetBinaryDesc();
+
+    /**
      * Creates common pointers used in test cases. Also calls EzMirTestSuite::create.
      * @param workingPath
      */
@@ -29,6 +34,9 @@ class EzTripleTestSuite : public EzMirTestSuite
      * Frees everything of this test suite. Also calls EzMirTestSuite::destroy.
      */
     virtual void destroy() override;
+
+  private:
+    TargetBinaryDesc *m_targetBinaryDesc;
 };
 
 class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Test

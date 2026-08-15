@@ -17,7 +17,7 @@ TEST_F(TestFrameLowererPass, LowerEmptyLeafFunction)
                                    func->getEntryPoint()->getInstructions().begin());
     iBuilder.RET();
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
@@ -55,7 +55,7 @@ TEST_F(TestFrameLowererPass, LowerFunctionWithLocalVariablesAndSpills)
     iBuilder.STORE(stackRefSpill0, vReg2);
     iBuilder.RET();
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
@@ -88,7 +88,7 @@ TEST_F(TestFrameLowererPass, LowerCalleeSavedRegisters)
                                    func->getEntryPoint()->getInstructions().begin());
     iBuilder.RET();
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
@@ -131,7 +131,7 @@ TEST_F(TestFrameLowererPass, LowerMultipleReturnBlocks)
     thenBuilder.RET();
     elseBuilder.RET();
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
@@ -160,7 +160,7 @@ TEST_F(TestFrameLowererPass, LowerDynamicStackAllocation)
     iBuilder.DALLOC(dynPtr, runtimeSize);
     iBuilder.RET();
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getTargetDesc());
 
     MirFrameLowererPass *framePass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());

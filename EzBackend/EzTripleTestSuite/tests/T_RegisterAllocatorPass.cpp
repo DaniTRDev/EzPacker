@@ -32,7 +32,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateBasicVirtualRegisters)
     iBuilder.MOV(v1, oBuilder.buildInt(t->i32(), FlexInt(20, 32)));
     iBuilder.ADD(v0, v1);
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirRegisterAllocatorPass *pass = runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getTargetDesc());
 
     RegisterAllocatorCtx *ctx = pass->getResult().m_contexts.at(func);
@@ -60,22 +60,29 @@ TEST_F(TestRegisterAllocatorPass, AllocateMixedGprAndFprRegisters)
                                    entryBlock->getInstructions().begin());
     MirOperandBuilder oBuilder(getBuilderCtx());
 
-    MirRegister *intReg0 = oBuilder.buildVReg(t->i32(), "intVal0");
-    MirRegister *intReg1 = oBuilder.buildVReg(t->i32(), "intVal1");
-    MirRegister *floatReg0 = oBuilder.buildVReg(t->f64(), "fpVal0");
-    MirRegister *floatReg1 = oBuilder.buildVReg(t->f64(), "fpVal1");
+    MirRegister *int32Reg = oBuilder.buildVReg(t->i32(), "i32Val");
+    MirRegister *int64SmallReg = oBuilder.buildVReg(t->i64(), "i64SmallVal");
+    MirRegister *int64LargeReg = oBuilder.buildVReg(t->i64(), "i64LargeVal");
 
-    // Integer ops: MOV int0, 42 -> MOV int1, int0
-    iBuilder.MOV(intReg0, oBuilder.buildInt(t->i32(), FlexInt(42, 32)));
-    iBuilder.MOV(intReg1, intReg0);
+    MirRegister *fp32Reg = oBuilder.buildVReg(t->f32(), "f32Val");
+    MirRegister *fp64Reg = oBuilder.buildVReg(t->f64(), "f64Val");
 
-    // Floating point ops (2-operand: fp1 = fp1 + fp0):
-    // MOV fp0, 3.14159 -> MOV fp1, fp0 -> ADD fp1, fp0
-    iBuilder.MOV(floatReg0, oBuilder.buildFloat(t->f64(), FlexFloat(3.14159)));
-    iBuilder.MOV(floatReg1, floatReg0);
-    iBuilder.FADD(floatReg1, floatReg0);
+    // 32-bit Immediate -> Lowers to: MOV32ri
+    iBuilder.MOV(int32Reg, oBuilder.buildInt(t->i32(), FlexInt(42, 32)));
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    // 64-bit Small Immediate (fits in signed 32-bit) -> Lowers to: MOV64ri32
+    iBuilder.MOV(int64SmallReg, oBuilder.buildInt(t->i64(), FlexInt(1000, 64)));
+
+    // 64-bit Large Immediate (requires full 64-bit imm) -> Lowers to: MOVABS64ri
+    iBuilder.MOV(int64LargeReg, oBuilder.buildInt(t->i64(), FlexInt(uint64_t(0x1122334455667788ULL), 64)));
+
+    // 32-bit Float Immediate -> Lowers to: MOV32ri (to temp GPR32) -> MOVDtoFPR
+    iBuilder.MOV(fp32Reg, oBuilder.buildFloat(t->f32(), FlexFloat(3.14159f)));
+
+    // 64-bit Float Immediate -> Lowers to: MOVABS64ri (to temp GPR64) -> MOVQtoFPR
+    iBuilder.MOV(fp64Reg, oBuilder.buildFloat(t->f64(), FlexFloat(3.141592653589793)));
+
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirRegisterAllocatorPass *pass = runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getTargetDesc());
 
     RegisterAllocatorCtx *ctx = pass->getResult().m_contexts.at(func);
@@ -114,7 +121,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateAcrossCallInstruction)
     iBuilder.CALL(calleeTarget);
     iBuilder.ADD(liveAcross, oBuilder.buildInt(t->i32(), FlexInt(50, 32)));
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirRegisterAllocatorPass *pass = runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getTargetDesc());
 
     RegisterAllocatorCtx *ctx = pass->getResult().m_contexts.at(func);
@@ -161,7 +168,7 @@ TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRematerializatio
         iBuilder.ADD(accum, vregs[i]);
     }
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirRegisterAllocatorPass *pass = runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getTargetDesc());
 
     RegisterAllocatorCtx *ctx = pass->getResult().m_contexts.at(func);
@@ -222,7 +229,7 @@ TEST_F(TestRegisterAllocatorPass, ForceMemorySpillingForNonRematerializableValue
 
     iBuilder.RET();
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirRegisterAllocatorPass *pass = runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getTargetDesc());
 
     RegisterAllocatorCtx *ctx = pass->getResult().m_contexts.at(func);
@@ -258,7 +265,7 @@ TEST_F(TestRegisterAllocatorPass, ForceFramePointerReservationOnDAlloc)
     // Emit DALLOC instruction
     iBuilder.DALLOC(dynPtr, allocSize);
 
-    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
     MirRegisterAllocatorPass *pass = runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getTargetDesc());
 
     RegisterAllocatorCtx *ctx = pass->getResult().m_contexts.at(func);

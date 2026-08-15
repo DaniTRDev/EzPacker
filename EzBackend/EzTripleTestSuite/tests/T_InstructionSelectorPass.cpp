@@ -38,11 +38,12 @@ TEST_F(TestMirInstructionSelectorPass, SelectDataMovementAndMemory)
     iBuilder.STORE(memOp, vregF64);
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    MirInstructionSelectorPass *pass =
+            runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::MOV8rr)
-            .verifyInstructionSelected(block, 1, EzTestTriple::TargetInst::MOV32rr)
+    verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::MOV8ri)
+            .verifyInstructionSelected(block, 1, EzTestTriple::TargetInst::MOV32ri)
             .verifyInstructionSelected(block, 2, EzTestTriple::TargetInst::MOV64rm)
             .verifyInstructionSelected(block, 3, EzTestTriple::TargetInst::MOVSDmr);
 
@@ -75,7 +76,8 @@ TEST_F(TestMirInstructionSelectorPass, SelectAluOperations)
     addTestInstructionRegReg(MirInstructionOpCode::IDIV, t->i64(), t->i64());
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    MirInstructionSelectorPass *pass =
+            runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::ADD32rr)
@@ -123,7 +125,8 @@ TEST_F(TestMirInstructionSelectorPass, SelectCastingAndControlFlow)
     iBuilder.JMP(oBuilder.buildRef(getTestFunc()->getEntryPoint()));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    MirInstructionSelectorPass *pass =
+            runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::MOVZX32rr8)
@@ -158,7 +161,8 @@ TEST_F(TestMirInstructionSelectorPass, SelectCallRetAndSystem)
     iBuilder.RET();
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
+    MirInstructionSelectorPass *pass =
+            runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetBinaryDesc(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::CALL)
