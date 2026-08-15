@@ -3,17 +3,15 @@
 using namespace EzTestTriple;
 
 int64_t EzTestTripleFrameLowerer::calculateStaticFrameAdjustment(const MirFunctionAnalysisData *analysisData,
-                                                                 size_t stackAlign) const
+                                                                 size_t /*stackAlign*/) const
 {
     if (!analysisData)
         return 0;
 
-    int64_t rawPayload = static_cast<int64_t>(analysisData->m_totalFrameSize - analysisData->m_calleeSavedAreaSize);
-    if (rawPayload <= 0)
-        return 0;
+    int64_t rawPayload = static_cast<int64_t>(analysisData->m_totalFrameSize) -
+            static_cast<int64_t>(analysisData->m_calleeSavedAreaSize);
 
-    int64_t mask = static_cast<int64_t>(stackAlign - 1);
-    return (rawPayload + mask) & ~mask;
+    return (rawPayload > 0) ? rawPayload : 0;
 }
 
 void EzTestTripleFrameLowerer::insertPrologue(FrameLowererCtx &ctx)
@@ -59,8 +57,7 @@ void EzTestTripleFrameLowerer::insertPrologue(FrameLowererCtx &ctx)
         if (useFramePointer && physRegRef == fpRef)
             continue;
 
-        MirRegister *savedReg = oBuilder.buildPhysReg(i64Type, physRegRef.getId());
-        savedReg->setClass(gpr64);
+        MirRegister *savedReg = oBuilder.buildPhysReg(i64Type, physRegRef.getId(), "", physRegRef.getClass());
         iBuilder.buildTarget(TargetInst::PUSH64r, srcRef, { savedReg });
     }
 
@@ -108,7 +105,7 @@ void EzTestTripleFrameLowerer::insertEpilogue(FrameLowererCtx &ctx)
         {
             MirInstruction *inst = *it;
             const bool isRet =
-                    inst->getFlags() & MirInstructionFlags::IsReturn || inst->getTargetDesc() == TargetInst::RET;
+                    (inst->getFlags() & MirInstructionFlags::IsReturn) || inst->getTargetDesc() == TargetInst::RET;
 
             if (!isRet)
                 continue;

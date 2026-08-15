@@ -20,11 +20,6 @@ class EzTripleTestSuite : public EzMirTestSuite
 {
   public:
     /**
-     * Returns the register allocator.
-     */
-    MirRegisterAllocator *getRegisterAllocator();
-
-    /**
      * Creates common pointers used in test cases. Also calls EzMirTestSuite::create.
      * @param workingPath
      */
@@ -34,9 +29,6 @@ class EzTripleTestSuite : public EzMirTestSuite
      * Frees everything of this test suite. Also calls EzMirTestSuite::destroy.
      */
     virtual void destroy() override;
-
-  private:
-    std::shared_ptr<MirRegisterAllocator> m_regAllocator;
 };
 
 class MirTripleTestSuiteAsGtest : public EzTripleTestSuite, public ::testing::Test

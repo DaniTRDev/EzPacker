@@ -230,7 +230,7 @@ std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail /*
             tier = "INT";
             break;
         case MirInstructionTier::TargetLow:
-            tier = "TL ";
+            tier = "TL";
             break;
     }
 
@@ -274,7 +274,7 @@ std::string MirPrinter::printToString(MirOperand *operand) { return operand ? op
 std::string MirPrinter::printToString(const RegisterRef &ref)
 {
     char prefix = ref.isVirtual() ? 'v' : 'p';
-    const char *className = ref.getClass() ? ref.getClass()->getName() : "unassigned";
+    const char *className = ref.getClass() ? ref.getClass()->getName() : "unselected";
     return std::format("%{}{}({})", prefix, ref.getId(), className);
 }
 

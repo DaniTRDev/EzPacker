@@ -43,6 +43,11 @@ class TargetDesc
     virtual class MirLegalizer *getLegalizer() = 0;
 
     /**
+     * Returns the register allocator needed for this target.
+     */
+    virtual class MirRegisterAllocator *getRegisterAllocator() = 0;
+
+    /**
      * Returns the displacement's type of a memory operand.
      */
     virtual MirType *getMemOperandDisplacementType() = 0;

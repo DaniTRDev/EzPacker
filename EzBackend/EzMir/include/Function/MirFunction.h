@@ -13,7 +13,7 @@
 struct MirFunctionAnalysisData
 {
     bool m_hasCalls{ false };         // Set by AbiLowererPass.
-    bool m_hasDynamicAllocs{ false }; // Set by FrameLowererPass.
+    bool m_hasDynamicAllocs{ false }; // Set by RegisterAllocator OR FrameLowererPass.
 
     // Total size (in bytes) occupied by pushed callee-saved registers.
     size_t m_calleeSavedAreaSize = 0; // Set by FrameLowererPass.

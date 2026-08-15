@@ -142,8 +142,8 @@ TEST_F(TestLegalizeCallAct, TestSretCallLegalization)
     MirOperandBuilder opBuilder(getBuilderCtx());
     MirFunctionBuilder functionBuilder(getBuilderCtx());
 
-    // Force a type that triggers the SRET path (wider than 64 bits)
-    MirType *wideStructType = t->i128();
+    // Force a type that exceeds 128 bits so canReturnInRegs() returns false
+    MirType *wideStructType = t->i256();
 
     functionBuilder.buildParam(t->i32(), "userArg0");
     MirFunction *func = functionBuilder.build(wideStructType);
@@ -153,21 +153,19 @@ TEST_F(TestLegalizeCallAct, TestSretCallLegalization)
                                   InsertionType::InsertAfter,
                                   func->getEntryPoint()->getInstructions().begin());
 
-    // Virtual destination register where the high-level code expects the output struct payload
+    // Virtual destination register for the output struct
     MirRegister *destReg = opBuilder.buildVReg(wideStructType, "sret_dest_var");
 
-    // The original standard high-level layout array: [destReg, calleeRef, userArg0]
     std::vector<MirOperand *> expectedOrigOperands{ destReg,
                                                     opBuilder.buildRef(func),
                                                     opBuilder.buildInt(t->i32(), FlexInt(77, 32)) };
 
-    // Build standard high-level CALL: CALL %destReg, %func, %arg
-    auto callInstr = builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1], expectedOrigOperands[2]);
+    // Build CALL: CALL %destReg, %func, %arg
+    builder.CALL(expectedOrigOperands[0], expectedOrigOperands[1], expectedOrigOperands[2]);
 
-    // Execute the legalizer pass over the block stream
     MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getTargetDesc());
     LegalizeCallActionVerifier verifier(getBuilderCtx(), pass);
 
-    // Assert: ALLOC, PUSH_ARG sret_ptr, PUSH_ARG user_arg, CALL call_token, callee (No POP_RET)
+    // Verifies: ALLOC, PUSH_ARG %token, %sret_ptr, PUSH_ARG %token, %user_arg, CALL %token, %func
     verifier.verifySretCallSequence(func->getEntryPoint()->getInstructions().begin(), expectedOrigOperands);
 }

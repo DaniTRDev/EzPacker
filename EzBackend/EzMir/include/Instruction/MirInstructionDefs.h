@@ -127,7 +127,7 @@ enum class MirInstructionTier : uint8_t
     HighLevel,    // Standard IR opcodes emitted by the frontend/IRBuilder (ADD, SUB, CALL, RET, etc.)
     PassInternal, // Intermediate lowering opcodes generated/consumed by passes (PUSH_ARG, POP_ARG, PUSH_RET, POP_RET,
                   // etc.)
-    TargetLow     // Target-selected hardware pseudo-opcodes emitted during ISel (TARGET_INST, etc.)
+    TargetLow // For selected (by ISel) instructions.
 };
 
 // --- OpCode Generation ---

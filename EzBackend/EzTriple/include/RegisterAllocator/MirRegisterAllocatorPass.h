@@ -5,13 +5,21 @@
 #include "MirRegisterAllocator.h"
 #include "InstructionSelector/MirInstructionSelectorPass.h"
 
+struct MirRegisterAllocatorPassResult
+{
+    std::pmr::unordered_map<MirFunction *, RegisterAllocatorCtx *> m_contexts;
+    std::pmr::unordered_set<MirFunction *> m_resolvedFunctions;
+
+    MirRegisterAllocatorPassResult(std::pmr::memory_resource *alloc) : m_contexts(alloc), m_resolvedFunctions(alloc) {}
+};
+
 class MirRegisterAllocatorPass : public IMirTransformPass
 {
   public:
     /**
-     * Creates the pass linked to the given builder context, register allocator, and target descriptor.
+     * Creates the pass linked to the given builder context and target descriptor.
      */
-    MirRegisterAllocatorPass(MirBuilderContext *ctx, MirRegisterAllocator *regAllocator, TargetDesc *targetDesc);
+    MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc);
 
     /**
      * Returns "RegisterAllocatorPass".
@@ -37,9 +45,19 @@ class MirRegisterAllocatorPass : public IMirTransformPass
                       class MirPassManager *passManager) override;
 
     /**
+     * Returns the result structure of this pass.
+     */
+    const MirRegisterAllocatorPassResult &getResult() const;
+
+    /**
      * Prints the pass result to the diag collector. In this case, it just prints the modified funcs.
      */
     void printResult() const override;
+
+    /**
+     * Clears the resolved function list and the allocator context.
+     */
+    void reset() override;
 
     /**
      * This pass depends on instruction selection and LivenessAnalysisPass.
@@ -49,8 +67,8 @@ class MirRegisterAllocatorPass : public IMirTransformPass
   private:
     MirBuilderContext *m_ctx;
     MirRegisterAllocator *m_regAllocator;
+    MirRegisterAllocatorPassResult m_result;
     TargetDesc *m_targetDesc;
-    std::pmr::vector<MirFunction *> m_resolvedFunctions;
 };
 
 #endif // EZPACKER_REGISTERALLOCATORPASS_H

@@ -79,4 +79,7 @@ void EzTestTripleTargetDesc::initialize()
     // 6. Initialize Instruction Selector
     m_instructionSelector = alloc.new_object<MirInstructionSelector>(m_ctx);
     EzTestTriple::CreateInstructionSelector(m_ctx, m_instructionSelector);
+
+    // 7. Initialize Register Allocator
+    m_registerAllocator = alloc.new_object<EzTestTripleRegisterAllocator>();
 }

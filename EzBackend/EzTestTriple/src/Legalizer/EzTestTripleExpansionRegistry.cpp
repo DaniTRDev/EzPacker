@@ -41,11 +41,11 @@ void CreateExpansionRegistry(MirExpansionRuleRegistry *registry)
     // Low 64-bit chunk at base, High 64-bit chunk at base + 8
     ExpansionRuleBuilder(registry, Op::LOAD)
             .emit(Op::LOAD, { O::dstLo(), O::MemHalf(Type::SrcLow, 0, 0) })
-            .emit(Op::LOAD, { O::dstHi(), O::MemHalf(Type::SrcLow, 0, 8) });
+            .emit(Op::LOAD, { O::dstHi(), O::MemHalf(Type::SrcLow, 1, 0) });
 
     ExpansionRuleBuilder(registry, Op::STORE)
             .emit(Op::STORE, { O::MemHalf(Type::DestLow, 0, 0), O::srcLo() })
-            .emit(Op::STORE, { O::MemHalf(Type::DestLow, 0, 8), O::scrHi() });
+            .emit(Op::STORE, { O::MemHalf(Type::DestLow, 1, 0), O::scrHi() });
 
     // =========================================================================
     // 3. ARITHMETIC & LOGIC (ALU)

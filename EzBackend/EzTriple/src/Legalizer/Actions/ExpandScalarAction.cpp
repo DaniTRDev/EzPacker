@@ -233,7 +233,6 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
                     MirOperand *baseOp =
                             (recipeOp.m_memOperand.m_base == ExpansionOperandType::SrcLow) ? srcLo : destLo;
 
-                    // Linear stride offset: factor * sizeof(halfType) + displacement
                     int64_t halfSizeInBytes = static_cast<int64_t>(halfType->getTotalSizeInBits() / 8);
                     int64_t stride = recipeOp.m_memOperand.m_scaleHalfFactor * halfSizeInBytes;
                     int64_t finalOffset = stride + recipeOp.m_memOperand.m_displ;
@@ -241,17 +240,17 @@ LegalizationResult ExpandScalar(LegalizeCtx &ctx)
                     if (baseOp && baseOp->isOfType<MirMemory>())
                     {
                         MirMemory *origMem = baseOp->get<MirMemory>();
-                        FlexInt displ = origMem->getDisplacement()->getValue();
-                        resolvedOp = opBuilder.buildMem(halfType,
-                                                        origMem->getBase(),
-                                                        FlexInt(finalOffset) + displ,
-                                                        origMem->getSourceRef());
+                        FlexInt origDispl = origMem->getDisplacement()->getValue();
+                        FlexInt newDispl = origDispl + FlexInt(finalOffset, origDispl.getBitSize());
+
+                        resolvedOp =
+                                opBuilder.buildMem(halfType, origMem->getBase(), newDispl, origMem->getSourceRef());
                     }
-                    else if (baseOp)
+                    else if (baseOp && baseOp->isOfType<MirRegister>())
                     {
                         resolvedOp = opBuilder.buildMem(halfType,
                                                         baseOp->get<MirRegister>(),
-                                                        FlexInt(finalOffset),
+                                                        FlexInt(finalOffset, 64),
                                                         baseOp->getSourceRef());
                     }
                     break;

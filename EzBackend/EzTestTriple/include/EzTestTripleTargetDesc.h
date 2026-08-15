@@ -7,6 +7,7 @@
 #include "InstructionSelector/EzTestTripleInstructionSelector.h"
 #include "Legalizer/EzTestTripleExpansionRegistry.h"
 #include "Legalizer/EzTestTripleLegalizer.h"
+#include "RegisterAllocator/EzTestTripleRegisterAllocator.h"
 #include "RegisterBanks/EzTestTripleRegisterBanks.h"
 #include "Type/EzTestTripleTypeLayout.h"
 
@@ -27,6 +28,7 @@ class EzTestTripleTargetDesc : public TargetDesc
     MirFrameLowerer *getFrameLowerer() override { return m_frameLowerer; }
     MirInstructionSelector *getInstructionSelector() override { return m_instructionSelector; }
     MirLegalizer *getLegalizer() override { return m_legalizer; }
+    MirRegisterAllocator *getRegisterAllocator() override { return m_registerAllocator; }
 
     MirType *getMemOperandDisplacementType() override;
     MirType *getNearestLegalType(MirType *type) override;
@@ -46,6 +48,7 @@ class EzTestTripleTargetDesc : public TargetDesc
 
     EzTestTripleTypeLayout m_typeLayout;
     EzTestTripleFrameLowerer *m_frameLowerer{ nullptr };
+    EzTestTripleRegisterAllocator *m_registerAllocator{ nullptr };
     MirExpansionRuleRegistry *m_expansionRegistry{ nullptr };
     MirLegalizer *m_legalizer{ nullptr };
     MirInstructionSelector *m_instructionSelector{ nullptr };

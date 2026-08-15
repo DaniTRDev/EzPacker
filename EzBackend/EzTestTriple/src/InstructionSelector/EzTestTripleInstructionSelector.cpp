@@ -503,8 +503,8 @@ void CreateInstructionSelector(MirBuilderContext *ctx, MirInstructionSelector *s
 
     ADD_RULE("push64", MirInstructionOpCode::PUSH, ISelPreds::operandMirType(0, i64), TargetInst::PUSH64r, gpr64);
     ADD_RULE("pop64", MirInstructionOpCode::POP, ISelPreds::operandMirType(0, i64), TargetInst::POP64r, gpr64);
+    ADD_RULE("call", MirInstructionOpCode::CALL, catchAllPred, TargetInst::CALL, gpr64);
 
-    ADD_RULE_NOREG("call", MirInstructionOpCode::CALL, catchAllPred, TargetInst::CALL);
     ADD_RULE_NOREG("ret", MirInstructionOpCode::RET, catchAllPred, TargetInst::RET);
     ADD_RULE_NOREG("nop", MirInstructionOpCode::NOP, catchAllPred, TargetInst::NOP);
     ADD_RULE_NOREG("halt", MirInstructionOpCode::HALT, catchAllPred, TargetInst::HLT);

@@ -35,10 +35,10 @@ MirPassResult MirFrameLowererPass::run(std::pmr::list<MirFunction *> &funcList,
             MirInstruction *instr = *it;
             ctx.m_allocIt = it;
 
-            if (instr->getOpCode() == MirInstructionOpCode::ALLOC)
-                lowerer->lowerAlloc(ctx);
-            else if (instr->getOpCode() == MirInstructionOpCode::DALLOC)
+            if (!lowerer->lowerAlloc(ctx))
+            {
                 lowerer->lowerDAlloc(ctx);
+            }
 
             it++;
         }

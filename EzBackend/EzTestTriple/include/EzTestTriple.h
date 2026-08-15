@@ -14,6 +14,8 @@
 #include "Legalizer/EzTestTripleExpansionRegistry.h"
 #include "Legalizer/EzTestTripleLegalizer.h"
 
+#include "RegisterAllocator/EzTestTripleRegisterAllocator.h"
+
 #include "RegisterBanks/EzTestTripleRegisterBanks.h"
 
 #include "Type/EzTestTripleTypeLayout.h"

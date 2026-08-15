@@ -1,18 +1,8 @@
 #include "EzTripleTestSuite.h"
 
-MirRegisterAllocator *EzTripleTestSuite::getRegisterAllocator() { return m_regAllocator.get(); }
+void EzTripleTestSuite::create(const std::filesystem::path &workingPath) { EzMirTestSuite::create(workingPath); }
 
-void EzTripleTestSuite::create(const std::filesystem::path &workingPath)
-{
-    EzMirTestSuite::create(workingPath);
-    m_regAllocator = std::make_shared<MirRegisterAllocator>();
-}
-
-void EzTripleTestSuite::destroy()
-{
-    m_regAllocator.reset();
-    EzMirTestSuite::destroy();
-}
+void EzTripleTestSuite::destroy() { EzMirTestSuite::destroy(); }
 
 void MirTripleTestSuiteAsGtest::SetUp()
 {

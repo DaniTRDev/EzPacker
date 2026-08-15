@@ -11,6 +11,7 @@ set(EZTESTTRIPLE_FILES_LIST
         "include/InstructionSelector/EzTestTripleInstructionSetDefs.h"
         "include/Legalizer/EzTestTripleExpansionRegistry.h"
         "include/Legalizer/EzTestTripleLegalizer.h"
+        "include/RegisterAllocator/EzTestTripleRegisterAllocator.h"
         "include/RegisterBanks/EzTestTripleRegisterBanks.h"
         "include/Type/EzTestTripleTypeLayout.h"
 
@@ -21,6 +22,7 @@ set(EZTESTTRIPLE_FILES_LIST
         "src/InstructionSelector/EzTestTripleInstructionSet.cpp"
         "src/Legalizer/EzTestTripleExpansionRegistry.cpp"
         "src/Legalizer/EzTestTripleLegalizer.cpp"
+        "src/RegisterAllocator/EzTestTripleRegisterAllocator.cpp"
         "src/RegisterBanks/EzTestTripleRegisterBanks.cpp"
         "src/Type/EzTestTripleTypeLayout.cpp"
 )

@@ -18,28 +18,28 @@ class RegisterAllocatorPassVerifier : public MirPassVerifier<MirRegisterAllocato
      * Asserts that every virtual register in the interference graph was either assigned a physical
      * register or recorded in m_spilledRegs.
      */
-    RegisterAllocatorPassVerifier &verifyAllocationMappingComplete(const RegisterAllocatorCtx &allocCtx);
+    RegisterAllocatorPassVerifier &verifyAllocationMappingComplete(RegisterAllocatorCtx *allocCtx);
 
     /**
      * Asserts that no two interfering nodes in the graph share the same physical register color.
      */
-    RegisterAllocatorPassVerifier &verifyNoInterferenceConflicts(const RegisterAllocatorCtx &allocCtx);
+    RegisterAllocatorPassVerifier &verifyNoInterferenceConflicts(RegisterAllocatorCtx *allocCtx);
 
     /**
      * Asserts that spilled registers have valid stack slots and corresponding spill code (LOAD/STORE).
      */
-    RegisterAllocatorPassVerifier &verifySpillingCorrectness(const RegisterAllocatorCtx &allocCtx,
+    RegisterAllocatorPassVerifier &verifySpillingCorrectness(RegisterAllocatorCtx *allocCtx,
                                                              const std::pmr::list<MirBlock *> &blockList);
 
     /**
      * Asserts that no virtual register was allocated to any physical register marked in m_reservedRegs.
      */
-    RegisterAllocatorPassVerifier &verifyReservedRegistersNotAssigned(const RegisterAllocatorCtx &allocCtx);
+    RegisterAllocatorPassVerifier &verifyReservedRegistersNotAssigned(RegisterAllocatorCtx *allocCtx);
 
     /**
      * Asserts that if m_needsFramePointer is active, the calling convention's FP register is present in m_reservedRegs.
      */
-    RegisterAllocatorPassVerifier &verifyFramePointerReservedOnDAlloc(const RegisterAllocatorCtx &allocCtx);
+    RegisterAllocatorPassVerifier &verifyFramePointerReservedOnDAlloc(RegisterAllocatorCtx *allocCtx);
 
   private:
     MirBuilderContext *m_ctx;
