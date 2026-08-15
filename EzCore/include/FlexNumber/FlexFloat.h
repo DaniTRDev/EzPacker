@@ -198,6 +198,18 @@ class FlexFloat
     FlexFloat &operator/=(const FlexFloat &other);
 
     /**
+     * Returns the current value as a double. If number is bigger|smaller (float, float128) ROUNDING is used so it may
+     * become INF.
+     */
+    double getDouble() const;
+
+    /**
+     * Returns the current value as a float. If number is bigger|smaller (float16, double) ROUNDING is used so it may
+     * become INF.
+     */
+    float getFloat() const;
+
+    /**
      * Returns the configured tracking bit size of this float container representation (e.g., 32, 64, 128, 256).
      * @return Total structural bit architecture layout parameter size.
      */

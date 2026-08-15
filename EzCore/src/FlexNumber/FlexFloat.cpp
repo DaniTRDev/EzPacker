@@ -248,6 +248,22 @@ FlexFloat &FlexFloat::operator/=(const FlexFloat &other)
     return *this;
 }
 
+double FlexFloat::getDouble() const
+{
+    double currentVal = 0;
+    libbf::bf_get_float64(&m_number, &currentVal, libbf::BF_RNDN);
+
+    return currentVal;
+}
+
+float FlexFloat::getFloat() const
+{
+    double currentVal = 0;
+    libbf::bf_get_float64(&m_number, &currentVal, libbf::BF_RNDN);
+
+    return static_cast<float>(currentVal);
+}
+
 size_t FlexFloat::getBitSize() const { return m_bitWidth; }
 
 libbf::limb_t FlexFloat::getPrecBits() const
