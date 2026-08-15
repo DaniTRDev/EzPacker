@@ -1,12 +1,10 @@
 set(EZCODEEMITTER_FILES_LIST
-        "include/CodeEmitter.h"
-        "include/CodeEmitterRuleBuilder.h"
+        "include/CodeEmitterContext.h"
         "include/EzCodeEmitter.h"
         "include/EzCodeEmitterCommon.h"
         "include/GenericCodeEmitter.h"
 
-        "src/CodeEmitter.cpp"
-        "src/CodeEmitterRuleBuilder.cpp"
+        "src/CodeEmitterContext.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzCodeEmitter"

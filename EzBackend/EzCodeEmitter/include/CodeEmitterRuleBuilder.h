@@ -1,8 +1,0 @@
-#ifndef EZPACKER_CODEEMITTER_RULE_BUILDER_H
-#define EZPACKER_CODEEMITTER_RULE_BUILDER_H
-
-#include "EzCodeEmitterCommon.h"
-#include "CodeEmitter.h"
-
-
-#endif // EZPACKER_CODEEMITTER_RULE_BUILDER_H
