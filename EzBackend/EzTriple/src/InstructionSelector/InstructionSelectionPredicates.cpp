@@ -8,14 +8,10 @@ InstructionSelPred _not(const InstructionSelPred &pred)
     return [pred](const SelectionContext &sCtx) -> bool { return !pred(sCtx); };
 }
 
-InstructionSelPred _and(const InstructionSelPred &pred1, const InstructionSelPred &pred2)
+InstructionSelPred codeModel(CodeModel expected)
 {
-    return [pred1, pred2](const SelectionContext &sCtx) -> bool { return pred1(sCtx) && pred2(sCtx); };
-}
-
-InstructionSelPred _or(const InstructionSelPred &pred1, const InstructionSelPred &pred2)
-{
-    return [pred1, pred2](const SelectionContext &sCtx) -> bool { return pred1(sCtx) || pred2(sCtx); };
+    return [expected](const SelectionContext &ctx) -> bool
+    { return ctx.m_targetBinaryDesc->getCodeModel() == expected; };
 }
 
 InstructionSelPred opcode(MirInstructionOpCode opcode)
@@ -24,6 +20,23 @@ InstructionSelPred opcode(MirInstructionOpCode opcode)
     {
         MirInstruction *instr = *sCtx.m_it;
         return instr->getOpCode() == opcode;
+    };
+}
+
+InstructionSelPred operandIsGlobalRef(size_t index)
+{
+    return [index](const SelectionContext &ctx) -> bool
+    {
+        MirInstruction *instr = *ctx.m_it;
+        const auto &operands = instr->getOperands();
+
+        if (operands.size() <= index)
+            return false;
+
+        MirOperand *op = operands[index];
+        MirReference *ref = op->get<MirReference>();
+
+        return ref && (ref->isGlobalVar() || ref->isFunction() || ref->isGlobalArrayElem());
     };
 }
 

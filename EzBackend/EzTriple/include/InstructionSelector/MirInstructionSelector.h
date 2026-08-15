@@ -2,6 +2,7 @@
 #define EZPACKER_MIRINSTRUCTIONSELECTOR_H
 
 #include "EzTripleCommon.h"
+#include "Descriptors/TargetBinaryDesc.h"
 
 /**
  * Simple wrapper that holds everything needed by the selector.
@@ -9,6 +10,8 @@
 struct SelectionContext
 {
     MirBuilderContext *m_ctx;
+    TargetBinaryDesc *m_targetBinaryDesc;
+
     std::pmr::list<MirInstruction *> &m_instrList;
     std::pmr::list<MirInstruction *>::iterator m_it;
 };

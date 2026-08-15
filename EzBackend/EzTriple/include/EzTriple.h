@@ -18,6 +18,7 @@
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 
 #include "Descriptors/TargetDesc.h"
+#include "Descriptors/TargetBinaryDesc.h"
 
 #include "FrameLowerer/MirFrameLowerer.h"
 #include "FrameLowerer/MirFrameLowererPass.h"

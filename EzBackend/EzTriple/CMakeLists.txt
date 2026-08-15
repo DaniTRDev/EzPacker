@@ -6,6 +6,7 @@ set(EZTRIPLE_FILES_LIST
         "include/FrameLowerer/MirFrameLowerer.h"
         "include/FrameLowerer/MirFrameLowererPass.h"
         "include/Descriptors/TargetDesc.h"
+        "include/Descriptors/TargetBinaryDesc.h"
         "include/InstructionSelector/Actions/ManualSelectAction.h"
         "include/InstructionSelector/Actions/SelectRegisterClassAction.h"
         "include/InstructionSelector/Actions/SequenceAction.h"

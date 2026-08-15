@@ -1,7 +1,9 @@
 #include "InstructionSelector/MirInstructionSelectorPass.h"
 
-MirInstructionSelectorPass::MirInstructionSelectorPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
-    m_ctx(ctx), m_selector(targetDesc->getInstructionSelector())
+MirInstructionSelectorPass::MirInstructionSelectorPass(MirBuilderContext *ctx,
+                                                       TargetBinaryDesc *TargetBinaryDesc,
+                                                       TargetDesc *targetDesc) :
+    m_ctx(ctx), m_selector(targetDesc->getInstructionSelector()), m_targetBinaryDesc(TargetBinaryDesc)
 {
 }
 
@@ -20,7 +22,10 @@ MirPassResult MirInstructionSelectorPass::run(std::pmr::list<MirBlock *> &blockL
     do
     {
         modifiedThisIt = false;
-        SelectionContext selectCtx{ .m_ctx = m_ctx, .m_instrList = instructions, .m_it = instructions.begin() };
+        SelectionContext selectCtx{ .m_ctx = m_ctx,
+                                    .m_targetBinaryDesc = m_targetBinaryDesc,
+                                    .m_instrList = instructions,
+                                    .m_it = instructions.begin() };
 
         for (; selectCtx.m_it != instructions.end(); ++selectCtx.m_it)
         {

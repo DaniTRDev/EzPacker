@@ -15,7 +15,7 @@ class MirInstructionSelectorPass : public IMirTransformPass
      * @param ctx
      * @param selector
      */
-    MirInstructionSelectorPass(MirBuilderContext *ctx, TargetDesc *targetDesc);
+    MirInstructionSelectorPass(MirBuilderContext *ctx, TargetBinaryDesc *TargetBinaryDesc, TargetDesc *targetDesc);
 
     /**
      * Returns "MirInstructionSelectorPass".
@@ -48,6 +48,7 @@ class MirInstructionSelectorPass : public IMirTransformPass
   private:
     MirBuilderContext *m_ctx;
     MirInstructionSelector *m_selector;
+    TargetBinaryDesc *m_targetBinaryDesc;
 };
 
 #endif // EZPACKER_MIRINSTRUCTIONSELECTORPASS_H

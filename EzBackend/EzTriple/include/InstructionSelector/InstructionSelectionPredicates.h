@@ -3,6 +3,7 @@
 
 #include "EzTripleCommon.h"
 #include "InstructionSelectionRuleBuilder.h"
+#include "Descriptors/TargetBinaryDesc.h"
 
 namespace ISelPreds
 {
@@ -12,20 +13,44 @@ namespace ISelPreds
 extern InstructionSelPred _not(const InstructionSelPred &pred);
 
 /**
- * Creates a new predicate that returns true if both, pred1 and pred2, return true.
+ * Creates a new predicate that returns true if all provided predicates evaluate to true (short-circuiting).
+ * Supports chaining 2 or more predicates directly: _and(p1, p2, p3, ...)
  */
-extern InstructionSelPred _and(const InstructionSelPred &pred1, const InstructionSelPred &pred2);
+template <typename... Preds>
+    requires(sizeof...(Preds) >= 2 && (std::is_convertible_v<Preds, InstructionSelPred> && ...))
+inline InstructionSelPred _and(Preds &&...preds)
+{
+    return [preds = std::make_tuple(std::forward<Preds>(preds)...)](const SelectionContext &ctx) -> bool
+    { return std::apply([&ctx](const auto &...p) { return (p(ctx) && ...); }, preds); };
+}
 
 /**
- * Creates a new predicate that returns true if pred1 or pred2 returns true. If pred1 returns true, pred2 won't be
- * called.
+ * Creates a new predicate that returns true if at least one of the provided predicates evaluates to true
+ * (short-circuiting). Supports chaining 2 or more predicates directly: _or(p1, p2, p3, ...)
  */
-extern InstructionSelPred _or(const InstructionSelPred &pred1, const InstructionSelPred &pred2);
+template <typename... Preds>
+    requires(sizeof...(Preds) >= 2 && (std::is_convertible_v<Preds, InstructionSelPred> && ...))
+inline InstructionSelPred _or(Preds &&...preds)
+{
+    return [preds = std::make_tuple(std::forward<Preds>(preds)...)](const SelectionContext &ctx) -> bool
+    { return std::apply([&ctx](const auto &...p) { return (p(ctx) || ...); }, preds); };
+}
+
+/**
+ * Creates a new predicate that returns true if the code model of the target binary descriptor matches the one given.
+ */
+extern InstructionSelPred codeModel(CodeModel expected);
 
 /**
  * Creates a new predicate that returns true if the instruction opcode matches the one given.
  */
 extern InstructionSelPred opcode(MirInstructionOpCode opcode);
+
+/**
+ * Creates a new predicate that returns true if the instruction has an operand at the given index, if it's a reference
+ * and if it's a global reference (GlobalVar, Function, GlobalArray).
+ */
+extern InstructionSelPred operandIsGlobalRef(size_t index);
 
 /**
  * Creates a new predicate that returns true if the instruction has an operand at the given index, and if it's type

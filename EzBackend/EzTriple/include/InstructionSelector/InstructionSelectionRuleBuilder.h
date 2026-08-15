@@ -20,7 +20,7 @@ class InstructionSelectionRuleBuilder
      * @return
      */
     InstructionSelectionRuleBuilder &act(const InstructionSelAction &act);
-
+    
     /**
      * Begins a new rule with the given name and targeting the given opcode.
      * @param name

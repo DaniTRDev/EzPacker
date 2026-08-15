@@ -2,10 +2,15 @@
 #define EZPACKER_TARGETDESC_H
 
 #include "EzTripleCommon.h"
+#include "TargetBinaryDesc.h"
 
 /**
  * Interface used to store target-dependent information (CPU-level).
+ *
+ * Ex: TargetDesc = AMD64, TargetBinaryDesc = AMD64_Windows | AMD64_Linux.
+ * The calling convention is also dependant on the target binary desc (AMD64_Windows_Windows | AMD64_Linux_SysV)
  */
+
 class TargetDesc
 {
   public:
@@ -67,6 +72,11 @@ class TargetDesc
     virtual MirType *getNearestLegalType(MirType *type) = 0;
 
     /**
+     * Returns a reference to the target's instruction pointer.
+     */
+    virtual RegisterRef getInstructionPtrReg() const = 0;
+
+    /**
      * Returns the size in bytes of a standard stack slot (e.g., 8 for 64-bit targets, 4 for 32-bit).
      */
     virtual size_t getStackSlotSize() const = 0;
@@ -75,6 +85,11 @@ class TargetDesc
      * Initializes the target descriptor. This is the function that starts creating everything needed by the descriptor.
      */
     virtual void initialize() = 0;
+
+    /**
+     * Returns a list with the available binary descriptors.
+     */
+    virtual std::pmr::vector<TargetBinaryDesc *> getAvailableBinaryDescriptors() = 0;
 
     /**
      * Returns a list with the available calling conventions defined for this target.
