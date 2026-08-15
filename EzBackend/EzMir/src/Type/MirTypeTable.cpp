@@ -1,7 +1,7 @@
 #include "Type/MirTypeTable.h"
 
-MirTypeTable::MirTypeTable(IMirTargetTypeLayout *typeLayout, std::pmr::memory_resource *globalArena) :
-    m_typeLayout(typeLayout), m_arena(globalArena), m_typeNames(globalArena), m_idToType(globalArena),
+MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena) :
+    m_typeLayout(nullptr), m_arena(globalArena), m_typeNames(globalArena), m_idToType(globalArena),
     m_pointerCache(globalArena)
 {
 }
@@ -278,8 +278,9 @@ MirType *MirTypeTable::f32() const { return m_float32Type; }
 MirType *MirTypeTable::f64() const { return m_float64Type; }
 MirType *MirTypeTable::f128() const { return m_float128Type; }
 
-void MirTypeTable::initialize()
+void MirTypeTable::initialize(IMirTargetTypeLayout *typeLayout)
 {
+    m_typeLayout = typeLayout;
     m_voidType = create(MirTypeKind::Void, 0, {}, "void");
     m_int1Type = create(MirTypeKind::Integer, 1, {}, "i1");
     m_int8Type = create(MirTypeKind::Integer, 8, {}, "i8");

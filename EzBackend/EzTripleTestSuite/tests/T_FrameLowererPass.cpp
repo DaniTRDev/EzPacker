@@ -1,9 +1,3 @@
-/**
- * @file TestFrameLowererPass.cpp
- * @brief Unit tests for MirFrameLowererPass verifying frame layout generation, prologue/epilogue
- * insertion, callee-saved register handling, and stack object reference resolution.
- */
-
 #include "EzTripleTestSuite.h"
 
 class TestFrameLowererPass : public MirTripleTestSuiteAsGtest
@@ -28,15 +22,15 @@ TEST_F(TestFrameLowererPass, LowerEmptyLeafFunction)
     iBuilder.RET();
 
     // Execute Frame Lowerer Pass
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     // Verify Prologue, Epilogue, and Stack Reference Resolution via Pass Verifier
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
-    const FrameLayout &layout = pass->getResult().m_layouts.at(func);
 
-    verifier.verifyPrologue(func, layout);
-    verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func, layout);
+    verifier.verifyPrologue(func);
+    verifier.verifyEpilogue(func);
+    verifier.verifyStackReferencesLowered(func);
 }
 
 // =========================================================================
@@ -77,18 +71,18 @@ TEST_F(TestFrameLowererPass, LowerFunctionWithLocalVariablesAndSpills)
     // RET
     iBuilder.RET();
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
-    const FrameLayout &layout = pass->getResult().m_layouts.at(func);
 
     // Frame allocation size must account for i32 (4), i64 (8), and f64 (8) + alignment
-    EXPECT_GT(layout.totalFrameSize, 0u);
+    EXPECT_GT(func->getAnalysisData()->m_totalFrameSize, 0u);
 
-    verifier.verifyPrologue(func, layout);
-    verifier.verifyEpilogue(func, layout);
+    verifier.verifyPrologue(func);
+    verifier.verifyEpilogue(func);
     // Ensure all MirReference::StackFrameObject operands were converted into concrete MirMemory [FP/SP + offset]
-    verifier.verifyStackReferencesLowered(func, layout);
+    verifier.verifyStackReferencesLowered(func);
 }
 
 // =========================================================================
@@ -104,10 +98,11 @@ TEST_F(TestFrameLowererPass, LowerCalleeSavedRegisters)
     CallingConvDesc *cc = func->getCallingConv();
     EXPECT_NE(cc, nullptr);
 
-    // Add physical callee-saved registers to the function
-    const auto &calleeSavedList = cc->getCalleeSavedRegs(RegisterRefClass::GPR);
+    // Retrieve all callee-saved registers for this target/ABI
+    const auto &calleeSavedList = cc->getAllCalleeSavedRegs();
+    ASSERT_FALSE(calleeSavedList.empty());
 
-    RegisterRef reg1 = calleeSavedList[0];
+    RegisterRef reg1 = calleeSavedList.front();
     func->addCalleeSavedRegUse(reg1);
 
     MirInstructionBuilder iBuilder(getBuilderCtx(),
@@ -116,20 +111,20 @@ TEST_F(TestFrameLowererPass, LowerCalleeSavedRegisters)
                                    func->getEntryPoint()->getInstructions().begin());
     iBuilder.RET();
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
-    const FrameLayout &layout = pass->getResult().m_layouts.at(func);
 
-    // Callee-saved area size should cover the register.
-    EXPECT_GT(layout.calleeSavedAreaSize, 0u);
+    // Callee-saved area size should cover the register
+    EXPECT_GT(func->getAnalysisData()->m_calleeSavedAreaSize, 0u);
 
     // Verifiers ensure:
     // - Prologue pushes reg1
     // - Epilogue pops reg1 before RET
-    verifier.verifyPrologue(func, layout);
-    verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func, layout);
+    verifier.verifyPrologue(func);
+    verifier.verifyEpilogue(func);
+    verifier.verifyStackReferencesLowered(func);
 }
 
 // =========================================================================
@@ -163,7 +158,6 @@ TEST_F(TestFrameLowererPass, LowerMultipleReturnBlocks)
     func->getStackFrame()->createStaticStackObj(t->i64());
 
     // Branch to then / else
-    MirRegister *condReg = oBuilder.buildVReg(t->i1(), "cond");
     entryBuilder.JE(oBuilder.buildRef(thenBlock));
     entryBuilder.JMP(oBuilder.buildRef(elseBlock));
 
@@ -171,16 +165,16 @@ TEST_F(TestFrameLowererPass, LowerMultipleReturnBlocks)
     thenBuilder.RET();
     elseBuilder.RET();
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
-    const FrameLayout &layout = pass->getResult().m_layouts.at(func);
 
     // Prologue must only be injected once at entryBlock
-    verifier.verifyPrologue(func, layout);
+    verifier.verifyPrologue(func);
     // Epilogue must be injected before RET in BOTH thenBlock and elseBlock
-    verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func, layout);
+    verifier.verifyEpilogue(func);
+    verifier.verifyStackReferencesLowered(func);
 }
 
 // =========================================================================
@@ -193,9 +187,10 @@ TEST_F(TestFrameLowererPass, LowerComplexStackLayout)
     MirFunction *func = funcBuilder.build(t->getVoidType());
 
     CallingConvDesc *cc = func->getCallingConv();
-    if (!cc->getCalleeSavedRegs(RegisterRefClass::GPR).empty())
+    const auto &calleeSavedList = cc->getAllCalleeSavedRegs();
+    if (!calleeSavedList.empty())
     {
-        func->addCalleeSavedRegUse(cc->getCalleeSavedRegs(RegisterRefClass::GPR).front());
+        func->addCalleeSavedRegUse(calleeSavedList.front());
     }
 
     MirFunctionStackFrame *frame = func->getStackFrame();
@@ -221,18 +216,18 @@ TEST_F(TestFrameLowererPass, LowerComplexStackLayout)
     iBuilder.STORE(lastObjRef, regVal);
     iBuilder.RET();
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirFrameLowererPass *pass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
 
     FrameLowererPassVerifier verifier(getBuilderCtx(), pass);
-    const FrameLayout &layout = pass->getResult().m_layouts.at(func);
 
-    verifier.verifyPrologue(func, layout);
-    verifier.verifyEpilogue(func, layout);
-    verifier.verifyStackReferencesLowered(func, layout);
+    verifier.verifyPrologue(func);
+    verifier.verifyEpilogue(func);
+    verifier.verifyStackReferencesLowered(func);
 }
 
 // =========================================================================
-// DYNAMIC ALLOCATION (DALLOC) LOWERING TEST
+// 6. DYNAMIC ALLOCATION (DALLOC) LOWERING TEST
 // =========================================================================
 TEST_F(TestFrameLowererPass, LowerDynamicStackAllocation)
 {
@@ -248,11 +243,11 @@ TEST_F(TestFrameLowererPass, LowerDynamicStackAllocation)
     MirOperandBuilder oBuilder(getBuilderCtx());
 
     // Allocate virtual registers for dynamic size & pointer destination
-    MirRegister *dynPtr = oBuilder.buildVReg(t->getPtr(t->i32()), "dynPtr");
-    MirRegister *runtimeSize = oBuilder.buildVReg(t->i32(), "runtimeSize");
+    MirRegister *dynPtr = oBuilder.buildVReg(t->getPtr(t->i8()), "dynPtr");
+    MirRegister *runtimeSize = oBuilder.buildVReg(t->i64(), "runtimeSize");
 
     // Initialize runtime size variable (e.g. MOV %runtimeSize, 128)
-    iBuilder.MOV(runtimeSize, oBuilder.buildInt(t->i32(), FlexInt(128, 32)));
+    iBuilder.MOV(runtimeSize, oBuilder.buildInt(t->i64(), FlexInt(128, 64)));
 
     // Emit DALLOC instruction: %dynPtr = DALLOC %runtimeSize
     iBuilder.DALLOC(dynPtr, runtimeSize);
@@ -260,21 +255,18 @@ TEST_F(TestFrameLowererPass, LowerDynamicStackAllocation)
     // Emit a dummy RET instruction to close the block
     iBuilder.RET();
 
-    // 1. Run Register Allocator Pass (Flags func->setHasDynamicAlloca(true) and reserves FP)
+    // 1. Run Register Allocator Pass (Flags func->setHasDynamicAllocs(true) and reserves FP)
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
     // 2. Run Frame Lowerer Pass (Lowers DALLOC, calculates layout, inserts Prologue/Epilogue)
     MirFrameLowererPass *framePass = runPass<MirFrameLowererPass>(getBuilderCtx(), getTargetDesc());
-    const FrameLayout &layout = framePass->getResult().m_layouts.at(func);
 
     // 3. Verify Frame Lowerer execution using the updated verifiers
     FrameLowererPassVerifier verifier(getBuilderCtx(), framePass);
-    verifier.verifyDAllocLowered(func, layout)
-            .verifyPrologue(func, layout)
-            .verifyEpilogue(func, layout)
-            .verifyStackReferencesLowered(func, layout);
+    verifier.verifyDAllocLowered(func).verifyPrologue(func).verifyEpilogue(func).verifyStackReferencesLowered(func);
 
     // 4. Assert structural invariants
-    EXPECT_TRUE(layout.m_hasDynamicAllocs);
+    EXPECT_TRUE(func->getAnalysisData()->m_hasDynamicAllocs);
     EXPECT_EQ(entryBlock->getInstructions().back()->getOpCode(), MirInstructionOpCode::RET);
 }

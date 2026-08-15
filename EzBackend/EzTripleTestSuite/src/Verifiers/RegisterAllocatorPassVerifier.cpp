@@ -139,9 +139,11 @@ RegisterAllocatorPassVerifier::verifyReservedRegistersNotAssigned(const Register
 RegisterAllocatorPassVerifier &
 RegisterAllocatorPassVerifier::verifyFramePointerReservedOnDAlloc(const RegisterAllocatorCtx &allocCtx)
 {
-    if (allocCtx.m_needsFramePointer && allocCtx.m_targetFunction->getCallingConv())
+    MirFunction *func = allocCtx.m_targetFunction;
+    CallingConvDesc *callingConv = func->getCallingConv();
+    if (callingConv && callingConv->hasFramePointer(func))
     {
-        RegisterRef fpReg = allocCtx.m_targetFunction->getCallingConv()->getFramePointerReg();
+        RegisterRef fpReg = callingConv->getFramePointerReg();
 
         EXPECT_TRUE(allocCtx.m_reservedRegs.contains(fpReg))
                 << "Function requires a Frame Pointer (m_needsFramePointer is true), but the FP register %p"

@@ -11,11 +11,11 @@ class MirInstructionSelectorPass : public IMirTransformPass
 {
   public:
     /**
-     * Creates the selector pass with the given context selector.
+     * Creates the selector pass with the given ctx and target desc.
      * @param ctx
      * @param selector
      */
-    MirInstructionSelectorPass(MirBuilderContext *ctx, MirInstructionSelector *selector);
+    MirInstructionSelectorPass(MirBuilderContext *ctx, TargetDesc *targetDesc);
 
     /**
      * Returns "MirInstructionSelectorPass".

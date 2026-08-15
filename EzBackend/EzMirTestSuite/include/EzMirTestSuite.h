@@ -1,13 +1,12 @@
 #ifndef EZPACKER_EZMIRTESTSUITE_H
 #define EZPACKER_EZMIRTESTSUITE_H
 
+#include "EzTestTriple.h"
 #include "Verifiers/ClassOffsetResolverVerifier.h"
 #include "Verifiers/MirCoreVerifiers.h"
 #include "Verifiers/CodeFlowPassVerifier.h"
 #include "Verifiers/LivenessPassVerifier.h"
 #include "Verifiers/RelativeReferenceLowererVerifier.h"
-#include "TestTargetTypeLayout.h"
-#include "TestCallingConvention.h"
 
 /**
  * Class used to contain helper methods related to creation/destruction of needed objects in common test scenarios.
@@ -15,6 +14,11 @@
 class EzMirTestSuite
 {
   public:
+    /**
+     * Returns the target descriptor.
+     */
+    EzTestTripleTargetDesc *getTargetDesc();
+
     /**
      * Returns the builder context used by this test.
      * @return
@@ -51,16 +55,7 @@ class EzMirTestSuite
         MirPassManager *passManager = getPassManager();
         PassType *pass = (PassType *)passManager->addPass<PassType, Args...>(std::forward<Args>(args)...);
 
-        if constexpr (std::is_base_of<IMirAnalysisPass, PassType>::value)
-        {
-            pass = passManager->getAnalysis<PassType>(getBuilderCtx());
-        }
-        else
-        {
-            passManager->generatePipeline();
-            passManager->runPipeline(getBuilderCtx());
-        }
-
+        passManager->runPass(pass, m_builderCtx.get());
         return pass;
     }
 
@@ -127,26 +122,13 @@ class EzMirTestSuite
      */
     std::pmr::list<MirFunction *> &getFunctions();
 
-    /**
-     * Creates the target type layout used to define aligned types and returns it. Made it virtual so upper tests can
-     * return their own layout if needed. By default it returns TestTargetTypeLayout.
-     */
-    virtual std::shared_ptr<IMirTargetTypeLayout> createTypeLayout();
-
-    /**
-     * Creates the default calling convention and returns it. Made it virtual so upper tests can
-     * return their own layout if needed. By default it returns TestCallingConvention.
-     */
-    virtual std::shared_ptr<CallingConvDesc> createDefaultCallingConv();
-
   private:
     MirFunction *m_testFunction; // Pre-created function used to be able to create quick tests easily.
     MirInstructionInsertionPoint m_insertPoint;
     std::pmr::monotonic_buffer_resource m_arena;
-    std::shared_ptr<CallingConvDesc> m_callingConv; // Default calling conv given to builder ctx.
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
     std::shared_ptr<DiagnosticLogger> m_diagLogger;
-    std::shared_ptr<IMirTargetTypeLayout> m_typeLayout;
+    std::shared_ptr<EzTestTripleTargetDesc> m_targetDesc;
     std::shared_ptr<MirBuilderContext> m_builderCtx;
     std::shared_ptr<MirPassManager> m_passManager;
     std::shared_ptr<MirTypeTable> m_typeTable;

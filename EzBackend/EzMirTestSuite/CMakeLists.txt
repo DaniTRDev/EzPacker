@@ -1,7 +1,5 @@
 set(MIRTESTSUITE_FILES_LIST
         "include/EzMirTestSuite.h"
-        "include/TestCallingConvention.h"
-        "include/TestTargetTypeLayout.h"
         "include/Verifiers/ClassOffsetResolverVerifier.h"
         "include/Verifiers/CodeFlowPassVerifier.h"
         "include/Verifiers/LivenessPassVerifier.h"
@@ -9,8 +7,6 @@ set(MIRTESTSUITE_FILES_LIST
         "include/Verifiers/RelativeReferenceLowererVerifier.h"
 
         "src/EzMirTestSuite.cpp"
-        "src/TestCallingConvention.cpp"
-        "src/TestTargetTypeLayout.cpp"
         "src/Verifiers/ClassOffsetResolverVerifier.cpp"
         "src/Verifiers/CodeFlowPassVerifier.cpp"
         "src/Verifiers/LivenessPassVerifier.cpp"
@@ -21,7 +17,7 @@ set(MIRTESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzMirTestSuite"
         FILE_LIST ${MIRTESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER "include/Verifiers/MirCoreVerifiers.h"
-        LINKED_LIBRARIES "EzMir"
+        LINKED_LIBRARIES "EzTestTriple"
         INCLUDED_DIRS "include"
 )
 

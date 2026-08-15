@@ -16,11 +16,11 @@ class MirFunctionSignatureLegalizerPass : public IMirTransformPass
 {
   public:
     /**
-     * Creates the pass linked to the given legalizer and builder context.
+     * Creates the pass linked to the given builder context and target desc.
      * @param ctx
      * @param legalizer
      */
-    MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer);
+    MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc);
 
     /**
      * Returns "MirFunctionSignatureLegalizerPass".

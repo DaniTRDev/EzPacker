@@ -34,10 +34,10 @@ using InstructionSelAction = std::function<SelectionResult(SelectionContext &ctx
 
 struct InstructionSelectionRule
 {
-    const char *m_name;         // Important for debug purposes.
-    InstructionSelAction m_act; // Action that will be run if the predicate evaluates to true.
-    InstructionSelPred m_pred;  // If the predicates evaluate to true, the given instruction will be lowered into the
-                                // target opcode.
+    const char *m_name;        // Important for debug purposes.
+    InstructionSelPred m_pred; // If the predicates evaluate to true, the given instruction will be lowered into the
+                               // target opcode.
+    std::pmr::list<InstructionSelAction> m_actions; // Actions that will be run if the predicate evaluates to true.
 };
 
 class MirInstructionSelector
@@ -63,8 +63,14 @@ class MirInstructionSelector
      */
     void addRule(MirInstructionOpCode opcode, InstructionSelectionRule rule);
 
+    /**
+     * Returns the allocator resource of the selector.
+     */
+    std::pmr::memory_resource *getAlloc() const;
+
   private:
     std::pmr::map<MirInstructionOpCode, std::pmr::vector<InstructionSelectionRule>> m_selectionRules;
+    std::pmr::memory_resource *m_alloc;
 };
 
 #endif // EZPACKER_MIRINSTRUCTIONSELECTOR_H

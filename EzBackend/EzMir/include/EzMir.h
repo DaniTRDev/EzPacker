@@ -53,6 +53,8 @@
 #include "Operand/MirOperand.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
+#include "Operand/MirRegisterBank.h"
+#include "Operand/MirRegisterClass.h"
 #include "Operand/MirRegisterReference.h"
 
 #include "Printer/MirPrinter.h"

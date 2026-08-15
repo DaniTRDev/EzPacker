@@ -1,11 +1,5 @@
 set(TRIPLETESTSUITE_FILES_LIST
-        "include/EzTripleTestExpansionRegistry.h"
-        "include/EzTripleTestFrameLowerer.h"
-        "include/EzTripleTestInstructionSet.h"
-        "include/EzTripleTestLegalizer.h"
-        "include/EzTripleTestSelector.h"
         "include/EzTripleTestSuite.h"
-        "include/EzTripleTestTargetDescriptor.h"
         "include/Verifiers/CallAbiLowererVerifier.h"
         "include/Verifiers/ExpandScalarActionVerifier.h"
         "include/Verifiers/FrameLowererPassVerifier.h"
@@ -18,12 +12,7 @@ set(TRIPLETESTSUITE_FILES_LIST
         "include/Verifiers/RegisterAllocatorPassVerifier.h"
         "include/Verifiers/ReturnAbiLowererVerifier.h"
 
-        "src/EzTripleTestExpansionRegistry.cpp"
-        "src/EzTripleTestFrameLowerer.cpp"
-        "src/EzTripleTestLegalizer.cpp"
-        "src/EzTripleTestSelector.cpp"
         "src/EzTripleTestSuite.cpp"
-        "src/EzTripleTestTargetDescriptor.cpp"
         "src/Verifiers/CallAbiLowererVerifier.cpp"
         "src/Verifiers/ExpandScalarActionVerifier.cpp"
         "src/Verifiers/FrameLowererPassVerifier.cpp"
@@ -40,7 +29,7 @@ set(TRIPLETESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzTripleTestSuite"
         FILE_LIST ${TRIPLETESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER "include/EzTripleTestSuite.h"
-        LINKED_LIBRARIES "EzTriple;EzMirTestSuite"
+        LINKED_LIBRARIES "EzMirTestSuite"
         INCLUDED_DIRS "include/"
 )
 

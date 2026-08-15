@@ -10,7 +10,7 @@ class MirBlockLegalizerPass : public IMirTransformPass
     /**
      * Creates the pass linked to the given legalizer, builder context adn target description.
      */
-    MirBlockLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer, TargetDesc *targetDesc);
+    MirBlockLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc);
 
     /**
      * Returns "MirBlockLegalizerPass".

@@ -20,7 +20,7 @@ LegalizationResult PromoteScalar(LegalizeCtx &ctx)
         MirOperand *operand = operands[i];
         MirType *origType = operand->getMirType();
         MirType *promotedType = ctx.m_targetDesc->getNearestLegalType(origType);
-        OperandConstraint constraint = instr->getMetadata().m_operandConstraints[i];
+        OperandConstraint constraint = instr->getMetadata().m_operandFlags[i];
 
         if (!promotedType)
         {

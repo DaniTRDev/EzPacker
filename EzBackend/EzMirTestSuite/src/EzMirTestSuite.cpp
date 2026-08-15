@@ -1,4 +1,6 @@
-#include "../include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
+
+EzTestTripleTargetDesc *EzMirTestSuite::getTargetDesc() { return m_targetDesc.get(); }
 
 MirBuilderContext *EzMirTestSuite::getBuilderCtx() { return m_builderCtx.get(); }
 
@@ -13,27 +15,27 @@ MirTypeTable *EzMirTestSuite::getTypeTable() { return m_typeTable.get(); }
 void EzMirTestSuite::create(const std::filesystem::path &workingPath)
 {
     m_diagCollector = std::make_shared<DiagnosticCollector>();
-    m_typeLayout = createTypeLayout();
-    m_typeTable = std::make_shared<MirTypeTable>(m_typeLayout.get(), &m_arena);
+    m_typeTable = std::make_shared<MirTypeTable>(&m_arena);
     m_builderCtx = std::make_shared<MirBuilderContext>(nullptr, &m_arena, m_diagCollector, m_typeTable);
     m_sourceManager = std::make_shared<SourceManager>(workingPath);
     m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
-
-    m_callingConv = createDefaultCallingConv();
-    m_builderCtx->setDefaultCallingConvention(m_callingConv.get());
-
     m_passManager = std::make_shared<MirPassManager>(&m_arena, m_diagCollector);
-    m_passManager->setTestMode();
+    m_targetDesc = std::make_shared<EzTestTripleTargetDesc>(m_builderCtx.get(), m_builderCtx->getGlobalAllocator());
 
     m_diagCollector->addListener(m_diagLogger.get());
-    m_typeTable->initialize();
+    m_typeTable->initialize(m_targetDesc->getTypeLayout());
+    m_targetDesc->initialize();
+    m_passManager->setTestMode();
+
+    m_builderCtx->setDefaultCallingConvention(m_targetDesc->getAvailableCallingConventions().front());
+
     m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->getVoidType(), "TEST");
 
     m_diagCollector->builder(Diag_Debug, "EzMirTestSuite")
             << "Created pass manager in test mode (skip dependency resolution)";
 
     m_diagCollector->builder(Diag_Debug, "EzMirTestSuite")
-            << "Using default calling convention: " << m_callingConv->getName();
+            << "Using default calling convention: " << m_builderCtx->getDefaultCallingConvention()->getName();
 
     m_diagCollector->builder(Diag_Debug, "EzMirTestSuite") << "Adding common passes to pass manager";
     m_passManager->addPass<CodeFlowAnalysisPass>(getBuilderCtx());
@@ -113,16 +115,6 @@ MirInstruction *EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode op
 }
 
 std::pmr::list<MirFunction *> &EzMirTestSuite::getFunctions() { return getBuilderCtx()->getFunctions(); }
-
-std::shared_ptr<IMirTargetTypeLayout> EzMirTestSuite::createTypeLayout()
-{
-    return std::make_shared<TestTargetTypeLayout>();
-}
-
-std::shared_ptr<CallingConvDesc> EzMirTestSuite::createDefaultCallingConv()
-{
-    return std::make_shared<TestCallingConvention>(getBuilderCtx());
-}
 
 void MirTestSuiteAsGtest::SetUp()
 {

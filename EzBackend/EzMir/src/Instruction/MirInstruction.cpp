@@ -5,7 +5,7 @@ MirInstruction::MirInstruction(class MirBlock *owner,
                                SourceReference *ref,
                                std::pmr::vector<MirOperand *> operands) :
     m_cachedDefinedRegisters(false), m_cachedUsedRegisters(false), m_owner(owner), m_opcode(opcode),
-    m_targetId(MIRID_INVALID), m_sourceRef(ref),
+    m_targetDesc(nullptr), m_sourceRef(ref),
     m_definedRegisters(std::pmr::vector<RegisterRef>(operands.get_allocator().resource())),
     m_usedRegisters(std::pmr::vector<RegisterRef>(operands.get_allocator().resource())), m_operands(std::move(operands))
 {
@@ -15,7 +15,7 @@ bool MirInstruction::hasOperands() const { return !m_operands.empty(); }
 
 bool MirInstruction::isSelected() const
 {
-    return m_opcode == MirInstructionOpCode::TARGET_INST && m_targetId != MIRID_INVALID;
+    return m_opcode == MirInstructionOpCode::TARGET_INST && m_targetDesc != nullptr;
 }
 
 bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstructionFlags::TreatAsSigned; }
@@ -32,7 +32,34 @@ MirInstructionTier MirInstruction::getTier() const { return getMetadata().m_tier
 
 MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
 
-MirTargetInstructionId MirInstruction::getTargetId() const { return m_targetId; }
+MirTargetInstructionDesc *MirInstruction::getTargetDesc() const { return m_targetDesc; }
+
+OperandFlag MirInstruction::getOperandFlag(size_t index) const
+{
+    if (isSelected())
+    {
+        if (m_targetDesc)
+        {
+            const auto &flags = m_targetDesc->getOperandsFlags();
+            if (index < flags.size())
+            {
+                return flags[index];
+            }
+        }
+        // Fallback for target instructions without explicit descriptors:
+        // By standard convention, operand 0 is destination (Write/ReadWrite) unless it's a store/branch.
+        return OperandFlag::Read;
+    }
+
+    // High-Level IR instructions
+    const auto &flags = getMetadata().m_operandFlags;
+    if (index < flags.size())
+    {
+        return flags[index].flags;
+    }
+
+    return OperandFlag::None;
+}
 
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 
@@ -48,7 +75,11 @@ void MirInstruction::invalidateCachedUsedAndDefs()
     m_cachedUsedRegisters = false;
 }
 
-void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
+void MirInstruction::setOpcode(MirInstructionOpCode opcode)
+{
+    m_opcode = opcode;
+    invalidateCachedUsedAndDefs();
+}
 
 void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands)
 {
@@ -56,7 +87,11 @@ void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands)
     invalidateCachedUsedAndDefs();
 }
 
-void MirInstruction::setTargetId(MirTargetInstructionId id) { m_targetId = id; }
+void MirInstruction::setTargetDesc(MirTargetInstructionDesc *desc)
+{
+    m_targetDesc = desc;
+    invalidateCachedUsedAndDefs();
+}
 
 const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
 
@@ -76,18 +111,31 @@ const std::pmr::vector<RegisterRef> &MirInstruction::getDefinedRegisters()
     if (!m_cachedDefinedRegisters)
     {
         m_cachedDefinedRegisters = true;
+        m_definedRegisters.clear();
+
         for (size_t i = 0; i < m_operands.size(); i++)
         {
             MirOperand *operand = m_operands[i];
-            MirRegister *reg = operand->get<MirRegister>();
+            if (!operand)
+                continue;
 
+            MirRegister *reg = operand->get<MirRegister>();
             if (reg)
             {
-                OperandFlag flags = getMetadata().m_operandConstraints[i].flags;
+                OperandFlag flags = getOperandFlag(i);
                 if (flags & OperandFlag::Write)
                 {
-                    m_definedRegisters.push_back(operand->get<MirRegister>()->getRef());
+                    m_definedRegisters.push_back(reg->getRef());
                 }
+            }
+        }
+
+        // Include implicit target registers defined by this instruction (if lowered)
+        if (m_targetDesc)
+        {
+            for (const auto &impDef : m_targetDesc->getImplicitDefs())
+            {
+                m_definedRegisters.push_back(impDef);
             }
         }
     }
@@ -100,23 +148,38 @@ const std::pmr::vector<RegisterRef> &MirInstruction::getUsedRegisters()
     if (!m_cachedUsedRegisters)
     {
         m_cachedUsedRegisters = true;
+        m_usedRegisters.clear();
+
         for (size_t i = 0; i < m_operands.size(); i++)
         {
             MirOperand *operand = m_operands[i];
+            if (!operand)
+                continue;
+
             MirRegister *reg = operand->get<MirRegister>();
             MirMemory *mem = operand->get<MirMemory>();
 
             if (reg)
             {
-                OperandFlag flags = getMetadata().m_operandConstraints[i].flags;
+                OperandFlag flags = getOperandFlag(i);
                 if (flags & OperandFlag::Read)
                 {
-                    m_usedRegisters.push_back(operand->get<MirRegister>()->getRef());
+                    m_usedRegisters.push_back(reg->getRef());
                 }
             }
             else if (mem && mem->getBase())
             {
+                // Memory base register is always read
                 m_usedRegisters.push_back(mem->getBase()->getRef());
+            }
+        }
+
+        // Include implicit target registers used by this instruction (if lowered)
+        if (m_targetDesc)
+        {
+            for (const auto &impUse : m_targetDesc->getImplicitUses())
+            {
+                m_usedRegisters.push_back(impUse);
             }
         }
     }

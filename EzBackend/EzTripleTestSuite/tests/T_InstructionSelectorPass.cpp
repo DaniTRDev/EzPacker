@@ -1,5 +1,4 @@
 #include "EzTripleTestSuite.h"
-using namespace EzTripleTestInstructionSet;
 
 class TestMirInstructionSelectorPass : public MirTripleTestSuiteAsGtest
 {
@@ -39,13 +38,13 @@ TEST_F(TestMirInstructionSelectorPass, SelectDataMovementAndMemory)
     iBuilder.STORE(memOp, vregF64);
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getInstrSelector());
+    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyInstructionSelected(block, 0, TargetInst::MOV8rr)
-            .verifyInstructionSelected(block, 1, TargetInst::MOV32rr)
-            .verifyInstructionSelected(block, 2, TargetInst::MOV64rm)
-            .verifyInstructionSelected(block, 3, TargetInst::MOVSDmr);
+    verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::MOV8rr)
+            .verifyInstructionSelected(block, 1, EzTestTriple::TargetInst::MOV32rr)
+            .verifyInstructionSelected(block, 2, EzTestTriple::TargetInst::MOV64rm)
+            .verifyInstructionSelected(block, 3, EzTestTriple::TargetInst::MOVSDmr);
 
     // Verify selected instruction operands
     MirInstructionVerifier(block->at(0)).operandVerifier(0).verifyRegister(t->i8(), true, MIRID_INVALID);
@@ -76,16 +75,15 @@ TEST_F(TestMirInstructionSelectorPass, SelectAluOperations)
     addTestInstructionRegReg(MirInstructionOpCode::IDIV, t->i64(), t->i64());
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass =
-            runPass<MirInstructionSelectorPass>(getBuilderCtx(), createInstructionSelector().get());
+    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyInstructionSelected(block, 0, TargetInst::ADD32rr)
-            .verifyInstructionSelected(block, 1, TargetInst::SUB64rr)
-            .verifyInstructionSelected(block, 2, TargetInst::AND32rr)
-            .verifyInstructionSelected(block, 3, TargetInst::XOR64rr)
-            .verifyInstructionSelected(block, 4, TargetInst::CMP32rr)
-            .verifyInstructionSelected(block, 5, TargetInst::IDIV64r);
+    verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::ADD32rr)
+            .verifyInstructionSelected(block, 1, EzTestTriple::TargetInst::SUB64rr)
+            .verifyInstructionSelected(block, 2, EzTestTriple::TargetInst::AND32rr)
+            .verifyInstructionSelected(block, 3, EzTestTriple::TargetInst::XOR64rr)
+            .verifyInstructionSelected(block, 4, EzTestTriple::TargetInst::CMP32rr)
+            .verifyInstructionSelected(block, 5, EzTestTriple::TargetInst::IDIV64r);
 
     MirInstructionVerifier(block->at(0)).operandVerifier(0).verifyRegister(t->i32(), true, MIRID_INVALID);
     MirInstructionVerifier(block->at(1)).operandVerifier(0).verifyRegister(t->i64(), true, MIRID_INVALID);
@@ -125,14 +123,14 @@ TEST_F(TestMirInstructionSelectorPass, SelectCastingAndControlFlow)
     iBuilder.JMP(oBuilder.buildRef(getTestFunc()->getEntryPoint()));
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getInstrSelector());
+    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyInstructionSelected(block, 0, TargetInst::MOVZX32rr8)
-            .verifyInstructionSelected(block, 1, TargetInst::MOVSX32rr8)
-            .verifyInstructionSelected(block, 2, TargetInst::CVTSS2SDrr)
-            .verifyInstructionSelected(block, 3, TargetInst::JE)
-            .verifyInstructionSelected(block, 4, TargetInst::JMP);
+    verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::MOVZX32rr8)
+            .verifyInstructionSelected(block, 1, EzTestTriple::TargetInst::MOVSX32rr8)
+            .verifyInstructionSelected(block, 2, EzTestTriple::TargetInst::CVTSS2SDrr)
+            .verifyInstructionSelected(block, 3, EzTestTriple::TargetInst::JE)
+            .verifyInstructionSelected(block, 4, EzTestTriple::TargetInst::JMP);
 }
 
 // =========================================================================
@@ -160,12 +158,12 @@ TEST_F(TestMirInstructionSelectorPass, SelectCallRetAndSystem)
     iBuilder.RET();
 
     MirBlock *block = getTestFunc()->getEntryPoint();
-    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getInstrSelector());
+    MirInstructionSelectorPass *pass = runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
 
     InstructionSelectorPassVerifier verifier(getBuilderCtx(), pass);
-    verifier.verifyInstructionSelected(block, 0, TargetInst::CALL)
-            .verifyInstructionSelected(block, 1, TargetInst::NOP)
-            .verifyInstructionSelected(block, 2, TargetInst::RET);
+    verifier.verifyInstructionSelected(block, 0, EzTestTriple::TargetInst::CALL)
+            .verifyInstructionSelected(block, 1, EzTestTriple::TargetInst::NOP)
+            .verifyInstructionSelected(block, 2, EzTestTriple::TargetInst::RET);
 
     MirInstructionVerifier(block->at(0))
             .operandVerifier(0)

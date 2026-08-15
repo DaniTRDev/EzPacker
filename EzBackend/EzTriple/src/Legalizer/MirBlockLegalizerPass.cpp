@@ -1,7 +1,7 @@
 #include "Legalizer/MirBlockLegalizerPass.h"
 
-MirBlockLegalizerPass::MirBlockLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer, TargetDesc *targetDesc) :
-    m_ctx(ctx), m_legalizer(legalizer), m_modifiedBlockSet(ctx->getGlobalAllocator()),
+MirBlockLegalizerPass::MirBlockLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
+    m_ctx(ctx), m_legalizer(targetDesc->getLegalizer()), m_modifiedBlockSet(ctx->getGlobalAllocator()),
     m_modifiedBlocks(ctx->getGlobalAllocator()),
     m_legalizeCtx(LegalizeCtx{
             .m_ctx = ctx,

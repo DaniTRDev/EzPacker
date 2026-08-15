@@ -87,19 +87,31 @@ class CallingConvDesc
     /**
      * Returns true if frame pointers (RBP/FP) are required for the given function.
      */
-    virtual bool hasFramePointer(const class MirFunction *func) const = 0;
+    virtual bool hasFramePointer(class MirFunction *func) const = 0;
+
+    /**
+     * Returns EVERY register that must be preserved by the callee.
+     * @return
+     */
+    virtual const std::pmr::vector<RegisterRef> &getAllCalleeSavedRegs() = 0;
 
     /**
      * Returns the list of registers of the given class that must be preserved by the callee.
      * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(RegisterRefClass refClass) = 0;
+    virtual const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(MirRegisterClass *_class) = 0;
 
     /**
-     * Returns the list of GPR registers that needs to be preserved by the caller.
+     * Returns EVERY register that needs to be preserved by the caller.
      * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getCallerSavedRegs(RegisterRefClass refClass) = 0;
+    virtual const std::pmr::vector<RegisterRef> &getAllCallerSavedRegs() = 0;
+
+    /**
+     * Returns the list of registers of the given class that needs to be preserved by the caller.
+     * @return
+     */
+    virtual const std::pmr::vector<RegisterRef> &getCallerSavedRegs(MirRegisterClass *_class) = 0;
 };
 
 #endif // EZPACKER_CALLINGCONVDESC_H

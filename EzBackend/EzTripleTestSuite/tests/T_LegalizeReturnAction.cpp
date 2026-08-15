@@ -17,7 +17,7 @@ TEST_F(TestLegalizeReturnAct, TestEmptyRet)
 
     builder.RET();
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getTargetDesc());
     LegalizeReturnActionVerifier verifier(getBuilderCtx(), pass);
 
     // Void returns are standardized to hold a single tracking token operand
@@ -39,7 +39,7 @@ TEST_F(TestLegalizeReturnAct, TestRetImm)
 
     builder.RET(immRet);
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getTargetDesc());
 
     LegalizeReturnActionVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyRetPush(func->getEntryPoint()->getInstructions().begin(), immRet);
@@ -63,7 +63,7 @@ TEST_F(TestLegalizeReturnAct, TestRetReg)
 
     builder.RET(regRet);
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getTargetDesc());
 
     LegalizeReturnActionVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyRetPush(func->getEntryPoint()->getInstructions().begin(), regRet);
@@ -79,7 +79,7 @@ TEST_F(TestLegalizeReturnAct, TestRetSretStruct)
     MirType *largeStructType = t->i256();
     MirType *sretPtrType = t->getPtr(largeStructType);
 
-    LegalizeRuleBuilder(getLegalizer())
+    LegalizeRuleBuilder(getTargetDesc()->getLegalizer())
             .begin("STORE_CUSTOM", MirInstructionOpCode::STORE, true)
             .legalFor({ largeStructType });
 
@@ -100,7 +100,7 @@ TEST_F(TestLegalizeReturnAct, TestRetSretStruct)
 
     builder.RET(structVal);
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getTargetDesc());
 
     LegalizeReturnActionVerifier verifier(getBuilderCtx(), pass);
 
@@ -126,7 +126,7 @@ TEST_F(TestLegalizeReturnAct, TestRetFloatReg)
 
     builder.RET(floatRet);
 
-    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getLegalizer(), getTargetDesc());
+    MirBlockLegalizerPass *pass = runPass<MirBlockLegalizerPass>(getBuilderCtx(), getTargetDesc());
 
     LegalizeReturnActionVerifier verifier(getBuilderCtx(), pass);
     verifier.verifyRetPush(func->getEntryPoint()->getInstructions().begin(), floatRet);

@@ -47,6 +47,16 @@ InstructionSelPred operandMirType(size_t index, MirType *type)
     };
 }
 
+InstructionSelPred operandMirTypeKind(size_t index, MirTypeKind kind)
+{
+    return [index, kind](const SelectionContext &sCtx) -> bool
+    {
+        MirInstruction *instr = *sCtx.m_it;
+        const auto &operands = instr->getOperands();
+        return operands.size() > index && operands[index]->getMirType()->getKind() == kind;
+    };
+}
+
 InstructionSelPred operandInt(size_t index, size_t bitWidth)
 {
     return [index, bitWidth](const SelectionContext &sCtx) -> bool

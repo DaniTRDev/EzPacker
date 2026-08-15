@@ -35,6 +35,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateBasicVirtualRegisters)
     // Build allocator context to verify graph properties directly
     RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
@@ -92,6 +93,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateMixedGprAndFprRegisters)
 
     RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
@@ -144,6 +146,7 @@ TEST_F(TestRegisterAllocatorPass, AllocateAcrossCallInstruction)
 
     RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
@@ -204,6 +207,7 @@ TEST_F(TestRegisterAllocatorPass, ForceRegisterSpillingAndVerifyRematerializatio
 
     RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
@@ -273,6 +277,7 @@ TEST_F(TestRegisterAllocatorPass, ForceMemorySpillingForNonRematerializableValue
 
     RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
@@ -325,6 +330,7 @@ TEST_F(TestRegisterAllocatorPass, ForceFramePointerReservationOnDAlloc)
 
     RegisterAllocatorCtx ctx(getBuilderCtx(), func, getTargetDesc(), getBuilderCtx()->getGlobalAllocator());
 
+    runPass<MirInstructionSelectorPass>(getBuilderCtx(), getTargetDesc());
     MirRegisterAllocatorPass *pass =
             runPass<MirRegisterAllocatorPass>(getBuilderCtx(), getRegisterAllocator(), getTargetDesc());
 
@@ -347,5 +353,5 @@ TEST_F(TestRegisterAllocatorPass, ForceFramePointerReservationOnDAlloc)
             .verifyReservedRegistersNotAssigned(ctx)
             .verifyFramePointerReservedOnDAlloc(ctx);
 
-    EXPECT_TRUE(ctx.m_needsFramePointer);
+    EXPECT_TRUE(func->getCallingConv()->hasFramePointer(func));
 }

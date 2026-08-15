@@ -60,7 +60,7 @@ inline Predicate operandFlag(OperandFlag flag)
 {
     return [=](const MirInstruction *inst) -> bool
     {
-        for (const auto &opConst : inst->getMetadata().m_operandConstraints)
+        for (const auto &opConst : inst->getMetadata().m_operandFlags)
         {
             if (opConst.flags & flag)
                 return true;

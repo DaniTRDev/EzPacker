@@ -5,23 +5,11 @@
 #include "Descriptors/TargetDesc.h"
 
 /**
- * Stores calculated stack frame dimensions and concrete object offsets
- * for a single function.
- */
-struct FrameLayout
-{
-    bool m_hasDynamicAllocs{ false };
-    size_t calleeSavedAreaSize = 0; ///< Total size (in bytes) occupied by pushed callee-saved registers.
-    size_t totalFrameSize = 0;      ///< Total aligned stack payload size allocated during the prologue.
-};
-
-/**
  * Execution context provided to the frame lowerer containing function,
  * target hardware, and memory resource state.
  */
 struct FrameLowererCtx
 {
-    FrameLayout m_layout;
     MirBuilderContext *m_ctx;  ///< Shared compiler context for operand and instruction building.
     MirFunction *m_targetFunc; ///< Function being processed.
     TargetDesc *m_targetDesc;  ///< Hardware target descriptor containing the TargetFrameLowering implementation.
@@ -75,19 +63,19 @@ class MirFrameLowerer
     virtual void insertEpilogue(FrameLowererCtx &ctx) = 0;
 
     /**
-     * Lowers an ALLOC instruction. This must be called BEFORE calculateFrameLayout.
-     * This function will create a new static stack object and push it to the function's stack frame.
-     *
-     * It will replace the ALLOC instruction with a LEA.
+     * Lowers an ALLOC instruction. This must be called BEFORE calculateFrameLayout. Returns true if an ALLOC was
+     * lowered.
      */
-    virtual void lowerAlloc(FrameLowererCtx &ctx);
+    virtual bool lowerAlloc(FrameLowererCtx &ctx) = 0;
 
     /**
      * Lowers a DALLOC instruction by emitting a series of instructions. This will force the function to use a frame
      * pointer, even if it means using a scratch register. This function is also highly dependant on the target, that's
      * why each target needs to define how to properly lower the dynamic alloc.
      *
-     * Emitted instructions in the place of the DALLOC:
+     * This function returns TRUE if a DALLOC was actually lowered.
+     *
+     * Emitted instructions (in general cases) in the place of the DALLOC:
      * sub sp, allocSize
      * and sp, alignment
      * mov type %dest, sp.
@@ -97,7 +85,7 @@ class MirFrameLowerer
      * mov sp, fp
      * ret
      */
-    virtual void lowerDAlloc(FrameLowererCtx &ctx) = 0;
+    virtual bool lowerDAlloc(FrameLowererCtx &ctx) = 0;
 
     /**
      * Lowers each reference to a stack frame object into a MirMemory as FP/SP + offset.

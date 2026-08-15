@@ -55,6 +55,14 @@ class MirPassManager
     }
 
     /**
+     * Runs a TRANSFORMATION pass on the given place depending on its iteration type.
+     * @param pass
+     * @param ctx
+     * @return
+     */
+    MirPassResult runPass(MirPass *pass, MirBuilderContext *ctx);
+
+    /**
      * Invalidates the analysis stored.
      */
     void invalidateAnalysis();
@@ -94,14 +102,6 @@ class MirPassManager
     void resolveDependencies(std::type_index passId,
                              std::unordered_set<std::type_index> &resolved,
                              std::unordered_set<std::type_index> &seenInCurrentPath);
-
-    /**
-     * Runs a TRANSFORMATION pass on the given place depending on its iteration type.
-     * @param pass
-     * @param ctx
-     * @return
-     */
-    MirPassResult runPass(MirPass *pass, MirBuilderContext *ctx);
 
   private:
     bool m_testMode;

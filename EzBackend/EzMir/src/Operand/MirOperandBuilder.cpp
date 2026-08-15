@@ -119,15 +119,16 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const F
     return build<MirMemory>(type, base, build<MirInteger>(t->i64(), displ, nullptr), ref);
 }
 
-MirRegister *MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReference *ref)
+MirRegister *
+MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReference *ref, MirRegisterClass *_class)
 {
-    return build<MirRegister>(type, true, m_ctx->createId(), ref, name);
+    return build<MirRegister>(type, true, m_ctx->createId(), ref, _class, name);
 }
 
-MirRegister *
-MirOperandBuilder::buildPhysReg(MirType *type, PhysicalRegId physId, std::pmr::string name, SourceReference *ref)
+MirRegister *MirOperandBuilder::buildPhysReg(
+        MirType *type, PhysicalRegId physId, std::pmr::string name, MirRegisterClass *_class, SourceReference *ref)
 {
-    return build<MirRegister>(type, false, physId, ref, name);
+    return build<MirRegister>(type, false, physId, ref, _class, name);
 }
 
 MirReference *MirOperandBuilder::buildArrayElemRef(MirGlobalVar *var, size_t elementIndex, SourceReference *ref)

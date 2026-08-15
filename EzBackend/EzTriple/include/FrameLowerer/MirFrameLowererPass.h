@@ -5,13 +5,6 @@
 #include "MirFrameLowerer.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 
-struct MirFrameLowererPassResult
-{
-    std::pmr::map<MirFunction *, FrameLayout> m_layouts;
-
-    MirFrameLowererPassResult(std::pmr::memory_resource *allocator) : m_layouts(allocator) {}
-};
-
 class MirFrameLowererPass : public IMirTransformPass
 {
   public:
@@ -24,11 +17,6 @@ class MirFrameLowererPass : public IMirTransformPass
      * Returns "MirFrameLowererPass".
      */
     const char *getName() const override;
-
-    /**
-     * Returns the result of this pass, if any.
-     */
-    const MirFrameLowererPassResult &getResult();
 
     /**
      * Returns MirPassIterationPlace::Function.
@@ -48,12 +36,12 @@ class MirFrameLowererPass : public IMirTransformPass
                       class MirPassManager *passManager) override;
 
     /**
-     * Prints the content of each lowered function.
+     * Prints each lowered function using MirPrinter.
      */
     void printResult() const override;
 
     /**
-     * Clears the result of this pass.
+     * Clears m_lowredFunction list.
      */
     void reset() override;
 
@@ -64,8 +52,8 @@ class MirFrameLowererPass : public IMirTransformPass
 
   private:
     MirBuilderContext *m_ctx;
-    MirFrameLowererPassResult m_result;
     TargetDesc *m_targetDesc;
+    std::pmr::list<MirFunction *> m_loweredFunctions;
 };
 
 #endif // EZPACKER_MIRFRAMELOWERERPASS_H

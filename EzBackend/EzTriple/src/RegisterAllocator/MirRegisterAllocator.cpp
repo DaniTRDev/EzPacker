@@ -4,13 +4,7 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
 {
     MirFunction *func = ctx.m_targetFunction;
     CallingConvDesc *cc = func->getCallingConv();
-
-    // Check if ABI mandates frame pointer.
-    if (cc && cc->hasFramePointer(func))
-    {
-        ctx.m_needsFramePointer = true;
-    }
-
+    const auto analysisData = func->getAnalysisData();
     const auto &blockList = func->getBlocks();
 
     for (MirBlock *block : blockList)
@@ -35,11 +29,9 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             const auto &defs = inst->getDefinedRegisters();
             const auto &uses = inst->getUsedRegisters();
 
-            if (inst->getOpCode() == MirInstructionOpCode::DALLOC)
+            if (!analysisData->m_hasDynamicAllocs && inst->getOpCode() == MirInstructionOpCode::DALLOC)
             {
-                auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Debug, "MirRegisterAllocator");
-                log << "Found DALLOC in function, marking FP requirement" << inst->getSourceRef();
-                ctx.m_needsFramePointer = true;
+                func->getAnalysisData()->m_hasDynamicAllocs = true;
             }
 
             // Add nodes and interference edges for DEFs
@@ -74,7 +66,7 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
     }
 
     // Reserve physical Frame Pointer register if required
-    if (ctx.m_needsFramePointer && cc)
+    if (cc->hasFramePointer(func))
     {
         RegisterRef fpReg = cc->getFramePointerReg();
         ctx.m_reservedRegs.insert(fpReg);
@@ -86,8 +78,8 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
 bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
 {
     // Cache target register counts per class to avoid repetitive targetDesc lookups
-    std::pmr::unordered_map<RegisterRefClass, size_t> colorLimits(ctx.m_allocator);
     size_t totalVirtualNodes = 0;
+    std::pmr::unordered_map<MirRegisterClass *, size_t> colorLimits(ctx.m_allocator);
 
     for (const auto &[node, neighbors] : ctx.m_iGraph)
     {
@@ -96,12 +88,13 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
             totalVirtualNodes++;
             if (!colorLimits.contains(node.getClass()))
             {
-                const auto &available = ctx.m_targetDesc->getAvailableRegisters(node.getClass());
+                const auto &available = node.getClass()->getRegs();
                 size_t usableCount = 0;
 
                 // Subtract reserved physical registers (e.g. FP) from availability threshold K
-                for (const RegisterRef &physReg : available)
+                for (auto &[name, regDesc] : available)
                 {
+                    RegisterRef physReg = RegisterRef::preg(regDesc);
                     if (!ctx.m_reservedRegs.contains(physReg))
                     {
                         usableCount++;
@@ -211,22 +204,22 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx &ctx)
 bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx &ctx)
 {
     std::pmr::unordered_set<RegisterRef> spilledNodes(ctx.m_allocator);
-    std::vector<bool> usedColorsBitset;
+    std::unordered_set<RegisterRef> usedColorsSet;
 
     while (!ctx.m_selectStack.empty())
     {
         RegisterRef node = ctx.m_selectStack.back();
         ctx.m_selectStack.pop_back();
 
-        const auto &availableColors = ctx.m_targetDesc->getAvailableRegisters(node.getClass());
-        usedColorsBitset.assign(availableColors.size(), false);
+        const auto &availableColors = node.getClass()->getRegs();
 
         // Permanently lock out physical registers that are reserved (such as Frame Pointer)
-        for (size_t i = 0; i < availableColors.size(); ++i)
+        for (auto &[name, regDesc] : availableColors)
         {
-            if (ctx.m_reservedRegs.contains(availableColors[i]))
+            RegisterRef ref = RegisterRef::preg(regDesc);
+            if (ctx.m_reservedRegs.contains(ref))
             {
-                usedColorsBitset[i] = true;
+                usedColorsSet.insert(std::move(ref));
             }
         }
 
@@ -240,11 +233,12 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx &ctx)
             if (it != ctx.m_allocatedRegs.end())
             {
                 const RegisterRef &assignedColor = it->second;
-                for (size_t i = 0; i < availableColors.size(); ++i)
+                for (auto &[name, regDesc] : availableColors)
                 {
-                    if (availableColors[i] == assignedColor)
+                    RegisterRef ref = RegisterRef::preg(regDesc);
+                    if (ref == assignedColor)
                     {
-                        usedColorsBitset[i] = true;
+                        usedColorsSet.insert(std::move(ref));
                         break;
                     }
                 }
@@ -252,11 +246,12 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx &ctx)
         }
 
         std::optional<RegisterRef> assignedPhysReg;
-        for (size_t i = 0; i < availableColors.size(); ++i)
+        for (auto &[name, regDesc] : availableColors)
         {
-            if (!usedColorsBitset[i])
+            RegisterRef ref = RegisterRef::preg(regDesc);
+            if (!usedColorsSet.contains(ref))
             {
-                assignedPhysReg = availableColors[i];
+                assignedPhysReg = std::move(ref);
                 break;
             }
         }
@@ -379,7 +374,7 @@ double MirRegisterAllocator::calculateSpillCost(RegisterRef node, RegisterAlloca
 
     for (MirBlock *block : ctx.m_targetFunction->getBlocks())
     {
-        size_t loopDepth = 0; // TODO: Populated by LoopAnalysis pass
+        size_t loopDepth = 0; // TODO: Create LoopAnalysis pass.
         double weight = std::pow(10.0, static_cast<double>(loopDepth));
 
         for (MirInstruction *inst : block->getInstructions())
@@ -459,7 +454,7 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
         for (auto it = origInstructions.begin(); it != origInstructions.end(); ++it)
         {
             MirInstruction *inst = *it;
-            const auto &operandConsts = inst->getMetadata().m_operandConstraints;
+            const auto &operandConsts = inst->getMetadata().m_operandFlags;
             SourceReference *srcRef = inst->getSourceRef();
             MirOperandBuilder opBuilder(ctx.m_ctx);
 

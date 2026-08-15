@@ -12,14 +12,15 @@ class InstructionSelectionRuleBuilder
      * @param selector
      */
     InstructionSelectionRuleBuilder(MirInstructionSelector *selector);
-    
+
     /**
-     * Sets the action for the current target instruction rule. WILL OVERWRITE THE CURRENT ACTION.
+     * PUSHES the action for the current target instruction rule. Actions will be executed in the same order as this
+     * method is called within a rule.
      * @param act
      * @return
      */
     InstructionSelectionRuleBuilder &act(const InstructionSelAction &act);
-    
+
     /**
      * Begins a new rule with the given name and targeting the given opcode.
      * @param name

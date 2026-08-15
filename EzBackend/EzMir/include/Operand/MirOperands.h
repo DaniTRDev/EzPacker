@@ -4,6 +4,8 @@
 #include "EzMirCommon.h"
 #include "MirOperand.h"
 #include "MirRegisterReference.h"
+#include <format>
+#include <string>
 
 enum class MirReferenceType : uint8_t
 {
@@ -18,6 +20,9 @@ enum class MirReferenceType : uint8_t
     ConstantArrayElement
 };
 
+// =========================================================================
+// 1. FLOATING POINT IMMEDIATE
+// =========================================================================
 class MirFloat : public MirOperand
 {
   public:
@@ -26,11 +31,12 @@ class MirFloat : public MirOperand
     MirFloat(MirType *type, FlexFloat value, SourceReference *ref) : MirOperand(type, ref), m_float(std::move(value)) {}
 
     FlexFloat &getValue() { return m_float; }
+    const FlexFloat &getValue() const { return m_float; }
     MirOperandType getType() const override { return OpKind; }
 
     std::string toString() const override
     {
-        // Output format: f32 3.14159
+        // Output format: f32 3.14159 or f64 0.0
         return std::format("{} {}", getMirType()->getName(), m_float.toString(10));
     }
 
@@ -38,6 +44,9 @@ class MirFloat : public MirOperand
     FlexFloat m_float;
 };
 
+// =========================================================================
+// 2. INTEGER IMMEDIATE
+// =========================================================================
 class MirInteger : public MirOperand
 {
   public:
@@ -46,18 +55,27 @@ class MirInteger : public MirOperand
     MirInteger(MirType *type, FlexInt value, SourceReference *ref) : MirOperand(type, ref), m_int(value) {}
 
     FlexInt &getValue() { return m_int; }
+    const FlexInt &getValue() const { return m_int; }
     MirOperandType getType() const override { return OpKind; }
 
     std::string toString() const override
     {
-        // Output format: i32 0x2A
-        return std::format("{} {}", getMirType()->getName(), m_int.toString(16));
+        // Output format: i32 1...9 or i64 0x2A for larger values
+        int64_t val = m_int.getI64();
+        if (val >= 0 && val <= 9)
+        {
+            return std::format("{} {}", getMirType()->getName(), val);
+        }
+        return std::format("{} 0x{:X}", getMirType()->getName(), val);
     }
 
   private:
     FlexInt m_int;
 };
 
+// =========================================================================
+// 3. CONSTANT ARRAY
+// =========================================================================
 class MirConstantArray : public MirOperand
 {
   public:
@@ -73,13 +91,13 @@ class MirConstantArray : public MirOperand
 
     std::string toString() const override
     {
-        // Output format: i32[3] [i32 0x1, i32 0x2, i32 0x3]
+        // Output format: i32[3] [i32 1, i32 2, i32 3]
         std::string res = std::format("{} [", getMirType()->getName());
         for (size_t i = 0; i < m_elements.size(); ++i)
         {
             if (i > 0)
                 res += ", ";
-            res += m_elements[i]->toString();
+            res += m_elements[i] ? m_elements[i]->toString() : "<null>";
         }
         return res + "]";
     }
@@ -88,6 +106,9 @@ class MirConstantArray : public MirOperand
     std::pmr::vector<MirOperand *> m_elements;
 };
 
+// =========================================================================
+// 4. SYMBOLIC & ABSTRACT REFERENCES
+// =========================================================================
 class MirReference : public MirOperand
 {
   public:
@@ -115,26 +136,28 @@ class MirReference : public MirOperand
 
     std::string toString() const override
     {
-        auto typePrefix = getMirType()->getName();
+        auto typePrefix = getMirType() ? getMirType()->getName() : "void";
 
         switch (m_refType)
         {
             case MirReferenceType::Block:
                 return std::format("label %block_{}", m_refId);
             case MirReferenceType::GlobalVar:
-                return std::format("{} @global_{}+{}", typePrefix, m_refId, m_offset);
+                if (m_offset > 0)
+                    return std::format("{}* @global_{}+0x{:X}", typePrefix, m_refId, m_offset);
+                return std::format("{}* @global_{}", typePrefix, m_refId);
             case MirReferenceType::GlobalArrayElem:
-                return std::format("{} @global_{}[{}]", typePrefix, m_refId, m_offset);
+                return std::format("{}* @global_{}[{}]", typePrefix, m_refId, m_offset);
             case MirReferenceType::Function:
-                return std::format("{} @func_{}", typePrefix, m_refId);
+                return std::format("{}() @func_{}", typePrefix, m_refId);
             case MirReferenceType::ClassField:
-                return std::format("{} %v{}.field_{}", typePrefix, m_refId, m_offset);
+                return std::format("{}* %v{}.field_{}", typePrefix, m_refId, m_offset);
             case MirReferenceType::ClassMethod:
                 return std::format("{} %v{}.method_{}", typePrefix, m_refId, m_offset);
             case MirReferenceType::ConstantArrayElement:
                 return std::format("{} %v{}[{}]", typePrefix, m_refId, m_offset);
             case MirReferenceType::StackFrameObject:
-                return std::format("{} %stack[{}]", typePrefix, m_refId);
+                return std::format("{}* %stack[{}]", typePrefix, m_refId);
             default:
                 return std::format("{} <invalid_ref>", typePrefix);
         }
@@ -146,6 +169,9 @@ class MirReference : public MirOperand
     size_t m_offset{ 0 };
 };
 
+// =========================================================================
+// 5. RUNTIME ABI SYMBOL
+// =========================================================================
 class MirRuntimeSymbol : public MirOperand
 {
   public:
@@ -161,39 +187,57 @@ class MirRuntimeSymbol : public MirOperand
 
     std::string toString() const override
     {
-        // Output format: @rt_memcpy
-        return std::format("@rt_{}", m_symbolName);
+        // Output format: @__udivti3 or @memcpy
+        if (m_symbolName.starts_with("@"))
+            return std::string(m_symbolName);
+        return std::format("@{}", m_symbolName);
     }
 
   private:
     std::pmr::string m_symbolName;
 };
 
+// =========================================================================
+// 6. REGISTER OPERAND
+// =========================================================================
 class MirRegister : public MirOperand
 {
   public:
     static constexpr MirOperandType OpKind = MirOperandType::Register;
 
-    MirRegister(MirType *type, bool isVirtual, size_t id, SourceReference *ref, std::pmr::string name = "") :
-        MirOperand(type, ref), m_ref(RegisterRef::fromType(type, id, isVirtual)), m_name(std::move(name))
+    MirRegister(MirType *type,
+                bool isVirtual,
+                size_t id,
+                SourceReference *ref,
+                MirRegisterClass *_class = nullptr,
+                std::pmr::string name = "") :
+        MirOperand(type, ref), m_ref(RegisterRef(id, isVirtual, _class)), m_name(std::move(name))
     {
     }
 
     bool isVirtual() const { return m_ref.isVirtual(); }
+    bool isPhysical() const { return !m_ref.isVirtual(); }
     bool operator==(const MirRegister &other) const { return m_ref == other.m_ref; }
+
     MirOperandType getType() const override { return OpKind; }
     RegisterRef getRef() const { return m_ref; }
     size_t getRegId() const { return m_ref.getId(); }
+
+    void setClass(MirRegisterClass *_class) { m_ref.setClass(_class); }
     void setRef(RegisterRef ref) { m_ref = ref; }
 
     std::string toString() const override
     {
         char prefix = m_ref.isVirtual() ? 'v' : 'p';
+        const char *className = m_ref.getClass() ? m_ref.getClass()->getName() : "unassigned";
+        std::pmr::string typeStr = getMirType()->getName();
+
+        // Format: i32 %v5(val32:GPR32) or i64 %p4(rsp:GPR64)
         if (!m_name.empty())
         {
-            return std::format("{} %{}{}({})", getMirType()->getName(), prefix, m_ref.getId(), m_name);
+            return std::format("{} %{}{}({}:{})", typeStr, prefix, m_ref.getId(), m_name, className);
         }
-        return std::format("{} %{}{}", getMirType()->getName(), prefix, m_ref.getId());
+        return std::format("{} %{}{}({})", typeStr, prefix, m_ref.getId(), className);
     }
 
     const std::pmr::string &getName() const { return m_name; }
@@ -203,6 +247,9 @@ class MirRegister : public MirOperand
     std::pmr::string m_name;
 };
 
+// =========================================================================
+// 7. FRAME INDEX OPERAND
+// =========================================================================
 class MirFrameIndex : public MirOperand
 {
   public:
@@ -223,6 +270,9 @@ class MirFrameIndex : public MirOperand
     size_t m_frameId{ 0 };
 };
 
+// =========================================================================
+// 8. CONCRETE MEMORY OPERAND
+// =========================================================================
 class MirMemory : public MirOperand
 {
   public:
@@ -235,20 +285,28 @@ class MirMemory : public MirOperand
 
     MirRegister *getBase() const { return m_base; }
     MirInteger *getDisplacement() const { return m_displ; }
+    bool hasBaseReg() const { return m_base != nullptr; }
     MirOperandType getType() const override { return OpKind; }
 
     std::string toString() const override
     {
         std::string baseStr = m_base ? m_base->toString() : "0";
+        std::pmr::string typePrefix = getMirType()->getName();
 
         if (m_displ && !m_displ->getValue().isZero())
         {
-            // Output format: qword ptr [%v0 + 0x10]
-            return std::format("ptr [{} + {}]", baseStr, m_displ->getValue().toString(16));
+            int64_t offset = m_displ->getValue().getI64();
+            if (offset >= 0)
+            {
+                // Format: i32 ptr [i64 %p4(rsp:GPR64) + 0x10]
+                return std::format("{} ptr [{} + 0x{:X}]", typePrefix, baseStr, offset);
+            }
+            // Format: f64 ptr [i64 %p4(rsp:GPR64) - 0x10]
+            return std::format("{} ptr [{} - 0x{:X}]", typePrefix, baseStr, -offset);
         }
 
-        // Output format: qword ptr [%v0]
-        return std::format("ptr [{}]", baseStr);
+        // Format: i32 ptr [i64 %p4(rsp:GPR64)]
+        return std::format("{} ptr [{}]", typePrefix, baseStr);
     }
 
   private:

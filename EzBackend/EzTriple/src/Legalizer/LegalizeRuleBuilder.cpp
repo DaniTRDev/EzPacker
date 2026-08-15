@@ -60,7 +60,7 @@ LegalizeRuleBuilder &LegalizeRuleBuilder::legalForDest(std::vector<MirType *> ty
                                bool checkedAny = false;
                                for (size_t i = 0; i < operands.size(); i++)
                                {
-                                   const auto &constraint = instrMetadata.m_operandConstraints[i];
+                                   const auto &constraint = instrMetadata.m_operandFlags[i];
                                    const auto &operand = operands[i];
 
                                    if (constraint.flags & OperandFlag::Write)
@@ -105,7 +105,7 @@ LegalizeRuleBuilder &LegalizeRuleBuilder::legalForSrc(std::vector<MirType *> typ
                                bool checkedAny = false;
                                for (size_t i = 0; i < operands.size(); i++)
                                {
-                                   const auto &constraint = instrMetadata.m_operandConstraints[i];
+                                   const auto &constraint = instrMetadata.m_operandFlags[i];
                                    const auto &operand = operands[i];
 
                                    if ((constraint.flags & OperandFlag::Read) &&

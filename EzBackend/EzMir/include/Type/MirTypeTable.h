@@ -19,7 +19,7 @@ class MirTypeTable
      * @param typeLayout
      * @param globalArena
      */
-    MirTypeTable(IMirTargetTypeLayout *typeLayout, std::pmr::memory_resource *globalArena);
+    MirTypeTable(std::pmr::memory_resource *globalArena);
 
     // Disable copies to safeguard our arena resource mappings
     MirTypeTable(const MirTypeTable &) = delete;
@@ -118,9 +118,9 @@ class MirTypeTable
     MirType *f128() const;
 
     /**
-     * Initializes the type table with the basic primitive types needed: iXX, void and fXX.
+     * Initializes the type table with the basic primitive types needed as well as the type layout class.
      */
-    void initialize();
+    void initialize(IMirTargetTypeLayout *typeLayout);
 
   private:
     IMirTargetTypeLayout *m_typeLayout{ nullptr };

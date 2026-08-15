@@ -71,13 +71,13 @@ INSTRUCTION(LOAD,
             T(HighLevel),
             MirCat_Memory,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::Memory, OperandFlag::Read }),
+                                { ExpectedOperandType::AddressSource, OperandFlag::Read }),
             F(ReadsMemory))
 
 INSTRUCTION(STORE,
             T(HighLevel),
             MirCat_Memory,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Memory, OperandFlag::Write },
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::AddressSource, OperandFlag::Write },
                                 { ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(WritesMemory) | F(HasSideEffect))
 
@@ -90,7 +90,7 @@ INSTRUCTION(PUSH,
 INSTRUCTION(POP,
             T(HighLevel),
             MirCat_Memory,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Memory, OperandFlag::Write }),
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write }),
             F(WritesMemory) | F(HasSideEffect))
 
 INSTRUCTION(ALLOC,
@@ -106,7 +106,7 @@ INSTRUCTION(DALLOC,
                                 { ExpectedOperandType::Register, OperandFlag::Read }),
             F(HasSideEffect))
 
-/* --- ARITHMETIC (ALU) ----------------------------------------------------- */
+/* --- ARITHMETIC (INTEGER ALU) --------------------------------------------- */
 INSTRUCTION(ADD,
             T(HighLevel),
             MirCat_Arithmetic,
@@ -176,6 +176,35 @@ INSTRUCTION(NEG,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite }),
             F(WritesCPUFlags))
 
+/* --- ARITHMETIC (FLOATING-POINT ALU) --------------------------------------- */
+INSTRUCTION(FADD,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
+                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
+            F(SizeMatch) | F(IsCommutative))
+
+INSTRUCTION(FSUB,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
+                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
+            F(SizeMatch))
+
+INSTRUCTION(FMUL,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
+                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
+            F(SizeMatch) | F(IsCommutative))
+
+INSTRUCTION(FDIV,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
+                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
+            F(SizeMatch))
+
 /* --- BITWISE LOGIC -------------------------------------------------------- */
 INSTRUCTION(AND,
             T(HighLevel),
@@ -201,7 +230,8 @@ INSTRUCTION(XOR,
 INSTRUCTION(NOT,
             T(HighLevel),
             MirCat_Bitwise,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite }),
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::ReadWrite },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
             F(WritesCPUFlags))
 
 INSTRUCTION(SHL,
@@ -225,8 +255,15 @@ INSTRUCTION(SAR,
                                 { ExpectedOperandType::RegIntImm, OperandFlag::Read }),
             F(WritesCPUFlags) | F(TreatAsSigned))
 
-/* --- CONTROL FLOW --------------------------------------------------------- */
+/* --- CONTROL FLOW & COMPARISONS ------------------------------------------- */
 INSTRUCTION(CMP,
+            T(HighLevel),
+            MirCat_Compare,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
+                                { ExpectedOperandType::RegImm, OperandFlag::Read }),
+            F(SizeMatch) | F(WritesCPUFlags))
+
+INSTRUCTION(FCMP,
             T(HighLevel),
             MirCat_Compare,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Read },
@@ -309,40 +346,61 @@ INSTRUCTION(RET,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::AnyValue, OperandFlag::Read }),
             F(IsTerminator) | F(IsReturn) | F(HasSideEffect))
 
-/* --- TYPE CASTING --------------------------------------------------------- */
+/* --- TYPE CASTING & CONVERSIONS ------------------------------------------- */
 INSTRUCTION(TRUNC,
             T(HighLevel),
             MirCat_Casting,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::RegIntImm, OperandFlag::Read }),
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
             F(DestSmaller))
 
 INSTRUCTION(ZEXT,
             T(HighLevel),
             MirCat_Casting,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::RegIntImm, OperandFlag::Read }),
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
             F(DestLarger))
 
 INSTRUCTION(SEXT,
             T(HighLevel),
             MirCat_Casting,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::RegIntImm, OperandFlag::Read }),
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
             F(DestLarger))
 
 INSTRUCTION(FPEXT,
             T(HighLevel),
             MirCat_Casting,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::RegIntImm, OperandFlag::Read }),
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
             F(DestLarger))
+
+INSTRUCTION(FPTRUNC,
+            T(HighLevel),
+            MirCat_Casting,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
+            F(DestSmaller))
+
+INSTRUCTION(SITOFP,
+            T(HighLevel),
+            MirCat_Casting,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
+            F(None))
+
+INSTRUCTION(FPTOSI,
+            T(HighLevel),
+            MirCat_Casting,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
+            F(None))
 
 INSTRUCTION(BITCAST,
             T(HighLevel),
             MirCat_Casting,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, OperandFlag::Write },
-                                { ExpectedOperandType::RegIntImm, OperandFlag::Read }),
+                                { ExpectedOperandType::Register, OperandFlag::Read }),
             F(SizeMatch))
 
 /* --- SYSTEM & SPECIAL ----------------------------------------------------- */

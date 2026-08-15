@@ -25,7 +25,7 @@ enum class ExpectedOperandType : uint16_t
     RegImm = RegIntImm | RegFloatImm,
 
     // Any kind of memory address source (used for LEA)
-    AddressSource = Memory | FrameIndex,
+    AddressSource = Memory | FrameIndex | Reference,
 
     // Anything that can be read as a value
     AnyValue = Register | Integer | FloatingPoint,
@@ -147,7 +147,7 @@ struct MirInstructionMetadata
     MirInstructionTier m_tier;
     MirInstructionFlags m_flags;
     std::string_view m_name;
-    std::vector<OperandConstraint> m_operandConstraints;
+    std::vector<OperandConstraint> m_operandFlags;
 
     MirInstructionMetadata(MirInstructionCategory category,
                            MirInstructionOpCode opcode,
@@ -156,7 +156,7 @@ struct MirInstructionMetadata
                            std::string_view name,
                            std::initializer_list<OperandConstraint> operands) :
         m_category(category), m_opcode(opcode), m_tier(tier), m_flags(flag), m_name(std::move(name)),
-        m_operandConstraints(operands)
+        m_operandFlags(operands)
     {
     }
 };

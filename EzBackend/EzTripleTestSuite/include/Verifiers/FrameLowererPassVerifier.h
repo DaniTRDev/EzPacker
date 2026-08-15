@@ -19,7 +19,7 @@ class FrameLowererPassVerifier : public MirPassVerifier<MirFrameLowererPass, Fra
      * @param layout Expected frame layout metadata computed during pass execution.
      * @return Reference to self for method chaining.
      */
-    FrameLowererPassVerifier &verifyPrologue(MirFunction *func, const FrameLayout &layout);
+    FrameLowererPassVerifier &verifyPrologue(MirFunction *func);
 
     /**
      * Verifies that every block terminating with a return instruction contains a valid epilogue:
@@ -31,7 +31,7 @@ class FrameLowererPassVerifier : public MirPassVerifier<MirFrameLowererPass, Fra
      * @param layout Expected frame layout metadata computed during pass execution.
      * @return Reference to self for method chaining.
      */
-    FrameLowererPassVerifier &verifyEpilogue(MirFunction *func, const FrameLayout &layout);
+    FrameLowererPassVerifier &verifyEpilogue(MirFunction *func);
 
     /**
      * Verifies that no abstract StackObject MirReference operands remain in any block instruction.
@@ -40,13 +40,13 @@ class FrameLowererPassVerifier : public MirPassVerifier<MirFrameLowererPass, Fra
      * @param func Target function to verify.
      * @return Reference to self for method chaining.
      */
-    FrameLowererPassVerifier &verifyStackReferencesLowered(MirFunction *func, const FrameLayout &layout);
+    FrameLowererPassVerifier &verifyStackReferencesLowered(MirFunction *func);
 
     /**
      * Asserts that no DALLOC instructions remain, size alignment / SUB SP sequence was emitted,
      * and that the function has enforce-FP flagged.
      */
-    FrameLowererPassVerifier &verifyDAllocLowered(MirFunction *func, const FrameLayout &layout);
+    FrameLowererPassVerifier &verifyDAllocLowered(MirFunction *func);
 
   private:
     MirBuilderContext *m_ctx;

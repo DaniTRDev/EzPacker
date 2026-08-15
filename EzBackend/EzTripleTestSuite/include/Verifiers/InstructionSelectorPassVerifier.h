@@ -16,11 +16,11 @@ class InstructionSelectorPassVerifier
      *
      * @param targetBlock The block containing the instruction.
      * @param instructionIndex Zero-based index of the instruction in the block.
-     * @param expectedTargetId The expected target instruction ID assigned by selection.
+     * @param expectedDesc The expected target instruction descriptor assigned by selection.
      * @return Reference to self for method chaining.
      */
     InstructionSelectorPassVerifier &
-    verifyInstructionSelected(MirBlock *targetBlock, size_t instructionIndex, MirTargetInstructionId expectedTargetId);
+    verifyInstructionSelected(MirBlock *targetBlock, size_t instructionIndex, MirTargetInstructionDesc *expectedDesc);
 
   private:
     MirBuilderContext *m_ctx;

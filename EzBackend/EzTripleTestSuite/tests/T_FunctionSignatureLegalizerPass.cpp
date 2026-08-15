@@ -17,7 +17,7 @@ TEST_F(TestLegalizeCallAct, TestCallNoArgs)
                                   func->getEntryPoint()->getInstructions().begin());
 
     MirFunctionSignatureLegalizerPass *pass =
-            runPass<MirFunctionSignatureLegalizerPass>(getBuilderCtx(), getLegalizer());
+            runPass<MirFunctionSignatureLegalizerPass>(getBuilderCtx(), getTargetDesc());
 
     FuncSignaturePassVerifier verifier(getBuilderCtx(), pass);
     verifier.beginFunc(func);
@@ -56,7 +56,7 @@ TEST_F(TestLegalizeCallAct, TestCall1Arg)
                                   func->getEntryPoint()->getInstructions().begin());
 
     MirFunctionSignatureLegalizerPass *pass =
-            runPass<MirFunctionSignatureLegalizerPass>(getBuilderCtx(), getLegalizer());
+            runPass<MirFunctionSignatureLegalizerPass>(getBuilderCtx(), getTargetDesc());
 
     FuncSignaturePassVerifier verifier(getBuilderCtx(), pass);
     verifier.beginFunc(func);
@@ -101,7 +101,7 @@ TEST_F(TestLegalizeCallAct, TestCall4Arg)
                                   func->getEntryPoint()->getInstructions().begin());
 
     MirFunctionSignatureLegalizerPass *pass =
-            runPass<MirFunctionSignatureLegalizerPass>(getBuilderCtx(), getLegalizer());
+            runPass<MirFunctionSignatureLegalizerPass>(getBuilderCtx(), getTargetDesc());
 
     FuncSignaturePassVerifier verifier(getBuilderCtx(), pass);
     verifier.beginFunc(func);

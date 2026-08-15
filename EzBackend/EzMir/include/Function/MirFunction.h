@@ -1,18 +1,3 @@
-/**
- * @file MirFunction.h
- * @brief Function-level MIR container: entry point, block list, parameters, and return type.
- *
- * A `MirFunction` groups a set of `MirBlock`s into one callable MIR unit.
- * The object stores:
- *   - an entry-point block,
- *   - a unique MIR function ID,
- *   - the MIR type ID of the return value,
- *   - the arena-managed block list for the function,
- *   - and the operand list describing its parameters.
- *
- * The function does not own these slices directly; they are allocated and
- * maintained by `MirBuilderContext`.
- */
 #ifndef EZPACKER_MIRFUNCTION_H
 #define EZPACKER_MIRFUNCTION_H
 
@@ -21,6 +6,21 @@
 #include "Type/MirType.h"
 #include "MirFunctionStackFrame.h"
 #include "CallingConvDesc.h"
+
+/**
+ * Structure that contains information that is filled by passes as the function flows in the compilation process.
+ */
+struct MirFunctionAnalysisData
+{
+    bool m_hasCalls{ false };         // Set by AbiLowererPass.
+    bool m_hasDynamicAllocs{ false }; // Set by FrameLowererPass.
+
+    // Total size (in bytes) occupied by pushed callee-saved registers.
+    size_t m_calleeSavedAreaSize = 0; // Set by FrameLowererPass.
+
+    // Total aligned stack payload size allocated during the prologue.
+    size_t m_totalFrameSize = 0; // Set by FrameLowererPass.
+};
 
 /**
  * Important: Parameters MUST BE VIRTUAL/PHYSICAL REGISTERS.
@@ -69,6 +69,11 @@ class MirFunction
      * Returns the function entry block.
      */
     MirBlock *getEntryPoint() const;
+
+    /**
+     * Returns the analysis data of this function.
+     */
+    MirFunctionAnalysisData *getAnalysisData();
 
     /**
      * Returns the stack frame linked to this object.
@@ -142,6 +147,7 @@ class MirFunction
   private:
     CallingConvDesc *m_callingConv;
     MirBlock *m_entryPoint;
+    MirFunctionAnalysisData m_analysisData;
     MirFunctionStackFrame *m_stackFrame;
     MirType *m_returnType;
     MirType *m_type;

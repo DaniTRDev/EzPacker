@@ -1,5 +1,4 @@
-#include "gtest/gtest.h"
-#include "../include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
 
 /**
  * This test defines certain special operations to make the creation of tests easier.
@@ -10,8 +9,7 @@ class LivenessAnalysisTest : public MirTestSuiteAsGtest
     // Helper to quickly allocate registers in tests
     MirRegister *createInt32Reg(std::string_view name)
     {
-        return MirOperandBuilder(getBuilderCtx())
-                .build<MirRegister>(getTypeTable()->i32(), true, getBuilderCtx()->createId(), nullptr, name.data());
+        return MirOperandBuilder(getBuilderCtx()).buildVReg(getTypeTable()->i32(), name.data());
     }
 
   private:
@@ -52,13 +50,11 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     size_t blockId = entryPoint->getId();
 
     // Local Verification
-    verifier.localDef(blockId, RegisterRefClass::GPR, v0->getRegId())
-            .localDef(blockId, RegisterRefClass::GPR, v1->getRegId());
+    verifier.localDef(blockId, v0->getRegId()).localDef(blockId, v1->getRegId());
 
     // Because %v0 is defined *before* it is used in line 2, it should NOT be in the block-local USE set.
     // The only things in the local USE set are things read *before* a local definition.
-    verifier.notLocalUse(blockId, RegisterRefClass::GPR, v0->getRegId())
-            .notLocalUse(blockId, RegisterRefClass::GPR, v1->getRegId());
+    verifier.notLocalUse(blockId, v0->getRegId()).notLocalUse(blockId, v1->getRegId());
 
     // Global Verification (Empty boundary conditions for basic block terminal functions)
     verifier.liveInCount(blockId, 0).liveOutCount(blockId, 0);
@@ -128,13 +124,13 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
 
     // Global Verifications:
     // %v0 MUST be live out of entryPoint
-    verifier.liveOut(entryPoint->getId(), RegisterRefClass::GPR, v0->getRegId());
+    verifier.liveOut(entryPoint->getId(), v0->getRegId());
 
     // %v0 MUST be live into the thenBlock (since it reads it)
-    verifier.liveIn(thenBlock->getId(), RegisterRefClass::GPR, v0->getRegId());
+    verifier.liveIn(thenBlock->getId(), v0->getRegId());
 
     // %v0 should NOT be live into elseBlock (since it doesn't read it, nor do its successors)
-    verifier.notLiveIn(elseBlock->getId(), RegisterRefClass::GPR, v0->getRegId());
+    verifier.notLiveIn(elseBlock->getId(), v0->getRegId());
 }
 
 TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
@@ -165,10 +161,10 @@ TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
 
     // Local Verification
     // %v0 must be both defined AND used locally by this single basic block
-    verifier.localDef(blockId, RegisterRefClass::GPR, v0->getRegId());
-    verifier.localUse(blockId, RegisterRefClass::GPR, v0->getRegId());
+    verifier.localDef(blockId, v0->getRegId());
+    verifier.localUse(blockId, v0->getRegId());
 
     // Global Verification:
     // Because it was used before a pure overwrite, it is expected to be a LIVE-IN to this block!
-    verifier.liveIn(blockId, RegisterRefClass::GPR, v0->getRegId());
+    verifier.liveIn(blockId, v0->getRegId());
 }

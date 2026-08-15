@@ -6,7 +6,6 @@
 
 struct RegisterAllocatorCtx
 {
-    bool m_needsFramePointer; // Does the function needs a mandatory FP (dynamic alloc found)?
     MirBuilderContext *m_ctx;
     MirFunction *m_targetFunction;
     TargetDesc *m_targetDesc;
@@ -50,9 +49,9 @@ struct RegisterAllocatorCtx
                                   MirFunction *targetFunction,
                                   TargetDesc *targetDesc,
                                   std::pmr::memory_resource *alloc) :
-        m_needsFramePointer(false), m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc),
-        m_allocator(alloc), m_selectStack(alloc), m_removedNodes(alloc), m_reservedRegs(alloc), m_allocatedRegs(alloc),
-        m_degree(alloc), m_spilledRegs(alloc), m_iGraph(alloc), m_unspillableRegs(alloc)
+        m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc), m_allocator(alloc),
+        m_selectStack(alloc), m_removedNodes(alloc), m_reservedRegs(alloc), m_allocatedRegs(alloc), m_degree(alloc),
+        m_spilledRegs(alloc), m_iGraph(alloc), m_unspillableRegs(alloc)
     {
     }
 };

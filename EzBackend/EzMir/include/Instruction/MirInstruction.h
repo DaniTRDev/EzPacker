@@ -13,13 +13,8 @@
 
 #include "EzMirCommon.h"
 #include "MirInstructionDefs.h"
+#include "MirTargetInstructionDesc.h"
 #include "Operand/MirOperands.h"
-
-/**
- * Type used to abstract away details about the selected opcode of a mir instruction (happens in instruction selector
- * pass).
- */
-using MirTargetInstructionId = MirId;
 
 class MirInstruction
 {
@@ -45,8 +40,8 @@ class MirInstruction
     bool hasOperands() const;
 
     /**
-     * Returns true if this instruction is selected: m_opcode == MirInstructionOpCode::TARGET_INST AND m_targetId !=
-     * MIRID_INVALID.
+     * Returns true if this instruction is selected: m_opcode == MirInstructionOpCode::TARGET_INST AND m_targetInstDesc
+     * != nullptr.
      */
     bool isSelected() const;
 
@@ -92,10 +87,16 @@ class MirInstruction
     MirInstructionFlags getFlags() const;
 
     /**
-     * Returns the targetId of the instruction. Will only contain a valid value after instruction selection pass.
-     * @return
+     * Returns the target description of the instruction. Will only contain a valid value after instruction selection
+     * pass.
      */
-    MirTargetInstructionId getTargetId() const;
+    MirTargetInstructionDesc *getTargetDesc() const;
+
+    /**
+     * Returns the operand flag for the given operand distinguishing between a high level mir instruction and a target
+     * instruction.
+     */
+    OperandFlag getOperandFlag(size_t index) const;
 
     /**
      * Returns the source reference of this instruction.
@@ -121,10 +122,10 @@ class MirInstruction
     void setOpcode(MirInstructionOpCode opcode);
 
     /**
-     * Sets the target instruction ID.
+     * Sets the target descriptor for the instruction.
      * @param id
      */
-    void setTargetId(MirTargetInstructionId id);
+    void setTargetDesc(MirTargetInstructionDesc *desc);
 
     /**
      * Replaces the operands of this instruction with the ones given. Also invalidates cached defined and used
@@ -166,7 +167,7 @@ class MirInstruction
     bool m_cachedUsedRegisters;
     class MirBlock *m_owner;
     MirInstructionOpCode m_opcode;
-    MirTargetInstructionId m_targetId;
+    MirTargetInstructionDesc *m_targetDesc;
     SourceReference *m_sourceRef;
     std::pmr::vector<MirOperand *> m_operands;
     std::pmr::vector<RegisterRef> m_definedRegisters;

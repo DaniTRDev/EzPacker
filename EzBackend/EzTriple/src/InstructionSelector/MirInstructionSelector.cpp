@@ -1,11 +1,14 @@
 #include "InstructionSelector/MirInstructionSelector.h"
 
-MirInstructionSelector::MirInstructionSelector(MirBuilderContext *ctx) : m_selectionRules(ctx->getGlobalAllocator()) {}
+MirInstructionSelector::MirInstructionSelector(MirBuilderContext *ctx) :
+    m_selectionRules(ctx->getGlobalAllocator()), m_alloc(ctx->getGlobalAllocator())
+{
+}
 
 SelectionResult MirInstructionSelector::select(SelectionContext &ctx)
 {
     MirInstruction *instr = *ctx.m_it;
-    if (instr->getTargetId() != MIRID_INVALID)
+    if (instr->isSelected())
     {
         return SelectionResult::AlreadySelected;
     }
@@ -19,12 +22,21 @@ SelectionResult MirInstructionSelector::select(SelectionContext &ctx)
         if (rule.m_pred(ctx))
         {
             auto diag = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirInstructionSelector");
-            diag << "Executing selection action" << instr->getSourceRef();
-            diag.appendNote(std::format("Action name: {}", rule.m_name).c_str(), nullptr);
+            diag << "Executing selection rule" << instr->getSourceRef();
+            diag.appendNote(std::format("Rule name: {}", rule.m_name).c_str(), nullptr);
             diag.appendNote(MirPrinter::printToString(instr, MirPrinterDetail::Detailed).c_str(),
                             instr->getSourceRef());
             diag.flush();
-            return rule.m_act(ctx);
+
+            for (auto &action : rule.m_actions)
+            {
+                if (action(ctx) != SelectionResult::Selected)
+                {
+                    return SelectionResult::SelectionError;
+                }
+            }
+
+            return SelectionResult::Selected;
         }
     }
     return SelectionResult::NoRule;
@@ -34,3 +46,5 @@ void MirInstructionSelector::addRule(MirInstructionOpCode opcode, InstructionSel
 {
     m_selectionRules[opcode].push_back(rule);
 }
+
+std::pmr::memory_resource *MirInstructionSelector::getAlloc() const { return m_alloc; }

@@ -7,9 +7,9 @@
 namespace SelectorActions
 {
 /**
- * This action dictates that an instruction is going to be selected with the given target instruction ID.
+ * This action dictates that an instruction is going to be selected with the given target instruction descriptor.
  */
-extern InstructionSelAction ManualAction(MirTargetInstructionId id);
+extern InstructionSelAction ManualAction(MirTargetInstructionDesc *desc);
 }; // namespace SelectorActions
 
 #endif // EZPACKER_MANUALSELECTACTION_H

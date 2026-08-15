@@ -1,21 +1,29 @@
 #include "Printer/MirPrinter.h"
+#include <iomanip>
+#include <sstream>
 
 std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
 {
-    // Indent block headers slightly
+    if (!block)
+        return "<null block>\n";
+
     std::string result;
+    const std::pmr::string &blockName = block->getName();
 
-    if (!block->getName().empty())
-        result = std::format("%block.name={}", block->getName());
+    if (blockName.empty())
+    {
+        result = std::format("%block_{} (id={}, instrs={}):\n",
+                             block->getId(),
+                             block->getId(),
+                             block->getInstructions().size());
+    }
     else
-        result = std::format("%block.id={}", block->getId());
-
-    result += std::format(".instrCount={}", block->getInstructions().size());
-    result += std::format(".owner={}\n", block->getOwner()->getName());
+    {
+        result = std::format("%{} (id={}, instrs={}):\n", blockName, block->getId(), block->getInstructions().size());
+    }
 
     if (detail == MirPrinterDetail::Detailed)
     {
-        // Cascade into Instructions
         for (MirInstruction *instr : block->getInstructions())
         {
             result += printToString(instr, detail);
@@ -30,40 +38,37 @@ std::string MirPrinter::printToString(MirClass *_class, MirPrinterDetail detail)
     if (!_class)
         return "";
 
-    std::string result = std::format("\n{:#^50}\n", " Class Dump ");
+    std::string result = std::format("\n{:=^60}\n", " Class Dump ");
 
-    std::string parentInfo = "";
+    std::string parentInfo;
     if (_class->getParentClass() != nullptr)
     {
-        parentInfo = std::format(".parent={}", _class->getParentClass()->getName());
+        parentInfo = std::format(" : {}", _class->getParentClass()->getName());
     }
 
-    result += std::format("%class.name={}.size={}{}\n",
+    result += std::format("class {}{} [size: {} bytes]\n",
                           _class->getName(),
-                          _class->getType()->getTotalSizeInBytes(),
-                          parentInfo);
+                          parentInfo,
+                          _class->getType()->getTotalSizeInBytes());
 
-    result += " - Fields:\n";
+    result += "  Fields:\n";
     if (_class->getFields().empty())
     {
-        result += "\t<None>\n";
+        result += "    <none>\n";
     }
     else
     {
-        for (auto &field : _class->getFields())
+        for (const auto &field : _class->getFields())
         {
-            result += std::format("\t%field.name={}.type={}.offset={:#X}\n",
-                                  field->m_name,
-                                  field->m_type->getName(),
-                                  field->m_offset);
+            result += std::format("    +0x{:02X}: {} {}\n", field->m_offset, field->m_type->getName(), field->m_name);
         }
     }
 
-    result += " - VTable Layout:\n";
-    auto &vTable = _class->getVTable();
+    result += "  VTable:\n";
+    const auto &vTable = _class->getVTable();
     if (vTable.empty())
     {
-        result += "\t<None/Empty>\n";
+        result += "    <empty>\n";
     }
     else
     {
@@ -73,84 +78,94 @@ std::string MirPrinter::printToString(MirClass *_class, MirPrinterDetail detail)
 
             if (detail == MirPrinterDetail::Detailed)
             {
-                // Detailed print dumps signature: ret Type class::name(param types)
-                std::string paramsStr = "";
+                std::string paramsStr;
                 bool firstParam = true;
-                for (auto param : func->getParameters())
+                for (auto *param : func->getParameters())
                 {
                     if (!firstParam)
                         paramsStr += ", ";
                     paramsStr += param->getMirType()->getName();
                     firstParam = false;
                 }
-                result += std::format("\t[Slot {}] {} {}::{}({})\n",
+                result += std::format("    [{:>2}] {} {}::{}({})\n",
                                       i,
                                       func->getReturnType()->getName(),
                                       _class->getName(),
                                       func->getName(),
                                       paramsStr);
             }
-            else // MirPrinterDetail::General
+            else
             {
-                // General print only dumps method slot names
-                result += std::format("\t[Slot {}] {}::{}\n", i, _class->getName(), func->getName());
+                result += std::format("    [{:>2}] {}::{}\n", i, _class->getName(), func->getName());
             }
         }
     }
 
-    result += std::format("{:#^50}\n", " End Class Dump ");
+    result += std::format("{:=^60}\n", " End Class Dump ");
     return result;
 }
 
 std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail detail)
 {
-    std::string result = std::format("\n{:#^50}\n", " Function Dump ");
+    if (!function)
+        return "<null function>\n";
 
-    // Print header
-    result += std::format("%func.return={}.name={}.paramCount={}\nType:{}\n",
+    std::string result = std::format("\n{:=^60}\n", " Function Dump ");
+
+    // Signature header
+    std::pmr::string fnName = !function->getName().empty() ? function->getName() : "<anonymous>";
+    result += std::format("fn {}() -> {} [params: {}]\n",
+                          fnName,
                           function->getReturnType()->getName(),
-                          function->getName(),
-                          function->getParameters().size(),
-                          function->getType()->getName());
+                          function->getParameters().size());
 
     // Parameters
-    result += " - Params: \n\t";
-    bool firstParam = true;
-    for (auto param : function->getParameters())
+    result += "  Params:\n";
+    if (function->getParameters().empty())
     {
-        if (!firstParam)
-            result += "\n\t";
-
-        result += param->toString();
-        firstParam = false;
+        result += "    <none>\n";
     }
-    result += '\n';
+    else
+    {
+        for (auto *param : function->getParameters())
+        {
+            result += std::format("    {}\n", param->toString());
+        }
+    }
 
     if (detail == MirPrinterDetail::Detailed)
     {
-        // Stack frame (Fixed spacing/delimiters)
-        result += " - Stack Frame: \n\t";
-        bool firstFrame = true;
-        for (StackFrameObject *frameObj : function->getStackFrame()->getObjects())
+        // Stack Frame
+        result += "  Stack Frame:\n";
+        auto *frame = function->getStackFrame();
+        if (!frame || frame->getObjects().empty())
         {
-            if (!firstFrame)
-                result += "\n\t";
-
-            result += printToString(frameObj);
-            firstFrame = false;
+            result += "    <empty>\n";
         }
-        result += '\n';
-
-        // Cascade into Blocks
-        result += " - Block list: \n";
-        for (MirBlock *block : function->getBlocks())
+        else
         {
-            result += printToString(block, detail) + '\n';
+            for (const StackFrameObject *frameObj : frame->getObjects())
+            {
+                result += std::format("    {}\n", printToString(frameObj));
+            }
         }
-        result += '\n';
+
+        // Basic Blocks & Instructions
+        result += "  Blocks:\n";
+        if (function->getBlocks().empty())
+        {
+            result += "    <no blocks>\n";
+        }
+        else
+        {
+            for (MirBlock *block : function->getBlocks())
+            {
+                result += printToString(block, detail);
+            }
+        }
     }
 
-    result += std::format("{:#^50}\n", " End Function Dump ");
+    result += std::format("{:=^60}\n", " End Function Dump ");
     return result;
 }
 
@@ -159,7 +174,7 @@ std::string MirPrinter::printToString(MirGlobalVar *globalVar, MirPrinterDetail 
     if (!globalVar)
         return "";
 
-    std::string linkageStr = "unknown";
+    std::string_view linkageStr = "internal";
     switch (globalVar->getLinkage())
     {
         case MirGlobalVarLinkage::External:
@@ -173,58 +188,71 @@ std::string MirPrinter::printToString(MirGlobalVar *globalVar, MirPrinterDetail 
             break;
     }
 
-    std::string result = std::format("%gVar.name={}.id={}.type={}.linkage={}.constant={}\n",
+    std::string result = std::format("@{} [id: {}, type: {}, linkage: {}, const: {}]\n",
                                      globalVar->getName(),
                                      globalVar->getId(),
                                      globalVar->getType()->getName(),
                                      linkageStr,
                                      globalVar->isConstant() ? "true" : "false");
 
-    // Check the new structured initializer expression tree pointer
     MirOperand *initOperand = globalVar->getInitializer();
     if (!initOperand)
     {
-        result += "  Initializer  : zero-initialized";
+        result += "  init: <zeroinit>\n";
     }
     else
     {
-        result += "  Initializer  : initialized";
-
         if (detail == MirPrinterDetail::Detailed)
         {
-            result += std::format("    Initializer data: {}\n", initOperand->toString());
+            result += std::format("  init: {}\n", initOperand->toString());
+        }
+        else
+        {
+            result += "  init: <initialized>\n";
         }
     }
 
     return result;
 }
 
-std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail detail)
+std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail /*detail*/)
 {
-    std::string_view tier = "HL";
+    if (!instr)
+        return "    <null instruction>\n";
+
+    std::string_view tier = "HL ";
     switch (instr->getTier())
     {
         case MirInstructionTier::HighLevel:
-        {
+            tier = "HL ";
             break;
-        }
         case MirInstructionTier::PassInternal:
-        {
             tier = "INT";
             break;
-        }
         case MirInstructionTier::TargetLow:
-        {
-            tier = "TL";
+            tier = "TL ";
             break;
-        }
     }
 
-    std::string result = std::format("  {:<4}{:<12}", tier, instr->getMetadata().m_name);
+    const MirTargetInstructionDesc *desc = instr->getTargetDesc();
+    std::string opName;
 
-    // Print operands
-    auto operands = instr->getOperands();
-    if (operands.size() > 0)
+    if (instr->getOpCode() == MirInstructionOpCode::TARGET_INST && desc)
+    {
+        opName = desc->getName();
+    }
+    else
+    {
+        opName = instr->getMetadata().m_name;
+    }
+
+    // Align Tier, Opcode, and metadata tag
+    std::string targetTag = desc ? std::format("({}:{})", desc->getId(), desc->getName()) : "(unselected)";
+    std::string result = std::format("  {} {:<12} {:<20}", tier, opName, targetTag);
+
+    // Operands formatting
+    const auto &operands = instr->getOperands();
+    if (!operands.empty())
     {
         result += " ";
         bool firstOp = true;
@@ -232,7 +260,6 @@ std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail de
         {
             if (!firstOp)
                 result += ", ";
-
             result += printToString(op);
             firstOp = false;
         }
@@ -242,35 +269,40 @@ std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail de
     return result;
 }
 
-std::string MirPrinter::printToString(MirOperand *operand) { return operand->toString(); }
+std::string MirPrinter::printToString(MirOperand *operand) { return operand ? operand->toString() : "<null operand>"; }
 
 std::string MirPrinter::printToString(const RegisterRef &ref)
 {
     char prefix = ref.isVirtual() ? 'v' : 'p';
-    return std::format("%{}{}", prefix, ref.getId());
+    const char *className = ref.getClass() ? ref.getClass()->getName() : "unassigned";
+    return std::format("%{}{}({})", prefix, ref.getId(), className);
 }
 
 std::string MirPrinter::printToString(const StackFrameObject *obj)
 {
-    std::string src = "invalid";
+    if (!obj)
+        return "<null frame object>";
+
+    std::string_view src = "var";
     switch (obj->m_source)
     {
         case StackFrameObjectSource::Parameter:
-        {
-            src = "parameter";
+            src = "param";
             break;
-        }
         case StackFrameObjectSource::Spill:
-        {
             src = "spill";
             break;
-        }
         case StackFrameObjectSource::Variable:
-        {
-            src = "variable";
+            src = "var";
             break;
-        }
     }
 
-    return std::format("{} %frame.id={}.src={}.offset={:#X})", obj->m_type->getName(), obj->m_id, src, obj->m_offset);
+    int64_t off = obj->m_offset;
+    std::string offsetStr = (off >= 0) ? std::format("+0x{:X}", off) : std::format("-0x{:X}", -off);
+
+    return std::format("[%frame.{:<2}] type: {:<6} offset: {:<8} (src: {})",
+                       obj->m_id,
+                       obj->m_type ? obj->m_type->getName() : "void",
+                       offsetStr,
+                       src);
 }

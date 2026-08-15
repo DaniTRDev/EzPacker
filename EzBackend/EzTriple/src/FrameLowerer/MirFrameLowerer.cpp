@@ -5,16 +5,16 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
     MirFunction *func = ctx.m_targetFunc;
     TargetDesc *targetDesc = ctx.m_targetDesc;
     CallingConvDesc *cc = func->getCallingConv();
-    FrameLayout &layout = ctx.m_layout;
+    MirFunctionAnalysisData *analysisData = func->getAnalysisData();
     const size_t slotSize = targetDesc->getStackSlotSize();
     const size_t stackAlign = cc->getStackAlignment();
 
     // Calculate Callee-saved register push area
     const auto &usedCalleeSavedRegs = func->getUsedCalleeSavedRegs();
-    layout.calleeSavedAreaSize = usedCalleeSavedRegs.size() * slotSize;
+    analysisData->m_calleeSavedAreaSize = usedCalleeSavedRegs.size() * slotSize;
 
     // Use unsigned arithmetic during offset computation to avoid sign-extension masking issues
-    size_t currentOffset = layout.calleeSavedAreaSize;
+    size_t currentOffset = analysisData->m_calleeSavedAreaSize;
     const bool growsDown = cc->doesStackGrowsDownwards();
 
     for (StackFrameObject *obj : func->getStackFrame()->getObjects())
@@ -46,50 +46,13 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
     currentOffset += cc->getShadowSpaceSize();
 
     // Round total frame payload up to required ABI stack boundary (e.g., 16 bytes)
-    layout.totalFrameSize = (currentOffset + stackAlign - 1) & ~(stackAlign - 1);
+    analysisData->m_totalFrameSize = (currentOffset + stackAlign - 1) & ~(stackAlign - 1);
 
     auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
     log << "Calculated stack frame layout" << func->getSourceRef();
-    log.appendNote(std::format("Callee save size: {:X}", layout.calleeSavedAreaSize).c_str(), func->getSourceRef());
-    log.appendNote(std::format("Total size: {:X}", layout.totalFrameSize).c_str(), func->getSourceRef());
-}
-
-void MirFrameLowerer::lowerAlloc(FrameLowererCtx &ctx)
-{
-    MirInstruction *instr = *ctx.m_allocIt;
-    if (instr->getOpCode() != MirInstructionOpCode::ALLOC)
-    {
-        ctx.m_ctx->getDiagCollector()->builder(Diag_Error, "MirFrameLowerer")
-                << "Given AllocLowererCtx does not have a valid ALLOC instruction";
-        return;
-    }
-
-    MirFunction *func = ctx.m_targetFunc;
-    MirOperand *dst = instr->getOperands()[0];
-    MirType *allocTypePtr = dst->getMirType();
-    MirType *allocType = allocTypePtr->getPointedType();
-
-    StackFrameObject *obj = func->getStackFrame()->createStaticStackObj(allocType);
-    MirInstructionBuilder iBuilder(ctx.m_ctx,
-                                   instr->getOwner(),
-                                   InsertionType::InsertBefore,
-                                   instr->getOwner()->getInstructions().begin());
-    MirOperandBuilder oBuilder(ctx.m_ctx);
-
-    MirInstruction *newInstr = iBuilder.LEA(instr->getSourceRef(), dst, oBuilder.buildRef(obj, instr->getSourceRef()));
-
-    auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
-    log << "Lowered ALLOC in function" << func->getSourceRef();
-    log.appendNote(
-            std::format("Original instr: {}", MirPrinter::printToString(instr, MirPrinterDetail::Detailed)).c_str(),
-            instr->getSourceRef());
-    log.appendNote(std::format("Assigned stack obj: {}", MirPrinter::printToString(obj)).c_str(),
-                   instr->getSourceRef());
-    log.appendNote(
-            std::format("New instr: {}", MirPrinter::printToString(newInstr, MirPrinterDetail::Detailed)).c_str(),
-            newInstr->getSourceRef());
-
-    instr->getOwner()->getInstructions().erase(ctx.m_allocIt);
+    log.appendNote(std::format("Callee save size: {:X}", analysisData->m_calleeSavedAreaSize).c_str(),
+                   func->getSourceRef());
+    log.appendNote(std::format("Total size: {:X}", analysisData->m_totalFrameSize).c_str(), func->getSourceRef());
 }
 
 void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
@@ -104,7 +67,7 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
 
     // Determine the base register designated by the ABI (FP if enabled, otherwise SP)
     RegisterRef baseRegRef = cc->hasFramePointer(func) ? cc->getFramePointerReg() : cc->getStackPointerReg();
-    MirRegister *baseReg = opBuilder.buildPhysReg(ptrType, baseRegRef.getId());
+    MirRegister *baseReg = opBuilder.buildPhysReg(ptrType, baseRegRef.getId(), "", baseRegRef.getClass());
 
     for (MirBlock *block : func->getBlocks())
     {

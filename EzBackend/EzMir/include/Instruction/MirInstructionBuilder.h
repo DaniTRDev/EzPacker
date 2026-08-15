@@ -75,6 +75,14 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
     build(MirInstructionOpCode opcode, SourceReference *ref, const std::pmr::vector<MirOperand *> &operands);
 
     /**
+     * Builds a target instruction with the given target descriptor, scr ref and operands. The opcode of this
+     * instruction is set to TARGET_INST. The targetId of the instruction is set to the one given.
+     */
+    MirInstruction *buildTarget(MirTargetInstructionDesc *targetDesc,
+                                SourceReference *srcRef,
+                                std::initializer_list<MirOperand *> operands);
+
+    /**
      * Overload of the '<<' operator that allows pushing operands easily.
      * @param operand
      * @return

@@ -1,7 +1,7 @@
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 
-MirFunctionSignatureLegalizerPass::MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, MirLegalizer *legalizer) :
-    m_ctx(ctx), m_legalizer(legalizer)
+MirFunctionSignatureLegalizerPass::MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
+    m_ctx(ctx), m_legalizer(targetDesc->getLegalizer())
 {
 }
 

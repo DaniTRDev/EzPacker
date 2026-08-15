@@ -16,12 +16,15 @@
 #include "Legalizer/MirLegalizer.h"
 #include "Legalizer/MirBlockLegalizerPass.h"
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
+
 #include "Descriptors/TargetDesc.h"
 
 #include "FrameLowerer/MirFrameLowerer.h"
 #include "FrameLowerer/MirFrameLowererPass.h"
 
 #include "InstructionSelector/Actions/ManualSelectAction.h"
+#include "InstructionSelector/Actions/SelectRegisterClassAction.h"
+#include "InstructionSelector/Actions/SequenceAction.h"
 #include "InstructionSelector/InstructionSelectionPredicates.h"
 #include "InstructionSelector/InstructionSelectionRuleBuilder.h"
 #include "InstructionSelector/MirInstructionSelector.h"

@@ -7,7 +7,7 @@ InstructionSelectorPassVerifier::InstructionSelectorPassVerifier(MirBuilderConte
 }
 
 InstructionSelectorPassVerifier &InstructionSelectorPassVerifier::verifyInstructionSelected(
-        MirBlock *targetBlock, size_t instructionIndex, MirTargetInstructionId expectedTargetId)
+        MirBlock *targetBlock, size_t instructionIndex, MirTargetInstructionDesc *expectedDesc)
 {
     EXPECT_NE(targetBlock, nullptr) << "Target block must not be null.";
     auto &instructions = targetBlock->getInstructions();
@@ -21,11 +21,12 @@ InstructionSelectorPassVerifier &InstructionSelectorPassVerifier::verifyInstruct
 
     EXPECT_NE(instr, nullptr) << "Instruction at index " << instructionIndex << " must not be null.";
     EXPECT_TRUE(instr->isSelected()) << "Instruction at index " << instructionIndex << " is not selected";
-    EXPECT_NE(instr->getTargetId(), MIRID_INVALID) << "Instruction at index " << instructionIndex << " ("
-                                                   << instr->getOpCodeName() << ") does not have a target ID assigned.";
-    EXPECT_EQ(instr->getTargetId(), expectedTargetId)
+    EXPECT_NE(instr->getTargetDesc(), nullptr)
+            << "Instruction at index " << instructionIndex << " (" << instr->getOpCodeName()
+            << ") does not have a target descriptor assigned.";
+    EXPECT_EQ(instr->getTargetDesc()->getId(), expectedDesc->getId())
             << "Target ID mismatch for instruction at index " << instructionIndex << " (" << instr->getOpCodeName()
-            << "). Expected: " << expectedTargetId << ", Actual: " << instr->getTargetId();
+            << "). Expected: " << expectedDesc->getId() << ", Actual: " << instr->getTargetDesc()->getId();
 
     return *this;
 }

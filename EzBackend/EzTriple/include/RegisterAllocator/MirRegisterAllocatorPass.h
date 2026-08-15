@@ -37,7 +37,7 @@ class MirRegisterAllocatorPass : public IMirTransformPass
                       class MirPassManager *passManager) override;
 
     /**
-     * Prints the pass result to the diag collector. In this case, it just prints the modified blocks.
+     * Prints the pass result to the diag collector. In this case, it just prints the modified funcs.
      */
     void printResult() const override;
 

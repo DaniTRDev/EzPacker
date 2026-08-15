@@ -231,9 +231,9 @@ MirInstructionVerifier &MirInstructionVerifier::operandCount(size_t operandCount
     return *this;
 }
 
-MirInstructionVerifier &MirInstructionVerifier::targetId(MirTargetInstructionId id)
+MirInstructionVerifier &MirInstructionVerifier::targetDesc(MirTargetInstructionDesc *desc)
 {
-    EXPECT_EQ(getTestedObj()->getTargetId(), id);
+    EXPECT_EQ(getTestedObj()->getTargetDesc()->getId(), desc->getId());
     return *this;
 }
 

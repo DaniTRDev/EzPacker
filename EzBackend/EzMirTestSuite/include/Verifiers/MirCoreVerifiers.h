@@ -283,7 +283,7 @@ class MirInstructionVerifier : public MirVerifier<MirInstruction>
      * @param id
      * @return
      */
-    MirInstructionVerifier &targetId(MirTargetInstructionId id);
+    MirInstructionVerifier &targetDesc(MirTargetInstructionDesc *desc);
 
     /**
      * Creates an operand verifier for the given operand at the given ID. Will also check that the instruction has

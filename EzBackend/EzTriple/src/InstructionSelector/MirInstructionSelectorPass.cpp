@@ -1,7 +1,7 @@
 #include "InstructionSelector/MirInstructionSelectorPass.h"
 
-MirInstructionSelectorPass::MirInstructionSelectorPass(MirBuilderContext *ctx, MirInstructionSelector *selector) :
-    m_ctx(ctx), m_selector(selector)
+MirInstructionSelectorPass::MirInstructionSelectorPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
+    m_ctx(ctx), m_selector(targetDesc->getInstructionSelector())
 {
 }
 

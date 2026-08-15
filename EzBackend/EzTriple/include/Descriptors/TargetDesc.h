@@ -18,6 +18,11 @@ class TargetDesc
     virtual const char *getName() const = 0;
 
     /**
+     * Returns the type layout for this target.
+     */
+    virtual IMirTargetTypeLayout *getTypeLayout() = 0;
+
+    /**
      * Returns the expansion registry used during expand action.
      */
     virtual class MirExpansionRuleRegistry *getExpansionRegistry() = 0;
@@ -26,6 +31,16 @@ class TargetDesc
      * Returns the frame lowerer for this target.
      */
     virtual class MirFrameLowerer *getFrameLowerer() = 0;
+
+    /**
+     * Returns the instruction selector required for this target.
+     */
+    virtual class MirInstructionSelector *getInstructionSelector() = 0;
+
+    /**
+     * Returns the legalizer needed for this target.
+     */
+    virtual class MirLegalizer *getLegalizer() = 0;
 
     /**
      * Returns the displacement's type of a memory operand.
@@ -39,7 +54,8 @@ class TargetDesc
      * Examples 1: using an i1 (1-bit integer) is not possible in x64 arithmetic instructions, but might be allowed for
      * dev convenience, it must be promoted to the first legal type, which is i8 (8-bit).
      *
-     * Example 2: using an i128 is not possible in x64 (without SSE/AVX), the operand needs to be expanded into 2 i64.
+     * TODO: Use the table-driven approach the legalizer current has to enforce the legal type directly on the
+     * definition of the legalization rule.
      * @param type
      * @return
      */
@@ -51,9 +67,19 @@ class TargetDesc
     virtual size_t getStackSlotSize() const = 0;
 
     /**
-     * Returns a list with the available registers of a specific class.
+     * Initializes the target descriptor. This is the function that starts creating everything needed by the descriptor.
      */
-    virtual std::pmr::vector<RegisterRef> getAvailableRegisters(RegisterRefClass refClass) = 0;
+    virtual void initialize() = 0;
+
+    /**
+     * Returns a list with the available calling conventions defined for this target.
+     */
+    virtual std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() = 0;
+
+    /**
+     * Returns a list with the available register banks for this target.
+     */
+    virtual std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() = 0;
 };
 
 #endif // EZPACKER_TARGETDESC_H

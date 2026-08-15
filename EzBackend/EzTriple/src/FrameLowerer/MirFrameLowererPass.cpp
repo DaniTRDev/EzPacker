@@ -3,13 +3,11 @@
 #include <ranges>
 
 MirFrameLowererPass::MirFrameLowererPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
-    m_ctx(ctx), m_result(ctx->getGlobalAllocator()), m_targetDesc(targetDesc)
+    m_ctx(ctx), m_targetDesc(targetDesc)
 {
 }
 
 const char *MirFrameLowererPass::getName() const { return "FrameLowererPass"; }
-
-const MirFrameLowererPassResult &MirFrameLowererPass::getResult() { return m_result; }
 
 MirPassIterationPlace MirFrameLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
@@ -55,24 +53,24 @@ MirPassResult MirFrameLowererPass::run(std::pmr::list<MirFunction *> &funcList,
     lowerer->insertPrologue(ctx);
     lowerer->insertEpilogue(ctx);
     lowerer->lowerStackObjectReferences(ctx);
+    m_loweredFunctions.push_back(func);
 
-    m_result.m_layouts[func] = ctx.m_layout;
     return { .m_modifiedMir = true, .m_executed = true, .m_succeeded = true };
 }
 
 void MirFrameLowererPass::printResult() const
 {
-    auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowererPass");
-    diag << "Printing MirFrameLowererPass result:";
+    auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirFrameLowererPass");
+    log << std::format("Printing frame lowerer result").c_str();
 
-    const auto &layouts = m_result.m_layouts;
-    for (auto &func : layouts | std::ranges::views::keys)
+    for (auto &func : m_loweredFunctions)
     {
-        diag.appendNote(MirPrinter::printToString(func, MirPrinterDetail::Detailed).c_str(), func->getSourceRef());
+        std::string str = MirPrinter::printToString(func, MirPrinterDetail::Detailed);
+        log.appendNote(str.c_str(), func->getSourceRef());
     }
 }
 
-void MirFrameLowererPass::reset() { m_result.m_layouts.clear(); }
+void MirFrameLowererPass::reset() { m_loweredFunctions.clear(); }
 
 std::vector<std::type_index> MirFrameLowererPass::getDependencies() const
 {

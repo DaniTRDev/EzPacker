@@ -2,4 +2,5 @@
 #define EZPACKER_EZTRIPLECOMMON_H
 
 #include "EzMir.h"
+
 #endif // EZPACKER_EZTRIPLECOMMON_H

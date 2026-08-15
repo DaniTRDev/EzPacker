@@ -35,6 +35,8 @@ MirBlock *MirFunction::getBlock(MirId id) const
 
 MirBlock *MirFunction::getEntryPoint() const { return m_entryPoint; }
 
+MirFunctionAnalysisData *MirFunction::getAnalysisData() { return &m_analysisData; }
+
 MirFunctionStackFrame *MirFunction::getStackFrame() const { return m_stackFrame; }
 
 MirId MirFunction::getId() const { return m_id; }

@@ -142,6 +142,16 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     return instr;
 }
 
+MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
+                                                   SourceReference *srcRef,
+                                                   std::initializer_list<MirOperand *> operands)
+{
+    MirInstruction *instr = build(MirInstructionOpCode::TARGET_INST, srcRef, operands);
+    instr->setTargetDesc(targetDesc);
+
+    return instr;
+}
+
 MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
 {
     if (!isBuilt() || !operand)

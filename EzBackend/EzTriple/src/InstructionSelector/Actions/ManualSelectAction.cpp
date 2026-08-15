@@ -2,14 +2,14 @@
 
 namespace SelectorActions
 {
-InstructionSelAction ManualAction(MirTargetInstructionId id)
+InstructionSelAction ManualAction(MirTargetInstructionDesc *desc)
 {
-    return [id](SelectionContext &ctx) -> SelectionResult
+    return [desc](SelectionContext &ctx) -> SelectionResult
     {
         auto instr = *ctx.m_it;
 
         instr->setOpcode(MirInstructionOpCode::TARGET_INST);
-        instr->setTargetId(id);
+        instr->setTargetDesc(desc);
 
         return SelectionResult::Selected;
     };

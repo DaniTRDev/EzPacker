@@ -40,6 +40,12 @@ extern InstructionSelPred operandType(size_t index, MirOperandType operType);
 extern InstructionSelPred operandMirType(size_t index, MirType *type);
 
 /**
+ * Creates a new predicate that returns true if instruction has an operand at the given index, and if it's MIR type kind
+ * matches the one given..
+ */
+extern InstructionSelPred operandMirTypeKind(size_t index, MirTypeKind kind);
+
+/**
  * Creates a new predicate that returns true if the instruction has an operand at the given index, and if it's an
  * integer immediate of the given bit-width.
  */

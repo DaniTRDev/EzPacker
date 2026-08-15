@@ -3,81 +3,102 @@
 
 #include "EzMirCommon.h"
 #include "Type/MirType.h"
-
-enum class RegisterRefClass : uint8_t
-{
-    Invalid = 0,
-    GPR,
-    FPR,
-    FRAME,
-    MAX_REF_TYPE // Used to iterate over this enum
-};
+#include "MirRegisterClass.h"
+#include <functional>
 
 /**
- * This class is used to encapsulate register indexing without affecting MirRegister in a bad way.
- * A register reference is what its name says: a reference to a register. This reference holds an ID which is
- * used to know if the referenced register is virtual or physical; and a class, which is used internally to distinguish
- * registers.
+ * This class is used to encapsulate register references.
+ * Virtual registers do not contain a register class, as this is only assigned to PHYSICAL.
+ * Physical registers have a register class, which also links them to a HW-defined register bank.
+ *
+ * Important note, IDs are unique within each bank but shared across classes. This means that register ID 1 from bank 1
+ * is different to register ID 1 from bank 2; AND register ID 1, with class 1 is different of register ID 1 with
+ * class 2.
+ *
+ *
+ * When a VIRTUAL register ref has a class, this means the register reference passed ISel phase.
  */
 class RegisterRef
 {
   public:
     constexpr RegisterRef() = default;
-    constexpr RegisterRef(RegisterRefClass refClass, size_t id, bool isVirtual) :
-        m_virtual(isVirtual), m_class(refClass), m_id(id)
+
+    constexpr RegisterRef(size_t id, bool isVirtual = true, MirRegisterClass *_class = nullptr) :
+        m_virtual(isVirtual), m_class(_class), m_id(id)
     {
     }
 
-    static constexpr RegisterRef vreg(RegisterRefClass refClass, size_t id) { return RegisterRef(refClass, id, true); }
-    static constexpr RegisterRef preg(RegisterRefClass refClass, size_t id) { return RegisterRef(refClass, id, false); }
+    /**
+     * Constructor for PHYSICAL registers.
+     */
+    constexpr RegisterRef(MirRegisterClass *_class, size_t id) : m_virtual(false), m_class(_class), m_id(id) {}
 
-    static constexpr RegisterRef fromType(MirType *type, size_t id, bool isVirtual)
+    static constexpr RegisterRef vreg(size_t id) { return RegisterRef(id); }
+    static constexpr RegisterRef vreg(size_t id, MirRegisterClass *_class) { return RegisterRef(id, true, _class); }
+
+    static constexpr RegisterRef preg(MirRegisterDescriptor *desc)
     {
-        RegisterRefClass regClass = RegisterRefClass::Invalid;
-        if (type->getKind() == MirTypeKind::Integer || type->getKind() == MirTypeKind::Pointer)
-        {
-            regClass = RegisterRefClass::GPR;
-        }
-        else if (type->getKind() == MirTypeKind::FloatingPoint)
-        {
-            regClass = RegisterRefClass::FPR;
-        }
-        return RegisterRef(regClass, id, isVirtual);
+        if (desc->m_owner == nullptr)
+            throw std::runtime_error("LOL");
+
+        return RegisterRef(desc->m_id, false, desc->m_owner);
     }
 
     constexpr bool isVirtual() const { return m_virtual; }
     constexpr bool isPhysical() const { return !m_virtual; }
-    constexpr RegisterRefClass getClass() const { return m_class; }
+
+    constexpr MirRegisterClass *getClass() const { return m_class; }
     constexpr size_t getId() const { return m_id; }
+
+    void setClass(MirRegisterClass *_class) { m_class = _class; }
 
     constexpr bool operator==(const RegisterRef &other) const
     {
-        return m_id == other.m_id && m_virtual == other.m_virtual;
+        if (m_virtual != other.m_virtual || m_id != other.m_id)
+            return false;
+
+        // Virtual registers don't have a class; physical registers must match class
+        return m_virtual || (m_class == other.m_class);
     }
+
     constexpr bool operator!=(const RegisterRef &other) const { return !(*this == other); }
+
     constexpr bool operator<(const RegisterRef &other) const
     {
         if (m_virtual != other.m_virtual)
             return m_virtual < other.m_virtual;
 
-        return m_id < other.m_id;
+        if (m_id != other.m_id)
+            return m_id < other.m_id;
+
+        // Compare class pointers for physical registers
+        return !m_virtual && (m_class < other.m_class);
     }
 
   private:
     bool m_virtual{ true };
-    RegisterRefClass m_class{ RegisterRefClass::Invalid };
+    MirRegisterClass *m_class{ nullptr };
     size_t m_id{ MIRID_INVALID };
 };
 
-// Standard hash implementation so RegisterRef can key ordered containers.
+// Standard hash implementation for unordered containers
 namespace std
 {
 template <> struct hash<RegisterRef>
 {
     size_t operator()(const RegisterRef &reg) const noexcept
     {
-        uint64_t combined = (static_cast<uint64_t>(reg.getId()) << 1) | (reg.isVirtual() ? 1 : 0);
-        return std::hash<uint64_t>{}(combined);
+        // Hash the ID and virtual status
+        size_t seed = std::hash<size_t>{}(reg.getId());
+        seed ^= std::hash<bool>{}(reg.isVirtual()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+
+        // Hash the class pointer for physical registers
+        if (reg.isPhysical())
+        {
+            seed ^= std::hash<const MirRegisterClass *>{}(reg.getClass()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+
+        return seed;
     }
 };
 } // namespace std
