@@ -1,7 +1,7 @@
 #include "EzTestTripleTargetDesc.h"
 
 EzTestTripleTargetDesc::EzTestTripleTargetDesc(MirBuilderContext *ctx, std::pmr::memory_resource *alloc) :
-    m_ctx(ctx), m_alloc(alloc), m_registerBanks(alloc), m_callingConvs(alloc)
+    m_ctx(ctx), m_alloc(alloc), m_registerBanks(alloc), m_callingConvs(alloc), m_binDescriptors(alloc)
 {
 }
 
@@ -44,25 +44,19 @@ MirType *EzTestTripleTargetDesc::getNearestLegalType(MirType *type)
     }
 }
 
+RegisterRef EzTestTripleTargetDesc::getInstructionPtrReg() const { return RegisterRef::preg(m_spr64->getReg("rip")); }
+
 void EzTestTripleTargetDesc::initialize()
 {
-    // 1. Initialize Register Banks
-    m_registerBanks = EzTestTriple::CreateRegisterBanks(m_alloc);
-
-    MirRegisterBank *gprBank = nullptr;
-    MirRegisterBank *fprBank = nullptr;
-    for (auto *bank : m_registerBanks)
-    {
-        if (std::string_view(bank->getName()) == "GPR")
-            gprBank = bank;
-        if (std::string_view(bank->getName()) == "FPR")
-            fprBank = bank;
-    }
-
+    using namespace EzTestTriple;
     std::pmr::polymorphic_allocator<> alloc(m_alloc);
 
+    // 1. Initialize Register Banks
+    m_registerBanks = EzTestTriple::CreateRegisterBanks(m_alloc);
+    m_spr64 = Banks::SPR->getClass("SPR64");
+
     // 2. Initialize Calling Conventions
-    auto *defaultCC = alloc.new_object<EzTestTripleCallingConv>(gprBank, fprBank, m_alloc);
+    auto *defaultCC = alloc.new_object<EzTestTripleCallingConv>(Banks::GPR, Banks::FPR, m_alloc);
     m_callingConvs.push_back(defaultCC);
 
     // 3. Initialize Frame Lowerer
@@ -82,4 +76,8 @@ void EzTestTripleTargetDesc::initialize()
 
     // 7. Initialize Register Allocator
     m_registerAllocator = alloc.new_object<EzTestTripleRegisterAllocator>();
+
+    // 8. Initialize Binary Descriptors.
+    auto *defaultBinDesc = alloc.new_object<EzTestTripleBinaryDesc>(EzTestTripleBinaryDesc::Options{});
+    m_binDescriptors.push_back(defaultBinDesc);
 }

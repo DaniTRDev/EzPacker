@@ -29,7 +29,7 @@ bool EzTestTripleRegisterAllocator::isRematerializable(MirRegister *vreg, MirIns
 
     // 1. Integer Immediate Moves: MOV reg, imm (MOV8ri, MOV16ri, MOV32ri, MOV64ri)
     if (desc == TargetInst::MOV8ri || desc == TargetInst::MOV16ri || desc == TargetInst::MOV32ri ||
-        desc == TargetInst::MOV64ri)
+        desc == TargetInst::MOVABS64ri)
     {
         if (operands.size() >= 2 && operands[1]->isOfType<MirInteger>())
         {

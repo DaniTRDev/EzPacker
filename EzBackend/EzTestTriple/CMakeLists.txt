@@ -4,6 +4,7 @@ set(EZTESTTRIPLE_FILES_LIST
         "include/EzTestTriple.h"
         "include/EzTestTripleCommon.h"
         "include/EzTestTripleTargetDesc.h"
+        "include/BinaryDescriptors/EzTestTripleBinaryDesc.h"
         "include/CallingConvs/EzTestTripleCallingConv.h"
         "include/FrameLowerer/EzTestTripleFrameLowerer.h"
         "include/InstructionSelector/EzTestTripleInstructionSelector.h"
@@ -16,6 +17,7 @@ set(EZTESTTRIPLE_FILES_LIST
         "include/Type/EzTestTripleTypeLayout.h"
 
         "src/EzTestTripleTargetDesc.cpp"
+        "src/BinaryDescriptors/EzTestTripleBinaryDesc.cpp"
         "src/CallingConvs/EzTestTripleCallingConv.cpp"
         "src/FrameLowerer/EzTestTripleFrameLowerer.cpp"
         "src/InstructionSelector/EzTestTripleInstructionSelector.cpp"

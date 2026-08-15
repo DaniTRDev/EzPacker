@@ -2,6 +2,7 @@
 #define EZPACKER_EZTESTTRIPLETARGETDESC_H
 
 #include "EzTestTripleCommon.h"
+#include "BinaryDescriptors/EzTestTripleBinaryDesc.h"
 #include "CallingConvs/EzTestTripleCallingConv.h"
 #include "FrameLowerer/EzTestTripleFrameLowerer.h"
 #include "InstructionSelector/EzTestTripleInstructionSelector.h"
@@ -32,10 +33,14 @@ class EzTestTripleTargetDesc : public TargetDesc
 
     MirType *getMemOperandDisplacementType() override;
     MirType *getNearestLegalType(MirType *type) override;
+
+    RegisterRef getInstructionPtrReg() const override;
+
     size_t getStackSlotSize() const override { return 8; }
 
     void initialize() override;
 
+    std::pmr::vector<TargetBinaryDesc *> getAvailableBinaryDescriptors() override { return m_binDescriptors; }
     std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() override { return m_callingConvs; }
     std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() override { return m_registerBanks; }
 
@@ -43,14 +48,17 @@ class EzTestTripleTargetDesc : public TargetDesc
     MirBuilderContext *m_ctx;
     std::pmr::memory_resource *m_alloc;
 
-    std::pmr::vector<MirRegisterBank *> m_registerBanks;
-    std::pmr::vector<CallingConvDesc *> m_callingConvs;
-
     EzTestTripleTypeLayout m_typeLayout;
     EzTestTripleFrameLowerer *m_frameLowerer{ nullptr };
     EzTestTripleRegisterAllocator *m_registerAllocator{ nullptr };
     MirExpansionRuleRegistry *m_expansionRegistry{ nullptr };
     MirLegalizer *m_legalizer{ nullptr };
     MirInstructionSelector *m_instructionSelector{ nullptr };
+
+    MirRegisterClass *m_spr64{ nullptr }; // Cache.
+
+    std::pmr::vector<CallingConvDesc *> m_callingConvs;
+    std::pmr::vector<MirRegisterBank *> m_registerBanks;
+    std::pmr::vector<TargetBinaryDesc *> m_binDescriptors;
 };
 #endif

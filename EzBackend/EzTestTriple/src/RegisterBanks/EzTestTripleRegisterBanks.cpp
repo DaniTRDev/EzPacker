@@ -6,6 +6,7 @@ namespace Banks
 {
 MirRegisterBank *GPR = nullptr;
 MirRegisterBank *FPR = nullptr;
+MirRegisterBank *SPR = nullptr;
 }; // namespace Banks
 
 std::pmr::vector<MirRegisterBank *> CreateRegisterBanks(std::pmr::memory_resource *alloc)
@@ -96,6 +97,19 @@ std::pmr::vector<MirRegisterBank *> CreateRegisterBanks(std::pmr::memory_resourc
     fprBank->addClass("FPR64", fpr64);
     fprBank->addClass("FPR32", fpr32);
     banks.push_back(fprBank);
+
+    // ==========================================
+    // 3. SPR BANK SETUP
+    // ==========================================
+    auto *sprBank = pAlloc.new_object<MirRegisterBank>("SPR", alloc);
+    auto *spr64 = pAlloc.new_object<MirRegisterClass>("SPR64", sprBank, alloc);
+
+    Banks::SPR = sprBank;
+
+    spr64->addRegister("rip", 64, 0, {});
+
+    sprBank->addClass("SPR64", spr64);
+    banks.push_back(sprBank);
 
     return banks;
 }

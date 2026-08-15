@@ -46,6 +46,14 @@
  *   5 | XMM5  | XMM5_S | Float Scratch / Caller-saved
  *   6 | XMM6  | XMM6_S | Float Scratch / Caller-saved
  *   7 | XMM7  | XMM7_S | Float Scratch / Caller-saved
+ *
+ * ----------------------------------------------------------------------------
+ * Register Bank 2: SPR (Special Registers)
+ * Classes: SPR64
+ * ----------------------------------------------------------------------------
+ *  ID | SPR64 | Role
+ * ----+-------+--------+------------------------------------------------------
+ *  0  | RIP  | Instruction pointer
  */
 class EzTestTripleCallingConv : public CallingConvDesc
 {

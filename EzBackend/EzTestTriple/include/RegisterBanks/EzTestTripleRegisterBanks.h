@@ -45,6 +45,14 @@
  *   5 | XMM5  | XMM5_S | Float Scratch / Caller-saved
  *   6 | XMM6  | XMM6_S | Float Scratch / Caller-saved
  *   7 | XMM7  | XMM7_S | Float Scratch / Caller-saved
+ *
+ * ----------------------------------------------------------------------------
+ * Register Bank 2: SPR (Special Registers)
+ * Classes: SPR64
+ * ----------------------------------------------------------------------------
+ *  ID | SPR64 | Role
+ * ----+-------+--------+------------------------------------------------------
+ *  0  | RIP  | Instruction pointer
  */
 namespace EzTestTriple
 {
@@ -77,12 +85,16 @@ constexpr size_t XMM4 = 4;
 constexpr size_t XMM5 = 5;
 constexpr size_t XMM6 = 6;
 constexpr size_t XMM7 = 7;
+
+// SPECIAL
+constexpr size_t RIP = 0;
 }; // namespace RegisterIds
 
 namespace Banks
 {
 extern MirRegisterBank *GPR;
 extern MirRegisterBank *FPR;
+extern MirRegisterBank *SPR;
 }; // namespace Banks
 
 /**
