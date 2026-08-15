@@ -39,7 +39,7 @@ inline InstructionSelPred _or(Preds &&...preds)
 /**
  * Creates a new predicate that returns true if the code model of the target binary descriptor matches the one given.
  */
-extern InstructionSelPred codeModel(CodeModel expected);
+extern InstructionSelPred codeModel(TargetCodeModel expected);
 
 /**
  * Creates a new predicate that returns true if the instruction opcode matches the one given.

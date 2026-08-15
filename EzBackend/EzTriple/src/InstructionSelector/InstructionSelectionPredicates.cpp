@@ -8,7 +8,7 @@ InstructionSelPred _not(const InstructionSelPred &pred)
     return [pred](const SelectionContext &sCtx) -> bool { return !pred(sCtx); };
 }
 
-InstructionSelPred codeModel(CodeModel expected)
+InstructionSelPred codeModel(TargetCodeModel expected)
 {
     return [expected](const SelectionContext &ctx) -> bool
     { return ctx.m_targetBinaryDesc->getCodeModel() == expected; };

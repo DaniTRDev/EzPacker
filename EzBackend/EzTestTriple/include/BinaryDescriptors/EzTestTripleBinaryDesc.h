@@ -38,19 +38,20 @@ class EzTestTripleBinaryDesc : public TargetBinaryDesc
 {
   public:
     /**
-     * Configuration parameters for customizing the target binary representation (ABI/OS-level):
+     * Configuration parameters for customizing the target binary representation (ABI/OS-level) for testing purposes
+     * without creating multiple ABIs:
      *
-     *   • m_codeModel (CodeModel):
+     *   • m_codeModel (TargetCodeModel):
      *       Determines the virtual address space and displacement rules for code/data accesses:
-     *         - CodeModel::Small: Assumes all symbols fit within a signed 32-bit (2 GB) PC-relative offset.
+     *         - TargetCodeModel::Small: Assumes all symbols fit within a signed 32-bit (2 GB) PC-relative offset.
      *                             Enables compact RIP-relative addressing and 32-bit direct jumps/calls.
-     *         - CodeModel::Large: Makes no proximity assumptions; symbols can span the full 64-bit address space.
+     *         - TargetCodeModel::Large: Makes no proximity assumptions; symbols can span the full 64-bit address space.
      *                             Forces full 64-bit absolute address materialization (e.g., movabs) and indirect
      * calls.
      *
-     *   • m_objectFormat (ObjectFormat):
-     *       Specifies the target container/object file format (ObjectFormat::ELF, ObjectFormat::COFF,
-     *       or ObjectFormat::MachO) used by downstream object encoders (e.g., LIEF) to generate
+     *   • m_objectFormat (TargetObjectFormat):
+     *       Specifies the target container/object file format (TargetObjectFormat::ELF, TargetObjectFormat::COFF,
+     *       or TargetObjectFormat::MachO) used by downstream object encoders (e.g., LIEF) to generate
      *       platform-compliant section headers and relocation records.
      *
      *   • m_isPIC (bool):
@@ -63,12 +64,12 @@ class EzTestTripleBinaryDesc : public TargetBinaryDesc
      */
     struct Options
     {
-        CodeModel m_codeModel{ CodeModel::Small };
-        ObjectFormat m_objectFormat{ ObjectFormat::ELF };
+        TargetCodeModel m_codeModel{ TargetCodeModel::Small };
+        TargetObjectFormat m_objectFormat{ TargetObjectFormat::ELF };
         bool m_isPIC{ false };
     };
 
-    explicit EzTestTripleBinaryDesc(const Options &options);
+    EzTestTripleBinaryDesc(const Options &options, std::pmr::memory_resource *alloc);
 
     /**
      * Returns true (EzTestTriple follows x86-64 little-endian byte ordering).
@@ -86,14 +87,19 @@ class EzTestTripleBinaryDesc : public TargetBinaryDesc
     const char *getName() const override;
 
     /**
+     * Returns the a NEW section for each type. All of them have the same alignment.
+     */
+    virtual CodeSection *getSection(SectionType type) override;
+
+    /**
      * Returns the active code model (Small or Large).
      */
-    CodeModel getCodeModel() const override;
+    TargetCodeModel getCodeModel() const override;
 
     /**
      * Returns the binary object container format (ELF, COFF, MachO).
      */
-    ObjectFormat getObjectFormat() const override;
+    TargetObjectFormat getObjectFormat() const override;
 
     /**
      * Returns the byte alignment required for function entry points (16 bytes on x86-64).
@@ -106,17 +112,19 @@ class EzTestTripleBinaryDesc : public TargetBinaryDesc
     size_t getLoopAlignment() const override;
 
     /**
-     * Returns the memory alignment for the specified section name.
+     * Initializes the descriptor. Sets the sections depending on the object format.
      */
-    size_t getSectionAlignment(std::string_view sectionName) const override;
+    void initialize() override;
 
     // Modifiers for testing configurations
-    void setCodeModel(CodeModel model) { m_options.m_codeModel = model; }
+    void setCodeModel(TargetCodeModel model) { m_options.m_codeModel = model; }
     void setPositionIndependent(bool isPic) { m_options.m_isPIC = isPic; }
-    void setObjectFormat(ObjectFormat format) { m_options.m_objectFormat = format; }
+    void setObjectFormat(TargetObjectFormat format) { m_options.m_objectFormat = format; }
 
   private:
     Options m_options;
+    std::pmr::memory_resource *m_alloc;
+    std::pmr::unordered_map<SectionType, CodeSection> m_sections;
 };
 
 #endif // EZPACKER_EZTESTTRIPLEBINARYDESC_H

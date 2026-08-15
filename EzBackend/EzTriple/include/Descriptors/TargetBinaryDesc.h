@@ -3,70 +3,17 @@
 
 #include "EzTripleCommon.h"
 
-enum class CodeModel : uint8_t
+enum class TargetCodeModel : uint8_t
 {
     Small, // Global addresses can be encoded in instruction pointer + small integer immediate.
     Large  // The entire address must be encoded in the instruction.
 };
 
-enum class Endianness : uint8_t
-{
-    Little, // The first bit is the LSB (Least Significant Bit).
-    Big     // The first bit is the MSB (Most Significant Bit).
-};
-
-enum class ObjectFormat : uint8_t
+enum class TargetObjectFormat : uint8_t
 {
     ELF,
     COFF,
     MachO
-};
-
-/**
- * Target-agnostic relocation types representing standard relocation fixups
- * required across various object formats (ELF, COFF/PE, Mach-O).
- */
-enum class CodeRelocationType : uint8_t
-{
-    /** No relocation needed or relocation is undefined. */
-    None,
-
-    /**
-     * Direct 32-bit absolute address fixup (e.g., ELF R_X86_64_32 / COFF IMAGE_REL_AMD64_ADDR32).
-     * The linker writes the full 32-bit virtual address of the symbol directly into the field.
-     */
-    Absolute32,
-
-    /**
-     * Direct 64-bit absolute address fixup (e.g., ELF R_X86_64_64 / COFF IMAGE_REL_AMD64_ADDR64).
-     * Used by instructions loading 64-bit immediate pointers (such as x86-64 `movabs reg, imm64`).
-     */
-    Absolute64,
-
-    /**
-     * 32-bit signed PC-relative (RIP-relative) data displacement (e.g., ELF R_X86_64_PC32 / COFF
-     * IMAGE_REL_AMD64_REL32). Computes the signed offset between the next instruction address (PC/RIP) and the target
-     * symbol (e.g., `mov reg, [rip + symbol]`).
-     */
-    PCRel32,
-
-    /**
-     * 32-bit signed PC-relative branch or call offset (e.g., ELF R_X86_64_PLT32 or direct branch relocations).
-     * Used specifically for control flow instructions (`call target`, `jmp target`, conditional jumps).
-     */
-    BranchRel32,
-
-    /**
-     * 32-bit PC-relative reference to a Global Offset Table (GOT) entry (e.g., ELF R_X86_64_GOTPCREL).
-     * Used in Position-Independent Code (PIC) to resolve external/global symbols via an indirect pointer in the GOT.
-     */
-    GOTPCREL,
-
-    /**
-     * 32-bit PC-relative reference to a Procedure Linkage Table (PLT) entry (e.g., ELF R_X86_64_PLT32).
-     * Used in shared libraries and dynamic linking to invoke external functions via dynamic stubs.
-     */
-    PLTRel32
 };
 
 /**
@@ -99,14 +46,19 @@ class TargetBinaryDesc
     virtual const char *getName() const = 0;
 
     /**
+     * Returns the section of the given type. This function MUST ALWAYS RETURN NON-NULLPTR.
+     */
+    virtual CodeSection *getSection(SectionType type) = 0;
+
+    /**
      * Returns the code model for this binary description.
      */
-    virtual CodeModel getCodeModel() const = 0;
+    virtual TargetCodeModel getCodeModel() const = 0;
 
     /**
      * Returns the object format this ABI expects.
      */
-    virtual ObjectFormat getObjectFormat() const = 0;
+    virtual TargetObjectFormat getObjectFormat() const = 0;
 
     /**
      * Returns the alignment needed for the starting address of a function. Imagine current address = 3. A new function
@@ -123,9 +75,9 @@ class TargetBinaryDesc
     virtual size_t getLoopAlignment() const = 0;
 
     /**
-     * Returns the alignment needed for the given section name.
+     * Initializes the binary descriptor and creates the needed structures.
      */
-    virtual size_t getSectionAlignment(std::string_view sectionName) const = 0;
+    virtual void initialize() = 0;
 
   private:
 };

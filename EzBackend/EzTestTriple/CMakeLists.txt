@@ -32,5 +32,5 @@ set(EZTESTTRIPLE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzTestTriple"
         FILE_LIST ${EZTESTTRIPLE_FILES_LIST}
         PRECOMPILED_HEADER "include/EzTestTripleCommon.h"
-        LINKED_LIBRARIES "EzTriple"
+        LINKED_LIBRARIES "EzTriple;EzCodeEmitter"
         INCLUDED_DIRS "include")

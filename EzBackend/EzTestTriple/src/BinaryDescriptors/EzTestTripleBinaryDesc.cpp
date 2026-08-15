@@ -1,6 +1,9 @@
 #include "BinaryDescriptors/EzTestTripleBinaryDesc.h"
 
-EzTestTripleBinaryDesc::EzTestTripleBinaryDesc(const Options &options) : m_options(options) {}
+EzTestTripleBinaryDesc::EzTestTripleBinaryDesc(const Options &options, std::pmr::memory_resource *alloc) :
+    m_options(options), m_alloc(alloc), m_sections(alloc)
+{
+}
 
 bool EzTestTripleBinaryDesc::isLittleEndian() const { return true; }
 
@@ -8,9 +11,11 @@ bool EzTestTripleBinaryDesc::isPositionIndependent() const { return m_options.m_
 
 const char *EzTestTripleBinaryDesc::getName() const { return "EzTestTripleBinaryDesc"; }
 
-CodeModel EzTestTripleBinaryDesc::getCodeModel() const { return m_options.m_codeModel; }
+CodeSection *EzTestTripleBinaryDesc::getSection(SectionType type) { return m_sections.at(type); }
 
-ObjectFormat EzTestTripleBinaryDesc::getObjectFormat() const { return m_options.m_objectFormat; }
+TargetCodeModel EzTestTripleBinaryDesc::getCodeModel() const { return m_options.m_codeModel; }
+
+TargetObjectFormat EzTestTripleBinaryDesc::getObjectFormat() const { return m_options.m_objectFormat; }
 
 size_t EzTestTripleBinaryDesc::getFunctionAlignment() const
 {
@@ -20,22 +25,24 @@ size_t EzTestTripleBinaryDesc::getFunctionAlignment() const
 
 size_t EzTestTripleBinaryDesc::getLoopAlignment() const { return 16; }
 
-size_t EzTestTripleBinaryDesc::getSectionAlignment(std::string_view sectionName) const
+void EzTestTripleBinaryDesc::initialize()
 {
-    if (sectionName == ".text" || sectionName == "text")
+    switch (m_options.m_objectFormat)
     {
-        return 16;
+        case TargetObjectFormat::COFF:
+        {
+            Helpers::ObjectFormat::CreateCoffSections(m_sections, m_alloc);
+            break;
+        }
+        case TargetObjectFormat::ELF:
+        {
+            Helpers::ObjectFormat::CreateElfSections(m_sections, m_alloc);
+            break;
+        }
+        case TargetObjectFormat::MachO:
+        {
+            Helpers::ObjectFormat::CreateMachoSections(m_sections, m_alloc);
+            break;
+        }
     }
-    if (sectionName == ".rodata" || sectionName == "rodata")
-    {
-        // 16-byte alignment accommodates vectorized constants and floating-point literals
-        return 16;
-    }
-    if (sectionName == ".data" || sectionName == "data" || sectionName == ".bss" || sectionName == "bss")
-    {
-        return 8;
-    }
-
-    // Default fallback alignment for custom sections
-    return 8;
 }

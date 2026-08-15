@@ -57,5 +57,5 @@ set(EZTRIPLE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzTriple"
         FILE_LIST ${EZTRIPLE_FILES_LIST}
         PRECOMPILED_HEADER "include/EzTripleCommon.h"
-        LINKED_LIBRARIES "EzMir"
+        LINKED_LIBRARIES "EzMir;EzCodeEmitter"
         INCLUDED_DIRS "include")

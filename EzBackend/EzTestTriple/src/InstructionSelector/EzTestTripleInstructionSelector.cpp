@@ -131,8 +131,8 @@ void CreateInstructionSelector(MirBuilderContext *ctx, MirInstructionSelector *s
     auto isImmS32 = [](size_t opIdx) { return ISelPreds::operandIntFitsInSigned(opIdx, 32); };
     auto isFloatImm = [](size_t opIdx) { return ISelPreds::operandType(opIdx, MirOperandType::FloatingPoint); };
 
-    auto isSmallModel = ISelPreds::codeModel(CodeModel::Small);
-    auto isLargeModel = ISelPreds::codeModel(CodeModel::Large);
+    auto isSmallModel = ISelPreds::codeModel(TargetCodeModel::Small);
+    auto isLargeModel = ISelPreds::codeModel(TargetCodeModel::Large);
 
     auto catchAll = [](const SelectionContext &) -> bool { return true; };
 

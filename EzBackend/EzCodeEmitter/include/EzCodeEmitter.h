@@ -5,5 +5,6 @@
 
 #include "CodeEmitter.h"
 #include "CodeEmitterRuleBuilder.h"
+#include "Helpers.h"
 
 #endif // EZPACKER_EZCODEEMITTER_H

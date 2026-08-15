@@ -2,14 +2,65 @@
 #define EZPACKER_CODEEMITERCONTEXT_H
 
 #include "EzCodeEmitterCommon.h"
+#include "CodeSection.h"
+
+/**
+ * Target-agnostic relocation types representing standard relocation fixups
+ * required across various object formats (ELF, COFF/PE, Mach-O).
+ */
+enum class TargetCodeRelocationType : uint8_t
+{
+    /** No relocation needed or relocation is undefined. */
+    None,
+
+    /**
+     * Direct 32-bit absolute address fixup (e.g., ELF R_X86_64_32 / COFF IMAGE_REL_AMD64_ADDR32).
+     * The linker writes the full 32-bit virtual address of the symbol directly into the field.
+     */
+    Absolute32,
+
+    /**
+     * Direct 64-bit absolute address fixup (e.g., ELF R_X86_64_64 / COFF IMAGE_REL_AMD64_ADDR64).
+     * Used by instructions loading 64-bit immediate pointers (such as x86-64 `movabs reg, imm64`).
+     */
+    Absolute64,
+
+    /**
+     * 32-bit signed PC-relative (RIP-relative) data displacement (e.g., ELF R_X86_64_PC32 / COFF
+     * IMAGE_REL_AMD64_REL32). Computes the signed offset between the next instruction address (PC/RIP) and the target
+     * symbol (e.g., `mov reg, [rip + symbol]`).
+     */
+    PCRel32,
+
+    /**
+     * 32-bit signed PC-relative branch or call offset (e.g., ELF R_X86_64_PLT32 or direct branch relocations).
+     * Used specifically for control flow instructions (`call target`, `jmp target`, conditional jumps).
+     */
+    BranchRel32,
+
+    /**
+     * 32-bit PC-relative reference to a Global Offset Table (GOT) entry (e.g., ELF R_X86_64_GOTPCREL).
+     * Used in Position-Independent Code (PIC) to resolve external/global symbols via an indirect pointer in the GOT.
+     */
+    GOTPCREL,
+
+    /**
+     * 32-bit PC-relative reference to a Procedure Linkage Table (PLT) entry (e.g., ELF R_X86_64_PLT32).
+     * Used in shared libraries and dynamic linking to invoke external functions via dynamic stubs.
+     */
+    PLTRel32
+};
 
 /**
  * Structure used to contain the bare minimum information about an emitted label.
  */
 struct CodeLabel
 {
-    MirId m_id;
-    std::string_view m_name;
+    // Section in which this label was defined.
+    CodeSection *m_definingSection{ nullptr };
+    MirId m_id{ MIRID_INVALID };
+    uint64_t m_labelAddress{ 0 }; // Offset from the start of the section.
+    std::string_view m_name{};
 };
 
 /**
@@ -17,8 +68,10 @@ struct CodeLabel
  */
 struct CodeRelocation
 {
+    TargetCodeRelocationType m_relocType{ TargetCodeRelocationType::None };
+    CodeSection *m_definingSection{ nullptr };
     MirReference *m_srcRef{ nullptr }; // Reference that caused the relocation to appear.
-    uint64_t m_address{ 0 };           // Address or section offset where the relocation fixup applies.
+    uint64_t m_address{ 0 };           // Offset from the start of the section.
 };
 
 /**
