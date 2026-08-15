@@ -399,6 +399,36 @@ FlexInt &FlexInt::operator%=(const FlexInt &other)
     return *this;
 }
 
+int8_t FlexInt::getI8() const { return static_cast<int8_t>(getI64()); }
+
+int16_t FlexInt::getI16() const { return static_cast<int16_t>(getI64()); }
+
+int32_t FlexInt::getI32() const { return static_cast<int32_t>(getI64()); }
+
+int64_t FlexInt::getI64() const
+{
+    if (mp_isneg(&m_number) == MP_YES)
+    {
+        return mp_get_i64(&m_number);
+    }
+    return static_cast<int64_t>(mp_get_u64(&m_number));
+}
+
+uint8_t FlexInt::getU8() const { return static_cast<uint8_t>(getU64()); }
+
+uint16_t FlexInt::getU16() const { return static_cast<uint16_t>(getU64()); }
+
+uint32_t FlexInt::getU32() const { return static_cast<uint32_t>(getU64()); }
+
+uint64_t FlexInt::getU64() const
+{
+    if (mp_isneg(&m_number) == MP_YES)
+    {
+        return static_cast<uint64_t>(mp_get_i64(&m_number));
+    }
+    return mp_get_u64(&m_number);
+}
+
 size_t FlexInt::getBitSize() const { return m_bitWidth; }
 
 void FlexInt::extend(size_t newBitSize, bool isSigned)

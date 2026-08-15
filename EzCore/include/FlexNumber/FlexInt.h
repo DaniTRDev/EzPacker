@@ -256,6 +256,46 @@ class FlexInt
     FlexInt &operator%=(const FlexInt &other);
 
     /**
+     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     */
+    int8_t getI8() const;
+
+    /**
+     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     */
+    int16_t getI16() const;
+
+    /**
+     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     */
+    int32_t getI32() const;
+
+    /**
+     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     */
+    int64_t getI64() const;
+
+    /**
+     * Returns the UNSIGNED VERSION of the integer in 8 bits, WILL TRUNC IF BIGGER.
+     */
+    uint8_t getU8() const;
+
+    /**
+     * Returns the UNSIGNED VERSION of the integer in 16 bits, WILL TRUNC IF BIGGER.
+     */
+    uint16_t getU16() const;
+
+    /**
+     * Returns the UNSIGNED VERSION of the integer in 32 bits, WILL TRUNC IF BIGGER.
+     */
+    uint32_t getU32() const;
+
+    /**
+     * Returns the UNSIGNED VERSION of the integer in 64 bits, WILL TRUNC IF BIGGER.
+     */
+    uint64_t getU64() const;
+
+    /**
      * Returns the bit size of this number.
      * @return
      */
