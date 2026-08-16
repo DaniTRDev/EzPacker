@@ -46,6 +46,7 @@ CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
 /bin/
+/build/
 
 ### CLion+all template
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
