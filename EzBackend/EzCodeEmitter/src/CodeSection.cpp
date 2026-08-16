@@ -7,9 +7,12 @@ CodeSection::CodeSection(SectionFlags flags,
                          uint8_t padByte,
                          std::string_view name,
                          std::pmr::memory_resource *alloc) :
-    m_flags(flags), m_type(type), m_alignment(alignment), m_endianness(endianness), m_padByte(padByte), m_name(name),
-    m_buffer(alloc)
+    m_isFinalized(false), m_flags(flags), m_head(nullptr), m_tail(nullptr), m_cursor(nullptr), m_type(type),
+    m_alignment(alignment), m_endianness(endianness), m_padByte(padByte), m_name(name), m_buffer(alloc), m_alloc(alloc)
 {
+    m_head = createDataNode();
+    m_tail = m_head;
+    m_cursor = m_head;
 }
 
 SectionFlags CodeSection::getFlags() const { return m_flags; }
@@ -18,62 +21,87 @@ SectionType CodeSection::getType() const { return m_type; }
 
 size_t CodeSection::getAlignment() const { return m_alignment; }
 
-uint64_t CodeSection::getCurrentOffset() const { return m_buffer.size(); }
+SectionNode *CodeSection::getHead() const { return m_head; }
 
-void CodeSection::emit8(uint8_t val) { m_buffer.push_back(val); }
+SectionNode *CodeSection::getCursor() const { return m_cursor; }
+
+SectionNode *CodeSection::bindLabel(MirId labelId)
+{
+    auto *lblNode = insertNodeAfter(m_cursor, SectionNodeKind::Label);
+    lblNode->m_labelId = labelId;
+    return lblNode;
+}
+
+void CodeSection::alignTo(size_t alignment)
+{
+    auto *alignNode = insertNodeAfter(m_cursor, SectionNodeKind::Align);
+    alignNode->m_alignment = alignment;
+    alignNode->m_padByte = m_padByte;
+}
+
+void CodeSection::emit8(uint8_t val) { getActiveDataBuffer().push_back(val); }
 
 void CodeSection::emit16(uint16_t val)
 {
+    auto &buf = getActiveDataBuffer();
     if (m_endianness == TargetEndianness::Little)
     {
-        m_buffer.push_back(static_cast<uint8_t>(val));
-        m_buffer.push_back(static_cast<uint8_t>(val >> 8));
+        buf.push_back(static_cast<uint8_t>(val));
+        buf.push_back(static_cast<uint8_t>(val >> 8));
     }
     else
     {
-        m_buffer.push_back(static_cast<uint8_t>(val >> 8));
-        m_buffer.push_back(static_cast<uint8_t>(val));
+        buf.push_back(static_cast<uint8_t>(val >> 8));
+        buf.push_back(static_cast<uint8_t>(val));
     }
 }
 
 void CodeSection::emit32(uint32_t val)
 {
+    auto &buf = getActiveDataBuffer();
     if (m_endianness == TargetEndianness::Little)
     {
-        m_buffer.push_back(static_cast<uint8_t>(val));
-        m_buffer.push_back(static_cast<uint8_t>(val >> 8));
-        m_buffer.push_back(static_cast<uint8_t>(val >> 16));
-        m_buffer.push_back(static_cast<uint8_t>(val >> 24));
+        buf.push_back(static_cast<uint8_t>(val));
+        buf.push_back(static_cast<uint8_t>(val >> 8));
+        buf.push_back(static_cast<uint8_t>(val >> 16));
+        buf.push_back(static_cast<uint8_t>(val >> 24));
     }
     else
     {
-        m_buffer.push_back(static_cast<uint8_t>(val >> 24));
-        m_buffer.push_back(static_cast<uint8_t>(val >> 16));
-        m_buffer.push_back(static_cast<uint8_t>(val >> 8));
-        m_buffer.push_back(static_cast<uint8_t>(val));
+        buf.push_back(static_cast<uint8_t>(val >> 24));
+        buf.push_back(static_cast<uint8_t>(val >> 16));
+        buf.push_back(static_cast<uint8_t>(val >> 8));
+        buf.push_back(static_cast<uint8_t>(val));
     }
 }
 
 void CodeSection::emit64(uint64_t val)
 {
+    auto &buf = getActiveDataBuffer();
     if (m_endianness == TargetEndianness::Little)
     {
         for (int i = 0; i < 8; ++i)
-            m_buffer.push_back(static_cast<uint8_t>(val >> (i * 8)));
+        {
+            buf.push_back(static_cast<uint8_t>(val >> (i * 8)));
+        }
     }
     else
     {
         for (int i = 7; i >= 0; --i)
-            m_buffer.push_back(static_cast<uint8_t>(val >> (i * 8)));
+        {
+            buf.push_back(static_cast<uint8_t>(val >> (i * 8)));
+        }
     }
 }
 
 void CodeSection::emitBytes(const uint8_t *data, size_t size)
 {
     if (!data || size == 0)
+    {
         return;
-
-    m_buffer.insert(m_buffer.end(), data, data + size);
+    }
+    auto &buf = getActiveDataBuffer();
+    buf.insert(buf.end(), data, data + size);
 }
 
 void CodeSection::emitBytesWithEndian(const uint8_t *data, size_t size, TargetEndianness inputEndianness)
@@ -82,39 +110,70 @@ void CodeSection::emitBytesWithEndian(const uint8_t *data, size_t size, TargetEn
     {
         return;
     }
+    auto &buf = getActiveDataBuffer();
+    buf.reserve(buf.size() + size);
 
-    m_buffer.reserve(m_buffer.size() + size);
-
-    // If input and target match: emit in forward order (as-is)
     if (inputEndianness == m_endianness)
     {
-        m_buffer.insert(m_buffer.end(), data, data + size);
+        buf.insert(buf.end(), data, data + size);
     }
     else
     {
-        // Endianness differs: reverse the byte sequence
         for (size_t i = size; i > 0; --i)
         {
-            m_buffer.push_back(data[i - 1]);
+            buf.push_back(data[i - 1]);
         }
     }
 }
 
-void CodeSection::alignTo(size_t alignment)
+void CodeSection::finalize()
 {
-    size_t current = m_buffer.size();
-    size_t rem = current % alignment;
-    if (rem != 0)
+    m_buffer.clear();
+    uint64_t currentOffset = 0;
+
+    for (SectionNode *node = m_head; node != nullptr; node = node->m_next)
     {
-        size_t padSize = alignment - rem;
-        m_buffer.insert(m_buffer.end(), padSize, m_padByte);
+        switch (node->m_kind)
+        {
+            case SectionNodeKind::Label:
+                node->m_calculatedOffset = currentOffset;
+                break;
+
+            case SectionNodeKind::Align:
+            {
+                if (node->m_alignment > 1)
+                {
+                    size_t rem = currentOffset % node->m_alignment;
+                    if (rem != 0)
+                    {
+                        size_t padSize = node->m_alignment - rem;
+                        m_buffer.insert(m_buffer.end(), padSize, node->m_padByte);
+                        currentOffset += padSize;
+                    }
+                }
+                break;
+            }
+
+            case SectionNodeKind::Data:
+                if (!node->m_data.empty())
+                {
+                    m_buffer.insert(m_buffer.end(), node->m_data.begin(), node->m_data.end());
+                    currentOffset += node->m_data.size();
+                }
+                break;
+        }
     }
+
+    m_isFinalized = true;
 }
+
+void CodeSection::resetCursorToEnd() { m_cursor = m_tail; }
+
+void CodeSection::setCursor(SectionNode *node) { m_cursor = node ? node : m_tail; }
 
 bool CodeSection::patch32(uint64_t offset, uint32_t val)
 {
-    // Bounds check for 4 bytes
-    if (offset + 4 > m_buffer.size())
+    if (!m_isFinalized || (offset + 4 > m_buffer.size()))
     {
         return false;
     }
@@ -139,33 +198,24 @@ bool CodeSection::patch32(uint64_t offset, uint32_t val)
 
 bool CodeSection::patch64(uint64_t offset, uint64_t val)
 {
-    // Bounds check for 8 bytes
-    if (offset + 8 > m_buffer.size())
+    if (!m_isFinalized || (offset + 8 > m_buffer.size()))
     {
         return false;
     }
 
     if (m_endianness == TargetEndianness::Little)
     {
-        m_buffer[offset + 0] = static_cast<uint8_t>(val);
-        m_buffer[offset + 1] = static_cast<uint8_t>(val >> 8);
-        m_buffer[offset + 2] = static_cast<uint8_t>(val >> 16);
-        m_buffer[offset + 3] = static_cast<uint8_t>(val >> 24);
-        m_buffer[offset + 4] = static_cast<uint8_t>(val >> 32);
-        m_buffer[offset + 5] = static_cast<uint8_t>(val >> 40);
-        m_buffer[offset + 6] = static_cast<uint8_t>(val >> 48);
-        m_buffer[offset + 7] = static_cast<uint8_t>(val >> 56);
+        for (int i = 0; i < 8; ++i)
+        {
+            m_buffer[offset + i] = static_cast<uint8_t>(val >> (i * 8));
+        }
     }
     else
     {
-        m_buffer[offset + 0] = static_cast<uint8_t>(val >> 56);
-        m_buffer[offset + 1] = static_cast<uint8_t>(val >> 48);
-        m_buffer[offset + 2] = static_cast<uint8_t>(val >> 40);
-        m_buffer[offset + 3] = static_cast<uint8_t>(val >> 32);
-        m_buffer[offset + 4] = static_cast<uint8_t>(val >> 24);
-        m_buffer[offset + 5] = static_cast<uint8_t>(val >> 16);
-        m_buffer[offset + 6] = static_cast<uint8_t>(val >> 8);
-        m_buffer[offset + 7] = static_cast<uint8_t>(val);
+        for (int i = 0; i < 8; ++i)
+        {
+            m_buffer[offset + i] = static_cast<uint8_t>(val >> ((7 - i) * 8));
+        }
     }
 
     return true;
@@ -176,7 +226,7 @@ bool CodeSection::patchBytesWithEndian(uint64_t offset,
                                        size_t size,
                                        TargetEndianness inputEndianness)
 {
-    if (!data || (offset + size > m_buffer.size()))
+    if (!m_isFinalized || !data || (offset + size > m_buffer.size()))
     {
         return false;
     }
@@ -199,6 +249,81 @@ bool CodeSection::patchBytesWithEndian(uint64_t offset,
     return true;
 }
 
+uint64_t CodeSection::getCurrentOffset() const
+{
+    if (m_isFinalized)
+    {
+        return m_buffer.size();
+    }
+
+    uint64_t sz = 0;
+    for (SectionNode *n = m_head; n != nullptr; n = n->m_next)
+    {
+        if (n->m_kind == SectionNodeKind::Data)
+        {
+            sz += n->m_data.size();
+        }
+        if (n == m_cursor)
+        {
+            break;
+        }
+    }
+    return sz;
+}
+
 std::string_view CodeSection::getName() const { return m_name; }
 
 std::span<const uint8_t> CodeSection::getData() const { return m_buffer; }
+
+SectionNode *CodeSection::createDataNode()
+{
+    void *mem = m_alloc->allocate(sizeof(SectionNode), alignof(SectionNode));
+    return new (mem) SectionNode(SectionNodeKind::Data, m_alloc);
+}
+
+SectionNode *CodeSection::insertNodeAfter(SectionNode *target, SectionNodeKind kind)
+{
+    void *mem = m_alloc->allocate(sizeof(SectionNode), alignof(SectionNode));
+    auto *newNode = new (mem) SectionNode(kind, m_alloc);
+
+    if (!target)
+    {
+        newNode->m_next = m_head;
+        if (m_head)
+        {
+            m_head->m_prev = newNode;
+        }
+        m_head = newNode;
+        if (!m_tail)
+        {
+            m_tail = newNode;
+        }
+    }
+    else
+    {
+        newNode->m_next = target->m_next;
+        newNode->m_prev = target;
+        if (target->m_next)
+        {
+            target->m_next->m_prev = newNode;
+        }
+        else
+        {
+            m_tail = newNode;
+        }
+        target->m_next = newNode;
+    }
+
+    m_cursor = newNode;
+    return newNode;
+}
+
+std::pmr::vector<uint8_t> &CodeSection::getActiveDataBuffer()
+{
+    if (m_cursor && m_cursor->m_kind == SectionNodeKind::Data)
+    {
+        return m_cursor->m_data;
+    }
+    auto *dataNode = insertNodeAfter(m_cursor, SectionNodeKind::Data);
+    return dataNode->m_data;
+}

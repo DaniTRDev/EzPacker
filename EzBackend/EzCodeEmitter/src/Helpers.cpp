@@ -22,7 +22,8 @@ CodeSection *AllocateSection(SectionFlags flags,
 // =========================================================================
 // 1. Windows PE / COFF Sections
 // =========================================================================
-void CreateCoffSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, std::pmr::memory_resource *alloc)
+void CreateCoffSections(std::pmr::unordered_map<SectionType, CodeSection *> &sectionMap,
+                        std::pmr::memory_resource *alloc)
 {
     std::pmr::polymorphic_allocator<> allocator(alloc);
 
@@ -90,7 +91,8 @@ void CreateCoffSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, s
 // =========================================================================
 // 2. Linux / BSD ELF Sections
 // =========================================================================
-void CreateElfSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, std::pmr::memory_resource *alloc)
+void CreateElfSections(std::pmr::unordered_map<SectionType, CodeSection *> &sectionMap,
+                       std::pmr::memory_resource *alloc)
 {
     std::pmr::polymorphic_allocator<> allocator(alloc);
 
@@ -167,7 +169,8 @@ void CreateElfSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, st
 // =========================================================================
 // 3. Apple Mach-O Sections
 // =========================================================================
-void CreateMachoSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, std::pmr::memory_resource *alloc)
+void CreateMachoSections(std::pmr::unordered_map<SectionType, CodeSection *> &sectionMap,
+                         std::pmr::memory_resource *alloc)
 {
     std::pmr::polymorphic_allocator<> allocator(alloc);
 
@@ -261,7 +264,6 @@ void CreateMachoSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, 
                                       TargetEndianness::Little,
                                       allocator);
 
-    // Fine-grained Mach-O Mappings
     sectionMap[SectionType::Text] = textSec;
     sectionMap[SectionType::ReadOnly] = constSec;
     sectionMap[SectionType::ReadOnlyWithRel] = constDataSec;

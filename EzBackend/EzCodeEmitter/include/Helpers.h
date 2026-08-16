@@ -26,7 +26,8 @@ namespace Helpers::ObjectFormat
  * All scalar encodings are configured as Little-Endian.
  *
  */
-extern void CreateCoffSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, std::pmr::memory_resource *alloc);
+extern void CreateCoffSections(std::pmr::unordered_map<SectionType, CodeSection *> &sectionMap,
+                               std::pmr::memory_resource *alloc);
 
 /**
  * Instantiates and registers the standard binary sections compliant with the System V / Linux ELF specification.
@@ -47,7 +48,8 @@ extern void CreateCoffSections(std::pmr::map<SectionType, CodeSection *> &sectio
  * All scalar encodings are configured as Little-Endian.
  *
  */
-extern void CreateElfSections(std::pmr::map<SectionType, CodeSection *> &sectionMap, std::pmr::memory_resource *alloc);
+extern void CreateElfSections(std::pmr::unordered_map<SectionType, CodeSection *> &sectionMap,
+                              std::pmr::memory_resource *alloc);
 
 /**
  * Instantiates and registers the standard binary sections compliant with the Apple Mach-O specification.
@@ -73,7 +75,7 @@ extern void CreateElfSections(std::pmr::map<SectionType, CodeSection *> &section
  * All scalar encodings are configured as Little-Endian.
  *
  */
-extern void CreateMachoSections(std::pmr::map<SectionType, CodeSection *> &sectionMap,
+extern void CreateMachoSections(std::pmr::unordered_map<SectionType, CodeSection *> &sectionMap,
                                 std::pmr::memory_resource *alloc);
 }; // namespace Helpers::ObjectFormat
 

@@ -20,6 +20,21 @@ class EzTripleTestSuite : public EzMirTestSuite
 {
   public:
     /**
+     * Returns the emitter context.
+     */
+    CodeEmitterContext *getEmitterCtx();
+
+    /**
+     * Returns the code emitter for the test triple.
+     */
+    EzTestTripleCodeEmitter *getEmitter();
+
+    /**
+     * Returns the dissasembler for the test triple
+     */
+    EzTestTripleDisassembler *getDisassembler();
+
+    /**
      * Returns the target binary descriptor used for the test suite.
      */
     TargetBinaryDesc *getTargetBinaryDesc();
@@ -36,6 +51,9 @@ class EzTripleTestSuite : public EzMirTestSuite
     virtual void destroy() override;
 
   private:
+    CodeEmitterContext *m_emitterCtx;
+    EzTestTripleCodeEmitter *m_emitter;
+    EzTestTripleDisassembler *m_disassembler;
     TargetBinaryDesc *m_targetBinaryDesc;
 };
 

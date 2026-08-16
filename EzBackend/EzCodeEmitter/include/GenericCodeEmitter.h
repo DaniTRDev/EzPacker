@@ -20,29 +20,14 @@ class GenericCodeEmitter
     virtual ~GenericCodeEmitter() = default;
 
     /**
-     * Creates a code label.
+     * Begins a function.
      */
-    virtual CodeLabel *getOrCreateLabel(MirId id) = 0;
-
-    /**
-     * Creates a relocation out of the given reference and address.
-     */
-    virtual CodeLabel *createReloc(MirReference *ref, uint64_t address) = 0;
-
-    /**
-     * Gets the currently active section.
-     */
-    virtual CodeSection *getActiveSection() const = 0;
+    virtual void beginFunction(CodeEmitterContext *ctx, std::string_view name) = 0;
 
     /**
      * Binds the given label ID to the emitter so the next instructions are emitted inside this label.
      */
-    virtual void bindBlockLabel(size_t labelId) = 0;
-
-    /**
-     * Begins a function.
-     */
-    virtual void beginFunction(CodeEmitterContext *ctx, std::string_view name) = 0;
+    virtual void bindLabel(MirId labelId) = 0;
 
     /**
      * Ends a function.
@@ -53,16 +38,6 @@ class GenericCodeEmitter
      * Emits the instruction with the given operands and target desc.
      */
     virtual void emitInst(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands) = 0;
-
-    /**
-     * Sets the active section where subsequent byte emissions, labels, and fixups will be placed.
-     */
-    virtual void switchSection(CodeSection *section) = 0;
-
-    /**
-     * Convenience helper to switch by name.
-     */
-    virtual void switchSection(std::string_view sectionName) = 0;
 };
 
 #endif // EZPACKER_GENERICCODEEMITTER_H

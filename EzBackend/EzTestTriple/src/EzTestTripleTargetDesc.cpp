@@ -78,6 +78,6 @@ void EzTestTripleTargetDesc::initialize()
     m_registerAllocator = alloc.new_object<EzTestTripleRegisterAllocator>();
 
     // 8. Initialize Binary Descriptors.
-    auto *defaultBinDesc = alloc.new_object<EzTestTripleBinaryDesc>(EzTestTripleBinaryDesc::Options{});
+    auto *defaultBinDesc = alloc.new_object<EzTestTripleBinaryDesc>(EzTestTripleBinaryDesc::Options{}, m_alloc);
     m_binDescriptors.push_back(defaultBinDesc);
 }

@@ -3,8 +3,9 @@
 
 #include "EzCodeEmitterCommon.h"
 
-#include "CodeEmitter.h"
-#include "CodeEmitterRuleBuilder.h"
+#include "CodeEmitterContext.h"
+#include "CodeSection.h"
+#include "GenericCodeEmitter.h"
 #include "Helpers.h"
 
 #endif // EZPACKER_EZCODEEMITTER_H

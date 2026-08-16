@@ -46,3 +46,12 @@ void EzTestTripleBinaryDesc::initialize()
         }
     }
 }
+
+void EzTestTripleBinaryDesc::setCodeModel(TargetCodeModel model) { m_options.m_codeModel = model; }
+void EzTestTripleBinaryDesc::setPositionIndependent(bool isPic) { m_options.m_isPIC = isPic; }
+void EzTestTripleBinaryDesc::setObjectFormat(TargetObjectFormat format) { m_options.m_objectFormat = format; }
+
+const std::pmr::unordered_map<SectionType, CodeSection *> &EzTestTripleBinaryDesc::getSections() const
+{
+    return m_sections;
+}

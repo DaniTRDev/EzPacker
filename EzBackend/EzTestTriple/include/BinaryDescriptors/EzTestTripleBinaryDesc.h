@@ -87,7 +87,7 @@ class EzTestTripleBinaryDesc : public TargetBinaryDesc
     const char *getName() const override;
 
     /**
-     * Returns the a NEW section for each type. All of them have the same alignment.
+     * Returns the section of the given type, target must define each section and overlap them if needed.
      */
     virtual CodeSection *getSection(SectionType type) override;
 
@@ -117,14 +117,19 @@ class EzTestTripleBinaryDesc : public TargetBinaryDesc
     void initialize() override;
 
     // Modifiers for testing configurations
-    void setCodeModel(TargetCodeModel model) { m_options.m_codeModel = model; }
-    void setPositionIndependent(bool isPic) { m_options.m_isPIC = isPic; }
-    void setObjectFormat(TargetObjectFormat format) { m_options.m_objectFormat = format; }
+    void setCodeModel(TargetCodeModel model);
+    void setPositionIndependent(bool isPic);
+    void setObjectFormat(TargetObjectFormat format);
+
+    /**
+     * Returns the map of sections.
+     */
+    const std::pmr::unordered_map<SectionType, CodeSection *> &getSections() const override;
 
   private:
     Options m_options;
     std::pmr::memory_resource *m_alloc;
-    std::pmr::unordered_map<SectionType, CodeSection> m_sections;
+    std::pmr::unordered_map<SectionType, CodeSection *> m_sections;
 };
 
 #endif // EZPACKER_EZTESTTRIPLEBINARYDESC_H

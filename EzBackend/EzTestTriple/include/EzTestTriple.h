@@ -7,6 +7,9 @@
 
 #include "CallingConvs/EzTestTripleCallingConv.h"
 
+#include "CodeEmitter/EzTestTripleCodeEmitter.h"
+#include "CodeEmitter/EzTestTripleDisassembler.h"
+
 #include "FrameLowerer/EzTestTripleFrameLowerer.h"
 
 #include "InstructionSelector/EzTestTripleInstructionSelector.h"

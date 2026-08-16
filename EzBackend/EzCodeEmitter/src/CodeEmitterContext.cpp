@@ -1,9 +1,11 @@
 #include "CodeEmitterContext.h"
 #include <memory_resource>
 
-CodeEmitterContext::CodeEmitterContext(DiagnosticCollector *diagCollector, std::pmr::memory_resource *alloc) :
-    m_diagCollector(diagCollector), m_alloc(alloc), m_currentFuncLabels(alloc), m_currentFuncRelocs(alloc),
-    m_labels(alloc), m_relocations(alloc)
+CodeEmitterContext::CodeEmitterContext(DiagnosticCollector *diagCollector,
+                                       const std::pmr::unordered_map<SectionType, CodeSection *> &sections,
+                                       std::pmr::memory_resource *alloc) :
+    m_currentLabel(nullptr), m_diagCollector(diagCollector), m_alloc(alloc), m_currentFuncLabels(alloc),
+    m_currentFuncRelocs(alloc), m_labels(alloc), m_relocations(alloc), m_sections(sections)
 {
 }
 
@@ -35,7 +37,7 @@ CodeEmitterContext::~CodeEmitterContext()
     m_labels.clear();
 
     // Deallocate unflushed active function relocations
-    for (auto &[addr, reloc] : m_currentFuncRelocs)
+    for (auto &reloc : m_currentFuncRelocs)
     {
         if (reloc != nullptr)
         {
@@ -45,9 +47,9 @@ CodeEmitterContext::~CodeEmitterContext()
     m_currentFuncRelocs.clear();
 
     // Deallocate persistent module-wide relocations
-    for (auto &[addr, reloc] : m_relocations)
+    for (auto &[section, relocs] : m_relocations)
     {
-        if (reloc != nullptr)
+        for (auto &reloc : relocs)
         {
             pAlloc.delete_object(reloc);
         }
@@ -55,59 +57,84 @@ CodeEmitterContext::~CodeEmitterContext()
     m_relocations.clear();
 }
 
-CodeLabel *CodeEmitterContext::getOrCreateLabel(MirId id, const std::string_view &name)
+CodeLabel *CodeEmitterContext::getOrCreateLabel(CodeSection *definingSection, MirId id, const std::string_view &name)
 {
     auto it = m_currentFuncLabels.find(id);
     if (it != m_currentFuncLabels.end())
     {
+        // Update defining section if it was previously undefined
+        if (it->second->m_definingSection == nullptr)
+        {
+            it->second->m_definingSection = definingSection;
+        }
         return it->second;
     }
 
     std::pmr::polymorphic_allocator<> pAlloc(m_alloc);
     CodeLabel *newLabel = pAlloc.new_object<CodeLabel>();
+    newLabel->m_definingSection = definingSection;
+    newLabel->m_node = nullptr;
     newLabel->m_id = id;
+    newLabel->m_currentOffset = 0;
+    newLabel->m_labelAddress = definingSection ? definingSection->getCurrentOffset() : 0;
     newLabel->m_name = name;
 
     m_currentFuncLabels.insert({ id, newLabel });
     return newLabel;
 }
 
-CodeRelocation *CodeEmitterContext::addReloc(MirReference *srcRef, uint64_t address)
+CodeLabel *CodeEmitterContext::getCurrentLabel() const { return m_currentLabel; }
+
+CodeRelocation *CodeEmitterContext::addReloc(MirReference *srcRef, TargetCodeRelocationType relocType)
 {
-    auto it = m_currentFuncRelocs.find(address);
-    if (it != m_currentFuncRelocs.end())
-    {
-        it->second->m_srcRef = srcRef;
-        it->second->m_address = address;
-        return it->second;
-    }
+    CodeSection *sec = getCurrentSection();
 
     std::pmr::polymorphic_allocator<> pAlloc(m_alloc);
     CodeRelocation *newReloc = pAlloc.new_object<CodeRelocation>();
+    newReloc->m_relocType = relocType;
+    newReloc->m_definingSection = sec;
     newReloc->m_srcRef = srcRef;
-    newReloc->m_address = address;
+    newReloc->m_address = sec ? sec->getCurrentOffset() : 0;
 
-    m_currentFuncRelocs.insert({ address, newReloc });
+    m_currentFuncRelocs.push_back(newReloc);
     return newReloc;
 }
 
-CodeRelocation *CodeEmitterContext::getReloc(uint64_t address)
+CodeSection *CodeEmitterContext::getCurrentSection() const
 {
-    // Search current function local relocations first
-    auto it = m_currentFuncRelocs.find(address);
-    if (it != m_currentFuncRelocs.end())
+    if (m_currentLabel && m_currentLabel->m_definingSection)
     {
-        return it->second;
+        return m_currentLabel->m_definingSection;
+    }
+    // Fallback to primary Text section if no label has been bound yet
+    return getSection(SectionType::Text);
+}
+
+CodeSection *CodeEmitterContext::getSection(SectionType type) const { return m_sections.at(type); }
+
+void CodeEmitterContext::bindLabel(CodeLabel *label)
+{
+    if (!label)
+    {
+        return;
     }
 
-    // Search module-wide aggregated table
-    auto globalIt = m_relocations.find(address);
-    if (globalIt != m_relocations.end())
-    {
-        return globalIt->second;
-    }
+    m_currentLabel = label;
 
-    return nullptr;
+    if (label->m_definingSection != nullptr)
+    {
+        // If node has not been physically bound into the section stream, create the node
+        if (label->m_node == nullptr)
+        {
+            label->m_node = label->m_definingSection->bindLabel(label->m_id);
+            label->m_labelAddress = label->m_definingSection->getCurrentOffset();
+        }
+        else
+        {
+            // Rewind cursor to this existing label node for mid-stream appending
+            label->m_definingSection->setCursor(label->m_node);
+        }
+    }
 }
 
 void CodeEmitterContext::resetFuncState(MirFunction *currentFunc)
@@ -119,12 +146,13 @@ void CodeEmitterContext::resetFuncState(MirFunction *currentFunc)
     }
 
     // Merge function relocations into module-wide table
-    for (auto &[addr, reloc] : m_currentFuncRelocs)
+    for (auto &reloc : m_currentFuncRelocs)
     {
-        m_relocations.insert_or_assign(addr, reloc);
+        m_relocations[reloc->m_definingSection].push_back(reloc);
     }
 
     // Reset local lookup maps for the next function emission
     m_currentFuncLabels = std::pmr::unordered_map<MirId, CodeLabel *>(m_alloc);
-    m_currentFuncRelocs = std::pmr::unordered_map<uint64_t, CodeRelocation *>(m_alloc);
+    m_currentFuncRelocs = std::pmr::vector<CodeRelocation *>(m_alloc);
+    m_currentLabel = nullptr;
 }

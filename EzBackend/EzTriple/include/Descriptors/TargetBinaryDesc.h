@@ -46,7 +46,7 @@ class TargetBinaryDesc
     virtual const char *getName() const = 0;
 
     /**
-     * Returns the section of the given type. This function MUST ALWAYS RETURN NON-NULLPTR.
+     * Returns the section of the given type, target must define EVERY section and overlap them if needed.
      */
     virtual CodeSection *getSection(SectionType type) = 0;
 
@@ -78,6 +78,11 @@ class TargetBinaryDesc
      * Initializes the binary descriptor and creates the needed structures.
      */
     virtual void initialize() = 0;
+
+    /**
+     * Returns the map of sections.
+     */
+    virtual const std::pmr::unordered_map<SectionType, CodeSection *> &getSections() const = 0;
 
   private:
 };
