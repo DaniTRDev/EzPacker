@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.27)
 project(EzPacker)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -26,10 +26,6 @@ EzCMK_SetLibraryBuildType("SHARED")
 include("CMake/Vendor.cmake") # Fetch 3rd party libs.
 include("CMake/TestWrapper.cmake")
 
-if (EZPACKER_BUILD_TESTS)
-    EzCMK_EnableTestsForCurrentProject()
-endif ()
-
 add_subdirectory(LibBf) # https://bellard.org/libbf/
 add_subdirectory(EzCore)
 
@@ -38,6 +34,7 @@ add_subdirectory(EzTriple)
 add_subdirectory(EzCodeEmitter)
 
 if (EZPACKER_BUILD_TESTS)
+    EzCMK_EnableTestsForCurrentProject()
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
 
     message(STATUS "Configuring EzTestTriple")
