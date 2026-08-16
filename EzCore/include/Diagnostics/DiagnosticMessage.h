@@ -1,8 +1,7 @@
-#ifndef EZPACKER_DIAGNOSTICMESSAGE_H
-#define EZPACKER_DIAGNOSTICMESSAGE_H
+#ifndef EZCORE_DIAGNOSTIC_MESSAGE_H
+#define EZCORE_DIAGNOSTIC_MESSAGE_H
 
 #include "EzCoreCommon.h"
-#include "SourceManager/SourceManager.h"
 
 enum DiagnosticMessageType : uint8_t
 {
@@ -18,7 +17,7 @@ enum DiagnosticMessageType : uint8_t
  */
 struct DiagnosticNote
 {
-    SourceReference *m_sourceRef{ nullptr }; // Note was appended with a source reference.
+    class SourceReference *m_sourceRef{ nullptr }; // Note was appended with a source reference.
     std::pmr::string m_noteContent{};
 };
 
@@ -36,55 +35,46 @@ class DiagnosticMessage
     /**
      * Returns the primary source reference. It is used to locate the parent object/scope that executed an algorithm and
      * any of its sub-steps emitted a diagnostic.
-     * @return
      */
-    SourceReference *getPrimarySourceRef() const;
+    class SourceReference *getPrimarySourceRef() const;
 
     /**
      * Appends a note to the diagnostic message.
-     * @param note
      */
     void addNote(const DiagnosticNote &note);
 
     /**
      * Appends the string to the main message of the diagnostic.
-     * @param mainMsg
      */
     void addMainMsg(const std::string_view &str);
 
     /**
      * Sets the primary source reference.
-     * @param sourceRef
      */
-    void setPrimarySourceRef(SourceReference *sourceRef);
+    void setPrimarySourceRef(class SourceReference *sourceRef);
 
     /**
      * Sets the sender of the diagnostic message.
-     * @param sender
      */
     void setSender(const std::string_view &sender);
 
     /**
      * Sets the type of the diagnostic message.
-     * @param type
      */
     void setType(DiagnosticMessageType type);
 
     /**
      * Returns the notes (if any) attached to this message.
-     * @return
      */
     const std::list<DiagnosticNote> &getNotes() const;
 
     /**
      * Returns the main message.
-     * @return
      */
     std::string_view getMainMsg() const;
 
     /**
      * Returns the sender of the message.
-     * @return
      */
     std::string_view getSender() const;
 
@@ -99,26 +89,23 @@ class DiagnosticMessage
      * after executing this constructor IS ALLOWED.
      *
      * This constructor is made private because a message is going to be built using a builder.
-     * @param arena Used to create permanent copies of strings.
-     * @param type
-     * @param primarySourceRef
-     * @param mainMsg
-     * @param sender
-     * @param notes
      */
     DiagnosticMessage(DiagnosticMessageType type,
-                      SourceReference *primarySourceRef,
+                      class SourceReference *primarySourceRef,
                       const std::string_view &mainMsg,
                       const std::string_view &sender,
                       const std::list<DiagnosticNote> &notes = {});
 
   private:
     DiagnosticMessageType m_type;
-    SourceReference *m_primarySourceRef{ nullptr }; // A reference to the parent scope/object that executed a traverse
-                                                    // operation and created a diagnostic in any of its sub-steps.
-    std::list<DiagnosticNote> m_notes{};            // List ensure O(1) appends/removes (linked list).
-    std::pmr::string m_mainMessage;                 // The main message of the diagnostic.
-    std::pmr::string m_sender;                      // The component that sent the diagnostic.
+
+    // A reference to the parent scope/object that executed a traverse operation and created a diagnostic in any of
+    // its sub-steps.
+    class SourceReference *m_primarySourceRef{ nullptr };
+
+    std::list<DiagnosticNote> m_notes{}; // List ensure O(1) appends/removes (linked list).
+    std::pmr::string m_mainMessage;      // The main message of the diagnostic.
+    std::pmr::string m_sender;           // The component that sent the diagnostic.
 };
 
-#endif // EZPACKER_DIAGNOSTICMESSAGE_H
+#endif // EZCORE_DIAGNOSTIC_MESSAGE_H

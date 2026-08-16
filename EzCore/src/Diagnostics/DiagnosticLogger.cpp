@@ -1,6 +1,7 @@
 #include "Diagnostics/DiagnosticLogger.h"
+#include "SourceManager/SourceManager.h"
 
-DiagnosticLogger::DiagnosticLogger(SourceManager *sourceManager) :
+DiagnosticLogger::DiagnosticLogger(class SourceManager *sourceManager) :
     m_sourceManager(sourceManager), m_logger(EzLogger::createSyncLogger("EzPacker"))
 {
 }
@@ -70,7 +71,7 @@ void DiagnosticLogger::logType(LogMessage &msg, DiagnosticMessageType type)
     }
 }
 
-void DiagnosticLogger::logSourceRef(LogMessage &msg, const SourceReference &sourceRef)
+void DiagnosticLogger::logSourceRef(LogMessage &msg, const class SourceReference &sourceRef)
 {
     if (!m_sourceManager || !sourceRef.m_valid)
         return;

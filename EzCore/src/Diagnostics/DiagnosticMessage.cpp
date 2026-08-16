@@ -1,7 +1,8 @@
 #include "Diagnostics/DiagnosticMessage.h"
+#include "SourceManager/SourceManager.h"
 
 DiagnosticMessage::DiagnosticMessage(DiagnosticMessageType type,
-                                     SourceReference *primarySourceRef,
+                                     class SourceReference *primarySourceRef,
                                      const std::string_view &mainMsg,
                                      const std::string_view &sender,
                                      const std::list<DiagnosticNote> &notes) :
@@ -11,18 +12,15 @@ DiagnosticMessage::DiagnosticMessage(DiagnosticMessageType type,
 
 DiagnosticMessageType DiagnosticMessage::getType() const { return m_type; }
 
-SourceReference *DiagnosticMessage::getPrimarySourceRef() const { return m_primarySourceRef; }
+class SourceReference *DiagnosticMessage::getPrimarySourceRef() const { return m_primarySourceRef; }
 
 void DiagnosticMessage::addNote(const DiagnosticNote &note) { m_notes.push_back(note); }
 
 void DiagnosticMessage::addMainMsg(const std::string_view &str) { m_mainMessage += str; }
 
-void DiagnosticMessage::setPrimarySourceRef(SourceReference *sourceRef) { m_primarySourceRef = sourceRef; }
+void DiagnosticMessage::setPrimarySourceRef(class SourceReference *sourceRef) { m_primarySourceRef = sourceRef; }
 
-void DiagnosticMessage::setSender(const std::string_view &sender)
-{
-    m_sender = sender;
-}
+void DiagnosticMessage::setSender(const std::string_view &sender) { m_sender = sender; }
 
 void DiagnosticMessage::setType(DiagnosticMessageType type) { m_type = type; }
 

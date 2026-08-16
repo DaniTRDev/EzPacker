@@ -1,4 +1,9 @@
-#include "EzCore.h"
+#include "Diagnostics/DiagnosticBuilder.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Diagnostics/DiagnosticLogger.h"
+#include "Diagnostics/DiagnosticScope.h"
+#include "SourceManager/SourceManager.h"
+
 #include <gtest/gtest.h>
 
 class DiagTest : public ::testing::Test

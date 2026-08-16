@@ -1,5 +1,4 @@
 set(EZCORE_FILES_LIST
-        "include/EzCore.h"
         "include/EzCoreCommon.h"
         "include/StringUtils.h"
         "include/Diagnostics/DiagnosticBuilder.h"
@@ -25,8 +24,8 @@ set(EZCORE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzCore"
         FILE_LIST ${EZCORE_FILES_LIST}
         PRECOMPILED_HEADER "include/EzCoreCommon.h"
-        LINKED_LIBRARIES "EzLogger;libtommath;LibBF;gtest;GTest::gtest_main"
-        INCLUDED_DIRS "include;${gtest_build_include_dirs}"
+        LINKED_LIBRARIES "EzLogger;libtommath;LibBF"
+        INCLUDED_DIRS "include"
 )
 
 if (EZPACKER_BUILD_TESTS)
@@ -35,7 +34,7 @@ if (EZPACKER_BUILD_TESTS)
     EzPacker_AddTest(
             "T_DiagnosticLogger"
             "EzCore"
-            ""
+            "gtest;GTest::gtest_main"
             "tests/T_DiagnosticLogger.cpp"
     )
 endif ()

@@ -1,12 +1,10 @@
-#ifndef EZPACKER_STRINGUTILS_H
-#define EZPACKER_STRINGUTILS_H
+#ifndef EZCORE_STRING_UTILS_H
+#define EZCORE_STRING_UTILS_H
 
 #include "EzCoreCommon.h"
 
 /**
- * @brief Converts a given string to lowercase.
- * @param str The string to convert.
- * @returns The lowercase string.
+ * Converts a given string to lowercase.
  */
 inline std::string StrToLower(const std::string &str)
 {
@@ -18,9 +16,7 @@ inline std::string StrToLower(const std::string &str)
 }
 
 /**
- * @brief Converts a given string to uppercase.
- * @param str The string to convert.
- * @returns The uppercase string.
+ * Converts a given string to uppercase.
  */
 inline std::string StrToUpper(const std::string &str)
 {
@@ -31,4 +27,4 @@ inline std::string StrToUpper(const std::string &str)
     return upperStr;
 }
 
-#endif // EZPACKER_STRINGUTILS_H
+#endif // EZCORE_STRING_UTILS_H

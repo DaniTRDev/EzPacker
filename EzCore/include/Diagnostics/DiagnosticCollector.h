@@ -1,5 +1,5 @@
-#ifndef EZPACKER_DIAGNOSTICCOLLECTOR_H
-#define EZPACKER_DIAGNOSTICCOLLECTOR_H
+#ifndef EZCORE_DIAGNOSTIC_COLLECTOR_H
+#define EZCORE_DIAGNOSTIC_COLLECTOR_H
 
 #include "EzCoreCommon.h"
 #include "DiagnosticBuilder.h"
@@ -21,21 +21,16 @@ class DiagnosticCollector
 
     /**
      * Returns a diagnostic builder with the main diagnostic information.
-     * @param type
-     * @param sender
-     * @return
      */
     DiagnosticBuilder builder(DiagnosticMessageType type, const std::string_view &sender);
 
     /**
      * Adds a listener for diagnostic messages.
-     * @param listener
      */
     void addListener(DiagnosticListener *listener);
 
     /**
      * Begins a new scope with a default action.
-     * @param action
      */
     void beginScope(DiagnosticScopeAction action);
 
@@ -46,14 +41,12 @@ class DiagnosticCollector
 
     /**
      * Sets the current scope's action. This does not affect top-most scope.
-     * @param action
      */
     void setScopeAction(DiagnosticScopeAction action);
 
     /**
      * Pushes a new message to the diagnostic message list. If the current scope is the top-most (1), every listener
      * is notified.
-     * @param msg
      */
     void onDiag(DiagnosticMessage message);
 
@@ -66,4 +59,4 @@ class DiagnosticCollector
     std::recursive_mutex m_mutex;
 };
 
-#endif // EZPACKER_DIAGNOSTICCOLLECTOR_H
+#endif // EZCORE_DIAGNOSTIC_COLLECTOR_H

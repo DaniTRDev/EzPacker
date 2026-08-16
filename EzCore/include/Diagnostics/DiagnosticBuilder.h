@@ -1,5 +1,5 @@
-#ifndef EZPACKER_DIAGNOSTICBUILDER_H
-#define EZPACKER_DIAGNOSTICBUILDER_H
+#ifndef EZCORE_DIAGNOSTIC_BUILDER_H
+#define EZCORE_DIAGNOSTIC_BUILDER_H
 
 #include "EzCoreCommon.h"
 #include "DiagnosticMessage.h"
@@ -16,13 +16,11 @@ class DiagnosticBuilder
 
     /**
      * Creates the builder and attaches it to a collector.
-     * @param collector
      */
     DiagnosticBuilder(class DiagnosticCollector *collector);
 
     /**
      * Creates the builder, builds a simple diagnostic message and attaches it to a collector.
-     * @param collector
      */
     DiagnosticBuilder(class DiagnosticCollector *collector, DiagnosticMessageType type, const std::string_view &sender);
 
@@ -33,34 +31,23 @@ class DiagnosticBuilder
 
     /**
      * Appends a note to the current message.
-     * @param message
-     * @param loc
-     * @return
      */
-    DiagnosticBuilder &appendNote(const std::pmr::string &message, SourceReference *sourceRef);
+    DiagnosticBuilder &appendNote(const std::pmr::string &message, class SourceReference *sourceRef);
 
     /**
      * Sets the type and sender of the current message.
-     * @param type
-     * @param sender
-     * @return
      */
     DiagnosticBuilder &build(DiagnosticMessageType type, const std::string_view &sender);
 
     /**
      * Operator used to append a string into the main message.
-     * @param message
-     * @return
      */
     DiagnosticBuilder &operator<<(const std::pmr::string &str);
 
     /**
-     *
-     * @param sourceRef
-     * @param str
-     * @return
+     * Operator used to append a source reference to the main message.
      */
-    DiagnosticBuilder &operator<<(SourceReference *sourceRef);
+    DiagnosticBuilder &operator<<(class SourceReference *sourceRef);
 
     /**
      * Pushes the current message to the diagnostic collector and clears it.
@@ -72,4 +59,4 @@ class DiagnosticBuilder
     DiagnosticMessage m_message;
 };
 
-#endif // EZPACKER_DIAGNOSTICBUILDER_H
+#endif // EZCORE_DIAGNOSTIC_BUILDER_H

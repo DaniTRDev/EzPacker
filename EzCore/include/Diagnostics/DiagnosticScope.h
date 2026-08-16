@@ -1,5 +1,5 @@
-#ifndef EZPACKER_DIAGNOSTICSCOPE_H
-#define EZPACKER_DIAGNOSTICSCOPE_H
+#ifndef EZCORE_DIAGNOSTIC_SCOPE_H
+#define EZCORE_DIAGNOSTIC_SCOPE_H
 
 #include "EzCoreCommon.h"
 #include "DiagnosticMessage.h"
@@ -16,45 +16,37 @@ class DiagnosticScope
   public:
     /**
      * Creates a scope linked to a pool that will contain a list of diagnostic messages.
-     * @param pool
      */
     DiagnosticScope(std::pmr::memory_resource *pool);
 
     /**
      * Returns the action to be performed on the messages on scope's end.
-     * @return
      */
     DiagnosticScopeAction getAction() const;
 
     /**
      * Appends a message to the current scope. Creates a copy used the arena-managed vector.
-     * @param message
      */
     void appendMessage(const DiagnosticMessage &message);
 
     /**
      * Inserts the given range of a vector into the current scope.
-     * @param begin
-     * @param end
      */
     void insert(std::pmr::vector<DiagnosticMessage>::const_iterator begin,
                 std::pmr::vector<DiagnosticMessage>::const_iterator end);
 
     /**
      * Sets the action to be performed on the messages on scope's end.
-     * @param action
      */
     void setAction(DiagnosticScopeAction action);
 
     /**
      * Mark this scope because there was an error somewhere inside it.
-     * @param value
      */
     void setHasFatalErrors(bool value);
 
     /**
      * Returns the list of arena-backed messages.
-     * @return
      */
     const std::pmr::vector<DiagnosticMessage> &getMessages() const;
 
@@ -64,4 +56,4 @@ class DiagnosticScope
     std::pmr::vector<DiagnosticMessage> m_messages;
 };
 
-#endif // EZPACKER_DIAGNOSTICSCOPE_H
+#endif // EZCORE_DIAGNOSTIC_SCOPE_H

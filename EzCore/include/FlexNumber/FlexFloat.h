@@ -1,5 +1,5 @@
-#ifndef EZPACKER_FLEXFLOAT_H
-#define EZPACKER_FLEXFLOAT_H
+#ifndef EZCORE_FLEX_FLOAT_H
+#define EZCORE_FLEX_FLOAT_H
 
 #include "EzCoreCommon.h"
 
@@ -21,27 +21,21 @@ class FlexFloat
 
     /**
      * Creates a DEEP copy of other, cloning its allocation values and numeric parameters safely.
-     * @param other The source FlexFloat instance to copy.
      */
     FlexFloat(const FlexFloat &other);
 
     /**
      * Initializes the container and sets a standard single-precision hardware float value into it.
-     * @param value Real value to store.
      */
     explicit FlexFloat(float value);
 
     /**
      * Initializes the container and sets a standard double-precision hardware float value into it.
-     * @param value Real value to store.
      */
     explicit FlexFloat(double value);
 
     /**
      * Initializes the container and parses a safe string slice into a floating-point number using the given base radix.
-     * @param numberStr Visual character presentation representing the arbitrary value.
-     * @param bitWidth Dynamic accuracy width sizing allocation target.
-     * @param radix Literal numeric base tracking space (2 to 36).
      */
     FlexFloat(const std::string_view &numberStr, size_t bitWidth, size_t radix = 10);
 
@@ -57,143 +51,107 @@ class FlexFloat
 
     /**
      * Returns true if this number fits in a container of the given bitsize.
-     * @param bitWidth
-     * @return
      */
     bool fitsIn(size_t bitWidth) const;
 
     /**
      * Returns true if a allocation panic or memory out-of-bounds flag occurred within the underlying library state.
-     * @return true on internal memory exhaustion.
      */
     bool hasError() const;
 
     /**
      * Returns true if this floating-point value is structurally negative and not a NaN.
-     * @return true if the numeric value drops below zero.
      */
     bool isNeg() const;
 
     /**
      * Returns true if this floating-point value is positive, non-zero, and valid.
-     * @return true if number is greater than zero.
      */
     bool isPositive() const;
 
     /**
      * Returns true if this number evaluates precisely to 0.0 or -0.0.
-     * @return true if value has no non-zero magnitudes.
      */
     bool isZero() const;
 
     /**
      * Compares this against other and returns true if this is greater.
-     * @param other
-     * @return
      */
     bool operator>(const FlexFloat &other) const;
 
     /**
      * Compares this against other and returns true if this is greater or equal.
-     * @param other
-     * @return
      */
     bool operator>=(const FlexFloat &other) const;
 
     /**
      * Compares this against other and returns true if this is smaller.
-     * @param other
-     * @return
      */
     bool operator<(const FlexFloat &other) const;
 
     /**
      * Compares this against other and returns true if this is smaller or equal.
-     * @param other
-     * @return
      */
     bool operator<=(const FlexFloat &other) const;
 
     /**
      * Compares this against other and returns true if this is equal to other.
-     * @param other
-     * @return
      */
     bool operator==(const FlexFloat &other) const;
 
     /**
      * Compares this against other and returns true if this is not equal to other.
-     * @param other
-     * @return
      */
     bool operator!=(const FlexFloat &other) const;
 
     /**
      * Extracts the upper half components (sign and exponent fields) for floating-point scalar expansion.
-     * @return A new FlexFloat with a bit-width of half the current size.
      */
     FlexFloat getHighHalf() const;
 
     /**
      * Extracts the lower half components (the fractional mantissa bits) for floating-point scalar expansion.
-     * @return A new FlexFloat with a bit-width of half the current size.
      */
     FlexFloat getLowHalf() const;
 
     /**
      * Creates a new resulting FlexFloat that's a copy of this and adds other into it.
-     * @param other The right hand side operand.
-     * @return Value computation result container.
      */
     FlexFloat operator+(const FlexFloat &other);
 
     /**
      * Increments this value by other and returns a reference to this instance.
-     * @param other The right hand side operand.
-     * @return Updated self instance.
      */
     FlexFloat &operator+=(const FlexFloat &other);
 
     /**
      * Creates a new resulting FlexFloat that's a copy of this and subtracts other from it.
-     * @param other The right hand side operand.
-     * @return Value computation result container.
      */
     FlexFloat operator-(const FlexFloat &other);
 
     /**
      * Decrements this value by other and returns a reference to this instance.
-     * @param other The right hand side operand.
-     * @return Updated self instance.
      */
     FlexFloat &operator-=(const FlexFloat &other);
 
     /**
      * Creates a new resulting FlexFloat that's a copy of this and multiplies it by other.
-     * @param other The right hand side operand.
-     * @return Value computation result container.
      */
     FlexFloat operator*(const FlexFloat &other);
 
     /**
      * Multiplies this value by other and returns a reference to this instance.
-     * @param other The right hand side operand.
-     * @return Updated self instance.
      */
     FlexFloat &operator*=(const FlexFloat &other);
 
     /**
      * Creates a new resulting FlexFloat that's a copy of this and divides it by other.
-     * @param other The right hand side operand.
-     * @return Value computation result container.
      */
     FlexFloat operator/(const FlexFloat &other);
 
     /**
-     * Divides this value by other and returns a reference to this instance.
-     * @param other The right hand side operand.
-     * @throw std::runtime_error if other evaluates exactly to zero.
-     * @return Updated self instance.
+     * Divides this value by other and returns a reference to this instance. Throws std::runtime_error if other
+     * evaluates exactly to zero.
      */
     FlexFloat &operator/=(const FlexFloat &other);
 
@@ -211,14 +169,12 @@ class FlexFloat
 
     /**
      * Returns the configured tracking bit size of this float container representation (e.g., 32, 64, 128, 256).
-     * @return Total structural bit architecture layout parameter size.
      */
     size_t getBitSize() const;
 
     /**
      * Extends the float value to the new bit size. If it is smaller than the previous, a std::bad_alloc exception
      * is thrown.
-     * @param newBitSize
      */
     void extend(size_t newBitSize);
 
@@ -229,16 +185,11 @@ class FlexFloat
      *
      * If bigEndian is set to true, the number will be dumped in big endian format; if it is set to false, the number
      * will be dumped in little endian.
-     * @param bigEndian Byte organization flow rule flags.
-     * @param alloc Target polymorphic memory tracking provider interface.
-     * @return Vector chunk representing exported structural binary byte spaces.
      */
     std::pmr::vector<uint8_t> dump(bool bigEndian, std::pmr::memory_resource *alloc = std::pmr::get_default_resource());
 
     /**
      * Returns the string representation of the number with the given radix.
-     * @param radix
-     * @return
      */
     std::string toString(size_t radix = 2) const;
 
@@ -253,7 +204,6 @@ class FlexFloat
     /**
      * Computes or looks up the explicit mantissa bit precision limits used by LibBF operational formulas
      * matching the configured structural layout configurations.
-     * @return Exact precision bit allocation count limit.
      */
     libbf::limb_t getPrecBits() const;
 
@@ -264,4 +214,4 @@ class FlexFloat
     size_t m_bitWidth;
 };
 
-#endif // EZPACKER_FLEXFLOAT_H
+#endif // EZCORE_FLEX_FLOAT_H

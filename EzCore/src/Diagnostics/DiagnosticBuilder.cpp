@@ -1,9 +1,10 @@
-#include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticBuilder.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "SourceManager/SourceManager.h"
 
-DiagnosticBuilder::DiagnosticBuilder(struct DiagnosticCollector *collector) : m_collector(collector) {}
+DiagnosticBuilder::DiagnosticBuilder(class DiagnosticCollector *collector) : m_collector(collector) {}
 
-DiagnosticBuilder::DiagnosticBuilder(struct DiagnosticCollector *collector,
+DiagnosticBuilder::DiagnosticBuilder(class DiagnosticCollector *collector,
                                      DiagnosticMessageType type,
                                      const std::string_view &sender) : DiagnosticBuilder(collector)
 {
@@ -12,7 +13,7 @@ DiagnosticBuilder::DiagnosticBuilder(struct DiagnosticCollector *collector,
 
 DiagnosticBuilder::~DiagnosticBuilder() { flush(); }
 
-DiagnosticBuilder &DiagnosticBuilder::appendNote(const std::pmr::string &message, SourceReference *sourceRef)
+DiagnosticBuilder &DiagnosticBuilder::appendNote(const std::pmr::string &message, class SourceReference *sourceRef)
 {
     m_message.addNote({ sourceRef, message });
     return *this;
@@ -32,7 +33,7 @@ DiagnosticBuilder &DiagnosticBuilder::operator<<(const std::pmr::string &str)
     return *this;
 }
 
-DiagnosticBuilder &DiagnosticBuilder::operator<<(SourceReference *sourceRef)
+DiagnosticBuilder &DiagnosticBuilder::operator<<(class SourceReference *sourceRef)
 {
     m_message.setPrimarySourceRef(sourceRef);
     return *this;
