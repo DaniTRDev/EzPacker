@@ -1,4 +1,6 @@
 #include "Operand/MirOperand.h"
+#include "SourceManager/SourceManager.h"
+#include "Type/MirType.h"
 
 MirOperand::MirOperand(MirType *type, SourceReference *sourceRef) : m_type(type), m_sourceRef(sourceRef) {}
 

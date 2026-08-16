@@ -1,10 +1,7 @@
-#ifndef EZPACKER_MIRREGISTERREFERENCE_H
-#define EZPACKER_MIRREGISTERREFERENCE_H
+#ifndef EZMIR_MIR_REGISTER_REFERENCE_H
+#define EZMIR_MIR_REGISTER_REFERENCE_H
 
 #include "EzMirCommon.h"
-#include "Type/MirType.h"
-#include "MirRegisterClass.h"
-#include <functional>
 
 /**
  * This class is used to encapsulate register references.
@@ -18,75 +15,59 @@
  *
  * When a VIRTUAL register ref has a class, this means the register reference passed ISel phase.
  */
-class RegisterRef
+class MirRegisterRef
 {
   public:
-    constexpr RegisterRef() = default;
-
-    constexpr RegisterRef(size_t id, bool isVirtual = true, MirRegisterClass *_class = nullptr) :
-        m_virtual(isVirtual), m_class(_class), m_id(id)
-    {
-    }
+    constexpr MirRegisterRef() = default;
+    MirRegisterRef(size_t id, bool isVirtual = true, class MirRegisterClass *_class = nullptr);
 
     /**
      * Constructor for PHYSICAL registers.
      */
-    constexpr RegisterRef(MirRegisterClass *_class, size_t id) : m_virtual(false), m_class(_class), m_id(id) {}
+    MirRegisterRef(class MirRegisterClass *_class, size_t id);
 
-    static constexpr RegisterRef vreg(size_t id) { return RegisterRef(id); }
-    static constexpr RegisterRef vreg(size_t id, MirRegisterClass *_class) { return RegisterRef(id, true, _class); }
+    bool isVirtual() const;
+    bool isPhysical() const;
 
-    static constexpr RegisterRef preg(MirRegisterDescriptor *desc)
-    {
-        if (desc->m_owner == nullptr)
-            throw std::runtime_error("LOL");
+    class MirRegisterClass *getClass() const;
 
-        return RegisterRef(desc->m_id, false, desc->m_owner);
-    }
+    /**
+     * Builds a FULL virtual register ref with the given ID.
+     */
+    static MirRegisterRef vreg(size_t id);
 
-    constexpr bool isVirtual() const { return m_virtual; }
-    constexpr bool isPhysical() const { return !m_virtual; }
+    /**
+     * Builds a virtual register ref with a physical class assigned.
+     */
+    static MirRegisterRef vreg(size_t id, class MirRegisterClass *_class);
 
-    constexpr MirRegisterClass *getClass() const { return m_class; }
-    constexpr size_t getId() const { return m_id; }
+    /**
+     * Builds a physical register ref out of the given register descriptor.
+     */
+    static MirRegisterRef preg(class MirRegisterDescriptor *desc);
 
-    void setClass(MirRegisterClass *_class) { m_class = _class; }
+    size_t getId() const;
 
-    constexpr bool operator==(const RegisterRef &other) const
-    {
-        if (m_virtual != other.m_virtual || m_id != other.m_id)
-            return false;
+    void setClass(class MirRegisterClass *_class);
 
-        // Virtual registers don't have a class; physical registers must match class
-        return m_virtual || (m_class == other.m_class);
-    }
+    bool operator==(const MirRegisterRef &other) const;
 
-    constexpr bool operator!=(const RegisterRef &other) const { return !(*this == other); }
+    bool operator!=(const MirRegisterRef &other) const;
 
-    constexpr bool operator<(const RegisterRef &other) const
-    {
-        if (m_virtual != other.m_virtual)
-            return m_virtual < other.m_virtual;
-
-        if (m_id != other.m_id)
-            return m_id < other.m_id;
-
-        // Compare class pointers for physical registers
-        return !m_virtual && (m_class < other.m_class);
-    }
+    bool operator<(const MirRegisterRef &other) const;
 
   private:
     bool m_virtual{ true };
-    MirRegisterClass *m_class{ nullptr };
+    class MirRegisterClass *m_class{ nullptr };
     size_t m_id{ MIRID_INVALID };
 };
 
 // Standard hash implementation for unordered containers
 namespace std
 {
-template <> struct hash<RegisterRef>
+template <> struct hash<MirRegisterRef>
 {
-    size_t operator()(const RegisterRef &reg) const noexcept
+    size_t operator()(const MirRegisterRef &reg) const noexcept
     {
         // Hash the ID and virtual status
         size_t seed = std::hash<size_t>{}(reg.getId());
@@ -103,4 +84,4 @@ template <> struct hash<RegisterRef>
 };
 } // namespace std
 
-#endif // EZPACKER_MIRREGISTERREFERENCE_H
+#endif // EZMIR_MIR_REGISTER_REFERENCE_H

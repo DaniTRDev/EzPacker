@@ -1,5 +1,5 @@
-#ifndef EZPACKER_IMIRTRANSFORMPASS_H
-#define EZPACKER_IMIRTRANSFORMPASS_H
+#ifndef EZMIR_IMIR_TRANSFORM_PASS_H
+#define EZMIR_IMIR_TRANSFORM_PASS_H
 
 #include "EzMirCommon.h"
 #include "MirPass.h"
@@ -11,9 +11,8 @@ class IMirTransformPass : public MirPass
 
     /**
      * Returns 'MirPassType::Transform' for this pass.
-     * @return
      */
     MirPassType getPassType() const override { return MirPassType::Transform; }
 };
 
-#endif // EZPACKER_IMIRTRANSFORMPASS_H
+#endif // EZMIR_IMIR_TRANSFORM_PASS_H

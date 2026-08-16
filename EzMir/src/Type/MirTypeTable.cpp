@@ -1,4 +1,6 @@
+#include "Type/IMirTargetTypeLayout.h"
 #include "Type/MirTypeTable.h"
+#include "Operand/MirOperands.h"
 
 MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena) :
     m_typeLayout(nullptr), m_arena(globalArena), m_typeNames(globalArena), m_idToType(globalArena),

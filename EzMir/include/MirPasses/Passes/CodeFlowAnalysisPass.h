@@ -1,22 +1,23 @@
-#ifndef EZPACKER_CODEFLOWANALYSIS_H
-#define EZPACKER_CODEFLOWANALYSIS_H
+#ifndef EZMIR_CODE_FLOW_ANALYSIS_PASS_H
+#define EZMIR_CODE_FLOW_ANALYSIS_PASS_H
 
 #include "EzMirCommon.h"
-#include "Builder/MirBuilderContext.h"
 #include "MirPasses/IMirAnalysisPass.h"
-#include "MirPasses/MirPassManager.h"
 
 /**
- * @brief High-performance PMR-backed snapshot of a function's control flow graph.
+ * Resulting structure that contains the resulting Code Flow Graph.
  */
 struct ControlFlowResult
 {
-    std::pmr::unordered_map<size_t, std::pmr::set<size_t>> m_successors;
-    std::pmr::unordered_map<size_t, std::pmr::set<size_t>> m_predecessors;
+    std::pmr::unordered_map<MirId, std::pmr::set<MirId>> m_successors;
+    std::pmr::unordered_map<MirId, std::pmr::set<MirId>> m_predecessors;
 
     ControlFlowResult(std::pmr::memory_resource *arena) : m_successors(arena), m_predecessors(arena) {}
 };
 
+/**
+ * This pass executes a CFG search and saves the result in a ControlFlowResult structure.
+ */
 class CodeFlowAnalysisPass : public IMirAnalysisPass
 {
   public:
@@ -24,43 +25,35 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
 
     /**
      * Creates the analyzer with the given context.
-     * @param ctx
      */
-    CodeFlowAnalysisPass(MirBuilderContext *ctx);
+    CodeFlowAnalysisPass(class MirBuilderContext *ctx);
 
     /**
      * Returns "CodeFlowAnalysisPass".
-     * @return
      */
     const char *getName() const override;
 
     /**
      * Returns the result of the pass, if populated. If run was not called, an empty result is returned.
-     * @return
      */
-    const ControlFlowResult &getResult() const;
+    ControlFlowResult *getResult();
 
     /**
      * Returns the iteration place for this pass (Function).
-     * @return
      */
     MirPassIterationPlace getIterationPlace() const override;
 
     /**
      * Runs the pass and builds a Code Flow Graph out of the given function iterator.
-     * @param funcList
-     * @param it
-     * @param passManager
-     * @return
      */
-    MirPassResult run(std::pmr::list<MirFunction *> &funcList,
-                      std::pmr::list<MirFunction *>::iterator it,
+    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
+                      std::pmr::list<class MirFunction *>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**
      * For every block processed in after calling run, it prints its predecessors and successors.
      */
-    void printResult() const override;
+    void printResult() override;
 
     /**
      * Resets the result of the pass.
@@ -68,12 +61,12 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     void reset() override;
 
   private:
-    void addEdge(MirBlock *from, MirBlock *to);
-    MirBlock *getTargetJumpBlock(const MirInstruction *inst) const;
+    void addEdge(class MirBlock *from, class MirBlock *to);
+    MirBlock *getTargetJumpBlock(const class MirInstruction *inst) const;
 
   private:
     ControlFlowResult m_result;
-    MirBuilderContext *m_ctx;
+    class MirBuilderContext *m_ctx;
     std::pmr::memory_resource *m_arena;
 };
 

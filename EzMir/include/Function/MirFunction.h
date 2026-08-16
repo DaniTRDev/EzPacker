@@ -1,11 +1,7 @@
-#ifndef EZPACKER_MIRFUNCTION_H
-#define EZPACKER_MIRFUNCTION_H
+#ifndef EZMIR_MIR_FUNCTION_H
+#define EZMIR_MIR_FUNCTION_H
 
 #include "EzMirCommon.h"
-#include "Block/MirBlock.h"
-#include "Type/MirType.h"
-#include "MirFunctionStackFrame.h"
-#include "CallingConvDesc.h"
 
 /**
  * Structure that contains information that is filled by passes as the function flows in the compilation process.
@@ -30,45 +26,33 @@ class MirFunction
   public:
     /**
      * Creates a function wrapper over arena-managed MIR data structures.
-     *
-     * @param callingConv
-     * @param entryPoint    First block executed when the function starts.
-     * @param stackFrame    A stack frame object that describes this function's stack frame.
-     * @param returnType    MIR type describing the function's return value.
-     * @param type
-     * @param id            Unique MIR ID for the function itself.
-     * @param sourceRef     Source reference that originated this function.
-     * @param blocks        Ordered block slice belonging to the function.
-     * @param parameters    Slice of parameter operands in declaration order.
-     * @param name
      */
-    MirFunction(CallingConvDesc *callingConv,
-                MirBlock *entryPoint,
-                MirFunctionStackFrame *stackFrame,
-                MirType *returnType,
-                MirType *type,
+    MirFunction(class CallingConvDesc *callingConv,
+                class MirBlock *entryPoint,
+                class MirFunctionStackFrame *stackFrame,
+                class MirType *returnType,
+                class MirType *type,
                 MirId id,
-                SourceReference *sourceRef,
-                std::pmr::list<MirBlock *> blocks,
-                std::pmr::list<MirRegister *> parameters,
+                class SourceReference *sourceRef,
+                std::pmr::list<class MirBlock *> blocks,
+                std::pmr::list<class MirRegister *> parameters,
                 std::pmr::string name);
 
     /**
      * Returns the calling convention of this function.
      */
-    CallingConvDesc *getCallingConv() const;
+    class CallingConvDesc *getCallingConv() const;
 
     /**
-     * Returns the MirBlock owned by this function that matches the given ID, if no case is found nullptr is returned.
-     * @param id
-     * @return
+     * Returns the class MirBlock owned by this function that matches the given ID, if no case is found nullptr is
+     * returned.
      */
-    MirBlock *getBlock(size_t id) const;
+    class MirBlock *getBlock(size_t id) const;
 
     /**
      * Returns the function entry block.
      */
-    MirBlock *getEntryPoint() const;
+    class MirBlock *getEntryPoint() const;
 
     /**
      * Returns the analysis data of this function.
@@ -77,20 +61,18 @@ class MirFunction
 
     /**
      * Returns the stack frame linked to this object.
-     * @return
      */
-    MirFunctionStackFrame *getStackFrame() const;
+    class MirFunctionStackFrame *getStackFrame() const;
 
     /**
      * Returns the return type of the function.
-     * @return
      */
-    MirType *getReturnType() const;
+    class MirType *getReturnType() const;
 
     /**
      * Returns the type of this function.
      */
-    MirType *getType() const;
+    class MirType *getType() const;
 
     /**
      * Returns the unique MIR ID assigned to this function.
@@ -99,15 +81,20 @@ class MirFunction
 
     /**
      * Returns the source reference that created this function.
-     * @return
      */
-    SourceReference *getSourceRef() const;
+    class SourceReference *getSourceRef() const;
 
     /**
      * Adds a callee-saved register that this function is using. If the register is already present, it will be
      * dupplicated.
      */
-    void addCalleeSavedRegUse(const RegisterRef &reg);
+    void addCalleeSavedRegUse(const class MirRegisterRef &reg);
+
+    /**
+     * Sets the entry point of the function. This WON'T push the block to the list, it is up to the caller to push the
+     * block in the FIRST position.
+     */
+    void setEntryPoint(MirBlock *entryPoint);
 
     /**
      * Returns the mutable list of blocks that belong to this function.
@@ -115,7 +102,7 @@ class MirFunction
      * The list always contains the entry point as its first block right after
      * `MirBuilderContext::createFunction()` succeeds.
      */
-    std::pmr::list<MirBlock *> &getBlocks();
+    std::pmr::list<class MirBlock *> &getBlocks();
 
     /**
      * Returns a pointer to the mutable list of blocks that belong to this function.
@@ -123,45 +110,45 @@ class MirFunction
      * The list always contains the entry point as its first block right after
      * `MirBuilderContext::createFunction()` succeeds.
      */
-    std::pmr::list<MirBlock *> *getBlocksPtr();
+    std::pmr::list<class MirBlock *> *getBlocksPtr();
 
     /**
      * Returns the MUTABLE parameter list for this function.
      *
-     * Each element is a `MirFuncParam*` describing one incoming parameter. The
+     * Each element is a `MirRegister*` describing one incoming parameter. The
      * exact calling-convention meaning is defined by later lowering stages.
      */
-    std::pmr::list<MirRegister *> &getParameters();
+    std::pmr::list<class MirRegister *> &getParameters();
 
     /**
-     * Returns the list of callee-saved register consumed by this function.
+     * Returns the list of callee-saved register consumed by this function. This information is available after
+     * MirRegisterAllocatorPass.
      */
-    const std::pmr::vector<RegisterRef> &getUsedCalleeSavedRegs() const;
+    const std::pmr::vector<class MirRegisterRef> &getUsedCalleeSavedRegs() const;
 
     /**
      * Returns the name of the function.
-     * @return
      */
     const std::pmr::string &getName();
 
   private:
-    CallingConvDesc *m_callingConv;
-    MirBlock *m_entryPoint;
+    class CallingConvDesc *m_callingConv;
+    class MirBlock *m_entryPoint;
     MirFunctionAnalysisData m_analysisData;
-    MirFunctionStackFrame *m_stackFrame;
-    MirType *m_returnType;
-    MirType *m_type;
+    class MirFunctionStackFrame *m_stackFrame;
+    class MirType *m_returnType;
+    class MirType *m_type;
     MirId m_id;
-    SourceReference *m_sourceRef;
+    class SourceReference *m_sourceRef;
 
-    std::pmr::list<MirBlock *> m_blocks;
-    std::pmr::list<MirRegister *> m_parameters;
-    std::pmr::map<MirId, MirBlock *> m_blockIdToBlock;
+    std::pmr::list<class MirBlock *> m_blocks;
+    std::pmr::list<class MirRegister *> m_parameters;
+    std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock;
 
     std::pmr::string m_name;
 
-    // Set filled by RegisterAllocatorPass that contains which callee-saved registers were consume by this function.
-    std::pmr::vector<RegisterRef> m_usedCalleeSavedRegs;
+    // Set filled by MirRegisterAllocatorPass that contains which callee-saved registers were consume by this function.
+    std::pmr::vector<class MirRegisterRef> m_usedCalleeSavedRegs;
 };
 
-#endif // EZPACKER_MIRFUNCTION_H
+#endif // EZMIR_MIR_FUNCTION_H

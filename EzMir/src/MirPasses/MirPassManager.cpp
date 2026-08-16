@@ -1,11 +1,16 @@
+#include "Builder/MirBuilderContext.h"
+#include "Block/MirBlock.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
 #include "MirPasses/MirPassManager.h"
 
-MirPassManager::MirPassManager(std::pmr::memory_resource *globalArena,
-                               std::shared_ptr<DiagnosticCollector> diagCollector) :
-    m_testMode(false), m_validAnalyses(globalArena), m_passesBlueprint(globalArena), m_executionPipeline(globalArena),
-    m_savedResults(globalArena), m_diagCollector(std::move(diagCollector))
+MirPassManager::MirPassManager(DiagnosticCollector *diagCollector, std::pmr::memory_resource *globalArena) :
+    m_testMode(false), m_diagCollector(diagCollector), m_validAnalyses(globalArena), m_passesBlueprint(globalArena),
+    m_savedResults(globalArena), m_executionPipeline(globalArena)
 {
 }
+
+DiagnosticCollector *MirPassManager::getDiagCollector() const { return m_diagCollector; }
 
 MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
 {
@@ -242,5 +247,3 @@ void MirPassManager::resolveDependencies(std::type_index passId,
     resolved.insert(passId);
     m_executionPipeline.push_back(it->second.get());
 }
-
-const std::shared_ptr<DiagnosticCollector> &MirPassManager::getDiagCollector() const { return m_diagCollector; }

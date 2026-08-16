@@ -1,4 +1,11 @@
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
+#include "Instruction/MirInstructionSet.h"
+#include "Operand/MirOperand.h"
+#include "Printer/MirPrinter.h"
 
 MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint) :
     m_ctx(ctx), m_insertionPoint(std::move(insertionPoint))
@@ -17,7 +24,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::initializer_list<MirOperand *> &operands)
 {
-    std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
@@ -70,7 +77,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::vector<MirOperand *> &operands)
 {
-    std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
@@ -111,7 +118,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::pmr::vector<MirOperand *> &operands)
 {
-    std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector

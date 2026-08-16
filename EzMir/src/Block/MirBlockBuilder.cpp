@@ -1,26 +1,17 @@
+#include "Builder/MirBuilderContext.h"
+#include "Block/MirBlock.h"
 #include "Block/MirBlockBuilder.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Instruction/MirInstruction.h"
+#include "Function/MirFunction.h"
+#include "SourceManager/SourceManager.h"
 
-MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, std::pmr::list<MirBlock *> *owner) :
-    m_ctx(ctx), m_owner(owner), m_ownerFunc(nullptr)
-{
-    if (!owner->empty())
-    {
-        MirBlock *targetBlock = owner->back();
-        m_insertPoint = { .m_type = InsertionType::InsertAfter,
-                          .m_block = targetBlock,
-                          .m_iterator = targetBlock->getInstructions().begin() };
-    }
-}
-
-MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) :
-    MirBlockBuilder(ctx, owner->getBlocksPtr())
-{
-    m_ownerFunc = owner;
-}
+MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) : m_ctx(ctx), m_ownerFunc(owner) {}
 
 MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::string &name)
 {
-    std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place, passing the arena down to the instruction's internal PMR vector
@@ -30,7 +21,7 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
                                                  m_ownerFunc,
                                                  name);
 
-    m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirBlockBuilder")
+    m_ctx->getDiagCollector()->builder(Diag_Debug, "MirBlockBuilder")
             << sourceRef << std::pmr::string(std::format("Built block with id: {}", block->getId()));
 
     if (m_ctx->appendBlock(block))
@@ -39,9 +30,9 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
                           .m_block = block,
                           .m_iterator = block->getInstructions().begin() };
 
-        m_owner->push_back(block); // InsertAfter the block to the owner function.
-
+        m_ownerFunc->getBlocks().push_back(block);
         setBuildResult(block);
+
         return block;
     }
 

@@ -1,4 +1,9 @@
+#include "Builder/MirBuilderContext.h"
+#include "Function/CallingConvDesc.h"
 #include "Function/CallLoweringState.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionStackFrame.h"
+#include "Operand/MirRegisterClass.h"
 
 CallLoweringState::CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx, MirFunction *func) :
     m_callingConv(cc), m_func(func), m_allocatedRegs(ctx->getGlobalAllocator()), m_usableRegs(ctx->getGlobalAllocator())
@@ -11,7 +16,7 @@ CallLoweringState::CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx
     }
 }
 
-bool CallLoweringState::allocate(MirRegisterClass *_class, RegisterRef &outReg)
+bool CallLoweringState::allocate(MirRegisterClass *_class, MirRegisterRef &outReg)
 {
     auto it = m_usableRegs.find(_class);
     if (it == m_usableRegs.end() || it->second.empty())

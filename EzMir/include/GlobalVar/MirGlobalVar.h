@@ -1,9 +1,7 @@
-#ifndef EZPACKER_MIRMirGlobalVar_H
-#define EZPACKER_MIRMirGlobalVar_H
+#ifndef EZMIR_MIR_GLOBAL_VAR_H
+#define EZMIR_MIR_GLOBAL_VAR_H
 
 #include "EzMirCommon.h"
-#include "Operand/MirOperand.h"
-#include "Type/MirType.h"
 
 enum class MirGlobalVarLinkage
 {
@@ -17,20 +15,13 @@ class MirGlobalVar
   public:
     /**
      * Creates the global variable with the given options.
-     * @param constant
-     * @param id
-     * @param linkage
-     * @param type
-     * @param initializer
-     * @param sourceRef
-     * @param name
      */
     MirGlobalVar(bool constant,
                  MirId id,
                  MirGlobalVarLinkage linkage,
-                 MirType *type,
-                 MirOperand *initializer,
-                 SourceReference *sourceRef,
+                 class MirType *type,
+                 class MirOperand *initializer,
+                 class SourceReference *sourceRef,
                  const std::pmr::string &name);
 
     /**
@@ -56,12 +47,12 @@ class MirGlobalVar
     /**
      * Returns the initializer for this global variable.
      */
-    MirOperand *getInitializer() const;
+    class MirOperand *getInitializer() const;
 
     /**
      * Returns the source reference attached to this global variable.
      */
-    SourceReference *getSourceRef() const;
+    class SourceReference *getSourceRef() const;
 
     /**
      * Returns the name of the global variable.
@@ -72,10 +63,10 @@ class MirGlobalVar
     bool m_constant; // Read-Only
     MirId m_id;
     MirGlobalVarLinkage m_linkage;
-    MirType *m_type;
-    MirOperand *m_initializer; // Only constant values: MirConstantArray, MirFloat, MirInteger.
-    SourceReference *m_sourceRef;
+    class MirType *m_type;
+    class MirOperand *m_initializer; // Only constant values: MirConstantArray, MirFloat, MirInteger.
+    class SourceReference *m_sourceRef;
     std::pmr::string m_name;
 };
 
-#endif // EZPACKER_MirGlobalVar_H
+#endif // EZMIR_MIR_GLOBAL_VAR_H

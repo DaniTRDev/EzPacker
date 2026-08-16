@@ -1,4 +1,11 @@
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "GlobalVar/MirGlobalVar.h"
 #include "GlobalVar/MirGlobalVarBuilder.h"
+#include "Operand/MirOperand.h"
+#include "Operand/MirOperands.h"
+#include "Printer/MirPrinter.h"
+#include "Type/MirType.h"
 
 MirGlobalVarBuilder::MirGlobalVarBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_initializer(nullptr)
 {

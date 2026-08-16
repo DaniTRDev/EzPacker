@@ -1,4 +1,12 @@
+#include "Builder/MirBuilderContext.h"
 #include "Class/MirClassBuilder.h"
+#include "Class/MirClass.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
+#include "Operand/MirOperands.h"
+#include "Printer/MirPrinter.h"
+#include "Type/MirType.h"
+#include "Type/MirTypeTable.h"
 
 MirClassBuilder::MirClassBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_constructor(nullptr) {}
 

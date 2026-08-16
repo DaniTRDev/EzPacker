@@ -1,4 +1,8 @@
+#include "Block/MirBlock.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirTargetInstructionDesc.h"
+#include "Instruction/MirInstructionSet.h"
+#include "Operand/MirOperands.h"
 
 MirInstruction::MirInstruction(class MirBlock *owner,
                                MirInstructionOpCode opcode,
@@ -6,8 +10,9 @@ MirInstruction::MirInstruction(class MirBlock *owner,
                                std::pmr::vector<MirOperand *> operands) :
     m_cachedDefinedRegisters(false), m_cachedUsedRegisters(false), m_owner(owner), m_opcode(opcode),
     m_targetDesc(nullptr), m_sourceRef(ref),
-    m_definedRegisters(std::pmr::vector<RegisterRef>(operands.get_allocator().resource())),
-    m_usedRegisters(std::pmr::vector<RegisterRef>(operands.get_allocator().resource())), m_operands(std::move(operands))
+    m_definedRegisters(std::pmr::vector<MirRegisterRef>(operands.get_allocator().resource())),
+    m_usedRegisters(std::pmr::vector<MirRegisterRef>(operands.get_allocator().resource())),
+    m_operands(std::move(operands))
 {
 }
 
@@ -34,7 +39,7 @@ MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode(
 
 MirTargetInstructionDesc *MirInstruction::getTargetDesc() const { return m_targetDesc; }
 
-OperandFlag MirInstruction::getOperandFlag(size_t index) const
+MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
 {
     if (isSelected())
     {
@@ -48,7 +53,7 @@ OperandFlag MirInstruction::getOperandFlag(size_t index) const
         }
         // Fallback for target instructions without explicit descriptors:
         // By standard convention, operand 0 is destination (Write/ReadWrite) unless it's a store/branch.
-        return OperandFlag::Read;
+        return MirOperandFlag::Read;
     }
 
     // High-Level IR instructions
@@ -58,7 +63,7 @@ OperandFlag MirInstruction::getOperandFlag(size_t index) const
         return flags[index].flags;
     }
 
-    return OperandFlag::None;
+    return MirOperandFlag::None;
 }
 
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
@@ -97,16 +102,11 @@ const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { retu
 
 std::pmr::vector<MirOperand *> &MirInstruction::getOperands()
 {
-    m_cachedDefinedRegisters = false;
-    m_cachedUsedRegisters = false;
-
-    m_definedRegisters.clear();
-    m_usedRegisters.clear();
-
+    invalidateCachedUsedAndDefs();
     return m_operands;
 }
 
-const std::pmr::vector<RegisterRef> &MirInstruction::getDefinedRegisters()
+const std::pmr::vector<MirRegisterRef> &MirInstruction::getDefinedRegisters()
 {
     if (!m_cachedDefinedRegisters)
     {
@@ -122,8 +122,8 @@ const std::pmr::vector<RegisterRef> &MirInstruction::getDefinedRegisters()
             MirRegister *reg = operand->get<MirRegister>();
             if (reg)
             {
-                OperandFlag flags = getOperandFlag(i);
-                if (flags & OperandFlag::Write)
+                MirOperandFlag flags = getOperandFlag(i);
+                if (flags & MirOperandFlag::Write)
                 {
                     m_definedRegisters.push_back(reg->getRef());
                 }
@@ -143,7 +143,7 @@ const std::pmr::vector<RegisterRef> &MirInstruction::getDefinedRegisters()
     return m_definedRegisters;
 }
 
-const std::pmr::vector<RegisterRef> &MirInstruction::getUsedRegisters()
+const std::pmr::vector<MirRegisterRef> &MirInstruction::getUsedRegisters()
 {
     if (!m_cachedUsedRegisters)
     {
@@ -161,8 +161,8 @@ const std::pmr::vector<RegisterRef> &MirInstruction::getUsedRegisters()
 
             if (reg)
             {
-                OperandFlag flags = getOperandFlag(i);
-                if (flags & OperandFlag::Read)
+                MirOperandFlag flags = getOperandFlag(i);
+                if (flags & MirOperandFlag::Read)
                 {
                     m_usedRegisters.push_back(reg->getRef());
                 }

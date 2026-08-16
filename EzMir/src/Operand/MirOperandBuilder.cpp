@@ -1,6 +1,20 @@
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Class/MirClass.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionStackFrame.h"
+#include "GlobalVar/MirGlobalVar.h"
 #include "Operand/MirOperandBuilder.h"
+#include "Operand/MirOperands.h"
+#include "Operand/MirRegisterReference.h"
+#include "Type/MirType.h"
+#include "Type/MirTypeTable.h"
 
-MirOperandBuilder::MirOperandBuilder(MirBuilderContext *ctx) : m_ctx(ctx) {}
+MirOperandBuilder::MirOperandBuilder(MirBuilderContext *ctx) :
+    m_ctx(ctx), m_resource(ctx->getGlobalAllocator()), m_allocator(m_resource)
+{
+}
 
 MirConstantArray *
 MirOperandBuilder::buildConstantArray(MirType *elemType, const std::vector<MirOperand *> &elems, SourceReference *ref)
@@ -126,7 +140,7 @@ MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReferen
 }
 
 MirRegister *MirOperandBuilder::buildPhysReg(
-        MirType *type, PhysicalRegId physId, std::pmr::string name, MirRegisterClass *_class, SourceReference *ref)
+        MirType *type, MirPhysicalRegId physId, std::pmr::string name, MirRegisterClass *_class, SourceReference *ref)
 {
     return build<MirRegister>(type, false, physId, ref, _class, name);
 }

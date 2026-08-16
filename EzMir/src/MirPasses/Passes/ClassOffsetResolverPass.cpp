@@ -1,4 +1,13 @@
+#include "Builder/MirBuilderContext.h"
+#include "Class/MirClass.h"
+#include "Diagnostics/DiagnosticCollector.h"
 #include "MirPasses/Passes/ClassOffsetResolverPass.h"
+#include "MirPasses/MirPassManager.h"
+#include "Printer/MirPrinter.h"
+#include "SourceManager/SourceManager.h"
+#include "Type/IMirTargetTypeLayout.h"
+#include "Type/MirType.h"
+#include "Type/MirTypeTable.h"
 
 ClassOffsetResolverPass::ClassOffsetResolverPass(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
@@ -74,7 +83,7 @@ MirPassResult ClassOffsetResolverPass::run(MirClass *_class, MirPassManager *pas
     return res;
 }
 
-void ClassOffsetResolverPass::printResult() const
+void ClassOffsetResolverPass::printResult()
 {
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirBlockLegalizerPass");
     log << std::format("Printing class offser resolver result:").c_str();

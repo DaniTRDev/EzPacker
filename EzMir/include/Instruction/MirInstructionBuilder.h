@@ -1,10 +1,9 @@
-#ifndef EZPACKER_MIRINSTRUCTIONBUILDER_H
-#define EZPACKER_MIRINSTRUCTIONBUILDER_H
+#ifndef EZPACKER_MIR_INSTRUCTION_BUILDER_H
+#define EZPACKER_MIR_INSTRUCTION_BUILDER_H
 
 #include "EzMirCommon.h"
+#include "MirInstructionSet.h"
 #include "Builder/MirBuilder.h"
-#include "Builder/MirBuilderContext.h"
-#include "Printer/MirPrinter.h"
 
 enum class InsertionType : uint8_t
 {
@@ -18,80 +17,68 @@ enum class InsertionType : uint8_t
 struct MirInstructionInsertionPoint
 {
     InsertionType m_type;
-    MirBlock *m_block;
-    std::pmr::list<MirInstruction *>::iterator m_iterator{};
+    class MirBlock *m_block;
+    std::pmr::list<class MirInstruction *>::iterator m_iterator{};
 };
 
-class MirInstructionBuilder : public MirBuilder<MirInstruction>
+class MirInstructionBuilder : public MirBuilder<class MirInstruction>
 {
   public:
     /**
      * Creates the builder with the given ctx, insertion point and opcode.
-     * @param ctx
-     * @param insertionPoint
      */
-    MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint);
+    MirInstructionBuilder(class MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint);
 
     /**
      * Creates an instruction builder linked to a block at a specic position, the insertion order can be also set.
-     * @param ctx
-     * @param block
-     * @param type
-     * @param it
      */
-    MirInstructionBuilder(MirBuilderContext *ctx,
-                          MirBlock *block,
+    MirInstructionBuilder(class MirBuilderContext *ctx,
+                          class MirBlock *block,
                           InsertionType type,
                           std::pmr::list<MirInstruction *>::iterator it);
 
     /**
-     * Builds an instruction with the given opcode and inserts it with the insert point information.
-     * @param opcode
-     * @param ref
-     * @param operands
-     * @return
+     * Builds an instruction with the given opcode and inserts it with the insert point information. Given operand's
+     * initializer list' elements will be COPIED into the list of operands of the instruction.
      */
-    MirInstruction *
-    build(MirInstructionOpCode opcode, SourceReference *ref, const std::initializer_list<MirOperand *> &operands = {});
+    MirInstruction *build(MirInstructionOpCode opcode,
+                          class SourceReference *ref,
+                          const std::initializer_list<class MirOperand *> &operands = {});
 
     /**
-     * Builds an instruction with the given opcode, operands and inserts it with the insert point information.
-     * @param opcode
-     * @param ref
-     * @param operands
-     * @return
+     * Builds an instruction with the given opcode, operands and inserts it with the insert point information. Given
+     * operand's vector' elements will be COPIED into the list of operands of the instruction.
      */
-    MirInstruction *
-    build(MirInstructionOpCode opcode, SourceReference *ref, const std::vector<MirOperand *> &operands = {});
+    MirInstruction *build(MirInstructionOpCode opcode,
+                          class SourceReference *ref,
+                          const std::vector<class MirOperand *> &operands = {});
 
     /**
-     * Builds an instruction with the given opcode, operands and inserts it with the insert point information.
-     * @param opcode
-     * @param ref
-     * @param operands
-     * @return
+     * Builds an instruction with the given opcode, operands and inserts it with the insert point information. Given
+     * operand's initializer list' elements will be COPIED into the list of operands of the instruction.
      */
-    MirInstruction *
-    build(MirInstructionOpCode opcode, SourceReference *ref, const std::pmr::vector<MirOperand *> &operands);
+    MirInstruction *build(MirInstructionOpCode opcode,
+                          class SourceReference *ref,
+                          const std::pmr::vector<class MirOperand *> &operands);
 
     /**
      * Builds a target instruction with the given target descriptor, scr ref and operands. The opcode of this
-     * instruction is set to TARGET_INST. The targetId of the instruction is set to the one given.
+     * instruction is set to TARGET_INST. The targetId of the instruction is set to the one given. Given operand's
+     * initializer list' elements will be COPIED into the list of operands of the instruction.
      */
-    MirInstruction *buildTarget(MirTargetInstructionDesc *targetDesc,
-                                SourceReference *srcRef,
-                                std::initializer_list<MirOperand *> operands);
+    MirInstruction *buildTarget(class MirTargetInstructionDesc *targetDesc,
+                                class SourceReference *srcRef,
+                                std::initializer_list<class MirOperand *> operands);
 
     /**
-     * Overload of the '<<' operator that allows pushing operands easily.
-     * @param operand
-     * @return
+     * Overload of the '<<' operator that allows pushing operands easily in the FUTURE instruction.
      */
-    MirInstructionBuilder &operator<<(MirOperand *operand);
+    MirInstructionBuilder &operator<<(class MirOperand *operand);
 
 // Define the macro to generate a method for each instruction. This one makes possible attaching a source ref.
 #define INSTRUCTION(NAME, tier, category, ops, flags)                                                                  \
-    template <typename... OperandTypes> MirInstruction *NAME(SourceReference *sourceRef, OperandTypes &&...operands)   \
+    template <typename... OperandTypes>                                                                                \
+    MirInstruction *NAME(class SourceReference *sourceRef, OperandTypes &&...operands)                                 \
     {                                                                                                                  \
         std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
         MirInstruction *instr = build(MirInstructionOpCode::NAME, sourceRef, operandList);                             \
@@ -116,27 +103,23 @@ class MirInstructionBuilder : public MirBuilder<MirInstruction>
 
     /**
      * Changes the insertion type of the current insertion point.
-     * @param type
      */
     void changeInsertionType(InsertionType type);
 
     /**
      * Sets the insertion point for the builder.
-     * @param insertionPoint
      */
     void setInsertionPoint(MirInstructionInsertionPoint insertionPoint);
 
     /**
      * Sets the insertion point for the builder.
-     * @param block
-     * @param type
-     * @param it
      */
-    void setInsertionPoint(MirBlock *block, InsertionType type, std::pmr::list<MirInstruction *>::iterator it);
+    void
+    setInsertionPoint(class MirBlock *block, InsertionType type, std::pmr::list<class MirInstruction *>::iterator it);
 
   private:
-    MirBuilderContext *m_ctx;
+    class MirBuilderContext *m_ctx;
     MirInstructionInsertionPoint m_insertionPoint;
 };
 
-#endif // EZPACKER_MIRINSTRUCTIONBUILDER_H
+#endif // EZPACKER_MIR_INSTRUCTION_BUILDER_H

@@ -1,11 +1,8 @@
-#ifndef EZPACKER_RELATIVEREFERENCELOWERER_H
-#define EZPACKER_RELATIVEREFERENCELOWERER_H
+#ifndef EZMIR_RELATIVE_REFERENCE_LOWERER_H
+#define EZMIR_RELATIVE_REFERENCE_LOWERER_H
 
 #include "EzMirCommon.h"
-#include "Builder/MirBuilderContext.h"
 #include "MirPasses/IMirTransformPass.h"
-#include "Operand/MirOperandBuilder.h"
-#include "Printer/MirPrinter.h"
 
 /**
  * This pass takes instructions with REFERENCE operands that can be lowered as RELATIVE-TO-POINTER memory operands
@@ -16,7 +13,8 @@
  *  - ClassMethod (base: classPtr, off: methodOffset)
  *  - ConstantArrayElement (base, arrayPtr, off: elemIndex * elemSize)
  *
- * Theses cases CAN'T be lowered by this pass because they require information about the final code format:
+ * Theses cases CAN'T be lowered by this pass because they require information about the final code format and will
+ * result in RELOCATIONS.
  *  - Block (needs the address of the block)
  *  - GlobalArrayElem (needs the address of the global variable)
  *  - GlobalVar (needs the address of the global variable)
@@ -28,7 +26,7 @@ class RelativeReferenceLowererPass : public IMirTransformPass
     /**
      * Creates the pass with the given context.
      */
-    RelativeReferenceLowererPass(MirBuilderContext *ctx);
+    RelativeReferenceLowererPass(class MirBuilderContext *ctx);
 
     /**
      * Returns the name of the pass "RelativeReferenceLowererPass".
@@ -49,17 +47,17 @@ class RelativeReferenceLowererPass : public IMirTransformPass
      * @param passManager
      * @return
      */
-    MirPassResult run(std::pmr::list<MirInstruction *> &instrList,
-                      std::pmr::list<MirInstruction *>::iterator it,
+    MirPassResult run(std::pmr::list<class MirInstruction *> &instrList,
+                      std::pmr::list<class MirInstruction *>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**
      * As the results are printed as TRACE, this does not print anything.
      */
-    void printResult() const override;
+    void printResult() override;
 
   private:
-    MirBuilderContext *m_ctx;
+    class MirBuilderContext *m_ctx;
 };
 
-#endif // EZPACKER_RELATIVEREFERENCELOWERER_H
+#endif // EZMIR_RELATIVE_REFERENCE_LOWERER_H

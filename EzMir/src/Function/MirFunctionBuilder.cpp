@@ -1,7 +1,17 @@
+#include "Block/MirBlock.h"
+#include "Block/MirBlockBuilder.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/CallingConvDesc.h"
+#include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
+#include "Function/MirFunctionStackFrame.h"
+#include "Operand/MirOperandBuilder.h"
+#include "Type/MirTypeTable.h"
+#include "Printer/MirPrinter.h"
 
 MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) :
-    m_callingConv(nullptr), m_ctx(ctx), m_parameters(ctx->getFuncAllocator()), m_owner(nullptr)
+    m_callingConv(nullptr), m_ctx(ctx), m_parameters(ctx->getGlobalAllocator()), m_owner(nullptr)
 {
 }
 
@@ -27,7 +37,7 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
 MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::string &name, SourceReference *sourceRef)
 {
     const auto &t = m_ctx->getTypeTable();
-    std::pmr::memory_resource *arena = m_ctx->getFuncAllocator();
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator<MirFunction> funcAlloc(arena);
     std::pmr::polymorphic_allocator<MirFunctionStackFrame> funcStackFrameAlloc(arena);
     std::pmr::list<MirBlock *> blocks(arena);
@@ -42,10 +52,8 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
         m_callingConv = m_ctx->getDefaultCallingConvention();
     }
 
-    MirBlockBuilder builder(m_ctx, &blocks);
-    MirBlock *entryPoint = builder.build(sourceRef, "entryPoint");
     MirFunction *func = funcAlloc.new_object<MirFunction>(m_callingConv,
-                                                          entryPoint,
+                                                          nullptr,
                                                           stackFrame,
                                                           returnType,
                                                           funcType,
@@ -55,12 +63,16 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
                                                           m_parameters,
                                                           name);
 
+    MirBlockBuilder builder(m_ctx, func);
+    MirBlock *entryPoint = builder.build(sourceRef, "entryPoint");
+
     entryPoint->setOwner(func);
+    func->setEntryPoint(entryPoint);
 
     auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirFunctionBuilder");
     diagBuilder << std::pmr::string(std::format("Built func with id: {}", func->getId()));
     diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(func, MirPrinterDetail::Detailed)), sourceRef);
-    diagBuilder.appendNote(std::format("Using calling convention: {}", m_callingConv->getName()).c_str(), nullptr);
+    diagBuilder.appendNote(std::format("Using calling convention: {}", m_callingConv->getName()).c_str());
 
     if (!m_ctx->appendFunction(func))
     {

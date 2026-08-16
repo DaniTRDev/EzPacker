@@ -1,7 +1,15 @@
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
+#include "Instruction/MirInstruction.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
+#include "MirPasses/MirPassManager.h"
+#include "Printer/MirPrinter.h"
 
 std::string printMirRegMap(MirBuilderContext *ctx,
-                           const std::pmr::unordered_map<MirId, std::pmr::unordered_set<RegisterRef>> &map)
+                           const std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> &map)
 {
     std::string res;
     for (auto &[blockId, defs] : map)
@@ -31,13 +39,13 @@ LivenessAnalysisPass::LivenessAnalysisPass(MirBuilderContext *ctx) :
 
 const char *LivenessAnalysisPass::getName() const { return "LivenessAnalysisPass"; }
 
-const LivenessResult &LivenessAnalysisPass::getResult() const { return m_result; }
+LivenessResult *LivenessAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace LivenessAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
 MirPassResult LivenessAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
-                                    std::pmr::list<MirFunction *>::iterator it,
-                                    class MirPassManager *passManager)
+                                        std::pmr::list<MirFunction *>::iterator it,
+                                        class MirPassManager *passManager)
 {
     MirFunction *func = *it;
     auto diag = passManager->getDiagCollector();
@@ -47,7 +55,7 @@ MirPassResult LivenessAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
     }
 
     // Recover the pre-computed Control Flow Graph directly from the Pass Manager cache
-    const auto &cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
+    auto cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
 
     // Initialize and extract block-local Gen (Use) and Kill (Def) sets
     computeLocalLiveness(func, diag);
@@ -57,18 +65,18 @@ MirPassResult LivenessAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
-void LivenessAnalysisPass::printResult() const
+void LivenessAnalysisPass::printResult()
 {
-    const auto &res = getResult();
+    const auto res = getResult();
     auto diag = m_ctx->getDiagCollector();
 
     auto log = diag->builder(DiagnosticMessageType::Diag_Debug, getName());
     log << "Final Liveness Analysis Matrix";
 
-    log.appendNote(std::string("Def\n").append(printMirRegMap(m_ctx, res.m_def)).c_str(), nullptr);
-    log.appendNote(std::string("Use\n").append(printMirRegMap(m_ctx, res.m_use)).c_str(), nullptr);
-    log.appendNote(std::string("LiveIn\n").append(printMirRegMap(m_ctx, res.m_liveIn)).c_str(), nullptr);
-    log.appendNote(std::string("LiveOut\n").append(printMirRegMap(m_ctx, res.m_liveOut)).c_str(), nullptr);
+    log.appendNote(std::string("Def\n").append(printMirRegMap(m_ctx, res->m_def)).c_str(), nullptr);
+    log.appendNote(std::string("Use\n").append(printMirRegMap(m_ctx, res->m_use)).c_str(), nullptr);
+    log.appendNote(std::string("LiveIn\n").append(printMirRegMap(m_ctx, res->m_liveIn)).c_str(), nullptr);
+    log.appendNote(std::string("LiveOut\n").append(printMirRegMap(m_ctx, res->m_liveOut)).c_str(), nullptr);
     log.flush();
 }
 
@@ -80,7 +88,7 @@ void LivenessAnalysisPass::reset()
     m_result.m_liveOut.clear();
 }
 
-void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, const ControlFlowResult &cfg)
+void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, ControlFlowResult *cfg)
 {
     m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, getName())
             << "Analyzing global variable generation rules (live IN / OUT calculation)...";
@@ -107,10 +115,10 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, const Contro
             const auto &uses = m_result.m_use[blockId];
 
             // Equation 1: LiveOut[B] = Union of LiveIn[S] for all Successors S
-            std::pmr::unordered_set<RegisterRef> newLiveOut(m_arena);
-            if (cfg.m_successors.contains(block->getId()))
+            std::pmr::unordered_set<MirRegisterRef> newLiveOut(m_arena);
+            if (cfg->m_successors.contains(block->getId()))
             {
-                for (size_t succ : cfg.m_successors.at(block->getId()))
+                for (size_t succ : cfg->m_successors.at(block->getId()))
                 {
                     const auto &succLiveIn = m_result.m_liveIn.at(succ);
                     newLiveOut.insert(succLiveIn.begin(), succLiveIn.end());
@@ -124,7 +132,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, const Contro
             }
 
             // Equation 2: LiveIn[B] = Use[B] Union (LiveOut[B] Except Def[B])
-            std::pmr::unordered_set<RegisterRef> newLiveIn(uses.begin(), uses.end());
+            std::pmr::unordered_set<MirRegisterRef> newLiveIn(uses.begin(), uses.end());
             for (const auto &regRef : liveOut)
             {
                 if (!defs.contains(regRef))
@@ -142,7 +150,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, const Contro
     }
 }
 
-void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func, const std::shared_ptr<DiagnosticCollector> &collector)
+void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func, DiagnosticCollector *collector)
 {
     collector->builder(DiagnosticMessageType::Diag_Debug, getName())
             << "Analyzing block-local variable generation rules (USE / DEF calculation)...";
@@ -150,17 +158,17 @@ void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func, const std::sh
     for (auto &block : func->getBlocks())
     {
         size_t blockId = block->getId();
-        m_result.m_def[blockId] = std::pmr::unordered_set<RegisterRef>(m_arena);
-        m_result.m_use[blockId] = std::pmr::unordered_set<RegisterRef>(m_arena);
-        m_result.m_liveIn[blockId] = std::pmr::unordered_set<RegisterRef>(m_arena);
-        m_result.m_liveOut[blockId] = std::pmr::unordered_set<RegisterRef>(m_arena);
+        m_result.m_def[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
+        m_result.m_use[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
+        m_result.m_liveIn[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
+        m_result.m_liveOut[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
 
         auto &defs = m_result.m_def[blockId];
         auto &uses = m_result.m_use[blockId];
 
         for (const auto &instr : block->getInstructions())
         {
-            // Note: getDefinedRegisters() and getUsedRegisters() return std::pmr::vector<RegisterRef>
+            // Note: getDefinedRegisters() and getUsedRegisters() return std::pmr::vector<MirRegisterRef>
             const auto &localDefs = instr->getDefinedRegisters();
             const auto &localUses = instr->getUsedRegisters();
 

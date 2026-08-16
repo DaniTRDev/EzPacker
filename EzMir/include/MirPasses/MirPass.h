@@ -1,5 +1,5 @@
-#ifndef EZPACKER_MIRPASS_H
-#define EZPACKER_MIRPASS_H
+#ifndef EZMIR_MIR_PASS_H
+#define EZMIR_MIR_PASS_H
 
 #include "EzMirCommon.h"
 
@@ -27,6 +27,8 @@ struct MirPassResult
 
 /**
  * Interface used by passes that iterate over the MIR.
+ *
+ * TODO: Add MirModule level.
  */
 class MirPass
 {
@@ -35,9 +37,6 @@ class MirPass
 
     /**
      * Runs the pass on the given MIR func.
-     * @param funcList
-     * @param it
-     * @param passManager
      */
     virtual MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
                               std::pmr::list<class MirFunction *>::iterator it,
@@ -48,9 +47,6 @@ class MirPass
 
     /**
      * Runs the pass on the given MIR block.
-     * @param blockList
-     * @param it
-     * @param passManager
      */
     virtual MirPassResult run(std::pmr::list<class MirBlock *> &blockList,
                               std::pmr::list<class MirBlock *>::iterator it,
@@ -61,9 +57,6 @@ class MirPass
 
     /**
      * Runs the pass on the given MIR func.
-     * @param instrList
-     * @param it
-     * @param passManager
      */
     virtual MirPassResult run(std::pmr::list<class MirInstruction *> &instrList,
                               std::pmr::list<class MirInstruction *>::iterator it,
@@ -75,49 +68,39 @@ class MirPass
     /**
      * Runs the pass on the given MIR class. In this case the list/iterator is not needed as passes will only modify
      * things around the given classes.
-     * @param instrList
-     * @param it
-     * @param passManager
      */
     virtual MirPassResult run(class MirClass *_class, MirPassManager *passManager) { return {}; }
 
     /**
      * Runs the pass on the given global variable. In this case the list/iterator is not needed as passes will only
      * modify things around the given variable.
-     * @param instrList
-     * @param it
-     * @param passManager
      */
     virtual MirPassResult run(class MirGlobalVar *var, MirPassManager *passManager) { return {}; }
 
     /**
      * Returns the name of the pass.
-     * @return
      */
     virtual const char *getName() const = 0;
 
     /**
      * Returns the iteration place. Depending on the place, one callback or the other will be called.
-     * @return
      */
     virtual MirPassIterationPlace getIterationPlace() const = 0;
 
     /**
      * Returns the last result of this pass.
-     * @return
      */
     MirPassResult *getResult();
 
     /**
      * Returns the pass type.
-     * @return
      */
     virtual MirPassType getPassType() const = 0;
 
     /**
      * Prints the pass result to the diag collector.
      */
-    virtual void printResult() const {};
+    virtual void printResult() {};
 
     /**
      * Called by the pass manager when the pass needs to be reset.
@@ -126,13 +109,11 @@ class MirPass
 
     /**
      * Sets the result of the pass (by copying the value, it does not store the pointer).
-     * @param result
      */
     void setResult(MirPassResult *result);
 
     /**
      * Returns the dependencies linked to this pass (other passes that must be run before this one).
-     * @return
      */
     virtual std::vector<std::type_index> getDependencies() const { return {}; }
 

@@ -1,8 +1,7 @@
-#ifndef EZPACKER_MIRREGISTERCLASS_H
-#define EZPACKER_MIRREGISTERCLASS_H
+#ifndef EZMIR_MIR_REGISTER_CLASS_H
+#define EZMIR_MIR_REGISTER_CLASS_H
 
 #include "EzMirCommon.h"
-#include "Type/MirType.h"
 
 /**
  * This descriptor contains information about a register.
@@ -83,4 +82,4 @@ class MirRegisterClass
     std::pmr::unordered_map<std::string_view, MirRegisterDescriptor *> m_registers;
 };
 
-#endif // EZPACKER_MIRREGISTERCLASS_H
+#endif // EZMIR_MIR_REGISTER_CLASS_H

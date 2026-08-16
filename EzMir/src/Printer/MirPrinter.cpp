@@ -1,6 +1,17 @@
+#include "Block/MirBlock.h"
+#include "Class/MirClass.h"
+#include "Instruction/MirInstruction.h"
+#include "Instruction/MirTargetInstructionDesc.h"
+#include "Instruction/MirInstructionSet.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionStackFrame.h"
+#include "GlobalVar/MirGlobalVar.h"
+#include "Operand/MirOperand.h"
+#include "Operand/MirOperands.h"
+#include "Operand/MirRegisterClass.h"
+#include "Operand/MirRegisterReference.h"
 #include "Printer/MirPrinter.h"
-#include <iomanip>
-#include <sstream>
+#include "Type/MirType.h"
 
 std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
 {
@@ -271,7 +282,7 @@ std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail /*
 
 std::string MirPrinter::printToString(MirOperand *operand) { return operand ? operand->toString() : "<null operand>"; }
 
-std::string MirPrinter::printToString(const RegisterRef &ref)
+std::string MirPrinter::printToString(const MirRegisterRef &ref)
 {
     char prefix = ref.isVirtual() ? 'v' : 'p';
     const char *className = ref.getClass() ? ref.getClass()->getName() : "unselected";

@@ -1,5 +1,5 @@
-#ifndef EZPACKER_MIRINSTRUCTIONDEFS_H
-#define EZPACKER_MIRINSTRUCTIONDEFS_H
+#ifndef EZMIR_MIR_INSTRUCTION_METADATA_H
+#define EZMIR_MIR_INSTRUCTION_METADATA_H
 
 #include "EzMirCommon.h"
 
@@ -42,7 +42,7 @@ inline constexpr bool operator&(ExpectedOperandType a, ExpectedOperandType b)
     return (static_cast<uint16_t>(a) & static_cast<uint16_t>(b)) != 0;
 }
 
-enum class OperandFlag : uint8_t
+enum class MirOperandFlag : uint8_t
 {
     None = 0,
     Read = 1 << 0,
@@ -50,19 +50,19 @@ enum class OperandFlag : uint8_t
     ReadWrite = Read | Write
 };
 
-inline constexpr OperandFlag operator|(OperandFlag a, OperandFlag b)
+inline constexpr MirOperandFlag operator|(MirOperandFlag a, MirOperandFlag b)
 {
-    return static_cast<OperandFlag>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+    return static_cast<MirOperandFlag>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
-inline constexpr bool operator&(OperandFlag a, OperandFlag b)
+inline constexpr bool operator&(MirOperandFlag a, MirOperandFlag b)
 {
     return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
 }
 
-struct OperandConstraint
+struct MirOperandMetadata
 {
     ExpectedOperandType type;
-    OperandFlag flags;
+    MirOperandFlag flags;
 };
 
 // --- Instruction Flags (Unchanged) ---
@@ -127,19 +127,11 @@ enum class MirInstructionTier : uint8_t
     HighLevel,    // Standard IR opcodes emitted by the frontend/IRBuilder (ADD, SUB, CALL, RET, etc.)
     PassInternal, // Intermediate lowering opcodes generated/consumed by passes (PUSH_ARG, POP_ARG, PUSH_RET, POP_RET,
                   // etc.)
-    TargetLow // For selected (by ISel) instructions.
-};
-
-// --- OpCode Generation ---
-enum MirInstructionOpCode : uint16_t
-{
-#define INSTRUCTION(name, tier, category, operands, flags) name,
-#include "MirInstructionSet.h"
-#undef INSTRUCTION
-    OPCODE_COUNT
+    TargetLow     // For selected (by ISel) instructions.
 };
 
 // --- Metadata Structure ---
+enum MirInstructionOpCode : uint16_t;
 struct MirInstructionMetadata
 {
     MirInstructionCategory m_category;
@@ -147,46 +139,17 @@ struct MirInstructionMetadata
     MirInstructionTier m_tier;
     MirInstructionFlags m_flags;
     std::string_view m_name;
-    std::vector<OperandConstraint> m_operandFlags;
+    std::vector<MirOperandMetadata> m_operandFlags;
 
     MirInstructionMetadata(MirInstructionCategory category,
                            MirInstructionOpCode opcode,
                            MirInstructionTier tier,
                            MirInstructionFlags flag,
                            std::string_view name,
-                           std::initializer_list<OperandConstraint> operands) :
+                           std::initializer_list<MirOperandMetadata> operands) :
         m_category(category), m_opcode(opcode), m_tier(tier), m_flags(flag), m_name(std::move(name)),
         m_operandFlags(operands)
     {
     }
 };
-
-extern std::string StrToLower(const std::string &str);
-
-// --- Metadata Arrays ---
-inline const MirInstructionMetadata g_MirInstructionSet[] = {
-#define INSTRUCTION(name, tier, category, operands, flags)                                                             \
-    MirInstructionMetadata(MirInstructionCategory::category, name, tier, flags, #name, operands),
-#include "MirInstructionSet.h"
-#undef INSTRUCTION
-};
-
-inline std::map<std::string, MirInstructionOpCode> g_String2MirInstruction = {
-#define INSTRUCTION(name, tier, category, operands, flags) { #name, name },
-#include "MirInstructionSet.h"
-#undef INSTRUCTION
-};
-
-inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op) { return g_MirInstructionSet[op]; }
-
-inline MirInstructionOpCode getOpCodeFromStr(const std::string &str)
-{
-    auto it = g_String2MirInstruction.find(StrToLower(str));
-    if (it == g_String2MirInstruction.end())
-    {
-        return static_cast<MirInstructionOpCode>(0);
-    }
-    return it->second;
-}
-
-#endif // EZPACKER_MIRINSTRUCTIONDEFS_H
+#endif // EZMIR_MIR_INSTRUCTION_METADATA_H

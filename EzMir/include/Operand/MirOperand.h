@@ -1,20 +1,7 @@
-/**
- * @file MirOperand.h
- * @brief Variant type representing any operand an MIR instruction can use.
- *
- * A `MirOperand` is a polymorphic base class used by `MirInstruction` to store
- * instruction arguments in a uniform way. Each instance holds exactly one of
- * the payload structs declared in `MirOperands.h`.
- *
- * Accessors such as `get<MirRegister>()` return a typed pointer to the active
- * payload, or `nullptr` if the operand currently stores a different kind,
- * utilizing a fast RTTI static_cast system.
- */
-#ifndef EZPACKER_MIROPERAND_H
-#define EZPACKER_MIROPERAND_H
+#ifndef EZMIR_MIR_OPERAND_H
+#define EZMIR_MIR_OPERAND_H
 
 #include "EzMirCommon.h"
-#include "Type/MirType.h"
 
 enum class MirOperandType : uint8_t
 {
@@ -26,11 +13,11 @@ enum class MirOperandType : uint8_t
     Register,      // A physical or virtual register.
     RuntimeSymbol, // A symbol that's defined in the runtime library.
     FrameIndex,    // Used to reference parameters and objects that are saved in a stack frame. Used internally.
-    Memory,        // Used to access addresses.
+    Memory,        // A memory address of the form: base+displacement.
     MaxOperandType
 };
 
-inline std::map<MirOperandType, std::string> g_MirOperandType2Str = {
+inline std::unordered_map<MirOperandType, std::string> g_MirOperandType2Str = {
     { MirOperandType::Invalid, "Invalid" },
     { MirOperandType::FloatingPoint, "FloatingPoint" },
     { MirOperandType::Integer, "Integer" },
@@ -50,10 +37,8 @@ class MirOperand
 
     /**
      * Creates the operand with the given type.
-     * @param type
-     * @param sourceRef
      */
-    explicit MirOperand(MirType *type, SourceReference *sourceRef);
+    explicit MirOperand(class MirType *type, class SourceReference *sourceRef);
 
     /**
      * Returns the type of this operand.
@@ -63,43 +48,35 @@ class MirOperand
     /**
      * Returns the MIR type associated with this operand.
      */
-    MirType *getMirType() const;
+    class MirType *getMirType() const;
 
     /**
-     * Centralized implementation: gets the size from the attached MirType.
-     * @return The size in BYTES of the operand.
+     * Gets the size of the operand using its inner MirType.
      */
     virtual size_t getSizeInBytes() const;
 
     /**
      * Returns the source reference of the operand. It MAY BE nullptr if the operand does not have a source reference.
-     * @return
      */
-    SourceReference *getSourceRef() const;
+    class SourceReference *getSourceRef() const;
 
     /**
      * Sets the MirType of the operand.
-     * @param type
      */
-    void setMirType(MirType *type);
+    void setMirType(class MirType *type);
 
     /**
      * Returns a string representation of the operand.
-     * @return std::string
      */
     virtual std::string toString() const = 0;
 
     /**
      * Returns true if the operand is of the given type.
-     * @tparam OperandType
-     * @return
      */
     template <typename OperandType> bool isOfType() const { return getType() == OperandType::OpKind; }
 
     /**
-     * Returns a casted pointer to the operand if is of given time.
-     * @tparam OperandType
-     * @return
+     * Returns a casted pointer to the operand if it is of the given type.
      */
     template <typename OperandType> OperandType *get()
     {
@@ -111,9 +88,7 @@ class MirOperand
     }
 
     /**
-     * Returns a const-casted pointer to the operand if is of given time.
-     * @tparam OperandType
-     * @return
+     * Returns a const-casted pointer to the operand if it is of the given type.
      */
     template <typename OperandType> const OperandType *get() const
     {
@@ -125,8 +100,8 @@ class MirOperand
     }
 
   private:
-    MirType *m_type{ nullptr }; // Centralized type tracking
-    SourceReference *m_sourceRef{ nullptr };
+    class MirType *m_type{ nullptr };
+    class SourceReference *m_sourceRef{ nullptr };
 };
 
-#endif // EZPACKER_MIROPERAND_H
+#endif // EZMIR_MIR_OPERAND_H

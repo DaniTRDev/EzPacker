@@ -1,9 +1,8 @@
-#ifndef EZPACKER_ARGUMENTLOCATIONDESC_H
-#define EZPACKER_ARGUMENTLOCATIONDESC_H
+#ifndef EZMIR_ARGUMENT_LOCATION_DESC_H
+#define EZMIR_ARGUMENT_LOCATION_DESC_H
 
 #include "EzMirCommon.h"
 #include "Operand/MirRegisterReference.h"
-#include "MirFunctionStackFrame.h"
 
 /**
  * Simple type used to abstract the register ID field as this may change in a future. THIS WILL COLLIDE
@@ -22,7 +21,7 @@ enum class ArgLocationType
 
 struct RegLoc
 {
-    RegisterRef m_ref;
+    MirRegisterRef m_ref;
     size_t m_sizeBytes;
 };
 
@@ -32,7 +31,7 @@ struct RegLoc
 struct StackLoc
 {
     size_t m_sizeBytes;
-    StackFrameObject *m_object;
+    class StackFrameObject *m_object;
 };
 
 /**
@@ -57,7 +56,7 @@ struct StackLoc
  */
 struct SplitPiece
 {
-    RegisterRef m_reg;
+    MirRegisterRef m_reg;
     class MirType *m_type;
     size_t m_offsetInParam; // Byte offset from the start of the user's variable
 };
@@ -74,7 +73,7 @@ struct IndirectLoc
     size_t m_size;
 
     // The pointer to the data is either in a register OR sitting on the incoming stack slot area
-    RegisterRef m_pointerStorage;
+    MirRegisterRef m_pointerStorage;
 };
 
 /**
@@ -88,65 +87,50 @@ class ArgumentLocationDesc
 
     /**
      * Creates a register location with the given parameters.
-     * @param reg
-     * @param sizeInBytes
-     * @return
      */
-    static ArgumentLocationDesc Reg(RegisterRef reg, size_t sizeInBytes);
+    static ArgumentLocationDesc Reg(MirRegisterRef reg, size_t sizeInBytes);
 
     /**
      * Creates an indirect location with the given parameters.
-     * @param byVal
-     * @param copyOnReg
-     * @param size
-     * @param ptrStorage
-     * @return
      */
-    static ArgumentLocationDesc Indirect(bool byVal, bool copyOnReg, size_t size, RegisterRef ptrStorage);
+    static ArgumentLocationDesc Indirect(bool byVal, bool copyOnReg, size_t size, MirRegisterRef ptrStorage);
 
     /**
      * Creates a split location with the given parameters.
-     * @param regs
-     * @return
      */
     static ArgumentLocationDesc Split(const std::vector<SplitPiece> &pieces);
 
     /**
      * Creates a stack location with the given parameters.
      */
-    static ArgumentLocationDesc Stack(size_t sizeInBytes, StackFrameObject *object);
+    static ArgumentLocationDesc Stack(size_t sizeInBytes, class StackFrameObject *object);
 
     /**
      * Returns the type of the location.
-     * @return
      */
     ArgLocationType getType() const;
 
     /**
      * Returns the indirect location (IndirectLoc) of the argument. If internal type is not the one expected, an
      * exception is thrown.
-     * @return
      */
     const IndirectLoc &getIndirect() const;
 
     /**
      * Returns the register location (RegisterLoc) of the argument. If internal type is not the one expected, an
      * exception is thrown.
-     * @return
      */
     const RegLoc &getReg() const;
 
     /**
      * Returns the split location (SplitLoc) of the argument. If internal type is not the one expected, an exception is
      * thrown.
-     * @return
      */
     const SplitLoc &getSplit() const;
 
     /**
      * Returns the stack location (StackLoc) of the argument. If internal type is not the one expected, an exception is
      * thrown.
-     * @return
      */
     const StackLoc &getStack() const;
 
@@ -154,8 +138,6 @@ class ArgumentLocationDesc
     /**
      * Creates an argument location with the given parameters. Constructor is made private so that the factory methods
      * are used.
-     * @param type
-     * @param storage
      */
     ArgumentLocationDesc(ArgLocationType type, StorageT storage);
 
@@ -164,4 +146,4 @@ class ArgumentLocationDesc
     StorageT m_storage;
 };
 
-#endif // EZPACKER_ARGUMENTLOCATIONDESC_H
+#endif // EZMIR_ARGUMENT_LOCATION_DESC_H

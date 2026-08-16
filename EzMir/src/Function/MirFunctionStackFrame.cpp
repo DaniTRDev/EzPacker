@@ -1,4 +1,5 @@
 #include "Function/MirFunctionStackFrame.h"
+#include "Type/MirType.h"
 
 MirFunctionStackFrame::MirFunctionStackFrame(std::pmr::vector<StackFrameObject *> stackFrameObjs) :
     m_stackFrameObjects(std::move(stackFrameObjs))

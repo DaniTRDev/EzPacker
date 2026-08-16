@@ -1,8 +1,7 @@
-#ifndef EZPACKER_MIRREGISTERBANK_H
-#define EZPACKER_MIRREGISTERBANK_H
+#ifndef EZMIR_MIR_REGISTERBANK_H
+#define EZMIR_MIR_REGISTERBANK_H
 
 #include "EzMirCommon.h"
-#include "MirRegisterClass.h"
 
 /**
  * This class represents a bank of register the HW has. For example: GPR, FPR, SSE, AVX, ... Each bank might contain 1
@@ -24,7 +23,7 @@ class MirRegisterBank
      * Tries to add a class to the bank. If the class already existed, it returns false and it won't be inserted.
      * Returns true other ways.
      */
-    bool addClass(const std::string_view &name, MirRegisterClass *_class);
+    bool addClass(const std::string_view &name, class MirRegisterClass *_class);
 
     /**
      * Returns the name of the bank.
@@ -34,16 +33,16 @@ class MirRegisterBank
     /**
      * Returns the class that has the same name as the one given. If no class matches, nullptr is returned.
      */
-    MirRegisterClass *getClass(const std::string_view &name) const;
+    class MirRegisterClass *getClass(const std::string_view &name) const;
 
     /**
      * Returns the map which contains all the register classes of this bank.
      */
-    const std::pmr::unordered_map<std::string_view, MirRegisterClass *> &getClasses() const;
+    const std::pmr::unordered_map<std::string_view, class MirRegisterClass *> &getClasses() const;
 
   private:
     const char *m_name;
-    std::pmr::unordered_map<std::string_view, MirRegisterClass *> m_classes;
+    std::pmr::unordered_map<std::string_view, class MirRegisterClass *> m_classes;
 };
 
-#endif // EZPACKER_MIRREGISTERBANK_H
+#endif // EZMIR_MIR_REGISTERBANK_H

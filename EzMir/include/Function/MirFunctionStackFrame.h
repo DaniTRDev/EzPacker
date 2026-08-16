@@ -1,8 +1,7 @@
-#ifndef EZPACKER_MIRFUNCTIONSTACKFRAME_H
-#define EZPACKER_MIRFUNCTIONSTACKFRAME_H
+#ifndef EZMIR_MIR_FUNCTION_STACK_FRAME_H
+#define EZMIR_MIR_FUNCTION_STACK_FRAME_H
 
 #include "EzMirCommon.h"
-#include "Type/MirType.h"
 
 enum class StackFrameObjectSource : uint8_t
 {
@@ -19,7 +18,7 @@ struct StackFrameObject
 {
     // Filled by the prologue/epilogue pass (frame lowerer).
     int64_t m_offset{ 0 };
-    MirType *m_type;
+    class MirType *m_type;
     size_t m_id;
     StackFrameObjectSource m_source;
 };
@@ -48,7 +47,7 @@ class MirFunctionStackFrame
      * @param type
      * @return
      */
-    StackFrameObject *createStaticStackObj(MirType *type);
+    StackFrameObject *createStaticStackObj(class MirType *type);
 
     /**
      * Creates an object resulting of a spill in the function's stack frame.
@@ -56,7 +55,7 @@ class MirFunctionStackFrame
      * @param align
      * @return
      */
-    StackFrameObject *createStackSpill(MirType *type);
+    StackFrameObject *createStackSpill(class MirType *type);
 
     /**
      * Creates a parameter in the function stack frame.
@@ -64,23 +63,20 @@ class MirFunctionStackFrame
      * @param align
      * @return
      */
-    StackFrameObject *createStackParam(MirType *type);
+    StackFrameObject *createStackParam(class MirType *type);
 
     /**
      * Creates a specific stack frame object with the given parameters
      */
-    StackFrameObject *create(int64_t offset, MirType *type, StackFrameObjectSource source);
+    StackFrameObject *create(int64_t offset, class MirType *type, StackFrameObjectSource source);
 
     /**
      * Returns a stack frame object out of an ID, if it was not found, nullptr is returned.
-     * @param id
-     * @return
      */
     StackFrameObject *getObjectFromId(MirId id);
 
     /**
      * Returns the list of stack frame objects.
-     * @return
      */
     const std::pmr::vector<StackFrameObject *> &getObjects() const;
 
@@ -88,4 +84,4 @@ class MirFunctionStackFrame
     std::pmr::vector<StackFrameObject *> m_stackFrameObjects;
 };
 
-#endif // EZPACKER_MIRFUNCTIONSTACKFRAME_H
+#endif // EZMIR_MIR_FUNCTION_STACK_FRAME_H

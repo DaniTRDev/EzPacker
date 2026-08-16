@@ -1,4 +1,12 @@
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
+#include "Instruction/MirInstruction.h"
+#include "MirPasses/MirPassManager.h"
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
+#include "Operand/MirOperands.h"
+#include "Printer/MirPrinter.h"
 
 CodeFlowAnalysisPass::CodeFlowAnalysisPass(MirBuilderContext *ctx) :
     m_ctx(ctx), m_arena(ctx->getGlobalAllocator()), m_result(ctx->getGlobalAllocator())
@@ -7,13 +15,13 @@ CodeFlowAnalysisPass::CodeFlowAnalysisPass(MirBuilderContext *ctx) :
 
 const char *CodeFlowAnalysisPass::getName() const { return "CodeFlowAnalysisPass"; }
 
-const ControlFlowResult &CodeFlowAnalysisPass::getResult() const { return m_result; }
+ControlFlowResult *CodeFlowAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace CodeFlowAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
 MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
-                                    std::pmr::list<struct MirFunction *>::iterator it,
-                                    class MirPassManager *passManager)
+                                        std::pmr::list<MirFunction *>::iterator it,
+                                        class MirPassManager *passManager)
 {
     MirFunction *func = *it;
     auto diag = passManager->getDiagCollector();
@@ -99,16 +107,16 @@ MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
-void CodeFlowAnalysisPass::printResult() const
+void CodeFlowAnalysisPass::printResult()
 {
-    const auto &result = getResult();
+    auto result = getResult();
     auto diag = m_ctx->getDiagCollector();
 
     {
         auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
         log << std::pmr::string(std::format("CodeFlowAnalysisPass SUCCESSOR list:"));
 
-        for (auto &[blockId, successors] : result.m_successors)
+        for (auto &[blockId, successors] : result->m_successors)
         {
             std::string succeededBy =
                     MirPrinter::printToString(m_ctx->getBlockById(blockId), MirPrinterDetail::General);
@@ -131,7 +139,7 @@ void CodeFlowAnalysisPass::printResult() const
         auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
         log << std::pmr::string(std::format("CodeFlowAnalysisPass PREDECESSOR list:"));
 
-        for (auto &[blockId, predecessors] : result.m_predecessors)
+        for (auto &[blockId, predecessors] : result->m_predecessors)
         {
             std::string precededBy = MirPrinter::printToString(m_ctx->getBlockById(blockId), MirPrinterDetail::General);
             for (auto &predecessor : predecessors)

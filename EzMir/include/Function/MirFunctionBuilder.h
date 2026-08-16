@@ -1,71 +1,58 @@
-#ifndef EZPACKER_MIRFUNCTIONBUILDER_H
-#define EZPACKER_MIRFUNCTIONBUILDER_H
+#ifndef EZMIR_MIR_FUNCTION_BUILDER_H
+#define EZMIR_MIR_FUNCTION_BUILDER_H
 
 #include "EzMirCommon.h"
 #include "Block/MirBlockBuilder.h"
-#include "Builder/MirBuilder.h"
-#include "Builder/MirBuilderContext.h"
-#include "Printer/MirPrinter.h"
-#include "Operand/MirOperandBuilder.h"
 
-class MirFunctionBuilder : public MirBuilder<MirFunction>
+/**
+ * TODO: Remove this ugly list constructor and add a MirModule.
+ */
+class MirFunctionBuilder : public MirBuilder<class MirFunction>
 {
   public:
     /**
      * Creates the function builder with the given context.
-     * @param ctx
      */
-    MirFunctionBuilder(MirBuilderContext *ctx);
+    MirFunctionBuilder(class MirBuilderContext *ctx);
 
     /**
      * Creates the function builder linked to an owner vector container.
-     * @param ctx
      */
-    MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::vector<MirFunction *> *owner);
+    MirFunctionBuilder(class MirBuilderContext *ctx, std::pmr::vector<class MirFunction *> *owner);
 
     /**
      * Returns a block builder attached to the current function. If this function HAS NOT been built, an invalid
      * block builder is returned and a diagnostic error is pushed.
-     * @param sourceRef
-     * @return
      */
     MirBlockBuilder blockBuilder();
 
     /**
      * Builds a function over arena-managed MIR data structures.
-     *
-     * @param returnType    MIR type describing the function's return value.
-     * @param name
-     * @param sourceRef
      */
-    MirFunction *build(MirType *returnType, const std::pmr::string &name = "", SourceReference *sourceRef = nullptr);
+    MirFunction *
+    build(class MirType *returnType, const std::pmr::string &name = "", class SourceReference *sourceRef = nullptr);
 
     /**
      * Adds a parameter into the FUTURE function that's going to be built. This does not affect the stack frame.
-     * @param type
-     * @param name
-     * @param sourceRef
-     * @return
      */
     MirFunctionBuilder &
-    buildParam(MirType *type, const std::pmr::string &name = "", SourceReference *sourceRef = nullptr);
+    buildParam(class MirType *type, const std::pmr::string &name = "", class SourceReference *sourceRef = nullptr);
 
     /**
      * Appends the given already-built parameter into the function.
-     * @param param
      */
-    MirFunctionBuilder &buildParam(MirRegister *param);
+    MirFunctionBuilder &buildParam(class MirRegister *param);
 
     /**
-     * Sets this function's calling convention.
+     * Sets the calling convention of the FUTURE function that's going to be built.
      */
-    MirFunctionBuilder &setCallingConvention(CallingConvDesc *cc);
+    MirFunctionBuilder &setCallingConvention(class CallingConvDesc *cc);
 
   private:
-    CallingConvDesc *m_callingConv;
-    MirBuilderContext *m_ctx;
-    std::pmr::list<MirRegister *> m_parameters;
-    std::pmr::vector<MirFunction *> *m_owner;
+    class CallingConvDesc *m_callingConv;
+    class MirBuilderContext *m_ctx;
+    std::pmr::list<class MirRegister *> m_parameters;
+    std::pmr::vector<class MirFunction *> *m_owner;
 };
 
-#endif // EZPACKER_MIRFUNCTIONBUILDER_H
+#endif // EZMIR_MIR_FUNCTION_BUILDER_H

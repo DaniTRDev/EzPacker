@@ -1,18 +1,20 @@
-#ifndef EZPACKER_CALLINGCONVDESC_H
-#define EZPACKER_CALLINGCONVDESC_H
+#ifndef EZMIR_CALLING_CONV_DESC_H
+#define EZMIR_CALLING_CONV_DESC_H
 
 #include "EzMirCommon.h"
 #include "ArgumentLocationDesc.h"
-#include "Type/MirType.h"
 
 /**
  * Class used as a book to know where function arguments and returns should be placed. Since this information CAN'T be
- * set statically, its methods also need a "CallLoweringState" pointer.
+ * known statically, its methods also need a "CallLoweringState" pointer.
  *
  * Example of why it is needed:
  * Imagine 1 integer arg: The CallingConvDesc would ask the CallLoweringState how many integer
  * registers are currently used, if less than available a register location will be return; if no integer register is
  * available, a stack location will be returned.
+ *
+ * This is the most clear reason, but there's a LOT of obfuscure rules (mostly in x86) that need an object to keep track
+ * of the calling state.
  */
 class CallingConvDesc
 {
@@ -20,19 +22,13 @@ class CallingConvDesc
     /**
      * Returns the location of an argument of the given type supposing the current call state. This ensure reusing the
      * maximum numbers of registers and to correctly keep track of call parameters.
-     * @param type
-     * @param callState
-     * @return
      */
-    virtual ArgumentLocationDesc getArgLoc(MirType *type, class CallLoweringState *callState) = 0;
+    virtual ArgumentLocationDesc getArgLoc(class MirType *type, class CallLoweringState *callState) = 0;
 
     /**
      * Returns the location of where the result of a function should be placed. Depends on the call state.
-     * @param type
-     * @param callState
-     * @return
      */
-    virtual ArgumentLocationDesc getReturnLoc(MirType *type, class CallLoweringState *callState) = 0;
+    virtual ArgumentLocationDesc getReturnLoc(class MirType *type, class CallLoweringState *callState) = 0;
 
     /**
      * Returns true if the given type can be returned in register(s). This is useful because in the same target,
@@ -41,10 +37,8 @@ class CallingConvDesc
      *
      * If this returns false, a SRET should be used (struct return, meaning caller allocates space for the return, pass
      * it as a parameter to the callee and the callee writes into it during its execution).
-     * @param type
-     * @return
      */
-    virtual bool canReturnInRegs(MirType *type) const = 0;
+    virtual bool canReturnInRegs(class MirType *type) const = 0;
 
     /**
      * Returns true if the callee is responsible for cleaning up stack arguments (e.g., stdcall).
@@ -65,22 +59,20 @@ class CallingConvDesc
     /**
      * Returns the frame pointer register used by this calling convention (e.g., RBP / FP).
      */
-    virtual RegisterRef getFramePointerReg() const = 0;
+    virtual MirRegisterRef getFramePointerReg() const = 0;
 
     /**
      * Returns the stack pointer register used by this calling convention (e.g., RSP / SP).
      */
-    virtual RegisterRef getStackPointerReg() const = 0;
+    virtual MirRegisterRef getStackPointerReg() const = 0;
 
     /**
      * Returns the stack alignment needed BEFORE a call.
-     * @return
      */
     virtual size_t getStackAlignment() const = 0;
 
     /**
      * Returns the shadown space needed BEFORE a call.
-     * @return
      */
     virtual size_t getShadowSpaceSize() const = 0;
 
@@ -91,27 +83,23 @@ class CallingConvDesc
 
     /**
      * Returns EVERY register that must be preserved by the callee.
-     * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getAllCalleeSavedRegs() = 0;
+    virtual const std::pmr::vector<MirRegisterRef> &getAllCalleeSavedRegs() = 0;
 
     /**
      * Returns the list of registers of the given class that must be preserved by the callee.
-     * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getCalleeSavedRegs(MirRegisterClass *_class) = 0;
+    virtual const std::pmr::vector<MirRegisterRef> &getCalleeSavedRegs(class MirRegisterClass *_class) = 0;
 
     /**
      * Returns EVERY register that needs to be preserved by the caller.
-     * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getAllCallerSavedRegs() = 0;
+    virtual const std::pmr::vector<MirRegisterRef> &getAllCallerSavedRegs() = 0;
 
     /**
      * Returns the list of registers of the given class that needs to be preserved by the caller.
-     * @return
      */
-    virtual const std::pmr::vector<RegisterRef> &getCallerSavedRegs(MirRegisterClass *_class) = 0;
+    virtual const std::pmr::vector<MirRegisterRef> &getCallerSavedRegs(class MirRegisterClass *_class) = 0;
 };
 
-#endif // EZPACKER_CALLINGCONVDESC_H
+#endif // EZMIR_CALLING_CONV_DESC_H

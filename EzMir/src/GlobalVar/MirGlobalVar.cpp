@@ -1,4 +1,7 @@
 #include "GlobalVar/MirGlobalVar.h"
+#include "Operand/MirOperand.h"
+#include "SourceManager/SourceManager.h"
+#include "Type/MirType.h"
 
 MirGlobalVar::MirGlobalVar(bool constant,
                            MirId id,
@@ -20,10 +23,7 @@ MirGlobalVarLinkage MirGlobalVar::getLinkage() const { return m_linkage; }
 
 MirType *MirGlobalVar::getType() const { return m_type; }
 
-MirOperand *MirGlobalVar::getInitializer() const
-{
-    return m_initializer;
-}
+MirOperand *MirGlobalVar::getInitializer() const { return m_initializer; }
 
 SourceReference *MirGlobalVar::getSourceRef() const { return m_sourceRef; }
 

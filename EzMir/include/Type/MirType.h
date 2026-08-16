@@ -1,5 +1,5 @@
-#ifndef EZPACKER_MIRTYPE_H
-#define EZPACKER_MIRTYPE_H
+#ifndef EZMIR_MIR_TYPE_H
+#define EZMIR_MIR_TYPE_H
 
 #include "EzMirCommon.h"
 
@@ -28,14 +28,6 @@ class MirType
   public:
     /**
      * Constructs a MIR type descriptor.
-     *
-     * @param kind     High-level classification of the type.
-     * @param owner
-     * @param id       Unique MIR ID assigned by the context.
-     * @param maxAlignmentInBytes
-     * @param totalSizeInBits
-     * @param name     Human-readable type name kept for diagnostics/debugging.
-     * @param subTypes Optional child-type slice used by compound kinds.
      */
     MirType(MirTypeKind kind,
             class MirTypeTable *owner,
@@ -47,7 +39,6 @@ class MirType
 
     /**
      * Returns the array element type if this type is an array, nullptr if not.
-     * @return
      */
     MirType *getArrayElementType() const;
 
@@ -68,7 +59,6 @@ class MirType
 
     /**
      * Returns the array element count of this type. If this type is not an array, it returns 0.
-     * @return
      */
     size_t getArrayElementCount() const;
 
@@ -84,13 +74,11 @@ class MirType
 
     /**
      * Returns the total size in bits of this type.
-     * @return
      */
     size_t getTotalSizeInBits() const;
 
     /**
      * Returns the total size in bytes of this type.
-     * @return
      */
     size_t getTotalSizeInBytes() const;
 

@@ -1,14 +1,28 @@
+#include "Builder/MirBuilderContext.h"
+#include "Class/MirClass.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
+#include "Instruction/MirInstruction.h"
 #include "MirPasses/Passes/RelativeReferenceLowererPass.h"
+#include "Operand/MirOperandBuilder.h"
+#include "Operand/MirOperands.h"
+#include "Printer/MirPrinter.h"
+#include "SourceManager/SourceManager.h"
+#include "Type/MirType.h"
+#include "Type/MirTypeTable.h"
 
 RelativeReferenceLowererPass::RelativeReferenceLowererPass(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
 const char *RelativeReferenceLowererPass::getName() const { return "RelativeReferenceLowererPass"; }
 
-MirPassIterationPlace RelativeReferenceLowererPass::getIterationPlace() const { return MirPassIterationPlace::Instruction; }
+MirPassIterationPlace RelativeReferenceLowererPass::getIterationPlace() const
+{
+    return MirPassIterationPlace::Instruction;
+}
 
 MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *> &instrList,
-                                            std::pmr::list<MirInstruction *>::iterator it,
-                                            class MirPassManager *passManager)
+                                                std::pmr::list<MirInstruction *>::iterator it,
+                                                class MirPassManager *passManager)
 {
     MirInstruction *instr = *it;
     MirPassResult res{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
@@ -125,4 +139,4 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
     return res;
 }
 
-void RelativeReferenceLowererPass::printResult() const {}
+void RelativeReferenceLowererPass::printResult() {}

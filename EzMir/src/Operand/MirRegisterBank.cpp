@@ -1,4 +1,5 @@
 #include "Operand/MirRegisterBank.h"
+#include "Operand/MirRegisterClass.h"
 
 MirRegisterBank::MirRegisterBank(const char *name, std::pmr::memory_resource *alloc) : m_name(name), m_classes(alloc) {}
 

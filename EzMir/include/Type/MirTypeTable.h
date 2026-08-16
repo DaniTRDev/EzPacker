@@ -1,23 +1,19 @@
-#ifndef EZPACKER_MIRTYPETABLE_H
-#define EZPACKER_MIRTYPETABLE_H
+#ifndef EZMIR_MIR_TYPE_TABLE_H
+#define EZMIR_MIR_TYPE_TABLE_H
 
 #include "EzCoreCommon.h"
-#include "MirType.h"
-#include "IMirTargetTypeLayout.h"
-#include "Operand/MirOperands.h"
+#include "Type/MirType.h"
 
 /**
  * Class used to store the least minimum required types so everything else works.
  *
- * IMPORTANT: When created, types are aligned using the given target type layout.
+ * IMPORTANT: When created, types are aligned using the given target type layout (primitives).
  */
 class MirTypeTable
 {
   public:
     /**
      * Creates the type table with the given target type layout and arena allocator.
-     * @param typeLayout
-     * @param globalArena
      */
     MirTypeTable(std::pmr::memory_resource *globalArena);
 
@@ -28,15 +24,10 @@ class MirTypeTable
     /**
      * Returns the target type layout used by this type table.
      */
-    IMirTargetTypeLayout *getTargetTypeLayout() const;
+    class IMirTargetTypeLayout *getTargetTypeLayout() const;
 
     /**
      * Creates a unique base or compound type. If there was an error while creating the type nullptr is returned.
-     * @param kind
-     * @param totalSizeInBits
-     * @param subTypes
-     * @param name
-     * @return
      */
     MirType *create(MirTypeKind kind,
                     size_t totalSizeInBits,
@@ -51,56 +42,39 @@ class MirTypeTable
     /**
      * Creates a class type (if it does not exist). Returns the existing type if it was already created or nullptr if
      * there was any error.
-     * @param fieldTypes
-     * @param name
-     * @return
      */
     MirType *getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &name);
 
     /**
      * Creates a function type with the given parameters. This function will CREATE only if it wasn't added before, if
      * it was the existing type is returned.
-     * @param returnType
-     * @param parameters
-     * @param name
-     * @return
      */
-    MirType *
-    getFuncType(MirType *returnType, const std::pmr::list<MirRegister *> &parameters, const std::string_view &funcName);
+    MirType *getFuncType(MirType *returnType,
+                         const std::pmr::list<class MirRegister *> &parameters,
+                         const std::string_view &funcName);
 
     /**
      * Interns pointer types. Guarantees that getPtr(T) always returns the exact same type instance pointer.
-     * @param srcType
-     * @return
      */
     MirType *getPtr(MirType *srcType);
 
     /**
      * Interns array types structurally based on size and base element composition.
-     * @param elementType
-     * @param elementCount
-     * @return
      */
     MirType *getArray(MirType *elementType, size_t elementCount);
 
     /**
      * Returns the first floating-point type that can hold the given bit size.
-     * @param sizeInBits
-     * @return
      */
     MirType *getFloatingTypeBySize(size_t sizeInBits) const;
 
     /**
      * Returns the first integer type that can hold the given bit size.
-     * @param sizeInBits
-     * @return
      */
     MirType *getIntegerTypeBySize(size_t sizeInBits) const;
 
     /**
      * Searches the table for the given ID and returns its type, if any. Returns nullptr if type was not created.
-     * @param id
-     * @return
      */
     MirType *getMirTypeById(size_t id) const;
 
@@ -120,10 +94,10 @@ class MirTypeTable
     /**
      * Initializes the type table with the basic primitive types needed as well as the type layout class.
      */
-    void initialize(IMirTargetTypeLayout *typeLayout);
+    void initialize(class IMirTargetTypeLayout *typeLayout);
 
   private:
-    IMirTargetTypeLayout *m_typeLayout{ nullptr };
+    class IMirTargetTypeLayout *m_typeLayout{ nullptr };
     size_t m_currentId{ 0 };
 
     MirType *m_bindingToken{ nullptr };
@@ -152,4 +126,4 @@ class MirTypeTable
     std::pmr::unordered_map<MirType *, MirType *> m_pointerCache;
 };
 
-#endif // EZPACKER_MIRTYPETABLE_H
+#endif // EZMIR_MIR_TYPE_TABLE_H
