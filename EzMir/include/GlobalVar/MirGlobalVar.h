@@ -3,13 +3,19 @@
 
 #include "EzMirCommon.h"
 
-enum class MirGlobalVarLinkage
+enum class MirGlobalVarLinkage : uint8_t
 {
     External = 0, // Visible globally (standard global)
     Internal,     // Private to this module (static)
     Weak          // Mergeable at link time
 };
 
+/**
+ * This structure defines global variables. The given MirType MUST be a pointer. This comes from the idea that global
+ * variables are POINTERS to the type they were created this.
+ *
+ * This is handled by the global variable builder.
+ */
 class MirGlobalVar
 {
   public:

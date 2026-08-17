@@ -1,4 +1,12 @@
+#include "Builder/MirBuilderContext.h"
+#include "Descriptors/TargetDesc.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
+#include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/LivenessAnalysisPass.h"
+#include "RegisterAllocator/MirRegisterAllocator.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
+#include "Printer/MirPrinter.h"
 
 MirRegisterAllocatorPass::MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
     m_ctx(ctx), m_regAllocator(targetDesc->getRegisterAllocator()), m_result(ctx->getGlobalAllocator()),
@@ -42,9 +50,9 @@ MirPassResult MirRegisterAllocatorPass::run(std::pmr::list<class MirFunction *> 
         ctx->m_unspillableRegs.clear();
 
         LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
-        LivenessResult result = livenessAnalysis->getResult();
+        LivenessResult *result = livenessAnalysis->getResult();
 
-        if (!m_regAllocator->buildInterferenceGraph(&result, ctx))
+        if (!m_regAllocator->buildInterferenceGraph(result, ctx))
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                     << "Failed to build interference graph for function " << func->getName();
@@ -97,7 +105,7 @@ void MirRegisterAllocatorPass::reset()
     m_result.m_resolvedFunctions.clear();
 }
 
-void MirRegisterAllocatorPass::printResult() const
+void MirRegisterAllocatorPass::printResult()
 {
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirRegisterAllocatorPass");
     log << std::format("Printing function register allocation result").c_str();
@@ -111,5 +119,6 @@ void MirRegisterAllocatorPass::printResult() const
 
 std::vector<std::type_index> MirRegisterAllocatorPass::getDependencies() const
 {
-    return { std::type_index(typeid(MirInstructionSelectorPass)) };
+    // TODO: FIll with instruction selector pass.
+    return {};
 }

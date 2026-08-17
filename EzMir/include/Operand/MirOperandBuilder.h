@@ -5,6 +5,7 @@
 #include "Builder/MirBuilder.h"
 #include "FlexNumber/FlexFloat.h"
 #include "FlexNumber/FlexInt.h"
+#include "Operand/MirOperand.h"
 
 class MirOperandBuilder : public MirBuilder<MirOperand>
 {
@@ -13,14 +14,6 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * Creates the builder with the given context.
      */
     MirOperandBuilder(class MirBuilderContext *ctx);
-
-    /**
-     * This function will build a constant array with the given element type. Will check if the elements have the same
-     * type as elemType and will return nullptr if there's a mismatch.
-     */
-    class MirConstantArray *buildConstantArray(class MirType *elemType,
-                                               const std::vector<class MirOperand *> &elems,
-                                               class SourceReference *ref = nullptr);
 
     /**
      * Returns a float operand with the given floating point value. If the value's bit-width is smaller than given
@@ -44,6 +37,8 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
 
     /**
      * Builds a memory operand out of the given parameters.
+     *
+     * If the given base is not a pointer, an error will be thrown an nullptr will be returned.
      */
     class MirMemory *buildMem(class MirType *type,
                               class MirRegister *base,
@@ -52,6 +47,8 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
 
     /**
      * Builds a memory operand out of the given parameters. A MirInteger is built out of the given displ int.
+     *
+     * If the given base is not a pointer, an error will be thrown an nullptr will be returned.
      */
     class MirMemory *
     buildMem(class MirType *type, class MirRegister *base, const FlexInt &displ, class SourceReference *ref = nullptr);
@@ -72,13 +69,6 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
                                     std::pmr::string name = "",
                                     class MirRegisterClass *_class = nullptr,
                                     class SourceReference *ref = nullptr);
-
-    /**
-     * Creates an indexed reference to a specific element within a global array variable.
-     */
-    class MirReference *
-    buildArrayElemRef(class MirGlobalVar *var, size_t elementIndex, class SourceReference *ref = nullptr);
-
     /**
      * Creates a reference to the given block.
      */

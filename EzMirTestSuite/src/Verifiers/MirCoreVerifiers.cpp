@@ -1,4 +1,8 @@
-#include "../../include/Verifiers/MirCoreVerifiers.h"
+#include "Verifiers/MirCoreVerifiers.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionStackFrame.h
+#include "Instruction/MirInstruction.h"
+#include "Operand/MirOperands.h"
 
 MirTypeVerifier::MirTypeVerifier(MirType *type) : MirVerifier(type) {}
 

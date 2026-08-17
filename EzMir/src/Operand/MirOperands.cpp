@@ -21,23 +21,6 @@ std::string MirInteger::toString() const
     return std::format("{} 0x{:X}", getMirType()->getName(), val);
 }
 
-MirConstantArray::MirConstantArray(MirType *arrayType, std::pmr::vector<MirOperand *> elements, SourceReference *ref) :
-    MirOperand(arrayType, ref), m_elements(std::move(elements))
-{
-}
-
-std::string MirConstantArray::toString() const
-{
-    std::string res = std::format("{} [", getMirType()->getName());
-    for (size_t i = 0; i < m_elements.size(); ++i)
-    {
-        if (i > 0)
-            res += ", ";
-        res += m_elements[i] ? m_elements[i]->toString() : "<null>";
-    }
-    return res + "]";
-}
-
 MirReference::MirReference(MirType *type, MirReferenceType refType, size_t refId, size_t offset, SourceReference *ref) :
     MirOperand(type, ref), m_refType(refType), m_refId(refId), m_offset(offset)
 {
@@ -53,20 +36,16 @@ std::string MirReference::toString() const
             return std::format("label %block_{}", m_refId);
         case MirReferenceType::GlobalVar:
             if (m_offset > 0)
-                return std::format("{}* @global_{}+0x{:X}", typePrefix, m_refId, m_offset);
-            return std::format("{}* @global_{}", typePrefix, m_refId);
-        case MirReferenceType::GlobalArrayElem:
-            return std::format("{}* @global_{}[{}]", typePrefix, m_refId, m_offset);
+                return std::format("{} @global_{}+0x{:X}", typePrefix, m_refId, m_offset);
+            return std::format("{} @global_{}", typePrefix, m_refId);
         case MirReferenceType::Function:
             return std::format("{}() @func_{}", typePrefix, m_refId);
         case MirReferenceType::ClassField:
-            return std::format("{}* %v{}.field_{}", typePrefix, m_refId, m_offset);
+            return std::format("{} %v{}.field_{}", typePrefix, m_refId, m_offset);
         case MirReferenceType::ClassMethod:
             return std::format("{} %v{}.method_{}", typePrefix, m_refId, m_offset);
-        case MirReferenceType::ConstantArrayElement:
-            return std::format("{} %v{}[{}]", typePrefix, m_refId, m_offset);
         case MirReferenceType::StackFrameObject:
-            return std::format("{}* %stack[{}]", typePrefix, m_refId);
+            return std::format("{} %stack[{}]", typePrefix, m_refId);
         default:
             return std::format("{} <invalid_ref>", typePrefix);
     }
@@ -106,13 +85,6 @@ std::string MirRegister::toString() const
     }
     return std::format("{} %{}{}({})", typeStr, prefix, m_ref.getId(), className);
 }
-
-MirFrameIndex::MirFrameIndex(MirType *type, size_t frameId, SourceReference *ref) :
-    MirOperand(type, ref), m_frameId(frameId)
-{
-}
-
-std::string MirFrameIndex::toString() const { return std::format("[stack#{}]", m_frameId); }
 
 MirMemory::MirMemory(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref) :
     MirOperand(type, ref), m_base(base), m_displ(displ)

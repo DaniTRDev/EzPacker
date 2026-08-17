@@ -1,7 +1,17 @@
-#ifndef EZPACKER_EZTRIPLECOMMON_H
-#define EZPACKER_EZTRIPLECOMMON_H
+#ifndef EZTRIPLE_EZ_TRIPLE_COMMON_H
+#define EZTRIPLE_EZ_TRIPLE_COMMON_H
 
-#include "EzMir.h"
-#include "EzCodeEmitter.h"
+#include <cstring>
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <memory>
+#include <functional>
+#include <set>
+#include <typeindex>
+#include <unordered_set>
+#include <iomanip>
+#include <sstream>
+#include <memory_resource>
 
-#endif // EZPACKER_EZTRIPLECOMMON_H
+#endif // EZTRIPLE_EZ_TRIPLE_COMMON_H

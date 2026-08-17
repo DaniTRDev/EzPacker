@@ -1,6 +1,20 @@
 #include "EzMirTestSuite.h"
-
-EzTestTripleTargetDesc *EzMirTestSuite::getTargetDesc() { return m_targetDesc.get(); }
+#include "EzMirTestSuiteCallingConv.h"
+#include "EzMirTestSuiteTypeLayout.h"
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Diagnostics/DiagnosticLogger.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionBuilder.h"
+#include "Instruction/MirInstruction.h"
+#include "Instruction/MirInstructionBuilder.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
+#include "MirPasses/Passes/LivenessAnalysisPass.h"
+#include "Operand/MirOperandBuilder.h"
+#include "Operand/MirOperands.h"
+#include "SourceManager/SourceManager.h"
+#include "Type/MirTypeTable.h"
 
 MirBuilderContext *EzMirTestSuite::getBuilderCtx() { return m_builderCtx.get(); }
 
@@ -16,18 +30,19 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
 {
     m_diagCollector = std::make_shared<DiagnosticCollector>();
     m_typeTable = std::make_shared<MirTypeTable>(&m_arena);
-    m_builderCtx = std::make_shared<MirBuilderContext>(nullptr, &m_arena, m_diagCollector, m_typeTable);
+    m_builderCtx = std::make_shared<MirBuilderContext>(nullptr, m_diagCollector.get(), m_typeTable.get(), &m_arena);
     m_sourceManager = std::make_shared<SourceManager>(workingPath);
     m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
-    m_passManager = std::make_shared<MirPassManager>(&m_arena, m_diagCollector);
-    m_targetDesc = std::make_shared<EzTestTripleTargetDesc>(m_builderCtx.get(), m_builderCtx->getGlobalAllocator());
+    m_passManager = std::make_shared<MirPassManager>(m_diagCollector.get(), &m_arena);
+
+    m_callingConv = std::make_shared<EzMirTestSuiteCallingConv>();
+    m_typeLayout = std::make_shared<EzMirTestSuiteTypeLayout>();
 
     m_diagCollector->addListener(m_diagLogger.get());
-    m_typeTable->initialize(m_targetDesc->getTypeLayout());
-    m_targetDesc->initialize();
+    m_typeTable->initialize(m_typeLayout.get());
     m_passManager->setTestMode();
 
-    m_builderCtx->setDefaultCallingConvention(m_targetDesc->getAvailableCallingConventions().front());
+    m_builderCtx->setDefaultCallingConvention(m_callingConv.get());
 
     m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->getVoidType(), "TEST");
 

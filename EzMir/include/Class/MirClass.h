@@ -81,6 +81,16 @@ class MirClass
     class MirType *getType() const;
 
     /**
+     * Returns the number of fields this class has.
+     */
+    size_t getFieldCount() const;
+
+    /**
+     * Returns the vTable size (number of methods) this class has.
+     */
+    size_t getVTableSize() const;
+
+    /**
      * Returns the source ref of this class, if set.
      */
     class SourceReference *getSourceRef() const;

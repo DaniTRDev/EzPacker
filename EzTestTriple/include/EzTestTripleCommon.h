@@ -1,7 +1,0 @@
-#ifndef EZPACKER_EZTESTTRIPLECOMMON_H
-#define EZPACKER_EZTESTTRIPLECOMMON_H
-
-#include <EzTriple.h>
-#include <EzCodeEmitter.h>
-
-#endif // EZPACKER_EZTESTTRIPLECOMMON_H

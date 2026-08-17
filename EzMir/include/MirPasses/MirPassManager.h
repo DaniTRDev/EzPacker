@@ -11,7 +11,7 @@ class MirPassManager
     /**
      * Creates the pass manager and links it to the given arena.
      */
-    MirPassManager(DiagnosticCollector *diagCollector, std::pmr::memory_resource *globalArena);
+    MirPassManager(class DiagnosticCollector *diagCollector, std::pmr::memory_resource *globalArena);
 
     /**
      * Returns the diag collector linked to this pass manager.

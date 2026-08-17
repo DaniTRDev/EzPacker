@@ -1,6 +1,8 @@
 #ifndef EZMIR_MIR_BUILDER_CONTEXT_H
 #define EZMIR_MIR_BUILDER_CONTEXT_H
 
+#include "EzMirCommon.h"
+
 class MirBuilderContext
 {
   public:
@@ -8,9 +10,9 @@ class MirBuilderContext
      * Builds the context with the given type table.
      */
     MirBuilderContext(class CallingConvDesc *defaultCallingConv,
-                      std::pmr::monotonic_buffer_resource *globalArena,
-                      const std::shared_ptr<class DiagnosticCollector> &diagCollector,
-                      const std::shared_ptr<class MirTypeTable> &typeTable);
+                      class DiagnosticCollector *diagCollector,
+                      class MirTypeTable *typeTable,
+                      std::pmr::monotonic_buffer_resource *globalArena);
 
     // Disable copy/move constructors to preserve safety across the arena resource references
     MirBuilderContext(const MirBuilderContext &) = delete;
@@ -45,6 +47,11 @@ class MirBuilderContext
      * Returns the default calling convention for a function.
      */
     class CallingConvDesc *getDefaultCallingConvention() const;
+
+    /**
+     * Returns the diagnostic collector.
+     */
+    class DiagnosticCollector *getDiagCollector();
 
     /**
      * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr if the
@@ -87,6 +94,11 @@ class MirBuilderContext
     class MirRegister *getRegisterById(size_t id) const;
 
     /**
+     * Returns the type table attached to this context.
+     */
+    class MirTypeTable *getTypeTable();
+
+    /**
      * Sets the default calling convention.
      */
     void setDefaultCallingConvention(class CallingConvDesc *defaultCallingConv);
@@ -111,19 +123,11 @@ class MirBuilderContext
      */
     std::pmr::list<class MirGlobalVar *> &getGlobalVars();
 
-    /**
-     * Returns the diagnostic collector.
-     */
-    const std::shared_ptr<class DiagnosticCollector> &getDiagCollector();
-
-    /**
-     * Returns the type table attached to this context.
-     */
-    const std::shared_ptr<class MirTypeTable> &getTypeTable();
-
   private:
     class CallingConvDesc *m_defaultCallingConv; // Default calling convention used when building functions.
+    class DiagnosticCollector *m_diagCollector;
     MirId m_currentId{ 0 };
+    class MirTypeTable *m_typeTable;
 
     // Pools.
     std::pmr::monotonic_buffer_resource *m_globalResource;
@@ -138,9 +142,6 @@ class MirBuilderContext
     std::pmr::map<MirId, class MirFunction *> m_functionIdToFunc;     // Used to search for functions.
     std::pmr::map<MirId, class MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
     std::pmr::map<MirId, class MirRegister *> m_registerIdToRegister; // Used to search for registers.
-
-    std::shared_ptr<class DiagnosticCollector> m_diagCollector;
-    std::shared_ptr<class MirTypeTable> m_typeTable;
 };
 
 #endif // EZMIR_MIR_BUILDER_CONTEXT_H

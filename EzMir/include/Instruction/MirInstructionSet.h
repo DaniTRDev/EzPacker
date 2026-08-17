@@ -4,7 +4,7 @@
 #include "MirInstructionMetadata.h"
 
 // --- OpCode Generation ---
-enum MirInstructionOpCode : uint16_t
+enum class MirInstructionOpCode : uint16_t
 {
 #define INSTRUCTION(name, tier, category, operands, flags) name,
 #include "MirInstructionSetDefs.h"
@@ -15,18 +15,21 @@ enum MirInstructionOpCode : uint16_t
 // --- Metadata Arrays ---
 inline const MirInstructionMetadata g_MirInstructionSet[] = {
 #define INSTRUCTION(name, tier, category, operands, flags)                                                             \
-    MirInstructionMetadata(MirInstructionCategory::category, name, tier, flags, #name, operands),
+    MirInstructionMetadata(MirInstructionCategory::category, MirInstructionOpCode::name, tier, flags, #name, operands),
 #include "MirInstructionSetDefs.h"
 #undef INSTRUCTION
 };
 
 inline std::unordered_map<std::string, MirInstructionOpCode> g_String2MirInstruction = {
-#define INSTRUCTION(name, tier, category, operands, flags) { #name, name },
+#define INSTRUCTION(name, tier, category, operands, flags) { #name, MirInstructionOpCode::name },
 #include "MirInstructionSetDefs.h"
 #undef INSTRUCTION
 };
 
-inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op) { return g_MirInstructionSet[op]; }
+inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op)
+{
+    return g_MirInstructionSet[static_cast<uint16_t>(op)];
+}
 
 inline MirInstructionOpCode getOpCodeFromStr(const std::string &str)
 {

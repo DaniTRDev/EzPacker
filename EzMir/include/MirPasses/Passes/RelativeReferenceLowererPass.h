@@ -5,20 +5,16 @@
 #include "MirPasses/IMirTransformPass.h"
 
 /**
- * This pass takes instructions with REFERENCE operands that can be lowered as RELATIVE-TO-POINTER memory operands
- * using pointer arithmetic.
+ * This pass takes instructions with REFERENCE operands and lowers them into flat MEMORY
+ * operands (MirMemory) using pointer arithmetic.
  *
- * This is the case of:
- *  - ClassField (base: classPtr, off: fieldOffset)
- *  - ClassMethod (base: classPtr, off: methodOffset)
- *  - ConstantArrayElement (base, arrayPtr, off: elemIndex * elemSize)
+ * It handles the following structural accesses:
  *
- * Theses cases CAN'T be lowered by this pass because they require information about the final code format and will
- * result in RELOCATIONS.
- *  - Block (needs the address of the block)
- *  - GlobalArrayElem (needs the address of the global variable)
- *  - GlobalVar (needs the address of the global variable)
- *  - Function (needs the address of the function)
+ *  - ClassField  (base: classPtr, displacement: fieldOffset)
+ *      Resolved at compile-time. Becomes [base + constant offset].
+ *
+ *  - ClassMethod (base: classPtr, displacement: methodOffset)
+ *      Resolved at compile-time. Becomes [base + constant offset].
  */
 class RelativeReferenceLowererPass : public IMirTransformPass
 {
@@ -30,22 +26,16 @@ class RelativeReferenceLowererPass : public IMirTransformPass
 
     /**
      * Returns the name of the pass "RelativeReferenceLowererPass".
-     * @return
      */
     const char *getName() const override;
 
     /**
      * Returns MirPassIterationPlace::Instruction.
-     * @return
      */
     MirPassIterationPlace getIterationPlace() const override;
 
     /**
      * Runs the pass in the given instruction and returns the result.
-     * @param instrList
-     * @param it
-     * @param passManager
-     * @return
      */
     MirPassResult run(std::pmr::list<class MirInstruction *> &instrList,
                       std::pmr::list<class MirInstruction *>::iterator it,

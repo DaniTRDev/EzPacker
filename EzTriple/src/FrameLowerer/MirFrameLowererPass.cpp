@@ -1,6 +1,12 @@
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Descriptors/TargetDesc.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "FrameLowerer/MirFrameLowerer.h"
 #include "FrameLowerer/MirFrameLowererPass.h"
-
-#include <ranges>
+#include "Function/MirFunction.h"
+#include "Printer/MirPrinter.h"
+#include "RegisterAllocator/MirRegisterAllocatorPass.h"
 
 MirFrameLowererPass::MirFrameLowererPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
     m_ctx(ctx), m_targetDesc(targetDesc)
@@ -58,7 +64,7 @@ MirPassResult MirFrameLowererPass::run(std::pmr::list<MirFunction *> &funcList,
     return { .m_modifiedMir = true, .m_executed = true, .m_succeeded = true };
 }
 
-void MirFrameLowererPass::printResult() const
+void MirFrameLowererPass::printResult()
 {
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirFrameLowererPass");
     log << std::format("Printing frame lowerer result").c_str();
@@ -75,5 +81,5 @@ void MirFrameLowererPass::reset() { m_loweredFunctions.clear(); }
 std::vector<std::type_index> MirFrameLowererPass::getDependencies() const
 {
     // Frame lowering MUST execute after register allocation!
-    return { std::type_index(typeid(MirRegisterAllocatorPass)) };
+    return { std::type_index(typeid(class MirRegisterAllocatorPass)) };
 }

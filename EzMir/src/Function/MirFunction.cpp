@@ -51,6 +51,8 @@ MirType *MirFunction::getReturnType() const { return m_returnType; }
 
 MirType *MirFunction::getType() const { return m_type; }
 
+size_t MirFunction::getParamCount() const { return m_parameters.size(); }
+
 SourceReference *MirFunction::getSourceRef() const { return m_sourceRef; }
 
 void MirFunction::addCalleeSavedRegUse(const MirRegisterRef &reg) { m_usedCalleeSavedRegs.push_back(reg); }

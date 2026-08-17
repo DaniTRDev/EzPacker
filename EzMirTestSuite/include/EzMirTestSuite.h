@@ -1,12 +1,26 @@
-#ifndef EZPACKER_EZMIRTESTSUITE_H
-#define EZPACKER_EZMIRTESTSUITE_H
+#ifndef EZMIRTESTSUITE_EZ_MIR_TEST_SUITE_H
+#define EZMIRTESTSUITE_EZ_MIR_TEST_SUITE_H
 
-#include "EzTestTriple.h"
-#include "Verifiers/ClassOffsetResolverVerifier.h"
-#include "Verifiers/MirCoreVerifiers.h"
-#include "Verifiers/CodeFlowPassVerifier.h"
-#include "Verifiers/LivenessPassVerifier.h"
-#include "Verifiers/RelativeReferenceLowererVerifier.h"
+#include "gtest/gtest.h"
+#include "Instruction/MirInstructionBuilder.h"
+#include "MirPasses/MirPassManager.h"
+
+class DiagnosticCollector;
+class DiagnosticLogger;
+class EzMirTestSuiteCallingConv;
+class EzMirTestSuiteTypeLayout;
+class FlexInt;
+class MirBuilderContext;
+class MirFunction;
+class MirInstruction;
+class MirInstructionInsertionPoint;
+class MirPass;
+class MirPassManager;
+class MirType;
+class MirTypeTable;
+class SourceManager;
+
+enum class MirInstructionOpCode : uint16_t;
 
 /**
  * Class used to contain helper methods related to creation/destruction of needed objects in common test scenarios.
@@ -14,11 +28,6 @@
 class EzMirTestSuite
 {
   public:
-    /**
-     * Returns the target descriptor.
-     */
-    EzTestTripleTargetDesc *getTargetDesc();
-
     /**
      * Returns the builder context used by this test.
      * @return
@@ -125,10 +134,11 @@ class EzMirTestSuite
   private:
     MirFunction *m_testFunction; // Pre-created function used to be able to create quick tests easily.
     MirInstructionInsertionPoint m_insertPoint;
+    std::shared_ptr<EzMirTestSuiteCallingConv> m_callingConv;
+    std::shared_ptr<EzMirTestSuiteTypeLayout> m_typeLayout;
     std::pmr::monotonic_buffer_resource m_arena;
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
     std::shared_ptr<DiagnosticLogger> m_diagLogger;
-    std::shared_ptr<EzTestTripleTargetDesc> m_targetDesc;
     std::shared_ptr<MirBuilderContext> m_builderCtx;
     std::shared_ptr<MirPassManager> m_passManager;
     std::shared_ptr<MirTypeTable> m_typeTable;

@@ -1,4 +1,6 @@
-#include "../../include/Verifiers/CodeFlowPassVerifier.h"
+#include "Builder/MirBuilderContext.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
+#include "Verifiers/CodeFlowPassVerifier.h"
 
 CodeFlowAnalysisVerifier::CodeFlowAnalysisVerifier(CodeFlowAnalysisPass *analysis, MirBuilderContext *ctx) :
     m_ctx(ctx), MirPassVerifier(analysis)
@@ -7,19 +9,19 @@ CodeFlowAnalysisVerifier::CodeFlowAnalysisVerifier(CodeFlowAnalysisPass *analysi
 
 CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::predecessor(size_t toId, size_t fromId)
 {
-    const auto &res = getTestedObj()->getResult();
-    auto it = res.m_predecessors.find(toId);
+    auto res = getTestedObj()->getResult();
+    auto it = res->m_predecessors.find(toId);
 
-    EXPECT_TRUE(res.m_predecessors.contains(fromId));
+    EXPECT_TRUE(res->m_predecessors.contains(fromId));
     return *this;
 }
 
 CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::predecessorCount(size_t blockId, size_t count)
 {
-    const auto &res = getTestedObj()->getResult();
-    auto it = res.m_predecessors.find(blockId);
+    auto res = getTestedObj()->getResult();
+    auto it = res->m_predecessors.find(blockId);
 
-    EXPECT_NE(it, res.m_predecessors.end());
+    EXPECT_NE(it, res->m_predecessors.end());
     EXPECT_EQ(it->second.size(), count);
 
     return *this;
@@ -27,7 +29,7 @@ CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::predecessorCount(size_t bloc
 
 CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::reachable(size_t start, size_t end)
 {
-    const auto &res = getTestedObj()->getResult();
+    auto res = getTestedObj()->getResult();
 
     // Lambda for Depth-First Search traversal
     // We use a tracking set passed by reference to handle cycles safely
@@ -46,8 +48,8 @@ CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::reachable(size_t start, size
         visited.insert(current);
 
         // Look up successors for the current block
-        auto it = res.m_successors.find(current);
-        if (it == res.m_successors.end())
+        auto it = res->m_successors.find(current);
+        if (it == res->m_successors.end())
             return false; // Dead end / Sink block
 
         // Recursively check all outgoing control flow branches
@@ -71,8 +73,8 @@ CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::reachable(size_t start, size
 }
 CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::successor(size_t fromId, size_t toId)
 {
-    const auto &res = getTestedObj()->getResult();
-    auto it = res.m_successors.find(fromId);
+    auto res = getTestedObj()->getResult();
+    auto it = res->m_successors.find(fromId);
 
     EXPECT_TRUE(it->second.contains(toId));
     return *this;
@@ -80,10 +82,10 @@ CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::successor(size_t fromId, siz
 
 CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::successorCount(size_t blockId, size_t count)
 {
-    const auto &res = getTestedObj()->getResult();
-    auto it = res.m_successors.find(blockId);
+    auto res = getTestedObj()->getResult();
+    auto it = res->m_successors.find(blockId);
 
-    EXPECT_NE(it, res.m_successors.end());
+    EXPECT_NE(it, res->m_successors.end());
     EXPECT_EQ(it->second.size(), count);
 
     return *this;
@@ -91,7 +93,7 @@ CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::successorCount(size_t blockI
 
 CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::unreachable(size_t start, size_t end)
 {
-    const auto &res = getTestedObj()->getResult();
+    auto res = getTestedObj()->getResult();
 
     // Lambda for Depth-First Search traversal
     // We use a tracking set passed by reference to handle cycles safely
@@ -110,8 +112,8 @@ CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::unreachable(size_t start, si
         visited.insert(current);
 
         // Look up successors for the current block
-        auto it = res.m_successors.find(current);
-        if (it == res.m_successors.end())
+        auto it = res->m_successors.find(current);
+        if (it == res->m_successors.end())
             return false; // Dead end / Sink block
 
         // Recursively check all outgoing control flow branches
@@ -134,10 +136,10 @@ CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::unreachable(size_t start, si
 
 CodeFlowAnalysisVerifier &CodeFlowAnalysisVerifier::exitBlock(size_t blockId)
 {
-    const auto &res = getTestedObj()->getResult();
-    auto it = res.m_successors.find(blockId);
+    auto res = getTestedObj()->getResult();
+    auto it = res->m_successors.find(blockId);
 
-    EXPECT_NE(it, res.m_successors.end());
+    EXPECT_NE(it, res->m_successors.end());
     EXPECT_EQ(it->second.size(), 0);
 
     return *this;

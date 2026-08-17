@@ -39,6 +39,11 @@ class MirBlock
     class SourceReference *getSourceRef() const;
 
     /**
+     * Returns the total number of instructions in this block.
+     */
+    size_t getInstrCount() const;
+
+    /**
      * Sets the owning function of this block.
      */
     void setOwner(class MirFunction *func);
@@ -59,6 +64,16 @@ class MirBlock
      * Returns a pointer to the MUTABLE list of instructions.
      */
     std::pmr::list<class MirInstruction *> *getInstructionsPtr();
+
+    /**
+     * Returns an interator to the beginning of the instruction list.
+     */
+    std::pmr::list<MirInstruction *>::iterator begin();
+
+    /**
+     * Returns an iterator to the end of the instruction list.
+     */
+    std::pmr::list<MirInstruction *>::iterator end();
 
     /**
      * Returns the name of the block, if any.

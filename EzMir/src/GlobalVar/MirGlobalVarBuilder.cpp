@@ -5,7 +5,7 @@
 #include "Operand/MirOperand.h"
 #include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
-#include "Type/MirType.h"
+#include "Type/MirTypeTable.h"
 
 MirGlobalVarBuilder::MirGlobalVarBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_initializer(nullptr)
 {
@@ -20,8 +20,7 @@ MirGlobalVarBuilder &MirGlobalVarBuilder::setConstant(bool constant)
 
 MirGlobalVarBuilder &MirGlobalVarBuilder::setInitializer(MirOperand *initializer)
 {
-    if (!initializer->isOfType<MirInteger>() && !initializer->isOfType<MirFloat>() &&
-        !initializer->isOfType<MirConstantArray>())
+    if (!initializer->isOfType<MirInteger>() && !initializer->isOfType<MirFloat>())
     {
         auto diag = m_ctx->getDiagCollector()->builder(Diag_Error, "MirGlobalVarBuilder");
         diag << initializer->getSourceRef() << "Can't set a non-constant value to a global variable's initializer";

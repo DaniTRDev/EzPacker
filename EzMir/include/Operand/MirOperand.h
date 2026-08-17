@@ -8,26 +8,18 @@ enum class MirOperandType : uint8_t
     Invalid = 0,
     FloatingPoint, // Immediate floating point value.
     Integer,       // Immediate integer.
-    ConstantArray, // An array whose size is known at compile time and that is made of immediates.
     Reference,     // A reference to a block, a function or data.
     Register,      // A physical or virtual register.
     RuntimeSymbol, // A symbol that's defined in the runtime library.
-    FrameIndex,    // Used to reference parameters and objects that are saved in a stack frame. Used internally.
     Memory,        // A memory address of the form: base+displacement.
     MaxOperandType
 };
 
 inline std::unordered_map<MirOperandType, std::string> g_MirOperandType2Str = {
-    { MirOperandType::Invalid, "Invalid" },
-    { MirOperandType::FloatingPoint, "FloatingPoint" },
-    { MirOperandType::Integer, "Integer" },
-    { MirOperandType::ConstantArray, "ConstantArray" },
-    { MirOperandType::Reference, "Reference" },
-    { MirOperandType::Register, "Register" },
-    { MirOperandType::RuntimeSymbol, "RuntimeSymbol" },
-    { MirOperandType::FrameIndex, "FrameIndex" },
-    { MirOperandType::Memory, "Memory" },
-    { MirOperandType::MaxOperandType, "MaxOperandType" }
+    { MirOperandType::Invalid, "Invalid" },   { MirOperandType::FloatingPoint, "FloatingPoint" },
+    { MirOperandType::Integer, "Integer" },   { MirOperandType::Reference, "Reference" },
+    { MirOperandType::Register, "Register" }, { MirOperandType::RuntimeSymbol, "RuntimeSymbol" },
+    { MirOperandType::Memory, "Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
 };
 
 class MirOperand

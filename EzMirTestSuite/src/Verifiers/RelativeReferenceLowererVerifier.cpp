@@ -1,4 +1,4 @@
-#include "../../include/Verifiers/RelativeReferenceLowererVerifier.h"
+#include "Verifiers/RelativeReferenceLowererVerifier.h"
 
 RelativeReferenceLowererVerifier &RelativeReferenceLowererVerifier::verifyInstruction(
         MirFunction *func, size_t blockId, size_t instrIndex, std::function<void(MirInstructionVerifier &)> callback)

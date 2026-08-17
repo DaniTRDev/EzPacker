@@ -15,6 +15,8 @@ class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
 
     /**
      * Creates the global variable with the given parameters. Will move m_initData to the resulting object.
+     * This function creates a global variable whose type is a POINTER to the given type, because global variables are
+     * pointers to their declared data type.
      */
     MirGlobalVar *build(MirGlobalVarLinkage linkage,
                         class MirType *type,
@@ -29,7 +31,6 @@ class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
     /**
      * Adds an initializer to this variable. The initializer can only be a constant value: MirInteger, MirFloat or
      * MirConstantArray, in any other cases a diag error will be thrown.
-     * @param initializer
      */
     MirGlobalVarBuilder &setInitializer(class MirOperand *initializer);
 

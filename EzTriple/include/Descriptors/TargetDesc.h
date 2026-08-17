@@ -1,8 +1,8 @@
-#ifndef EZPACKER_TARGETDESC_H
-#define EZPACKER_TARGETDESC_H
+#ifndef EZTRIPLE_TARGET_DESC_H
+#define EZTRIPLE_TARGET_DESC_H
 
 #include "EzTripleCommon.h"
-#include "TargetBinaryDesc.h"
+#include "Operand/MirRegisterReference.h"
 
 /**
  * Interface used to store target-dependent information (CPU-level).
@@ -25,7 +25,7 @@ class TargetDesc
     /**
      * Returns the type layout for this target.
      */
-    virtual IMirTargetTypeLayout *getTypeLayout() = 0;
+    virtual class IMirTargetTypeLayout *getTypeLayout() = 0;
 
     /**
      * Returns the expansion registry used during expand action.
@@ -55,7 +55,7 @@ class TargetDesc
     /**
      * Returns the displacement's type of a memory operand.
      */
-    virtual MirType *getMemOperandDisplacementType() = 0;
+    virtual class MirType *getMemOperandDisplacementType() = 0;
 
     /**
      * Returns the nearest compatible type for the given type. If the type is already legal, it is returned as-is. If no
@@ -69,12 +69,12 @@ class TargetDesc
      * @param type
      * @return
      */
-    virtual MirType *getNearestLegalType(MirType *type) = 0;
+    virtual class MirType *getNearestLegalType(class MirType *type) = 0;
 
     /**
      * Returns a reference to the target's instruction pointer.
      */
-    virtual RegisterRef getInstructionPtrReg() const = 0;
+    virtual MirRegisterRef getInstructionPtrReg() const = 0;
 
     /**
      * Returns the size in bytes of a standard stack slot (e.g., 8 for 64-bit targets, 4 for 32-bit).
@@ -89,17 +89,17 @@ class TargetDesc
     /**
      * Returns a list with the available binary descriptors.
      */
-    virtual std::pmr::vector<TargetBinaryDesc *> getAvailableBinaryDescriptors() = 0;
+    virtual std::pmr::vector<class TargetBinaryDesc *> getAvailableBinaryDescriptors() = 0;
 
     /**
      * Returns a list with the available calling conventions defined for this target.
      */
-    virtual std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() = 0;
+    virtual std::pmr::vector<class CallingConvDesc *> getAvailableCallingConventions() = 0;
 
     /**
      * Returns a list with the available register banks for this target.
      */
-    virtual std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() = 0;
+    virtual std::pmr::vector<class MirRegisterBank *> getAvailableRegisterBanks() = 0;
 };
 
-#endif // EZPACKER_TARGETDESC_H
+#endif // EZTRIPLE_TARGET_DESC_H

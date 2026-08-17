@@ -93,6 +93,10 @@ MirId MirClass::getId() const { return m_id; }
 
 MirType *MirClass::getType() const { return m_type; }
 
+size_t MirClass::getFieldCount() const { return m_fields.size(); }
+
+size_t MirClass::getVTableSize() const { return m_vTable.size(); }
+
 SourceReference *MirClass::getSourceRef() const { return m_sourceRef; }
 
 const std::pmr::string &MirClass::getName() const { return m_name; }

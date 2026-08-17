@@ -107,16 +107,6 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
                 newOp = opBuilder.buildMem(ptrType, classPtr, FlexInt(method->m_offset), ref->getSourceRef());
                 break;
             }
-            case MirReferenceType::ConstantArrayElement:
-            {
-                MirRegister *arrayPtr = m_ctx->getRegisterById(ref->getRefId());
-                MirType *arrayElem = arrayPtr->getMirType()->getPointedType()->getArrayElementType();
-
-                int64_t offset = arrayElem->getTotalSizeInBytes() * ref->getOffset();
-                newOp = opBuilder.buildMem(arrayElem, arrayPtr, FlexInt(offset), ref->getSourceRef());
-                break;
-            }
-
             default:
             {
                 m_ctx->getDiagCollector()->builder(Diag_Trace, "RelativeReferenceLowererPass")

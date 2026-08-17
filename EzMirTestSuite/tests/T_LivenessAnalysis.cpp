@@ -1,8 +1,15 @@
+#include <gtest/gtest.h>
 #include "EzMirTestSuite.h"
+#include "Block/MirBlock.h"
+#include "Block/MirBlockBuilder.h"
+#include "Function/MirFunction.h"
+#include "Instruction/MirInstructionBuilder.h"
+#include "Operand/MirOperandBuilder.h"
+#include "Operand/MirOperands.h"
+#include "Type/MirTypeTable.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
+#include "MirPasses/Passes/LivenessAnalysisPass.h"
 
-/**
- * This test defines certain special operations to make the creation of tests easier.
- */
 class LivenessAnalysisTest : public MirTestSuiteAsGtest
 {
   public:
@@ -11,26 +18,134 @@ class LivenessAnalysisTest : public MirTestSuiteAsGtest
     {
         return MirOperandBuilder(getBuilderCtx()).buildVReg(getTypeTable()->i32(), name.data());
     }
-
-  private:
 };
+
+namespace
+{
+
+// ---------------------------------------------------------
+// GTest Assertion Helpers
+// ---------------------------------------------------------
+
+::testing::AssertionResult CheckSet(const std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> *map,
+                                    size_t blockId,
+                                    size_t regId,
+                                    bool expected,
+                                    const char *setName)
+{
+    if (!map)
+        return ::testing::AssertionFailure() << "Map pointer is null";
+
+    auto it = map->find(blockId);
+    bool contains = (it != map->end() && it->second.contains(MirRegisterRef::vreg(regId)));
+
+    if (contains != expected)
+    {
+        return ::testing::AssertionFailure()
+                << "Block " << blockId << (expected ? " MISSING " : " UNEXPECTEDLY CONTAINS ") << "vreg(" << regId
+                << ") in its " << setName << " set.";
+    }
+    return ::testing::AssertionSuccess();
+}
+
+::testing::AssertionResult HasLocalDef(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_def, blockId, regId, true, "DEF");
+}
+
+::testing::AssertionResult NotLocalDef(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_def, blockId, regId, false, "DEF");
+}
+
+::testing::AssertionResult HasLocalUse(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_use, blockId, regId, true, "USE");
+}
+
+::testing::AssertionResult NotLocalUse(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_use, blockId, regId, false, "USE");
+}
+
+::testing::AssertionResult IsLiveIn(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_liveIn, blockId, regId, true, "LIVE-IN");
+}
+
+::testing::AssertionResult NotLiveIn(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_liveIn, blockId, regId, false, "LIVE-IN");
+}
+
+::testing::AssertionResult IsLiveOut(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_liveOut, blockId, regId, true, "LIVE-OUT");
+}
+
+::testing::AssertionResult NotLiveOut(const LivenessResult *res, size_t blockId, size_t regId)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+    return CheckSet(&res->m_liveOut, blockId, regId, false, "LIVE-OUT");
+}
+
+::testing::AssertionResult
+HasLiveCounts(const LivenessResult *res, size_t blockId, size_t expectedIn, size_t expectedOut)
+{
+    if (!res)
+        return ::testing::AssertionFailure() << "LivenessResult is null";
+
+    size_t actualIn = 0, actualOut = 0;
+
+    auto itIn = res->m_liveIn.find(blockId);
+    if (itIn != res->m_liveIn.end())
+        actualIn = itIn->second.size();
+
+    auto itOut = res->m_liveOut.find(blockId);
+    if (itOut != res->m_liveOut.end())
+        actualOut = itOut->second.size();
+
+    if (actualIn != expectedIn || actualOut != expectedOut)
+    {
+        return ::testing::AssertionFailure() << "Block " << blockId << " counts mismatch.\n"
+                                             << "  Live-In Expected: " << expectedIn << ", Got: " << actualIn << "\n"
+                                             << "  Live-Out Expected: " << expectedOut << ", Got: " << actualOut;
+    }
+    return ::testing::AssertionSuccess();
+}
+
+} // anonymous namespace
+
+// ---------------------------------------------------------
+// Core Analysis Tests
+// ---------------------------------------------------------
 
 TEST_F(LivenessAnalysisTest, TestStraightLineCode)
 {
     MirBuilderContext *ctx = getBuilderCtx();
-    MirBlockBuilder blockBuilder(ctx, getTestFunc());
     MirOperandBuilder opBuilder(ctx);
-
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
     MirInstructionBuilder builder(ctx, getTestInsertionPoint());
 
-    // Setup 3 variables
     MirRegister *v0 = createInt32Reg("v0");
     MirRegister *v1 = createInt32Reg("v1");
-    MirRegister *v2 = createInt32Reg("v2");
     MirInteger *imm10 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(10));
 
-    // Sequence:
     // 1. MOV %v0, 10      -> DEF: %v0
     // 2. MOV %v1, %v0     -> USE: %v0, DEF: %v1
     // 3. RET %v1          -> USE: %v1
@@ -38,26 +153,25 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     builder.MOV(v1, v0);
     builder.RET(v1);
 
-    // Run Analysis. This pass is added and then run because it is an ANALYSIS pass.
-    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
     getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
 
-    LivenessAnalysisPass *pass = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx);
-    LivenessAnalysisVerifier verifier(pass);
+    ASSERT_NE(res, nullptr);
 
-    verifier.executed().succeeded();
-
-    size_t blockId = entryPoint->getId();
+    size_t bId = entryPoint->getId();
 
     // Local Verification
-    verifier.localDef(blockId, v0->getRegId()).localDef(blockId, v1->getRegId());
+    EXPECT_TRUE(HasLocalDef(res, bId, v0->getRegId()));
+    EXPECT_TRUE(HasLocalDef(res, bId, v1->getRegId()));
 
-    // Because %v0 is defined *before* it is used in line 2, it should NOT be in the block-local USE set.
-    // The only things in the local USE set are things read *before* a local definition.
-    verifier.notLocalUse(blockId, v0->getRegId()).notLocalUse(blockId, v1->getRegId());
+    // %v0 and %v1 are read AFTER being defined in the SAME block.
+    // Therefore, they do NOT flow in from outside, so they are NOT in the local USE set.
+    EXPECT_TRUE(NotLocalUse(res, bId, v0->getRegId()));
+    EXPECT_TRUE(NotLocalUse(res, bId, v1->getRegId()));
 
-    // Global Verification (Empty boundary conditions for basic block terminal functions)
-    verifier.liveInCount(blockId, 0).liveOutCount(blockId, 0);
+    // Global Verification
+    EXPECT_TRUE(HasLiveCounts(res, bId, 0, 0));
 }
 
 TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
@@ -66,105 +180,206 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
     MirBlockBuilder blockBuilder(ctx, getTestFunc());
     MirOperandBuilder opBuilder(ctx);
 
-    MirBlock *entryPoint = getTestFunc()->getEntryPoint();
+    MirBlock *entryBlock = getTestFunc()->getEntryPoint();
     MirBlock *thenBlock = blockBuilder.build(nullptr, "then");
     MirBlock *elseBlock = blockBuilder.build(nullptr, "else");
     MirBlock *mergeBlock = blockBuilder.build(nullptr, "merge");
-
-    // Enforce layout sequence for CFG fallthrough compatibility
-    auto &blocks = getTestFunc()->getBlocks();
-    blocks.clear();
-    blocks.push_back(entryPoint);
-    blocks.push_back(thenBlock);
-    blocks.push_back(elseBlock);
-    blocks.push_back(mergeBlock);
 
     MirRegister *v0 = createInt32Reg("v0");
     MirRegister *vCond = createInt32Reg("vCond");
     MirInteger *imm5 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(5));
 
-    // Entry Block: Define %v0, define condition, branch
+    // Entry Block: Define %v0, branch
     MirInstructionBuilder entryBuilder(ctx, getTestInsertionPoint());
     entryBuilder.MOV(v0, imm5);
     entryBuilder.CMP(vCond, imm5);
     entryBuilder.JE(opBuilder.buildRef(thenBlock));
-    // Fallthrough to elseBlock automatically
+    entryBuilder.JMP(opBuilder.buildRef(elseBlock));
 
     // Then Block: Reads %v0
-    MirInstructionInsertionPoint thenIP{ .m_type = InsertionType::InsertAfter,
-                                         .m_block = thenBlock,
-                                         .m_iterator = thenBlock->getInstructions().begin() };
-    MirInstructionBuilder thenBuilder(ctx, thenIP);
+    MirInstructionBuilder thenBuilder(ctx, thenBlock, InsertionType::InsertAfter, thenBlock->begin());
     thenBuilder.MOV(createInt32Reg("unused1"), v0);
     thenBuilder.JMP(opBuilder.buildRef(mergeBlock));
 
-    // Else Block: Overwrites or ignores %v0 completely (Does NOT use it)
-    MirInstructionInsertionPoint elseIP{ .m_type = InsertionType::InsertAfter,
-                                         .m_block = elseBlock,
-                                         .m_iterator = elseBlock->getInstructions().begin() };
-    MirInstructionBuilder elseBuilder(ctx, elseIP);
+    // Else Block: Ignores %v0
+    MirInstructionBuilder elseBuilder(ctx, elseBlock, InsertionType::InsertAfter, elseBlock->begin());
     elseBuilder.MOV(createInt32Reg("unused2"), imm5);
     elseBuilder.JMP(opBuilder.buildRef(mergeBlock));
 
     // Merge Block: Clean exit
-    MirInstructionInsertionPoint mergeIP{ .m_type = InsertionType::InsertAfter,
-                                          .m_block = mergeBlock,
-                                          .m_iterator = mergeBlock->getInstructions().begin() };
-    MirInstructionBuilder mergeBuilder(ctx, mergeIP);
+    MirInstructionBuilder mergeBuilder(ctx, mergeBlock, InsertionType::InsertAfter, mergeBlock->begin());
     mergeBuilder.RET(imm5);
 
-    // Run Dataflow Pipelines
-    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
     getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
 
-    LivenessAnalysisPass *pass = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx);
-    LivenessAnalysisVerifier verifier(pass);
+    ASSERT_NE(res, nullptr);
 
-    verifier.executed().succeeded();
+    // %v0 MUST be live out of entry (needed by 'then')
+    EXPECT_TRUE(IsLiveOut(res, entryBlock->getId(), v0->getRegId()));
 
-    // Global Verifications:
-    // %v0 MUST be live out of entryPoint
-    verifier.liveOut(entryPoint->getId(), v0->getRegId());
+    // %v0 MUST be live into 'then'
+    EXPECT_TRUE(IsLiveIn(res, thenBlock->getId(), v0->getRegId()));
 
-    // %v0 MUST be live into the thenBlock (since it reads it)
-    verifier.liveIn(thenBlock->getId(), v0->getRegId());
-
-    // %v0 should NOT be live into elseBlock (since it doesn't read it, nor do its successors)
-    verifier.notLiveIn(elseBlock->getId(), v0->getRegId());
+    // %v0 MUST NOT be live into 'else' (not read there or in merge)
+    EXPECT_TRUE(NotLiveIn(res, elseBlock->getId(), v0->getRegId()));
 }
 
 TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
 {
     MirBuilderContext *ctx = getBuilderCtx();
     MirOperandBuilder opBuilder(ctx);
-
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
     MirInstructionBuilder builder(ctx, getTestInsertionPoint());
 
     MirRegister *v0 = createInt32Reg("v0");
     MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
 
-    // Sequence:
-    // 1. ADD %v0, 1 -> Because ADD destination is ReadWrite, this reads %v0 BEFORE rewriting it.
-    //                  Therefore, %v0 is a local USE, and its value must flow from outside this block.
+    // ADD destination is ReadWrite. It reads %v0 BEFORE rewriting it.
     builder.ADD(v0, imm1);
 
-    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
     getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
 
-    LivenessAnalysisPass *pass = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx);
-    LivenessAnalysisVerifier verifier(pass);
+    ASSERT_NE(res, nullptr);
 
-    verifier.executed().succeeded();
+    size_t bId = entryPoint->getId();
 
-    size_t blockId = entryPoint->getId();
+    // %v0 is both locally defined and locally used (read-modify-write)
+    EXPECT_TRUE(HasLocalDef(res, bId, v0->getRegId()));
+    EXPECT_TRUE(HasLocalUse(res, bId, v0->getRegId()));
 
-    // Local Verification
-    // %v0 must be both defined AND used locally by this single basic block
-    verifier.localDef(blockId, v0->getRegId());
-    verifier.localUse(blockId, v0->getRegId());
+    // Because it was used before a pure overwrite, it flows in from outside
+    EXPECT_TRUE(IsLiveIn(res, bId, v0->getRegId()));
+}
 
-    // Global Verification:
-    // Because it was used before a pure overwrite, it is expected to be a LIVE-IN to this block!
-    verifier.liveIn(blockId, v0->getRegId());
+// ---------------------------------------------------------
+// Bulletproof Edge Cases
+// ---------------------------------------------------------
+
+TEST_F(LivenessAnalysisTest, TestLoopLiveness)
+{
+    // Tests that liveness iteratively propagates UP a back-edge.
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirBlockBuilder blockBuilder(ctx, getTestFunc());
+    MirOperandBuilder opBuilder(ctx);
+
+    MirBlock *entryBlock = getTestFunc()->getEntryPoint();
+    MirBlock *headerBlock = blockBuilder.build(nullptr, "header");
+    MirBlock *bodyBlock = blockBuilder.build(nullptr, "body");
+    MirBlock *exitBlock = blockBuilder.build(nullptr, "exit");
+
+    MirRegister *v0 = createInt32Reg("v0");
+    MirRegister *v1 = createInt32Reg("v1");
+    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
+
+    // Entry: %v0 = 1
+    MirInstructionBuilder entryBuilder(ctx, entryBlock, InsertionType::InsertAfter, entryBlock->begin());
+    entryBuilder.MOV(v0, imm1);
+    entryBuilder.JMP(opBuilder.buildRef(headerBlock));
+
+    // Header: %v1 = %v0 + 1. If cond, jump Exit.
+    MirInstructionBuilder headerBuilder(ctx, headerBlock, InsertionType::InsertAfter, headerBlock->begin());
+    headerBuilder.MOV(v1, v0);
+    headerBuilder.ADD(v1, imm1);
+    headerBuilder.JE(opBuilder.buildRef(exitBlock));
+    headerBuilder.JMP(opBuilder.buildRef(bodyBlock));
+
+    // Body: %v0 = %v1. Jump Header (back-edge)
+    MirInstructionBuilder bodyBuilder(ctx, bodyBlock, InsertionType::InsertAfter, bodyBlock->begin());
+    bodyBuilder.MOV(v0, v1);
+    bodyBuilder.JMP(opBuilder.buildRef(headerBlock));
+
+    // Exit: RET %v1
+    MirInstructionBuilder exitBuilder(ctx, exitBlock, InsertionType::InsertAfter, exitBlock->begin());
+    exitBuilder.RET(v1);
+
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    ASSERT_NE(res, nullptr);
+
+    // %v0 must survive from Entry into the loop
+    EXPECT_TRUE(IsLiveOut(res, entryBlock->getId(), v0->getRegId()));
+    EXPECT_TRUE(IsLiveIn(res, headerBlock->getId(), v0->getRegId()));
+
+    // %v1 is defined in Header, flows into Exit AND into Body
+    EXPECT_TRUE(IsLiveOut(res, headerBlock->getId(), v1->getRegId()));
+    EXPECT_TRUE(IsLiveIn(res, bodyBlock->getId(), v1->getRegId()));
+    EXPECT_TRUE(IsLiveIn(res, exitBlock->getId(), v1->getRegId()));
+
+    // %v0 is redefined in Body, and must flow up the back-edge to Header
+    EXPECT_TRUE(IsLiveOut(res, bodyBlock->getId(), v0->getRegId()));
+}
+
+TEST_F(LivenessAnalysisTest, TestVariableRedefinitionKillsLiveness)
+{
+    // Tests that redefining a variable prevents its liveness from propagating further up.
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirBlockBuilder blockBuilder(ctx, getTestFunc());
+    MirOperandBuilder opBuilder(ctx);
+
+    MirBlock *b1 = getTestFunc()->getEntryPoint();
+    MirBlock *b2 = blockBuilder.build(nullptr, "b2");
+
+    MirRegister *v0 = createInt32Reg("v0");
+    MirRegister *v1 = createInt32Reg("v1");
+    MirInteger *imm0 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(0));
+
+    // B1: %v0 = 0
+    MirInstructionBuilder b1Builder(ctx, b1, InsertionType::InsertAfter, b1->begin());
+    b1Builder.MOV(v0, imm0);
+    b1Builder.JMP(opBuilder.buildRef(b2));
+
+    // B2: Read %v0, then KILL %v0, then Read %v0 again
+    MirInstructionBuilder b2Builder(ctx, b2, InsertionType::InsertAfter, b2->begin());
+    b2Builder.MOV(v1, v0);   // First read: uses B1's %v0
+    b2Builder.MOV(v0, imm0); // Redefinition: KILLS the old %v0
+    b2Builder.RET(v0);       // Second read: uses B2's internal %v0
+
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    ASSERT_NE(res, nullptr);
+
+    // B2 uses %v0 BEFORE redefining it, so it is a local USE.
+    EXPECT_TRUE(HasLocalUse(res, b2->getId(), v0->getRegId()));
+
+    // B1 must push %v0 to B2
+    EXPECT_TRUE(IsLiveOut(res, b1->getId(), v0->getRegId()));
+    EXPECT_TRUE(IsLiveIn(res, b2->getId(), v0->getRegId()));
+}
+
+TEST_F(LivenessAnalysisTest, TestDeadCodeDefinitions)
+{
+    // Tests that a variable defined but never used doesn't falsely become live.
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirOperandBuilder opBuilder(ctx);
+    MirBlock *entryBlock = getTestFunc()->getEntryPoint();
+
+    MirRegister *vAlive = createInt32Reg("vAlive");
+    MirRegister *vDead = createInt32Reg("vDead");
+    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
+
+    MirInstructionBuilder builder(ctx, getTestInsertionPoint());
+    builder.MOV(vAlive, imm1);
+    builder.MOV(vDead, imm1);
+    builder.RET(vAlive);
+
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    ASSERT_NE(res, nullptr);
+
+    // vDead is defined locally
+    EXPECT_TRUE(HasLocalDef(res, entryBlock->getId(), vDead->getRegId()));
+
+    // But it is NEVER live-in or live-out
+    EXPECT_TRUE(NotLiveIn(res, entryBlock->getId(), vDead->getRegId()));
+    EXPECT_TRUE(NotLiveOut(res, entryBlock->getId(), vDead->getRegId()));
 }

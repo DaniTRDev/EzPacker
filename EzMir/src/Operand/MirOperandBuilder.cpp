@@ -16,26 +16,6 @@ MirOperandBuilder::MirOperandBuilder(MirBuilderContext *ctx) :
 {
 }
 
-MirConstantArray *
-MirOperandBuilder::buildConstantArray(MirType *elemType, const std::vector<MirOperand *> &elems, SourceReference *ref)
-{
-    MirType *arrType = m_ctx->getTypeTable()->getArray(elemType, elems.size());
-    for (auto &elem : elems)
-    {
-        if (elem->getMirType()->getId() != elemType->getId())
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref << "Can't build constant array because 1 elem does not match expected type";
-            return nullptr;
-        }
-    }
-
-    std::pmr::vector<MirOperand *> ops(m_ctx->getGlobalAllocator());
-    ops.insert(ops.begin(), elems.begin(), elems.end());
-
-    return build<MirConstantArray>(arrType, std::move(ops), ref);
-}
-
 MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref)
 {
     FlexFloat val = value;
@@ -124,19 +104,40 @@ MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, Sou
 
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref)
 {
+    MirType *baseType = base->getMirType();
+    if (baseType->getKind() != MirTypeKind::Pointer)
+    {
+        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                << ref << "Can't create a memory operand if the base register doesn't have pointer type "
+                << type->getName();
+        return nullptr;
+    }
+
     return build<MirMemory>(type, base, displ, ref);
 }
 
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const FlexInt &displ, SourceReference *ref)
 {
-    auto &t = m_ctx->getTypeTable();
+    MirType *baseType = base->getMirType();
+    if (baseType->getKind() != MirTypeKind::Pointer)
+    {
+        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                << ref << "Can't create a memory operand if the base register doesn't have pointer type "
+                << type->getName();
+        return nullptr;
+    }
+
+    MirTypeTable *t = m_ctx->getTypeTable();
     return build<MirMemory>(type, base, build<MirInteger>(t->i64(), displ, nullptr), ref);
 }
 
 MirRegister *
 MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReference *ref, MirRegisterClass *_class)
 {
-    return build<MirRegister>(type, true, m_ctx->createId(), ref, _class, name);
+    MirRegister *reg = build<MirRegister>(type, true, m_ctx->createId(), ref, _class, name);
+    m_ctx->appendRegister(reg);
+
+    return reg;
 }
 
 MirRegister *MirOperandBuilder::buildPhysReg(
@@ -145,22 +146,9 @@ MirRegister *MirOperandBuilder::buildPhysReg(
     return build<MirRegister>(type, false, physId, ref, _class, name);
 }
 
-MirReference *MirOperandBuilder::buildArrayElemRef(MirGlobalVar *var, size_t elementIndex, SourceReference *ref)
-{
-    MirType *elementType = var->getType()->getArrayElementType();
-    if (!elementType)
-    {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                << ref << "Can't create a reference to a global array element because given variable is not an array";
-        return nullptr;
-    }
-
-    return build<MirReference>(elementType, MirReferenceType::GlobalArrayElem, var->getId(), elementIndex, ref);
-}
-
 MirReference *MirOperandBuilder::buildRef(MirBlock *block, SourceReference *ref)
 {
-    auto &t = m_ctx->getTypeTable();
+    MirTypeTable *t = m_ctx->getTypeTable();
     MirType *ptr = t->getPtr(t->getVoidType());
 
     return build<MirReference>(ptr, MirReferenceType::Block, block->getId(), 0, ref);
@@ -168,7 +156,7 @@ MirReference *MirOperandBuilder::buildRef(MirBlock *block, SourceReference *ref)
 
 MirReference *MirOperandBuilder::buildRef(MirFunction *func, SourceReference *ref)
 {
-    auto &t = m_ctx->getTypeTable();
+    MirTypeTable *t = m_ctx->getTypeTable();
     MirType *ptr = t->getPtr(func->getType());
 
     return build<MirReference>(ptr, MirReferenceType::Function, func->getId(), 0, ref);
@@ -176,7 +164,7 @@ MirReference *MirOperandBuilder::buildRef(MirFunction *func, SourceReference *re
 
 MirReference *MirOperandBuilder::buildRef(MirGlobalVar *var, size_t offset, SourceReference *ref)
 {
-    auto &t = m_ctx->getTypeTable();
+    MirTypeTable *t = m_ctx->getTypeTable();
     MirType *ptr = t->getPtr(var->getType());
 
     return build<MirReference>(ptr, MirReferenceType::GlobalVar, var->getId(), offset, ref);
@@ -184,7 +172,7 @@ MirReference *MirOperandBuilder::buildRef(MirGlobalVar *var, size_t offset, Sour
 
 MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassField *field, SourceReference *ref)
 {
-    auto &t = m_ctx->getTypeTable();
+    MirTypeTable *t = m_ctx->getTypeTable();
     MirType *fieldPtrType = t->getPtr(field->m_type);
 
     return build<MirReference>(fieldPtrType, MirReferenceType::ClassField, classPtr->getRegId(), field->m_id, ref);
@@ -192,7 +180,7 @@ MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassField *
 
 MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassMethod *method, SourceReference *ref)
 {
-    auto &t = m_ctx->getTypeTable();
+    MirTypeTable *t = m_ctx->getTypeTable();
     MirType *fieldPtrType = t->getPtr(method->m_func->getReturnType());
 
     return build<MirReference>(fieldPtrType, MirReferenceType::ClassMethod, classPtr->getRegId(), method->m_id, ref);
@@ -200,7 +188,7 @@ MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassMethod 
 
 MirReference *MirOperandBuilder::buildRef(StackFrameObject *obj, SourceReference *ref)
 {
-    auto &t = m_ctx->getTypeTable();
+    MirTypeTable *t = m_ctx->getTypeTable();
     MirType *fieldPtrType = t->getPtr(obj->m_type);
 
     return build<MirReference>(fieldPtrType, MirReferenceType::StackFrameObject, obj->m_id, 0, ref);
@@ -208,7 +196,7 @@ MirReference *MirOperandBuilder::buildRef(StackFrameObject *obj, SourceReference
 
 MirRuntimeSymbol *MirOperandBuilder::buildRtSymbol(std::pmr::string symbolName, SourceReference *ref)
 {
-    const auto &t = m_ctx->getTypeTable();
+    MirTypeTable *t = m_ctx->getTypeTable();
     MirType *ptr = t->getPtr(t->getVoidType());
 
     return build<MirRuntimeSymbol>(ptr, std::move(symbolName), ref);

@@ -1,65 +1,94 @@
-#include <gtest/gtest.h>
-#include "../include/EzMirTestSuite.h"
+#include "EzMirTestSuite.h"
+#include "Block/MirBlock.h"
+#include "Class/MirClass.h"
+#include "Class/MirClassBuilder.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionBuilder.h"
+#include "Instruction/MirInstruction.h"
+#include "Instruction/MirInstructionBuilder.h"
+#include "Operand/MirOperandBuilder.h"
+#include "Operand/MirOperands.h"
+#include "Type/MirTypeTable.h"
+#include "MirPasses/Passes/RelativeReferenceLowererPass.h"
 
 class TestRelativeReferenceLowerer : public MirTestSuiteAsGtest
 {
   public:
+  protected:
 };
 
-TEST_F(TestRelativeReferenceLowerer, TestConstantArrayElementLowering)
+namespace
 {
-    MirBuilderContext *ctx = getBuilderCtx();
-    MirTypeTable *typeTable = getTypeTable();
-    MirOperandBuilder operandBuilder(ctx);
 
-    // 1. Fetch the default managed test function entry block point from the base suite
-    MirBlock *entryPoint = getTestFunc()->getEntryPoint();
-    size_t entryPointId = entryPoint->getId();
+::testing::AssertionResult PassSucceededAndModified(MirPass *pass)
+{
+    if (!pass)
+        return ::testing::AssertionFailure() << "Pass is nullptr";
+    if (!pass->getResult())
+        return ::testing::AssertionFailure() << "Pass result is nullptr";
 
-    // 2. Set up structural types (e.g., an array holding 32-bit integers)
-    MirType *i32Type = typeTable->i32();
-    MirType *arrayShapeType = typeTable->getArray(i32Type, 8);
-    MirType *ptrToArray = typeTable->getPtr(arrayShapeType);
+    if (!pass->getResult()->m_executed)
+        return ::testing::AssertionFailure() << "Pass was not marked as executed";
+    if (!pass->getResult()->m_succeeded)
+        return ::testing::AssertionFailure() << "Pass failed during execution";
+    if (!pass->getResult()->m_modifiedMir)
+        return ::testing::AssertionFailure() << "Pass did not modify the MIR as expected";
 
-    // Simulated virtual base register point
-    MirRegister *arrayBaseVReg = operandBuilder.buildVReg(ptrToArray, "local_arr_ptr");
-
-    // Create a high-level symbolic array reference targeting element slot index 3
-    MirOperand *symbolicArrayRef = operandBuilder.build<MirReference>(i32Type,
-                                                                      MirReferenceType::ConstantArrayElement,
-                                                                      arrayBaseVReg->getRegId(),
-                                                                      3,
-                                                                      nullptr);
-
-    // Build instruction payload attached to the managed block flow
-    MirInstructionInsertionPoint ip{ .m_type = InsertionType::InsertAfter, .m_block = entryPoint };
-    MirInstructionBuilder instrBuilder(ctx, ip);
-
-    MirRegister *destReg = operandBuilder.buildVReg(i32Type, "loaded_val");
-    instrBuilder.LOAD(destReg, symbolicArrayRef);
-
-    // 3. Execute the pass using the test suite's native runPass framework
-    RelativeReferenceLowererPass *pass = runPass<RelativeReferenceLowererPass>(ctx);
-    RelativeReferenceLowererVerifier verifier(pass, ctx);
-
-    // 4. Fluent verifier assertions check lower transformations perfectly
-    verifier.executed().succeeded().mirModified().verifyInstruction(
-            getTestFunc(),
-            entryPointId,
-            0,
-            [&](MirInstructionVerifier &instr)
-            {
-                instr.opcode(MirInstructionOpCode::LOAD).operandCount(2);
-
-                // Offset Verification: Element Index 3 * sizeof(i32)[4 bytes] = 12 bytes byte offset
-                // Verify that the High-Level reference operand was correctly changed into a flat Memory operand
-                instr.operandVerifier(1)
-                        .type(MirOperandType::Memory)
-                        .verifyMemory(i32Type,
-                                      arrayBaseVReg,
-                                      operandBuilder.buildInt(typeTable->i64(), FlexInt(int64_t(12))));
-            });
+    return ::testing::AssertionSuccess();
 }
+
+::testing::AssertionResult
+IsInstruction(MirInstruction *instr, MirInstructionOpCode expectedOpcode, size_t expectedOperandCount)
+{
+    if (!instr)
+        return ::testing::AssertionFailure() << "Instruction is nullptr";
+
+    if (instr->getOpCode() != expectedOpcode)
+        return ::testing::AssertionFailure() << "Expected opcode " << static_cast<int>(expectedOpcode) << ", got "
+                                             << static_cast<int>(instr->getOpCode());
+
+    if (instr->getOperands().size() != expectedOperandCount)
+        return ::testing::AssertionFailure()
+                << "Expected " << expectedOperandCount << " operands, got " << instr->getOperands().size();
+
+    return ::testing::AssertionSuccess();
+}
+
+::testing::AssertionResult
+IsMemoryOperand(MirOperand *op, MirType *expectedType, MirRegister *expectedBase, int64_t expectedDispl)
+{
+    if (!op)
+        return ::testing::AssertionFailure() << "Operand is nullptr";
+
+    if (op->getType() != MirOperandType::Memory)
+        return ::testing::AssertionFailure() << "Expected Memory operand, got type " << static_cast<int>(op->getType());
+
+    if (op->getMirType() != expectedType)
+        return ::testing::AssertionFailure()
+                << "Expected operand MIR type " << expectedType << ", got " << op->getMirType();
+
+    MirMemory *mem = static_cast<MirMemory *>(op);
+
+    if (mem->getBase() != expectedBase)
+        return ::testing::AssertionFailure() << "Base register mismatch";
+
+    MirInteger *displ = mem->getDisplacement();
+    if (!displ)
+    {
+        if (expectedDispl != 0)
+            return ::testing::AssertionFailure() << "Expected displacement " << expectedDispl << ", got none";
+    }
+    else
+    {
+        if (displ->getValue().getI64() != expectedDispl)
+            return ::testing::AssertionFailure()
+                    << "Displacement mismatch: " << displ->getValue().getI64() << " != " << expectedDispl;
+    }
+
+    return ::testing::AssertionSuccess();
+}
+
+} // anonymous namespace
 
 TEST_F(TestRelativeReferenceLowerer, TestClassFieldReferenceLowering)
 {
@@ -74,37 +103,41 @@ TEST_F(TestRelativeReferenceLowerer, TestClassFieldReferenceLowering)
     MirClass *playerClass = cBuilder.build(nullptr, "Player");
     MirType *ptrToPlayer = types->getPtr(playerClass->getType());
 
-    // Manually update offsets. This is done by ClassOffsetMapperPass, but we are unit-testing other pass.
-    // Offset logic: Field m_id (4 bytes) -> m_score offset = 8 (due to f64 alignment)
-    playerClass->getFieldByName("m_id")->m_offset = 8;
+    // Manually update offsets (simulating ClassOffsetMapperPass logic)
+    // Field m_id (4 bytes) -> m_score offset = 8 (due to f64 alignment)
+    playerClass->getFieldByName("m_id")->m_offset = 0;
     playerClass->getFieldByName("m_score")->m_offset = 8;
+    int64_t expectedOffset = 8;
 
     // 2. Setup instruction: Load f64 score = player_ptr->m_score
     MirBlock *entry = getTestFunc()->getEntryPoint();
-    MirInstructionBuilder ib(ctx, { InsertionType::InsertAfter, entry });
+    MirInstructionBuilder ib(ctx, { InsertionType::InsertAfter, entry, entry->begin() });
 
     MirRegister *ptrReg = opBuilder.buildVReg(ptrToPlayer, "player_ptr");
-    MirOperand *fieldRef = opBuilder.buildRef(ptrReg, playerClass->getFieldByName("m_score"));
+    MirReference *fieldRef = opBuilder.buildRef(ptrReg, playerClass->getFieldByName("m_score"));
     MirRegister *destReg = opBuilder.buildVReg(types->f64(), "loaded_score");
 
+    ib.ALLOC(ptrReg);
     ib.LOAD(destReg, fieldRef);
 
     // 3. Run Lowerer
     RelativeReferenceLowererPass *pass = runPass<RelativeReferenceLowererPass>(ctx);
 
     // 4. Verify memory lowering
-    RelativeReferenceLowererVerifier(pass, ctx).executed().succeeded().mirModified().verifyInstruction(
-            getTestFunc(),
-            entry->getId(),
-            0,
-            [&](MirInstructionVerifier &instr)
-            {
-                // Offset logic: Field m_id (4 bytes) -> m_score offset = 8 (due to f64 alignment)
-                int64_t expectedOffset = playerClass->getFieldByName("m_score")->m_offset;
-                instr.operandVerifier(1)
-                        .type(MirOperandType::Memory)
-                        .verifyMemory(types->f64(), ptrReg, opBuilder.buildInt(types->i64(), FlexInt(expectedOffset)));
-            });
+    EXPECT_TRUE(PassSucceededAndModified(pass));
+
+    ASSERT_GT(entry->getInstrCount(), 0);
+    auto it = entry->begin();
+
+    // ALLOC is the first instruction
+    ASSERT_TRUE(IsInstruction(*it, MirInstructionOpCode::ALLOC, 1));
+    ++it;
+
+    // LOAD takes 2 operands
+    ASSERT_TRUE(IsInstruction(*it, MirInstructionOpCode::LOAD, 2));
+
+    // The reference operand is index 1. Verify it became a memory address at offset 8.
+    EXPECT_TRUE(IsMemoryOperand((*it)->getOperands()[1], types->f64(), ptrReg, expectedOffset));
 }
 
 TEST_F(TestRelativeReferenceLowerer, TestClassMethodReferenceLowering)
@@ -121,33 +154,96 @@ TEST_F(TestRelativeReferenceLowerer, TestClassMethodReferenceLowering)
     MirClass *vClass = cBuilder.build(nullptr, "VClass");
     MirType *ptrToV = types->getPtr(vClass->getType());
 
-    // Manually update offsets. This is done by ClassOffsetMapperPass, but we are unit-testing other pass.
+    // Manually set offset (simulating ClassOffsetMapperPass)
     vClass->getMethodBySignature(types->getVoidType(), {}, "doAction")->m_offset = 0;
+    int64_t expectedVTableOffset = 0;
 
     // 2. Setup instruction: Call [ptr + VTableOffset]
     MirBlock *entry = getTestFunc()->getEntryPoint();
-    MirInstructionBuilder ib(ctx, { InsertionType::InsertAfter, entry });
+    MirInstructionBuilder ib(ctx, { InsertionType::InsertAfter, entry, entry->begin() });
 
     MirRegister *ptrReg = opBuilder.buildVReg(ptrToV, "vclass_ptr");
-    MirOperand *methodRef =
+    MirReference *methodRef =
             opBuilder.buildRef(ptrReg, vClass->getMethodBySignature(types->getVoidType(), {}, "doAction"));
 
-    ib.CALL(methodRef);
+    // As per instruction constraints: CALL requires a Destination Register (Write) and a Target (Read).
+    // Even if returning void, a dummy register captures the structural constraint.
+    MirRegister *destReg = opBuilder.buildVReg(types->i32(), "call_result");
+
+    ib.ALLOC(ptrReg);
+    ib.CALL(destReg, methodRef);
 
     // 3. Run Lowerer
     RelativeReferenceLowererPass *pass = runPass<RelativeReferenceLowererPass>(ctx);
 
     // 4. Verify lowering to function pointer memory access
+    EXPECT_TRUE(PassSucceededAndModified(pass));
+
+    ASSERT_GT(entry->getInstrCount(), 0);
+    auto it = entry->begin();
     MirType *ptrToFunc = types->getPtr(method->getType());
-    RelativeReferenceLowererVerifier(pass, ctx).executed().succeeded().mirModified().verifyInstruction(
-            getTestFunc(),
-            entry->getId(),
-            0,
-            [&](MirInstructionVerifier &instr)
-            {
-                int64_t vTableOffset = vClass->getMethodBySignature(types->getVoidType(), {}, "doAction")->m_offset;
-                instr.operandVerifier(0)
-                        .type(MirOperandType::Memory)
-                        .verifyMemory(ptrToFunc, ptrReg, opBuilder.buildInt(types->i64(), FlexInt(vTableOffset)));
-            });
+
+    // ALLOC is the first instruction
+    ASSERT_TRUE(IsInstruction(*it, MirInstructionOpCode::ALLOC, 1));
+    ++it;
+
+    // CALL takes 2 operands: Destination(Write), Target(Read)
+    ASSERT_TRUE(IsInstruction(*it, MirInstructionOpCode::CALL, 2));
+
+    // The target address is at index 1.
+    EXPECT_TRUE(IsMemoryOperand((*it)->getOperands()[1], ptrToFunc, ptrReg, expectedVTableOffset));
+}
+
+TEST_F(TestRelativeReferenceLowerer, TestClassMethodReferenceLoweringOffset16)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirTypeTable *types = getTypeTable();
+    MirOperandBuilder opBuilder(ctx);
+    MirFunctionBuilder fBuilder(ctx);
+
+    // 1. Construct class with virtual method
+    MirFunction *method = fBuilder.build(types->getVoidType(), "doActionSecondary");
+    MirClassBuilder cBuilder(ctx);
+
+    // We append the method. To simulate a deeper vtable index, we manually force the offset to 16.
+    cBuilder.appendMethod(method);
+    MirClass *vClass = cBuilder.build(nullptr, "VClassOffset");
+    MirType *ptrToV = types->getPtr(vClass->getType());
+
+    // Manually set offset to 16 (e.g. simulating a 3rd method in a 64-bit vtable)
+    vClass->getMethodBySignature(types->getVoidType(), {}, "doActionSecondary")->m_offset = 16;
+    int64_t expectedVTableOffset = 16;
+
+    // 2. Setup instruction: Call [ptr + VTableOffset]
+    MirBlock *entry = getTestFunc()->getEntryPoint();
+    MirInstructionBuilder ib(ctx, { InsertionType::InsertAfter, entry, entry->begin() });
+
+    MirRegister *ptrReg = opBuilder.buildVReg(ptrToV, "vclass_ptr");
+    MirReference *methodRef =
+            opBuilder.buildRef(ptrReg, vClass->getMethodBySignature(types->getVoidType(), {}, "doActionSecondary"));
+
+    MirRegister *destReg = opBuilder.buildVReg(types->i32(), "call_result");
+
+    ib.ALLOC(ptrReg);
+    ib.CALL(destReg, methodRef);
+
+    // 3. Run Lowerer
+    RelativeReferenceLowererPass *pass = runPass<RelativeReferenceLowererPass>(ctx);
+
+    // 4. Verify lowering to function pointer memory access at offset 16
+    EXPECT_TRUE(PassSucceededAndModified(pass));
+
+    ASSERT_GT(entry->getInstrCount(), 0);
+    auto it = entry->begin();
+    MirType *ptrToFunc = types->getPtr(method->getType());
+
+    // ALLOC is the first instruction
+    ASSERT_TRUE(IsInstruction(*it, MirInstructionOpCode::ALLOC, 1));
+    ++it;
+
+    // CALL takes 2 operands: Destination(Write), Target(Read)
+    ASSERT_TRUE(IsInstruction(*it, MirInstructionOpCode::CALL, 2));
+
+    // The target address is at index 1. Expecting displacement of 16.
+    EXPECT_TRUE(IsMemoryOperand((*it)->getOperands()[1], ptrToFunc, ptrReg, expectedVTableOffset));
 }

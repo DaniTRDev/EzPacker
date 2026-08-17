@@ -28,6 +28,8 @@ MirId MirBlock::getId() const { return m_id; }
 
 SourceReference *MirBlock::getSourceRef() const { return m_sourceRef; }
 
+size_t MirBlock::getInstrCount() const { return m_instructions.size(); }
+
 void MirBlock::setOwner(MirFunction *func) { m_owner = func; }
 
 std::pmr::list<MirInstruction *> &MirBlock::getInstructions() { return m_instructions; }
@@ -35,5 +37,9 @@ std::pmr::list<MirInstruction *> &MirBlock::getInstructions() { return m_instruc
 const std::pmr::list<MirInstruction *> &MirBlock::getInstructions() const { return m_instructions; }
 
 std::pmr::list<MirInstruction *> *MirBlock::getInstructionsPtr() { return &m_instructions; }
+
+std::pmr::list<MirInstruction *>::iterator MirBlock::begin() { return m_instructions.begin(); }
+
+std::pmr::list<MirInstruction *>::iterator MirBlock::end() { return m_instructions.end(); }
 
 const std::pmr::string &MirBlock::getName() const { return m_name; }

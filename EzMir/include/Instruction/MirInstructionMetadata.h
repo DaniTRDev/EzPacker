@@ -5,14 +5,13 @@
 
 enum class ExpectedOperandType : uint16_t
 {
-    None = 0,
-    Register = 1 << 0,      // MirRegister
-    Integer = 1 << 1,       // MirInteger
-    FloatingPoint = 1 << 2, // MirDouble
-    Memory = 1 << 4,        // MirMemory
-    FrameIndex = 1 << 5,    // MirFrameIndex
-    Reference = 1 << 6,     // MirReference (Blocks, Functions)
-    RuntimeSymbol = 1 << 7, // MirRuntimeSymbol. Used to identify an address that's exported by the RT library.
+    None                = 1 << 0,
+    Register            = 1 << 1, // MirRegister
+    Integer             = 1 << 2, // MirInteger
+    FloatingPoint       = 1 << 3, // MirDouble
+    Memory              = 1 << 4, // MirMemory
+    Reference           = 1 << 5, // MirReference (Blocks, Functions)
+    RuntimeSymbol       = 1 << 6, // MirRuntimeSymbol. Used to identify an address, by its name, that's exported by the RT library.
 
     // --- Composite Helper Masks ---
 
@@ -24,8 +23,8 @@ enum class ExpectedOperandType : uint16_t
     RegFloatImm = Register | FloatingPoint,
     RegImm = RegIntImm | RegFloatImm,
 
-    // Any kind of memory address source (used for LEA)
-    AddressSource = Memory | FrameIndex | Reference,
+    // Any kind of memory address source
+    AddressSource = Memory | Reference,
 
     // Anything that can be read as a value
     AnyValue = Register | Integer | FloatingPoint,
@@ -131,7 +130,7 @@ enum class MirInstructionTier : uint8_t
 };
 
 // --- Metadata Structure ---
-enum MirInstructionOpCode : uint16_t;
+enum class MirInstructionOpCode : uint16_t;
 struct MirInstructionMetadata
 {
     MirInstructionCategory m_category;

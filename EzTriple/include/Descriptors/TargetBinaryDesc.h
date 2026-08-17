@@ -1,17 +1,20 @@
-#ifndef EZPACKER_TARGETBINARYDESC_H
-#define EZPACKER_TARGETBINARYDESC_H
+#ifndef EZTRIPLE_TARGET_BINARY_DESC_H
+#define EZTRIPLE_TARGET_BINARY_DESC_H
 
 #include "EzTripleCommon.h"
 
+// Forward declaration
+enum class SectionType : uint8_t;
+
 enum class TargetCodeModel : uint8_t
 {
-    Small, // Global addresses can be encoded in instruction pointer + small integer immediate.
-    Large  // The entire address must be encoded in the instruction.
+    Small = 0, // Global addresses can be encoded in instruction pointer + small integer immediate.
+    Large      // The entire address must be encoded in the instruction.
 };
 
 enum class TargetObjectFormat : uint8_t
 {
-    ELF,
+    ELF = 0,
     COFF,
     MachO
 };
@@ -48,7 +51,7 @@ class TargetBinaryDesc
     /**
      * Returns the section of the given type, target must define EVERY section and overlap them if needed.
      */
-    virtual CodeSection *getSection(SectionType type) = 0;
+    virtual class CodeSection *getSection(SectionType type) = 0;
 
     /**
      * Returns the code model for this binary description.
@@ -82,9 +85,9 @@ class TargetBinaryDesc
     /**
      * Returns the map of sections.
      */
-    virtual const std::pmr::unordered_map<SectionType, CodeSection *> &getSections() const = 0;
+    virtual const std::pmr::unordered_map<SectionType, class CodeSection *> &getSections() const = 0;
 
   private:
 };
 
-#endif // EZPACKER_TARGETBINARYDESC_H
+#endif // EZTRIPLE_TARGET_BINARY_DESC_H

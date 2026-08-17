@@ -78,18 +78,18 @@ class MirTypeTable
      */
     MirType *getMirTypeById(size_t id) const;
 
-    MirType *getVoidType() const;
-    MirType *i1() const;
-    MirType *i8() const;
-    MirType *i16() const;
-    MirType *i32() const;
-    MirType *i64() const;
-    MirType *i128() const;
-    MirType *i256() const;
+    MirType *getVoidType();
+    MirType *i1();
+    MirType *i8();
+    MirType *i16();
+    MirType *i32();
+    MirType *i64();
+    MirType *i128();
+    MirType *i256();
 
-    MirType *f32() const;
-    MirType *f64() const;
-    MirType *f128() const;
+    MirType *f32();
+    MirType *f64();
+    MirType *f128();
 
     /**
      * Initializes the type table with the basic primitive types needed as well as the type layout class.

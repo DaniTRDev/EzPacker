@@ -1,9 +1,8 @@
-#ifndef EZPACKER_MIRFRAMELOWERERPASS_H
-#define EZPACKER_MIRFRAMELOWERERPASS_H
+#ifndef EZMIR_MIR_FRAME_LOWERER_PASS_H
+#define EZMIR_MIR_FRAME_LOWERER_PASS_H
 
 #include "EzTripleCommon.h"
-#include "MirFrameLowerer.h"
-#include "RegisterAllocator/MirRegisterAllocatorPass.h"
+#include "MirPasses/IMirTransformPass.h"
 
 class MirFrameLowererPass : public IMirTransformPass
 {
@@ -11,7 +10,7 @@ class MirFrameLowererPass : public IMirTransformPass
     /**
      * Creates the pass with the given context and target desc.
      */
-    MirFrameLowererPass(MirBuilderContext *ctx, TargetDesc *targetDesc);
+    MirFrameLowererPass(class MirBuilderContext *ctx, class TargetDesc *targetDesc);
 
     /**
      * Returns "MirFrameLowererPass".
@@ -38,7 +37,7 @@ class MirFrameLowererPass : public IMirTransformPass
     /**
      * Prints each lowered function using MirPrinter.
      */
-    void printResult() const override;
+    void printResult() override;
 
     /**
      * Clears m_lowredFunction list.
@@ -51,9 +50,9 @@ class MirFrameLowererPass : public IMirTransformPass
     std::vector<std::type_index> getDependencies() const override;
 
   private:
-    MirBuilderContext *m_ctx;
-    TargetDesc *m_targetDesc;
-    std::pmr::list<MirFunction *> m_loweredFunctions;
+    class MirBuilderContext *m_ctx;
+    class TargetDesc *m_targetDesc;
+    std::pmr::list<class MirFunction *> m_loweredFunctions;
 };
 
-#endif // EZPACKER_MIRFRAMELOWERERPASS_H
+#endif // EZMIR_MIR_FRAME_LOWERER_PASS_H

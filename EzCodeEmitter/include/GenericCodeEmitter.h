@@ -11,7 +11,7 @@
  * diagnostic collector.
  *
  * If an instruction reaches this step, it's guaranteed that it has the correct types/values. This means that for
- * example using mov(RegisterRef, FlexInt), is a 1:1 translation that doesn't need further checks because the backend
+ * example using mov(MirRegisterRef, FlexInt), is a 1:1 translation that doesn't need further checks because the backend
  * has ensured the value can be moved.
  */
 class GenericCodeEmitter

@@ -35,14 +35,9 @@ add_subdirectory(EzCodeEmitter)
 
 if (EZPACKER_BUILD_TESTS)
     EzCMK_EnableTestsForCurrentProject()
-    EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
-
-    message(STATUS "Configuring EzTestTriple")
-    add_subdirectory(EzTestTriple)
 
     message(STATUS "Configuring EzMirTestSuite")
     add_subdirectory(EzMirTestSuite)
 
-    message(STATUS "Configuring EzTripleTestSuite")
-    add_subdirectory(EzTripleTestSuite)
+    EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
 endif ()

@@ -1,5 +1,5 @@
-#ifndef EZPMIR_MIR_OPERANDS_H
-#define EZPMIR_MIR_OPERANDS_H
+#ifndef EZMIR_MIR_OPERANDS_H
+#define EZMIR_MIR_OPERANDS_H
 
 #include "FlexNumber/FlexFloat.h"
 #include "FlexNumber/FlexInt.h"
@@ -15,16 +15,17 @@ class MirRegisterClass;
 enum class MirReferenceType : uint8_t
 {
     Invalid = 0,
-    Block,
-    GlobalArrayElem,
-    GlobalVar,
-    Function,
-    ClassField,
-    ClassMethod,
-    StackFrameObject,
-    ConstantArrayElement
+    Block,           // A reference to a code block.
+    ClassField,      // A reference to the field of a class.
+    ClassMethod,     // A reference to a method of a class.
+    Function,        // A reference to a function.
+    GlobalVar,       // A reference to a global variable.
+    StackFrameObject // A reference to a stack frame object.
 };
 
+/**
+ * Represents a constant compile-time floating point value. It follows IEEE-764.
+ */
 class MirFloat : public MirOperand
 {
   public:
@@ -42,6 +43,9 @@ class MirFloat : public MirOperand
     FlexFloat m_float;
 };
 
+/**
+ * Represents a constant compile-time integer value.
+ */
 class MirInteger : public MirOperand
 {
   public:
@@ -59,22 +63,10 @@ class MirInteger : public MirOperand
     FlexInt m_int;
 };
 
-class MirConstantArray : public MirOperand
-{
-  public:
-    static constexpr MirOperandType OpKind = MirOperandType::ConstantArray;
-
-    MirConstantArray(MirType *arrayType, std::pmr::vector<MirOperand *> elements, SourceReference *ref);
-
-    const std::pmr::vector<MirOperand *> &getElements() const { return m_elements; }
-    MirOperandType getType() const override { return OpKind; }
-
-    std::string toString() const override;
-
-  private:
-    std::pmr::vector<MirOperand *> m_elements;
-};
-
+/**
+ *This represents a pointer to a symbol. This can be fed to memory operands in STORE/LOAD instructions to dereference
+ *the address.
+ */
 class MirReference : public MirOperand
 {
   public:
@@ -83,17 +75,16 @@ class MirReference : public MirOperand
     MirReference(MirType *type, MirReferenceType refType, size_t refId, size_t offset, SourceReference *ref);
 
     bool isBlock() const { return m_refType == MirReferenceType::Block; }
-    bool isGlobalArrayElem() const { return m_refType == MirReferenceType::GlobalArrayElem; }
     bool isGlobalVar() const { return m_refType == MirReferenceType::GlobalVar; }
     bool isFunction() const { return m_refType == MirReferenceType::Function; }
     bool isClassField() const { return m_refType == MirReferenceType::ClassField; }
     bool isClassMethod() const { return m_refType == MirReferenceType::ClassMethod; }
-    bool isConstantArrayElem() const { return m_refType == MirReferenceType::ConstantArrayElement; }
     bool isStackFrameObject() const { return m_refType == MirReferenceType::StackFrameObject; }
     bool isInvalid() const { return m_refType == MirReferenceType::Invalid; }
 
     MirReferenceType getRefType() const { return m_refType; }
     MirOperandType getType() const override { return OpKind; }
+
     size_t getRefId() const { return m_refId; }
     size_t getOffset() const { return m_offset; }
 
@@ -153,22 +144,6 @@ class MirRegister : public MirOperand
     std::pmr::string m_name;
 };
 
-class MirFrameIndex : public MirOperand
-{
-  public:
-    static constexpr MirOperandType OpKind = MirOperandType::FrameIndex;
-
-    MirFrameIndex(MirType *type, size_t frameId, SourceReference *ref);
-
-    size_t getFrameId() const { return m_frameId; }
-    MirOperandType getType() const override { return OpKind; }
-
-    std::string toString() const override;
-
-  private:
-    size_t m_frameId{ 0 };
-};
-
 class MirMemory : public MirOperand
 {
   public:
@@ -188,4 +163,4 @@ class MirMemory : public MirOperand
     MirInteger *m_displ;
 };
 
-#endif // EZPMIR_MIR_OPERANDS_H
+#endif // EZMIR_MIR_OPERANDS_H

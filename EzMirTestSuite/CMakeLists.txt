@@ -1,23 +1,17 @@
 set(MIRTESTSUITE_FILES_LIST
         "include/EzMirTestSuite.h"
-        "include/Verifiers/ClassOffsetResolverVerifier.h"
-        "include/Verifiers/CodeFlowPassVerifier.h"
-        "include/Verifiers/LivenessPassVerifier.h"
-        "include/Verifiers/MirCoreVerifiers.h"
-        "include/Verifiers/RelativeReferenceLowererVerifier.h"
+        "include/EzMirTestSuiteCallingConv.h"
+        "include/EzMirTestSuiteTypeLayout.h"
 
         "src/EzMirTestSuite.cpp"
-        "src/Verifiers/ClassOffsetResolverVerifier.cpp"
-        "src/Verifiers/CodeFlowPassVerifier.cpp"
-        "src/Verifiers/LivenessPassVerifier.cpp"
-        "src/Verifiers/MirCoreVerifiers.cpp"
-        "src/Verifiers/RelativeReferenceLowererVerifier.cpp"
+        "src/EzMirTestSuiteCallingConv.cpp"
+        "src/EzMirTestSuiteTypeLayout.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzMirTestSuite"
         FILE_LIST ${MIRTESTSUITE_FILES_LIST}
-        PRECOMPILED_HEADER "include/Verifiers/MirCoreVerifiers.h"
-        LINKED_LIBRARIES "EzTestTriple"
+        PRECOMPILED_HEADER ""
+        LINKED_LIBRARIES "EzMir;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include"
 )
 

@@ -25,7 +25,10 @@ INSTRUCTION(MOV,
                                 { ExpectedOperandType::AnyValue, MirOperandFlag::Read }),
             F(None))
 
-INSTRUCTION(LEA,
+/**
+ * Movs an address into a register without dereferencing.
+ */
+INSTRUCTION(MOV_ADDR,
             T(HighLevel),
             MirCat_DataMovement,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },

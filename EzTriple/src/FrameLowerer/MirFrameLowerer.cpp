@@ -1,4 +1,18 @@
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Descriptors/TargetDesc.h"
+#include "Diagnostics/DiagnosticCollector.h"
 #include "FrameLowerer/MirFrameLowerer.h"
+#include "Function/CallingConvDesc.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionStackFrame.h"
+#include "Instruction/MirInstruction.h"
+#include "Operand/MirOperandBuilder.h"
+#include "Operand/MirOperands.h"
+#include "Printer/MirPrinter.h"
+#include "SourceManager/SourceManager.h"
+#include "Type/MirType.h"
+#include "Type/MirTypeTable.h"
 
 void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
 {
@@ -66,7 +80,7 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
     MirType *ptrType = ctx.m_ctx->getTypeTable()->getIntegerTypeBySize(slotSize);
 
     // Determine the base register designated by the ABI (FP if enabled, otherwise SP)
-    RegisterRef baseRegRef = cc->hasFramePointer(func) ? cc->getFramePointerReg() : cc->getStackPointerReg();
+    MirRegisterRef baseRegRef = cc->hasFramePointer(func) ? cc->getFramePointerReg() : cc->getStackPointerReg();
     MirRegister *baseReg = opBuilder.buildPhysReg(ptrType, baseRegRef.getId(), "", baseRegRef.getClass());
 
     for (MirBlock *block : func->getBlocks())

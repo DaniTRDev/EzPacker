@@ -84,23 +84,17 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
         MirInstruction *instr = build(MirInstructionOpCode::NAME, sourceRef, operandList);                             \
                                                                                                                        \
         return instr;                                                                                                  \
-    } // Include the file again to expand the macros
-
-#include "Instruction/MirInstructionSet.h"
-#undef INSTRUCTION
-
-#define INSTRUCTION(NAME, tier, category, ops, flags)                                                                  \
+    }                                                                                                                  \
     template <typename... OperandTypes> MirInstruction *NAME(OperandTypes &&...operands)                               \
     {                                                                                                                  \
         std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
         MirInstruction *instr = build(MirInstructionOpCode::NAME, nullptr, operandList);                               \
                                                                                                                        \
         return instr;                                                                                                  \
-    } // Include the file again to expand the macros
+    }
 
-#include "Instruction/MirInstructionSet.h"
+#include "Instruction/MirInstructionSetDefs.h"
 #undef INSTRUCTION
-
     /**
      * Changes the insertion type of the current insertion point.
      */

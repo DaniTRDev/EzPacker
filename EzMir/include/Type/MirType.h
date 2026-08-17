@@ -3,7 +3,7 @@
 
 #include "EzMirCommon.h"
 
-enum class MirTypeKind
+enum class MirTypeKind : uint8_t
 {
     Invalid = 0,
     Class,

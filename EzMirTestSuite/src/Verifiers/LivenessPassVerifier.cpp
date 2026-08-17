@@ -8,7 +8,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::localDef(size_t blockId, siz
     auto it = res.m_def.find(blockId);
 
     EXPECT_NE(it, res.m_def.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(MirRegisterRef::vreg(regId)));
 
     return *this;
 }
@@ -19,7 +19,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLocalDef(size_t blockId, 
     auto it = res.m_def.find(blockId);
 
     EXPECT_NE(it, res.m_def.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(MirRegisterRef::vreg(regId)));
     return *this;
 }
 
@@ -29,7 +29,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::localUse(size_t blockId, siz
     auto it = res.m_use.find(blockId);
 
     EXPECT_NE(it, res.m_use.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(MirRegisterRef::vreg(regId)));
     return *this;
 }
 
@@ -39,7 +39,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLocalUse(size_t blockId, 
     auto it = res.m_use.find(blockId);
 
     EXPECT_NE(it, res.m_use.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(MirRegisterRef::vreg(regId)));
     return *this;
 }
 
@@ -49,7 +49,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::liveIn(size_t blockId, size_
     auto it = res.m_liveIn.find(blockId);
 
     EXPECT_NE(it, res.m_liveIn.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(MirRegisterRef::vreg(regId)));
     return *this;
 }
 
@@ -59,7 +59,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLiveIn(size_t blockId, si
     auto it = res.m_liveIn.find(blockId);
 
     EXPECT_NE(it, res.m_liveIn.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(MirRegisterRef::vreg(regId)));
     return *this;
 }
 
@@ -69,7 +69,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::liveOut(size_t blockId, size
     auto it = res.m_liveOut.find(blockId);
 
     EXPECT_NE(it, res.m_liveOut.end());
-    EXPECT_TRUE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_TRUE(it->second.contains(MirRegisterRef::vreg(regId)));
     return *this;
 }
 
@@ -79,7 +79,7 @@ LivenessAnalysisVerifier &LivenessAnalysisVerifier::notLiveOut(size_t blockId, s
     auto it = res.m_liveOut.find(blockId);
 
     EXPECT_NE(it, res.m_liveOut.end());
-    EXPECT_FALSE(it->second.contains(RegisterRef::vreg(regId)));
+    EXPECT_FALSE(it->second.contains(MirRegisterRef::vreg(regId)));
     return *this;
 }
 

@@ -32,7 +32,7 @@ class DiagnosticBuilder
     /**
      * Appends a note to the current message.
      */
-    DiagnosticBuilder &appendNote(const std::pmr::string &message, class SourceReference *sourceRef);
+    DiagnosticBuilder &appendNote(const std::pmr::string &message, class SourceReference *sourceRef = nullptr);
 
     /**
      * Sets the type and sender of the current message.

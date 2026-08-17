@@ -1,8 +1,7 @@
-#ifndef EZPACKER_MIRFRAMELOWERER_H
-#define EZPACKER_MIRFRAMELOWERER_H
+#ifndef EZTRIPLE_MIR_FRAME_LOWERER_H
+#define EZTRIPLE_MIR_FRAME_LOWERER_H
 
 #include "EzTripleCommon.h"
-#include "Descriptors/TargetDesc.h"
 
 /**
  * Execution context provided to the frame lowerer containing function,
@@ -10,17 +9,17 @@
  */
 struct FrameLowererCtx
 {
-    MirBuilderContext *m_ctx;  ///< Shared compiler context for operand and instruction building.
-    MirFunction *m_targetFunc; ///< Function being processed.
-    TargetDesc *m_targetDesc;  ///< Hardware target descriptor containing the TargetFrameLowering implementation.
+    class MirBuilderContext *m_ctx;  // Shared compiler context for operand and instruction building.
+    class MirFunction *m_targetFunc; // Function being processed.
+    class TargetDesc *m_targetDesc;  // Hardware target descriptor containing the TargetFrameLowering implementation.
 
-    std::pmr::list<MirInstruction *>::iterator
-            m_allocIt; ///< Iterator pointing to an ALLOC/DALLOC instruction. Used by lowerAlloc/lowerDAlloc.
+    // Iterator pointing to an ALLOC/DALLOC instruction. Used by lowerAlloc/lowerDAlloc.
+    std::pmr::list<class MirInstruction *>::iterator m_allocIt;
     std::pmr::memory_resource *m_allocator; ///< Memory allocator for temporary layout data structures.
 
-    FrameLowererCtx(MirBuilderContext *ctx,
-                    MirFunction *func,
-                    TargetDesc *targetDesc,
+    FrameLowererCtx(class MirBuilderContext *ctx,
+                    class MirFunction *func,
+                    class TargetDesc *targetDesc,
                     std::pmr::memory_resource *alloc) :
         m_ctx(ctx), m_targetFunc(func), m_targetDesc(targetDesc), m_allocator(alloc)
     {
@@ -32,7 +31,9 @@ struct FrameLowererCtx
  * converting abstract stack object references into concrete memory operands.
  *
  * The insertion of the prologue and epilogue is highly dependent on the target, so each target needs to define
- * its own frame lowerer.
+ * its own frame lowerer. Since this pass executes AFTER MirInstructionSelectorPass, this pass need to emit VALID TARGET
+ * INSTRUCTIONS, if a high level / pass internal instruction is emitted, undefined behaviour is assured when emitting
+ * the code.
  *
  * Execution flow:
  * 1. Lower every ALLOC instruction.
@@ -93,4 +94,4 @@ class MirFrameLowerer
     virtual void lowerStackObjectReferences(FrameLowererCtx &ctx);
 };
 
-#endif // EZPACKER_MIRFRAMELOWERER_H
+#endif // EZTRIPLE_MIR_FRAME_LOWERER_H

@@ -10,13 +10,13 @@
 #include "Type/MirTypeTable.h"
 
 MirBuilderContext::MirBuilderContext(CallingConvDesc *defaultCallingConv,
-                                     std::pmr::monotonic_buffer_resource *globalArena,
-                                     const std::shared_ptr<DiagnosticCollector> &diagCollector,
-                                     const std::shared_ptr<MirTypeTable> &typeTable) :
-    m_defaultCallingConv(defaultCallingConv), m_currentId(1), m_globalResource(globalArena),
-    m_functions(m_globalResource), m_blockIdToBlock(m_globalResource), m_classIdToClass(m_globalResource),
-    m_functionIdToFunc(m_globalResource), m_globalVarIdToGVar(m_globalResource), m_diagCollector(diagCollector),
-    m_typeTable(typeTable)
+                                     DiagnosticCollector *diagCollector,
+                                     MirTypeTable *typeTable,
+                                     std::pmr::monotonic_buffer_resource *globalArena) :
+    m_defaultCallingConv(defaultCallingConv), m_diagCollector(diagCollector), m_currentId(1), m_typeTable(typeTable),
+    m_globalResource(globalArena), m_functions(m_globalResource), m_blockIdToBlock(m_globalResource),
+    m_classIdToClass(m_globalResource), m_functionIdToFunc(m_globalResource), m_globalVarIdToGVar(m_globalResource)
+
 {
 }
 
@@ -146,7 +146,7 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
 
 CallingConvDesc *MirBuilderContext::getDefaultCallingConvention() const { return m_defaultCallingConv; }
 
-MirId MirBuilderContext::createId() { return m_currentId++; }
+DiagnosticCollector *MirBuilderContext::getDiagCollector() { return m_diagCollector; }
 
 MirBlock *MirBuilderContext::getBlockById(MirId id) const
 {
@@ -203,6 +203,8 @@ MirGlobalVar *MirBuilderContext::getGVarById(MirId id) const
     return nullptr;
 }
 
+MirId MirBuilderContext::createId() { return m_currentId++; }
+
 MirRegister *MirBuilderContext::getRegisterById(MirId id) const
 {
     auto it = m_registerIdToRegister.find(id);
@@ -212,6 +214,8 @@ MirRegister *MirBuilderContext::getRegisterById(MirId id) const
 
     return nullptr;
 }
+
+MirTypeTable *MirBuilderContext::getTypeTable() { return m_typeTable; }
 
 void MirBuilderContext::setDefaultCallingConvention(CallingConvDesc *defaultCallingConv)
 {
@@ -225,7 +229,3 @@ std::pmr::list<MirClass *> &MirBuilderContext::getClasses() { return m_classes; 
 std::pmr::list<MirFunction *> &MirBuilderContext::getFunctions() { return m_functions; }
 
 std::pmr::list<MirGlobalVar *> &MirBuilderContext::getGlobalVars() { return m_globalVars; }
-
-const std::shared_ptr<DiagnosticCollector> &MirBuilderContext::getDiagCollector() { return m_diagCollector; }
-
-const std::shared_ptr<MirTypeTable> &MirBuilderContext::getTypeTable() { return m_typeTable; }

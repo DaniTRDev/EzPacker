@@ -80,6 +80,11 @@ class MirFunction
     MirId getId() const;
 
     /**
+     * Returns the number of parameters.
+     */
+    size_t getParamCount() const;
+
+    /**
      * Returns the source reference that created this function.
      */
     class SourceReference *getSourceRef() const;
