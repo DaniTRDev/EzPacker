@@ -16,6 +16,8 @@ MirInstruction::MirInstruction(class MirBlock *owner,
 {
 }
 
+bool MirInstruction::hasOpcode(MirInstructionOpCode opcode) const { return m_opcode == opcode; }
+
 bool MirInstruction::hasOperands() const { return !m_operands.empty(); }
 
 bool MirInstruction::isSelected() const
@@ -38,6 +40,27 @@ MirInstructionTier MirInstruction::getTier() const { return getMetadata().m_tier
 MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
 
 MirTargetInstructionDesc *MirInstruction::getTargetDesc() const { return m_targetDesc; }
+
+MirOperand *MirInstruction::getOperand(size_t index)
+{
+    if (index >= m_operands.size())
+    {
+        return nullptr;
+    }
+
+    invalidateCachedUsedAndDefs();
+    return m_operands[index];
+}
+
+const MirOperand *MirInstruction::getConstOperand(size_t index)
+{
+    if (index >= m_operands.size())
+    {
+        return nullptr;
+    }
+
+    return m_operands[index];
+}
 
 MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
 {
@@ -62,9 +85,15 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
     {
         return flags[index].flags;
     }
+    else if (getFlags() & MirInstructionFlags::VariadicArgs)
+    {
+        return MirOperandFlag::Read;
+    }
 
     return MirOperandFlag::None;
 }
+
+size_t MirInstruction::getOperandCount() const { return m_operands.size(); }
 
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 

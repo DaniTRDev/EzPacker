@@ -22,8 +22,9 @@ MirGlobalVarBuilder &MirGlobalVarBuilder::setInitializer(MirOperand *initializer
 {
     if (!initializer->isOfType<MirInteger>() && !initializer->isOfType<MirFloat>())
     {
-        auto diag = m_ctx->getDiagCollector()->builder(Diag_Error, "MirGlobalVarBuilder");
-        diag << initializer->getSourceRef() << "Can't set a non-constant value to a global variable's initializer";
+        m_ctx->getDiagCollector()->error("MirGlobalVarBuilder",
+                                         "Can't set a non-constant value to a global variable's initializer")
+                << initializer->getSourceRef();
     }
 
     m_initializer = initializer;
@@ -46,9 +47,10 @@ MirGlobalVar *MirGlobalVarBuilder::build(MirGlobalVarLinkage linkage,
                                                        sourceRef,
                                                        name);
 
-    auto diag = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirMirGlobalVarBuilder");
-    diag << sourceRef << std::pmr::string(std::format("Built global var with id: {}", var->getId()));
-    diag.appendNote(MirPrinter::printToString(var, MirPrinterDetail::Detailed).c_str(), nullptr);
+    auto diag =
+            m_ctx->getDiagCollector()->trace("MirMirGlobalVarBuilder", "Built global var with id: {}", var->getId());
+    diag << sourceRef;
+    diag.appendNote(MirPrinter::printToString(var, MirPrinterDetail::Detailed));
 
     return var;
 }

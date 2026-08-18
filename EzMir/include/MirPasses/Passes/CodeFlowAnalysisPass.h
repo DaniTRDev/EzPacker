@@ -7,16 +7,16 @@
 /**
  * Resulting structure that contains the resulting Code Flow Graph.
  */
-struct ControlFlowResult
+struct CodeFlowResult
 {
-    std::pmr::unordered_map<MirId, std::pmr::set<MirId>> m_successors;
-    std::pmr::unordered_map<MirId, std::pmr::set<MirId>> m_predecessors;
+    std::pmr::map<MirId, std::pmr::set<MirId>> m_successors;
+    std::pmr::map<MirId, std::pmr::set<MirId>> m_predecessors;
 
-    ControlFlowResult(std::pmr::memory_resource *arena) : m_successors(arena), m_predecessors(arena) {}
+    CodeFlowResult(std::pmr::memory_resource *arena) : m_successors(arena), m_predecessors(arena) {}
 };
 
 /**
- * This pass executes a CFG search and saves the result in a ControlFlowResult structure.
+ * This pass executes a CFG search and saves the result in a CodeFlowResult structure.
  */
 class CodeFlowAnalysisPass : public IMirAnalysisPass
 {
@@ -36,7 +36,7 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     /**
      * Returns the result of the pass, if populated. If run was not called, an empty result is returned.
      */
-    ControlFlowResult *getResult();
+    CodeFlowResult *getResult();
 
     /**
      * Returns the iteration place for this pass (Function).
@@ -62,10 +62,9 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
 
   private:
     void addEdge(class MirBlock *from, class MirBlock *to);
-    MirBlock *getTargetJumpBlock(const class MirInstruction *inst) const;
 
   private:
-    ControlFlowResult m_result;
+    CodeFlowResult m_result;
     class MirBuilderContext *m_ctx;
     std::pmr::memory_resource *m_arena;
 };

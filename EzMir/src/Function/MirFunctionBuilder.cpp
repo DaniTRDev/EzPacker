@@ -26,8 +26,7 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
     MirFunction *obj = getBuiltObj();
     if (!obj)
     {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirFunctionBuilder")
-                << "Can't create block builder from non-built function";
+        m_ctx->getDiagCollector()->error("MirFunctionBuilder", "Can't create block builder from non-built function");
         return MirBlockBuilder(nullptr, (MirFunction *)nullptr); // Ambiguous call if cast is not set.
     }
 
@@ -69,10 +68,9 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
     entryPoint->setOwner(func);
     func->setEntryPoint(entryPoint);
 
-    auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirFunctionBuilder");
-    diagBuilder << std::pmr::string(std::format("Built func with id: {}", func->getId()));
-    diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(func, MirPrinterDetail::Detailed)), sourceRef);
-    diagBuilder.appendNote(std::format("Using calling convention: {}", m_callingConv->getName()).c_str());
+    auto diagBuilder = m_ctx->getDiagCollector()->trace("MirFunctionBuilder", "Built func with id: {}", func->getId());
+    diagBuilder.appendNote(sourceRef, MirPrinter::printToString(func, MirPrinterDetail::Detailed));
+    diagBuilder.appendNote("Using calling convention: {}", m_callingConv->getName());
 
     if (!m_ctx->appendFunction(func))
     {

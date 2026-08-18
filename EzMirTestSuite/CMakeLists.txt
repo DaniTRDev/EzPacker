@@ -16,20 +16,6 @@ EzCMK_ConfigureLib(NAME "EzMirTestSuite"
 )
 
 EzPacker_AddTest(
-        "T_Operand"
-        "EzMirTestSuite"
-        ""
-        "tests/T_Operand.cpp"
-)
-
-EzPacker_AddTest(
-        "T_Instruction"
-        "EzMirTestSuite"
-        ""
-        "tests/T_Instruction.cpp"
-)
-
-EzPacker_AddTest(
         "T_Block"
         "EzMirTestSuite"
         ""
@@ -51,6 +37,13 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_CodeFlowPass"
+        "EzMirTestSuite"
+        ""
+        "tests/T_CodeFlowPass.cpp"
+)
+
+EzPacker_AddTest(
         "T_Function"
         "EzMirTestSuite"
         ""
@@ -65,10 +58,10 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
-        "T_CodeFlowPass"
+        "T_Instruction"
         "EzMirTestSuite"
         ""
-        "tests/T_CodeFlowPass.cpp"
+        "tests/T_Instruction.cpp"
 )
 
 EzPacker_AddTest(
@@ -76,6 +69,20 @@ EzPacker_AddTest(
         "EzMirTestSuite"
         ""
         "tests/T_LivenessAnalysis.cpp"
+)
+
+EzPacker_AddTest(
+        "T_NonSsaToSsa"
+        "EzMirTestSuite"
+        ""
+        "tests/T_NonSsaToSsa.cpp"
+)
+
+EzPacker_AddTest(
+        "T_Operand"
+        "EzMirTestSuite"
+        ""
+        "tests/T_Operand.cpp"
 )
 
 EzPacker_AddTest(

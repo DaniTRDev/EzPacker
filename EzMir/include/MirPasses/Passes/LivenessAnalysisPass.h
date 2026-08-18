@@ -63,12 +63,12 @@ class LivenessAnalysisPass : public IMirAnalysisPass
     /**
      * Computes the gloval live-in/live-out set of a function.
      */
-    void computeGlobalLiveness(class MirFunction *func, class ControlFlowResult *cfg);
+    void computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
 
     /**
      * Computes the local def/use of the blocks inside the function.
      */
-    void computeLocalLiveness(class MirFunction *func, class DiagnosticCollector *collector);
+    void computeLocalLiveness(class MirFunction *func);
 
   private:
     LivenessResult m_result;

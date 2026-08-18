@@ -5,13 +5,14 @@
 
 enum class ExpectedOperandType : uint16_t
 {
-    None                = 1 << 0,
-    Register            = 1 << 1, // MirRegister
-    Integer             = 1 << 2, // MirInteger
-    FloatingPoint       = 1 << 3, // MirDouble
-    Memory              = 1 << 4, // MirMemory
-    Reference           = 1 << 5, // MirReference (Blocks, Functions)
-    RuntimeSymbol       = 1 << 6, // MirRuntimeSymbol. Used to identify an address, by its name, that's exported by the RT library.
+    None = 1 << 0,
+    Register = 1 << 1,      // MirRegister
+    Integer = 1 << 2,       // MirInteger
+    FloatingPoint = 1 << 3, // MirDouble
+    Memory = 1 << 4,        // MirMemory
+    Reference = 1 << 5,     // MirReference (Blocks, Functions)
+    RuntimeSymbol =
+            1 << 6, // MirRuntimeSymbol. Used to identify an address, by its name, that's exported by the RT library.
 
     // --- Composite Helper Masks ---
 
@@ -81,7 +82,9 @@ enum class MirInstructionFlags : uint32_t
     IsCommutative = 1 << 10,
     ReadsCPUFlags = 1 << 11,
     WritesCPUFlags = 1 << 12,
-    TreatAsSigned = 1 << 13
+    TreatAsSigned = 1 << 13,
+    VariadicArgs = 1 << 14 // Flag used to tell that there will be an unexpected number of arguments. If a constraint is
+                           // given, it must be followed. By default, all the values are READ.
 };
 
 inline constexpr MirInstructionFlags operator|(MirInstructionFlags a, MirInstructionFlags b)

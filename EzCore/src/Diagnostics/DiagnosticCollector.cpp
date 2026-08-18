@@ -2,10 +2,13 @@
 
 DiagnosticCollector::DiagnosticCollector()
 {
+    m_enabledDiags = Diag_Debug | Diag_Error | Diag_Trace | Diag_Warning;
     m_messages = std::pmr::vector<DiagnosticMessage>(&m_diagScopePool);
     m_scopes = std::pmr::vector<DiagnosticScope>(&m_diagScopePool);
     m_scopes.emplace_back(&m_diagScopePool); // Ensure there's at least 1 scope available.
 }
+
+bool DiagnosticCollector::isDiagEnabledForType(DiagnosticMessageType type) const { return m_enabledDiags & type; }
 
 DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const std::string_view &sender)
 {
@@ -87,6 +90,9 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
         throw std::runtime_error("Internal Compiler Error: Tried to push a message to a non-existent scope.");
     }
 
+    if (!isDiagEnabledForType(message.getType()))
+        return;
+
     DiagnosticScope &scope = m_scopes.back();
     if (m_scopes.size() == 1)
     {
@@ -94,7 +100,7 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
         {
             listener->onDiag(message);
         }
-        
+
         // Move the message into the permanent record of messages.
         m_messages.push_back(message);
     }
@@ -108,3 +114,5 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
         scope.setHasFatalErrors(true);
     }
 }
+
+std::pmr::memory_resource *DiagnosticCollector::getAllocator() { return &m_diagScopePool; }

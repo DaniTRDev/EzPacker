@@ -129,6 +129,7 @@ class MirRegister : public MirOperand
     bool operator==(const MirRegister &other) const { return m_ref == other.m_ref; }
 
     MirOperandType getType() const override { return OpKind; }
+    MirRegisterClass *getRegClass() { return m_ref.getClass(); }
     MirRegisterRef getRef() const { return m_ref; }
     size_t getRegId() const { return m_ref.getId(); }
 

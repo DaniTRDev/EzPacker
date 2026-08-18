@@ -17,15 +17,26 @@ MirFunction::MirFunction(CallingConvDesc *callingConv,
                          std::pmr::list<MirRegister *> parameters,
                          std::pmr::string name) :
     m_callingConv(callingConv), m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType),
-    m_type(type), m_id(id), m_sourceRef(sourceRef), m_blocks(std::move(blocks)), m_parameters(std::move(parameters)),
-    m_blockIdToBlock(m_blocks.get_allocator().resource()), m_name(std::move(name))
+    m_type(type), m_id(id), m_sourceRef(sourceRef), m_blocks(blocks.get_allocator().resource()),
+    m_parameters(std::move(parameters)), m_blockIdToBlock(m_blocks.get_allocator().resource()), m_name(std::move(name))
 {
     for (auto &block : m_blocks)
     {
-        m_blockIdToBlock.insert({ block->getId(), block });
+        appendBlock(block);
     }
 
     m_usedCalleeSavedRegs = std::pmr::vector<MirRegisterRef>(m_blocks.get_allocator().resource());
+}
+
+bool MirFunction::appendBlock(MirBlock *block)
+{
+    if (m_blockIdToBlock.contains(block->getId()))
+        return false;
+
+    m_blockIdToBlock.insert({ block->getId(), block });
+    m_blocks.push_back(block);
+
+    return true;
 }
 
 CallingConvDesc *MirFunction::getCallingConv() const { return m_callingConv; }
@@ -50,6 +61,8 @@ MirId MirFunction::getId() const { return m_id; }
 MirType *MirFunction::getReturnType() const { return m_returnType; }
 
 MirType *MirFunction::getType() const { return m_type; }
+
+size_t MirFunction::getBlockCount() const { return m_blocks.size(); }
 
 size_t MirFunction::getParamCount() const { return m_parameters.size(); }
 

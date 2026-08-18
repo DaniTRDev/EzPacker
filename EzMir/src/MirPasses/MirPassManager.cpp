@@ -14,15 +14,13 @@ DiagnosticCollector *MirPassManager::getDiagCollector() const { return m_diagCol
 
 MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
 {
-    auto log = m_diagCollector->builder(Diag_Trace, "MirPassManager");
-    log << std::pmr::string(std::format("Running pass {}", pass->getName()));
-    log.flush();
-    MirPassResult combinedResult{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
-    pass->reset();
+    m_diagCollector->trace("MirPassManager", "Running pass {}", pass->getName());
+    pass->reset(); // Resets pass' previous results.
 
     auto &functionList = ctx->getFunctions();
     auto &classList = ctx->getClasses();
     auto &globalList = ctx->getGlobalVars();
+    MirPassResult combinedResult{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 
     switch (pass->getIterationPlace())
     {
@@ -124,11 +122,10 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
     pass->setResult(&combinedResult);
     m_savedResults[std::type_index(typeid(*pass))] = combinedResult;
 
-    auto builder = m_diagCollector->builder(Diag_Trace, "MirPassManager");
-    builder << "Pass result";
-    builder.appendNote(std::pmr::string(std::format("Executed: {}", combinedResult.m_executed)), nullptr);
-    builder.appendNote(std::pmr::string(std::format("Succeeded: {}", combinedResult.m_succeeded)), nullptr);
-    builder.appendNote(std::pmr::string(std::format("Modified Mir: {}", combinedResult.m_modifiedMir)), nullptr);
+    auto builder = m_diagCollector->trace("MirPassManager", "Pass result");
+    builder.appendNote("Executed: {}", combinedResult.m_executed);
+    builder.appendNote("Succeeded: {}", combinedResult.m_succeeded);
+    builder.appendNote("Modified Mir: {}", combinedResult.m_modifiedMir);
     builder.flush();
 
     pass->printResult();
@@ -191,7 +188,7 @@ MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderConte
 
 void MirPassManager::generatePipeline()
 {
-    m_diagCollector->builder(Diag_Trace, "MirPassManager") << "Calculating pass dependency pipeline";
+    m_diagCollector->trace("MirPassManager", "Calculating pass dependency pipeline");
 
     m_executionPipeline.clear();
     std::unordered_set<std::type_index> resolved;
@@ -206,12 +203,11 @@ void MirPassManager::generatePipeline()
         }
     }
 
-    auto builder = m_diagCollector->builder(DiagnosticMessageType::Diag_Trace, "MirPassManager");
-    builder << "Calculated pass dependency pipeline:";
+    auto builder = m_diagCollector->trace("MirPassManager", "Calculated pass dependency pipeline:");
 
     for (auto &pass : m_executionPipeline)
     {
-        builder.appendNote(pass->getName(), nullptr);
+        builder.appendNote(pass->getName());
     }
 }
 

@@ -113,10 +113,9 @@ MirClass *MirClassBuilder::build(MirClass *parent, const std::pmr::string &name,
 
                 if (signatureMatches)
                 {
-                    auto diagBuilder = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirClassBuilder");
-                    diagBuilder << m_vTable[i]->m_func->getSourceRef() << "Overridden class method";
-                    diagBuilder.appendNote(std::format("New method: {}", newFunc->getName()).c_str(),
-                                           newFunc->getSourceRef());
+                    auto diagBuilder = m_ctx->getDiagCollector()->trace("MirClassBuilder", "Overridden class method");
+                    diagBuilder << m_vTable[i]->m_func->getSourceRef();
+                    diagBuilder.appendNote(newFunc->getSourceRef(), "New method: {}", newFunc->getName());
 
                     m_vTable[i]->m_func = newFunc;
                     isOverride = true;
@@ -187,15 +186,15 @@ MirClass *MirClassBuilder::build(MirClass *parent, const std::pmr::string &name,
         method->m_id = methodId++;
     }
 
-    auto diagBuilder = m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, "MirClassBuilder");
-    diagBuilder << sourceRef << std::pmr::string(std::format("Built class with id: {}", _class->getId()));
+    auto diagBuilder = m_ctx->getDiagCollector()->trace("MirClassBuilder", "Built class with id: {}", _class->getId());
+    diagBuilder << sourceRef;
 
     if (parent)
     {
-        diagBuilder.appendNote(std::format("Parent: {}", parent->getName()).c_str(), parent->getSourceRef());
+        diagBuilder.appendNote(parent->getSourceRef(), "Parent: {}", parent->getName());
     }
 
-    diagBuilder.appendNote(std::pmr::string(MirPrinter::printToString(_class, MirPrinterDetail::Detailed)), sourceRef);
+    diagBuilder.appendNote(sourceRef, MirPrinter::printToString(_class, MirPrinterDetail::Detailed));
 
     if (!m_ctx->appendClass(_class))
     {

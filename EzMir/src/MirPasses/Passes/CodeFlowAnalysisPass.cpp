@@ -15,7 +15,7 @@ CodeFlowAnalysisPass::CodeFlowAnalysisPass(MirBuilderContext *ctx) :
 
 const char *CodeFlowAnalysisPass::getName() const { return "CodeFlowAnalysisPass"; }
 
-ControlFlowResult *CodeFlowAnalysisPass::getResult() { return &m_result; }
+CodeFlowResult *CodeFlowAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace CodeFlowAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
@@ -25,22 +25,23 @@ MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
 {
     MirFunction *func = *it;
     auto diag = passManager->getDiagCollector();
-    {
-        auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
-        log << std::pmr::string(std::format("Computing Control Flow Graph (CFG) topology for: '{}'", func->getName()));
-    }
+
+    // Direct lazy formatting without eager allocations
+    diag->trace(getName(), "Computing Control Flow Graph (CFG) topology for: '{}'", func->getName());
 
     auto &blockList = func->getBlocks();
+    auto &predecessors = m_result.m_predecessors;
+    auto &successors = m_result.m_successors;
 
     for (auto blockIt = blockList.begin(); blockIt != blockList.end(); ++blockIt)
     {
         MirBlock *currentBlock = *blockIt;
 
         // Ensure our maps are initialized for every block, even terminal ones with zero edges
-        if (!m_result.m_successors.contains(currentBlock->getId()))
-            m_result.m_successors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
-        if (!m_result.m_predecessors.contains(currentBlock->getId()))
-            m_result.m_predecessors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
+        if (!successors.contains(currentBlock->getId()))
+            successors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
+        if (!predecessors.contains(currentBlock->getId()))
+            predecessors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
 
         // Identify fallback path coordinates (the next sequential block in code layout)
         auto nextIt = blockIt;
@@ -57,13 +58,26 @@ MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
             MirInstructionFlags flags = inst->getFlags();
             if (flags & MirInstructionFlags::IsBranch)
             {
-                MirBlock *jumpTarget = getTargetJumpBlock(inst);
+                bool foundAnyTarget = false;
 
-                if (jumpTarget)
+                for (const MirOperand *op : inst->getOperands())
                 {
-                    addEdge(currentBlock, jumpTarget);
+                    if (op && op->getType() == MirOperandType::Reference)
+                    {
+                        if (const MirReference *ref = op->get<MirReference>())
+                        {
+                            // If the reference is a function (e.g., in a CALL), getBlockById gracefully returns nullptr
+                            MirBlock *jumpTarget = m_ctx->getBlockById(ref->getRefId());
+                            if (jumpTarget)
+                            {
+                                addEdge(currentBlock, jumpTarget);
+                                foundAnyTarget = true;
+                            }
+                        }
+                    }
                 }
-                else
+
+                if (!foundAnyTarget)
                 {
                     auto log = diag->builder(DiagnosticMessageType::Diag_Warning, getName());
                     log << "Branch instruction lacks a valid Target Basic Block reference layout frame.";
@@ -71,6 +85,8 @@ MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
 
                 // If it's an unconditional branch (does NOT read CPU flags), no subsequent
                 // instructions in this block can execute.
+                // Note: BR_COND explicitly maps BOTH true and false blocks as operands, so it
+                // satisfies the CFG topology exclusively via its operands and does not need fallthrough.
                 if ((flags & MirInstructionFlags::ReadsCPUFlags) == 0)
                 {
                     hasUnconditionalJump = true;
@@ -81,9 +97,8 @@ MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
             {
                 isReturnBlock = true;
 
-                auto log = diag->builder(DiagnosticMessageType::Diag_Debug, getName());
-                log << std::pmr::string(
-                        std::format("Found leaf node function exit terminal at Block ID: {}", currentBlock->getId()));
+                diag->trace(getName(), "Found leaf node function exit terminal at Block ID: {}", currentBlock->getId())
+                        << inst->getSourceRef();
 
                 break; // Return statements instantly terminate block evaluation
             }
@@ -94,8 +109,6 @@ MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
         // it falls through to the next sequential block in memory layout.
         if (!hasUnconditionalJump && !isReturnBlock)
         {
-            // Note: If the block had a conditional branch, the 'true' path was handled
-            // inside the loop above, and this adds the 'false' (fallthrough) path.
             if (nextBlock)
             {
                 addEdge(currentBlock, nextBlock);
@@ -109,12 +122,16 @@ MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
 
 void CodeFlowAnalysisPass::printResult()
 {
-    auto result = getResult();
     auto diag = m_ctx->getDiagCollector();
 
+    // Guard the heavy string constructions and print loops entirely
+    if (!diag->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+        return;
+
+    auto result = getResult();
+
     {
-        auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
-        log << std::pmr::string(std::format("CodeFlowAnalysisPass SUCCESSOR list:"));
+        auto log = diag->trace(getName(), "CodeFlowAnalysisPass SUCCESSOR list:");
 
         for (auto &[blockId, successors] : result->m_successors)
         {
@@ -131,13 +148,12 @@ void CodeFlowAnalysisPass::printResult()
                 succeededBy += "empty\n";
             }
 
-            log.appendNote(succeededBy.data(), nullptr);
+            log.appendNote("{}", succeededBy);
         }
     }
 
     {
-        auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
-        log << std::pmr::string(std::format("CodeFlowAnalysisPass PREDECESSOR list:"));
+        auto log = diag->trace(getName(), "CodeFlowAnalysisPass PREDECESSOR list:");
 
         for (auto &[blockId, predecessors] : result->m_predecessors)
         {
@@ -152,7 +168,7 @@ void CodeFlowAnalysisPass::printResult()
                 precededBy += "empty\n";
             }
 
-            log.appendNote(precededBy.c_str(), nullptr);
+            log.appendNote("{}", precededBy);
         }
     }
 }
@@ -161,23 +177,6 @@ void CodeFlowAnalysisPass::reset()
 {
     m_result.m_successors.clear();
     m_result.m_predecessors.clear();
-}
-
-MirBlock *CodeFlowAnalysisPass::getTargetJumpBlock(const MirInstruction *inst) const
-{
-    if (!inst || inst->getOperands().empty())
-        return nullptr;
-
-    // Secure the target tracking operand index block securely
-    const MirOperand *op = inst->getOperands().front();
-    if (!op)
-        return nullptr;
-
-    const MirReference *ref = op->get<MirReference>();
-    if (!ref)
-        return nullptr;
-
-    return m_ctx->getBlockById(ref->getRefId());
 }
 
 void CodeFlowAnalysisPass::addEdge(MirBlock *from, MirBlock *to)

@@ -39,6 +39,11 @@ class MirFunction
                 std::pmr::string name);
 
     /**
+     * Appends the given block into the function. If it's already present, false is returned.
+     */
+    bool appendBlock(MirBlock *block);
+
+    /**
      * Returns the calling convention of this function.
      */
     class CallingConvDesc *getCallingConv() const;
@@ -78,6 +83,11 @@ class MirFunction
      * Returns the unique MIR ID assigned to this function.
      */
     MirId getId() const;
+
+    /**
+     * Returns the number of blocks defined in this function.
+     */
+    size_t getBlockCount() const;
 
     /**
      * Returns the number of parameters.

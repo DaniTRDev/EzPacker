@@ -1,0 +1,548 @@
+#include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Instruction/MirInstruction.h"
+#include "Instruction/MirInstructionBuilder.h"
+#include "Function/MirFunction.h"
+#include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
+#include "MirPasses/Passes/NonSsaToSsaPass.h"
+#include "Operand/MirOperands.h"
+#include "Operand/MirOperandBuilder.h"
+
+NonSsaToSsaPass::NonSsaToSsaPass(class MirBuilderContext *ctx) :
+    m_ctx(ctx), m_result(ctx->getGlobalAllocator()), m_resc(ctx->getGlobalAllocator())
+{
+}
+
+const char *NonSsaToSsaPass::getName() const { return "NonSsaToSsaPass"; }
+
+MirPassIterationPlace NonSsaToSsaPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
+
+MirPassResult NonSsaToSsaPass::run(std::pmr::list<MirFunction *> &funcList,
+                                   std::pmr::list<MirFunction *>::iterator it,
+                                   MirPassManager *passManager)
+{
+    CodeFlowResult *cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
+    MirFunction *func = *it;
+
+    m_ctx->getDiagCollector()->trace("NonSsaToSsaPass", "--- Starting SSA Construction for function ---");
+
+    buildVirtualRegDefPlaces(func);
+    buildPostOrderIndexList(cfg, func, passManager);
+    buildImmDomTree(cfg, func, passManager);
+    buildDominanceFrontier(cfg, func, passManager);
+    insertPhiNodes(cfg, func);
+    renameVariables(cfg, func);
+
+    m_ctx->getDiagCollector()->trace("NonSsaToSsaPass", "--- Completed SSA Construction ---");
+
+    return { .m_modifiedMir = true, .m_executed = true, .m_succeeded = true };
+}
+
+NonSsaToSsaPassResult *NonSsaToSsaPass::getResult() { return &m_result; }
+
+void NonSsaToSsaPass::printResult() {}
+
+void NonSsaToSsaPass::reset() {}
+
+MirInstruction *
+NonSsaToSsaPass::createPhiInstruction(MirInstructionBuilder *iBuilder, MirId regId, size_t numPredecessors)
+{
+    MirRegister *reg = m_ctx->getRegisterById(regId);
+    MirInstruction *phi = iBuilder->PHI(reg);
+
+    for (size_t i = 0; i < numPredecessors; ++i)
+    {
+        phi->addOperand(reg);
+    }
+
+    return phi;
+}
+
+void NonSsaToSsaPass::buildVirtualRegDefPlaces(MirFunction *func)
+{
+    auto &defSites = m_result.m_defSites;
+    for (MirBlock *block : func->getBlocks())
+    {
+        MirId bId = block->getId();
+
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            for (const auto &def : inst->getDefinedRegisters())
+            {
+                if (def.isVirtual())
+                {
+                    defSites[def.getId()].insert(bId);
+
+                    m_ctx->getDiagCollector()->trace("NonSsaToSsaPass",
+                                                     "Tracked definition of virtual register {} in block {}",
+                                                     def.getId(),
+                                                     bId)
+                            << inst->getSourceRef();
+                }
+            }
+        }
+    }
+}
+
+void NonSsaToSsaPass::buildDominanceFrontier(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager)
+{
+    auto &blocks = func->getBlocks();
+    auto &domFrontier = m_result.m_domFrontier;
+    auto &idom = m_result.m_immDomTree;
+    auto &predecessors = cfg->m_predecessors;
+
+    for (MirBlock *b : blocks)
+    {
+        MirId bId = b->getId();
+
+        auto idomIt = idom.find(bId);
+        if (idomIt == idom.end())
+            continue;
+
+        MirId bIdom = idomIt->second;
+        auto predIt = predecessors.find(bId);
+
+        if (predIt == predecessors.end() || predIt->second.size() < 2)
+            continue;
+
+        for (MirId p : predIt->second)
+        {
+            MirId runner = p;
+
+            while (runner != bIdom)
+            {
+                auto runnerIdomIt = idom.find(runner);
+                if (runnerIdomIt == idom.end())
+                    break;
+
+                domFrontier[runner].insert(bId);
+
+                m_ctx->getDiagCollector()->trace("NonSsaToSsaPass",
+                                                 "Added block {} to Dominance Frontier of block {}",
+                                                 bId,
+                                                 runner);
+
+                MirId nextRunner = runnerIdomIt->second;
+                if (nextRunner == runner)
+                    break;
+
+                runner = nextRunner;
+            }
+        }
+    }
+}
+
+void NonSsaToSsaPass::buildImmDomTree(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager)
+{
+    auto &domTree = m_result.m_immDomTree;
+    auto &postOrderIndexes = m_result.m_postOrderIndexes;
+    auto &postOrderNodes = m_result.m_postOrderNodes;
+    bool changed = true;
+
+    MirId entryId = func->getEntryPoint()->getId();
+    domTree[entryId] = entryId;
+
+    auto intersect = [&](MirId b1, MirId b2) -> MirId
+    {
+        MirId finger1 = b1;
+        MirId finger2 = b2;
+
+        while (finger1 != finger2)
+        {
+            while (postOrderIndexes[finger1] < postOrderIndexes[finger2])
+            {
+                finger1 = domTree[finger1];
+            }
+            while (postOrderIndexes[finger2] < postOrderIndexes[finger1])
+            {
+                finger2 = domTree[finger2];
+            }
+        }
+        return finger1;
+    };
+
+    while (changed)
+    {
+        changed = false;
+
+        for (auto it = postOrderNodes.rbegin(); it != postOrderNodes.rend(); ++it)
+        {
+            MirId blockId = *it;
+
+            if (blockId == entryId)
+            {
+                continue;
+            }
+
+            MirId newIdom = 0;
+            bool foundFirst = false;
+
+            for (MirId pred : cfg->m_predecessors[blockId])
+            {
+                if (domTree.find(pred) != domTree.end())
+                {
+                    if (!foundFirst)
+                    {
+                        newIdom = pred;
+                        foundFirst = true;
+                    }
+                    else
+                    {
+                        newIdom = intersect(pred, newIdom);
+                    }
+                }
+            }
+
+            if (foundFirst && domTree[blockId] != newIdom)
+            {
+                domTree[blockId] = newIdom;
+                changed = true;
+
+                m_ctx->getDiagCollector()->trace("NonSsaToSsaPass",
+                                                 "Updated Immediate Dominator for block {} -> {}",
+                                                 blockId,
+                                                 newIdom);
+            }
+        }
+    }
+}
+
+void NonSsaToSsaPass::buildPostOrderIndexList(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager)
+{
+    MirId entryId = func->getEntryPoint()->getId();
+
+    auto &postOrder = m_result.m_postOrderNodes;
+    postOrder.reserve(func->getBlockCount());
+
+    std::pmr::unordered_set<MirId> visited(m_resc);
+
+    auto dfs = [&](auto &self, MirId currentBlock) -> void
+    {
+        visited.insert(currentBlock);
+
+        for (MirId succ : cfg->m_successors[currentBlock])
+        {
+            if (visited.find(succ) == visited.end())
+            {
+                self(self, succ);
+            }
+        }
+        postOrder.push_back(currentBlock);
+    };
+
+    dfs(dfs, entryId);
+
+    for (size_t i = 0; i < postOrder.size(); ++i)
+    {
+        m_result.m_postOrderIndexes[postOrder[i]] = i;
+        m_ctx->getDiagCollector()->trace("NonSsaToSsaPass", "PostOrder [{}] = Block {}", i, postOrder[i]);
+    }
+}
+
+void NonSsaToSsaPass::insertPhiNodes(CodeFlowResult *cfg, MirFunction *func)
+{
+    auto &domFrontier = m_result.m_domFrontier;
+    auto &defSites = m_result.m_defSites;
+    MirInstructionBuilder iBuilder(m_ctx, nullptr, InsertionType::InsertBefore, {});
+
+    for (const auto &[regId, definingBlocks] : defSites)
+    {
+        std::pmr::vector<MirId> worklist(m_resc);
+        worklist.reserve(definingBlocks.size());
+
+        std::pmr::unordered_set<MirId> inWorklist(m_resc);
+        std::pmr::unordered_set<MirId> hasPhi(m_resc);
+
+        for (MirId bId : definingBlocks)
+        {
+            worklist.push_back(bId);
+            inWorklist.insert(bId);
+        }
+
+        while (!worklist.empty())
+        {
+            MirId currentBlockId = worklist.back();
+            worklist.pop_back();
+            inWorklist.erase(currentBlockId);
+
+            auto dfIt = domFrontier.find(currentBlockId);
+            if (dfIt == domFrontier.end())
+                continue;
+
+            for (MirId dfBlockId : dfIt->second)
+            {
+                if (hasPhi.find(dfBlockId) == hasPhi.end())
+                {
+                    hasPhi.insert(dfBlockId);
+
+                    MirBlock *targetBlock = m_ctx->getBlockById(dfBlockId);
+                    iBuilder.setInsertionPoint(targetBlock, InsertionType::InsertBefore, targetBlock->begin());
+
+                    size_t numPreds = cfg->m_predecessors[dfBlockId].size();
+                    createPhiInstruction(&iBuilder, regId, numPreds);
+
+                    auto diag = m_ctx->getDiagCollector()->trace("NonSsaToSsaPass",
+                                                                 "Inserted PHI node for base reg {} in DF block {}",
+                                                                 regId,
+                                                                 dfBlockId);
+                    diag.appendNote("Required incoming predecessor paths: {}", numPreds);
+
+                    if (definingBlocks.find(dfBlockId) == definingBlocks.end() &&
+                        inWorklist.find(dfBlockId) == inWorklist.end())
+                    {
+                        worklist.push_back(dfBlockId);
+                        inWorklist.insert(dfBlockId);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
+{
+    DiagnosticCollector *collector = m_ctx->getDiagCollector();
+    MirOperandBuilder oBuilder(m_ctx);
+    std::pmr::unordered_map<MirId, std::pmr::vector<MirId>> domChildren(m_resc);
+
+    for (MirBlock *b : func->getBlocks())
+    {
+        MirId bId = b->getId();
+        auto it = m_result.m_immDomTree.find(bId);
+        if (it != m_result.m_immDomTree.end())
+        {
+            MirId parent = it->second;
+            if (parent != bId)
+            {
+                domChildren[parent].push_back(bId);
+            }
+        }
+    }
+
+    std::pmr::unordered_map<MirId, std::pmr::vector<MirRegister *>> varStacks(m_resc);
+    std::pmr::unordered_map<MirInstruction *, MirId> phiOriginalReg(m_resc);
+    std::pmr::unordered_map<MirId, size_t> varCounters(m_resc);
+    std::pmr::unordered_map<MirId, MirRegister *> undefRegs(m_resc);
+
+    for (MirBlock *block : func->getBlocks())
+    {
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            if (inst->hasOpcode(MirInstructionOpCode::PHI))
+            {
+                MirRegister *dst = inst->getOpAs<MirRegister>(0);
+                if (dst && dst->isVirtual())
+                {
+                    phiOriginalReg[inst] = dst->getRegId();
+                }
+            }
+        }
+    }
+
+    auto renameBlock = [&](auto &self, MirId blockId) -> void
+    {
+        MirBlock *block = func->getBlock(blockId);
+        if (!block)
+            return;
+
+        collector->trace("NonSsaToSsaPass", "---> Visiting block {} for renaming", blockId);
+
+        std::pmr::vector<MirId> pushedRegisters(m_resc);
+
+        // --- A. Process PHI destinations ---
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            if (!inst->hasOpcode(MirInstructionOpCode::PHI))
+                break;
+
+            MirRegister *dst = inst->getOpAs<MirRegister>(0);
+            if (!dst || !dst->isVirtual())
+                continue;
+
+            MirId origReg = phiOriginalReg[inst];
+            size_t count = ++varCounters[origReg];
+
+            MirRegister *newReg = oBuilder.buildVReg(dst->getMirType(),
+                                                     std::format("{}.{}", dst->getName().c_str(), count).c_str(),
+                                                     dst->getSourceRef(),
+                                                     dst->getRegClass());
+
+            auto &ops = inst->getOperands();
+            ops[0] = newReg;
+
+            varStacks[origReg].push_back(newReg);
+            pushedRegisters.push_back(origReg);
+
+            collector->trace("NonSsaToSsaPass",
+                             "Renamed PHI destination from base reg {} -> new reg {}",
+                             origReg,
+                             newReg->getRegId())
+                    << inst->getSourceRef();
+        }
+
+        // --- B. Process normal instructions ---
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            if (inst->hasOpcode(MirInstructionOpCode::PHI))
+                continue;
+
+            auto &ops = inst->getOperands();
+
+            // 1. Rename READ operands first
+            for (size_t i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (inst->getOperandFlag(i) == MirOperandFlag::Read)
+                {
+                    MirRegister *op = inst->getOpAs<MirRegister>(i);
+                    if (op && op->isVirtual())
+                    {
+                        MirId origReg = op->getRegId();
+                        auto &stack = varStacks[origReg];
+
+                        if (!stack.empty())
+                        {
+                            ops[i] = stack.back();
+
+                            collector->trace("NonSsaToSsaPass",
+                                             "Renamed READ operand from base reg {} -> reaching definition reg {}",
+                                             origReg,
+                                             stack.back()->getRegId())
+                                    << inst->getSourceRef();
+                        }
+                        else
+                        {
+                            if (undefRegs.find(origReg) == undefRegs.end())
+                            {
+                                undefRegs[origReg] = oBuilder.buildVReg(op->getMirType(),
+                                                                        "undef",
+                                                                        op->getSourceRef(),
+                                                                        op->getRegClass());
+                            }
+                            ops[i] = undefRegs[origReg];
+
+                            auto diag = collector->trace(
+                                    "NonSsaToSsaPass",
+                                    "Uninitialized READ detected for base reg {}. Resolved to undef reg {}",
+                                    origReg,
+                                    undefRegs[origReg]->getRegId());
+                            diag << inst->getSourceRef();
+                            diag.appendNote("Inst reads from a register that lacks a dominator definition path.");
+                        }
+                    }
+                }
+            }
+
+            // 2. Rename WRITE operands
+            for (size_t i = 0; i < inst->getOperandCount(); ++i)
+            {
+                if (inst->getOperandFlag(i) == MirOperandFlag::Write)
+                {
+                    MirRegister *op = inst->getOpAs<MirRegister>(i);
+                    if (op && op->isVirtual())
+                    {
+                        MirId origReg = op->getRegId();
+                        size_t count = ++varCounters[origReg];
+
+                        MirRegister *newReg =
+                                oBuilder.buildVReg(op->getMirType(),
+                                                   std::format("{}.{}", op->getName().c_str(), count).c_str(),
+                                                   op->getSourceRef(),
+                                                   op->getRegClass());
+
+                        ops[i] = newReg;
+                        varStacks[origReg].push_back(newReg);
+                        pushedRegisters.push_back(origReg);
+
+                        collector->trace("NonSsaToSsaPass",
+                                         "Renamed WRITE operand from base reg {} -> new reg {}",
+                                         origReg,
+                                         newReg->getRegId())
+                                << inst->getSourceRef();
+                    }
+                }
+            }
+        }
+
+        // --- C. Populate PHI arguments in CFG Successors ---
+        for (MirId succId : cfg->m_successors[blockId])
+        {
+            MirBlock *succBlock = func->getBlock(succId);
+            if (!succBlock)
+                continue;
+
+            const auto &preds = cfg->m_predecessors.at(succId);
+            auto predIt = preds.find(blockId);
+            if (predIt == preds.end())
+                continue;
+
+            size_t predIndex = std::distance(preds.begin(), predIt);
+
+            for (MirInstruction *inst : succBlock->getInstructions())
+            {
+                if (!inst->hasOpcode(MirInstructionOpCode::PHI))
+                    break;
+
+                auto it = phiOriginalReg.find(inst);
+                if (it == phiOriginalReg.end())
+                    continue;
+
+                MirId origReg = it->second;
+                auto &stack = varStacks[origReg];
+
+                MirRegister *activeReg = nullptr;
+                if (!stack.empty())
+                {
+                    activeReg = stack.back();
+                }
+                else
+                {
+                    if (undefRegs.find(origReg) == undefRegs.end())
+                    {
+                        MirRegister *phiDst = inst->getOpAs<MirRegister>(0);
+                        undefRegs[origReg] = oBuilder.buildVReg(phiDst->getMirType(),
+                                                                "undef",
+                                                                phiDst->getSourceRef(),
+                                                                phiDst->getRegClass());
+                    }
+                    activeReg = undefRegs[origReg];
+                }
+
+                auto &ops = inst->getOperands();
+                if ((1 + predIndex) < ops.size())
+                {
+                    ops[1 + predIndex] = activeReg;
+
+                    collector->trace("NonSsaToSsaPass",
+                                     "Populated PHI incoming val in block {} (path from {}) for base reg {} -> "
+                                     "resolved to reg {}",
+                                     succId,
+                                     blockId,
+                                     origReg,
+                                     activeReg->getRegId())
+                            << inst->getSourceRef();
+                }
+            }
+        }
+
+        // --- D. Recurse down the Dominator Tree ---
+        for (MirId childId : domChildren[blockId])
+        {
+            self(self, childId);
+        }
+
+        // --- E. Scope Rollback ---
+        for (MirId origReg : pushedRegisters)
+        {
+            varStacks[origReg].pop_back();
+        }
+
+        collector->trace("NonSsaToSsaPass",
+                         "<--- Leaving block {}, rolled back {} definitions",
+                         blockId,
+                         pushedRegisters.size());
+    };
+
+    renameBlock(renameBlock, func->getEntryPoint()->getId());
+}

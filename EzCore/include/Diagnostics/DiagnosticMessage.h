@@ -5,11 +5,12 @@
 
 enum DiagnosticMessageType : uint8_t
 {
-    Diag_Debug = 0, // The diagnostic contains debug information.
-    Diag_Error,     // The diagnostic contains information about an error.
-    Diag_Trace,     // The diagnostic contains information about a trace during a specific algorithm execution.
-    Diag_Warning    // The diagnostic contains information that should be considered by the reader. MAY or MAY NOT be
-                    // important.
+    Diag_None = 0,
+    Diag_Debug = 1,         // The diagnostic contains debug information.
+    Diag_Error = (1 << 1),  // The diagnostic contains information about an error.
+    Diag_Trace = (1 << 2),  // The diagnostic contains information about a trace during a specific algorithm execution.
+    Diag_Warning = (1 << 3) // The diagnostic contains information that should be considered by the reader. MAY or MAY
+                            // NOT be important.
 };
 
 /**
@@ -80,13 +81,14 @@ class DiagnosticMessage
 
   private:
     /**
-     * Default constructor is made private because a message is going to be built using a builder.
+     * This is the "default" constructor. It is needed to allocate pmr objects.
      */
-    DiagnosticMessage() = default;
+    DiagnosticMessage(std::pmr::memory_resource *alloc);
 
     /**
      * Creates a diagnostic message with the given type, main msg, sender and notes (if specified). Appending notes
-     * after executing this constructor IS ALLOWED.
+     * after executing this constructor IS ALLOWED. This class will use the allocator to create a copy of the
+     * string_view and store that copy inside the pmr strings.
      *
      * This constructor is made private because a message is going to be built using a builder.
      */
@@ -94,6 +96,7 @@ class DiagnosticMessage
                       class SourceReference *primarySourceRef,
                       const std::string_view &mainMsg,
                       const std::string_view &sender,
+                      std::pmr::memory_resource *alloc,
                       const std::list<DiagnosticNote> &notes = {});
 
   private:

@@ -8,6 +8,8 @@
 #include "MirPasses/MirPassManager.h"
 #include "Printer/MirPrinter.h"
 
+namespace
+{
 std::string printMirRegMap(MirBuilderContext *ctx,
                            const std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> &map)
 {
@@ -31,6 +33,7 @@ std::string printMirRegMap(MirBuilderContext *ctx,
 
     return res;
 }
+} // anonymous namespace
 
 LivenessAnalysisPass::LivenessAnalysisPass(MirBuilderContext *ctx) :
     m_result(ctx->getGlobalAllocator()), m_ctx(ctx), m_arena(ctx->getGlobalAllocator())
@@ -49,35 +52,35 @@ MirPassResult LivenessAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
 {
     MirFunction *func = *it;
     auto diag = passManager->getDiagCollector();
-    {
-        auto log = diag->builder(DiagnosticMessageType::Diag_Trace, getName());
-        log << std::pmr::string(std::format("Analyzing register liveness spans for function: '{}'", func->getName()));
-    }
+    diag->trace(getName(), "Analyzing register liveness spans for function: '{}'", func->getName());
 
     // Recover the pre-computed Control Flow Graph directly from the Pass Manager cache
     auto cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
 
     // Initialize and extract block-local Gen (Use) and Kill (Def) sets
-    computeLocalLiveness(func, diag);
+    computeLocalLiveness(func);
 
     // Solve global fixed-point backward equations across our CFG topology paths
     computeGlobalLiveness(func, cfg);
+
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
 void LivenessAnalysisPass::printResult()
 {
-    const auto res = getResult();
     auto diag = m_ctx->getDiagCollector();
 
-    auto log = diag->builder(DiagnosticMessageType::Diag_Debug, getName());
-    log << "Final Liveness Analysis Matrix";
+    // Guard against running expensive map stringification if trace logging is off
+    if (!diag->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+        return;
 
-    log.appendNote(std::string("Def\n").append(printMirRegMap(m_ctx, res->m_def)).c_str(), nullptr);
-    log.appendNote(std::string("Use\n").append(printMirRegMap(m_ctx, res->m_use)).c_str(), nullptr);
-    log.appendNote(std::string("LiveIn\n").append(printMirRegMap(m_ctx, res->m_liveIn)).c_str(), nullptr);
-    log.appendNote(std::string("LiveOut\n").append(printMirRegMap(m_ctx, res->m_liveOut)).c_str(), nullptr);
-    log.flush();
+    const auto res = getResult();
+
+    auto log = diag->trace(getName(), "Final Liveness Analysis");
+    log.appendNote("Def\n{}", printMirRegMap(m_ctx, res->m_def));
+    log.appendNote("Use\n{}", printMirRegMap(m_ctx, res->m_use));
+    log.appendNote("LiveIn\n{}", printMirRegMap(m_ctx, res->m_liveIn));
+    log.appendNote("LiveOut\n{}", printMirRegMap(m_ctx, res->m_liveOut));
 }
 
 void LivenessAnalysisPass::reset()
@@ -88,10 +91,10 @@ void LivenessAnalysisPass::reset()
     m_result.m_liveOut.clear();
 }
 
-void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, ControlFlowResult *cfg)
+void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResult *cfg)
 {
-    m_ctx->getDiagCollector()->builder(DiagnosticMessageType::Diag_Debug, getName())
-            << "Analyzing global variable generation rules (live IN / OUT calculation)...";
+    m_ctx->getDiagCollector()->trace(getName(),
+                                     "Analyzing global variable generation rules (live IN / OUT calculation)...");
 
     auto &blocks = func->getBlocks();
     bool changed = true;
@@ -150,10 +153,10 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, ControlFlowR
     }
 }
 
-void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func, DiagnosticCollector *collector)
+void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func)
 {
-    collector->builder(DiagnosticMessageType::Diag_Debug, getName())
-            << "Analyzing block-local variable generation rules (USE / DEF calculation)...";
+    m_ctx->getDiagCollector()->trace(getName(),
+                                     "Analyzing block-local variable generation rules (USE / DEF calculation)...");
 
     for (auto &block : func->getBlocks())
     {

@@ -47,8 +47,8 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
                 MirRegister *classPtr = m_ctx->getRegisterById(ref->getRefId());
                 if (!classPtr)
                 {
-                    m_ctx->getDiagCollector()->builder(Diag_Error, "RelativeReferenceLowererPass")
-                            << sourceRef << "Invalid class pointer";
+                    m_ctx->getDiagCollector()->error("RelativeReferenceLowererPass", "Invalid class pointer")
+                            << sourceRef;
                     res.m_succeeded = false;
                     return res;
                 }
@@ -56,8 +56,8 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
                 MirClass *_class = m_ctx->getClassByTypeId(classPtr->getMirType()->getPointedType()->getId());
                 if (!_class)
                 {
-                    m_ctx->getDiagCollector()->builder(Diag_Error, "RelativeReferenceLowererPass")
-                            << sourceRef << "Invalid referenced class";
+                    m_ctx->getDiagCollector()->error("RelativeReferenceLowererPass", "Invalid referenced class")
+                            << sourceRef;
                     res.m_succeeded = false;
                     return res;
                 }
@@ -65,8 +65,8 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
                 MirClassField *field = _class->getFieldById(ref->getOffset());
                 if (!field || field->m_offset == -1)
                 {
-                    m_ctx->getDiagCollector()->builder(Diag_Error, "RelativeReferenceLowererPass")
-                            << sourceRef << "Invalid referenced class field";
+                    m_ctx->getDiagCollector()->error("RelativeReferenceLowererPass", "Invalid referenced class field")
+                            << sourceRef;
                     res.m_succeeded = false;
                     return res;
                 }
@@ -79,8 +79,8 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
                 MirRegister *classPtr = m_ctx->getRegisterById(ref->getRefId());
                 if (!classPtr)
                 {
-                    m_ctx->getDiagCollector()->builder(Diag_Error, "RelativeReferenceLowererPass")
-                            << sourceRef << "Invalid class pointer";
+                    m_ctx->getDiagCollector()->error("RelativeReferenceLowererPass", "Invalid class pointer")
+                            << sourceRef;
                     res.m_succeeded = false;
                     return res;
                 }
@@ -88,8 +88,8 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
                 MirClass *_class = m_ctx->getClassByTypeId(classPtr->getMirType()->getPointedType()->getId());
                 if (!_class)
                 {
-                    m_ctx->getDiagCollector()->builder(Diag_Error, "RelativeReferenceLowererPass")
-                            << sourceRef << "Invalid referenced class";
+                    m_ctx->getDiagCollector()->error("RelativeReferenceLowererPass", "Invalid referenced class")
+                            << sourceRef;
                     res.m_succeeded = false;
                     return res;
                 }
@@ -97,8 +97,8 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
                 MirClassMethod *method = _class->getMethodById(ref->getOffset());
                 if (!method || method->m_offset == -1)
                 {
-                    m_ctx->getDiagCollector()->builder(Diag_Error, "RelativeReferenceLowererPass")
-                            << sourceRef << "Invalid referenced class method";
+                    m_ctx->getDiagCollector()->error("RelativeReferenceLowererPass", "Invalid referenced class method")
+                            << sourceRef;
                     res.m_succeeded = false;
                     return res;
                 }
@@ -109,17 +109,21 @@ MirPassResult RelativeReferenceLowererPass::run(std::pmr::list<MirInstruction *>
             }
             default:
             {
-                m_ctx->getDiagCollector()->builder(Diag_Trace, "RelativeReferenceLowererPass")
-                        << sourceRef << "Skipping invalid reference: " << ref->toString().c_str();
+                m_ctx->getDiagCollector()->trace("RelativeReferenceLowererPass",
+                                                 "Skipping invalid reference: {}",
+                                                 ref->toString())
+                        << sourceRef;
                 break;
             }
         }
 
         if (newOp != nullptr)
         {
-            auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "RelativeReferenceLowererPass");
-            diag << sourceRef << "Lowered relative reference: " << ref->toString().c_str();
-            diag.appendNote(MirPrinter::printToString(newOp).c_str(), sourceRef);
+            auto diag = m_ctx->getDiagCollector()->trace("RelativeReferenceLowererPass",
+                                                         "Lowered relative reference: {}",
+                                                         ref->toString());
+            diag << sourceRef;
+            diag.appendNote(sourceRef, MirPrinter::printToString(newOp));
 
             operandList[i] = newOp; // Switch the operand in-place.
             res.m_modifiedMir = true;

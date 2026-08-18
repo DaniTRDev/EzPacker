@@ -23,8 +23,8 @@ MirPassResult ClassOffsetResolverPass::run(MirClass *_class, MirPassManager *pas
         return res;
     }
 
-    m_ctx->getDiagCollector()->builder(Diag_Trace, "ClassOffsetResolverPass")
-            << _class->getSourceRef() << "Running on class: " << _class->getName();
+    m_ctx->getDiagCollector()->trace("ClassOffsetResolverPass", "Running on class: {}", _class->getName())
+            << _class->getSourceRef();
 
     SourceReference *sourceRef = _class->getSourceRef();
     IMirTargetTypeLayout *typeLayout = m_ctx->getTypeTable()->getTargetTypeLayout();
@@ -85,12 +85,9 @@ MirPassResult ClassOffsetResolverPass::run(MirClass *_class, MirPassManager *pas
 
 void ClassOffsetResolverPass::printResult()
 {
-    auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirBlockLegalizerPass");
-    log << std::format("Printing class offser resolver result:").c_str();
-
+    auto log = m_ctx->getDiagCollector()->trace("MirBlockLegalizerPass", "Printing class offser resolver result:");
     for (auto &[id, _class] : m_resolvedClasses)
     {
-        std::string str = MirPrinter::printToString(_class, MirPrinterDetail::Detailed);
-        log.appendNote(str.c_str(), _class->getSourceRef());
+        log.appendNote(_class->getSourceRef(), MirPrinter::printToString(_class, MirPrinterDetail::Detailed));
     }
 }

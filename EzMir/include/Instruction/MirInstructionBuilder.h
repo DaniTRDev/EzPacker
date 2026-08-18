@@ -7,8 +7,10 @@
 
 enum class InsertionType : uint8_t
 {
-    InsertAfter, // After a point.
-    InsertBefore // Before a point.
+    InsertAfter,  // After a point. Needs to specify an iterator.
+    InsertBefore, // Before a point. Needs to specify an iterator.
+    Append // Grabs the last instruction of the owner and pushes right after it. This type DOES not use m_iterator and
+           // can be left NULL.
 };
 
 /**
@@ -35,7 +37,7 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
     MirInstructionBuilder(class MirBuilderContext *ctx,
                           class MirBlock *block,
                           InsertionType type,
-                          std::pmr::list<MirInstruction *>::iterator it);
+                          std::pmr::list<MirInstruction *>::iterator it = {});
 
     /**
      * Builds an instruction with the given opcode and inserts it with the insert point information. Given operand's
@@ -108,8 +110,20 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
     /**
      * Sets the insertion point for the builder.
      */
-    void
-    setInsertionPoint(class MirBlock *block, InsertionType type, std::pmr::list<class MirInstruction *>::iterator it);
+    void setInsertionPoint(class MirBlock *block,
+                           InsertionType type,
+                           std::pmr::list<class MirInstruction *>::iterator it = {});
+
+  private:
+    /**
+     * Creates an empty instruction container used the opcode and reference.
+     */
+    MirInstruction *createInstruction(MirInstructionOpCode opcode, SourceReference *ref);
+
+    /**
+     * Pushes the instruction into the proper place depending on the configuration of m_insertionPoint.
+     */
+    void finalizeInstruction(MirInstruction *instr, SourceReference *ref);
 
   private:
     class MirBuilderContext *m_ctx;

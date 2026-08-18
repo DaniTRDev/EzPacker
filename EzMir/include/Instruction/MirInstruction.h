@@ -3,6 +3,7 @@
 
 #include "EzMirCommon.h"
 #include "MirInstructionMetadata.h"
+#include "Operand/MirOperand.h"
 #include "Operand/MirRegisterReference.h"
 
 class MirInstruction
@@ -15,6 +16,11 @@ class MirInstruction
                             MirInstructionOpCode opcode,
                             class SourceReference *ref,
                             std::pmr::vector<class MirOperand *> operands);
+
+    /**
+     * Returns true if the instruction's opcode is the one given.
+     */
+    bool hasOpcode(MirInstructionOpCode opcode) const;
 
     /**
      * Returns `true` when the instruction currently stores at least one
@@ -73,15 +79,54 @@ class MirInstruction
     class MirTargetInstructionDesc *getTargetDesc() const;
 
     /**
+     * Returns a pointer to operand at given index. If there isn't an operand in that place, nullptr is returned. This
+     * operation TRIGGERS a cache invalidation.
+     */
+    MirOperand *getOperand(size_t index);
+
+    /**
+     * Returns a constant pointer to the operand at given index. If there isn't an operand in that place, nullptr is
+     * returned. This operation DOES NOT trigger a cache invalidation.
+     */
+    const MirOperand *getConstOperand(size_t index);
+
+    /**
      * Returns the operand flag for the given operand distinguishing between a high level mir instruction and a target
      * instruction.
      */
     MirOperandFlag getOperandFlag(size_t index) const;
 
     /**
+     * Return the number of operands this instruction has.
+     */
+    size_t getOperandCount() const;
+
+    /**
      * Returns the source reference of this instruction.
      */
     class SourceReference *getSourceRef() const;
+
+    /**
+     * Returns a constant pointer to the operand in the given index. This DOES not trigger a cache invalidation.
+     */
+    template <typename T>
+        requires(std::is_const<T>::value)
+    const T *getOpAs(size_t index)
+    {
+        const MirOperand *op = getConstOperand(index);
+        return op->get<T>();
+    }
+
+    /**
+     * Returns a pointer to the operand in the given index. This DOES not trigger a cache invalidation.
+     */
+    template <typename T>
+        requires(!std::is_const<T>::value)
+    T *getOpAs(size_t index)
+    {
+        MirOperand *op = getOperand(index);
+        return op->get<T>();
+    }
 
     /**
      * Adds an operand to the instruction. This invalidates cached defined and used registers.

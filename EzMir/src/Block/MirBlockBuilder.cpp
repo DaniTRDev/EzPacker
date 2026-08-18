@@ -21,8 +21,7 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
                                                  m_ownerFunc,
                                                  name);
 
-    m_ctx->getDiagCollector()->builder(Diag_Debug, "MirBlockBuilder")
-            << sourceRef << std::pmr::string(std::format("Built block with id: {}", block->getId()));
+    m_ctx->getDiagCollector()->trace("MirBlockBuilder", "Built block with id: {}", block->getId()) << sourceRef;
 
     if (m_ctx->appendBlock(block))
     {
@@ -30,7 +29,7 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
                           .m_block = block,
                           .m_iterator = block->getInstructions().begin() };
 
-        m_ownerFunc->getBlocks().push_back(block);
+        m_ownerFunc->appendBlock(block);
         setBuildResult(block);
 
         return block;
@@ -43,8 +42,8 @@ MirInstructionBuilder MirBlockBuilder::instrBuilder()
 {
     if (!getBuiltObj())
     {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirBlockBuilder")
-                << "Can't create an instruction builder for a block if block was not built";
+        m_ctx->getDiagCollector()->error("MirBlockBuilder",
+                                         "Can't create an instruction builder for a block if block was not built");
         return MirInstructionBuilder(nullptr, {});
     }
 

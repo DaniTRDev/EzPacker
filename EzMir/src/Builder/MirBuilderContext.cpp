@@ -24,22 +24,20 @@ bool MirBuilderContext::appendBlock(MirBlock *block)
 {
     if (!block)
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext") << "Could not append block because it is invalid";
+        m_diagCollector->error("MirBuilderContext", "Could not append block because it is invalid");
         return false;
     }
 
     auto it = m_blockIdToBlock.find(block->getId());
     if (it != m_blockIdToBlock.end())
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext")
-                << "Could not append block because it was already appended";
+        m_diagCollector->error("MirBuilderContext", "Could not append block because it was already appended");
         return false;
     }
 
-    m_diagCollector->builder(Diag_Trace, "MirBuilderContext")
-            << std::pmr::string(std::format("Appended block with id: {}", block->getId()));
-
+    m_diagCollector->trace("MirBuilderContext", "Appended block with id: {}", block->getId());
     m_blockIdToBlock.insert({ block->getId(), block });
+
     return true;
 }
 
@@ -47,20 +45,18 @@ bool MirBuilderContext::appendClass(MirClass *_class)
 {
     if (!_class)
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext") << "Could not append class because it is invalid";
+        m_diagCollector->error("MirBuilderContext", "Could not append class because it is invalid");
         return false;
     }
 
     auto it = m_classIdToClass.find(_class->getId());
     if (it != m_classIdToClass.end())
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext")
-                << "Could not append class because it was already appended";
+        m_diagCollector->error("MirBuilderContext", "Could not append class because it was already appended");
         return false;
     }
 
-    m_diagCollector->builder(Diag_Trace, "MirBuilderContext")
-            << std::pmr::string(std::format("Appended class with id: {}", _class->getId()));
+    m_diagCollector->trace("MirBuilderContext", "Appended class with id: {}", _class->getId());
 
     m_typeIdToClass.insert({ _class->getType()->getId(), _class });
     m_classIdToClass.insert({ _class->getId(), _class });
@@ -73,22 +69,20 @@ bool MirBuilderContext::appendFunction(MirFunction *func)
 {
     if (!func)
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext") << "Could not append function because it is invalid";
+        m_diagCollector->error("MirBuilderContext", "Could not append function because it is invalid");
         return false;
     }
 
     auto it = m_functionIdToFunc.find(func->getId());
     if (it != m_functionIdToFunc.end())
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext")
-                << "Could not append function because it was already appended";
+        m_diagCollector->error("MirBuilderContext", "Could not append function because it was already appended");
         return false;
     }
 
+    m_diagCollector->trace("MirBuilderContext", "Appended function: {} (id: {})", func->getName(), func->getId());
     m_functions.push_back(func);
     m_functionIdToFunc.insert({ func->getId(), func });
-    m_diagCollector->builder(Diag_Trace, "MirBuilderContext")
-            << std::pmr::string(std::format("Appended function: {} (id: {})", func->getName(), func->getId()));
 
     return true;
 }
@@ -97,22 +91,22 @@ bool MirBuilderContext::appendGlobalVar(MirGlobalVar *globalVar)
 {
     if (!globalVar)
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext")
-                << "Could not append global variable because it is invalid";
+        m_diagCollector->error("MirBuilderContext", "Could not append global variable because it is invalid");
         return false;
     }
 
     auto it = m_globalVarIdToGVar.find(globalVar->getId());
     if (it != m_globalVarIdToGVar.end())
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext")
-                << "Could not append global variable because it was already appended";
+        m_diagCollector->error("MirBuilderContext", "Could not append global variable because it was already appended");
         return false;
     }
 
+    m_diagCollector->trace("MirBuilderContext",
+                           "Appended global var: {} (id: {})",
+                           globalVar->getName(),
+                           globalVar->getId());
     m_globalVarIdToGVar.insert({ globalVar->getId(), globalVar });
-    m_diagCollector->builder(Diag_Trace, "MirBuilderContext") << std::pmr::string(
-            std::format("Appended global var: {} (id: {})", globalVar->getName(), globalVar->getId()));
     m_globalVars.push_back(globalVar);
 
     return true;
@@ -122,7 +116,7 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
 {
     if (!reg)
     {
-        m_diagCollector->builder(Diag_Error, "MirBuilderContext") << "Could not append register because it is invalid";
+        m_diagCollector->error("MirBuilderContext", "Could not append register because it is invalid");
         return false;
     }
 
@@ -131,14 +125,12 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
         auto it = m_registerIdToRegister.find(reg->getRegId());
         if (it != m_registerIdToRegister.end())
         {
-            m_diagCollector->builder(Diag_Error, "MirBuilderContext")
-                    << "Could not append register because it was already appended";
+            m_diagCollector->error("MirBuilderContext", "Could not append register because it was already appended");
             return false;
         }
 
+        m_diagCollector->trace("MirBuilderContext", "Appended register: {} (id: {})", reg->getName(), reg->getRegId());
         m_registerIdToRegister.insert({ reg->getRegId(), reg });
-        m_diagCollector->builder(Diag_Trace, "MirBuilderContext")
-                << std::pmr::string(std::format("Appended register: {} (id: {})", reg->getName(), reg->getRegId()));
     }
 
     return true;

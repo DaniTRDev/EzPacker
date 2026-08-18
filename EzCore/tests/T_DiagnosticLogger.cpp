@@ -63,13 +63,13 @@ TEST_F(DiagTest, BasicErrorDiagnostic)
     m_diagCollector->beginScope(DiagnosticScopeAction::Commit);
     {
         // Emit the main error utilizing our fluent builder pipeline
-        m_diagCollector->builder(Diag_Error, "TypeChecker")
-                << &assignmentOpRef << "Incompatible types when assigning to type 'int' from type 'const char*'";
+        m_diagCollector->error("TypeChecker", "Incompatible types when assigning to type 'int' from type 'const char*'")
+                << &assignmentOpRef;
 
         // InsertAfter a supplemental contextual note highlighting the exact literal mismatch
         m_diagCollector->builder(Diag_Warning, "TypeChecker")
-                .appendNote("String literal value cannot be implicitly promoted to scalar integers",
-                            &invalidStringLiteralRef);
+                .appendNote(&invalidStringLiteralRef,
+                            "String literal value cannot be implicitly promoted to scalar integers");
     }
     // Semicolon completes expression lines, destroying the builders and flushing them.
 

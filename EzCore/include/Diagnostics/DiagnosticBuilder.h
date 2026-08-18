@@ -25,14 +25,55 @@ class DiagnosticBuilder
     DiagnosticBuilder(class DiagnosticCollector *collector, DiagnosticMessageType type, const std::string_view &sender);
 
     /**
+     * Defines the move constructor. It will unlink other's from emitting the message.
+     */
+    DiagnosticBuilder(DiagnosticBuilder &&other);
+
+    /**
      * When this object is destroyed, the message is flushed into the collector.
      */
     ~DiagnosticBuilder();
 
     /**
-     * Appends a note to the current message.
+     * Utility function that builds a note with the given ref and format str. If the current's message type level log is
+     * not enabled, the function won't even format the string and will return early.
      */
-    DiagnosticBuilder &appendNote(const std::pmr::string &message, class SourceReference *sourceRef = nullptr);
+    template <typename... Args>
+    DiagnosticBuilder &appendNote(class SourceReference *ref, std::format_string<Args...> fmt, Args &&...args)
+    {
+        if (!isDiagEnabledForType(m_message.getType()))
+        {
+            return *this; // Exit immediately. To avoid allocations.
+        }
+
+        // If we got here, the message can be notified to the collector. Format and send to the appendNote method.
+        return appendNoteRaw(std::format(fmt, std::forward<Args>(args)...), ref);
+    }
+
+    /**
+     * Utility function that builds a note with the given format str. If the current's message type level log is
+     * not enabled, the function won't even format the string and will return early.
+     */
+    template <typename... Args> DiagnosticBuilder &appendNote(std::format_string<Args...> fmt, Args &&...args)
+    {
+        if (!isDiagEnabledForType(m_message.getType()))
+        {
+            return *this; // Exit immediately. To avoid allocations.
+        }
+
+        // If we got here, the message can be notified to the collector. Format and send to the appendNote method.
+        return appendNoteRaw(std::format(fmt, std::forward<Args>(args)...), nullptr);
+    }
+
+    /**
+     * Appends a note with the given source reference and message.
+     */
+    DiagnosticBuilder &appendNote(class SourceReference *sourceRef, std::string_view message);
+
+    /**
+     * Appends a note with the given message and WITHOUT a source reference.
+     */
+    DiagnosticBuilder &appendNote(std::string_view message);
 
     /**
      * Sets the type and sender of the current message.
@@ -42,7 +83,7 @@ class DiagnosticBuilder
     /**
      * Operator used to append a string into the main message.
      */
-    DiagnosticBuilder &operator<<(const std::pmr::string &str);
+    DiagnosticBuilder &operator<<(const std::string_view &str);
 
     /**
      * Operator used to append a source reference to the main message.
@@ -53,6 +94,18 @@ class DiagnosticBuilder
      * Pushes the current message to the diagnostic collector and clears it.
      */
     void flush();
+
+  private:
+    /**
+     * Simple wrapper that calls m_collector method. Made a whole new method just not to make the builder require
+     * including collector's files.
+     */
+    bool isDiagEnabledForType(DiagnosticMessageType type) const;
+
+    /**
+     * Internal append method used to stop template recursion in the template appends.
+     */
+    DiagnosticBuilder &appendNoteRaw(std::string_view str, class SourceReference *ref);
 
   private:
     class DiagnosticCollector *m_collector;

@@ -15,7 +15,7 @@ class TestCodeFlowPass : public MirTestSuiteAsGtest
 namespace
 {
 
-bool DepthFirstSearch(ControlFlowResult *res, size_t current, size_t target, std::unordered_set<size_t> &visited)
+bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::unordered_set<size_t> &visited)
 {
     if (current == target)
         return true;
@@ -37,7 +37,7 @@ bool DepthFirstSearch(ControlFlowResult *res, size_t current, size_t target, std
     return false;
 }
 
-::testing::AssertionResult HasGraphSize(ControlFlowResult *result, size_t predCount, size_t succCount)
+::testing::AssertionResult HasGraphSize(CodeFlowResult *result, size_t predCount, size_t succCount)
 {
     if (!result)
         return ::testing::AssertionFailure() << "Result is nullptr";
@@ -53,7 +53,7 @@ bool DepthFirstSearch(ControlFlowResult *res, size_t current, size_t target, std
     return ::testing::AssertionSuccess();
 }
 
-::testing::AssertionResult IsCfgExit(ControlFlowResult *result, MirBlock *exitBlock)
+::testing::AssertionResult IsCfgExit(CodeFlowResult *result, MirBlock *exitBlock)
 {
     if (!result)
         return ::testing::AssertionFailure() << "Result is nullptr";
@@ -73,8 +73,7 @@ bool DepthFirstSearch(ControlFlowResult *res, size_t current, size_t target, std
     return ::testing::AssertionSuccess();
 }
 
-::testing::AssertionResult
-IsCfgNode(ControlFlowResult *result, MirBlock *node, size_t expectedPreds, size_t expectedSuccs)
+::testing::AssertionResult IsCfgNode(CodeFlowResult *result, MirBlock *node, size_t expectedPreds, size_t expectedSuccs)
 {
     if (!result)
         return ::testing::AssertionFailure() << "Result is nullptr";
@@ -98,7 +97,7 @@ IsCfgNode(ControlFlowResult *result, MirBlock *node, size_t expectedPreds, size_
     return ::testing::AssertionSuccess();
 }
 
-::testing::AssertionResult HasEdge(ControlFlowResult *result, MirBlock *from, MirBlock *to)
+::testing::AssertionResult HasEdge(CodeFlowResult *result, MirBlock *from, MirBlock *to)
 {
     if (!result)
         return ::testing::AssertionFailure() << "Result is nullptr";
@@ -121,7 +120,7 @@ IsCfgNode(ControlFlowResult *result, MirBlock *node, size_t expectedPreds, size_
     return ::testing::AssertionSuccess();
 }
 
-::testing::AssertionResult IsReachable(ControlFlowResult *result, MirBlock *from, MirBlock *to)
+::testing::AssertionResult IsReachable(CodeFlowResult *result, MirBlock *from, MirBlock *to)
 {
     if (!result || !from || !to)
         return ::testing::AssertionFailure() << "Nullptr argument provided";
@@ -133,7 +132,7 @@ IsCfgNode(ControlFlowResult *result, MirBlock *node, size_t expectedPreds, size_
     return ::testing::AssertionFailure() << "No path found from block " << from->getId() << " to block " << to->getId();
 }
 
-::testing::AssertionResult IsNotReachable(ControlFlowResult *result, MirBlock *from, MirBlock *to)
+::testing::AssertionResult IsNotReachable(CodeFlowResult *result, MirBlock *from, MirBlock *to)
 {
     if (!result || !from || !to)
         return ::testing::AssertionFailure() << "Nullptr argument provided";
@@ -150,17 +149,22 @@ void AddCfgEdge(MirBuilderContext *context, MirBlock *initialBlock, MirBlock *ta
 {
     ASSERT_NE(context, nullptr);
     MirOperandBuilder oBuilder(context);
-    MirInstructionBuilder instrBuilder(context, initialBlock, InsertionType::InsertAfter, initialBlock->begin());
+    MirInstructionBuilder instrBuilder(context, initialBlock, InsertionType::InsertAfter, {});
     instrBuilder.JMP(oBuilder.buildRef(targetBlock));
 }
 
-void AddCondEdge(MirBuilderContext *context, MirBlock *initialBlock, MirBlock *targetBlock)
+void AddCondEdge(MirBuilderContext *context,
+                 MirRegister *condReg,
+                 MirBlock *initialBlock,
+                 MirBlock *trueBlock,
+                 MirBlock *falseBlock)
 {
     ASSERT_NE(context, nullptr);
     MirOperandBuilder oBuilder(context);
-    MirInstructionBuilder instrBuilder(context, initialBlock, InsertionType::InsertAfter, initialBlock->begin());
-    // Uses a conditional jump so the block can have 2 successors (this jump + the natural fallthrough)
-    instrBuilder.JE(oBuilder.buildRef(targetBlock));
+    MirInstructionBuilder instrBuilder(context, initialBlock, InsertionType::Append, {});
+
+    // Explicitly layout both true and false paths using the new BR_COND
+    instrBuilder.BR_COND(condReg, oBuilder.buildRef(trueBlock), oBuilder.buildRef(falseBlock));
 }
 
 } // anonymous namespace
@@ -171,7 +175,7 @@ TEST_F(TestCodeFlowPass, TestFuncDoesNotHaveSuccessorsOrPredecessors)
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
 
     CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
-    ControlFlowResult *result = pass->getResult();
+    CodeFlowResult *result = pass->getResult();
 
     EXPECT_TRUE(HasGraphSize(result, 1, 1)); // Corrected to 1, 1 since the node is mapped
     EXPECT_TRUE(IsCfgExit(result, entryPoint));
@@ -188,7 +192,7 @@ TEST_F(TestCodeFlowPass, Test1Successor)
     AddCfgEdge(ctx, entryPoint, successor);
 
     CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
-    ControlFlowResult *result = pass->getResult();
+    CodeFlowResult *result = pass->getResult();
 
     // Assert graph edge details
     EXPECT_TRUE(IsCfgNode(result, entryPoint, 0, 1));
@@ -208,24 +212,25 @@ TEST_F(TestCodeFlowPass, TestDiamondPattern)
 {
     MirBuilderContext *ctx = getBuilderCtx();
     MirBlockBuilder blockBuilder(ctx, getTestFunc());
+    MirOperandBuilder oBuilder(ctx);
 
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
 
-    // Layout order is important for fallthrough: entryPoint -> trueBlock -> falseBlock -> mergeBlock
     MirBlock *trueBlock = blockBuilder.build(nullptr, "if_true");
     MirBlock *falseBlock = blockBuilder.build(nullptr, "if_false");
     MirBlock *mergeBlock = blockBuilder.build(nullptr, "merge");
 
-    // entryPoint branches to falseBlock conditionally.
-    // If condition fails, it natively falls through to the next block in layout (trueBlock).
-    AddCondEdge(ctx, entryPoint, falseBlock);
+    MirRegister *cond = oBuilder.buildVReg(getTypeTable()->i1(), "cond");
 
-    // Both branch paths jump to mergeBlock
+    // entryPoint branches to trueBlock and falseBlock conditionally via explicit target references
+    AddCondEdge(ctx, cond, entryPoint, trueBlock, falseBlock);
+
+    // Both branch paths unconditionally jump to mergeBlock
     AddCfgEdge(ctx, trueBlock, mergeBlock);
     AddCfgEdge(ctx, falseBlock, mergeBlock);
 
     CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
-    ControlFlowResult *result = pass->getResult();
+    CodeFlowResult *result = pass->getResult();
 
     EXPECT_TRUE(HasGraphSize(result, 4, 4));
 
@@ -246,25 +251,27 @@ TEST_F(TestCodeFlowPass, TestLoopCycle)
 {
     MirBuilderContext *ctx = getBuilderCtx();
     MirBlockBuilder blockBuilder(ctx, getTestFunc());
+    MirOperandBuilder oBuilder(ctx);
 
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
 
-    // Layout order: entry -> header -> body -> exit
     MirBlock *loopHeader = blockBuilder.build(nullptr, "loop_header");
     MirBlock *loopBody = blockBuilder.build(nullptr, "loop_body");
     MirBlock *exitBlock = blockBuilder.build(nullptr, "exit");
 
+    MirRegister *cond = oBuilder.buildVReg(getTypeTable()->i1(), "cond");
+
     // Enter the loop
     AddCfgEdge(ctx, entryPoint, loopHeader);
 
-    // Conditionally break out to exitBlock. If not taken, falls through to loopBody
-    AddCondEdge(ctx, loopHeader, exitBlock);
+    // Conditionally continue to loopBody or break out to exitBlock
+    AddCondEdge(ctx, cond, loopHeader, loopBody, exitBlock);
 
     // Body jumps back to header (back-edge)
     AddCfgEdge(ctx, loopBody, loopHeader);
 
     CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
-    ControlFlowResult *result = pass->getResult();
+    CodeFlowResult *result = pass->getResult();
 
     EXPECT_TRUE(HasGraphSize(result, 4, 4));
 
@@ -283,9 +290,6 @@ TEST_F(TestCodeFlowPass, TestDeadCodeBlock)
 
     MirBlock *entryPoint = getTestFunc()->getEntryPoint();
 
-    // IMPORTANT FIX: Create deadBlock BEFORE normalExit.
-    // Because normalExit has no terminal instruction, it will try to fallthrough
-    // to whatever is physically next. Putting it last prevents it from falling into dead code.
     MirBlock *deadBlock = blockBuilder.build(nullptr, "dead_code");
     MirBlock *normalExit = blockBuilder.build(nullptr, "normal_exit");
 
@@ -296,7 +300,7 @@ TEST_F(TestCodeFlowPass, TestDeadCodeBlock)
     AddCfgEdge(ctx, deadBlock, normalExit);
 
     CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
-    ControlFlowResult *result = pass->getResult();
+    CodeFlowResult *result = pass->getResult();
 
     EXPECT_TRUE(HasGraphSize(result, 3, 3));
 
