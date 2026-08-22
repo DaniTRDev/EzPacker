@@ -31,7 +31,7 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
     m_diagCollector = std::make_shared<DiagnosticCollector>();
     m_typeTable = std::make_shared<MirTypeTable>(&m_arena);
     m_builderCtx = std::make_shared<MirBuilderContext>(nullptr, m_diagCollector.get(), m_typeTable.get(), &m_arena);
-    m_sourceManager = std::make_shared<SourceManager>(workingPath);
+    m_sourceManager = std::make_shared<SourceManager>(workingPath, &m_arena);
     m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
     m_passManager = std::make_shared<MirPassManager>(m_diagCollector.get(), &m_arena);
 
