@@ -1,141 +1,181 @@
 #include "SourceManager/SourceManager.h"
-#include <algorithm>
-#include <stdexcept>
 
-SourceManager::SourceManager(const std::filesystem::path &workingPath) :
-    m_workingPath(std::filesystem::absolute(workingPath))
+SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc) :
+    m_workingPath(workingPath), m_alloc(alloc), m_pathToIdMap(m_alloc), m_sourceFiles(m_alloc)
 {
-    // Reserve ID 0 as an invalid/empty identifier flag
-    m_sourceFiles.push_back({ .name = "INVALID", .content = "", .lines = {} });
+    // Slot 0 reserved as a nullptr sentinel so 1-based IDs match indexing
+    m_sourceFiles.push_back(nullptr);
 }
 
 bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) const
 {
-    std::string resolved = resolveSourcePath(sourceName).string();
-    return m_pathToIdMap.contains(resolved);
-}
-
-size_t SourceManager::addSourceContent(const std::string &name, const std::string &content)
-{
-    std::string resolvedName = resolveSourcePath(name).string();
-
-    if (m_pathToIdMap.contains(resolvedName))
-    {
-        return 0;
-    }
-
-    size_t assignedId = m_sourceFiles.size();
-    m_pathToIdMap[resolvedName] = assignedId;
-
-    SourceFileEntry entry;
-    entry.name = resolvedName;
-    entry.content = content;
-    entry.lines.reserve(content.size() / 40);
-
-    size_t lineStart = 0;
-    size_t currentPos = 0;
-    const size_t contentSize = content.size();
-
-    while (currentPos < contentSize)
-    {
-        if (content[currentPos] == '\n')
-        {
-            size_t lineLength = currentPos - lineStart;
-            // Robust CRLF handling: Strip trailing \r line weights
-            if (lineLength > 0 && content[currentPos - 1] == '\r')
-            {
-                lineLength--;
-            }
-            entry.lines.push_back({ .m_start = lineStart, .m_length = lineLength });
-            lineStart = currentPos + 1;
-        }
-        currentPos++;
-    }
-
-    if (lineStart <= contentSize)
-    {
-        size_t lineLength = contentSize - lineStart;
-        if (lineLength > 0 && content[contentSize - 1] == '\r')
-        {
-            lineLength--;
-        }
-        entry.lines.push_back({ .m_start = lineStart, .m_length = lineLength });
-    }
-
-    m_sourceFiles.push_back(std::move(entry));
-    return assignedId;
-}
-
-SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, size_t sourceId)
-{
-    if (sourceId >= m_sourceFiles.size() || sourceId == 0)
-        return {};
-
-    const auto &lines = m_sourceFiles[sourceId].lines;
-    if (line >= lines.size())
-        return {};
-
-    const auto &lineRange = lines[line];
-    if ((col + length) > lineRange.m_length)
-        return {};
-
-    return SourceReference{ true, col, length, line, sourceId };
-}
-
-SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, const std::string &sourceFile)
-{
-    std::string resolved = resolveSourcePath(sourceFile).string();
-    auto it = m_pathToIdMap.find(resolved);
-    if (it == m_pathToIdMap.end())
-        return {};
-    return createReference(col, length, line, it->second);
+    return m_pathToIdMap.find(sourceName) != m_pathToIdMap.end();
 }
 
 std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::path &sourceFile) const
 {
-    return sourceFile.is_relative() ? (m_workingPath / sourceFile) : sourceFile;
-}
-
-std::string SourceManager::getRawLineContent(const SourceReference &ref) const
-{
-    if (!ref.m_valid || ref.m_sourceFileId >= m_sourceFiles.size())
-        return "";
-
-    const auto &file = m_sourceFiles[ref.m_sourceFileId];
-    if (ref.m_line >= file.lines.size())
-        return "";
-
-    const auto &range = file.lines[ref.m_line];
-    return file.content.substr(range.m_start, range.m_length);
-}
-
-std::string SourceManager::getReferenceContent(const SourceReference &ref) const
-{
-    std::string lineContent = getRawLineContent(ref);
-    if (lineContent.empty() && ref.m_valid)
+    if (sourceFile.is_absolute())
     {
-        return "Internal Compiler Error: Malformed Source Reference";
+        return std::filesystem::weakly_canonical(sourceFile);
+    }
+    return std::filesystem::weakly_canonical(m_workingPath / sourceFile);
+}
+
+size_t SourceManager::addSourceContent(const std::string &name, const std::string_view &content)
+{
+    if (doesSourceNameExist(name))
+    {
+        return 0;
     }
 
-    std::string indent;
-    indent.reserve(ref.m_col);
-    for (size_t i = 0; i < ref.m_col && i < lineContent.size(); ++i)
+    size_t newId = m_sourceFiles.size();
+
+    // Allocate SourceFileEntry using the PMR memory resource
+    void *entryMem = m_alloc->allocate(sizeof(SourceFileEntry), alignof(SourceFileEntry));
+    SourceFileEntry *entry = new (entryMem) SourceFileEntry{ std::pmr::string(content, m_alloc),
+                                                             std::pmr::string(name, m_alloc),
+                                                             std::pmr::vector<SourceLineRange>(m_alloc) };
+
+    // Precompute line bounds with 1-based line numbers (safely handles \n and \r\n)
+    size_t lineStart = 0;
+    size_t lineNumber = 1;
+
+    for (size_t i = 0; i < content.size(); ++i)
     {
-        indent += (lineContent[i] == '\t') ? '\t' : ' ';
+        if (content[i] == '\n')
+        {
+            entry->m_lines.push_back({ lineStart, i, lineNumber++ });
+            lineStart = i + 1;
+        }
+    }
+    if (lineStart <= content.size())
+    {
+        entry->m_lines.push_back({ lineStart, content.size(), lineNumber });
     }
 
-    size_t markLength = std::max<size_t>(1, std::min(ref.m_length, lineContent.size() - ref.m_col));
-    std::string squiggles = "^" + std::string(markLength - 1, '~');
+    // Use the arena-backed string to ensure it outlives the map entry
+    m_pathToIdMap.emplace(entry->m_name, newId);
+    m_sourceFiles.push_back(entry);
 
-    return std::format("{}\n{}{}", lineContent, indent, squiggles);
+    return newId;
 }
 
-std::string SourceManager::getSourceContent(size_t id) const
+SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
 {
-    return (id < m_sourceFiles.size()) ? m_sourceFiles[id].content : "";
+    if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
+    {
+        return nullptr;
+    }
+
+    SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
+    if (!entry || entry->m_lines.empty())
+    {
+        return nullptr;
+    }
+
+    // Binary search for the line range containing ref->m_beginOffset
+    auto it = std::upper_bound(entry->m_lines.begin(),
+                               entry->m_lines.end(),
+                               ref->m_beginOffset,
+                               [](size_t val, const SourceLineRange &range) { return val < range.m_beginOffset; });
+
+    if (it != entry->m_lines.begin())
+    {
+        --it;
+        // Verify the offset falls within this line range
+        if (ref->m_beginOffset >= it->m_beginOffset && ref->m_beginOffset <= it->m_endOffset)
+        {
+            return &(*it);
+        }
+    }
+
+    return nullptr;
 }
 
-std::string SourceManager::getSourceName(size_t id) const
+SourceReference *SourceManager::createReference(size_t startOffset, size_t length, size_t sourceId)
 {
-    return (id < m_sourceFiles.size()) ? m_sourceFiles[id].name : "";
+    if (sourceId == 0 || sourceId >= m_sourceFiles.size())
+    {
+        return nullptr;
+    }
+
+    SourceFileEntry *entry = m_sourceFiles[sourceId];
+    if (!entry)
+    {
+        return nullptr;
+    }
+
+    size_t fileLength = entry->m_content.size();
+    if (startOffset > fileLength)
+    {
+        return nullptr;
+    }
+
+    size_t endOffset = std::min(startOffset + length, fileLength);
+
+    void *mem = m_alloc->allocate(sizeof(SourceReference), alignof(SourceReference));
+    return new (mem) SourceReference{ startOffset, endOffset, sourceId };
+}
+
+SourceReference *SourceManager::createReference(size_t startOffset, size_t length, const std::string_view &sourceFile)
+{
+    auto it = m_pathToIdMap.find(sourceFile);
+    if (it == m_pathToIdMap.end())
+    {
+        return nullptr;
+    }
+    return createReference(startOffset, length, it->second);
+}
+
+std::string_view SourceManager::getRawLineContent(SourceReference *ref) const
+{
+    SourceLineRange *lineRange = getReferenceLine(ref);
+    if (!lineRange)
+    {
+        return {};
+    }
+
+    const SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
+    return std::string_view(entry->m_content.data() + lineRange->m_beginOffset, lineRange->length());
+}
+
+std::string_view SourceManager::getReferenceContent(SourceReference *ref) const
+{
+    if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
+    {
+        return {};
+    }
+
+    const SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
+    if (!entry)
+    {
+        return {};
+    }
+
+    const auto &content = entry->m_content;
+    if (ref->m_beginOffset > content.size() || ref->m_endOffset > content.size() ||
+        ref->m_beginOffset > ref->m_endOffset)
+    {
+        return {};
+    }
+
+    return std::string_view(content.data() + ref->m_beginOffset, ref->length());
+}
+
+std::string_view SourceManager::getSourceContent(size_t id) const
+{
+    if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
+    {
+        return {};
+    }
+    return m_sourceFiles[id]->m_content;
+}
+
+std::string_view SourceManager::getSourceName(size_t id) const
+{
+    if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
+    {
+        return {};
+    }
+    return m_sourceFiles[id]->m_name;
 }
