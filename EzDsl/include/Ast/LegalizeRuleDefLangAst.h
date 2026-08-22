@@ -1,40 +1,40 @@
-#ifndef EZDSL_LEGALIZE_RULE_DEF_LANG_H
-#define EZDSL_LEGALIZE_RULE_DEF_LANG_H
+#ifndef EZDSL_LEGALIZE_RULE_DEF_LANG_AST_H
+#define EZDSL_LEGALIZE_RULE_DEF_LANG_AST_H
 
 #include "EzDslCommon.h"
 #include "Ast/CommonAstNodes.h"
 
-namespace DSL::Ast::LegalizeRuleDefLang
-{
-namespace DSL::Ast::LegalizeRuleDefLang
+namespace DSL::Ast::LegalizeRuleDef
 {
 /**
  * Identifies the nature of an operand inside a pattern or expansion instruction.
  */
 enum class OperandKind
 {
-    SsaRegister,      // An SSA virtual register (e.g., "$dst", "$src1").
+    SsaRegister,      // An SSA virtual register (e.g., "$dst", "i32:$dst", "$src1").
     ImmediateLiteral, // A concrete integer literal immediate (e.g., 0, 42, 0xFF).
-    ImmediateSymbol,  // A bound symbolic immediate constant (e.g., "$c:imm").
+    ImmediateSymbol,  // A bound symbolic immediate constant (e.g., "imm:$c", "imm(i32):$c").
     CustomTransform   // A compile-time function transform (e.g., "log2($c)", "neg($imm)").
 };
 
 /**
  * Represents an operand within a pattern match or expansion IR instruction.
  *
- * Examples:
- * - "i32:$dst"     -> SSA register named "dst", explicit type "i32"
- * - "$src"         -> SSA register named "src", type inferred from match context
- * - "$c:imm"       -> Symbolic immediate operand named "c"
- * - "0x20"         -> Literal immediate constant
- * - "log2($shift)" -> Custom transform expression applied to "$shift"
+ * Supported Syntax:
+ * - "i32:$dst"     -> SSA register (m_type="i32", m_name="dst")
+ * - "imm(i32):$c"  -> Immediate symbol (m_type="imm", m_typeParam="i32", m_name="c")
+ * - "imm:$c"       -> Immediate symbol (m_type="imm", m_name="c")
+ * - "$src"         -> Bare SSA register (m_name="src", m_type=std::nullopt)
+ * - "42", "0xFF"   -> Immediate literal (m_immLiteral=42)
+ * - "log2($shift)" -> Custom transform expression
  */
 struct RuleOperand
 {
     OperandKind m_kind = OperandKind::SsaRegister;
     Common::Identifier m_name;                          // Variable or transform function name.
-    std::optional<Common::Identifier> m_type;           // Optional type binding (e.g., "i8", "i32", "imm").
-    std::optional<Common::IntegerLiteral> m_immLiteral; // Concrete value if m_kind == ImmediateLiteral.
+    std::optional<Common::Identifier> m_type;           // Base type or classifier ("i32", "imm", "GPR").
+    std::optional<Common::Identifier> m_typeParam;      // Optional parameter ("i32" in "imm(i32):$c").
+    std::optional<Common::IntegerLiteral> m_immLiteral; // Value if m_kind == ImmediateLiteral.
     std::pmr::vector<Common::Identifier> m_callArgs;    // Arguments if m_kind == CustomTransform.
 };
 
@@ -51,10 +51,12 @@ struct RuleOperand
  */
 struct RuleInstruction
 {
-    std::pmr::vector<RuleOperand> m_defs; // Target / destination operand(s) on the LHS.
-    Common::Identifier m_opcode;          // Generic IR opcode name (e.g., "ADD", "SEXT").
-    std::pmr::vector<RuleOperand> m_uses; // Source operand(s) on the RHS.
+    Common::Identifier m_opcode;              // Generic IR opcode name (e.g., "ADD", "SEXT").
+    std::pmr::vector<RuleOperand> m_operands; // Dest and source operand(s). This is known by MIR instr metadata.
 };
+
+// Represents an argument to a predicate: either an identifier ($c, Zba) or an integer literal (-2048, 2047).
+using PredicateArg = std::variant<Common::Identifier, Common::IntegerLiteral>;
 
 /**
  * A semantic predicate check defined in a `when { ... }` guard clause.
@@ -69,8 +71,8 @@ struct RuleInstruction
  */
 struct RulePredicate
 {
-    Common::Identifier m_predicateName;               // Name of the predicate function / hook.
-    std::pmr::vector<Common::Identifier> m_arguments; // Bound SSA or immediate variables passed to the check.
+    Common::Identifier m_predicateName;         // Name of the predicate function / hook.
+    std::pmr::vector<PredicateArg> m_arguments; // Bound variables, subtarget features, or integer literals.
 };
 
 /**
@@ -127,6 +129,6 @@ struct TargetLegalizeRuleDef
 {
     std::pmr::vector<LegalizeRewriteRule> m_rules; // Collection of declared rewrite rules.
 };
-}; // namespace DSL::Ast::LegalizeRuleDefLang
+}; // namespace DSL::Ast::LegalizeRuleDef
 
-#endif // EZDSL_LEGALIZE_RULE_DEF_LANG_H
+#endif // EZDSL_LEGALIZE_RULE_DEF_LANG_AST_H

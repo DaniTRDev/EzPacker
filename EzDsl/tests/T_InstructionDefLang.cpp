@@ -1,8 +1,8 @@
 #include "EzDslCommon.h"
-#include "Ast/InstDefLangAst.h"
+#include "Ast/InstructionDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
-#include "Parser/InstDefLang.h"
+#include "Parser/InstructionDefLang.h"
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 #include <gtest/gtest.h>
@@ -36,6 +36,10 @@ class InstDefLangTest : public ::testing::Test
     std::shared_ptr<DiagnosticLogger> m_diagLogger;
     std::shared_ptr<SourceManager> m_sourceManager;
 };
+
+// ============================================================================
+// 1. Bit Slices & Bit Expressions
+// ============================================================================
 
 TEST_F(InstDefLangTest, TestBitSliceNormalization)
 {
@@ -151,7 +155,7 @@ TEST_F(InstDefLangTest, TestBitAssignment)
 }
 
 // ============================================================================
-// 3. Formats & Layouts
+// 2. Formats & Layouts
 // ============================================================================
 
 TEST_F(InstDefLangTest, TestFormatDeclarationExplicitWidth)
@@ -207,6 +211,10 @@ format SimpleFormat {
     ASSERT_EQ(res->m_fields.size(), 2);
 }
 
+// ============================================================================
+// 3. Unified Instruction Operands & Header
+// ============================================================================
+
 TEST_F(InstDefLangTest, TestRegisterAndImmediateOperands)
 {
     // 1. Register operand
@@ -214,31 +222,45 @@ TEST_F(InstDefLangTest, TestRegisterAndImmediateOperands)
     size_t regSourceId = addSource("regTest", regTest);
     ParseContext regCtx(getDiagCollector(), getSourceManager(), regSourceId);
 
-    auto regRes = regCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstArgValues>();
+    auto regRes = regCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
     ASSERT_TRUE(regRes.has_value());
-    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::InstRegOperand>(*regRes));
-    const auto &regArg = std::get<DSL::Ast::InstDef::InstRegOperand>(*regRes);
-    EXPECT_EQ(regArg.m_regClass.m_node, "GPR");
-    EXPECT_EQ(regArg.m_argName.m_node, "rd");
-    EXPECT_EQ(regArg.m_argDir, DSL::Ast::InstDef::InstOperandDir::ArgOut);
+    EXPECT_EQ(regRes->m_kind, DSL::Ast::InstDef::InstOperandKind::Register);
+    EXPECT_EQ(regRes->m_typeOrClass.m_node, "GPR");
+    EXPECT_FALSE(regRes->m_typeParam.has_value());
+    EXPECT_EQ(regRes->m_name.m_node, "rd");
+    EXPECT_EQ(regRes->m_dir, DSL::Ast::InstDef::InstOperandDir::ArgOut);
 
-    // 2. Immediate operand
-    std::string immTest = "simm12:imm offset IN";
+    // 2. Parameterized immediate operand (e.g., simm(i12):offset IN)
+    std::string immParamTest = "simm(i12):offset IN";
+    size_t immParamSourceId = addSource("immParamTest", immParamTest);
+    ParseContext immParamCtx(getDiagCollector(), getSourceManager(), immParamSourceId);
+
+    auto immParamRes = immParamCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
+    ASSERT_TRUE(immParamRes.has_value());
+    EXPECT_EQ(immParamRes->m_kind, DSL::Ast::InstDef::InstOperandKind::Immediate);
+    EXPECT_EQ(immParamRes->m_typeOrClass.m_node, "simm");
+    ASSERT_TRUE(immParamRes->m_typeParam.has_value());
+    EXPECT_EQ(immParamRes->m_typeParam->m_node, "i12");
+    EXPECT_EQ(immParamRes->m_name.m_node, "offset");
+    EXPECT_EQ(immParamRes->m_dir, DSL::Ast::InstDef::InstOperandDir::ArgIn);
+
+    // 3. Unparameterized immediate operand (e.g., imm:val IN)
+    std::string immTest = "imm:val IN";
     size_t immSourceId = addSource("immTest", immTest);
     ParseContext immCtx(getDiagCollector(), getSourceManager(), immSourceId);
 
-    auto immRes = immCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstArgValues>();
+    auto immRes = immCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
     ASSERT_TRUE(immRes.has_value());
-    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::InstImmOperand>(*immRes));
-    const auto &immArg = std::get<DSL::Ast::InstDef::InstImmOperand>(*immRes);
-    EXPECT_EQ(immArg.m_typeName.m_node, "simm12");
-    EXPECT_EQ(immArg.m_argName.m_node, "offset");
-    EXPECT_EQ(immArg.m_argDir, DSL::Ast::InstDef::InstOperandDir::ArgIn);
+    EXPECT_EQ(immRes->m_kind, DSL::Ast::InstDef::InstOperandKind::Immediate);
+    EXPECT_EQ(immRes->m_typeOrClass.m_node, "imm");
+    EXPECT_FALSE(immRes->m_typeParam.has_value());
+    EXPECT_EQ(immRes->m_name.m_node, "val");
+    EXPECT_EQ(immRes->m_dir, DSL::Ast::InstDef::InstOperandDir::ArgIn);
 }
 
 TEST_F(InstDefLangTest, TestInstHeader)
 {
-    std::string test = "inst SW(GPR:rs2 IN, GPR:rs1 IN, simm12:imm imm12 IN) format SType";
+    std::string test = "inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format SType";
     size_t sourceId = addSource("test", test);
     ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
 
@@ -248,12 +270,24 @@ TEST_F(InstDefLangTest, TestInstHeader)
     EXPECT_EQ(res->m_formatName.m_node, "SType");
     ASSERT_EQ(res->m_args.size(), 3);
 
-    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::InstRegOperand>(res->m_args[0]));
-    EXPECT_EQ(std::get<DSL::Ast::InstDef::InstRegOperand>(res->m_args[0]).m_argName.m_node, "rs2");
+    // rs2
+    EXPECT_EQ(res->m_args[0].m_kind, DSL::Ast::InstDef::InstOperandKind::Register);
+    EXPECT_EQ(res->m_args[0].m_typeOrClass.m_node, "GPR");
+    EXPECT_EQ(res->m_args[0].m_name.m_node, "rs2");
+    EXPECT_EQ(res->m_args[0].m_dir, DSL::Ast::InstDef::InstOperandDir::ArgIn);
 
-    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::InstImmOperand>(res->m_args[2]));
-    EXPECT_EQ(std::get<DSL::Ast::InstDef::InstImmOperand>(res->m_args[2]).m_argName.m_node, "imm12");
+    // imm12
+    EXPECT_EQ(res->m_args[2].m_kind, DSL::Ast::InstDef::InstOperandKind::Immediate);
+    EXPECT_EQ(res->m_args[2].m_typeOrClass.m_node, "simm");
+    ASSERT_TRUE(res->m_args[2].m_typeParam.has_value());
+    EXPECT_EQ(res->m_args[2].m_typeParam->m_node, "i12");
+    EXPECT_EQ(res->m_args[2].m_name.m_node, "imm12");
+    EXPECT_EQ(res->m_args[2].m_dir, DSL::Ast::InstDef::InstOperandDir::ArgIn);
 }
+
+// ============================================================================
+// 4. Complete Instruction Declarations & Translation Unit
+// ============================================================================
 
 TEST_F(InstDefLangTest, TestCompleteInstructionDeclaration)
 {
@@ -283,11 +317,10 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
 
     // Implicit arguments
     ASSERT_EQ(res->m_body.m_implicitArgs.size(), 1);
-    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::InstRegOperand>(res->m_body.m_implicitArgs[0]));
-    const auto &imp = std::get<DSL::Ast::InstDef::InstRegOperand>(res->m_body.m_implicitArgs[0]);
-    EXPECT_EQ(imp.m_regClass.m_node, "CSR");
-    EXPECT_EQ(imp.m_argName.m_node, "fcsr");
-    EXPECT_EQ(imp.m_argDir, DSL::Ast::InstDef::InstOperandDir::ArgInOut);
+    EXPECT_EQ(res->m_body.m_implicitArgs[0].m_kind, DSL::Ast::InstDef::InstOperandKind::Register);
+    EXPECT_EQ(res->m_body.m_implicitArgs[0].m_typeOrClass.m_node, "CSR");
+    EXPECT_EQ(res->m_body.m_implicitArgs[0].m_name.m_node, "fcsr");
+    EXPECT_EQ(res->m_body.m_implicitArgs[0].m_dir, DSL::Ast::InstDef::InstOperandDir::ArgInOut);
 
     // Format assignments
     ASSERT_EQ(res->m_body.m_assigns.size(), 3);
@@ -323,7 +356,7 @@ format RType(32) {
     funct7[25:31];
 };
 
-inst SW(GPR:rs2 IN, GPR:rs1 IN, simm12:imm imm12 IN) format SType {
+inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format SType {
     FORMAT(
         opcode = 0x23,
         funct3 = 2,
@@ -335,9 +368,8 @@ inst SW(GPR:rs2 IN, GPR:rs1 IN, simm12:imm imm12 IN) format SType {
     LATENCY(1);
 };
 
-inst ADD(GPR : rd OUT, GPR : rs1 IN, GPR : rs2 IN) format RType
-{
-    IMPLICIT(CSR : fcsr INOUT);
+inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
+    IMPLICIT(CSR:fcsr INOUT);
     FORMAT(opcode = 0x33, funct3 = 0, funct7 = 0);
     FLAGS(commutative);
     ASM("add $rd, $rs1, $rs2");
@@ -361,6 +393,10 @@ inst ADD(GPR : rd OUT, GPR : rs1 IN, GPR : rs2 IN) format RType
     EXPECT_EQ(res->m_instructions[1].m_header.m_name.m_node, "ADD");
 }
 
+// ============================================================================
+// 5. Negative & Error Parsing Tests
+// ============================================================================
+
 TEST_F(InstDefLangTest, TestMissingSemicolonInFormatError)
 {
     std::string test = R"(
@@ -382,7 +418,7 @@ TEST_F(InstDefLangTest, TestInvalidDirectionError)
     size_t sourceId = addSource("test", test);
     ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
 
-    auto res = ctx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstArgValues>();
+    auto res = ctx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
     EXPECT_FALSE(res.has_value());
 }
 

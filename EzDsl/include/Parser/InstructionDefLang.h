@@ -1,8 +1,8 @@
-#ifndef EZDSL_PARSER_INST_DEF_LANG_H
-#define EZDSL_PARSER_INST_DEF_LANG_H
+#ifndef EZDSL_INSTRUCTION_DEF_LANG_H
+#define EZDSL_INSTRUCTION_DEF_LANG_H
 
 #include "EzDslCommon.h"
-#include "Ast/InstDefLangAst.h"
+#include "Ast/InstructionDefLangAst.h"
 #include "Parser/CommonParsers.h"
 
 namespace DSL::Parser::InstDef
@@ -182,26 +182,28 @@ struct InstFormatDecl
         return kw >> (name + opt_width + fields);
     }();
 
-    static constexpr auto
-            value = lexy::as_list<std::vector<Ast::InstDef::FormatField>> >>
+    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstDef::FormatField>> >>
             lexy::callback<Ast::InstDef::InstFormatDecl>(
-                            [](Ast::Common::Identifier name, auto width, std::vector<Ast::InstDef::FormatField> fields)
-                            {
-                                uint32_t bitWidth = 32;
-                                if constexpr (std::is_same_v<std::decay_t<decltype(width)>, Common::IntegerLiteral>)
-                                {
-                                    bitWidth = static_cast<uint32_t>(width.m_node);
-                                }
-
-                                Ast::InstDef::InstFormatDecl decl;
-                                decl.m_name = std::move(name);
-                                decl.m_bitWidth = bitWidth;
-                                for (auto &f : fields)
-                                {
-                                    decl.m_fields.push_back(std::move(f));
-                                }
-                                return decl;
-                            });
+                                          [](Ast::Common::Identifier name,
+                                             Ast::Common::IntegerLiteral width,
+                                             std::pmr::vector<Ast::InstDef::FormatField> fields)
+                                          {
+                                              Ast::InstDef::InstFormatDecl decl;
+                                              decl.m_name = std::move(name);
+                                              decl.m_bitWidth = static_cast<uint32_t>(width.m_node);
+                                              decl.m_fields = std::move(fields);
+                                              return decl;
+                                          },
+                                          [](Ast::Common::Identifier name,
+                                             lexy::nullopt,
+                                             std::pmr::vector<Ast::InstDef::FormatField> fields)
+                                          {
+                                              Ast::InstDef::InstFormatDecl decl;
+                                              decl.m_name = std::move(name);
+                                              decl.m_bitWidth = 32;
+                                              decl.m_fields = std::move(fields);
+                                              return decl;
+                                          });
 };
 
 struct Direction
@@ -231,42 +233,51 @@ struct InstFlag
     static constexpr auto value = lexy::forward<Ast::InstDef::InstFlag>;
 };
 
+/**
+ * Parses unified instruction operands:
+ *   - Registers:  "GPR:rd OUT"
+ *   - Immediates: "simm(i12):imm12 IN", "imm(i32):offset IN", "imm:val IN"
+ */
 struct InstArgItem
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    struct ImmTag
-    {
-        static constexpr auto rule = Common::Keyword<"imm">::rule;
-        static constexpr auto value = lexy::constant(true);
-    };
-
     static constexpr auto rule = []
     {
-        auto type_or_class = dsl::p<Common::Identifier>;
+        auto typeParam = dsl::parenthesized(dsl::p<Common::Identifier>);
+        auto type_or_class = dsl::p<Common::Identifier> + dsl::opt(typeParam);
         auto colon = dsl::lit<':'>;
-        auto optImm = dsl::opt(dsl::p<ImmTag>);
         auto name = dsl::p<Common::Identifier>;
         auto dir = dsl::p<Direction>;
-        return type_or_class + colon + optImm + name + dir;
+        return type_or_class + colon + name + dir;
     }();
 
-    static constexpr auto value = lexy::callback<Ast::InstDef::InstArgValues>(
-            [](Ast::Common::Identifier type, auto isImm, Ast::Common::Identifier name, Ast::InstDef::InstOperandDir dir)
-                    -> Ast::InstDef::InstArgValues
+    static constexpr auto value = lexy::callback<Ast::InstDef::InstOperand>(
+            [](Ast::Common::Identifier type,
+               Ast::Common::Identifier typeParam,
+               Ast::Common::Identifier name,
+               Ast::InstDef::InstOperandDir dir) -> Ast::InstDef::InstOperand
             {
-                if constexpr (std::is_same_v<std::decay_t<decltype(isImm)>, bool>)
-                {
-                    return Ast::InstDef::InstImmOperand{ .m_typeName = std::move(type),
-                                                         .m_argName = std::move(name),
-                                                         .m_argDir = dir };
-                }
-                else
-                {
-                    return Ast::InstDef::InstRegOperand{ .m_regClass = std::move(type),
-                                                         .m_argName = std::move(name),
-                                                         .m_argDir = dir };
-                }
+                const bool isImm = (type.m_node == "imm" || type.m_node == "simm" || type.m_node == "uimm");
+                return Ast::InstDef::InstOperand{ .m_kind = isImm ? Ast::InstDef::InstOperandKind::Immediate
+                                                                  : Ast::InstDef::InstOperandKind::Register,
+                                                  .m_typeOrClass = std::move(type),
+                                                  .m_typeParam = std::move(typeParam),
+                                                  .m_name = std::move(name),
+                                                  .m_dir = dir };
+            },
+            [](Ast::Common::Identifier type,
+               lexy::nullopt,
+               Ast::Common::Identifier name,
+               Ast::InstDef::InstOperandDir dir) -> Ast::InstDef::InstOperand
+            {
+                const bool isImm = (type.m_node == "imm" || type.m_node == "simm" || type.m_node == "uimm");
+                return Ast::InstDef::InstOperand{ .m_kind = isImm ? Ast::InstDef::InstOperandKind::Immediate
+                                                                  : Ast::InstDef::InstOperandKind::Register,
+                                                  .m_typeOrClass = std::move(type),
+                                                  .m_typeParam = std::nullopt,
+                                                  .m_name = std::move(name),
+                                                  .m_dir = dir };
             });
 };
 
@@ -285,19 +296,16 @@ struct InstHeaderParser
         return instKw >> (name + args + formatKw + fmtName);
     }();
 
-    static constexpr auto value = lexy::as_list<std::vector<Ast::InstDef::InstArgValues>> >>
+    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstDef::InstOperand>> >>
             lexy::callback<Ast::InstDef::InstHeader>(
                                           [](Ast::Common::Identifier name,
-                                             std::vector<Ast::InstDef::InstArgValues> args,
+                                             std::pmr::vector<Ast::InstDef::InstOperand> args,
                                              Ast::Common::Identifier fmtName)
                                           {
                                               Ast::InstDef::InstHeader header;
                                               header.m_name = std::move(name);
                                               header.m_formatName = std::move(fmtName);
-                                              for (auto &arg : args)
-                                              {
-                                                  header.m_args.push_back(std::move(arg));
-                                              }
+                                              header.m_args = std::move(args);
                                               return header;
                                           });
 };
@@ -313,17 +321,9 @@ struct InstBodyItemParser
         static constexpr auto rule = Common::Keyword<"IMPLICIT">::rule >>
                 (dsl::parenthesized.list(dsl::p<InstArgItem>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>);
 
-        static constexpr auto value = lexy::as_list<std::vector<Ast::InstDef::InstArgValues>> >>
-                lexy::callback<Ast::InstDef::InstBodyItem>(
-                                              [](std::vector<Ast::InstDef::InstArgValues> args)
-                                              {
-                                                  std::pmr::vector<Ast::InstDef::InstArgValues> pmrArgs;
-                                                  for (auto &arg : args)
-                                                  {
-                                                      pmrArgs.push_back(std::move(arg));
-                                                  }
-                                                  return Ast::InstDef::InstBodyItem{ std::move(pmrArgs) };
-                                              });
+        static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstDef::InstOperand>> >>
+                lexy::callback<Ast::InstDef::InstBodyItem>([](std::pmr::vector<Ast::InstDef::InstOperand> args)
+                                                           { return Ast::InstDef::InstBodyItem{ std::move(args) }; });
     };
 
     struct FormatDecl
@@ -333,17 +333,10 @@ struct InstBodyItemParser
         static constexpr auto rule = Common::Keyword<"FORMAT">::rule >>
                 (dsl::parenthesized.list(dsl::p<BitExprAssign>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>);
 
-        static constexpr auto value = lexy::as_list<std::vector<Ast::InstDef::BitExprAssign>> >>
+        static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstDef::BitExprAssign>> >>
                 lexy::callback<Ast::InstDef::InstBodyItem>(
-                                              [](std::vector<Ast::InstDef::BitExprAssign> assigns)
-                                              {
-                                                  std::pmr::vector<Ast::InstDef::BitExprAssign> pmrAssigns;
-                                                  for (auto &a : assigns)
-                                                  {
-                                                      pmrAssigns.push_back(std::move(a));
-                                                  }
-                                                  return Ast::InstDef::InstBodyItem{ std::move(pmrAssigns) };
-                                              });
+                                              [](std::pmr::vector<Ast::InstDef::BitExprAssign> assigns)
+                                              { return Ast::InstDef::InstBodyItem{ std::move(assigns) }; });
     };
 
     struct FlagsDecl
@@ -353,17 +346,9 @@ struct InstBodyItemParser
         static constexpr auto rule = Common::Keyword<"FLAGS">::rule >>
                 (dsl::parenthesized.list(dsl::p<InstFlag>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>);
 
-        static constexpr auto value = lexy::as_list<std::vector<Ast::InstDef::InstFlag>> >>
-                lexy::callback<Ast::InstDef::InstBodyItem>(
-                                              [](std::vector<Ast::InstDef::InstFlag> flags)
-                                              {
-                                                  std::pmr::vector<Ast::InstDef::InstFlag> pmrFlags;
-                                                  for (auto f : flags)
-                                                  {
-                                                      pmrFlags.push_back(f);
-                                                  }
-                                                  return Ast::InstDef::InstBodyItem{ std::move(pmrFlags) };
-                                              });
+        static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstDef::InstFlag>> >>
+                lexy::callback<Ast::InstDef::InstBodyItem>([](std::pmr::vector<Ast::InstDef::InstFlag> flags)
+                                                           { return Ast::InstDef::InstBodyItem{ std::move(flags) }; });
     };
 
     struct AsmDecl
@@ -418,7 +403,7 @@ struct InstDeclParser
                                     [&](auto &&val)
                                     {
                                         using T = std::decay_t<decltype(val)>;
-                                        if constexpr (std::is_same_v<T, std::pmr::vector<Ast::InstDef::InstArgValues>>)
+                                        if constexpr (std::is_same_v<T, std::pmr::vector<Ast::InstDef::InstOperand>>)
                                         {
                                             inst.m_body.m_implicitArgs = std::move(val);
                                         }
@@ -433,9 +418,9 @@ struct InstDeclParser
                                             inst.m_body.m_asmTemplate =
                                                     std::pmr::string(val.m_node.data(), val.m_node.size());
                                         }
-                                        else if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, uint32_t>)
+                                        else if constexpr (std::is_same_v<T, uint32_t>)
                                         {
-                                            inst.m_body.m_latency = static_cast<uint32_t>(val);
+                                            inst.m_body.m_latency = val;
                                         }
                                         else if constexpr (std::is_same_v<T, std::pmr::vector<Ast::InstDef::InstFlag>>)
                                         {
@@ -470,13 +455,11 @@ struct InstDefFileParser
             return (fmtBranch | instBranch) + dsl::opt(dsl::lit_c<';'>);
         }();
 
-        // Use auto... to consume the optional nullopt produced by dsl::opt(dsl::lit_c<';'>)
         static constexpr auto value =
                 lexy::callback<Entry>([](Ast::InstDef::InstFormatDecl fmt, auto...) { return Entry{ std::move(fmt) }; },
                                       [](Ast::InstDef::InstDecl inst, auto...) { return Entry{ std::move(inst) }; });
     };
 
-    // Use terminator.list instead of opt_list
     static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<EntryParser>);
 
     static constexpr auto value =
@@ -502,4 +485,4 @@ struct InstDefFileParser
 
 } // namespace DSL::Parser::InstDef
 
-#endif // EZDSL_PARSER_INST_DEF_LANG_H
+#endif // EZDSL_INSTRUCTION_DEF_LANG_H

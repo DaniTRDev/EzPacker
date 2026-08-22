@@ -1,12 +1,14 @@
 set(EZDSL_FILES_LIST
         "include/EzDslCommon.h"
         "include/Ast/CommonAstNodes.h"
-        "include/Ast/InstDefLangAst.h"
-        "include/Ast/LegalizeMatrixDefLang.h"
-        "include/Ast/LegalizeRuleDefLang.h"
+        "include/Ast/InstructionDefLangAst.h"
+        "include/Ast/InstructionSelDefLang.h"
+        "include/Ast/LegalizeActionDefLangAst.h"
+        "include/Ast/LegalizeRuleDefLangAst.h"
         "include/Ast/TargetDefLangAst.h"
         "include/Parser/CommonParsers.h"
-        "include/Parser/InstDefLang.h"
+        "include/Parser/InstructionDefLang.h"
+        "include/Parser/LegalizeActionDefLang.h"
         "include/Parser/ParseContext.h"
         "include/Parser/TargetDefLang.h"
 
@@ -31,9 +33,23 @@ if (EZPACKER_BUILD_TESTS)
     )
 
     EzPacker_AddTest(
-            "T_InstDefLang"
+            "T_LegalizeActionDefLang"
             "EzDsl"
             "GTest::gtest_main"
-            "tests/T_InstDefLang.cpp"
+            "tests/T_LegalizeActionDefLang.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_LegalizeRuleDefLang"
+            "EzDsl"
+            "GTest::gtest_main"
+            "tests/T_LegalizeRuleDefLang.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_InstructionSelDefLang.cpp"
+            "EzDsl"
+            "GTest::gtest_main"
+            "tests/T_InstructionSelDefLang.cpp"
     )
 endif ()

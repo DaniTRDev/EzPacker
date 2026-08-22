@@ -1,17 +1,17 @@
-#ifndef EZDSL_INST_DEF_LANG_AST_H
-#define EZDSL_INST_DEF_LANG_AST_H
+#ifndef EZDSL_INSTRUCTION_DEF_LANG_AST_H
+#define EZDSL_INSTRUCTION_DEF_LANG_AST_H
 
+#include "Ast/CommonAstNodes.h"
 #include "EzDslCommon.h"
-#include "CommonAstNodes.h"
+
 #include <memory>
 #include <optional>
+#include <string>
 #include <variant>
 #include <vector>
-#include <string>
 
 namespace DSL::Ast::InstDef
 {
-
 struct BitSlice
 {
     uint16_t m_low{ 0 };
@@ -76,21 +76,30 @@ enum class InstOperandDir
     ArgInOut
 };
 
-struct InstRegOperand
+enum class InstOperandKind
 {
-    Common::Identifier m_regClass;
-    Common::Identifier m_argName;
-    InstOperandDir m_argDir{ InstOperandDir::ArgIn };
+    Register, // Hardware or virtual register (e.g., "GPR:rd OUT")
+    Immediate // Immediate value (e.g., "simm(i12):imm12 IN", "imm(i32):val IN", "imm:c IN")
 };
 
-struct InstImmOperand
+/**
+ * Unified representation for all instruction arguments (registers & immediates).
+ *
+ * Examples:
+ * - "GPR:rd OUT"             -> m_kind=Register,  m_typeOrClass="GPR",  m_typeParam=nullopt, m_name="rd", m_dir=ArgOut
+ * - "simm(i12):imm12 IN"     -> m_kind=Immediate, m_typeOrClass="simm", m_typeParam="i12",   m_name="imm12",
+ * m_dir=ArgIn
+ * - "imm(i32):offset IN"     -> m_kind=Immediate, m_typeOrClass="imm",  m_typeParam="i32", m_name="offset",m_dir=ArgIn
+ * - "imm:val IN"             -> m_kind=Immediate, m_typeOrClass="imm",  m_typeParam=nullopt, m_name="val", m_dir=ArgIn
+ */
+struct InstOperand
 {
-    Common::Identifier m_typeName;
-    Common::Identifier m_argName;
-    InstOperandDir m_argDir{ InstOperandDir::ArgIn };
+    InstOperandKind m_kind{ InstOperandKind::Register };
+    Common::Identifier m_typeOrClass; // Register class ("GPR") or immediate classifier ("imm", "simm", "uimm")
+    std::optional<Common::Identifier> m_typeParam; // Inner type or width specifier (e.g., "i12", "i32", "12")
+    Common::Identifier m_name;                     // Operand identifier (e.g., "rd", "rs1", "imm12")
+    InstOperandDir m_dir{ InstOperandDir::ArgIn }; // Dataflow direction ("IN", "OUT", "INOUT")
 };
-
-using InstArgValues = std::variant<InstRegOperand, InstImmOperand>;
 
 enum class InstFlag
 {
@@ -107,11 +116,11 @@ enum class InstFlag
 struct InstHeader
 {
     Common::Identifier m_name;
-    std::pmr::vector<InstArgValues> m_args;
+    std::pmr::vector<InstOperand> m_args;
     Common::Identifier m_formatName;
 };
 
-using InstBodyItem = std::variant<std::pmr::vector<InstArgValues>, // IMPLICIT(...)
+using InstBodyItem = std::variant<std::pmr::vector<InstOperand>,   // IMPLICIT(...)
                                   std::pmr::vector<BitExprAssign>, // FORMAT(...)
                                   Common::StringLiteral,           // ASM(...)
                                   uint32_t,                        // LATENCY(...)
@@ -120,7 +129,7 @@ using InstBodyItem = std::variant<std::pmr::vector<InstArgValues>, // IMPLICIT(.
 
 struct InstBody
 {
-    std::pmr::vector<InstArgValues> m_implicitArgs;
+    std::pmr::vector<InstOperand> m_implicitArgs;
     std::pmr::vector<BitExprAssign> m_assigns;
     std::pmr::string m_asmTemplate;
     uint32_t m_latency{ 1 };
@@ -141,4 +150,4 @@ struct InstDefFile
 
 } // namespace DSL::Ast::InstDef
 
-#endif // EZDSL_INST_DEF_LANG_AST_H
+#endif // EZDSL_INSTRUCTION_DEF_LANG_AST_H

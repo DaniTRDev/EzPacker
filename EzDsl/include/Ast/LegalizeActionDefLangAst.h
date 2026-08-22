@@ -1,12 +1,12 @@
-#ifndef EZDSL_LEGALIZE_MATRIX_DEF_LANG_H
-#define EZDSL_LEGALIZE_MATRIX_DEF_LANG_H
+#ifndef EZDSL_LEGALIZE_ACTION_DEF_LANG_AST_H
+#define EZDSL_LEGALIZE_ACTION_DEF_LANG_AST_H
 
 #include "EzDslCommon.h"
 #include "Ast/CommonAstNodes.h"
 
 #include <optional>
 
-namespace DSL::Ast::LegalizeMatrixDefLang
+namespace DSL::Ast::LegalizeActionDef
 {
 /**
  * Action to perform when an instruction matches a given type combination.
@@ -16,7 +16,6 @@ enum class LegalizeActionKind
     Legal,        // The instruction and type combination is natively supported.
     WidenScalar,  // Promote scalar types to a larger legal scalar type (e.g., i8 -> i32).
     NarrowScalar, // Split scalar types into smaller legal scalar types (e.g., i64 -> 2x i32).
-    Lower,        // Decompose the instruction into simpler generic IR instructions.
     Libcall,      // Lower the instruction into a runtime library call (e.g., __divdi3).
     Custom,       // Delegate legalization to a target-specific C++ callback.
     Bitcast,      // Reinterpret the value into a legal type of equal bit-width (e.g., i32 -> f32).
@@ -53,11 +52,10 @@ struct TypeConstraint
  *
  * Syntax Examples:
  * - LEGAL(i8, i16, i32);
- * - WIDEN(i1, i2, i4) >> i32;
- * - WIDEN(i1:1, i8:1) >> i32;
- * - NARROW(i64) >> i32;
+ * - WIDENS(i1, i2, i4) >> i32;
+ * - WIDENS(i1:1, i8:1) >> i32;
+ * - NARROWS(i64) >> i32;
  * - LIBCALL(i64) >> "__divdi3";
- * - LOWER(i8:1);
  */
 struct LegalizeActionClause
 {
@@ -74,8 +72,8 @@ struct LegalizeActionClause
  * @code
  * action ADD {
  *     LEGAL(i32, f32);
- *     WIDEN(i1, i8, i16) >> i32;
- *     NARROW(i64) >> i32;
+ *     WIDENS(i1, i8, i16) >> i32;
+ *     NARROWS(i64) >> i32;
  * };
  * @endcode
  */
@@ -86,7 +84,7 @@ struct InstructionLegalizeDecl
 };
 
 /**
- * Root AST node representing a complete target legalization definition file.
+ * Root AST node representing a complete target legalization matrix definition file.
  *
  * Defines the full action table mapping opcodes to their legality rules.
  */
@@ -94,6 +92,6 @@ struct TargetLegalizeDef
 {
     std::pmr::vector<InstructionLegalizeDecl> m_instructionActions; // Per-instruction legalization declarations.
 };
-}; // namespace DSL::Ast::LegalizeMatrixDefLang
+}; // namespace DSL::Ast::LegalizeActionDef
 
-#endif // EZDSL_LEGALIZE_MATRIX_DEF_LANG_H
+#endif // EZDSL_LEGALIZE_ACTION_DEF_LANG_AST_H

@@ -9,24 +9,63 @@ namespace DSL::Parser::Common
 {
 namespace dsl = ::lexy::dsl;
 
+template <lexy::_detail::string_literal KeywordStr> struct Keyword
+{
+    static constexpr auto rule = []
+    {
+        auto head = dsl::ascii::alpha_underscore;
+        auto tail = dsl::ascii::alpha_digit_underscore;
+        auto id = dsl::identifier(head, tail);
+        return LEXY_KEYWORD(KeywordStr, id);
+    }();
+
+    static constexpr auto value = lexy::constant(true);
+};
+
+template <char C> struct SingleChar
+{
+    static constexpr auto rule = dsl::lit_c<C>;
+    static constexpr auto value = lexy::constant(true);
+};
+
 struct IntegerLiteral
 {
     static constexpr auto rule = []
     {
+        // Optional Sign (-)
+        auto sign = dsl::opt(dsl::p<SingleChar<'-'>>);
+
+        // Base prefixes and digit parsers
         auto hex = (dsl::lit<"0x"> | dsl::lit<"0X">) >> dsl::integer<uint64_t, dsl::hex>(dsl::digits<dsl::hex>);
+        auto bin = (dsl::lit<"0b"> | dsl::lit<"0B">) >> dsl::integer<uint64_t, dsl::binary>(dsl::digits<dsl::binary>);
+        auto oct = (dsl::lit<"0o"> | dsl::lit<"0O">) >> dsl::integer<uint64_t, dsl::octal>(dsl::digits<dsl::octal>);
         auto dec = dsl::integer<uint64_t>(dsl::digits<dsl::decimal>);
-        return dsl::position + (hex | dec) + dsl::position;
+
+        auto number = hex | bin | oct | dec;
+
+        return dsl::position + sign + number + dsl::position;
     }();
 
-    static constexpr auto value =
-            lexy::bind(lexy::callback<Ast::Common::IntegerLiteral>(
-                               [](ParseContext &ctx, const char *startIter, int64_t val, const char *endIter)
-                               {
-                                   SourceReference *ref = ctx.createRef(startIter, endIter);
-                                   return Ast::Common::IntegerLiteral{ std::move(val), ref };
-                               }),
-                       lexy::parse_state,
-                       lexy::values);
+    static constexpr auto value = lexy::bind(
+            lexy::callback<Ast::Common::IntegerLiteral>(
+                    [](ParseContext &ctx, const char *startIter, auto isNegative, uint64_t val, const char *endIter)
+                    {
+                        int64_t signedVal = 0;
+
+                        if constexpr (!std::is_same_v<std::decay_t<decltype(isNegative)>, lexy::nullopt>)
+                        {
+                            signedVal = -static_cast<int64_t>(val);
+                        }
+                        else
+                        {
+                            signedVal = static_cast<int64_t>(val);
+                        }
+
+                        SourceReference *ref = ctx.createRef(startIter, endIter);
+                        return Ast::Common::IntegerLiteral{ signedVal, ref };
+                    }),
+            lexy::parse_state,
+            lexy::values);
 };
 
 struct RealLiteral
@@ -69,19 +108,6 @@ struct Identifier
 struct Comment
 {
     static constexpr auto rule = dsl::lit_c<'/'> >> dsl::lit_c<'/'> >> dsl::until(dsl::newline);
-};
-
-template <lexy::_detail::string_literal KeywordStr> struct Keyword
-{
-    static constexpr auto rule = []
-    {
-        auto head = dsl::ascii::alpha_underscore;
-        auto tail = dsl::ascii::alpha_digit_underscore;
-        auto id = dsl::identifier(head, tail);
-        return LEXY_KEYWORD(KeywordStr, id);
-    }();
-
-    static constexpr auto value = lexy::constant(true);
 };
 
 struct StringLiteral
