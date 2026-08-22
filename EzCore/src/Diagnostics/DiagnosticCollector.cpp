@@ -15,6 +15,32 @@ DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const
     return DiagnosticBuilder(this, type, sender);
 }
 
+DiagnosticBuilder DiagnosticCollector::error(const std::string_view &sender, const std::string_view &message)
+{
+    auto b = builder(Diag_Error, sender);
+
+    // Only format and append if enabled.
+    // If disabled, 'b' acts as an inactive dummy builder that consumes chained calls for free.
+    if (isDiagEnabledForType(Diag_Error))
+    {
+        b << message;
+    }
+
+    return b;
+}
+
+DiagnosticBuilder DiagnosticCollector::trace(const std::string_view &sender, const std::string_view &message)
+{
+    auto b = builder(Diag_Trace, sender);
+
+    if (isDiagEnabledForType(Diag_Trace))
+    {
+        b << message;
+    }
+
+    return b;
+}
+
 void DiagnosticCollector::addListener(DiagnosticListener *listener) { m_listeners.push_back(listener); }
 
 void DiagnosticCollector::beginScope(DiagnosticScopeAction action)

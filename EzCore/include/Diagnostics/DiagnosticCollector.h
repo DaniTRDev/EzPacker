@@ -49,6 +49,11 @@ class DiagnosticCollector
     }
 
     /**
+     * Creates an error diagnostic builder with a predefined message and sender. If error diag is not enabled, this
+     * function returns an empty builder.
+     */
+    DiagnosticBuilder error(const std::string_view &sender, const std::string_view &message);
+    /**
      * Creates an error diagnostic builder with a predefined format message and sender. If trace diag is not enabled,
      * this function will return an empty builder.
      */
@@ -64,6 +69,12 @@ class DiagnosticCollector
 
         return b;
     }
+
+    /**
+     * Creates a trace diagnostic builder with a predefined message and sender. If trace diag is not enabled, this
+     * function returns an empty builder.
+     */
+    DiagnosticBuilder trace(const std::string_view &sender, const std::string_view &message);
 
     /**
      * Adds a listener for diagnostic messages.

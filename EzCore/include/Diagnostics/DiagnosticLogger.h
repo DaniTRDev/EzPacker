@@ -37,7 +37,7 @@ class DiagnosticLogger : public DiagnosticListener
     /**
      * Logs the given source reference, if it is != nullptr and valid.
      */
-    void logSourceRef(LogMessage &msg, const class SourceReference &sourceRef);
+    void logSourceRef(LogMessage &msg, class SourceReference *sourceRef);
 
   private:
     SourceManager *m_sourceManager;
