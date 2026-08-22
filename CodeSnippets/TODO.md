@@ -6,4 +6,6 @@
 
 ## Things to add
 - Create README(s).md for every project and ensure it covers everything.
-
+- Add a calling convetion definition language in the DSL.
+- Start with EzDsl::Sema (semantic checks).
+- Make EzMir benefit of the DSL to autogenerate its IR instructions.
