@@ -1,42 +1,14 @@
-#include "EzDslCommon.h"
+#include "EzDslTestSuite.h"
 #include "Ast/InstructionSelDefLang.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Parser/InstructionSelDefLang.h"
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
-#include <gtest/gtest.h>
 
-class InstSelDefLangTest : public ::testing::Test
+class InstSelDefLangTest : public DslTestSuiteAsGtest
 {
   public:
-    DiagnosticCollector *getDiagCollector() { return m_diagCollector.get(); }
-
-    size_t addSource(const std::string &source, const std::string &content)
-    {
-        return m_sourceManager->addSourceContent(source, content);
-    }
-
-    SourceManager *getSourceManager() { return m_sourceManager.get(); }
-
-    void SetUp() override
-    {
-        m_sourceManager = std::make_shared<SourceManager>("", &m_resource);
-        m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
-        m_diagCollector = std::make_shared<DiagnosticCollector>();
-
-        m_diagCollector->addListener(m_diagLogger.get());
-    }
-
-    void TearDown() override {}
-
-    std::pmr::monotonic_buffer_resource *getAllocator() { return &m_resource; }
-
-  private:
-    std::pmr::monotonic_buffer_resource m_resource;
-    std::shared_ptr<DiagnosticCollector> m_diagCollector;
-    std::shared_ptr<DiagnosticLogger> m_diagLogger;
-    std::shared_ptr<SourceManager> m_sourceManager;
 };
 
 // ============================================================================
@@ -46,8 +18,7 @@ class InstSelDefLangTest : public ::testing::Test
 TEST_F(InstSelDefLangTest, TestAddrModeParamSimple)
 {
     std::string test = "GPR:base";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res.has_value());
@@ -60,8 +31,7 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamSimple)
 TEST_F(InstSelDefLangTest, TestAddrModeParamWithDefault)
 {
     std::string test = "simm12:offset = 0";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res.has_value());
@@ -75,8 +45,7 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamWithDefault)
 TEST_F(InstSelDefLangTest, TestAddrModeParamParameterizedWithDefault)
 {
     std::string test1 = "simm(i12):offset = 0";
-    size_t sourceId1 = addSource("test1", test1);
-    ParseContext ctx1(getDiagCollector(), getSourceManager(), sourceId1, getAllocator());
+    ParseContext ctx1 = createParseContextFromBuff("test1", test1);
 
     auto res1 = ctx1.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res1.has_value());
@@ -88,8 +57,7 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamParameterizedWithDefault)
     EXPECT_EQ(res1->m_defaultValue->m_node, 0);
 
     std::string test2 = "imm(i32):disp = 16";
-    size_t sourceId2 = addSource("test2", test2);
-    ParseContext ctx2(getDiagCollector(), getSourceManager(), sourceId2, getAllocator());
+    ParseContext ctx2 = createParseContextFromBuff("test2", test2);
 
     auto res2 = ctx2.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res2.has_value());
@@ -118,8 +86,7 @@ variant OffsetAddr {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeVariantParser, DSL::Ast::InstSelDef::AddrModeVariant>();
     ASSERT_TRUE(res.has_value());
@@ -170,8 +137,7 @@ addrmode AddrModeRegImm12(GPR:base, simm(i12):offset = 0) {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeDefParser, DSL::Ast::InstSelDef::AddrModeDef>();
     ASSERT_TRUE(res.has_value());
@@ -217,8 +183,7 @@ pattern Select_ADDI {
     cost(1);
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -265,8 +230,7 @@ pattern Select_SH2ADD {
     cost(1);
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -309,8 +273,7 @@ pattern Select_LW {
     cost(2);
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -347,8 +310,7 @@ pattern Select_RotL {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -411,9 +373,7 @@ pattern Select_SW {
     cost(1);
 };
 )dsl";
-
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelDefFileParser, DSL::Ast::InstSelDef::ISelDefFile>();
     ASSERT_TRUE(res.has_value());
@@ -441,8 +401,7 @@ pattern BadPattern {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     EXPECT_FALSE(res.has_value());
@@ -460,8 +419,7 @@ pattern BadPattern {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     EXPECT_FALSE(res.has_value());
@@ -479,8 +437,7 @@ pattern BadPattern {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelDefFileParser, DSL::Ast::InstSelDef::ISelDefFile>();
     EXPECT_FALSE(res.has_value());
@@ -495,8 +452,7 @@ addrmode BadAddrMode(GPR:base, simm(12):offset =) {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeDefParser, DSL::Ast::InstSelDef::AddrModeDef>();
     EXPECT_FALSE(res.has_value());
@@ -513,8 +469,7 @@ pattern IncompletePattern {
         ADDI GPR:$dst, GPR:$rs1, $imm;
     };
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     EXPECT_FALSE(res.has_value());

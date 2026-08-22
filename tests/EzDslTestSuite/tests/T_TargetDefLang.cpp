@@ -1,49 +1,24 @@
-#include "EzDslCommon.h"
+#include "EzDslTestSuite.h"
 #include "Ast/TargetDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Parser/ParseContext.h"
 #include "Parser/TargetDefLang.h"
 #include "SourceManager/SourceManager.h"
-#include <gtest/gtest.h>
 
-class TargetDefLangTest : public ::testing::Test
+class TargetDefLangTest : public DslTestSuiteAsGtest
 {
   public:
-    DiagnosticCollector *getDiagCollector() { return m_diagCollector.get(); }
-
-    size_t addSource(const std::string &source, const std::string &content)
-    {
-        return m_sourceManager->addSourceContent(source, content);
-    }
-
-    SourceManager *getSourceManager() { return m_sourceManager.get(); }
-
-    void SetUp() override
-    {
-        m_sourceManager = std::make_shared<SourceManager>("", &m_resource);
-        m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
-        m_diagCollector = std::make_shared<DiagnosticCollector>();
-
-        m_diagCollector->addListener(m_diagLogger.get());
-    }
-
-    void TearDown() override {}
-
-    std::pmr::monotonic_buffer_resource *getAllocator() { return &m_resource; }
-
-  private:
-    std::pmr::monotonic_buffer_resource m_resource;
-    std::shared_ptr<DiagnosticCollector> m_diagCollector;
-    std::shared_ptr<DiagnosticLogger> m_diagLogger;
-    std::shared_ptr<SourceManager> m_sourceManager;
 };
+
+// ============================================================================
+// 1. Hardware & Virtual Register Declarations
+// ============================================================================
 
 TEST_F(TargetDefLangTest, TestRootRegisterWithoutParent)
 {
     std::string test = "rax(, 64, 0)";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     ASSERT_TRUE(res.has_value());
@@ -56,8 +31,7 @@ TEST_F(TargetDefLangTest, TestRootRegisterWithoutParent)
 TEST_F(TargetDefLangTest, TestAliasedSubRegister)
 {
     std::string test = "eax(rax, 32, 0)";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     ASSERT_TRUE(res.has_value());
@@ -70,8 +44,7 @@ TEST_F(TargetDefLangTest, TestAliasedSubRegister)
 TEST_F(TargetDefLangTest, TestHighByteSubRegisterWithOffset)
 {
     std::string test = "ah(ax, 8, 8)";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     ASSERT_TRUE(res.has_value());
@@ -81,11 +54,14 @@ TEST_F(TargetDefLangTest, TestHighByteSubRegisterWithOffset)
     EXPECT_EQ(res->m_offset.m_node, 8);
 }
 
+// ============================================================================
+// 2. Register Classes & Register Banks
+// ============================================================================
+
 TEST_F(TargetDefLangTest, TestEmptyRegisterClass)
 {
     std::string test = "CLASS(gpr64);";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterClass, DSL::Ast::TargetDef::TargetRegisterClass>();
     ASSERT_TRUE(res.has_value());
@@ -102,8 +78,7 @@ CLASS(gpr64,
     rdx(, 64, 0)
 );
 )";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterClass, DSL::Ast::TargetDef::TargetRegisterClass>();
     ASSERT_TRUE(res.has_value());
@@ -112,6 +87,9 @@ CLASS(gpr64,
 
     EXPECT_EQ(res->m_registers[0].m_name.m_node, "rax");
     EXPECT_TRUE(res->m_registers[0].m_parentName.m_node.empty());
+    EXPECT_EQ(res->m_registers[0].m_size.m_node, 64);
+    EXPECT_EQ(res->m_registers[0].m_offset.m_node, 0);
+
     EXPECT_EQ(res->m_registers[1].m_name.m_node, "rcx");
     EXPECT_EQ(res->m_registers[2].m_name.m_node, "rdx");
 }
@@ -130,8 +108,7 @@ bank GPR {
     );
 };
 )";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterBank, DSL::Ast::TargetDef::TargetRegisterBank>();
     ASSERT_TRUE(res.has_value());
@@ -148,6 +125,10 @@ bank GPR {
     EXPECT_EQ(res->m_classes[1].m_registers[0].m_parentName.m_node, "rax");
 }
 
+// ============================================================================
+// 3. File Inclusions & Full Target Declarations
+// ============================================================================
+
 TEST_F(TargetDefLangTest, TestMultipleInclusions)
 {
     std::string test = R"(
@@ -156,10 +137,9 @@ target RISCV64 {
     include lad "legalizeAction.lad";
     include lrd "legalizeRule.lrd";
     include isf "instructionSel.isf";
-}
+};
 )";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     ASSERT_TRUE(res.has_value());
@@ -208,8 +188,7 @@ target x86_64 {
     };
 };
 )";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     ASSERT_TRUE(res.has_value());
@@ -234,14 +213,17 @@ target x86_64 {
     EXPECT_EQ(res->m_regBanks[1].m_classes[0].m_name.m_node, "fpr64");
 }
 
+// ============================================================================
+// 4. Negative & Error Parsing Tests
+// ============================================================================
+
 TEST_F(TargetDefLangTest, TestEmptyTargetBodyFails)
 {
     std::string test = R"(
 target MyTarget {
-}
+};
 )";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     EXPECT_FALSE(res.has_value());
@@ -250,8 +232,7 @@ target MyTarget {
 TEST_F(TargetDefLangTest, TestMalformedRegisterMissingOffset)
 {
     std::string test = "rax(, 64)"; // Missing comma and offset parameter
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     EXPECT_FALSE(res.has_value());
@@ -264,8 +245,7 @@ CLASS(gpr64,
     rax(, 64, 0)
 )
 )"; // Missing closing semicolon
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterClass, DSL::Ast::TargetDef::TargetRegisterClass>();
     EXPECT_FALSE(res.has_value());
@@ -276,10 +256,9 @@ TEST_F(TargetDefLangTest, TestUnknownBodyItemInTarget)
     std::string test = R"(
 target MyTarget {
     foo bar "file.idf";
-}
+};
 )";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     EXPECT_FALSE(res.has_value());
@@ -291,8 +270,7 @@ TEST_F(TargetDefLangTest, TestUnterminatedTargetDef)
 target MyTarget {
     include idef "file.idf";
 )"; // Missing closing brace '}'
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     EXPECT_FALSE(res.has_value());

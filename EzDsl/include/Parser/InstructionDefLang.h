@@ -1,16 +1,247 @@
-#ifndef EZDSL_INST_SEL_DEF_LANG_H
-#define EZDSL_INST_SEL_DEF_LANG_H
+#ifndef EZDSL_PARSER_INST_DEF_LANG_H
+#define EZDSL_PARSER_INST_DEF_LANG_H
 
+#include "Ast/CommonAstNodes.h"
+#include "Ast/InstructionDefLangAst.h"
 #include "EzDslCommon.h"
-#include "Ast/InstructionSelDefLang.h"
 #include "Parser/CommonParsers.h"
-#include "Parser/LegalizeRuleDefLang.h"
 
-namespace DSL::Parser::InstSelDef
+namespace DSL::Parser::InstDef
 {
 namespace dsl = ::lexy::dsl;
 
-struct AddrModeParam
+// Matches "[31:0]" or "[0:15]" (normalizes to min/max)
+struct BitSlice
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    static constexpr auto rule =
+            dsl::square_bracketed(dsl::p<Common::IntegerLiteral> + dsl::lit_c<':'> + dsl::p<Common::IntegerLiteral>);
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::BitSlice>(
+            [](const Ast::Common::IntegerLiteral &first, const Ast::Common::IntegerLiteral &second)
+            {
+                auto v1 = static_cast<uint16_t>(first.m_node);
+                auto v2 = static_cast<uint16_t>(second.m_node);
+                return Ast::InstDef::BitSlice{ .m_from = std::min(v1, v2), .m_to = std::max(v1, v2) };
+            });
+};
+
+// Matches "ident[0:4]"
+struct SlicedIdentifier
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::p<Common::Identifier> + dsl::p<BitSlice>;
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::SlicedIdentifier>(
+            [](Ast::Common::Identifier name, Ast::InstDef::BitSlice slice)
+            { return Ast::InstDef::SlicedIdentifier{ .m_name = std::move(name), .m_slice = slice }; });
+};
+
+// BitExpression Operator Precedence Matrix:
+// 1 (~ prefix) > 2 (+, -) > 3 (<<, >>) > 4 (&) > 5 (^) > 6 (|)
+struct BitExpression : lexy::expression_production
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    static constexpr auto atom = []
+    {
+        auto paren = dsl::parenthesized(dsl::recurse_branch<BitExpression>);
+        auto intLit =
+                dsl::peek(dsl::ascii::digit | dsl::lit_c<'-'> | dsl::lit_c<'+'>) >> dsl::p<Common::IntegerLiteral>;
+        auto slicedId = dsl::peek(dsl::p<Common::Identifier> + dsl::lit_c<'['>) >> dsl::p<SlicedIdentifier>;
+        auto bareId = dsl::else_ >> dsl::p<Common::Identifier>;
+        return paren | intLit | slicedId | bareId;
+    }();
+
+    struct Not : dsl::prefix_op
+    {
+        static constexpr auto op = dsl::op<Ast::InstDef::BitExprOp::Not>(LEXY_LIT("~"));
+        using operand = dsl::atom;
+    };
+
+    struct AddSub : dsl::infix_op_left
+    {
+        static constexpr auto op = dsl::op<Ast::InstDef::BitExprOp::Add>(LEXY_LIT("+")) /
+                dsl::op<Ast::InstDef::BitExprOp::Sub>(LEXY_LIT("-"));
+        using operand = Not;
+    };
+
+    struct Shift : dsl::infix_op_left
+    {
+        static constexpr auto op = dsl::op<Ast::InstDef::BitExprOp::Shl>(LEXY_LIT("<<")) /
+                dsl::op<Ast::InstDef::BitExprOp::Shr>(LEXY_LIT(">>"));
+        using operand = AddSub;
+    };
+
+    struct And : dsl::infix_op_left
+    {
+        static constexpr auto op = dsl::op<Ast::InstDef::BitExprOp::And>(LEXY_LIT("&"));
+        using operand = Shift;
+    };
+
+    struct Xor : dsl::infix_op_left
+    {
+        static constexpr auto op = dsl::op<Ast::InstDef::BitExprOp::Xor>(LEXY_LIT("^"));
+        using operand = And;
+    };
+
+    struct Or : dsl::infix_op_left
+    {
+        static constexpr auto op = dsl::op<Ast::InstDef::BitExprOp::Or>(LEXY_LIT("|"));
+        using operand = Xor;
+    };
+
+    using operation = Or;
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::BitExprValues>(
+            [](Ast::InstDef::BitExprValues expr) -> Ast::InstDef::BitExprValues { return expr; },
+            [](Ast::Common::IntegerLiteral lit) -> Ast::InstDef::BitExprValues
+            { return Ast::InstDef::BitExprValues{ lit }; },
+            [](Ast::InstDef::SlicedIdentifier sId) -> Ast::InstDef::BitExprValues
+            { return Ast::InstDef::BitExprValues{ std::move(sId) }; },
+            [](Ast::Common::Identifier id) -> Ast::InstDef::BitExprValues
+            { return Ast::InstDef::BitExprValues{ std::move(id) }; },
+            [](Ast::InstDef::BitExprOp op, Ast::InstDef::BitExprValues operand) -> Ast::InstDef::BitExprValues
+            {
+                auto node = std::make_shared<Ast::InstDef::BitExpression>();
+                node->m_lhs = std::move(operand);
+                node->m_op = op;
+                node->m_rhs = std::nullopt;
+                return Ast::InstDef::BitExprValues{ std::move(node) };
+            },
+            [](Ast::InstDef::BitExprValues lhs,
+               Ast::InstDef::BitExprOp op,
+               Ast::InstDef::BitExprValues rhs) -> Ast::InstDef::BitExprValues
+            {
+                auto node = std::make_shared<Ast::InstDef::BitExpression>();
+                node->m_lhs = std::move(lhs);
+                node->m_op = op;
+                node->m_rhs = std::move(rhs);
+                return Ast::InstDef::BitExprValues{ std::move(node) };
+            });
+};
+
+// Matches "opcode = 0x33" or "imm4_0[0:4] = imm12[0:4]"
+struct BitExprAssign
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    static constexpr auto rule = []
+    {
+        auto lhs_field = dsl::p<Common::Identifier>;
+        auto opt_slice = dsl::opt(dsl::peek(dsl::lit_c<'['>) >> dsl::p<BitSlice>);
+        auto eq_expr = dsl::lit_c<'='> >> dsl::p<BitExpression>;
+        return lhs_field + opt_slice + eq_expr;
+    }();
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::BitExprAssign>(
+            [](Ast::Common::Identifier lhs, Ast::InstDef::BitSlice slice, Ast::InstDef::BitExprValues rhs)
+            {
+                return Ast::InstDef::BitExprAssign{ .m_lhs = std::move(lhs),
+                                                    .m_lhsSlice = slice,
+                                                    .m_rhs = std::move(rhs) };
+            },
+            [](Ast::Common::Identifier lhs, lexy::nullopt, Ast::InstDef::BitExprValues rhs)
+            {
+                return Ast::InstDef::BitExprAssign{ .m_lhs = std::move(lhs),
+                                                    .m_lhsSlice = std::nullopt,
+                                                    .m_rhs = std::move(rhs) };
+            });
+};
+
+// Matches "opcode[0:6];" or "funct3[12:14] = 0b000;"
+struct FormatField
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    static constexpr auto rule = []
+    {
+        auto name = dsl::p<Common::Identifier>;
+        auto slice = dsl::p<BitSlice>;
+        auto opt_default = dsl::opt(dsl::lit_c<'='> >> dsl::p<BitExpression>);
+        auto separator = dsl::lit_c<';'>;
+        return name + slice + opt_default + separator;
+    }();
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::FormatField>(
+            [](Ast::Common::Identifier name, Ast::InstDef::BitSlice slice, Ast::InstDef::BitExprValues defVal)
+            {
+                return Ast::InstDef::FormatField{ .m_name = std::move(name),
+                                                  .m_slice = slice,
+                                                  .m_defaultValue = std::move(defVal) };
+            },
+            [](Ast::Common::Identifier name, Ast::InstDef::BitSlice slice, lexy::nullopt)
+            {
+                return Ast::InstDef::FormatField{ .m_name = std::move(name),
+                                                  .m_slice = slice,
+                                                  .m_defaultValue = std::nullopt };
+            });
+};
+
+// Matches "format RType(32) { ... };"
+struct InstFormatDecl
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    struct FieldList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<FormatField>);
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstDef::FormatField>>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"format">::rule >>
+            (dsl::p<Common::Identifier> + dsl::opt(dsl::parenthesized(dsl::p<Common::IntegerLiteral>)) +
+             dsl::p<FieldList> + dsl::opt(dsl::lit_c<';'>));
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::InstFormatDecl>(
+            [](Ast::Common::Identifier name,
+               Ast::Common::IntegerLiteral width,
+               std::pmr::vector<Ast::InstDef::FormatField> fields,
+               auto...)
+            {
+                return Ast::InstDef::InstFormatDecl{ .m_name = std::move(name),
+                                                     .m_bitWidth = static_cast<uint32_t>(width.m_node),
+                                                     .m_fields = std::move(fields) };
+            },
+            [](Ast::Common::Identifier name, lexy::nullopt, std::pmr::vector<Ast::InstDef::FormatField> fields, auto...)
+            {
+                return Ast::InstDef::InstFormatDecl{ .m_name = std::move(name),
+                                                     .m_bitWidth = 32u,
+                                                     .m_fields = std::move(fields) };
+            });
+};
+
+struct Direction
+{
+    static constexpr auto Table = lexy::symbol_table<Ast::InstDef::InstOperandDir>
+        .map(LEXY_LIT("INOUT"), Ast::InstDef::InstOperandDir::ArgInOut)
+        .map(LEXY_LIT("IN"), Ast::InstDef::InstOperandDir::ArgIn)
+        .map(LEXY_LIT("OUT"), Ast::InstDef::InstOperandDir::ArgOut);
+
+    static constexpr auto rule = dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha));
+    static constexpr auto value = lexy::forward<Ast::InstDef::InstOperandDir>;
+};
+
+struct InstFlag
+{
+    static constexpr auto Table = lexy::symbol_table<Ast::InstDef::InstFlag>
+        .map(LEXY_LIT("isBranch"), Ast::InstDef::InstFlag::IsBranch)
+        .map(LEXY_LIT("isCall"), Ast::InstDef::InstFlag::IsCall)
+        .map(LEXY_LIT("isReturn"), Ast::InstDef::InstFlag::IsReturn)
+        .map(LEXY_LIT("isTerminator"), Ast::InstDef::InstFlag::IsTerminator)
+        .map(LEXY_LIT("mayLoad"), Ast::InstDef::InstFlag::MayLoad)
+        .map(LEXY_LIT("mayStore"), Ast::InstDef::InstFlag::MayStore)
+        .map(LEXY_LIT("commutative"), Ast::InstDef::InstFlag::IsCommutative)
+        .map(LEXY_LIT("volatile"), Ast::InstDef::InstFlag::HasSideEffects);
+
+    static constexpr auto rule = dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha_underscore));
+    static constexpr auto value = lexy::forward<Ast::InstDef::InstFlag>;
+};
+
+// Matches "GPR:rd OUT", "simm(i12):imm12 IN", "imm:val IN"
+struct InstOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
 
@@ -18,237 +249,220 @@ struct AddrModeParam
     {
         auto typeParam = dsl::parenthesized(dsl::p<Common::Identifier>);
         auto type_or_class = dsl::p<Common::Identifier> + dsl::opt(typeParam);
-        auto colon = dsl::lit<':'>;
+        auto colon = dsl::lit_c<':'>;
         auto name = dsl::p<Common::Identifier>;
-        auto optDefault = dsl::opt(dsl::lit<'='> >> dsl::p<Common::IntegerLiteral>);
-        return type_or_class + colon + name + optDefault;
+        auto dir = dsl::p<Direction>;
+        return type_or_class + colon + name + dir;
     }();
 
-    static constexpr auto value = lexy::callback<Ast::InstSelDef::AddrModeParam>(
-            [](Ast::Common::Identifier type, auto optTypeParam, Ast::Common::Identifier name, auto optDefVal)
+    static constexpr auto value = lexy::callback<Ast::InstDef::InstOperand>(
+            [](Ast::Common::Identifier type,
+               Ast::Common::Identifier param,
+               Ast::Common::Identifier name,
+               Ast::InstDef::InstOperandDir dir)
             {
-                std::optional<Ast::Common::Identifier> typeParam;
-                if constexpr (std::is_same_v<std::decay_t<decltype(optTypeParam)>, Ast::Common::Identifier>)
-                {
-                    typeParam = std::move(optTypeParam);
-                }
+                return Ast::InstDef::InstOperand{ .m_kind = Ast::InstDef::InstOperandKind::Immediate,
+                                                  .m_typeOrClass = std::move(type),
+                                                  .m_typeParam = std::move(param),
+                                                  .m_name = std::move(name),
+                                                  .m_dir = dir };
+            },
+            [](Ast::Common::Identifier type,
+               lexy::nullopt,
+               Ast::Common::Identifier name,
+               Ast::InstDef::InstOperandDir dir)
+            {
+                bool isImm = (type.m_node == "imm" || type.m_node == "simm" || type.m_node == "uimm");
+                auto kind = isImm ? Ast::InstDef::InstOperandKind::Immediate : Ast::InstDef::InstOperandKind::Register;
 
-                std::optional<Ast::Common::IntegerLiteral> defVal;
-                if constexpr (std::is_same_v<std::decay_t<decltype(optDefVal)>, Ast::Common::IntegerLiteral>)
-                {
-                    defVal = optDefVal;
-                }
-
-                return Ast::InstSelDef::AddrModeParam{ .m_typeOrClass = std::move(type),
-                                                       .m_typeParam = std::move(typeParam),
-                                                       .m_name = std::move(name),
-                                                       .m_defaultValue = defVal };
+                return Ast::InstDef::InstOperand{ .m_kind = kind,
+                                                  .m_typeOrClass = std::move(type),
+                                                  .m_typeParam = std::nullopt,
+                                                  .m_name = std::move(name),
+                                                  .m_dir = dir };
             });
 };
 
-struct AddrModeParamList
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::parenthesized.list(dsl::p<AddrModeParam>, dsl::sep(dsl::lit_c<','>));
-    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstSelDef::AddrModeParam>>;
-};
-
-using VariantBlockClause = std::variant<LegalizeRuleDef::MatchClause, LegalizeRuleDef::WhenClause>;
-
-struct VariantBlock
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = (LEXY_KEYWORD("match", dsl::identifier(dsl::ascii::alpha_underscore)) >>
-                                  dsl::p<LegalizeRuleDef::MatchBlockBody>) |
-            (LEXY_KEYWORD("when", dsl::identifier(dsl::ascii::alpha_underscore)) >>
-             dsl::p<LegalizeRuleDef::WhenBlockBody>);
-
-    static constexpr auto value = lexy::construct<VariantBlockClause>;
-};
-
-struct AddrModeVariantParser
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = LEXY_KEYWORD("variant", dsl::identifier(dsl::ascii::alpha_underscore)) >>
-            (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<VariantBlock> + dsl::lit_c<';'>));
-
-    static constexpr auto
-            value = Common::PmrAsList<std::pmr::vector<VariantBlockClause>> >>
-            lexy::callback<Ast::InstSelDef::AddrModeVariant>(
-                            [](Ast::Common::Identifier name, std::pmr::vector<VariantBlockClause> clauses)
-                            {
-                                Ast::InstSelDef::AddrModeVariant variant;
-                                variant.m_variantName = std::move(name);
-
-                                for (auto &clause : clauses)
-                                {
-                                    std::visit(
-                                            [&](auto &&val)
-                                            {
-                                                using T = std::decay_t<decltype(val)>;
-                                                if constexpr (std::is_same_v<T, LegalizeRuleDef::MatchClause>)
-                                                    variant.m_matchPatterns = std::move(val.instructions);
-                                                else if constexpr (std::is_same_v<T, LegalizeRuleDef::WhenClause>)
-                                                    variant.m_predicates = std::move(val.predicates);
-                                            },
-                                            clause);
-                                }
-                                return variant;
-                            });
-};
-
-struct AddrModeVariantList
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<AddrModeVariantParser> + dsl::lit_c<';'>);
-    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstSelDef::AddrModeVariant>>;
-};
-
-struct AddrModeDefParser
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = LEXY_KEYWORD("addrmode", dsl::identifier(dsl::ascii::alpha_underscore)) >>
-            (dsl::p<Common::Identifier> + dsl::p<AddrModeParamList> + dsl::p<AddrModeVariantList>);
-
-    static constexpr auto value = lexy::callback<Ast::InstSelDef::AddrModeDef>(
-            [](Ast::Common::Identifier name,
-               std::pmr::vector<Ast::InstSelDef::AddrModeParam> params,
-               std::pmr::vector<Ast::InstSelDef::AddrModeVariant> variants)
-            {
-                return Ast::InstSelDef::AddrModeDef{ .m_name = std::move(name),
-                                                     .m_parameters = std::move(params),
-                                                     .m_variants = std::move(variants) };
-            });
-};
-
-struct EmitClause
-{
-    std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction> instructions;
-};
-
-struct CostClause
-{
-    Ast::Common::IntegerLiteral cost;
-};
-
-using PatternBlockClause =
-        std::variant<LegalizeRuleDef::MatchClause, LegalizeRuleDef::WhenClause, EmitClause, CostClause>;
-
-struct EmitBlockBody
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<LegalizeRuleDef::RuleInstruction>);
-    static constexpr auto value =
-            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<EmitClause>;
-};
-
-struct CostBody
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::parenthesized(dsl::p<Common::IntegerLiteral>);
-    static constexpr auto value =
-            lexy::callback<CostClause>([](Ast::Common::IntegerLiteral lit) { return CostClause{ lit }; });
-};
-
-struct PatternBlock
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = (LEXY_KEYWORD("match", dsl::identifier(dsl::ascii::alpha_underscore)) >>
-                                  dsl::p<LegalizeRuleDef::MatchBlockBody>) |
-            (LEXY_KEYWORD("when", dsl::identifier(dsl::ascii::alpha_underscore)) >>
-             dsl::p<LegalizeRuleDef::WhenBlockBody>) |
-            (LEXY_KEYWORD("emit", dsl::identifier(dsl::ascii::alpha_underscore)) >> dsl::p<EmitBlockBody>) |
-            (LEXY_KEYWORD("cost", dsl::identifier(dsl::ascii::alpha_underscore)) >> dsl::p<CostBody>);
-
-    static constexpr auto value = lexy::construct<PatternBlockClause>;
-};
-
-struct ISelPatternParser
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = LEXY_KEYWORD("pattern", dsl::identifier(dsl::ascii::alpha_underscore)) >>
-            (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<PatternBlock> + dsl::lit_c<';'>));
-
-    static constexpr auto
-            value = Common::PmrAsList<std::pmr::vector<PatternBlockClause>> >>
-            lexy::callback<Ast::InstSelDef::ISelPattern>(
-                            [](Ast::Common::Identifier name, std::pmr::vector<PatternBlockClause> clauses)
-                            {
-                                Ast::InstSelDef::ISelPattern pat;
-                                pat.m_patternName = std::move(name);
-
-                                for (auto &clause : clauses)
-                                {
-                                    std::visit(
-                                            [&](auto &&val)
-                                            {
-                                                using T = std::decay_t<decltype(val)>;
-                                                if constexpr (std::is_same_v<T, LegalizeRuleDef::MatchClause>)
-                                                    pat.m_matchPatterns = std::move(val.instructions);
-                                                else if constexpr (std::is_same_v<T, LegalizeRuleDef::WhenClause>)
-                                                    pat.m_predicates = std::move(val.predicates);
-                                                else if constexpr (std::is_same_v<T, EmitClause>)
-                                                    pat.m_emitSequence = std::move(val.instructions);
-                                                else if constexpr (std::is_same_v<T, CostClause>)
-                                                    pat.m_cost = val.cost;
-                                            },
-                                            clause);
-                                }
-                                return pat;
-                            });
-};
-
-struct ISelDefFileParser
+// Matches "inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format SType"
+struct InstHeader
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    struct Entry
+    struct InstArgList
     {
-        std::variant<Ast::InstSelDef::AddrModeDef, Ast::InstSelDef::ISelPattern> decl;
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::parenthesized.list(dsl::p<InstOperand>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstDef::InstOperand>>;
     };
 
-    struct EntryParser
+    static constexpr auto rule = Common::Keyword<"inst">::rule >>
+            (dsl::p<Common::Identifier> + dsl::p<InstArgList> + Common::Keyword<"format">::rule +
+             dsl::p<Common::Identifier>);
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::InstHeader>(
+            [](Ast::Common::Identifier name,
+               std::pmr::vector<Ast::InstDef::InstOperand> args,
+               Ast::Common::Identifier fmtName)
+            {
+                return Ast::InstDef::InstHeader{ .m_name = std::move(name),
+                                                 .m_args = std::move(args),
+                                                 .m_formatName = std::move(fmtName) };
+            });
+};
+
+struct InstBodyItem
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    struct ImplicitDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"IMPLICIT">::rule >>
+                (dsl::parenthesized.list(dsl::p<InstOperand>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>);
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstDef::InstOperand>>;
+    };
+
+    struct FormatDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"FORMAT">::rule >>
+                (dsl::parenthesized.list(dsl::p<BitExprAssign>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>);
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstDef::BitExprAssign>>;
+    };
+
+    struct FlagsDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"FLAGS">::rule >>
+                (dsl::parenthesized.list(dsl::p<InstFlag>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>);
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstDef::InstFlag>>;
+    };
+
+    struct AsmDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"ASM">::rule >>
+                (dsl::parenthesized(dsl::p<Common::StringLiteral>) + dsl::lit_c<';'>);
+        static constexpr auto value = lexy::forward<Ast::Common::StringLiteral>;
+    };
+
+    struct LatencyDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"LATENCY">::rule >>
+                (dsl::parenthesized(dsl::p<Common::IntegerLiteral>) + dsl::lit_c<';'>);
+        static constexpr auto value = lexy::callback<uint32_t>([](Ast::Common::IntegerLiteral lit)
+                                                               { return static_cast<uint32_t>(lit.m_node); });
+    };
+
+    static constexpr auto rule = (dsl::peek(Common::Keyword<"IMPLICIT">::rule) >> dsl::p<ImplicitDecl>) |
+            (dsl::peek(Common::Keyword<"FORMAT">::rule) >> dsl::p<FormatDecl>) |
+            (dsl::peek(Common::Keyword<"FLAGS">::rule) >> dsl::p<FlagsDecl>) |
+            (dsl::peek(Common::Keyword<"ASM">::rule) >> dsl::p<AsmDecl>) |
+            (dsl::peek(Common::Keyword<"LATENCY">::rule) >> dsl::p<LatencyDecl>);
+
+    static constexpr auto value = lexy::construct<Ast::InstDef::InstBodyItem>;
+};
+
+struct InstDecl
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    struct InstBodyList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<InstBodyItem>);
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstDef::InstBodyItem>>;
+    };
+
+    static constexpr auto rule = dsl::p<InstHeader> + dsl::p<InstBodyList> + dsl::opt(dsl::lit_c<';'>);
+
+    static constexpr auto value = lexy::callback<Ast::InstDef::InstDecl>(
+            [](Ast::InstDef::InstHeader header, std::pmr::vector<Ast::InstDef::InstBodyItem> items, auto...)
+            {
+                Ast::InstDef::InstDecl inst;
+                inst.m_header = std::move(header);
+
+                for (auto &item : items)
+                {
+                    std::visit(
+                            [&](auto &&val)
+                            {
+                                using T = std::decay_t<decltype(val)>;
+                                if constexpr (std::is_same_v<T, std::pmr::vector<Ast::InstDef::InstOperand>>)
+                                {
+                                    inst.m_body.m_implicitArgs = std::move(val);
+                                }
+                                else if constexpr (std::is_same_v<T, std::pmr::vector<Ast::InstDef::BitExprAssign>>)
+                                {
+                                    inst.m_body.m_assigns = std::move(val);
+                                }
+                                else if constexpr (std::is_same_v<T, Ast::Common::StringLiteral>)
+                                {
+                                    inst.m_body.m_asmTemplate = std::pmr::string(val.m_node.data(), val.m_node.size());
+                                }
+                                else if constexpr (std::is_same_v<T, uint32_t>)
+                                {
+                                    inst.m_body.m_latency = val;
+                                }
+                                else if constexpr (std::is_same_v<T, std::pmr::vector<Ast::InstDef::InstFlag>>)
+                                {
+                                    inst.m_body.m_flags = std::move(val);
+                                }
+                            },
+                            item);
+                }
+                return inst;
+            });
+};
+
+struct InstDefFile
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    struct EntryItem
+    {
+        std::variant<Ast::InstDef::InstFormatDecl, Ast::InstDef::InstDecl> decl;
+    };
+
+    struct Entry
     {
         static constexpr auto whitespace = Common::Whitespace;
 
         static constexpr auto rule = []
         {
-            auto addrModeBranch = dsl::peek(LEXY_KEYWORD("addrmode", dsl::identifier(dsl::ascii::alpha_underscore))) >>
-                    dsl::p<AddrModeDefParser>;
-            auto patternBranch = dsl::peek(LEXY_KEYWORD("pattern", dsl::identifier(dsl::ascii::alpha_underscore))) >>
-                    dsl::p<ISelPatternParser>;
-            return (addrModeBranch | patternBranch) + dsl::lit_c<';'>;
+            auto fmtBranch = dsl::peek(Common::Keyword<"format">::rule) >> dsl::p<InstFormatDecl>;
+            auto instBranch = dsl::peek(Common::Keyword<"inst">::rule) >> dsl::p<InstDecl>;
+            return (fmtBranch | instBranch);
         }();
 
-        static constexpr auto value = lexy::callback<Entry>(
-                [](Ast::InstSelDef::AddrModeDef addrMode) { return Entry{ std::move(addrMode) }; },
-                [](Ast::InstSelDef::ISelPattern pattern) { return Entry{ std::move(pattern) }; });
+        static constexpr auto value =
+                lexy::callback<EntryItem>([](Ast::InstDef::InstFormatDecl fmt) { return EntryItem{ std::move(fmt) }; },
+                                          [](Ast::InstDef::InstDecl inst) { return EntryItem{ std::move(inst) }; });
     };
 
-    static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<EntryParser>);
+    static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<Entry>);
 
-    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Entry>> >>
-            lexy::callback<Ast::InstSelDef::ISelDefFile>(
-                                          [](std::pmr::vector<Entry> entries)
-                                          {
-                                              Ast::InstSelDef::ISelDefFile file;
-                                              for (auto &entry : entries)
-                                              {
-                                                  if (std::holds_alternative<Ast::InstSelDef::AddrModeDef>(entry.decl))
-                                                  {
-                                                      file.m_addrModes.push_back(std::get<Ast::InstSelDef::AddrModeDef>(
-                                                              std::move(entry.decl)));
-                                                  }
-                                                  else
-                                                  {
-                                                      file.m_patterns.push_back(std::get<Ast::InstSelDef::ISelPattern>(
-                                                              std::move(entry.decl)));
-                                                  }
-                                              }
-                                              return file;
-                                          });
+    static constexpr auto value =
+            Common::PmrAsList<std::pmr::vector<EntryItem>> >>
+            lexy::callback<Ast::InstDef::InstDefFile>(
+                    [](std::pmr::vector<EntryItem> entries)
+                    {
+                        Ast::InstDef::InstDefFile file;
+                        for (auto &entry : entries)
+                        {
+                            if (std::holds_alternative<Ast::InstDef::InstFormatDecl>(entry.decl))
+                            {
+                                file.m_formats.push_back(std::get<Ast::InstDef::InstFormatDecl>(std::move(entry.decl)));
+                            }
+                            else
+                            {
+                                file.m_instructions.push_back(std::get<Ast::InstDef::InstDecl>(std::move(entry.decl)));
+                            }
+                        }
+                        return file;
+                    });
 };
+} // namespace DSL::Parser::InstDef
 
-} // namespace DSL::Parser::InstSelDef
-
-#endif // EZDSL_INST_SEL_DEF_LANG_H
+#endif // EZDSL_PARSER_INST_DEF_LANG_H

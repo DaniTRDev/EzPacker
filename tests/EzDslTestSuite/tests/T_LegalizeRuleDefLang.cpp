@@ -1,42 +1,14 @@
-#include "EzDslCommon.h"
+#include "EzDslTestSuite.h"
 #include "Ast/LegalizeRuleDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Parser/LegalizeRuleDefLang.h"
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
-#include <gtest/gtest.h>
 
-class LegalizeRuleDefLangTest : public ::testing::Test
+class LegalizeRuleDefLangTest : public DslTestSuiteAsGtest
 {
   public:
-    DiagnosticCollector *getDiagCollector() { return m_diagCollector.get(); }
-
-    size_t addSource(const std::string &source, const std::string &content)
-    {
-        return m_sourceManager->addSourceContent(source, content);
-    }
-
-    SourceManager *getSourceManager() { return m_sourceManager.get(); }
-
-    void SetUp() override
-    {
-        m_sourceManager = std::make_shared<SourceManager>("", &m_resource);
-        m_diagLogger = std::make_shared<DiagnosticLogger>(m_sourceManager.get());
-        m_diagCollector = std::make_shared<DiagnosticCollector>();
-
-        m_diagCollector->addListener(m_diagLogger.get());
-    }
-
-    void TearDown() override {}
-
-    std::pmr::monotonic_buffer_resource *getAllocator() { return &m_resource; }
-
-  private:
-    std::pmr::monotonic_buffer_resource m_resource;
-    std::shared_ptr<DiagnosticCollector> m_diagCollector;
-    std::shared_ptr<DiagnosticLogger> m_diagLogger;
-    std::shared_ptr<SourceManager> m_sourceManager;
 };
 
 // ============================================================================
@@ -46,8 +18,7 @@ class LegalizeRuleDefLangTest : public ::testing::Test
 TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixSsaOperand)
 {
     std::string test = "i32:$dst";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(res.has_value());
@@ -61,8 +32,7 @@ TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixSsaOperand)
 TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixImmediateSymbolOperand)
 {
     std::string test = "imm:$c";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(res.has_value());
@@ -76,8 +46,7 @@ TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixImmediateSymbolOperand)
 TEST_F(LegalizeRuleDefLangTest, TestParameterizedPrefixImmediateSymbolOperand)
 {
     std::string testTyped = "imm(i32):$c";
-    size_t sourceIdTyped = addSource("testTyped", testTyped);
-    ParseContext ctxTyped(getDiagCollector(), getSourceManager(), sourceIdTyped, getAllocator());
+    ParseContext ctxTyped = createParseContextFromBuff("testTyped", testTyped);
 
     auto resTyped = ctxTyped.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(resTyped.has_value());
@@ -89,8 +58,7 @@ TEST_F(LegalizeRuleDefLangTest, TestParameterizedPrefixImmediateSymbolOperand)
     EXPECT_EQ(resTyped->m_typeParam->m_node, "i32");
 
     std::string testWidth = "simm(i12):$offset";
-    size_t sourceIdWidth = addSource("testWidth", testWidth);
-    ParseContext ctxWidth(getDiagCollector(), getSourceManager(), sourceIdWidth, getAllocator());
+    ParseContext ctxWidth = createParseContextFromBuff("testWidth", testWidth);
 
     auto resWidth = ctxWidth.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(resWidth.has_value());
@@ -105,8 +73,7 @@ TEST_F(LegalizeRuleDefLangTest, TestParameterizedPrefixImmediateSymbolOperand)
 TEST_F(LegalizeRuleDefLangTest, TestBareSsaOperand)
 {
     std::string test = "$src";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(res.has_value());
@@ -120,8 +87,7 @@ TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
 {
     // Decimal literal
     std::string testDec = "42";
-    size_t sourceIdDec = addSource("testDec", testDec);
-    ParseContext ctxDec(getDiagCollector(), getSourceManager(), sourceIdDec, getAllocator());
+    ParseContext ctxDec = createParseContextFromBuff("testDec", testDec);
 
     auto resDec = ctxDec.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(resDec.has_value());
@@ -131,8 +97,7 @@ TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
 
     // Negative literal
     std::string testNeg = "-2048";
-    size_t sourceIdNeg = addSource("testNeg", testNeg);
-    ParseContext ctxNeg(getDiagCollector(), getSourceManager(), sourceIdNeg, getAllocator());
+    ParseContext ctxNeg = createParseContextFromBuff("testNeg", testNeg);
 
     auto resNeg = ctxNeg.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(resNeg.has_value());
@@ -142,8 +107,7 @@ TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
 
     // Hexadecimal literal
     std::string testHex = "0xFF";
-    size_t sourceIdHex = addSource("testHex", testHex);
-    ParseContext ctxHex(getDiagCollector(), getSourceManager(), sourceIdHex, getAllocator());
+    ParseContext ctxHex = createParseContextFromBuff("testHex", testHex);
 
     auto resHex = ctxHex.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(resHex.has_value());
@@ -155,8 +119,7 @@ TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
 TEST_F(LegalizeRuleDefLangTest, TestCustomTransformOperand)
 {
     std::string test = "log2($shift)";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(res.has_value());
@@ -169,8 +132,7 @@ TEST_F(LegalizeRuleDefLangTest, TestCustomTransformOperand)
 TEST_F(LegalizeRuleDefLangTest, TestCustomTransformMultiArgOperand)
 {
     std::string test = "combineBits($hi, $lo)";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleOperand, DSL::Ast::LegalizeRuleDef::RuleOperand>();
     ASSERT_TRUE(res.has_value());
@@ -188,8 +150,7 @@ TEST_F(LegalizeRuleDefLangTest, TestCustomTransformMultiArgOperand)
 TEST_F(LegalizeRuleDefLangTest, TestInstructionWithoutOperands)
 {
     std::string test = "NOP;";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleInstruction, DSL::Ast::LegalizeRuleDef::RuleInstruction>();
     ASSERT_TRUE(res.has_value());
@@ -200,8 +161,7 @@ TEST_F(LegalizeRuleDefLangTest, TestInstructionWithoutOperands)
 TEST_F(LegalizeRuleDefLangTest, TestInstructionWithMixedOperands)
 {
     std::string test = "ADD i32:$dst, $lhs, imm(i32):$c, 42, log2($shift);";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleInstruction, DSL::Ast::LegalizeRuleDef::RuleInstruction>();
     ASSERT_TRUE(res.has_value());
@@ -243,8 +203,7 @@ TEST_F(LegalizeRuleDefLangTest, TestInstructionWithMixedOperands)
 TEST_F(LegalizeRuleDefLangTest, TestRulePredicateSingleArg)
 {
     std::string test = "isPowTwo($c);";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RulePredicate, DSL::Ast::LegalizeRuleDef::RulePredicate>();
     ASSERT_TRUE(res.has_value());
@@ -258,8 +217,7 @@ TEST_F(LegalizeRuleDefLangTest, TestRulePredicateSingleArg)
 TEST_F(LegalizeRuleDefLangTest, TestRulePredicateMultiArg)
 {
     std::string test = "isAddCarryLegal($lhs, $rhs);";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RulePredicate, DSL::Ast::LegalizeRuleDef::RulePredicate>();
     ASSERT_TRUE(res.has_value());
@@ -292,8 +250,7 @@ rule SDivPow2 {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRewriteRule,
                          DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule>();
@@ -345,8 +302,7 @@ rule PermutedOrder {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRewriteRule,
                          DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule>();
@@ -379,8 +335,7 @@ rule NarrowAddi64 {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRewriteRule,
                          DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule>();
@@ -431,8 +386,7 @@ rule NarrowAddi64 {
 };
 )dsl";
 
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::TargetLegalizeRuleDef,
                          DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef>();
@@ -450,8 +404,7 @@ rule NarrowAddi64 {
 TEST_F(LegalizeRuleDefLangTest, TestDisallowedPostfixImmediateSyntaxError)
 {
     std::string test = "ADD i32:$dst, i32:$lhs, $c:imm;";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleInstruction, DSL::Ast::LegalizeRuleDef::RuleInstruction>();
     EXPECT_FALSE(res.has_value());
@@ -460,8 +413,7 @@ TEST_F(LegalizeRuleDefLangTest, TestDisallowedPostfixImmediateSyntaxError)
 TEST_F(LegalizeRuleDefLangTest, TestDisallowedPostfixTypeSyntaxError)
 {
     std::string test = "ADD $dst:i32, $src:i32, 42;";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleInstruction, DSL::Ast::LegalizeRuleDef::RuleInstruction>();
     EXPECT_FALSE(res.has_value());
@@ -479,8 +431,7 @@ rule BadRule {
     };
 };
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::TargetLegalizeRuleDef,
                          DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef>();
@@ -499,8 +450,7 @@ rule BadRule {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::TargetLegalizeRuleDef,
                          DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef>();
@@ -519,8 +469,7 @@ rule BadRule {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRewriteRule,
                          DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule>();
@@ -542,8 +491,7 @@ rule BadRule {
     };
 }
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRewriteRule,
                          DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule>();
@@ -553,8 +501,7 @@ rule BadRule {
 TEST_F(LegalizeRuleDefLangTest, TestInvalidDollarVariableSyntaxError)
 {
     std::string test = "ADD $; ";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::RuleInstruction, DSL::Ast::LegalizeRuleDef::RuleInstruction>();
     EXPECT_FALSE(res.has_value());
@@ -570,8 +517,7 @@ rule BadRule {
     expand {
         NOP;
 )dsl";
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRewriteRule,
                          DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule>();

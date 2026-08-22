@@ -1,4 +1,4 @@
-set(MIRTESTSUITE_FILES_LIST
+set(EZMIRTESTSUITE_FILES_LIST
         "include/EzMirTestSuite.h"
         "include/EzMirTestSuiteCallingConv.h"
         "include/EzMirTestSuiteTypeLayout.h"
@@ -9,7 +9,7 @@ set(MIRTESTSUITE_FILES_LIST
 )
 
 EzCMK_ConfigureLib(NAME "EzMirTestSuite"
-        FILE_LIST ${MIRTESTSUITE_FILES_LIST}
+        FILE_LIST ${EZMIRTESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER ""
         LINKED_LIBRARIES "EzMir;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include"

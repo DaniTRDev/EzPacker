@@ -45,9 +45,8 @@ enum class BitExprOp
     Not
 };
 
-// Replaced std::shared_ptr with std::unique_ptr for strict AST tree ownership.
 using BitExprValues =
-        std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, std::unique_ptr<BitExpression>>;
+        std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, std::shared_ptr<BitExpression>>;
 
 struct BitExpression
 {

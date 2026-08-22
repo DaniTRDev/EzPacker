@@ -21,35 +21,3 @@ EzCMK_ConfigureLib(NAME "EzDsl"
         LINKED_LIBRARIES "EzCore;foonathan::lexy"
         INCLUDED_DIRS "include"
 )
-
-if (EZPACKER_BUILD_TESTS)
-    message(STATUS "Building tests for EzDsl")
-
-    EzPacker_AddTest(
-            "T_TargetDefLang"
-            "EzDsl"
-            "GTest::gtest_main"
-            "tests/T_TargetDefLang.cpp"
-    )
-
-    EzPacker_AddTest(
-            "T_LegalizeActionDefLang"
-            "EzDsl"
-            "GTest::gtest_main"
-            "tests/T_LegalizeActionDefLang.cpp"
-    )
-
-    EzPacker_AddTest(
-            "T_LegalizeRuleDefLang"
-            "EzDsl"
-            "GTest::gtest_main"
-            "tests/T_LegalizeRuleDefLang.cpp"
-    )
-
-    EzPacker_AddTest(
-            "T_InstructionSelDefLang.cpp"
-            "EzDsl"
-            "GTest::gtest_main"
-            "tests/T_InstructionSelDefLang.cpp"
-    )
-endif ()

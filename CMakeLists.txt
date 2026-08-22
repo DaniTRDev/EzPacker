@@ -39,7 +39,10 @@ add_subdirectory(EzCodeEmitter)
 
 if (EZPACKER_BUILD_TESTS)
     message(STATUS "Configuring EzMirTestSuite")
-    add_subdirectory(EzMirTestSuite)
+    add_subdirectory(tests/EzMirTestSuite)
+
+    message(STATUS "Configuring EzDslTestSuite")
+    add_subdirectory(tests/EzDslTestSuite)
 
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
 endif ()
