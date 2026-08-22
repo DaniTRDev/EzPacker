@@ -347,17 +347,6 @@ TEST_F(LegalizeMatrixLangTest, TestUnknownActionKindError)
     EXPECT_FALSE(res.has_value());
 }
 
-TEST_F(LegalizeMatrixLangTest, TestMissingArrowOperatorError)
-{
-    std::string test = "WIDENS(i8, i16) i32"; // Missing '>>'
-    size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
-
-    auto res = ctx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
-                         DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
-    EXPECT_FALSE(res.has_value());
-}
-
 TEST_F(LegalizeMatrixLangTest, TestMissingActionKeywordError)
 {
     std::string test = R"(

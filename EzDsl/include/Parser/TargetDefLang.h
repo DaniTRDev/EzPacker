@@ -1,19 +1,15 @@
 #ifndef EZDSL_TARGET_DEF_LANG_H
 #define EZDSL_TARGET_DEF_LANG_H
 
+#include "Ast/TargetDefLangAst.h"
 #include "EzDslCommon.h"
 #include "ParseContext.h"
-#include "Ast/TargetDefLangAst.h"
-#include "CommonParsers.h"
+#include "Parser/CommonParsers.h"
 
 namespace DSL::Parser::TargetDef
 {
 namespace dsl = ::lexy::dsl;
 
-/**
- * rax(, 64, 0)
- * eax(rax, 32, 0)
- */
 struct TargetRegister
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -21,7 +17,6 @@ struct TargetRegister
     static constexpr auto rule = []
     {
         auto name = dsl::p<Common::Identifier>;
-        // Wrap the peek branch in dsl::opt so omitting the parent identifier is valid
         auto parent = dsl::opt(dsl::peek(dsl::ascii::alpha_underscore) >> dsl::p<Common::Identifier>);
         auto size = dsl::p<Common::IntegerLiteral>;
         auto offset = dsl::p<Common::IntegerLiteral>;
@@ -32,29 +27,17 @@ struct TargetRegister
 
     static constexpr auto value = lexy::callback<Ast::TargetDef::TargetRegister>(
             [](Ast::Common::Identifier name,
-               auto parent,
+               Ast::Common::Identifier parent,
                Ast::Common::IntegerLiteral size,
                Ast::Common::IntegerLiteral offset)
-            {
-                Ast::Common::Identifier resolvedParent;
-                if constexpr (std::is_same_v<std::decay_t<decltype(parent)>, Ast::Common::Identifier>)
-                {
-                    resolvedParent = std::move(parent);
-                }
-
-                return Ast::TargetDef::TargetRegister{ std::move(name),
-                                                       std::move(resolvedParent),
-                                                       std::move(size),
-                                                       std::move(offset) };
-            });
+            { return Ast::TargetDef::TargetRegister{ std::move(name), std::move(parent), size, offset }; },
+            [](Ast::Common::Identifier name,
+               lexy::nullopt,
+               Ast::Common::IntegerLiteral size,
+               Ast::Common::IntegerLiteral offset)
+            { return Ast::TargetDef::TargetRegister{ std::move(name), Ast::Common::Identifier{}, size, offset }; });
 };
 
-/**
- * CLASS(gpr64,
- *     rax(, 64, 0),
- *     rcx(, 64, 0)
- * );
- */
 struct TargetRegisterClass
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -68,35 +51,15 @@ struct TargetRegisterClass
         return kw >> (dsl::parenthesized(name + regList) + dsl::lit_c<';'>);
     }();
 
-    static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::TargetDef::TargetRegister>> >>
+    static constexpr auto
+            value = lexy::as_list<std::pmr::vector<Ast::TargetDef::TargetRegister>> >>
             lexy::callback<Ast::TargetDef::TargetRegisterClass>(
-                    [](Ast::Common::Identifier name, auto... rest)
-                    {
-                        Ast::TargetDef::TargetRegisterClass cls;
-                        cls.m_name = std::move(name);
-
-                        (
-                                [&](auto &&arg)
-                                {
-                                    using T = std::decay_t<decltype(arg)>;
-                                    if constexpr (std::is_same_v<T, std::pmr::vector<Ast::TargetDef::TargetRegister>>)
-                                    {
-                                        cls.m_registers = std::move(arg);
-                                    }
-                                }(rest),
-                                ...);
-
-                        return cls;
-                    });
+                            [](Ast::Common::Identifier name, std::pmr::vector<Ast::TargetDef::TargetRegister> registers)
+                            { return Ast::TargetDef::TargetRegisterClass{ std::move(name), std::move(registers) }; },
+                            [](Ast::Common::Identifier name, lexy::nullopt)
+                            { return Ast::TargetDef::TargetRegisterClass{ std::move(name), {} }; });
 };
 
-/**
- * bank MyBankName {
- *     CLASS(gpr64, ...);
- *     CLASS(fpr64, ...);
- * };
- */
 struct TargetRegisterBank
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -110,19 +73,17 @@ struct TargetRegisterBank
         return kw >> (name + classes + dsl::opt(dsl::lit_c<';'>));
     }();
 
-    static constexpr auto
-            value = lexy::as_list<std::pmr::vector<Ast::TargetDef::TargetRegisterClass>> >>
+    static constexpr auto value =
+            lexy::as_list<std::pmr::vector<Ast::TargetDef::TargetRegisterClass>> >>
             lexy::callback<Ast::TargetDef::TargetRegisterBank>(
-                            [](Ast::Common::Identifier name,
-                               std::pmr::vector<Ast::TargetDef::TargetRegisterClass> classes,
-                               auto...)
-                            { return Ast::TargetDef::TargetRegisterBank{ std::move(name), std::move(classes) }; });
+                    [](Ast::Common::Identifier name, std::pmr::vector<Ast::TargetDef::TargetRegisterClass> classes)
+                    { return Ast::TargetDef::TargetRegisterBank{ std::move(name), std::move(classes) }; },
+                    [](Ast::Common::Identifier name,
+                       std::pmr::vector<Ast::TargetDef::TargetRegisterClass> classes,
+                       lexy::nullopt)
+                    { return Ast::TargetDef::TargetRegisterBank{ std::move(name), std::move(classes) }; });
 };
 
-/**
- * include idef "file.idf";
- * include isel "file.isf";
- */
 struct TargetIncFile
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -133,12 +94,6 @@ struct TargetIncFile
     static constexpr auto value = lexy::construct<Ast::TargetDef::TargetIncFile>;
 };
 
-/**
- * target x86_64 {
- *     include idef "common.idf";
- *     bank GPR { ... };
- * };
- */
 struct TargetDef
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -174,9 +129,29 @@ struct TargetDef
     }();
 
     static constexpr auto
-            value = lexy::as_list<std::vector<Item>> >>
+            value = lexy::as_list<std::pmr::vector<Item>> >>
             lexy::callback<Ast::TargetDef::TargetDef>(
-                            [](Ast::Common::Identifier name, std::vector<Item> items, auto...)
+                            [](Ast::Common::Identifier name, std::pmr::vector<Item> items)
+                            {
+                                Ast::TargetDef::TargetDef target;
+                                target.m_name = std::move(name);
+
+                                for (auto &item : items)
+                                {
+                                    if (std::holds_alternative<Ast::TargetDef::TargetIncFile>(item.value))
+                                    {
+                                        target.m_inclusions.push_back(
+                                                std::get<Ast::TargetDef::TargetIncFile>(std::move(item.value)));
+                                    }
+                                    else
+                                    {
+                                        target.m_regBanks.push_back(
+                                                std::get<Ast::TargetDef::TargetRegisterBank>(std::move(item.value)));
+                                    }
+                                }
+                                return target;
+                            },
+                            [](Ast::Common::Identifier name, std::pmr::vector<Item> items, lexy::nullopt)
                             {
                                 Ast::TargetDef::TargetDef target;
                                 target.m_name = std::move(name);

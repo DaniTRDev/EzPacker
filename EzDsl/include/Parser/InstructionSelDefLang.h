@@ -1,8 +1,8 @@
 #ifndef EZDSL_INST_SEL_DEF_LANG_H
 #define EZDSL_INST_SEL_DEF_LANG_H
 
-#include "EzDslCommon.h"
 #include "Ast/InstructionSelDefLang.h"
+#include "EzDslCommon.h"
 #include "Parser/CommonParsers.h"
 #include "Parser/LegalizeRuleDefLang.h"
 
@@ -12,17 +12,6 @@ namespace DSL::Parser::InstSelDef
 {
 namespace dsl = ::lexy::dsl;
 
-// ============================================================================
-// 1. Addressing Mode Parameter Parser
-// ============================================================================
-
-/**
- * Parses an AddrMode parameter declaration with optional type parameter and default value:
- *   - "GPR:base"               (type="GPR",  typeParam=nullopt, name="base",   default=nullopt)
- *   - "simm(12):offset = 0"    (type="simm", typeParam="12",    name="offset", default=0)
- *   - "imm(i32):disp = 0"      (type="imm",  typeParam="i32",   name="disp",   default=0)
- *   - "simm12:offset = 0"      (type="simm12", typeParam=nullopt, name="offset", default=0)
- */
 struct AddrModeParam
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -84,10 +73,6 @@ struct AddrModeParamList
     static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstSelDef::AddrModeParam>>;
 };
 
-// ============================================================================
-// 2. Addressing Mode Variant & Aggregate Parsers
-// ============================================================================
-
 using VariantBlockClause = std::variant<LegalizeRuleDef::MatchClause, LegalizeRuleDef::WhenClause>;
 
 struct VariantBlock
@@ -104,12 +89,12 @@ struct AddrModeVariantParser
     static constexpr auto whitespace = Common::Whitespace;
 
     static constexpr auto rule = Common::Keyword<"variant">::rule >>
-            dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<VariantBlock> + dsl::lit_c<';'>);
+            (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<VariantBlock> + dsl::lit_c<';'>));
 
     static constexpr auto
-            value = lexy::as_list<std::vector<VariantBlockClause>> >>
+            value = lexy::as_list<std::pmr::vector<VariantBlockClause>> >>
             lexy::callback<Ast::InstSelDef::AddrModeVariant>(
-                            [](Ast::Common::Identifier name, std::vector<VariantBlockClause> clauses)
+                            [](Ast::Common::Identifier name, std::pmr::vector<VariantBlockClause> clauses)
                             {
                                 Ast::InstSelDef::AddrModeVariant variant;
                                 variant.m_variantName = std::move(name);
@@ -121,13 +106,9 @@ struct AddrModeVariantParser
                                             {
                                                 using T = std::decay_t<decltype(val)>;
                                                 if constexpr (std::is_same_v<T, LegalizeRuleDef::MatchClause>)
-                                                {
                                                     variant.m_matchPatterns = std::move(val.instructions);
-                                                }
                                                 else if constexpr (std::is_same_v<T, LegalizeRuleDef::WhenClause>)
-                                                {
                                                     variant.m_predicates = std::move(val.predicates);
-                                                }
                                             },
                                             clause);
                                 }
@@ -147,24 +128,18 @@ struct AddrModeDefParser
     static constexpr auto whitespace = Common::Whitespace;
 
     static constexpr auto rule = Common::Keyword<"addrmode">::rule >>
-            dsl::p<Common::Identifier> + dsl::p<AddrModeParamList> + dsl::p<AddrModeVariantList>;
+            (dsl::p<Common::Identifier> + dsl::p<AddrModeParamList> + dsl::p<AddrModeVariantList>);
 
     static constexpr auto value = lexy::callback<Ast::InstSelDef::AddrModeDef>(
             [](Ast::Common::Identifier name,
                std::pmr::vector<Ast::InstSelDef::AddrModeParam> params,
                std::pmr::vector<Ast::InstSelDef::AddrModeVariant> variants)
             {
-                Ast::InstSelDef::AddrModeDef def;
-                def.m_name = std::move(name);
-                def.m_parameters = std::move(params);
-                def.m_variants = std::move(variants);
-                return def;
+                return Ast::InstSelDef::AddrModeDef{ .m_name = std::move(name),
+                                                     .m_parameters = std::move(params),
+                                                     .m_variants = std::move(variants) };
             });
 };
-
-// ============================================================================
-// 3. Instruction Selection Pattern Parser
-// ============================================================================
 
 struct EmitClause
 {
@@ -211,12 +186,12 @@ struct ISelPatternParser
     static constexpr auto whitespace = Common::Whitespace;
 
     static constexpr auto rule = Common::Keyword<"pattern">::rule >>
-            dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<PatternBlock> + dsl::lit_c<';'>);
+            (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<PatternBlock> + dsl::lit_c<';'>));
 
     static constexpr auto
-            value = lexy::as_list<std::vector<PatternBlockClause>> >>
+            value = lexy::as_list<std::pmr::vector<PatternBlockClause>> >>
             lexy::callback<Ast::InstSelDef::ISelPattern>(
-                            [](Ast::Common::Identifier name, std::vector<PatternBlockClause> clauses)
+                            [](Ast::Common::Identifier name, std::pmr::vector<PatternBlockClause> clauses)
                             {
                                 Ast::InstSelDef::ISelPattern pat;
                                 pat.m_patternName = std::move(name);
@@ -228,31 +203,19 @@ struct ISelPatternParser
                                             {
                                                 using T = std::decay_t<decltype(val)>;
                                                 if constexpr (std::is_same_v<T, LegalizeRuleDef::MatchClause>)
-                                                {
                                                     pat.m_matchPatterns = std::move(val.instructions);
-                                                }
                                                 else if constexpr (std::is_same_v<T, LegalizeRuleDef::WhenClause>)
-                                                {
                                                     pat.m_predicates = std::move(val.predicates);
-                                                }
                                                 else if constexpr (std::is_same_v<T, EmitClause>)
-                                                {
                                                     pat.m_emitSequence = std::move(val.instructions);
-                                                }
                                                 else if constexpr (std::is_same_v<T, CostClause>)
-                                                {
                                                     pat.m_cost = val.cost;
-                                                }
                                             },
                                             clause);
                                 }
                                 return pat;
                             });
 };
-
-// ============================================================================
-// 4. Translation Unit Root Parser
-// ============================================================================
 
 struct ISelDefFileParser
 {
@@ -281,9 +244,9 @@ struct ISelDefFileParser
 
     static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<EntryParser>);
 
-    static constexpr auto value = lexy::as_list<std::vector<Entry>> >>
+    static constexpr auto value = lexy::as_list<std::pmr::vector<Entry>> >>
             lexy::callback<Ast::InstSelDef::ISelDefFile>(
-                                          [](std::vector<Entry> entries)
+                                          [](std::pmr::vector<Entry> entries)
                                           {
                                               Ast::InstSelDef::ISelDefFile file;
                                               for (auto &entry : entries)

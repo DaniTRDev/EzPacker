@@ -6,16 +6,20 @@
 
 #include <memory>
 #include <optional>
-#include <string>
 #include <variant>
 #include <vector>
 
 namespace DSL::Ast::InstDef
 {
+
+/**
+ * Represents a bit-range slice (e.g., "[31:25]", "[0:7]").
+ * Preserves syntax slice directionality (MSB to LSB or LSB to MSB).
+ */
 struct BitSlice
 {
-    uint16_t m_low{ 0 };
-    uint16_t m_high{ 0 };
+    uint16_t m_from{ 0 };
+    uint16_t m_to{ 0 };
 };
 
 struct SlicedIdentifier
@@ -38,8 +42,9 @@ enum class BitExprOp
     Not
 };
 
+// Replaced std::shared_ptr with std::unique_ptr for strict AST tree ownership.
 using BitExprValues =
-        std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, std::shared_ptr<BitExpression>>;
+        std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, std::unique_ptr<BitExpression>>;
 
 struct BitExpression
 {
@@ -79,24 +84,21 @@ enum class InstOperandDir
 enum class InstOperandKind
 {
     Register, // Hardware or virtual register (e.g., "GPR:rd OUT")
-    Immediate // Immediate value (e.g., "simm(i12):imm12 IN", "imm(i32):val IN", "imm:c IN")
+    Immediate // Immediate value (e.g., "simm(i12):imm12 IN", "imm(i32):val IN")
 };
 
 /**
  * Unified representation for all instruction arguments (registers & immediates).
  *
  * Examples:
- * - "GPR:rd OUT"             -> m_kind=Register,  m_typeOrClass="GPR",  m_typeParam=nullopt, m_name="rd", m_dir=ArgOut
- * - "simm(i12):imm12 IN"     -> m_kind=Immediate, m_typeOrClass="simm", m_typeParam="i12",   m_name="imm12",
- * m_dir=ArgIn
- * - "imm(i32):offset IN"     -> m_kind=Immediate, m_typeOrClass="imm",  m_typeParam="i32", m_name="offset",m_dir=ArgIn
- * - "imm:val IN"             -> m_kind=Immediate, m_typeOrClass="imm",  m_typeParam=nullopt, m_name="val", m_dir=ArgIn
+ * - "GPR:rd OUT"         -> m_kind=Register,  m_typeOrClass="GPR",  m_typeParam=nullopt, m_name="rd", m_dir=ArgOut
+ * - "simm(i12):imm12 IN" -> m_kind=Immediate, m_typeOrClass="simm", m_typeParam="i12",   m_name="imm12", m_dir=ArgIn
  */
 struct InstOperand
 {
     InstOperandKind m_kind{ InstOperandKind::Register };
-    Common::Identifier m_typeOrClass; // Register class ("GPR") or immediate classifier ("imm", "simm", "uimm")
-    std::optional<Common::Identifier> m_typeParam; // Inner type or width specifier (e.g., "i12", "i32", "12")
+    Common::Identifier m_typeOrClass;              // Register class ("GPR") or immediate ("imm", "simm", "uimm")
+    std::optional<Common::Identifier> m_typeParam; // Width or type specifier (e.g., "i12", "i32")
     Common::Identifier m_name;                     // Operand identifier (e.g., "rd", "rs1", "imm12")
     InstOperandDir m_dir{ InstOperandDir::ArgIn }; // Dataflow direction ("IN", "OUT", "INOUT")
 };

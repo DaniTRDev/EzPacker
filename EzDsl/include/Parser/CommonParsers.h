@@ -1,9 +1,11 @@
 #ifndef EZDSL_COMMON_PARSERS_H
 #define EZDSL_COMMON_PARSERS_H
 
+#include "Ast/CommonAstNodes.h"
 #include "EzDslCommon.h"
 #include "ParseContext.h"
-#include "Ast/CommonAstNodes.h"
+
+#include <charconv>
 
 namespace DSL::Parser::Common
 {
@@ -28,14 +30,36 @@ template <char C> struct SingleChar
     static constexpr auto value = lexy::constant(true);
 };
 
+struct Comment
+{
+    static constexpr auto rule = dsl::lit_c<'/'> >> dsl::lit_c<'/'> >> dsl::until(dsl::newline);
+};
+
+static constexpr auto Whitespace = dsl::ascii::space | dsl::inline_<Comment> | dsl::ascii::newline;
+
+struct Identifier
+{
+    static constexpr auto rule = dsl::position +
+            dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore) + dsl::position;
+
+    static constexpr auto value =
+            lexy::bind(lexy::callback<Ast::Common::Identifier>(
+                               [](ParseContext &ctx, const char *startIter, auto lexeme, const char *endIter)
+                               {
+                                   SourceReference *ref = ctx.createRef(startIter, endIter);
+                                   std::string_view str(lexeme.data(), lexeme.size());
+                                   return Ast::Common::Identifier{ str, ref };
+                               }),
+                       lexy::parse_state,
+                       lexy::values);
+};
+
 struct IntegerLiteral
 {
     static constexpr auto rule = []
     {
-        // Optional Sign (-)
         auto sign = dsl::opt(dsl::p<SingleChar<'-'>>);
 
-        // Base prefixes and digit parsers
         auto hex = (dsl::lit<"0x"> | dsl::lit<"0X">) >> dsl::integer<uint64_t, dsl::hex>(dsl::digits<dsl::hex>);
         auto bin = (dsl::lit<"0b"> | dsl::lit<"0B">) >> dsl::integer<uint64_t, dsl::binary>(dsl::digits<dsl::binary>);
         auto oct = (dsl::lit<"0o"> | dsl::lit<"0O">) >> dsl::integer<uint64_t, dsl::octal>(dsl::digits<dsl::octal>);
@@ -51,7 +75,6 @@ struct IntegerLiteral
                     [](ParseContext &ctx, const char *startIter, auto isNegative, uint64_t val, const char *endIter)
                     {
                         int64_t signedVal = 0;
-
                         if constexpr (!std::is_same_v<std::decay_t<decltype(isNegative)>, lexy::nullopt>)
                         {
                             signedVal = -static_cast<int64_t>(val);
@@ -75,39 +98,17 @@ struct RealLiteral
 
     static constexpr auto rule = dsl::position + dsl::capture(FloatRule) + dsl::position;
 
-    static constexpr auto value = lexy::bind(
-            lexy::callback<Ast::Common::RealLiteral>(
-                    [](ParseContext &ctx, const char *startIter, auto textLexeme, const char *endIter)
-                    {
-                        std::string_view text(textLexeme.data(), textLexeme.size());
-                        double parsedValue = 0.0;
-                        std::from_chars(text.data(), text.data() + text.size(), parsedValue);
-                        return Ast::Common::RealLiteral{ { parsedValue, ctx.createRef(startIter, endIter) } };
-                    }),
-            lexy::parse_state,
-            lexy::values);
-};
-
-struct Identifier
-{
-    static constexpr auto rule = dsl::position +
-            dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore) + dsl::position;
-
     static constexpr auto value =
-            lexy::bind(lexy::callback<Ast::Common::Identifier>(
-                               [](ParseContext &ctx, const char *startIter, auto lexeme, const char *endIter)
+            lexy::bind(lexy::callback<Ast::Common::RealLiteral>(
+                               [](ParseContext &ctx, const char *startIter, auto textLexeme, const char *endIter)
                                {
-                                   SourceReference *ref = ctx.createRef(startIter, endIter);
-                                   std::string_view str(lexeme.data(), lexeme.size());
-                                   return Ast::Common::Identifier{ str, ref };
+                                   std::string_view text(textLexeme.data(), textLexeme.size());
+                                   double parsedValue = 0.0;
+                                   std::from_chars(text.data(), text.data() + text.size(), parsedValue);
+                                   return Ast::Common::RealLiteral{ parsedValue, ctx.createRef(startIter, endIter) };
                                }),
                        lexy::parse_state,
                        lexy::values);
-};
-
-struct Comment
-{
-    static constexpr auto rule = dsl::lit_c<'/'> >> dsl::lit_c<'/'> >> dsl::until(dsl::newline);
 };
 
 struct StringLiteral
@@ -132,8 +133,6 @@ struct StringLiteral
                        lexy::values);
 };
 
-static constexpr auto Whitespace = dsl::ascii::space | dsl::inline_<Common::Comment> | dsl::ascii::newline;
-
-}; // namespace DSL::Parser::Common
+} // namespace DSL::Parser::Common
 
 #endif // EZDSL_COMMON_PARSERS_H

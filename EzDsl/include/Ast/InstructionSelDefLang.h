@@ -7,13 +7,9 @@
 
 namespace DSL::Ast::InstSelDef
 {
+
 /**
- * Represents a parameter in an AddrMode declaration with optional type parameter and default value.
- *
- * Examples:
- *   - "GPR:base"               -> m_typeOrClass="GPR",  m_typeParam=nullopt, m_name="base",   m_defaultValue=nullopt
- *   - "imm(i32):disp = 0"      -> m_typeOrClass="imm",  m_typeParam="i32",   m_name="disp",   m_defaultValue=0
- *   - "simm:disp = 0"          -> m_typeOrClass="simm",  m_typeParam=nullopt,   m_name="disp",   m_defaultValue=0
+ * Parameter declaration for an addressing mode aggregate.
  */
 struct AddrModeParam
 {
@@ -25,7 +21,6 @@ struct AddrModeParam
 
 /**
  * Individual matching variant inside an AddrMode aggregate.
- * Reuses `RuleInstruction` for the match block and `RulePredicate` for the when block.
  */
 struct AddrModeVariant
 {
@@ -36,17 +31,6 @@ struct AddrModeVariant
 
 /**
  * Complete AddrMode aggregate definition.
- *
- * Example:
- *   addrmode AddrModeRegImm12(GPR:base, simm(i12):offset = 0) {
- *       variant OffsetAddr {
- *           match { G_PTR_ADD $addr, GPR:$base, simm(i12):$offset; };
- *           when  { hasOneUse($addr); immInRange($offset, -2048, 2047); };
- *       };
- *       variant BaseOnly {
- *           match { GPR:$base; };
- *       };
- *   };
  */
 struct AddrModeDef
 {
@@ -56,16 +40,7 @@ struct AddrModeDef
 };
 
 /**
- * Complete pattern definition for instruction selection.
- * Reuses `RuleInstruction` for match and emit blocks, and `RulePredicate` for when guards.
- *
- * Example:
- *   pattern Select_LW {
- *       match { G_LOAD i32:$dst, AddrModeRegImm12($base, $offset); };
- *       when  { hasOneUse($base); };
- *       emit  { LW GPR:$dst, GPR:$base, $offset; };
- *       cost(1);
- *   };
+ * ISel pattern rule definition.
  */
 struct ISelPattern
 {
@@ -76,13 +51,6 @@ struct ISelPattern
     std::optional<Common::IntegerLiteral> m_cost;
 };
 
-// ============================================================================
-// 3. Translation Unit Root Node
-// ============================================================================
-
-/**
- * Root AST node for an entire ISel definition file (.isf).
- */
 struct ISelDefFile
 {
     std::pmr::vector<AddrModeDef> m_addrModes;

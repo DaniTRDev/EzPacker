@@ -1,21 +1,18 @@
 #ifndef EZDSL_TARGET_DEF_LANG_AST_H
 #define EZDSL_TARGET_DEF_LANG_AST_H
 
+#include "Ast/CommonAstNodes.h"
 #include "EzDslCommon.h"
-#include "CommonAstNodes.h"
 
-/**
- * This namespace contains AST nodes defined EXCLUSIVELY to parse target definition lang files.
- */
+#include <vector>
+
 namespace DSL::Ast::TargetDef
 {
+
 /**
- * m_offset acts as a helper to define register ALIASES:
- * TargetRegister(rax,    ,     64, 0)
- * TargetRegister(eax,    rax,  32, 0);
- * TargetRegister(ax,     eax,  16, 0);
- * TargetRegister(ah,     ax,   8,  8);
- * TargetRegister(al,     ax,   8,  0);
+ * Register declaration with optional parent register alias and bit offsets:
+ *   - TargetRegister(rax,    ,    64, 0)
+ *   - TargetRegister(eax, rax,    32, 0)
  */
 struct TargetRegister
 {
@@ -26,7 +23,7 @@ struct TargetRegister
 };
 
 /**
- * TargetRegisterClass(GPR64, { TargetRegister(rax, , 64, 0), TargetRegister(rdx, , 64, 0), ... })
+ * TargetRegisterClass(GPR64, { TargetRegister(rax, , 64, 0), ... })
  */
 struct TargetRegisterClass
 {
@@ -35,7 +32,7 @@ struct TargetRegisterClass
 };
 
 /**
- * TargetRegisterBank(GPR, { TargetRegisterClass(GPR64), TargetRegisterClass(FPR64), ... })
+ * TargetRegisterBank(GPR, { TargetRegisterClass(GPR64), ... })
  */
 struct TargetRegisterBank
 {
@@ -44,15 +41,18 @@ struct TargetRegisterBank
 };
 
 /**
- * Node for defining an included file.
+ * Target include directive:
+ *   - include idef "instructions.idf";
  */
 struct TargetIncFile
 {
     Common::Identifier m_inclusionType;
     Common::StringLiteral m_path;
 };
+
 /**
- * Node for defining the main target.
+ * Target translation unit root:
+ *   - target x86_64 { include idef "..."; bank GPR { ... }; };
  */
 struct TargetDef
 {
@@ -60,6 +60,7 @@ struct TargetDef
     std::pmr::vector<TargetIncFile> m_inclusions;
     std::pmr::vector<TargetRegisterBank> m_regBanks;
 };
-}; // namespace DSL::Ast::TargetDef
+
+} // namespace DSL::Ast::TargetDef
 
 #endif // EZDSL_TARGET_DEF_LANG_AST_H
