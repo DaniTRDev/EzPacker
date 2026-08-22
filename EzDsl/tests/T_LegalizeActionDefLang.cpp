@@ -30,6 +30,8 @@ class LegalizeMatrixLangTest : public ::testing::Test
 
     void TearDown() override {}
 
+    std::pmr::monotonic_buffer_resource *getAllocator() { return &m_resource; }
+
   private:
     std::pmr::monotonic_buffer_resource m_resource;
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
@@ -45,7 +47,7 @@ TEST_F(LegalizeMatrixLangTest, TestHomogeneousTypeConstraint)
 {
     std::string test = "i32";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeConstraint, DSL::Ast::LegalizeActionDef::TypeConstraint>();
     ASSERT_TRUE(res.has_value());
@@ -57,7 +59,7 @@ TEST_F(LegalizeMatrixLangTest, TestHeterogeneousTypeConstraintWithIndex)
 {
     std::string test = "i8:1";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeConstraint, DSL::Ast::LegalizeActionDef::TypeConstraint>();
     ASSERT_TRUE(res.has_value());
@@ -70,7 +72,7 @@ TEST_F(LegalizeMatrixLangTest, TestPointerAndVectorTypeConstraints)
 {
     std::string test = "v4f32";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeConstraint, DSL::Ast::LegalizeActionDef::TypeConstraint>();
     ASSERT_TRUE(res.has_value());
@@ -86,7 +88,7 @@ TEST_F(LegalizeMatrixLangTest, TestWidenActionClause)
 {
     std::string test = "WIDENS(i1, i8, i16) >> i32";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                          DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -106,7 +108,7 @@ TEST_F(LegalizeMatrixLangTest, TestNarrowActionClause)
 {
     std::string test = "NARROWS(i64) >> i32";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                          DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -124,7 +126,7 @@ TEST_F(LegalizeMatrixLangTest, TestLibcallActionClause)
 {
     std::string test = "LIBCALL(i64) >> \"__divdi3\"";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                          DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -142,7 +144,7 @@ TEST_F(LegalizeMatrixLangTest, TestBitcastActionClause)
 {
     std::string test = "BITCAST(f32) >> i32";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                          DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -160,7 +162,7 @@ TEST_F(LegalizeMatrixLangTest, TestCustomAndUnsupportedActionClauses)
 {
     std::string customTest = "CUSTOM(i128) >> i64";
     size_t customSourceId = addSource("customTest", customTest);
-    ParseContext customCtx(getDiagCollector(), getSourceManager(), customSourceId);
+    ParseContext customCtx(getDiagCollector(), getSourceManager(), customSourceId, getAllocator());
 
     auto customRes = customCtx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                                      DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -170,7 +172,7 @@ TEST_F(LegalizeMatrixLangTest, TestCustomAndUnsupportedActionClauses)
 
     std::string unsuppTest = "UNSUPPORTED(f128) >> f128";
     size_t unsuppSourceId = addSource("unsuppTest", unsuppTest);
-    ParseContext unsuppCtx(getDiagCollector(), getSourceManager(), unsuppSourceId);
+    ParseContext unsuppCtx(getDiagCollector(), getSourceManager(), unsuppSourceId, getAllocator());
 
     auto unsuppRes = unsuppCtx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                                      DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -192,7 +194,7 @@ action ADD {
 };
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::InstructionLegalizeDecl,
                          DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl>();
@@ -221,7 +223,7 @@ action SEXT {
 };
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::InstructionLegalizeDecl,
                          DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl>();
@@ -261,7 +263,7 @@ action BITCAST {
 )dsl";
 
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TargetLegalizeDef,
                          DSL::Ast::LegalizeActionDef::TargetLegalizeDef>();
@@ -294,7 +296,7 @@ action ADD {
 };
 )"; // Missing ';' after first clause
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::InstructionLegalizeDecl,
                          DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl>();
@@ -308,7 +310,7 @@ action ADD {
     LEGAL(i32) >> i32;
 )"; // Unclosed '{'
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::InstructionLegalizeDecl,
                          DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl>();
@@ -319,7 +321,7 @@ TEST_F(LegalizeMatrixLangTest, TestDanglingColonInTypeConstraintError)
 {
     std::string test = "i32:"; // Colon present but missing integer slot index
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeConstraint, DSL::Ast::LegalizeActionDef::TypeConstraint>();
     EXPECT_FALSE(res.has_value());
@@ -329,7 +331,7 @@ TEST_F(LegalizeMatrixLangTest, TestMissingCommaSeparatorInTypesError)
 {
     std::string test = "WIDENS(i8 i16) >> i32"; // Missing ',' separator
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                          DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -340,7 +342,7 @@ TEST_F(LegalizeMatrixLangTest, TestUnknownActionKindError)
 {
     std::string test = "UNKNOWN_ACTION(i32) >> i64";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                          DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
@@ -355,7 +357,7 @@ ADD {
 };
 )"; // Missing leading 'action' keyword
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::InstructionLegalizeDecl,
                          DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl>();

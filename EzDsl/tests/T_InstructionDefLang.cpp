@@ -30,6 +30,8 @@ class InstDefLangTest : public ::testing::Test
 
     void TearDown() override {}
 
+    std::pmr::monotonic_buffer_resource *getAllocator() { return &m_resource; }
+
   private:
     std::pmr::monotonic_buffer_resource m_resource;
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
@@ -45,7 +47,7 @@ TEST_F(InstDefLangTest, TestBitSliceNormalization)
 {
     std::string test = "[31:0]";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::BitSlice, DSL::Ast::InstDef::BitSlice>();
     ASSERT_TRUE(res.has_value());
@@ -55,7 +57,7 @@ TEST_F(InstDefLangTest, TestBitSliceNormalization)
     // Test reverse index specification [0:15]
     std::string testRev = "[0:15]";
     size_t sourceIdRev = addSource("testRev", testRev);
-    ParseContext ctxRev(getDiagCollector(), getSourceManager(), sourceIdRev);
+    ParseContext ctxRev(getDiagCollector(), getSourceManager(), sourceIdRev, getAllocator());
 
     auto resRev = ctxRev.parse<DSL::Parser::InstDef::BitSlice, DSL::Ast::InstDef::BitSlice>();
     ASSERT_TRUE(resRev.has_value());
@@ -67,7 +69,7 @@ TEST_F(InstDefLangTest, TestSlicedIdentifier)
 {
     std::string test = "imm12[0:4]";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::SlicedIdentifier, DSL::Ast::InstDef::SlicedIdentifier>();
     ASSERT_TRUE(res.has_value());
@@ -81,7 +83,7 @@ TEST_F(InstDefLangTest, TestBitExpressionPrecedence)
     // Evaluates: a | (b & (c << 2))
     std::string test = "a | b & c << 2";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::BitExpression, DSL::Ast::InstDef::BitExprValues>();
     ASSERT_TRUE(res.has_value());
@@ -110,7 +112,7 @@ TEST_F(InstDefLangTest, TestUnaryComplementAndSliceInExpression)
 {
     std::string test = "~mask & imm12[0:4]";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::BitExpression, DSL::Ast::InstDef::BitExprValues>();
     ASSERT_TRUE(res.has_value());
@@ -138,7 +140,7 @@ TEST_F(InstDefLangTest, TestBitAssignment)
 {
     std::string test = "imm4_0[0:4] = imm12[0:4]";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::BitExprAssign, DSL::Ast::InstDef::BitExprAssign>();
     ASSERT_TRUE(res.has_value());
@@ -172,7 +174,7 @@ format RType(32) {
 }
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstFormatDecl, DSL::Ast::InstDef::InstFormatDecl>();
     ASSERT_TRUE(res.has_value());
@@ -202,7 +204,7 @@ format SimpleFormat {
 }
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstFormatDecl, DSL::Ast::InstDef::InstFormatDecl>();
     ASSERT_TRUE(res.has_value());
@@ -220,7 +222,7 @@ TEST_F(InstDefLangTest, TestRegisterAndImmediateOperands)
     // 1. Register operand
     std::string regTest = "GPR:rd OUT";
     size_t regSourceId = addSource("regTest", regTest);
-    ParseContext regCtx(getDiagCollector(), getSourceManager(), regSourceId);
+    ParseContext regCtx(getDiagCollector(), getSourceManager(), regSourceId, getAllocator());
 
     auto regRes = regCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
     ASSERT_TRUE(regRes.has_value());
@@ -233,7 +235,7 @@ TEST_F(InstDefLangTest, TestRegisterAndImmediateOperands)
     // 2. Parameterized immediate operand (e.g., simm(i12):offset IN)
     std::string immParamTest = "simm(i12):offset IN";
     size_t immParamSourceId = addSource("immParamTest", immParamTest);
-    ParseContext immParamCtx(getDiagCollector(), getSourceManager(), immParamSourceId);
+    ParseContext immParamCtx(getDiagCollector(), getSourceManager(), immParamSourceId, getAllocator());
 
     auto immParamRes = immParamCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
     ASSERT_TRUE(immParamRes.has_value());
@@ -247,7 +249,7 @@ TEST_F(InstDefLangTest, TestRegisterAndImmediateOperands)
     // 3. Unparameterized immediate operand (e.g., imm:val IN)
     std::string immTest = "imm:val IN";
     size_t immSourceId = addSource("immTest", immTest);
-    ParseContext immCtx(getDiagCollector(), getSourceManager(), immSourceId);
+    ParseContext immCtx(getDiagCollector(), getSourceManager(), immSourceId, getAllocator());
 
     auto immRes = immCtx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
     ASSERT_TRUE(immRes.has_value());
@@ -262,7 +264,7 @@ TEST_F(InstDefLangTest, TestInstHeader)
 {
     std::string test = "inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format SType";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstHeaderParser, DSL::Ast::InstDef::InstHeader>();
     ASSERT_TRUE(res.has_value());
@@ -305,7 +307,7 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
 };
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstDecl, DSL::Ast::InstDef::InstDecl>();
     ASSERT_TRUE(res.has_value());
@@ -378,7 +380,7 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
 )dsl";
 
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstDefFileParser, DSL::Ast::InstDef::InstDefFile>();
     ASSERT_TRUE(res.has_value());
@@ -406,7 +408,7 @@ format BadFormat {
 }
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstFormatDecl, DSL::Ast::InstDef::InstFormatDecl>();
     EXPECT_FALSE(res.has_value());
@@ -416,7 +418,7 @@ TEST_F(InstDefLangTest, TestInvalidDirectionError)
 {
     std::string test = "GPR:rd INVALIDSIDE";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstArgItem, DSL::Ast::InstDef::InstOperand>();
     EXPECT_FALSE(res.has_value());
@@ -431,7 +433,7 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN) format RType {
 )"; // Missing closing brace '}'
 
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstDef::InstDecl, DSL::Ast::InstDef::InstDecl>();
     EXPECT_FALSE(res.has_value());

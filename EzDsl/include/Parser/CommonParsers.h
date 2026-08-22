@@ -133,6 +133,53 @@ struct StringLiteral
                        lexy::values);
 };
 
+template <typename T> struct PmrContainerTraits
+{
+    using container_type = std::pmr::vector<T>;
+    using value_type = T;
+};
+
+template <typename T, typename Alloc> struct PmrContainerTraits<std::vector<T, Alloc>>
+{
+    using container_type = std::vector<T, Alloc>;
+    using value_type = T;
+};
+
+template <typename Target> struct PmrListSink
+{
+    using traits = PmrContainerTraits<Target>;
+    using return_type = typename traits::container_type;
+
+    struct _sink
+    {
+        using return_type = typename traits::container_type;
+        return_type _cont;
+
+        explicit _sink(std::pmr::memory_resource *mr) : _cont(mr ? mr : std::pmr::get_default_resource()) {}
+
+        template <typename U> void operator()(U &&item) { _cont.push_back(std::forward<U>(item)); }
+
+        return_type finish() && { return std::move(_cont); }
+    };
+
+    template <typename State> _sink sink(State &state) const
+    {
+        if constexpr (requires { state.memoryResource(); })
+        {
+            return _sink(state.memoryResource());
+        }
+        else
+        {
+            return _sink(std::pmr::get_default_resource());
+        }
+    }
+
+    _sink sink() const { return _sink(std::pmr::get_default_resource()); }
+};
+
+// Used to automatically make std::pmr lists allocate using the allocator of the ParseContext structure.
+template <typename ValueType> constexpr PmrListSink<ValueType> PmrAsList{};
+
 } // namespace DSL::Parser::Common
 
 #endif // EZDSL_COMMON_PARSERS_H

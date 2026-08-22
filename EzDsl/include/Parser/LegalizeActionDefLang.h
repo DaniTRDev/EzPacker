@@ -60,7 +60,7 @@ struct LegalizationClause
         return kind + dsl::parenthesized(types) + optTarget;
     }();
 
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::LegalizeActionDef::TypeConstraint>> >>
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::TypeConstraint>> >>
             lexy::callback<Ast::LegalizeActionDef::LegalizeActionClause>(
                                           [](Ast::LegalizeActionDef::LegalizeActionKind kind,
                                              std::pmr::vector<Ast::LegalizeActionDef::TypeConstraint> constraints,
@@ -102,7 +102,7 @@ struct InstructionLegalizeDecl
              dsl::opt(dsl::lit_c<';'>));
 
     static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause>> >>
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause>> >>
             lexy::callback<Ast::LegalizeActionDef::InstructionLegalizeDecl>(
                     [](Ast::Common::Identifier name,
                        std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause> actions)
@@ -117,7 +117,7 @@ struct TargetLegalizeDef
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<InstructionLegalizeDecl>);
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::LegalizeActionDef::InstructionLegalizeDecl>> >>
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::InstructionLegalizeDecl>> >>
             lexy::construct<Ast::LegalizeActionDef::TargetLegalizeDef>;
 };
 

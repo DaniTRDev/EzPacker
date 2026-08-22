@@ -43,7 +43,7 @@ struct RulePredicate
             dsl::parenthesized.list(dsl::p<PredicateArg>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>;
 
     static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg>> >>
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg>> >>
             lexy::callback<Ast::LegalizeRuleDef::RulePredicate>(
                     [](Ast::Common::Identifier predName, std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg> args)
                     {
@@ -58,7 +58,7 @@ struct CustomTransformOperand
     static constexpr auto rule =
             dsl::p<Common::Identifier> + dsl::parenthesized.list(dsl::p<SsaVarName>, dsl::sep(dsl::lit_c<','>));
 
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::Common::Identifier>> >>
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::Common::Identifier>> >>
             lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
                                           [](Ast::Common::Identifier funcName,
                                              std::pmr::vector<Ast::Common::Identifier> args)
@@ -152,7 +152,7 @@ struct InstructionOperandList
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::list(dsl::p<RuleOperand>, dsl::sep(dsl::lit_c<','>));
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::LegalizeRuleDef::RuleOperand>>;
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleOperand>>;
 };
 
 struct RuleInstruction
@@ -230,7 +230,7 @@ struct MatchBlockBody
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<RuleInstruction>);
     static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<MatchClause>;
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<MatchClause>;
 };
 
 struct WhenBlockBody
@@ -238,7 +238,7 @@ struct WhenBlockBody
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<RulePredicate>);
     static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::LegalizeRuleDef::RulePredicate>> >> lexy::construct<WhenClause>;
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RulePredicate>> >> lexy::construct<WhenClause>;
 };
 
 struct ExpandBlockBody
@@ -246,7 +246,7 @@ struct ExpandBlockBody
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<RuleInstruction>);
     static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<ExpandClause>;
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<ExpandClause>;
 };
 
 struct RuleBlock
@@ -265,7 +265,7 @@ struct LegalizeRewriteRule
     static constexpr auto rule = Common::Keyword<"rule">::rule >>
             (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<RuleBlock> + dsl::lit_c<';'>));
 
-    static constexpr auto value = lexy::as_list<std::pmr::vector<RuleBlockClause>> >>
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<RuleBlockClause>> >>
             lexy::callback<Ast::LegalizeRuleDef::LegalizeRewriteRule>(
                                           [](Ast::Common::Identifier name, std::pmr::vector<RuleBlockClause> clauses)
                                           {
@@ -297,7 +297,7 @@ struct TargetLegalizeRuleDef
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<LegalizeRewriteRule> + dsl::lit_c<';'>);
 
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::LegalizeRuleDef::LegalizeRewriteRule>> >>
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::LegalizeRewriteRule>> >>
             lexy::construct<Ast::LegalizeRuleDef::TargetLegalizeRuleDef>;
 };
 

@@ -4,8 +4,10 @@
 
 ParseContext::ParseContext(class DiagnosticCollector *diagCollector,
                            class GenericSourceManager *sourceManager,
-                           size_t sourceId) :
-    m_diagCollector(diagCollector), m_sourceManager(sourceManager), m_sourceId(sourceId), m_handler({ .ctx = *this })
+                           size_t sourceId,
+                           std::pmr::memory_resource *alloc) :
+    m_diagCollector(diagCollector), m_sourceManager(sourceManager), m_sourceId(sourceId), m_handler({ .ctx = *this }),
+    m_alloc(alloc)
 {
 }
 
@@ -24,6 +26,8 @@ SourceReference *ParseContext::createRef(const char *startIter, const char *endI
 
     return m_sourceManager->createReference(startOffset, length, m_sourceId);
 }
+
+std::pmr::memory_resource *ParseContext::getAllocator() const { return m_alloc; }
 
 void ParseContext::pushToCollector(std::string_view sourceName,
                                    std::string_view message,

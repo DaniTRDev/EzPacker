@@ -52,7 +52,7 @@ struct TargetRegisterClass
     }();
 
     static constexpr auto
-            value = lexy::as_list<std::pmr::vector<Ast::TargetDef::TargetRegister>> >>
+            value = Common::PmrAsList<std::pmr::vector<Ast::TargetDef::TargetRegister>> >>
             lexy::callback<Ast::TargetDef::TargetRegisterClass>(
                             [](Ast::Common::Identifier name, std::pmr::vector<Ast::TargetDef::TargetRegister> registers)
                             { return Ast::TargetDef::TargetRegisterClass{ std::move(name), std::move(registers) }; },
@@ -74,7 +74,7 @@ struct TargetRegisterBank
     }();
 
     static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::TargetDef::TargetRegisterClass>> >>
+            Common::PmrAsList<std::pmr::vector<Ast::TargetDef::TargetRegisterClass>> >>
             lexy::callback<Ast::TargetDef::TargetRegisterBank>(
                     [](Ast::Common::Identifier name, std::pmr::vector<Ast::TargetDef::TargetRegisterClass> classes)
                     { return Ast::TargetDef::TargetRegisterBank{ std::move(name), std::move(classes) }; },
@@ -129,7 +129,7 @@ struct TargetDef
     }();
 
     static constexpr auto
-            value = lexy::as_list<std::pmr::vector<Item>> >>
+            value = Common::PmrAsList<std::pmr::vector<Item>> >>
             lexy::callback<Ast::TargetDef::TargetDef>(
                             [](Ast::Common::Identifier name, std::pmr::vector<Item> items)
                             {

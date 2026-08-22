@@ -30,6 +30,8 @@ class TargetDefLangTest : public ::testing::Test
 
     void TearDown() override {}
 
+    std::pmr::monotonic_buffer_resource *getAllocator() { return &m_resource; }
+
   private:
     std::pmr::monotonic_buffer_resource m_resource;
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
@@ -41,7 +43,7 @@ TEST_F(TargetDefLangTest, TestRootRegisterWithoutParent)
 {
     std::string test = "rax(, 64, 0)";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     ASSERT_TRUE(res.has_value());
@@ -55,7 +57,7 @@ TEST_F(TargetDefLangTest, TestAliasedSubRegister)
 {
     std::string test = "eax(rax, 32, 0)";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     ASSERT_TRUE(res.has_value());
@@ -69,7 +71,7 @@ TEST_F(TargetDefLangTest, TestHighByteSubRegisterWithOffset)
 {
     std::string test = "ah(ax, 8, 8)";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     ASSERT_TRUE(res.has_value());
@@ -83,7 +85,7 @@ TEST_F(TargetDefLangTest, TestEmptyRegisterClass)
 {
     std::string test = "CLASS(gpr64);";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterClass, DSL::Ast::TargetDef::TargetRegisterClass>();
     ASSERT_TRUE(res.has_value());
@@ -101,7 +103,7 @@ CLASS(gpr64,
 );
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterClass, DSL::Ast::TargetDef::TargetRegisterClass>();
     ASSERT_TRUE(res.has_value());
@@ -129,7 +131,7 @@ bank GPR {
 };
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterBank, DSL::Ast::TargetDef::TargetRegisterBank>();
     ASSERT_TRUE(res.has_value());
@@ -156,7 +158,7 @@ target RISCV64 {
 }
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     ASSERT_TRUE(res.has_value());
@@ -203,7 +205,7 @@ target x86_64 {
 };
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     ASSERT_TRUE(res.has_value());
@@ -235,7 +237,7 @@ target MyTarget {
 }
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     EXPECT_FALSE(res.has_value());
@@ -245,7 +247,7 @@ TEST_F(TargetDefLangTest, TestMalformedRegisterMissingOffset)
 {
     std::string test = "rax(, 64)"; // Missing comma and offset parameter
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegister, DSL::Ast::TargetDef::TargetRegister>();
     EXPECT_FALSE(res.has_value());
@@ -259,7 +261,7 @@ CLASS(gpr64,
 )
 )"; // Missing closing semicolon
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetRegisterClass, DSL::Ast::TargetDef::TargetRegisterClass>();
     EXPECT_FALSE(res.has_value());
@@ -273,7 +275,7 @@ target MyTarget {
 }
 )";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     EXPECT_FALSE(res.has_value());
@@ -286,7 +288,7 @@ target MyTarget {
     include idef "file.idf";
 )"; // Missing closing brace '}'
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     EXPECT_FALSE(res.has_value());

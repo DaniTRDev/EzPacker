@@ -70,7 +70,7 @@ struct AddrModeParamList
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::parenthesized.list(dsl::p<AddrModeParam>, dsl::sep(dsl::lit_c<','>));
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstSelDef::AddrModeParam>>;
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstSelDef::AddrModeParam>>;
 };
 
 using VariantBlockClause = std::variant<LegalizeRuleDef::MatchClause, LegalizeRuleDef::WhenClause>;
@@ -92,7 +92,7 @@ struct AddrModeVariantParser
             (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<VariantBlock> + dsl::lit_c<';'>));
 
     static constexpr auto
-            value = lexy::as_list<std::pmr::vector<VariantBlockClause>> >>
+            value = Common::PmrAsList<std::pmr::vector<VariantBlockClause>> >>
             lexy::callback<Ast::InstSelDef::AddrModeVariant>(
                             [](Ast::Common::Identifier name, std::pmr::vector<VariantBlockClause> clauses)
                             {
@@ -120,7 +120,7 @@ struct AddrModeVariantList
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<AddrModeVariantParser> + dsl::lit_c<';'>);
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Ast::InstSelDef::AddrModeVariant>>;
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstSelDef::AddrModeVariant>>;
 };
 
 struct AddrModeDefParser
@@ -159,7 +159,7 @@ struct EmitBlockBody
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<LegalizeRuleDef::RuleInstruction>);
     static constexpr auto value =
-            lexy::as_list<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<EmitClause>;
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<EmitClause>;
 };
 
 struct CostBody
@@ -189,7 +189,7 @@ struct ISelPatternParser
             (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<PatternBlock> + dsl::lit_c<';'>));
 
     static constexpr auto
-            value = lexy::as_list<std::pmr::vector<PatternBlockClause>> >>
+            value = Common::PmrAsList<std::pmr::vector<PatternBlockClause>> >>
             lexy::callback<Ast::InstSelDef::ISelPattern>(
                             [](Ast::Common::Identifier name, std::pmr::vector<PatternBlockClause> clauses)
                             {
@@ -244,7 +244,7 @@ struct ISelDefFileParser
 
     static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<EntryParser>);
 
-    static constexpr auto value = lexy::as_list<std::pmr::vector<Entry>> >>
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Entry>> >>
             lexy::callback<Ast::InstSelDef::ISelDefFile>(
                                           [](std::pmr::vector<Entry> entries)
                                           {

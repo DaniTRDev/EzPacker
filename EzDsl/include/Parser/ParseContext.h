@@ -13,7 +13,10 @@ class ParseContext
     /**
      * Creates the parsing context with the given diagnostic collector, source manager and sourceId.
      */
-    ParseContext(class DiagnosticCollector *diagCollector, class GenericSourceManager *sourceManager, size_t sourceId);
+    ParseContext(class DiagnosticCollector *diagCollector,
+                 class GenericSourceManager *sourceManager,
+                 size_t sourceId,
+                 std::pmr::memory_resource *alloc);
 
     /**
      * Returns the diagnostic collector linked to this context.
@@ -116,6 +119,11 @@ class ParseContext
         return std::move(result.value());
     }
 
+    /**
+     * Returns the allocator used by this parser.
+     */
+    std::pmr::memory_resource *getAllocator() const;
+
   private:
     /**
      * Pushes the given error into the linked collector.
@@ -127,6 +135,7 @@ class ParseContext
     class GenericSourceManager *m_sourceManager;
     LexyDiagnosticHandler m_handler;
     size_t m_sourceId;
+    std::pmr::memory_resource *m_alloc;
 };
 
 #endif // EZDSL_PARSE_CONTEXT_H

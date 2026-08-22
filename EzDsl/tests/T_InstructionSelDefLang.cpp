@@ -30,6 +30,8 @@ class InstSelDefLangTest : public ::testing::Test
 
     void TearDown() override {}
 
+    std::pmr::monotonic_buffer_resource *getAllocator() { return &m_resource; }
+
   private:
     std::pmr::monotonic_buffer_resource m_resource;
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
@@ -45,7 +47,7 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamSimple)
 {
     std::string test = "GPR:base";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res.has_value());
@@ -59,7 +61,7 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamWithDefault)
 {
     std::string test = "simm12:offset = 0";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res.has_value());
@@ -74,7 +76,7 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamParameterizedWithDefault)
 {
     std::string test1 = "simm(i12):offset = 0";
     size_t sourceId1 = addSource("test1", test1);
-    ParseContext ctx1(getDiagCollector(), getSourceManager(), sourceId1);
+    ParseContext ctx1(getDiagCollector(), getSourceManager(), sourceId1, getAllocator());
 
     auto res1 = ctx1.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res1.has_value());
@@ -87,7 +89,7 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamParameterizedWithDefault)
 
     std::string test2 = "imm(i32):disp = 16";
     size_t sourceId2 = addSource("test2", test2);
-    ParseContext ctx2(getDiagCollector(), getSourceManager(), sourceId2);
+    ParseContext ctx2(getDiagCollector(), getSourceManager(), sourceId2, getAllocator());
 
     auto res2 = ctx2.parse<DSL::Parser::InstSelDef::AddrModeParam, DSL::Ast::InstSelDef::AddrModeParam>();
     ASSERT_TRUE(res2.has_value());
@@ -117,7 +119,7 @@ variant OffsetAddr {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeVariantParser, DSL::Ast::InstSelDef::AddrModeVariant>();
     ASSERT_TRUE(res.has_value());
@@ -169,7 +171,7 @@ addrmode AddrModeRegImm12(GPR:base, simm(i12):offset = 0) {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeDefParser, DSL::Ast::InstSelDef::AddrModeDef>();
     ASSERT_TRUE(res.has_value());
@@ -216,7 +218,7 @@ pattern Select_ADDI {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -264,7 +266,7 @@ pattern Select_SH2ADD {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -308,7 +310,7 @@ pattern Select_LW {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -346,7 +348,7 @@ pattern Select_RotL {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     ASSERT_TRUE(res.has_value());
@@ -411,7 +413,7 @@ pattern Select_SW {
 )dsl";
 
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelDefFileParser, DSL::Ast::InstSelDef::ISelDefFile>();
     ASSERT_TRUE(res.has_value());
@@ -440,7 +442,7 @@ pattern BadPattern {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     EXPECT_FALSE(res.has_value());
@@ -459,7 +461,7 @@ pattern BadPattern {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     EXPECT_FALSE(res.has_value());
@@ -478,7 +480,7 @@ pattern BadPattern {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelDefFileParser, DSL::Ast::InstSelDef::ISelDefFile>();
     EXPECT_FALSE(res.has_value());
@@ -494,7 +496,7 @@ addrmode BadAddrMode(GPR:base, simm(12):offset =) {
 }
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::AddrModeDefParser, DSL::Ast::InstSelDef::AddrModeDef>();
     EXPECT_FALSE(res.has_value());
@@ -512,7 +514,7 @@ pattern IncompletePattern {
     };
 )dsl";
     size_t sourceId = addSource("test", test);
-    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId);
+    ParseContext ctx(getDiagCollector(), getSourceManager(), sourceId, getAllocator());
 
     auto res = ctx.parse<DSL::Parser::InstSelDef::ISelPatternParser, DSL::Ast::InstSelDef::ISelPattern>();
     EXPECT_FALSE(res.has_value());
