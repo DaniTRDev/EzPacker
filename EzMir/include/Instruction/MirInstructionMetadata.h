@@ -11,8 +11,10 @@ enum class ExpectedOperandType : uint16_t
     FloatingPoint = 1 << 3, // MirDouble
     Memory = 1 << 4,        // MirMemory
     Reference = 1 << 5,     // MirReference (Blocks, Functions)
-    RuntimeSymbol =
-            1 << 6, // MirRuntimeSymbol. Used to identify an address, by its name, that's exported by the RT library.
+    // MirRuntimeSymbol. Used to identify an address, by its name, that's exported by the RT library.
+    RuntimeSymbol = 1 << 6,
+    // Used to define the variadic args, this is useful to define if they are read or written.
+    VariadicArgs = (1 << 7),
 
     // --- Composite Helper Masks ---
 

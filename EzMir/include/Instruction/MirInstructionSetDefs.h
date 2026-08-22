@@ -221,21 +221,6 @@ INSTRUCTION(ADD,
             F(SizeMatch) | F(IsCommutative))
 
 /**
- * Integer Addition with Carry: dst = src1 + src2 + Carry.
- * Operands:
- *   [0] Write: Destination Register
- *   [1] Read:  LHS Register
- *   [2] Read:  RHS (Register or Immediate)
- */
-INSTRUCTION(ADC,
-            T(HighLevel),
-            MirCat_Arithmetic,
-            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
-                                { ExpectedOperandType::Register, MirOperandFlag::Read },
-                                { ExpectedOperandType::RegIntImm, MirOperandFlag::Read }),
-            F(SizeMatch) | F(IsCommutative))
-
-/**
  * Integer Subtraction: dst = src1 - src2.
  * Operands:
  *   [0] Write: Destination Register
@@ -251,19 +236,99 @@ INSTRUCTION(SUB,
             F(SizeMatch))
 
 /**
- * Integer Subtraction with Borrow: dst = src1 - src2 - Borrow.
+ * Unsigned Add with Overflow: Returns (sum, carry_out:i1).
  * Operands:
- *   [0] Write: Destination Register
- *   [1] Read:  LHS Register (Minuend)
- *   [2] Read:  RHS (Register or Immediate Subtrahend)
+ *   [0] Write: Destination Sum Register
+ *   [1] Write: Destination Carry-out Register (i1)
+ *   [2] Read:  LHS Register
+ *   [3] Read:  RHS (Register or Immediate)
  */
-INSTRUCTION(SBB,
+INSTRUCTION(UADDO,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read },
+                                { ExpectedOperandType::RegIntImm, MirOperandFlag::Read }),
+            F(IsCommutative))
+
+/**
+ * Unsigned Add with Carry-in and Carry-out: Returns (sum, carry_out:i1).
+ * Operands:
+ *   [0] Write: Destination Sum Register
+ *   [1] Write: Destination Carry-out Register (i1)
+ *   [2] Read:  LHS Register
+ *   [3] Read:  RHS (Register or Immediate)
+ *   [4] Read:  Carry-in Register (i1)
+ */
+INSTRUCTION(UADDE,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read },
+                                { ExpectedOperandType::RegIntImm, MirOperandFlag::Read },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read }),
+            F(None))
+
+/**
+ * Unsigned Sub with Overflow: Returns (sub, borrow_out:i1).
+ * Operands:
+ *   [0] Write: Destination Sub Register
+ *   [1] Write: Destination borrow-out Register (i1)
+ *   [2] Read:  LHS Register
+ *   [3] Read:  RHS (Register or Immediate)
+ */
+INSTRUCTION(USUBO,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read },
+                                { ExpectedOperandType::RegIntImm, MirOperandFlag::Read }),
+            F(IsCommutative))
+
+/**
+ * Unsigned Sub with borrow-in and borrow-out: Returns (sub, borrow_out:i1).
+ * Operands:
+ *   [0] Write: Destination Sub Register
+ *   [1] Write: Destination borrow-out Register (i1)
+ *   [2] Read:  LHS Register
+ *   [3] Read:  RHS (Register or Immediate)
+ *   [4] Read:  borrow-in Register (i1)
+ */
+INSTRUCTION(USUBE,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read },
+                                { ExpectedOperandType::RegIntImm, MirOperandFlag::Read },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read }),
+            F(None))
+
+/**
+ * Unsigned/Signed Multiplication High: dst = (src1 * src2) >> BitWidth.
+ * Operands:
+ *   [0] Write: Destination Register (High-half bits)
+ *   [1] Read:  LHS Register
+ *   [2] Read:  RHS (Register or Immediate)
+ */
+INSTRUCTION(UMULH,
             T(HighLevel),
             MirCat_Arithmetic,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
                                 { ExpectedOperandType::Register, MirOperandFlag::Read },
                                 { ExpectedOperandType::RegIntImm, MirOperandFlag::Read }),
-            F(SizeMatch))
+            F(SizeMatch) | F(IsCommutative))
+
+INSTRUCTION(SMULH,
+            T(HighLevel),
+            MirCat_Arithmetic,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read },
+                                { ExpectedOperandType::RegIntImm, MirOperandFlag::Read }),
+            F(SizeMatch) | F(IsCommutative) | F(TreatAsSigned))
 
 /**
  * Unsigned Integer Multiplication: dst = src1 * src2.
@@ -738,7 +803,7 @@ INSTRUCTION(CALL,
 /**
  * Return from Function: returns execution and an optional value to the caller.
  * Operands:
- *   [0] Read: Return Value (Register, Immediate, or Void/None)
+ *   [0] Read: Return Value (Register, Immediate, or None (for void))
  */
 INSTRUCTION(RET,
             T(HighLevel),
@@ -853,6 +918,57 @@ INSTRUCTION(BITCAST,
             OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
                                 { ExpectedOperandType::Register, MirOperandFlag::Read }),
             F(SizeMatch))
+
+/* ========================================================================= */
+/* --- LEGALIZATION & MULTI-PART DECOMPOSITION ----------------------------- */
+/* ========================================================================= */
+
+/**
+ * Combines multiple smaller scalars into a single wider scalar or vector.
+ * e.g., MERGE_VALUES $dst:i64, $lo:i32, $hi:i32
+ * Operands:
+ *   [0] Write: Destination Register (Wider type)
+ *   [1..N] Read: Source Registers (Narrower type chunks, low-to-high)
+ */
+INSTRUCTION(MERGE_VALUES,
+            T(HighLevel),
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::VariadicArgs, MirOperandFlag::Read }),
+            F(VariadicArgs))
+
+/**
+ * Splits a wide scalar or vector into multiple smaller scalar components.
+ * e.g., UNMERGE_VALUES $src:i64, $lo:i32, $hi:i32
+ * Requires multi-def support in MIR instructions.
+ * Operands:
+ *   [0..N-1] Write: Destination Registers (Narrower type chunks, low-to-high)
+ *   [N]     Read:  Source Register (Wider type)
+ */
+INSTRUCTION(UNMERGE_VALUES,
+            T(HighLevel),
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Read },
+                                { ExpectedOperandType::VariadicArgs, MirOperandFlag::Write }),
+            F(VariadicArgs))
+
+/**
+ * Branchless conditional selection: dst = cond ? true_val : false_val.
+ * Essential for lowering shifts, min/max, and saturating math without introducing basic blocks.
+ * Operands:
+ *   [0] Write: Destination Register
+ *   [1] Read:  Condition Register (i1)
+ *   [2] Read:  True Value (Register or Immediate)
+ *   [3] Read:  False Value (Register or Immediate)
+ */
+INSTRUCTION(SELECT,
+            T(HighLevel),
+            MirCat_DataMovement,
+            OPERAND_CONSTRAINTS({ ExpectedOperandType::Register, MirOperandFlag::Write },
+                                { ExpectedOperandType::Register, MirOperandFlag::Read },
+                                { ExpectedOperandType::AnyValue, MirOperandFlag::Read },
+                                { ExpectedOperandType::AnyValue, MirOperandFlag::Read }),
+            F(None))
 
 /* ========================================================================= */
 /* --- SYSTEM & SPECIAL ---------------------------------------------------- */
