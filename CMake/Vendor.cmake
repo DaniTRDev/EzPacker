@@ -19,3 +19,8 @@ EzCMK_AddVendor(https://github.com/libtom/libtommath
         994f6df64cc9dd86a4f7994fe0530861470b5fa4
         libtommath
 )
+
+EzCMK_AddVendor(https://github.com/foonathan/lexy
+        c1358c4117752393e9ce27d6c885d9146846f2f9
+        lexy
+)

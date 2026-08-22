@@ -26,16 +26,18 @@ EzCMK_SetLibraryBuildType("SHARED")
 include("CMake/Vendor.cmake") # Fetch 3rd party libs.
 include("CMake/TestWrapper.cmake")
 
+if (EZPACKER_BUILD_TESTS)
+    EzCMK_EnableTestsForCurrentProject()
+endif ()
+
 add_subdirectory(LibBf) # https://bellard.org/libbf/
 add_subdirectory(EzCore)
-
 add_subdirectory(EzMir)
+add_subdirectory(EzDsl)
 add_subdirectory(EzTriple)
 add_subdirectory(EzCodeEmitter)
 
 if (EZPACKER_BUILD_TESTS)
-    EzCMK_EnableTestsForCurrentProject()
-
     message(STATUS "Configuring EzMirTestSuite")
     add_subdirectory(EzMirTestSuite)
 
