@@ -117,9 +117,10 @@ $$\text{TargetRegister}(\text{Name}, \text{ParentName}, \text{BitWidth}, \text{B
 
 ```dsl
 target x86_64 {
-    include idef "x86_instructions.idf";
-    include isel "x86_patterns.isf";
-    include action "x86_legalizer.lad";
+    include idf "x86_instructions.idf";
+    include isf "x86_patterns.isf";
+    include lad "x86_legalizerActions.lad";
+    include lrd "x86_legalizerRules.lrd";
 
     bank GPR {
         CLASS(GPR64,

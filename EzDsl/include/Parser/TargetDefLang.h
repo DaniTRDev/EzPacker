@@ -84,12 +84,24 @@ struct TargetRegisterBank
                     { return Ast::TargetDef::TargetRegisterBank{ std::move(name), std::move(classes) }; });
 };
 
+struct TargetIncFileType
+{
+    static constexpr auto TypeTable = lexy::symbol_table<Ast::TargetDef::TargetIncludeFileType>
+        .map(LEXY_LIT("idf"), Ast::TargetDef::TargetIncludeFileType::InstructionDef)
+        .map(LEXY_LIT("lad"), Ast::TargetDef::TargetIncludeFileType::LegalizeActionDef)
+        .map(LEXY_LIT("lrd"), Ast::TargetDef::TargetIncludeFileType::LegalizeRuleDef)
+        .map(LEXY_LIT("isf"), Ast::TargetDef::TargetIncludeFileType::InstructionSelDef);
+
+    static constexpr auto rule = dsl::symbol<TypeTable>(dsl::identifier(dsl::ascii::alpha));
+    static constexpr auto value = lexy::forward<Ast::TargetDef::TargetIncludeFileType>;
+};
+
 struct TargetIncFile
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    static constexpr auto rule = Common::Keyword<"include">::rule >>
-            (dsl::p<Common::Identifier> + dsl::p<Common::StringLiteral> + dsl::lit_c<';'>);
+    static constexpr auto rule = Common::Keyword<"include">::rule >> dsl::p<TargetIncFileType> >>
+            (dsl::p<Common::StringLiteral> + dsl::lit_c<';'>);
 
     static constexpr auto value = lexy::construct<Ast::TargetDef::TargetIncFile>;
 };

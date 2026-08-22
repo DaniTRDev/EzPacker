@@ -152,9 +152,10 @@ TEST_F(TargetDefLangTest, TestMultipleInclusions)
 {
     std::string test = R"(
 target RISCV64 {
-    include idef "instructions.idf";
-    include isel "selection.isf";
-    include sched "scheduling.scd";
+    include idf "instructions.idf";
+    include lad "legalizeAction.lad";
+    include lrd "legalizeRule.lrd";
+    include isf "instructionSel.isf";
 }
 )";
     size_t sourceId = addSource("test", test);
@@ -163,16 +164,19 @@ target RISCV64 {
     auto res = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
     ASSERT_TRUE(res.has_value());
     EXPECT_EQ(res->m_name.m_node, "RISCV64");
-    ASSERT_EQ(res->m_inclusions.size(), 3);
+    ASSERT_EQ(res->m_inclusions.size(), 4);
 
-    EXPECT_EQ(res->m_inclusions[0].m_inclusionType.m_node, "idef");
+    EXPECT_EQ(res->m_inclusions[0].m_inclusionType, DSL::Ast::TargetDef::TargetIncludeFileType::InstructionDef);
     EXPECT_EQ(res->m_inclusions[0].m_path.m_node, "instructions.idf");
 
-    EXPECT_EQ(res->m_inclusions[1].m_inclusionType.m_node, "isel");
-    EXPECT_EQ(res->m_inclusions[1].m_path.m_node, "selection.isf");
+    EXPECT_EQ(res->m_inclusions[1].m_inclusionType, DSL::Ast::TargetDef::TargetIncludeFileType::LegalizeActionDef);
+    EXPECT_EQ(res->m_inclusions[1].m_path.m_node, "legalizeAction.lad");
 
-    EXPECT_EQ(res->m_inclusions[2].m_inclusionType.m_node, "sched");
-    EXPECT_EQ(res->m_inclusions[2].m_path.m_node, "scheduling.scd");
+    EXPECT_EQ(res->m_inclusions[2].m_inclusionType, DSL::Ast::TargetDef::TargetIncludeFileType::LegalizeRuleDef);
+    EXPECT_EQ(res->m_inclusions[2].m_path.m_node, "legalizeRule.lrd");
+
+    EXPECT_EQ(res->m_inclusions[3].m_inclusionType, DSL::Ast::TargetDef::TargetIncludeFileType::InstructionSelDef);
+    EXPECT_EQ(res->m_inclusions[3].m_path.m_node, "instructionSel.isf");
 
     EXPECT_TRUE(res->m_regBanks.empty());
 }
@@ -181,7 +185,7 @@ TEST_F(TargetDefLangTest, TestCompleteTargetDefinitionInterleaved)
 {
     std::string test = R"(
 target x86_64 {
-    include idef "x86_insts.idf";
+    include idf "x86_insts.idf";
 
     bank GPR {
         CLASS(gpr64,
@@ -194,7 +198,7 @@ target x86_64 {
         );
     };
 
-    include isel "x86_patterns.isf";
+    include isf "x86_patterns.isf";
 
     bank FPR {
         CLASS(fpr64,
@@ -213,9 +217,9 @@ target x86_64 {
 
     // Inclusions validation
     ASSERT_EQ(res->m_inclusions.size(), 2);
-    EXPECT_EQ(res->m_inclusions[0].m_inclusionType.m_node, "idef");
+    EXPECT_EQ(res->m_inclusions[0].m_inclusionType, DSL::Ast::TargetDef::TargetIncludeFileType::InstructionDef);
     EXPECT_EQ(res->m_inclusions[0].m_path.m_node, "x86_insts.idf");
-    EXPECT_EQ(res->m_inclusions[1].m_inclusionType.m_node, "isel");
+    EXPECT_EQ(res->m_inclusions[1].m_inclusionType, DSL::Ast::TargetDef::TargetIncludeFileType::InstructionSelDef);
     EXPECT_EQ(res->m_inclusions[1].m_path.m_node, "x86_patterns.isf");
 
     // Register banks validation

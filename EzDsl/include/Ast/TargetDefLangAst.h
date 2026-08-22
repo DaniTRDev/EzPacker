@@ -40,13 +40,21 @@ struct TargetRegisterBank
     std::pmr::vector<TargetRegisterClass> m_classes;
 };
 
+enum class TargetIncludeFileType
+{
+    InstructionDef,
+    LegalizeActionDef,
+    LegalizeRuleDef,
+    InstructionSelDef
+};
+
 /**
  * Target include directive:
  *   - include idef "instructions.idf";
  */
 struct TargetIncFile
 {
-    Common::Identifier m_inclusionType;
+    TargetIncludeFileType m_inclusionType;
     Common::StringLiteral m_path;
 };
 

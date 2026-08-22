@@ -22,6 +22,9 @@ struct BitSlice
     uint16_t m_to{ 0 };
 };
 
+/**
+ * Ex: ident[0:35]
+ */
 struct SlicedIdentifier
 {
     Common::Identifier m_name;
