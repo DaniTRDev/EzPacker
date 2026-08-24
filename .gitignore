@@ -138,3 +138,7 @@ fabric.properties
 
 /cmake-build-debug/**.**
 /cmake-build-debug/**
+
+# Graphifyy
+/graphify-out
+/.agents

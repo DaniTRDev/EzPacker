@@ -1,11 +1,8 @@
 # EzDSL: Compiler Backend Description Language Suite
 
-EzDSL is a modular, declarative Domain-Specific Language (DSL) suite engineered for compiler backends. Inspired by
-LLVM's TableGen, EzDSL decouples target architecture definitions, hardware instruction encodings, GlobalISel-style
-legalization matrices, IR rewrite rules, and instruction selection patterns into dedicated, specialized sub-languages.
+**EzDSL** is a modular, declarative Domain-Specific Language (DSL) suite engineered for compiler backends and code generators within the **EzPacker** toolchain. Inspired by LLVM's TableGen, EzDSL cleanly decouples target architecture definitions, hardware instruction encodings, GlobalISel-style legalization matrices, IR rewrite rules, and instruction selection patterns into specialized sub-languages.
 
-All sub-languages share a unified lexical grammar, zero-copy source reference tracking, and an allocation-efficient AST
-model powered by C++20 Polymorphic Memory Resources (`std::pmr`) and `lexy`.
+EzDSL includes an end-to-end processing pipeline: Lexy-based zero-copy parsing, semantic validation passes, hierarchical symbol tables, C++ code generators (`CppMirTypeTableGenerator`, `CppMirInstructionGenerator`), and a dedicated command-line compiler driver (`EzDsl-cli`).
 
 ---
 
@@ -13,115 +10,65 @@ model powered by C++20 Polymorphic Memory Resources (`std::pmr`) and `lexy`.
 
 1. [Language Suite Overview](#1-language-suite-overview)
 2. [Common Lexical & Grammar Foundation](#2-common-lexical--grammar-foundation)
-3. [Target Definition Language (`.tdf`)](#3-target-definition-language-tdf)
-4. [Instruction Definition Language (`.idf`)](#4-instruction-definition-language-idf)
-5. [Legalization Action Definition Language (`.lad`)](#5-legalization-action-definition-language-lad)
-6. [Legalization Rule Definition Language (`.lrd`)](#6-legalization-rule-definition-language-lrd)
-7. [Instruction Selection Definition Language (`.isf`)](#7-instruction-selection-definition-language-isf)
-8. [Type Definition Language (`.tyf`)](#8-type-definition-language-tyf)
-9. [Memory Architecture & Driver API](#9-memory-architecture--driver-api)
+3. [Language Specifications](#3-language-specifications)
+   - [Target Definition (`.tdf`)](#target-definition-tdf)
+   - [Target Instruction Definition (`.idf`)](#target-instruction-definition-idf)
+   - [Generic IR Instruction Definition (`.irdf`)](#generic-ir-instruction-definition-irdf)
+   - [Legalization Actions (`.lad`)](#legalization-actions-lad)
+   - [Legalization Rewrite Rules (`.lrd`)](#legalization-rewrite-rules-lrd)
+   - [Instruction Selection Patterns (`.isf`)](#instruction-selection-patterns-isf)
+   - [Type Definitions (`.tyf`)](#type-definitions-tyf)
+4. [Semantic Analysis & Symbol Table Pipeline](#4-semantic-analysis--symbol-table-pipeline)
+5. [C++ Code Generators](#5-c-code-generators)
+6. [CLI Driver (`EzDsl-cli`) & Options](#6-cli-driver-ezdsl-cli--options)
+7. [CMake Build System Integration](#7-cmake-build-system-integration)
+8. [Memory Architecture](#8-memory-architecture)
 
 ---
 
 ## 1. Language Suite Overview
 
-| Language                   | Extension | Primary Domain                                    | Key Constructs                                                         |
-|----------------------------|-----------|---------------------------------------------------|------------------------------------------------------------------------|
-| **Target Definition**      | `.tdf`    | Target ISA, File Inclusions, Register Hierarchies | `target`, `include`, `bank`, `CLASS`, `TargetRegister`                 |
-| **Instruction Definition** | `.idf`    | Formats, Binary Encoding, Assembly, Latencies     | `format`, `inst`, `IMPLICIT`, `FORMAT`, `FLAGS`, `ASM`, `LATENCY`      |
-| **Legalization Action**    | `.lad`    | Type Legality Tables, Promotions, Scalar Splits   | `action`, `LEGAL`, `WIDENS`, `NARROWS`, `LIBCALL`, `CUSTOM`, `BITCAST` |
-| **Legalization Rule**      | `.lrd`    | IR-to-IR Decomposition & Pre-ISel Rewrites        | `rule`, `match`, `when`, `expand`, custom transforms                   |
-| **Instruction Selection**  | `.isf`    | Generic-to-Target MIR Mapping, Addressing Modes   | `addrmode`, `variant`, `pattern`, `emit`, `cost`                       |
+| Language | Extension | Primary Domain | Generated Artifacts / Roles |
+|:---|:---|:---|:---|
+| **Target Definition** | `.tdf` | Target ISA, File Inclusions, Register Hierarchies | Hardware register trees, register banks, register classes |
+| **Instruction Definition** | `.idf` | Formats, Binary Encoding, Assembly, Latencies | Target machine instruction metadata, encoding tables |
+| **Generic IR Definition** | `.irdf` | Canonical IR Opcode Catalog, Categories, Flags | `MirInstructionSetDefs.h` (C++ MIR opcode enum & metadata) |
+| **Legalization Action** | `.lad` | Type Legality Tables, Promotions, Scalar Splits | Legality action matrices (`LEGAL`, `WIDENS`, `NARROWS`, etc.) |
+| **Legalization Rule** | `.lrd` | IR-to-IR Decomposition & Pre-ISel Rewrites | Subtarget expansion & arithmetic lowering transforms |
+| **Instruction Selection** | `.isf` | Generic-to-Target MIR Mapping, Addressing Modes | Multi-variant pattern matching and instruction emission |
+| **Type Definition** | `.tyf` | Canonical IR Types and Bitwidths | `MirTypeTable.h` / `MirTypeTable.cpp` C++ class hierarchy |
 
 ---
 
 ## 2. Common Lexical & Grammar Foundation
 
-All EzDSL sub-languages share a unified lexical foundation.
+All EzDSL sub-languages share a unified lexical foundation:
 
-### Comments & Whitespace
-
-* **Line Comments**: Begun with `//` and consumed up to the next newline.
-* **Whitespace**: ASCII space (`0x20`), horizontal tab (`0x09`), and newlines (`\n`, `\r\n`) act as token separators and
-  are ignored outside string literals.
-
-### Identifiers & Literals
-
+* **Comments**: C++ line comments (`// ...`) consumed up to newline.
+* **Whitespace**: ASCII space, horizontal tabs, and newlines (`\r`, `\n`) act as token separators and are ignored outside string literals.
 * **Identifiers**: Match `[a-zA-Z_][a-zA-Z0-9_]*`.
-* **String Literals**: Double-quoted character streams `"[^"\r\n]*"`.
-* **Real Literals**: Standard decimal floating-point representations (`12.34`, `.5`, `42.0`).
-* **Integer Literals**: Stored as signed 64-bit integers (`int64_t`) with optional leading signs:
-* **Decimal**: `0`, `42`, `-2048`
-* **Hexadecimal**: `0x1A2F`, `0XFF`, `-0x10`
-* **Binary**: `0b101010`, `0B0`
-* **Octal**: `0o755`, `0O77`
-
-### Source Tracking
-
-Every AST literal and identifier wraps `DSL::Ast::Common::SourcedAstNode<T>`:
-
-```cpp
-template <typename Node>
-struct SourcedAstNode {
-    Node m_node;
-    SourceReference *m_sourceRef{ nullptr }; // Zero-copy begin/end buffer pointers
-};
-
-```
-
-### Typed Identifier Syntax
-
-A uniform pattern is used across declarations and pattern matchers:
-
-$$\text{Type}(\text{Param})\text{:\$Name} \quad \text{or} \quad \text{Type:Name}$$
-
-* `GPR:rd` $\rightarrow$ Base type `GPR`, identifier `rd`.
-* `simm(i12):imm12` $\rightarrow$ Immediate classifier `simm`, width parameter `i12`, identifier `imm12`.
-* `i32:$dst` $\rightarrow$ IR type `i32`, SSA register variable `dst`.
+* **Literals**:
+  - String Literals: Double-quoted strings (`"add $rd, $rs1, $rs2"`).
+  - Integer Literals: Signed 64-bit integer values in Decimal (`42`, `-2048`), Hexadecimal (`0x1A2F`), Binary (`0b1010`), or Octal (`0o755`).
+  - Real Literals: Standard decimal floating-point (`3.14`, `0.5`).
+* **Source Tracking**: Every AST node wraps `DSL::Ast::Common::SourcedAstNode<T>`, binding zero-copy `SourceReference*` pointers for diagnostics.
+* **Typed Identifiers**: Unified syntax across all declarations:
+  $$\text{Type}(\text{Param})\text{:\$Name} \quad \text{or} \quad \text{Type:Name}$$
+  - `GPR:rd`: Base register class `GPR`, identifier `rd`.
+  - `simm(i12):imm12`: Immediate classifier `simm`, width parameter `i12`, identifier `imm12`.
+  - `i32:$dst`: IR type `i32`, SSA register variable `$dst`.
 
 ---
 
-## 3. Target Definition Language (`.tdf`)
+## 3. Language Specifications
 
-The `.tdf` language declares target roots, source inclusions, register aliasing trees, and register classes grouped into
-register banks.
-
-### Grammar (EBNF)
-
-```ebnf
-TargetDefFile       ::= TargetDef EOF ;
-
-TargetDef           ::= "target" Identifier "{" TargetItem* "}" ";"? ;
-TargetItem          ::= TargetIncFile | TargetRegisterBank ;
-
-TargetIncFile       ::= "include" Identifier StringLiteral ";" ;
-
-TargetRegisterBank  ::= "bank" Identifier "{" TargetRegisterClass* "}" ";"? ;
-TargetRegisterClass ::= "CLASS" "(" Identifier ("," TargetRegisterList)? ")" ";" ;
-TargetRegisterList  ::= TargetRegister ("," TargetRegister)* ;
-
-TargetRegister      ::= Identifier "(" Identifier? "," IntegerLiteral "," IntegerLiteral ")" ;
-
-```
-
-### Register Aliasing Model
-
-Hardware registers are defined via 4 parameters:
-
-$$\text{TargetRegister}(\text{Name}, \text{ParentName}, \text{BitWidth}, \text{BitOffset})$$
-
-* **Root Registers**: Omit the parent identifier (e.g., `rax(, 64, 0)`).
-* **Sub-Registers**: Declare parent name, width, and zero-based bit offset into parent storage (e.g., `al(ax, 8, 0)`,
-  `ah(ax, 8, 8)`).
-
-### Example: Target Definition File (`x86_64.tdf`)
-
+### Target Definition (`.tdf`)
+Declares target roots, inclusions, and register class hierarchies mapped to physical register banks:
 ```dsl
 target x86_64 {
     include idf "x86_instructions.idf";
     include isf "x86_patterns.isf";
     include lad "x86_legalizerActions.lad";
-    include lrd "x86_legalizerRules.lrd";
 
     bank GPR {
         CLASS(GPR64,
@@ -130,100 +77,18 @@ target x86_64 {
             rdx(, 64, 0),
             rbx(, 64, 0)
         );
-
         CLASS(GPR32,
             eax(rax, 32, 0),
             ecx(rcx, 32, 0),
             edx(rdx, 32, 0),
             ebx(rbx, 32, 0)
         );
-
-        CLASS(GPR16,
-            ax(eax, 16, 0),
-            cx(ecx, 16, 0),
-            dx(edx, 16, 0),
-            bx(ebx, 16, 0)
-        );
-
-        CLASS(GPR8,
-            al(ax, 8, 0),
-            ah(ax, 8, 8),
-            cl(cx, 8, 0),
-            ch(cx, 8, 8)
-        );
     };
 };
-
 ```
 
----
-
-## 4. Instruction Definition Language (`.idf`)
-
-The `.idf` language models physical instruction encodings, bitfield layouts, operand directionality, flags, and assembly
-templates.
-
-### Grammar (EBNF)
-
-```ebnf
-InstDefFile     ::= (InstFormatDecl | InstDecl)* EOF ;
-
-BitSlice        ::= "[" IntegerLiteral ":" IntegerLiteral "]" ;
-SlicedIdentifier::= Identifier BitSlice ;
-
-BitExpression   ::= BitExprAtom (BitExprInfixOp BitExprAtom)* ;
-BitExprAtom     ::= "(" BitExpression ")"
-                  | IntegerLiteral
-                  | SlicedIdentifier
-                  | Identifier
-                  | "~" BitExprAtom ;
-
-FormatField     ::= Identifier BitSlice ("=" BitExpression)? ";" ;
-InstFormatDecl  ::= "format" Identifier ("(" IntegerLiteral ")")? "{" FormatField* "}" ;
-
-InstOperandDir  ::= "IN" | "OUT" | "INOUT" ;
-InstArgItem     ::= Identifier ("(" Identifier ")")? ":" Identifier InstOperandDir ;
-
-InstHeader      ::= "inst" Identifier "(" (InstArgItem ("," InstArgItem)*)? ")" "format" Identifier ;
-
-InstFlag        ::= "isBranch" | "isCall" | "isReturn" | "isTerminator" 
-                  | "mayLoad" | "mayStore" | "commutative" | "volatile" ;
-
-InstBodyItem    ::= "IMPLICIT" "(" (InstArgItem ("," InstArgItem)*)? ")" ";"
-                  | "FORMAT" "(" (BitExprAssign ("," BitExprAssign)*)? ")" ";"
-                  | "FLAGS" "(" (InstFlag ("," InstFlag)*)? ")" ";"
-                  | "ASM" "(" StringLiteral ")" ";"
-                  | "LATENCY" "(" IntegerLiteral ")" ";" ;
-
-BitExprAssign   ::= Identifier BitSlice? "=" BitExpression ;
-InstDecl        ::= InstHeader "{" InstBodyItem* "}" ;
-
-```
-
-### Bit-Expression Operators & Precedence
-
-| Precedence      | Operator   | Description                     | Associativity |
-|-----------------|------------|---------------------------------|---------------|
-| **1 (Highest)** | `~`        | Bitwise NOT (Unary Prefix)      | Right         |
-| **2**           | `+`, `-`   | Binary Addition, Subtraction    | Left          |
-| **3**           | `<<`, `>>` | Bitwise Shift Left, Shift Right | Left          |
-| **4**           | `&`        | Bitwise AND                     | Left          |
-| **5**           | `^`        | Bitwise XOR                     | Left          |
-| **6 (Lowest)**  | `          | `                               | Bitwise OR    | Left |
-
-### Instruction Flags
-
-* `isBranch`: Conditional or unconditional control-flow branch.
-* `isCall`: Procedure / function call instruction.
-* `isReturn`: Return from subroutine.
-* `isTerminator`: Blocks fallthrough / ends a basic block.
-* `mayLoad`: Reads from memory.
-* `mayStore`: Writes to memory.
-* `commutative`: Operands are algebraically reversible ($A + B = B + A$).
-* `volatile`: Has unmodeled side-effects; prevents dead-code elimination.
-
-### Example: RISC-V Instruction Definition File (`riscv_insts.idf`)
-
+### Target Instruction Definition (`.idf`)
+Specifies binary formats, bitfield assignments, flags, and assembly templates:
 ```dsl
 format RType(32) {
     opcode[6:0]   = 0b0110011;
@@ -232,14 +97,6 @@ format RType(32) {
     rs1[19:15]    = 0;
     rs2[24:20]    = 0;
     funct7[31:25] = 0;
-};
-
-format IType(32) {
-    opcode[6:0]   = 0b0010011;
-    rd[11:7]      = 0;
-    funct3[14:12] = 0;
-    rs1[19:15]    = 0;
-    imm[31:20]    = 0;
 };
 
 inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
@@ -254,73 +111,26 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
     LATENCY(1);
     FLAGS(commutative);
 }
+```
 
-inst LW(GPR:rd OUT, GPR:rs1 IN, simm(i12):offset IN) format IType {
-    FORMAT(
-        opcode = 0b0000011,
-        rd = rd,
-        funct3 = 0b010,
-        rs1 = rs1,
-        imm = offset[11:0]
-    );
-    ASM("lw $rd, ${offset}(${rs1})");
-    LATENCY(3);
-    FLAGS(mayLoad);
+### Generic IR Instruction Definition (`.irdf`)
+Declares high-level generic IR opcodes, categories, tiers, and dataflow directionality:
+```dsl
+inst ADD(Register:dst OUT, RegIntImm:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(IsCommutative);
 }
 
+inst LOAD(Register:dst OUT, AddressSource:addr IN) {
+    CATEGORY(Memory);
+    TIER(HighLevel);
+    FLAGS(ReadsMemory);
+}
 ```
 
----
-
-## 5. Legalization Action Definition Language (`.lad`)
-
-The `.lad` language configures the Generic Machine IR legalizer. It maps Generic Opcodes and operand type signatures to
-legalization actions.
-
-### Grammar (EBNF)
-
-```ebnf
-TargetLegalizeDef       ::= InstructionLegalizeDecl* EOF ;
-
-InstructionLegalizeDecl ::= "action" Identifier "{" (LegalizationClause ";")* "}" ";"? ;
-
-LegalizeActionKind      ::= "LEGAL" 
-                          | "WIDENS" 
-                          | "NARROWS" 
-                          | "LIBCALL" 
-                          | "CUSTOM" 
-                          | "BITCAST" 
-                          | "UNSUPPORTED" ;
-
-TypeConstraint          ::= Identifier (":" IntegerLiteral)? ;
-TypeConstraintList      ::= TypeConstraint ("," TypeConstraint)* ;
-
-LegalizationTarget      ::= Identifier | StringLiteral ;
-LegalizationClause      ::= LegalizeActionKind "(" TypeConstraintList ")" (">>" LegalizationTarget)? ;
-
-```
-
-### Action Directives
-
-| Action Directive | Semantic Function                                  | Target Required (`>>`) |
-|------------------|----------------------------------------------------|------------------------|
-| `LEGAL`          | Operation and type combination natively supported. | No                     |
-| `WIDENS`         | Promote scalar types to larger legal size.         | Yes (`>> TargetType`)  |
-| `NARROWS`        | Split scalar types into smaller legal sizes.       | Yes (`>> TargetType`)  |
-| `LIBCALL`        | Lower operation into a runtime library function.   | Yes (`>> "symbol"`)    |
-| `CUSTOM`         | Delegate lowering to C++ target hook.              | No                     |
-| `BITCAST`        | Bitwise reinterpret to same-sized legal type.      | Yes (`>> TargetType`)  |
-| `UNSUPPORTED`    | Explicitly reject type combination as invalid.     | No                     |
-
-### Heterogeneous Type Slot Indexing
-
-When operations have multiple independent types across operand positions:
-
-* `i32` or `i32:0`: Constrains operand index 0 (Destination / Result).
-* `ptr:1`: Constrains operand index 1 (Source / Pointer).
-
-### Example: Legalizer Action File (`core_legalizer.lad`)
-
+### Legalization Actions (`.lad`)
+Declares legality matrices for generic opcodes across types:
 ```dsl
 action ADD {
     LEGAL(i32, i64, f32, f64);
@@ -328,73 +138,15 @@ action ADD {
     NARROWS(i128) >> i64;
 };
 
-action SDIV {
-    LEGAL(i32, i64);
-    WIDENS(i8, i16) >> i32;
-    LIBCALL(i128) >> "__divti3";
-};
-
 action SEXT {
     LEGAL(i32:0, i8:1);
-    LEGAL(i32:0, i16:1);
     LEGAL(i64:0, i32:1);
     WIDENS(i1:1) >> i8;
 };
-
-action LOAD {
-    LEGAL(i8:0, ptr:1);
-    LEGAL(i16:0, ptr:1);
-    LEGAL(i32:0, ptr:1);
-    LEGAL(i64:0, ptr:1);
-    CUSTOM(v4f32:0, ptr:1);
-};
-
 ```
 
----
-
-## 6. Legalization Rule Definition Language (`.lrd`)
-
-The `.lrd` language defines pattern-based, IR-to-IR legalization rules. It decomposes complex generic instructions into
-legal generic IR sequences before instruction selection.
-
-### Grammar (EBNF)
-
-```ebnf
-TargetLegalizeRuleDef ::= (LegalizeRewriteRule ";")* EOF ;
-
-LegalizeRewriteRule   ::= "rule" Identifier "{" RuleBlock+ "}" ;
-RuleBlock             ::= "match" "{" RuleInstruction* "}" ";"
-                        | "when"  "{" RulePredicate* "}" ";"
-                        | "expand""{" RuleInstruction* "}" ";" ;
-
-RuleInstruction       ::= Identifier (RuleOperand ("," RuleOperand)*)? ";"
-                        | RuleOperand ";" ;
-
-RuleOperand           ::= Identifier "(" SsaVarList ")"
-                        | Identifier ("(" Identifier ")")? ":" SsaVarName
-                        | SsaVarName
-                        | IntegerLiteral ;
-
-SsaVarName            ::= "$" Identifier ;
-SsaVarList            ::= SsaVarName ("," SsaVarName)* ;
-
-PredicateArg          ::= SsaVarName | IntegerLiteral | Identifier ;
-RulePredicate         ::= Identifier "(" (PredicateArg ("," PredicateArg)*)? ")" ";" ;
-
-```
-
-### Operand Matching Forms
-
-* `$src`: Bound or unbound bare SSA virtual register.
-* `i32:$dst`: Type-qualified SSA virtual register.
-* `imm:$c`: Bound symbolic immediate constant.
-* `imm(i32):$c`: Type-qualified symbolic immediate constant.
-* `42`, `-10`, `0xFF`: Concrete literal immediate integer.
-* `log2($shift)`: Compile-time transform hook evaluated on variables.
-
-### Example: 64-Bit Addition Decomposition (`narrow_add.lrd`)
-
+### Legalization Rewrite Rules (`.lrd`)
+Pattern-based IR-to-IR decomposition prior to instruction selection:
 ```dsl
 rule NarrowAddi64 {
     match {
@@ -406,55 +158,15 @@ rule NarrowAddi64 {
     expand {
         UNMERGE_VALUES i32:$lhs_lo, i32:$lhs_hi, i64:$lhs;
         UNMERGE_VALUES i32:$rhs_lo, i32:$rhs_hi, i64:$rhs;
-
         UADDO i32:$dst_lo, i1:$carry, i32:$lhs_lo, i32:$rhs_lo;
         UADDE i32:$dst_hi, i1:$carry_out, i32:$lhs_hi, i32:$rhs_hi, i1:$carry;
-
         MERGE_VALUES i64:$dst, i32:$dst_lo, i32:$dst_hi;
     };
 };
-
 ```
 
----
-
-## 7. Instruction Selection Definition Language (`.isf`)
-
-The `.isf` language maps Generic Machine IR patterns into target-specific machine instructions. It includes
-multi-variant addressing mode matching.
-
-### Grammar (EBNF)
-
-```ebnf
-ISelDefFile        ::= (AddrModeDef | ISelPattern)* EOF ;
-
-AddrModeParam      ::= Identifier ("(" Identifier ")")? ":" Identifier ("=" IntegerLiteral)? ;
-AddrModeParamList  ::= "(" (AddrModeParam ("," AddrModeParam)*)? ")" ;
-
-AddrModeDef        ::= "addrmode" Identifier AddrModeParamList "{" AddrModeVariantList "}" ";"? ;
-AddrModeVariantList::= (AddrModeVariant ";")* ;
-AddrModeVariant    ::= "variant" Identifier "{" VariantBlock* "}" ;
-VariantBlock       ::= "match" "{" RuleInstruction* "}" ";"
-                     | "when"  "{" RulePredicate* "}" ";" ;
-
-ISelPattern        ::= "pattern" Identifier "{" PatternBlock* "}" ";"? ;
-PatternBlock       ::= "match" "{" RuleInstruction* "}" ";"
-                     | "when"  "{" RulePredicate* "}" ";"
-                     | "emit"  "{" RuleInstruction* "}" ";"
-                     | "cost"  "(" IntegerLiteral ")" ";" ;
-
-```
-
-### Addressing Mode Fallback
-
-Addressing modes group multiple match variants behind a unified parameter interface. Variants evaluate in order of
-appearance:
-
-1. The first variant whose `match` pattern and `when` guards succeed binds values to the parameter list.
-2. Unbound parameters with default values automatically receive their default constant (e.g., `= 0`).
-
-### Example: Pattern Matching with Addressing Modes (`isel_patterns.isf`)
-
+### Instruction Selection Patterns (`.isf`)
+Declares complex multi-variant addressing modes and generic-to-target selection patterns:
 ```dsl
 addrmode AddrModeRegImm12(GPR:base, simm(i12):offset = 0) {
     variant OffsetAddr {
@@ -466,7 +178,6 @@ addrmode AddrModeRegImm12(GPR:base, simm(i12):offset = 0) {
             immInRange($offset, -2048, 2047);
         };
     };
-
     variant BaseOnly {
         match {
             GPR:$base;
@@ -478,121 +189,96 @@ pattern Select_LW {
     match {
         LOAD i32:$dst, AddrModeRegImm12($base, $offset);
     };
-    when {
-        hasOneUse($base);
-    };
     emit {
         LW GPR:$dst, GPR:$base, $offset;
     };
     cost(1);
 };
-
-pattern Select_ADDI {
-    match {
-        ADD i32:$dst, GPR:$src, simm(i12):$imm;
-    };
-    when {
-        immInRange($imm, -2048, 2047);
-    };
-    emit {
-        ADDI GPR:$dst, GPR:$src, $imm;
-    };
-    cost(1);
-};
-
 ```
 
----
-
-## 8. Type Definition Language
-
-EzDsl allows defining the types of the MIR (EzMir) using a specific syntax:
+### Type Definitions (`.tyf`)
+Declares canonical MIR types:
 ```dsl
-// Inside a type definition file (.tyf).
-integer i8(8); // Defines an integer type, i8, with 8-bit width.
-float f32(32); // Defines a floating point type, f32, with 32-bit width.
+integer i1(1);
+integer i8(8);
+integer i16(16);
+integer i32(32);
+integer i64(64);
+float f32(32);
+float f64(64);
+void void;
+bindingToken __bindToken;
 ```
-
-These types are used by EzMir and the rest of EzDsl to configure a target. If the type file is not present, types CAN'T be resolved properly.
 
 ---
 
-## 9. Memory Architecture & Driver API
+## 4. Semantic Analysis & Symbol Table Pipeline
 
-### Allocation Lifecycle
+EzDSL features a dedicated semantic validation stage (`EzDsl/include/Sema/`, `EzDsl/include/SemaPasses/`):
 
-EzDSL employs a monotonic arena allocator to eliminate per-node heap allocations and reference-counting overhead:
+- **`SymbolTable` & `Scope`**: Hierarchical lexical symbol table allocating through `std::pmr::memory_resource`. Manages symbols for types, instructions, register classes, banks, formats, and patterns.
+- **`TypePass`**: Ingests parsed `TypeDefFile` ASTs, registers interned types, validates bitwidths, and populates the `SymbolTable`.
+- **`IrInstructionPass`**: Ingests `IrInstDefFile` ASTs, verifies operand counts, category invariants (e.g. data movement, arithmetic), and directionality rules (`IN`, `OUT`, `INOUT`).
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│               std::pmr::monotonic_buffer_resource           │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Backs all AST nodes, collections, and strings
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  DSL::Parser::ParseContext                  │
-│  - Tracks source memory buffer & zero-copy string views     │
-│  - Formats syntax errors and source reference diagnostics   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ DSL::Parser::Common::PmrAsList<T>
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Typed AST Root Output                    │
-└─────────────────────────────────────────────────────────────┘
+---
 
+## 5. C++ Code Generators
+
+EzDSL translates verified AST and symbol table models into production C++ source and header files (`EzDsl/include/CodeGenerators/`):
+
+- **`GenerateMirTypeTable`**: Synthesizes `MirTypeTable.h` and `MirTypeTable.cpp`. Generates direct accessor methods (`i32()`, `f64()`, `getPtr()`, `getArray()`, `getClass()`), memory-interning structures, and layout initialization logic via `IMirTargetTypeLayout`.
+- **`GenerateMirIrInstructionDefs`**: Synthesizes `MirInstructionSetDefs.h`. Emits `INSTRUCTION(name, tier, category, operands, flags)` macro tables defining opcodes, instruction categories, and operand validation metadata.
+
+---
+
+## 6. CLI Driver (`EzDsl-cli`) & Options
+
+`EzDsl-cli` (`ezdsl-gen`) is the standalone executable driver used to process `.tyf` and `.irdf` definitions during build time.
+
+### CLI Usage:
+```bash
+ezdsl-gen [options] -i <input_file>
 ```
 
-### Driver Integration Example
+### Available Options:
+| Flag | Description |
+|:---|:---|
+| `-i, --input <file>` | Input EzDSL definition file (`.tyf`, `.irdf`, `.tdf`, `.idf`). |
+| `-o, --output <path>` | Output destination directory or file path (default: `.`). |
+| `-I, --include <dir>` | Directory to search for file inclusions (`include idf "..."`). |
+| `--emit-type-table` | Synthesize EzMir `MirTypeTable.h` and `MirTypeTable.cpp`. |
+| `--emit-instructions`| Synthesize EzMir `MirInstructionSetDefs.h`. |
+| `--header-only` | Synthesize only the `.h` header file. |
+| `--source-only` | Synthesize only the `.cpp` translation unit. |
+| `-v, --verbose` | Enable verbose diagnostic trace logs. |
+| `-h, --help` | Display command-line options. |
 
-```cpp
-#include "Parser/ParseContext.h"
-#include "Parser/TargetDefLang.h"
-#include "Parser/InstructionDefLang.h"
-#include "Parser/LegalizeActionDefLang.h"
-#include "Parser/LegalizeRuleDefLang.h"
-#include "Parser/InstructionSelDefLang.h"
+---
 
-#include <iostream>
-#include <memory_resource>
-#include <array>
+## 7. CMake Build System Integration
 
-int main() 
-{
-    std::string sourceBuffer = R"(
-        target DemoArch {
-            include idef "demo.idf";
-            bank GPR {
-                CLASS(GPR32, r0(, 32, 0), r1(, 32, 0));
-            };
-        };
-    )";
+EzDSL integrates cleanly into CMake build workflows via helper modules in `EzMir/CMake/`:
 
-    // 1. Initialize monotonic arena buffer (e.g. 64KB stack scratchpad)
-    std::array<std::byte, 65536> stackBuffer;
-    std::pmr::monotonic_buffer_resource arena(stackBuffer.data(), stackBuffer.size());
+```cmake
+# Generate C++ MirTypeTable class from types.tyf
+EzDslGenTypeTable(
+    TARGET EzMir
+    INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/types.tyf
+    OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/Type
+)
 
-    // 2. Initialize parser context with diagnostic and memory managers
-    DSL::Parser::ParseContext ctx(
-        getDiagCollector(), 
-        getSourceManager(), 
-        sourceId, 
-        &arena // Allocations from PmrAsList route directly here
-    );
-
-    // 3. Execute typed parser
-    auto ast = ctx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
-
-    if (!ast) 
-    {
-        std::cerr << "Parsing failed!\n";
-        ctx.emitDiagnostics();
-        return 1;
-    }
-
-    std::cout << "Successfully parsed target: " << ast->m_name.m_node << "\n";
-    std::cout << "Registered banks: " << ast->m_regBanks.size() << "\n";
-
-    return 0;
-}
-
+# Generate C++ MIR Instruction Set Definitions from instructions.irdf
+EzDslGenMirInstructions(
+    TARGET EzMir
+    INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/instructions.irdf
+    OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/Instruction
+)
 ```
+
+---
+
+## 8. Memory Architecture
+
+EzDSL is built on `std::pmr::monotonic_buffer_resource` arenas:
+- **Zero-allocation ASTs**: AST collections, literals, and symbol tables share a contiguous memory block.
+- **Fast teardown**: Releasing the top-level arena instantly frees all AST memory without individual node deallocations.

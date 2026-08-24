@@ -6,6 +6,9 @@
 
 namespace DSL::Ast::IrInstDef
 {
+/**
+ * Bitmask enumeration representing expected operand types in IR instruction declarations.
+ */
 enum class IrOperandType : uint16_t
 {
     None = 1 << 0,
@@ -27,6 +30,9 @@ enum class IrOperandType : uint16_t
     Any = 0xFFFF
 };
 
+/**
+ * Dataflow direction for an IR operand (In, Out, InOut).
+ */
 enum class IrOperandDir : uint8_t
 {
     ArgIn,
@@ -34,6 +40,9 @@ enum class IrOperandDir : uint8_t
     ArgInOut
 };
 
+/**
+ * Single operand in an IR instruction declaration with type, identifier, and direction.
+ */
 struct IrOperand
 {
     IrOperandType m_type;
@@ -41,6 +50,9 @@ struct IrOperand
     IrOperandDir m_dir{ IrOperandDir::ArgIn };
 };
 
+/**
+ * Functional category for classifying IR instructions.
+ */
 enum class IrInstCategory : uint8_t
 {
     Invalid = 0,
@@ -54,6 +66,9 @@ enum class IrInstCategory : uint8_t
     System
 };
 
+/**
+ * Abstraction tier of the IR instruction (HighLevel, PassInternal, TargetLow).
+ */
 enum class IrInstTier : uint8_t
 {
     HighLevel,
@@ -61,6 +76,9 @@ enum class IrInstTier : uint8_t
     TargetLow
 };
 
+/**
+ * Behavioral and verification flags for IR instructions.
+ */
 enum class IrInstFlag : uint32_t
 {
     None = 0,
@@ -81,6 +99,9 @@ enum class IrInstFlag : uint32_t
     VariadicArgs = 1 << 14
 };
 
+/**
+ * IR instruction body containing category, tier, and behavioral flags.
+ */
 struct IrInstBody
 {
     IrInstCategory m_category{ IrInstCategory::Invalid };
@@ -88,6 +109,9 @@ struct IrInstBody
     std::pmr::vector<IrInstFlag> m_flags;
 };
 
+/**
+ * Complete IR instruction declaration AST node (name, operand list, body attributes).
+ */
 struct IrInstDecl
 {
     Common::Identifier m_name;
@@ -95,6 +119,9 @@ struct IrInstDecl
     IrInstBody m_body;
 };
 
+/**
+ * Root AST structure representing a parsed IR instruction definition file.
+ */
 struct IrInstDefFile
 {
     std::pmr::vector<IrInstDecl> m_instructions;

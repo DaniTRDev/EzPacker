@@ -3,6 +3,9 @@
 
 #include "EzMirCommon.h"
 
+/**
+ * Bitmask enumeration defining expected operand types for MIR instructions and verification.
+ */
 enum class ExpectedOperandType : uint16_t
 {
     None = 1 << 0,
@@ -44,6 +47,9 @@ inline constexpr bool operator&(ExpectedOperandType a, ExpectedOperandType b)
     return (static_cast<uint16_t>(a) & static_cast<uint16_t>(b)) != 0;
 }
 
+/**
+ * Dataflow direction and usage flags for instruction operands (Read, Write, ReadWrite).
+ */
 enum class MirOperandFlag : uint8_t
 {
     None = 0,
@@ -61,13 +67,18 @@ inline constexpr bool operator&(MirOperandFlag a, MirOperandFlag b)
     return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
 }
 
+/**
+ * Metadata descriptor associating an expected operand type with its dataflow access flag.
+ */
 struct MirOperandMetadata
 {
     ExpectedOperandType type;
     MirOperandFlag flags;
 };
 
-// --- Instruction Flags (Unchanged) ---
+/**
+ * Semantic and behavioral flags associated with a MIR instruction opcode.
+ */
 enum class MirInstructionFlags : uint32_t
 {
     None = 0,
@@ -101,6 +112,9 @@ inline constexpr bool operator&(MirInstructionFlags a, MirInstructionFlags b)
             static_cast<std::underlying_type_t<MirInstructionFlags>>(b)) != 0;
 }
 
+/**
+ * Functional category classifying the high-level role of an instruction.
+ */
 enum MirInstructionCategory : uint8_t
 {
     MirCat_Invalid = 0,
@@ -126,6 +140,9 @@ inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2St
     { MirCat_System, "MirCat_System" }
 };
 
+/**
+ * Compilation tier indicating the abstraction level of an instruction.
+ */
 enum class MirInstructionTier : uint8_t
 {
     HighLevel,    // Standard IR opcodes emitted by the frontend/IRBuilder (ADD, SUB, CALL, RET, etc.)
@@ -136,6 +153,10 @@ enum class MirInstructionTier : uint8_t
 
 // --- Metadata Structure ---
 enum class MirInstructionOpCode : uint16_t;
+
+/**
+ * Static metadata descriptor capturing complete classification and operand schema for an opcode.
+ */
 struct MirInstructionMetadata
 {
     MirInstructionCategory m_category;

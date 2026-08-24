@@ -11,6 +11,9 @@
 class MirTargetInstructionDesc
 {
   public:
+    /**
+     * Constructs a target instruction descriptor with operand constraints, implicit defs, and implicit uses.
+     */
     MirTargetInstructionDesc(const char *name,
                              size_t id,
                              std::initializer_list<MirOperandFlag> operandFlags = {},

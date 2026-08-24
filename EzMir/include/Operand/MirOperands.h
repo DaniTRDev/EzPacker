@@ -96,6 +96,9 @@ class MirReference : public MirOperand
     size_t m_offset{ 0 };
 };
 
+/**
+ * Represents a reference to an external runtime symbol by name (e.g. from the runtime library).
+ */
 class MirRuntimeSymbol : public MirOperand
 {
   public:
@@ -112,6 +115,9 @@ class MirRuntimeSymbol : public MirOperand
     std::pmr::string m_symbolName;
 };
 
+/**
+ * Represents a virtual or physical register operand.
+ */
 class MirRegister : public MirOperand
 {
   public:
@@ -145,6 +151,9 @@ class MirRegister : public MirOperand
     std::pmr::string m_name;
 };
 
+/**
+ * Represents a base-plus-displacement memory addressing operand ([base + displacement]).
+ */
 class MirMemory : public MirOperand
 {
   public:

@@ -23,7 +23,7 @@ struct BitSlice
 };
 
 /**
- * Ex: ident[0:35]
+ * AST node for an identifier sliced by bit indices (e.g. ident[0:31]).
  */
 struct SlicedIdentifier
 {
@@ -33,6 +33,9 @@ struct SlicedIdentifier
 
 struct BitExpression;
 
+/**
+ * Bitwise and arithmetic operators available within bitfield expressions.
+ */
 enum class BitExprOp
 {
     Add,
@@ -45,9 +48,15 @@ enum class BitExprOp
     Not
 };
 
+/**
+ * Variant representing possible operand types in a bitfield expression.
+ */
 using BitExprValues =
         std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, std::shared_ptr<BitExpression>>;
 
+/**
+ * Binary or unary bit expression operating on identifiers, literals, slices, or sub-expressions.
+ */
 struct BitExpression
 {
     BitExprValues m_lhs;
@@ -55,6 +64,9 @@ struct BitExpression
     std::optional<BitExprValues> m_rhs;
 };
 
+/**
+ * Field assignment in instruction encoding formats (lhs[slice] = rhs_expr).
+ */
 struct BitExprAssign
 {
     Common::Identifier m_lhs;
@@ -62,6 +74,9 @@ struct BitExprAssign
     BitExprValues m_rhs;
 };
 
+/**
+ * Single named bitfield within an instruction encoding format layout.
+ */
 struct FormatField
 {
     Common::Identifier m_name;
@@ -69,6 +84,9 @@ struct FormatField
     std::optional<BitExprValues> m_defaultValue;
 };
 
+/**
+ * Instruction encoding format declaration (e.g., R-type, I-type) with width and bitfields.
+ */
 struct InstFormatDecl
 {
     Common::Identifier m_name;
@@ -76,6 +94,9 @@ struct InstFormatDecl
     std::pmr::vector<FormatField> m_fields;
 };
 
+/**
+ * Dataflow direction of an instruction operand.
+ */
 enum class InstOperandDir
 {
     ArgIn,
@@ -83,6 +104,9 @@ enum class InstOperandDir
     ArgInOut
 };
 
+/**
+ * Kind of operand in an instruction declaration (Register or Immediate).
+ */
 enum class InstOperandKind
 {
     Register, // Hardware or virtual register (e.g., "GPR:rd OUT")
@@ -105,6 +129,9 @@ struct InstOperand
     InstOperandDir m_dir{ InstOperandDir::ArgIn }; // Dataflow direction ("IN", "OUT", "INOUT")
 };
 
+/**
+ * Behavioral flags for target instruction definitions.
+ */
 enum class InstFlag
 {
     IsBranch,
@@ -117,6 +144,9 @@ enum class InstFlag
     HasSideEffects
 };
 
+/**
+ * Header declaration of a target instruction (name, formal arguments, and binary format).
+ */
 struct InstHeader
 {
     Common::Identifier m_name;
@@ -131,6 +161,9 @@ using InstBodyItem = std::variant<std::pmr::vector<InstOperand>,   // IMPLICIT(.
                                   std::pmr::vector<InstFlag>       // FLAGS(...)
                                   >;
 
+/**
+ * Body definition of an instruction specifying implicit operands, field assignments, assembly syntax, and flags.
+ */
 struct InstBody
 {
     std::pmr::vector<InstOperand> m_implicitArgs;
@@ -140,12 +173,18 @@ struct InstBody
     std::pmr::vector<InstFlag> m_flags;
 };
 
+/**
+ * Full instruction declaration AST node combining header and body.
+ */
 struct InstDecl
 {
     InstHeader m_header;
     InstBody m_body;
 };
 
+/**
+ * Root AST structure representing a parsed .idf (Instruction Definition File).
+ */
 struct InstDefFile
 {
     std::pmr::vector<InstFormatDecl> m_formats;

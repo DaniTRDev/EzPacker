@@ -20,6 +20,9 @@ struct SourceReference
     size_t length() const { return m_endOffset - m_beginOffset; }
 };
 
+/**
+ * Represents a discrete source line range, mapping byte offsets to a 1-based line number.
+ */
 struct SourceLineRange
 {
     size_t m_beginOffset{ 0 };
@@ -27,11 +30,14 @@ struct SourceLineRange
     size_t m_lineNumber{ 0 }; // 1-based line index
 
     /**
-     * Returns the length of the line.
+     * Returns the length of the line in bytes.
      */
     size_t length() const { return m_endOffset - m_beginOffset; }
 };
 
+/**
+ * Cached source file descriptor containing raw file content, display name, and precomputed line bounds.
+ */
 struct SourceFileEntry
 {
     std::pmr::string m_content;

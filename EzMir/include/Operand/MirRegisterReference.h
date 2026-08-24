@@ -19,6 +19,10 @@ class MirRegisterRef
 {
   public:
     constexpr MirRegisterRef() = default;
+
+    /**
+     * Constructs a register reference with the specified ID, virtual flag, and optional class.
+     */
     MirRegisterRef(size_t id, bool isVirtual = true, class MirRegisterClass *_class = nullptr);
 
     /**
@@ -26,9 +30,19 @@ class MirRegisterRef
      */
     MirRegisterRef(class MirRegisterClass *_class, size_t id);
 
+    /**
+     * Returns true if this register reference is virtual (unallocated).
+     */
     bool isVirtual() const;
+
+    /**
+     * Returns true if this register reference is physical (hardware-assigned).
+     */
     bool isPhysical() const;
 
+    /**
+     * Returns the register class descriptor for physical registers (or post-ISel virtuals).
+     */
     class MirRegisterClass *getClass() const;
 
     /**
@@ -46,8 +60,14 @@ class MirRegisterRef
      */
     static MirRegisterRef preg(class MirRegisterDescriptor *desc);
 
+    /**
+     * Returns the numeric ID of the register.
+     */
     size_t getId() const;
 
+    /**
+     * Sets or updates the register class for this register reference.
+     */
     void setClass(class MirRegisterClass *_class);
 
     bool operator==(const MirRegisterRef &other) const;
