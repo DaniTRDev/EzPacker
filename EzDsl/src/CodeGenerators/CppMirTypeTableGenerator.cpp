@@ -2,8 +2,7 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-
-#include <fstream>
+#include "Sema/Symbols/TypeSymbol.h"
 
 namespace CodeGenerators
 {
@@ -59,6 +58,30 @@ std::string KindToEnumString(DeducedTypeKind kind)
             return "MirTypeKind::BindingToken";
     }
     return "MirTypeKind::Integer";
+}
+
+void WriteFileIfChanged(const std::filesystem::path &filePath, const std::string &newContent)
+{
+    if (std::filesystem::exists(filePath))
+    {
+        std::ifstream currentFile(filePath, std::ios::in | std::ios::binary);
+        if (currentFile.is_open())
+        {
+            std::ostringstream ss;
+            ss << currentFile.rdbuf();
+            if (ss.str() == newContent)
+            {
+                // Unmodified content: preserve mtime to prevent unnecessary rebuild cascades
+                return;
+            }
+        }
+    }
+
+    std::ofstream outFile(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    if (outFile.is_open())
+    {
+        outFile << newContent;
+    }
 }
 
 void EmitHeader(std::ostream &out, const std::vector<GeneratedTypeEntry> &types)
@@ -469,7 +492,6 @@ MirType *MirTypeTable::getMirTypeById(size_t id) const
 MirType *MirTypeTable::getVoidType() { return m_voidType; }
 )code";
 
-    // Emit all getters
     for (const auto &type : types)
     {
         if (type.m_kind == DeducedTypeKind::Void || type.m_kind == DeducedTypeKind::BindingToken)
@@ -479,7 +501,6 @@ MirType *MirTypeTable::getVoidType() { return m_voidType; }
         out << std::format("MirType *MirTypeTable::{}() {{ return {}; }}\n", type.m_getterName, type.m_fieldName);
     }
 
-    // Emit initialize()
     out << R"(
 void MirTypeTable::initialize(IMirTargetTypeLayout *typeLayout)
 {
@@ -537,7 +558,7 @@ bool GenerateMirTypeTable(DiagnosticCollector *collector,
             continue;
         }
 
-        const auto *data = sym->getIf<TypeData>();
+        const auto *data = sym->getIf<Sema::Symbols::TypeSymbol>();
         if (!data)
         {
             continue;
@@ -599,32 +620,25 @@ bool GenerateMirTypeTable(DiagnosticCollector *collector,
         }
     }
 
-    // 3. Write Header if requested
+    // 3. Write Header if requested using WriteFileIfChanged
     if (mode & MirTypeTableGenWorkingMode::Header)
     {
-        std::ofstream headerStream(headerPath, std::ios::trunc);
-        if (!headerStream.is_open())
-        {
-            collector->error(genName, "Failed to open header output file: {}", headerPath.string());
-            return false;
-        }
+        std::ostringstream headerStream;
         EmitHeader(headerStream, collectedTypes);
+        WriteFileIfChanged(headerPath, headerStream.str());
     }
 
-    // 4. Write Source if requested
+    // 4. Write Source if requested using WriteFileIfChanged
     if (mode & MirTypeTableGenWorkingMode::Source)
     {
-        std::ofstream sourceStream(sourcePath, std::ios::trunc);
-        if (!sourceStream.is_open())
-        {
-            collector->error(genName, "Failed to open source output file: {}", sourcePath.string());
-            return false;
-        }
+        std::ostringstream sourceStream;
         EmitSource(sourceStream, collectedTypes);
+        WriteFileIfChanged(sourcePath, sourceStream.str());
     }
 
     collector->trace(genName, "Successfully generated {} type definitions", collectedTypes.size());
 
     return true;
 }
+
 } // namespace CodeGenerators

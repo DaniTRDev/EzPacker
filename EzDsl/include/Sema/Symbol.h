@@ -2,6 +2,8 @@
 #define EZDSL_SYMBOL_H
 
 #include "EzDslCommon.h"
+#include "Symbols/IrInstructionSymbol.h"
+#include "Symbols/TypeSymbol.h"
 
 using SymbolId = size_t;
 inline constexpr SymbolId InvalidSymbolId = UINT64_MAX;
@@ -27,9 +29,8 @@ enum class SymbolType : uint8_t
     FormatField,
     Instruction,
 
-    // .lad / .god Opcode entities
-    GenericOpcode,
-    TargetOpcode,
+    // .lad Opcode entities
+    IrInstructionOpCode,
 
     // .lrd / .isf Patterns & SSA entities
     SsaVariable,
@@ -37,7 +38,10 @@ enum class SymbolType : uint8_t
     ISelPattern,
 
     // .tyf Type File
-    Type
+    Type,
+
+    // .irdf IR instruction entities.
+    IrInstruction
 };
 
 constexpr SymbolFlags operator|(SymbolFlags a, SymbolFlags b) noexcept
@@ -49,20 +53,10 @@ constexpr bool operator&(SymbolFlags a, SymbolFlags b) noexcept
     return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
 }
 
-/**
- * Data contained inside a type symbol.
- */
-struct TypeData
-{
-    uint8_t m_kind; // Look at Ast::TypeDef::TypeKind.
-    uint32_t m_bitWidth;
-    std::string_view m_name;
-};
-
 class Symbol
 {
   public:
-    using SymbolData = std::variant<TypeData>;
+    using SymbolData = std::variant<Sema::Symbols::TypeSymbol, Sema::Symbols::IrInstructionSymbol>;
 
     /**
      * Creates the symbol with the given source reference, flags, definition scope, id, type and name. Data is NOT set.
@@ -78,6 +72,11 @@ class Symbol
      * Returns true if this symbol holds the given data type.
      */
     template <typename T> bool hasData() const { return std::holds_alternative<T>(m_data); }
+
+    /**
+     * Return true if the given flag is enabled in the symbol.
+     */
+    bool hasFlag(SymbolFlags flag) const;
 
     /**
      * Returns the source reference linked to this symbol.

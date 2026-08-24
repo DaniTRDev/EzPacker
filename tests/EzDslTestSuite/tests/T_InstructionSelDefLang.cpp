@@ -1,5 +1,5 @@
 #include "EzDslTestSuite.h"
-#include "Ast/InstructionSelDefLang.h"
+#include "Ast/InstructionSelDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Parser/InstructionSelDefLang.h"

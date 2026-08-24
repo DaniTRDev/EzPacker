@@ -10,7 +10,6 @@ set(EZMIR_FILES_LIST
         "include/Instruction/MirInstructionBuilder.h"
         "include/Instruction/MirInstructionMetadata.h"
         "include/Instruction/MirInstructionSet.h"
-        "include/Instruction/MirInstructionSetDefs.h"
         "include/Instruction/MirTargetInstructionDesc.h"
         "include/MirPasses/IMirAnalysisPass.h"
         "include/MirPasses/IMirTransformPass.h"
@@ -77,8 +76,16 @@ EzCMK_ConfigureLib(NAME "EzMir"
         INCLUDED_DIRS "include")
 
 include(CMake/EzDslGenTypeTable.cmake)
+include(CMake/EzDslGenMirInstructions.cmake)
+
 EzDslGenerateTypeTable(
     TARGET EzMir
     INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/types.tyf"
     OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/Type"
+)
+
+EzDslGenMirInstructions(
+    TARGET EzMir
+    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/instructions.irdf"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/Instruction"
 )

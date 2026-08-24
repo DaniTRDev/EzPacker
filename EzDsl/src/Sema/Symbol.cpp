@@ -10,6 +10,8 @@ Symbol::Symbol(class SourceReference *sourceRef,
 {
 }
 
+bool Symbol::hasFlag(SymbolFlags flag) const { return m_flags & flag; }
+
 class SourceReference *Symbol::getSourceRef() const { return m_sourceRef; }
 
 SymbolFlags Symbol::getFlags() const { return m_flags; }

@@ -1,7 +1,7 @@
 #ifndef EZDSL_INST_SEL_DEF_LANG_H
 #define EZDSL_INST_SEL_DEF_LANG_H
 
-#include "Ast/InstructionSelDefLang.h"
+#include "Ast/InstructionSelDefLangAst.h"
 #include "EzDslCommon.h"
 #include "Parser/CommonParsers.h"
 #include "Parser/LegalizeRuleDefLang.h"

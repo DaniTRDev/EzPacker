@@ -12,6 +12,13 @@ EzCMK_ConfigureLib(NAME "EzDslTestSuite"
 )
 
 EzPacker_AddTest(
+        "T_EzDslCli_GenMirInstruction"
+        "EzDslTestSuite"
+        ""
+        "tests/T_EzDslCli_GenMirInstruction.cpp"
+)
+
+EzPacker_AddTest(
         "T_EzDslCli_GenTypeTable"
         "EzDslTestSuite"
         ""
@@ -33,6 +40,13 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_IrInstructionDefLang"
+        "EzDslTestSuite"
+        ""
+        "tests/T_IrInstructionDefLang.cpp"
+)
+
+EzPacker_AddTest(
         "T_LegalizeActionDefLang"
         "EzDslTestSuite"
         ""
@@ -44,6 +58,13 @@ EzPacker_AddTest(
         "EzDslTestSuite"
         ""
         "tests/T_LegalizeRuleDefLang.cpp"
+)
+
+EzPacker_AddTest(
+        "T_Sema_IrInstructionPass"
+        "EzDslTestSuite"
+        ""
+        "tests/T_Sema_IrInstructionPass.cpp"
 )
 
 EzPacker_AddTest(

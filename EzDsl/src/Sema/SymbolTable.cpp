@@ -5,6 +5,8 @@
 SymbolTable::SymbolTable(std::pmr::memory_resource *alloc) :
     m_currentScopeId(InvalidScopeId), m_scopes(alloc), m_symbols(alloc), m_alloc(alloc)
 {
+    // Enters the global scope at the moment of creating the table.
+    enterScope("global");
 }
 
 ScopeId SymbolTable::getCurrentScopeId() const { return m_currentScopeId; }
@@ -67,8 +69,12 @@ SymbolId SymbolTable::declareSym(class SourceReference *sourceRef,
             alloc.new_object<Symbol>(sourceRef, flags, m_currentScopeId, m_symbols.size(), type, std::move(name));
     symbol->setData(std::move(data));
 
+    size_t symId = symbol->getId();
+
     m_symbols.push_back(symbol);
-    return symbol->getId();
+    m_scopes[m_currentScopeId]->addSymbol(symId);
+
+    return symId;
 }
 
 void SymbolTable::enterScope(std::string_view debugName)
