@@ -76,11 +76,6 @@ EzCMK_ConfigureLib(NAME "EzMir"
         LINKED_LIBRARIES "EzCore"
         INCLUDED_DIRS "include")
 
-target_include_directories(EzMir PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
 include(CMake/EzDslGenTypeTable.cmake)
 EzDslGenerateTypeTable(
     TARGET EzMir

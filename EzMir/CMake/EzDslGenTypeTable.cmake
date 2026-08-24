@@ -59,4 +59,14 @@ function(EzDslGenerateTypeTable)
         "$<BUILD_INTERFACE:${EZDSL_OUTPUT_DIR}>"
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
     )
+
+    target_sources(${EZDSL_TARGET} PRIVATE
+        "${GEN_HEADER}"
+        "${GEN_SOURCE}"
+    )
+
+    target_include_directories(${EZDSL_TARGET} PUBLIC
+        "$<BUILD_INTERFACE:${EZDSL_OUTPUT_DIR}>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
+    )
 endfunction()
