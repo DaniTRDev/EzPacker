@@ -1,0 +1,160 @@
+#include "EzDslTestSuite.h"
+#include "Ast/TypeDefLangAst.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Diagnostics/DiagnosticLogger.h"
+#include "Parser/ParseContext.h"
+#include "Parser/TypeDefLang.h"
+#include "SourceManager/SourceManager.h"
+
+class TypeDefLangTest : public DslTestSuiteAsGtest
+{
+  public:
+};
+
+// ============================================================================
+// 1. Single Type Descriptor Declarations
+// ============================================================================
+
+TEST_F(TypeDefLangTest, TestIntegerTypeDescriptor)
+{
+    std::string test = "integer i32(32)";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
+    ASSERT_TRUE(res.has_value());
+    EXPECT_EQ(res->m_kind, DSL::Ast::TypeDef::TypeKind::Integer);
+    EXPECT_EQ(res->m_name.m_node, "i32");
+    EXPECT_EQ(res->m_bitSize.m_node, 32);
+}
+
+TEST_F(TypeDefLangTest, TestFloatTypeDescriptor)
+{
+    std::string test = "float f64(64)";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
+    ASSERT_TRUE(res.has_value());
+    EXPECT_EQ(res->m_kind, DSL::Ast::TypeDef::TypeKind::FloatingPoint);
+    EXPECT_EQ(res->m_name.m_node, "f64");
+    EXPECT_EQ(res->m_bitSize.m_node, 64);
+}
+
+TEST_F(TypeDefLangTest, TestCustomBitWidths)
+{
+    std::string test = "integer i1(1)";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
+    ASSERT_TRUE(res.has_value());
+    EXPECT_EQ(res->m_kind, DSL::Ast::TypeDef::TypeKind::Integer);
+    EXPECT_EQ(res->m_name.m_node, "i1");
+    EXPECT_EQ(res->m_bitSize.m_node, 1);
+}
+
+// ============================================================================
+// 2. Type Definition File / Multi-Type Declarations
+// ============================================================================
+
+TEST_F(TypeDefLangTest, TestSingleTypeInFile)
+{
+    std::string test = "integer i8(8);";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+    ASSERT_TRUE(res.has_value());
+    ASSERT_EQ(res->m_types.size(), 1);
+
+    EXPECT_EQ(res->m_types[0].m_kind, DSL::Ast::TypeDef::TypeKind::Integer);
+    EXPECT_EQ(res->m_types[0].m_name.m_node, "i8");
+    EXPECT_EQ(res->m_types[0].m_bitSize.m_node, 8);
+}
+
+TEST_F(TypeDefLangTest, TestMultipleTypesInFile)
+{
+    std::string test = R"(
+        integer i8(8);
+        integer i16(16);
+        integer i32(32);
+        integer i64(64);
+        float f32(32);
+        float f64(64);
+    )";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+    ASSERT_TRUE(res.has_value());
+    ASSERT_EQ(res->m_types.size(), 6);
+
+    EXPECT_EQ(res->m_types[0].m_kind, DSL::Ast::TypeDef::TypeKind::Integer);
+    EXPECT_EQ(res->m_types[0].m_name.m_node, "i8");
+    EXPECT_EQ(res->m_types[0].m_bitSize.m_node, 8);
+
+    EXPECT_EQ(res->m_types[1].m_kind, DSL::Ast::TypeDef::TypeKind::Integer);
+    EXPECT_EQ(res->m_types[1].m_name.m_node, "i16");
+    EXPECT_EQ(res->m_types[1].m_bitSize.m_node, 16);
+
+    EXPECT_EQ(res->m_types[2].m_kind, DSL::Ast::TypeDef::TypeKind::Integer);
+    EXPECT_EQ(res->m_types[2].m_name.m_node, "i32");
+    EXPECT_EQ(res->m_types[2].m_bitSize.m_node, 32);
+
+    EXPECT_EQ(res->m_types[3].m_kind, DSL::Ast::TypeDef::TypeKind::Integer);
+    EXPECT_EQ(res->m_types[3].m_name.m_node, "i64");
+    EXPECT_EQ(res->m_types[3].m_bitSize.m_node, 64);
+
+    EXPECT_EQ(res->m_types[4].m_kind, DSL::Ast::TypeDef::TypeKind::FloatingPoint);
+    EXPECT_EQ(res->m_types[4].m_name.m_node, "f32");
+    EXPECT_EQ(res->m_types[4].m_bitSize.m_node, 32);
+
+    EXPECT_EQ(res->m_types[5].m_kind, DSL::Ast::TypeDef::TypeKind::FloatingPoint);
+    EXPECT_EQ(res->m_types[5].m_name.m_node, "f64");
+    EXPECT_EQ(res->m_types[5].m_bitSize.m_node, 64);
+}
+
+// ============================================================================
+// 3. Negative & Error Parsing Tests
+// ============================================================================
+
+TEST_F(TypeDefLangTest, TestUnknownTypeKindFails)
+{
+    std::string test = "double d64(64);";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+    EXPECT_FALSE(res.has_value());
+}
+
+TEST_F(TypeDefLangTest, TestMissingSemicolonInFileFails)
+{
+    std::string test = "integer i32(32)";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+    EXPECT_FALSE(res.has_value());
+}
+
+TEST_F(TypeDefLangTest, TestMissingBitSizeParenthesesFails)
+{
+    std::string test = "integer i32 32;";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+    EXPECT_FALSE(res.has_value());
+}
+
+TEST_F(TypeDefLangTest, TestMissingTypeNameFails)
+{
+    std::string test = "integer (32);";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+    EXPECT_FALSE(res.has_value());
+}
+
+TEST_F(TypeDefLangTest, TestEmptyBitSizeParameterFails)
+{
+    std::string test = "integer i32();";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+    EXPECT_FALSE(res.has_value());
+}

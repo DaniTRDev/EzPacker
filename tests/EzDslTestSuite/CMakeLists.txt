@@ -45,3 +45,10 @@ EzPacker_AddTest(
         ""
         "tests/T_TargetDefLang.cpp"
 )
+
+EzPacker_AddTest(
+        "T_TypeDefLang"
+        "EzDslTestSuite"
+        ""
+        "tests/T_TypeDefLang.cpp"
+)

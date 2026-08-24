@@ -18,7 +18,8 @@ model powered by C++20 Polymorphic Memory Resources (`std::pmr`) and `lexy`.
 5. [Legalization Action Definition Language (`.lad`)](#5-legalization-action-definition-language-lad)
 6. [Legalization Rule Definition Language (`.lrd`)](#6-legalization-rule-definition-language-lrd)
 7. [Instruction Selection Definition Language (`.isf`)](#7-instruction-selection-definition-language-isf)
-8. [Memory Architecture & Driver API](#8-memory-architecture--driver-api)
+8. [Type Definition Language (`.tyf`)](#8-type-definition-language-tyf)
+9. [Memory Architecture & Driver API](#9-memory-architecture--driver-api)
 
 ---
 
@@ -503,7 +504,20 @@ pattern Select_ADDI {
 
 ---
 
-## 8. Memory Architecture & Driver API
+## 8. Type Definition Language
+
+EzDsl allows defining the types of the MIR (EzMir) using a specific syntax:
+```dsl
+// Inside a type definition file (.tyf).
+integer i8(8); // Defines an integer type, i8, with 8-bit width.
+float f32(32); // Defines a floating point type, f32, with 32-bit width.
+```
+
+These types are used by EzMir and the rest of EzDsl to configure a target. If the type file is not present, types CAN'T be resolved properly.
+
+---
+
+## 9. Memory Architecture & Driver API
 
 ### Allocation Lifecycle
 
@@ -542,7 +556,8 @@ EzDSL employs a monotonic arena allocator to eliminate per-node heap allocations
 #include <memory_resource>
 #include <array>
 
-int main() {
+int main() 
+{
     std::string sourceBuffer = R"(
         target DemoArch {
             include idef "demo.idf";
