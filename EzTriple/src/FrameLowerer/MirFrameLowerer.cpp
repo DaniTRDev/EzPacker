@@ -51,7 +51,7 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
 
         auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
         log << "Lowered stack frame object" << func->getSourceRef();
-        log.appendNote(MirPrinter::printToString(obj).c_str(), func->getSourceRef());
+        log.appendNote(func->getSourceRef(), "{}", MirPrinter::printToString(obj));
 
         currentOffset += objSize;
     }
@@ -64,9 +64,8 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
 
     auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
     log << "Calculated stack frame layout" << func->getSourceRef();
-    log.appendNote(std::format("Callee save size: {:X}", analysisData->m_calleeSavedAreaSize).c_str(),
-                   func->getSourceRef());
-    log.appendNote(std::format("Total size: {:X}", analysisData->m_totalFrameSize).c_str(), func->getSourceRef());
+    log.appendNote(func->getSourceRef(), "Callee save size: {:X}", analysisData->m_calleeSavedAreaSize);
+    log.appendNote(func->getSourceRef(), "Total size: {:X}", analysisData->m_totalFrameSize);
 }
 
 void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
@@ -112,7 +111,7 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
                     {
                         auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Error, "MirFrameLowerer");
                         log << "Could not retrieve stack frame object out of given reference" << ref->getSourceRef();
-                        log.appendNote(MirPrinter::printToString(ref).c_str(), ref->getSourceRef());
+                        log.appendNote(ref->getSourceRef(), "{}", MirPrinter::printToString(ref));
                         continue;
                     }
 

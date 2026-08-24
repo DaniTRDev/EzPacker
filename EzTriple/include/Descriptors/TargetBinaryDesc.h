@@ -6,12 +6,18 @@
 // Forward declaration
 enum class SectionType : uint8_t;
 
+/**
+ * Code model controlling symbol address reachability and encoding size.
+ */
 enum class TargetCodeModel : uint8_t
 {
     Small = 0, // Global addresses can be encoded in instruction pointer + small integer immediate.
     Large      // The entire address must be encoded in the instruction.
 };
 
+/**
+ * Binary object container format targeting the host operating system.
+ */
 enum class TargetObjectFormat : uint8_t
 {
     ELF = 0,

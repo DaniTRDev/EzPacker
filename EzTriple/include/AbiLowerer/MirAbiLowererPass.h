@@ -4,6 +4,9 @@
 #include "EzTripleCommon.h"
 #include "MirPasses/IMirTransformPass.h"
 
+/**
+ * Tag classifying unlowered ABI calling sequences (Return, Call, or Function incoming arguments).
+ */
 enum class UnloweredBlockType
 {
     Return = 0,

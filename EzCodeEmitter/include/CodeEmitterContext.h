@@ -6,6 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
+class DiagnosticCollector;
+class MirReference;
+class MirFunction;
+
 /**
  * Target-agnostic relocation types representing standard relocation fixups
  * required across various object formats (ELF, COFF/PE, Mach-O).

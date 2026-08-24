@@ -193,11 +193,10 @@ void MirAbiLowererPass::printResult()
     for (auto &block : m_loweredBlocks)
     {
         if (block.m_type != UnloweredBlockType::FunctionArgs)
-            diag.appendNote("Lowered block in function", (*block.m_termIt)->getSourceRef());
+            diag.appendNote((*block.m_termIt)->getSourceRef(), "Lowered block in function");
 
-        diag.appendNote(std::format("Block content: {}",
-                                    MirPrinter::printToString(block.m_targetBlock, MirPrinterDetail::Detailed))
-                                .c_str(),
-                        block.m_targetBlock->getSourceRef());
+        diag.appendNote(block.m_targetBlock->getSourceRef(),
+                        "Block content: {}",
+                        MirPrinter::printToString(block.m_targetBlock, MirPrinterDetail::Detailed));
     }
 }

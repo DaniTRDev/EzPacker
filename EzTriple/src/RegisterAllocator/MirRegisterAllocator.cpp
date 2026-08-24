@@ -104,7 +104,7 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
                 auto diag = ctx->m_ctx->getDiagCollector()->builder(Diag_Error, "MirRegisterAllocator");
                 diag << "Virtual register has no assigned register class (Instruction selection rule missing "
                         "constraint)";
-                diag.appendNote(MirPrinter::printToString(node).c_str(), nullptr);
+                diag.appendNote("{}", MirPrinter::printToString(node));
 
                 return false;
             }
@@ -294,7 +294,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             {
                 auto log = ctx->m_ctx->getDiagCollector()->builder(Diag_Error, "MirRegisterAllocator");
                 log << "Unspillable temporary register ran out of colors during select!";
-                log.appendNote(std::format("Register: {}", MirPrinter::printToString(node)).c_str(), nullptr);
+                log.appendNote("Register: {}", MirPrinter::printToString(node));
                 return false;
             }
 
@@ -512,8 +512,7 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
                         {
                             auto log = ctx->m_ctx->getDiagCollector()->builder(Diag_Trace, "MirRegisterAllocator");
                             log << "Rematerializing register";
-                            log.appendNote(std::format("Register: {}", MirPrinter::printToString(tempVReg)).c_str(),
-                                           srcRef);
+                            log.appendNote(srcRef, "Register: {}", MirPrinter::printToString(tempVReg));
 
                             reMaterialize(ctx, block, it, srcRef, tempVReg, defInst);
                         }

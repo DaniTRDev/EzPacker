@@ -4,6 +4,10 @@
 #include "EzTripleCommon.h"
 #include "Operand/MirRegisterReference.h"
 
+/**
+ * Working context for graph-coloring register allocation on a single function,
+ * containing the interference graph, degree tables, select stack, and spill tracking.
+ */
 struct RegisterAllocatorCtx
 {
     class MirBuilderContext *m_ctx;
@@ -56,6 +60,10 @@ struct RegisterAllocatorCtx
     }
 };
 
+/**
+ * Graph-coloring register allocator implementing Chaitin-Briggs style simplification,
+ * coloring selection, spill cost estimation, and register rewriting.
+ */
 class MirRegisterAllocator
 {
   public:

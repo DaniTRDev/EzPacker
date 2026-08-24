@@ -121,8 +121,7 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
             {
                 auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "ReturnAbiLowerer");
                 diag << sretPtrReg->getSourceRef() << "Indirect return needs CopyOnReg:";
-                diag.appendNote(std::format("Target register ID: {}", indirect.m_pointerStorage.getId()).c_str(),
-                                nullptr);
+                diag.appendNote("Target register ID: {}", indirect.m_pointerStorage.getId());
 
                 MirRegister *phys = oBuilder.buildPhysReg(sretPtrReg->getMirType(),
                                                           indirect.m_pointerStorage.getId(),

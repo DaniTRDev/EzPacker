@@ -4,6 +4,9 @@
 #include "EzTripleCommon.h"
 #include "MirPasses/IMirTransformPass.h"
 
+/**
+ * Result data container holding per-function allocator contexts and resolved status.
+ */
 struct MirRegisterAllocatorPassResult
 {
     std::pmr::unordered_map<class MirFunction *, class RegisterAllocatorCtx *> m_contexts;

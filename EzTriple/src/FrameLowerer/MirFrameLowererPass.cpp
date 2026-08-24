@@ -72,7 +72,7 @@ void MirFrameLowererPass::printResult()
     for (auto &func : m_loweredFunctions)
     {
         std::string str = MirPrinter::printToString(func, MirPrinterDetail::Detailed);
-        log.appendNote(str.c_str(), func->getSourceRef());
+        log.appendNote(func->getSourceRef(), "{}", str);
     }
 }
 
