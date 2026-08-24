@@ -126,13 +126,15 @@ MirBuilderContext context(callingConv, &diagCollector, &typeTable, &arena);
 MirType *i32Type = typeTable.i32();
 MirType *funcType = typeTable.getFuncType(i32Type, { i32Type, i32Type });
 
+// The type table needs an IMirTargetTypeLayout used to compute alignments and sizes.
+typeTable.initialize(typeLayout);
+
 MirFunctionBuilder funcBuilder(&context);
 MirFunction *func = funcBuilder.build(
     "add", 
     funcType, 
-    i32Type, 
-    /*isVarArg=*/false, 
-    /*sourceRef=*/nullptr
+    i32Type,
+    ....
 );
 
 // 3. Build Entry Block & Instructions
@@ -142,7 +144,7 @@ MirBlock *entryBlock = blockBuilder.build(/*sourceRef=*/nullptr, "entry");
 MirInstructionBuilder instBuilder(&context, entryBlock, InsertionType::AppendToEnd);
 
 // Fetch parameter registers
-auto paramIt = func->getParameters().begin();
+auto paramIt = func->getParameters().begin(); 
 MirRegister *regA = *paramIt++;
 MirRegister *regB = *paramIt;
 
@@ -165,12 +167,3 @@ std::cout << irText << std::endl;
 ```
 
 ---
-
-## Building and Linking
-
-`EzMir` is built as a static CMake library.
-
-```cmake
-target_link_libraries(YourTarget PRIVATE EzMir EzCore)
-target_include_directories(YourTarget PRIVATE ${EZPACKER_ROOT}/EzMir/include)
-```
