@@ -2,7 +2,7 @@
 
 DiagnosticCollector::DiagnosticCollector()
 {
-    m_enabledDiags = Diag_Debug | Diag_Error | Diag_Trace | Diag_Warning;
+    m_enabledDiags = Diag_Error | Diag_Warning;
     m_messages = std::pmr::vector<DiagnosticMessage>(&m_diagScopePool);
     m_scopes = std::pmr::vector<DiagnosticScope>(&m_diagScopePool);
     m_scopes.emplace_back(&m_diagScopePool); // Ensure there's at least 1 scope available.
@@ -51,6 +51,8 @@ void DiagnosticCollector::beginScope(DiagnosticScopeAction action)
     std::lock_guard lock(m_mutex);
     m_scopes.push_back(std::move(scope));
 }
+
+void DiagnosticCollector::enableDiag(DiagnosticMessageType type) { m_enabledDiags |= type; }
 
 void DiagnosticCollector::endScope()
 {

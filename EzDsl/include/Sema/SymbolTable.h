@@ -40,10 +40,14 @@ class SymbolTable
     Symbol *getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope = std::nullopt);
 
     /**
-     * Declares a symbol in the current scope with the given source reference, flags, type and name.
+     * Declares a symbol in the current scope with the given source reference, flags, type, data and name.
      * If the symbol already exists in the current scope, InvalidSymbolId is returned.
      */
-    SymbolId declareSym(class SourceReference *sourceRef, SymbolFlags flags, SymbolType type, std::string_view name);
+    SymbolId declareSym(class SourceReference *sourceRef,
+                        SymbolFlags flags,
+                        SymbolType type,
+                        Symbol::SymbolData data,
+                        std::string_view name);
 
     /**
      * Creates and enters a scope with the given debug name. It internally calls createScope with the appropiate
@@ -56,6 +60,11 @@ class SymbolTable
      * is done.
      */
     void exitScope();
+
+    /**
+     * Returns the list of symbols.
+     */
+    const std::pmr::vector<Symbol *> &getSymbols() const;
 
   private:
     /**
@@ -70,4 +79,4 @@ class SymbolTable
     std::pmr::vector<Symbol *> m_symbols;
 };
 
-#endif // EZDSL_SYMBOL_TABLE_H0
+#endif // EZDSL_SYMBOL_TABLE_H

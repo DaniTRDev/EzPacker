@@ -87,6 +87,11 @@ class DiagnosticCollector
     void beginScope(DiagnosticScopeAction action);
 
     /**
+     * Enables the diagnostic for the given message type.
+     */
+    void enableDiag(DiagnosticMessageType type);
+
+    /**
      * Ends the current scope. If it is the top most scope, an exception is thrown.
      */
     void endScope();

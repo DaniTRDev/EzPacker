@@ -20,4 +20,6 @@ SymbolId Symbol::getId() const { return m_id; }
 
 SymbolType Symbol::getType() const { return m_type; }
 
+void Symbol::setData(Symbol::SymbolData data) { m_data = std::move(data); }
+
 const std::string_view &Symbol::getName() const { return m_name; }

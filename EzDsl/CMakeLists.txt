@@ -7,6 +7,7 @@ set(EZDSL_FILES_LIST
         "include/Ast/LegalizeRuleDefLangAst.h"
         "include/Ast/TargetDefLangAst.h"
         "include/Ast/TypeDefLangAst.h"
+        "include/CodeGenerators/CppMirTypeTableGenerator.h"
         "include/Parser/CommonParsers.h"
         "include/Parser/InstructionDefLang.h"
         "include/Parser/LegalizeActionDefLang.h"
@@ -17,12 +18,15 @@ set(EZDSL_FILES_LIST
         "include/Sema/SemaContext.h"
         "include/Sema/Symbol.h"
         "include/Sema/SymbolTable.h"
+        "include/SemaPasses/TypePass.h"
 
+        "src/CodeGenerators/CppMirTypeTableGenerator.cpp"
         "src/Parser/ParseContext.cpp"
         "src/Sema/Scope.cpp"
         "src/Sema/SemaContext.cpp"
         "src/Sema/Symbol.cpp"
         "src/Sema/SymbolTable.cpp"
+        "src/SemaPasses/TypePass.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzDsl"
@@ -30,4 +34,11 @@ EzCMK_ConfigureLib(NAME "EzDsl"
         PRECOMPILED_HEADER "include/EzDslCommon.h"
         LINKED_LIBRARIES "EzCore;foonathan::lexy"
         INCLUDED_DIRS "include"
+)
+
+EzCMK_AddExecutable(NAME "EzDsl-cli"
+        FILE_LIST "src/Driver/Main.cpp"
+        PRECOMPILED_HEADER "include/EzDslCommon.h"
+        LINKED_LIBRARIES "EzDsl"
+        INCLUDED_DIRS ""
 )

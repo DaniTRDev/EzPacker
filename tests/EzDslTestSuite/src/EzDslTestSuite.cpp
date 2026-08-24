@@ -27,6 +27,10 @@ void EzDslTestSuite::create()
     m_diagnosticCollector = alloc.new_object<DiagnosticCollector>();
     m_sourceManager = alloc.new_object<SourceManager>(std::filesystem::current_path(), &m_allocator);
     m_diagnosticLogger = alloc.new_object<DiagnosticLogger>(m_sourceManager);
+
+    m_diagnosticCollector->addListener(m_diagnosticLogger);
+    m_diagnosticCollector->enableDiag(Diag_Trace);
+    m_diagnosticCollector->enableDiag(Diag_Debug);
 }
 
 void EzDslTestSuite::destroy()

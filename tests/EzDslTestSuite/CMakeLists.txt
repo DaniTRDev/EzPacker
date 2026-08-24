@@ -12,6 +12,13 @@ EzCMK_ConfigureLib(NAME "EzDslTestSuite"
 )
 
 EzPacker_AddTest(
+        "T_EzDslCli_GenTypeTable"
+        "EzDslTestSuite"
+        ""
+        "tests/T_EzDslCli_GenTypeTable.cpp"
+)
+
+EzPacker_AddTest(
         "T_InstructionDefLang"
         "EzDslTestSuite"
         ""

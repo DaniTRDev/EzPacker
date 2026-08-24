@@ -37,7 +37,6 @@ set(EZMIR_FILES_LIST
         "include/Operand/MirRegisterReference.h"
         "include/Printer/MirPrinter.h"
         "include/Type/MirType.h"
-        "include/Type/MirTypeTable.h"
         
         "src/Block/MirBlock.cpp"
         "src/Block/MirBlockBuilder.cpp"
@@ -69,7 +68,6 @@ set(EZMIR_FILES_LIST
         "src/Operand/MirRegisterReference.cpp"
         "src/Printer/MirPrinter.cpp"
         "src/Type/MirType.cpp"
-        "src/Type/MirTypeTable.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzMir"
@@ -77,3 +75,15 @@ EzCMK_ConfigureLib(NAME "EzMir"
         PRECOMPILED_HEADER "include/EzMirCommon.h"
         LINKED_LIBRARIES "EzCore"
         INCLUDED_DIRS "include")
+
+target_include_directories(EzMir PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+include(CMake/EzDslGenTypeTable.cmake)
+EzDslGenerateTypeTable(
+    TARGET EzMir
+    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/types.tyf"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/Type"
+)

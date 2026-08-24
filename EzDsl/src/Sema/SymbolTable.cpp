@@ -3,7 +3,7 @@
 #include "Sema/SymbolTable.h"
 
 SymbolTable::SymbolTable(std::pmr::memory_resource *alloc) :
-    m_currentScopeId(InvalidScopeId), m_scopes(alloc), m_symbols(alloc)
+    m_currentScopeId(InvalidScopeId), m_scopes(alloc), m_symbols(alloc), m_alloc(alloc)
 {
 }
 
@@ -51,8 +51,11 @@ Symbol *SymbolTable::getSymByName(const std::string_view &name, std::optional<Sc
     return nullptr;
 }
 
-SymbolId
-SymbolTable::declareSym(class SourceReference *sourceRef, SymbolFlags flags, SymbolType type, std::string_view name)
+SymbolId SymbolTable::declareSym(class SourceReference *sourceRef,
+                                 SymbolFlags flags,
+                                 SymbolType type,
+                                 Symbol::SymbolData data,
+                                 std::string_view name)
 {
     if (getSymByName(name) != nullptr)
     {
@@ -62,6 +65,7 @@ SymbolTable::declareSym(class SourceReference *sourceRef, SymbolFlags flags, Sym
     std::pmr::polymorphic_allocator<> alloc(m_alloc);
     Symbol *symbol =
             alloc.new_object<Symbol>(sourceRef, flags, m_currentScopeId, m_symbols.size(), type, std::move(name));
+    symbol->setData(std::move(data));
 
     m_symbols.push_back(symbol);
     return symbol->getId();
@@ -80,6 +84,8 @@ void SymbolTable::exitScope()
     if (parentId != InvalidScopeId)
         m_currentScopeId = parentId;
 }
+
+const std::pmr::vector<Symbol *> &SymbolTable::getSymbols() const { return m_symbols; }
 
 Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name) const
 {

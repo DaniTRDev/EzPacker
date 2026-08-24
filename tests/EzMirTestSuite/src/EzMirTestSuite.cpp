@@ -39,6 +39,9 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
     m_typeLayout = std::make_shared<EzMirTestSuiteTypeLayout>();
 
     m_diagCollector->addListener(m_diagLogger.get());
+    m_diagCollector->enableDiag(Diag_Trace);
+    m_diagCollector->enableDiag(Diag_Debug);
+
     m_typeTable->initialize(m_typeLayout.get());
     m_passManager->setTestMode();
 

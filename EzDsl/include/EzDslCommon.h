@@ -9,8 +9,11 @@
 #include <lexy_ext/report_error.hpp> // lexy_ext::report_error
 
 #include <charconv>
+#include <filesystem>
+#include <format>
 #include <memory_resource>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>

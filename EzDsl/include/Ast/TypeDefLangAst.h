@@ -10,17 +10,23 @@ namespace DSL::Ast::TypeDef
 enum class TypeKind : uint8_t
 {
     Integer,
-    FloatingPoint
+    FloatingPoint,
+    Void,
+    BindingToken
 };
 
 /**
- * Defines an IR PRIMITIVE type: integer i8(8).
+ * Defines an IR PRIMITIVE or SPECIAL type:
+ * - integer i8(8);
+ * - float f32(32);
+ * - void void; or void void(0);
+ * - bindingToken __bindToken;
  */
 struct TypeDescriptor
 {
     TypeKind m_kind;
     Common::Identifier m_name;
-    Common::IntegerLiteral m_bitSize;
+    std::optional<Common::IntegerLiteral> m_bitSize;
 };
 
 /**

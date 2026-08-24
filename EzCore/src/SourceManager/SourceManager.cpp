@@ -1,7 +1,9 @@
 #include "SourceManager/SourceManager.h"
+#include <algorithm>
+#include <fstream>
 
 SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc) :
-    m_workingPath(workingPath), m_alloc(alloc), m_pathToIdMap(m_alloc), m_sourceFiles(m_alloc)
+    m_workingPath(workingPath), m_alloc(alloc), m_includePaths(m_alloc), m_pathToIdMap(m_alloc), m_sourceFiles(m_alloc)
 {
     // Slot 0 reserved as a nullptr sentinel so 1-based IDs match indexing
     m_sourceFiles.push_back(nullptr);
@@ -10,15 +12,6 @@ SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr:
 bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) const
 {
     return m_pathToIdMap.find(sourceName) != m_pathToIdMap.end();
-}
-
-std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::path &sourceFile) const
-{
-    if (sourceFile.is_absolute())
-    {
-        return std::filesystem::weakly_canonical(sourceFile);
-    }
-    return std::filesystem::weakly_canonical(m_workingPath / sourceFile);
 }
 
 size_t SourceManager::addSourceContent(const std::string &name, const std::string_view &content)
@@ -60,38 +53,6 @@ size_t SourceManager::addSourceContent(const std::string &name, const std::strin
     return newId;
 }
 
-SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
-{
-    if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
-    {
-        return nullptr;
-    }
-
-    SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
-    if (!entry || entry->m_lines.empty())
-    {
-        return nullptr;
-    }
-
-    // Binary search for the line range containing ref->m_beginOffset
-    auto it = std::upper_bound(entry->m_lines.begin(),
-                               entry->m_lines.end(),
-                               ref->m_beginOffset,
-                               [](size_t val, const SourceLineRange &range) { return val < range.m_beginOffset; });
-
-    if (it != entry->m_lines.begin())
-    {
-        --it;
-        // Verify the offset falls within this line range
-        if (ref->m_beginOffset >= it->m_beginOffset && ref->m_beginOffset <= it->m_endOffset)
-        {
-            return &(*it);
-        }
-    }
-
-    return nullptr;
-}
-
 SourceReference *SourceManager::createReference(size_t startOffset, size_t length, size_t sourceId)
 {
     if (sourceId == 0 || sourceId >= m_sourceFiles.size())
@@ -126,6 +87,148 @@ SourceReference *SourceManager::createReference(size_t startOffset, size_t lengt
     }
     return createReference(startOffset, length, it->second);
 }
+
+SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
+{
+    if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
+    {
+        return nullptr;
+    }
+
+    SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
+    if (!entry || entry->m_lines.empty())
+    {
+        return nullptr;
+    }
+
+    // Binary search for the line range containing ref->m_beginOffset
+    auto it = std::upper_bound(entry->m_lines.begin(),
+                               entry->m_lines.end(),
+                               ref->m_beginOffset,
+                               [](size_t val, const SourceLineRange &range) { return val < range.m_beginOffset; });
+
+    if (it != entry->m_lines.begin())
+    {
+        --it;
+        // Verify the offset falls within this line range
+        if (ref->m_beginOffset >= it->m_beginOffset && ref->m_beginOffset <= it->m_endOffset)
+        {
+            return &(*it);
+        }
+    }
+
+    return nullptr;
+}
+
+void SourceManager::addIncludePath(const std::filesystem::path &path)
+{
+    std::error_code ec;
+    if (std::filesystem::exists(path, ec))
+    {
+        m_includePaths.push_back(std::filesystem::weakly_canonical(path, ec));
+    }
+    else
+    {
+        m_includePaths.push_back(path);
+    }
+}
+
+std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::path &sourceFile,
+                                                       const std::optional<std::filesystem::path> &relativeTo) const
+{
+    std::error_code ec;
+
+    if (sourceFile.is_absolute() && std::filesystem::exists(sourceFile, ec))
+    {
+        return std::filesystem::weakly_canonical(sourceFile, ec);
+    }
+
+    // Relative to the including source file's directory
+    if (relativeTo.has_value())
+    {
+        auto candidate = *relativeTo / sourceFile;
+        if (std::filesystem::exists(candidate, ec))
+        {
+            return std::filesystem::weakly_canonical(candidate, ec);
+        }
+    }
+
+    // Relative to working directory
+    auto workingCandidate = m_workingPath / sourceFile;
+    if (std::filesystem::exists(workingCandidate, ec))
+    {
+        return std::filesystem::weakly_canonical(workingCandidate, ec);
+    }
+
+    // Search in registered include search paths
+    for (const auto &incPath : m_includePaths)
+    {
+        auto candidate = incPath / sourceFile;
+        if (std::filesystem::exists(candidate, ec))
+        {
+            return std::filesystem::weakly_canonical(candidate, ec);
+        }
+    }
+
+    // Fallback: Return weakly canonical path relative to working directory or as-is
+    if (sourceFile.is_absolute())
+    {
+        return std::filesystem::weakly_canonical(sourceFile, ec);
+    }
+    return std::filesystem::weakly_canonical(m_workingPath / sourceFile, ec);
+}
+
+std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &filePath,
+                                              const std::optional<std::filesystem::path> &relativeTo)
+{
+    std::filesystem::path resolvedPath = resolveSourcePath(filePath, relativeTo);
+    std::string canonicalName = resolvedPath.string();
+
+    // Avoid loading duplicate entries
+    auto it = m_pathToIdMap.find(canonicalName);
+    if (it != m_pathToIdMap.end())
+    {
+        return it->second;
+    }
+
+    std::ifstream file(resolvedPath, std::ios::in | std::ios::binary);
+    if (!file.is_open())
+    {
+        return std::nullopt;
+    }
+
+    file.seekg(0, std::ios::end);
+    size_t fileSize = static_cast<size_t>(file.tellg());
+    file.seekg(0, std::ios::beg);
+
+    std::string content;
+    content.resize(fileSize);
+    file.read(content.data(), fileSize);
+
+    if (!file && fileSize > 0)
+    {
+        return std::nullopt;
+    }
+
+    size_t id = addSourceContent(canonicalName, content);
+    if (id == 0)
+    {
+        return std::nullopt;
+    }
+
+    return id;
+}
+
+const std::pmr::string *SourceManager::getSourceBuffer(size_t id) const
+{
+    if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
+    {
+        return nullptr;
+    }
+    return &m_sourceFiles[id]->m_content;
+}
+
+const std::pmr::vector<std::filesystem::path> &SourceManager::getIncludePaths() const { return m_includePaths; }
 
 std::string_view SourceManager::getRawLineContent(SourceReference *ref) const
 {

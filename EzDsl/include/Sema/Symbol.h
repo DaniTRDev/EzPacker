@@ -35,6 +35,9 @@ enum class SymbolType : uint8_t
     SsaVariable,
     AddrMode,
     ISelPattern,
+
+    // .tyf Type File
+    Type
 };
 
 constexpr SymbolFlags operator|(SymbolFlags a, SymbolFlags b) noexcept
@@ -46,9 +49,21 @@ constexpr bool operator&(SymbolFlags a, SymbolFlags b) noexcept
     return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
 }
 
+/**
+ * Data contained inside a type symbol.
+ */
+struct TypeData
+{
+    uint8_t m_kind; // Look at Ast::TypeDef::TypeKind.
+    uint32_t m_bitWidth;
+    std::string_view m_name;
+};
+
 class Symbol
 {
   public:
+    using SymbolData = std::variant<TypeData>;
+
     /**
      * Creates the symbol with the given source reference, flags, definition scope, id, type and name. Data is NOT set.
      */
@@ -58,6 +73,11 @@ class Symbol
            SymbolId id,
            SymbolType type,
            std::string_view name);
+
+    /**
+     * Returns true if this symbol holds the given data type.
+     */
+    template <typename T> bool hasData() const { return std::holds_alternative<T>(m_data); }
 
     /**
      * Returns the source reference linked to this symbol.
@@ -85,12 +105,28 @@ class Symbol
     SymbolType getType() const;
 
     /**
+     * Returns a pointer to the given data type if this symbol holds its. Returns nullptr if not.
+     */
+    template <typename T> T *getIf() { return std::get_if<T>(&m_data); }
+
+    /**
+     * Const overload for read-only access on const Symbol instances.
+     */
+    template <typename T> const T *getIf() const { return std::get_if<T>(&m_data); }
+
+    /**
+     * Sets the data of the symbol OVERRIDING previous one, if any.
+     */
+    void setData(SymbolData data);
+
+    /**
      * Returns the name of the symbol.
      */
     const std::string_view &getName() const;
 
   private:
     class SourceReference *m_sourceRef;
+    SymbolData m_data;
     SymbolFlags m_flags;
     SymbolId m_definingScopeId; // Same datatype as ScopeId but we can't use here...
     SymbolId m_id;

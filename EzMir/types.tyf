@@ -1,0 +1,21 @@
+// ============================================================================
+// Core Built-in Primitives & Special Types
+// ============================================================================
+
+// Special & Control Types
+void void;
+bindingToken __bindToken;
+
+// Scalar Integers
+integer i1(1);
+integer i8(8);
+integer i16(16);
+integer i32(32);
+integer i64(64);
+integer i128(128);
+integer i256(256);
+
+// IEEE 754 Floating-Point Types
+float f32(32);
+float f64(64);
+float f128(128);
