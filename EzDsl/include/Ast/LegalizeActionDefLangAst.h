@@ -41,7 +41,7 @@ enum class LegalizeActionKind : uint8_t
 struct TypeConstraint
 {
     Common::Identifier m_type;                         // Type name (e.g., "i8", "i32", "p0", "v4f32").
-    std::optional<Common::IntegerLiteral> m_typeIndex; // Optional operand slot index (e.g., 0, 1).
+    std::optional<Common::IntegerLiteral> m_operandIndex; // Optional operand slot index (e.g., 0, 1).
 };
 
 /**

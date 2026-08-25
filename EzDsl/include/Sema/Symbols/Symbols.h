@@ -188,7 +188,7 @@ struct IrInstructionSymbol
 struct LegalizeConstraintSymbol
 {
     SymbolId m_typeId{ InvalidSymbolId }; // Resolved type ID (e.g. i32)
-    std::optional<uint32_t> m_typeIndex;  // Operand slot index (0, 1, etc.)
+    std::optional<uint32_t> m_operandIndex;  // Operand slot index (0, 1, etc.)
 };
 
 struct LegalizeClauseSymbol

@@ -23,7 +23,7 @@ TEST_F(LegalizeActionLangTest, TestHomogeneousTypeConstraint)
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeConstraint, DSL::Ast::LegalizeActionDef::TypeConstraint>();
     ASSERT_TRUE(res.has_value());
     EXPECT_EQ(res->m_type.m_node, "i32");
-    EXPECT_FALSE(res->m_typeIndex.has_value());
+    EXPECT_FALSE(res->m_operandIndex.has_value());
 }
 
 TEST_F(LegalizeActionLangTest, TestHeterogeneousTypeConstraintWithIndex)
@@ -34,8 +34,8 @@ TEST_F(LegalizeActionLangTest, TestHeterogeneousTypeConstraintWithIndex)
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeConstraint, DSL::Ast::LegalizeActionDef::TypeConstraint>();
     ASSERT_TRUE(res.has_value());
     EXPECT_EQ(res->m_type.m_node, "i8");
-    ASSERT_TRUE(res->m_typeIndex.has_value());
-    EXPECT_EQ(res->m_typeIndex->m_node, 1);
+    ASSERT_TRUE(res->m_operandIndex.has_value());
+    EXPECT_EQ(res->m_operandIndex->m_node, 1);
 }
 
 TEST_F(LegalizeActionLangTest, TestPointerAndVectorTypeConstraints)
@@ -46,7 +46,7 @@ TEST_F(LegalizeActionLangTest, TestPointerAndVectorTypeConstraints)
     auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeConstraint, DSL::Ast::LegalizeActionDef::TypeConstraint>();
     ASSERT_TRUE(res.has_value());
     EXPECT_EQ(res->m_type.m_node, "v4f32");
-    EXPECT_FALSE(res->m_typeIndex.has_value());
+    EXPECT_FALSE(res->m_operandIndex.has_value());
 }
 
 // ============================================================================
@@ -194,8 +194,8 @@ action SEXT {
 
     ASSERT_EQ(res->m_actions[1].m_types.size(), 3);
     EXPECT_EQ(res->m_actions[1].m_types[0].m_type.m_node, "i1");
-    ASSERT_TRUE(res->m_actions[1].m_types[0].m_typeIndex.has_value());
-    EXPECT_EQ(res->m_actions[1].m_types[0].m_typeIndex->m_node, 1);
+    ASSERT_TRUE(res->m_actions[1].m_types[0].m_operandIndex.has_value());
+    EXPECT_EQ(res->m_actions[1].m_types[0].m_operandIndex->m_node, 1);
 }
 
 // ============================================================================

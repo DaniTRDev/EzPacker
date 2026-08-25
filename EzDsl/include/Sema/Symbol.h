@@ -25,8 +25,8 @@ enum class SymbolType : uint8_t
     FormatField,
     Instruction,
 
-    // .lad Opcode entities
-    IrInstructionOpCode,
+    // .lad action symbol.
+    LegalizeAction,
 
     // .lrd / .isf Patterns & SSA entities
     SsaVariable,

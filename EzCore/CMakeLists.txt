@@ -10,6 +10,7 @@ set(EZCORE_FILES_LIST
         "include/FlexNumber/FlexFloat.h"
         "include/FlexNumber/FlexInt.h"
         "include/HelperClasses/DenseBitSet.h"
+        "include/HelperClasses/IntrusiveLinkedList.h"
         "include/SourceManager/SourceManager.h"
 
         "src/Diagnostics/DiagnosticBuilder.cpp"
