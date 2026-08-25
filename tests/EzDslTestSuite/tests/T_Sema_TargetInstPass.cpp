@@ -273,10 +273,9 @@ inst BIT_MANIP(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN, GPR:rs3 IN) format R_TYPE {
 
     const auto &rootExpr = std::get<std::shared_ptr<Sema::Symbols::ResolvedBitExpr>>(rs2Assign.m_value);
     EXPECT_EQ(rootExpr->m_op, DSL::Ast::InstDef::BitExprOp::Shl);
-    
 
-            // LHS is rs1 operand reference
-            ASSERT_TRUE(std::holds_alternative<Sema::Symbols::SlicedOperandRef>(rootExpr->m_lhs));
+    // LHS is rs1 operand reference
+    ASSERT_TRUE(std::holds_alternative<Sema::Symbols::SlicedOperandRef>(rootExpr->m_lhs));
     EXPECT_EQ(std::get<Sema::Symbols::SlicedOperandRef>(rootExpr->m_lhs).m_operandName, "rs1");
 
     // RHS is sub-expression ((rs2 | rs3) & 0x1F)
@@ -284,10 +283,9 @@ inst BIT_MANIP(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN, GPR:rs3 IN) format R_TYPE {
     ASSERT_TRUE(std::holds_alternative<std::shared_ptr<Sema::Symbols::ResolvedBitExpr>>(*rootExpr->m_rhs));
     const auto &andExpr = std::get<std::shared_ptr<Sema::Symbols::ResolvedBitExpr>>(*rootExpr->m_rhs);
     EXPECT_EQ(andExpr->m_op, DSL::Ast::InstDef::BitExprOp::And);
-    
 
-            // Constant 0x1F on RHS of AND
-            ASSERT_TRUE(andExpr->m_rhs.has_value());
+    // Constant 0x1F on RHS of AND
+    ASSERT_TRUE(andExpr->m_rhs.has_value());
     ASSERT_TRUE(std::holds_alternative<uint64_t>(*andExpr->m_rhs));
     EXPECT_EQ(std::get<uint64_t>(*andExpr->m_rhs), 0x1F);
 }
@@ -539,7 +537,7 @@ inst SLLI(GPR:rd OUT, GPR:rs1 IN, imm:shamt IN) format SHIFT_TYPE {
     ASSERT_EQ(instData->m_args.size(), 3);
     EXPECT_EQ(instData->m_args[2].m_name, "shamt");
     EXPECT_EQ(instData->m_args[2].m_kind, DSL::Ast::InstDef::InstOperandKind::Immediate);
-     EXPECT_EQ(instData->m_args[2].m_typeOrClassId, InvalidSymbolId); // Unparameterized
+    EXPECT_EQ(instData->m_args[2].m_typeOrClassId, InvalidSymbolId); // Unparameterized
 }
 
 TEST_F(InstructionDefPassTest, TestMultipleImplicitArgumentsInOut)
@@ -573,9 +571,8 @@ inst CALL_SYS(GPR:target IN) format SYS_TYPE {
     ASSERT_EQ(instData->m_implicitArgs.size(), 2);
     EXPECT_EQ(instData->m_implicitArgs[0].m_name, "ra");
     EXPECT_EQ(instData->m_implicitArgs[0].m_dir, DSL::Ast::InstDef::InstOperandDir::ArgOut);
-     EXPECT_EQ(instData->m_implicitArgs[1].m_name, "fcsr");
+    EXPECT_EQ(instData->m_implicitArgs[1].m_name, "fcsr");
     EXPECT_EQ(instData->m_implicitArgs[1].m_dir, DSL::Ast::InstDef::InstOperandDir::ArgInOut);
-    
 }
 
 TEST_F(InstructionDefPassTest, TestDuplicateOperandAcrossExplicitAndImplicitFails)
@@ -698,8 +695,7 @@ inst BEQ(GPR:rs1 IN, GPR:rs2 IN, simm(i12):offset IN) format B_TYPE {
     const auto *instData = instSym->getIf<Sema::Symbols::TargetInstructionSymbol>();
     ASSERT_NE(instData, nullptr);
     EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsBranch));
-     EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsTerminator));
-    
+    EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsTerminator));
 }
 
 TEST_F(InstructionDefPassTest, TestValidReturnWithTerminator)
@@ -726,8 +722,7 @@ inst JALR_RET(GPR:ra IN) format I_TYPE {
     const auto *instData = instSym->getIf<Sema::Symbols::TargetInstructionSymbol>();
     ASSERT_NE(instData, nullptr);
     EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsReturn));
-     EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsTerminator));
-    
+    EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsTerminator));
 }
 
 TEST_F(InstructionDefPassTest, TestBranchWithoutTerminatorFails)
@@ -791,7 +786,149 @@ inst BAD_CALL(GPR:target IN) format J_TYPE {
 }
 
 // ============================================================================
-// 5. Semantic Validation & Error Invariant Tests
+// 5. ASM Template validation.
+// ============================================================================
+
+// ============================================================================
+// 6. Assembly Template (${symbol}) Interpolation Validation
+// ============================================================================
+
+TEST_F(InstructionDefPassTest, TestValidAssemblyTemplateInterpolation)
+{
+    std::string test = R"dsl(
+format R_TYPE(32) {
+    opcode[0:6];
+    rd[7:11];
+    rs1[15:19];
+    rs2[20:24];
+};
+
+inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
+    ASM("add ${rd}, ${rs1}, ${rs2}");
+}
+)dsl";
+
+    auto ast = parseInstDef(test);
+    ASSERT_TRUE(ast.has_value());
+
+    SymbolTable table(getAllocator());
+    setupMockTargetEnvironment(table);
+
+    EXPECT_TRUE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
+
+    const Symbol *instSym = table.getSymByName("ADD");
+    ASSERT_NE(instSym, nullptr);
+    const auto *instData = instSym->getIf<Sema::Symbols::TargetInstructionSymbol>();
+    ASSERT_NE(instData, nullptr);
+    EXPECT_EQ(instData->m_asmTemplate, "add ${rd}, ${rs1}, ${rs2}");
+}
+
+TEST_F(InstructionDefPassTest, TestValidAssemblyTemplateWithImplicitOperands)
+{
+    std::string test = R"dsl(
+format I_TYPE(32) {
+    f[0:31];
+};
+
+inst LOAD_CUSTOM(GPR:rd OUT, GPR:rs1 IN, simm(i12):imm12 IN) format I_TYPE {
+    IMPLICIT(CSR:fcsr IN);
+    ASM("load_c ${rd}, ${imm12}(${rs1}) [fcsr: ${fcsr}]");
+}
+)dsl";
+
+    auto ast = parseInstDef(test);
+    ASSERT_TRUE(ast.has_value());
+
+    SymbolTable table(getAllocator());
+    setupMockTargetEnvironment(table);
+
+    EXPECT_TRUE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
+
+    const Symbol *instSym = table.getSymByName("LOAD_CUSTOM");
+    ASSERT_NE(instSym, nullptr);
+    const auto *instData = instSym->getIf<Sema::Symbols::TargetInstructionSymbol>();
+    ASSERT_NE(instData, nullptr);
+    EXPECT_EQ(instData->m_asmTemplate, "load_c ${rd}, ${imm12}(${rs1}) [fcsr: ${fcsr}]");
+}
+
+TEST_F(InstructionDefPassTest, TestAssemblyTemplateWithoutInterpolationPasses)
+{
+    std::string test = R"dsl(
+format NOP_TYPE(32) { f[0:31]; };
+
+inst NOP() format NOP_TYPE {
+    ASM("nop");
+}
+)dsl";
+
+    auto ast = parseInstDef(test);
+    ASSERT_TRUE(ast.has_value());
+
+    SymbolTable table(getAllocator());
+    setupMockTargetEnvironment(table);
+
+    EXPECT_TRUE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
+}
+
+TEST_F(InstructionDefPassTest, TestAssemblyTemplateUnknownOperandFails)
+{
+    std::string test = R"dsl(
+format R_TYPE(32) { f[0:31]; };
+
+inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
+    ASM("add ${rd}, ${rs1}, ${undeclared_operand}");
+}
+)dsl";
+
+    auto ast = parseInstDef(test);
+    ASSERT_TRUE(ast.has_value());
+
+    SymbolTable table(getAllocator());
+    setupMockTargetEnvironment(table);
+
+    EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
+}
+
+TEST_F(InstructionDefPassTest, TestAssemblyTemplateUnclosedBraceFails)
+{
+    std::string test = R"dsl(
+format R_TYPE(32) { f[0:31]; };
+
+inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
+    ASM("add ${rd, ${rs1}, ${rs2}");
+}
+)dsl";
+
+    auto ast = parseInstDef(test);
+    ASSERT_TRUE(ast.has_value());
+
+    SymbolTable table(getAllocator());
+    setupMockTargetEnvironment(table);
+
+    EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
+}
+
+TEST_F(InstructionDefPassTest, TestAssemblyTemplateEmptyVariableReferenceFails)
+{
+    std::string test = R"dsl(
+format R_TYPE(32) { f[0:31]; };
+
+inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
+    ASM("add ${}, ${rs1}, ${rs2}");
+}
+)dsl";
+
+    auto ast = parseInstDef(test);
+    ASSERT_TRUE(ast.has_value());
+
+    SymbolTable table(getAllocator());
+    setupMockTargetEnvironment(table);
+
+    EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
+}
+
+// ============================================================================
+// 6. Semantic Validation & Error Invariant Tests
 // ============================================================================
 
 TEST_F(InstructionDefPassTest, TestUndefinedFormatReferenceFails)

@@ -10,15 +10,12 @@
 class LegalizeActionPassTest : public DslTestSuiteAsGtest
 {
   protected:
-    std::pmr::memory_resource *m_alloc{ std::pmr::get_default_resource() };
-    std::unique_ptr<DiagnosticCollector> m_collector;
     std::unique_ptr<SymbolTable> m_table;
 
     void SetUp() override
     {
         DslTestSuiteAsGtest::SetUp();
-        m_collector = std::make_unique<DiagnosticCollector>();
-        m_table = std::make_unique<SymbolTable>(m_alloc);
+        m_table = std::make_unique<SymbolTable>(getAllocator());
         registerPrimitiveTypes();
         registerDefaultIrInstructions();
 
@@ -51,8 +48,8 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
                                                   .m_category = static_cast<DSL::Ast::IrInstDef::IrInstCategory>(0),
                                                   .m_tier = static_cast<DSL::Ast::IrInstDef::IrInstTier>(0),
                                                   .m_flagsMask = static_cast<DSL::Ast::IrInstDef::IrInstFlag>(0),
-                                                  .m_operands =
-                                                          std::pmr::vector<Sema::Symbols::IrOperandSymbol>{ m_alloc } };
+                                                  .m_operands = std::pmr::vector<Sema::Symbols::IrOperandSymbol>{
+                                                          getAllocator() } };
         m_table->declareSym(nullptr, SymbolFlags::IsDefined, SymbolType::IrInstruction, irSym, name);
     }
 
@@ -81,7 +78,7 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         {
             return false;
         }
-        return LegalizeActionPass::run(m_collector.get(), m_table.get(), &ast.value());
+        return LegalizeActionPass::run(getDiagCollector(), m_table.get(), &ast.value());
     }
 };
 

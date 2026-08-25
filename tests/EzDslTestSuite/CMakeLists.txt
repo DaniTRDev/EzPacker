@@ -82,6 +82,13 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_Sema_LegalizeRulePass"
+        "EzDslTestSuite"
+        ""
+        "tests/T_Sema_LegalizeRulePass.cpp"
+)
+
+EzPacker_AddTest(
         "T_Sema_RegisterBankPass"
         "EzDslTestSuite"
         ""

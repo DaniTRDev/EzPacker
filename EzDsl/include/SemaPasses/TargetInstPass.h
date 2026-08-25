@@ -35,6 +35,10 @@ class InstructionDefPass
                                 std::pmr::vector<Sema::Symbols::TargetOperandSymbol> &outArgs,
                                 std::pmr::vector<Sema::Symbols::TargetOperandSymbol> &outImplicitArgs);
 
+    static bool validateAsmTemplate(DiagnosticCollector *collector,
+                                    const DSL::Ast::InstDef::InstDecl &instDecl,
+                                    const std::unordered_set<std::string_view> &validOperands);
+
     static bool validateFieldAssignments(class DiagnosticCollector *collector,
                                          class SymbolTable *table,
                                          const DSL::Ast::InstDef::InstDecl &instDecl,

@@ -150,7 +150,7 @@ resolveBitExpr(DiagnosticCollector *collector,
     }
 
     // 4. Composite Binary/Unary BitExpression
-    if (const auto *subExprPtr = std::get_if<DSL::Ast::InstDef::BitExpression*>(&expr))
+    if (const auto *subExprPtr = std::get_if<DSL::Ast::InstDef::BitExpression *>(&expr))
     {
         const auto &subExpr = *subExprPtr;
         auto lhsResolved = resolveBitExpr(collector, subExpr->m_lhs, targetBitWidth, contextName, operands, sourceRef);
@@ -192,7 +192,6 @@ resolveBitExpr(DiagnosticCollector *collector,
 
     return std::nullopt;
 }
-
 } // anonymous namespace
 
 bool InstructionDefPass::run(DiagnosticCollector *collector, SymbolTable *table, DSL::Ast::InstDef::InstDefFile *file)
@@ -229,7 +228,6 @@ bool InstructionDefPass::declareFormats(DiagnosticCollector *collector,
     bool success = true;
 
     for (const auto &fmt : file->m_formats)
-
     {
         const auto &nameIdent = fmt.m_name;
 
@@ -295,7 +293,6 @@ bool InstructionDefPass::validateFormat(DiagnosticCollector *collector,
         if (!seenFields.insert(fieldName).second)
         {
             collector->error(PassName, "Format '{}': Duplicate field name '{}'", formatDecl.m_name.m_node, fieldName)
-
                     << fieldRef;
             valid = false;
         }
@@ -306,7 +303,6 @@ bool InstructionDefPass::validateFormat(DiagnosticCollector *collector,
 
         // 2. Out-of-bounds bit slices
         if (maxBit >= formatDecl.m_bitWidth)
-
         {
             collector->error(PassName,
                              "Format '{}', field '{}': Bit range [{}:{}] exceeds format bitwidth ({})",
@@ -341,7 +337,6 @@ bool InstructionDefPass::validateFormat(DiagnosticCollector *collector,
         // 4. Resolve and validate field default expression (if declared)
         std::optional<Sema::Symbols::ResolvedBitExprValue> resolvedDefault = std::nullopt;
         if (field.m_defaultValue)
-
         {
             resolvedDefault =
                     resolveBitExpr(collector, *field.m_defaultValue, fieldBitWidth, fieldName, nullptr, fieldRef);
@@ -371,7 +366,6 @@ bool InstructionDefPass::declareInstructions(DiagnosticCollector *collector,
     bool success = true;
 
     for (const auto &inst : file->m_instructions)
-
     {
         if (!validateInstruction(collector, table, inst))
         {
@@ -419,21 +413,37 @@ bool InstructionDefPass::validateInstruction(DiagnosticCollector *collector,
         return false;
     }
 
-    // 4. Validate bitfield assignments against format and resolve expressions
+    // 4. Validate assembly template interpolations
+    std::unordered_set<std::string_view> declaredOperands;
+    for (const auto &arg : resolvedArgs)
+    {
+        declaredOperands.insert(arg.m_name);
+    }
+    for (const auto &implicitArg : resolvedImplicitArgs)
+    {
+        declaredOperands.insert(implicitArg.m_name);
+    }
+
+    if (!validateAsmTemplate(collector, instDecl, declaredOperands))
+    {
+        return false;
+    }
+
+    // 5. Validate bitfield assignments against format and resolve expressions
     std::pmr::vector<Sema::Symbols::FieldAssignmentSymbol> resolvedAssignments{ table->getAllocator() };
     if (formatData && !validateFieldAssignments(collector, table, instDecl, *formatData, resolvedAssignments))
     {
         return false;
     }
 
-    // 5. Aggregate and validate flags
+    // 6. Aggregate and validate flags
     uint32_t flagsMask = 0;
     if (!aggregateAndValidateFlags(collector, flagsMask, instDecl))
     {
         return false;
     }
 
-    // 6. Register instruction symbol in SymbolTable
+    // 7. Register instruction symbol in SymbolTable
     Sema::Symbols::TargetInstructionSymbol data{ .m_name = instName.m_node,
                                                  .m_formatId = formatSym->getId(),
                                                  .m_fieldAssignments = std::move(resolvedAssignments),
@@ -484,7 +494,6 @@ bool InstructionDefPass::resolveOperands(DiagnosticCollector *collector,
         SymbolId resolvedTypeId = InvalidSymbolId;
 
         if (op.m_kind == DSL::Ast::InstDef::InstOperandKind::Register)
-
         {
             Symbol *classSym = table->getSymByName(op.m_typeOrClass.m_node);
             if (!classSym || classSym->getType() != SymbolType::RegisterClass)
@@ -503,7 +512,6 @@ bool InstructionDefPass::resolveOperands(DiagnosticCollector *collector,
         {
             if (op.m_dir == DSL::Ast::InstDef::InstOperandDir::ArgOut ||
                 op.m_dir == DSL::Ast::InstDef::InstOperandDir::ArgInOut)
-
             {
                 collector->error(PassName,
                                  "Instruction '{}', operand '{}': Immediates cannot be OUT/INOUT",
@@ -548,7 +556,6 @@ bool InstructionDefPass::resolveOperands(DiagnosticCollector *collector,
     };
 
     for (const auto &op : instDecl.m_header.m_args)
-
     {
         if (!processOp(op, false))
         {
@@ -561,6 +568,76 @@ bool InstructionDefPass::resolveOperands(DiagnosticCollector *collector,
         if (!processOp(op, true))
         {
             valid = false;
+        }
+    }
+
+    return valid;
+}
+
+bool InstructionDefPass::validateAsmTemplate(DiagnosticCollector *collector,
+                                             const DSL::Ast::InstDef::InstDecl &instDecl,
+                                             const std::unordered_set<std::string_view> &validOperands)
+{
+    std::string_view asmTemplate = instDecl.m_body.m_asmTemplate;
+    const auto &instName = instDecl.m_header.m_name.m_node;
+    SourceReference *ref = instDecl.m_header.m_name.m_sourceRef;
+
+    bool valid = true;
+    size_t pos = 0;
+    const size_t len = asmTemplate.size();
+
+    while (pos < len)
+    {
+        size_t dollarPos = asmTemplate.find('$', pos);
+        if (dollarPos == std::string_view::npos)
+        {
+            break;
+        }
+
+        if (dollarPos + 1 >= len)
+        {
+            break;
+        }
+
+        if (asmTemplate[dollarPos + 1] == '{')
+        {
+            size_t start = dollarPos + 2;
+            size_t closeBrace = asmTemplate.find('}', start);
+            if (closeBrace == std::string_view::npos)
+            {
+                collector->error(PassName,
+                                 "Instruction '{}': Unclosed variable reference '${{' in assembly template \"{}\"",
+                                 instName,
+                                 asmTemplate)
+                        << ref;
+                valid = false;
+                break;
+            }
+
+            std::string_view varName = asmTemplate.substr(start, closeBrace - start);
+            if (varName.empty())
+            {
+                collector->error(PassName,
+                                 "Instruction '{}': Empty variable reference '${{}}' in assembly template",
+                                 instName)
+                        << ref;
+                valid = false;
+            }
+            else if (validOperands.find(varName) == validOperands.end())
+            {
+                collector->error(PassName,
+                                 "Instruction '{}': Assembly template references unknown operand '${{{}}}'",
+                                 instName,
+                                 varName)
+                        << ref;
+                valid = false;
+            }
+
+            pos = closeBrace + 1;
+        }
+        else
+        {
+            pos = dollarPos + 1;
         }
     }
 
@@ -592,7 +669,6 @@ bool InstructionDefPass::validateFieldAssignments(
             uint32_t width = 0;
             SymbolId typeId = InvalidSymbolId;
             if (op.m_kind == DSL::Ast::InstDef::InstOperandKind::Register)
-
             {
                 if (Symbol *rcSym = table->getSymByName(op.m_typeOrClass.m_node))
                 {
@@ -602,7 +678,6 @@ bool InstructionDefPass::validateFieldAssignments(
             else if (op.m_typeParam)
             {
                 if (Symbol *tySym = table->getSymByName(op.m_typeParam->m_node))
-
                 {
                     typeId = tySym->getId();
                     if (const auto *tyData = tySym->getIf<Sema::Symbols::TypeSymbol>())
@@ -620,7 +695,6 @@ bool InstructionDefPass::validateFieldAssignments(
     std::unordered_map<std::string_view, uint64_t> fieldBitMasks;
 
     for (const auto &assign : instDecl.m_body.m_assigns)
-
     {
         const auto &lhsName = assign.m_lhs.m_node;
         SourceReference *lhsRef = assign.m_lhs.m_sourceRef;
@@ -645,7 +719,6 @@ bool InstructionDefPass::validateFieldAssignments(
         // 2. Validate bit slice on the LHS field if present
         Sema::Symbols::BitSlice targetSlice{ .m_from = 0, .m_to = static_cast<uint16_t>(fieldBitWidth - 1) };
         if (assign.m_lhsSlice.has_value())
-
         {
             uint16_t maxSliceBit = std::max(assign.m_lhsSlice->m_from, assign.m_lhsSlice->m_to);
             if (maxSliceBit >= fieldBitWidth)
