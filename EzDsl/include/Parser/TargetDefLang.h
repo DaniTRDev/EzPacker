@@ -10,6 +10,16 @@ namespace DSL::Parser::TargetDef
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Lexy parser rule for a target register definition.
+ *
+ * Syntax:
+ *   TargetRegister := Identifier '(' Identifier? ',' IntegerLiteral ',' IntegerLiteral ')'
+ *
+ * Examples:
+ *   rax(, 64, 0)
+ *   eax(rax, 32, 0)
+ */
 struct TargetRegister
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -38,6 +48,16 @@ struct TargetRegister
             { return Ast::TargetDef::TargetRegister{ std::move(name), Ast::Common::Identifier{}, size, offset }; });
 };
 
+/**
+ * Lexy parser rule for a target register class grouping.
+ *
+ * Syntax:
+ *   TargetRegisterClass := 'CLASS' '(' Identifier ( ',' TargetRegister ( ',' TargetRegister )* )? ')' ';'
+ *
+ * Examples:
+ *   CLASS(GPR64, rax(, 64, 0), rbx(, 64, 0));
+ *   CLASS(EMPTY);
+ */
 struct TargetRegisterClass
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -60,6 +80,17 @@ struct TargetRegisterClass
                             { return Ast::TargetDef::TargetRegisterClass{ std::move(name), {} }; });
 };
 
+/**
+ * Lexy parser rule for a target register bank definition.
+ *
+ * Syntax:
+ *   TargetRegisterBank := 'bank' Identifier '{' ( TargetRegisterClass )* '}' ';'?
+ *
+ * Example:
+ *   bank GPR {
+ *       CLASS(GPR64, rax(, 64, 0));
+ *   };
+ */
 struct TargetRegisterBank
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -84,6 +115,12 @@ struct TargetRegisterBank
                     { return Ast::TargetDef::TargetRegisterBank{ std::move(name), std::move(classes) }; });
 };
 
+/**
+ * Lexy symbol table mapping included file extension types.
+ *
+ * Syntax:
+ *   TargetIncFileType := 'idf' | 'lad' | 'lrd' | 'isf'
+ */
 struct TargetIncFileType
 {
     static constexpr auto TypeTable = lexy::symbol_table<Ast::TargetDef::TargetIncludeFileType>
@@ -96,6 +133,15 @@ struct TargetIncFileType
     static constexpr auto value = lexy::forward<Ast::TargetDef::TargetIncludeFileType>;
 };
 
+/**
+ * Lexy parser rule for target include statements.
+ *
+ * Syntax:
+ *   TargetIncFile := 'include' TargetIncFileType StringLiteral ';'
+ *
+ * Example:
+ *   include idf "x86_instructions.idf";
+ */
 struct TargetIncFile
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -106,6 +152,12 @@ struct TargetIncFile
     static constexpr auto value = lexy::construct<Ast::TargetDef::TargetIncFile>;
 };
 
+/**
+ * Top-level Lexy file parser for .tdf target definition files.
+ *
+ * Syntax:
+ *   TargetDef := 'target' Identifier '{' ( TargetIncFile | TargetRegisterBank )* '}' ';'? EOF
+ */
 struct TargetDef
 {
     static constexpr auto whitespace = Common::Whitespace;

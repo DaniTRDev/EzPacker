@@ -6,6 +6,9 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for IR Instruction Definition Language (.irdf) parser, operand constraints, and AST validation.
+ */
 class IrInstDefLangTest : public DslTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class IrInstDefLangTest : public DslTestSuiteAsGtest
 // 1. Operand Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies parsing an input argument operand with AnyValue type constraint (e.g. AnyValue:src IN).
+ */
 TEST_F(IrInstDefLangTest, TestIrOperandSimpleIn)
 {
     std::string test = "AnyValue:src IN";
@@ -27,6 +33,9 @@ TEST_F(IrInstDefLangTest, TestIrOperandSimpleIn)
     EXPECT_EQ(res->m_dir, DSL::Ast::IrInstDef::IrOperandDir::ArgIn);
 }
 
+/**
+ * Verifies parsing an output argument operand with Register type constraint (e.g. Register:dst OUT).
+ */
 TEST_F(IrInstDefLangTest, TestIrOperandSimpleOut)
 {
     std::string test = "Register:dst OUT";
@@ -39,6 +48,9 @@ TEST_F(IrInstDefLangTest, TestIrOperandSimpleOut)
     EXPECT_EQ(res->m_dir, DSL::Ast::IrInstDef::IrOperandDir::ArgOut);
 }
 
+/**
+ * Verifies parsing composite and bidirectional operand types including RegImm, AddressSource, and INOUT directions.
+ */
 TEST_F(IrInstDefLangTest, TestIrOperandCompositeTypes)
 {
     {
@@ -74,6 +86,9 @@ TEST_F(IrInstDefLangTest, TestIrOperandCompositeTypes)
 // 2. Single Instruction Declaration Tests
 // ============================================================================
 
+/**
+ * Verifies parsing zero-operand IR instruction declarations (e.g. NOP).
+ */
 TEST_F(IrInstDefLangTest, TestInstructionNoOperands)
 {
     std::string test = R"dsl(
@@ -93,6 +108,9 @@ ir_inst NOP() {
     EXPECT_TRUE(res->m_body.m_flags.empty());
 }
 
+/**
+ * Verifies parsing multi-operand instructions with categories, tiers, and behavioral flag lists.
+ */
 TEST_F(IrInstDefLangTest, TestInstructionWithOperandsAndFlags)
 {
     std::string test = R"dsl(
@@ -130,6 +148,9 @@ ir_inst ADD(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
     EXPECT_EQ(res->m_body.m_flags[1], DSL::Ast::IrInstDef::IrInstFlag::IsCommutative);
 }
 
+/**
+ * Verifies parsing instructions with body attributes declared in arbitrary order.
+ */
 TEST_F(IrInstDefLangTest, TestInstructionArbitraryBodyOrder)
 {
     std::string test = R"dsl(
@@ -156,6 +177,9 @@ ir_inst STORE(AddressSource:dst IN, AnyValue:src IN) {
     EXPECT_EQ(res->m_body.m_flags[1], DSL::Ast::IrInstDef::IrInstFlag::HasSideEffect);
 }
 
+/**
+ * Verifies parsing compiler-internal pass instructions (e.g. POP_RET with PassInternal tier).
+ */
 TEST_F(IrInstDefLangTest, TestInternalPassInstruction)
 {
     std::string test = R"dsl(
@@ -180,6 +204,9 @@ ir_inst POP_RET(Register:token IN, Register:dst OUT) {
 // 3. Full File / Translation Unit Tests
 // ============================================================================
 
+/**
+ * Verifies parsing an entire .irdf file with multiple instruction declarations across data movement, memory, and control flow.
+ */
 TEST_F(IrInstDefLangTest, TestMultipleInstructionsInFile)
 {
     std::string test = R"dsl(
@@ -235,6 +262,9 @@ ir_inst CALL(Register:dstRet OUT, AnyValue:target IN) {
 // 4. Negative & Error Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies syntax error rejection when an unknown operand type is specified.
+ */
 TEST_F(IrInstDefLangTest, TestUnknownOperandTypeFails)
 {
     std::string test = R"dsl(
@@ -249,6 +279,9 @@ ir_inst BAD(UnknownType:dst OUT) {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an operand is missing its direction specification.
+ */
 TEST_F(IrInstDefLangTest, TestMissingDirectionFails)
 {
     std::string test = R"dsl(
@@ -263,6 +296,9 @@ ir_inst BAD(Register:dst) {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an operand is missing the colon separator.
+ */
 TEST_F(IrInstDefLangTest, TestMissingColonInOperandFails)
 {
     std::string test = R"dsl(
@@ -277,6 +313,9 @@ ir_inst BAD(Register dst OUT) {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an unknown category identifier is specified.
+ */
 TEST_F(IrInstDefLangTest, TestUnknownCategoryFails)
 {
     std::string test = R"dsl(
@@ -291,6 +330,9 @@ ir_inst BAD(Register:dst OUT) {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a semicolon is missing in the instruction body.
+ */
 TEST_F(IrInstDefLangTest, TestMissingSemicolonInBodyItemFails)
 {
     std::string test = R"dsl(
@@ -305,6 +347,9 @@ ir_inst BAD(Register:dst OUT) {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when instruction body closing braces are missing.
+ */
 TEST_F(IrInstDefLangTest, TestUnclosedBracesFails)
 {
     std::string test = R"dsl(

@@ -8,6 +8,9 @@
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Test fixture for MIR Function creation, parameter configuration, and stack frame object management.
+ */
 class FunctionTest : public MirTestSuiteAsGtest
 {
   public:
@@ -17,7 +20,8 @@ class FunctionTest : public MirTestSuiteAsGtest
 namespace
 {
 /**
- * Checks the signature of a function.
+ * Custom GoogleTest assertion verifying complete function signature attributes:
+ * return type, parameter count, allocated stack frame object count, and function name.
  */
 ::testing::AssertionResult
 FuncSignature(MirFunction *func, MirType *retType, size_t paramCount, size_t stackObjCount, std::string_view name)
@@ -40,6 +44,9 @@ FuncSignature(MirFunction *func, MirType *retType, size_t paramCount, size_t sta
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying parameter type and identifier at a specific zero-based parameter index.
+ */
 ::testing::AssertionResult FuncParam(MirFunction *func, size_t index, MirType *type, std::string_view name)
 {
     if (!func)
@@ -62,6 +69,9 @@ FuncSignature(MirFunction *func, MirType *retType, size_t paramCount, size_t sta
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying stack frame object properties (type and allocation source) at a specific index.
+ */
 ::testing::AssertionResult FuncStackFrameObj(MirFunction *func, size_t index, MirType *type, StackFrameObjectSource src)
 {
     if (!func)
@@ -85,6 +95,10 @@ FuncSignature(MirFunction *func, MirType *retType, size_t paramCount, size_t sta
 }
 } // anonymous namespace
 
+/**
+ * Verifies that the default test function is constructed with void return type, 0 parameters,
+ * and 0 stack objects under the name "TEST".
+ */
 TEST_F(FunctionTest, TestFuncNoParameters)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -94,6 +108,9 @@ TEST_F(FunctionTest, TestFuncNoParameters)
     EXPECT_TRUE(FuncSignature(func, ctx->getTypeTable()->_void(), 0, 0, "TEST"));
 }
 
+/**
+ * Verifies function builder constructing a function with a single i8 parameter and matching return type.
+ */
 TEST_F(FunctionTest, TestFunc1Parameter)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -107,6 +124,9 @@ TEST_F(FunctionTest, TestFunc1Parameter)
     EXPECT_TRUE(FuncParam(func, 0, types->i8(), "testParam"));
 }
 
+/**
+ * Verifies function builder handling multiple heterogeneous parameters (i8, i16, i32, i64).
+ */
 TEST_F(FunctionTest, TestFuncNParameters)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -127,6 +147,9 @@ TEST_F(FunctionTest, TestFuncNParameters)
     EXPECT_TRUE(FuncParam(func, 3, types->i64(), "testParam4"));
 }
 
+/**
+ * Verifies allocating a single static local variable on the function's stack frame.
+ */
 TEST_F(FunctionTest, TestFunc1LocalStackObj)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -140,6 +163,9 @@ TEST_F(FunctionTest, TestFunc1LocalStackObj)
     EXPECT_TRUE(FuncStackFrameObj(func, 0, i8, obj->m_source));
 }
 
+/**
+ * Verifies allocating multiple static local variables of differing types on the stack frame.
+ */
 TEST_F(FunctionTest, TestFuncNLocalStackObj)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -157,6 +183,9 @@ TEST_F(FunctionTest, TestFuncNLocalStackObj)
     EXPECT_TRUE(FuncStackFrameObj(func, 1, i16, obj2->m_source));
 }
 
+/**
+ * Verifies allocating a register spill slot on the function's stack frame.
+ */
 TEST_F(FunctionTest, TestFunc1Spill1StackObj)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -170,6 +199,9 @@ TEST_F(FunctionTest, TestFunc1Spill1StackObj)
     EXPECT_TRUE(FuncStackFrameObj(func, 0, i8, obj->m_source));
 }
 
+/**
+ * Verifies allocating multiple register spill slots on the stack frame.
+ */
 TEST_F(FunctionTest, TestFunc1SpillNStackObj)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -187,6 +219,9 @@ TEST_F(FunctionTest, TestFunc1SpillNStackObj)
     EXPECT_TRUE(FuncStackFrameObj(func, 1, i16, obj2->m_source));
 }
 
+/**
+ * Verifies allocating stack space reserved for passed parameters.
+ */
 TEST_F(FunctionTest, TestFunc1ParameterNStackObj)
 {
     MirBuilderContext *ctx = getBuilderCtx();

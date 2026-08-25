@@ -4,45 +4,60 @@
 #include "EzMirCommon.h"
 #include "Operand/MirRegisterReference.h"
 
+/**
+ * State machine tracking register and stack allocations during ABI call/argument lowering.
+ *
+ * Maintains the sequence of caller-saved registers consumed so far across parameter slots,
+ * delegating spill parameters to the function's stack frame.
+ */
 class CallLoweringState
 {
   public:
     /**
-     * Creates the state with the given calling convention and context.
+     * Constructs a lowering state machine initialized with caller-saved registers from the calling convention.
      */
     CallLoweringState(class CallingConvDesc *cc, class MirBuilderContext *ctx, class MirFunction *func);
 
     /**
-     * Attempts to allocate the next available register of the given class. Returns true if succeded and false if
-     * no register is available.
+     * Attempts to allocate the next free physical register belonging to the requested register class.
+     * Returns true on success and writes the register reference to outReg; returns false if exhausted.
      */
     bool allocate(class MirRegisterClass *_class, MirRegisterRef &reg);
 
     /**
-     * Returns the count of available registers of the given class type for the call.
-     * @return
+     * Returns the number of unallocated usable registers remaining in the specified register class.
      */
     size_t getUsableRegCount(class MirRegisterClass *_class) const;
 
     /**
-     * Returns the count of used registers of the given class type for the call so far.
-     * @return
+     * Returns the number of registers already allocated in the specified register class during this lowering.
      */
     size_t getUsedRegCount(class MirRegisterClass *_class) const;
 
     /**
-     * Allocates an abstract stack slot in the target function.
+     * Allocates a parameter slot in the target function's stack frame.
      */
     class StackFrameObject *allocateStack(class MirType *type) const;
 
   private:
+    /**
+     * Calling convention providing ABI classification rules.
+     */
     class CallingConvDesc *m_callingConv;
+
+    /**
+     * Target function undergoing call lowering.
+     */
     class MirFunction *m_func;
 
-    // Record of registers allocated during this lowering state
+    /**
+     * Registers allocated so far, partitioned by register class.
+     */
     std::pmr::unordered_map<class MirRegisterClass *, std::pmr::vector<MirRegisterRef>> m_allocatedRegs;
 
-    // Record of usable registers by this call lowering state machine.
+    /**
+     * Usable register pool available for arguments, partitioned by register class.
+     */
     std::pmr::unordered_map<class MirRegisterClass *, std::pmr::vector<MirRegisterRef>> m_usableRegs;
 };
 

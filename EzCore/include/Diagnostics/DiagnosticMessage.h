@@ -3,94 +3,94 @@
 
 #include "EzCoreCommon.h"
 
+/**
+ * Bitflag enumeration categorizing the severity and purpose of a diagnostic message.
+ */
 enum DiagnosticMessageType : uint8_t
 {
     Diag_None = 0,
-    Diag_Debug = 1,         // The diagnostic contains debug information.
-    Diag_Error = (1 << 1),  // The diagnostic contains information about an error.
-    Diag_Trace = (1 << 2),  // The diagnostic contains information about a trace during a specific algorithm execution.
-    Diag_Warning = (1 << 3) // The diagnostic contains information that should be considered by the reader. MAY or MAY
-                            // NOT be important.
+    Diag_Debug = 1,         // Debug information emitted during development or tracing.
+    Diag_Error = (1 << 1),  // Error condition preventing compilation or analysis.
+    Diag_Trace = (1 << 2),  // Trace information during specific compiler passes.
+    Diag_Warning = (1 << 3) // Warning condition that does not halt compilation.
 };
 
 /**
- * A note is an extra piece of information that can be attached into a diagnostic message.
+ * Supplementary note attached to a diagnostic message providing additional context or source spans.
  */
 struct DiagnosticNote
 {
-    class SourceReference *m_sourceRef{ nullptr }; // Note was appended with a source reference.
+    class SourceReference *m_sourceRef{ nullptr };
     std::pmr::string m_noteContent{};
 };
 
+/**
+ * Diagnostic record containing severity, sender component, primary source span, main message, and attached notes.
+ * Managed and emitted through DiagnosticCollector and DiagnosticBuilder.
+ */
 class DiagnosticMessage
 {
   public:
-    friend class DiagnosticBuilder; // Ensure the builder has access to private methods of this class.
+    friend class DiagnosticBuilder;
 
     /**
-     * Returns the type of the diagnostic message.
-     * @return
+     * Returns the severity classification of this diagnostic message.
      */
     DiagnosticMessageType getType() const;
 
     /**
-     * Returns the primary source reference. It is used to locate the parent object/scope that executed an algorithm and
-     * any of its sub-steps emitted a diagnostic.
+     * Returns the primary source reference pointing to the source code span where the error/warning originated.
      */
     class SourceReference *getPrimarySourceRef() const;
 
     /**
-     * Appends a note to the diagnostic message.
+     * Appends an additional DiagnosticNote to this message.
      */
     void addNote(const DiagnosticNote &note);
 
     /**
-     * Appends the string to the main message of the diagnostic.
+     * Appends string text to the primary diagnostic description buffer.
      */
     void addMainMsg(const std::string_view &str);
 
     /**
-     * Sets the primary source reference.
+     * Sets the primary source span reference for this diagnostic.
      */
     void setPrimarySourceRef(class SourceReference *sourceRef);
 
     /**
-     * Sets the sender of the diagnostic message.
+     * Sets the identifier name of the compiler component emitting this message.
      */
     void setSender(const std::string_view &sender);
 
     /**
-     * Sets the type of the diagnostic message.
+     * Sets the diagnostic severity type.
      */
     void setType(DiagnosticMessageType type);
 
     /**
-     * Returns the notes (if any) attached to this message.
+     * Returns the list of contextual notes attached to this diagnostic.
      */
     const std::list<DiagnosticNote> &getNotes() const;
 
     /**
-     * Returns the main message.
+     * Returns a string view of the primary message text.
      */
     std::string_view getMainMsg() const;
 
     /**
-     * Returns the sender of the message.
+     * Returns a string view of the sender component name.
      */
     std::string_view getSender() const;
 
   private:
     /**
-     * This is the "default" constructor. It is needed to allocate pmr objects.
+     * Internal constructor initializing PMR strings with the specified memory resource.
      */
     DiagnosticMessage(std::pmr::memory_resource *alloc);
 
     /**
-     * Creates a diagnostic message with the given type, main msg, sender and notes (if specified). Appending notes
-     * after executing this constructor IS ALLOWED. This class will use the allocator to create a copy of the
-     * string_view and store that copy inside the pmr strings.
-     *
-     * This constructor is made private because a message is going to be built using a builder.
+     * Parameterized internal constructor used by DiagnosticBuilder upon flush.
      */
     DiagnosticMessage(DiagnosticMessageType type,
                       class SourceReference *primarySourceRef,

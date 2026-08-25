@@ -8,9 +8,15 @@
 #include "Sema/Symbols/Symbols.h"
 #include "SemaPasses/IrInstructionPass.h"
 
+/**
+ * Test fixture for semantic validation and symbol registration pass over IR instruction definitions (IrInstructionPass).
+ */
 class IrInstructionPassTest : public DslTestSuiteAsGtest
 {
   protected:
+    /**
+     * Helper to parse an IR instruction definition DSL string into an AST representation.
+     */
     std::optional<DSL::Ast::IrInstDef::IrInstDefFile> parseFile(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff("test.iid", source);
@@ -22,6 +28,9 @@ class IrInstructionPassTest : public DslTestSuiteAsGtest
 // 1. Happy Path & Symbol Table Registration Tests
 // ============================================================================
 
+/**
+ * Verifies semantic validation and symbol table entry creation for a valid binary arithmetic instruction (ADD).
+ */
 TEST_F(IrInstructionPassTest, TestValidInstructionRegistration)
 {
     std::string test = R"dsl(
@@ -56,6 +65,9 @@ ir_inst ADD(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
     EXPECT_EQ(data->m_operands[0].m_dir, DSL::Ast::IrInstDef::IrOperandDir::ArgOut);
 }
 
+/**
+ * Verifies semantic processing and symbol table registration for a diverse set of instructions across all standard categories.
+ */
 TEST_F(IrInstructionPassTest, TestComprehensiveInstructionSet)
 {
     std::string test = R"dsl(
@@ -121,6 +133,9 @@ ir_inst NOP() {
 // 2. Operand Semantic Invariant Tests
 // ============================================================================
 
+/**
+ * Verifies that the semantic pass rejects instructions with duplicate operand names.
+ */
 TEST_F(IrInstructionPassTest, TestDuplicateOperandNamesFail)
 {
     std::string test = R"dsl(
@@ -139,6 +154,9 @@ ir_inst BAD(Register:dst OUT, Register:dst IN) {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that the semantic pass rejects immediate operands marked with output direction.
+ */
 TEST_F(IrInstructionPassTest, TestImmediateAsOutputFails)
 {
     std::string test = R"dsl(
@@ -157,6 +175,9 @@ ir_inst BAD(Immediate:imm OUT) {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that the semantic pass rejects reference operands marked with INOUT direction.
+ */
 TEST_F(IrInstructionPassTest, TestReferenceAsInOutFails)
 {
     std::string test = R"dsl(
@@ -180,6 +201,9 @@ ir_inst BAD(Reference:target INOUT) {
 // 3. Control Flow & Terminator Invariant Tests
 // ============================================================================
 
+/**
+ * Verifies that the semantic pass enforces that instructions flagged with IsBranch must also specify IsTerminator.
+ */
 TEST_F(IrInstructionPassTest, TestBranchWithoutTerminatorFails)
 {
     std::string test = R"dsl(
@@ -199,6 +223,9 @@ ir_inst BAD_JMP(Reference:target IN) {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that the semantic pass enforces that instructions flagged with IsReturn must also specify IsTerminator.
+ */
 TEST_F(IrInstructionPassTest, TestReturnWithoutTerminatorFails)
 {
     std::string test = R"dsl(
@@ -218,6 +245,9 @@ ir_inst BAD_RET(AnyValue:val IN) {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that the semantic pass rejects mutually exclusive control flow flags (e.g. IsCall and IsReturn together).
+ */
 TEST_F(IrInstructionPassTest, TestMutuallyExclusiveControlFlowFlagsFail)
 {
     std::string test = R"dsl(
@@ -241,6 +271,9 @@ ir_inst BAD_CALL(Register:dst OUT, Reference:target IN) {
 // 4. Arithmetic, Size Constraint & Casting Tests
 // ============================================================================
 
+/**
+ * Verifies that the semantic pass rejects IsCommutative on instructions with fewer than two inputs.
+ */
 TEST_F(IrInstructionPassTest, TestCommutativeWithLessThanTwoInputsFails)
 {
     std::string test = R"dsl(
@@ -260,6 +293,9 @@ ir_inst NEG(Register:dst OUT, Register:src IN) {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that the semantic pass rejects conflicting size flags (e.g. DestLarger and DestSmaller simultaneously).
+ */
 TEST_F(IrInstructionPassTest, TestConflictingSizeFlagsFail)
 {
     std::string test = R"dsl(
@@ -279,6 +315,9 @@ ir_inst BAD_CAST(Register:dst OUT, Register:src IN) {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that casting instructions require at least one input and one output operand.
+ */
 TEST_F(IrInstructionPassTest, TestCastingWithoutInputOrOutputFails)
 {
     std::string test = R"dsl(
@@ -298,6 +337,9 @@ ir_inst BAD_TRUNC(Register:dst OUT) {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that arithmetic compute instructions without side effects must define an output operand.
+ */
 TEST_F(IrInstructionPassTest, TestPureComputeWithoutOutputFails)
 {
     std::string test = R"dsl(
@@ -320,6 +362,9 @@ ir_inst DEAD_ADD(Register:lhs IN, Register:rhs IN) {
 // 5. Symbol Name Collision Tests
 // ============================================================================
 
+/**
+ * Verifies that defining duplicate instruction symbols in the same translation unit is rejected.
+ */
 TEST_F(IrInstructionPassTest, TestDuplicateInstructionSymbolsInSameFileFail)
 {
     std::string test = R"dsl(
@@ -343,6 +388,9 @@ ir_inst DUP() {
     EXPECT_FALSE(pass.run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that defining an IR instruction whose name collides with an existing symbol in the table fails.
+ */
 TEST_F(IrInstructionPassTest, TestPreExistingSymbolCollisionFails)
 {
     std::string test = R"dsl(

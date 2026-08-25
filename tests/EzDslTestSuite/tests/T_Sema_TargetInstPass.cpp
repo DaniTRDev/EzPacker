@@ -9,15 +9,24 @@
 #include "Sema/Symbols/Symbols.h"
 #include "SemaPasses/TargetInstPass.h"
 
+/**
+ * Test fixture for semantic validation and encoding analysis of target instruction definitions (InstructionDefPass / TargetInstPass).
+ */
 class InstructionDefPassTest : public DslTestSuiteAsGtest
 {
   protected:
+    /**
+     * Helper to parse target instruction definition DSL into an InstDefFile AST.
+     */
     std::optional<DSL::Ast::InstDef::InstDefFile> parseInstDef(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff("test.idf", source);
         return ctx.parse<DSL::Parser::InstDef::InstDefFile, DSL::Ast::InstDef::InstDefFile>();
     }
 
+    /**
+     * Initializes mock primitive types (i5, i12, i20, i32, f64) and target register classes (GPR, FPR, CSR).
+     */
     void setupMockTargetEnvironment(SymbolTable &table)
     {
         // Primitive scalar types
@@ -86,6 +95,9 @@ class InstructionDefPassTest : public DslTestSuiteAsGtest
 // 1. Format Declarations, Slices & Default Value Expressions
 // ============================================================================
 
+/**
+ * Verifies format declaration with constant folding of default value expressions (e.g. shift/and/not expressions).
+ */
 TEST_F(InstructionDefPassTest, TestValidFormatWithDefaultConstantFolding)
 {
     std::string test = R"dsl(
@@ -130,6 +142,9 @@ format R_TYPE(32) {
     EXPECT_EQ(std::get<uint64_t>(*fmtData->m_fields[5].m_defaultValue), 0x7E);
 }
 
+/**
+ * Verifies that zero-width instruction formats are rejected.
+ */
 TEST_F(InstructionDefPassTest, TestZeroOrExcessiveBitWidthFormatFails)
 {
     std::string test = R"dsl(
@@ -145,6 +160,9 @@ format BAD_FORMAT(0) {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that duplicate field names within a format declaration are rejected.
+ */
 TEST_F(InstructionDefPassTest, TestDuplicateFormatFieldNamesFail)
 {
     std::string test = R"dsl(
@@ -161,6 +179,9 @@ format R_TYPE(32) {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that format field slices that exceed format bit width are rejected.
+ */
 TEST_F(InstructionDefPassTest, TestFormatFieldSliceOutOfBoundsFails)
 {
     std::string test = R"dsl(
@@ -177,6 +198,9 @@ format R_TYPE(32) {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that overlapping field slice intervals in format declarations are rejected.
+ */
 TEST_F(InstructionDefPassTest, TestOverlappingFormatFieldsFail)
 {
     std::string test = R"dsl(
@@ -193,6 +217,9 @@ format R_TYPE(32) {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that format default constants overflowing field bit width are rejected.
+ */
 TEST_F(InstructionDefPassTest, TestFormatDefaultConstantOverflowFails)
 {
     std::string test = R"dsl(
@@ -208,6 +235,9 @@ format R_TYPE(32) {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that format field defaults cannot reference runtime identifier names.
+ */
 TEST_F(InstructionDefPassTest, TestFormatDefaultUsingIdentifierFails)
 {
     std::string test = R"dsl(
@@ -227,6 +257,9 @@ format R_TYPE(32) {
 // 2. Complex Bit Expressions & Instruction Format Overrides
 // ============================================================================
 
+/**
+ * Verifies nested bit expressions in instruction field assignments (shift, or, and).
+ */
 TEST_F(InstructionDefPassTest, TestComplexNestedBitExpressionInFormatAssignment)
 {
     std::string test = R"dsl(
@@ -290,6 +323,9 @@ inst BIT_MANIP(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN, GPR:rs3 IN) format R_TYPE {
     EXPECT_EQ(std::get<uint64_t>(*andExpr->m_rhs), 0x1F);
 }
 
+/**
+ * Verifies sliced operand mapping into split instruction fields (imm4_0 and imm11_5).
+ */
 TEST_F(InstructionDefPassTest, TestSlicedOperandsAndSplicedFields)
 {
     std::string test = R"dsl(
@@ -348,6 +384,9 @@ inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format S_TYPE {
     EXPECT_EQ(sliceHigh.m_slice.m_to, 11);
 }
 
+/**
+ * Verifies that field slice assignments exceeding destination field width fail.
+ */
 TEST_F(InstructionDefPassTest, TestLhsFieldSliceExceedsFieldWidthFails)
 {
     std::string test = R"dsl(
@@ -372,6 +411,9 @@ inst BAD(GPR:rd OUT) format R_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that operand slice references exceeding operand bit width fail.
+ */
 TEST_F(InstructionDefPassTest, TestRhsSliceExceedsOperandWidthFails)
 {
     std::string test = R"dsl(
@@ -396,6 +438,9 @@ inst BAD(simm(i12):imm12 IN) format I_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that overlapping field assignments in FORMAT(...) fail.
+ */
 TEST_F(InstructionDefPassTest, TestOverlappingFieldAssignmentsInInstructionFails)
 {
     std::string test = R"dsl(
@@ -421,6 +466,9 @@ inst BAD(GPR:r1 IN, GPR:r2 IN) format R_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that assigning to a nonexistent format field fails.
+ */
 TEST_F(InstructionDefPassTest, TestAssigningNonExistentFormatFieldFails)
 {
     std::string test = R"dsl(
@@ -446,6 +494,9 @@ inst BAD(GPR:rd OUT) format R_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that referencing an undeclared operand in FORMAT(...) fails.
+ */
 TEST_F(InstructionDefPassTest, TestRhsRefersToUnknownOperandFails)
 {
     std::string test = R"dsl(
@@ -472,6 +523,9 @@ inst BAD(GPR:rd OUT) format R_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that numeric constant values overflowing the destination field slice width fail.
+ */
 TEST_F(InstructionDefPassTest, TestConstantValueOverflowsTargetFieldSliceFails)
 {
     std::string test = R"dsl(
@@ -500,6 +554,9 @@ inst BAD() format R_TYPE {
 // 3. Operand Types, Slices, Immediates & Implicits
 // ============================================================================
 
+/**
+ * Verifies instructions with unparameterized immediate operands.
+ */
 TEST_F(InstructionDefPassTest, TestMixedRegistersAndUnparameterizedImmediates)
 {
     std::string test = R"dsl(
@@ -540,6 +597,9 @@ inst SLLI(GPR:rd OUT, GPR:rs1 IN, imm:shamt IN) format SHIFT_TYPE {
     EXPECT_EQ(instData->m_args[2].m_typeOrClassId, InvalidSymbolId); // Unparameterized
 }
 
+/**
+ * Verifies implicit argument resolution with distinct directions (OUT and INOUT).
+ */
 TEST_F(InstructionDefPassTest, TestMultipleImplicitArgumentsInOut)
 {
     std::string test = R"dsl(
@@ -575,6 +635,9 @@ inst CALL_SYS(GPR:target IN) format SYS_TYPE {
     EXPECT_EQ(instData->m_implicitArgs[1].m_dir, DSL::Ast::InstDef::InstOperandDir::ArgInOut);
 }
 
+/**
+ * Verifies that operand name collisions between explicit and implicit operand lists fail.
+ */
 TEST_F(InstructionDefPassTest, TestDuplicateOperandAcrossExplicitAndImplicitFails)
 {
     std::string test = R"dsl(
@@ -595,6 +658,9 @@ inst BAD(GPR:rd OUT) format F {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that immediate operands declared with OUT direction fail.
+ */
 TEST_F(InstructionDefPassTest, TestImmediateAsOutputFails)
 {
     std::string test = R"dsl(
@@ -613,6 +679,9 @@ inst BAD(simm(i12):imm OUT) format F {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that immediate operands declared with INOUT direction fail.
+ */
 TEST_F(InstructionDefPassTest, TestImmediateAsInOutFails)
 {
     std::string test = R"dsl(
@@ -631,6 +700,9 @@ inst BAD(imm:val INOUT) format F {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that operands referencing nonexistent register classes fail.
+ */
 TEST_F(InstructionDefPassTest, TestUndefinedRegisterClassFails)
 {
     std::string test = R"dsl(
@@ -649,6 +721,9 @@ inst BAD(NON_EXISTENT_CLASS:rd OUT) format F {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that immediate operands referencing undefined type parameters fail.
+ */
 TEST_F(InstructionDefPassTest, TestUndefinedImmediateTypeParamFails)
 {
     std::string test = R"dsl(
@@ -671,6 +746,9 @@ inst BAD(simm(unknown_type):imm IN) format F {
 // 4. Control Flow, Terminators & Instruction Flags
 // ============================================================================
 
+/**
+ * Verifies branch instructions requiring both isBranch and isTerminator flags.
+ */
 TEST_F(InstructionDefPassTest, TestValidBranchWithTerminator)
 {
     std::string test = R"dsl(
@@ -698,6 +776,9 @@ inst BEQ(GPR:rs1 IN, GPR:rs2 IN, simm(i12):offset IN) format B_TYPE {
     EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsTerminator));
 }
 
+/**
+ * Verifies return instructions requiring both isReturn and isTerminator flags.
+ */
 TEST_F(InstructionDefPassTest, TestValidReturnWithTerminator)
 {
     std::string test = R"dsl(
@@ -725,6 +806,9 @@ inst JALR_RET(GPR:ra IN) format I_TYPE {
     EXPECT_TRUE(instData->hasFlag(DSL::Ast::InstDef::InstFlag::IsTerminator));
 }
 
+/**
+ * Verifies that branch instructions missing isTerminator flag fail.
+ */
 TEST_F(InstructionDefPassTest, TestBranchWithoutTerminatorFails)
 {
     std::string test = R"dsl(
@@ -745,6 +829,9 @@ inst JMP(GPR:target IN) format J_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that return instructions missing isTerminator flag fail.
+ */
 TEST_F(InstructionDefPassTest, TestReturnWithoutTerminatorFails)
 {
     std::string test = R"dsl(
@@ -765,6 +852,9 @@ inst RET(GPR:val IN) format I_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that conflicting control flow flags (isCall, isReturn) on the same instruction fail.
+ */
 TEST_F(InstructionDefPassTest, TestMutuallyExclusiveControlFlowFlagsFail)
 {
     std::string test = R"dsl(
@@ -786,13 +876,12 @@ inst BAD_CALL(GPR:target IN) format J_TYPE {
 }
 
 // ============================================================================
-// 5. ASM Template validation.
+// 5. Assembly Template (${symbol}) Interpolation Validation
 // ============================================================================
 
-// ============================================================================
-// 6. Assembly Template (${symbol}) Interpolation Validation
-// ============================================================================
-
+/**
+ * Verifies assembly template interpolation using ${rd}, ${rs1}, ${rs2} format.
+ */
 TEST_F(InstructionDefPassTest, TestValidAssemblyTemplateInterpolation)
 {
     std::string test = R"dsl(
@@ -823,6 +912,9 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
     EXPECT_EQ(instData->m_asmTemplate, "add ${rd}, ${rs1}, ${rs2}");
 }
 
+/**
+ * Verifies assembly template interpolation including implicit operands.
+ */
 TEST_F(InstructionDefPassTest, TestValidAssemblyTemplateWithImplicitOperands)
 {
     std::string test = R"dsl(
@@ -851,6 +943,9 @@ inst LOAD_CUSTOM(GPR:rd OUT, GPR:rs1 IN, simm(i12):imm12 IN) format I_TYPE {
     EXPECT_EQ(instData->m_asmTemplate, "load_c ${rd}, ${imm12}(${rs1}) [fcsr: ${fcsr}]");
 }
 
+/**
+ * Verifies assembly template without variable interpolation (literal string).
+ */
 TEST_F(InstructionDefPassTest, TestAssemblyTemplateWithoutInterpolationPasses)
 {
     std::string test = R"dsl(
@@ -870,6 +965,9 @@ inst NOP() format NOP_TYPE {
     EXPECT_TRUE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that assembly templates referencing undeclared operands fail.
+ */
 TEST_F(InstructionDefPassTest, TestAssemblyTemplateUnknownOperandFails)
 {
     std::string test = R"dsl(
@@ -889,6 +987,9 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that assembly templates with unclosed braces fail.
+ */
 TEST_F(InstructionDefPassTest, TestAssemblyTemplateUnclosedBraceFails)
 {
     std::string test = R"dsl(
@@ -908,6 +1009,9 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that assembly templates with empty variable references (${}) fail.
+ */
 TEST_F(InstructionDefPassTest, TestAssemblyTemplateEmptyVariableReferenceFails)
 {
     std::string test = R"dsl(
@@ -931,6 +1035,9 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format R_TYPE {
 // 6. Semantic Validation & Error Invariant Tests
 // ============================================================================
 
+/**
+ * Verifies that instructions referencing undefined format names fail.
+ */
 TEST_F(InstructionDefPassTest, TestUndefinedFormatReferenceFails)
 {
     std::string test = R"dsl(
@@ -948,6 +1055,9 @@ inst BAD(GPR:rd OUT) format UNDEFINED_FORMAT {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that duplicate format declarations fail.
+ */
 TEST_F(InstructionDefPassTest, TestDuplicateFormatDeclarationsFail)
 {
     std::string test = R"dsl(
@@ -962,6 +1072,9 @@ format F(32) { f[0:31]; };
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that duplicate instruction declarations fail.
+ */
 TEST_F(InstructionDefPassTest, TestDuplicateInstructionDeclarationsFail)
 {
     std::string test = R"dsl(
@@ -983,6 +1096,9 @@ inst NOP(GPR:rd IN) format F {
     EXPECT_FALSE(InstructionDefPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that declaring an instruction whose name collides with a pre-existing root symbol fails.
+ */
 TEST_F(InstructionDefPassTest, TestPreExistingSymbolCollisionFails)
 {
     std::string test = R"dsl(

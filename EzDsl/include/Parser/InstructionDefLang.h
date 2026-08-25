@@ -10,7 +10,16 @@ namespace DSL::Parser::InstDef
 {
 namespace dsl = ::lexy::dsl;
 
-// Matches "[31:0]" or "[0:15]" (normalizes to min/max)
+/**
+ * Lexy parser rule for a bit slice range expression [from:to] or [to:from].
+ *
+ * Syntax:
+ *   BitSlice := '[' IntegerLiteral ':' IntegerLiteral ']'
+ *
+ * Examples:
+ *   [31:0]
+ *   [12:14]
+ */
 struct BitSlice
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -27,7 +36,15 @@ struct BitSlice
             });
 };
 
-// Matches "ident[0:4]"
+/**
+ * Lexy parser rule matching an identifier followed by a bit slice.
+ *
+ * Syntax:
+ *   SlicedIdentifier := Identifier BitSlice
+ *
+ * Example:
+ *   imm12[0:4]
+ */
 struct SlicedIdentifier
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -38,6 +55,18 @@ struct SlicedIdentifier
             { return Ast::InstDef::SlicedIdentifier{ .m_name = std::move(name), .m_slice = slice }; });
 };
 
+/**
+ * Lexy expression production parsing precedence-climbing bit expressions.
+ *
+ * Precedence levels (highest to lowest):
+ *   1. Atom: parenthesized expression, integer literal, sliced identifier, bare identifier
+ *   2. Prefix unary Not ('~')
+ *   3. Infix Add ('+') / Sub ('-')
+ *   4. Infix Shift Left ('<<') / Shift Right ('>>')
+ *   5. Infix And ('&')
+ *   6. Infix Xor ('^')
+ *   7. Infix Or ('|')
+ */
 struct BitExpression : lexy::expression_production
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -126,7 +155,16 @@ struct BitExpression : lexy::expression_production
             lexy::values);
 };
 
-// Matches "opcode = 0x33" or "imm4_0[0:4] = imm12[0:4]"
+/**
+ * Lexy parser rule for a bitfield expression assignment in FORMAT(...) bodies.
+ *
+ * Syntax:
+ *   BitExprAssign := Identifier BitSlice? '=' BitExpression
+ *
+ * Examples:
+ *   opcode = 0x33
+ *   imm4_0[0:4] = imm12[0:4]
+ */
 struct BitExprAssign
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -153,7 +191,16 @@ struct BitExprAssign
             });
 };
 
-// Matches "opcode[0:6];" or "funct3[12:14] = 0b000;"
+/**
+ * Lexy parser rule for a format field definition with optional default expression.
+ *
+ * Syntax:
+ *   FormatField := Identifier BitSlice ( '=' BitExpression )? ';'
+ *
+ * Examples:
+ *   opcode[0:6];
+ *   funct3[12:14] = 0b000;
+ */
 struct FormatField
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -181,7 +228,22 @@ struct FormatField
             });
 };
 
-// Matches "format RType(32) { ... };"
+/**
+ * Lexy parser rule for instruction binary format declarations.
+ *
+ * Syntax:
+ *   InstFormatDecl := 'format' Identifier ( '(' IntegerLiteral ')' )? '{' ( FormatField )* '}' ';'?
+ *
+ * Example:
+ *   format RType(32) {
+ *       opcode[0:6] = 0x33;
+ *       rd[7:11];
+ *       funct3[12:14];
+ *       rs1[15:19];
+ *       rs2[20:24];
+ *       funct7[25:31];
+ *   };
+ */
 struct InstFormatDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -215,6 +277,12 @@ struct InstFormatDecl
             });
 };
 
+/**
+ * Lexy symbol table mapping instruction operand dataflow directions.
+ *
+ * Syntax:
+ *   Direction := 'INOUT' | 'IN' | 'OUT'
+ */
 struct Direction
 {
     static constexpr auto Table = lexy::symbol_table<Ast::InstDef::InstOperandDir>
@@ -226,6 +294,13 @@ struct Direction
     static constexpr auto value = lexy::forward<Ast::InstDef::InstOperandDir>;
 };
 
+/**
+ * Lexy symbol table mapping target instruction flags.
+ *
+ * Syntax:
+ *   InstFlag := 'isBranch' | 'isCall' | 'isReturn' | 'isTerminator' | 'mayLoad' | 'mayStore'
+ *             | 'commutative' | 'volatile'
+ */
 struct InstFlag
 {
     static constexpr auto Table = lexy::symbol_table<Ast::InstDef::InstFlag>
@@ -242,7 +317,17 @@ struct InstFlag
     static constexpr auto value = lexy::forward<Ast::InstDef::InstFlag>;
 };
 
-// Matches "GPR:rd OUT", "simm(i12):imm12 IN", "imm:val IN"
+/**
+ * Lexy parser rule for an instruction formal parameter operand.
+ *
+ * Syntax:
+ *   InstOperand := TypeName ('(' ParamName ')')? ':' OperandName Direction
+ *
+ * Examples:
+ *   GPR:rd OUT
+ *   simm(i12):imm12 IN
+ *   imm:val IN
+ */
 struct InstOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -285,7 +370,15 @@ struct InstOperand
             });
 };
 
-// Matches "inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format SType"
+/**
+ * Lexy parser rule for the header signature of an instruction.
+ *
+ * Syntax:
+ *   InstHeader := 'inst' Identifier '(' ( InstOperand (',' InstOperand)* )? ')' 'format' Identifier
+ *
+ * Example:
+ *   inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format SType
+ */
 struct InstHeader
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -317,6 +410,16 @@ struct InstHeader
             });
 };
 
+/**
+ * Lexy parser rule for instruction body directives (IMPLICIT, FORMAT, FLAGS, ASM, LATENCY).
+ *
+ * Syntax:
+ *   InstBodyItem := 'IMPLICIT' '(' ( InstOperand (',' InstOperand)* )? ')' ';'
+ *                 | 'FORMAT' '(' ( BitExprAssign (',' BitExprAssign)* )? ')' ';'
+ *                 | 'FLAGS' '(' ( InstFlag (',' InstFlag)* )? ')' ';'
+ *                 | 'ASM' '(' StringLiteral ')' ';'
+ *                 | 'LATENCY' '(' IntegerLiteral ')' ';'
+ */
 struct InstBodyItem
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -371,6 +474,12 @@ struct InstBodyItem
     static constexpr auto value = lexy::construct<Ast::InstDef::InstBodyItem>;
 };
 
+/**
+ * Lexy parser rule for a complete target instruction definition.
+ *
+ * Syntax:
+ *   InstDecl := InstHeader '{' ( InstBodyItem )* '}' ';'?
+ */
 struct InstDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -423,6 +532,12 @@ struct InstDecl
             });
 };
 
+/**
+ * Top-level Lexy file parser for .idf instruction definition files.
+ *
+ * Syntax:
+ *   InstDefFile := ( InstFormatDecl | InstDecl )* EOF
+ */
 struct InstDefFile
 {
     static constexpr auto whitespace = Common::Whitespace;

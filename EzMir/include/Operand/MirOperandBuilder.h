@@ -7,38 +7,35 @@
 #include "FlexNumber/FlexInt.h"
 #include "Operand/MirOperand.h"
 
+/**
+ * Factory builder for constructing and allocating all variants of MirOperand objects
+ * within the MirBuilderContext memory arena.
+ */
 class MirOperandBuilder : public MirBuilder<MirOperand>
 {
   public:
     /**
-     * Creates the builder with the given context.
+     * Initializes the operand builder attached to the compilation context.
      */
     MirOperandBuilder(class MirBuilderContext *ctx);
 
     /**
-     * Returns a float operand with the given floating point value. If the value's bit-width is smaller than given
-     * type's, it will be extended and a warning will be thrown. If it is greater, given MirType will be
-     * extended to the closest available and a warning will be thrown; if no mir type is available an error will be
-     * thrown.
-     *
-     * If given type is not a floating type, an error will be thrown and nullptr will be returned.
+     * Builds a floating-point constant operand (MirFloat).
+     * If the value's bit-width is smaller than the target type, it is extended with a diagnostic warning.
+     * If greater, the type is promoted to the closest matching floating-point type; if none matches, an error is reported.
      */
     class MirFloat *buildFloat(class MirType *type, const FlexFloat &value, class SourceReference *ref = nullptr);
 
     /**
-     * Returns an integer operand with the given value. If the value's bit-width is smaller than given
-     * type's, it will be z-extended (non-signed) and a warning will be thrown. If it is greater, given MirType will be
-     * extended to the closest available and a warning will be thrown; if no mir type is available an error will be
-     * thrown.
-     *
-     * If given type is not an integer type, an error will be thrown and nullptr will be returned.
+     * Builds an integer constant operand (MirInteger).
+     * If the value's bit-width is smaller than the target type, it is zero-extended with a diagnostic warning.
+     * If greater, the type is promoted to the closest matching integer type; if none matches, an error is reported.
      */
     class MirInteger *buildInt(class MirType *type, const FlexInt &value, class SourceReference *ref = nullptr);
 
     /**
-     * Builds a memory operand out of the given parameters.
-     *
-     * If the given base is not a pointer, an error will be thrown an nullptr will be returned.
+     * Builds a memory address operand [base + displ] with an existing MirInteger displacement.
+     * Validates that the base register operand has pointer type.
      */
     class MirMemory *buildMem(class MirType *type,
                               class MirRegister *base,
@@ -46,15 +43,15 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
                               class SourceReference *ref = nullptr);
 
     /**
-     * Builds a memory operand out of the given parameters. A MirInteger is built out of the given displ int.
-     *
-     * If the given base is not a pointer, an error will be thrown an nullptr will be returned.
+     * Builds a memory address operand [base + displ] converting an immediate FlexInt displacement into a MirInteger.
+     * Validates that the base register operand has pointer type.
      */
     class MirMemory *
     buildMem(class MirType *type, class MirRegister *base, const FlexInt &displ, class SourceReference *ref = nullptr);
 
     /**
-     * Creates a virtual register with the given type, name and source reference.
+     * Allocates a new virtual register operand (MirRegister) with a unique MIR ID,
+     * registering it in the context register tracking list.
      */
     class MirRegister *buildVReg(MirType *type,
                                  std::pmr::string name = "",
@@ -62,42 +59,42 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
                                  class MirRegisterClass *_class = nullptr);
 
     /**
-     * Creates a physical register with the given type, physical ID, name and source reference.
+     * Allocates a physical hardware register operand (MirRegister) with a target physical register ID and class.
      */
     class MirRegister *buildPhysReg(class MirType *type,
                                     MirPhysicalRegId physId,
                                     std::pmr::string name = "",
                                     class MirRegisterClass *_class = nullptr,
                                     class SourceReference *ref = nullptr);
+
     /**
-     * Creates a reference to the given block.
+     * Builds a symbolic reference operand pointing to a MirBlock label.
      */
     class MirReference *buildRef(class MirBlock *block, class SourceReference *ref = nullptr);
 
     /**
-     * Creates a reference to the given function.
+     * Builds a symbolic reference operand pointing to a MirFunction entry point.
      */
     class MirReference *buildRef(class MirFunction *func, class SourceReference *ref = nullptr);
 
     /**
-     * Creates a reference to a global variable at given offset.
+     * Builds a symbolic reference operand pointing to a MirGlobalVar at the given byte offset.
      */
     class MirReference *buildRef(class MirGlobalVar *var, size_t offset, class SourceReference *ref = nullptr);
 
     /**
-     * Creates a reference to the given stack frame object.
+     * Builds a symbolic reference operand pointing to a StackFrameObject slot.
      */
     class MirReference *buildRef(class StackFrameObject *obj, class SourceReference *ref = nullptr);
 
     /**
-     * Builds a runtime symbol that will later be resolved by the backend. A runtime symbol is a symbol that
-     * has been defined within the runtime library.
+     * Builds a named external runtime symbol reference operand (e.g. "@__ez_rt_alloc").
      */
     class MirRuntimeSymbol *buildRtSymbol(std::pmr::string symbolName, class SourceReference *ref = nullptr);
 
   private:
     /**
-     * Creates the operand with the given context and args. OperandType must be a sub type of MirOperand.
+     * Internal generic factory allocating concrete OperandType in the arena allocator.
      */
     template <typename OperandType, typename... Args>
         requires(std::is_base_of<MirOperand, OperandType>::value)
@@ -110,8 +107,19 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     }
 
   private:
+    /**
+     * MIR compilation context.
+     */
     MirBuilderContext *m_ctx;
+
+    /**
+     * PMR memory resource for allocations.
+     */
     std::pmr::memory_resource *m_resource;
+
+    /**
+     * Polymorphic allocator instance.
+     */
     std::pmr::polymorphic_allocator<> m_allocator;
 };
 

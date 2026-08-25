@@ -7,6 +7,9 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Test fixture for MIR Basic Block construction, instruction insertion, and metadata management.
+ */
 class BlockTest : public MirTestSuiteAsGtest
 {
   public:
@@ -14,6 +17,9 @@ class BlockTest : public MirTestSuiteAsGtest
 
 namespace
 {
+/**
+ * Custom GoogleTest assertion verifying that a MIR basic block contains the expected number of instructions.
+ */
 ::testing::AssertionResult HasInstructionCount(MirBlock *block, size_t expectedCount)
 {
     if (!block)
@@ -30,6 +36,9 @@ namespace
 
 } // anonymous namespace
 
+/**
+ * Verifies that a basic block can be constructed within a function and starts with 0 instructions.
+ */
 TEST_F(BlockTest, AddBlock)
 {
     MirBlockBuilder builder(getBuilderCtx(), getTestFunc());
@@ -38,6 +47,10 @@ TEST_F(BlockTest, AddBlock)
     EXPECT_TRUE(HasInstructionCount(block, 0));
 }
 
+/**
+ * Verifies that inserting an instruction into the entry block before building a new block
+ * results in the instruction residing solely in the entry block.
+ */
 TEST_F(BlockTest, AddBlockAndInstructionBeforeCreatingBlock)
 {
     // Order:
@@ -62,6 +75,10 @@ TEST_F(BlockTest, AddBlockAndInstructionBeforeCreatingBlock)
     EXPECT_TRUE(HasInstructionCount(block2, 0));
 }
 
+/**
+ * Verifies that inserting an instruction using a newly created block's builder
+ * targets the new block without modifying the entry point.
+ */
 TEST_F(BlockTest, AddBlockAndInstructionAfterCreatingBlock)
 {
     // Order:
@@ -82,6 +99,9 @@ TEST_F(BlockTest, AddBlockAndInstructionAfterCreatingBlock)
     EXPECT_TRUE(HasInstructionCount(block2, 1));
 }
 
+/**
+ * Verifies independent instruction insertions across multiple basic blocks within the same function.
+ */
 TEST_F(BlockTest, AddBlockAndInstructionOnBothBlocks)
 {
     // Order:
@@ -92,7 +112,6 @@ TEST_F(BlockTest, AddBlockAndInstructionOnBothBlocks)
     MirBuilderContext *ctx = getBuilderCtx();
     MirBlockBuilder blockBuilder(ctx, getTestFunc());
 
-    // FIX: Removed the erroneous '=' which invoked the comma operator
     MirInstructionBuilder instrBuilder(ctx,
                                        getTestFunc()->getEntryPoint(),
                                        InsertionType::InsertAfter,
@@ -113,12 +132,12 @@ TEST_F(BlockTest, AddBlockAndInstructionOnBothBlocks)
     EXPECT_TRUE(HasInstructionCount(block2, 1));
 }
 
-// --- New Coverage Tests ---
-
+/**
+ * Verifies sequential insertion of multiple instructions (ADD, SUB, MUL) into a single block
+ * and verifies iterator stability.
+ */
 TEST_F(BlockTest, TestMultipleInstructionsInSingleBlock)
 {
-    // Verifies that a block can hold multiple sequential instructions
-    // and that the count increments properly.
     MirBuilderContext *ctx = getBuilderCtx();
     MirBlockBuilder blockBuilder(ctx, getTestFunc());
     MirBlock *block = blockBuilder.build();
@@ -140,9 +159,11 @@ TEST_F(BlockTest, TestMultipleInstructionsInSingleBlock)
     EXPECT_NE(it, block->end());
 }
 
+/**
+ * Verifies that basic blocks receive unique sequential IDs and correctly preserve given string names.
+ */
 TEST_F(BlockTest, TestBlockNamingAndID)
 {
-    // Verifies that blocks receive unique identifiers and retain given string names.
     MirBuilderContext *ctx = getBuilderCtx();
     MirBlockBuilder blockBuilder(ctx, getTestFunc());
 

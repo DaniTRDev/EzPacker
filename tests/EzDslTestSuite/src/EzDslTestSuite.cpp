@@ -4,10 +4,18 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+// Retrieves the active diagnostic collector.
 DiagnosticCollector *EzDslTestSuite::getDiagCollector() { return m_diagnosticCollector; }
 
+// Retrieves the diagnostic logger.
 DiagnosticLogger *EzDslTestSuite::getDiagLogger() { return m_diagnosticLogger; }
 
+/**
+ * Creates a ParseContext bound to an in-memory string buffer:
+ * 1. Registers the buffer with the SourceManager under the given source name.
+ * 2. Throws an exception if registration fails.
+ * 3. Constructs and returns a ParseContext configured with the test allocator and diagnostics.
+ */
 ParseContext EzDslTestSuite::createParseContextFromBuff(const std::string &sourceName, const std::string &sourceContent)
 {
     size_t sourceId = m_sourceManager->addSourceContent(sourceName, sourceContent);
@@ -19,8 +27,13 @@ ParseContext EzDslTestSuite::createParseContextFromBuff(const std::string &sourc
     return ParseContext(m_diagnosticCollector, m_sourceManager, sourceId, &m_allocator);
 }
 
+// Retrieves the source manager.
 SourceManager *EzDslTestSuite::getSourceManager() { return m_sourceManager; }
 
+/**
+ * Initializes the test suite by allocating the diagnostic collector, source manager,
+ * and diagnostic logger from the internal PMR buffer resource, enabling trace and debug logs.
+ */
 void EzDslTestSuite::create()
 {
     std::pmr::polymorphic_allocator<> alloc(&m_allocator);
@@ -33,6 +46,9 @@ void EzDslTestSuite::create()
     m_diagnosticCollector->enableDiag(Diag_Debug);
 }
 
+/**
+ * Destroys all allocated diagnostic and source manager objects.
+ */
 void EzDslTestSuite::destroy()
 {
     std::pmr::polymorphic_allocator<> alloc(&m_allocator);
@@ -41,14 +57,17 @@ void EzDslTestSuite::destroy()
     alloc.delete_object(m_diagnosticLogger);
 }
 
+// Retrieves the monotonic memory resource.
 std::pmr::memory_resource *EzDslTestSuite::getAllocator() { return &m_allocator; }
 
+// Sets up the test fixture by initializing EzDslTestSuite.
 void DslTestSuiteAsGtest::SetUp()
 {
     Test::SetUp();
     EzDslTestSuite::create();
 }
 
+// Tears down the test fixture by destroying EzDslTestSuite.
 void DslTestSuiteAsGtest::TearDown()
 {
     EzDslTestSuite::destroy();

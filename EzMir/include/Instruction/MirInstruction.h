@@ -8,11 +8,18 @@
 
 #include <vector>
 
+/**
+ * Represents a single instruction in the Machine Intermediate Representation (MIR).
+ *
+ * Implements nodes of an intrusive doubly-linked list within its parent MirBlock.
+ * Encapsulates an opcode, operand list, target descriptor (for selected target machine instructions),
+ * and metadata providing semantic flags and operand schema.
+ */
 class MirInstruction
 {
   public:
     /**
-     * Creates an instruction wrapper around an opcode and its operand list inside an owning block.
+     * Constructs an instruction record within an owning basic block with opcode, source ref, and operand list.
      */
     explicit MirInstruction(class MirBlock *owner,
                             MirInstructionOpCode opcode,
@@ -20,97 +27,98 @@ class MirInstruction
                             std::pmr::vector<class MirOperand *> operands);
 
     /**
-     * Returns true if the instruction's opcode matches the given opcode.
+     * Checks if this instruction's opcode matches the specified opcode.
      */
     bool hasOpcode(MirInstructionOpCode opcode) const;
 
     /**
-     * Returns true when the instruction currently stores at least one operand.
+     * Checks whether the instruction has one or more operands.
      */
     bool hasOperands() const;
 
     /**
-     * Returns true if this instruction has been lowered to a target machine instruction.
+     * Checks if this instruction has been lowered to a target machine instruction (opcode TARGET_INST with targetDesc).
      */
     bool isSelected() const;
 
     /**
-     * Returns true when the instruction's opcode is marked as signed in its metadata flags.
+     * Checks if this instruction performs signed arithmetic or comparison based on its metadata flags.
      */
     bool isSigned() const;
 
     /**
-     * Returns the name of the opcode.
+     * Returns the mnemonic name of the instruction opcode.
      */
     const char *getOpCodeName() const;
 
     /**
-     * Returns the owner block of this instruction.
+     * Returns the basic block owning this instruction.
      */
     class MirBlock *getOwner() const;
 
     /**
-     * Returns the previous instruction.
+     * Returns the preceding instruction in the basic block's intrusive list.
      */
     MirInstruction *getPrev() const;
 
     /**
-     * Returns the next instruction.
+     * Returns the subsequent instruction in the basic block's intrusive list.
      */
     MirInstruction *getNext() const;
 
     /**
-     * Returns the metadata entry associated with this instruction's opcode.
+     * Returns the static metadata associated with this instruction's opcode.
      */
     const MirInstructionMetadata &getMetadata() const;
 
     /**
-     * Returns this instruction's opcode.
+     * Returns the opcode enumeration value of this instruction.
      */
     MirInstructionOpCode getOpCode() const;
 
     /**
-     * Returns the tier of the instruction.
+     * Returns the abstraction tier of this instruction (HighLevel, PassInternal, TargetLow).
      */
     MirInstructionTier getTier() const;
 
     /**
-     * Returns the instruction flags from the opcode metadata.
+     * Returns the behavioral semantic flags associated with this instruction.
      */
     MirInstructionFlags getFlags() const;
 
     /**
-     * Returns the target instruction descriptor if lowered.
+     * Returns the target machine instruction descriptor, if selected.
      */
     class MirTargetInstructionDesc *getTargetDesc() const;
 
     /**
-     * Returns a pointer to the operand at the given index, or nullptr if out of bounds.
+     * Retrieves the operand at the specified index, or nullptr if out of bounds.
      */
     MirOperand *getOperand(size_t index) const;
 
     /**
-     * Returns a const pointer to the operand at the given index, or nullptr if out of bounds.
+     * Retrieves the const operand at the specified index, or nullptr if out of bounds.
      */
     const MirOperand *getConstOperand(size_t index) const;
 
     /**
-     * Returns the operand flag for the given index.
+     * Resolves the operand access flag (Read, Write, ReadWrite) for the operand at index,
+     * supporting fixed operands and elastic variadic argument slots.
      */
     MirOperandFlag getOperandFlag(size_t index) const;
 
     /**
-     * Returns the number of operands.
+     * Returns the total number of operands attached to this instruction.
      */
     size_t getOperandCount() const;
 
     /**
-     * Returns the source reference of this instruction.
+     * Returns the source location reference for diagnostics.
      */
     class SourceReference *getSourceRef() const;
 
     /**
-     * Returns a const pointer to the typed operand at the given index.
+     * Casts and retrieves the const operand at the given index to concrete operand type T.
      */
     template <typename T>
         requires(std::is_const_v<T>)
@@ -121,7 +129,7 @@ class MirInstruction
     }
 
     /**
-     * Returns a pointer to the typed operand at the given index.
+     * Casts and retrieves the mutable operand at the given index to concrete operand type T.
      */
     template <typename T>
         requires(!std::is_const_v<T>)
@@ -132,67 +140,94 @@ class MirInstruction
     }
 
     /**
-     * Adds an operand to the instruction.
+     * Appends an operand to the end of the operand list.
      */
     void addOperand(MirOperand *operand);
 
     /**
-     * Sets or switches the opcode of the instruction.
+     * Updates the opcode of this instruction.
      */
     void setOpcode(MirInstructionOpCode opcode);
 
     /**
-     * Sets the target descriptor for the lowered instruction.
+     * Associates a target machine instruction descriptor for lowered instructions.
      */
     void setTargetDesc(MirTargetInstructionDesc *desc);
 
     /**
-     * Replaces the operands of this instruction.
+     * Replaces the entire operand list of this instruction.
      */
     void setOperands(const std::pmr::vector<class MirOperand *> &operands);
 
     /**
-     * Sets the previous instruction.
+     * Sets the preceding instruction in the block's intrusive list.
      */
     void setPrev(MirInstruction *prev);
 
     /**
-     * Sets the next instruction.
+     * Sets the subsequent instruction in the block's intrusive list.
      */
     void setNext(MirInstruction *next);
 
     /**
-     * Returns the immutable operand slice.
+     * Returns const reference to the internal operand vector.
      */
     const std::pmr::vector<class MirOperand *> &getOperands() const;
 
     /**
-     * Returns the mutable operand slice.
+     * Returns mutable reference to the internal operand vector.
      */
     std::pmr::vector<class MirOperand *> &getOperands();
 
     /**
-     * Computes and returns the registers defined (written) by this instruction on-the-fly.
+     * Computes the set of registers defined (written) by this instruction, including explicit and target implicit defs.
      */
     std::vector<MirRegisterRef> getDefinedRegisters() const;
 
     /**
-     * Computes and returns the registers used (read) by this instruction on-the-fly.
+     * Computes the set of registers used (read) by this instruction, including explicit, memory base, and implicit uses.
      */
     std::vector<MirRegisterRef> getUsedRegisters() const;
 
     /**
-     * Returns a string representation of the instruction in assembly format.
+     * Formats the instruction into assembly text format.
      */
     std::string toString() const;
 
   private:
+    /**
+     * Owning basic block containing this instruction.
+     */
     class MirBlock *m_owner;
+
+    /**
+     * Intrusive pointer to previous instruction.
+     */
     MirInstruction *m_prev{ nullptr };
+
+    /**
+     * Intrusive pointer to next instruction.
+     */
     MirInstruction *m_next{ nullptr };
+
+    /**
+     * Opcode identifier.
+     */
     MirInstructionOpCode m_opcode;
+
+    /**
+     * Low-level target machine instruction descriptor (null for generic IR).
+     */
     class MirTargetInstructionDesc *m_targetDesc;
+
+    /**
+     * Source code reference for diagnostics.
+     */
     class SourceReference *m_sourceRef;
+
+    /**
+     * List of operand pointers allocated in the context memory arena.
+     */
     std::pmr::vector<class MirOperand *> m_operands;
 };
 

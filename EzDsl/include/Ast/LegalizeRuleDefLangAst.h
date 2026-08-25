@@ -11,6 +11,9 @@
 namespace DSL::Ast::LegalizeRuleDef
 {
 
+/**
+ * Kind of operand appearing within rewrite rule patterns or expansion templates.
+ */
 enum class OperandKind : uint8_t
 {
     SsaRegister,      // SSA virtual register (e.g., "$dst", "i32:$dst")
@@ -20,7 +23,22 @@ enum class OperandKind : uint8_t
 };
 
 /**
- * Instruction operand inside a pattern match or expansion block.
+ * Instruction operand inside a rewrite rule pattern match or expansion block.
+ *
+ * Syntax:
+ *   RuleOperand := CustomTransform | TypedPrefixSsa | BareSsa | LiteralOperand
+ *   CustomTransform   := FuncName '(' SsaVar (',' SsaVar)* ')'
+ *   TypedPrefixSsa    := TypeName ('(' TypeParam ')')? ':' SsaVar
+ *   BareSsa           := SsaVar
+ *   SsaVar            := '$' Identifier
+ *   LiteralOperand    := IntegerLiteral
+ *
+ * Examples:
+ *   $dst
+ *   i32:$lhs
+ *   simm(i12):$imm
+ *   42
+ *   log2($val)
  */
 struct RuleOperand
 {
@@ -33,27 +51,64 @@ struct RuleOperand
 };
 
 /**
- * Generic IR instruction statement.
+ * Generic IR instruction statement within rewrite patterns or expansions.
+ *
+ * Syntax:
+ *   RuleInstruction := OpcodeName ( RuleOperand (',' RuleOperand)* )? ';' | SingleOperandStatement
+ *   SingleOperandStatement := RuleOperand ';'
+ *
+ * Examples:
+ *   ADD $dst, $lhs, $rhs;
+ *   RET $val;
+ *   $dst;
  */
 struct RuleInstruction
 {
-    Common::Identifier m_opcode;              // Opcode name (e.g., "ADD", "SEXT")
-    std::pmr::vector<RuleOperand> m_operands; // Destination and source operands
+    Common::Identifier m_opcode;
+    std::pmr::vector<RuleOperand> m_operands;
 };
 
 using PredicateArg = std::variant<Common::Identifier, Common::IntegerLiteral>;
 
 /**
- * Semantic guard check in a `when { ... }` block.
+ * Semantic guard predicate evaluated inside a `when { ... }` block.
+ *
+ * Syntax:
+ *   RulePredicate := PredicateName '(' PredicateArg (',' PredicateArg)* ')' ';'
+ *   PredicateArg  := '$' Identifier | IntegerLiteral | Identifier
+ *
+ * Examples:
+ *   is_power_of_two($c);
+ *   fits_in_simm12($imm);
  */
 struct RulePredicate
 {
-    Common::Identifier m_predicateName;         // Name of the predicate function / hook
-    std::pmr::vector<PredicateArg> m_arguments; // Bound variables or integer constants
+    Common::Identifier m_predicateName;
+    std::pmr::vector<PredicateArg> m_arguments;
 };
 
 /**
- * IR-to-IR expansion rule definition.
+ * Complete IR-to-IR rewrite rule AST node.
+ *
+ * Syntax:
+ *   LegalizeRewriteRule := 'rule' RuleName '{' ( RuleBlock ';' )* '}'
+ *   RuleBlock := MatchBlock | WhenBlock | ExpandBlock
+ *   MatchBlock  := 'match' '{' ( RuleInstruction )* '}'
+ *   WhenBlock   := 'when' '{' ( RulePredicate )* '}'
+ *   ExpandBlock := 'expand' '{' ( RuleInstruction )* '}'
+ *
+ * Example:
+ *   rule LowerAddImm {
+ *       match {
+ *           ADD $dst, $src, imm(i32):$c;
+ *       };
+ *       when {
+ *           is_simm12($c);
+ *       };
+ *       expand {
+ *           ADDI $dst, $src, $c;
+ *       };
+ *   };
  */
 struct LegalizeRewriteRule
 {
@@ -63,6 +118,12 @@ struct LegalizeRewriteRule
     std::pmr::vector<RuleInstruction> m_expansionSequence;
 };
 
+/**
+ * Root AST structure representing a parsed .lrd (Legalize Rule Definition) file.
+ *
+ * Syntax:
+ *   TargetLegalizeRuleDef := ( LegalizeRewriteRule ';' )* EOF
+ */
 struct TargetLegalizeRuleDef
 {
     std::pmr::vector<LegalizeRewriteRule> m_rules;

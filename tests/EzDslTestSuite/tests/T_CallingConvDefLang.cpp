@@ -6,6 +6,9 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for Calling Convention Definition Language (.ccdf) grammar, AST construction, and syntax validation.
+ */
 class CallingConvDefLangTest : public DslTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class CallingConvDefLangTest : public DslTestSuiteAsGtest
 // 1. Registers & Stack Configuration
 // ============================================================================
 
+/**
+ * Verifies parsing register references combining register class name and register identifier (e.g. GPR:rdi, FPR:xmm0).
+ */
 TEST_F(CallingConvDefLangTest, TestRegisterReference)
 {
     std::string test = "GPR:rdi";
@@ -34,6 +40,10 @@ TEST_F(CallingConvDefLangTest, TestRegisterReference)
     EXPECT_EQ(fprRes->m_regName.m_node, "xmm0");
 }
 
+/**
+ * Verifies parsing stack placement directives in unaligned, named aligned (STACK(ALIGN: 16)),
+ * and direct integer aligned (STACK(8)) formats.
+ */
 TEST_F(CallingConvDefLangTest, TestStackPlacement)
 {
     std::string unaligned = "STACK";
@@ -67,6 +77,9 @@ TEST_F(CallingConvDefLangTest, TestStackPlacement)
 // 2. Classification Stage
 // ============================================================================
 
+/**
+ * Verifies parsing primitive classification rules that map primitive type lists to ABI classes (e.g. TYPE(...) >> INTEGER).
+ */
 TEST_F(CallingConvDefLangTest, TestPrimitiveClassifyRule)
 {
     std::string test = "TYPE(i1, i8, i16, i32, i64, ptr) >> INTEGER;";
@@ -82,6 +95,10 @@ TEST_F(CallingConvDefLangTest, TestPrimitiveClassifyRule)
     EXPECT_EQ(res->m_targetClass.m_node, "INTEGER");
 }
 
+/**
+ * Verifies parsing various aggregate predicates: size comparisons (IF_SIZE_GT, IF_SIZE_IN),
+ * homogeneous float aggregates (IF_HOMOGENEOUS), alignment checks (IF_UNALIGNED), and DEFAULT fallbacks.
+ */
 TEST_F(CallingConvDefLangTest, TestAggregatePredicates)
 {
     std::string sizeGt = "IF_SIZE_GT(16) >> MEMORY;";
@@ -139,6 +156,10 @@ TEST_F(CallingConvDefLangTest, TestAggregatePredicates)
     EXPECT_EQ(defRes->m_resultClass.m_node, "BY_REF");
 }
 
+/**
+ * Verifies parsing an AGGREGATE classification block with predicates, chunk sizes,
+ * merge precedence hierarchies, and allocation policies.
+ */
 TEST_F(CallingConvDefLangTest, TestAggregateClassifyDef)
 {
     std::string test = R"(
@@ -173,6 +194,9 @@ AGGREGATE {
     EXPECT_EQ(res->m_allocPolicy, DSL::Ast::CallingConvDef::AllocPolicy::AllOrNothing);
 }
 
+/**
+ * Verifies parsing a complete CLASSIFY block combining both primitive type rules and aggregate classification blocks.
+ */
 TEST_F(CallingConvDefLangTest, TestClassifyBlock)
 {
     std::string test = R"(
@@ -205,6 +229,9 @@ CLASSIFY {
 // 3. Dispatch & SRET Rules
 // ============================================================================
 
+/**
+ * Verifies parsing a sequential register dispatch rule with register list (REG_SEQ) and stack fallback.
+ */
 TEST_F(CallingConvDefLangTest, TestSequentialDispatchRule)
 {
     std::string test = "INTEGER >> REG_SEQ(GPR:rdi, GPR:rsi, GPR:rdx, GPR:rcx, GPR:r8, GPR:r9) >> STACK(ALIGN: 8);";
@@ -224,6 +251,10 @@ TEST_F(CallingConvDefLangTest, TestSequentialDispatchRule)
     EXPECT_EQ(res->m_action.m_stackFallback->m_alignment->m_node, 8);
 }
 
+/**
+ * Verifies parsing slot-based register assignment (REG_SLOTS), aggregate expansion (EXPAND_TO),
+ * and indirect pointer passing (PASS_AS_POINTER).
+ */
 TEST_F(CallingConvDefLangTest, TestSlotsAndExpansionDispatchRules)
 {
     std::string slotsTest = "FLOAT >> REG_SLOTS(FPR:xmm0, FPR:xmm1, FPR:xmm2, FPR:xmm3) >> STACK;";
@@ -258,6 +289,10 @@ TEST_F(CallingConvDefLangTest, TestSlotsAndExpansionDispatchRules)
     EXPECT_EQ(byRefRes->m_action.m_targetClass->m_node, "INTEGER");
 }
 
+/**
+ * Verifies parsing struct return configuration blocks (SRET_CONFIG) specifying passing registers,
+ * slot consumption rules, and return registers for System V and ARM.
+ */
 TEST_F(CallingConvDefLangTest, TestSretConfig)
 {
     std::string sysvSret = R"(
@@ -297,6 +332,9 @@ SRET_CONFIG {
 // 4. Complete Translation Units (Full ABIs)
 // ============================================================================
 
+/**
+ * Verifies end-to-end AST parsing of a complete System V AMD64 calling convention translation unit.
+ */
 TEST_F(CallingConvDefLangTest, TestFullSystemVAMD64Definition)
 {
     std::string test = R"dsl(
@@ -385,6 +423,9 @@ calling_conv SystemV_AMD64 {
     EXPECT_EQ(res->m_sretConfig->m_returnReg->m_regName.m_node, "rax");
 }
 
+/**
+ * Verifies end-to-end AST parsing of a complete ARM AAPCS64 calling convention translation unit.
+ */
 TEST_F(CallingConvDefLangTest, TestFullAAPCS64Definition)
 {
     std::string test = R"dsl(
@@ -459,6 +500,9 @@ calling_conv AAPCS64 {
 // 5. Negative & Error Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies syntax error detection when a semicolon is missing at the end of a dispatch rule.
+ */
 TEST_F(CallingConvDefLangTest, TestMissingSemicolonInDispatchRuleError)
 {
     std::string test = "INTEGER >> REG_SEQ(GPR:rdi, GPR:rsi) >> STACK";
@@ -468,6 +512,9 @@ TEST_F(CallingConvDefLangTest, TestMissingSemicolonInDispatchRuleError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an invalid stack growth direction keyword is specified.
+ */
 TEST_F(CallingConvDefLangTest, TestInvalidStackDirectionError)
 {
     std::string test = "STACK_DIRECTION(SIDEWAYS);";
@@ -477,6 +524,9 @@ TEST_F(CallingConvDefLangTest, TestInvalidStackDirectionError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a calling convention body is unclosed.
+ */
 TEST_F(CallingConvDefLangTest, TestUnclosedCallingConvBodyError)
 {
     std::string test = R"(

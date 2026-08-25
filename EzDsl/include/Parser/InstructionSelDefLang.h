@@ -12,6 +12,16 @@ namespace DSL::Parser::InstSelDef
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Lexy parser rule for an addressing mode formal parameter with optional default value.
+ *
+ * Syntax:
+ *   AddrModeParam := TypeName ('(' TypeParam ')')? ':' Identifier ( '=' IntegerLiteral )?
+ *
+ * Examples:
+ *   GPR:base
+ *   simm(i12):offset = 0
+ */
 struct AddrModeParam
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -66,6 +76,12 @@ struct AddrModeParam
             });
 };
 
+/**
+ * Lexy parser rule for a comma-separated parenthesized list of AddrMode parameters.
+ *
+ * Syntax:
+ *   AddrModeParamList := '(' ( AddrModeParam (',' AddrModeParam)* )? ')'
+ */
 struct AddrModeParamList
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -75,6 +91,9 @@ struct AddrModeParamList
 
 using VariantBlockClause = std::variant<LegalizeRuleDef::MatchClause, LegalizeRuleDef::WhenClause>;
 
+/**
+ * Lexy parser rule for addressing mode variant clauses (match or when blocks).
+ */
 struct VariantBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -84,6 +103,17 @@ struct VariantBlock
     static constexpr auto value = lexy::construct<VariantBlockClause>;
 };
 
+/**
+ * Lexy parser rule for an individual addressing mode variant declaration.
+ *
+ * Syntax:
+ *   AddrModeVariantParser := 'variant' Identifier '{' ( VariantBlock ';' )* '}'
+ *
+ * Example:
+ *   variant RegOffset {
+ *       match { ADD $addr, GPR:$base, simm(i12):$offset; };
+ *   };
+ */
 struct AddrModeVariantParser
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -116,6 +146,9 @@ struct AddrModeVariantParser
                             });
 };
 
+/**
+ * Lexy parser rule for a list of addressing mode variants.
+ */
 struct AddrModeVariantList
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -123,6 +156,17 @@ struct AddrModeVariantList
     static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstSelDef::AddrModeVariant>>;
 };
 
+/**
+ * Lexy parser rule for an addressing mode aggregate definition.
+ *
+ * Syntax:
+ *   AddrModeDefParser := 'addrmode' Identifier AddrModeParamList AddrModeVariantList
+ *
+ * Example:
+ *   addrmode BaseOffset(GPR:base, simm(i12):offset = 0) {
+ *       variant RegOffset { match { ADD $addr, GPR:$base, simm(i12):$offset; }; };
+ *   };
+ */
 struct AddrModeDefParser
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -141,11 +185,17 @@ struct AddrModeDefParser
             });
 };
 
+/**
+ * Clause container for the emit { ... } sequence.
+ */
 struct EmitClause
 {
     std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction> instructions;
 };
 
+/**
+ * Clause container for the cost(N) metric.
+ */
 struct CostClause
 {
     Ast::Common::IntegerLiteral cost;
@@ -154,6 +204,12 @@ struct CostClause
 using PatternBlockClause =
         std::variant<LegalizeRuleDef::MatchClause, LegalizeRuleDef::WhenClause, EmitClause, CostClause>;
 
+/**
+ * Lexy parser rule for emit { ... } blocks in ISel patterns.
+ *
+ * Syntax:
+ *   EmitBlockBody := '{' ( RuleInstruction )* '}'
+ */
 struct EmitBlockBody
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -162,6 +218,12 @@ struct EmitBlockBody
             Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<EmitClause>;
 };
 
+/**
+ * Lexy parser rule for cost(N) clauses in ISel patterns.
+ *
+ * Syntax:
+ *   CostBody := '(' IntegerLiteral ')'
+ */
 struct CostBody
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -170,6 +232,9 @@ struct CostBody
             lexy::callback<CostClause>([](Ast::Common::IntegerLiteral lit) { return CostClause{ lit }; });
 };
 
+/**
+ * Lexy parser rule for ISel pattern block items (match, when, emit, cost).
+ */
 struct PatternBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -181,6 +246,19 @@ struct PatternBlock
     static constexpr auto value = lexy::construct<PatternBlockClause>;
 };
 
+/**
+ * Lexy parser rule for a complete ISel pattern rule.
+ *
+ * Syntax:
+ *   ISelPatternParser := 'pattern' Identifier '{' ( PatternBlock ';' )* '}'
+ *
+ * Example:
+ *   pattern SelectAdd {
+ *       match { ADD GPR:$dst, GPR:$lhs, GPR:$rhs; };
+ *       emit { ADD GPR:$dst, GPR:$lhs, GPR:$rhs; };
+ *       cost(1);
+ *   };
+ */
 struct ISelPatternParser
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -217,6 +295,12 @@ struct ISelPatternParser
                             });
 };
 
+/**
+ * Top-level Lexy file parser for .isf instruction selection definition files.
+ *
+ * Syntax:
+ *   ISelDefFileParser := ( ( AddrModeDefParser | ISelPatternParser ) ';' )* EOF
+ */
 struct ISelDefFileParser
 {
     static constexpr auto whitespace = Common::Whitespace;

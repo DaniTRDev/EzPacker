@@ -13,7 +13,12 @@ namespace DSL::Parser::CallingConvDef
 {
 namespace dsl = ::lexy::dsl;
 
-// Matches "DOWN" or "UP"
+/**
+ * Lexy symbol table mapping stack growth direction keywords ('DOWN', 'UP').
+ *
+ * Syntax:
+ *   StackDirection := 'DOWN' | 'UP'
+ */
 struct StackDirection
 {
     static constexpr auto Table = lexy::symbol_table<Ast::CallingConvDef::StackDirection>
@@ -24,7 +29,12 @@ struct StackDirection
     static constexpr auto value = lexy::forward<Ast::CallingConvDef::StackDirection>;
 };
 
-// Matches "CALLER" or "CALLEE"
+/**
+ * Lexy symbol table mapping stack cleanup responsibility keywords ('CALLER', 'CALLEE').
+ *
+ * Syntax:
+ *   StackCleaner := 'CALLER' | 'CALLEE'
+ */
 struct StackCleaner
 {
     static constexpr auto Table = lexy::symbol_table<Ast::CallingConvDef::StackCleaner>
@@ -35,7 +45,12 @@ struct StackCleaner
     static constexpr auto value = lexy::forward<Ast::CallingConvDef::StackCleaner>;
 };
 
-// Matches strictly "ALL_OR_NOTHING" or "INDEPENDENT"
+/**
+ * Lexy symbol table mapping multi-register allocation policies ('ALL_OR_NOTHING', 'INDEPENDENT').
+ *
+ * Syntax:
+ *   AllocPolicy := 'ALL_OR_NOTHING' | 'INDEPENDENT'
+ */
 struct AllocPolicy
 {
     static constexpr auto Table = lexy::symbol_table<Ast::CallingConvDef::AllocPolicy>
@@ -46,7 +61,9 @@ struct AllocPolicy
     static constexpr auto value = lexy::forward<Ast::CallingConvDef::AllocPolicy>;
 };
 
-// Matches boolean literals
+/**
+ * Lexy symbol table matching boolean literal tokens ('true', 'false', case-insensitive).
+ */
 struct BooleanLit
 {
     static constexpr auto Table = lexy::symbol_table<bool>
@@ -59,7 +76,16 @@ struct BooleanLit
     static constexpr auto value = lexy::forward<bool>;
 };
 
-// Matches "GPR:rdi", "FPR:xmm0"
+/**
+ * Lexy parser rule matching a register reference qualified with register class.
+ *
+ * Syntax:
+ *   RegisterRef := ClassName ':' RegName
+ *
+ * Examples:
+ *   GPR:rdi
+ *   FPR:xmm0
+ */
 struct RegisterRef
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -70,7 +96,17 @@ struct RegisterRef
             { return Ast::CallingConvDef::RegisterRef{ .m_className = std::move(cls), .m_regName = std::move(reg) }; });
 };
 
-// Matches "STACK", "STACK(ALIGN: 8)", "STACK(8)"
+/**
+ * Lexy parser rule matching stack placement fallback specifications.
+ *
+ * Syntax:
+ *   StackPlacement := 'STACK' ( '(' ( 'ALIGN' ':' )? IntegerLiteral ')' )?
+ *
+ * Examples:
+ *   STACK
+ *   STACK(ALIGN: 8)
+ *   STACK(16)
+ */
 struct StackPlacement
 {
     static constexpr auto whitespace = Common::Whitespace;

@@ -4,31 +4,38 @@
 #include "EzMirCommon.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
 
+/**
+ * Classification category of a compiler pass (Analysis or Transform).
+ */
 enum class MirPassType : uint8_t
 {
-    Analysis, // Only reads the MIR.
-    Transform // Can apply changes to the MIR.
-};
-
-enum class MirPassIterationPlace : uint8_t
-{
-    Function,       // The pass runs on each function.
-    Block,          // The pass runs on each block.
-    Instruction,    // The pass runs on each instruction.
-    GlobalVariable, // The pass runs on each global var defined.
-};
-
-struct MirPassResult
-{
-    bool m_modifiedMir{ false }; // Set to true if the pass modified the MIR.
-    bool m_executed{ false };    // Set to true if the pass was actually run.
-    bool m_succeeded{ false };   // Set to true of the pass was run and succeeded.
+    Analysis, // Read-only pass computing metrics/dataflow without mutating the MIR
+    Transform // Mutating pass modifying instruction sequences, CFGs, or operand layouts
 };
 
 /**
- * Interface used by passes that iterate over the MIR.
- *
- * TODO: Add MirModule level.
+ * Granularity level at which a MIR compiler pass operates.
+ */
+enum class MirPassIterationPlace : uint8_t
+{
+    Function,       // The pass runs per MirFunction instance
+    Block,          // The pass runs per MirBlock in each function
+    Instruction,    // The pass runs per MirInstruction in each block
+    GlobalVariable, // The pass runs per MirGlobalVar definition
+};
+
+/**
+ * Status and modification flag bundle returned after executing a compiler pass.
+ */
+struct MirPassResult
+{
+    bool m_modifiedMir{ false }; // True if the pass mutated the MIR representation
+    bool m_executed{ false };    // True if the pass was invoked
+    bool m_succeeded{ false };   // True if the pass completed without fatal errors
+};
+
+/**
+ * Base polymorphic interface for all MIR optimization, transformation, and analysis passes.
  */
 class MirPass
 {
@@ -36,7 +43,7 @@ class MirPass
     virtual ~MirPass() = default;
 
     /**
-     * Runs the pass on the given MIR func.
+     * Executes the pass over an individual MirFunction in the intrusive function list.
      */
     virtual MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
                               IntrusiveLinkedList<class MirFunction>::iterator it,
@@ -46,7 +53,7 @@ class MirPass
     }
 
     /**
-     * Runs the pass on the given MIR block.
+     * Executes the pass over an individual MirBlock in the function's block chain.
      */
     virtual MirPassResult run(IntrusiveLinkedList<class MirBlock> &blockList,
                               IntrusiveLinkedList<class MirBlock>::iterator it,
@@ -56,7 +63,7 @@ class MirPass
     }
 
     /**
-     * Runs the pass on the given MIR func.
+     * Executes the pass over an individual MirInstruction in a block's instruction chain.
      */
     virtual MirPassResult run(IntrusiveLinkedList<class MirInstruction> &instrList,
                               IntrusiveLinkedList<class MirInstruction>::iterator it,
@@ -66,48 +73,47 @@ class MirPass
     }
 
     /**
-     * Runs the pass on the given global variable. In this case the list/iterator is not needed as passes will only
-     * modify things around the given variable.
+     * Executes the pass over a global variable definition.
      */
     virtual MirPassResult run(class MirGlobalVar *var, MirPassManager *passManager) { return {}; }
 
     /**
-     * Returns the name of the pass.
+     * Returns the human-readable identifier name of this pass.
      */
     virtual const char *getName() const = 0;
 
     /**
-     * Returns the iteration place. Depending on the place, one callback or the other will be called.
+     * Returns the iteration granularity level determining which run overload is invoked.
      */
     virtual MirPassIterationPlace getIterationPlace() const = 0;
 
     /**
-     * Returns the last result of this pass.
+     * Returns a pointer to the last execution result of this pass.
      */
     MirPassResult *getResult();
 
     /**
-     * Returns the pass type.
+     * Returns the MirPassType discriminator (Analysis vs Transform).
      */
     virtual MirPassType getPassType() const = 0;
 
     /**
-     * Prints the pass result to the diag collector.
+     * Formats and logs pass results to the attached diagnostic collector.
      */
     virtual void printResult() {};
 
     /**
-     * Called by the pass manager when the pass needs to be reset.
+     * Clears internal cached analysis or transform state for a subsequent compilation run.
      */
     virtual void reset() {};
 
     /**
-     * Sets the result of the pass (by copying the value, it does not store the pointer).
+     * Stores a copy of the given execution result.
      */
     void setResult(MirPassResult *result);
 
     /**
-     * Returns the dependencies linked to this pass (other passes that must be run before this one).
+     * Returns the collection of pass type indices that must precede this pass in the pipeline.
      */
     virtual std::vector<std::type_index> getDependencies() const { return {}; }
 

@@ -4,6 +4,9 @@
 #include "EzMirCommon.h"
 #include "MirPasses/IMirTransformPass.h"
 
+/**
+ * Intermediate data structures computed during SSA reconstruction (dominance tree, dominance frontiers, def sites).
+ */
 struct NonSsaToSsaPassResult
 {
     std::pmr::unordered_map<MirId, MirId> m_immDomTree;
@@ -21,15 +24,18 @@ struct NonSsaToSsaPassResult
 };
 
 /**
- * This pass runs the algorithm "Cytron et al." to transform a non-SSA input IR into an SSA-compliant IR. For details,
- * look at the headers of private sub phases and in the code of each of the methods as this is rather complex to
- * explain.
+ * Transformation pass converting non-SSA intermediate representation into Static Single Assignment (SSA) form.
+ * Implements the classic Cytron et al. algorithm:
+ * 1. Computes reverse post-order and immediate dominator tree (Cooper-Harvey-Kennedy).
+ * 2. Computes dominance frontiers for all basic blocks.
+ * 3. Places iterated phi-nodes at dominance frontiers for variables with multiple definition sites.
+ * 4. Renames variable definitions and uses via recursive dominator tree traversal.
  */
 class NonSsaToSsaPass : public IMirTransformPass
 {
   public:
     /**
-     * Creates the analyzer with the given context.
+     * Constructs the SSA construction pass bound to the compilation context.
      */
     NonSsaToSsaPass(class MirBuilderContext *ctx);
     ~NonSsaToSsaPass() override = default;
@@ -40,72 +46,65 @@ class NonSsaToSsaPass : public IMirTransformPass
     const char *getName() const override;
 
     /**
-     * Returns the iteration place for this pass (MirPassIterationPlace::Function).
+     * Returns MirPassIterationPlace::Function.
      */
     MirPassIterationPlace getIterationPlace() const override;
 
     /**
-     * Runs the pass and builds a n SSA IR out of a non-SSA IR.
+     * Executes the SSA transformation pipeline over the targeted function.
      */
     MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
                       IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**
-     * Returns the result of the pass.
+     * Returns the computed SSA pass metrics and dominator tree data.
      */
     NonSsaToSsaPassResult *getResult();
 
     /**
-     * For every block processed in after calling run, it prints its predecessors and successors.
+     * Prints dominance frontiers and dominator tree information to diagnostics.
      */
     void printResult() override;
 
     /**
-     * Resets the result of the pass.
+     * Clears internal dominator tree and renaming maps for reuse.
      */
     void reset() override;
 
   private:
     /**
-     * Creates a PHI instruction with the given register IDs in the place that is currently bound in iBuilder.
+     * Instantiates and inserts a phi-node instruction for the specified register.
      */
     MirInstruction *createPhiInstruction(MirInstructionBuilder *iBuilder, MirId regId, size_t numPredecessors);
 
     /**
-     * Builds a map that contains the places in which a virtual register is defined (written).
+     * Scans the function to collect all basic blocks containing definitions for each virtual register.
      */
     void buildVirtualRegDefPlaces(MirFunction *func);
 
     /**
-     * This function computes the dominance frontier. The Dominance Frontier of a block B is the set of blocks where
-     * B's dominance "ends". This is exactly where control flow merges, and therefore exactly where PHI nodes need to be
-     * inserted.
+     * Computes dominance frontiers where control flow paths merge.
      */
     void buildDominanceFrontier(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager);
 
     /**
-     * Builds the immediate dominator tree using Cooper, Harvey, and Kennedy algorithm.
+     * Computes the immediate dominator tree using the Cooper, Harvey, and Kennedy algorithm.
      */
     void buildImmDomTree(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager);
 
     /**
-     * Traverses the blocks of the function in post-order and assings the position they are saved in the final postOrder
-     * list to the index list.
-     *
-     * Ex: post order results: { Block1, Block3, Block4 }
-     * The post order index list would contain: list[Block1] = 0, list[Block3] = 1, list[Block4] = 2
+     * Computes post-order traversal ordering and dense index mapping over CFG blocks.
      */
     void buildPostOrderIndexList(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager);
 
     /**
-     * Almost the last step of the alogorithm, it inserts PHI nodes at dominance frontiers. The nodes are in the form
-     * of: PHI origReg, origReg, ... (up to the number of predecessors that write to the value).
+     * Places phi-nodes at dominance frontiers of definition sites.
      */
     void insertPhiNodes(CodeFlowResult *cfg, MirFunction *func);
 
     /**
-     * Rename variables that were affected by PHI nodes. This is the last step and completes the SSA.
+     * Renames variable uses and definitions via dominator tree search stack.
      */
     void renameVariables(CodeFlowResult *cfg, MirFunction *func);
 

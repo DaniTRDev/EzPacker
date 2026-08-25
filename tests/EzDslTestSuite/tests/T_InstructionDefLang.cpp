@@ -6,6 +6,9 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for Target Instruction Definition Language (.idf) parser and AST validation.
+ */
 class InstDefLangTest : public DslTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class InstDefLangTest : public DslTestSuiteAsGtest
 // 1. Bit Slices & Bit Expressions
 // ============================================================================
 
+/**
+ * Verifies parsing bit slice ranges in both MSB:LSB ([31:0]) and LSB:MSB ([0:15]) formats.
+ */
 TEST_F(InstDefLangTest, TestBitSliceNormalization)
 {
     std::string test = "[31:0]";
@@ -35,6 +41,9 @@ TEST_F(InstDefLangTest, TestBitSliceNormalization)
     EXPECT_EQ(resRev->m_to, 15);
 }
 
+/**
+ * Verifies parsing sliced identifiers representing bit extraction from named operands (e.g. imm12[0:4]).
+ */
 TEST_F(InstDefLangTest, TestSlicedIdentifier)
 {
     std::string test = "imm12[0:4]";
@@ -47,6 +56,10 @@ TEST_F(InstDefLangTest, TestSlicedIdentifier)
     EXPECT_EQ(res->m_slice.m_to, 4);
 }
 
+/**
+ * Verifies operator precedence in bit expressions ensuring shift (<<) binds tighter than AND (&),
+ * which binds tighter than OR (|).
+ */
 TEST_F(InstDefLangTest, TestBitExpressionPrecedence)
 {
     // Evaluates: a | (b & (c << 2))
@@ -76,6 +89,9 @@ TEST_F(InstDefLangTest, TestBitExpressionPrecedence)
     EXPECT_EQ(shlExpr->m_op, DSL::Ast::InstDef::BitExprOp::Shl);
 }
 
+/**
+ * Verifies parsing unary bitwise complement (~) and sliced identifiers in compound expressions.
+ */
 TEST_F(InstDefLangTest, TestUnaryComplementAndSliceInExpression)
 {
     std::string test = "~mask & imm12[0:4]";
@@ -103,6 +119,9 @@ TEST_F(InstDefLangTest, TestUnaryComplementAndSliceInExpression)
     EXPECT_EQ(sliced.m_slice.m_to, 4);
 }
 
+/**
+ * Verifies parsing bit assignment statements mapping right-hand-side sliced operands into left-hand-side field slices.
+ */
 TEST_F(InstDefLangTest, TestBitAssignment)
 {
     std::string test = "imm4_0[0:4] = imm12[0:4]";
@@ -126,6 +145,9 @@ TEST_F(InstDefLangTest, TestBitAssignment)
 // 2. Formats & Layouts
 // ============================================================================
 
+/**
+ * Verifies parsing instruction format declarations with explicit bit width (e.g. format RType(32)) and sliced fields.
+ */
 TEST_F(InstDefLangTest, TestFormatDeclarationExplicitWidth)
 {
     std::string test = R"(
@@ -160,6 +182,9 @@ format RType(32) {
     EXPECT_EQ(res->m_fields[6].m_slice.m_to, 37);
 }
 
+/**
+ * Verifies parsing instruction format declarations with default 32-bit width.
+ */
 TEST_F(InstDefLangTest, TestFormatDeclarationDefaultWidth)
 {
     std::string test = R"(
@@ -181,6 +206,9 @@ format SimpleFormat {
 // 3. Unified Instruction Operands & Header
 // ============================================================================
 
+/**
+ * Verifies parsing register operands, parameterized immediate operands, and unparameterized immediate operands.
+ */
 TEST_F(InstDefLangTest, TestRegisterAndImmediateOperands)
 {
     // 1. Register operand
@@ -221,6 +249,9 @@ TEST_F(InstDefLangTest, TestRegisterAndImmediateOperands)
     EXPECT_EQ(immRes->m_dir, DSL::Ast::InstDef::InstOperandDir::ArgIn);
 }
 
+/**
+ * Verifies parsing instruction headers linking instruction names, operand signatures, and target format names.
+ */
 TEST_F(InstDefLangTest, TestInstHeader)
 {
     std::string test = "inst SW(GPR:rs2 IN, GPR:rs1 IN, simm(i12):imm12 IN) format SType";
@@ -251,6 +282,10 @@ TEST_F(InstDefLangTest, TestInstHeader)
 // 4. Complete Instruction Declarations & Translation Unit
 // ============================================================================
 
+/**
+ * Verifies parsing a complete target instruction declaration including implicit register dependencies,
+ * FORMAT encoding overrides, instruction flags, assembly syntax template, and execution latency.
+ */
 TEST_F(InstDefLangTest, TestCompleteInstructionDeclaration)
 {
     std::string test = R"(
@@ -297,6 +332,10 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
     EXPECT_EQ(res->m_body.m_latency, 1);
 }
 
+/**
+ * Verifies parsing an entire target instruction definition file (.idf) containing multiple format
+ * definitions and instruction declarations.
+ */
 TEST_F(InstDefLangTest, TestFullTranslationUnit)
 {
     std::string test = R"dsl(
@@ -358,6 +397,9 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
 // 5. Negative & Error Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies syntax error rejection when a format field is missing a terminating semicolon.
+ */
 TEST_F(InstDefLangTest, TestMissingSemicolonInFormatError)
 {
     std::string test = R"(
@@ -372,6 +414,9 @@ format BadFormat {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an operand specifies an invalid argument direction.
+ */
 TEST_F(InstDefLangTest, TestInvalidDirectionError)
 {
     std::string test = "GPR:rd INVALIDSIDE";
@@ -381,6 +426,9 @@ TEST_F(InstDefLangTest, TestInvalidDirectionError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an instruction body is unclosed.
+ */
 TEST_F(InstDefLangTest, TestUnterminatedInstBodyError)
 {
     std::string test = R"(

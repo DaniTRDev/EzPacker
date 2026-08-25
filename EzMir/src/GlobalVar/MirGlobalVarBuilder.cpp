@@ -7,17 +7,26 @@
 #include "Printer/MirPrinter.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Initializes the builder with the parent context and default constant setting (true).
+ */
 MirGlobalVarBuilder::MirGlobalVarBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_initializer(nullptr)
 {
     setConstant(true);
 }
 
+/**
+ * Configures the mutability / constancy of the global variable.
+ */
 MirGlobalVarBuilder &MirGlobalVarBuilder::setConstant(bool constant)
 {
     m_constant = constant;
     return *this;
 }
 
+/**
+ * Sets the initializer operand, validating that only constant values (integers or floats) are used.
+ */
 MirGlobalVarBuilder &MirGlobalVarBuilder::setInitializer(MirOperand *initializer)
 {
     if (!initializer->isOfType<MirInteger>() && !initializer->isOfType<MirFloat>())
@@ -31,6 +40,9 @@ MirGlobalVarBuilder &MirGlobalVarBuilder::setInitializer(MirOperand *initializer
     return *this;
 }
 
+/**
+ * Constructs and allocates a new MirGlobalVar in the context arena allocator with a unique MIR ID.
+ */
 MirGlobalVar *MirGlobalVarBuilder::build(MirGlobalVarLinkage linkage,
                                          MirType *type,
                                          const std::pmr::string &name,

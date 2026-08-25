@@ -19,6 +19,7 @@ size_t ParseContext::getSourceId() const { return m_sourceId; }
 
 SourceReference *ParseContext::createRef(const char *startIter, const char *endIter)
 {
+    // Compute character offset relative to the start of the source buffer
     const char *basePtr = m_sourceManager->getSourceContent(m_sourceId).data();
 
     const size_t startOffset = static_cast<size_t>(startIter - basePtr);
@@ -33,5 +34,6 @@ void ParseContext::pushToCollector(std::string_view sourceName,
                                    std::string_view message,
                                    struct SourceReference *sourceRef)
 {
+    // Format error diagnostic and attach source location span
     m_diagCollector->error(sourceName, message) << sourceRef;
 }

@@ -7,96 +7,99 @@
 #include <optional>
 
 /**
- * This class is responsible for debug symbols and source tracking. It keeps references to
- * the original content of source files and translates references to content from the file.
+ * Concrete source file registry managing arena-backed file buffers, include paths, and debug symbol spans.
+ * Provides thread-compatible storage of SourceFileEntry instances, line-to-offset binary mapping,
+ * and canonical include path resolution for the compiler frontend and AST/MIR diagnostics.
  */
 class SourceManager : public GenericSourceManager
 {
   public:
     /**
-     * Constructs a SourceManager with the given working path and memory resource.
+     * Constructs a SourceManager with a root working directory and a PMR memory resource for arena allocations.
      */
     SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc);
 
     /**
-     * Calls the destructor of the objects.
+     * Destructor freeing all allocated SourceFileEntry objects through the memory resource.
      */
     ~SourceManager();
 
     /**
-     * Checks if a source with the given name already exists in the manager.
+     * Checks if a source buffer with the given name or path exists in the path-to-ID lookup map.
      */
     bool doesSourceNameExist(const std::string_view &sourceName) const override;
 
     /**
-     * Adds a new source file using given content and name. Returns 0 if the source already existed.
+     * Adds an in-memory source file with the specified name and content string view.
+     * Computes line bounds and registers the entry. Returns the new 1-based ID, or 0 if name already exists.
      */
     size_t addSourceContent(const std::string &name, const std::string_view &content) override;
 
     /**
-     * Creates a source reference using start offset, length, and source file ID.
+     * Allocates and initializes a SourceReference for a byte interval within the file indicated by sourceId.
+     * Returns nullptr if sourceId is invalid or startOffset exceeds file length.
      */
     SourceReference *createReference(size_t startOffset, size_t length, size_t sourceId) override;
 
     /**
-     * Creates a source reference using start offset, length, and source file name.
+     * Allocates and initializes a SourceReference using registered source file name.
+     * Returns nullptr if source file is not found in the registry.
      */
     SourceReference *createReference(size_t startOffset, size_t length, const std::string_view &sourceFile) override;
 
     /**
-     * Returns the source line range that contains the given reference.
+     * Finds the precomputed 1-based line interval enclosing the given SourceReference via binary search.
+     * Returns nullptr if reference or source entry is invalid.
      */
     SourceLineRange *getReferenceLine(SourceReference *ref) const override;
 
     /**
-     * Adds an include directory to search for included or referenced files.
+     * Adds an include directory to the search list, converting existing paths to weakly canonical forms.
      */
     void addIncludePath(const std::filesystem::path &path) override;
 
     /**
-     * Resolves the given source file path based on the working directory, relative base, and include paths.
+     * Resolves a file path relative to an including file, the working directory, or registered include paths.
+     * Returns the weakly canonical path.
      */
     std::filesystem::path
     resolveSourcePath(const std::filesystem::path &sourceFile,
                       const std::optional<std::filesystem::path> &relativeTo = std::nullopt) const override;
 
     /**
-     * Loads a file from disk into the source manager, resolving its path against include paths
-     * and the working directory. Returns the assigned source ID, or std::nullopt on failure.
+     * Reads a source file from disk into the PMR arena, creates line index entries, and assigns a source ID.
+     * Avoids duplicate loads if canonical path is already registered. Returns assigned ID or std::nullopt on error.
      */
     std::optional<size_t> loadFile(const std::filesystem::path &filePath,
                                    const std::optional<std::filesystem::path> &relativeTo = std::nullopt) override;
 
     /**
-     * Returns a direct pointer to the arena-backed source buffer, or nullptr if id is invalid.
+     * Returns a direct pointer to the arena-backed string buffer for the specified source file ID, or nullptr if invalid.
      */
     const std::pmr::string *getSourceBuffer(size_t id) const;
 
     /**
-     * Returns all registered include search paths.
+     * Returns a const reference to the registered include search paths vector.
      */
     const std::pmr::vector<std::filesystem::path> &getIncludePaths() const;
 
     /**
-     * Returns the raw line of where this reference was created. Returns an empty string if ref was not found.
-     *
-     * This method returns a view to the internal content buffer.
+     * Returns a zero-copy string view of the full line containing the given SourceReference.
      */
     std::string_view getRawLineContent(SourceReference *ref) const override;
 
     /**
-     * Returns the line content of the given reference. Returns the content of the reference or an empty string if the
-     * reference was not found.
+     * Returns a zero-copy string view of the exact text span referenced by the given SourceReference.
      */
     std::string_view getReferenceContent(SourceReference *ref) const override;
 
     /**
-     * Returns the source content for the given ID. If the source file was not found, an empty string is returned.
+     * Returns the full content string view for the source file with the given numeric ID.
      */
     std::string_view getSourceContent(size_t id) const override;
 
     /**
-     * Returns the source name of the given source file id.
+     * Returns the registered name or path for the source file with the given numeric ID.
      */
     std::string_view getSourceName(size_t id) const override;
 

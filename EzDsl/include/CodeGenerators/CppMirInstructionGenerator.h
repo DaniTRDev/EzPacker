@@ -13,6 +13,7 @@ namespace CodeGenerators
 /**
  * Synthesizes the EzMir IR instruction definition file (MirInstructionSetDefs.h)
  * from the parsed IR instruction symbols in the SymbolTable.
+ * Emits opcode definitions, tier markers, flag masks, and instruction descriptor table registrations.
  */
 extern bool
 GenerateMirIrInstructionDefs(DiagnosticCollector *collector, SymbolTable *table, std::filesystem::path outPath);

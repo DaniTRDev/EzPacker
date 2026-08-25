@@ -4,11 +4,16 @@
 #include "EzMirCommon.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
 
+/**
+ * Central state and memory manager for MIR module construction.
+ * Manages monotonic PMR arena resources, symbol and type lookup tables, ID generation,
+ * and maintains collections of functions, global variables, basic blocks, and virtual registers.
+ */
 class MirBuilderContext
 {
   public:
     /**
-     * Builds the context with the given type table.
+     * Constructs a MIR builder context with default calling convention, diagnostic collector, type table, and arena.
      */
     MirBuilderContext(class CallingConvDesc *defaultCallingConv,
                       class DiagnosticCollector *diagCollector,
@@ -20,27 +25,27 @@ class MirBuilderContext
     MirBuilderContext &operator=(const MirBuilderContext &) = delete;
 
     /**
-     * Appends the block to the context. Returns true if succeeded.
+     * Appends and registers a basic block into the context's lookup map. Returns false if already registered.
      */
     bool appendBlock(class MirBlock *block);
 
     /**
-     * Appends the function to the context. Returns true if succeeded.
+     * Appends and registers a function into the context's intrusive function list and lookup map.
      */
     bool appendFunction(class MirFunction *func);
 
     /**
-     * Appends a global variable to the context. Returns true if succeeded.
+     * Appends and registers a global variable into the context's global variable list.
      */
     bool appendGlobalVar(class MirGlobalVar *globalVar);
 
     /**
-     * Appends a register to the context. Returns true if succeeded. This function will skip physical registers.
+     * Registers a virtual register into the context's ID lookup table. Skips physical registers.
      */
     bool appendRegister(class MirRegister *reg);
 
     /**
-     * Returns the default calling convention for a function.
+     * Returns the default calling convention descriptor.
      */
     class CallingConvDesc *getDefaultCallingConvention() const;
 
@@ -50,55 +55,52 @@ class MirBuilderContext
     class DiagnosticCollector *getDiagCollector();
 
     /**
-     * Returns the MUTABLE function list that were built in this context. Used internally by the pass manager.
+     * Returns the mutable intrusive list of functions built within this context.
      */
     IntrusiveLinkedList<class MirFunction> &getFunctions();
 
     /**
-     * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr if the
-     * ID is not found.
+     * Retrieves a basic block by its unique MirId. Returns nullptr if not found.
      */
     class MirBlock *getBlockById(MirId id) const;
 
     /**
-     * Searches in the context for the given function ID and returns a pointer to the function, if exists. Returns
-     * nullptr if the ID is not found.
+     * Retrieves a function by its unique MirId. Returns nullptr if not found.
      */
     class MirFunction *getFuncById(MirId id) const;
 
     /**
-     * Searches in the context for a global variable with the given index. If it exists, it is returned. Returns nullptr
-     * if not found.
+     * Retrieves a global variable by its unique MirId. Returns nullptr if not found.
      */
     class MirGlobalVar *getGVarById(MirId id) const;
 
     /**
-     * Creates an ID within this context. Returns 0 (MIRID_INVALID) if failed.
+     * Allocates and returns a new monotonically increasing MirId.
      */
     MirId createId();
 
     /**
-     * Returns the register that has the given ID. If no match is found, nullptr is returned.
+     * Retrieves a virtual/physical register by its numeric ID. Returns nullptr if not found.
      */
     class MirRegister *getRegisterById(size_t id) const;
 
     /**
-     * Returns the type table attached to this context.
+     * Returns the MirTypeTable associated with this context.
      */
     class MirTypeTable *getTypeTable();
 
     /**
-     * Sets the default calling convention.
+     * Sets the default target calling convention descriptor for functions built in this context.
      */
     void setDefaultCallingConvention(class CallingConvDesc *defaultCallingConv);
 
     /**
-     * Returns an allocator used to allocate complementary resources (global data, types, names, maps...).
+     * Returns the monotonic buffer memory resource for arena allocations.
      */
     std::pmr::monotonic_buffer_resource *getGlobalAllocator();
 
     /**
-     * Returns the MUTABLE global variable list that were built using this context. Used internally by the pass manager.
+     * Returns the mutable list of global variables registered in this context.
      */
     std::pmr::list<class MirGlobalVar *> &getGlobalVars();
 

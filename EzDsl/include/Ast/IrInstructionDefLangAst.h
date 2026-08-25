@@ -8,6 +8,10 @@ namespace DSL::Ast::IrInstDef
 {
 /**
  * Bitmask enumeration representing expected operand types in IR instruction declarations.
+ *
+ * Valid operand type keywords:
+ *   'Register', 'Integer', 'FloatingPoint', 'Memory', 'Reference', 'RuntimeSymbol', 'VariadicArgs',
+ *   'Immediate', 'RegIntImm', 'RegFloatImm', 'RegImm', 'AddressSource', 'AnyValue', 'Any'
  */
 enum class IrOperandType : uint16_t
 {
@@ -31,7 +35,10 @@ enum class IrOperandType : uint16_t
 };
 
 /**
- * Dataflow direction for an IR operand (In, Out, InOut).
+ * Dataflow direction for an IR operand.
+ *
+ * Valid direction keywords:
+ *   'IN', 'OUT', 'INOUT'
  */
 enum class IrOperandDir : uint8_t
 {
@@ -41,7 +48,15 @@ enum class IrOperandDir : uint8_t
 };
 
 /**
- * Single operand in an IR instruction declaration with type, identifier, and direction.
+ * Single operand in an IR instruction declaration.
+ *
+ * Syntax:
+ *   IrOperand := OperandType ':' Identifier Direction
+ *   Direction := 'IN' | 'OUT' | 'INOUT'
+ *
+ * Examples:
+ *   Register:dst OUT
+ *   RegImm:rhs IN
  */
 struct IrOperand
 {
@@ -52,6 +67,9 @@ struct IrOperand
 
 /**
  * Functional category for classifying IR instructions.
+ *
+ * Valid category keywords:
+ *   'DataMovement', 'Memory', 'Arithmetic', 'Bitwise', 'Compare', 'ControlFlow', 'Casting', 'System'
  */
 enum class IrInstCategory : uint8_t
 {
@@ -67,7 +85,10 @@ enum class IrInstCategory : uint8_t
 };
 
 /**
- * Abstraction tier of the IR instruction (HighLevel, PassInternal, TargetLow).
+ * Abstraction tier of the IR instruction.
+ *
+ * Valid tier keywords:
+ *   'HighLevel', 'PassInternal', 'TargetLow'
  */
 enum class IrInstTier : uint8_t
 {
@@ -78,6 +99,11 @@ enum class IrInstTier : uint8_t
 
 /**
  * Behavioral and verification flags for IR instructions.
+ *
+ * Valid flag keywords:
+ *   'SizeMatch', 'DestLarger', 'DestSmaller', 'ReadsMemory', 'WritesMemory', 'IsTerminator',
+ *   'IsBranch', 'IsCall', 'IsReturn', 'HasSideEffect', 'IsCommutative', 'ReadsCPUFlags',
+ *   'WritesCPUFlags', 'TreatAsSigned', 'VariadicArgs'
  */
 enum class IrInstFlag : uint32_t
 {
@@ -101,6 +127,13 @@ enum class IrInstFlag : uint32_t
 
 /**
  * IR instruction body containing category, tier, and behavioral flags.
+ *
+ * Syntax:
+ *   IrInstBody := '{' ( BodyItem )* '}'
+ *   BodyItem   := CategoryDecl | TierDecl | FlagsDecl
+ *   CategoryDecl := 'CATEGORY' '(' Category ')' ';'
+ *   TierDecl     := 'TIER' '(' Tier ')' ';'
+ *   FlagsDecl    := 'FLAGS' '(' ( Flag (',' Flag)* )? ')' ';'
  */
 struct IrInstBody
 {
@@ -110,7 +143,18 @@ struct IrInstBody
 };
 
 /**
- * Complete IR instruction declaration AST node (name, operand list, body attributes).
+ * Complete IR instruction declaration AST node.
+ *
+ * Syntax:
+ *   IrInstDecl := 'ir_inst' OpcodeName '(' ( IrOperand (',' IrOperand)* )? ')' IrInstBody ';'?
+ *   OpcodeName := Identifier
+ *
+ * Example:
+ *   ir_inst ADD(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+ *       CATEGORY(Arithmetic);
+ *       TIER(HighLevel);
+ *       FLAGS(SizeMatch, IsCommutative);
+ *   }
  */
 struct IrInstDecl
 {
@@ -120,7 +164,10 @@ struct IrInstDecl
 };
 
 /**
- * Root AST structure representing a parsed IR instruction definition file.
+ * Root AST structure representing a parsed .irdf IR instruction definition file.
+ *
+ * Syntax:
+ *   IrInstDefFile := ( IrInstDecl )* EOF
  */
 struct IrInstDefFile
 {

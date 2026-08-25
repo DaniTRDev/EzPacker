@@ -7,6 +7,9 @@
 namespace DSL::Ast::TypeDef
 {
 
+/**
+ * Enumeration of primitive and special type categories definable in .tyf files.
+ */
 enum class TypeKind : uint8_t
 {
     Integer,
@@ -17,12 +20,20 @@ enum class TypeKind : uint8_t
 };
 
 /**
- * Defines an IR PRIMITIVE or SPECIAL type:
- * - integer i8(8);
- * - float f32(32);
- * - void void; or void void(0);
- * - bindingToken __bindToken;
- * - pointer ptr
+ * AST node for primitive and special type declarations in .tyf files.
+ *
+ * Syntax:
+ *   TypeDescriptor := TypeKindName TypeName ('(' BitWidth ')')? ';'
+ *   TypeKindName   := 'integer' | 'float' | 'void' | 'bindingToken' | 'pointer'
+ *   TypeName       := Identifier
+ *   BitWidth       := IntegerLiteral
+ *
+ * Examples:
+ *   integer i32(32);
+ *   float f64(64);
+ *   void void_t;
+ *   bindingToken __token;
+ *   pointer ptr(64);
  */
 struct TypeDescriptor
 {
@@ -32,7 +43,10 @@ struct TypeDescriptor
 };
 
 /**
- * Types defined in a type definition file.
+ * Top-level AST root representing a parsed .tyf type definitions file.
+ *
+ * Syntax:
+ *   TypeDefFile := ( TypeDescriptor )* EOF
  */
 struct TypeDefFile
 {

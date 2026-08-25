@@ -10,6 +10,9 @@ namespace DSL::Ast::LegalizeActionDef
 {
 /**
  * Action to perform when an instruction matches a given type combination.
+ *
+ * Valid action keywords:
+ *   'LEGAL', 'WIDENS', 'NARROWS', 'LIBCALL', 'CUSTOM', 'BITCAST', 'UNSUPPORTED'
  */
 enum class LegalizeActionKind : uint8_t
 {
@@ -23,74 +26,73 @@ enum class LegalizeActionKind : uint8_t
 };
 
 /**
- * Represents a type constraint on a specific instruction operand slot.
+ * Type constraint on an instruction operand slot.
  *
- * For homogeneous operations (e.g., ADD, SUB), where all operands share
- * the same type, the index is omitted (std::nullopt). The legalizer assumes
- * type index 0 (which applies uniformly to destination and inputs).
- *
- * For heterogeneous operations (e.g., SEXT, LOAD), where operand
- * types differ, an explicit type index specifies the exact slot being checked:
- * - Type index 0: Destination / Result / Value type
- * - Type index 1: Source / Pointer / ...
+ * Syntax:
+ *   TypeConstraint := TypeName ( ':' OperandSlotIndex )?
+ *   TypeName       := Identifier
+ *   OperandSlotIndex := IntegerLiteral
  *
  * Examples:
- * - "i32"     -> Homogeneous check on type index 0
- * - "i8:1"    -> Heterogeneous check targeting operand type index 1 (e.g., Source)
+ *   - "i32"     -> Homogeneous check on default type index 0
+ *   - "i8:1"    -> Heterogeneous check targeting operand slot index 1
  */
 struct TypeConstraint
 {
-    Common::Identifier m_type;                         // Type name (e.g., "i8", "i32", "p0", "v4f32").
-    std::optional<Common::IntegerLiteral> m_operandIndex; // Optional operand slot index (e.g., 0, 1).
+    Common::Identifier m_type;
+    std::optional<Common::IntegerLiteral> m_operandIndex;
 };
 
 /**
- * A single legalization directive within an instruction declaration.
+ * Single legalization directive within an instruction declaration.
  *
- * Specifies which types trigger this action, along with optional transformation
- * targets (such as target types for widening/narrowing or symbol names for libcalls).
+ * Syntax:
+ *   LegalizeActionClause := ActionKind '(' TypeConstraint (',' TypeConstraint)* ')' ( '>>' Target )?
+ *   ActionKind := 'LEGAL' | 'WIDENS' | 'NARROWS' | 'LIBCALL' | 'CUSTOM' | 'BITCAST' | 'UNSUPPORTED'
+ *   Target     := Identifier | StringLiteral
  *
- * Syntax Examples:
- * - LEGAL(i8, i16, i32);
- * - WIDENS(i1, i2, i4) >> i32;
- * - WIDENS(i1:1, i8:1) >> i32;
- * - NARROWS(i64) >> i32;
- * - LIBCALL(i64) >> "__divdi3";
+ * Examples:
+ *   LEGAL(i8, i16, i32)
+ *   WIDENS(i1, i2, i4) >> i32
+ *   LIBCALL(i64) >> "__divdi3"
  */
 struct LegalizeActionClause
 {
     LegalizeActionKind m_kind;
-    std::pmr::vector<TypeConstraint> m_types;             // Types matched by this action.
-    std::optional<Common::Identifier> m_targetType;       // Target type for Widen/Narrow/Bitcast (e.g., "i32").
-    std::optional<Common::StringLiteral> m_libcallSymbol; // Runtime library symbol name for Libcall.
+    std::pmr::vector<TypeConstraint> m_types;
+    std::optional<Common::Identifier> m_targetType;
+    std::optional<Common::StringLiteral> m_libcallSymbol;
 };
 
 /**
- * Encapsulates all legalization rules declared for a specific generic IR opcode.
+ * Encapsulates all legalization rules declared for a specific generic IR opcode in a .lad file.
+ *
+ * Syntax:
+ *   InstructionLegalizeDecl := 'action' OpcodeName '{' ( LegalizeActionClause ';' )* '}' ';'?
+ *   OpcodeName              := Identifier
  *
  * Example:
- * @code
- * action ADD {
- *     LEGAL(i32, f32);
- *     WIDENS(i1, i8, i16) >> i32;
- *     NARROWS(i64) >> i32;
- * };
- * @endcode
+ *   action ADD {
+ *       LEGAL(i32, f32);
+ *       WIDENS(i1, i8, i16) >> i32;
+ *       NARROWS(i64) >> i32;
+ *   };
  */
 struct InstructionLegalizeDecl
 {
-    Common::Identifier m_instName;                    // Generic IR opcode name (e.g., "ADD", "SEXT").
-    std::pmr::vector<LegalizeActionClause> m_actions; // Directives declared for this instruction.
+    Common::Identifier m_instName;
+    std::pmr::vector<LegalizeActionClause> m_actions;
 };
 
 /**
- * Root AST node representing a complete target legalization matrix definition file.
+ * Root AST node representing a complete target legalization definition file (.lad).
  *
- * Defines the full action table mapping opcodes to their legality rules.
+ * Syntax:
+ *   TargetLegalizeDef := ( InstructionLegalizeDecl )* EOF
  */
 struct TargetLegalizeDef
 {
-    std::pmr::vector<InstructionLegalizeDecl> m_instructionActions; // Per-instruction legalization declarations.
+    std::pmr::vector<InstructionLegalizeDecl> m_instructionActions;
 };
 }; // namespace DSL::Ast::LegalizeActionDef
 

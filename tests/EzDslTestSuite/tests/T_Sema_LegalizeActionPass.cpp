@@ -7,11 +7,17 @@
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeActionPass.h"
 
+/**
+ * Test fixture for semantic validation and symbol resolution of target legalization actions (LegalizeActionPass).
+ */
 class LegalizeActionPassTest : public DslTestSuiteAsGtest
 {
   protected:
     std::unique_ptr<SymbolTable> m_table;
 
+    /**
+     * Initializes the symbol table with primitive scalar types and standard IR instructions before each test.
+     */
     void SetUp() override
     {
         DslTestSuiteAsGtest::SetUp();
@@ -22,6 +28,9 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         m_table->enterScope("TargetScope");
     }
 
+    /**
+     * Helper to declare a scalar type symbol with name and bit width in the symbol table.
+     */
     void registerType(std::string_view name, uint32_t bitWidth)
     {
         Sema::Symbols::TypeSymbol typeSym{ .m_name = name,
@@ -30,6 +39,9 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         m_table->declareSym(nullptr, SymbolFlags::IsDefined, SymbolType::Type, typeSym, name);
     }
 
+    /**
+     * Registers standard primitive integer and floating-point types in the mock symbol table.
+     */
     void registerPrimitiveTypes()
     {
         registerType("i1", 1);
@@ -42,6 +54,9 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         registerType("f64", 64);
     }
 
+    /**
+     * Helper to declare a generic IR instruction symbol in the mock symbol table.
+     */
     void registerIrInstruction(std::string_view name)
     {
         Sema::Symbols::IrInstructionSymbol irSym{ .m_name = name,
@@ -53,6 +68,9 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         m_table->declareSym(nullptr, SymbolFlags::IsDefined, SymbolType::IrInstruction, irSym, name);
     }
 
+    /**
+     * Registers standard IR instruction symbols used across legalization tests.
+     */
     void registerDefaultIrInstructions()
     {
         registerIrInstruction("ADD");
@@ -64,6 +82,9 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         registerIrInstruction("BITCAST");
     }
 
+    /**
+     * Parses a string containing legalization action DSL into an AST.
+     */
     std::optional<DSL::Ast::LegalizeActionDef::TargetLegalizeDef> parseFile(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff("LegalizeActionPassTest", source);
@@ -71,6 +92,9 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
                          DSL::Ast::LegalizeActionDef::TargetLegalizeDef>();
     }
 
+    /**
+     * Executes the LegalizeActionPass semantic analysis pass over the given source code string.
+     */
     bool runPass(const std::string &source)
     {
         auto ast = parseFile(source);
@@ -86,6 +110,9 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
 // 1. Success & Symbol Resolution Tests
 // ============================================================================
 
+/**
+ * Verifies semantic resolution of a valid LEGAL action clause marking i32 and f32 as directly supported.
+ */
 TEST_F(LegalizeActionPassTest, TestValidLegalActionDeclaration)
 {
     std::string code = R"(
@@ -111,6 +138,9 @@ action ADD {
     EXPECT_EQ(clause.m_types[1].m_operandIndex, std::nullopt);
 }
 
+/**
+ * Verifies semantic resolution of WIDENS, NARROWS, and BITCAST clauses and resolution of target type IDs.
+ */
 TEST_F(LegalizeActionPassTest, TestValidWidenNarrowAndBitcastTransformations)
 {
     std::string code = R"(
@@ -149,6 +179,9 @@ action CONV {
     EXPECT_EQ(actionData->m_clauses[2].m_targetTypeId, i32Sym->getId());
 }
 
+/**
+ * Verifies semantic resolution of a LIBCALL lowering action mapping to an external runtime library symbol string.
+ */
 TEST_F(LegalizeActionPassTest, TestValidLibcallAction)
 {
     std::string code = R"(
@@ -173,6 +206,9 @@ action SDIV {
     EXPECT_FALSE(clause.m_targetTypeId.has_value());
 }
 
+/**
+ * Verifies semantic resolution of heterogeneous type constraints where specific operand indices are designated.
+ */
 TEST_F(LegalizeActionPassTest, TestHeterogeneousConstraintOperandIndices)
 {
     std::string code = R"(
@@ -203,6 +239,9 @@ action SEXT {
 // 2. Opcode Validation & Semantic Error Tests
 // ============================================================================
 
+/**
+ * Verifies that the semantic pass rejects action blocks for undefined generic IR opcodes.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorUndefinedIrOpcode)
 {
     std::string code = R"(
@@ -214,6 +253,9 @@ action UNKNOWN_OPCODE {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects action declarations targeting symbols that are not IR instructions.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorSymbolNotAnIrInstruction)
 {
     // "i32" is defined as a SymbolType::Type, not a SymbolType::IrInstruction
@@ -226,6 +268,9 @@ action i32 {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects clauses referencing undefined source types.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorUndefinedSourceType)
 {
     std::string code = R"(
@@ -237,6 +282,9 @@ action ADD {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects clauses referencing undefined target types.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorUndefinedTargetType)
 {
     std::string code = R"(
@@ -248,6 +296,9 @@ action ADD {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies semantic validation error when WIDENS targets a narrower bit width.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorInvalidWidenBitwidth)
 {
     std::string code = R"(
@@ -259,6 +310,9 @@ action ADD {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies semantic validation error when NARROWS targets a wider bit width.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorInvalidNarrowBitwidth)
 {
     std::string code = R"(
@@ -270,6 +324,9 @@ action ADD {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies semantic validation error when BITCAST source and target types have mismatched bit widths.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorBitcastBitwidthMismatch)
 {
     std::string code = R"(
@@ -281,6 +338,9 @@ action CAST {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies semantic validation error on multiple action declarations for the same generic opcode.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorOpcodeRedefinition)
 {
     std::string code = R"(
@@ -296,6 +356,9 @@ action ADD {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies semantic validation error when LIBCALL erroneously specifies a target type instead of a symbol string.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorLibcallWithTargetType)
 {
     std::string code = R"(
@@ -307,6 +370,9 @@ action SDIV {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies semantic validation error when a LEGAL clause specifies a transformation target type.
+ */
 TEST_F(LegalizeActionPassTest, TestErrorLegalClauseWithTargetType)
 {
     std::string code = R"(

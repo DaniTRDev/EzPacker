@@ -6,6 +6,9 @@
 #include "Parser/TypeDefLang.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for Type Definition Language (.tyf) parser, scalar type descriptors, and AST generation.
+ */
 class TypeDefLangTest : public DslTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class TypeDefLangTest : public DslTestSuiteAsGtest
 // 1. Single Type Descriptor Declarations
 // ============================================================================
 
+/**
+ * Verifies parsing an integer type descriptor with explicit bit width (e.g. integer i32(32)).
+ */
 TEST_F(TypeDefLangTest, TestIntegerTypeDescriptor)
 {
     std::string test = "integer i32(32)";
@@ -28,6 +34,9 @@ TEST_F(TypeDefLangTest, TestIntegerTypeDescriptor)
     EXPECT_EQ(res->m_bitSize->m_node, 32);
 }
 
+/**
+ * Verifies parsing a floating-point type descriptor with explicit bit width (e.g. float f64(64)).
+ */
 TEST_F(TypeDefLangTest, TestFloatTypeDescriptor)
 {
     std::string test = "float f64(64)";
@@ -41,6 +50,9 @@ TEST_F(TypeDefLangTest, TestFloatTypeDescriptor)
     EXPECT_EQ(res->m_bitSize->m_node, 64);
 }
 
+/**
+ * Verifies parsing arbitrary single-bit and custom bit-width integer types (e.g. integer i1(1)).
+ */
 TEST_F(TypeDefLangTest, TestCustomBitWidths)
 {
     std::string test = "integer i1(1)";
@@ -54,6 +66,9 @@ TEST_F(TypeDefLangTest, TestCustomBitWidths)
     EXPECT_EQ(res->m_bitSize->m_node, 1);
 }
 
+/**
+ * Verifies parsing void type descriptor without bit size parameter.
+ */
 TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithoutBitSize)
 {
     std::string test = "void void";
@@ -66,6 +81,9 @@ TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithoutBitSize)
     EXPECT_FALSE(res->m_bitSize.has_value());
 }
 
+/**
+ * Verifies parsing void type descriptor with explicit zero bit size parameter (void void(0)).
+ */
 TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithBitSize)
 {
     std::string test = "void void(0)";
@@ -79,6 +97,9 @@ TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithBitSize)
     EXPECT_EQ(res->m_bitSize->m_node, 0);
 }
 
+/**
+ * Verifies parsing compiler binding token type descriptors.
+ */
 TEST_F(TypeDefLangTest, TestBindingTokenTypeDescriptor)
 {
     std::string test = "bindingToken __bindToken";
@@ -95,6 +116,9 @@ TEST_F(TypeDefLangTest, TestBindingTokenTypeDescriptor)
 // 2. Type Definition File / Multi-Type Declarations
 // ============================================================================
 
+/**
+ * Verifies parsing a single type declaration statement within a .tyf file.
+ */
 TEST_F(TypeDefLangTest, TestSingleTypeInFile)
 {
     std::string test = "integer i8(8);";
@@ -110,6 +134,9 @@ TEST_F(TypeDefLangTest, TestSingleTypeInFile)
     EXPECT_EQ(res->m_types[0].m_bitSize->m_node, 8);
 }
 
+/**
+ * Verifies parsing an entire .tyf file containing multiple integer, float, void, and token declarations.
+ */
 TEST_F(TypeDefLangTest, TestMultipleTypesInFile)
 {
     std::string test = R"(
@@ -171,6 +198,9 @@ TEST_F(TypeDefLangTest, TestMultipleTypesInFile)
 // 3. Negative & Error Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies syntax error rejection on unsupported type kind keywords (e.g. double).
+ */
 TEST_F(TypeDefLangTest, TestUnknownTypeKindFails)
 {
     std::string test = "double d64(64);";
@@ -180,6 +210,9 @@ TEST_F(TypeDefLangTest, TestUnknownTypeKindFails)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a type declaration statement is missing a terminating semicolon.
+ */
 TEST_F(TypeDefLangTest, TestMissingSemicolonInFileFails)
 {
     std::string test = "integer i32(32)";
@@ -189,6 +222,9 @@ TEST_F(TypeDefLangTest, TestMissingSemicolonInFileFails)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when bit size parameter is missing parentheses.
+ */
 TEST_F(TypeDefLangTest, TestMissingBitSizeParenthesesFails)
 {
     std::string test = "integer i32 32;";
@@ -198,6 +234,9 @@ TEST_F(TypeDefLangTest, TestMissingBitSizeParenthesesFails)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when type name identifier is omitted.
+ */
 TEST_F(TypeDefLangTest, TestMissingTypeNameFails)
 {
     std::string test = "integer (32);";
@@ -207,6 +246,9 @@ TEST_F(TypeDefLangTest, TestMissingTypeNameFails)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when bit size parameter parentheses are empty.
+ */
 TEST_F(TypeDefLangTest, TestEmptyBitSizeParameterFails)
 {
     std::string test = "integer i32();";

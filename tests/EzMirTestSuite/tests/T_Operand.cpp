@@ -8,12 +8,18 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Test fixture for MIR operand creation, type checking, and representation correctness.
+ */
 class OperandTest : public MirTestSuiteAsGtest
 {
 };
 
 namespace
 {
+/**
+ * Custom GoogleTest assertion verifying integer immediate operand type, MIR type, and numerical value.
+ */
 ::testing::AssertionResult IsInteger(MirOperand *op, MirType *expectedType, const FlexInt &expectedVal)
 {
     if (!op)
@@ -34,6 +40,9 @@ namespace
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying floating point immediate operand type, MIR type, and value.
+ */
 ::testing::AssertionResult IsFloat(MirOperand *op, MirType *expectedType, const FlexFloat &expectedVal)
 {
     if (!op)
@@ -54,6 +63,9 @@ namespace
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying reference operand type, target pointer type, and reference kind (Function/Block).
+ */
 ::testing::AssertionResult IsReference(MirOperand *op, MirType *expectedType, MirReferenceType expectedRefType)
 {
     if (!op)
@@ -76,6 +88,9 @@ namespace
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying register operand type, virtual/physical status, and register ID.
+ */
 ::testing::AssertionResult
 IsRegister(MirOperand *op, MirType *expectedType, bool expectedVirtual, size_t expectedId = MIRID_INVALID)
 {
@@ -102,6 +117,9 @@ IsRegister(MirOperand *op, MirType *expectedType, bool expectedVirtual, size_t e
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying runtime symbol operand type and symbol identifier name.
+ */
 ::testing::AssertionResult IsRuntimeSymbol(MirOperand *op, const std::string_view &expectedName)
 {
     if (!op)
@@ -119,6 +137,9 @@ IsRegister(MirOperand *op, MirType *expectedType, bool expectedVirtual, size_t e
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying memory operand type, base pointer register, and displacement offset.
+ */
 ::testing::AssertionResult
 IsMemory(MirOperand *op, MirType *expectedType, MirRegister *expectedBase, int64_t expectedDispl)
 {
@@ -153,6 +174,9 @@ IsMemory(MirOperand *op, MirType *expectedType, MirRegister *expectedBase, int64
 
 } // anonymous namespace
 
+/**
+ * Verifies integer immediate operands of varying bit widths (i8, i16, i32).
+ */
 TEST_F(OperandTest, Integer)
 {
     MirOperandBuilder builder(getBuilderCtx());
@@ -171,6 +195,9 @@ TEST_F(OperandTest, Integer)
                           FlexInt(uint32_t(0xDEADC0DE))));
 }
 
+/**
+ * Verifies 64-bit double-precision floating point immediate operands.
+ */
 TEST_F(OperandTest, Double)
 {
     MirOperandBuilder builder(getBuilderCtx());
@@ -184,6 +211,9 @@ TEST_F(OperandTest, Double)
                         FlexFloat(1.14151617)));
 }
 
+/**
+ * Verifies 32-bit single-precision floating point immediate operands.
+ */
 TEST_F(OperandTest, Float)
 {
     MirOperandBuilder builder(getBuilderCtx());
@@ -194,6 +224,9 @@ TEST_F(OperandTest, Float)
     EXPECT_TRUE(IsFloat(builder.buildFloat(types->f32(), FlexFloat(2.141516f)), types->f32(), FlexFloat(2.141516f)));
 }
 
+/**
+ * Verifies arbitrary-precision floating point operands (e.g. 128-bit IEEE-754 quad precision).
+ */
 TEST_F(OperandTest, FloatAnySize)
 {
     MirOperandBuilder builder(getBuilderCtx());
@@ -209,6 +242,9 @@ TEST_F(OperandTest, FloatAnySize)
                         FlexFloat("2.7182818284590452353602874713526625", 128)));
 }
 
+/**
+ * Verifies code reference operands targeting basic blocks and functions.
+ */
 TEST_F(OperandTest, Reference)
 {
     MirOperandBuilder builder(getBuilderCtx());
@@ -222,6 +258,9 @@ TEST_F(OperandTest, Reference)
     EXPECT_TRUE(IsReference(funcRef, types->getPtr(funcType), MirReferenceType::Function));
 }
 
+/**
+ * Verifies virtual and physical register operand construction and ID assignments.
+ */
 TEST_F(OperandTest, Register)
 {
     MirOperandBuilder builder(getBuilderCtx());
@@ -234,12 +273,19 @@ TEST_F(OperandTest, Register)
     EXPECT_TRUE(IsRegister(builder.buildPhysReg(types->f64(), 4), types->f64(), false, 4));
 }
 
+/**
+ * Verifies runtime symbol operand construction and symbol name preservation.
+ */
 TEST_F(OperandTest, RuntimeSymbol)
 {
     MirOperandBuilder builder(getBuilderCtx());
     EXPECT_TRUE(IsRuntimeSymbol(builder.buildRtSymbol("mySymbol"), "mySymbol"));
 }
 
+/**
+ * Verifies memory operand creation with a pointer base register and displacement offset,
+ * and confirms that non-pointer base registers are rejected.
+ */
 TEST_F(OperandTest, Memory)
 {
     MirOperandBuilder builder(getBuilderCtx());

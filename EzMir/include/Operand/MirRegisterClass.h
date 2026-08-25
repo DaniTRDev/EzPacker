@@ -4,22 +4,50 @@
 #include "EzMirCommon.h"
 
 /**
- * This descriptor contains information about a register.
+ * Descriptor storing physical register metadata, size, parent class, and sub-register aliasing relations.
  *
- * m_partOffsetInBits indicates whenever this register is the lower/upper part of another register in REVERSE ORDER.
- * Here's an example:
- *  - Imagine AL(m_partOffsetInBits:0) and AH(m_partOffsetInBits:8) (m_subParts = empty)
- *  - Now imagine EAX (m_partOffsetInBits:0) (m_subParts = AL, AH).
+ * The m_partOffsetInBits member indicates bit offset when this register is a sub-slice of a larger register.
+ * For instance:
+ *  - AL (m_partOffsetInBits: 0, m_bitSize: 8, m_subParts: empty)
+ *  - AH (m_partOffsetInBits: 8, m_bitSize: 8, m_subParts: empty)
+ *  - AX (m_partOffsetInBits: 0, m_bitSize: 16, m_subParts: [AL, AH])
+ *  - EAX (m_partOffsetInBits: 0, m_bitSize: 32, m_subParts: [AX])
  */
 struct MirRegisterDescriptor
 {
+    /**
+     * Diagnostic and assembly print name of the hardware register.
+     */
     std::string_view m_name;
+
+    /**
+     * Owning register class.
+     */
     class MirRegisterClass *m_owner;
+
+    /**
+     * Bit width of the physical register.
+     */
     size_t m_bitSize;
+
+    /**
+     * Unique index within the owning register class.
+     */
     size_t m_id;
+
+    /**
+     * Bit offset of this sub-register inside its enclosing parent register.
+     */
     size_t m_partOffsetInBits;
+
+    /**
+     * Sub-register slices that compose this register.
+     */
     std::pmr::vector<MirRegisterDescriptor *> m_subParts;
 
+    /**
+     * Constructs a register descriptor.
+     */
     MirRegisterDescriptor(const std::string_view &name,
                           class MirRegisterClass *owner,
                           size_t bitSize,
@@ -33,32 +61,26 @@ struct MirRegisterDescriptor
 };
 
 /**
- *  This structure abstract register classes: GPR8, GPR16, ..., FPR8, Special classes (imagine a coprocessor having a
- * special set of registers...)
+ * Abstraction for register classes within a hardware register bank (e.g. GPR8, GPR16, GPR32, GPR64, FPR32, FPR64).
  *
- * The bank is where the HW store 1 or more classes of registers: register bank(GPR). Classes: GPR8, GPR16, GPR32,
- * GPR64...
- *
- * Important note, IDs are unique within each bank but shared across classes. This means that register ID 1 from bank
- * 1 is different to register ID 1 from bank 2; AND register ID 1, with class 1 is different of register ID 1 with
- * class 2.
+ * Register IDs are unique within each bank but shared across classes in the same bank.
  */
 class MirRegisterClass
 {
   public:
     /**
-     * Creates an empty register class with the given name, owning bank, and allocator.
+     * Constructs an empty register class with the given name, parent bank, and memory resource.
      */
     MirRegisterClass(const char *name, class MirRegisterBank *owner, std::pmr::memory_resource *alloc);
 
     /**
-     * Returns the name of the class.
+     * Returns the name of the register class.
      */
     const char *getName() const;
 
     /**
-     * Adds a register, if not added already. If the register is already present in this class, false is returned.
-     * This function returns true if the register was correctly inserted.
+     * Inserts a register descriptor into this class if not already registered.
+     * Returns true upon successful insertion, false if a register with the same name exists.
      */
     bool addRegister(const std::string_view &name,
                      size_t bitSize,
@@ -66,19 +88,34 @@ class MirRegisterClass
                      std::initializer_list<MirRegisterDescriptor *> subParts);
 
     /**
-     * Returns the register with the given name. If no register matches, nullptr is returned.
+     * Looks up a register descriptor by name within this class; returns nullptr if not found.
      */
     MirRegisterDescriptor *getReg(const std::string_view &name) const;
 
     /**
-     * Returns the register map.
+     * Returns the map of register names to their descriptors.
      */
     const std::pmr::unordered_map<std::string_view, MirRegisterDescriptor *> &getRegs() const;
 
   private:
+    /**
+     * Name identifier for this register class (e.g., "GPR32").
+     */
     const char *m_name;
+
+    /**
+     * Owning hardware register bank (e.g., GPR, FPR).
+     */
     class MirRegisterBank *m_owner;
+
+    /**
+     * Memory resource used for descriptor allocations.
+     */
     std::pmr::memory_resource *m_alloc;
+
+    /**
+     * Lookup table mapping register names to descriptors.
+     */
     std::pmr::unordered_map<std::string_view, MirRegisterDescriptor *> m_registers;
 };
 

@@ -4,276 +4,270 @@
 #include "EzCoreCommon.h"
 
 /**
- * This class acts as a wrapper for libtommath's mp_int. It provides a set of utility and operators to be able to work
- * with flexible-width integers as if they were normal integers.
+ * Multi-precision arbitrary-width integer wrapper built atop LibTomMath's mp_int structure.
+ * Supports configurable bitwidths, signed/unsigned semantics, two's complement clamping,
+ * arithmetic operators, radix-based parsing/formatting, endianness-aware binary serialization,
+ * and high/low scalar half splitting for compiler legalization.
  */
 class FlexInt
 {
   public:
     /**
-     * Creates a DEEP copy of other.
+     * Copy constructor performing a deep copy of the underlying LibTomMath mp_int structure.
      */
     FlexInt(const FlexInt &other);
 
     /**
-     * Creates a new object and moves other into this.
+     * Move constructor transferring ownership of the mp_int representation without reallocating.
      */
     FlexInt(FlexInt &&other) noexcept;
 
     /**
-     * Initializes the container and sets an unsigned int32 value into it. If the container could not be initialized, it
-     * throws std::bad_alloc.
+     * Constructs a FlexInt from an unsigned 32-bit integer with the specified bitwidth.
      */
     explicit FlexInt(uint32_t value, size_t bitWidth = 32);
 
     /**
-     * Initializes the container and sets an unsigned int64 value into it. If the container could not be initialized, it
-     * throws std::bad_alloc.
+     * Constructs a FlexInt from an unsigned 64-bit integer with the specified bitwidth.
      */
     explicit FlexInt(uint64_t value, size_t bitWidth = 64);
 
     /**
-     * Initializes the container and sets an signed int32 value into it. If the container could not be initialized, it
-     * throws std::bad_alloc.
+     * Constructs a FlexInt from a signed 32-bit integer with the specified bitwidth.
      */
     explicit FlexInt(int32_t value, size_t bitWidth = 32);
 
     /**
-     * Initializes the container and sets an signed int64 value into it. If the container could not be initialized, it
-     * throws std::bad_alloc.
+     * Constructs a FlexInt from a signed 64-bit integer with the specified bitwidth.
      */
     explicit FlexInt(int64_t value, size_t bitWidth = 64);
 
     /**
-     * Initializes the container and converts the string to a number using the given base. If the number starts with
-     * a '-' it will be treat as a signed integer, if it doesn't it will be unsigned.
+     * Parses a string into a multi-precision integer using the specified radix, bitwidth, and signedness.
+     * Supports prefixes like '0x', '0b', '0o', and negative sign signs.
      */
     FlexInt(std::string_view numberStr, size_t bitWidth, bool _signed, size_t radix = 10);
 
     /**
-     * Moves other into this.
+     * Move assignment operator transferring the underlying mp_int state.
      */
     FlexInt &operator=(FlexInt &&other) noexcept;
 
     /**
-     * DEEP copies other into this.
+     * Copy assignment operator performing a deep copy of the underlying mp_int structure.
      */
     FlexInt &operator=(const FlexInt &other);
 
     /**
-     * Clears the container of the number and destroys the object.
+     * Destructor clearing the underlying LibTomMath mp_int memory.
      */
     ~FlexInt();
 
     /**
-     * Returns true if this number fits in a container of the given bitSize and signedess.
+     * Checks whether the current numerical value fits within the specified bit size and signedness bounds
+     * without overflow or truncation.
      */
     bool fitsIn(size_t bitSize, bool _signed);
 
     /**
-     * Returns true if this number threw an error somewhere during its uses.
+     * Returns true if a LibTomMath error occurred during the most recent operation.
      */
     bool hasError() const;
 
     /**
-     * Returns true if this number is even.
+     * Returns true if the integer value is even.
      */
     bool isEven() const;
 
     /**
-     * Returns true if this number is negative.
+     * Returns true if the integer value is strictly negative (< 0).
      */
     bool isNeg() const;
 
     /**
-     * Returns true if this number is odd.
+     * Returns true if the integer value is odd.
      */
     bool isOdd() const;
 
     /**
-     * Returns true if this number is positive.
+     * Returns true if the integer value is strictly positive (> 0).
      */
     bool isPositive() const;
 
     /**
-     * Returns true if this is a signed number.
+     * Returns true if this instance was constructed with signed semantics.
      */
     bool isSigned() const;
 
     /**
-     * Returns true if this number is zero.
+     * Returns true if the integer value is equal to zero.
      */
     bool isZero() const;
 
     /**
-     * Compares this against other and returns true if this is greater.
+     * Returns true if this value is strictly greater than other.
      */
     bool operator>(const FlexInt &other) const;
 
     /**
-     * Compares this against other and returns true if this is greater or equal.
+     * Returns true if this value is greater than or equal to other.
      */
     bool operator>=(const FlexInt &other) const;
 
     /**
-     * Compares this against other and returns true if this is smaller.
+     * Returns true if this value is strictly less than other.
      */
     bool operator<(const FlexInt &other) const;
 
     /**
-     * Compares this against other and returns true if this is smaller or equal.
+     * Returns true if this value is less than or equal to other.
      */
     bool operator<=(const FlexInt &other) const;
 
     /**
-     * Compares this against other and returns true if this is equal to other.
+     * Returns true if this value is equal to other in numerical value, sign, and bitwidth.
      */
     bool operator==(const FlexInt &other) const;
 
     /**
-     * Compares this against other and returns true if this is not equal to other.
+     * Returns true if this value differs from other.
      */
     bool operator!=(const FlexInt &other) const;
 
     /**
-     * Extracts the upper half of this integer.
+     * Splits this integer and extracts the most significant half (bitWidth / 2 bits).
      */
     FlexInt getHighHalf();
 
     /**
-     * Extracts the lower half of this integer .
+     * Splits this integer and extracts the least significant half (bitWidth / 2 bits).
      */
     FlexInt getLowHalf();
 
     /**
-     * Creates a new resulting FlexInt that's a copy of this and adds other into it.
+     * Returns the sum of this integer and other, clamped to the target bitwidth.
      */
     FlexInt operator+(const FlexInt &other);
 
     /**
-     * Increments by 1 this and returns a reference to this.
+     * Increments this value in-place by 1.
      */
     FlexInt &operator++();
 
     /**
-     * Increments by other this and returns a reference to this.
+     * Adds other to this value in-place.
      */
     FlexInt &operator+=(const FlexInt &other);
 
     /**
-     * Creates a new resulting FlexInt that's a copy of this and subtracts other into it.
+     * Returns the difference of this integer minus other, clamped to the target bitwidth.
      */
     FlexInt operator-(const FlexInt &other);
 
     /**
-     * Decrements by 1 this and returns a reference to this.
+     * Decrements this value in-place by 1.
      */
     FlexInt &operator--();
 
     /**
-     * Decrements by other this and returns a reference to this.
+     * Subtracts other from this value in-place.
      */
     FlexInt &operator-=(const FlexInt &other);
 
     /**
-     * Creates a new resulting FlexInt that's a copy of this and multiplies by other.
+     * Returns the product of this integer multiplied by other.
      */
     FlexInt operator*(const FlexInt &other);
 
     /**
-     * Multiplies this by other this and returns a reference to this.
+     * Multiplies this value by other in-place.
      */
     FlexInt &operator*=(const FlexInt &other);
 
     /**
-     * Creates a new resulting FlexInt that's a copy of this and divides by other.
+     * Returns the quotient of this integer divided by other.
      */
     FlexInt operator/(const FlexInt &other);
 
     /**
-     * Divides this by other this and returns a reference to this.
+     * Divides this value by other in-place.
      */
     FlexInt &operator/=(const FlexInt &other);
 
     /**
-     * Creates a new resulting FlexInt that's a copy of this and calculates this mod other
+     * Returns the remainder (modulus) of this integer divided by other.
      */
     FlexInt operator%(const FlexInt &other);
 
     /**
-     * Calculates this mod other this and returns a reference to this.
+     * Computes the modulus of this value by other in-place.
      */
     FlexInt &operator%=(const FlexInt &other);
 
     /**
-     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native signed 8-bit integer (int8_t).
      */
     int8_t getI8() const;
 
     /**
-     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native signed 16-bit integer (int16_t).
      */
     int16_t getI16() const;
 
     /**
-     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native signed 32-bit integer (int32_t).
      */
     int32_t getI32() const;
 
     /**
-     * Returns the integer in 8 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native signed 64-bit integer (int64_t).
      */
     int64_t getI64() const;
 
     /**
-     * Returns the UNSIGNED VERSION of the integer in 8 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native unsigned 8-bit integer (uint8_t).
      */
     uint8_t getU8() const;
 
     /**
-     * Returns the UNSIGNED VERSION of the integer in 16 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native unsigned 16-bit integer (uint16_t).
      */
     uint16_t getU16() const;
 
     /**
-     * Returns the UNSIGNED VERSION of the integer in 32 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native unsigned 32-bit integer (uint32_t).
      */
     uint32_t getU32() const;
 
     /**
-     * Returns the UNSIGNED VERSION of the integer in 64 bits, WILL TRUNC IF BIGGER.
+     * Truncates or converts the value to a native unsigned 64-bit integer (uint64_t).
      */
     uint64_t getU64() const;
 
     /**
-     * Returns the bit size of this number.
+     * Returns the configured bit size of this integer.
      */
     size_t getBitSize() const;
 
     /**
-     * Extends the value to the given bitsize and sign. If newBitSize is smaller than current bit size,
-     * a bad_alloc exception is thrown.
+     * Extends or truncates the integer to a new bit size and signedness representation.
      */
     void extend(size_t newBitSize, bool isSigned);
 
     /**
-     * Dumps the number into a binary-encoded byte array. If alloc is provided, the resulting vector will be allocated
-     * using it.
-     *
-     * If bigEndian is set to true, the number will be dumped in big endian format; if it is set to false, the number
-     * will be dumped in little endian.
+     * Dumps the number into a binary byte vector using the specified endianness.
+     * Allocates via the supplied PMR memory resource.
      */
     std::pmr::vector<uint8_t> dump(bool bigEndian, std::pmr::memory_resource *alloc = std::pmr::get_default_resource());
 
     /**
-     * Returns the string representation of the number with the given radix.
+     * Formats the integer into a string representation in the specified radix (base 2, 8, 10, or 16).
      */
     std::string toString(size_t radix = 10) const;
 
   private:
     /**
-     * Ensure the number is ALWAYS in Ca2 and it fits in the given bit width, if it isn't an exception is thrown and
-     * m_lastErr is updated.
+     * Enforces two's complement bit bounds, wrapping or sign-extending values to strictly fit within m_bitWidth.
      */
     void clampToTwosComplement();
 

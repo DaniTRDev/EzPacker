@@ -9,9 +9,17 @@
 
 #include <random>
 
+/**
+ * Test fixture for C++ MIR Type Table code generator (CppMirTypeTableGenerator).
+ * Verifies generation of MirTypeTable.h and MirTypeTable.cpp, working mode isolation
+ * (Header-Only, Source-Only, Full), and null safety.
+ */
 class MirTypeTableGeneratorTest : public DslTestSuiteAsGtest
 {
   protected:
+    /**
+     * Sets up the test environment and creates a temporary sandbox directory.
+     */
     void SetUp() override
     {
         DslTestSuiteAsGtest::SetUp();
@@ -22,6 +30,9 @@ class MirTypeTableGeneratorTest : public DslTestSuiteAsGtest
         getDiagCollector()->trace("MirTypeTableGeneratorTest", "Testing dir at: {}", m_tempDir.string());
     }
 
+    /**
+     * Cleans up the temporary sandbox directory after test execution.
+     */
     void TearDown() override
     {
         std::error_code ec;
@@ -30,6 +41,9 @@ class MirTypeTableGeneratorTest : public DslTestSuiteAsGtest
         DslTestSuiteAsGtest::TearDown();
     }
 
+    /**
+     * Reads and returns the entire contents of a file on disk as a string.
+     */
     std::string readFile(const std::filesystem::path &filePath) const
     {
         std::ifstream file(filePath);
@@ -49,6 +63,10 @@ class MirTypeTableGeneratorTest : public DslTestSuiteAsGtest
 // 1. Full Generation & Content Verification
 // ============================================================================
 
+/**
+ * Verifies end-to-end code generation of both MirTypeTable.h and MirTypeTable.cpp from .tyf DSL input,
+ * asserting header declarations, member pointers, accessor methods, and initialize() instantiations.
+ */
 TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderAndSourceWithValidTypes)
 {
     std::string dslContent = R"(
@@ -117,6 +135,9 @@ TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderAndSourceWithValidTypes)
 // 2. Working Mode Isolation (Header-Only / Source-Only)
 // ============================================================================
 
+/**
+ * Verifies Header-Only generation mode, creating MirTypeTable.h while omitting MirTypeTable.cpp.
+ */
 TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderOnlyWhenRequested)
 {
     std::string dslContent = "integer i32(32);";
@@ -141,6 +162,9 @@ TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderOnlyWhenRequested)
     EXPECT_FALSE(std::filesystem::exists(m_tempDir / "MirTypeTable.cpp"));
 }
 
+/**
+ * Verifies Source-Only generation mode, creating MirTypeTable.cpp while omitting MirTypeTable.h.
+ */
 TEST_F(MirTypeTableGeneratorTest, GeneratesSourceOnlyWhenRequested)
 {
     std::string dslContent = "integer i32(32);";
@@ -169,6 +193,9 @@ TEST_F(MirTypeTableGeneratorTest, GeneratesSourceOnlyWhenRequested)
 // 3. Error Handling
 // ============================================================================
 
+/**
+ * Verifies that the type table generator fails gracefully when provided a nullptr symbol table.
+ */
 TEST_F(MirTypeTableGeneratorTest, FailsGracefullyOnNullSymbolTable)
 {
     DiagnosticCollector collector;

@@ -13,8 +13,14 @@ namespace DSL::Ast::InstDef
 {
 
 /**
- * Represents a bit-range slice (e.g., "[31:25]", "[0:7]").
- * Preserves syntax slice directionality (MSB to LSB or LSB to MSB).
+ * Represents a bit-range slice within instruction bitfields.
+ *
+ * Syntax:
+ *   BitSlice := '[' IntegerLiteral ':' IntegerLiteral ']'
+ *
+ * Examples:
+ *   [31:0]
+ *   [12:14]
  */
 struct BitSlice
 {
@@ -23,7 +29,13 @@ struct BitSlice
 };
 
 /**
- * AST node for an identifier sliced by bit indices (e.g. ident[0:31]).
+ * AST node for an identifier indexed by a bit slice.
+ *
+ * Syntax:
+ *   SlicedIdentifier := Identifier BitSlice
+ *
+ * Example:
+ *   imm12[0:4]
  */
 struct SlicedIdentifier
 {
@@ -35,6 +47,9 @@ struct BitExpression;
 
 /**
  * Bitwise and arithmetic operators available within bitfield expressions.
+ *
+ * Operator tokens:
+ *   Add: '+'   Sub: '-'   And: '&'   Or: '|'   Xor: '^'   Shl: '<<'   Shr: '>>'   Not: '~'
  */
 enum class BitExprOp
 {
@@ -54,7 +69,17 @@ enum class BitExprOp
 using BitExprValues = std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, BitExpression *>;
 
 /**
- * Binary or unary bit expression operating on identifiers, literals, slices, or sub-expressions.
+ * AST node representing a bit expression (unary or binary with precedence).
+ *
+ * Syntax:
+ *   BitExpression := BitOrExpr
+ *   BitOrExpr     := BitXorExpr ( '|' BitXorExpr )*
+ *   BitXorExpr    := BitAndExpr ( '^' BitAndExpr )*
+ *   BitAndExpr    := BitShiftExpr ( '&' BitShiftExpr )*
+ *   BitShiftExpr  := BitAddExpr ( ('<<' | '>>') BitAddExpr )*
+ *   BitAddExpr    := BitUnaryExpr ( ('+' | '-') BitUnaryExpr )*
+ *   BitUnaryExpr  := '~'? BitAtom
+ *   BitAtom       := '(' BitExpression ')' | IntegerLiteral | SlicedIdentifier | Identifier
  */
 struct BitExpression
 {
@@ -64,7 +89,14 @@ struct BitExpression
 };
 
 /**
- * Field assignment in instruction encoding formats (lhs[slice] = rhs_expr).
+ * Field assignment in instruction encoding formats.
+ *
+ * Syntax:
+ *   BitExprAssign := Identifier BitSlice? '=' BitExpression
+ *
+ * Examples:
+ *   opcode = 0x33
+ *   imm4_0[0:4] = imm12[0:4]
  */
 struct BitExprAssign
 {
@@ -75,6 +107,13 @@ struct BitExprAssign
 
 /**
  * Single named bitfield within an instruction encoding format layout.
+ *
+ * Syntax:
+ *   FormatField := Identifier BitSlice ( '=' BitExpression )? ';'
+ *
+ * Examples:
+ *   opcode[0:6] = 0x33;
+ *   rd[7:11];
  */
 struct FormatField
 {
@@ -85,6 +124,21 @@ struct FormatField
 
 /**
  * Instruction encoding format declaration (e.g., R-type, I-type) with width and bitfields.
+ *
+ * Syntax:
+ *   InstFormatDecl := 'format' FormatName ( '(' BitWidth ')' )? '{' ( FormatField )* '}' ';'?
+ *   FormatName     := Identifier
+ *   BitWidth       := IntegerLiteral (defaults to 32 if omitted)
+ *
+ * Example:
+ *   format RType(32) {
+ *       opcode[0:6] = 0x33;
+ *       rd[7:11];
+ *       funct3[12:14];
+ *       rs1[15:19];
+ *       rs2[20:24];
+ *       funct7[25:31];
+ *   };
  */
 struct InstFormatDecl
 {
@@ -95,6 +149,9 @@ struct InstFormatDecl
 
 /**
  * Dataflow direction of an instruction operand.
+ *
+ * Valid direction keywords:
+ *   'IN', 'OUT', 'INOUT'
  */
 enum class InstOperandDir : uint8_t
 {
@@ -104,7 +161,7 @@ enum class InstOperandDir : uint8_t
 };
 
 /**
- * Kind of operand in an instruction declaration (Register or Immediate).
+ * Kind of operand in an instruction declaration.
  */
 enum class InstOperandKind : uint8_t
 {
@@ -115,9 +172,18 @@ enum class InstOperandKind : uint8_t
 /**
  * Unified representation for all instruction arguments (registers & immediates).
  *
+ * Syntax:
+ *   InstOperand := ( RegClass | ImmType ('(' ImmWidth ')')? ) ':' OperandName Direction
+ *   RegClass    := Identifier
+ *   ImmType     := 'imm' | 'simm' | 'uimm'
+ *   ImmWidth    := Identifier
+ *   OperandName := Identifier
+ *   Direction   := 'IN' | 'OUT' | 'INOUT'
+ *
  * Examples:
- * - "GPR:rd OUT"         -> m_kind=Register,  m_typeOrClass="GPR",  m_typeParam=nullopt, m_name="rd", m_dir=ArgOut
- * - "simm(i12):imm12 IN" -> m_kind=Immediate, m_typeOrClass="simm", m_typeParam="i12",   m_name="imm12", m_dir=ArgIn
+ *   GPR:rd OUT
+ *   simm(i12):imm12 IN
+ *   imm:val IN
  */
 struct InstOperand
 {
@@ -130,6 +196,9 @@ struct InstOperand
 
 /**
  * Behavioral flags for target instruction definitions.
+ *
+ * Valid flag keywords:
+ *   'isBranch', 'isCall', 'isReturn', 'isTerminator', 'mayLoad', 'mayStore', 'commutative', 'volatile'
  */
 enum class InstFlag : uint8_t
 {
@@ -145,6 +214,14 @@ enum class InstFlag : uint8_t
 
 /**
  * Header declaration of a target instruction (name, formal arguments, and binary format).
+ *
+ * Syntax:
+ *   InstHeader := 'inst' InstName '(' ( InstOperand (',' InstOperand)* )? ')' 'format' FormatName
+ *   InstName   := Identifier
+ *   FormatName := Identifier
+ *
+ * Example:
+ *   inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType
  */
 struct InstHeader
 {
@@ -162,6 +239,15 @@ using InstBodyItem = std::variant<std::pmr::vector<InstOperand>,   // IMPLICIT(.
 
 /**
  * Body definition of an instruction specifying implicit operands, field assignments, assembly syntax, and flags.
+ *
+ * Syntax:
+ *   InstBody := '{' ( BodyItem )* '}'
+ *   BodyItem := ImplicitDecl | FormatDecl | AsmDecl | LatencyDecl | FlagsDecl
+ *   ImplicitDecl := 'IMPLICIT' '(' ( InstOperand (',' InstOperand)* )? ')' ';'
+ *   FormatDecl   := 'FORMAT' '(' ( BitExprAssign (',' BitExprAssign)* )? ')' ';'
+ *   AsmDecl      := 'ASM' '(' StringLiteral ')' ';'
+ *   LatencyDecl  := 'LATENCY' '(' IntegerLiteral ')' ';'
+ *   FlagsDecl    := 'FLAGS' '(' ( InstFlag (',' InstFlag)* )? ')' ';'
  */
 struct InstBody
 {
@@ -174,6 +260,17 @@ struct InstBody
 
 /**
  * Full instruction declaration AST node combining header and body.
+ *
+ * Syntax:
+ *   InstDecl := InstHeader InstBody ';'?
+ *
+ * Example:
+ *   inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
+ *       FORMAT(funct3 = 0b000, funct7 = 0b0000000);
+ *       ASM("add ${rd}, ${rs1}, ${rs2}");
+ *       LATENCY(1);
+ *       FLAGS(commutative);
+ *   };
  */
 struct InstDecl
 {
@@ -183,6 +280,9 @@ struct InstDecl
 
 /**
  * Root AST structure representing a parsed .idf (Instruction Definition File).
+ *
+ * Syntax:
+ *   InstDefFile := ( InstFormatDecl | InstDecl )* EOF
  */
 struct InstDefFile
 {

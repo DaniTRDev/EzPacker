@@ -8,16 +8,14 @@
  */
 enum class ExpectedOperandType : uint16_t
 {
-    None = 1 << 0,
-    Register = 1 << 1,      // MirRegister
-    Integer = 1 << 2,       // MirInteger
-    FloatingPoint = 1 << 3, // MirDouble
-    Memory = 1 << 4,        // MirMemory
-    Reference = 1 << 5,     // MirReference (Blocks, Functions)
-    // MirRuntimeSymbol. Used to identify an address, by its name, that's exported by the RT library.
-    RuntimeSymbol = 1 << 6,
-    // Used to define the variadic args, this is useful to define if they are read or written.
-    VariadicArgs = (1 << 7),
+    None = 1 << 0,          // No operand expected
+    Register = 1 << 1,      // Virtual or physical register operand (MirRegister)
+    Integer = 1 << 2,       // Immediate integer constant (MirInteger)
+    FloatingPoint = 1 << 3, // Immediate floating-point constant (MirFloat)
+    Memory = 1 << 4,        // Memory reference addressing operand (MirMemory)
+    Reference = 1 << 5,     // Symbolic reference (MirReference to Block, Function, Global, Stack slot)
+    RuntimeSymbol = 1 << 6, // Named runtime library symbol (MirRuntimeSymbol)
+    VariadicArgs = (1 << 7), // Variadic argument expansion slot
 
     // --- Composite Helper Masks ---
 
@@ -35,13 +33,21 @@ enum class ExpectedOperandType : uint16_t
     // Anything that can be read as a value
     AnyValue = Register | Integer | FloatingPoint,
 
+    // Matches any operand type
     Any = 0xFFFF
 };
 
+/**
+ * Bitwise OR operator combining expected operand types.
+ */
 inline constexpr ExpectedOperandType operator|(ExpectedOperandType a, ExpectedOperandType b)
 {
     return static_cast<ExpectedOperandType>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
 }
+
+/**
+ * Bitwise AND operator testing expected operand type intersection.
+ */
 inline constexpr bool operator&(ExpectedOperandType a, ExpectedOperandType b)
 {
     return (static_cast<uint16_t>(a) & static_cast<uint16_t>(b)) != 0;
@@ -53,15 +59,22 @@ inline constexpr bool operator&(ExpectedOperandType a, ExpectedOperandType b)
 enum class MirOperandFlag : uint8_t
 {
     None = 0,
-    Read = 1 << 0,
-    Write = 1 << 1,
-    ReadWrite = Read | Write
+    Read = 1 << 0,          // Operand is consumed/read by the instruction (USE)
+    Write = 1 << 1,         // Operand is defined/written by the instruction (DEF)
+    ReadWrite = Read | Write // Operand is modified (both DEF and USE)
 };
 
+/**
+ * Bitwise OR operator combining operand access flags.
+ */
 inline constexpr MirOperandFlag operator|(MirOperandFlag a, MirOperandFlag b)
 {
     return static_cast<MirOperandFlag>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
+
+/**
+ * Bitwise AND operator testing operand access flag intersection.
+ */
 inline constexpr bool operator&(MirOperandFlag a, MirOperandFlag b)
 {
     return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
@@ -72,7 +85,14 @@ inline constexpr bool operator&(MirOperandFlag a, MirOperandFlag b)
  */
 struct MirOperandMetadata
 {
+    /**
+     * Bitmask of accepted operand types for this argument position.
+     */
     ExpectedOperandType type;
+
+    /**
+     * Dataflow direction (Read, Write, ReadWrite) for this argument position.
+     */
     MirOperandFlag flags;
 };
 
@@ -82,30 +102,35 @@ struct MirOperandMetadata
 enum class MirInstructionFlags : uint32_t
 {
     None = 0,
-    SizeMatch = 1 << 0,
-    DestLarger = 1 << 1,
-    DestSmaller = 1 << 2,
-    ReadsMemory = 1 << 3,
-    WritesMemory = 1 << 4,
-    IsTerminator = 1 << 5,
-    IsBranch = 1 << 6,
-    IsCall = 1 << 7,
-    IsReturn = 1 << 8,
-    HasSideEffect = 1 << 9,
-    IsCommutative = 1 << 10,
-    ReadsCPUFlags = 1 << 11,
-    WritesCPUFlags = 1 << 12,
-    TreatAsSigned = 1 << 13,
-    VariadicArgs = 1 << 14 // Flag used to tell that there will be an unexpected number of arguments. If a constraint is
-                           // given, it must be followed. By default, all the values are READ.
+    SizeMatch = 1 << 0,      // All operands must share identical bit-width
+    DestLarger = 1 << 1,     // Destination operand bit-width must exceed source bit-width
+    DestSmaller = 1 << 2,    // Destination operand bit-width must be smaller than source bit-width
+    ReadsMemory = 1 << 3,    // Instruction performs memory load operations
+    WritesMemory = 1 << 4,   // Instruction performs memory store operations
+    IsTerminator = 1 << 5,   // Instruction terminates a basic block (branches, jumps, returns)
+    IsBranch = 1 << 6,       // Conditional or unconditional control-flow branch
+    IsCall = 1 << 7,         // Procedure call instruction
+    IsReturn = 1 << 8,       // Function return instruction
+    HasSideEffect = 1 << 9,  // Instruction has unmodeled side effects preventing DCE
+    IsCommutative = 1 << 10, // Binary operation is commutative: op(a, b) == op(b, a)
+    ReadsCPUFlags = 1 << 11, // Instruction inspects hardware status flags
+    WritesCPUFlags = 1 << 12,// Instruction modifies hardware status flags
+    TreatAsSigned = 1 << 13, // Arithmetic or comparison treats operands as signed integers
+    VariadicArgs = 1 << 14   // Instruction accepts variable number of operands (e.g. CALL, PHI)
 };
 
+/**
+ * Bitwise OR operator combining instruction behavior flags.
+ */
 inline constexpr MirInstructionFlags operator|(MirInstructionFlags a, MirInstructionFlags b)
 {
     return static_cast<MirInstructionFlags>(static_cast<std::underlying_type_t<MirInstructionFlags>>(a) |
                                             static_cast<std::underlying_type_t<MirInstructionFlags>>(b));
 }
 
+/**
+ * Bitwise AND operator testing instruction behavior flag intersection.
+ */
 inline constexpr bool operator&(MirInstructionFlags a, MirInstructionFlags b)
 {
     return (static_cast<std::underlying_type_t<MirInstructionFlags>>(a) &
@@ -117,17 +142,20 @@ inline constexpr bool operator&(MirInstructionFlags a, MirInstructionFlags b)
  */
 enum MirInstructionCategory : uint8_t
 {
-    MirCat_Invalid = 0,
-    MirCat_DataMovement,
-    MirCat_Memory,
-    MirCat_Arithmetic,
-    MirCat_Bitwise,
-    MirCat_Compare,
-    MirCat_ControlFlow,
-    MirCat_Casting,
-    MirCat_System
+    MirCat_Invalid = 0,     // Invalid or uninitialized category
+    MirCat_DataMovement,    // Register moves, constant loading (MOV)
+    MirCat_Memory,          // Memory loads and stores (LOAD, STORE)
+    MirCat_Arithmetic,      // Arithmetic computations (ADD, SUB, MUL, DIV, NEG)
+    MirCat_Bitwise,         // Bitwise logic and shifts (AND, OR, XOR, SHL, SHR)
+    MirCat_Compare,         // Relational comparisons (CMP_EQ, CMP_NE, CMP_LT, etc.)
+    MirCat_ControlFlow,     // Branches, jumps, calls, returns, phi nodes (BR, JMP, CALL, RET, PHI)
+    MirCat_Casting,         // Type conversions, truncations, extensions (CAST, TRUNC, ZEXT, SEXT)
+    MirCat_System           // System calls, interrupts, inline assembly
 };
 
+/**
+ * Mapping table from MirInstructionCategory enum to diagnostic strings.
+ */
 inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2Str = {
     { MirCat_Invalid, "MirCat_Invalid" },
     { MirCat_DataMovement, "MirCat_DataMovement" },
@@ -146,9 +174,8 @@ inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2St
 enum class MirInstructionTier : uint8_t
 {
     HighLevel,    // Standard IR opcodes emitted by the frontend/IRBuilder (ADD, SUB, CALL, RET, etc.)
-    PassInternal, // Intermediate lowering opcodes generated/consumed by passes (PUSH_ARG, POP_ARG, PUSH_RET, POP_RET,
-                  // etc.)
-    TargetLow     // For selected (by ISel) instructions.
+    PassInternal, // Intermediate lowering opcodes generated/consumed by passes (PUSH_ARG, POP_ARG, PUSH_RET, POP_RET, etc.)
+    TargetLow     // Machine-specific target instructions produced by instruction selection
 };
 
 // --- Metadata Structure ---
@@ -159,13 +186,39 @@ enum class MirInstructionOpCode : uint16_t;
  */
 struct MirInstructionMetadata
 {
+    /**
+     * Functional category of the opcode.
+     */
     MirInstructionCategory m_category;
+
+    /**
+     * Concrete opcode enumeration value.
+     */
     MirInstructionOpCode m_opcode;
+
+    /**
+     * Abstraction tier of the instruction.
+     */
     MirInstructionTier m_tier;
+
+    /**
+     * Behavioral and semantic flags.
+     */
     MirInstructionFlags m_flags;
+
+    /**
+     * Mnemonic name of the opcode.
+     */
     std::string_view m_name;
+
+    /**
+     * Formal operand signature specifying expected types and access directions.
+     */
     std::vector<MirOperandMetadata> m_operandMeta;
 
+    /**
+     * Constructs a static metadata descriptor for an instruction opcode.
+     */
     MirInstructionMetadata(MirInstructionCategory category,
                            MirInstructionOpCode opcode,
                            MirInstructionTier tier,

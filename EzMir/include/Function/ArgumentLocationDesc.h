@@ -5,80 +5,114 @@
 #include "Operand/MirRegisterReference.h"
 
 /**
- * Simple type used to abstract the register ID field as this may change in a future. THIS WILL COLLIDE
- * WITH MirId!
+ * Type alias representing a target physical hardware register ID.
  */
 using PhysicalRegId = size_t;
 
+/**
+ * High-level ABI classification for parameter and return value placement.
+ */
 enum class ArgLocationType
 {
-    Invalid = 0,
-    Indirect, // Used for objects, the compiler passes a pointer to the object in a register or stack location.
-    Register, // The argument is passed into a specific physical register.
-    Split,    // The argument is passed into a specific set of physical registers.
-    Stack     // The argument is passed into a specific stack location.
+    Invalid = 0, // Uninitialized or invalid location
+    Indirect,    // Passed or returned indirectly by pointer (in register or stack slot)
+    Register,    // Passed or returned directly in a single physical hardware register
+    Split,       // Passed or returned split across multiple hardware registers (e.g. aggregate fields)
+    Stack        // Passed or returned via caller/callee stack frame slot
 };
 
+/**
+ * Direct physical register argument placement descriptor.
+ */
 struct RegLoc
 {
+    /**
+     * Physical register reference.
+     */
     MirRegisterRef m_ref;
+
+    /**
+     * Size of the passed value in bytes.
+     */
     size_t m_sizeBytes;
 };
 
 /**
- * Returns the stack object at which the argument is going to be placed.
+ * Stack frame argument placement descriptor.
  */
 struct StackLoc
 {
+    /**
+     * Size of the stack slot in bytes.
+     */
     size_t m_sizeBytes;
+
+    /**
+     * Abstract stack frame object allocated for this argument.
+     */
     class StackFrameObject *m_object;
 };
 
 /**
- * A structure might be returned in registers depending on the types of the fields.
- *
- * Example:
- * struct MyStruct
- * {
- *      int x;
- *      float y;
- * };
- *
- * FOR x ->
- * SplitLoc[0].m_regId = GPR
- * SplitLoc[0].m_sizeBytes = 4
- * SplitLoc[0]. m_offsetInParam = 0
- *
- * FOR y ->
- * SplitLoc[1].m_regId = FPR
- * SplitLoc[1].m_sizeBytes = 4
- * SplitLoc[1]. m_offsetInParam = 4
+ * Segment descriptor for aggregate types passed or returned across multiple hardware registers.
  */
 struct SplitPiece
 {
+    /**
+     * Target physical register reference for this piece.
+     */
     MirRegisterRef m_reg;
+
+    /**
+     * MirType of this component.
+     */
     class MirType *m_type;
-    size_t m_offsetInParam; // Byte offset from the start of the user's variable
+
+    /**
+     * Byte offset from the beginning of the composite variable.
+     */
+    size_t m_offsetInParam;
 };
 
+/**
+ * Multi-register placement descriptor for split aggregate arguments.
+ */
 struct SplitLoc
 {
+    /**
+     * Ordered list of register chunks composing the split value.
+     */
     std::vector<SplitPiece> m_parts;
 };
 
+/**
+ * Indirect argument placement descriptor for pointer/by-value passing.
+ */
 struct IndirectLoc
 {
+    /**
+     * True if callee receives a copy of the value (by-value semantics).
+     */
     bool m_isByVal;
-    bool m_copyOnReg; // Should the return ptr be copied into the return register?
+
+    /**
+     * True if return pointer should be mirrored in standard return register (e.g. RAX).
+     */
+    bool m_copyOnReg;
+
+    /**
+     * Size of the underlying pointed-to object in bytes.
+     */
     size_t m_size;
 
-    // The pointer to the data is either in a register.
+    /**
+     * Physical register holding the pointer address.
+     */
     MirRegisterRef m_pointerStorage;
 };
 
 /**
- * This class is used to determine in which place an argument will be lowered into. It may go to a register,
- * to a group of register or to stack.
+ * Discriminated union descriptor capturing the exact ABI-lowered location of a function argument or return value.
  */
 class ArgumentLocationDesc
 {
@@ -86,63 +120,65 @@ class ArgumentLocationDesc
     using StorageT = std::variant<RegLoc, StackLoc, SplitLoc, IndirectLoc>;
 
     /**
-     * Creates a register location with the given parameters.
+     * Factory constructing a direct physical register location descriptor.
      */
     static ArgumentLocationDesc Reg(MirRegisterRef reg, size_t sizeInBytes);
 
     /**
-     * Creates an indirect location with the given parameters.
+     * Factory constructing an indirect pointer-passed location descriptor.
      */
     static ArgumentLocationDesc Indirect(bool byVal, bool copyOnReg, size_t size, MirRegisterRef ptrStorage);
 
     /**
-     * Creates a split location with the given parameters.
+     * Factory constructing a split multi-register location descriptor.
      */
     static ArgumentLocationDesc Split(const std::vector<SplitPiece> &pieces);
 
     /**
-     * Creates a stack location with the given parameters.
+     * Factory constructing a stack frame slot location descriptor.
      */
     static ArgumentLocationDesc Stack(size_t sizeInBytes, class StackFrameObject *object);
 
     /**
-     * Returns the type of the location.
+     * Returns the active location category (Register, Indirect, Split, Stack).
      */
     ArgLocationType getType() const;
 
     /**
-     * Returns the indirect location (IndirectLoc) of the argument. If internal type is not the one expected, an
-     * exception is thrown.
+     * Retrieves the indirect location payload, throwing std::runtime_error if type mismatch.
      */
     const IndirectLoc &getIndirect() const;
 
     /**
-     * Returns the register location (RegisterLoc) of the argument. If internal type is not the one expected, an
-     * exception is thrown.
+     * Retrieves the direct register location payload, throwing std::runtime_error if type mismatch.
      */
     const RegLoc &getReg() const;
 
     /**
-     * Returns the split location (SplitLoc) of the argument. If internal type is not the one expected, an exception is
-     * thrown.
+     * Retrieves the split multi-register location payload, throwing std::runtime_error if type mismatch.
      */
     const SplitLoc &getSplit() const;
 
     /**
-     * Returns the stack location (StackLoc) of the argument. If internal type is not the one expected, an exception is
-     * thrown.
+     * Retrieves the stack slot location payload, throwing std::runtime_error if type mismatch.
      */
     const StackLoc &getStack() const;
 
   private:
     /**
-     * Creates an argument location with the given parameters. Constructor is made private so that the factory methods
-     * are used.
+     * Private constructor initializing active type tag and variant storage payload.
      */
     ArgumentLocationDesc(ArgLocationType type, StorageT storage);
 
   private:
+    /**
+     * Active discriminator tag.
+     */
     ArgLocationType m_type;
+
+    /**
+     * Variant storage container.
+     */
     StorageT m_storage;
 };
 

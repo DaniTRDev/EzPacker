@@ -6,8 +6,15 @@
 #include "Instruction/MirInstruction.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Initializes the block builder with parent context and owning function.
+ */
 MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) : m_ctx(ctx), m_ownerFunc(owner) {}
 
+/**
+ * Allocates and builds a new basic block in the arena, records it with context and function,
+ * and sets up default append insertion point.
+ */
 MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::string &name)
 {
     std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
@@ -37,6 +44,9 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
     return nullptr;
 }
 
+/**
+ * Creates an instruction builder configured with the insertion point of this basic block.
+ */
 MirInstructionBuilder MirBlockBuilder::instrBuilder()
 {
     if (!getBuiltObj())

@@ -5,7 +5,7 @@
 
 // --- OpCode Generation ---
 /**
- * Enumeration of all MIR opcodes, dynamically populated from MirInstructionSetDefs.h.
+ * Enumeration of all MIR instruction opcodes generated from MirInstructionSetDefs.h.
  */
 enum class MirInstructionOpCode : uint16_t
 {
@@ -16,7 +16,7 @@ enum class MirInstructionOpCode : uint16_t
 };
 
 /**
- * Global array storing static opcode metadata indexed by MirInstructionOpCode ordinal.
+ * Global array storing static opcode metadata records indexed by MirInstructionOpCode value.
  */
 inline const MirInstructionMetadata g_MirInstructionSet[] = {
 #define INSTRUCTION(name, tier, category, operands, flags)                                                             \
@@ -26,7 +26,7 @@ inline const MirInstructionMetadata g_MirInstructionSet[] = {
 };
 
 /**
- * Lookup mapping from lowercase opcode string names to their MirInstructionOpCode.
+ * Mapping table from opcode name strings to their MirInstructionOpCode enum values.
  */
 inline std::unordered_map<std::string, MirInstructionOpCode> g_String2MirInstruction = {
 #define INSTRUCTION(name, tier, category, operands, flags) { #name, MirInstructionOpCode::name },
@@ -43,8 +43,8 @@ inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op)
 }
 
 /**
- * Parses a string representation of an opcode into its MirInstructionOpCode enum value.
- * Performs case-insensitive matching; returns opcode 0 if not found.
+ * Parses a string representation of an opcode into its MirInstructionOpCode enum value (case-insensitive).
+ * Returns opcode 0 if no match is found.
  */
 inline MirInstructionOpCode getOpCodeFromStr(const std::string &str)
 {

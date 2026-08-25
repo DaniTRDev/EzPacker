@@ -4,6 +4,9 @@
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Operand/MirOperands.h"
 
+/**
+ * Initializes a new instruction node within the owning basic block.
+ */
 MirInstruction::MirInstruction(MirBlock *owner,
                                MirInstructionOpCode opcode,
                                SourceReference *ref,
@@ -12,35 +15,77 @@ MirInstruction::MirInstruction(MirBlock *owner,
 {
 }
 
+/**
+ * Checks if the instruction opcode equals the queried opcode.
+ */
 bool MirInstruction::hasOpcode(MirInstructionOpCode opcode) const { return m_opcode == opcode; }
 
+/**
+ * Returns true if the instruction has one or more operands.
+ */
 bool MirInstruction::hasOperands() const { return !m_operands.empty(); }
 
+/**
+ * Returns true if this is a selected target machine instruction (TARGET_INST with valid target descriptor).
+ */
 bool MirInstruction::isSelected() const
 {
     return m_opcode == MirInstructionOpCode::TARGET_INST && m_targetDesc != nullptr;
 }
 
+/**
+ * Checks if the instruction treats its operands as signed quantities.
+ */
 bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstructionFlags::TreatAsSigned; }
 
+/**
+ * Returns the opcode mnemonic string.
+ */
 const char *MirInstruction::getOpCodeName() const { return getMetadata().m_name.data(); }
 
+/**
+ * Returns the static metadata structure for this instruction opcode.
+ */
 const MirInstructionMetadata &MirInstruction::getMetadata() const { return getMeta(getOpCode()); }
 
+/**
+ * Returns the owning basic block.
+ */
 MirBlock *MirInstruction::getOwner() const { return m_owner; }
 
+/**
+ * Returns the preceding instruction in the basic block list.
+ */
 MirInstruction *MirInstruction::getPrev() const { return m_prev; }
 
+/**
+ * Returns the succeeding instruction in the basic block list.
+ */
 MirInstruction *MirInstruction::getNext() const { return m_next; }
 
+/**
+ * Returns the opcode enumeration value.
+ */
 MirInstructionOpCode MirInstruction::getOpCode() const { return m_opcode; }
 
+/**
+ * Returns the abstraction tier of the instruction.
+ */
 MirInstructionTier MirInstruction::getTier() const { return getMetadata().m_tier; }
 
+/**
+ * Returns the behavioral flags from the opcode metadata.
+ */
 MirInstructionFlags MirInstruction::getFlags() const { return getMetadata().m_flags; }
 
+/**
+ * Returns the target instruction descriptor if lowered.
+ */
 MirTargetInstructionDesc *MirInstruction::getTargetDesc() const { return m_targetDesc; }
 
+/**
+ * Retrieves the operand pointer at the specified index, or nullptr if out of bounds.
+ */
 MirOperand *MirInstruction::getOperand(size_t index) const
 {
     if (index >= m_operands.size())
@@ -50,6 +95,9 @@ MirOperand *MirInstruction::getOperand(size_t index) const
     return m_operands[index];
 }
 
+/**
+ * Retrieves the const operand pointer at the specified index, or nullptr if out of bounds.
+ */
 const MirOperand *MirInstruction::getConstOperand(size_t index) const
 {
     if (index >= m_operands.size())
@@ -59,6 +107,10 @@ const MirOperand *MirInstruction::getConstOperand(size_t index) const
     return m_operands[index];
 }
 
+/**
+ * Resolves the dataflow access flag (Read, Write, ReadWrite) for the operand at the given index.
+ * Handles target instructions, fixed signatures, and elastic variadic argument slots.
+ */
 MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
 {
     if (isSelected())
@@ -130,33 +182,66 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
     }
     else if (getFlags() & MirInstructionFlags::VariadicArgs)
     {
-        // Fallback.
+        // Fallback for variadic instructions without explicit slot
         return MirOperandFlag::Read;
     }
 
     return MirOperandFlag::None;
 }
 
+/**
+ * Returns the total count of operands attached to this instruction.
+ */
 size_t MirInstruction::getOperandCount() const { return m_operands.size(); }
 
+/**
+ * Returns the source location reference for diagnostics.
+ */
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 
+/**
+ * Appends a new operand to the instruction's operand list.
+ */
 void MirInstruction::addOperand(MirOperand *operand) { m_operands.push_back(operand); }
 
+/**
+ * Updates the instruction's opcode.
+ */
 void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
 
+/**
+ * Replaces the instruction's operand list.
+ */
 void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands) { m_operands = operands; }
 
+/**
+ * Attaches a target machine instruction descriptor.
+ */
 void MirInstruction::setTargetDesc(MirTargetInstructionDesc *desc) { m_targetDesc = desc; }
 
+/**
+ * Sets the previous instruction in the intrusive list.
+ */
 void MirInstruction::setPrev(MirInstruction *prev) { m_prev = prev; }
 
+/**
+ * Sets the next instruction in the intrusive list.
+ */
 void MirInstruction::setNext(MirInstruction *next) { m_next = next; }
 
+/**
+ * Returns const reference to the operand list.
+ */
 const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
 
+/**
+ * Returns mutable reference to the operand list.
+ */
 std::pmr::vector<MirOperand *> &MirInstruction::getOperands() { return m_operands; }
 
+/**
+ * Identifies all register definitions (DEFs) written by this instruction, including explicit write operands and target implicit defs.
+ */
 std::vector<MirRegisterRef> MirInstruction::getDefinedRegisters() const
 {
     std::vector<MirRegisterRef> defs;
@@ -188,6 +273,9 @@ std::vector<MirRegisterRef> MirInstruction::getDefinedRegisters() const
     return defs;
 }
 
+/**
+ * Identifies all register uses (USEs) read by this instruction, including explicit read operands, memory bases, and target implicit uses.
+ */
 std::vector<MirRegisterRef> MirInstruction::getUsedRegisters() const
 {
     std::vector<MirRegisterRef> uses;
@@ -226,6 +314,9 @@ std::vector<MirRegisterRef> MirInstruction::getUsedRegisters() const
     return uses;
 }
 
+/**
+ * Formats the instruction into assembly text format ("<opcode> <op0>, <op1>, ...").
+ */
 std::string MirInstruction::toString() const
 {
     std::string res;

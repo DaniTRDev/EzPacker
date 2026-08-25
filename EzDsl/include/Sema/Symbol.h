@@ -4,6 +4,9 @@
 #include "EzDslCommon.h"
 #include "Symbols/Symbols.h"
 
+/**
+ * Bitflags tracking definition state, reference count, synthetic generation, and error poisoning on symbols.
+ */
 enum class SymbolFlags : uint8_t
 {
     None = 0,
@@ -13,6 +16,9 @@ enum class SymbolFlags : uint8_t
     HasErrors = 1 << 3    // Poisoned symbol to avoid duplicate diagnostics
 };
 
+/**
+ * Discriminator enum identifying the syntactic/semantic category of a Symbol.
+ */
 enum class SymbolType : uint8_t
 {
     // .tdf Target entities
@@ -43,15 +49,26 @@ enum class SymbolType : uint8_t
     CallingConv
 };
 
+/**
+ * Bitwise OR operator for combining SymbolFlags bitmasks.
+ */
 constexpr SymbolFlags operator|(SymbolFlags a, SymbolFlags b) noexcept
 {
     return static_cast<SymbolFlags>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
+
+/**
+ * Bitwise AND test operator checking if any common flags are set.
+ */
 constexpr bool operator&(SymbolFlags a, SymbolFlags b) noexcept
 {
     return (static_cast<uint8_t>(a) & static_cast<uint8_t>(b)) != 0;
 }
 
+/**
+ * Universal symbol table entry representing named definitions across all EzDsl sub-languages.
+ * Holds typed semantic payload in a std::variant.
+ */
 class Symbol
 {
   public:
@@ -71,7 +88,7 @@ class Symbol
                                     Sema::Symbols::TargetSymbol>;
 
     /**
-     * Creates the symbol with the given source reference, flags, definition scope, id, type and name. Data is NOT set.
+     * Constructs a symbol with source location span, flags, defining scope ID, unique symbol ID, type, and name.
      */
     Symbol(class SourceReference *sourceRef,
            SymbolFlags flags,
@@ -81,57 +98,57 @@ class Symbol
            std::string_view name);
 
     /**
-     * Returns true if this symbol holds the given data type.
+     * Checks if the symbol holds semantic data of type T in its variant payload.
      */
     template <typename T> bool hasData() const { return std::holds_alternative<T>(m_data); }
 
     /**
-     * Return true if the given flag is enabled in the symbol.
+     * Checks if the specified symbol flag bit is set.
      */
     bool hasFlag(SymbolFlags flag) const;
 
     /**
-     * Returns the source reference linked to this symbol.
+     * Returns the SourceReference span representing the symbol's declaration location.
      */
     class SourceReference *getSourceRef() const;
 
     /**
-     * Returns the flags of the symbol.
+     * Returns the symbol flags bitmask.
      */
     SymbolFlags getFlags() const;
 
     /**
-     * Returns the ID of the scope that defined this symbol.
+     * Returns the unique ID of the lexical/semantic scope that contains this symbol.
      */
     SymbolId getDefiningScopeId() const;
 
     /**
-     * Returns the ID of the symbol.
+     * Returns the unique numeric ID assigned to this symbol.
      */
     SymbolId getId() const;
 
     /**
-     * Returns the type of the symbol.
+     * Returns the symbol category type.
      */
     SymbolType getType() const;
 
     /**
-     * Returns a pointer to the given data type if this symbol holds its. Returns nullptr if not.
+     * Returns a mutable pointer to the payload if it matches type T, or nullptr otherwise.
      */
     template <typename T> T *getIf() { return std::get_if<T>(&m_data); }
 
     /**
-     * Const overload for read-only access on const Symbol instances.
+     * Const overload returning a read-only pointer to the payload of type T, or nullptr if unmatched.
      */
     template <typename T> const T *getIf() const { return std::get_if<T>(&m_data); }
 
     /**
-     * Sets the data of the symbol OVERRIDING previous one, if any.
+     * Sets or overwrites the symbol's semantic data payload.
      */
     void setData(SymbolData data);
 
     /**
-     * Returns the name of the symbol.
+     * Returns the textual identifier name of the symbol.
      */
     const std::string_view &getName() const;
 

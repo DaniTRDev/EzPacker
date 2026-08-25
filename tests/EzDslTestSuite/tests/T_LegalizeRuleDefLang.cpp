@@ -6,6 +6,9 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for Legalize Rule Definition Language (.lrd) parser, rewrite rules, and AST construction.
+ */
 class LegalizeRuleDefLangTest : public DslTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class LegalizeRuleDefLangTest : public DslTestSuiteAsGtest
 // 1. Operand Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies parsing typed prefix SSA register operands (e.g. i32:$dst).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixSsaOperand)
 {
     std::string test = "i32:$dst";
@@ -29,6 +35,9 @@ TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixSsaOperand)
     EXPECT_FALSE(res->m_typeParam.has_value());
 }
 
+/**
+ * Verifies parsing typed prefix immediate symbol operands (e.g. imm:$c).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixImmediateSymbolOperand)
 {
     std::string test = "imm:$c";
@@ -43,6 +52,9 @@ TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixImmediateSymbolOperand)
     EXPECT_FALSE(res->m_typeParam.has_value());
 }
 
+/**
+ * Verifies parsing parameterized prefix immediate symbol operands (e.g. imm(i32):$c, simm(i12):$offset).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestParameterizedPrefixImmediateSymbolOperand)
 {
     std::string testTyped = "imm(i32):$c";
@@ -70,6 +82,9 @@ TEST_F(LegalizeRuleDefLangTest, TestParameterizedPrefixImmediateSymbolOperand)
     EXPECT_EQ(resWidth->m_typeParam->m_node, "i12");
 }
 
+/**
+ * Verifies parsing untyped bare SSA register references (e.g. $src).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestBareSsaOperand)
 {
     std::string test = "$src";
@@ -83,6 +98,9 @@ TEST_F(LegalizeRuleDefLangTest, TestBareSsaOperand)
     EXPECT_FALSE(res->m_typeParam.has_value());
 }
 
+/**
+ * Verifies parsing immediate integer literals in decimal, negative decimal, and hexadecimal formats.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
 {
     // Decimal literal
@@ -116,6 +134,9 @@ TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
     EXPECT_EQ(resHex->m_immLiteral->m_node, 0xFF);
 }
 
+/**
+ * Verifies parsing single-argument custom transformation functions (e.g. log2($shift)).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestCustomTransformOperand)
 {
     std::string test = "log2($shift)";
@@ -129,6 +150,9 @@ TEST_F(LegalizeRuleDefLangTest, TestCustomTransformOperand)
     EXPECT_EQ(res->m_callArgs[0].m_node, "shift");
 }
 
+/**
+ * Verifies parsing multi-argument custom transformation functions (e.g. combineBits($hi, $lo)).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestCustomTransformMultiArgOperand)
 {
     std::string test = "combineBits($hi, $lo)";
@@ -147,6 +171,9 @@ TEST_F(LegalizeRuleDefLangTest, TestCustomTransformMultiArgOperand)
 // 2. RuleInstruction Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies parsing zero-operand rule instruction patterns (e.g. NOP;).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestInstructionWithoutOperands)
 {
     std::string test = "NOP;";
@@ -158,6 +185,10 @@ TEST_F(LegalizeRuleDefLangTest, TestInstructionWithoutOperands)
     EXPECT_TRUE(res->m_operands.empty());
 }
 
+/**
+ * Verifies parsing rule instructions containing heterogeneous combinations of typed registers,
+ * bare registers, immediate symbols, literal constants, and custom transforms.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestInstructionWithMixedOperands)
 {
     std::string test = "ADD i32:$dst, $lhs, imm(i32):$c, 42, log2($shift);";
@@ -200,6 +231,9 @@ TEST_F(LegalizeRuleDefLangTest, TestInstructionWithMixedOperands)
 // 3. RulePredicate (When Guard) Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies parsing single-argument semantic predicate guards in when clauses (e.g. isPowTwo($c);).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestRulePredicateSingleArg)
 {
     std::string test = "isPowTwo($c);";
@@ -214,6 +248,9 @@ TEST_F(LegalizeRuleDefLangTest, TestRulePredicateSingleArg)
     EXPECT_EQ(std::get<DSL::Ast::Common::Identifier>(res->m_arguments[0]).m_node, "c");
 }
 
+/**
+ * Verifies parsing multi-argument semantic predicate guards in when clauses (e.g. isAddCarryLegal($lhs, $rhs);).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestRulePredicateMultiArg)
 {
     std::string test = "isAddCarryLegal($lhs, $rhs);";
@@ -234,6 +271,9 @@ TEST_F(LegalizeRuleDefLangTest, TestRulePredicateMultiArg)
 // 4. LegalizeRewriteRule Parsing Tests (Block Permutations)
 // ============================================================================
 
+/**
+ * Verifies parsing a complete rewrite rule in standard section ordering (match -> when -> expand).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestCompleteRewriteRuleStandardOrder)
 {
     std::string test = R"dsl(
@@ -286,6 +326,9 @@ rule SDivPow2 {
     EXPECT_EQ(res->m_expansionSequence[0].m_operands[2].m_name.m_node, "log2");
 }
 
+/**
+ * Verifies parsing rewrite rules with permuted block ordering (expand -> when -> match).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestRewriteRulePermutedBlocksOrder)
 {
     // Order: expand -> when -> match
@@ -319,6 +362,9 @@ rule PermutedOrder {
     EXPECT_EQ(res->m_expansionSequence[0].m_opcode.m_node, "SAR");
 }
 
+/**
+ * Verifies parsing rewrite rules that do not declare a when predicate guard block.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestRewriteRuleWithoutWhenBlock)
 {
     std::string test = R"dsl(
@@ -357,6 +403,9 @@ rule NarrowAddi64 {
 // 5. Full Target Legalize Rule Translation Unit Tests
 // ============================================================================
 
+/**
+ * Verifies parsing an entire target legalization rule file (.lrd) containing multiple rewrite rules.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestFullTargetLegalizeRuleDef)
 {
     std::string test = R"dsl(
@@ -401,6 +450,9 @@ rule NarrowAddi64 {
 // 6. Negative & Syntax Error Tests
 // ============================================================================
 
+/**
+ * Verifies syntax error rejection when disallowed postfix immediate notation ($c:imm) is used.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestDisallowedPostfixImmediateSyntaxError)
 {
     std::string test = "ADD i32:$dst, i32:$lhs, $c:imm;";
@@ -410,6 +462,9 @@ TEST_F(LegalizeRuleDefLangTest, TestDisallowedPostfixImmediateSyntaxError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when disallowed postfix type notation ($dst:i32) is used.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestDisallowedPostfixTypeSyntaxError)
 {
     std::string test = "ADD $dst:i32, $src:i32, 42;";
@@ -419,6 +474,9 @@ TEST_F(LegalizeRuleDefLangTest, TestDisallowedPostfixTypeSyntaxError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a semicolon is missing after an inner block in a rule.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestMissingSemicolonAfterBlockError)
 {
     std::string test = R"dsl(
@@ -438,6 +496,9 @@ rule BadRule {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a semicolon is missing after a top-level rule declaration in a file.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestMissingSemicolonAfterRuleInFileError)
 {
     std::string test = R"dsl(
@@ -457,6 +518,9 @@ rule BadRule {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a semicolon is missing at the end of an instruction.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestMissingSemicolonInInstructionError)
 {
     std::string test = R"dsl(
@@ -476,6 +540,9 @@ rule BadRule {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a semicolon is missing inside a predicate guard.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestMissingSemicolonInPredicateError)
 {
     std::string test = R"dsl(
@@ -498,6 +565,9 @@ rule BadRule {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection on empty dollar sign variable syntax ($;).
+ */
 TEST_F(LegalizeRuleDefLangTest, TestInvalidDollarVariableSyntaxError)
 {
     std::string test = "ADD $; ";
@@ -507,6 +577,9 @@ TEST_F(LegalizeRuleDefLangTest, TestInvalidDollarVariableSyntaxError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an expand block has an unclosed brace.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestUnclosedBraceInExpandBlockError)
 {
     std::string test = R"dsl(

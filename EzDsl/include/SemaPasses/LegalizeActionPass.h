@@ -9,27 +9,42 @@ namespace Sema::Symbols
 class LegalizeClauseSymbol;
 }
 
+/**
+ * Semantic analysis pass validating target legalization actions (.lad).
+ * Resolves opcode legality matrices, type constraints, target scalar promotion types (WIDENS/NARROWS),
+ * and runtime libcall symbols against the symbol table.
+ */
 class LegalizeActionPass
 {
   public:
     /**
      * Executes the semantic analysis and symbol resolution pass for legalization action definitions.
+     * Returns true if all action rules, type constraints, and target types were successfully validated.
      */
     static bool run(class DiagnosticCollector *collector,
                     class SymbolTable *table,
                     DSL::Ast::LegalizeActionDef::TargetLegalizeDef *file);
 
   private:
+    /**
+     * Processes and declares legalization action symbols for a single generic IR opcode.
+     */
     static bool processInstructionDecl(class DiagnosticCollector *collector,
                                        class SymbolTable *table,
                                        const DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl &decl);
 
+    /**
+     * Validates a single action clause (LEGAL, WIDENS, NARROWS, LIBCALL) and resolves its target types.
+     */
     static bool processClause(class DiagnosticCollector *collector,
                               class SymbolTable *table,
                               const DSL::Ast::LegalizeActionDef::LegalizeActionClause &clause,
                               std::string_view instName,
                               Sema::Symbols::LegalizeClauseSymbol &outClause);
 
+    /**
+     * Resolves a type constraint (e.g. i32, i8:1) against declared type symbols.
+     */
     static bool resolveConstraint(class DiagnosticCollector *collector,
                                   class SymbolTable *table,
                                   const DSL::Ast::LegalizeActionDef::TypeConstraint &constraint,

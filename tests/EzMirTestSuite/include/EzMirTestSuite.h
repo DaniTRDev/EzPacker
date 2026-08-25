@@ -23,39 +23,36 @@ class SourceManager;
 enum class MirInstructionOpCode : uint16_t;
 
 /**
- * Class used to contain helper methods related to creation/destruction of needed objects in common test scenarios.
+ * Common test harness and helper container for EzMir unit tests.
+ * Provides pre-initialized MIR building blocks including memory arenas,
+ * diagnostic collectors, type tables, pass managers, and a default TEST function.
  */
 class EzMirTestSuite
 {
   public:
     /**
-     * Returns the builder context used by this test.
-     * @return
+     * Returns the builder context used across MIR test cases.
      */
     MirBuilderContext *getBuilderCtx();
 
     /**
-     * Returns the TEST function.
-     * @return
+     * Returns the pre-constructed synthetic TEST function.
      */
     MirFunction *getTestFunc();
 
     /**
-     * Returns the pass manager linked to this test.
-     * @return
+     * Returns the MIR pass manager linked to this test instance.
      */
     MirPassManager *getPassManager();
 
     /**
-     * Returns the insertion point of the first block of the TEST function.
-     * @return
+     * Returns the insertion point located at the beginning of the TEST function's entry block.
      */
     const MirInstructionInsertionPoint &getTestInsertionPoint();
 
     /**
-     * Runs the given pass.
-     * @param pass
-     * @return
+     * Registers and executes a compiler pass of type PassType with the provided arguments,
+     * executing it immediately on the test suite's builder context in test mode.
      */
     template <typename PassType, typename... Args>
         requires(std::is_base_of<MirPass, PassType>::value)
@@ -69,24 +66,19 @@ class EzMirTestSuite
     }
 
     /**
-     * Returns the type table.
-     * @return
+     * Returns the MIR type table holding primitive and target type layout definitions.
      */
     MirTypeTable *getTypeTable();
 
     /**
-     * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-register.
-     * @param destOperType
-     * @param srcOperType
+     * Inserts a two-operand register-to-register instruction at the current test insertion point.
+     * Creates virtual destination and source registers with the given MIR types.
      */
     MirInstruction *addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType);
 
     /**
-     * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-immediate(int).
-     * @param opcode
-     * @param destOperType
-     * @param srcOperType
-     * @param srcValue
+     * Inserts a register-to-integer-immediate instruction at the current test insertion point.
+     * Creates a virtual destination register and an integer immediate operand with the specified value.
      */
     MirInstruction *addTestInstructionRegIntImm(MirInstructionOpCode opcode,
                                                 MirType *destOperType,
@@ -94,20 +86,14 @@ class EzMirTestSuite
                                                 FlexInt srcValue);
 
     /**
-     * Adds a test instruction USING THE CURRENT INSERTION POINT, of the form register-immediate(float).
-     * @param opcode
-     * @param destOperType
-     * @param srcOperType
-     * @param srcValue
+     * Inserts a register-to-float-immediate instruction at the current test insertion point.
+     * Creates a virtual destination register and a 32-bit floating point immediate operand.
      */
     MirInstruction *addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue);
 
     /**
-     * Adds an instruction USING THE CURRENT INSERTION POINT, of the form register-memory. The memory operand
-     * has BOTH base and displacement.
-     * @param opcode
-     * @param destOperType
-     * @param srcOperType
+     * Inserts a register-to-memory instruction at the current test insertion point.
+     * Creates a virtual destination register and a memory operand with base virtual register and displacement.
      */
     MirInstruction *addTestInstructionRegMem(MirInstructionOpCode opcode,
                                              MirType *destOperType,
@@ -115,19 +101,18 @@ class EzMirTestSuite
                                              const FlexInt &displacement);
 
     /**
-     * Creates all the needed context pointers in a basic state for a test. It also creates 1 void "TEST" function,
-     * without parameters. Might be overriden by parent classes, but THEY MUST CALL THIS METHOD.
-     * @param workingPath
+     * Initializes all diagnostic infrastructure, type tables, target layout,
+     * default calling convention, and the synthetic void TEST function with an entry block.
      */
     virtual void create(const std::filesystem::path &workingPath);
 
     /**
-     * Frees everything of this test suite. Might be overriden by parent classes, but THEY MUST CALL THIS METHOD.
+     * Cleans up and releases all allocated MIR contexts and diagnostic structures.
      */
     virtual void destroy();
 
     /**
-     * Returns the function list out of the current context.
+     * Retrieves the intrusive list of MIR functions registered in the current builder context.
      */
     IntrusiveLinkedList<MirFunction> &getFunctions();
 
@@ -145,16 +130,20 @@ class EzMirTestSuite
     std::shared_ptr<SourceManager> m_sourceManager;
 };
 
+/**
+ * GoogleTest test fixture adapter that invokes EzMirTestSuite::create
+ * in SetUp() and EzMirTestSuite::destroy in TearDown().
+ */
 class MirTestSuiteAsGtest : public EzMirTestSuite, public ::testing::Test
 {
   public:
     /**
-     * Calls EzMirTestSuite::create.
+     * Sets up the test environment by creating the EzMirTestSuite context.
      */
     void SetUp() override;
 
     /**
-     * Calls EzMirTestSuite::destroy.
+     * Tears down the test environment by freeing the EzMirTestSuite context.
      */
     void TearDown() override;
 

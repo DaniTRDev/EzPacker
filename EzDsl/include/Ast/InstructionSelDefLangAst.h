@@ -9,7 +9,18 @@ namespace DSL::Ast::InstSelDef
 {
 
 /**
- * Parameter declaration for an addressing mode aggregate.
+ * Parameter declaration for an addressing mode aggregate in .isf files.
+ *
+ * Syntax:
+ *   AddrModeParam := TypeName ('(' TypeParam ')')? ':' ParamName ( '=' DefaultValue )?
+ *   TypeName      := Identifier
+ *   TypeParam     := Identifier
+ *   ParamName     := Identifier
+ *   DefaultValue  := IntegerLiteral
+ *
+ * Examples:
+ *   GPR:base
+ *   simm(i12):offset = 0
  */
 struct AddrModeParam
 {
@@ -21,6 +32,19 @@ struct AddrModeParam
 
 /**
  * Individual matching variant inside an AddrMode aggregate.
+ *
+ * Syntax:
+ *   AddrModeVariant := 'variant' VariantName '{' ( VariantBlock ';' )* '}'
+ *   VariantBlock    := MatchBlock | WhenBlock
+ *   MatchBlock      := 'match' '{' ( RuleInstruction )* '}'
+ *   WhenBlock       := 'when' '{' ( RulePredicate )* '}'
+ *
+ * Example:
+ *   variant RegOffset {
+ *       match {
+ *           ADD $addr, GPR:$base, simm(i12):$offset;
+ *       };
+ *   };
  */
 struct AddrModeVariant
 {
@@ -31,6 +55,20 @@ struct AddrModeVariant
 
 /**
  * Complete AddrMode aggregate definition.
+ *
+ * Syntax:
+ *   AddrModeDef := 'addrmode' AddrModeName '(' ( AddrModeParam (',' AddrModeParam)* )? ')' '{' ( AddrModeVariant ';' )* '}'
+ *   AddrModeName := Identifier
+ *
+ * Example:
+ *   addrmode BaseOffset(GPR:base, simm(i12):offset = 0) {
+ *       variant RegOffset {
+ *           match { ADD $addr, GPR:$base, simm(i12):$offset; };
+ *       };
+ *       variant BaseOnly {
+ *           match { GPR:$base; };
+ *       };
+ *   };
  */
 struct AddrModeDef
 {
@@ -40,7 +78,26 @@ struct AddrModeDef
 };
 
 /**
- * ISel pattern rule definition.
+ * ISel pattern rule definition mapping generic IR match patterns to target instruction emit sequences.
+ *
+ * Syntax:
+ *   ISelPattern  := 'pattern' PatternName '{' ( PatternBlock ';' )* '}'
+ *   PatternBlock := MatchBlock | WhenBlock | EmitBlock | CostBlock
+ *   MatchBlock   := 'match' '{' ( RuleInstruction )* '}'
+ *   WhenBlock    := 'when' '{' ( RulePredicate )* '}'
+ *   EmitBlock    := 'emit' '{' ( RuleInstruction )* '}'
+ *   CostBlock    := 'cost' '(' IntegerLiteral ')'
+ *
+ * Example:
+ *   pattern SelectAdd {
+ *       match {
+ *           ADD GPR:$dst, GPR:$lhs, GPR:$rhs;
+ *       };
+ *       emit {
+ *           ADD GPR:$dst, GPR:$lhs, GPR:$rhs;
+ *       };
+ *       cost(1);
+ *   };
  */
 struct ISelPattern
 {
@@ -51,6 +108,12 @@ struct ISelPattern
     std::optional<Common::IntegerLiteral> m_cost;
 };
 
+/**
+ * Root AST structure representing a parsed .isf (Instruction Selection Definition) file.
+ *
+ * Syntax:
+ *   ISelDefFile := ( ( AddrModeDef | ISelPattern ) ';' )* EOF
+ */
 struct ISelDefFile
 {
     std::pmr::vector<AddrModeDef> m_addrModes;

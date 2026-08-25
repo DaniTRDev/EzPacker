@@ -10,6 +10,16 @@ namespace DSL::Parser::LegalizeRuleDef
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Lexy parser rule for SSA variable references ($name).
+ *
+ * Syntax:
+ *   SsaVarName := '$' Identifier
+ *
+ * Examples:
+ *   $dst
+ *   $src
+ */
 struct SsaVarName
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -17,60 +27,105 @@ struct SsaVarName
     static constexpr auto value = lexy::forward<Ast::Common::Identifier>;
 };
 
+/**
+ * Lexy parser rule for arguments to semantic guard predicates ($var, integer literal, or identifier).
+ *
+ * Syntax:
+ *   PredicateArg := SsaVarName | IntegerLiteral | Identifier
+ */
 struct PredicateArg
 {
     static constexpr auto whitespace = Common::Whitespace;
-
-    static constexpr auto rule = []
-    {
-        auto dollarVar = dsl::peek(dsl::lit_c<'$'>) >> dsl::p<SsaVarName>;
-        auto intLit =
-                dsl::peek(dsl::lit_c<'-'> | dsl::lit_c<'+'> | dsl::ascii::digit) >> dsl::p<Common::IntegerLiteral>;
-        auto bareIdent = dsl::else_ >> dsl::p<Common::Identifier>;
-
-        return dollarVar | intLit | bareIdent;
-    }();
+    static constexpr auto rule = (dsl::peek(dsl::lit_c<'$'>) >> dsl::p<SsaVarName>) |
+            (dsl::peek(dsl::ascii::digit | dsl::lit_c<'-'> | dsl::lit_c<'+'>) >> dsl::p<Common::IntegerLiteral>) |
+            (dsl::else_ >> dsl::p<Common::Identifier>);
 
     static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::PredicateArg>(
-            [](Ast::Common::Identifier ident) -> Ast::LegalizeRuleDef::PredicateArg { return ident; },
-            [](Ast::Common::IntegerLiteral lit) -> Ast::LegalizeRuleDef::PredicateArg { return lit; });
+            [](Ast::Common::Identifier id) { return Ast::LegalizeRuleDef::PredicateArg{ std::move(id) }; },
+            [](Ast::Common::IntegerLiteral lit) { return Ast::LegalizeRuleDef::PredicateArg{ lit }; });
 };
 
+/**
+ * Lexy parser rule for semantic guard predicate calls.
+ *
+ * Syntax:
+ *   RulePredicate := Identifier '(' ( PredicateArg (',' PredicateArg)* )? ')' ';'
+ *
+ * Example:
+ *   is_simm12($c);
+ */
 struct RulePredicate
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::p<Common::Identifier> +
-            dsl::parenthesized.list(dsl::p<PredicateArg>, dsl::sep(dsl::lit_c<','>)) + dsl::lit_c<';'>;
 
-    static constexpr auto value =
-            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg>> >>
-            lexy::callback<Ast::LegalizeRuleDef::RulePredicate>(
-                    [](Ast::Common::Identifier predName, std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg> args)
-                    {
-                        return Ast::LegalizeRuleDef::RulePredicate{ .m_predicateName = std::move(predName),
-                                                                    .m_arguments = std::move(args) };
-                    });
+    struct ArgList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::list(dsl::p<PredicateArg>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg>>;
+    };
+
+    static constexpr auto rule = []
+    {
+        auto name = dsl::p<Common::Identifier>;
+        auto args = dsl::parenthesized(
+                dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore | dsl::lit_c<'$'> | dsl::lit_c<'-'> |
+                                   dsl::lit_c<'+'>) >>
+                         dsl::p<ArgList>));
+        return name + args + dsl::lit_c<';'>;
+    }();
+
+    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RulePredicate>(
+            [](Ast::Common::Identifier name, std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg> args)
+            { return Ast::LegalizeRuleDef::RulePredicate{ std::move(name), std::move(args) }; },
+            [](Ast::Common::Identifier name, lexy::nullopt)
+            { return Ast::LegalizeRuleDef::RulePredicate{ std::move(name), {} }; });
 };
 
+/**
+ * Lexy parser rule for custom compile-time transform calls in rule operands.
+ *
+ * Syntax:
+ *   CustomTransformOperand := Identifier '(' SsaVarName (',' SsaVarName)* ')'
+ *
+ * Example:
+ *   log2($c)
+ */
 struct CustomTransformOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule =
-            dsl::p<Common::Identifier> + dsl::parenthesized.list(dsl::p<SsaVarName>, dsl::sep(dsl::lit_c<','>));
 
-    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::Common::Identifier>> >>
-            lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
-                                          [](Ast::Common::Identifier funcName,
-                                             std::pmr::vector<Ast::Common::Identifier> args)
-                                          {
-                                              return Ast::LegalizeRuleDef::RuleOperand{
-                                                  .m_kind = Ast::LegalizeRuleDef::OperandKind::CustomTransform,
-                                                  .m_name = std::move(funcName),
-                                                  .m_callArgs = std::move(args)
-                                              };
-                                          });
+    struct VarList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::list(dsl::p<SsaVarName>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::Common::Identifier>>;
+    };
+
+    static constexpr auto rule =
+            dsl::p<Common::Identifier> + dsl::parenthesized(dsl::p<VarList>);
+
+    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
+            [](Ast::Common::Identifier funcName, std::pmr::vector<Ast::Common::Identifier> args)
+            {
+                Ast::LegalizeRuleDef::RuleOperand op;
+                op.m_kind = Ast::LegalizeRuleDef::OperandKind::CustomTransform;
+                op.m_name = std::move(funcName);
+                op.m_callArgs = std::move(args);
+                return op;
+            });
 };
 
+/**
+ * Lexy parser rule for type-annotated SSA operand references.
+ *
+ * Syntax:
+ *   TypedPrefixSsaOperand := TypeName ('(' TypeParam ')')? ':' SsaVarName
+ *
+ * Examples:
+ *   i32:$lhs
+ *   simm(i12):$c
+ */
 struct TypedPrefixSsaOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -103,6 +158,12 @@ struct TypedPrefixSsaOperand
             });
 };
 
+/**
+ * Lexy parser rule for bare SSA operand variables ($var).
+ *
+ * Syntax:
+ *   BareSsaOperand := '$' Identifier
+ */
 struct BareSsaOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -116,6 +177,12 @@ struct BareSsaOperand
             });
 };
 
+/**
+ * Lexy parser rule for immediate integer literals in rule operands.
+ *
+ * Syntax:
+ *   LiteralOperand := IntegerLiteral
+ */
 struct LiteralOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -129,6 +196,9 @@ struct LiteralOperand
             });
 };
 
+/**
+ * Lexy parser rule dispatching between custom transforms, typed SSA operands, bare SSA variables, and literals.
+ */
 struct RuleOperand
 {
     static constexpr auto whitespace = Common::Whitespace;

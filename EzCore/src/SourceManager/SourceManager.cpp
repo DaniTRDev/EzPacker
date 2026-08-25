@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <fstream>
 
+// Scans content buffer for newline boundaries and constructs 1-based SourceLineRange records
 static void populateLineRanges(SourceFileEntry *entry)
 {
     const auto &content = entry->m_content;
@@ -16,6 +17,7 @@ static void populateLineRanges(SourceFileEntry *entry)
             lineStart = i + 1;
         }
     }
+    // Record final line if buffer does not end with a newline
     if (lineStart <= content.size())
     {
         entry->m_lines.push_back({ lineStart, content.size(), lineNumber });
@@ -31,6 +33,7 @@ SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr:
 
 SourceManager::~SourceManager()
 {
+    // Explicitly destroy and deallocate each arena-allocated SourceFileEntry
     for (SourceFileEntry *entry : m_sourceFiles)
     {
         if (entry != nullptr)

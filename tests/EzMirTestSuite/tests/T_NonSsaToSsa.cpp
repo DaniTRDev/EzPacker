@@ -13,9 +13,18 @@
 #include "Printer/MirPrinter.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Test fixture for SSA construction pass (NonSsaToSsaPass).
+ * Verifies variable renaming, dominance frontier calculation, PHI node placement,
+ * and undef variable handling.
+ */
 class NonSsaToSsaTest : public MirTestSuiteAsGtest
 {
   protected:
+    /**
+     * Helper to configure the pass manager pipeline with CodeFlowAnalysisPass and NonSsaToSsaPass,
+     * and execute it across the active builder context.
+     */
     void runSSAPass()
     {
         MirPassManager *passManager = getPassManager();
@@ -28,7 +37,9 @@ class NonSsaToSsaTest : public MirTestSuiteAsGtest
         passManager->runPipeline(getBuilderCtx());
     }
 
-    // Helper to abstract away block creation if your API differs slightly
+    /**
+     * Helper to allocate a named basic block inside the active test function.
+     */
     MirBlock *createBlock(const char *name)
     {
         MirFunction *func = getTestFunc();
@@ -40,6 +51,9 @@ class NonSsaToSsaTest : public MirTestSuiteAsGtest
 
 namespace
 {
+/**
+ * Custom GoogleTest assertion verifying that an instruction is a PHI node with the expected incoming paths.
+ */
 ::testing::AssertionResult IsPhi(MirInstruction *instr, size_t expectedIncomingPaths)
 {
     if (!instr)
@@ -56,6 +70,9 @@ namespace
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that an operand is a synthetic undef virtual register.
+ */
 ::testing::AssertionResult IsUndef(MirOperand *op)
 {
     if (!op)
@@ -71,9 +88,10 @@ namespace
 }
 } // anonymous namespace
 
-// =========================================================================
-// TEST 1: Straight-line code renaming (No PHI nodes expected)
-// =========================================================================
+/**
+ * Verifies variable versioning and renaming in straight-line code without inserting PHI nodes,
+ * ensuring that subsequent uses resolve to the most recent dominating definition.
+ */
 TEST_F(NonSsaToSsaTest, StraightLineRenaming)
 {
     MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
@@ -106,9 +124,9 @@ TEST_F(NonSsaToSsaTest, StraightLineRenaming)
             << "Read operand did not map to the most recent dominance definition.";
 }
 
-// =========================================================================
-// TEST 2: Diamond CFG (If-Then-Else) -> Expect 1 PHI node
-// =========================================================================
+/**
+ * Verifies PHI node insertion in a diamond (if-then-else) CFG at the join block (dominance frontier).
+ */
 TEST_F(NonSsaToSsaTest, DiamondCfgPhiInsertion)
 {
     MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
@@ -168,9 +186,9 @@ TEST_F(NonSsaToSsaTest, DiamondCfgPhiInsertion)
     EXPECT_EQ(phiDst->getRegId(), readSrc->getRegId()) << "Downstream read instruction should use the PHI result.";
 }
 
-// =========================================================================
-// TEST 3: Loop CFG (While Loop) -> Expect PHI node at Header
-// =========================================================================
+/**
+ * Verifies PHI node placement at the loop header due to value merge between the loop entry and back-edge.
+ */
 TEST_F(NonSsaToSsaTest, LoopHeaderPhiInsertion)
 {
     MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
@@ -228,9 +246,9 @@ TEST_F(NonSsaToSsaTest, LoopHeaderPhiInsertion)
     EXPECT_EQ(phiDst->getRegId(), readSrc->getRegId());
 }
 
-// =========================================================================
-// TEST 4: Uninitialized Memory / Undef Variable
-// =========================================================================
+/**
+ * Verifies that reading an uninitialized variable generates an undef virtual register operand without error.
+ */
 TEST_F(NonSsaToSsaTest, UndefVariableHandling)
 {
     MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());

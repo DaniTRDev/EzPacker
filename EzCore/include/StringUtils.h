@@ -4,7 +4,8 @@
 #include "EzCoreCommon.h"
 
 /**
- * Converts a given string to lowercase.
+ * Converts all characters in a given string view to lowercase using ASCII transformations.
+ * Allocates and returns a new std::string of the same length with lowercase characters.
  */
 inline std::string StrToLower(const std::string_view &str)
 {
@@ -16,7 +17,8 @@ inline std::string StrToLower(const std::string_view &str)
 }
 
 /**
- * Converts a given string to uppercase.
+ * Converts all characters in a given string view to uppercase using ASCII transformations.
+ * Allocates and returns a new std::string of the same length with uppercase characters.
  */
 inline std::string StrToUpper(const std::string_view &str)
 {

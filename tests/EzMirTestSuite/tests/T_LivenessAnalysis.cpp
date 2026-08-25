@@ -10,16 +10,25 @@
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 
+/**
+ * Test fixture for MIR Liveness Analysis pass.
+ * Verifies local generation/killing of register definitions and uses (DEF/USE sets)
+ * as well as global fixed-point iterative dataflow propagation (LIVE-IN/LIVE-OUT sets).
+ */
 class LivenessAnalysisTest : public MirTestSuiteAsGtest
 {
   public:
-    // Helper to quickly allocate 32-bit registers in tests
+    /**
+     * Helper to allocate a 32-bit integer virtual register with a given name.
+     */
     MirRegister *createInt32Reg(std::string_view name)
     {
         return MirOperandBuilder(getBuilderCtx()).buildVReg(getTypeTable()->i32(), name.data());
     }
 
-    // Helper to quickly allocate 1-bit boolean registers (for BR_COND)
+    /**
+     * Helper to allocate a 1-bit boolean virtual register with a given name (used for branch conditions).
+     */
     MirRegister *createInt1Reg(std::string_view name)
     {
         return MirOperandBuilder(getBuilderCtx()).buildVReg(getTypeTable()->i1(), name.data());
@@ -29,10 +38,9 @@ class LivenessAnalysisTest : public MirTestSuiteAsGtest
 namespace
 {
 
-// ---------------------------------------------------------
-// GTest Assertion Helpers
-// ---------------------------------------------------------
-
+/**
+ * Checks whether a given virtual register ID is present or absent in a per-block register set map.
+ */
 ::testing::AssertionResult CheckSet(const std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> *map,
                                     size_t blockId,
                                     size_t regId,
@@ -54,6 +62,9 @@ namespace
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a block's local DEF set contains the given virtual register.
+ */
 ::testing::AssertionResult HasLocalDef(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -61,6 +72,9 @@ namespace
     return CheckSet(&res->m_def, blockId, regId, true, "DEF");
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a block's local DEF set does NOT contain the given virtual register.
+ */
 ::testing::AssertionResult NotLocalDef(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -68,6 +82,9 @@ namespace
     return CheckSet(&res->m_def, blockId, regId, false, "DEF");
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a block's local USE set contains the given virtual register.
+ */
 ::testing::AssertionResult HasLocalUse(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -75,6 +92,9 @@ namespace
     return CheckSet(&res->m_use, blockId, regId, true, "USE");
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a block's local USE set does NOT contain the given virtual register.
+ */
 ::testing::AssertionResult NotLocalUse(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -82,6 +102,9 @@ namespace
     return CheckSet(&res->m_use, blockId, regId, false, "USE");
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a register is in the LIVE-IN set of a block.
+ */
 ::testing::AssertionResult IsLiveIn(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -89,6 +112,9 @@ namespace
     return CheckSet(&res->m_liveIn, blockId, regId, true, "LIVE-IN");
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a register is NOT in the LIVE-IN set of a block.
+ */
 ::testing::AssertionResult NotLiveIn(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -96,6 +122,9 @@ namespace
     return CheckSet(&res->m_liveIn, blockId, regId, false, "LIVE-IN");
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a register is in the LIVE-OUT set of a block.
+ */
 ::testing::AssertionResult IsLiveOut(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -103,6 +132,9 @@ namespace
     return CheckSet(&res->m_liveOut, blockId, regId, true, "LIVE-OUT");
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a register is NOT in the LIVE-OUT set of a block.
+ */
 ::testing::AssertionResult NotLiveOut(const LivenessResult *res, size_t blockId, size_t regId)
 {
     if (!res)
@@ -110,6 +142,9 @@ namespace
     return CheckSet(&res->m_liveOut, blockId, regId, false, "LIVE-OUT");
 }
 
+/**
+ * Custom GoogleTest assertion verifying the total number of LIVE-IN and LIVE-OUT registers for a block.
+ */
 ::testing::AssertionResult
 HasLiveCounts(const LivenessResult *res, size_t blockId, size_t expectedIn, size_t expectedOut)
 {
@@ -137,10 +172,10 @@ HasLiveCounts(const LivenessResult *res, size_t blockId, size_t expectedIn, size
 
 } // anonymous namespace
 
-// ---------------------------------------------------------
-// Core Analysis Tests
-// ---------------------------------------------------------
-
+/**
+ * Verifies liveness analysis on straight-line code where registers are defined and consumed
+ * entirely within a single basic block (local defs kill external liveness, resulting in 0 live-in/live-out).
+ */
 TEST_F(LivenessAnalysisTest, TestStraightLineCode)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -180,6 +215,10 @@ TEST_F(LivenessAnalysisTest, TestStraightLineCode)
     EXPECT_TRUE(HasLiveCounts(res, bId, 0, 0));
 }
 
+/**
+ * Verifies that a variable defined in an entry block remains live along the conditional branch path
+ * that reads it, but is not considered live along alternate paths where it is untouched.
+ */
 TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -231,6 +270,10 @@ TEST_F(LivenessAnalysisTest, TestBranchingLiveness)
     EXPECT_TRUE(NotLiveIn(res, elseBlock->getId(), v0->getRegId()));
 }
 
+/**
+ * Verifies read-modify-write operations where a register is both read and written within the same instruction,
+ * ensuring it appears in both local DEF and local USE sets, flowing in as live-in.
+ */
 TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -261,10 +304,9 @@ TEST_F(LivenessAnalysisTest, TestInPlaceArithmetic)
     EXPECT_TRUE(IsLiveIn(res, bId, v0->getRegId()));
 }
 
-// ---------------------------------------------------------
-// Bulletproof Edge Cases
-// ---------------------------------------------------------
-
+/**
+ * Verifies that variable liveness propagates backward across loop back-edges from loop body to loop header.
+ */
 TEST_F(LivenessAnalysisTest, TestLoopLiveness)
 {
     // Tests that liveness iteratively propagates UP a back-edge.
@@ -321,6 +363,9 @@ TEST_F(LivenessAnalysisTest, TestLoopLiveness)
     EXPECT_TRUE(IsLiveOut(res, bodyBlock->getId(), v0->getRegId()));
 }
 
+/**
+ * Verifies that redefining a variable kills its previous liveness, preventing further upward propagation.
+ */
 TEST_F(LivenessAnalysisTest, TestVariableRedefinitionKillsLiveness)
 {
     // Tests that redefining a variable prevents its liveness from propagating further up.
@@ -360,6 +405,9 @@ TEST_F(LivenessAnalysisTest, TestVariableRedefinitionKillsLiveness)
     EXPECT_TRUE(IsLiveIn(res, b2->getId(), v0->getRegId()));
 }
 
+/**
+ * Verifies that dead definitions (variables defined but never read) do not become live-in or live-out.
+ */
 TEST_F(LivenessAnalysisTest, TestDeadCodeDefinitions)
 {
     // Tests that a variable defined but never used doesn't falsely become live.

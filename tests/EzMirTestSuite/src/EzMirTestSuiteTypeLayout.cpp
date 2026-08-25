@@ -1,8 +1,17 @@
 #include "EzMirTestSuiteTypeLayout.h"
 #include "Type/MirType.h"
 
+// Returns 8 bytes as standard 64-bit target pointer size.
 size_t EzMirTestSuiteTypeLayout::getPointerSizeInBytes() const { return 8; }
 
+/**
+ * Computes type alignment in bytes based on type kind and bit width:
+ * - Void: 1 byte
+ * - Integers/Floats: 1 byte (<=8 bits), 2 bytes (<=16 bits), 4 bytes (<=32 bits),
+ *   8 bytes (<=64 bits), 16 bytes (<=128 bits), 32 bytes (>128 bits)
+ * - Pointer: 8 bytes
+ * - Array: Alignment of its underlying element type
+ */
 size_t EzMirTestSuiteTypeLayout::getTypeAlignmentInBytes(const MirType *type) const
 {
     if (!type)
@@ -46,6 +55,13 @@ size_t EzMirTestSuiteTypeLayout::getTypeAlignmentInBytes(const MirType *type) co
     }
 }
 
+/**
+ * Computes memory footprint in bytes for a given type:
+ * - Void: 0 bytes
+ * - Integers/Floats: Rounded up to nearest byte boundary
+ * - Pointer: 8 bytes
+ * - Array: Element size multiplied by array element count
+ */
 size_t EzMirTestSuiteTypeLayout::getTypeSizeInBytes(const MirType *type) const
 {
     if (!type)

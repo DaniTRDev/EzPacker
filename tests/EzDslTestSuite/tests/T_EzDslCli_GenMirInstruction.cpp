@@ -15,9 +15,17 @@
 #include <string>
 #include <thread>
 
+/**
+ * Test fixture for C++ MIR instruction set definition code generator (CppMirInstructionGenerator).
+ * Verifies code generation, operand constraint arrays, instruction flag bitmasks,
+ * write-if-changed timestamp caching, and null safety.
+ */
 class MirIrInstructionGeneratorTest : public DslTestSuiteAsGtest
 {
   protected:
+    /**
+     * Initializes test environment and creates a temporary sandbox directory for output code generation.
+     */
     void SetUp() override
     {
         DslTestSuiteAsGtest::SetUp();
@@ -29,6 +37,9 @@ class MirIrInstructionGeneratorTest : public DslTestSuiteAsGtest
         getDiagCollector()->trace("MirIrInstructionGeneratorTest", "Testing dir at: {}", m_tempDir.string());
     }
 
+    /**
+     * Cleans up the temporary sandbox directory and tears down the test environment.
+     */
     void TearDown() override
     {
         std::error_code ec;
@@ -37,6 +48,9 @@ class MirIrInstructionGeneratorTest : public DslTestSuiteAsGtest
         DslTestSuiteAsGtest::TearDown();
     }
 
+    /**
+     * Reads and returns the entire contents of a file on disk as a string.
+     */
     std::string readFile(const std::filesystem::path &filePath) const
     {
         std::ifstream file(filePath);
@@ -56,6 +70,10 @@ class MirIrInstructionGeneratorTest : public DslTestSuiteAsGtest
 // 1. Full Instruction Set Generation & Content Verification
 // ============================================================================
 
+/**
+ * Verifies end-to-end code generation of MirInstructionSetDefs.h from IR instruction definitions across multiple categories,
+ * checking macro guards, tier macros, operand constraints, and instruction flag bitmasks.
+ */
 TEST_F(MirIrInstructionGeneratorTest, GeneratesInstructionDefsWithMultipleCategories)
 {
     std::string dslContent = R"dsl(
@@ -192,6 +210,9 @@ ir_inst POP_RET(Register:token IN, Register:dst OUT) {
 // 2. Direct File Path Output Specification
 // ============================================================================
 
+/**
+ * Verifies code generation when targeting an explicit file path rather than a directory.
+ */
 TEST_F(MirIrInstructionGeneratorTest, GeneratesToExplicitFilePath)
 {
     std::string dslContent = R"dsl(
@@ -226,6 +247,9 @@ ir_inst HALT() {
 // 3. Incremental Build: Write-If-Changed Verification
 // ============================================================================
 
+/**
+ * Verifies write-if-changed optimization ensuring file timestamps remain untouched when contents are identical.
+ */
 TEST_F(MirIrInstructionGeneratorTest, PreservesTimestampWhenContentIsUnchanged)
 {
     std::string dslContent = R"dsl(
@@ -264,6 +288,9 @@ ir_inst NOP() {
 // 4. Baseline & Error Handling Tests
 // ============================================================================
 
+/**
+ * Verifies that code generator handles an empty symbol table gracefully by outputting baseline boilerplate.
+ */
 TEST_F(MirIrInstructionGeneratorTest, HandlesEmptySymbolTableGracefully)
 {
     SymbolTable emptyTable(getAllocator());
@@ -279,6 +306,9 @@ TEST_F(MirIrInstructionGeneratorTest, HandlesEmptySymbolTableGracefully)
               std::string::npos);
 }
 
+/**
+ * Verifies that the generator rejects null pointers for diagnostics or symbol table inputs.
+ */
 TEST_F(MirIrInstructionGeneratorTest, FailsGracefullyOnNullInputs)
 {
     DiagnosticCollector collector;

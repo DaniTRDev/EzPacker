@@ -5,6 +5,9 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Test fixture for MIR global variable declarations, linkage modes, immutability, and initializers.
+ */
 class GlobalVarTest : public MirTestSuiteAsGtest
 {
   public:
@@ -14,6 +17,10 @@ class GlobalVarTest : public MirTestSuiteAsGtest
 namespace
 {
 
+/**
+ * Custom GoogleTest assertion verifying that a global variable matches expected name, type,
+ * constancy flag, and linkage specification.
+ */
 ::testing::AssertionResult IsGlobalVar(MirGlobalVar *global,
                                        const std::string_view &expectedName,
                                        MirType *expectedType,
@@ -41,6 +48,9 @@ namespace
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a global variable is zero-initialized (has a nullptr initializer).
+ */
 ::testing::AssertionResult IsZeroInitialized(MirGlobalVar *global)
 {
     if (!global)
@@ -53,6 +63,9 @@ namespace
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a global variable has a specific non-null initializer operand.
+ */
 ::testing::AssertionResult HasInitializer(MirGlobalVar *global, MirOperand *expectedInit)
 {
     if (!global)
@@ -78,6 +91,9 @@ namespace
 
 } // anonymous namespace
 
+/**
+ * Verifies creating a default 32-bit integer global variable with external linkage and zero-initialization.
+ */
 TEST_F(GlobalVarTest, TestDefaultGlobalVariable)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -94,6 +110,9 @@ TEST_F(GlobalVarTest, TestDefaultGlobalVariable)
     EXPECT_TRUE(IsZeroInitialized(global));
 }
 
+/**
+ * Verifies creating a mutable (non-constant) 8-bit integer global variable with internal linkage.
+ */
 TEST_F(GlobalVarTest, TestMutableGlobalVariable)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -108,6 +127,9 @@ TEST_F(GlobalVarTest, TestMutableGlobalVariable)
     EXPECT_TRUE(IsZeroInitialized(global));
 }
 
+/**
+ * Verifies creating an immutable global variable initialized with an explicit 32-bit floating point literal.
+ */
 TEST_F(GlobalVarTest, TestGlobalVariableWithInitializer)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -126,6 +148,9 @@ TEST_F(GlobalVarTest, TestGlobalVariableWithInitializer)
     EXPECT_TRUE(HasInitializer(global, _float));
 }
 
+/**
+ * Verifies creating a 64-bit integer global variable with weak linkage.
+ */
 TEST_F(GlobalVarTest, TestGlobalVariableWeakLinkage)
 {
     MirBuilderContext *ctx = getBuilderCtx();

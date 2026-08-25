@@ -5,13 +5,17 @@
 #include <iterator>
 
 /**
- * This class is here to replaced std::pmr::list with a linked list of already-constructed nodes. Instead of making an
- * extra 24 bytes per inserted element, this makes each list owner use extra 24 bytes ONCE to hold the list. Or just 16
- * bytes to hold prev and next so this object can be constructed.
+ * High-performance doubly-linked list that embeds linkage pointers directly inside element nodes.
+ * Unlike standard library node-based containers (e.g. std::list or std::pmr::list), this intrusive design
+ * incurs zero dynamic memory allocations on node insertion/removal operations.
+ * Element nodes must implement getPrev(), setPrev(), getNext(), and setNext() accessor methods.
  */
 template <typename T> class IntrusiveLinkedList
 {
   public:
+    /**
+     * Bidirectional iterator for traversing and manipulating intrusive linked lists.
+     */
     class iterator
     {
         friend class IntrusiveLinkedList;
@@ -32,6 +36,9 @@ template <typename T> class IntrusiveLinkedList
         T *operator->() const { return m_node; }
         T *get() const { return m_node; }
 
+        /**
+         * Prefix increment advancing iterator to the next node in sequence.
+         */
         iterator &operator++()
         {
             if (m_node)
@@ -39,6 +46,9 @@ template <typename T> class IntrusiveLinkedList
             return *this;
         }
 
+        /**
+         * Postfix increment advancing iterator to the next node and returning previous position.
+         */
         iterator operator++(int)
         {
             iterator tmp = *this;
@@ -46,6 +56,9 @@ template <typename T> class IntrusiveLinkedList
             return tmp;
         }
 
+        /**
+         * Prefix decrement moving iterator to the previous node or tail if at end.
+         */
         iterator &operator--()
         {
             if (m_node)
@@ -55,6 +68,9 @@ template <typename T> class IntrusiveLinkedList
             return *this;
         }
 
+        /**
+         * Postfix decrement moving iterator to the previous node and returning previous position.
+         */
         iterator operator--(int)
         {
             iterator tmp = *this;
@@ -76,6 +92,9 @@ template <typename T> class IntrusiveLinkedList
     IntrusiveLinkedList(const IntrusiveLinkedList &) = delete;
     IntrusiveLinkedList &operator=(const IntrusiveLinkedList &) = delete;
 
+    /**
+     * Move constructor transferring list ownership and resetting source list state.
+     */
     IntrusiveLinkedList(IntrusiveLinkedList &&other) noexcept :
         m_head(other.m_head), m_tail(other.m_tail), m_size(other.m_size)
     {
@@ -84,6 +103,9 @@ template <typename T> class IntrusiveLinkedList
         other.m_size = 0;
     }
 
+    /**
+     * Move assignment operator transferring list pointers and size.
+     */
     IntrusiveLinkedList &operator=(IntrusiveLinkedList &&other) noexcept
     {
         if (this != &other)
@@ -98,10 +120,26 @@ template <typename T> class IntrusiveLinkedList
         return *this;
     }
 
+    /**
+     * Returns an iterator pointing to the first node in the list.
+     */
     iterator begin() { return iterator(m_head, this); }
+
+    /**
+     * Returns an iterator representing the past-the-end sentinel.
+     */
     iterator end() { return iterator(nullptr, this); }
+
+    /**
+     * Returns a const iterator pointing to the first node in the list.
+     */
     const_iterator begin() const { return const_iterator(m_head, this); }
+
+    /**
+     * Returns a const iterator representing the past-the-end sentinel.
+     */
     const_iterator end() const { return const_iterator(nullptr, this); }
+
     const_iterator cbegin() const { return begin(); }
     const_iterator cend() const { return end(); }
 
@@ -110,12 +148,29 @@ template <typename T> class IntrusiveLinkedList
     const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
     const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
 
+    /**
+     * Returns true if the list contains zero elements.
+     */
     bool empty() const { return m_size == 0; }
+
+    /**
+     * Returns the total count of elements currently linked in the list.
+     */
     size_t size() const { return m_size; }
 
+    /**
+     * Returns a raw pointer to the first node in the list, or nullptr if empty.
+     */
     T *front() const { return m_head; }
+
+    /**
+     * Returns a raw pointer to the last node in the list, or nullptr if empty.
+     */
     T *back() const { return m_tail; }
 
+    /**
+     * Appends a pre-allocated node to the end of the intrusive list in O(1) time.
+     */
     void push_back(T *node)
     {
         if (!node)
@@ -130,6 +185,9 @@ template <typename T> class IntrusiveLinkedList
         ++m_size;
     }
 
+    /**
+     * Prepends a pre-allocated node to the beginning of the intrusive list in O(1) time.
+     */
     void push_front(T *node)
     {
         if (!node)
@@ -144,6 +202,9 @@ template <typename T> class IntrusiveLinkedList
         ++m_size;
     }
 
+    /**
+     * Inserts a pre-allocated node immediately before the position specified by iterator pos.
+     */
     iterator insert(iterator pos, T *node)
     {
         if (!node)
@@ -172,6 +233,10 @@ template <typename T> class IntrusiveLinkedList
         return iterator(node, this);
     }
 
+    /**
+     * Unlinks the node referenced by iterator pos from the list without deallocating its memory.
+     * Returns an iterator pointing to the element immediately following the removed node.
+     */
     iterator erase(iterator pos)
     {
         if (!pos.m_node)
@@ -197,6 +262,9 @@ template <typename T> class IntrusiveLinkedList
         return iterator(next, this);
     }
 
+    /**
+     * Unlinks the specified node instance from the list in O(1) time.
+     */
     void remove(T *node)
     {
         if (!node)
@@ -204,6 +272,9 @@ template <typename T> class IntrusiveLinkedList
         erase(to_iterator(node));
     }
 
+    /**
+     * Unlinks all nodes from the list and clears internal head, tail, and size states.
+     */
     void clear()
     {
         T *curr = m_head;
@@ -219,7 +290,14 @@ template <typename T> class IntrusiveLinkedList
         m_size = 0;
     }
 
+    /**
+     * Converts a raw node pointer to an iterator bound to this list.
+     */
     iterator to_iterator(T *node) { return iterator(node, this); }
+
+    /**
+     * Converts a const raw node pointer to a const iterator bound to this list.
+     */
     const_iterator to_iterator(const T *node) const { return const_iterator(const_cast<T *>(node), this); }
 
   private:

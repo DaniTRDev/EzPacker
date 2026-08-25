@@ -7,44 +7,48 @@
 /**
  * TODO: Remove this ugly list constructor and add a MirModule.
  */
+/**
+ * Fluent builder for constructing MirFunction instances.
+ * Manages formal parameter accumulation, calling convention configuration,
+ * entry block creation, and automatic registration into the owning module list.
+ */
 class MirFunctionBuilder : public MirBuilder<class MirFunction>
 {
   public:
     /**
-     * Creates the function builder with the given context.
+     * Constructs a function builder bound to a MirBuilderContext.
      */
     MirFunctionBuilder(class MirBuilderContext *ctx);
 
     /**
-     * Creates the function builder linked to an owner vector container.
+     * Constructs a function builder bound to a context and an owning function list.
      */
     MirFunctionBuilder(class MirBuilderContext *ctx, std::pmr::vector<class MirFunction *> *owner);
 
     /**
-     * Returns a block builder attached to the current function. If this function HAS NOT been built, an invalid
-     * block builder is returned and a diagnostic error is pushed.
+     * Creates and returns a MirBlockBuilder configured to append blocks to this function.
      */
     MirBlockBuilder blockBuilder();
 
     /**
-     * Builds a function over arena-managed MIR data structures.
+     * Finalizes and instantiates the MirFunction in the arena with return type, name, and source location.
      */
     MirFunction *
     build(class MirType *returnType, const std::pmr::string &name = "", class SourceReference *sourceRef = nullptr);
 
     /**
-     * Adds a parameter into the FUTURE function that's going to be built. This does not affect the stack frame.
+     * Adds an incoming virtual register parameter to the function signature under construction.
      */
     MirFunctionBuilder &
     buildParam(class MirType *type, const std::pmr::string &name = "", class SourceReference *sourceRef = nullptr);
 
     /**
-     * Appends the given already-built parameter into the function.
+     * Appends an existing MirRegister parameter to the function under construction.
      */
     MirFunctionBuilder &buildParam(class MirRegister *param);
 
     /**
-     * Sets the calling convention of the FUTURE function that's going to be built.
+     * Sets the target calling convention descriptor for the function under construction.
      */
     MirFunctionBuilder &setCallingConvention(class CallingConvDesc *cc);
 

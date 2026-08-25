@@ -10,9 +10,18 @@ namespace DSL::Ast::TargetDef
 {
 
 /**
- * Register declaration with optional parent register alias and bit offsets:
- *   - TargetRegister(rax,    ,    64, 0)
- *   - TargetRegister(eax, rax,    32, 0)
+ * Target architecture register definition with parent alias, bit size, and bit offset.
+ *
+ * Syntax:
+ *   TargetRegister := RegName '(' ParentName? ',' BitSize ',' BitOffset ')'
+ *   RegName        := Identifier
+ *   ParentName     := Identifier
+ *   BitSize        := IntegerLiteral
+ *   BitOffset      := IntegerLiteral
+ *
+ * Examples:
+ *   rax(, 64, 0)
+ *   eax(rax, 32, 0)
  */
 struct TargetRegister
 {
@@ -23,7 +32,15 @@ struct TargetRegister
 };
 
 /**
- * TargetRegisterClass(GPR64, { TargetRegister(rax, , 64, 0), ... })
+ * Register class group containing a list of target registers.
+ *
+ * Syntax:
+ *   TargetRegisterClass := 'CLASS' '(' ClassName ( ',' TargetRegister ( ',' TargetRegister )* )? ')' ';'
+ *   ClassName           := Identifier
+ *
+ * Examples:
+ *   CLASS(GPR64, rax(, 64, 0), rbx(, 64, 0));
+ *   CLASS(EMPTY);
  */
 struct TargetRegisterClass
 {
@@ -32,7 +49,17 @@ struct TargetRegisterClass
 };
 
 /**
- * TargetRegisterBank(GPR, { TargetRegisterClass(GPR64), ... })
+ * Register bank AST node grouping multiple register classes.
+ *
+ * Syntax:
+ *   TargetRegisterBank := 'bank' BankName '{' ( TargetRegisterClass )* '}' ';'?
+ *   BankName           := Identifier
+ *
+ * Example:
+ *   bank GPR {
+ *       CLASS(GPR64, rax(, 64, 0), rcx(, 64, 0));
+ *       CLASS(GPR32, eax(rax, 32, 0), ecx(rcx, 32, 0));
+ *   };
  */
 struct TargetRegisterBank
 {
@@ -40,6 +67,15 @@ struct TargetRegisterBank
     std::pmr::vector<TargetRegisterClass> m_classes;
 };
 
+/**
+ * File type indicator for sub-language files included into a target definition.
+ *
+ * Valid include type keywords:
+ *   'idf' -> InstructionDef
+ *   'lad' -> LegalizeActionDef
+ *   'lrd' -> LegalizeRuleDef
+ *   'isf' -> InstructionSelDef
+ */
 enum class TargetIncludeFileType
 {
     InstructionDef,
@@ -49,8 +85,15 @@ enum class TargetIncludeFileType
 };
 
 /**
- * Target include directive:
- *   - include idef "instructions.idf";
+ * Target sub-file inclusion directive.
+ *
+ * Syntax:
+ *   TargetIncFile := 'include' TargetIncFileType StringLiteral ';'
+ *   TargetIncFileType := 'idf' | 'lad' | 'lrd' | 'isf'
+ *
+ * Examples:
+ *   include idf "x86_64_instructions.idf";
+ *   include lad "x86_64_legalize.lad";
  */
 struct TargetIncFile
 {
@@ -59,8 +102,19 @@ struct TargetIncFile
 };
 
 /**
- * Target translation unit root:
- *   - target x86_64 { include idef "..."; bank GPR { ... }; };
+ * Top-level target definition root in a .tdf file.
+ *
+ * Syntax:
+ *   TargetDef := 'target' TargetName '{' ( TargetIncFile | TargetRegisterBank )* '}' ';'? EOF
+ *   TargetName := Identifier
+ *
+ * Example:
+ *   target x86_64 {
+ *       include idf "x86_instructions.idf";
+ *       bank GPR {
+ *           CLASS(GPR64, rax(, 64, 0));
+ *       };
+ *   };
  */
 struct TargetDef
 {

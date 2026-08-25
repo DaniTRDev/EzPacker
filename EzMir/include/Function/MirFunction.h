@@ -5,7 +5,7 @@
 #include "HelperClasses/IntrusiveLinkedList.h"
 
 /**
- * Structure that contains information that is filled by passes as the function flows in the compilation process.
+ * Compiler pass analysis metrics collected during lowering and optimization pipelines.
  */
 struct MirFunctionAnalysisData
 {
@@ -20,13 +20,15 @@ struct MirFunctionAnalysisData
 };
 
 /**
- * Important: Parameters MUST BE VIRTUAL/PHYSICAL REGISTERS.
+ * Mid-level intermediate representation for a function definition.
+ * Owns the CFG of MirBlock nodes (intrusively linked), incoming virtual register parameters,
+ * stack frame layout (MirFunctionStackFrame), and target calling convention descriptor.
  */
 class MirFunction
 {
   public:
     /**
-     * Creates a function wrapper over arena-managed MIR data structures.
+     * Constructs a MIR function instance with arena memory resource and initializes its CFG entry block.
      */
     MirFunction(class CallingConvDesc *callingConv,
                 class MirBlock *entryPoint,
@@ -40,79 +42,72 @@ class MirFunction
                 std::pmr::memory_resource *alloc);
 
     /**
-     * Appends the given block into the function. If it's already present, false is returned.
+     * Appends a basic block to the end of the function's block chain. Returns false if already inserted.
      */
     bool appendBlock(MirBlock *block);
 
     /**
-     * Returns the calling convention of this function.
+     * Returns the target calling convention descriptor for this function.
      */
     class CallingConvDesc *getCallingConv() const;
 
     /**
-     * Returns the mutable list of blocks that belong to this function.
-     *
-     * The list always contains the entry point as its first block right after
-     * `MirBuilderContext::createFunction()` succeeds.
+     * Returns a mutable reference to the intrusive linked list of basic blocks comprising this function.
      */
     IntrusiveLinkedList<class MirBlock> &getBlocks();
 
     /**
-     * Returns a pointer to the mutable list of blocks that belong to this function.
-     *
-     * The list always contains the entry point as its first block right after
-     * `MirBuilderContext::createFunction()` succeeds.
+     * Returns a pointer to the intrusive linked list of basic blocks.
      */
     IntrusiveLinkedList<class MirBlock> *getBlocksPtr();
 
     /**
-     * Returns an iterator pointing to the first element of the list.
+     * Returns an iterator to the entry block of the function.
      */
     IntrusiveLinkedList<class MirBlock>::iterator begin();
 
     /**
-     * Returns an iterator pointing to the last element (INVALID) of the list.
+     * Returns an end iterator past the last block of the function.
      */
     IntrusiveLinkedList<class MirBlock>::iterator end();
 
     /**
-     * Returns the class MirBlock owned by this function that matches the given ID, if no case is found nullptr is
-     * returned.
+     * Retrieves a basic block by its numeric MirId. Returns nullptr if not found in this function.
      */
     class MirBlock *getBlock(size_t id) const;
 
     /**
-     * Returns the function entry block.
+     * Returns the designated CFG entry basic block.
      */
     class MirBlock *getEntryPoint() const;
 
     /**
-     * Returns the previous function.
+     * Returns the preceding function in the module function list.
      */
     MirFunction *getPrev() const;
 
     /**
-     * Returns the next function.
+     * Returns the subsequent function in the module function list.
      */
     MirFunction *getNext() const;
 
     /**
-     * Returns the analysis data of this function.
+     * Returns a pointer to mutable pass analysis metadata.
      */
     MirFunctionAnalysisData *getAnalysisData();
 
     /**
-     * Returns the stack frame linked to this object.
+     * Returns the stack frame layout descriptor for this function.
      */
     class MirFunctionStackFrame *getStackFrame() const;
 
     /**
-     * Returns the return type of the function.
+     * Returns the return MirType of this function.
      */
     class MirType *getReturnType() const;
 
     /**
-     * Returns the type of this function.
+     * Returns the composite function signature MirType.
      */
     class MirType *getType() const;
 
@@ -122,58 +117,52 @@ class MirFunction
     MirId getId() const;
 
     /**
-     * Returns the number of blocks defined in this function.
+     * Returns the total number of basic blocks in this function.
      */
     size_t getBlockCount() const;
 
     /**
-     * Returns the number of parameters.
+     * Returns the number of formal parameters accepted by this function.
      */
     size_t getParamCount() const;
 
     /**
-     * Returns the source reference that created this function.
+     * Returns the SourceReference span representing the function definition in source code.
      */
     class SourceReference *getSourceRef() const;
 
     /**
-     * Adds a callee-saved register that this function is using. If the register is already present, it will be
-     * dupplicated.
+     * Records a callee-saved register consumed by this function requiring prologue preservation.
      */
     void addCalleeSavedRegUse(const class MirRegisterRef &reg);
 
     /**
-     * Sets the entry point of the function. This WON'T push the block to the list, it is up to the caller to push the
-     * block in the FIRST position.
+     * Updates the entry basic block pointer without inserting it into the block list.
      */
     void setEntryPoint(MirBlock *entryPoint);
 
     /**
-     * Sets the next function.
+     * Links the subsequent function in the intrusive module chain.
      */
     void setNext(MirFunction *next);
 
     /**
-     * Sets the previous function.
+     * Links the preceding function in the intrusive module chain.
      */
     void setPrev(MirFunction *prev);
 
     /**
-     * Returns the MUTABLE parameter list for this function.
-     *
-     * Each element is a `MirRegister*` describing one incoming parameter. The
-     * exact calling-convention meaning is defined by later lowering stages.
+     * Returns the mutable list of incoming virtual/physical parameter registers.
      */
     std::pmr::list<class MirRegister *> &getParameters();
 
     /**
-     * Returns the list of callee-saved register consumed by this function. This information is available after
-     * MirRegisterAllocatorPass.
+     * Returns the collection of callee-saved registers modified in this function body.
      */
     const std::pmr::vector<class MirRegisterRef> &getUsedCalleeSavedRegs() const;
 
     /**
-     * Returns the name of the function.
+     * Returns the symbol name of this function.
      */
     const std::pmr::string &getName();
 

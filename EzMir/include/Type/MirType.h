@@ -3,16 +3,19 @@
 
 #include "EzMirCommon.h"
 
+/**
+ * High-level categorization of MIR types.
+ */
 enum class MirTypeKind : uint8_t
 {
-    Invalid = 0,
-    Integer,
-    FloatingPoint,
-    Function,
-    Pointer,
-    Array, // An array of other type. Ex: i32 arr[3];
-    Void,
-    BindingToken // Used to bind things. Like PUSH_ARGS to a CALL, PUSH_RET to a RET, ...
+    Invalid = 0,    // Uninitialized or invalid type sentinel
+    Integer,        // Fixed-width integer types (e.g., i8, i16, i32, i64, i128)
+    FloatingPoint,  // IEEE floating-point types (e.g., f32, f64, f128)
+    Function,       // Function signature type encapsulating return and parameter types
+    Pointer,        // Pointer type referencing a pointee MirType
+    Array,          // Homogeneous sequential collection of elements of a base type (e.g., i32[3])
+    Void,           // Unit or empty type representing lack of value
+    BindingToken    // Token type used for control-flow or lowering bindings (e.g., PUSH_ARGS to CALL, PUSH_RET to RET)
 };
 
 /**
@@ -26,8 +29,9 @@ class MirType
 {
   public:
     /**
-     * Constructs a MIR type descriptor. If this type is trivial it means it can be copied/moved without caring. If it's
-     * not trivial it means the destruction of the type needs to perform a sequence of actions.
+     * Constructs a MIR type descriptor.
+     * Trivial types can be trivially copied or moved without special destructor actions,
+     * whereas non-trivial types require structured destruction sequences.
      */
     MirType(MirTypeKind kind,
             class MirTypeTable *owner,
@@ -44,81 +48,111 @@ class MirType
     bool isTrivial() const;
 
     /**
-     * Returns true if the type is not aligned (align = 0)
+     * Returns true if the type has zero required byte alignment.
      */
     bool isUnAligned() const;
 
     /**
-     * Returns the array element type if this type is an array, nullptr if not.
+     * Returns the element type if this type is an array kind, or nullptr otherwise.
      */
     MirType *getArrayElementType() const;
 
     /**
-     * Returns the MirType that this type points to. If this type is not a pointer, will return nullptr.
+     * Returns the pointee type if this type is a pointer kind, or nullptr otherwise.
      */
     MirType *getPointedType() const;
 
     /**
-     * Returns the high-level kind of this type.
+     * Returns the high-level category of this type.
      */
     MirTypeKind getKind() const;
 
     /**
-     * Returns the owner of this type.
+     * Returns the parent type table owning this type descriptor.
      */
     class MirTypeTable *getOwner() const;
 
     /**
-     * Returns the array element count of this type. If this type is not an array, it returns 0.
+     * Calculates the number of elements in an array type based on total size and element size, or 0 if not an array.
      */
     size_t getArrayElementCount() const;
 
     /**
-     * Returns the unique MIR ID of this type.
+     * Returns the unique MIR identifier of this type descriptor.
      */
     size_t getId() const;
 
     /**
-     * Returns the max alignment of this type.
+     * Returns the maximum alignment requirement in bytes.
      */
     size_t getMaxAlignmentInBytes() const;
 
     /**
-     * Returns the total size in bits of this type.
+     * Returns the total bit width of this type.
      */
     size_t getTotalSizeInBits() const;
 
     /**
-     * Returns the total size in bytes of this type.
+     * Returns the total byte width of this type (bits divided by 8).
      */
     size_t getTotalSizeInBytes() const;
 
     /**
-     * Sets this type as nontrivial.
+     * Marks this type as non-trivial, indicating custom destruction semantics are required.
      */
     void setNonTrivial();
 
     /**
-     * Returns the human-readable name associated with this type.
-     *
-     * This name is informational; identity is determined by `getId()`.
+     * Returns the human-readable diagnostic name associated with this type.
+     * Identity is determined by getId() rather than name.
      */
     const std::pmr::string &getName() const;
 
     /**
-     * Returns the child-type slice for compound kinds, it may be empty.
+     * Returns the collection of subtype descriptors for compound kinds (e.g. array element or pointee type).
      */
     const std::pmr::vector<MirType *> &getSubTypes() const;
 
   private:
+    /**
+     * Indicates whether the type requires special cleanup/destruction logic.
+     */
     bool m_isTrivial;
-    MirTypeKind m_kind; // High-level classification of the type.
+
+    /**
+     * High-level classification of the type.
+     */
+    MirTypeKind m_kind;
+
+    /**
+     * Type table managing the lifetime and lookup of this type.
+     */
     class MirTypeTable *m_owner;
-    size_t m_id;                            // Unique MIR identifier for this type.
-    size_t m_maxAlignmentInBytes;           // Total alignment in bytes of this type.
-    size_t m_totalSizeInBits;               // Total size in bytes of this type.
-    std::pmr::string m_name;                // Debug/diagnostic name.
-    std::pmr::vector<MirType *> m_subTypes; // Optional child types for compound kinds.
+
+    /**
+     * Unique MIR identifier for this type record.
+     */
+    size_t m_id;
+
+    /**
+     * Byte alignment requirement for memory storage of this type.
+     */
+    size_t m_maxAlignmentInBytes;
+
+    /**
+     * Total bit width of this type.
+     */
+    size_t m_totalSizeInBits;
+
+    /**
+     * Informational/diagnostic type name string.
+     */
+    std::pmr::string m_name;
+
+    /**
+     * Subordinate types for compound constructs (pointees, element types, etc.).
+     */
+    std::pmr::vector<MirType *> m_subTypes;
 };
 
 #endif // EZPACKER_MIRTYPE_H

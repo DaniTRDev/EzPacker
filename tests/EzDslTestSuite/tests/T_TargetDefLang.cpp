@@ -6,6 +6,9 @@
 #include "Parser/TargetDefLang.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for Target Definition Language (.tdf) parser, register bank declarations, and include directives.
+ */
 class TargetDefLangTest : public DslTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class TargetDefLangTest : public DslTestSuiteAsGtest
 // 1. Hardware & Virtual Register Declarations
 // ============================================================================
 
+/**
+ * Verifies parsing root hardware register declarations without parent aliases (e.g. rax(, 64, 0)).
+ */
 TEST_F(TargetDefLangTest, TestRootRegisterWithoutParent)
 {
     std::string test = "rax(, 64, 0)";
@@ -28,6 +34,9 @@ TEST_F(TargetDefLangTest, TestRootRegisterWithoutParent)
     EXPECT_EQ(res->m_offset.m_node, 0);
 }
 
+/**
+ * Verifies parsing sub-register aliases referencing a parent register at bit offset 0 (e.g. eax(rax, 32, 0)).
+ */
 TEST_F(TargetDefLangTest, TestAliasedSubRegister)
 {
     std::string test = "eax(rax, 32, 0)";
@@ -41,6 +50,9 @@ TEST_F(TargetDefLangTest, TestAliasedSubRegister)
     EXPECT_EQ(res->m_offset.m_node, 0);
 }
 
+/**
+ * Verifies parsing high-byte sub-register aliases with non-zero bit offsets (e.g. ah(ax, 8, 8)).
+ */
 TEST_F(TargetDefLangTest, TestHighByteSubRegisterWithOffset)
 {
     std::string test = "ah(ax, 8, 8)";
@@ -58,6 +70,9 @@ TEST_F(TargetDefLangTest, TestHighByteSubRegisterWithOffset)
 // 2. Register Classes & Register Banks
 // ============================================================================
 
+/**
+ * Verifies parsing empty register class declarations (CLASS(name);).
+ */
 TEST_F(TargetDefLangTest, TestEmptyRegisterClass)
 {
     std::string test = "CLASS(gpr64);";
@@ -69,6 +84,9 @@ TEST_F(TargetDefLangTest, TestEmptyRegisterClass)
     EXPECT_TRUE(res->m_registers.empty());
 }
 
+/**
+ * Verifies parsing register classes containing multiple register declarations.
+ */
 TEST_F(TargetDefLangTest, TestRegisterClassWithRegisters)
 {
     std::string test = R"(
@@ -94,6 +112,9 @@ CLASS(gpr64,
     EXPECT_EQ(res->m_registers[2].m_name.m_node, "rdx");
 }
 
+/**
+ * Verifies parsing register bank definitions containing multiple register classes.
+ */
 TEST_F(TargetDefLangTest, TestRegisterBankMultipleClasses)
 {
     std::string test = R"(
@@ -129,6 +150,9 @@ bank GPR {
 // 3. File Inclusions & Full Target Declarations
 // ============================================================================
 
+/**
+ * Verifies parsing multiple include directives inside a target block (including .idf, .lad, .lrd, .isf files).
+ */
 TEST_F(TargetDefLangTest, TestMultipleInclusions)
 {
     std::string test = R"(
@@ -161,6 +185,9 @@ target RISCV64 {
     EXPECT_TRUE(res->m_regBanks.empty());
 }
 
+/**
+ * Verifies parsing a complete target definition with interleaved register bank definitions and include directives.
+ */
 TEST_F(TargetDefLangTest, TestCompleteTargetDefinitionInterleaved)
 {
     std::string test = R"(
@@ -217,6 +244,9 @@ target x86_64 {
 // 4. Negative & Error Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies syntax error rejection when a target definition block is empty.
+ */
 TEST_F(TargetDefLangTest, TestEmptyTargetBodyFails)
 {
     std::string test = R"(
@@ -229,6 +259,9 @@ target MyTarget {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a register declaration is missing its offset argument.
+ */
 TEST_F(TargetDefLangTest, TestMalformedRegisterMissingOffset)
 {
     std::string test = "rax(, 64)"; // Missing comma and offset parameter
@@ -238,6 +271,9 @@ TEST_F(TargetDefLangTest, TestMalformedRegisterMissingOffset)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a register class declaration is missing its terminating semicolon.
+ */
 TEST_F(TargetDefLangTest, TestMalformedClassMissingSemicolon)
 {
     std::string test = R"(
@@ -251,6 +287,9 @@ CLASS(gpr64,
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an unrecognized statement is encountered in a target block.
+ */
 TEST_F(TargetDefLangTest, TestUnknownBodyItemInTarget)
 {
     std::string test = R"(
@@ -264,6 +303,9 @@ target MyTarget {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a target definition block is unclosed.
+ */
 TEST_F(TargetDefLangTest, TestUnterminatedTargetDef)
 {
     std::string test = R"(

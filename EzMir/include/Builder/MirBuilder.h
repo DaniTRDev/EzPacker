@@ -1,28 +1,31 @@
 #ifndef EZMIR_MIR_BUILDER_H
 #define EZMIR_MIR_BUILDER_H
 
-/*
- * Interface used to abstract away common details about builders.
+/**
+ * Generic base class for fluent MIR builders producing objects of type T.
  */
 template <typename T> class MirBuilder
 {
   public:
     virtual ~MirBuilder(){};
 
+    /**
+     * Returns true if an object has been successfully built by this builder.
+     */
     bool isBuilt() const { return m_builtObj != nullptr; }
 
     /**
-     * Returns the built object.
+     * Returns a pointer to the built result object, or nullptr if not yet finalized.
      */
     T *getBuiltObj() { return m_builtObj; }
 
     /**
-     * Sets the built result object.
+     * Stores the built result object reference.
      */
     void setBuildResult(T *obj) { m_builtObj = obj; }
 
   private:
-    T *m_builtObj;
+    T *m_builtObj{ nullptr };
 };
 
 #endif // EZMIR_MIR_BUILDER_H

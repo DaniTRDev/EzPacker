@@ -5,17 +5,16 @@
 #include "Ast/TypeDefLangAst.h"
 
 /**
- * This pass runs on the resulting AST of parsing a .tyf file. It will register each type as a symbol in the symbol
- * table.
- *
- * This pass is scope-sensible, meaning symbols will be declared in the current scope of the symbol table. Caller must
- * ensure it is the global scope or at least, it is higher that everything else that references a type.
+ * Semantic analysis pass processing parsed TypeDefFile (.tyf) AST trees.
+ * Registers declared primitive and special types as SymbolType::Type in the active symbol table scope.
+ * Validates bit-widths, prevents duplicate declarations, and emits diagnostic messages on violations.
  */
 class TypePass
 {
   public:
     /**
-     * Runs the pass and returns true if succeeded.
+     * Executes the type declaration semantic pass over the provided AST root.
+     * Returns true if all types were successfully validated and declared without errors.
      */
     bool run(class DiagnosticCollector *collector, class SymbolTable *table, DSL::Ast::TypeDef::TypeDefFile *file);
 };

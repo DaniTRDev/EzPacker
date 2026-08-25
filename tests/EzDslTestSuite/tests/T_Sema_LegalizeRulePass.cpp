@@ -7,11 +7,17 @@
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeRulePass.h"
 
+/**
+ * Test fixture for semantic validation and variable binding analysis of target legalization rewrite rules (LegalizeRulePass).
+ */
 class LegalizeRulePassTest : public DslTestSuiteAsGtest
 {
   protected:
     std::unique_ptr<SymbolTable> m_table;
 
+    /**
+     * Initializes the symbol table with primitive types and generic IR instructions before each test.
+     */
     void SetUp() override
     {
         DslTestSuiteAsGtest::SetUp();
@@ -23,6 +29,9 @@ class LegalizeRulePassTest : public DslTestSuiteAsGtest
         m_table->enterScope("TargetScope");
     }
 
+    /**
+     * Helper to declare a scalar type symbol with name and bit width in the mock symbol table.
+     */
     void registerType(std::string_view name, uint32_t bitWidth)
     {
         Sema::Symbols::TypeSymbol typeSym{ .m_name = name,
@@ -31,6 +40,9 @@ class LegalizeRulePassTest : public DslTestSuiteAsGtest
         m_table->declareSym(nullptr, SymbolFlags::IsDefined, SymbolType::Type, typeSym, name);
     }
 
+    /**
+     * Registers standard primitive types in the symbol table.
+     */
     void registerPrimitiveTypes()
     {
         registerType("i1", 1);
@@ -42,6 +54,9 @@ class LegalizeRulePassTest : public DslTestSuiteAsGtest
         registerType("f64", 64);
     }
 
+    /**
+     * Helper to declare a generic IR instruction symbol in the mock symbol table.
+     */
     void registerIrInstruction(std::string_view name)
     {
         Sema::Symbols::IrInstructionSymbol irSym{ .m_name = name,
@@ -53,6 +68,9 @@ class LegalizeRulePassTest : public DslTestSuiteAsGtest
         m_table->declareSym(nullptr, SymbolFlags::IsDefined, SymbolType::IrInstruction, irSym, name);
     }
 
+    /**
+     * Registers default IR instructions required by rewrite rule tests.
+     */
     void registerDefaultIrInstructions()
     {
         registerIrInstruction("ADD");
@@ -64,6 +82,9 @@ class LegalizeRulePassTest : public DslTestSuiteAsGtest
         registerIrInstruction("SEXT");
     }
 
+    /**
+     * Parses a string containing rewrite rule DSL into an AST.
+     */
     std::optional<DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef> parseFile(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff("LegalizeRulePassTest", source);
@@ -71,6 +92,9 @@ class LegalizeRulePassTest : public DslTestSuiteAsGtest
                          DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef>();
     }
 
+    /**
+     * Executes the LegalizeRulePass semantic analysis pass over the given source code string.
+     */
     bool runPass(const std::string &source)
     {
         auto ast = parseFile(source);
@@ -86,6 +110,10 @@ class LegalizeRulePassTest : public DslTestSuiteAsGtest
 // 1. Success & Symbol Resolution Tests
 // ============================================================================
 
+/**
+ * Verifies semantic resolution of a basic rewrite rule (AddZeroToCopy), checking match pattern operands,
+ * literal constants, and expand sequence operand bindings.
+ */
 TEST_F(LegalizeRulePassTest, TestValidBasicRewriteRule)
 {
     std::string code = R"(
@@ -128,6 +156,9 @@ rule AddZeroToCopy {
     EXPECT_EQ(expandInst.m_operands[1].m_name, "src");
 }
 
+/**
+ * Verifies semantic resolution of a rewrite rule with predicate guards and custom transformation functions (MulPowerOfTwoToShl).
+ */
 TEST_F(LegalizeRulePassTest, TestValidRuleWithPredicateAndCustomTransform)
 {
     std::string code = R"(
@@ -165,6 +196,9 @@ rule MulPowerOfTwoToShl {
 // 2. Semantic Error & Validation Failure Tests
 // ============================================================================
 
+/**
+ * Verifies that the semantic pass rejects rewrite rules with undefined opcodes in match blocks.
+ */
 TEST_F(LegalizeRulePassTest, TestErrorUndefinedOpcodeInMatch)
 {
     std::string code = R"(
@@ -181,6 +215,9 @@ rule InvalidMatchOpcode {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects rewrite rules with undefined opcodes in expand blocks.
+ */
 TEST_F(LegalizeRulePassTest, TestErrorUndefinedOpcodeInExpand)
 {
     std::string code = R"(
@@ -197,6 +234,9 @@ rule InvalidExpandOpcode {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects SSA operands with undefined types.
+ */
 TEST_F(LegalizeRulePassTest, TestErrorUndefinedTypeInSsaOperand)
 {
     std::string code = R"(
@@ -213,6 +253,9 @@ rule UnknownTypeOnOperand {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects when predicate guards referencing unbound SSA variables.
+ */
 TEST_F(LegalizeRulePassTest, TestErrorUndefinedSsaVariableInPredicate)
 {
     std::string code = R"(
@@ -232,6 +275,9 @@ rule UndefinedPredVar {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects custom transform functions referencing unbound variables.
+ */
 TEST_F(LegalizeRulePassTest, TestErrorUndefinedSsaVariableInCustomTransform)
 {
     std::string code = R"(
@@ -248,6 +294,9 @@ rule UndefinedTransformVar {
     EXPECT_FALSE(runPass(code));
 }
 
+/**
+ * Verifies that the semantic pass rejects duplicate rewrite rule declarations with identical names.
+ */
 TEST_F(LegalizeRulePassTest, TestErrorDuplicateRuleName)
 {
     std::string code = R"(

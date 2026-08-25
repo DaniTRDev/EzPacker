@@ -1,8 +1,8 @@
 # EzDSL: Compiler Backend Description Language Suite
 
-**EzDSL** is a modular, declarative Domain-Specific Language (DSL) suite engineered for compiler backends and code generators within the **EzPacker** toolchain. Inspired by LLVM's TableGen, EzDSL cleanly decouples target architecture definitions, hardware instruction encodings, GlobalISel-style legalization matrices, IR rewrite rules, and instruction selection patterns into specialized sub-languages.
+**EzDSL** is a declarative Domain-Specific Language (DSL) suite engineered for compiler backends and code generators within the **EzPacker** toolchain. Inspired by modern compiler architectures (such as LLVM's TableGen and GlobalISel), EzDSL cleanly decouples target architecture definitions, hardware instruction encodings, calling conventions, legalization action matrices, IR-to-IR rewrite rules, and instruction selection patterns into specialized, human-readable sub-languages.
 
-EzDSL includes an end-to-end processing pipeline: Lexy-based zero-copy parsing, semantic validation passes, hierarchical symbol tables, C++ code generators (`CppMirTypeTableGenerator`, `CppMirInstructionGenerator`), and a dedicated command-line compiler driver (`EzDsl-cli`).
+EzDSL provides a complete processing pipeline: Lexy-based zero-copy parsing, semantic validation passes, hierarchical symbol tables, C++ code generators (`CppMirTypeTableGenerator`, `CppMirInstructionGenerator`), and a dedicated command-line compiler driver (`EzDsl-cli`).
 
 ---
 
@@ -11,14 +11,15 @@ EzDSL includes an end-to-end processing pipeline: Lexy-based zero-copy parsing, 
 1. [Language Suite Overview](#1-language-suite-overview)
 2. [Common Lexical & Grammar Foundation](#2-common-lexical--grammar-foundation)
 3. [Language Specifications](#3-language-specifications)
-   - [Target Definition (`.tdf`)](#target-definition-tdf)
-   - [Target Instruction Definition (`.idf`)](#target-instruction-definition-idf)
-   - [Generic IR Instruction Definition (`.irdf`)](#generic-ir-instruction-definition-irdf)
+   - [Target Definitions (`.tdf`)](#target-definitions-tdf)
+   - [Target Instruction Definitions (`.idf`)](#target-instruction-definitions-idf)
+   - [Calling Convention Definitions (`.ccdf` / `.cdf`)](#calling-convention-definitions-ccdf--cdf)
+   - [Generic IR Instruction Definitions (`.irdf`)](#generic-ir-instruction-definitions-irdf)
    - [Legalization Actions (`.lad`)](#legalization-actions-lad)
    - [Legalization Rewrite Rules (`.lrd`)](#legalization-rewrite-rules-lrd)
    - [Instruction Selection Patterns (`.isf`)](#instruction-selection-patterns-isf)
    - [Type Definitions (`.tyf`)](#type-definitions-tyf)
-4. [Semantic Analysis & Symbol Table Pipeline](#4-semantic-analysis--symbol-table-pipeline)
+4. [Semantic Analysis & Symbol Table Architecture](#4-semantic-analysis--symbol-table-architecture)
 5. [C++ Code Generators](#5-c-code-generators)
 6. [CLI Driver (`EzDsl-cli`) & Options](#6-cli-driver-ezdsl-cli--options)
 7. [CMake Build System Integration](#7-cmake-build-system-integration)
@@ -28,10 +29,11 @@ EzDSL includes an end-to-end processing pipeline: Lexy-based zero-copy parsing, 
 
 ## 1. Language Suite Overview
 
-| Language | Extension | Primary Domain | Generated Artifacts / Roles |
+| Sub-Language | Extension | Primary Domain | Generated Artifacts / Roles |
 |:---|:---|:---|:---|
 | **Target Definition** | `.tdf` | Target ISA, File Inclusions, Register Hierarchies | Hardware register trees, register banks, register classes |
 | **Instruction Definition** | `.idf` | Formats, Binary Encoding, Assembly, Latencies | Target machine instruction metadata, encoding tables |
+| **Calling Convention** | `.ccdf` / `.cdf` | Stack Layout, Preservation Sets, ABI Classification, Calling Conventions | ABI lowering descriptors, argument placement, return rules, SRET handling |
 | **Generic IR Definition** | `.irdf` | Canonical IR Opcode Catalog, Categories, Flags | `MirInstructionSetDefs.h` (C++ MIR opcode enum & metadata) |
 | **Legalization Action** | `.lad` | Type Legality Tables, Promotions, Scalar Splits | Legality action matrices (`LEGAL`, `WIDENS`, `NARROWS`, etc.) |
 | **Legalization Rule** | `.lrd` | IR-to-IR Decomposition & Pre-ISel Rewrites | Subtarget expansion & arithmetic lowering transforms |
@@ -62,7 +64,7 @@ All EzDSL sub-languages share a unified lexical foundation:
 
 ## 3. Language Specifications
 
-### Target Definition (`.tdf`)
+### Target Definitions (`.tdf`)
 Declares target roots, inclusions, and register class hierarchies mapped to physical register banks:
 ```dsl
 target x86_64 {
@@ -87,7 +89,7 @@ target x86_64 {
 };
 ```
 
-### Target Instruction Definition (`.idf`)
+### Target Instruction Definitions (`.idf`)
 Specifies binary formats, bitfield assignments, flags, and assembly templates:
 ```dsl
 format RType(32) {
@@ -107,13 +109,50 @@ inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
         funct3 = 0b000,
         funct7 = 0b0000000
     );
-    ASM("add $rd, $rs1, $rs2");
+    ASM("add ${rd}, ${rs1}, ${rs2}");
     LATENCY(1);
     FLAGS(commutative);
 }
 ```
 
-### Generic IR Instruction Definition (`.irdf`)
+### Calling Convention Definitions (`.ccdf` / `.cdf`)
+Declares complete ABI calling conventions, stack direction/cleanup, preservation sets, type classification, argument/return lowering, and struct-return (SRET) config:
+```dsl
+calling_conv SysV64 {
+    STACK_ALIGN: 16;
+    STACK_DIRECTION: DOWN;
+    STACK_CLEANUP: CALLER;
+    SHADOW_SPACE: 0;
+    STACK_POINTER: GPR:rsp;
+    FRAME_POINTER: GPR:rbp;
+
+    CALLEE_SAVED: [GPR:rbx, GPR:rbp, GPR:r12, GPR:r13, GPR:r14, GPR:r15];
+    CALLER_SAVED: [GPR:rax, GPR:rcx, GPR:rdx, GPR:rsi, GPR:rdi, GPR:r8, GPR:r9, GPR:r10, GPR:r11];
+
+    CLASSIFY {
+        TYPE(i1, i8, i16, i32, i64, ptr) -> INTEGER;
+        TYPE(f32, f64) -> SSE;
+        AGGREGATE {
+            SIZE_LE(16) -> INTEGER;
+            DEFAULT -> MEMORY;
+        };
+    };
+
+    PASS {
+        INTEGER -> REG_SEQ(GPR:rdi, GPR:rsi, GPR:rdx, GPR:rcx, GPR:r8, GPR:r9) STACK(ALIGN: 8);
+        SSE -> REG_SEQ(FPR:xmm0, FPR:xmm1, FPR:xmm2, FPR:xmm3, FPR:xmm4, FPR:xmm5, FPR:xmm6, FPR:xmm7) STACK(ALIGN: 8);
+        MEMORY -> STACK(ALIGN: 8);
+    };
+
+    RETURN {
+        INTEGER -> REG_SEQ(GPR:rax, GPR:rdx);
+        SSE -> REG_SEQ(FPR:xmm0, FPR:xmm1);
+        SRET_CONFIG(GPR:rdi, CONSUMES_ARG_SLOT: true, RETURN_IN: GPR:rax);
+    };
+};
+```
+
+### Generic IR Instruction Definitions (`.irdf`)
 Declares high-level generic IR opcodes, categories, tiers, and dataflow directionality:
 ```dsl
 inst ADD(Register:dst OUT, RegIntImm:lhs IN, RegIntImm:rhs IN) {
@@ -212,13 +251,17 @@ bindingToken __bindToken;
 
 ---
 
-## 4. Semantic Analysis & Symbol Table Pipeline
+## 4. Semantic Analysis & Symbol Table Architecture
 
-EzDSL features a dedicated semantic validation stage (`EzDsl/include/Sema/`, `EzDsl/include/SemaPasses/`):
+EzDSL features a dedicated semantic validation pipeline (`EzDsl/include/Sema/`, `EzDsl/include/SemaPasses/`):
 
-- **`SymbolTable` & `Scope`**: Hierarchical lexical symbol table allocating through `std::pmr::memory_resource`. Manages symbols for types, instructions, register classes, banks, formats, and patterns.
-- **`TypePass`**: Ingests parsed `TypeDefFile` ASTs, registers interned types, validates bitwidths, and populates the `SymbolTable`.
-- **`IrInstructionPass`**: Ingests `IrInstDefFile` ASTs, verifies operand counts, category invariants (e.g. data movement, arithmetic), and directionality rules (`IN`, `OUT`, `INOUT`).
+- **`SymbolTable` & `Scope`**: Hierarchical lexical symbol table allocating through `std::pmr::memory_resource`. Manages typed `Symbol` instances across all sub-languages.
+- **`TypePass`**: Ingests `TypeDefFile` ASTs, registers interned types, validates bitwidths, and populates the symbol table.
+- **`IrInstructionPass`**: Ingests `IrInstDefFile` ASTs, verifies operand counts, category invariants, and directionality rules (`IN`, `OUT`, `INOUT`).
+- **`RegisterBankPass`**: Resolves register classes, banks, hardware sub-register alias hierarchies, bit-sizes, bit-offsets, and performs DFS cycle detection.
+- **`InstructionDefPass`**: Ingests `InstDefFile` ASTs, checks format bitfield boundaries, operand classes, assembly placeholders, and `FORMAT` assignments.
+- **`LegalizeActionPass`**: Ingests `TargetLegalizeDef` ASTs, validates legality matrices, type constraints, and widening/narrowing targets.
+- **`LegalizeRulePass`**: Ingests `TargetLegalizeRuleDef` ASTs, checks SSA variable scoping between match and expand templates, and validates guard predicates.
 
 ---
 
@@ -243,7 +286,7 @@ ezdsl-gen [options] -i <input_file>
 ### Available Options:
 | Flag | Description |
 |:---|:---|
-| `-i, --input <file>` | Input EzDSL definition file (`.tyf`, `.irdf`, `.tdf`, `.idf`). |
+| `-i, --input <file>` | Input EzDSL definition file (`.tyf`, `.irdf`, `.tdf`, `.idf`, `.ccdf`, `.lad`, `.lrd`, `.isf`). |
 | `-o, --output <path>` | Output destination directory or file path (default: `.`). |
 | `-I, --include <dir>` | Directory to search for file inclusions (`include idf "..."`). |
 | `--emit-type-table` | Synthesize EzMir `MirTypeTable.h` and `MirTypeTable.cpp`. |

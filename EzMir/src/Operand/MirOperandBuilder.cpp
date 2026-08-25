@@ -10,11 +10,17 @@
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Initializes the builder with the parent context and retrieves its global allocator resource.
+ */
 MirOperandBuilder::MirOperandBuilder(MirBuilderContext *ctx) :
     m_ctx(ctx), m_resource(ctx->getGlobalAllocator()), m_allocator(m_resource)
 {
 }
 
+/**
+ * Builds a floating-point constant operand, extending precision or promoting type to match target width.
+ */
 MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref)
 {
     FlexFloat val = value;
@@ -30,7 +36,7 @@ MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, S
 
     if (mirSize > valueSize)
     {
-        // Emit a warning an extend.
+        // Emit a warning and extend.
         m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
                 << ref << "Extending float value to type: " << type->getName();
         val.extend(mirSize);
@@ -58,6 +64,9 @@ MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, S
     return build<MirFloat>(destType, std::move(val), ref);
 }
 
+/**
+ * Builds an integer constant operand, zero-extending or promoting type to match target width.
+ */
 MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, SourceReference *ref)
 {
     FlexInt val = value;
@@ -73,7 +82,7 @@ MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, Sou
 
     if (mirSize > valueSize)
     {
-        // Emit a warning an extend.
+        // Emit a warning and extend.
         m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
                 << ref << "Z-Extending integer value to type: " << type->getName();
         val.extend(mirSize, false);
@@ -101,6 +110,9 @@ MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, Sou
     return build<MirInteger>(destType, std::move(val), ref);
 }
 
+/**
+ * Constructs a base-plus-displacement memory operand using an existing MirInteger displacement operand.
+ */
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref)
 {
     MirType *baseType = base->getMirType();
@@ -115,6 +127,9 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInte
     return build<MirMemory>(type, base, displ, ref);
 }
 
+/**
+ * Constructs a base-plus-displacement memory operand converting an immediate FlexInt offset to a 64-bit integer operand.
+ */
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const FlexInt &displ, SourceReference *ref)
 {
     MirType *baseType = base->getMirType();
@@ -130,6 +145,9 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const F
     return build<MirMemory>(type, base, build<MirInteger>(t->i64(), displ, nullptr), ref);
 }
 
+/**
+ * Allocates and registers a new virtual SSA register operand with a unique MIR ID.
+ */
 MirRegister *
 MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReference *ref, MirRegisterClass *_class)
 {
@@ -139,12 +157,18 @@ MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReferen
     return reg;
 }
 
+/**
+ * Allocates a physical hardware register operand bound to a physical register ID and register class.
+ */
 MirRegister *MirOperandBuilder::buildPhysReg(
         MirType *type, MirPhysicalRegId physId, std::pmr::string name, MirRegisterClass *_class, SourceReference *ref)
 {
     return build<MirRegister>(type, false, physId, ref, _class, name);
 }
 
+/**
+ * Builds a symbolic reference operand pointing to a basic block label (void pointer type).
+ */
 MirReference *MirOperandBuilder::buildRef(MirBlock *block, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();
@@ -153,6 +177,9 @@ MirReference *MirOperandBuilder::buildRef(MirBlock *block, SourceReference *ref)
     return build<MirReference>(ptr, MirReferenceType::Block, block->getId(), 0, ref);
 }
 
+/**
+ * Builds a symbolic reference operand pointing to a function (function pointer type).
+ */
 MirReference *MirOperandBuilder::buildRef(MirFunction *func, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();
@@ -161,6 +188,9 @@ MirReference *MirOperandBuilder::buildRef(MirFunction *func, SourceReference *re
     return build<MirReference>(ptr, MirReferenceType::Function, func->getId(), 0, ref);
 }
 
+/**
+ * Builds a symbolic reference operand pointing to a global variable at a specified byte displacement.
+ */
 MirReference *MirOperandBuilder::buildRef(MirGlobalVar *var, size_t offset, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();
@@ -169,6 +199,9 @@ MirReference *MirOperandBuilder::buildRef(MirGlobalVar *var, size_t offset, Sour
     return build<MirReference>(ptr, MirReferenceType::GlobalVar, var->getId(), offset, ref);
 }
 
+/**
+ * Builds a symbolic reference operand pointing to a stack frame object slot.
+ */
 MirReference *MirOperandBuilder::buildRef(StackFrameObject *obj, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();
@@ -177,6 +210,9 @@ MirReference *MirOperandBuilder::buildRef(StackFrameObject *obj, SourceReference
     return build<MirReference>(fieldPtrType, MirReferenceType::StackFrameObject, obj->m_id, 0, ref);
 }
 
+/**
+ * Builds a named runtime library symbol operand.
+ */
 MirRuntimeSymbol *MirOperandBuilder::buildRtSymbol(std::pmr::string symbolName, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();

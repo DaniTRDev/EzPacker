@@ -3,56 +3,62 @@
 
 #include "EzMirCommon.h"
 
+/**
+ * Level of verbosity for MIR textual disassembly and formatting.
+ */
 enum MirPrinterDetail : uint8_t
 {
-    General, // Prints regular information
-    Detailed // Prints detailed information.
+    General, // Prints high-level summary information
+    Detailed // Prints complete detailed instructions, operands, and payload hex
 };
 
+/**
+ * Textual formatter and disassembler for MIR data structures.
+ * Produces readable representations of blocks, functions, global variables, instructions, operands, and stack slots.
+ */
 class MirPrinter
 {
   public:
     /**
-     * Prints all the information about a block.
-     * If detail is set to General, only block id and instruction count is shown.
-     * If detail is set to Detailed, instructions will also be printed.
+     * Formats a MirBlock into a string representation.
+     * General detail prints block ID and instruction count.
+     * Detailed detail prints all contained instructions line-by-line.
      */
     static std::string printToString(class MirBlock *block, MirPrinterDetail detail);
 
     /**
-     * Prints all the information about a function, including the stack frame, parameters, blocks and instructions.
-     * If detail is set to General, only the header, param count, stack frame obj count and block count will be printed.
-     * If detail is set to Detailed, the entire function will be printed including blocks and instructions inside
-     * blocks.
+     * Formats a MirFunction into a string representation.
+     * General detail prints function signature, parameter count, and frame metrics.
+     * Detailed detail prints the full CFG including all basic blocks and instructions.
      */
     static std::string printToString(class MirFunction *function, MirPrinterDetail detail);
 
     /**
-     * Prints all the information about a global variable, including its linkage, type and constness.
-     * If detail is set to General, initialization data is skipped (only emptyness or filled will be shown).
-     * If detail is set to Detailed, the init data is printed in HEX format.
+     * Formats a MirGlobalVar into a string representation.
+     * General detail prints linkage and type.
+     * Detailed detail prints full hexadecimal payload data.
      */
     static std::string printToString(class MirGlobalVar *var, MirPrinterDetail detail);
 
     /**
-     * Prints information about an instruction.
-     * If detail is set to General, only OPCODE will be shown.
-     * If detail is set to Detailed, operands will also be printed.
+     * Formats a MirInstruction into a string representation.
+     * General detail prints opcode name.
+     * Detailed detail prints opcode with destination and source operands.
      */
     static std::string printToString(class MirInstruction *instr, MirPrinterDetail detail);
 
     /**
-     * Prints the information of an operand.
+     * Formats a single MirOperand into textual representation.
      */
     static std::string printToString(class MirOperand *operand);
 
     /**
-     * Prints the information of a reference to a register.
+     * Formats a MirRegisterRef into its class and register identifier text.
      */
     static std::string printToString(const class MirRegisterRef &ref);
 
     /**
-     * Prints the information of a stack frame object.
+     * Formats a StackFrameObject into its offset, size, and source origin text.
      */
     static std::string printToString(const class StackFrameObject *obj);
 };

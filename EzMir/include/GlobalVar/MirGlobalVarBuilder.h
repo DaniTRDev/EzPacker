@@ -5,18 +5,20 @@
 #include "Builder/MirBuilder.h"
 #include "GlobalVar/MirGlobalVar.h"
 
+/**
+ * Builder class for allocating and configuring MirGlobalVar instances within a MirBuilderContext.
+ */
 class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
 {
   public:
     /**
-     * Creates the builder with the given context.
+     * Constructs a builder associated with the target MIR compilation context.
      */
     MirGlobalVarBuilder(class MirBuilderContext *ctx);
 
     /**
-     * Creates the global variable with the given parameters. Will move m_initData to the resulting object.
-     * This function creates a global variable whose type is a POINTER to the given type, because global variables are
-     * pointers to their declared data type.
+     * Allocates and initializes a new MirGlobalVar in the context arena allocator.
+     * Generates a unique MIR ID and logs trace diagnostics.
      */
     MirGlobalVar *build(MirGlobalVarLinkage linkage,
                         class MirType *type,
@@ -24,19 +26,30 @@ class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
                         class SourceReference *sourceRef = nullptr);
 
     /**
-     * Sets the constness of the future result object.
+     * Sets whether the constructed global variable is marked as constant (read-only).
      */
     MirGlobalVarBuilder &setConstant(bool constant);
 
     /**
-     * Adds an initializer to this variable. The initializer can only be a constant value: MirInteger, MirFloat or
-     * MirConstantArray, in any other cases a diag error will be thrown.
+     * Assigns the constant initializer operand (must be a constant type: MirInteger, MirFloat, or MirConstantArray).
+     * Emits a diagnostic error if an invalid operand is supplied.
      */
     MirGlobalVarBuilder &setInitializer(class MirOperand *initializer);
 
   private:
-    bool m_constant; // True by default.
+    /**
+     * Constant flag state for the global variable being built (defaults to true).
+     */
+    bool m_constant;
+
+    /**
+     * Context providing arena allocators, diagnostic collectors, and ID generators.
+     */
     MirBuilderContext *m_ctx;
+
+    /**
+     * Initializer operand to attach to the global variable.
+     */
     class MirOperand *m_initializer;
 };
 

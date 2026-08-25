@@ -7,6 +7,9 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Test fixture for Control Flow Graph (CFG) analysis, reachability, and edge detection pass.
+ */
 class TestCodeFlowPass : public MirTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class TestCodeFlowPass : public MirTestSuiteAsGtest
 namespace
 {
 
+/**
+ * Recursive Depth-First Search helper that traverses CFG successor edges to evaluate block reachability.
+ */
 bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::unordered_set<size_t> &visited)
 {
     if (current == target)
@@ -37,6 +43,9 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
     return false;
 }
 
+/**
+ * Custom GoogleTest assertion verifying the total number of predecessor and successor map entries in the CFG result.
+ */
 ::testing::AssertionResult HasGraphSize(CodeFlowResult *result, size_t predCount, size_t succCount)
 {
     if (!result)
@@ -53,6 +62,9 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a block has 0 successors, acting as a CFG exit node.
+ */
 ::testing::AssertionResult IsCfgExit(CodeFlowResult *result, MirBlock *exitBlock)
 {
     if (!result)
@@ -73,6 +85,9 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying the exact predecessor and successor count for a specific CFG node.
+ */
 ::testing::AssertionResult IsCfgNode(CodeFlowResult *result, MirBlock *node, size_t expectedPreds, size_t expectedSuccs)
 {
     if (!result)
@@ -97,6 +112,10 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying the existence of a directed CFG edge from 'from' to 'to',
+ * checking both successor and predecessor maps for bidirectional consistency.
+ */
 ::testing::AssertionResult HasEdge(CodeFlowResult *result, MirBlock *from, MirBlock *to)
 {
     if (!result)
@@ -120,6 +139,9 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that a directed path exists from 'from' to 'to'.
+ */
 ::testing::AssertionResult IsReachable(CodeFlowResult *result, MirBlock *from, MirBlock *to)
 {
     if (!result || !from || !to)
@@ -132,6 +154,9 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
     return ::testing::AssertionFailure() << "No path found from block " << from->getId() << " to block " << to->getId();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that NO directed path exists from 'from' to 'to'.
+ */
 ::testing::AssertionResult IsNotReachable(CodeFlowResult *result, MirBlock *from, MirBlock *to)
 {
     if (!result || !from || !to)
@@ -145,6 +170,9 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
                                          << to->getId();
 }
 
+/**
+ * Helper to emit an unconditional JMP instruction from initialBlock to targetBlock.
+ */
 void AddCfgEdge(MirBuilderContext *context, MirBlock *initialBlock, MirBlock *targetBlock)
 {
     ASSERT_NE(context, nullptr);
@@ -153,6 +181,9 @@ void AddCfgEdge(MirBuilderContext *context, MirBlock *initialBlock, MirBlock *ta
     instrBuilder.JMP(oBuilder.buildRef(targetBlock));
 }
 
+/**
+ * Helper to emit a conditional branch (BR_COND) with explicit true and false target block references.
+ */
 void AddCondEdge(MirBuilderContext *context,
                  MirRegister *condReg,
                  MirBlock *initialBlock,
@@ -169,6 +200,10 @@ void AddCondEdge(MirBuilderContext *context,
 
 } // anonymous namespace
 
+/**
+ * Verifies a single-block function CFG where the entry point has 0 predecessors, 0 successors,
+ * and functions as the exit node.
+ */
 TEST_F(TestCodeFlowPass, TestFuncDoesNotHaveSuccessorsOrPredecessors)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -181,6 +216,9 @@ TEST_F(TestCodeFlowPass, TestFuncDoesNotHaveSuccessorsOrPredecessors)
     EXPECT_TRUE(IsCfgExit(result, entryPoint));
 }
 
+/**
+ * Verifies a linear two-block control flow graph with an unconditional edge from entry point to successor.
+ */
 TEST_F(TestCodeFlowPass, Test1Successor)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -208,6 +246,10 @@ TEST_F(TestCodeFlowPass, Test1Successor)
     EXPECT_TRUE(IsCfgExit(result, successor));
 }
 
+/**
+ * Verifies diamond (if-then-else) CFG pattern containing 4 basic blocks:
+ * conditional branching from entry into true/false branches that merge into a single join block.
+ */
 TEST_F(TestCodeFlowPass, TestDiamondPattern)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -247,6 +289,9 @@ TEST_F(TestCodeFlowPass, TestDiamondPattern)
     EXPECT_TRUE(IsNotReachable(result, trueBlock, falseBlock));
 }
 
+/**
+ * Verifies cyclic loop control flow graph with back-edges (loop body jumping back to loop header).
+ */
 TEST_F(TestCodeFlowPass, TestLoopCycle)
 {
     MirBuilderContext *ctx = getBuilderCtx();
@@ -283,6 +328,10 @@ TEST_F(TestCodeFlowPass, TestLoopCycle)
     EXPECT_TRUE(IsReachable(result, entryPoint, exitBlock));
 }
 
+/**
+ * Verifies that disconnected / dead code blocks are identified properly in CFG maps
+ * without being falsely reachable from the entry point.
+ */
 TEST_F(TestCodeFlowPass, TestDeadCodeBlock)
 {
     MirBuilderContext *ctx = getBuilderCtx();

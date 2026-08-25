@@ -13,38 +13,59 @@ class RuleInstructionSymbol;
 class RuleOperandSymbol;
 }; // namespace Sema::Symbols
 
+/**
+ * Semantic analysis pass validating IR rewrite rules (.lrd).
+ * Checks SSA variable scoping between match and expand templates, resolves types and immediate constants,
+ * and validates semantic guard predicate arguments.
+ */
 class LegalizeRulePass
 {
   public:
     /**
-     * Executes the semantic analysis and symbol resolution pass for legalization rewrite rules.
+     * Executes the rewrite rule semantic analysis and symbol resolution pass.
+     * Returns true if all rules, match patterns, predicates, and expansion sequences were successfully resolved.
      */
     static bool run(class DiagnosticCollector *collector,
                     class SymbolTable *table,
                     DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef *file);
 
   private:
+    /**
+     * Processes a single rewrite rule declaration.
+     */
     static bool processRule(class DiagnosticCollector *collector,
                             class SymbolTable *table,
                             const DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule &rule);
 
+    /**
+     * Validates match pattern instructions and records defined SSA variables into the local rule scope.
+     */
     static bool processMatchPattern(class DiagnosticCollector *collector,
                                     class SymbolTable *table,
                                     const DSL::Ast::LegalizeRuleDef::RuleInstruction &inst,
                                     std::string_view ruleName,
                                     Sema::Symbols::RuleInstructionSymbol &outInst);
 
+    /**
+     * Validates semantic guard predicates and verifies that variable arguments were defined in the match block.
+     */
     static bool processPredicate(class DiagnosticCollector *collector,
                                  class SymbolTable *table,
                                  const DSL::Ast::LegalizeRuleDef::RulePredicate &predicate,
                                  std::string_view ruleName);
 
+    /**
+     * Validates expansion instructions and ensures all referenced SSA variables were bound in match patterns.
+     */
     static bool processExpandInstruction(class DiagnosticCollector *collector,
                                          class SymbolTable *table,
                                          const DSL::Ast::LegalizeRuleDef::RuleInstruction &inst,
                                          std::string_view ruleName,
                                          Sema::Symbols::RuleInstructionSymbol &outInst);
 
+    /**
+     * Resolves rule operands (SSA variables, constants, type prefixes, custom transforms).
+     */
     static bool resolveOperand(class DiagnosticCollector *collector,
                                class SymbolTable *table,
                                const DSL::Ast::LegalizeRuleDef::RuleOperand &operand,

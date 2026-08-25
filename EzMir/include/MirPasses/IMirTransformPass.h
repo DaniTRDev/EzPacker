@@ -4,13 +4,16 @@
 #include "EzMirCommon.h"
 #include "MirPass.h"
 
+/**
+ * Base abstract class for mutating MIR transformation passes (e.g. NonSsaToSsa, RegisterAllocator, FrameLowerer).
+ */
 class IMirTransformPass : public MirPass
 {
   public:
     virtual ~IMirTransformPass() = default;
 
     /**
-     * Returns 'MirPassType::Transform' for this pass.
+     * Returns MirPassType::Transform for all transformation passes.
      */
     MirPassType getPassType() const override { return MirPassType::Transform; }
 };

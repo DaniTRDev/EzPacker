@@ -61,6 +61,9 @@ enum class TypeKind : uint8_t;
 
 namespace Sema::Symbols
 {
+/**
+ * Semantic symbol for a parsed primitive or special IR type declaration (.tyf).
+ */
 struct TypeSymbol
 {
     std::string_view m_name;
@@ -68,6 +71,9 @@ struct TypeSymbol
     uint32_t m_bitWidth{ 0 };
 };
 
+/**
+ * Semantic symbol for an architecture hardware register definition (.tdf).
+ */
 struct RegisterSymbol
 {
     std::string_view m_name;
@@ -77,6 +83,9 @@ struct RegisterSymbol
     SymbolId m_primaryClassId{ InvalidSymbolId };
 };
 
+/**
+ * Semantic symbol for a register class grouping (.tdf).
+ */
 struct RegisterClassSymbol
 {
     std::string_view m_name;
@@ -84,12 +93,18 @@ struct RegisterClassSymbol
     std::pmr::vector<SymbolId> m_registers; // Resolved RegisterSymbol IDs
 };
 
+/**
+ * Semantic symbol for a register bank container (.tdf).
+ */
 struct RegisterBankSymbol
 {
     std::string_view m_name;
     std::pmr::vector<SymbolId> m_classes; // Resolved RegisterClassSymbol IDs
 };
 
+/**
+ * Resolved bit slice range [from, to].
+ */
 struct BitSlice
 {
     uint16_t m_from{ 0 };
@@ -98,6 +113,9 @@ struct BitSlice
 
 struct ResolvedBitExpr;
 
+/**
+ * Resolved reference to an instruction operand with optional bit slicing.
+ */
 struct SlicedOperandRef
 {
     std::string_view m_operandName;
@@ -111,6 +129,9 @@ using ResolvedBitExprValue =
                      std::shared_ptr<ResolvedBitExpr> // Composite binary/unary expression tree
                      >;
 
+/**
+ * Resolved bit expression tree with operator and evaluated child operands.
+ */
 struct ResolvedBitExpr
 {
     ResolvedBitExprValue m_lhs;
@@ -118,6 +139,9 @@ struct ResolvedBitExpr
     std::optional<ResolvedBitExprValue> m_rhs;
 };
 
+/**
+ * Semantic symbol for a named bitfield in an instruction encoding format (.idf).
+ */
 struct FormatFieldSymbol
 {
     std::string_view m_name;
@@ -125,6 +149,9 @@ struct FormatFieldSymbol
     std::optional<ResolvedBitExprValue> m_defaultValue; // Folded constant or default bit expression
 };
 
+/**
+ * Semantic symbol for an instruction binary encoding format (.idf).
+ */
 struct InstructionFormatSymbol
 {
     std::string_view m_name;
@@ -132,6 +159,9 @@ struct InstructionFormatSymbol
     std::pmr::vector<FormatFieldSymbol> m_fields;
 };
 
+/**
+ * Semantic symbol for a formal argument operand of a target instruction (.idf).
+ */
 struct TargetOperandSymbol
 {
     DSL::Ast::InstDef::InstOperandKind m_kind;
@@ -140,6 +170,9 @@ struct TargetOperandSymbol
     DSL::Ast::InstDef::InstOperandDir m_dir;
 };
 
+/**
+ * Semantic symbol for a format field assignment in an instruction declaration (.idf).
+ */
 struct FieldAssignmentSymbol
 {
     std::string_view m_fieldName;
@@ -147,6 +180,9 @@ struct FieldAssignmentSymbol
     ResolvedBitExprValue m_value; // Constant, operand reference, or expression tree
 };
 
+/**
+ * Semantic symbol representing a fully resolved target architecture instruction (.idf).
+ */
 struct TargetInstructionSymbol
 {
     std::string_view m_name;
@@ -158,12 +194,18 @@ struct TargetInstructionSymbol
     uint32_t m_latency{ 1 };
     uint32_t m_flagsMask{ 0 }; // Bitmask of DSL::Ast::InstDef::InstFlag
 
+    /**
+     * Checks if the instruction has the specified behavioral flag set.
+     */
     [[nodiscard]] bool hasFlag(DSL::Ast::InstDef::InstFlag flag) const noexcept
     {
         return (m_flagsMask & (1u << static_cast<uint32_t>(flag))) != 0;
     }
 };
 
+/**
+ * Semantic symbol for an IR instruction operand slot (.irdf).
+ */
 struct IrOperandSymbol
 {
     DSL::Ast::IrInstDef::IrOperandType m_typeMask;
@@ -171,6 +213,9 @@ struct IrOperandSymbol
     DSL::Ast::IrInstDef::IrOperandDir m_dir;
 };
 
+/**
+ * Semantic symbol for an intermediate representation (IR) instruction opcode (.irdf).
+ */
 struct IrInstructionSymbol
 {
     std::string_view m_name;
@@ -179,18 +224,27 @@ struct IrInstructionSymbol
     DSL::Ast::IrInstDef::IrInstFlag m_flagsMask;
     std::pmr::vector<IrOperandSymbol> m_operands;
 
+    /**
+     * Checks if the IR instruction has the specified verification or behavioral flag set.
+     */
     [[nodiscard]] bool hasFlag(DSL::Ast::IrInstDef::IrInstFlag flagMask) const noexcept
     {
         return (static_cast<uint32_t>(m_flagsMask) & static_cast<uint32_t>(flagMask)) != 0;
     }
 };
 
+/**
+ * Semantic symbol representing a type constraint on a legalized operand slot (.lad).
+ */
 struct LegalizeConstraintSymbol
 {
     SymbolId m_typeId{ InvalidSymbolId }; // Resolved type ID (e.g. i32)
     std::optional<uint32_t> m_operandIndex;  // Operand slot index (0, 1, etc.)
 };
 
+/**
+ * Semantic symbol for a legalization directive clause (.lad).
+ */
 struct LegalizeClauseSymbol
 {
     DSL::Ast::LegalizeActionDef::LegalizeActionKind m_kind;
@@ -199,12 +253,18 @@ struct LegalizeClauseSymbol
     std::optional<std::string_view> m_libcallSymbol;
 };
 
+/**
+ * Semantic symbol grouping all legalization rules for a generic IR opcode (.lad).
+ */
 struct LegalizeActionSymbol
 {
     std::string_view m_genericOpcode;
     std::pmr::vector<LegalizeClauseSymbol> m_clauses;
 };
 
+/**
+ * Semantic symbol for an operand in a rewrite rule pattern or template (.lrd).
+ */
 struct RuleOperandSymbol
 {
     DSL::Ast::LegalizeRuleDef::OperandKind m_kind;
@@ -213,12 +273,18 @@ struct RuleOperandSymbol
     std::optional<int64_t> m_immLiteral;
 };
 
+/**
+ * Semantic symbol for an instruction in a rewrite rule pattern or template (.lrd).
+ */
 struct RuleInstructionSymbol
 {
     std::string_view m_opcode;
     std::pmr::vector<RuleOperandSymbol> m_operands;
 };
 
+/**
+ * Semantic symbol for an IR-to-IR legalization rewrite rule (.lrd).
+ */
 struct LegalizeRewriteRuleSymbol
 {
     std::string_view m_ruleName;
@@ -226,12 +292,18 @@ struct LegalizeRewriteRuleSymbol
     std::pmr::vector<RuleInstructionSymbol> m_expansionSequence;
 };
 
+/**
+ * Semantic symbol for an addressing mode matching variant (.isf).
+ */
 struct AddrModeVariantSymbol
 {
     std::string_view m_name;
     std::pmr::vector<RuleInstructionSymbol> m_matchPatterns;
 };
 
+/**
+ * Semantic symbol for an addressing mode aggregate definition (.isf).
+ */
 struct AddrModeSymbol
 {
     std::string_view m_name;
@@ -239,6 +311,9 @@ struct AddrModeSymbol
     std::pmr::vector<AddrModeVariantSymbol> m_variants;
 };
 
+/**
+ * Semantic symbol for an instruction selection (ISel) pattern rule (.isf).
+ */
 struct ISelPatternSymbol
 {
     std::string_view m_patternName;
@@ -247,12 +322,18 @@ struct ISelPatternSymbol
     uint32_t m_cost{ 1 };
 };
 
+/**
+ * Semantic symbol referencing a target register with its class ID and register ID.
+ */
 struct RegisterRefSymbol
 {
     SymbolId m_classId{ InvalidSymbolId };
     SymbolId m_registerId{ InvalidSymbolId };
 };
 
+/**
+ * Semantic symbol for an aggregate classification predicate in calling conventions (.cdf).
+ */
 struct AggregatePredicateSymbol
 {
     DSL::Ast::CallingConvDef::AggregatePredicateKind m_kind;
@@ -263,6 +344,9 @@ struct AggregatePredicateSymbol
     std::string_view m_resultClass;
 };
 
+/**
+ * Semantic symbol for an aggregate classification configuration block (.cdf).
+ */
 struct AggregateClassifySymbol
 {
     std::pmr::vector<AggregatePredicateSymbol> m_predicates;
@@ -271,6 +355,9 @@ struct AggregateClassifySymbol
     DSL::Ast::CallingConvDef::AllocPolicy m_allocPolicy;
 };
 
+/**
+ * Semantic symbol for an argument/return lowering action (.cdf).
+ */
 struct LoweringActionSymbol
 {
     DSL::Ast::CallingConvDef::LoweringActionKind m_kind;
@@ -280,12 +367,18 @@ struct LoweringActionSymbol
     std::optional<uint32_t> m_stackFallbackAlign;
 };
 
+/**
+ * Semantic symbol mapping an ABI class to a lowering action (.cdf).
+ */
 struct DispatchRuleSymbol
 {
     std::string_view m_abiClass;
     LoweringActionSymbol m_action;
 };
 
+/**
+ * Semantic symbol for struct-return (SRET) convention configuration (.cdf).
+ */
 struct SretConfigSymbol
 {
     RegisterRefSymbol m_passInReg;
@@ -293,6 +386,9 @@ struct SretConfigSymbol
     std::optional<RegisterRefSymbol> m_returnReg;
 };
 
+/**
+ * Semantic symbol representing a complete target calling convention definition (.cdf).
+ */
 struct CallingConvSymbol
 {
     std::string_view m_name;
@@ -318,6 +414,9 @@ struct CallingConvSymbol
     std::optional<SretConfigSymbol> m_sretConfig;
 };
 
+/**
+ * Root semantic symbol encapsulating all banks, instructions, calling conventions, and rules for a target architecture.
+ */
 struct TargetSymbol
 {
     std::string_view m_name;

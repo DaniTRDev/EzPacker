@@ -7,9 +7,17 @@
 #include <gtest/gtest.h>
 #include <memory_resource>
 
+/**
+ * Test fixture setting up an arena-backed SourceManager, DiagnosticLogger, and DiagnosticCollector
+ * loaded with a mock C source code buffer.
+ */
 class DiagTest : public ::testing::Test
 {
   protected:
+    /**
+     * Initializes the source manager with mock C code containing a type error on line 3,
+     * registers the diagnostic logger subscriber with the collector, and records the file ID.
+     */
     void SetUp() override
     {
         m_sourceManager =
@@ -45,6 +53,10 @@ class DiagTest : public ::testing::Test
     std::unique_ptr<SourceManager> m_sourceManager;
 };
 
+/**
+ * Verifies that emitting an error diagnostic with attached source span references and
+ * supplemental notes correctly formats and logs the diagnostic upon committing the transaction scope.
+ */
 TEST_F(DiagTest, BasicErrorDiagnostic)
 {
     // Absolute start offset in buffer for '='

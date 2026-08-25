@@ -5,7 +5,7 @@
 #include "MirPasses/IMirAnalysisPass.h"
 
 /**
- * Resulting structure that contains the resulting Code Flow Graph.
+ * Control Flow Graph (CFG) representation storing predecessor and successor adjacency sets for each basic block.
  */
 struct CodeFlowResult
 {
@@ -16,7 +16,8 @@ struct CodeFlowResult
 };
 
 /**
- * This pass executes a CFG search and saves the result in a CodeFlowResult structure.
+ * Analysis pass constructing the explicit Control Flow Graph (CFG) for a function.
+ * Inspects branch and jump instructions to compute predecessor and successor mappings for all basic blocks.
  */
 class CodeFlowAnalysisPass : public IMirAnalysisPass
 {
@@ -24,7 +25,7 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     virtual ~CodeFlowAnalysisPass() override = default;
 
     /**
-     * Creates the analyzer with the given context.
+     * Constructs a CFG analysis pass bound to the compilation context.
      */
     CodeFlowAnalysisPass(class MirBuilderContext *ctx);
 
@@ -34,33 +35,36 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     const char *getName() const override;
 
     /**
-     * Returns the result of the pass, if populated. If run was not called, an empty result is returned.
+     * Returns the computed CFG predecessor/successor adjacency mappings.
      */
     CodeFlowResult *getResult();
 
     /**
-     * Returns the iteration place for this pass (Function).
+     * Returns MirPassIterationPlace::Function.
      */
     MirPassIterationPlace getIterationPlace() const override;
 
     /**
-     * Runs the pass and builds a Code Flow Graph out of the given function iterator.
+     * Executes CFG construction over the targeted function.
      */
     MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
                       IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**
-     * For every block processed in after calling run, it prints its predecessors and successors.
+     * Prints predecessor and successor sets for each basic block in the function.
      */
     void printResult() override;
 
     /**
-     * Resets the result of the pass.
+     * Clears internal CFG mappings for reuse across functions.
      */
     void reset() override;
 
   private:
+    /**
+     * Adds a directed control flow edge from the source basic block to the destination basic block.
+     */
     void addEdge(class MirBlock *from, class MirBlock *to);
 
   private:

@@ -6,6 +6,9 @@
 #include "Operand/MirRegisterReference.h"
 #include "HelperClasses/DenseBitSet.h"
 
+/**
+ * Dataflow liveness analysis container tracking live-in, live-out, def, and use register sets per basic block.
+ */
 struct LivenessResult
 {
     // Block Id, <MirRegisterRef>.
@@ -17,23 +20,27 @@ struct LivenessResult
     LivenessResult(std::pmr::memory_resource *arena) : m_liveIn(arena), m_liveOut(arena), m_def(arena), m_use(arena) {}
 };
 
+/**
+ * Backward dataflow analysis pass computing live register ranges across the CFG.
+ * Determines variable live-in and live-out sets for register allocation and dead code elimination.
+ */
 class LivenessAnalysisPass : public IMirAnalysisPass
 {
   public:
     ~LivenessAnalysisPass() override = default;
 
     /**
-     * Allocates the liveness analyzer maps on the global compilation arena.
+     * Constructs a liveness analysis pass with arena storage.
      */
     LivenessAnalysisPass(class MirBuilderContext *ctx);
 
     /**
-     * Returns the name of the pass "LivenessAnalysisPass"
+     * Returns "LivenessAnalysisPass".
      */
     const char *getName() const override;
 
     /**
-     * Returns the result of the pass. The result contains a live interval of the variables of a function.
+     * Returns the computed liveness analysis data (liveIn, liveOut, def, use sets).
      */
     LivenessResult *getResult();
 
@@ -43,31 +50,32 @@ class LivenessAnalysisPass : public IMirAnalysisPass
     MirPassIterationPlace getIterationPlace() const override;
 
     /**
-     * Runs the pass and builds a the live in-out intervals of the variables used in a function.
+     * Executes local and global backward dataflow analysis over the function.
      */
     MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
                       IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**
-     * Prints the result of the liveness analysis. It shows the def/use set of variables of each block and the global
-     * live in/out graph.
+     * Formats and prints def/use and live-in/live-out sets to diagnostics.
      */
     void printResult() override;
 
     /**
-     * Resets the result of the pass.
+     * Clears internal liveness sets for reuse.
      */
     void reset() override;
 
   private:
     /**
-     * Computes the gloval live-in/live-out set of a function.
+     * Iteratively solves the backward dataflow equations:
+     * LiveIn[B] = Use[B] U (LiveOut[B] - Def[B])
+     * LiveOut[B] = U { LiveIn[S] for S in Successors(B) }
      */
     void computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
 
     /**
-     * Computes the local def/use of the blocks inside the function.
+     * Computes the local Def and Use register sets for all basic blocks within the function.
      */
     void computeLocalLiveness(class MirFunction *func);
 

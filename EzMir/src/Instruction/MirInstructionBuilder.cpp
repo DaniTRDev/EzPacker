@@ -7,11 +7,17 @@
 #include "Operand/MirOperand.h"
 #include "Printer/MirPrinter.h"
 
+/**
+ * Initializes the instruction builder with parent context and insertion cursor.
+ */
 MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint) :
     m_ctx(ctx), m_insertionPoint(std::move(insertionPoint))
 {
 }
 
+/**
+ * Initializes the instruction builder with target block, insertion mode, and iterator.
+ */
 MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
                                              MirBlock *block,
                                              InsertionType type,
@@ -20,6 +26,9 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
 {
 }
 
+/**
+ * Allocates a new unlinked MirInstruction in the arena allocator.
+ */
 MirInstruction *MirInstructionBuilder::createInstruction(MirInstructionOpCode opcode, SourceReference *ref)
 {
     std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
@@ -31,6 +40,9 @@ MirInstruction *MirInstructionBuilder::createInstruction(MirInstructionOpCode op
                                             std::pmr::vector<MirOperand *>(arena));
 }
 
+/**
+ * Emits trace diagnostics and splices the completed instruction into the target block according to insertion type.
+ */
 void MirInstructionBuilder::finalizeInstruction(MirInstruction *instr, SourceReference *ref)
 {
     if (!instr)
@@ -78,6 +90,9 @@ void MirInstructionBuilder::finalizeInstruction(MirInstruction *instr, SourceRef
     setBuildResult(instr);
 }
 
+/**
+ * Builds an instruction from opcode, source reference, and initializer_list of operands.
+ */
 MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::initializer_list<MirOperand *> &operands)
@@ -92,6 +107,9 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     return instr;
 }
 
+/**
+ * Builds an instruction from opcode, source reference, and std::vector of operands.
+ */
 MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::vector<MirOperand *> &operands)
@@ -106,6 +124,9 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     return instr;
 }
 
+/**
+ * Builds an instruction from opcode, source reference, and PMR vector of operands.
+ */
 MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::pmr::vector<MirOperand *> &operands)
@@ -121,6 +142,9 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
     return instr;
 }
 
+/**
+ * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
+ */
 MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
                                                    SourceReference *srcRef,
                                                    std::initializer_list<MirOperand *> operands)
@@ -133,6 +157,9 @@ MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *tar
     return instr;
 }
 
+/**
+ * Stream operator overload for chaining and appending operands to the active instruction.
+ */
 MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
 {
     if (!isBuilt() || !operand)
@@ -149,13 +176,22 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
     return *this;
 }
 
+/**
+ * Modifies the insertion mode (Append, InsertBefore, InsertAfter) of the active insertion point.
+ */
 void MirInstructionBuilder::changeInsertionType(InsertionType type) { m_insertionPoint.m_type = type; }
 
+/**
+ * Sets the insertion point structure.
+ */
 void MirInstructionBuilder::setInsertionPoint(MirInstructionInsertionPoint insertionPoint)
 {
     m_insertionPoint = std::move(insertionPoint);
 }
 
+/**
+ * Configures the insertion point with target block, insertion mode, and list iterator.
+ */
 void MirInstructionBuilder::setInsertionPoint(MirBlock *block,
                                               InsertionType type,
                                               IntrusiveLinkedList<MirInstruction>::iterator it)

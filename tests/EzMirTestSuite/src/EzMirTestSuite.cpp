@@ -16,16 +16,29 @@
 #include "SourceManager/SourceManager.h"
 #include "Type/MirTypeTable.h"
 
+// Retrieves the MIR builder context associated with this test suite.
 MirBuilderContext *EzMirTestSuite::getBuilderCtx() { return m_builderCtx.get(); }
 
+// Retrieves the synthetic TEST function generated during test suite initialization.
 MirFunction *EzMirTestSuite::getTestFunc() { return m_testFunction; }
 
+// Retrieves the active instruction insertion point at the start of the TEST function's entry block.
 const MirInstructionInsertionPoint &EzMirTestSuite::getTestInsertionPoint() { return m_insertPoint; }
 
+// Retrieves the pass manager configured for test mode.
 MirPassManager *EzMirTestSuite::getPassManager() { return m_passManager.get(); }
 
+// Retrieves the MIR type table holding type layout and definitions.
 MirTypeTable *EzMirTestSuite::getTypeTable() { return m_typeTable.get(); }
 
+/**
+ * Initializes all core compiler structures and test fixtures:
+ * 1. Allocates diagnostic collector and logger attached to the current source manager.
+ * 2. Initializes the MIR type table with a 64-bit mock target type layout.
+ * 3. Creates the builder context and sets the mock calling convention.
+ * 4. Configures the pass manager in test mode (bypassing strict dependency resolution).
+ * 5. Constructs a default void "TEST" function with an entry block and sets the insertion point.
+ */
 void EzMirTestSuite::create(const std::filesystem::path &workingPath)
 {
     m_diagCollector = std::make_shared<DiagnosticCollector>();
@@ -71,6 +84,9 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
                       .m_iterator = entryPoint->getInstructions().begin() };
 }
 
+/**
+ * Releases all shared instances and frees resources allocated for the test fixture.
+ */
 void EzMirTestSuite::destroy()
 {
     m_builderCtx.reset();
@@ -79,6 +95,10 @@ void EzMirTestSuite::destroy()
     m_diagCollector.reset();
 }
 
+/**
+ * Creates and inserts a binary register-to-register instruction (e.g. ADD %dest, %src)
+ * at the current test insertion point with the provided operand types.
+ */
 MirInstruction *
 EzMirTestSuite::addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *destOperType, MirType *srcOperType)
 {
@@ -91,6 +111,10 @@ EzMirTestSuite::addTestInstructionRegReg(MirInstructionOpCode opcode, MirType *d
             { opBuilder.buildVReg(destOperType, "testDest"), opBuilder.buildVReg(srcOperType, "testScr") });
 }
 
+/**
+ * Creates and inserts a register-immediate instruction with an integer constant
+ * at the current test insertion point.
+ */
 MirInstruction *EzMirTestSuite::addTestInstructionRegIntImm(MirInstructionOpCode opcode,
                                                             MirType *destOperType,
                                                             MirType *srcOperType,
@@ -105,6 +129,10 @@ MirInstruction *EzMirTestSuite::addTestInstructionRegIntImm(MirInstructionOpCode
             { opBuilder.buildVReg(destOperType, "testDest"), opBuilder.buildInt(srcOperType, FlexInt(srcValue)) });
 }
 
+/**
+ * Creates and inserts a register-immediate instruction with a 32-bit floating point constant
+ * at the current test insertion point.
+ */
 MirInstruction *
 EzMirTestSuite::addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirType *destOperType, float srcValue)
 {
@@ -117,6 +145,10 @@ EzMirTestSuite::addTestInstructionRegFloatImm(MirInstructionOpCode opcode, MirTy
                            opBuilder.buildFloat(getTypeTable()->f32(), FlexFloat(srcValue)) });
 }
 
+/**
+ * Creates and inserts a register-memory instruction with base virtual register and displacement
+ * at the current test insertion point.
+ */
 MirInstruction *EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode opcode,
                                                          MirType *destOperType,
                                                          MirType *srcOperType,
@@ -132,14 +164,17 @@ MirInstruction *EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode op
               opBuilder.buildMem(srcOperType, opBuilder.buildVReg(getTypeTable()->i64(), "testBase"), displacement) });
 }
 
+// Retrieves all functions registered in the active builder context.
 IntrusiveLinkedList<MirFunction> &EzMirTestSuite::getFunctions() { return getBuilderCtx()->getFunctions(); }
 
+// GoogleTest SetUp hook: initializes test suite using the current working directory.
 void MirTestSuiteAsGtest::SetUp()
 {
     EzMirTestSuite::create(std::filesystem::current_path());
     Test::SetUp();
 }
 
+// GoogleTest TearDown hook: cleans up test suite state and invokes base teardown.
 void MirTestSuiteAsGtest::TearDown()
 {
     EzMirTestSuite::destroy();

@@ -8,9 +8,11 @@
 namespace DSL::Ast::CallingConvDef
 {
 /**
- * Determines the direction of growth of the stack:
- *  - Down: Stack pointer is decremented.
- *  - Up:   Stack pointer is incremented.
+ * Determines the direction of growth of the stack.
+ *
+ * Valid keywords:
+ *   'DOWN' -> Stack pointer decrements on allocation
+ *   'UP'   -> Stack pointer increments on allocation
  */
 enum class StackDirection : uint8_t
 {
@@ -20,6 +22,9 @@ enum class StackDirection : uint8_t
 
 /**
  * Determines who is responsible for cleaning up stack arguments.
+ *
+ * Valid keywords:
+ *   'CALLER', 'CALLEE'
  */
 enum class StackCleaner : uint8_t
 {
@@ -29,6 +34,9 @@ enum class StackCleaner : uint8_t
 
 /**
  * Register allocation strategy for multi-register / chunk arguments.
+ *
+ * Valid keywords:
+ *   'ALL_OR_NOTHING', 'INDEPENDENT'
  */
 enum class AllocPolicy : uint8_t
 {
@@ -72,7 +80,16 @@ enum class LoweringActionKind : uint8_t
 };
 
 /**
- * A reference to a register (e.g. GPR:rdi, FPR:xmm0).
+ * Register reference with register class qualifier.
+ *
+ * Syntax:
+ *   RegisterRef := ClassName ':' RegName
+ *   ClassName   := Identifier
+ *   RegName     := Identifier
+ *
+ * Examples:
+ *   GPR:rdi
+ *   FPR:xmm0
  */
 struct RegisterRef
 {
@@ -82,6 +99,14 @@ struct RegisterRef
 
 /**
  * Stack placement configuration and alignment constraints.
+ *
+ * Syntax:
+ *   StackPlacement := 'STACK' ( '(' ( 'ALIGN' ':' )? IntegerLiteral ')' )?
+ *
+ * Examples:
+ *   STACK
+ *   STACK(8)
+ *   STACK(ALIGN: 16)
  */
 struct StackPlacement
 {
@@ -89,8 +114,15 @@ struct StackPlacement
 };
 
 /**
- * Scalar primitive classification rule:
- * TYPE(i1, i8, i16, i32, i64, ptr) >> INTEGER;
+ * Scalar primitive classification rule in a calling convention.
+ *
+ * Syntax:
+ *   PrimitiveClassifyRule := 'TYPE' '(' TypeName (',' TypeName)* ')' '>>' AbiClass ';'
+ *   TypeName              := Identifier
+ *   AbiClass              := Identifier
+ *
+ * Example:
+ *   TYPE(i1, i8, i16, i32, i64, ptr) >> INTEGER;
  */
 struct PrimitiveClassifyRule
 {
@@ -99,9 +131,22 @@ struct PrimitiveClassifyRule
 };
 
 /**
- * Aggregate classification predicate:
- * IF_SIZE_GT(16) >> MEMORY;
- * IF_HOMOGENEOUS(FLOAT, MAX: 4) >> HFA;
+ * Aggregate classification predicate mapping aggregate properties to ABI classes.
+ *
+ * Syntax:
+ *   AggregatePredicate := PredicateBranch ';'
+ *   PredicateBranch    := ( 'IF_SIZE_GT' '(' IntegerLiteral ')'
+ *                         | 'IF_SIZE_LE' '(' IntegerLiteral ')'
+ *                         | 'IF_SIZE_IN' '(' IntegerLiteral (',' IntegerLiteral)* ')'
+ *                         | 'IF_HOMOGENEOUS' '(' ClassName ',' ( 'MAX' ':' )? IntegerLiteral ')'
+ *                         | 'IF_UNALIGNED'
+ *                         | 'IF_NON_TRIVIAL'
+ *                         | 'DEFAULT' ) '>>' ResultClass
+ *
+ * Examples:
+ *   IF_SIZE_GT(16) >> MEMORY;
+ *   IF_HOMOGENEOUS(FLOAT, MAX: 4) >> HFA;
+ *   DEFAULT >> INTEGER;
  */
 struct AggregatePredicate
 {
@@ -114,8 +159,14 @@ struct AggregatePredicate
 };
 
 /**
- * Aggregate slicing, precedence, and policy definition:
- * AGGREGATE { IF_SIZE_GT(16) >> MEMORY; CHUNK_SIZE(8); MERGE_PRECEDENCE >> ... };
+ * Aggregate slicing, precedence, and policy definition block.
+ *
+ * Syntax:
+ *   AggregateClassifyDef := 'AGGREGATE' '{' ( AggregateItem )* '}' ';'?
+ *   AggregateItem        := AggregatePredicate | ChunkSizeDecl | MergePrecedenceDecl | AllocPolicyDecl
+ *   ChunkSizeDecl        := 'CHUNK_SIZE' '(' IntegerLiteral ')' ';'
+ *   MergePrecedenceDecl  := 'MERGE_PRECEDENCE' '>>' ClassName ( '>' ClassName )* ';'
+ *   AllocPolicyDecl      := 'ALLOC_POLICY' '(' ('ALL_OR_NOTHING' | 'INDEPENDENT') ')' ';'
  */
 struct AggregateClassifyDef
 {
@@ -126,7 +177,10 @@ struct AggregateClassifyDef
 };
 
 /**
- * The CLASSIFY block grouping all type-to-class rules.
+ * CLASSIFY block grouping primitive and aggregate classification rules.
+ *
+ * Syntax:
+ *   ClassifyBlock := 'CLASSIFY' '{' ( PrimitiveClassifyRule | AggregateClassifyDef )* '}' ';'?
  */
 struct ClassifyBlock
 {
@@ -136,6 +190,14 @@ struct ClassifyBlock
 
 /**
  * Action descriptor detailing how an ABI class is passed or returned.
+ *
+ * Syntax:
+ *   LoweringAction := 'REG_SEQ' '(' RegisterRef (',' RegisterRef)* ')' ( '>>' StackPlacement )?
+ *                   | 'REG_SLOTS' '(' RegisterRef (',' RegisterRef)* ')' ( '>>' StackPlacement )?
+ *                   | 'EXPAND_TO' '(' ClassName ')'
+ *                   | 'PASS_AS_POINTER' '>>' ClassName
+ *                   | StackPlacement
+ *                   | 'SRET'
  */
 struct LoweringAction
 {
@@ -147,8 +209,15 @@ struct LoweringAction
 };
 
 /**
- * Mapping rule from an ABI class to a lowering action:
- * INTEGER >> REG_SEQ(GPR:rdi, GPR:rsi, ...) >> STACK(ALIGN: 8);
+ * Mapping rule from an ABI class to a lowering action.
+ *
+ * Syntax:
+ *   DispatchRule := AbiClass '>>' LoweringAction ';'
+ *   AbiClass     := Identifier
+ *
+ * Examples:
+ *   INTEGER >> REG_SEQ(GPR:rdi, GPR:rsi, GPR:rdx) >> STACK(ALIGN: 8);
+ *   FLOAT   >> REG_SEQ(FPR:xmm0, FPR:xmm1) >> STACK(8);
  */
 struct DispatchRule
 {
@@ -158,6 +227,12 @@ struct DispatchRule
 
 /**
  * Struct Return (SRET) specific ABI behavior configuration.
+ *
+ * Syntax:
+ *   SretConfig := 'SRET_CONFIG' '{' ( SretItem )* '}' ';'?
+ *   SretItem   := 'PASS_IN_REG' '(' RegisterRef ')' ';'
+ *               | 'CONSUMES_ARG_SLOT' '(' ('true' | 'false') ')' ';'
+ *               | 'RETURN_REG' '(' ( RegisterRef | 'NONE' ) ')' ';'
  */
 struct SretConfig
 {
@@ -166,6 +241,24 @@ struct SretConfig
     std::optional<RegisterRef> m_returnReg; // Echoed return register (e.g., GPR:rax or std::nullopt)
 };
 
+/**
+ * Complete top-level calling convention definition AST root in a .cdf file.
+ *
+ * Syntax:
+ *   CallingConvDefFile := 'calling_conv' ConvName '{' ( Directive )* '}' ';'? EOF
+ *   ConvName  := Identifier
+ *   Directive := 'STACK_ALIGN' '(' IntegerLiteral ')' ';'
+ *              | 'STACK_DIRECTION' '(' ('DOWN' | 'UP') ')' ';'
+ *              | 'STACK_CLEANUP' '(' ('CALLER' | 'CALLEE') ')' ';'
+ *              | 'SHADOW_SPACE' '(' IntegerLiteral ')' ';'
+ *              | 'STACK_POINTER' '(' RegisterRef ')' ';'
+ *              | 'FRAME_POINTER' '(' RegisterRef ')' ';'
+ *              | 'CALLEE_SAVED' '(' RegisterRef (',' RegisterRef)* ')' ';'
+ *              | 'CALLER_SAVED' '(' RegisterRef (',' RegisterRef)* ')' ';'
+ *              | ClassifyBlock
+ *              | 'PASS' '{' ( DispatchRule )* '}' ';'?
+ *              | 'RETURN' '{' ( DispatchRule | SretConfig )* '}' ';'?
+ */
 struct CallingConvDefFile
 {
     Common::Identifier m_name;

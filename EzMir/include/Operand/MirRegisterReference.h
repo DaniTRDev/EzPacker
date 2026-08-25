@@ -4,89 +4,112 @@
 #include "EzMirCommon.h"
 
 /**
- * This class is used to encapsulate register references.
- * Virtual registers do not contain a register class, as this is only assigned to PHYSICAL.
- * Physical registers have a register class, which also links them to a HW-defined register bank.
+ * Encapsulates a reference to either a virtual register (SSA/pre-allocation) or a physical register (hardware-assigned).
  *
- * Important note, IDs are unique within each bank but shared across classes. This means that register ID 1 from bank 1
- * is different to register ID 1 from bank 2; AND register ID 1, with class 1 is different of register ID 1 with
- * class 2.
- *
- *
- * When a VIRTUAL register ref has a class, this means the register reference passed ISel phase.
+ * Virtual registers originate without a register class. When instruction selection assigns a target register class,
+ * the virtual register receives the associated MirRegisterClass descriptor.
+ * Physical registers are always bound to a specific MirRegisterClass and bank.
  */
 class MirRegisterRef
 {
   public:
+    /**
+     * Default constructor creating an unassigned virtual register reference.
+     */
     constexpr MirRegisterRef() = default;
 
     /**
-     * Constructs a register reference with the specified ID, virtual flag, and optional class.
+     * Constructs a register reference with the specified identifier, virtual/physical flag, and optional class.
      */
     MirRegisterRef(size_t id, bool isVirtual = true, class MirRegisterClass *_class = nullptr);
 
     /**
-     * Constructor for PHYSICAL registers.
+     * Constructs a physical register reference with a bound register class and physical ID.
      */
     MirRegisterRef(class MirRegisterClass *_class, size_t id);
 
     /**
-     * Returns true if this register reference is virtual (unallocated).
+     * Returns true if this register reference is virtual (not yet allocated to hardware).
      */
     bool isVirtual() const;
 
     /**
-     * Returns true if this register reference is physical (hardware-assigned).
+     * Returns true if this register reference represents a physical hardware register.
      */
     bool isPhysical() const;
 
     /**
-     * Returns the register class descriptor for physical registers (or post-ISel virtuals).
+     * Returns the register class descriptor (assigned during/after instruction selection for virtuals, or inherent for physicals).
      */
     class MirRegisterClass *getClass() const;
 
     /**
-     * Builds a FULL virtual register ref with the given ID.
+     * Factory function creating a purely virtual register reference with no initial class.
      */
     static MirRegisterRef vreg(size_t id);
 
     /**
-     * Builds a virtual register ref with a physical class assigned.
+     * Factory function creating a virtual register reference constrained to a specific physical register class.
      */
     static MirRegisterRef vreg(size_t id, class MirRegisterClass *_class);
 
     /**
-     * Builds a physical register ref out of the given register descriptor.
+     * Factory function creating a physical register reference from a hardware register descriptor.
      */
     static MirRegisterRef preg(class MirRegisterDescriptor *desc);
 
     /**
-     * Returns the numeric ID of the register.
+     * Returns the numeric identifier of the register.
      */
     size_t getId() const;
 
     /**
-     * Sets or updates the register class for this register reference.
+     * Sets or updates the register class constraint for this register reference.
      */
     void setClass(class MirRegisterClass *_class);
 
+    /**
+     * Equality operator comparing virtual flag, ID, and class pointer (for physical registers).
+     */
     bool operator==(const MirRegisterRef &other) const;
 
+    /**
+     * Inequality operator.
+     */
     bool operator!=(const MirRegisterRef &other) const;
 
+    /**
+     * Ordering operator enabling use as keys in ordered containers.
+     */
     bool operator<(const MirRegisterRef &other) const;
 
   private:
+    /**
+     * Flag indicating if the register is virtual (true) or physical (false).
+     */
     bool m_virtual{ true };
+
+    /**
+     * Associated hardware register class descriptor.
+     */
     class MirRegisterClass *m_class{ nullptr };
+
+    /**
+     * Unique numeric register identifier.
+     */
     size_t m_id{ MIRID_INVALID };
 };
 
-// Standard hash implementation for unordered containers
+/**
+ * Standard hash specialization for MirRegisterRef to enable hashing in std::unordered_map / std::unordered_set.
+ */
 namespace std
 {
 template <> struct hash<MirRegisterRef>
 {
+    /**
+     * Computes a combined hash from the register ID, virtuality flag, and physical class pointer.
+     */
     size_t operator()(const MirRegisterRef &reg) const noexcept
     {
         // Hash the ID and virtual status

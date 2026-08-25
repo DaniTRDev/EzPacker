@@ -4,28 +4,32 @@
 #include "EzMirCommon.h"
 
 /**
- * This interface exists just to make EzMir be able to calculate type offsets correctly, depending on a target
- * architecture, without needing to depend on EzTriple at all.
+ * Interface enabling target-specific type layout calculations (sizes, alignments, pointer sizing)
+ * without requiring EzMir to directly depend on EzTriple.
  *
- * The methods defined hered are only used for PRIMITIVES (i8, i16, i64, ...) not for arrays or classes.
+ * Provides primitive data type queries (i8, i16, i32, i64, f32, f64, pointers) for memory operand sizing,
+ * structure layouts, and calling convention lowering.
  */
 class IMirTargetTypeLayout
 {
   public:
+    /**
+     * Virtual destructor for interface cleanup.
+     */
     virtual ~IMirTargetTypeLayout() = default;
 
     /**
-     * Returns the size IN BYTES of a pointer.
+     * Returns the size of a machine pointer in bytes for the target architecture.
      */
     virtual size_t getPointerSizeInBytes() const = 0;
 
     /**
-     * Returns the alignment needed for a given type, IN BYTES.
+     * Returns the required memory alignment in bytes for the specified primitive MIR type.
      */
     virtual size_t getTypeAlignmentInBytes(const class MirType *type) const = 0;
 
     /**
-     * Returns the type size, IN BYTES, (including alignment) of a given type.
+     * Returns the allocation size in bytes (including ABI padding/alignment) for the specified primitive MIR type.
      */
     virtual size_t getTypeSizeInBytes(const class MirType *type) const = 0;
 };

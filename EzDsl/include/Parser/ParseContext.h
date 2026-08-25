@@ -5,13 +5,15 @@
 #include "SourceManager/GenericSourceManager.h"
 
 /**
- * This class represents a cheap-to-create context used PER-FILE.
+ * Per-file lexical and syntactic parsing state passed to Lexy grammar rules.
+ * Holds references to the diagnostic collector, source manager, active file ID,
+ * and arena allocator for PMR AST node allocation.
  */
 class ParseContext
 {
   public:
     /**
-     * Creates the parsing context with the given diagnostic collector, source manager and sourceId.
+     * Constructs a parsing context bound to a DiagnosticCollector, GenericSourceManager, sourceId, and PMR allocator.
      */
     ParseContext(class DiagnosticCollector *diagCollector,
                  class GenericSourceManager *sourceManager,
@@ -19,27 +21,27 @@ class ParseContext
                  std::pmr::memory_resource *alloc);
 
     /**
-     * Returns the diagnostic collector linked to this context.
+     * Returns the diagnostic collector linked to this parsing context.
      */
     class DiagnosticCollector *getDiagCollector() const;
 
     /**
-     * Returns the source manager linked to this context.
+     * Returns the generic source manager linked to this context.
      */
     class GenericSourceManager *getSourceManager() const;
 
     /**
-     * Returns the source ID linked to this context.
+     * Returns the numeric source ID of the file being parsed.
      */
     size_t getSourceId() const;
 
     /**
-     * Creates a source reference out of the given starting and ending iter (given by lexy).
+     * Creates a SourceReference span corresponding to the input iterator interval [startIter, endIter).
      */
     class SourceReference *createRef(const char *startIter, const char *endIter);
 
     /**
-     * Simple diagnostic collector that will get lexy's errors and will push them into our collector.
+     * Lexy error callback handler intercepting syntax parse failures and translating them into compiler diagnostics.
      */
     struct LexyDiagnosticHandler
     {
@@ -64,7 +66,7 @@ class ParseContext
                 auto errBegin = error.position();
                 auto errSize = 0;
 
-                // Write the main annotation.
+                // Write the main annotation based on error tag category
                 if constexpr (std::is_same_v<Tag, lexy::expected_literal>)
                 {
                     errSize = error.index() + 1;
@@ -101,8 +103,8 @@ class ParseContext
     };
 
     /**
-     * Tries to parse the source file linked to this context using the given rule. If an error is thrown, false is
-     * returned and the diagnostic collector will have the information.
+     * Parses the current source buffer using the specified top-level Lexy grammar rule.
+     * Returns std::optional containing the resulting AST on success, or std::nullopt if syntax errors occurred.
      */
     template <typename Rule, typename Ret> std::optional<Ret> parse()
     {
@@ -120,13 +122,13 @@ class ParseContext
     }
 
     /**
-     * Returns the allocator used by this parser.
+     * Returns the arena memory resource used for PMR list and node allocations during parsing.
      */
     std::pmr::memory_resource *getAllocator() const;
 
   private:
     /**
-     * Pushes the given error into the linked collector.
+     * Pushes a syntax error message with associated SourceReference to the DiagnosticCollector.
      */
     void pushToCollector(std::string_view sourceName, std::string_view message, class SourceReference *sourceRef);
 

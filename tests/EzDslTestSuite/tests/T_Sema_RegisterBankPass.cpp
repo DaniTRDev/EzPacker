@@ -8,9 +8,15 @@
 #include "Sema/Symbols/Symbols.h"
 #include "SemaPasses/RegisterBankPass.h"
 
+/**
+ * Test fixture for semantic validation and hierarchy resolution of target register banks and register classes (RegisterBankPass).
+ */
 class RegisterBankPassTest : public DslTestSuiteAsGtest
 {
   protected:
+    /**
+     * Parses a string containing target definition DSL into a TargetDef AST node.
+     */
     std::optional<DSL::Ast::TargetDef::TargetDef> parseTarget(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff("test.tdf", source);
@@ -22,6 +28,9 @@ class RegisterBankPassTest : public DslTestSuiteAsGtest
 // 1. Happy Path & Hierarchy Topology Tests
 // ============================================================================
 
+/**
+ * Verifies basic semantic registration of a register bank, register class, and root registers (rax, rcx).
+ */
 TEST_F(RegisterBankPassTest, TestBasicRegisterBankAndClassRegistration)
 {
     std::string test = R"dsl(
@@ -77,6 +86,9 @@ target x86_64 {
     EXPECT_EQ(raxData->m_primaryClassId, classSym->getId());
 }
 
+/**
+ * Verifies multi-tier sub-register alias resolution across full register hierarchies (rax -> eax -> ax -> al/ah).
+ */
 TEST_F(RegisterBankPassTest, TestMultiTierSubRegisterHierarchyResolution)
 {
     std::string test = R"dsl(
@@ -143,6 +155,9 @@ target x86_64 {
     EXPECT_EQ(ahData->m_bitSize, 8);
 }
 
+/**
+ * Verifies that sub-registers declared prior to their parent register are resolved correctly (order-independent).
+ */
 TEST_F(RegisterBankPassTest, TestOrderIndependentParentRegisterResolution)
 {
     // Sub-register 'eax' declared in class BEFORE parent register 'rax'
@@ -176,6 +191,9 @@ target x86_64 {
     EXPECT_EQ(*eaxData->m_parentId, raxSym->getId());
 }
 
+/**
+ * Verifies multiple distinct register bank declarations (GPR and FPR) and their independent namespace resolutions.
+ */
 TEST_F(RegisterBankPassTest, TestMultipleDistinctBanks)
 {
     std::string test = R"dsl(
@@ -216,6 +234,9 @@ target MixedTarget {
 // 2. Sub-Register Bit Range & Alignment Invariant Tests
 // ============================================================================
 
+/**
+ * Verifies that sub-registers with bit size greater than parent register fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestSubRegisterSizeGreaterThanParentFails)
 {
     std::string test = R"dsl(
@@ -238,6 +259,9 @@ target x86_64 {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that sub-registers whose bit offset plus size exceeds parent bit width fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestSubRegisterOffsetPlusSizeExceedsParentFails)
 {
     std::string test = R"dsl(
@@ -260,6 +284,9 @@ target x86_64 {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that sub-registers whose offset begins past parent end fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestSubRegisterOffsetPastParentEndFails)
 {
     std::string test = R"dsl(
@@ -286,6 +313,9 @@ target x86_64 {
 // 3. Parent Resolution & Reference Invariant Tests
 // ============================================================================
 
+/**
+ * Verifies that sub-registers referencing undefined parent registers fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestUndefinedParentRegisterFails)
 {
     std::string test = R"dsl(
@@ -305,6 +335,9 @@ target x86_64 {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that sub-registers referencing a bank instead of a register fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestParentIsBankNotRegisterFails)
 {
     // Parent references a Bank name instead of a Register
@@ -329,6 +362,9 @@ target x86_64 {
 // 4. Sub-Register Cycle Detection Invariant Tests
 // ============================================================================
 
+/**
+ * Verifies that self-referencing register aliases fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestSelfReferencingRegisterCycleFails)
 {
     std::string test = R"dsl(
@@ -348,6 +384,9 @@ target BrokenTarget {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that two-node register alias cycles fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestDirectTwoNodeRegisterCycleFails)
 {
     std::string test = R"dsl(
@@ -368,6 +407,9 @@ target BrokenTarget {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that multi-node register alias cycles fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestMultiNodeRegisterCycleFails)
 {
     std::string test = R"dsl(
@@ -389,6 +431,9 @@ target BrokenTarget {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that alias cycles spanning across different register classes fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestCycleAcrossDifferentRegisterClassesFails)
 {
     std::string test = R"dsl(
@@ -411,6 +456,9 @@ target BrokenTarget {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that an alias cycle inside one class fails validation even if other classes in the bank are valid.
+ */
 TEST_F(RegisterBankPassTest, TestCycleInSubTreeWithValidSiblingsFails)
 {
     std::string test = R"dsl(
@@ -439,6 +487,9 @@ target MixedTarget {
 // 5. Duplicate Symbol & Collision Invariant Tests
 // ============================================================================
 
+/**
+ * Verifies that duplicate register bank names fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestDuplicateRegisterBankNamesFail)
 {
     std::string test = R"dsl(
@@ -459,6 +510,9 @@ target x86_64 {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that duplicate register class names within the target fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestDuplicateRegisterClassNamesFail)
 {
     std::string test = R"dsl(
@@ -477,6 +531,9 @@ target x86_64 {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that duplicate register names within the same register class fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestDuplicateRegisterNamesInSameClassFail)
 {
     std::string test = R"dsl(
@@ -497,6 +554,9 @@ target x86_64 {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that duplicate register names across different register classes fail validation.
+ */
 TEST_F(RegisterBankPassTest, TestDuplicateRegisterNamesAcrossClassesFail)
 {
     std::string test = R"dsl(
@@ -519,6 +579,9 @@ target x86_64 {
     EXPECT_FALSE(RegisterBankPass::run(getDiagCollector(), &table, &*ast));
 }
 
+/**
+ * Verifies that declaring a register whose name collides with a pre-existing root symbol fails validation.
+ */
 TEST_F(RegisterBankPassTest, TestPreExistingSymbolCollisionFails)
 {
     std::string test = R"dsl(

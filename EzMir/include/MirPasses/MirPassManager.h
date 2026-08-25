@@ -5,21 +5,25 @@
 #include "IMirAnalysisPass.h"
 #include "IMirTransformPass.h"
 
+/**
+ * Orchestrator managing pass dependency resolution, dynamic topological pipeline construction,
+ * on-demand analysis caching and invalidation, and iterative execution over MIR data structures.
+ */
 class MirPassManager
 {
   public:
     /**
-     * Creates the pass manager and links it to the given arena.
+     * Constructs a pass manager bound to a DiagnosticCollector and arena memory resource.
      */
     MirPassManager(class DiagnosticCollector *diagCollector, std::pmr::memory_resource *globalArena);
 
     /**
-     * Returns the diag collector linked to this pass manager.
+     * Returns the diagnostic collector attached to this pass manager.
      */
     class DiagnosticCollector *getDiagCollector() const;
 
     /**
-     * Stashes a pass into the blueprint registry. It won't be ordered yet.
+     * Registers a pass blueprint with constructor arguments into the manager.
      */
     template <typename PassType, typename... Args>
         requires(std::is_base_of_v<MirPass, PassType>)
@@ -32,12 +36,12 @@ class MirPassManager
     }
 
     /**
-     * Calculates the pipeline needed to run all the passes that have been pushed.
+     * Computes the topologically sorted execution pipeline resolving all declared pass dependencies.
      */
     void generatePipeline();
 
     /**
-     * Lazy-loads, executes, and caches an analysis pass utilizing the given context.
+     * Retrieves an analysis pass result on-demand, executing the analysis pass if not already cached.
      */
     template <typename AnalysisPass>
         requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
@@ -55,24 +59,22 @@ class MirPassManager
     }
 
     /**
-     * Runs a TRANSFORMATION pass on the given place depending on its iteration type.
+     * Executes a transformation pass across its configured granularity place (Function, Block, Instruction, GlobalVar).
      */
     MirPassResult runPass(MirPass *pass, class MirBuilderContext *ctx);
 
     /**
-     * Invalidates the analysis stored.
+     * Invalidates all cached analysis results following a mutating transformation pass.
      */
     void invalidateAnalysis();
 
     /**
-     * Runs the generated pipeline (by generatePipeline) on the given context. Only TRANSFORM passes will be
-     * executed, analysis passes will be run ONLY if they are required by any of the transform passes (through
-     * getAnalysis).
+     * Executes the generated pipeline of transformation passes over all functions/globals in the context.
      */
     void runPipeline(class MirBuilderContext *ctx);
 
     /**
-     * When called, the pass manager enters in test mode, making it NOT RESOLVE dependencies.
+     * Enables test mode, allowing passes to run without enforcing prerequisite dependency resolution.
      */
     void setTestMode();
 
@@ -83,7 +85,7 @@ class MirPassManager
     MirPass *runAnalysisById(std::type_index passId, class MirBuilderContext *ctx);
 
     /**
-     * Tries to form a valid pass execution pipeline satisfying the dependencies of each pass.
+     * Recursively traverses and resolves dependencies for a pass, detecting cyclic dependency chains.
      */
     void resolveDependencies(std::type_index passId,
                              std::unordered_set<std::type_index> &resolved,

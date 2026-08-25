@@ -5,43 +5,47 @@
 #include "Scope.h"
 #include "Symbol.h"
 
+/**
+ * Central repository managing hierarchical lexical/semantic scopes and Symbol instances.
+ * Allocates scopes and symbols using a PMR arena resource.
+ */
 class SymbolTable
 {
   public:
     /**
-     * Builds the symbol table with the given pmr resource.
+     * Constructs a symbol table with the given PMR memory resource and initializes the root global scope.
      */
     SymbolTable(std::pmr::memory_resource *alloc);
 
     /**
-     * Returns the ID of the current scope.
+     * Returns the numeric ID of the active scope.
      */
     ScopeId getCurrentScopeId() const;
 
     /**
-     * Creates a scope with the given parent and debug name.
+     * Creates a new scope as a child of parentId with the specified debug name.
      */
     ScopeId createScope(ScopeId parentId, const std::string_view &debugName);
 
     /**
-     * Returns the scope at the given index. If no scope exists, nullptr is returned.
+     * Returns a pointer to the Scope with the specified ID, or nullptr if out of bounds.
      */
     Scope *getScopeById(ScopeId id) const;
 
     /**
-     * Returns the symbol at the given index. If no symbol exists, nullptr is returned.
+     * Returns a pointer to the Symbol with the specified SymbolId, or nullptr if out of bounds.
      */
     Symbol *getSymById(SymbolId id) const;
 
     /**
-     * Starts a bottom-up search for the given scope name. The first scope checked is starting scope, if it's nullopt,
-     * the current scope is the starting point.
+     * Performs a bottom-up lexical lookup for a symbol name starting at startingScope (defaults to current scope).
+     * Climbs the parent scope chain until found or the root scope is exceeded.
      */
     Symbol *getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope = std::nullopt);
 
     /**
-     * Declares a symbol in the current scope with the given source reference, flags, type, data and name.
-     * If the symbol already exists in the current scope, InvalidSymbolId is returned.
+     * Declares a new symbol in the active scope with source reference, flags, type, semantic payload, and name.
+     * Returns InvalidSymbolId if a symbol with the same name already exists in the active scope.
      */
     SymbolId declareSym(class SourceReference *sourceRef,
                         SymbolFlags flags,
@@ -50,30 +54,28 @@ class SymbolTable
                         std::string_view name);
 
     /**
-     * Creates and enters a scope with the given debug name. It internally calls createScope with the appropiate
-     * parameters.
+     * Creates a new child scope under the active scope and makes it the active scope.
      */
     void enterScope(std::string_view debugName = "");
 
     /**
-     * Exits the current scope and sets m_current scope to the parent. If the current scope is the root scope, nothing
-     * is done.
+     * Exits the current scope and restores its parent as the active scope.
      */
     void exitScope();
 
     /**
-     * Returns the allocator of the symbol table.
+     * Returns the underlying PMR memory resource.
      */
     std::pmr::memory_resource *getAllocator();
 
     /**
-     * Returns the list of symbols.
+     * Returns the complete list of all allocated symbols.
      */
     const std::pmr::vector<Symbol *> &getSymbols() const;
 
   private:
     /**
-     * Returns the symbol if the the target scope has defined it. Returns nullptr if not.
+     * Looks up a symbol name within a single specific scope without ascending to parents.
      */
     Symbol *getSymInScope(ScopeId id, const std::string_view &name) const;
 

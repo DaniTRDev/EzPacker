@@ -6,6 +6,10 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for Instruction Selection Definition Language (.isf) grammar, pattern matching,
+ * addressing mode definitions, and AST validation.
+ */
 class InstSelDefLangTest : public DslTestSuiteAsGtest
 {
   public:
@@ -15,6 +19,9 @@ class InstSelDefLangTest : public DslTestSuiteAsGtest
 // 1. Addressing Mode Parameter Tests
 // ============================================================================
 
+/**
+ * Verifies parsing a simple addressing mode parameter without default values (e.g. GPR:base).
+ */
 TEST_F(InstSelDefLangTest, TestAddrModeParamSimple)
 {
     std::string test = "GPR:base";
@@ -28,6 +35,9 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamSimple)
     EXPECT_FALSE(res->m_defaultValue.has_value());
 }
 
+/**
+ * Verifies parsing addressing mode parameters with default constant initializers (e.g. simm12:offset = 0).
+ */
 TEST_F(InstSelDefLangTest, TestAddrModeParamWithDefault)
 {
     std::string test = "simm12:offset = 0";
@@ -42,6 +52,9 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamWithDefault)
     EXPECT_EQ(res->m_defaultValue->m_node, 0);
 }
 
+/**
+ * Verifies parsing parameterized addressing mode parameters with default constants (e.g. simm(i12):offset = 0).
+ */
 TEST_F(InstSelDefLangTest, TestAddrModeParamParameterizedWithDefault)
 {
     std::string test1 = "simm(i12):offset = 0";
@@ -73,6 +86,9 @@ TEST_F(InstSelDefLangTest, TestAddrModeParamParameterizedWithDefault)
 // 2. Addressing Mode Variant & Declaration Tests
 // ============================================================================
 
+/**
+ * Verifies parsing an addressing mode variant block with match pattern and when guard predicates.
+ */
 TEST_F(InstSelDefLangTest, TestAddrModeVariantParsing)
 {
     std::string test = R"dsl(
@@ -117,6 +133,9 @@ variant OffsetAddr {
     EXPECT_EQ(std::get<DSL::Ast::Common::IntegerLiteral>(res->m_predicates[1].m_arguments[2]).m_node, 2047);
 }
 
+/**
+ * Verifies parsing a multi-variant addressing mode declaration with default parameter fallbacks (e.g. OffsetAddr vs BaseOnly).
+ */
 TEST_F(InstSelDefLangTest, TestAddrModeDefMultiVariantWithDefaults)
 {
     std::string test = R"dsl(
@@ -167,6 +186,9 @@ addrmode AddrModeRegImm12(GPR:base, simm(i12):offset = 0) {
 // 3. Instruction Selection Pattern Tests
 // ============================================================================
 
+/**
+ * Verifies parsing simple instruction selection patterns with match, when guard, emit block, and explicit cost value.
+ */
 TEST_F(InstSelDefLangTest, TestSimplePatternWithCost)
 {
     std::string test = R"dsl(
@@ -212,6 +234,9 @@ pattern Select_ADDI {
     EXPECT_EQ(res->m_cost->m_node, 1);
 }
 
+/**
+ * Verifies parsing multi-instruction match graphs (e.g. matching SHL and ADD into a combined SH2ADD instruction).
+ */
 TEST_F(InstSelDefLangTest, TestMultiInstructionMatchAndEmit)
 {
     std::string test = R"dsl(
@@ -260,6 +285,9 @@ pattern Select_SH2ADD {
     EXPECT_EQ(res->m_emitSequence[0].m_opcode.m_node, "SH2ADD");
 }
 
+/**
+ * Verifies parsing patterns that invoke custom addressing mode matchers (e.g. AddrModeRegImm12($base, $offset)).
+ */
 TEST_F(InstSelDefLangTest, TestPatternUsingAddrModeAndTransforms)
 {
     std::string test = R"dsl(
@@ -296,6 +324,9 @@ pattern Select_LW {
     EXPECT_EQ(res->m_cost.value().m_node, 2);
 }
 
+/**
+ * Verifies parsing patterns that emit multi-instruction sequences and custom operand transformations (e.g. sub($amt)).
+ */
 TEST_F(InstSelDefLangTest, TestPatternWithMultiInstructionEmitAndTransform)
 {
     std::string test = R"dsl(
@@ -334,6 +365,9 @@ pattern Select_RotL {
 // 4. Full Translation Unit Tests
 // ============================================================================
 
+/**
+ * Verifies parsing an entire instruction selection definition file (.isf) containing addressing modes and patterns.
+ */
 TEST_F(InstSelDefLangTest, TestFullTranslationUnit)
 {
     std::string test = R"dsl(
@@ -389,6 +423,9 @@ pattern Select_SW {
 // 5. Negative & Error Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies syntax error rejection when disallowed postfix immediate syntax ($imm:imm) is used.
+ */
 TEST_F(InstSelDefLangTest, TestDisallowedPostfixImmediateInPatternError)
 {
     std::string test = R"dsl(
@@ -407,6 +444,9 @@ pattern BadPattern {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a semicolon is missing after a pattern match block.
+ */
 TEST_F(InstSelDefLangTest, TestMissingSemicolonAfterBlockError)
 {
     std::string test = R"dsl(
@@ -425,6 +465,9 @@ pattern BadPattern {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a semicolon is missing after a top-level pattern in a file.
+ */
 TEST_F(InstSelDefLangTest, TestMissingSemicolonAfterPatternInFileError)
 {
     std::string test = R"dsl(
@@ -443,6 +486,9 @@ pattern BadPattern {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when an addressing mode parameter default initializer is missing.
+ */
 TEST_F(InstSelDefLangTest, TestMissingParamDefaultValueError)
 {
     std::string test = R"dsl(
@@ -458,6 +504,9 @@ addrmode BadAddrMode(GPR:base, simm(12):offset =) {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies syntax error rejection when a pattern body is unclosed.
+ */
 TEST_F(InstSelDefLangTest, TestUnterminatedPatternBodyError)
 {
     std::string test = R"dsl(

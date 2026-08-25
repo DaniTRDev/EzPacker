@@ -6,13 +6,14 @@
 #include "Operand/MirRegisterReference.h"
 
 /**
- * Class used to define the bare minimum things EzMir needs to know about target instructions to work properly.
+ * Target machine instruction descriptor storing backend metadata (assembly name, target opcode ID,
+ * explicit operand dataflow flags, and implicit hardware register defs/uses).
  */
 class MirTargetInstructionDesc
 {
   public:
     /**
-     * Constructs a target instruction descriptor with operand constraints, implicit defs, and implicit uses.
+     * Constructs a target instruction descriptor with name, target opcode ID, operand flags, and implicit defs/uses.
      */
     MirTargetInstructionDesc(const char *name,
                              size_t id,
@@ -21,35 +22,54 @@ class MirTargetInstructionDesc
                              std::initializer_list<MirRegisterRef> implicitUses = {});
 
     /**
-     * Returns the name of the target instruction.
+     * Returns the target machine assembly mnemonic name.
      */
     const char *getName() const;
 
     /**
-     * Returns the ID of the target instruction.
+     * Returns the target-specific numeric opcode identifier.
      */
     size_t getId() const;
 
     /**
-     * Returns the flags for the current operands.
+     * Returns the list of operand dataflow access flags (Read/Write) for explicit instruction arguments.
      */
     const std::vector<MirOperandFlag> &getOperandsFlags() const;
 
     /**
-     * Returns the implicit def list for this instruction, if any.
+     * Returns the list of implicit hardware register definitions (DEF) modified by this instruction (e.g. RAX, RDX in IDIV).
      */
     const std::vector<MirRegisterRef> &getImplicitDefs() const;
 
     /**
-     * Returns the implicit use list for this instruction, if any.
+     * Returns the list of implicit hardware register uses (USE) consumed by this instruction.
      */
     const std::vector<MirRegisterRef> &getImplicitUses() const;
 
   private:
+    /**
+     * Assembly mnemonic string.
+     */
     const char *m_name;
+
+    /**
+     * Target-specific opcode identifier.
+     */
     size_t m_id;
+
+    /**
+     * Explicit operand dataflow directions.
+     */
     std::vector<MirOperandFlag> m_operandsFlags;
+
+    /**
+     * Hardware registers implicitly written/clobbered.
+     */
     std::vector<MirRegisterRef> m_implicitDefs;
+
+    /**
+     * Hardware registers implicitly read.
+     */
     std::vector<MirRegisterRef> m_implicitUses;
 };
 

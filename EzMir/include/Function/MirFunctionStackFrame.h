@@ -3,20 +3,23 @@
 
 #include "EzMirCommon.h"
 
+/**
+ * Origin classification of an object residing on the function stack frame.
+ */
 enum class StackFrameObjectSource : uint8_t
 {
     Invalid = 0,
-    Parameter, // The object comes from a parameter.
-    Variable,  // The object comes from a variable.
-    Spill      // The object comes from a spill.
+    Parameter, // The object comes from an incoming stack argument.
+    Variable,  // The object comes from a local stack variable.
+    Spill      // The object comes from a register allocator spill slot.
 };
 
 /**
- * An object that lives the the stack frame of a function.
+ * Single allocated slot on the function stack frame with byte offset, type, and source origin.
  */
 struct StackFrameObject
 {
-    // Filled by the prologue/epilogue pass (frame lowerer).
+    // Byte offset relative to frame pointer / stack pointer calculated during frame lowering
     int64_t m_offset{ 0 };
     class MirType *m_type;
     size_t m_id;
@@ -24,59 +27,48 @@ struct StackFrameObject
 };
 
 /**
- * Class used to describe a function's frame.
+ * Stack frame layout manager tracking local variables, incoming stack parameters, and spill slots.
  */
 class MirFunctionStackFrame
 {
   public:
     /**
-     * Creates the stack frame of the function with the given object list. This list should be backend by an
-     * arena somewhere and the arena must keep it alive until it's not needed at all.
-     * @param objectList
+     * Constructs a stack frame instance initialized with an arena-managed object list.
      */
     MirFunctionStackFrame(std::pmr::vector<StackFrameObject *> objectList);
 
     /**
-     * Returns the allocated object count.
-     * @return
+     * Returns the total count of stack frame objects allocated in this frame.
      */
     size_t getAllocatedObjectCount() const;
 
     /**
-     * Creates a local object in the function's stack frame.
-     * @param type
-     * @return
+     * Allocates a local variable stack slot of the specified type.
      */
     StackFrameObject *createStaticStackObj(class MirType *type);
 
     /**
-     * Creates an object resulting of a spill in the function's stack frame.
-     * @param size
-     * @param align
-     * @return
+     * Allocates a spill slot of the specified type for register allocation.
      */
     StackFrameObject *createStackSpill(class MirType *type);
 
     /**
-     * Creates a parameter in the function stack frame.
-     * @param size
-     * @param align
-     * @return
+     * Allocates an incoming parameter stack slot of the specified type.
      */
     StackFrameObject *createStackParam(class MirType *type);
 
     /**
-     * Creates a specific stack frame object with the given parameters
+     * Creates a customized stack frame object with explicit offset, type, and source classifier.
      */
     StackFrameObject *create(int64_t offset, class MirType *type, StackFrameObjectSource source);
 
     /**
-     * Returns a stack frame object out of an ID, if it was not found, nullptr is returned.
+     * Retrieves a stack frame object by its numeric MirId. Returns nullptr if not found.
      */
     StackFrameObject *getObjectFromId(MirId id);
 
     /**
-     * Returns the list of stack frame objects.
+     * Returns the collection of all stack frame objects in this function frame.
      */
     const std::pmr::vector<StackFrameObject *> &getObjects() const;
 

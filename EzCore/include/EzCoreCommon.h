@@ -17,6 +17,10 @@
 
 extern "C"
 {
+    /**
+     * LibBF arbitrary-precision floating-point library C bindings.
+     * Isolated within the libbf namespace to prevent symbol collisions with standard math symbols.
+     */
     namespace libbf
     {
 #include <libbf.h>
@@ -25,6 +29,11 @@ extern "C"
 
 #include <EzLogger.h>
 
+/**
+ * Global synchronous logger instance used across all EzPacker compiler subsystems.
+ * Initialized eagerly via an immediately invoked lambda expression (IIFE) using
+ * EzLogger's synchronous logger creation factory with channel name "EzPacker".
+ */
 inline std::unique_ptr<SyncLogger> g_logger = []() { return EzLogger::createSyncLogger("EzPacker"); }();
 
 #endif // EZCORE_COMMON_H

@@ -3,18 +3,24 @@
 
 #include "EzMirCommon.h"
 
+/**
+ * Enumeration specifying the concrete kind of a MIR operand.
+ */
 enum class MirOperandType : uint8_t
 {
-    Invalid = 0,
-    FloatingPoint, // Immediate floating point value.
-    Integer,       // Immediate integer.
-    Reference,     // A reference to a block, a function or data.
-    Register,      // A physical or virtual register.
-    RuntimeSymbol, // A symbol that's defined in the runtime library.
-    Memory,        // A memory address of the form: base+displacement.
-    MaxOperandType
+    Invalid = 0,    // Uninitialized / invalid operand kind sentinel
+    FloatingPoint,  // Immediate floating-point constant value (MirFloat)
+    Integer,        // Immediate integer constant value (MirInteger)
+    Reference,      // Symbolic reference to a block, function, global variable, or stack slot (MirReference)
+    Register,       // Virtual or physical register identifier (MirRegister)
+    RuntimeSymbol,  // Named runtime library symbol (MirRuntimeSymbol)
+    Memory,         // Base-plus-displacement memory addressing mode [base + displacement] (MirMemory)
+    MaxOperandType  // Operand count sentinel
 };
 
+/**
+ * Mapping table from MirOperandType to human-readable string representations.
+ */
 inline std::unordered_map<MirOperandType, std::string> g_MirOperandType2Str = {
     { MirOperandType::Invalid, "Invalid" },   { MirOperandType::FloatingPoint, "FloatingPoint" },
     { MirOperandType::Integer, "Integer" },   { MirOperandType::Reference, "Reference" },
@@ -22,53 +28,60 @@ inline std::unordered_map<MirOperandType, std::string> g_MirOperandType2Str = {
     { MirOperandType::Memory, "Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
 };
 
+/**
+ * Abstract base class for all operands attached to MIR instructions.
+ * Encapsulates the associated MirType and optional source location reference.
+ */
 class MirOperand
 {
   public:
+    /**
+     * Virtual destructor for operand polymorphism.
+     */
     virtual ~MirOperand() = default;
 
     /**
-     * Creates the operand with the given type.
+     * Constructs a base operand with an associated MIR type and source code reference.
      */
     explicit MirOperand(class MirType *type, class SourceReference *sourceRef);
 
     /**
-     * Returns the type of this operand.
+     * Returns the concrete MirOperandType discriminant.
      */
     virtual MirOperandType getType() const = 0;
 
     /**
-     * Returns the MIR type associated with this operand.
+     * Returns the MIR type descriptor associated with this operand.
      */
     class MirType *getMirType() const;
 
     /**
-     * Gets the size of the operand using its inner MirType.
+     * Returns the size in bytes of the operand derived from its underlying MirType.
      */
     virtual size_t getSizeInBytes() const;
 
     /**
-     * Returns the source reference of the operand. It MAY BE nullptr if the operand does not have a source reference.
+     * Returns the source location reference for diagnostics, or nullptr if unavailable.
      */
     class SourceReference *getSourceRef() const;
 
     /**
-     * Sets the MirType of the operand.
+     * Updates the MIR type descriptor of this operand.
      */
     void setMirType(class MirType *type);
 
     /**
-     * Returns a string representation of the operand.
+     * Formats the operand into a diagnostic and printable string representation.
      */
     virtual std::string toString() const = 0;
 
     /**
-     * Returns true if the operand is of the given type.
+     * Checks if this operand matches the concrete derived operand type OperandType.
      */
     template <typename OperandType> bool isOfType() const { return getType() == OperandType::OpKind; }
 
     /**
-     * Returns a casted pointer to the operand if it is of the given type.
+     * Casts this operand to the derived OperandType pointer, or returns nullptr if type mismatch.
      */
     template <typename OperandType> OperandType *get()
     {
@@ -80,7 +93,7 @@ class MirOperand
     }
 
     /**
-     * Returns a const-casted pointer to the operand if it is of the given type.
+     * Const-qualified cast to the derived OperandType pointer, or returns nullptr if type mismatch.
      */
     template <typename OperandType> const OperandType *get() const
     {
@@ -92,7 +105,14 @@ class MirOperand
     }
 
   private:
+    /**
+     * MIR type associated with this operand value.
+     */
     class MirType *m_type{ nullptr };
+
+    /**
+     * Source location reference for diagnostic tracing.
+     */
     class SourceReference *m_sourceRef{ nullptr };
 };
 

@@ -4,44 +4,49 @@
 #include "EzMirCommon.h"
 
 /**
- * This class represents a bank of register the HW has. For example: GPR, FPR, SSE, AVX, ... Each bank might contain 1
- * or more register classes.
+ * Hardware register bank container (e.g. GPR, FPR, SSE/AVX vector banks).
  *
- * Important note, IDs are unique within each bank and shared across classes. This means that register ID 1 from bank 1
- * is different to register ID 1 from bank 2; AND register ID 1, with class 1 is different of register ID 1 with
- * class 2.
+ * Groups related register classes that share a common underlying physical register set.
+ * Register IDs are unique within each bank and shared across classes within the same bank.
  */
 class MirRegisterBank
 {
   public:
     /**
-     * Creates the bank with the given name and allocator.
+     * Constructs a register bank with the specified name and allocator.
      */
     MirRegisterBank(const char *name, std::pmr::memory_resource *alloc);
 
     /**
-     * Tries to add a class to the bank. If the class already existed, it returns false and it won't be inserted.
-     * Returns true other ways.
+     * Registers a new class into the bank under the specified name.
+     * Returns true if successfully inserted, false if a class with the same name already exists.
      */
     bool addClass(const std::string_view &name, class MirRegisterClass *_class);
 
     /**
-     * Returns the name of the bank.
+     * Returns the name of the register bank.
      */
     const char *getName() const;
 
     /**
-     * Returns the class that has the same name as the one given. If no class matches, nullptr is returned.
+     * Retrieves a register class by name, or nullptr if no matching class exists.
      */
     class MirRegisterClass *getClass(const std::string_view &name) const;
 
     /**
-     * Returns the map which contains all the register classes of this bank.
+     * Returns the map of all register classes contained within this bank.
      */
     const std::pmr::unordered_map<std::string_view, class MirRegisterClass *> &getClasses() const;
 
   private:
+    /**
+     * Identifier name of the register bank (e.g., "GPR", "FPR").
+     */
     const char *m_name;
+
+    /**
+     * Collection of register classes registered in this bank.
+     */
     std::pmr::unordered_map<std::string_view, class MirRegisterClass *> m_classes;
 };
 

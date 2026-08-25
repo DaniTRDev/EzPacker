@@ -11,6 +11,12 @@ namespace DSL::Parser::Common
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Lexy parser rule matching an exact keyword token with word boundary enforcement.
+ *
+ * Syntax:
+ *   Keyword<Str> := Str !( [a-zA-Z0-9_] )
+ */
 template <lexy::_detail::string_literal KeywordStr> struct Keyword
 {
     static constexpr auto rule = []
@@ -24,19 +30,37 @@ template <lexy::_detail::string_literal KeywordStr> struct Keyword
     static constexpr auto value = lexy::constant(true);
 };
 
+/**
+ * Lexy parser rule matching a single character literal.
+ */
 template <char C> struct SingleChar
 {
     static constexpr auto rule = dsl::lit_c<C>;
     static constexpr auto value = lexy::constant(true);
 };
 
+/**
+ * Lexy parser rule for single-line comments extending to the next newline.
+ *
+ * Syntax:
+ *   Comment := '//' [^\n]* '\n'
+ */
 struct Comment
 {
     static constexpr auto rule = dsl::lit_c<'/'> >> dsl::lit_c<'/'> >> dsl::until(dsl::newline);
 };
 
+/**
+ * Common whitespace parser rule skipping ASCII whitespace, newlines, and inline comments.
+ */
 static constexpr auto Whitespace = dsl::ascii::space | dsl::inline_<Comment> | dsl::ascii::newline;
 
+/**
+ * Lexy parser rule producing an Ast::Common::Identifier with attached SourceReference.
+ *
+ * Syntax:
+ *   Identifier := [a-zA-Z_] [a-zA-Z0-9_]*
+ */
 struct Identifier
 {
     static constexpr auto rule = dsl::position +
@@ -54,6 +78,17 @@ struct Identifier
                        lexy::values);
 };
 
+/**
+ * Lexy parser rule producing an Ast::Common::IntegerLiteral with attached SourceReference.
+ * Supports decimal, hexadecimal (0x/0X), binary (0b/0B), and octal (0o/0O) with optional '-' sign.
+ *
+ * Syntax:
+ *   IntegerLiteral := '-'? ( HexLiteral | BinLiteral | OctLiteral | DecLiteral )
+ *   HexLiteral     := ('0x' | '0X') [0-9a-fA-F]+
+ *   BinLiteral     := ('0b' | '0B') [01]+
+ *   OctLiteral     := ('0o' | '0O') [0-7]+
+ *   DecLiteral     := [0-9]+
+ */
 struct IntegerLiteral
 {
     static constexpr auto rule = []
@@ -91,6 +126,12 @@ struct IntegerLiteral
             lexy::values);
 };
 
+/**
+ * Lexy parser rule producing an Ast::Common::RealLiteral with attached SourceReference.
+ *
+ * Syntax:
+ *   RealLiteral := [0-9]+ '.' [0-9]+
+ */
 struct RealLiteral
 {
     static constexpr auto FloatRule =
@@ -111,6 +152,12 @@ struct RealLiteral
                        lexy::values);
 };
 
+/**
+ * Lexy parser rule producing an Ast::Common::StringLiteral with attached SourceReference.
+ *
+ * Syntax:
+ *   StringLiteral := '"' [^"\\]* '"'
+ */
 struct StringLiteral
 {
     static constexpr auto rule = []
@@ -145,6 +192,9 @@ template <typename T, typename Alloc> struct PmrContainerTraits<std::vector<T, A
     using value_type = T;
 };
 
+/**
+ * Custom Lexy list sink allocating std::pmr::vector instances using the ParseContext arena memory resource.
+ */
 template <typename Target> struct PmrListSink
 {
     using traits = PmrContainerTraits<Target>;
@@ -177,7 +227,9 @@ template <typename Target> struct PmrListSink
     _sink sink() const { return _sink(std::pmr::get_default_resource()); }
 };
 
-// Used to automatically make std::pmr lists allocate using the allocator of the ParseContext structure.
+/**
+ * Global constant helper instance to bind Lexy list rules to PMR arena allocation sinks.
+ */
 template <typename ValueType> constexpr PmrListSink<ValueType> PmrAsList{};
 
 } // namespace DSL::Parser::Common

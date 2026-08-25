@@ -1,6 +1,6 @@
 # EzMir (Machine Intermediate Representation)
 
-`EzMir` is the intermediate representation and middle-end compilation framework of the **EzPacker** toolchain. It provides a strongly-typed, SSA-capable, target-configurable IR designed to span the continuum from high-level structured representations down to low-level target instructions.
+`EzMir` is the intermediate representation and middle-end compilation framework of the **EzPacker** toolchain. It provides a strongly-typed, SSA-capable, target-configurable IR designed to span the continuum from high-level structured representations down to low-level target machine instructions.
 
 ---
 
@@ -12,7 +12,7 @@
    - **Target-Low IR**: Post-instruction-selection target instructions tied to physical register classes.
 2. **Complete SSA Infrastructure**:
    - Automated conversion from non-SSA variable assignments to SSA form using the **Cytron et al.** algorithm.
-   - Immediate dominator computation (**Cooper, Harvey, and Kennedy**), dominance frontiers, iterated dominance frontier $\text{IDF}$ placement for $\phi$ nodes, and variable version stack renaming.
+   - Immediate dominator computation (**Cooper, Harvey, and Kennedy**), dominance frontiers, iterated dominance frontier ($\text{IDF}$) placement for $\phi$ nodes, and variable version stack renaming.
 3. **Flexible Calling Convention & ABI Subsystem**:
    - Pluggable calling convention models (`CallingConvDesc`) supporting System V AMD64, Microsoft x64, and custom ABIs.
    - Dynamic argument placement resolution (`ArgumentLocationDesc`: Register, Stack, Split structs, Indirect/ByVal).
@@ -21,7 +21,7 @@
    - Canonical interned type table (`MirTypeTable`) supporting primitives (`i1`..`i128`, `f16`..`f128`, `void`), pointers, arrays, and classes.
    - Target-independent layout query interface (`IMirTargetTypeLayout`).
 5. **Pass Manager Pipeline**:
-   - Dependency-driven pass orchestration (`MirPassManager`) with automatic analysis invalidation and caching.
+   - Dependency-driven pass orchestration (`MirPassManager`) with automatic topological pipeline sorting, on-demand analysis caching, and pass invalidation.
    - Extensible analysis (`IMirAnalysisPass`) and transformation (`IMirTransformPass`) passes.
 6. **Polymorphic Memory Architecture (`std::pmr`)**:
    - Fast monotonic arena allocations for functions, blocks, instructions, and operands with zero heap fragmentation.
@@ -71,32 +71,37 @@
 
 ---
 
-## Core Components
+## Core Subsystems
 
 ### 1. Context and Builders (`EzMir/include/Builder/`)
 - **`MirBuilderContext`**: The root container for an IR module. Owns the global `std::pmr::monotonic_buffer_resource`, `MirTypeTable`, `DiagnosticCollector`, and index maps for blocks, functions, globals, classes, and registers.
-- **`MirFunctionBuilder`**, **`MirBlockBuilder`**, **`MirInstructionBuilder`**: Fluent builder interfaces that construct validated MIR entities within the context.
+- **`MirFunctionBuilder`**: Fluent builder for constructing `MirFunction` instances, accumulating formal parameters, and setting calling conventions.
+- **`MirBlockBuilder`**: Fluent builder for instantiating and appending basic blocks (`MirBlock`) to functions.
+- **`MirInstructionBuilder`**: Fluent instruction emission interface providing named helpers for every IR opcode (`ADD`, `SUB`, `CALL`, `RET`, `LOAD`, `STORE`, etc.) with positional operand insertion (`AppendToEnd`, `PrependToStart`, `InsertBefore`, `InsertAfter`).
 
 ### 2. Instructions & Operands (`EzMir/include/Instruction/`, `EzMir/include/Operand/`)
-- **`MirInstruction`**: An instruction instance containing an opcode (`MirInstructionOpCode`), flags (`MirInstructionFlags`), source reference (`SourceReference`), and a dynamic operand array (`std::pmr::vector<MirOperand*>`).
+- **`MirInstruction`**: An instruction instance containing an opcode (`MirInstructionOpCode`), flags (`MirInstructionFlags`), source location (`SourceReference`), and a dynamic operand array (`std::pmr::vector<MirOperand*>`). Intrusively linked inside `MirBlock`.
 - **`MirRegister` & `MirRegisterRef`**: Unifies virtual registers (`vreg(id)`) and physical registers (`preg(desc)`).
 - **`MirMemory`**: Base-displacement memory addressing (`[baseReg + displacement]`).
 - **`MirReference`**: Symbolic references to code blocks, global variables, functions, class fields, or stack slots, lowered by downstream passes into concrete pointer offsets.
 
 ### 3. ABI and Calling Conventions (`EzMir/include/Function/`)
 - **`CallingConvDesc`**: Encapsulates ABI-specific rules:
-  - Stack growth direction and alignment boundaries.
+  - Stack growth direction (`UP`, `DOWN`) and alignment boundaries.
   - Caller-saved and callee-saved register partitions.
   - Frame pointer (`RBP`/`FP`) and stack pointer (`RSP`/`SP`) requirements.
   - Argument and return value classification (`getArgLoc()`, `getReturnLoc()`).
 - **`MirFunctionStackFrame`**: Tracks static locals, spill slots, and stack parameters with layout offsets resolved during frame lowering.
 
 ### 4. Built-in Compiler Passes (`EzMir/include/MirPasses/Passes/`)
-- **`CodeFlowAnalysisPass`**: Analyzes instruction flow to construct the Control Flow Graph (CFG) containing predecessors and successors for each basic block.
+- **`CodeFlowAnalysisPass`**: Analyzes control flow instructions to construct the Control Flow Graph (CFG) containing predecessor and successor mappings for each basic block.
 - **`NonSsaToSsaPass`**: Computes dominator trees and dominance frontiers to place minimal $\phi$ nodes and rename virtual registers into Single Static Assignment (SSA) form.
-- **`LivenessAnalysisPass`**: Computes local block `def`/`use` sets and global `liveIn`/`liveOut` sets for register allocation.
+- **`LivenessAnalysisPass`**: Computes local block `def`/`use` sets and solves backward dataflow equations to determine `liveIn`/`liveOut` register intervals for register allocation.
 - **`ClassOffsetResolverPass`**: Resolves byte offsets and virtual table layout for object-oriented class hierarchies.
 - **`RelativeReferenceLowererPass`**: Lowers symbolic `MirReference` operands into base-plus-displacement `MirMemory` operations.
+
+### 5. Formatting & Disassembly (`EzMir/include/Printer/`)
+- **`MirPrinter`**: Disassembles blocks, functions, global variables, instructions, and operands into human-readable formatted textual IR with configurable verbosity (`MirPrinterDetail::General` vs `MirPrinterDetail::Detailed`).
 
 ---
 
@@ -117,7 +122,6 @@
 std::pmr::monotonic_buffer_resource arena;
 DiagnosticCollector diagCollector;
 MirTypeTable typeTable(&arena);
-// Assuming default calling convention (e.g. System V) is initialized:
 CallingConvDesc *callingConv = GetSystemVCallingConv(&arena);
 
 MirBuilderContext context(callingConv, &diagCollector, &typeTable, &arena);
@@ -126,16 +130,10 @@ MirBuilderContext context(callingConv, &diagCollector, &typeTable, &arena);
 MirType *i32Type = typeTable.i32();
 MirType *funcType = typeTable.getFuncType(i32Type, { i32Type, i32Type });
 
-// The type table needs an IMirTargetTypeLayout used to compute alignments and sizes.
-typeTable.initialize(typeLayout);
-
 MirFunctionBuilder funcBuilder(&context);
-MirFunction *func = funcBuilder.build(
-    "add", 
-    funcType, 
-    i32Type,
-    ....
-);
+MirFunction *func = funcBuilder.buildParam(i32Type, "a")
+                               .buildParam(i32Type, "b")
+                               .build(i32Type, "add");
 
 // 3. Build Entry Block & Instructions
 MirBlockBuilder blockBuilder(&context, func);
@@ -165,5 +163,3 @@ passManager.runPipeline(&context);
 std::string irText = MirPrinter::printToString(func, MirPrinterDetail::Detailed);
 std::cout << irText << std::endl;
 ```
-
----

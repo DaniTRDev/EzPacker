@@ -6,28 +6,32 @@
 using SemaId = size_t;
 constexpr size_t SEMAID_INVALID = 0;
 
+/**
+ * Unified context passed across semantic analysis passes in EzDsl.
+ * Holds references to the global DiagnosticCollector, SourceManager, and SymbolTable.
+ */
 class SemaContext
 {
   public:
     /**
-     * Creates the context with the given diagnostic collector, source manager and symbol table.
+     * Constructs a semantic analysis context with the given diagnostic collector, source manager, and symbol table.
      */
     SemaContext(class DiagnosticCollector *diagCollector,
                 class SourceManager *sourceManager,
                 class SymbolTable *symbolTable);
 
     /**
-     * Returns the diagnostic collector.
+     * Returns the diagnostic collector linked to this semantic analysis session.
      */
     class DiagnosticCollector *getDiagCollector() const;
 
     /**
-     * Returns the source manager.
+     * Returns the concrete source manager managing loaded source files.
      */
     class SourceManager *getSourceManager() const;
 
     /**
-     * Returns the symbol table.
+     * Returns the symbol table holding declared types, opcodes, registers, and rules.
      */
     class SymbolTable *getSymTable() const;
 

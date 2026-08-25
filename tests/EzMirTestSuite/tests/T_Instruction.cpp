@@ -7,6 +7,9 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Test fixture for MIR instruction building, opcode assignments, and operand bindings.
+ */
 class InstrTest : public MirTestSuiteAsGtest
 {
   public:
@@ -16,6 +19,9 @@ class InstrTest : public MirTestSuiteAsGtest
 namespace
 {
 
+/**
+ * Custom GoogleTest assertion verifying that an instruction has the expected opcode and operand count.
+ */
 ::testing::AssertionResult
 IsInstruction(MirInstruction *instr, MirInstructionOpCode expectedOpcode, size_t expectedOperandCount)
 {
@@ -33,6 +39,9 @@ IsInstruction(MirInstruction *instr, MirInstructionOpCode expectedOpcode, size_t
     return ::testing::AssertionSuccess();
 }
 
+/**
+ * Custom GoogleTest assertion verifying that an operand is a virtual register of the expected MIR type.
+ */
 ::testing::AssertionResult IsVirtualRegister(MirOperand *operand, MirType *expectedType)
 {
     if (!operand)
@@ -55,6 +64,10 @@ IsInstruction(MirInstruction *instr, MirInstructionOpCode expectedOpcode, size_t
 }
 } // anonymous namespace
 
+/**
+ * Verifies basic instruction generation by constructing an ADD instruction with two virtual registers
+ * (i8 destination and i16 source) at the test insertion point.
+ */
 TEST_F(InstrTest, SimpleBuild)
 {
     MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
