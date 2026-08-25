@@ -1,6 +1,5 @@
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
-#include "Class/MirClass.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
@@ -15,7 +14,7 @@ MirBuilderContext::MirBuilderContext(CallingConvDesc *defaultCallingConv,
                                      std::pmr::monotonic_buffer_resource *globalArena) :
     m_defaultCallingConv(defaultCallingConv), m_diagCollector(diagCollector), m_currentId(1), m_typeTable(typeTable),
     m_globalResource(globalArena), m_functions(m_globalResource), m_blockIdToBlock(m_globalResource),
-    m_classIdToClass(m_globalResource), m_functionIdToFunc(m_globalResource), m_globalVarIdToGVar(m_globalResource)
+    m_functionIdToFunc(m_globalResource), m_globalVarIdToGVar(m_globalResource)
 
 {
 }
@@ -37,30 +36,6 @@ bool MirBuilderContext::appendBlock(MirBlock *block)
 
     m_diagCollector->trace("MirBuilderContext", "Appended block with id: {}", block->getId());
     m_blockIdToBlock.insert({ block->getId(), block });
-
-    return true;
-}
-
-bool MirBuilderContext::appendClass(MirClass *_class)
-{
-    if (!_class)
-    {
-        m_diagCollector->error("MirBuilderContext", "Could not append class because it is invalid");
-        return false;
-    }
-
-    auto it = m_classIdToClass.find(_class->getId());
-    if (it != m_classIdToClass.end())
-    {
-        m_diagCollector->error("MirBuilderContext", "Could not append class because it was already appended");
-        return false;
-    }
-
-    m_diagCollector->trace("MirBuilderContext", "Appended class with id: {}", _class->getId());
-
-    m_typeIdToClass.insert({ _class->getType()->getId(), _class });
-    m_classIdToClass.insert({ _class->getId(), _class });
-    m_classes.push_back(_class);
 
     return true;
 }
@@ -151,28 +126,6 @@ MirBlock *MirBuilderContext::getBlockById(MirId id) const
     return nullptr;
 }
 
-MirClass *MirBuilderContext::getClassById(MirId id) const
-{
-    auto it = m_classIdToClass.find(id);
-    if (it != m_classIdToClass.end())
-    {
-        return it->second;
-    }
-
-    return nullptr;
-}
-
-MirClass *MirBuilderContext::getClassByTypeId(MirId id) const
-{
-    auto it = m_typeIdToClass.find(id);
-    if (it != m_typeIdToClass.end())
-    {
-        return it->second;
-    }
-
-    return nullptr;
-}
-
 MirFunction *MirBuilderContext::getFuncById(MirId id) const
 {
     auto it = m_functionIdToFunc.find(id);
@@ -215,8 +168,6 @@ void MirBuilderContext::setDefaultCallingConvention(CallingConvDesc *defaultCall
 }
 
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
-
-std::pmr::list<MirClass *> &MirBuilderContext::getClasses() { return m_classes; }
 
 std::pmr::list<MirFunction *> &MirBuilderContext::getFunctions() { return m_functions; }
 

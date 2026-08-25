@@ -40,10 +40,6 @@ std::string MirReference::toString() const
             return std::format("{} @global_{}", typePrefix, m_refId);
         case MirReferenceType::Function:
             return std::format("{}() @func_{}", typePrefix, m_refId);
-        case MirReferenceType::ClassField:
-            return std::format("{} %v{}.field_{}", typePrefix, m_refId, m_offset);
-        case MirReferenceType::ClassMethod:
-            return std::format("{} %v{}.method_{}", typePrefix, m_refId, m_offset);
         case MirReferenceType::StackFrameObject:
             return std::format("{} %stack[{}]", typePrefix, m_refId);
         default:

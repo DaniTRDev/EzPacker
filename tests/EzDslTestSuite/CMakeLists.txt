@@ -12,6 +12,13 @@ EzCMK_ConfigureLib(NAME "EzDslTestSuite"
 )
 
 EzPacker_AddTest(
+        "T_CallingConvDefLang"
+        "EzDslTestSuite"
+        ""
+        "tests/T_CallingConvDefLang.cpp"
+)
+
+EzPacker_AddTest(
         "T_EzDslCli_GenMirInstruction"
         "EzDslTestSuite"
         ""

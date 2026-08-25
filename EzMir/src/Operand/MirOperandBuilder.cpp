@@ -1,6 +1,5 @@
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
-#include "Class/MirClass.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionStackFrame.h"
@@ -149,7 +148,7 @@ MirRegister *MirOperandBuilder::buildPhysReg(
 MirReference *MirOperandBuilder::buildRef(MirBlock *block, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();
-    MirType *ptr = t->getPtr(t->getVoidType());
+    MirType *ptr = t->getPtr(t->_void());
 
     return build<MirReference>(ptr, MirReferenceType::Block, block->getId(), 0, ref);
 }
@@ -170,22 +169,6 @@ MirReference *MirOperandBuilder::buildRef(MirGlobalVar *var, size_t offset, Sour
     return build<MirReference>(ptr, MirReferenceType::GlobalVar, var->getId(), offset, ref);
 }
 
-MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassField *field, SourceReference *ref)
-{
-    MirTypeTable *t = m_ctx->getTypeTable();
-    MirType *fieldPtrType = t->getPtr(field->m_type);
-
-    return build<MirReference>(fieldPtrType, MirReferenceType::ClassField, classPtr->getRegId(), field->m_id, ref);
-}
-
-MirReference *MirOperandBuilder::buildRef(MirRegister *classPtr, MirClassMethod *method, SourceReference *ref)
-{
-    MirTypeTable *t = m_ctx->getTypeTable();
-    MirType *fieldPtrType = t->getPtr(method->m_func->getReturnType());
-
-    return build<MirReference>(fieldPtrType, MirReferenceType::ClassMethod, classPtr->getRegId(), method->m_id, ref);
-}
-
 MirReference *MirOperandBuilder::buildRef(StackFrameObject *obj, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();
@@ -197,7 +180,7 @@ MirReference *MirOperandBuilder::buildRef(StackFrameObject *obj, SourceReference
 MirRuntimeSymbol *MirOperandBuilder::buildRtSymbol(std::pmr::string symbolName, SourceReference *ref)
 {
     MirTypeTable *t = m_ctx->getTypeTable();
-    MirType *ptr = t->getPtr(t->getVoidType());
+    MirType *ptr = t->getPtr(t->_void());
 
     return build<MirRuntimeSymbol>(ptr, std::move(symbolName), ref);
 }

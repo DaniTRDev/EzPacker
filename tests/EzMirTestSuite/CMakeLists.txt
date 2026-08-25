@@ -23,20 +23,6 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
-        "T_Class"
-        "EzMirTestSuite"
-        ""
-        "tests/T_Class.cpp"
-)
-
-EzPacker_AddTest(
-        "T_ClassOffsetResolver"
-        "EzMirTestSuite"
-        ""
-        "tests/T_ClassOffsetResolver.cpp"
-)
-
-EzPacker_AddTest(
         "T_CodeFlowPass"
         "EzMirTestSuite"
         ""
@@ -83,11 +69,4 @@ EzPacker_AddTest(
         "EzMirTestSuite"
         ""
         "tests/T_Operand.cpp"
-)
-
-EzPacker_AddTest(
-        "T_RelativeReferenceLowerer"
-        "EzMirTestSuite"
-        ""
-        "tests/T_RelativeReferenceLowerer.cpp"
 )

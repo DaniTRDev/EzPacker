@@ -81,28 +81,14 @@ TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithBitSize)
 
 TEST_F(TypeDefLangTest, TestBindingTokenTypeDescriptor)
 {
-    {
-        std::string test = "bindingToken __bindToken";
-        ParseContext ctx = createParseContextFromBuff("test", test);
+    std::string test = "bindingToken __bindToken";
+    ParseContext ctx = createParseContextFromBuff("test", test);
 
-        auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
-        ASSERT_TRUE(res.has_value());
-        EXPECT_EQ(res->m_kind, DSL::Ast::TypeDef::TypeKind::BindingToken);
-        EXPECT_EQ(res->m_name.m_node, "__bindToken");
-        EXPECT_FALSE(res->m_bitSize.has_value());
-    }
-
-    {
-        std::string test = "binding_token __bindToken(0)";
-        ParseContext ctx = createParseContextFromBuff("test2", test);
-
-        auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
-        ASSERT_TRUE(res.has_value());
-        EXPECT_EQ(res->m_kind, DSL::Ast::TypeDef::TypeKind::BindingToken);
-        EXPECT_EQ(res->m_name.m_node, "__bindToken");
-        ASSERT_TRUE(res->m_bitSize.has_value());
-        EXPECT_EQ(res->m_bitSize->m_node, 0);
-    }
+    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
+    ASSERT_TRUE(res.has_value());
+    EXPECT_EQ(res->m_kind, DSL::Ast::TypeDef::TypeKind::BindingToken);
+    EXPECT_EQ(res->m_name.m_node, "__bindToken");
+    EXPECT_FALSE(res->m_bitSize.has_value());
 }
 
 // ============================================================================

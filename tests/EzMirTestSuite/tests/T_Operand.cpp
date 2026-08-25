@@ -1,7 +1,5 @@
 #include "EzMirTestSuite.h"
 #include "Block/MirBlock.h"
-#include "Class/MirClass.h"
-#include "Class/MirClassBuilder.h"
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
 #include "Instruction/MirInstruction.h"
@@ -218,7 +216,7 @@ TEST_F(OperandTest, Reference)
     MirType *funcType = getTestFunc()->getType();
 
     MirOperand *blockRef = builder.buildRef(getTestFunc()->getEntryPoint());
-    EXPECT_TRUE(IsReference(blockRef, types->getPtr(types->getVoidType()), MirReferenceType::Block));
+    EXPECT_TRUE(IsReference(blockRef, types->getPtr(types->_void()), MirReferenceType::Block));
 
     MirOperand *funcRef = builder.buildRef(getTestFunc());
     EXPECT_TRUE(IsReference(funcRef, types->getPtr(funcType), MirReferenceType::Function));

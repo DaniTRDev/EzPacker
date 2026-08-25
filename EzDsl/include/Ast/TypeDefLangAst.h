@@ -12,7 +12,8 @@ enum class TypeKind : uint8_t
     Integer,
     FloatingPoint,
     Void,
-    BindingToken
+    BindingToken,
+    Pointer
 };
 
 /**
@@ -21,6 +22,7 @@ enum class TypeKind : uint8_t
  * - float f32(32);
  * - void void; or void void(0);
  * - bindingToken __bindToken;
+ * - pointer ptr
  */
 struct TypeDescriptor
 {

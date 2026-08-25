@@ -24,11 +24,6 @@ class MirBuilderContext
     bool appendBlock(class MirBlock *block);
 
     /**
-     * Appends the class to the context. Returns true if succeeded.
-     */
-    bool appendClass(class MirClass *_class);
-
-    /**
      * Appends the function to the context. Returns true if succeeded.
      */
     bool appendFunction(class MirFunction *func);
@@ -58,18 +53,6 @@ class MirBuilderContext
      * ID is not found.
      */
     class MirBlock *getBlockById(MirId id) const;
-
-    /**
-     * Searches in the context for the given class ID and returns a pointer to it, if exists. Returns nullptr if the ID
-     * is not found.
-     */
-    class MirClass *getClassById(MirId id) const;
-
-    /**
-     * Searches in the context for the given type ID and returns the class linked to it, if exists. Returns nullptr if
-     * the ID is not found.
-     */
-    class MirClass *getClassByTypeId(MirId id) const;
 
     /**
      * Searches in the context for the given function ID and returns a pointer to the function, if exists. Returns
@@ -109,11 +92,6 @@ class MirBuilderContext
     std::pmr::monotonic_buffer_resource *getGlobalAllocator();
 
     /**
-     * Returns the MUTABLE classes list that were built using this context. Used internally by the pass manager.
-     */
-    std::pmr::list<class MirClass *> &getClasses();
-
-    /**
      * Returns the MUTABLE function list that were built in this context. Used internally by the pass manager.
      */
     std::pmr::list<class MirFunction *> &getFunctions();
@@ -132,12 +110,10 @@ class MirBuilderContext
     // Pools.
     std::pmr::monotonic_buffer_resource *m_globalResource;
 
-    std::pmr::list<class MirClass *> m_classes;        // Used to quickly iterate over defined classes.
     std::pmr::list<class MirFunction *> m_functions;   // Used to quickly iterate over defined functions.
     std::pmr::list<class MirGlobalVar *> m_globalVars; // Used to quickly iterate over defined global variables.
 
     std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
-    std::pmr::map<MirId, class MirClass *> m_classIdToClass;          // Used to search for classes.
     std::pmr::map<MirId, class MirClass *> m_typeIdToClass;           // Used to search for classes using their type.
     std::pmr::map<MirId, class MirFunction *> m_functionIdToFunc;     // Used to search for functions.
     std::pmr::map<MirId, class MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.

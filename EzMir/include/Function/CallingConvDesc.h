@@ -5,6 +5,22 @@
 #include "ArgumentLocationDesc.h"
 
 /**
+ * This enum is used to know which class a type has. It makes easier coercing types used for aggregate
+ * returning-passing: SysV -> MEMORY > INTEGER > FLOAT. struct { int a (INTEGER); float b; (FLOAT) } -> the resulting
+ * type class IS INTEGER with a total size on 8 bytes, making it be returned/passed a single GPR64.
+ */
+enum class CallingConvTypeClass : uint8_t
+{
+    Integer = 0,
+    Float,
+    Memory,
+    Hfa,  // For aggregates that contains elements of the same type: struct { float a; float b; float c; float d;} ->
+          // return in a vec register.
+    ByRef // For types bigger thank X bytes in stack, copy the original content there and pass the new pointer to the
+          // callee.
+};
+
+/**
  * Class used as a book to know where function arguments and returns should be placed. Since this information CAN'T be
  * known statically, its methods also need a "CallLoweringState" pointer.
  *
@@ -80,6 +96,12 @@ class CallingConvDesc
      * Returns true if frame pointers (RBP/FP) are required for the given function.
      */
     virtual bool hasFramePointer(class MirFunction *func) const = 0;
+
+    /**
+     * Classifies the given type in any of the calling convention classes. If an aggregate is given, more than 1 type is
+     * returned.
+     */
+    virtual void classify(MirType *type, std::pmr::vector<CallingConvTypeClass> &out) const = 0;
 
     /**
      * Returns EVERY register that must be preserved by the callee.

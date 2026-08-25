@@ -72,7 +72,7 @@ struct IndirectLoc
     bool m_copyOnReg; // Should the return ptr be copied into the return register?
     size_t m_size;
 
-    // The pointer to the data is either in a register OR sitting on the incoming stack slot area
+    // The pointer to the data is either in a register.
     MirRegisterRef m_pointerStorage;
 };
 

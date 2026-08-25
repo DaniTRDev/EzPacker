@@ -1,5 +1,4 @@
 #include "Block/MirBlock.h"
-#include "Class/MirClass.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Instruction/MirInstructionSet.h"
@@ -41,78 +40,6 @@ std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
         }
     }
 
-    return result;
-}
-
-std::string MirPrinter::printToString(MirClass *_class, MirPrinterDetail detail)
-{
-    if (!_class)
-        return "";
-
-    std::string result = std::format("\n{:=^60}\n", " Class Dump ");
-
-    std::string parentInfo;
-    if (_class->getParentClass() != nullptr)
-    {
-        parentInfo = std::format(" : {}", _class->getParentClass()->getName());
-    }
-
-    result += std::format("class {}{} [size: {} bytes]\n",
-                          _class->getName(),
-                          parentInfo,
-                          _class->getType()->getTotalSizeInBytes());
-
-    result += "  Fields:\n";
-    if (_class->getFields().empty())
-    {
-        result += "    <none>\n";
-    }
-    else
-    {
-        for (const auto &field : _class->getFields())
-        {
-            result += std::format("    +0x{:02X}: {} {}\n", field->m_offset, field->m_type->getName(), field->m_name);
-        }
-    }
-
-    result += "  VTable:\n";
-    const auto &vTable = _class->getVTable();
-    if (vTable.empty())
-    {
-        result += "    <empty>\n";
-    }
-    else
-    {
-        for (size_t i = 0; i < vTable.size(); ++i)
-        {
-            MirFunction *func = vTable[i]->m_func;
-
-            if (detail == MirPrinterDetail::Detailed)
-            {
-                std::string paramsStr;
-                bool firstParam = true;
-                for (auto *param : func->getParameters())
-                {
-                    if (!firstParam)
-                        paramsStr += ", ";
-                    paramsStr += param->getMirType()->getName();
-                    firstParam = false;
-                }
-                result += std::format("    [{:>2}] {} {}::{}({})\n",
-                                      i,
-                                      func->getReturnType()->getName(),
-                                      _class->getName(),
-                                      func->getName(),
-                                      paramsStr);
-            }
-            else
-            {
-                result += std::format("    [{:>2}] {}::{}\n", i, _class->getName(), func->getName());
-            }
-        }
-    }
-
-    result += std::format("{:=^60}\n", " End Class Dump ");
     return result;
 }
 

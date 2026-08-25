@@ -20,6 +20,8 @@ class EzMirTestSuiteCallingConv : public CallingConvDesc
     bool canReturnInRegs(MirType *type) const override;
     bool isCalleeCleanup() const override { return false; } // Caller clean-up
     bool doesStackGrowsDownwards() const override { return true; }
+    bool hasFramePointer(class MirFunction *func) const override;
+
     const char *getName() const override { return "EzMirTestSuiteCallingConv"; }
 
     MirRegisterRef getFramePointerReg() const override;
@@ -28,7 +30,7 @@ class EzMirTestSuiteCallingConv : public CallingConvDesc
     size_t getStackAlignment() const override { return 16; }
     size_t getShadowSpaceSize() const override { return 0; }
 
-    bool hasFramePointer(class MirFunction *func) const override;
+    void classify(MirType *type, std::pmr::vector<CallingConvTypeClass> &out) const {}
 
     const std::pmr::vector<MirRegisterRef> &getAllCalleeSavedRegs() override;
     const std::pmr::vector<MirRegisterRef> &getCalleeSavedRegs(MirRegisterClass *_class) override;

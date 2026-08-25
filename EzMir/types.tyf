@@ -3,8 +3,9 @@
 // ============================================================================
 
 // Special & Control Types
-void void;
+void _void;
 bindingToken __bindToken;
+pointer ptr;
 
 // Scalar Integers
 integer i1(1);

@@ -122,6 +122,22 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
                 resolvedBitWidth = 0;
                 break;
             }
+            case DSL::Ast::TypeDef::TypeKind::Pointer:
+            {
+                if (type.m_bitSize.has_value())
+                {
+                    if (type.m_bitSize->m_node != 0)
+                    {
+                        collector->error(passName, "Pointer type '{}' cannot have a non-zero bit size.", typeName)
+                                << type.m_bitSize->m_sourceRef;
+                        hasErrors = true;
+                        continue;
+                    }
+                }
+
+                resolvedBitWidth = 0;
+                break;
+            }
         }
 
         // 2. Declare and register the type symbol

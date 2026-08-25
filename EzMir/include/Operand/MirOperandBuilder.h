@@ -85,18 +85,6 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     class MirReference *buildRef(class MirGlobalVar *var, size_t offset, class SourceReference *ref = nullptr);
 
     /**
-     * Creates a reference to the given class field.
-     */
-    class MirReference *
-    buildRef(class MirRegister *classPtr, class MirClassField *field, class SourceReference *ref = nullptr);
-
-    /**
-     * Creates a reference to the given class method.
-     */
-    class MirReference *
-    buildRef(class MirRegister *classPtr, class MirClassMethod *method, class SourceReference *ref = nullptr);
-
-    /**
      * Creates a reference to the given stack frame object.
      */
     class MirReference *buildRef(class StackFrameObject *obj, class SourceReference *ref = nullptr);

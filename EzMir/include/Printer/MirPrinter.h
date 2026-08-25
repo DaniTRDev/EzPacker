@@ -20,13 +20,6 @@ class MirPrinter
     static std::string printToString(class MirBlock *block, MirPrinterDetail detail);
 
     /**
-     * Prints all the information about a class, including its parent type (if any).
-     * If detail is set to General, method names and field will be printed.
-     * If detail is set to Detailed, method signatures and fields will be printed.
-     */
-    static std::string printToString(class MirClass *_class, MirPrinterDetail detail);
-
-    /**
      * Prints all the information about a function, including the stack frame, parameters, blocks and instructions.
      * If detail is set to General, only the header, param count, stack frame obj count and block count will be printed.
      * If detail is set to Detailed, the entire function will be printed including blocks and instructions inside

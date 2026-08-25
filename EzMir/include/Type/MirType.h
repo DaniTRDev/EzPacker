@@ -6,7 +6,6 @@
 enum class MirTypeKind : uint8_t
 {
     Invalid = 0,
-    Class,
     Integer,
     FloatingPoint,
     Function,
@@ -27,7 +26,8 @@ class MirType
 {
   public:
     /**
-     * Constructs a MIR type descriptor.
+     * Constructs a MIR type descriptor. If this type is trivial it means it can be copied/moved without caring. If it's
+     * not trivial it means the destruction of the type needs to perform a sequence of actions.
      */
     MirType(MirTypeKind kind,
             class MirTypeTable *owner,
@@ -35,7 +35,18 @@ class MirType
             size_t maxAlignmentInBytes,
             size_t totalSizeInBits,
             std::pmr::string name,
-            std::pmr::vector<MirType *> subTypes);
+            std::pmr::vector<MirType *> subTypes,
+            bool isTrivial = true);
+
+    /**
+     * Returns true if this is a trivial type.
+     */
+    bool isTrivial() const;
+
+    /**
+     * Returns true if the type is not aligned (align = 0)
+     */
+    bool isUnAligned() const;
 
     /**
      * Returns the array element type if this type is an array, nullptr if not.
@@ -83,6 +94,11 @@ class MirType
     size_t getTotalSizeInBytes() const;
 
     /**
+     * Sets this type as nontrivial.
+     */
+    void setNonTrivial();
+
+    /**
      * Returns the human-readable name associated with this type.
      *
      * This name is informational; identity is determined by `getId()`.
@@ -95,6 +111,7 @@ class MirType
     const std::pmr::vector<MirType *> &getSubTypes() const;
 
   private:
+    bool m_isTrivial;
     MirTypeKind m_kind; // High-level classification of the type.
     class MirTypeTable *m_owner;
     size_t m_id;                            // Unique MIR identifier for this type.

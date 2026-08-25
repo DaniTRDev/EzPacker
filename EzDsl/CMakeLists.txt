@@ -1,5 +1,6 @@
 set(EZDSL_FILES_LIST
         "include/EzDslCommon.h"
+        "include/Ast/CallingConvDefLangAst.h"
         "include/Ast/CommonAstNodes.h"
         "include/Ast/InstructionDefLangAst.h"
         "include/Ast/InstructionSelDefLangAst.h"

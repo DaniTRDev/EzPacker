@@ -41,17 +41,6 @@ size_t EzMirTestSuiteTypeLayout::getTypeAlignmentInBytes(const MirType *type) co
             }
             return 1;
 
-        case MirTypeKind::Class:
-        {
-            // Struct alignment is equal to the largest alignment requirement among its members
-            size_t maxAlign = 1;
-            for (const auto *memberType : type->getSubTypes())
-            {
-                maxAlign = std::max(maxAlign, getTypeAlignmentInBytes(memberType));
-            }
-            return maxAlign;
-        }
-
         default:
             return 1;
     }
@@ -95,13 +84,6 @@ size_t EzMirTestSuiteTypeLayout::getTypeSizeInBytes(const MirType *type) const
                 }
             }
             return 0;
-        }
-
-        case MirTypeKind::Class:
-        {
-            // If it's a pre-constructed struct, return its already padded size.
-            // Our MirTypeTable::getClass handles this padding logic upon creation.
-            return (type->getTotalSizeInBits() + 7) / 8;
         }
 
         default:

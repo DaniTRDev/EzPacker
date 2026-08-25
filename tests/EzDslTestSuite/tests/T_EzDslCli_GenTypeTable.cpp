@@ -52,12 +52,13 @@ class MirTypeTableGeneratorTest : public DslTestSuiteAsGtest
 TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderAndSourceWithValidTypes)
 {
     std::string dslContent = R"(
-        void void;
+        void _void;
         bindingToken __bindToken;
         integer i8(8);
         integer i32(32);
         float f32(32);
         float f64(64);
+        pointer ptr;
     )";
 
     // 1. Parse .tyf DSL
@@ -89,7 +90,7 @@ TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderAndSourceWithValidTypes)
     std::string sourceContent = readFile(sourcePath);
 
     // Verify Header method declarations
-    EXPECT_NE(headerContent.find("MirType *getVoidType();"), std::string::npos);
+    EXPECT_NE(headerContent.find("MirType *_void();"), std::string::npos);
     EXPECT_NE(headerContent.find("MirType *i8();"), std::string::npos);
     EXPECT_NE(headerContent.find("MirType *i32();"), std::string::npos);
     EXPECT_NE(headerContent.find("MirType *f32();"), std::string::npos);
@@ -105,7 +106,7 @@ TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderAndSourceWithValidTypes)
     EXPECT_NE(sourceContent.find("MirType *MirTypeTable::f64() { return m_f64Type; }"), std::string::npos);
 
     // Verify initialize() instantiation calls
-    EXPECT_NE(sourceContent.find("m_voidType = create(MirTypeKind::Void, 0, {}, \"void\");"), std::string::npos);
+    EXPECT_NE(sourceContent.find("m__voidType = create(MirTypeKind::Void, 0, {}, \"_void\");"), std::string::npos);
     EXPECT_NE(sourceContent.find("m_i8Type = create(MirTypeKind::Integer, 8, {}, \"i8\");"), std::string::npos);
     EXPECT_NE(sourceContent.find("m_i32Type = create(MirTypeKind::Integer, 32, {}, \"i32\");"), std::string::npos);
     EXPECT_NE(sourceContent.find("m_f32Type = create(MirTypeKind::FloatingPoint, 32, {}, \"f32\");"),

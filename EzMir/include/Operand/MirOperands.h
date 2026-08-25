@@ -16,8 +16,6 @@ enum class MirReferenceType : uint8_t
 {
     Invalid = 0,
     Block,           // A reference to a code block.
-    ClassField,      // A reference to the field of a class.
-    ClassMethod,     // A reference to a method of a class.
     Function,        // A reference to a function.
     GlobalVar,       // A reference to a global variable.
     StackFrameObject // A reference to a stack frame object.
@@ -77,8 +75,6 @@ class MirReference : public MirOperand
     bool isBlock() const { return m_refType == MirReferenceType::Block; }
     bool isGlobalVar() const { return m_refType == MirReferenceType::GlobalVar; }
     bool isFunction() const { return m_refType == MirReferenceType::Function; }
-    bool isClassField() const { return m_refType == MirReferenceType::ClassField; }
-    bool isClassMethod() const { return m_refType == MirReferenceType::ClassMethod; }
     bool isStackFrameObject() const { return m_refType == MirReferenceType::StackFrameObject; }
     bool isInvalid() const { return m_refType == MirReferenceType::Invalid; }
 

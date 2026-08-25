@@ -14,7 +14,6 @@ enum class MirPassIterationPlace : uint8_t
     Function,       // The pass runs on each function.
     Block,          // The pass runs on each block.
     Instruction,    // The pass runs on each instruction.
-    Class,          // The pass runs on each class defined.
     GlobalVariable, // The pass runs on each global var defined.
 };
 
@@ -64,12 +63,6 @@ class MirPass
     {
         return {};
     }
-
-    /**
-     * Runs the pass on the given MIR class. In this case the list/iterator is not needed as passes will only modify
-     * things around the given classes.
-     */
-    virtual MirPassResult run(class MirClass *_class, MirPassManager *passManager) { return {}; }
 
     /**
      * Runs the pass on the given global variable. In this case the list/iterator is not needed as passes will only

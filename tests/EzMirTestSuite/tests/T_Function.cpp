@@ -91,7 +91,7 @@ TEST_F(FunctionTest, TestFuncNoParameters)
     MirFunction *func = getTestFunc();
 
     // The default test function is named "TEST" and returns void
-    EXPECT_TRUE(FuncSignature(func, ctx->getTypeTable()->getVoidType(), 0, 0, "TEST"));
+    EXPECT_TRUE(FuncSignature(func, ctx->getTypeTable()->_void(), 0, 0, "TEST"));
 }
 
 TEST_F(FunctionTest, TestFunc1Parameter)

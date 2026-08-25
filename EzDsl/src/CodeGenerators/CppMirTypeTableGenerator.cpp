@@ -9,53 +9,29 @@ namespace CodeGenerators
 
 namespace
 {
-
-enum class DeducedTypeKind
-{
-    Void,
-    Integer,
-    FloatingPoint,
-    BindingToken
-};
-
 struct GeneratedTypeEntry
 {
     std::string m_name;
     uint32_t m_bitWidth{ 0 };
-    DeducedTypeKind m_kind{ DeducedTypeKind::Integer };
+    DSL::Ast::TypeDef::TypeKind m_kind{ DSL::Ast::TypeDef::TypeKind::Integer };
     std::string m_fieldName;
     std::string m_getterName;
 };
 
-DeducedTypeKind DeduceTypeKind(std::string_view name)
-{
-    if (name == "void")
-    {
-        return DeducedTypeKind::Void;
-    }
-    if (name == "__bindToken" || name == "bindingToken")
-    {
-        return DeducedTypeKind::BindingToken;
-    }
-    if (name.starts_with('f') || name.find("float") != std::string_view::npos)
-    {
-        return DeducedTypeKind::FloatingPoint;
-    }
-    return DeducedTypeKind::Integer;
-}
-
-std::string KindToEnumString(DeducedTypeKind kind)
+std::string KindToEnumString(DSL::Ast::TypeDef::TypeKind kind)
 {
     switch (kind)
     {
-        case DeducedTypeKind::Void:
+        case DSL::Ast::TypeDef::TypeKind::Void:
             return "MirTypeKind::Void";
-        case DeducedTypeKind::Integer:
+        case DSL::Ast::TypeDef::TypeKind::Integer:
             return "MirTypeKind::Integer";
-        case DeducedTypeKind::FloatingPoint:
+        case DSL::Ast::TypeDef::TypeKind::FloatingPoint:
             return "MirTypeKind::FloatingPoint";
-        case DeducedTypeKind::BindingToken:
+        case DSL::Ast::TypeDef::TypeKind::BindingToken:
             return "MirTypeKind::BindingToken";
+        case DSL::Ast::TypeDef::TypeKind::Pointer:
+            return "MirTypeKind::Pointer";
     }
     return "MirTypeKind::Integer";
 }
@@ -125,17 +101,6 @@ class MirTypeTable
                     const std::string_view &name);
 
     /**
-     * Returns a type that is only used to bind things, see more at MirTypeKind.
-     */
-    MirType *getBindingToken() const;
-
-    /**
-     * Creates a class type (if it does not exist). Returns the existing type if it was already created or nullptr if
-     * there was any error.
-     */
-    MirType *getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &name);
-
-    /**
      * Creates a function type with the given parameters. This function will CREATE only if it wasn't added before, if
      * it was the existing type is returned.
      */
@@ -169,15 +134,13 @@ class MirTypeTable
     MirType *getMirTypeById(size_t id) const;
 
     // --- Built-in & Generated Type Accessors ---
-    MirType *getVoidType();
 )";
 
     for (const auto &type : types)
     {
-        if (type.m_kind == DeducedTypeKind::Void || type.m_kind == DeducedTypeKind::BindingToken)
-        {
+        if (type.m_kind == DSL::Ast::TypeDef::TypeKind::Pointer)
             continue;
-        }
+
         out << std::format("    MirType *{}();\n", type.m_getterName);
     }
 
@@ -191,18 +154,14 @@ class MirTypeTable
     class IMirTargetTypeLayout *m_typeLayout{ nullptr };
     size_t m_currentId{ 0 };
 
-    MirType *m_bindingToken{ nullptr };
-    MirType *m_voidType{ nullptr };
-
     // Built-in & Generated Primitives
 )";
 
     for (const auto &type : types)
     {
-        if (type.m_kind == DeducedTypeKind::Void || type.m_kind == DeducedTypeKind::BindingToken)
-        {
+        if (type.m_kind == DSL::Ast::TypeDef::TypeKind::Pointer)
             continue;
-        }
+
         out << std::format("    MirType *{}{{ nullptr }};\n", type.m_fieldName);
     }
 
@@ -280,69 +239,6 @@ MirType *MirTypeTable::create(MirTypeKind kind,
     m_idToType[assignedId] = uniqueType;
 
     return uniqueType;
-}
-
-MirType *MirTypeTable::getBindingToken() const { return m_bindingToken; }
-
-MirType *MirTypeTable::getClass(const std::pmr::vector<MirType *> &fieldTypes, const std::string_view &structName)
-{
-    if (structName.empty())
-    {
-        return nullptr;
-    }
-
-    std::pmr::string lookupName(structName, m_arena);
-    auto it = m_typeNames.find(lookupName);
-    if (it != m_typeNames.end())
-    {
-        return it->second;
-    }
-
-    size_t currentOffsetInBytes = 0;
-    size_t maxAlignmentInBytes = 1;
-
-    for (const auto *fieldType : fieldTypes)
-    {
-        if (!fieldType)
-            continue;
-
-        size_t fieldAlignment = m_typeLayout->getTypeAlignmentInBytes(fieldType);
-        size_t fieldSize = m_typeLayout->getTypeSizeInBytes(fieldType);
-
-        if (fieldAlignment > maxAlignmentInBytes)
-        {
-            maxAlignmentInBytes = fieldAlignment;
-        }
-
-        if (currentOffsetInBytes % fieldAlignment != 0)
-        {
-            currentOffsetInBytes += (fieldAlignment - (currentOffsetInBytes % fieldAlignment));
-        }
-
-        currentOffsetInBytes += fieldSize;
-    }
-
-    if (currentOffsetInBytes % maxAlignmentInBytes != 0)
-    {
-        currentOffsetInBytes += (maxAlignmentInBytes - (currentOffsetInBytes % maxAlignmentInBytes));
-    }
-
-    size_t totalSizeInBits = currentOffsetInBytes * 8;
-
-    size_t assignedId = ++m_currentId;
-    std::pmr::polymorphic_allocator<MirType> alloc(m_arena);
-    MirType *newClassType = alloc.new_object<MirType>(MirTypeKind::Class,
-                                                      this,
-                                                      assignedId,
-                                                      maxAlignmentInBytes,
-                                                      totalSizeInBits,
-                                                      lookupName,
-                                                      std::move(fieldTypes));
-
-    m_typeNames[lookupName] = newClassType;
-    m_idToType[assignedId] = newClassType;
-
-    return newClassType;
 }
 
 MirType *MirTypeTable::getFuncType(MirType *returnType,
@@ -488,16 +384,13 @@ MirType *MirTypeTable::getMirTypeById(size_t id) const
     auto it = m_idToType.find(id);
     return (it != m_idToType.end()) ? it->second : nullptr;
 }
-
-MirType *MirTypeTable::getVoidType() { return m_voidType; }
 )code";
 
     for (const auto &type : types)
     {
-        if (type.m_kind == DeducedTypeKind::Void || type.m_kind == DeducedTypeKind::BindingToken)
-        {
+        if (type.m_kind == DSL::Ast::TypeDef::TypeKind::Pointer)
             continue;
-        }
+
         out << std::format("MirType *MirTypeTable::{}() {{ return {}; }}\n", type.m_getterName, type.m_fieldName);
     }
 
@@ -505,17 +398,13 @@ MirType *MirTypeTable::getVoidType() { return m_voidType; }
 void MirTypeTable::initialize(IMirTargetTypeLayout *typeLayout)
 {
     m_typeLayout = typeLayout;
-    m_voidType = create(MirTypeKind::Void, 0, {}, "void");
-    m_bindingToken = create(MirTypeKind::BindingToken, 0, std::pmr::vector<MirType *>{ m_arena }, "__bindToken");
-
 )";
 
     for (const auto &type : types)
     {
-        if (type.m_kind == DeducedTypeKind::Void || type.m_kind == DeducedTypeKind::BindingToken)
-        {
+        if (type.m_kind == DSL::Ast::TypeDef::TypeKind::Pointer)
             continue;
-        }
+
         out << std::format("    {} = create({}, {}, {{}}, \"{}\");\n",
                            type.m_fieldName,
                            KindToEnumString(type.m_kind),
@@ -565,13 +454,12 @@ bool GenerateMirTypeTable(DiagnosticCollector *collector,
         }
 
         std::string typeName(sym->getName());
-        DeducedTypeKind kind = DeduceTypeKind(typeName);
 
         collectedTypes.push_back(GeneratedTypeEntry{ .m_name = typeName,
                                                      .m_bitWidth = data->m_bitWidth,
-                                                     .m_kind = kind,
+                                                     .m_kind = data->m_kind,
                                                      .m_fieldName = std::format("m_{}Type", typeName),
-                                                     .m_getterName = (typeName == "void") ? "getVoidType" : typeName });
+                                                     .m_getterName = typeName });
     }
 
     // 2. Resolve destination file paths

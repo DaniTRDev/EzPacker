@@ -18,28 +18,11 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
     pass->reset(); // Resets pass' previous results.
 
     auto &functionList = ctx->getFunctions();
-    auto &classList = ctx->getClasses();
     auto &globalList = ctx->getGlobalVars();
     MirPassResult combinedResult{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 
     switch (pass->getIterationPlace())
     {
-        case MirPassIterationPlace::Class:
-        {
-            for (auto *cls : classList)
-            {
-                MirPassResult r = pass->run(cls, this);
-                combinedResult.m_modifiedMir |= r.m_modifiedMir;
-                if (!r.m_succeeded)
-                {
-                    combinedResult.m_succeeded = false;
-                    break;
-                }
-
-                invalidateAnalysis();
-            }
-            break;
-        }
         case MirPassIterationPlace::GlobalVariable:
         {
             for (auto *globalVar : globalList)
