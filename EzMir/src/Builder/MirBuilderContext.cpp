@@ -13,8 +13,8 @@ MirBuilderContext::MirBuilderContext(CallingConvDesc *defaultCallingConv,
                                      MirTypeTable *typeTable,
                                      std::pmr::monotonic_buffer_resource *globalArena) :
     m_defaultCallingConv(defaultCallingConv), m_diagCollector(diagCollector), m_currentId(1), m_typeTable(typeTable),
-    m_globalResource(globalArena), m_functions(m_globalResource), m_blockIdToBlock(m_globalResource),
-    m_functionIdToFunc(m_globalResource), m_globalVarIdToGVar(m_globalResource)
+    m_globalResource(globalArena), m_blockIdToBlock(m_globalResource), m_functionIdToFunc(m_globalResource),
+    m_globalVarIdToGVar(m_globalResource)
 
 {
 }
@@ -115,6 +115,8 @@ CallingConvDesc *MirBuilderContext::getDefaultCallingConvention() const { return
 
 DiagnosticCollector *MirBuilderContext::getDiagCollector() { return m_diagCollector; }
 
+IntrusiveLinkedList<MirFunction> &MirBuilderContext::getFunctions() { return m_functions; }
+
 MirBlock *MirBuilderContext::getBlockById(MirId id) const
 {
     auto it = m_blockIdToBlock.find(id);
@@ -168,7 +170,5 @@ void MirBuilderContext::setDefaultCallingConvention(CallingConvDesc *defaultCall
 }
 
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
-
-std::pmr::list<MirFunction *> &MirBuilderContext::getFunctions() { return m_functions; }
 
 std::pmr::list<MirGlobalVar *> &MirBuilderContext::getGlobalVars() { return m_globalVars; }

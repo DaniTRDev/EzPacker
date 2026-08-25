@@ -43,8 +43,8 @@ LivenessResult *LivenessAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace LivenessAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult LivenessAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
-                                        std::pmr::list<MirFunction *>::iterator it,
+MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction> &funcList,
+                                        IntrusiveLinkedList<MirFunction>::iterator it,
                                         class MirPassManager *passManager)
 {
     MirFunction *func = *it;
@@ -99,7 +99,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     std::vector<MirRegisterRef> regUniverse;
     std::unordered_map<MirRegisterRef, size_t> regToIdx;
 
-    for (auto &block : blocks)
+    for (auto block : blocks)
     {
         size_t blockId = block->getId();
         for (const auto &reg : m_result.m_def[blockId])
@@ -125,7 +125,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     std::unordered_map<size_t, DenseBitSet> liveInBits;
     std::unordered_map<size_t, DenseBitSet> liveOutBits;
 
-    for (auto &block : blocks)
+    for (auto block : blocks)
     {
         size_t blockId = block->getId();
         defBits.emplace(blockId, DenseBitSet(numBits));
@@ -182,7 +182,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     }
 
     // 4. Materialize final bitsets into m_result once
-    for (auto &block : blocks)
+    for (auto block : blocks)
     {
         size_t blockId = block->getId();
         auto &liveInSet = m_result.m_liveIn[blockId];
@@ -209,7 +209,7 @@ void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func)
     m_ctx->getDiagCollector()->trace(getName(),
                                      "Analyzing block-local variable generation rules (USE / DEF calculation)...");
 
-    for (auto &block : func->getBlocks())
+    for (auto block : func->getBlocks())
     {
         size_t blockId = block->getId();
         m_result.m_def[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);

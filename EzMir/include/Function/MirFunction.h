@@ -2,6 +2,7 @@
 #define EZMIR_MIR_FUNCTION_H
 
 #include "EzMirCommon.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
 
 /**
  * Structure that contains information that is filled by passes as the function flows in the compilation process.
@@ -34,9 +35,9 @@ class MirFunction
                 class MirType *type,
                 MirId id,
                 class SourceReference *sourceRef,
-                std::pmr::list<class MirBlock *> blocks,
                 std::pmr::list<class MirRegister *> parameters,
-                std::pmr::string name);
+                std::pmr::string name,
+                std::pmr::memory_resource *alloc);
 
     /**
      * Appends the given block into the function. If it's already present, false is returned.
@@ -49,6 +50,32 @@ class MirFunction
     class CallingConvDesc *getCallingConv() const;
 
     /**
+     * Returns the mutable list of blocks that belong to this function.
+     *
+     * The list always contains the entry point as its first block right after
+     * `MirBuilderContext::createFunction()` succeeds.
+     */
+    IntrusiveLinkedList<class MirBlock> &getBlocks();
+
+    /**
+     * Returns a pointer to the mutable list of blocks that belong to this function.
+     *
+     * The list always contains the entry point as its first block right after
+     * `MirBuilderContext::createFunction()` succeeds.
+     */
+    IntrusiveLinkedList<class MirBlock> *getBlocksPtr();
+
+    /**
+     * Returns an iterator pointing to the first element of the list.
+     */
+    IntrusiveLinkedList<class MirBlock>::iterator begin();
+
+    /**
+     * Returns an iterator pointing to the last element (INVALID) of the list.
+     */
+    IntrusiveLinkedList<class MirBlock>::iterator end();
+
+    /**
      * Returns the class MirBlock owned by this function that matches the given ID, if no case is found nullptr is
      * returned.
      */
@@ -58,6 +85,16 @@ class MirFunction
      * Returns the function entry block.
      */
     class MirBlock *getEntryPoint() const;
+
+    /**
+     * Returns the previous function.
+     */
+    MirFunction *getPrev() const;
+
+    /**
+     * Returns the next function.
+     */
+    MirFunction *getNext() const;
 
     /**
      * Returns the analysis data of this function.
@@ -112,20 +149,14 @@ class MirFunction
     void setEntryPoint(MirBlock *entryPoint);
 
     /**
-     * Returns the mutable list of blocks that belong to this function.
-     *
-     * The list always contains the entry point as its first block right after
-     * `MirBuilderContext::createFunction()` succeeds.
+     * Sets the next function.
      */
-    std::pmr::list<class MirBlock *> &getBlocks();
+    void setNext(MirFunction *next);
 
     /**
-     * Returns a pointer to the mutable list of blocks that belong to this function.
-     *
-     * The list always contains the entry point as its first block right after
-     * `MirBuilderContext::createFunction()` succeeds.
+     * Sets the previous function.
      */
-    std::pmr::list<class MirBlock *> *getBlocksPtr();
+    void setPrev(MirFunction *prev);
 
     /**
      * Returns the MUTABLE parameter list for this function.
@@ -149,6 +180,9 @@ class MirFunction
   private:
     class CallingConvDesc *m_callingConv;
     class MirBlock *m_entryPoint;
+    MirFunction *m_next{ nullptr };
+    MirFunction *m_prev{ nullptr };
+
     MirFunctionAnalysisData m_analysisData;
     class MirFunctionStackFrame *m_stackFrame;
     class MirType *m_returnType;
@@ -156,7 +190,7 @@ class MirFunction
     MirId m_id;
     class SourceReference *m_sourceRef;
 
-    std::pmr::list<class MirBlock *> m_blocks;
+    IntrusiveLinkedList<class MirBlock> m_blocks;
     std::pmr::list<class MirRegister *> m_parameters;
     std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock;
 

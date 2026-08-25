@@ -19,8 +19,8 @@ const char *NonSsaToSsaPass::getName() const { return "NonSsaToSsaPass"; }
 
 MirPassIterationPlace NonSsaToSsaPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult NonSsaToSsaPass::run(std::pmr::list<MirFunction *> &funcList,
-                                   std::pmr::list<MirFunction *>::iterator it,
+MirPassResult NonSsaToSsaPass::run(IntrusiveLinkedList<MirFunction> &funcList,
+                                   IntrusiveLinkedList<MirFunction>::iterator it,
                                    MirPassManager *passManager)
 {
     CodeFlowResult *cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();

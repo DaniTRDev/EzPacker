@@ -164,7 +164,7 @@ struct MirInstructionMetadata
     MirInstructionTier m_tier;
     MirInstructionFlags m_flags;
     std::string_view m_name;
-    std::vector<MirOperandMetadata> m_operandFlags;
+    std::vector<MirOperandMetadata> m_operandMeta;
 
     MirInstructionMetadata(MirInstructionCategory category,
                            MirInstructionOpCode opcode,
@@ -173,7 +173,7 @@ struct MirInstructionMetadata
                            std::string_view name,
                            std::initializer_list<MirOperandMetadata> operands) :
         m_category(category), m_opcode(opcode), m_tier(tier), m_flags(flag), m_name(std::move(name)),
-        m_operandFlags(operands)
+        m_operandMeta(operands)
     {
     }
 };

@@ -45,8 +45,8 @@ class LivenessAnalysisPass : public IMirAnalysisPass
     /**
      * Runs the pass and builds a the live in-out intervals of the variables used in a function.
      */
-    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
-                      std::pmr::list<class MirFunction *>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
+                      IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**

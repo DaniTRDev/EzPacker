@@ -6,6 +6,8 @@
 #include "Operand/MirOperand.h"
 #include "Operand/MirRegisterReference.h"
 
+#include <vector>
+
 class MirInstruction
 {
   public:
@@ -18,42 +20,47 @@ class MirInstruction
                             std::pmr::vector<class MirOperand *> operands);
 
     /**
-     * Returns true if the instruction's opcode is the one given.
+     * Returns true if the instruction's opcode matches the given opcode.
      */
     bool hasOpcode(MirInstructionOpCode opcode) const;
 
     /**
-     * Returns `true` when the instruction currently stores at least one
-     * operand in its operand list.
+     * Returns true when the instruction currently stores at least one operand.
      */
     bool hasOperands() const;
 
     /**
-     * Returns true if this instruction is selected: m_opcode == MirInstructionOpCode::TARGET_INST AND m_targetInstDesc
-     * != nullptr.
+     * Returns true if this instruction has been lowered to a target machine instruction.
      */
     bool isSelected() const;
 
     /**
-     * Returns `true` when the instruction's opcode is marked as signed in its metadata flags.
+     * Returns true when the instruction's opcode is marked as signed in its metadata flags.
      */
     bool isSigned() const;
 
     /**
-     * Returns the name of the opcode (using metadata).
+     * Returns the name of the opcode.
      */
     const char *getOpCodeName() const;
 
     /**
      * Returns the owner block of this instruction.
      */
-    class MirBlock *getOwner();
+    class MirBlock *getOwner() const;
+
+    /**
+     * Returns the previous instruction.
+     */
+    MirInstruction *getPrev() const;
+
+    /**
+     * Returns the next instruction.
+     */
+    MirInstruction *getNext() const;
 
     /**
      * Returns the metadata entry associated with this instruction's opcode.
-     *
-     * The metadata contains the printable opcode name, expected operand count,
-     * and instruction flags.
      */
     const MirInstructionMetadata &getMetadata() const;
 
@@ -73,31 +80,27 @@ class MirInstruction
     MirInstructionFlags getFlags() const;
 
     /**
-     * Returns the target description of the instruction. Will only contain a valid value after instruction selection
-     * pass.
+     * Returns the target instruction descriptor if lowered.
      */
     class MirTargetInstructionDesc *getTargetDesc() const;
 
     /**
-     * Returns a pointer to operand at given index. If there isn't an operand in that place, nullptr is returned. This
-     * operation TRIGGERS a cache invalidation.
+     * Returns a pointer to the operand at the given index, or nullptr if out of bounds.
      */
-    MirOperand *getOperand(size_t index);
+    MirOperand *getOperand(size_t index) const;
 
     /**
-     * Returns a constant pointer to the operand at given index. If there isn't an operand in that place, nullptr is
-     * returned. This operation DOES NOT trigger a cache invalidation.
+     * Returns a const pointer to the operand at the given index, or nullptr if out of bounds.
      */
-    const MirOperand *getConstOperand(size_t index);
+    const MirOperand *getConstOperand(size_t index) const;
 
     /**
-     * Returns the operand flag for the given operand distinguishing between a high level mir instruction and a target
-     * instruction.
+     * Returns the operand flag for the given index.
      */
     MirOperandFlag getOperandFlag(size_t index) const;
 
     /**
-     * Return the number of operands this instruction has.
+     * Returns the number of operands.
      */
     size_t getOperandCount() const;
 
@@ -107,74 +110,76 @@ class MirInstruction
     class SourceReference *getSourceRef() const;
 
     /**
-     * Returns a constant pointer to the operand in the given index. This DOES not trigger a cache invalidation.
+     * Returns a const pointer to the typed operand at the given index.
      */
     template <typename T>
-        requires(std::is_const<T>::value)
-    const T *getOpAs(size_t index)
+        requires(std::is_const_v<T>)
+    const T *getOpAs(size_t index) const
     {
         const MirOperand *op = getConstOperand(index);
-        return op->get<T>();
+        return op ? op->get<T>() : nullptr;
     }
 
     /**
-     * Returns a pointer to the operand in the given index. This DOES not trigger a cache invalidation.
+     * Returns a pointer to the typed operand at the given index.
      */
     template <typename T>
-        requires(!std::is_const<T>::value)
-    T *getOpAs(size_t index)
+        requires(!std::is_const_v<T>)
+    T *getOpAs(size_t index) const
     {
         MirOperand *op = getOperand(index);
-        return op->get<T>();
+        return op ? op->get<T>() : nullptr;
     }
 
     /**
-     * Adds an operand to the instruction. This invalidates cached defined and used registers.
+     * Adds an operand to the instruction.
      */
-    void addOperand(const MirOperand *operand);
+    void addOperand(MirOperand *operand);
 
     /**
-     * Invalidates cached uses and defs by setting the booleans to false.
-     */
-    void invalidateCachedUsedAndDefs();
-
-    /**
-     * Sets or switched the opcode of the instruction. This invalidates cached defined and used registers.
+     * Sets or switches the opcode of the instruction.
      */
     void setOpcode(MirInstructionOpCode opcode);
 
     /**
-     * Sets the target descriptor for the instruction. This invalidates cached defined and used registers.
+     * Sets the target descriptor for the lowered instruction.
      */
     void setTargetDesc(MirTargetInstructionDesc *desc);
 
     /**
-     * Replaces the operands of this instruction with the ones given. Also invalidates cached defined and used
-     * registers.
-     *
-     * Caller must ensure that the resource that allocated operands is alive when using this object.
+     * Replaces the operands of this instruction.
      */
     void setOperands(const std::pmr::vector<class MirOperand *> &operands);
 
     /**
-     * Returns the immutable operand slice for this instruction.
+     * Sets the previous instruction.
+     */
+    void setPrev(MirInstruction *prev);
+
+    /**
+     * Sets the next instruction.
+     */
+    void setNext(MirInstruction *next);
+
+    /**
+     * Returns the immutable operand slice.
      */
     const std::pmr::vector<class MirOperand *> &getOperands() const;
 
     /**
-     * Returns the mutable operand slice for this instruction. This will invalidate cached used and defined registers.
+     * Returns the mutable operand slice.
      */
     std::pmr::vector<class MirOperand *> &getOperands();
 
     /**
-     * Returns the registers defined (written) by this instruction.
+     * Computes and returns the registers defined (written) by this instruction on-the-fly.
      */
-    const std::pmr::vector<MirRegisterRef> &getDefinedRegisters();
+    std::vector<MirRegisterRef> getDefinedRegisters() const;
 
     /**
-     * Returns the registers used (read) by this instruction.
+     * Computes and returns the registers used (read) by this instruction on-the-fly.
      */
-    const std::pmr::vector<MirRegisterRef> &getUsedRegisters();
+    std::vector<MirRegisterRef> getUsedRegisters() const;
 
     /**
      * Returns a string representation of the instruction in assembly format.
@@ -182,15 +187,13 @@ class MirInstruction
     std::string toString() const;
 
   private:
-    bool m_cachedDefinedRegisters;
-    bool m_cachedUsedRegisters;
     class MirBlock *m_owner;
+    MirInstruction *m_prev{ nullptr };
+    MirInstruction *m_next{ nullptr };
     MirInstructionOpCode m_opcode;
     class MirTargetInstructionDesc *m_targetDesc;
     class SourceReference *m_sourceRef;
     std::pmr::vector<class MirOperand *> m_operands;
-    std::pmr::vector<MirRegisterRef> m_definedRegisters;
-    std::pmr::vector<MirRegisterRef> m_usedRegisters;
 };
 
 #endif // EZMIR_MIR_INSTRUCTION_H

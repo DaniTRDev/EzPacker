@@ -2,6 +2,7 @@
 #define EZMIR_MIR_BLOCK_H
 
 #include "EzMirCommon.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
 
 class MirBlock
 {
@@ -11,9 +12,45 @@ class MirBlock
      */
     MirBlock(MirId id,
              class SourceReference *sourceRef,
-             std::pmr::list<class MirInstruction *> instructions,
              class MirFunction *owner = nullptr,
              const std::pmr::string &name = "");
+
+    /**
+     * Returns the mutable instruction slice for this block.
+     * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
+     */
+    IntrusiveLinkedList<class MirInstruction> &getInstructions();
+
+    /**
+     * Returns the immutable instruction slice for this block.
+     * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
+     */
+    const IntrusiveLinkedList<class MirInstruction> &getInstructions() const;
+
+    /**
+     * Returns a pointer to the MUTABLE list of instructions.
+     */
+    IntrusiveLinkedList<class MirInstruction> *getInstructionsPtr();
+
+    /**
+     * Returns an interator to the beginning of the instruction list.
+     */
+    IntrusiveLinkedList<MirInstruction>::iterator begin();
+
+    /**
+     * Returns an iterator to the end of the instruction list.
+     */
+    IntrusiveLinkedList<MirInstruction>::iterator end();
+
+    /**
+     * Returns the previous block to this.
+     */
+    MirBlock *getPrev() const;
+
+    /**
+     * Returns the next block to this.
+     */
+    MirBlock *getNext() const;
 
     /**
      * Returns the owner of this block.
@@ -44,36 +81,19 @@ class MirBlock
     size_t getInstrCount() const;
 
     /**
+     * Sets the next block to this.
+     */
+    void setNext(MirBlock *next);
+
+    /**
      * Sets the owning function of this block.
      */
     void setOwner(class MirFunction *func);
 
     /**
-     * Returns the mutable instruction slice for this block.
-     * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
+     * Sets the previous block to this.
      */
-    std::pmr::list<class MirInstruction *> &getInstructions();
-
-    /**
-     * Returns the immutable instruction slice for this block.
-     * The returned slice is the same container that `MirBuilderContext` appends to when this block is currently bound.
-     */
-    const std::pmr::list<class MirInstruction *> &getInstructions() const;
-
-    /**
-     * Returns a pointer to the MUTABLE list of instructions.
-     */
-    std::pmr::list<class MirInstruction *> *getInstructionsPtr();
-
-    /**
-     * Returns an interator to the beginning of the instruction list.
-     */
-    std::pmr::list<MirInstruction *>::iterator begin();
-
-    /**
-     * Returns an iterator to the end of the instruction list.
-     */
-    std::pmr::list<MirInstruction *>::iterator end();
+    void setPrev(MirBlock *prev);
 
     /**
      * Returns the name of the block, if any.
@@ -81,10 +101,12 @@ class MirBlock
     const std::pmr::string &getName() const;
 
   private:
+    IntrusiveLinkedList<MirInstruction> m_instructions;
+    MirBlock *m_prev{ nullptr };
+    MirBlock *m_next{ nullptr };
     class MirFunction *m_owner;
     size_t m_id;
     class SourceReference *m_sourceRef;
-    std::pmr::list<MirInstruction *> m_instructions; // Arena-managed linked list of instructions.
     std::pmr::string m_name;
 };
 

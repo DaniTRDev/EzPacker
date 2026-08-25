@@ -2,14 +2,24 @@
 #include "Function/MirFunction.h"
 #include "Instruction/MirInstruction.h"
 
-MirBlock::MirBlock(MirId id,
-                   SourceReference *sourceRef,
-                   std::pmr::list<class MirInstruction *> instructions,
-                   MirFunction *owner,
-                   const std::pmr::string &name) :
-    m_owner(owner), m_id(id), m_sourceRef(sourceRef), m_instructions(std::move(instructions)), m_name(name)
+MirBlock::MirBlock(MirId id, SourceReference *sourceRef, MirFunction *owner, const std::pmr::string &name) :
+    m_owner(owner), m_id(id), m_sourceRef(sourceRef), m_name(name)
 {
 }
+
+IntrusiveLinkedList<MirInstruction> &MirBlock::getInstructions() { return m_instructions; }
+
+const IntrusiveLinkedList<MirInstruction> &MirBlock::getInstructions() const { return m_instructions; }
+
+IntrusiveLinkedList<MirInstruction> *MirBlock::getInstructionsPtr() { return &m_instructions; }
+
+IntrusiveLinkedList<MirInstruction>::iterator MirBlock::begin() { return m_instructions.begin(); }
+
+IntrusiveLinkedList<MirInstruction>::iterator MirBlock::end() { return m_instructions.end(); }
+
+MirBlock *MirBlock::getPrev() const { return m_prev; }
+
+MirBlock *MirBlock::getNext() const { return m_next; }
 
 MirInstruction *MirBlock::at(size_t index)
 {
@@ -30,16 +40,10 @@ SourceReference *MirBlock::getSourceRef() const { return m_sourceRef; }
 
 size_t MirBlock::getInstrCount() const { return m_instructions.size(); }
 
+void MirBlock::setNext(MirBlock *next) { m_next = next; }
+
 void MirBlock::setOwner(MirFunction *func) { m_owner = func; }
 
-std::pmr::list<MirInstruction *> &MirBlock::getInstructions() { return m_instructions; }
-
-const std::pmr::list<MirInstruction *> &MirBlock::getInstructions() const { return m_instructions; }
-
-std::pmr::list<MirInstruction *> *MirBlock::getInstructionsPtr() { return &m_instructions; }
-
-std::pmr::list<MirInstruction *>::iterator MirBlock::begin() { return m_instructions.begin(); }
-
-std::pmr::list<MirInstruction *>::iterator MirBlock::end() { return m_instructions.end(); }
+void MirBlock::setPrev(MirBlock *prev) { m_prev = prev; }
 
 const std::pmr::string &MirBlock::getName() const { return m_name; }

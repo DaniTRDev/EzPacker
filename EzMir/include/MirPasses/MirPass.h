@@ -2,6 +2,7 @@
 #define EZMIR_MIR_PASS_H
 
 #include "EzMirCommon.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
 
 enum class MirPassType : uint8_t
 {
@@ -37,8 +38,8 @@ class MirPass
     /**
      * Runs the pass on the given MIR func.
      */
-    virtual MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
-                              std::pmr::list<class MirFunction *>::iterator it,
+    virtual MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
+                              IntrusiveLinkedList<class MirFunction>::iterator it,
                               class MirPassManager *passManager)
     {
         return {};
@@ -47,8 +48,8 @@ class MirPass
     /**
      * Runs the pass on the given MIR block.
      */
-    virtual MirPassResult run(std::pmr::list<class MirBlock *> &blockList,
-                              std::pmr::list<class MirBlock *>::iterator it,
+    virtual MirPassResult run(IntrusiveLinkedList<class MirBlock> &blockList,
+                              IntrusiveLinkedList<class MirBlock>::iterator it,
                               class MirPassManager *passManager)
     {
         return {};
@@ -57,8 +58,8 @@ class MirPass
     /**
      * Runs the pass on the given MIR func.
      */
-    virtual MirPassResult run(std::pmr::list<class MirInstruction *> &instrList,
-                              std::pmr::list<class MirInstruction *>::iterator it,
+    virtual MirPassResult run(IntrusiveLinkedList<class MirInstruction> &instrList,
+                              IntrusiveLinkedList<class MirInstruction>::iterator it,
                               class MirPassManager *passManager)
     {
         return {};

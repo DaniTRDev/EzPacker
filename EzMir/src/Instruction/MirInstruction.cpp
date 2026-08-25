@@ -1,18 +1,14 @@
-#include "Block/MirBlock.h"
 #include "Instruction/MirInstruction.h"
-#include "Instruction/MirTargetInstructionDesc.h"
+#include "Block/MirBlock.h"
 #include "Instruction/MirInstructionSet.h"
+#include "Instruction/MirTargetInstructionDesc.h"
 #include "Operand/MirOperands.h"
 
-MirInstruction::MirInstruction(class MirBlock *owner,
+MirInstruction::MirInstruction(MirBlock *owner,
                                MirInstructionOpCode opcode,
                                SourceReference *ref,
                                std::pmr::vector<MirOperand *> operands) :
-    m_cachedDefinedRegisters(false), m_cachedUsedRegisters(false), m_owner(owner), m_opcode(opcode),
-    m_targetDesc(nullptr), m_sourceRef(ref),
-    m_definedRegisters(std::pmr::vector<MirRegisterRef>(operands.get_allocator().resource())),
-    m_usedRegisters(std::pmr::vector<MirRegisterRef>(operands.get_allocator().resource())),
-    m_operands(std::move(operands))
+    m_owner(owner), m_opcode(opcode), m_targetDesc(nullptr), m_sourceRef(ref), m_operands(std::move(operands))
 {
 }
 
@@ -31,34 +27,35 @@ const char *MirInstruction::getOpCodeName() const { return getMetadata().m_name.
 
 const MirInstructionMetadata &MirInstruction::getMetadata() const { return getMeta(getOpCode()); }
 
-class MirBlock *MirInstruction::getOwner() { return m_owner; }
+MirBlock *MirInstruction::getOwner() const { return m_owner; }
+
+MirInstruction *MirInstruction::getPrev() const { return m_prev; }
+
+MirInstruction *MirInstruction::getNext() const { return m_next; }
 
 MirInstructionOpCode MirInstruction::getOpCode() const { return m_opcode; }
 
 MirInstructionTier MirInstruction::getTier() const { return getMetadata().m_tier; }
 
-MirInstructionFlags MirInstruction::getFlags() const { return getMeta(getOpCode()).m_flags; }
+MirInstructionFlags MirInstruction::getFlags() const { return getMetadata().m_flags; }
 
 MirTargetInstructionDesc *MirInstruction::getTargetDesc() const { return m_targetDesc; }
 
-MirOperand *MirInstruction::getOperand(size_t index)
+MirOperand *MirInstruction::getOperand(size_t index) const
 {
     if (index >= m_operands.size())
     {
         return nullptr;
     }
-
-    invalidateCachedUsedAndDefs();
     return m_operands[index];
 }
 
-const MirOperand *MirInstruction::getConstOperand(size_t index)
+const MirOperand *MirInstruction::getConstOperand(size_t index) const
 {
     if (index >= m_operands.size())
     {
         return nullptr;
     }
-
     return m_operands[index];
 }
 
@@ -74,19 +71,66 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
                 return flags[index];
             }
         }
-        // Fallback for target instructions without explicit descriptors:
-        // By standard convention, operand 0 is destination (Write/ReadWrite) unless it's a store/branch.
         return MirOperandFlag::Read;
     }
 
-    // High-Level IR instructions
-    const auto &flags = getMetadata().m_operandFlags;
-    if (index < flags.size())
+    const auto &opMeta = getMetadata().m_operandMeta;
+    const size_t metaCount = opMeta.size();
+    const size_t totalOperands = m_operands.size();
+
+    if (metaCount == 0 || index >= totalOperands)
     {
-        return flags[index].flags;
+        return MirOperandFlag::None;
+    }
+
+    // 1. Locate the variadic expansion slot if one exists
+    size_t varSlot = size_t(-1);
+    for (size_t i = 0; i < metaCount; ++i)
+    {
+        if (opMeta[i].type & ExpectedOperandType::VariadicArgs)
+        {
+            varSlot = i;
+            break;
+        }
+    }
+
+    // 2. Elastic variadic slot resolution
+    if (varSlot != size_t(-1))
+    {
+        size_t trailingFixedCount = metaCount - 1 - varSlot;
+
+        // Malformed operand count safety fallback
+        if (totalOperands < metaCount - 1)
+        {
+            return (index < metaCount) ? opMeta[index].flags : MirOperandFlag::None;
+        }
+
+        // Leading fixed operands before the variadic slice
+        if (index < varSlot)
+        {
+            return opMeta[index].flags;
+        }
+        // Trailing fixed operands after the variadic slice
+        else if (index >= totalOperands - trailingFixedCount)
+        {
+            size_t offsetFromEnd = totalOperands - index;
+            return opMeta[metaCount - offsetFromEnd].flags;
+        }
+        // In the variadic expansion range (inherits Read/Write/ReadWrite from slot descriptor)
+        else
+        {
+            return opMeta[varSlot].flags;
+        }
+    }
+
+    // 3. Standard fixed-length metadata descriptor
+    if (index < metaCount)
+    {
+        return opMeta[index].flags;
     }
     else if (getFlags() & MirInstructionFlags::VariadicArgs)
     {
+        // Fallback.
         return MirOperandFlag::Read;
     }
 
@@ -97,123 +141,89 @@ size_t MirInstruction::getOperandCount() const { return m_operands.size(); }
 
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 
-void MirInstruction::addOperand(const MirOperand *operand)
-{
-    m_operands.push_back((MirOperand *)operand);
-    invalidateCachedUsedAndDefs();
-}
+void MirInstruction::addOperand(MirOperand *operand) { m_operands.push_back(operand); }
 
-void MirInstruction::invalidateCachedUsedAndDefs()
-{
-    m_cachedDefinedRegisters = false;
-    m_cachedUsedRegisters = false;
-}
+void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
 
-void MirInstruction::setOpcode(MirInstructionOpCode opcode)
-{
-    m_opcode = opcode;
-    invalidateCachedUsedAndDefs();
-}
+void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands) { m_operands = operands; }
 
-void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands)
-{
-    m_operands = operands;
-    invalidateCachedUsedAndDefs();
-}
+void MirInstruction::setTargetDesc(MirTargetInstructionDesc *desc) { m_targetDesc = desc; }
 
-void MirInstruction::setTargetDesc(MirTargetInstructionDesc *desc)
-{
-    m_targetDesc = desc;
-    invalidateCachedUsedAndDefs();
-}
+void MirInstruction::setPrev(MirInstruction *prev) { m_prev = prev; }
+
+void MirInstruction::setNext(MirInstruction *next) { m_next = next; }
 
 const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
 
-std::pmr::vector<MirOperand *> &MirInstruction::getOperands()
-{
-    invalidateCachedUsedAndDefs();
-    return m_operands;
-}
+std::pmr::vector<MirOperand *> &MirInstruction::getOperands() { return m_operands; }
 
-const std::pmr::vector<MirRegisterRef> &MirInstruction::getDefinedRegisters()
+std::vector<MirRegisterRef> MirInstruction::getDefinedRegisters() const
 {
-    if (!m_cachedDefinedRegisters)
+    std::vector<MirRegisterRef> defs;
+    defs.reserve(2);
+
+    for (size_t i = 0; i < m_operands.size(); ++i)
     {
-        m_cachedDefinedRegisters = true;
-        m_definedRegisters.clear();
+        MirOperand *operand = m_operands[i];
+        if (!operand)
+            continue;
 
-        for (size_t i = 0; i < m_operands.size(); i++)
+        if (auto *reg = operand->get<MirRegister>())
         {
-            MirOperand *operand = m_operands[i];
-            if (!operand)
-                continue;
-
-            MirRegister *reg = operand->get<MirRegister>();
-            if (reg)
+            if (getOperandFlag(i) & MirOperandFlag::Write)
             {
-                MirOperandFlag flags = getOperandFlag(i);
-                if (flags & MirOperandFlag::Write)
-                {
-                    m_definedRegisters.push_back(reg->getRef());
-                }
-            }
-        }
-
-        // Include implicit target registers defined by this instruction (if lowered)
-        if (m_targetDesc)
-        {
-            for (const auto &impDef : m_targetDesc->getImplicitDefs())
-            {
-                m_definedRegisters.push_back(impDef);
+                defs.push_back(reg->getRef());
             }
         }
     }
 
-    return m_definedRegisters;
+    if (m_targetDesc)
+    {
+        for (const auto &impDef : m_targetDesc->getImplicitDefs())
+        {
+            defs.push_back(impDef);
+        }
+    }
+
+    return defs;
 }
 
-const std::pmr::vector<MirRegisterRef> &MirInstruction::getUsedRegisters()
+std::vector<MirRegisterRef> MirInstruction::getUsedRegisters() const
 {
-    if (!m_cachedUsedRegisters)
+    std::vector<MirRegisterRef> uses;
+    uses.reserve(4);
+
+    for (size_t i = 0; i < m_operands.size(); ++i)
     {
-        m_cachedUsedRegisters = true;
-        m_usedRegisters.clear();
+        MirOperand *operand = m_operands[i];
+        if (!operand)
+            continue;
 
-        for (size_t i = 0; i < m_operands.size(); i++)
+        if (auto *reg = operand->get<MirRegister>())
         {
-            MirOperand *operand = m_operands[i];
-            if (!operand)
-                continue;
-
-            MirRegister *reg = operand->get<MirRegister>();
-            MirMemory *mem = operand->get<MirMemory>();
-
-            if (reg)
+            if (getOperandFlag(i) & MirOperandFlag::Read)
             {
-                MirOperandFlag flags = getOperandFlag(i);
-                if (flags & MirOperandFlag::Read)
-                {
-                    m_usedRegisters.push_back(reg->getRef());
-                }
-            }
-            else if (mem && mem->getBase())
-            {
-                // Memory base register is always read
-                m_usedRegisters.push_back(mem->getBase()->getRef());
+                uses.push_back(reg->getRef());
             }
         }
-
-        // Include implicit target registers used by this instruction (if lowered)
-        if (m_targetDesc)
+        else if (auto *mem = operand->get<MirMemory>())
         {
-            for (const auto &impUse : m_targetDesc->getImplicitUses())
+            if (mem->getBase())
             {
-                m_usedRegisters.push_back(impUse);
+                uses.push_back(mem->getBase()->getRef());
             }
         }
     }
 
-    return m_usedRegisters;
+    if (m_targetDesc)
+    {
+        for (const auto &impUse : m_targetDesc->getImplicitUses())
+        {
+            uses.push_back(impUse);
+        }
+    }
+
+    return uses;
 }
 
 std::string MirInstruction::toString() const
@@ -221,9 +231,9 @@ std::string MirInstruction::toString() const
     std::string res;
     res += getMetadata().m_name;
 
-    for (auto operand : m_operands)
+    for (auto *operand : m_operands)
     {
-        res += " " + operand->toString() + ",";
+        res += " " + (operand ? operand->toString() : "null") + ",";
     }
     return res;
 }

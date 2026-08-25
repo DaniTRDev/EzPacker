@@ -2,6 +2,7 @@
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
+#include "Instruction/MirInstruction.h"
 #include "Function/MirFunction.h"
 
 MirPassManager::MirPassManager(DiagnosticCollector *diagCollector, std::pmr::memory_resource *globalArena) :

@@ -2,6 +2,7 @@
 #define EZMIR_MIR_BUILDER_CONTEXT_H
 
 #include "EzMirCommon.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
 
 class MirBuilderContext
 {
@@ -49,6 +50,11 @@ class MirBuilderContext
     class DiagnosticCollector *getDiagCollector();
 
     /**
+     * Returns the MUTABLE function list that were built in this context. Used internally by the pass manager.
+     */
+    IntrusiveLinkedList<class MirFunction> &getFunctions();
+
+    /**
      * Searches in the context for the given block ID and returns a pointer to it, if exists. Returns nullptr if the
      * ID is not found.
      */
@@ -92,11 +98,6 @@ class MirBuilderContext
     std::pmr::monotonic_buffer_resource *getGlobalAllocator();
 
     /**
-     * Returns the MUTABLE function list that were built in this context. Used internally by the pass manager.
-     */
-    std::pmr::list<class MirFunction *> &getFunctions();
-
-    /**
      * Returns the MUTABLE global variable list that were built using this context. Used internally by the pass manager.
      */
     std::pmr::list<class MirGlobalVar *> &getGlobalVars();
@@ -110,8 +111,8 @@ class MirBuilderContext
     // Pools.
     std::pmr::monotonic_buffer_resource *m_globalResource;
 
-    std::pmr::list<class MirFunction *> m_functions;   // Used to quickly iterate over defined functions.
-    std::pmr::list<class MirGlobalVar *> m_globalVars; // Used to quickly iterate over defined global variables.
+    IntrusiveLinkedList<class MirFunction> m_functions; // Used to quickly iterate over defined functions.
+    std::pmr::list<class MirGlobalVar *> m_globalVars;  // Used to quickly iterate over defined global variables.
 
     std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
     std::pmr::map<MirId, class MirClass *> m_typeIdToClass;           // Used to search for classes using their type.

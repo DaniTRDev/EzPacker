@@ -46,8 +46,8 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     /**
      * Runs the pass and builds a Code Flow Graph out of the given function iterator.
      */
-    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
-                      std::pmr::list<class MirFunction *>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
+                      IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**

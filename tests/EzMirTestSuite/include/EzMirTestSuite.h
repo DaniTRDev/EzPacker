@@ -129,7 +129,7 @@ class EzMirTestSuite
     /**
      * Returns the function list out of the current context.
      */
-    std::pmr::list<MirFunction *> &getFunctions();
+    IntrusiveLinkedList<MirFunction> &getFunctions();
 
   private:
     MirFunction *m_testFunction; // Pre-created function used to be able to create quick tests easily.

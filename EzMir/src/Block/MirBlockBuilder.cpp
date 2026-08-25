@@ -1,5 +1,5 @@
-#include "Block/MirBlock.h"
 #include "Block/MirBlockBuilder.h"
+#include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
@@ -13,12 +13,8 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
     std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
-    // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(),
-                                                 sourceRef,
-                                                 std::pmr::list<MirInstruction *>(alloc),
-                                                 m_ownerFunc,
-                                                 name);
+    // Construct in-place without node wrapper allocations
+    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, m_ownerFunc, name);
 
     m_ctx->getDiagCollector()->trace("MirBlockBuilder", "Built block with id: {}", block->getId()) << sourceRef;
 
@@ -28,7 +24,11 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
                           .m_block = block,
                           .m_iterator = block->getInstructions().end() };
 
-        m_ownerFunc->appendBlock(block);
+        if (m_ownerFunc)
+        {
+            m_ownerFunc->appendBlock(block);
+        }
+        
         setBuildResult(block);
 
         return block;

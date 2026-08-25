@@ -33,7 +33,7 @@ class CallLoweringState
     /**
      * Allocates an abstract stack slot in the target function.
      */
-    class StackFrameObject *allocateStack(MirType *type) const;
+    class StackFrameObject *allocateStack(class MirType *type) const;
 
   private:
     class CallingConvDesc *m_callingConv;

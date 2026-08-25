@@ -4,6 +4,7 @@
 #include "EzMirCommon.h"
 #include "MirInstructionSet.h"
 #include "Builder/MirBuilder.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
 
 enum class InsertionType : uint8_t
 {
@@ -20,7 +21,7 @@ struct MirInstructionInsertionPoint
 {
     InsertionType m_type;
     class MirBlock *m_block;
-    std::pmr::list<class MirInstruction *>::iterator m_iterator{};
+    IntrusiveLinkedList<class MirInstruction>::iterator m_iterator{};
 };
 
 class MirInstructionBuilder : public MirBuilder<class MirInstruction>
@@ -37,7 +38,7 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
     MirInstructionBuilder(class MirBuilderContext *ctx,
                           class MirBlock *block,
                           InsertionType type,
-                          std::pmr::list<MirInstruction *>::iterator it = {});
+                          IntrusiveLinkedList<MirInstruction>::iterator it = {});
 
     /**
      * Builds an instruction with the given opcode and inserts it with the insert point information. Given operand's
@@ -112,7 +113,7 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
      */
     void setInsertionPoint(class MirBlock *block,
                            InsertionType type,
-                           std::pmr::list<class MirInstruction *>::iterator it = {});
+                           IntrusiveLinkedList<class MirInstruction>::iterator it = {});
 
   private:
     /**

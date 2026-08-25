@@ -19,8 +19,8 @@ CodeFlowResult *CodeFlowAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace CodeFlowAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult CodeFlowAnalysisPass::run(std::pmr::list<MirFunction *> &funcList,
-                                        std::pmr::list<MirFunction *>::iterator it,
+MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction> &funcList,
+                                        IntrusiveLinkedList<MirFunction>::iterator it,
                                         class MirPassManager *passManager)
 {
     MirFunction *func = *it;

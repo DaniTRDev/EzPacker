@@ -1,14 +1,14 @@
+#include "Function/MirFunctionBuilder.h"
 #include "Block/MirBlock.h"
 #include "Block/MirBlockBuilder.h"
 #include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
-#include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Operand/MirOperandBuilder.h"
-#include "Type/MirTypeTable.h"
 #include "Printer/MirPrinter.h"
+#include "Type/MirTypeTable.h"
 
 MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) :
     m_callingConv(nullptr), m_ctx(ctx), m_parameters(ctx->getGlobalAllocator()), m_owner(nullptr)
@@ -27,7 +27,7 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
     if (!obj)
     {
         m_ctx->getDiagCollector()->error("MirFunctionBuilder", "Can't create block builder from non-built function");
-        return MirBlockBuilder(nullptr, (MirFunction *)nullptr); // Ambiguous call if cast is not set.
+        return MirBlockBuilder(nullptr, static_cast<MirFunction *>(nullptr));
     }
 
     return MirBlockBuilder(m_ctx, obj);
@@ -39,10 +39,8 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
     std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator<MirFunction> funcAlloc(arena);
     std::pmr::polymorphic_allocator<MirFunctionStackFrame> funcStackFrameAlloc(arena);
-    std::pmr::list<MirBlock *> blocks(arena);
 
-    // Construct in-place, passing the arena down to the instruction's internal PMR vector
-    auto stackFrame =
+    auto *stackFrame =
             funcStackFrameAlloc.new_object<MirFunctionStackFrame>(std::pmr::vector<StackFrameObject *>(arena));
     MirType *funcType = t->getFuncType(returnType, m_parameters, name);
 
@@ -58,9 +56,9 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
                                                           funcType,
                                                           m_ctx->createId(),
                                                           sourceRef,
-                                                          blocks,
                                                           m_parameters,
-                                                          name);
+                                                          name,
+                                                          arena);
 
     MirBlockBuilder builder(m_ctx, func);
     MirBlock *entryPoint = builder.build(sourceRef, "entryPoint");
@@ -91,7 +89,6 @@ MirFunctionBuilder::buildParam(MirType *type, const std::pmr::string &name, Sour
 {
     MirOperandBuilder builder(m_ctx);
     m_parameters.push_back(builder.buildVReg(type, name, sourceRef));
-
     return *this;
 }
 

@@ -47,8 +47,8 @@ class NonSsaToSsaPass : public IMirTransformPass
     /**
      * Runs the pass and builds a n SSA IR out of a non-SSA IR.
      */
-    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
-                      std::pmr::list<class MirFunction *>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
+                      IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**

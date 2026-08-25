@@ -132,7 +132,7 @@ MirInstruction *EzMirTestSuite::addTestInstructionRegMem(MirInstructionOpCode op
               opBuilder.buildMem(srcOperType, opBuilder.buildVReg(getTypeTable()->i64(), "testBase"), displacement) });
 }
 
-std::pmr::list<MirFunction *> &EzMirTestSuite::getFunctions() { return getBuilderCtx()->getFunctions(); }
+IntrusiveLinkedList<MirFunction> &EzMirTestSuite::getFunctions() { return getBuilderCtx()->getFunctions(); }
 
 void MirTestSuiteAsGtest::SetUp()
 {
