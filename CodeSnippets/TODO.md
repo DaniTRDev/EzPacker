@@ -8,7 +8,7 @@ This document contains the **in-depth implementation details, architectural trad
 1. [Master Architecture Pipeline](#1-master-architecture-pipeline)
 2. [Architectural Decisions & Trade-Offs (Pros & Cons)](#2-architectural-decisions--trade-offs-pros--cons)
 3. [Phase 1: EzDSL Semantic Analysis & Calling Convention DSL](#3-phase-1-ezdsl-semantic-analysis--calling-convention-dsl)
-   - [1.1 Calling Convention DSL (`.ccdf`) Parser & AST](#11-calling-convention-dsl-ccdf-parser--ast)
+   - ~~[1.1 Calling Convention DSL (`.ccdf`) Parser & AST](#11-calling-convention-dsl-ccdf-parser--ast)~~
    - [1.2 Unified Symbol Table & Cross-Language Resolution](#12-unified-symbol-table--cross-language-resolution)
    - [1.3 Target Definition Semantic Pass (`TargetDefPass`)](#13-target-definition-semantic-pass-targetdefpass)
    - [1.4 Target Instruction Semantic Pass (`InstructionDefPass`)](#14-target-instruction-semantic-pass-instructiondefpass)

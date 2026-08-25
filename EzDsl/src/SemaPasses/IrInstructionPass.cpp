@@ -2,20 +2,20 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-#include "Sema/Symbols/IrInstructionSymbol.h"
+#include "Sema/Symbols/Symbols.h"
+
+constexpr auto PassName = "Sema::IrInstructionPass";
 
 bool IrInstructionPass::run(DiagnosticCollector *collector,
                             SymbolTable *table,
                             DSL::Ast::IrInstDef::IrInstDefFile *file)
 {
-    constexpr auto passName = "Sema::IrInstructionPass";
-
     if (!collector || !table || !file)
     {
         return false;
     }
 
-    collector->trace(passName, "Running semantic validation for {} IR instructions", file->m_instructions.size());
+    collector->trace(PassName, "Running semantic validation for {} IR instructions", file->m_instructions.size());
 
     bool hasErrors = false;
     for (const auto &inst : file->m_instructions)
@@ -34,7 +34,6 @@ bool IrInstructionPass::validateOperands(DiagnosticCollector *collector,
                                          size_t &numIn,
                                          size_t &numOut)
 {
-    constexpr auto passName = "Sema::IrInstructionPass";
     bool valid = true;
     SourceReference *ref = inst.m_name.m_sourceRef;
     std::unordered_set<std::string_view> seenOperandNames;
@@ -46,7 +45,7 @@ bool IrInstructionPass::validateOperands(DiagnosticCollector *collector,
         // 1. Check for duplicate operand identifiers within the same signature
         if (!seenOperandNames.insert(op.m_name.m_node).second)
         {
-            collector->error(passName,
+            collector->error(PassName,
                              "Instruction '{}': Duplicate operand name '{}'",
                              inst.m_name.m_node,
                              op.m_name.m_node)
@@ -65,7 +64,7 @@ bool IrInstructionPass::validateOperands(DiagnosticCollector *collector,
             (op.m_dir == DSL::Ast::IrInstDef::IrOperandDir::ArgOut ||
              op.m_dir == DSL::Ast::IrInstDef::IrOperandDir::ArgInOut))
         {
-            collector->error(passName,
+            collector->error(PassName,
                              "Instruction '{}': Immediate/Reference operand '{}' cannot be marked OUT or INOUT",
                              inst.m_name.m_node,
                              op.m_name.m_node)
@@ -96,7 +95,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
                                                  size_t numOut)
 {
     using namespace DSL::Ast::IrInstDef;
-    constexpr auto passName = "Sema::IrInstructionPass";
+    constexpr auto PassName = "Sema::IrInstructionPass";
     bool valid = true;
     SourceReference *ref = inst.m_name.m_sourceRef;
 
@@ -106,7 +105,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
     // 1. Mandatory category specification
     if (inst.m_body.m_category == IrInstCategory::Invalid)
     {
-        collector->error(passName, "Instruction '{}': Missing or Invalid CATEGORY", inst.m_name.m_node) << ref;
+        collector->error(PassName, "Instruction '{}': Missing or Invalid CATEGORY", inst.m_name.m_node) << ref;
         valid = false;
     }
 
@@ -118,7 +117,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
 
     if ((isBranch || isReturn) && !isTerminator)
     {
-        collector->error(passName,
+        collector->error(PassName,
                          "Instruction '{}': Flag 'IsBranch' or 'IsReturn' requires 'IsTerminator'",
                          inst.m_name.m_node)
                 << ref;
@@ -128,7 +127,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
     // 3. Mutually exclusive control flow roles
     if ((isBranch && isCall) || (isBranch && isReturn) || (isCall && isReturn))
     {
-        collector->error(passName,
+        collector->error(PassName,
                          "Instruction '{}': Flags 'IsBranch', 'IsCall', and 'IsReturn' are mutually exclusive",
                          inst.m_name.m_node)
                 << ref;
@@ -138,7 +137,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
     // 4. Commutativity validation
     if (hasFlag(IrInstFlag::IsCommutative) && numIn < 2)
     {
-        collector->error(passName,
+        collector->error(PassName,
                          "Instruction '{}': Flag 'IsCommutative' requires at least 2 IN operands (found {})",
                          inst.m_name.m_node,
                          numIn)
@@ -151,7 +150,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
             (hasFlag(IrInstFlag::DestSmaller) ? 1 : 0);
     if (sizeFlagsCount > 1)
     {
-        collector->error(passName,
+        collector->error(PassName,
                          "Instruction '{}': Flags 'SizeMatch', 'DestLarger', and 'DestSmaller' are mutually exclusive",
                          inst.m_name.m_node)
                 << ref;
@@ -161,7 +160,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
     // 6. Casting operand requirements
     if ((hasFlag(IrInstFlag::DestLarger) || hasFlag(IrInstFlag::DestSmaller)) && (numIn < 1 || numOut < 1))
     {
-        collector->error(passName,
+        collector->error(PassName,
                          "Instruction '{}': Casting operations ('DestLarger'/'DestSmaller') require at least 1 IN and "
                          "1 OUT operand",
                          inst.m_name.m_node)
@@ -177,7 +176,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
 
     if (isPureCompute && numOut == 0 && !hasFlag(IrInstFlag::HasSideEffect))
     {
-        collector->error(passName,
+        collector->error(PassName,
                          "Instruction '{}': Pure computational instruction produces no output register and lacks "
                          "'HasSideEffect'",
                          inst.m_name.m_node)
@@ -192,22 +191,21 @@ bool IrInstructionPass::validateInstruction(DiagnosticCollector *collector,
                                             SymbolTable *table,
                                             const DSL::Ast::IrInstDef::IrInstDecl &inst)
 {
-    constexpr auto passName = "Sema::IrInstructionPass";
     SourceReference *ref = inst.m_name.m_sourceRef;
 
-    // 1. Symbol collision check
+    // 1. Pre-declaration collision check
     if (table->getSymByName(inst.m_name.m_node) != nullptr)
     {
-        collector->error(passName, "Duplicate IR instruction symbol '{}'", inst.m_name.m_node) << ref;
+        collector->error(PassName, "Duplicate IR instruction symbol '{}'", inst.m_name.m_node) << ref;
         return false;
     }
 
-    // 2. Validate operands
+    // 2. Validate operand list
     size_t numIn = 0;
     size_t numOut = 0;
     bool operandsValid = validateOperands(collector, inst, numIn, numOut);
 
-    // 3. Aggregate instruction flags
+    // 3. Aggregate flags into a bitmask
     uint32_t rawFlags = 0;
     for (const auto &flag : inst.m_body.m_flags)
     {
@@ -215,7 +213,7 @@ bool IrInstructionPass::validateInstruction(DiagnosticCollector *collector,
     }
     auto combinedFlags = static_cast<DSL::Ast::IrInstDef::IrInstFlag>(rawFlags);
 
-    // 4. Validate category and flag invariants
+    // 4. Validate category and flag semantics
     bool flagsValid = validateFlagsAndCategory(collector, inst, combinedFlags, numIn, numOut);
 
     if (!operandsValid || !flagsValid)
@@ -223,11 +221,23 @@ bool IrInstructionPass::validateInstruction(DiagnosticCollector *collector,
         return false;
     }
 
-    // 5. Register instruction symbol in the SymbolTable
-    Sema::Symbols::IrInstructionSymbol data{ .m_category = inst.m_body.m_category,
+    // 5. Convert AST operands to resolved semantic operand symbols
+    std::pmr::vector<Sema::Symbols::IrOperandSymbol> semaOperands{ table->getAllocator() };
+    semaOperands.reserve(inst.m_operands.size());
+
+    for (const auto &op : inst.m_operands)
+    {
+        semaOperands.push_back(Sema::Symbols::IrOperandSymbol{ .m_typeMask = op.m_type,
+                                                               .m_name = op.m_name.m_node,
+                                                               .m_dir = op.m_dir });
+    }
+
+    // 6. Construct decoupled semantic IR instruction symbol
+    Sema::Symbols::IrInstructionSymbol data{ .m_name = inst.m_name.m_node,
+                                             .m_category = inst.m_body.m_category,
                                              .m_tier = inst.m_body.m_tier,
-                                             .m_flags = combinedFlags,
-                                             .m_operands = inst.m_operands };
+                                             .m_flagsMask = combinedFlags,
+                                             .m_operands = std::move(semaOperands) };
 
     SymbolId id = table->declareSym(ref,
                                     SymbolFlags::IsDefined,
@@ -237,10 +247,13 @@ bool IrInstructionPass::validateInstruction(DiagnosticCollector *collector,
 
     if (id == InvalidSymbolId)
     {
-        collector->error(passName, "Duplicate IR instruction symbol declaration '{}'", inst.m_name.m_node) << ref;
+        collector->error(PassName, "Duplicate IR instruction symbol declaration '{}'", inst.m_name.m_node) << ref;
         return false;
     }
 
-    collector->trace(passName, "Added IR instruction: {}", inst.m_name.m_node);
+    // 7. Bind assigned SymbolId within symbol payload
+    Symbol *registeredSym = table->getSymById(id);
+
+    collector->trace(PassName, "Added IR instruction: {}", inst.m_name.m_node);
     return true;
 }

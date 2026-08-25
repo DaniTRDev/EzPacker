@@ -5,7 +5,7 @@
 #include "Parser/ParseContext.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-#include "Sema/Symbols/IrInstructionSymbol.h"
+#include "Sema/Symbols/Symbols.h"
 #include "SemaPasses/IrInstructionPass.h"
 
 class IrInstructionPassTest : public DslTestSuiteAsGtest
@@ -52,7 +52,7 @@ ir_inst ADD(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
     EXPECT_TRUE(data->hasFlag(DSL::Ast::IrInstDef::IrInstFlag::SizeMatch));
     EXPECT_TRUE(data->hasFlag(DSL::Ast::IrInstDef::IrInstFlag::IsCommutative));
     ASSERT_EQ(data->m_operands.size(), 3);
-    EXPECT_EQ(data->m_operands[0].m_name.m_node, "dst");
+    EXPECT_EQ(data->m_operands[0].m_name, "dst");
     EXPECT_EQ(data->m_operands[0].m_dir, DSL::Ast::IrInstDef::IrOperandDir::ArgOut);
 }
 

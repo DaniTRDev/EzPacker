@@ -24,9 +24,9 @@ set(EZDSL_FILES_LIST
         "include/Sema/SemaContext.h"
         "include/Sema/Symbol.h"
         "include/Sema/SymbolTable.h"
-        "include/Sema/Symbols/IrInstructionSymbol.h"
-        "include/Sema/Symbols/TypeSymbol.h"
+        "include/Sema/Symbols/Symbols.h"
         "include/SemaPasses/IrInstructionPass.h"
+        "include/SemaPasses/RegisterBankPass.h"
         "include/SemaPasses/TypePass.h"
 
         "src/CodeGenerators/CppMirInstructionGenerator.cpp"
@@ -37,6 +37,7 @@ set(EZDSL_FILES_LIST
         "src/Sema/Symbol.cpp"
         "src/Sema/SymbolTable.cpp"
         "src/SemaPasses/IrInstructionPass.cpp"
+        "src/SemaPasses/RegisterBankPass.cpp"
         "src/SemaPasses/TypePass.cpp"
 )
 

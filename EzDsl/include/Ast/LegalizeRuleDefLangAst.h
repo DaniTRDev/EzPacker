@@ -11,7 +11,7 @@
 namespace DSL::Ast::LegalizeRuleDef
 {
 
-enum class OperandKind
+enum class OperandKind : uint8_t
 {
     SsaRegister,      // SSA virtual register (e.g., "$dst", "i32:$dst")
     ImmediateLiteral, // Concrete integer literal immediate (e.g., 0, 42, 0xFF)

@@ -141,7 +141,7 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
         }
 
         // 2. Declare and register the type symbol
-        Sema::Symbols::TypeSymbol data{ .m_kind = type.m_kind, .m_bitWidth = resolvedBitWidth, .m_name = typeName };
+        Sema::Symbols::TypeSymbol data{ .m_name = typeName, .m_kind = type.m_kind, .m_bitWidth = resolvedBitWidth };
 
         SymbolId id = table->declareSym(type.m_name.m_sourceRef,
                                         SymbolFlags::IsDefined,

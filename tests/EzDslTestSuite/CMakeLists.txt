@@ -75,6 +75,13 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_Sema_RegisterBankPass"
+        "EzDslTestSuite"
+        ""
+        "tests/T_Sema_RegisterBankPass.cpp"
+)
+
+EzPacker_AddTest(
         "T_TargetDefLang"
         "EzDslTestSuite"
         ""

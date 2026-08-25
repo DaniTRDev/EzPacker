@@ -62,6 +62,11 @@ class SymbolTable
     void exitScope();
 
     /**
+     * Returns the allocator of the symbol table.
+     */
+    std::pmr::memory_resource *getAllocator();
+
+    /**
      * Returns the list of symbols.
      */
     const std::pmr::vector<Symbol *> &getSymbols() const;

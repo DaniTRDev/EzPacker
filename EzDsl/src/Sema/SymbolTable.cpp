@@ -91,6 +91,8 @@ void SymbolTable::exitScope()
         m_currentScopeId = parentId;
 }
 
+std::pmr::memory_resource *SymbolTable::getAllocator() { return m_alloc; }
+
 const std::pmr::vector<Symbol *> &SymbolTable::getSymbols() const { return m_symbols; }
 
 Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name) const

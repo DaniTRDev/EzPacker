@@ -1,8 +1,9 @@
+#include "Ast/IrInstructionDefLangAst.h"
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-#include "Sema/Symbols/IrInstructionSymbol.h"
+#include "Sema/Symbols/Symbols.h"
 
 namespace CodeGenerators
 {
@@ -211,7 +212,7 @@ INSTRUCTION(INVALID, T(HighLevel), MirCat_Invalid, OPERAND_CONSTRAINTS(), F(None
         std::string name(sym->getName());
         std::string tier = TierToString(data->m_tier);
         std::string category = CategoryToString(data->m_category);
-        std::string flags = FlagsToString(data->m_flags);
+        std::string flags = FlagsToString(data->m_flagsMask);
 
         if (data->m_operands.empty())
         {
@@ -223,7 +224,7 @@ INSTRUCTION(INVALID, T(HighLevel), MirCat_Invalid, OPERAND_CONSTRAINTS(), F(None
             for (const auto &op : data->m_operands)
             {
                 constraints.push_back(
-                        std::format("{{ {}, {} }}", OperandTypeToString(op.m_type), OperandDirToString(op.m_dir)));
+                        std::format("{{ {}, {} }}", OperandTypeToString(op.m_typeMask), OperandDirToString(op.m_dir)));
             }
 
             out << std::format("\nINSTRUCTION({},\n"

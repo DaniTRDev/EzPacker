@@ -2,11 +2,7 @@
 #define EZDSL_SYMBOL_H
 
 #include "EzDslCommon.h"
-#include "Symbols/IrInstructionSymbol.h"
-#include "Symbols/TypeSymbol.h"
-
-using SymbolId = size_t;
-inline constexpr SymbolId InvalidSymbolId = UINT64_MAX;
+#include "Symbols/Symbols.h"
 
 enum class SymbolFlags : uint8_t
 {
@@ -41,7 +37,10 @@ enum class SymbolType : uint8_t
     Type,
 
     // .irdf IR instruction entities.
-    IrInstruction
+    IrInstruction,
+
+    // .ccdf Calling convention entities
+    CallingConv
 };
 
 constexpr SymbolFlags operator|(SymbolFlags a, SymbolFlags b) noexcept
@@ -56,7 +55,20 @@ constexpr bool operator&(SymbolFlags a, SymbolFlags b) noexcept
 class Symbol
 {
   public:
-    using SymbolData = std::variant<Sema::Symbols::TypeSymbol, Sema::Symbols::IrInstructionSymbol>;
+    using SymbolData = std::variant<std::monostate,
+                                    Sema::Symbols::TypeSymbol,
+                                    Sema::Symbols::RegisterSymbol,
+                                    Sema::Symbols::RegisterClassSymbol,
+                                    Sema::Symbols::RegisterBankSymbol,
+                                    Sema::Symbols::InstructionFormatSymbol,
+                                    Sema::Symbols::TargetInstructionSymbol,
+                                    Sema::Symbols::IrInstructionSymbol,
+                                    Sema::Symbols::LegalizeActionSymbol,
+                                    Sema::Symbols::LegalizeRewriteRuleSymbol,
+                                    Sema::Symbols::AddrModeSymbol,
+                                    Sema::Symbols::ISelPatternSymbol,
+                                    Sema::Symbols::CallingConvSymbol,
+                                    Sema::Symbols::TargetSymbol>;
 
     /**
      * Creates the symbol with the given source reference, flags, definition scope, id, type and name. Data is NOT set.

@@ -1,8 +1,9 @@
+#include "Ast/TypeDefLangAst.h"
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-#include "Sema/Symbols/TypeSymbol.h"
+#include "Sema/Symbols/Symbols.h"
 
 namespace CodeGenerators
 {

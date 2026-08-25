@@ -97,17 +97,17 @@ struct InstFormatDecl
 /**
  * Dataflow direction of an instruction operand.
  */
-enum class InstOperandDir
+enum class InstOperandDir : uint8_t
 {
-    ArgIn,
-    ArgOut,
-    ArgInOut
+    ArgIn = 1,
+    ArgOut = (1 << 1),
+    ArgInOut = ArgIn | ArgOut
 };
 
 /**
  * Kind of operand in an instruction declaration (Register or Immediate).
  */
-enum class InstOperandKind
+enum class InstOperandKind : uint8_t
 {
     Register, // Hardware or virtual register (e.g., "GPR:rd OUT")
     Immediate // Immediate value (e.g., "simm(i12):imm12 IN", "imm(i32):val IN")
@@ -132,16 +132,16 @@ struct InstOperand
 /**
  * Behavioral flags for target instruction definitions.
  */
-enum class InstFlag
+enum class InstFlag : uint8_t
 {
-    IsBranch,
-    IsCall,
-    IsReturn,
-    IsTerminator,
-    MayLoad,
-    MayStore,
-    IsCommutative,
-    HasSideEffects
+    IsBranch = 1,
+    IsCall = (1 << 1),
+    IsReturn = (1 << 2),
+    IsTerminator = (1 << 3),
+    MayLoad = (1 << 4),
+    MayStore = (1 << 5),
+    IsCommutative = (1 << 6),
+    HasSideEffects = (1 << 7)
 };
 
 /**

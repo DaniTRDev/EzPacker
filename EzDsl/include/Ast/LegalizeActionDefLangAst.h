@@ -11,7 +11,7 @@ namespace DSL::Ast::LegalizeActionDef
 /**
  * Action to perform when an instruction matches a given type combination.
  */
-enum class LegalizeActionKind
+enum class LegalizeActionKind : uint8_t
 {
     Legal,        // The instruction and type combination is natively supported.
     WidenScalar,  // Promote scalar types to a larger legal scalar type (e.g., i8 -> i32).
