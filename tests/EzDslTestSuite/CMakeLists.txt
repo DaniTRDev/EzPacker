@@ -82,6 +82,13 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_Sema_TargetInstPass"
+        "EzDslTestSuite"
+        ""
+        "tests/T_Sema_TargetInstPass.cpp"
+)
+
+EzPacker_AddTest(
         "T_TargetDefLang"
         "EzDslTestSuite"
         ""

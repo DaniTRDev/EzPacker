@@ -3,6 +3,13 @@
 
 #include "EzDslCommon.h"
 
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <variant>
+#include <vector>
+
 using SymbolId = size_t;
 inline constexpr SymbolId InvalidSymbolId = UINT64_MAX;
 
@@ -33,6 +40,7 @@ namespace InstDef
 enum class InstOperandKind : uint8_t;
 enum class InstOperandDir : uint8_t;
 enum class InstFlag : uint8_t;
+enum class BitExprOp;
 } // namespace InstDef
 
 namespace LegalizeActionDef
@@ -88,11 +96,33 @@ struct BitSlice
     uint16_t m_to{ 0 };
 };
 
+struct ResolvedBitExpr;
+
+struct SlicedOperandRef
+{
+    std::string_view m_operandName;
+    SymbolId m_operandTypeId{ InvalidSymbolId }; // Resolved TypeId/ClassId
+    BitSlice m_slice;
+};
+
+using ResolvedBitExprValue =
+        std::variant<uint64_t,                        // Folded compile-time constant (e.g. 0x33, 1 << 2)
+                     SlicedOperandRef,                // Direct or sliced instruction operand (e.g. rd, imm12[0:4])
+                     std::shared_ptr<ResolvedBitExpr> // Composite binary/unary expression tree
+                     >;
+
+struct ResolvedBitExpr
+{
+    ResolvedBitExprValue m_lhs;
+    DSL::Ast::InstDef::BitExprOp m_op;
+    std::optional<ResolvedBitExprValue> m_rhs;
+};
+
 struct FormatFieldSymbol
 {
     std::string_view m_name;
     BitSlice m_slice;
-    std::optional<uint64_t> m_defaultValue;
+    std::optional<ResolvedBitExprValue> m_defaultValue; // Folded constant or default bit expression
 };
 
 struct InstructionFormatSymbol
@@ -110,17 +140,25 @@ struct TargetOperandSymbol
     DSL::Ast::InstDef::InstOperandDir m_dir;
 };
 
+struct FieldAssignmentSymbol
+{
+    std::string_view m_fieldName;
+    BitSlice m_fieldSlice;        // Slice within target field ([0, width-1] if unsliced)
+    ResolvedBitExprValue m_value; // Constant, operand reference, or expression tree
+};
+
 struct TargetInstructionSymbol
 {
     std::string_view m_name;
     SymbolId m_formatId{ InvalidSymbolId };
+    std::pmr::vector<FieldAssignmentSymbol> m_fieldAssignments; // Resolved overrides
     std::pmr::vector<TargetOperandSymbol> m_args;
     std::pmr::vector<TargetOperandSymbol> m_implicitArgs;
     std::string_view m_asmTemplate;
     uint32_t m_latency{ 1 };
     uint32_t m_flagsMask{ 0 }; // Bitmask of DSL::Ast::InstDef::InstFlag
 
-    bool hasFlag(DSL::Ast::InstDef::InstFlag flag) const noexcept
+    [[nodiscard]] bool hasFlag(DSL::Ast::InstDef::InstFlag flag) const noexcept
     {
         return (m_flagsMask & (1u << static_cast<uint32_t>(flag))) != 0;
     }
@@ -141,7 +179,7 @@ struct IrInstructionSymbol
     DSL::Ast::IrInstDef::IrInstFlag m_flagsMask;
     std::pmr::vector<IrOperandSymbol> m_operands;
 
-    bool hasFlag(DSL::Ast::IrInstDef::IrInstFlag flagMask) const noexcept
+    [[nodiscard]] bool hasFlag(DSL::Ast::IrInstDef::IrInstFlag flagMask) const noexcept
     {
         return (static_cast<uint32_t>(m_flagsMask) & static_cast<uint32_t>(flagMask)) != 0;
     }
@@ -289,6 +327,7 @@ struct TargetSymbol
     std::pmr::vector<SymbolId> m_legalizeActions;
     std::pmr::vector<SymbolId> m_iselPatterns;
 };
-}; // namespace Sema::Symbols
+
+} // namespace Sema::Symbols
 
 #endif // EZDSL_SYMBOLS_H

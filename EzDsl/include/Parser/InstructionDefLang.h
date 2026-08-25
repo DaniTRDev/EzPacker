@@ -136,8 +136,7 @@ struct BitExprAssign
     }();
 
     static constexpr auto value = lexy::callback<Ast::InstDef::BitExprAssign>(
-            [](Ast::Common::Identifier lhs, Ast::InstDef::BitSlice slice, Ast::InstDef::BitExprValues rhs)
-            {
+            [](Ast::Common::Identifier lhs, Ast::InstDef::BitSlice slice, Ast::InstDef::BitExprValues rhs) {
                 return Ast::InstDef::BitExprAssign{ .m_lhs = std::move(lhs),
                                                     .m_lhsSlice = slice,
                                                     .m_rhs = std::move(rhs) };
@@ -171,8 +170,7 @@ struct FormatField
                                                   .m_slice = slice,
                                                   .m_defaultValue = std::move(defVal) };
             },
-            [](Ast::Common::Identifier name, Ast::InstDef::BitSlice slice, lexy::nullopt)
-            {
+            [](Ast::Common::Identifier name, Ast::InstDef::BitSlice slice, lexy::nullopt) {
                 return Ast::InstDef::FormatField{ .m_name = std::move(name),
                                                   .m_slice = slice,
                                                   .m_defaultValue = std::nullopt };
@@ -291,21 +289,26 @@ struct InstHeader
     struct InstArgList
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = dsl::parenthesized.list(dsl::p<InstOperand>, dsl::sep(dsl::lit_c<','>));
-        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::InstDef::InstOperand>>;
+        static constexpr auto rule = dsl::list(dsl::p<InstOperand>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<Ast::InstDef::InstOperand>;
     };
 
     static constexpr auto rule = Common::Keyword<"inst">::rule >>
-            (dsl::p<Common::Identifier> + dsl::p<InstArgList> + Common::Keyword<"format">::rule +
-             dsl::p<Common::Identifier>);
+            (dsl::p<Common::Identifier> +
+             dsl::parenthesized(dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore) >> dsl::p<InstArgList>)) +
+             Common::Keyword<"format">::rule + dsl::p<Common::Identifier>);
 
     static constexpr auto value = lexy::callback<Ast::InstDef::InstHeader>(
-            [](Ast::Common::Identifier name,
-               std::pmr::vector<Ast::InstDef::InstOperand> args,
-               Ast::Common::Identifier fmtName)
+            [](Ast::Common::Identifier name, auto args, Ast::Common::Identifier fmtName)
             {
+                std::pmr::vector<Ast::InstDef::InstOperand> resolvedArgs;
+                if constexpr (std::is_same_v<std::decay_t<decltype(args)>, std::pmr::vector<Ast::InstDef::InstOperand>>)
+                {
+                    resolvedArgs = std::move(args);
+                }
+
                 return Ast::InstDef::InstHeader{ .m_name = std::move(name),
-                                                 .m_args = std::move(args),
+                                                 .m_args = std::move(resolvedArgs),
                                                  .m_formatName = std::move(fmtName) };
             });
 };
