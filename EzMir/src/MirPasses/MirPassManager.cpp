@@ -1,8 +1,8 @@
-#include "Builder/MirBuilderContext.h"
+#include "MirPasses/MirPassManager.h"
 #include "Block/MirBlock.h"
+#include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
-#include "MirPasses/MirPassManager.h"
 
 MirPassManager::MirPassManager(DiagnosticCollector *diagCollector, std::pmr::memory_resource *globalArena) :
     m_testMode(false), m_diagCollector(diagCollector), m_validAnalyses(globalArena), m_passesBlueprint(globalArena),
@@ -34,8 +34,6 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                     combinedResult.m_succeeded = false;
                     break;
                 }
-
-                invalidateAnalysis();
             }
             break;
         }
@@ -50,8 +48,6 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                     combinedResult.m_succeeded = false;
                     break;
                 }
-
-                invalidateAnalysis();
             }
             break;
         }
@@ -69,15 +65,16 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                         combinedResult.m_succeeded = false;
                         break;
                     }
-
-                    invalidateAnalysis();
+                }
+                if (!combinedResult.m_succeeded)
+                {
+                    break;
                 }
             }
             break;
         }
         case MirPassIterationPlace::Instruction:
         {
-            // TODO: Encapsulate instruction and make multiple passes in the same instruction to avoid re-iterating.
             for (auto *func : functionList)
             {
                 for (auto *block : func->getBlocks())
@@ -94,12 +91,25 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
                             break;
                         }
                         it = nextIt;
-                        invalidateAnalysis();
                     }
+                    if (!combinedResult.m_succeeded)
+                    {
+                        break;
+                    }
+                }
+                if (!combinedResult.m_succeeded)
+                {
+                    break;
                 }
             }
             break;
         }
+    }
+
+    // Invalidate cached analyses only once if the pass actually mutated MIR
+    if (combinedResult.m_modifiedMir)
+    {
+        invalidateAnalysis();
     }
 
     pass->setResult(&combinedResult);
