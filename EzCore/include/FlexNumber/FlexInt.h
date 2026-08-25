@@ -16,6 +16,11 @@ class FlexInt
     FlexInt(const FlexInt &other);
 
     /**
+     * Creates a new object and moves other into this.
+     */
+    FlexInt(FlexInt &&other) noexcept;
+
+    /**
      * Initializes the container and sets an unsigned int32 value into it. If the container could not be initialized, it
      * throws std::bad_alloc.
      */
@@ -43,7 +48,12 @@ class FlexInt
      * Initializes the container and converts the string to a number using the given base. If the number starts with
      * a '-' it will be treat as a signed integer, if it doesn't it will be unsigned.
      */
-    FlexInt(const std::string_view &numberStr, size_t bitWidth, bool _signed, size_t radix = 10);
+    FlexInt(std::string_view numberStr, size_t bitWidth, bool _signed, size_t radix = 10);
+
+    /**
+     * Moves other into this.
+     */
+    FlexInt &operator=(FlexInt &&other) noexcept;
 
     /**
      * DEEP copies other into this.

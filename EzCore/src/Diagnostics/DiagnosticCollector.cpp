@@ -41,7 +41,11 @@ DiagnosticBuilder DiagnosticCollector::trace(const std::string_view &sender, con
     return b;
 }
 
-void DiagnosticCollector::addListener(DiagnosticListener *listener) { m_listeners.push_back(listener); }
+void DiagnosticCollector::addListener(DiagnosticListener *listener)
+{
+    std::lock_guard lock(m_mutex);
+    m_listeners.push_back(listener);
+}
 
 void DiagnosticCollector::beginScope(DiagnosticScopeAction action)
 {
@@ -63,7 +67,7 @@ void DiagnosticCollector::endScope()
     }
 
     // Extract the active scope
-    auto closingScope = m_scopes.back();
+    auto closingScope = std::move(m_scopes.back());
     m_scopes.pop_back();
 
     switch (closingScope.getAction())

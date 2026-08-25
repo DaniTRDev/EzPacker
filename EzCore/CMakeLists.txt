@@ -9,6 +9,7 @@ set(EZCORE_FILES_LIST
         "include/Diagnostics/DiagnosticScope.h"
         "include/FlexNumber/FlexFloat.h"
         "include/FlexNumber/FlexInt.h"
+        "include/HelperClasses/DenseBitSet.h"
         "include/SourceManager/SourceManager.h"
 
         "src/Diagnostics/DiagnosticBuilder.cpp"
@@ -18,6 +19,7 @@ set(EZCORE_FILES_LIST
         "src/Diagnostics/DiagnosticScope.cpp"
         "src/FlexNumber/FlexFloat.cpp"
         "src/FlexNumber/FlexInt.cpp"
+        "src/HelperClasses/DenseBitSet.cpp"
         "src/SourceManager/SourceManager.cpp"
 )
 

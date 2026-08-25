@@ -1,10 +1,9 @@
-#include "Builder/MirBuilderContext.h"
 #include "Block/MirBlock.h"
 #include "Block/MirBlockBuilder.h"
 #include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
-#include "Instruction/MirInstruction.h"
 #include "Function/MirFunction.h"
+#include "Instruction/MirInstruction.h"
 #include "SourceManager/SourceManager.h"
 
 MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) : m_ctx(ctx), m_ownerFunc(owner) {}
@@ -25,9 +24,9 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
 
     if (m_ctx->appendBlock(block))
     {
-        m_insertPoint = { .m_type = InsertionType::InsertAfter,
+        m_insertPoint = { .m_type = InsertionType::Append,
                           .m_block = block,
-                          .m_iterator = block->getInstructions().begin() };
+                          .m_iterator = block->getInstructions().end() };
 
         m_ownerFunc->appendBlock(block);
         setBuildResult(block);

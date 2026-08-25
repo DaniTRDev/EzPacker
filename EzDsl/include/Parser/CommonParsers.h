@@ -164,9 +164,9 @@ template <typename Target> struct PmrListSink
 
     template <typename State> _sink sink(State &state) const
     {
-        if constexpr (requires { state.memoryResource(); })
+        if constexpr (requires { state.getAllocator(); })
         {
-            return _sink(state.memoryResource());
+            return _sink(state.getAllocator());
         }
         else
         {

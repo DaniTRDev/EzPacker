@@ -2,11 +2,43 @@
 #include <algorithm>
 #include <fstream>
 
+static void populateLineRanges(SourceFileEntry *entry)
+{
+    const auto &content = entry->m_content;
+    size_t lineStart = 0;
+    size_t lineNumber = 1;
+
+    for (size_t i = 0; i < content.size(); ++i)
+    {
+        if (content[i] == '\n')
+        {
+            entry->m_lines.push_back({ lineStart, i, lineNumber++ });
+            lineStart = i + 1;
+        }
+    }
+    if (lineStart <= content.size())
+    {
+        entry->m_lines.push_back({ lineStart, content.size(), lineNumber });
+    }
+}
+
 SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc) :
     m_workingPath(workingPath), m_alloc(alloc), m_includePaths(m_alloc), m_pathToIdMap(m_alloc), m_sourceFiles(m_alloc)
 {
     // Slot 0 reserved as a nullptr sentinel so 1-based IDs match indexing
     m_sourceFiles.push_back(nullptr);
+}
+
+SourceManager::~SourceManager()
+{
+    for (SourceFileEntry *entry : m_sourceFiles)
+    {
+        if (entry != nullptr)
+        {
+            entry->~SourceFileEntry();
+            m_alloc->deallocate(entry, sizeof(SourceFileEntry), alignof(SourceFileEntry));
+        }
+    }
 }
 
 bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) const
@@ -29,22 +61,7 @@ size_t SourceManager::addSourceContent(const std::string &name, const std::strin
                                                              std::pmr::string(name, m_alloc),
                                                              std::pmr::vector<SourceLineRange>(m_alloc) };
 
-    // Precompute line bounds with 1-based line numbers (safely handles \n and \r\n)
-    size_t lineStart = 0;
-    size_t lineNumber = 1;
-
-    for (size_t i = 0; i < content.size(); ++i)
-    {
-        if (content[i] == '\n')
-        {
-            entry->m_lines.push_back({ lineStart, i, lineNumber++ });
-            lineStart = i + 1;
-        }
-    }
-    if (lineStart <= content.size())
-    {
-        entry->m_lines.push_back({ lineStart, content.size(), lineNumber });
-    }
+    populateLineRanges(entry);
 
     // Use the arena-backed string to ensure it outlives the map entry
     m_pathToIdMap.emplace(entry->m_name, newId);
@@ -201,22 +218,31 @@ std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &fileP
     size_t fileSize = static_cast<size_t>(file.tellg());
     file.seekg(0, std::ios::beg);
 
-    std::string content;
-    content.resize(fileSize);
-    file.read(content.data(), fileSize);
+    size_t newId = m_sourceFiles.size();
 
-    if (!file && fileSize > 0)
+    // Direct allocation of SourceFileEntry and its PMR string buffer without heap intermediates
+    void *entryMem = m_alloc->allocate(sizeof(SourceFileEntry), alignof(SourceFileEntry));
+    SourceFileEntry *entry = new (entryMem) SourceFileEntry{ std::pmr::string(fileSize, '\0', m_alloc),
+                                                             std::pmr::string(canonicalName, m_alloc),
+                                                             std::pmr::vector<SourceLineRange>(m_alloc) };
+
+    if (fileSize > 0)
     {
-        return std::nullopt;
+        file.read(entry->m_content.data(), static_cast<std::streamsize>(fileSize));
+        if (!file)
+        {
+            entry->~SourceFileEntry();
+            m_alloc->deallocate(entryMem, sizeof(SourceFileEntry), alignof(SourceFileEntry));
+            return std::nullopt;
+        }
     }
 
-    size_t id = addSourceContent(canonicalName, content);
-    if (id == 0)
-    {
-        return std::nullopt;
-    }
+    populateLineRanges(entry);
 
-    return id;
+    m_pathToIdMap.emplace(entry->m_name, newId);
+    m_sourceFiles.push_back(entry);
+
+    return newId;
 }
 
 const std::pmr::string *SourceManager::getSourceBuffer(size_t id) const

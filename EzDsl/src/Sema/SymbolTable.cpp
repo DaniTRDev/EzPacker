@@ -14,7 +14,7 @@ ScopeId SymbolTable::getCurrentScopeId() const { return m_currentScopeId; }
 ScopeId SymbolTable::createScope(ScopeId parentId, const std::string_view &debugName)
 {
     std::pmr::polymorphic_allocator<> alloc(m_alloc);
-    Scope *scope = alloc.new_object<Scope>(m_scopes.size(), m_currentScopeId, debugName, m_alloc);
+    Scope *scope = alloc.new_object<Scope>(m_scopes.size(), parentId, debugName, m_alloc);
 
     m_scopes.push_back(scope);
     return scope->getId();
@@ -59,20 +59,20 @@ SymbolId SymbolTable::declareSym(class SourceReference *sourceRef,
                                  Symbol::SymbolData data,
                                  std::string_view name)
 {
-    if (getSymByName(name) != nullptr)
+    // Only verify duplicates within the current scope to allow lexical shadowing
+    if (getSymInScope(m_currentScopeId, name) != nullptr)
     {
         return InvalidSymbolId;
     }
 
     std::pmr::polymorphic_allocator<> alloc(m_alloc);
-    Symbol *symbol =
-            alloc.new_object<Symbol>(sourceRef, flags, m_currentScopeId, m_symbols.size(), type, std::move(name));
+    Symbol *symbol = alloc.new_object<Symbol>(sourceRef, flags, m_currentScopeId, m_symbols.size(), type, name);
     symbol->setData(std::move(data));
 
-    size_t symId = symbol->getId();
+    SymbolId symId = symbol->getId();
 
     m_symbols.push_back(symbol);
-    m_scopes[m_currentScopeId]->addSymbol(symId);
+    m_scopes[m_currentScopeId]->addSymbol(name, symId);
 
     return symId;
 }
@@ -97,14 +97,17 @@ const std::pmr::vector<Symbol *> &SymbolTable::getSymbols() const { return m_sym
 
 Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name) const
 {
-    Scope *scope = m_scopes[id];
-    const auto &symbolIds = scope->getSymbols();
+    if (id >= m_scopes.size())
+        return nullptr;
 
-    for (auto &symId : symbolIds)
+    Scope *scope = m_scopes[id];
+    if (!scope)
+        return nullptr;
+
+    ScopeId symId = scope->findSymbol(name);
+    if (symId != InvalidScopeId && symId < m_symbols.size())
     {
-        Symbol *sym = m_symbols[symId];
-        if (sym->getName() == name)
-            return sym;
+        return m_symbols[symId];
     }
 
     return nullptr;

@@ -2,6 +2,9 @@
 #define EZDSL_SCOPE_H
 
 #include "EzDslCommon.h"
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
 using ScopeId = size_t;
 inline constexpr ScopeId InvalidScopeId = UINT64_MAX;
@@ -25,9 +28,14 @@ class Scope
     ScopeId getParentId() const;
 
     /**
-     * Adds a symbol to the symbol list.
+     * Finds a symbol ID in this scope by name in O(1). Returns InvalidScopeId if not found.
      */
-    void addSymbol(ScopeId symbolId);
+    ScopeId findSymbol(std::string_view name) const;
+
+    /**
+     * Adds a symbol to the symbol list and lookup map.
+     */
+    void addSymbol(std::string_view name, ScopeId symbolId);
 
     /**
      * Returns a vector with the IDs of the symbols defined in this scope.
@@ -42,7 +50,8 @@ class Scope
   private:
     ScopeId m_id;
     ScopeId m_parentId;
-    std::pmr::vector<ScopeId> m_symbols; // Same data type as SymbolId, but we can't use it here....
+    std::pmr::vector<ScopeId> m_symbols;
+    std::pmr::unordered_map<std::string_view, ScopeId> m_symbolMap;
     std::string_view m_debugName;
 };
 

@@ -150,7 +150,7 @@ resolveBitExpr(DiagnosticCollector *collector,
     }
 
     // 4. Composite Binary/Unary BitExpression
-    if (const auto *subExprPtr = std::get_if<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(&expr))
+    if (const auto *subExprPtr = std::get_if<DSL::Ast::InstDef::BitExpression*>(&expr))
     {
         const auto &subExpr = *subExprPtr;
         auto lhsResolved = resolveBitExpr(collector, subExpr->m_lhs, targetBitWidth, contextName, operands, sourceRef);

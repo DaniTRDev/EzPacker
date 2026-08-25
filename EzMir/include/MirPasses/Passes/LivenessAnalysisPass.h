@@ -4,6 +4,7 @@
 #include "EzMirCommon.h"
 #include "MirPasses/IMirAnalysisPass.h"
 #include "Operand/MirRegisterReference.h"
+#include "HelperClasses/DenseBitSet.h"
 
 struct LivenessResult
 {

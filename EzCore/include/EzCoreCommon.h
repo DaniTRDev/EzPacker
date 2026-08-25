@@ -25,6 +25,6 @@ extern "C"
 
 #include <EzLogger.h>
 
-inline std::unique_ptr<SyncLogger> g_logger = EzLogger::createSyncLogger("EzPacker");
+inline std::unique_ptr<SyncLogger> g_logger = []() { return EzLogger::createSyncLogger("EzPacker"); }();
 
 #endif // EZCORE_COMMON_H

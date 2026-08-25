@@ -19,6 +19,11 @@ class SourceManager : public GenericSourceManager
     SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc);
 
     /**
+     * Calls the destructor of the objects.
+     */
+    ~SourceManager();
+
+    /**
      * Checks if a source with the given name already exists in the manager.
      */
     bool doesSourceNameExist(const std::string_view &sourceName) const override;

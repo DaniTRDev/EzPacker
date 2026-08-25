@@ -1,6 +1,9 @@
 #include "Diagnostics/DiagnosticScope.h"
 
-DiagnosticScope::DiagnosticScope(std::pmr::memory_resource *pool) : m_messages(pool) {}
+DiagnosticScope::DiagnosticScope(std::pmr::memory_resource *pool) :
+    m_hasFatalErrors(false), m_action(DiagnosticScopeAction::Propagate), m_messages(pool)
+{
+}
 
 DiagnosticScopeAction DiagnosticScope::getAction() const { return m_action; }
 

@@ -25,6 +25,11 @@ class FlexFloat
     FlexFloat(const FlexFloat &other);
 
     /**
+     * Moves other into this.
+     */
+    FlexFloat(FlexFloat &&other) noexcept;
+
+    /**
      * Initializes the container and sets a standard single-precision hardware float value into it.
      */
     explicit FlexFloat(float value);
@@ -37,12 +42,17 @@ class FlexFloat
     /**
      * Initializes the container and parses a safe string slice into a floating-point number using the given base radix.
      */
-    FlexFloat(const std::string_view &numberStr, size_t bitWidth, size_t radix = 10);
+    FlexFloat(std::string_view numberStr, size_t bitWidth, size_t radix = 10);
 
     /**
      * Clears internal LibBF registers, frees custom dynamic memory frames, and destroys the object wrapper.
      */
     ~FlexFloat();
+
+    /**
+     * Moves other into this.
+     */
+    FlexFloat &operator=(FlexFloat &&other) noexcept;
 
     /**
      * Copies other into this.

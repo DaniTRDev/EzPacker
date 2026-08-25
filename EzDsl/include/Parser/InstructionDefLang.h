@@ -38,8 +38,6 @@ struct SlicedIdentifier
             { return Ast::InstDef::SlicedIdentifier{ .m_name = std::move(name), .m_slice = slice }; });
 };
 
-// BitExpression Operator Precedence Matrix:
-// 1 (~ prefix) > 2 (+, -) > 3 (<<, >>) > 4 (&) > 5 (^) > 6 (|)
 struct BitExpression : lexy::expression_production
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -94,32 +92,38 @@ struct BitExpression : lexy::expression_production
 
     using operation = Or;
 
-    static constexpr auto value = lexy::callback<Ast::InstDef::BitExprValues>(
-            [](Ast::InstDef::BitExprValues expr) -> Ast::InstDef::BitExprValues { return expr; },
-            [](Ast::Common::IntegerLiteral lit) -> Ast::InstDef::BitExprValues
-            { return Ast::InstDef::BitExprValues{ lit }; },
-            [](Ast::InstDef::SlicedIdentifier sId) -> Ast::InstDef::BitExprValues
-            { return Ast::InstDef::BitExprValues{ std::move(sId) }; },
-            [](Ast::Common::Identifier id) -> Ast::InstDef::BitExprValues
-            { return Ast::InstDef::BitExprValues{ std::move(id) }; },
-            [](Ast::InstDef::BitExprOp op, Ast::InstDef::BitExprValues operand) -> Ast::InstDef::BitExprValues
-            {
-                auto node = std::make_shared<Ast::InstDef::BitExpression>();
-                node->m_lhs = std::move(operand);
-                node->m_op = op;
-                node->m_rhs = std::nullopt;
-                return Ast::InstDef::BitExprValues{ std::move(node) };
-            },
-            [](Ast::InstDef::BitExprValues lhs,
-               Ast::InstDef::BitExprOp op,
-               Ast::InstDef::BitExprValues rhs) -> Ast::InstDef::BitExprValues
-            {
-                auto node = std::make_shared<Ast::InstDef::BitExpression>();
-                node->m_lhs = std::move(lhs);
-                node->m_op = op;
-                node->m_rhs = std::move(rhs);
-                return Ast::InstDef::BitExprValues{ std::move(node) };
-            });
+    static constexpr auto value = lexy::bind(
+            lexy::callback<Ast::InstDef::BitExprValues>(
+                    [](ParseContext &ctx, Ast::InstDef::BitExprValues expr) -> Ast::InstDef::BitExprValues
+                    { return expr; },
+                    [](ParseContext &ctx, Ast::Common::IntegerLiteral lit) -> Ast::InstDef::BitExprValues
+                    { return Ast::InstDef::BitExprValues{ lit }; },
+                    [](ParseContext &ctx, Ast::InstDef::SlicedIdentifier sId) -> Ast::InstDef::BitExprValues
+                    { return Ast::InstDef::BitExprValues{ std::move(sId) }; },
+                    [](ParseContext &ctx, Ast::Common::Identifier id) -> Ast::InstDef::BitExprValues
+                    { return Ast::InstDef::BitExprValues{ std::move(id) }; },
+                    [](ParseContext &ctx, Ast::InstDef::BitExprOp op, Ast::InstDef::BitExprValues operand)
+                            -> Ast::InstDef::BitExprValues
+                    {
+                        auto *alloc = ctx.getAllocator();
+                        void *mem = alloc->allocate(sizeof(Ast::InstDef::BitExpression),
+                                                    alignof(Ast::InstDef::BitExpression));
+                        auto *node = new (mem) Ast::InstDef::BitExpression{ std::move(operand), op, std::nullopt };
+                        return Ast::InstDef::BitExprValues{ node };
+                    },
+                    [](ParseContext &ctx,
+                       Ast::InstDef::BitExprValues lhs,
+                       Ast::InstDef::BitExprOp op,
+                       Ast::InstDef::BitExprValues rhs) -> Ast::InstDef::BitExprValues
+                    {
+                        auto *alloc = ctx.getAllocator();
+                        void *mem = alloc->allocate(sizeof(Ast::InstDef::BitExpression),
+                                                    alignof(Ast::InstDef::BitExpression));
+                        auto *node = new (mem) Ast::InstDef::BitExpression{ std::move(lhs), op, std::move(rhs) };
+                        return Ast::InstDef::BitExprValues{ node };
+                    }),
+            lexy::parse_state,
+            lexy::values);
 };
 
 // Matches "opcode = 0x33" or "imm4_0[0:4] = imm12[0:4]"

@@ -6,7 +6,7 @@
 /**
  * Converts a given string to lowercase.
  */
-inline std::string StrToLower(const std::string &str)
+inline std::string StrToLower(const std::string_view &str)
 {
     std::string lowerStr;
     lowerStr.resize(str.size());
@@ -18,9 +18,9 @@ inline std::string StrToLower(const std::string &str)
 /**
  * Converts a given string to uppercase.
  */
-inline std::string StrToUpper(const std::string &str)
+inline std::string StrToUpper(const std::string_view &str)
 {
-    std::string upperStr = str;
+    std::string upperStr;
     upperStr.resize(str.size());
 
     std::transform(upperStr.begin(), upperStr.end(), upperStr.begin(), toupper);

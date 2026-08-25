@@ -51,8 +51,7 @@ enum class BitExprOp
 /**
  * Variant representing possible operand types in a bitfield expression.
  */
-using BitExprValues =
-        std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, std::shared_ptr<BitExpression>>;
+using BitExprValues = std::variant<Common::Identifier, Common::IntegerLiteral, SlicedIdentifier, BitExpression *>;
 
 /**
  * Binary or unary bit expression operating on identifiers, literals, slices, or sub-expressions.

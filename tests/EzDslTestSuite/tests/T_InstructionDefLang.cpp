@@ -55,24 +55,24 @@ TEST_F(InstDefLangTest, TestBitExpressionPrecedence)
 
     auto res = ctx.parse<DSL::Parser::InstDef::BitExpression, DSL::Ast::InstDef::BitExprValues>();
     ASSERT_TRUE(res.has_value());
-    ASSERT_TRUE(std::holds_alternative<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*res));
+    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::BitExpression*>(*res));
 
     // Root should be Bitwise OR (lowest precedence)
-    const auto &rootExpr = std::get<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*res);
+    const auto &rootExpr = std::get<DSL::Ast::InstDef::BitExpression*>(*res);
     EXPECT_EQ(rootExpr->m_op, DSL::Ast::InstDef::BitExprOp::Or);
     ASSERT_TRUE(std::holds_alternative<DSL::Ast::Common::Identifier>(rootExpr->m_lhs));
     EXPECT_EQ(std::get<DSL::Ast::Common::Identifier>(rootExpr->m_lhs).m_node, "a");
 
     // RHS of OR should be Bitwise AND
     ASSERT_TRUE(rootExpr->m_rhs.has_value());
-    ASSERT_TRUE(std::holds_alternative<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*rootExpr->m_rhs));
-    const auto &andExpr = std::get<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*rootExpr->m_rhs);
+    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::BitExpression*>(*rootExpr->m_rhs));
+    const auto &andExpr = std::get<DSL::Ast::InstDef::BitExpression*>(*rootExpr->m_rhs);
     EXPECT_EQ(andExpr->m_op, DSL::Ast::InstDef::BitExprOp::And);
 
     // RHS of AND should be SHL (<<)
     ASSERT_TRUE(andExpr->m_rhs.has_value());
-    ASSERT_TRUE(std::holds_alternative<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*andExpr->m_rhs));
-    const auto &shlExpr = std::get<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*andExpr->m_rhs);
+    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::BitExpression*>(*andExpr->m_rhs));
+    const auto &shlExpr = std::get<DSL::Ast::InstDef::BitExpression*>(*andExpr->m_rhs);
     EXPECT_EQ(shlExpr->m_op, DSL::Ast::InstDef::BitExprOp::Shl);
 }
 
@@ -83,14 +83,14 @@ TEST_F(InstDefLangTest, TestUnaryComplementAndSliceInExpression)
 
     auto res = ctx.parse<DSL::Parser::InstDef::BitExpression, DSL::Ast::InstDef::BitExprValues>();
     ASSERT_TRUE(res.has_value());
-    ASSERT_TRUE(std::holds_alternative<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*res));
+    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::BitExpression*>(*res));
 
-    const auto &root = std::get<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(*res);
+    const auto &root = std::get<DSL::Ast::InstDef::BitExpression*>(*res);
     EXPECT_EQ(root->m_op, DSL::Ast::InstDef::BitExprOp::And);
 
     // Unary NOT check on LHS
-    ASSERT_TRUE(std::holds_alternative<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(root->m_lhs));
-    const auto &notExpr = std::get<std::shared_ptr<DSL::Ast::InstDef::BitExpression>>(root->m_lhs);
+    ASSERT_TRUE(std::holds_alternative<DSL::Ast::InstDef::BitExpression*>(root->m_lhs));
+    const auto &notExpr = std::get<DSL::Ast::InstDef::BitExpression*>(root->m_lhs);
     EXPECT_EQ(notExpr->m_op, DSL::Ast::InstDef::BitExprOp::Not);
     EXPECT_FALSE(notExpr->m_rhs.has_value());
 

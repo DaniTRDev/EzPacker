@@ -1,9 +1,11 @@
 #include "FlexNumber/FlexFloat.h"
+#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <stdexcept>
-#include <algorithm>
 #include <limits>
+#include <stdexcept>
+
+#include <libbf.h>
 
 static void *bf_realloc_wrapper(void *opaque, void *ptr, size_t size) { return std::realloc(ptr, size); }
 
@@ -21,6 +23,19 @@ FlexFloat::FlexFloat(const FlexFloat &other) : FlexFloat(other.getBitSize())
     {
         throw std::bad_alloc();
     }
+}
+
+FlexFloat::FlexFloat(FlexFloat &&other) noexcept : m_bitWidth(other.m_bitWidth), m_lastErr(other.m_lastErr)
+{
+    m_bfCtx = other.m_bfCtx;
+    m_number = other.m_number;
+
+    // Retarget m_number's internal context pointer to this instance's m_bfCtx
+    m_number.ctx = &m_bfCtx;
+
+    // Invalidate other so its destructor does not free shared memory
+    other.m_number = {};
+    other.m_bfCtx = {};
 }
 
 FlexFloat::FlexFloat(float value) : FlexFloat(size_t(32))
@@ -49,14 +64,13 @@ FlexFloat::FlexFloat(double value) : FlexFloat(size_t(64))
     }
 }
 
-FlexFloat::FlexFloat(const std::string_view &numberStr, size_t bitWidth, size_t radix) : FlexFloat(bitWidth)
+FlexFloat::FlexFloat(std::string_view numberStr, size_t bitWidth, size_t radix) : FlexFloat(bitWidth)
 {
     if (numberStr.empty() || radix < 2 || radix > 36)
     {
         throw std::runtime_error("Could not decode float because string is invalid or radix is not supported");
     }
 
-    // Force null-termination out of incoming std::string_view safely
     const char *next_ptr = nullptr;
     std::string str(numberStr);
 
@@ -75,67 +89,83 @@ FlexFloat::FlexFloat(const std::string_view &numberStr, size_t bitWidth, size_t 
 
 FlexFloat::~FlexFloat()
 {
-    libbf::bf_delete(&m_number);
-    libbf::bf_context_end(&m_bfCtx);
+    if (m_bfCtx.realloc_func != nullptr)
+    {
+        libbf::bf_delete(&m_number);
+        libbf::bf_context_end(&m_bfCtx);
+    }
+}
+
+FlexFloat &FlexFloat::operator=(FlexFloat &&other) noexcept
+{
+    if (this != &other)
+    {
+        if (m_bfCtx.realloc_func != nullptr)
+        {
+            libbf::bf_delete(&m_number);
+            libbf::bf_context_end(&m_bfCtx);
+        }
+
+        m_bfCtx = other.m_bfCtx;
+        m_number = other.m_number;
+        m_bitWidth = other.m_bitWidth;
+        m_lastErr = other.m_lastErr;
+
+        // Retarget m_number's internal context pointer to this instance's m_bfCtx
+        m_number.ctx = &m_bfCtx;
+
+        other.m_number = {};
+        other.m_bfCtx = {};
+    }
+    return *this;
 }
 
 FlexFloat &FlexFloat::operator=(const FlexFloat &other)
 {
-    m_lastErr = libbf::bf_set(&m_number, &other.m_number);
-    if (m_lastErr & BF_ST_MEM_ERROR)
+    if (this != &other)
     {
-        throw std::bad_alloc();
-    }
+        if (m_bfCtx.realloc_func == nullptr)
+        {
+            libbf::bf_context_init(&m_bfCtx, bf_realloc_wrapper, nullptr);
+            libbf::bf_init(&m_bfCtx, &m_number);
+        }
 
+        m_bitWidth = other.m_bitWidth;
+        m_lastErr = libbf::bf_set(&m_number, &other.m_number);
+        if (m_lastErr & BF_ST_MEM_ERROR)
+        {
+            throw std::bad_alloc();
+        }
+    }
     return *this;
 }
 
 bool FlexFloat::fitsIn(size_t bitWidth) const
 {
     if (bitWidth == 0)
-    {
         return false;
-    }
 
-    // NaN and Infinities are representable in valid float layouts of any width
-    if (libbf::bf_is_nan(&m_number) || !libbf::bf_is_finite(&m_number))
-    {
+    if (libbf::bf_is_nan(&m_number) || !libbf::bf_is_finite(&m_number) || libbf::bf_is_zero(&m_number))
         return true;
-    }
 
-    // Zero fits in any floating-point target size
-    if (libbf::bf_is_zero(&m_number))
-    {
-        return true;
-    }
-
-    // Checking standard target widths (32-bit single, 64-bit double) for faster times.
     double currentVal;
     libbf::bf_get_float64(&m_number, &currentVal, libbf::BF_RNDN);
 
     if (bitWidth <= 32)
     {
-        // Check if value exceeds IEEE 754 single-precision (binary32) bounds
         double maxFloat = static_cast<double>(std::numeric_limits<float>::max());
         return (currentVal >= -maxFloat && currentVal <= maxFloat);
     }
 
     if (bitWidth <= 64)
     {
-        // Check if value exceeds IEEE 754 double-precision (binary64) bounds
-        // If it converted to infinite double via libbf_get_float64, it exceeds f64
         return !std::isinf(currentVal);
     }
 
-    // For arbitrary precision (>64 bits), construct a temporary FlexFloat context
-    // and round to target precision to verify it doesn't overflow to infinity.
     FlexFloat tempCopy(*this);
     tempCopy.m_bitWidth = bitWidth;
-
-    // Attempt rounding to target precision bits
     libbf::bf_round(&tempCopy.m_number, tempCopy.getPrecBits(), libbf::BF_RNDN);
 
-    // If rounding yields infinity, the value was too large for bitWidth
     return libbf::bf_is_finite(&tempCopy.m_number);
 }
 
@@ -149,43 +179,44 @@ bool FlexFloat::isPositive() const { return !isNeg() && !isZero() && !libbf::bf_
 
 bool FlexFloat::operator>(const FlexFloat &other) const
 {
-    if (bf_is_nan(&m_number) || bf_is_nan(&other.m_number))
+    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
         return false;
-    return bf_cmp(&m_number, &other.m_number) > 0;
+    return libbf::bf_cmp(&m_number, &other.m_number) > 0;
 }
+
 bool FlexFloat::operator>=(const FlexFloat &other) const
 {
-    if (bf_is_nan(&m_number) || bf_is_nan(&other.m_number))
+    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
         return false;
-    return bf_cmp(&m_number, &other.m_number) >= 0;
+    return libbf::bf_cmp(&m_number, &other.m_number) >= 0;
 }
 
 bool FlexFloat::operator<(const FlexFloat &other) const
 {
-    if (bf_is_nan(&m_number) || bf_is_nan(&other.m_number))
+    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
         return false;
-    return bf_cmp(&m_number, &other.m_number) < 0;
+    return libbf::bf_cmp(&m_number, &other.m_number) < 0;
 }
+
 bool FlexFloat::operator<=(const FlexFloat &other) const
 {
-    if (bf_is_nan(&m_number) || bf_is_nan(&other.m_number))
+    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
         return false;
-    return bf_cmp(&m_number, &other.m_number) <= 0;
+    return libbf::bf_cmp(&m_number, &other.m_number) <= 0;
 }
 
 bool FlexFloat::operator==(const FlexFloat &other) const
 {
-    if (bf_is_nan(&m_number) || bf_is_nan(&other.m_number))
+    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
         return false;
-    return bf_cmp(&m_number, &other.m_number) == 0;
+    return libbf::bf_cmp(&m_number, &other.m_number) == 0;
 }
+
 bool FlexFloat::operator!=(const FlexFloat &other) const
 {
-    // According to IEEE-754 rules, NaN != NaN is always true,
-    // and NaN != any_number is also always true.
-    if (bf_is_nan(&m_number) || bf_is_nan(&other.m_number))
+    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
         return true;
-    return bf_cmp(&m_number, &other.m_number) != 0;
+    return libbf::bf_cmp(&m_number, &other.m_number) != 0;
 }
 
 FlexFloat FlexFloat::operator+(const FlexFloat &other)
@@ -252,7 +283,6 @@ double FlexFloat::getDouble() const
 {
     double currentVal = 0;
     libbf::bf_get_float64(&m_number, &currentVal, libbf::BF_RNDN);
-
     return currentVal;
 }
 
@@ -260,7 +290,6 @@ float FlexFloat::getFloat() const
 {
     double currentVal = 0;
     libbf::bf_get_float64(&m_number, &currentVal, libbf::BF_RNDN);
-
     return static_cast<float>(currentVal);
 }
 
@@ -275,7 +304,6 @@ libbf::limb_t FlexFloat::getPrecBits() const
     if (m_bitWidth == 128)
         return 113; // binary128 mantissa
 
-    // Dynamically handle arbitrary dimensions safely (IEEE style allocation rules)
     if (m_bitWidth > 128)
     {
         size_t expBits = static_cast<size_t>(std::round(4 * std::log2(static_cast<double>(m_bitWidth)))) - 13;
@@ -288,9 +316,8 @@ libbf::limb_t FlexFloat::getPrecBits() const
 FlexFloat FlexFloat::getHighHalf() const
 {
     if (m_bitWidth % 2 != 0)
-    {
         throw std::runtime_error("Cannot execute floating-point scalar expansion split on an odd bit-width.");
-    }
+
     size_t splitWidth = m_bitWidth / 2;
     FlexFloat highPart(splitWidth);
 
@@ -308,9 +335,8 @@ FlexFloat FlexFloat::getHighHalf() const
 FlexFloat FlexFloat::getLowHalf() const
 {
     if (m_bitWidth % 2 != 0)
-    {
         throw std::runtime_error("Cannot execute floating-point scalar expansion split on an odd bit-width.");
-    }
+
     size_t splitWidth = m_bitWidth / 2;
     FlexFloat lowPart(splitWidth);
 
@@ -328,18 +354,12 @@ FlexFloat FlexFloat::getLowHalf() const
 void FlexFloat::extend(size_t newBitSize)
 {
     if (newBitSize < m_bitWidth)
-    {
         throw std::runtime_error("FlexFloat::extend cannot be used to down-cast precision widths.");
-    }
 
     if (newBitSize == m_bitWidth)
         return;
 
-    // Update internal tracking bit dimension
     m_bitWidth = newBitSize;
-
-    // Force LibBF to realign, scale, and re-round its internal significand/mantissa bounds
-    // to match the newly requested target width precision step (e.g., 24 bits -> 53 bits).
     clampToFloatBounds();
 }
 
@@ -348,39 +368,129 @@ std::pmr::vector<uint8_t> FlexFloat::dump(bool bigEndian, std::pmr::memory_resou
     size_t byteSize = (m_bitWidth + 7) / 8;
     std::pmr::vector<uint8_t> buffer(byteSize, 0, alloc);
 
-    if (byteSize == 0)
+    if (byteSize == 0 || m_bitWidth == 0)
         return buffer;
 
-    if (m_bitWidth == 32)
-    {
-        double rawDouble;
-        libbf::bf_get_float64(&m_number, &rawDouble, libbf::BF_RNDN);
-        float rawFloat = static_cast<float>(rawDouble);
-        std::copy_n(reinterpret_cast<const uint8_t *>(&rawFloat), sizeof(float), buffer.data());
-    }
+    // Determine IEEE-754 exponent bits (w) and fraction bits (t)
+    size_t w;
+    if (m_bitWidth == 16)
+        w = 5;
+    else if (m_bitWidth == 32)
+        w = 8;
     else if (m_bitWidth == 64)
+        w = 11;
+    else if (m_bitWidth == 128)
+        w = 15;
+    else if (m_bitWidth > 128)
+        w = static_cast<size_t>(std::round(4.0 * std::log2(static_cast<double>(m_bitWidth)))) - 13;
+    else
+        w = (m_bitWidth >= 15) ? (m_bitWidth - getPrecBits() - 1) : 4;
+
+    if (w >= m_bitWidth - 1)
+        w = m_bitWidth / 2;
+
+    size_t t = m_bitWidth - 1 - w;
+    int64_t bias = (1LL << (w - 1)) - 1;
+    int64_t maxExp = (1LL << w) - 1;
+
+    int sign = (m_number.sign != 0) ? 1 : 0;
+    int64_t expField = 0;
+
+    auto set_be_bit = [&](size_t bitIdx, int val)
     {
-        double rawDouble;
-        libbf::bf_get_float64(&m_number, &rawDouble, libbf::BF_RNDN);
-        std::copy_n(reinterpret_cast<const uint8_t *>(&rawDouble), sizeof(double), buffer.data());
+        if (val && bitIdx < m_bitWidth)
+        {
+            size_t byteIdx = bitIdx / 8;
+            size_t bitInByte = 7 - (bitIdx % 8);
+            buffer[byteIdx] |= static_cast<uint8_t>(1U << bitInByte);
+        }
+    };
+
+    auto get_mantissa_bit = [&](size_t d) -> int
+    {
+        if (m_number.tab == nullptr || m_number.len == 0)
+            return 0;
+        size_t limbBits = sizeof(libbf::limb_t) * 8;
+        size_t limbOffset = d / limbBits;
+        if (limbOffset >= static_cast<size_t>(m_number.len))
+            return 0;
+        size_t limbIdx = static_cast<size_t>(m_number.len) - 1 - limbOffset;
+        size_t bitInLimb = (limbBits - 1) - (d % limbBits);
+        return static_cast<int>((m_number.tab[limbIdx] >> bitInLimb) & 1U);
+    };
+
+    // 1. Sign bit (bit 0)
+    if (sign)
+    {
+        set_be_bit(0, 1);
+    }
+
+    // 2. Exponent and Fraction encoding
+    if (libbf::bf_is_nan(&m_number))
+    {
+        expField = maxExp;
+        set_be_bit(1 + w, 1); // Quiet NaN flag (MSB of fraction)
+    }
+    else if (!libbf::bf_is_finite(&m_number))
+    {
+        expField = maxExp;
+    }
+    else if (libbf::bf_is_zero(&m_number))
+    {
+        expField = 0;
     }
     else
     {
-        // Safe continuous fallback for any-length layouts: serialize internal data bits
-        // cleanly across raw byte space limits up to bitWidth capacity
-        size_t limbsToCopy = std::min(byteSize, (size_t)(m_number.len * sizeof(libbf::limb_t)));
-        if (limbsToCopy > 0 && m_number.tab != nullptr)
+        int64_t unbiasedExp = static_cast<int64_t>(m_number.expn) - 1;
+        int64_t e = unbiasedExp + bias;
+
+        if (e >= maxExp)
         {
-            std::memcpy(buffer.data(), m_number.tab, limbsToCopy);
+            expField = maxExp;
+        }
+        else if (e >= 1)
+        {
+            expField = e;
+            for (size_t i = 0; i < t; ++i)
+            {
+                int bitVal = get_mantissa_bit(1 + i);
+                set_be_bit(1 + w + i, bitVal);
+            }
+        }
+        else
+        {
+            // Subnormal / Denormalized
+            expField = 0;
+            int64_t shift = 1 - e;
+            if (shift <= static_cast<int64_t>(t))
+            {
+                for (size_t i = 0; i < t; ++i)
+                {
+                    int bitVal = 0;
+                    if (static_cast<int64_t>(i) == shift - 1)
+                    {
+                        bitVal = 1;
+                    }
+                    else if (static_cast<int64_t>(i) > shift - 1)
+                    {
+                        size_t d = static_cast<size_t>(static_cast<int64_t>(i) - shift);
+                        bitVal = get_mantissa_bit(1 + d);
+                    }
+                    set_be_bit(1 + w + i, bitVal);
+                }
+            }
         }
     }
 
-    bool hostBigEndian = false;
-#if defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-    hostBigEndian = true;
-#endif
+    // 3. Write Exponent bits (bits 1 to w)
+    for (size_t i = 0; i < w; ++i)
+    {
+        int expBit = static_cast<int>((expField >> (w - 1 - i)) & 1);
+        set_be_bit(1 + i, expBit);
+    }
 
-    if (bigEndian != hostBigEndian)
+    // 4. Output Endianness Adjustment
+    if (!bigEndian)
     {
         std::reverse(buffer.begin(), buffer.end());
     }
@@ -391,23 +501,16 @@ std::pmr::vector<uint8_t> FlexFloat::dump(bool bigEndian, std::pmr::memory_resou
 std::string FlexFloat::toString(size_t radix) const
 {
     if (radix < 2 || radix > 36)
-    {
         throw std::runtime_error("Unsupported radix for string conversion.");
-    }
 
     size_t length = 0;
     libbf::bf_flags_t flags = BF_FTOA_FORMAT_FREE | libbf::BF_RNDN;
-    char *rawStr = bf_ftoa(&length, &m_number, static_cast<int>(radix), getPrecBits(), flags);
+    char *rawStr = libbf::bf_ftoa(&length, &m_number, static_cast<int>(radix), getPrecBits(), flags);
 
     if (!rawStr)
-    {
         throw std::bad_alloc();
-    }
 
-    // Capture the output in a C++ string safely before releasing the raw C memory
     std::string result(rawStr, length);
-
-    // Free using standard system free, context allocator uses std::realloc/malloc
     std::free(rawStr);
     return result;
 }
@@ -417,7 +520,6 @@ void FlexFloat::clampToFloatBounds()
     if (m_bitWidth == 0 || libbf::bf_is_nan(&m_number) || !libbf::bf_is_finite(&m_number))
         return;
 
-    // Only apply hard thresholds if we fit inside standard hardware type bounds
     if (m_bitWidth <= 64)
     {
         double currentVal;
@@ -426,13 +528,9 @@ void FlexFloat::clampToFloatBounds()
         if (m_bitWidth == 32)
         {
             if (currentVal > static_cast<double>(std::numeric_limits<float>::max()))
-            {
                 throw std::overflow_error("FlexFloat arithmetic caused an f32 precision target overflow.");
-            }
             if (currentVal < static_cast<double>(-std::numeric_limits<float>::max()))
-            {
                 throw std::underflow_error("FlexFloat arithmetic caused an f32 precision target underflow.");
-            }
 
             float truncated = static_cast<float>(currentVal);
             libbf::bf_set_float64(&m_number, static_cast<double>(truncated));
@@ -440,15 +538,11 @@ void FlexFloat::clampToFloatBounds()
         else if (m_bitWidth == 64)
         {
             if (std::isinf(currentVal))
-            {
                 throw std::overflow_error("FlexFloat arithmetic caused an f64 precision target overflow.");
-            }
         }
     }
     else
     {
-        // For arbitrary length numbers (e.g. 128+ bits), use LibBF's internal tracking round-offs
-        // to conform limits to requested target structures dynamically.
         libbf::bf_round(&m_number, getPrecBits(), libbf::BF_RNDN);
     }
 }
