@@ -1,94 +1,155 @@
 # EzPacker Backend 1.0 Complete Engineering Specification & Step-by-Step Implementation Guide
 
-This document contains the **in-depth implementation details, architectural trade-offs, semantic analysis algorithms, C++ code generation specifications, and concrete test plans** to deliver a **stable 1.0 release** of the EzPacker compiler backend.
+This document contains the **in-depth implementation details, architectural trade-offs, semantic analysis algorithms, C++ code generation specifications, EzTriple target synthesis design, and concrete test plans** to deliver a **stable 1.0 release** of the EzPacker compiler backend.
 
 ---
 
 # Table of Contents
 1. [Master Architecture Pipeline](#1-master-architecture-pipeline)
-2. [Architectural Decisions & Trade-Offs (Pros & Cons)](#2-architectural-decisions--trade-offs-pros--cons)
-3. [Phase 1: EzDSL Semantic Analysis & Calling Convention DSL](#3-phase-1-ezdsl-semantic-analysis--calling-convention-dsl)
-   - ~~[1.1 Calling Convention DSL (`.ccdf`) Parser & AST](#11-calling-convention-dsl-ccdf-parser--ast)~~
-   - [1.2 Unified Symbol Table & Cross-Language Resolution](#12-unified-symbol-table--cross-language-resolution)
-   - [1.3 Target Definition Semantic Pass (`TargetDefPass`)](#13-target-definition-semantic-pass-targetdefpass)
-   - [1.4 Target Instruction Semantic Pass (`InstructionDefPass`)](#14-target-instruction-semantic-pass-instructiondefpass)
-   - [1.5 Legalization Action Semantic Pass (`LegalizeActionPass`)](#15-legalization-action-semantic-pass-legalizeactionpass)
-   - [1.6 Legalization Rewrite Rule Semantic Pass (`LegalizeRulePass`)](#16-legalization-rewrite-rule-semantic-pass-legalizerulepass)
-   - [1.7 Instruction Selection Semantic Pass (`InstructionSelPass`)](#17-instruction-selection-semantic-pass-instructionselpass)
-   - [1.8 Calling Convention Semantic Pass (`CallingConvPass`)](#18-calling-convention-semantic-pass-callingconvpass)
-4. [Phase 2: EzDSL C++ Code Generators](#4-phase-2-ezdsl-c-code-generators)
-   - [2.1 Target Instruction & Format Binary Encoder (`CppTargetInstGenerator`)](#21-target-instruction--format-binary-encoder-cpptargetinstgenerator)
-   - [2.2 2D Legality Action Matrix Generator (`CppLegalizerGenerator`)](#22-2d-legality-action-matrix-generator-cpplegalizergenerator)
-   - [2.3 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`)](#23-legalization-rewrite-rule-engine-generator-cpplegalizerrulegenerator)
-   - [2.4 Multi-Variant ISel Table Generator (`CppISelTableGenerator`)](#24-multi-variant-isel-table-generator-cppiseltablegenerator)
-   - [2.5 Calling Convention Generator (`CppCallingConvGenerator`)](#25-calling-convention-generator-cppcallingconvgenerator)
-   - [2.6 Driver CLI & CMake Integration (`EzDsl-cli`)](#26-driver-cli--cmake-integration-ezdsl-cli)
-5. [Phase 3: EzMir Core & Execution Engines](#5-phase-3-ezmir-core--execution-engines)
-   - [3.1 Function-Scoped Monotonic Arenas (`MirFunction`)](#31-function-scoped-monotonic-arenas-mirfunction)
-   - [3.2 MIR Invariant Verifier Pass (`MirVerifierPass`)](#32-mir-invariant-verifier-pass-mirverifierpass)
-   - [3.3 Generic Legalizer Engine (`MirLegalizerPass`)](#33-generic-legalizer-engine-mirlegalizerpass)
-   - [3.4 Generic Instruction Selector Engine (`MirInstructionSelectorPass`)](#34-generic-instruction-selector-engine-mirinstructionselectorpass)
-6. [Phase 4: EzTriple & Backend Hardening](#6-phase-4-eztriple--backend-hardening)
-   - [4.1 Chaitin-Briggs Register Coalescing & Allocation Hardening](#41-chaitin-briggs-register-coalescing--allocation-hardening)
-   - [4.2 Dynamic Alloca & ABI Red Zone Handling (`MirFrameLowerer`)](#42-dynamic-alloca--abi-red-zone-handling-mirframelowerer)
-7. [Phase 5: EzCodeEmitter & Direct Object Writers](#7-phase-5-ezcodeemitter--direct-object-writers)
-   - [5.1 ELF64 Object Writer (`ElfObjectWriter`)](#51-elf64-object-writer-elfobjectwriter)
-   - [5.2 PE/COFF64 Object Writer (`CoffObjectWriter`)](#52-pecoff64-object-writer-coffobjectwriter)
-   - [5.3 Mach-O 64-bit Object Writer (`MachoObjectWriter`)](#53-mach-o-64-bit-object-writer-machoobjectwriter)
-8. [Phase 6: End-to-End Testing & 1.0 Release Checklist](#8-phase-6-end-to-end-testing--10-release-checklist)
+2. [Current Project State & Completion Audit](#2-current-project-state--completion-audit)
+3. [Architectural Decisions & Trade-Offs (Pros & Cons)](#3-architectural-decisions--trade-offs-pros--cons)
+4. [Phase 1: EzDSL Frontend & Semantic Analysis (STATUS: 100% COMPLETE)](#4-phase-1-ezdsl-frontend--semantic-analysis-status-100-complete)
+   - [x] [1.1 Calling Convention DSL (`.ccdf`) Parser & AST](#11-calling-convention-dsl-ccdf-parser--ast)
+   - [x] [1.2 Unified Symbol Table & Cross-Language Resolution](#12-unified-symbol-table--cross-language-resolution)
+   - [x] [1.3 Target Definition Semantic Pass (`RegisterBankPass`)](#13-target-definition-semantic-pass-registerbankpass)
+   - [x] [1.4 Target Instruction Semantic Pass (`TargetInstPass`)](#14-target-instruction-semantic-pass-targetinstpass)
+   - [x] [1.5 Legalization Action Semantic Pass (`LegalizeActionPass`)](#15-legalization-action-semantic-pass-legalizeactionpass)
+   - [x] [1.6 Legalization Rewrite Rule Semantic Pass (`LegalizeRulePass`)](#16-legalization-rewrite-rule-semantic-pass-legalizerulepass)
+   - [x] [1.7 Instruction Selection Semantic Pass (`InstSelPass`)](#17-instruction-selection-semantic-pass-instselpass)
+   - [x] [1.8 Calling Convention Semantic Pass (`CallingConvPass`)](#18-calling-convention-semantic-pass-callingconvpass)
+   - [x] [1.9 IR Instruction & Type Definition Passes (`IrInstructionPass`, `TypePass`)](#19-ir-instruction--type-definition-passes-irinstructionpass-typepass)
+5. [Phase 2: EzDSL C++ Code Generators & Full EzTriple Target Synthesis](#5-phase-2-ezdsl-c-code-generators--full-eztriple-target-synthesis)
+   - [x] [2.1 Type Table Generator (`CppMirTypeTableGenerator`)](#21-type-table-generator-cppmirtypetablegenerator)
+   - [x] [2.2 IR Instruction Definition Generator (`CppMirInstructionGenerator`)](#22-ir-instruction-definition-generator-cppmirinstructiongenerator)
+   - [ ] [2.3 Target Register & Bank Model Generator (`CppTargetBankGenerator`)](#23-target-register--bank-model-generator-cpptargetbankgenerator)
+   - [ ] [2.4 Target Instruction & Binary Encoder Generator (`CppTargetInstGenerator`)](#24-target-instruction--binary-encoder-generator-cpptargetinstgenerator)
+   - [ ] [2.5 Target Type Layout Generator (`CppTargetTypeLayoutGenerator`)](#25-target-type-layout-generator-cpptargettypelayoutgenerator)
+   - [ ] [2.6 2D Legality Action Matrix Generator (`CppLegalizerGenerator`)](#26-2d-legality-action-matrix-generator-cpplegalizergenerator)
+   - [ ] [2.7 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`)](#27-legalization-rewrite-rule-engine-generator-cpplegalizerrulegenerator)
+   - [ ] [2.8 Multi-Variant ISel Table Generator (`CppISelTableGenerator`)](#28-multi-variant-isel-table-generator-cppiseltablegenerator)
+   - [ ] [2.9 Calling Convention Descriptor Generator (`CppCallingConvGenerator`)](#29-calling-convention-descriptor-generator-cppcallingconvgenerator)
+   - [ ] [2.10 Target Descriptor & Binary Descriptor Glue Generator (`CppTargetDescGenerator`)](#210-target-descriptor--binary-descriptor-glue-generator-cpptargetdescgenerator)
+   - [ ] [2.11 Multi-Target Driver CLI (`EzDsl-cli`) & Target Pipeline Dispatcher](#211-multi-target-driver-cli-ezdsl-cli--target-pipeline-dispatcher)
+   - [ ] [2.12 CMake Target Integration Suite (`EzDslGenBackend.cmake`)](#212-cmake-target-integration-suite-ezdslgenbackendcmake)
+6. [Phase 3: EzMir Core & Execution Engines](#6-phase-3-ezmir-core--execution-engines)
+   - [x] [3.1 Function-Scoped Monotonic Arenas & Core MIR Data Structures](#31-function-scoped-monotonic-arenas--core-mir-data-structures)
+   - [x] [3.2 Core Analysis Passes (`CodeFlowAnalysisPass`, `LivenessAnalysisPass`, `NonSsaToSsaPass`)](#32-core-analysis-passes-codeflowanalysispass-livenessanalysispass-nonssatossapass)
+   - [ ] [3.3 MIR Invariant Verifier Pass (`MirVerifierPass`)](#33-mir-invariant-verifier-pass-mirverifierpass)
+   - [ ] [3.4 Generic Legalizer Engine (`MirLegalizerPass`)](#34-generic-legalizer-engine-mirlegalizerpass)
+   - [ ] [3.5 Generic Instruction Selector Engine (`MirInstructionSelectorPass`)](#35-generic-instruction-selector-engine-mirinstructionselectorpass)
+7. [Phase 4: EzTriple & Backend Hardening](#7-phase-4-eztriple--backend-hardening)
+   - [x] [4.1 Target & Binary Descriptor Architecture (`TargetDesc`, `TargetBinaryDesc`)](#41-target--binary-descriptor-architecture-targetdesc-targetbinarydesc)
+   - [x] [4.2 ABI Lowerer Engine (`MirAbiLowerer`, `MirAbiLowererPass`)](#42-abi-lowerer-engine-mirabilowerer-mirabilowererpass)
+   - [ ] [4.3 Frame Lowerer Engine (`MirFrameLowerer`, `MirFrameLowererPass`)](#43-frame-lowerer-engine-mirframelowerer-mirframelowererpass)
+   - [x] [4.4 Chaitin-Briggs Register Allocator (`MirRegisterAllocator`, `MirRegisterAllocatorPass`)](#44-chaitin-briggs-register-allocator-mirregisterallocator-mirregisterallocatorpass)
+8. [Phase 5: EzCodeEmitter & Direct Object Writers](#8-phase-5-ezcodeemitter--direct-object-writers)
+   - [x] [5.1 Object Emitter Core (`CodeSection`, `CodeEmitterContext`, `GenericCodeEmitter`)](#51-object-emitter-core-codesection-codeemittercontext-genericcodeemitter)
+   - [ ] [5.2 ELF64 Object Writer (`ElfObjectWriter`)](#52-elf64-object-writer-elfobjectwriter)
+   - [ ] [5.3 PE/COFF64 Object Writer (`CoffObjectWriter`)](#53-pecoff64-object-writer-coffobjectwriter)
+   - [ ] [5.4 Mach-O 64-bit Object Writer (`MachoObjectWriter`)](#54-mach-o-64-bit-object-writer-machoobjectwriter)
+9. [Phase 6: End-to-End Testing & 1.0 Release Checklist](#9-phase-6-end-to-end-testing--10-release-checklist)
 
 ---
 
 # 1. Master Architecture Pipeline
 
 ```
- ┌───────────────────────────────────────────────────────────────────────────────────────────┐
- │                                      EzDSL Frontend                                       │
- │   .tdf (Targets)   │   .idf (Insts)    │   .lad (Legality)  │   .lrd (Rules)  │  .isf    │
- └─────────────────────────────────────────────┬─────────────────────────────────────────────┘
-                                               │ Multi-Pass Sema Validation & Symbol Interning
-                                               ▼
- ┌───────────────────────────────────────────────────────────────────────────────────────────┐
- │                                   EzDSL Code Generators                                   │
- │  - CppTargetInstGenerator           - CppLegalizerGenerator (Action Table & Rewriter)     │
- │  - CppISelTableGenerator            - CppCallingConvGenerator                             │
- └─────────────────────────────────────────────┬─────────────────────────────────────────────┘
-                                               │ C++ Generated Tables, Matchers & Encoders
-                                               ▼
- ┌───────────────────────────────────────────────────────────────────────────────────────────┐
- │                              EzMir & EzTriple 1.0 Pipeline                                │
- │                                                                                           │
- │  Generic MIR (SSA Form)                                                                   │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [MirVerifierPass] ─────────── Verify SSA Invariants, Dominance & Terminators             │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [MirLegalizerPass] ────────── Driven by Generated .lad Action Tables & .lrd Rewriters    │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [MirInstructionSelectorPass]  Driven by Generated .isf Matchers & AddrModes              │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [MirAbiLowererPass] ───────── Driven by Generated Calling Convention Descriptors         │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [LivenessAnalysisPass] ────── Def-Use Chains, Live-In & Live-Out Sets                    │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [MirRegisterAllocatorPass] ── Chaitin-Briggs Graph Coloring, Coalescing & Spilling       │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [MirFrameLowererPass] ─────── Prologue/Epilogue Insertion & Offset Resolution            │
- │         │                                                                                 │
- │         ▼                                                                                 │
- │  [EzCodeEmitter] ───────────── Node-based Section Finalization & Direct Object Writers    │
- └───────────────────────────────────────────────────────────────────────────────────────────┘
+ ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
+ │                                           EzDSL Frontend                                          │
+ │  .tdf (Registers) │ .idf (Insts) │ .lad (Legality) │ .lrd (Rules) │ .isf (ISel) │ .ccdf (ABIs)   │
+ └─────────────────────────────────────────────────┬─────────────────────────────────────────────────┘
+                                                   │ Two-Phase Multi-Pass Sema Validation & Symbol Interning
+                                                   ▼
+ ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
+ │                                       EzDSL Code Generators                                       │
+ │  - CppTargetBankGenerator       - CppTargetInstGenerator & Binary Encoders (Encode_<Op>)          │
+ │  - CppTargetTypeLayoutGenerator - CppLegalizerGenerator (2D Action Matrix)                        │
+ │  - CppLegalizerRuleGenerator    - CppISelTableGenerator (Decision Tree)                           │
+ │  - CppCallingConvGenerator      - CppTargetDescGenerator (<Target>TargetDesc & BinaryDescs)       │
+ └─────────────────────────────────────────────────┬─────────────────────────────────────────────────┘
+                                                   │ Synthesized EzTriple Target Plugin C++ Code
+                                                   ▼
+ ┌───────────────────────────────────────────────────────────────────────────────────────────────────┐
+ │                                   EzMir & EzTriple 1.0 Pipeline                                   │
+ │                                                                                                   │
+ │  Generic MIR (SSA Form)                                                                           │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [MirVerifierPass] ─────────── Verify SSA Invariants, Dominance, Block Terminators & PHIs         │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [MirLegalizerPass] ────────── Driven by Synthesized .lad Action Tables & .lrd Rewriters          │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [MirInstructionSelectorPass]  Driven by Synthesized .isf Matchers & AddrMode Decision Trees      │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [MirAbiLowererPass] ───────── Driven by Synthesized Calling Convention Descriptors (.ccdf)       │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [LivenessAnalysisPass] ────── Def-Use Chains, Live-In & Live-Out Sets, Virtual Reg Intervals     │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [MirRegisterAllocatorPass] ── Chaitin-Briggs Graph Coloring, Coalescing & Spill Rewriter         │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [MirFrameLowererPass] ─────── Prologue/Epilogue Insertion (PEI), Stack Offsets & DAlloc Lowering │
+ │         │                                                                                         │
+ │         ▼                                                                                         │
+ │  [EzCodeEmitter] ───────────── Node-based Section Finalization, Encoders & Direct Object Writers  │
+ └───────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-# 2. Architectural Decisions & Trade-Offs (Pros & Cons)
+# 2. Current Project State & Completion Audit
+
+| Submodule | Feature / Component | Status | Location / Test Coverage |
+|:---|:---|:---:|:---|
+| **EzDsl (Lexy Parsers & ASTs)** | Calling Convention DSL (`.ccdf`) | ✅ **DONE** | `EzDsl/include/Parser/CallingConvDefLang.h`, `T_CallingConvDefLang.cpp` |
+| **EzDsl (Lexy Parsers & ASTs)** | Target Definition DSL (`.tdf`) | ✅ **DONE** | `EzDsl/include/Parser/TargetDefLang.h`, `T_TargetDefLang.cpp` |
+| **EzDsl (Lexy Parsers & ASTs)** | Instruction Definition DSL (`.idf`) | ✅ **DONE** | `EzDsl/include/Parser/InstructionDefLang.h`, `T_InstructionDefLang.cpp` |
+| **EzDsl (Lexy Parsers & ASTs)** | Legalize Action DSL (`.lad`) | ✅ **DONE** | `EzDsl/include/Parser/LegalizeActionDefLang.h`, `T_LegalizeActionDefLang.cpp` |
+| **EzDsl (Lexy Parsers & ASTs)** | Legalize Rule DSL (`.lrd`) | ✅ **DONE** | `EzDsl/include/Parser/LegalizeRuleDefLang.h`, `T_LegalizeRuleDefLang.cpp` |
+| **EzDsl (Lexy Parsers & ASTs)** | Instruction Selection DSL (`.isf`) | ✅ **DONE** | `EzDsl/include/Parser/InstructionSelDefLang.h`, `T_InstructionSelDefLang.cpp` |
+| **EzDsl (Lexy Parsers & ASTs)** | IR Instruction DSL (`.irdf`) | ✅ **DONE** | `EzDsl/include/Parser/IrInstructionDefLang.h`, `T_IrInstructionDefLang.cpp` |
+| **EzDsl (Lexy Parsers & ASTs)** | Type Definition DSL (`.tyf`) | ✅ **DONE** | `EzDsl/include/Parser/TypeDefLang.h`, `T_TypeDefLang.cpp` |
+| **EzDsl (Sema Passes)** | Unified Symbol Table & Scope Model | ✅ **DONE** | `EzDsl/include/Sema/SymbolTable.h`, `Scope.h`, `Symbol.h` |
+| **EzDsl (Sema Passes)** | `RegisterBankPass` (TDF Validation) | ✅ **DONE** | `EzDsl/src/SemaPasses/RegisterBankPass.cpp`, `T_Sema_RegisterBankPass.cpp` |
+| **EzDsl (Sema Passes)** | `TargetInstPass` (IDF Validation) | ✅ **DONE** | `EzDsl/src/SemaPasses/TargetInstPass.cpp`, `T_Sema_TargetInstPass.cpp` |
+| **EzDsl (Sema Passes)** | `LegalizeActionPass` (LAD Validation) | ✅ **DONE** | `EzDsl/src/SemaPasses/LegalizeActionPass.cpp`, `T_Sema_LegalizeActionPass.cpp` |
+| **EzDsl (Sema Passes)** | `LegalizeRulePass` (LRD Validation) | ✅ **DONE** | `EzDsl/src/SemaPasses/LegalizeRulePass.cpp`, `T_Sema_LegalizeRulePass.cpp` |
+| **EzDsl (Sema Passes)** | `InstSelPass` (ISF Validation) | ✅ **DONE** | `EzDsl/src/SemaPasses/InstSelPass.cpp`, `T_Sema_InstSelPass.cpp` |
+| **EzDsl (Sema Passes)** | `CallingConvPass` (CCDF Validation) | ✅ **DONE** | `EzDsl/src/SemaPasses/CallingConvPass.cpp`, `T_Sema_CallingConvPass.cpp` |
+| **EzDsl (Sema Passes)** | `IrInstructionPass` & `TypePass` | ✅ **DONE** | `EzDsl/src/SemaPasses/IrInstructionPass.cpp`, `TypePass.cpp` |
+| **EzDsl (Code Generators)** | `CppMirTypeTableGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppMirTypeTableGenerator.cpp`, `T_EzDslCli_GenTypeTable.cpp` |
+| **EzDsl (Code Generators)** | `CppMirInstructionGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppMirInstructionGenerator.cpp`, `T_EzDslCli_GenMirInstruction.cpp` |
+| **EzDsl (Code Generators)** | `CppTargetBankGenerator` | ⏳ **PENDING** | *Phase 2.3: Synthesizes registers, classes, banks, alias matrices* |
+| **EzDsl (Code Generators)** | `CppTargetInstGenerator` | ⏳ **PENDING** | *Phase 2.4: Synthesizes target opcodes, descriptors, binary encoders* |
+| **EzDsl (Code Generators)** | `CppTargetTypeLayoutGenerator` | ⏳ **PENDING** | *Phase 2.5: Synthesizes `IMirTargetTypeLayout` implementations* |
+| **EzDsl (Code Generators)** | `CppLegalizerGenerator` | ⏳ **PENDING** | *Phase 2.6: Synthesizes 2D constant-time legality action matrix* |
+| **EzDsl (Code Generators)** | `CppLegalizerRuleGenerator` | ⏳ **PENDING** | *Phase 2.7: Synthesizes AST expansion rewrite engine* |
+| **EzDsl (Code Generators)** | `CppISelTableGenerator` | ⏳ **PENDING** | *Phase 2.8: Synthesizes AddrMode matchers & decision tree selector* |
+| **EzDsl (Code Generators)** | `CppCallingConvGenerator` | ⏳ **PENDING** | *Phase 2.9: Synthesizes `CallingConvDesc` factory functions* |
+| **EzDsl (Code Generators)** | `CppTargetDescGenerator` | ⏳ **PENDING** | *Phase 2.10: Synthesizes `<Target>TargetDesc` & `TargetBinaryDesc` glue* |
+| **EzDsl (CLI Driver)** | Unified Multi-File Target Pipeline | ⏳ **PENDING** | `EzDsl/src/Driver/Main.cpp` *(Currently single-file only)* |
+| **EzMir (Core)** | MIR Functions, Blocks, Instructions, Operands | ✅ **DONE** | `EzMir/include/` (`MirFunction`, `MirBlock`, `MirInstruction`, `MirOperand`) |
+| **EzMir (Core)** | Monotonic PMR Buffer Arenas & Builders | ✅ **DONE** | `EzMir/include/Builder/MirBuilder.h`, `MirBuilderContext.h` |
+| **EzMir (Passes)** | `CodeFlowAnalysisPass` & `LivenessAnalysisPass` | ✅ **DONE** | `EzMir/src/MirPasses/Passes/` (`T_CodeFlowPass.cpp`, `T_LivenessAnalysis.cpp`) |
+| **EzMir (Passes)** | `NonSsaToSsaPass` | ✅ **DONE** | `EzMir/src/MirPasses/Passes/NonSsaToSsaPass.cpp`, `T_NonSsaToSsa.cpp` |
+| **EzMir (Passes)** | `MirVerifierPass` | ⏳ **PENDING** | *Phase 3.3: SSA dominance, single terminator, phi invariants* |
+| **EzMir (Passes)** | `MirLegalizerPass` & Generic Engine | ⏳ **PENDING** | *Phase 3.4: Snippets ready in `CodeSnippets/`, integration pending* |
+| **EzMir (Passes)** | `MirInstructionSelectorPass` | ⏳ **PENDING** | *Phase 3.5: Generic target instruction selector driver pass* |
+| **EzTriple (Architecture)** | `TargetDesc` & `TargetBinaryDesc` Interfaces | ✅ **DONE** | `EzTriple/include/Descriptors/TargetDesc.h`, `TargetBinaryDesc.h` |
+| **EzTriple (Passes)** | `MirAbiLowerer` & `MirAbiLowererPass` | ✅ **DONE** | `EzTriple/src/AbiLowerer/MirAbiLowerer.cpp`, `MirAbiLowererPass.cpp` |
+| **EzTriple (Passes)** | `MirRegisterAllocator` & `MirRegisterAllocatorPass` | ✅ **DONE** | `EzTriple/src/RegisterAllocator/MirRegisterAllocator.cpp`, `MirRegisterAllocatorPass.cpp` |
+| **EzTriple (Passes)** | `MirFrameLowerer` & `MirFrameLowererPass` | 🔄 **PARTIAL** | `EzTriple/include/FrameLowerer/MirFrameLowerer.h` *(PEI structure defined, target hooks needed)* |
+| **EzCodeEmitter** | `CodeSection`, `CodeEmitterContext`, Helpers | ✅ **DONE** | `EzCodeEmitter/include/CodeSection.h`, `CodeEmitterContext.h`, `GenericCodeEmitter.h` |
+| **EzCodeEmitter** | Direct Object Writers (ELF64, COFF64, Mach-O) | ⏳ **PENDING** | *Phase 5: Binary serialization to disk from `CodeSection` buffers* |
+
+---
+
+# 3. Architectural Decisions & Trade-Offs (Pros & Cons)
 
 ### Design Alternative 1: Multi-Pass vs. Single-Pass Semantic Checking
 
@@ -113,7 +174,7 @@ This document contains the **in-depth implementation details, architectural trad
 
 ---
 
-# 3. Phase 1: EzDSL Semantic Analysis & Calling Convention DSL
+# 4. Phase 1: EzDSL Frontend & Semantic Analysis (STATUS: 100% COMPLETE)
 
 ---
 
@@ -396,278 +457,440 @@ Procedure ValidateCallingConv(ccAst, symTable, diagCollector):
        Verify all registers in CalleeSet, CallerSet, ARGS, and RETURNS exist in symTable.
 ```
 
----
+# 5. Phase 2: EzDSL C++ Code Generators & Full EzTriple Target Synthesis
 
-# 4. Phase 2: EzDSL C++ Code Generators
-
----
-
-## 2.1 Target Instruction & Format Binary Encoder (`CppTargetInstGenerator`)
-
-### Generator Logic & Output Format
-```cpp
-// Emits <Target>InstructionDefs.h
-void CppTargetInstGenerator::emitHeader(std::ostream &os, SymbolTable *table) {
-    os << "enum class TargetOpCode : uint16_t {\n";
-    for (auto *sym : table->getSymbolsByType(SymbolType::TargetInstruction)) {
-        os << "    " << sym->getName() << ",\n";
-    }
-    os << "    TARGET_OPCODE_COUNT\n};\n";
-}
-
-// Emits <Target>BinaryEncoder.cpp
-void CppTargetInstGenerator::emitEncoders(std::ostream &os, SymbolTable *table) {
-    for (auto *sym : table->getSymbolsByType(SymbolType::TargetInstruction)) {
-        auto *instSym = sym->getIf<TargetInstructionSymbol>();
-        auto *fmtSym = table->getSymById(instSym->m_formatId)->getIf<InstructionFormatSymbol>();
-        
-        os << "void Encode_" << sym->getName() << "(CodeSection *sec, const MirInstruction *inst) {\n";
-        os << "    uint" << fmtSym->m_bitWidth << "_t binaryWord = 0;\n";
-        
-        // Emit bitfield assignments
-        for (const auto &field : fmtSym->m_fields) {
-            // Synthesize bit shift: binaryWord |= (val & mask) << field.m_startBit;
-            os << "    // Field: " << field.m_name << " [" << field.m_startBit << ":" << field.m_endBit << "]\n";
-        }
-        os << "    sec->emit" << fmtSym->m_bitWidth << "(binaryWord);\n";
-        os << "}\n";
-    }
-}
-```
+To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `AMD64`, `RiscV64`, `ARM64`) without requiring handwritten backend glue, EzDSL must synthesize 8 specific C++ code artifacts and integrate them via a unified CLI driver and CMake integration.
 
 ---
 
-## 2.2 2D Legality Action Matrix Generator (`CppLegalizerGenerator`)
-
-### Generator Logic & Output Format
-```cpp
-// Emits <Target>LegalizerActionTable.cpp
-void CppLegalizerGenerator::emitSource(std::ostream &os, SymbolTable *table) {
-    os << "static const LegalizeAction g_LegalizeMatrix[OPCODE_COUNT][MAX_TYPE_SLOTS][MAX_TYPES] = {\n";
-    for (size_t op = 0; op < OPCODE_COUNT; ++op) {
-        os << "  { // Opcode: " << g_OpcodeNames[op] << "\n";
-        for (size_t slot = 0; slot < MAX_TYPE_SLOTS; ++slot) {
-            os << "    { ";
-            for (size_t t = 0; t < MAX_TYPES; ++t) {
-                LegalizeAction action = ResolveAction(op, slot, t);
-                os << "LegalizeAction::" << ToString(action) << ", ";
-            }
-            os << "},\n";
-        }
-        os << "  },\n";
-    }
-    os << "};\n";
-}
-```
+## 2.1 Type Table Generator (`CppMirTypeTableGenerator`) [DONE]
+- **File Output:** `MirTypeTable.h`, `MirTypeTable.cpp`
+- **Location:** `EzDsl/include/CodeGenerators/CppMirTypeTableGenerator.h`, `src/CodeGenerators/CppMirTypeTableGenerator.cpp`
+- **Responsibilities:** Emits singleton `MirTypeTable` with all built-in and target-declared scalar, pointer, vector, and struct types.
+- **Test Coverage:** `tests/EzDslTestSuite/tests/T_EzDslCli_GenTypeTable.cpp`
 
 ---
 
-## 2.3 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`)
+## 2.2 IR Instruction Definition Generator (`CppMirInstructionGenerator`) [DONE]
+- **File Output:** `MirInstructionSet.h`
+- **Location:** `EzDsl/include/CodeGenerators/CppMirInstructionGenerator.h`, `src/CodeGenerators/CppMirInstructionGenerator.cpp`
+- **Responsibilities:** Emits generic MIR instruction opcodes, mnemonic tables, operand count metadata, and builder helper declarations.
+- **Test Coverage:** `tests/EzDslTestSuite/tests/T_EzDslCli_GenMirInstruction.cpp`
 
-### Generated Pattern Rewriter
-```cpp
-bool TargetLegalizeRules::tryExpand(MirBuilderContext *ctx, MirInstruction *inst) {
-    switch (inst->getOpcode()) {
-        case MirInstructionOpCode::ADD:
-            if (inst->getType()->getTotalSizeInBits() == 64 && TargetHooks::isSubtarget32Bit(ctx)) {
-                return Expand_NarrowAddi64(ctx, inst);
-            }
-            break;
+---
+
+## 2.3 Target Register & Bank Model Generator (`CppTargetBankGenerator`) [TODO]
+- **File Output:** `<Target>RegisterBanks.h`, `<Target>RegisterBanks.cpp`
+- **Input DSL:** `.tdf` (Target Definition File)
+- **Synthesized Structures:**
+  1. **Register Enumeration:**
+     ```cpp
+     enum class TargetReg : uint16_t {
+         NoRegister = 0,
+         RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI,
+         R8, R9, R10, R11, R12, R13, R14, R15,
+         EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI,
+         // ...
+         TARGET_REG_COUNT
+     };
+     ```
+  2. **Physical Register Descriptors (`MirRegister`):**
+     - Emits static array of physical `MirRegister` instances with bit sizes, offsets within parent registers, and parent links.
+  3. **Register Class Descriptors (`MirRegisterClass`):**
+     - Emits `MirRegisterClass` instances (e.g. `GPR64`, `GPR32`, `FPR64`) holding member register IDs, spill size, and spill alignment.
+  4. **Register Bank Descriptors (`MirRegisterBank`):**
+     - Emits `MirRegisterBank` instances (e.g. `GPRBank`, `FPRBank`) grouping classes together.
+  5. **Sub-Register Aliasing Bitmask Table:**
+     - Emits constant-time register overlap and interference checking:
+       ```cpp
+       bool TargetRegistersOverlap(TargetReg regA, TargetReg regB);
+       const std::pmr::vector<TargetReg> &GetSubRegisters(TargetReg reg);
+       const std::pmr::vector<TargetReg> &GetSuperRegisters(TargetReg reg);
+       ```
+
+---
+
+## 2.4 Target Instruction & Binary Encoder Generator (`CppTargetInstGenerator`) [TODO]
+- **File Output:** `<Target>InstructionDefs.h`, `<Target>InstructionDefs.cpp`, `<Target>BinaryEncoder.cpp`
+- **Input DSL:** `.idf` (Instruction Definition File), `.tdf`
+- **Synthesized Structures:**
+  1. **Target Opcode Enumeration:**
+     ```cpp
+     enum class TargetOpCode : uint16_t {
+         TARGET_OPCODE_START = 1000,
+         MOV_r64_r64,
+         ADD_r64_r64,
+         ADD_r64_imm32,
+         MOV_r64_m64,
+         MOV_m64_r64,
+         // ...
+         TARGET_OPCODE_COUNT
+     };
+     ```
+  2. **Target Instruction Descriptors (`MirTargetInstructionDesc`):**
+     - Emits static table describing instruction latency, operand counts, register class constraints per operand, implicit defs/uses, and instruction classification flags (`isTerminator`, `isBranch`, `isCall`, `isReturn`, `isMove`, `isLoad`, `isStore`).
+  3. **Bitfield-Packing Binary Encoders (`Encode_<OpCode>`):**
+     - For each format in `.idf`, synthesizes exact C++ bit shifting and bitmasking into `CodeSection`:
+     ```cpp
+     void Encode_ADD_r64_r64(CodeSection *sec, const MirInstruction *inst) {
+         uint32_t rex = 0x48; // REX.W
+         uint8_t opcode = 0x01;
+         uint8_t modrm = 0xC0 | (GetRegNum(inst->getOperand(1)) << 3) | GetRegNum(inst->getOperand(0));
+         sec->emit8(rex);
+         sec->emit8(opcode);
+         sec->emit8(modrm);
+     }
+     ```
+  4. **Target Instruction Disassembler / Printer:**
+     - Emits `<Target>InstPrinter::print(std::ostream &os, const MirInstruction *inst)` substituting operands into the declared `asmTemplate`.
+
+---
+
+## 2.5 Target Type Layout Generator (`CppTargetTypeLayoutGenerator`) [TODO]
+- **File Output:** `<Target>TypeLayout.h`, `<Target>TypeLayout.cpp`
+- **Input DSL:** `.tyf`, Target machine pointer size & alignment rules
+- **Synthesized Structures:**
+  - Concrete class `<Target>TargetTypeLayout : public IMirTargetTypeLayout`:
+    - `getTypeSize(MirType *type)`
+    - `getTypeAlignment(MirType *type)`
+    - `getStructMemberOffset(MirStructType *structType, size_t index)`
+    - `padStructLayout(MirStructType *structType)`
+
+---
+
+## 2.6 2D Legality Action Matrix Generator (`CppLegalizerGenerator`) [TODO]
+- **File Output:** `<Target>LegalizerActionTable.h`, `<Target>LegalizerActionTable.cpp`
+- **Input DSL:** `.lad` (Legalize Action Definition File), `.irdf`, `.tyf`
+- **Synthesized Structures:**
+  - Flat 2D/3D static lookup array:
+    ```cpp
+    // Indexed by [GenericOpcode - GENERIC_OPCODE_START][TypeSlotIndex][MirTypeId]
+    static const LegalizeAction g_<Target>_LegalizeMatrix[GENERIC_OPCODE_COUNT][MAX_TYPE_SLOTS][MAX_TYPES] = {
+        /* [ADD][Slot 0][i32] = */ LegalizeAction::Legal,
+        /* [ADD][Slot 0][i64] = */ LegalizeAction::Legal,
+        /* [ADD][Slot 0][i128]= */ LegalizeAction::NarrowScalar,
+        /* [SDIV][Slot 0][i64]= */ LegalizeAction::Libcall,
         // ...
-    }
-    return false;
-}
-```
-
----
-
-## 2.4 Multi-Variant ISel Table Generator (`CppISelTableGenerator`)
-
-### Generated Decision Tree Selector
-```cpp
-bool TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *inst) {
-    switch (inst->getOpcode()) {
-        case MirInstructionOpCode::LOAD: {
-            MirOperand *dst = inst->getOperand(0);
-            MirOperand *addr = inst->getOperand(1);
-            
-            // Check Pattern: Select_LW
-            AddrModeRegImm12Result am;
-            if (Match_AddrModeRegImm12(addr, am)) {
-                MirInstructionBuilder b(ctx, inst->getOwner(), InsertionType::InsertBefore, inst);
-                b.buildTarget(TargetOpCode::LW, { dst, am.base, am.offset });
-                inst->eraseFromParent();
-                return true;
-            }
-            break;
-        }
-    }
-    return false;
-}
-```
-
----
-
-## 2.5 Calling Convention Generator (`CppCallingConvGenerator`)
-
-### Generated ABI Initializer
-```cpp
-CallingConvDesc *Create_SystemV_AMD64(std::pmr::memory_resource *alloc) {
-    auto *cc = new (alloc->allocate(sizeof(CallingConvDesc))) CallingConvDesc("SystemV_AMD64", alloc);
-    cc->setStackAlignment(16);
-    cc->setShadowSpaceSize(0);
-    cc->setRedZoneSize(128);
-    // Populate callee-saved: RBX, RSP, RBP, R12-R15
-    // Populate caller-saved: RAX, RCX, RDX, RSI, RDI, R8-R11
-    // Populate argument rules & SRET rules
-    return cc;
-}
-```
-
----
-
-## 2.6 Driver CLI & CMake Integration (`EzDsl-cli`)
-
-### CMake Packaging (`EzMir/CMake/EzDslGenBackend.cmake`)
-```cmake
-function(EzDslGenBackend)
-    cmake_parse_arguments(ARG "" "TARGET;OUTPUT_DIR" "TDF_FILES;IDF_FILES;LAD_FILES;LRD_FILES;ISF_FILES;CCDF_FILES" ${ARGN})
+    };
     
-    add_custom_command(
-        OUTPUT 
-            ${ARG_OUTPUT_DIR}/TargetInstructionDefs.h
-            ${ARG_OUTPUT_DIR}/TargetInstructionTable.cpp
-            ${ARG_OUTPUT_DIR}/TargetLegalizerActionTable.cpp
-            ${ARG_OUTPUT_DIR}/TargetISelTable.cpp
-            ${ARG_OUTPUT_DIR}/TargetCallingConventions.cpp
-        COMMAND EzDsl-cli 
-            --target-def ${ARG_TDF_FILES}
-            --inst-def ${ARG_IDF_FILES}
-            --legalize-actions ${ARG_LAD_FILES}
-            --legalize-rules ${ARG_LRD_FILES}
-            --isel-patterns ${ARG_ISF_FILES}
-            --calling-conv ${ARG_CCDF_FILES}
-            -o ${ARG_OUTPUT_DIR}
-        DEPENDS EzDsl-cli ${ARG_TDF_FILES} ${ARG_IDF_FILES} ${ARG_LAD_FILES} ${ARG_LRD_FILES} ${ARG_ISF_FILES} ${ARG_CCDF_FILES}
-    )
-endfunction()
-```
+    LegalizeAction GetTargetLegalizeAction(MirInstructionOpCode op, size_t slot, MirTypeId type);
+    ```
 
 ---
 
-# 5. Phase 3: EzMir Core & Execution Engines
+## 2.7 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`) [TODO]
+- **File Output:** `<Target>LegalizeRules.h`, `<Target>LegalizeRules.cpp`
+- **Input DSL:** `.lrd` (Legalize Rule Definition File)
+- **Synthesized Structures:**
+  - Concrete class `<Target>LegalizeRules : public MirExpansionRuleRegistry`:
+    ```cpp
+    class <Target>LegalizeRules {
+    public:
+        static bool tryExpand(MirBuilderContext *ctx, MirInstruction *inst);
+    private:
+        static bool Expand_NarrowAddi128(MirBuilderContext *ctx, MirInstruction *inst);
+        static bool Expand_CustomLowerCall(MirBuilderContext *ctx, MirInstruction *inst);
+    };
+    ```
+  - Synthesizes SSA variable unmerging, carry/borrow chain insertion, and target helper calls according to `.lrd` expansion blocks.
 
 ---
 
-## 3.1 Function-Scoped Monotonic Arenas (`MirFunction`)
-
-### Implementation
-```cpp
-class MirFunction {
-public:
-    MirFunction(std::string_view name, MirType *funcType, std::pmr::memory_resource *parentAlloc) :
-        m_name(name), m_funcType(funcType), m_arena(parentAlloc) {}
-    
-    std::pmr::memory_resource *getAllocator() { return &m_arena; }
-    
-private:
-    std::pmr::monotonic_buffer_resource m_arena;
-};
-```
-
----
-
-## 3.2 MIR Invariant Verifier Pass (`MirVerifierPass`)
-
-### Validation Rules
-1. **Dominance**: For every instruction $I$ reading virtual register $V$, the unique defining instruction $D(V)$ must dominate $I$.
-2. **Terminators**: Basic block must have exactly one terminator (`isTerminator` flag) at the end.
-3. **$\phi$ Invariants**: $\phi$ instructions must only reside at block headers, with operand count matching predecessor count.
+## 2.8 Multi-Variant ISel Table Generator (`CppISelTableGenerator`) [TODO]
+- **File Output:** `<Target>ISelTable.h`, `<Target>ISelTable.cpp`
+- **Input DSL:** `.isf` (Instruction Selection File)
+- **Synthesized Structures:**
+  1. **Addressing Mode Matchers:**
+     ```cpp
+     struct AddrModeRegImmResult { MirOperand *base; int64_t offset; };
+     bool Match_AddrModeRegImm(MirOperand *addr, AddrModeRegImmResult &res);
+     ```
+  2. **Decision-Tree Instruction Selector (`<Target>InstructionSelector`):**
+     ```cpp
+     class <Target>InstructionSelector : public MirInstructionSelector {
+     public:
+         bool select(MirBuilderContext *ctx, MirInstruction *inst) override;
+     };
+     ```
+     - Groups patterns by root opcode (`LOAD`, `STORE`, `ADD`, `BR_COND`).
+     - Emits nested pattern tests ordered by pattern cost heuristic ($\text{cost} = \text{pattern depth} \times 10 - \text{emitted instructions}$).
+     - Emits replacement sequences constructing target `MirInstruction` nodes with `MirInstructionBuilder`.
 
 ---
 
-## 3.3 Generic Legalizer Engine (`MirLegalizerPass`)
-
-### Execution Pipeline
-1. Scan instructions for illegal type combinations using `TargetLegalizerActionTable`.
-2. Apply `WidenScalar`: insert `SEXT`/`ZEXT`, widen operation, insert `TRUNC`.
-3. Apply `NarrowScalar`: insert `UNMERGE_VALUES`, lower scalar halves with carry operations, insert `MERGE_VALUES`.
-4. Apply `Libcall`: lower to `PUSH_ARG` + runtime function `CALL`.
-5. Apply `Custom`: invoke `TargetLegalizeRules::tryExpand()`.
-
----
-
-## 3.4 Generic Instruction Selector Engine (`MirInstructionSelectorPass`)
-
-### Execution Pipeline
-1. Topological reverse traversal over basic blocks.
-2. Evaluate pattern matchers with highest cost reduction first (`cost(N)`).
-3. Replace generic instructions with target instruction nodes with physical register class constraints.
+## 2.9 Calling Convention Descriptor Generator (`CppCallingConvGenerator`) [TODO]
+- **File Output:** `<Target>CallingConventions.h`, `<Target>CallingConventions.cpp`
+- **Input DSL:** `.ccdf` (Calling Convention Definition File)
+- **Synthesized Structures:**
+  - Calling convention factory functions:
+    ```cpp
+    CallingConvDesc *Create_SystemV_AMD64(std::pmr::memory_resource *alloc);
+    CallingConvDesc *Create_Win64_AMD64(std::pmr::memory_resource *alloc);
+    ```
+  - Automatically initializes:
+    - Stack alignment, shadow space size, red zone size.
+    - Callee-saved and caller-saved register bitsets.
+    - Argument assignment rules (GPR sequence, FPR sequence, stack fallback).
+    - Return value assignment rules & indirect SRET register configurations.
 
 ---
 
-# 6. Phase 4: EzTriple & Backend Hardening
+## 2.10 Target Descriptor & Binary Descriptor Glue Generator (`CppTargetDescGenerator`) [TODO]
+- **File Output:** `<Target>TargetDesc.h`, `<Target>TargetDesc.cpp`, `<Target>TargetBinaryDesc.h`, `<Target>TargetBinaryDesc.cpp`
+- **Input DSL:** `.tdf`, Target configuration
+- **Synthesized Structures:**
+  1. **`<Target>TargetDesc : public TargetDesc`:**
+     - Implements `getTypeLayout()`, `getExpansionRegistry()`, `getFrameLowerer()`, `getInstructionSelector()`, `getLegalizer()`, `getRegisterAllocator()`, `getAvailableRegisterBanks()`, `getAvailableCallingConventions()`, `getNearestLegalType()`, `getInstructionPtrReg()`, `getStackSlotSize()`.
+  2. **`<Target><OS>TargetBinaryDesc : public TargetBinaryDesc`:**
+     - Implements `isLittleEndian()`, `isPositionIndependent()`, `getCodeModel()`, `getObjectFormat()`, `getFunctionAlignment()`, `getLoopAlignment()`, `getSections()`.
+  3. **Target Registry Entry Point:**
+     ```cpp
+     std::unique_ptr<TargetDesc> Create<Target>TargetDesc(std::pmr::memory_resource *alloc);
+     ```
 
 ---
 
-## 4.1 Chaitin-Briggs Register Coalescing & Allocation Hardening
-
-### Register Coalescing Algorithm (Briggs Criterion)
-- For every copy `MOV %dst, %src`:
-  - Combine nodes $U$ and $V$ into $UV$ if the merged node has $< K$ neighbors of significant degree ($\ge K$).
-  - Eliminate redundant `MOV` instruction.
-
-### Loop-Depth Weighted Spilling
-$$\text{Cost}(v) = \frac{\sum_{u \in \text{uses}(v)} 10^{\text{loopDepth}(u)} + \sum_{d \in \text{defs}(v)} 10^{\text{loopDepth}(d)}}{\text{degree}(v)}$$
-
----
-
-## 4.2 Dynamic Alloca & ABI Red Zone Handling (`MirFrameLowerer`)
-
-### `lowerDAlloc` Implementation
-```cpp
-bool MirFrameLowerer::lowerDAlloc(FrameLowererCtx &ctx) {
-    // 1. Force Frame Pointer usage for function
-    ctx.m_targetFunc->setRequiresFramePointer(true);
-    // 2. Emit SP alignment & stack subtraction
-    // sub rsp, allocSize
-    // and rsp, -alignment
-    // mov %dest, rsp
-    return true;
-}
-```
+## 2.11 Multi-Target Driver CLI (`EzDsl-cli`) & Target Pipeline Dispatcher [TODO]
+- **File:** `EzDsl/src/Driver/Main.cpp`
+- **CLI Options for Target Pipeline:**
+  ```bash
+  ezdsl-gen --target AMD64 \
+            --tdf targets/AMD64/AMD64.tdf \
+            --idf targets/AMD64/AMD64.idf \
+            --lad targets/AMD64/AMD64.lad \
+            --lrd targets/AMD64/AMD64.lrd \
+            --isf targets/AMD64/AMD64.isf \
+            --ccdf targets/AMD64/AMD64.ccdf \
+            --tyf types/StandardTypes.tyf \
+            --irdf ir/MirInstructionSet.irdf \
+            -o build/generated/AMD64/
+  ```
+- **Driver Pipeline Steps:**
+  1. Parse all input files into a unified PMR AST context.
+  2. Populate unified `SymbolTable` across all files.
+  3. Execute semantic validation passes in dependency order:
+     - `TypePass` $\to$ `IrInstructionPass` $\to$ `RegisterBankPass` $\to$ `TargetInstPass` $\to$ `LegalizeActionPass` $\to$ `LegalizeRulePass` $\to$ `InstSelPass` $\to$ `CallingConvPass`.
+  4. If any diagnostic error occurs, log formatted errors with source line locations and abort.
+  5. Invoke all 8 code generators to emit the complete target source files.
 
 ---
 
-# 7. Phase 5: EzCodeEmitter & Direct Object Writers
+## 2.12 CMake Target Integration Suite (`EzDslGenBackend.cmake`) [TODO]
+- **File:** `EzTriple/CMake/EzDslGenBackend.cmake`
+- **CMake Function Specification:**
+  ```cmake
+  function(EzDslGenTarget TARGET_NAME)
+      cmake_parse_arguments(ARG "" "OUTPUT_DIR" "TDF;IDF;LAD;LRD;ISF;CCDF;TYF;IRDF" ${ARGN})
+      
+      set(GENERATED_HEADERS
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}InstructionDefs.h
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}RegisterBanks.h
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}TypeLayout.h
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}LegalizerActionTable.h
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}LegalizeRules.h
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}ISelTable.h
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}CallingConventions.h
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}TargetDesc.h
+      )
+      
+      set(GENERATED_SOURCES
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}InstructionDefs.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}BinaryEncoder.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}RegisterBanks.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}TypeLayout.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}LegalizerActionTable.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}LegalizeRules.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}ISelTable.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}CallingConventions.cpp
+          ${ARG_OUTPUT_DIR}/${TARGET_NAME}TargetDesc.cpp
+      )
+      
+      add_custom_command(
+          OUTPUT ${GENERATED_HEADERS} ${GENERATED_SOURCES}
+          COMMAND EzDsl-cli --target ${TARGET_NAME}
+                            --tdf ${ARG_TDF}
+                            --idf ${ARG_IDF}
+                            --lad ${ARG_LAD}
+                            --lrd ${ARG_LRD}
+                            --isf ${ARG_ISF}
+                            --ccdf ${ARG_CCDF}
+                            --tyf ${ARG_TYF}
+                            --irdf ${ARG_IRDF}
+                            -o ${ARG_OUTPUT_DIR}
+          DEPENDS EzDsl-cli ${ARG_TDF} ${ARG_IDF} ${ARG_LAD} ${ARG_LRD} ${ARG_ISF} ${ARG_CCDF} ${ARG_TYF} ${ARG_IRDF}
+          COMMENT "Synthesizing EzTriple Target: ${TARGET_NAME}"
+      )
+      
+      add_library(EzTriple_${TARGET_NAME} STATIC ${GENERATED_SOURCES} ${GENERATED_HEADERS})
+      target_link_libraries(EzTriple_${TARGET_NAME} PUBLIC EzTriple EzMir EzCore)
+  endfunction()
+  ```
 
 ---
 
-## 7.1 ELF64 Object Writer (`ElfObjectWriter`)
-- Generates standard System V AMD64 ELF `.o` files.
-- Writes `Elf64_Ehdr`, `.text`, `.rodata`, `.data`, `.bss`, `.symtab`, `.strtab`, `.rela.text`.
-
-## 7.2 PE/COFF64 Object Writer (`CoffObjectWriter`)
-- Generates Microsoft Windows PE/COFF `.obj` files.
-- Writes `IMAGE_FILE_HEADER`, `.text`, `.rdata`, `.data`, `.pdata` (x64 SEH unwind info), symbol table, relocation records.
-
-## 7.3 Mach-O 64-bit Object Writer (`MachoObjectWriter`)
-- Generates Apple Mach-O `.o` files.
-- Writes `mach_header_64`, `LC_SEGMENT_64`, `__TEXT/__text`, `__DATA/__data`, `LC_SYMTAB`.
+# 6. Phase 3: EzMir Core & Execution Engines
 
 ---
 
-# 8. Phase 6: End-to-End Testing & 1.0 Release Checklist
+## 3.1 Function-Scoped Monotonic Arenas & Core MIR Data Structures [DONE]
+- Implemented in `EzMir/include/` and `src/`:
+  - `MirFunction`, `MirBlock`, `MirInstruction`, `MirOperand`, `MirOperands`, `MirRegisterBank`, `MirRegisterClass`, `MirRegisterReference`.
+  - Monotonic PMR memory allocator scoping per function and per compilation unit.
+  - Comprehensive instruction builder (`MirInstructionBuilder`), operand builder (`MirOperandBuilder`), and printer (`MirPrinter`).
+- **Test Coverage:** `tests/EzMirTestSuite/tests/T_Block.cpp`, `T_Function.cpp`, `T_Instruction.cpp`, `T_Operand.cpp`, `T_GlobalVar.cpp`.
+
+---
+
+## 3.2 Core Analysis Passes (`CodeFlowAnalysisPass`, `LivenessAnalysisPass`, `NonSsaToSsaPass`) [DONE]
+- Implemented in `EzMir/src/MirPasses/Passes/`:
+  - `CodeFlowAnalysisPass`: Builds CFG predecessor/successor graphs, loop depth, and dominator sets (`T_CodeFlowPass.cpp`).
+  - `LivenessAnalysisPass`: Computes Gen/Kill, Live-In/Live-Out sets, and virtual register live intervals (`T_LivenessAnalysis.cpp`).
+  - `NonSsaToSsaPass`: Standard SSA construction converting mutable alloca variables into SSA $\phi$ nodes (`T_NonSsaToSsa.cpp`).
+
+---
+
+## 3.3 MIR Invariant Verifier Pass (`MirVerifierPass`) [TODO]
+- **File:** `EzMir/include/MirPasses/Passes/MirVerifierPass.h`, `EzMir/src/MirPasses/Passes/MirVerifierPass.cpp`
+- **Verification Rules:**
+  1. **SSA Dominance Invariant:** For every instruction $I$ using virtual register $V$, the unique defining instruction $D(V)$ must strictly dominate $I$ (or dominate the corresponding incoming predecessor edge if $I$ is a $\phi$ node).
+  2. **Terminator Invariant:** Every `MirBlock` must contain exactly one terminator instruction (`isTerminator() == true`) located strictly at the end of the block instruction list.
+  3. **$\phi$ Invariant:** $\phi$ instructions must only reside at the entry of basic blocks before any non-$\phi$ instruction, with incoming block count matching predecessor count.
+  4. **Type Consistency:** Operand types must match instruction signature constraints.
+
+---
+
+## 3.4 Generic Legalizer Engine (`MirLegalizerPass`) [TODO]
+- **Files:** `EzMir/include/MirPasses/Passes/MirLegalizerPass.h`, `EzMir/src/MirPasses/Passes/MirLegalizerPass.cpp`
+- **Execution Pipeline (Driven by generated `<Target>LegalizerActionTable` & `<Target>LegalizeRules`):**
+  1. Iterate instructions in topological order.
+  2. Query `GetTargetLegalizeAction(opcode, slot, type)`.
+  3. Action Dispatch:
+     - `Legal`: Continue without alteration.
+     - `WidenScalar`: Insert `SEXT`/`ZEXT` from original type to nearest legal type, perform widened operation, insert `TRUNC` to original destination.
+     - `NarrowScalar`: Split wide operands into low/high halves via `UNMERGE_VALUES`, lower into multi-word arithmetic with carry/borrow, combine results with `MERGE_VALUES`.
+     - `Bitcast`: Insert reinterpret bitcast to legal bit-compatible type.
+     - `Libcall`: Lower complex operation (e.g. `f128` operations, `i128` division) into standard ABI function calls (`__divti3`, `__udivti3`).
+     - `Custom`: Invoke synthesized `<Target>LegalizeRules::tryExpand(ctx, inst)`.
+  4. Integration with Function Signature Legalization:
+     - Apply SRET transformations (`CodeSnippets/LegalizeCallAction.cpp`, `CodeSnippets/LegalizeReturnAction.cpp`, `CodeSnippets/MirFunctionSignatureLegalizerPass.cpp`).
+
+---
+
+## 3.5 Generic Instruction Selector Engine (`MirInstructionSelectorPass`) [TODO]
+- **Files:** `EzMir/include/MirPasses/Passes/MirInstructionSelectorPass.h`, `EzMir/src/MirPasses/Passes/MirInstructionSelectorPass.cpp`
+- **Execution Pipeline:**
+  1. Iterate basic blocks in reverse post-order.
+  2. Delegate to synthesized `targetDesc->getInstructionSelector()->select(ctx, inst)`.
+  3. Replaces generic MIR instructions with target physical/virtual instructions with register class constraints.
+  4. Erase selected generic MIR nodes.
+
+---
+
+# 7. Phase 4: EzTriple & Backend Hardening
+
+---
+
+## 4.1 Target & Binary Descriptor Architecture (`TargetDesc`, `TargetBinaryDesc`) [DONE]
+- Implemented in `EzTriple/include/Descriptors/TargetDesc.h` and `TargetBinaryDesc.h`.
+- Provides full polymorphic interfaces for target hardware (CPU) and operating system binary environments (ABI).
+
+---
+
+## 4.2 ABI Lowerer Engine (`MirAbiLowerer`, `MirAbiLowererPass`) [DONE]
+- Implemented in `EzTriple/src/AbiLowerer/MirAbiLowerer.cpp` and `MirAbiLowererPass.cpp`:
+  - `processCallBlock()`: Standardizes call sequences, allocates caller-saved spill tracking, inserts argument placement (`PUSH_ARG`).
+  - `processReturnBlock()`: Inserts return value moves (`PUSH_RET`) and SRET data moves according to `CallingConvDesc`.
+  - `processCallReturnBlock()`: Emits `POP_RET` unpacking returned registers into destination virtual registers.
+  - `processFunctionArguments()`: Lowers incoming parameters (`POP_ARG`) into function entry registers or stack slots.
+
+---
+
+## 4.3 Frame Lowerer Engine (`MirFrameLowerer`, `MirFrameLowererPass`) [PARTIAL]
+- **Files:** `EzTriple/include/FrameLowerer/MirFrameLowerer.h`, `EzTriple/src/FrameLowerer/MirFrameLowererPass.cpp`
+- **Completed:**
+  - Abstract stack frame object layout calculation (`calculateFrameLayout`).
+  - Abstract stack object reference rewriting into `MirMemory` operands (`lowerStackObjectReferences`).
+- **Pending Implementation:**
+  - Target-specific Prologue/Epilogue emission:
+    - Callee-saved register saving/restoring (`PUSH`/`POP`).
+    - Stack pointer adjustment (`SUB RSP, FrameSize` / `ADD RSP, FrameSize`).
+    - Frame pointer establishment (`MOV RBP, RSP`).
+  - Dynamic stack allocation lowering (`lowerDAlloc`):
+    - Adjust stack pointer at runtime, align pointer to required boundary, and bind destination register.
+
+---
+
+## 4.4 Chaitin-Briggs Register Allocator (`MirRegisterAllocator`, `MirRegisterAllocatorPass`) [DONE]
+- Implemented in `EzTriple/src/RegisterAllocator/MirRegisterAllocator.cpp` and `MirRegisterAllocatorPass.cpp`:
+  - Interference Graph construction from `LivenessResult`.
+  - Chaitin-Briggs degree evaluation and simplification (`simplify`) with $K$-colorability heuristic.
+  - Color assignment (`selectColors`) assigning physical registers to virtual nodes on the selection stack.
+  - Spill cost calculation:
+    $$\text{Cost}(v) = \frac{\sum_{u \in \text{uses}(v)} 10^{\text{loopDepth}(u)} + \sum_{d \in \text{defs}(v)} 10^{\text{loopDepth}(d)}}{\text{degree}(v)}$$
+  - Virtual register rewriting to assigned physical colors (`rewriteColors`).
+  - Spill insertion allocating stack slots and replacing operands with load/store sequences (`rewriteSpilledRegisters`).
+
+---
+
+# 8. Phase 5: EzCodeEmitter & Direct Object Writers
+
+---
+
+## 8.1 Object Emitter Core (`CodeSection`, `CodeEmitterContext`, `GenericCodeEmitter`) [DONE]
+- Implemented in `EzCodeEmitter/include/` and `src/`:
+  - `CodeSection`: Monotonic node-based byte buffer supporting 8/16/32/64-bit emissions, alignment padding, and label binding.
+  - `CodeEmitterContext`: Manages relocations (`CodeRelocation`), symbol tables, and section maps.
+  - `Helpers.cpp`: Section allocation templates for ELF (`.text`, `.rodata`, `.data`, `.bss`), COFF, and Mach-O.
+
+---
+
+## 8.2 ELF64 Object Writer (`ElfObjectWriter`) [TODO]
+- **File:** `EzCodeEmitter/include/Writers/ElfObjectWriter.h`, `EzCodeEmitter/src/Writers/ElfObjectWriter.cpp`
+- **Responsibilities:**
+  - Emits standard System V ELF64 object files (`.o`).
+  - Constructs `Elf64_Ehdr`, `Elf64_Shdr` table, string tables (`.strtab`, `.shstrtab`), symbol table (`.symtab`), and relocation tables (`.rela.text`, `.rela.data`).
+  - Serializes `CodeSection` payload buffers to file descriptor or output stream.
+
+---
+
+## 8.3 PE/COFF64 Object Writer (`CoffObjectWriter`) [TODO]
+- **File:** `EzCodeEmitter/include/Writers/CoffObjectWriter.h`, `EzCodeEmitter/src/Writers/CoffObjectWriter.cpp`
+- **Responsibilities:**
+  - Emits Microsoft Windows PE/COFF 64-bit `.obj` files.
+  - Constructs `IMAGE_FILE_HEADER`, `IMAGE_SECTION_HEADER` array, relocation entries (`IMAGE_RELOCATION`), symbol table records, and `.pdata`/`.xdata` SEH unwind structures.
+
+---
+
+## 8.4 Mach-O 64-bit Object Writer (`MachoObjectWriter`) [TODO]
+- **File:** `EzCodeEmitter/include/Writers/MachoObjectWriter.h`, `EzCodeEmitter/src/Writers/MachoObjectWriter.cpp`
+- **Responsibilities:**
+  - Emits Apple Mach-O 64-bit `.o` files.
+  - Constructs `mach_header_64`, `LC_SEGMENT_64` commands, `section_64` descriptors, `LC_SYMTAB`, and relocation records.
+
+---
+
+# 9. Phase 6: End-to-End Testing & 1.0 Release Checklist
 
 ### Complete 1.0 Milestone Verification Matrix
 
-| Phase | Milestone Item | Acceptance Criteria | Target Test Suite |
-|:---|:---|:---|:---|
-| **Phase 1** | `.ccdf` Lexy Parser & AST | Full parsing of System V & Win64 calling conventions | `T_CallingConvDefLang.cpp` |
-| **Phase 1** | Sema Passes | Cross-file symbol resolution, bitfield overlap, DAG alias cycle checks | `T_Sema_*Pass.cpp` (6 test suites) |
-| **Phase 2** | Code Generators | Target instruction encoders, 2D legality matrices, ISel decision trees | `T_Gen_*` (5 test suites) |
-| **Phase 3** | MirVerifierPass | Strict SSA dominance & terminator verification | `T_MirVerifierPass.cpp` |
-| **Phase 3** | Legalizer & ISel Engines | End-to-end SSA lowering from generic MIR to target MIR | `T_MirLegalizer_Integration.cpp`, `T_MirISel_Integration.cpp` |
-| **Phase 4** | RegAlloc & Frame | Chaitin-Briggs coloring, coalescing, loop-depth spill, `alloca` | `T_MirRegisterAllocator_*` |
-| **Phase 5** | Direct Object Writers | Valid ELF, COFF, and Mach-O binary generation parsed by `readelf`/`llvm-readobj` | `T_*ObjectWriter.cpp` |
-| **Phase 6** | End-to-End Targets | Fully functional **x86-64** and **RISC-V 64** backend execution | `ez-lit` & Native Execution Tests |
+| Phase | Milestone Item | Acceptance Criteria | Target Test Suite | Status |
+|:---|:---|:---|:---|:---:|
+| **Phase 1** | `.ccdf` Lexy Parser & AST | Parsing of System V & Win64 calling conventions | `T_CallingConvDefLang.cpp` | ✅ **DONE** |
+| **Phase 1** | All 8 DSL Parsers & ASTs | Full syntax coverage for `.tdf`, `.idf`, `.lad`, `.lrd`, `.isf`, `.irdf`, `.tyf` | `tests/EzDslTestSuite/` (8 suites) | ✅ **DONE** |
+| **Phase 1** | All 8 Sema Passes | Cross-file symbol resolution, bitfield overlap, DAG alias cycle checks | `T_Sema_*Pass.cpp` (7 suites) | ✅ **DONE** |
+| **Phase 2** | Type & IR Generators | Synthesize `MirTypeTable` & `MirInstructionSet` | `T_EzDslCli_Gen*.cpp` | ✅ **DONE** |
+| **Phase 2** | Target Model Generators | Synthesize registers, classes, banks, alias tables from `.tdf` | `T_Gen_TargetBank.cpp` | ⏳ **PENDING** |
+| **Phase 2** | Target Instruction Encoders | Synthesize target opcodes, descriptors, and binary encoders from `.idf` | `T_Gen_TargetInst.cpp` | ⏳ **PENDING** |
+| **Phase 2** | 2D Legality Action Matrix | Synthesize constant-time 2D matrix from `.lad` | `T_Gen_LegalizerTable.cpp` | ⏳ **PENDING** |
+| **Phase 2** | Rewrite Rule Engine | Synthesize expansion patterns from `.lrd` | `T_Gen_LegalizerRules.cpp` | ⏳ **PENDING** |
+| **Phase 2** | ISel Decision Tree | Synthesize AddrMode matchers & decision tree selector from `.isf` | `T_Gen_ISelTable.cpp` | ⏳ **PENDING** |
+| **Phase 2** | Calling Convention Descs | Synthesize `CallingConvDesc` factories from `.ccdf` | `T_Gen_CallingConv.cpp` | ⏳ **PENDING** |
+| **Phase 2** | TargetDesc & Glue Generator | Synthesize `<Target>TargetDesc` & `<Target>TargetBinaryDesc` | `T_Gen_TargetDesc.cpp` | ⏳ **PENDING** |
+| **Phase 2** | Multi-Target CLI Driver | `EzDsl-cli` compiles full target bundle in one invocation | `T_EzDslCli_FullTarget.cpp` | ⏳ **PENDING** |
+| **Phase 3** | MirVerifierPass | Strict SSA dominance & terminator verification | `T_MirVerifierPass.cpp` | ⏳ **PENDING** |
+| **Phase 3** | Legalizer & ISel Engines | Generic MIR lowering to target MIR driven by generated tables | `T_MirLegalizer_Integration.cpp` | ⏳ **PENDING** |
+| **Phase 4** | RegAlloc & ABI Lowering | Full Chaitin-Briggs coloring, coalescing, call/return ABI lowering | `T_MirRegisterAllocator_*`, `T_MirAbiLowerer_*` | ✅ **DONE** |
+| **Phase 4** | Frame Lowerer PEI | Target-specific prologue/epilogue and DAlloc lowering | `T_MirFrameLowerer_*` | ⏳ **PENDING** |
+| **Phase 5** | Direct Object Writers | Valid ELF64, COFF64, Mach-O binary generation verified by `readelf`/`llvm-readobj` | `T_*ObjectWriter.cpp` | ⏳ **PENDING** |
+| **Phase 6** | End-to-End Targets | Fully functional **x86-64 (AMD64)** and **RISC-V 64** execution | `ez-lit` Native Execution Tests | ⏳ **PENDING** |
+
