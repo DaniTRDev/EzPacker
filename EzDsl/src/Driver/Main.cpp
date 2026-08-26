@@ -9,16 +9,9 @@
 #include "Ast/TargetDefLangAst.h"
 #include "Ast/TypeDefLangAst.h"
 
-#include "CodeGenerators/CppCallingConvGenerator.h"
-#include "CodeGenerators/CppISelTableGenerator.h"
-#include "CodeGenerators/CppLegalizerGenerator.h"
-#include "CodeGenerators/CppLegalizerRuleGenerator.h"
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
 #include "CodeGenerators/CppTargetBankGenerator.h"
-#include "CodeGenerators/CppTargetDescGenerator.h"
-#include "CodeGenerators/CppTargetInstGenerator.h"
-#include "CodeGenerators/CppTargetTypeLayoutGenerator.h"
 
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
@@ -175,49 +168,73 @@ std::optional<CliOptions> ParseCommandLine(int argc, char **argv)
         }
         if (arg == "--tdf")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_tdfFile = args[i];
             continue;
         }
         if (arg == "--idf")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_idfFile = args[i];
             continue;
         }
         if (arg == "--lad")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_ladFile = args[i];
             continue;
         }
         if (arg == "--lrd")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_lrdFile = args[i];
             continue;
         }
         if (arg == "--isf")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_isfFile = args[i];
             continue;
         }
         if (arg == "--ccdf")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_ccdfFile = args[i];
             continue;
         }
         if (arg == "--tyf")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_tyfFile = args[i];
             continue;
         }
         if (arg == "--irdf")
         {
-            if (++i >= args.size()) { return std::nullopt; }
+            if (++i >= args.size())
+            {
+                return std::nullopt;
+            }
             opts.m_irdfFile = args[i];
             continue;
         }
@@ -408,7 +425,8 @@ int main(int argc, char **argv)
             if (fId)
             {
                 ParseContext pCtx(&collector, &sourceManager, *fId, &arena);
-                auto ast = pCtx.parse<DSL::Parser::LegalizeActionDef::TargetLegalizeDef, DSL::Ast::LegalizeActionDef::TargetLegalizeDef>();
+                auto ast = pCtx.parse<DSL::Parser::LegalizeActionDef::TargetLegalizeDef,
+                                      DSL::Ast::LegalizeActionDef::TargetLegalizeDef>();
                 if (ast)
                 {
                     LegalizeActionPass::run(&collector, &symbolTable, &*ast);
@@ -423,7 +441,8 @@ int main(int argc, char **argv)
             if (fId)
             {
                 ParseContext pCtx(&collector, &sourceManager, *fId, &arena);
-                auto ast = pCtx.parse<DSL::Parser::LegalizeRuleDef::TargetLegalizeRuleDef, DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef>();
+                auto ast = pCtx.parse<DSL::Parser::LegalizeRuleDef::TargetLegalizeRuleDef,
+                                      DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef>();
                 if (ast)
                 {
                     LegalizeRulePass::run(&collector, &symbolTable, &*ast);
@@ -453,7 +472,8 @@ int main(int argc, char **argv)
             if (fId)
             {
                 ParseContext pCtx(&collector, &sourceManager, *fId, &arena);
-                auto ast = pCtx.parse<DSL::Parser::CallingConvDef::CallingConvDefFile, DSL::Ast::CallingConvDef::CallingConvDefFile>();
+                auto ast = pCtx.parse<DSL::Parser::CallingConvDef::CallingConvDefFile,
+                                      DSL::Ast::CallingConvDef::CallingConvDefFile>();
                 if (ast)
                 {
                     CallingConvPass::run(&collector, &symbolTable, &*ast);
@@ -465,13 +485,13 @@ int main(int argc, char **argv)
         std::string targetName = options->m_targetName.empty() ? "Target" : options->m_targetName;
 
         CodeGenerators::GenerateTargetRegisterBanks(&collector, &symbolTable, options->m_outputPath, targetName);
-        CodeGenerators::GenerateTargetInstructionDefs(&collector, &symbolTable, options->m_outputPath, targetName);
+        /*CodeGenerators::GenerateTargetInstructionDefs(&collector, &symbolTable, options->m_outputPath, targetName);
         CodeGenerators::GenerateTargetTypeLayout(&collector, &symbolTable, options->m_outputPath, targetName);
         CodeGenerators::GenerateTargetLegalizerTable(&collector, &symbolTable, options->m_outputPath, targetName);
         CodeGenerators::GenerateTargetLegalizerRules(&collector, &symbolTable, options->m_outputPath, targetName);
         CodeGenerators::GenerateTargetISelTable(&collector, &symbolTable, options->m_outputPath, targetName);
         CodeGenerators::GenerateTargetCallingConventions(&collector, &symbolTable, options->m_outputPath, targetName);
-        CodeGenerators::GenerateTargetDescriptor(&collector, &symbolTable, options->m_outputPath, targetName);
+        CodeGenerators::GenerateTargetDescriptor(&collector, &symbolTable, options->m_outputPath, targetName);*/
 
         return EXIT_SUCCESS;
     }
@@ -492,9 +512,15 @@ int main(int argc, char **argv)
     if (extension == ".tyf")
     {
         auto ast = parseCtx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
-        if (!ast) { return EXIT_FAILURE; }
+        if (!ast)
+        {
+            return EXIT_FAILURE;
+        }
         TypePass typePass;
-        if (!typePass.run(&collector, &symbolTable, &*ast)) { return EXIT_FAILURE; }
+        if (!typePass.run(&collector, &symbolTable, &*ast))
+        {
+            return EXIT_FAILURE;
+        }
         if (options->m_emitTypeTable)
         {
             CodeGenerators::GenerateMirTypeTable(&collector, &symbolTable, options->m_outputPath, options->m_genMode);
@@ -503,9 +529,15 @@ int main(int argc, char **argv)
     else if (extension == ".irdf" || extension == ".iid")
     {
         auto ast = parseCtx.parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
-        if (!ast) { return EXIT_FAILURE; }
+        if (!ast)
+        {
+            return EXIT_FAILURE;
+        }
         IrInstructionPass instPass;
-        if (!instPass.run(&collector, &symbolTable, &*ast)) { return EXIT_FAILURE; }
+        if (!instPass.run(&collector, &symbolTable, &*ast))
+        {
+            return EXIT_FAILURE;
+        }
         if (options->m_emitInstructions)
         {
             CodeGenerators::GenerateMirIrInstructionDefs(&collector, &symbolTable, options->m_outputPath);
@@ -514,12 +546,26 @@ int main(int argc, char **argv)
     else if (extension == ".tdf")
     {
         auto ast = parseCtx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
-        if (!ast) { return EXIT_FAILURE; }
-        if (!TargetDefPass::run(&collector, &symbolTable, &*ast)) { return EXIT_FAILURE; }
-        if (!RegisterBankPass::run(&collector, &symbolTable, &*ast)) { return EXIT_FAILURE; }
+        if (!ast)
+        {
+            return EXIT_FAILURE;
+        }
+        if (!TargetDefPass::run(&collector, &symbolTable, &*ast))
+        {
+            return EXIT_FAILURE;
+        }
+        if (!RegisterBankPass::run(&collector, &symbolTable, &*ast))
+        {
+            return EXIT_FAILURE;
+        }
 
-        std::string targetName = options->m_targetName.empty() ? std::string(ast->m_name.m_node) : options->m_targetName;
-        CodeGenerators::GenerateTargetRegisterBanks(&collector, &symbolTable, options->m_outputPath, targetName, options->m_bankGenMode);
+        std::string targetName =
+                options->m_targetName.empty() ? std::string(ast->m_name.m_node) : options->m_targetName;
+        CodeGenerators::GenerateTargetRegisterBanks(&collector,
+                                                    &symbolTable,
+                                                    options->m_outputPath,
+                                                    targetName,
+                                                    options->m_bankGenMode);
     }
     else
     {

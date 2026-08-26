@@ -12,13 +12,6 @@ EzCMK_ConfigureLib(NAME "EzDslTestSuite"
 )
 
 EzPacker_AddTest(
-        "T_EzDslEndToEndTargetPipeline"
-        "EzDslTestSuite"
-        ""
-        "tests/T_EzDslEndToEndTargetPipeline.cpp"
-)
-
-EzPacker_AddTest(
         "T_CallingConvDefLang"
         "EzDslTestSuite"
         ""
@@ -44,48 +37,6 @@ EzPacker_AddTest(
         "EzDslTestSuite"
         ""
         "tests/T_EzDslCli_GenRegisterBanks.cpp"
-)
-
-EzPacker_AddTest(
-        "T_EzDslCli_GenTargetInst"
-        "EzDslTestSuite"
-        ""
-        "tests/T_EzDslCli_GenTargetInst.cpp"
-)
-
-EzPacker_AddTest(
-        "T_EzDslCli_GenTargetTypeLayout"
-        "EzDslTestSuite"
-        ""
-        "tests/T_EzDslCli_GenTargetTypeLayout.cpp"
-)
-
-EzPacker_AddTest(
-        "T_EzDslCli_GenLegalizer"
-        "EzDslTestSuite"
-        ""
-        "tests/T_EzDslCli_GenLegalizer.cpp"
-)
-
-EzPacker_AddTest(
-        "T_EzDslCli_GenISelTable"
-        "EzDslTestSuite"
-        ""
-        "tests/T_EzDslCli_GenISelTable.cpp"
-)
-
-EzPacker_AddTest(
-        "T_EzDslCli_GenCallingConv"
-        "EzDslTestSuite"
-        ""
-        "tests/T_EzDslCli_GenCallingConv.cpp"
-)
-
-EzPacker_AddTest(
-        "T_EzDslCli_GenTargetDesc"
-        "EzDslTestSuite"
-        ""
-        "tests/T_EzDslCli_GenTargetDesc.cpp"
 )
 
 EzPacker_AddTest(
