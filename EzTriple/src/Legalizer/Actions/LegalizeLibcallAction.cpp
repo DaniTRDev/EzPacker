@@ -5,10 +5,14 @@
 #include "Descriptors/TargetDesc.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
+#include "Instruction/MirInstructionMetadata.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
+
+#include <algorithm>
+#include <vector>
 
 namespace LegalizeActions
 {
@@ -21,34 +25,47 @@ LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSym
     }
 
     MirInstruction *instr = *ctx.m_it;
-    if (!instr || instr->getOperands().empty())
+    if (!instr)
     {
         return LegalizationResult::NotModified;
     }
 
-    MirInstructionBuilder ib(ctx.m_ctx, instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);
+    MirBlock *ownerBlock = instr->getOwner();
+    MirInstructionBuilder ib(ctx.m_ctx, ownerBlock, InsertionType::InsertBefore, ctx.m_it);
     MirOperandBuilder ob(ctx.m_ctx);
 
-    MirOperand *dst = instr->getOperand(0);
     std::pmr::string symStr(libcallSymbol, ctx.m_ctx->getGlobalAllocator());
     MirRuntimeSymbol *calleeRef = ob.buildRtSymbol(symStr);
 
     std::vector<MirOperand *> callOps;
-    callOps.push_back(dst);
-    callOps.push_back(calleeRef);
-    for (size_t i = 1; i < instr->getOperands().size(); ++i)
+    bool hasDst = (instr->hasOperands() && (instr->getOperandFlag(0) & MirOperandFlag::Write));
+
+    if (hasDst)
     {
-        callOps.push_back(instr->getOperand(i));
+        callOps.push_back(instr->getOperand(0));
+        callOps.push_back(calleeRef);
+        for (size_t i = 1; i < instr->getOperandCount(); ++i)
+        {
+            callOps.push_back(instr->getOperand(i));
+        }
+    }
+    else
+    {
+        callOps.push_back(calleeRef);
+        for (size_t i = 0; i < instr->getOperandCount(); ++i)
+        {
+            callOps.push_back(instr->getOperand(i));
+        }
     }
 
     MirInstruction *callInst = ib.build(MirInstructionOpCode::CALL, instr->getSourceRef(), callOps);
-    instr->getOwner()->getInstructions().erase(ctx.m_it);
+    ownerBlock->getInstructions().erase(ctx.m_it);
 
     // Run LegalizeCall on the newly formed CALL instruction
-    auto callIt = std::find(instr->getOwner()->getInstructions().begin(),
-                            instr->getOwner()->getInstructions().end(),
+    auto callIt = std::find(ownerBlock->getInstructions().begin(),
+                            ownerBlock->getInstructions().end(),
                             callInst);
-    if (callIt != instr->getOwner()->getInstructions().end())
+    if (callIt != ownerBlock->getInstructions().end())
     {
         LegalizeCtx newCtx(ctx.m_ctx, ctx.m_targetDesc, callIt);
         return LegalizeCall(newCtx);
@@ -58,3 +75,4 @@ LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSym
 }
 
 } // namespace LegalizeActions
+

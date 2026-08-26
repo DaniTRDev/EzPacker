@@ -144,7 +144,6 @@ class MockTargetDesc : public TargetDesc
     MirLegalizer *getLegalizer() override { return m_legalizer.get(); }
     MirRegisterAllocator *getRegisterAllocator() override { return nullptr; }
     MirType *getMemOperandDisplacementType() override;
-    MirType *getNearestLegalType(MirType *type) override { return type; }
     MirRegisterRef getInstructionPtrReg() const override { return {}; }
     size_t getStackSlotSize() const override { return 8; }
     void initialize() override {}

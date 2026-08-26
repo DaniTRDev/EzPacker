@@ -22,7 +22,6 @@ enum class LegalizeActionKind : uint8_t
     Libcall,      // Lower the instruction into a runtime library call (e.g., __divdi3).
     Custom,       // Delegate legalization to a target-specific C++ callback.
     Bitcast,      // Reinterpret the value into a legal type of equal bit-width (e.g., i32 -> f32).
-    Lower,        // Expand or lower the instruction using rewrite rules or standard expansion routines.
     Unsupported   // Explicitly reject the type combination as illegal.
 };
 

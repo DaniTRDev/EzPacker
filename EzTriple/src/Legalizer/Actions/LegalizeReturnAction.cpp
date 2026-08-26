@@ -21,11 +21,30 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
     MirInstruction *instr = *it;
     auto &operands = instr->getOperands();
 
+    if (!operands.empty() && operands[0] && operands[0]->isOfType<MirRegister>())
+    {
+        MirRegister *reg = operands[0]->get<MirRegister>();
+        if (reg->getMirType() && reg->getMirType()->getKind() == MirTypeKind::BindingToken)
+        {
+            return LegalizationResult::NotModified;
+        }
+    }
+
     MirBlock *owningBlock = instr->getOwner();
     MirFunction *owningFunc = owningBlock ? owningBlock->getOwner() : nullptr;
     CallingConvDesc *cc = owningFunc ? owningFunc->getCallingConv() : nullptr;
     MirInstructionBuilder insertBeforeBuilder(builderCtx, owningBlock, InsertionType::InsertBefore, it);
     MirOperandBuilder opBuilder(builderCtx);
+
+    bool firstInserted = false;
+    auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops) {
+        insertBeforeBuilder.build(opc, instr->getSourceRef(), ops);
+        if (!firstInserted)
+        {
+            insertBeforeBuilder.changeInsertionType(InsertionType::InsertAfter);
+            firstInserted = true;
+        }
+    };
 
     // Create a unique return tracking token (virtual register)
     MirRegister *retToken = opBuilder.buildVReg(builderCtx->getTypeTable()->__bindToken());
@@ -43,14 +62,14 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
 
             // Emit: STORE sourceRef, memDest, returnVal
             MirOperand *memDest = opBuilder.buildMem(retType, sretPtr, FlexInt(int64_t(0)));
-            insertBeforeBuilder.build(MirInstructionOpCode::STORE, instr->getSourceRef(), { memDest, returnVal });
+            emitBefore(MirInstructionOpCode::STORE, { memDest, returnVal });
 
             // Forward sretPtr as returnVal if required
             returnVal = sretPtr;
         }
 
         // PUSH_RET groups: (retToken, returnVal)
-        insertBeforeBuilder.build(MirInstructionOpCode::PUSH_RET, instr->getSourceRef(), { retToken, returnVal });
+        emitBefore(MirInstructionOpCode::PUSH_RET, { retToken, returnVal });
 
         // Replace the RET operand with the tracking token
         operands[0] = retToken;
@@ -64,3 +83,4 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
 }
 
 } // namespace LegalizeActions
+

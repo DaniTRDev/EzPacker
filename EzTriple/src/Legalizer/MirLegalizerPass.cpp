@@ -9,23 +9,14 @@ MirLegalizerPass::MirLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDes
 {
 }
 
-const char *MirLegalizerPass::getName() const
-{
-    return "MirLegalizerPass";
-}
+const char *MirLegalizerPass::getName() const { return "MirLegalizerPass"; }
 
-MirPassIterationPlace MirLegalizerPass::getIterationPlace() const
-{
-    return MirPassIterationPlace::Function;
-}
+MirPassIterationPlace MirLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
 MirPassResult MirLegalizerPass::run(IntrusiveLinkedList<MirFunction> &funcList,
                                     IntrusiveLinkedList<MirFunction>::iterator it,
                                     MirPassManager *passManager)
 {
-    (void)funcList;
-    (void)passManager;
-
     MirFunction *func = *it;
     if (!func)
     {

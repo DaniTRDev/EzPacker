@@ -234,7 +234,6 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
 
         case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Legal:
         case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom:
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Lower:
         case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Unsupported:
         {
             if (clause.m_targetType.has_value())

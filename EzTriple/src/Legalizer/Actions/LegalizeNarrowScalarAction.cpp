@@ -5,17 +5,72 @@
 #include "Descriptors/TargetDesc.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
+#include "Instruction/MirInstructionMetadata.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+#include <functional>
+#include <vector>
+
 namespace LegalizeActions
 {
 
+static std::vector<MirOperand *>
+splitOperand(MirOperand *op,
+             size_t numChunks,
+             size_t narrowBits,
+             MirType *narrowType,
+             const std::function<void(MirInstructionOpCode, const std::vector<MirOperand *> &)> &emitInst,
+             MirOperandBuilder &ob)
+{
+    std::vector<MirOperand *> chunks;
+    chunks.reserve(numChunks);
+
+    if (op->isOfType<MirRegister>())
+    {
+        for (size_t k = 0; k < numChunks; ++k)
+        {
+            chunks.push_back(ob.buildVReg(narrowType));
+        }
+        std::vector<MirOperand *> unmergeOps = std::move(chunks);
+        unmergeOps.push_back(op);
+        emitInst(MirInstructionOpCode::UNMERGE_VALUES, unmergeOps);
+        return chunks;
+    }
+
+    if (op->isOfType<MirInteger>())
+    {
+        MirInteger *imm = op->get<MirInteger>();
+        if (numChunks == 2)
+        {
+            FlexInt loVal = imm->getValue().getLowHalf();
+            FlexInt hiVal = imm->getValue().getHighHalf();
+            chunks.push_back(ob.buildInt(narrowType, loVal));
+            chunks.push_back(ob.buildInt(narrowType, hiVal));
+            return chunks;
+        }
+
+        uint64_t rawVal = imm->getValue().getU64();
+        uint64_t mask = (narrowBits >= 64) ? ~0ULL : ((1ULL << narrowBits) - 1ULL);
+        for (size_t k = 0; k < numChunks; ++k)
+        {
+            uint64_t piece = (k * narrowBits < 64) ? ((rawVal >> (k * narrowBits)) & mask) : 0ULL;
+            chunks.push_back(ob.buildInt(narrowType, FlexInt(piece, narrowBits)));
+        }
+        return chunks;
+    }
+
+    for (size_t k = 0; k < numChunks; ++k)
+    {
+        chunks.push_back(op);
+    }
+    return chunks;
+}
+
 LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, MirType *targetType)
 {
-    (void)operandSlot;
     if (!ctx.m_ctx || !ctx.m_targetDesc)
     {
         return LegalizationResult::Failed;
@@ -28,62 +83,211 @@ LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, Mi
     }
 
     auto &operands = instr->getOperands();
-    if (operands.size() < 3)
+    if (operands.empty())
     {
         return LegalizationResult::NotModified;
     }
 
     MirTypeTable *typeTable = ctx.m_ctx->getTypeTable();
-    MirType *narrowType = targetType ? targetType : typeTable->i64();
-    MirType *carryType = typeTable->i1();
+    MirType *narrowType = targetType;
 
+    size_t narrowBits = narrowType->getTotalSizeInBits();
+    if (narrowBits == 0)
+    {
+        return LegalizationResult::NotModified;
+    }
+
+    MirOperand *wideOp = nullptr;
+    if (operandSlot < operands.size() && operands[operandSlot] && operands[operandSlot]->getMirType() &&
+        operands[operandSlot]->getMirType()->getTotalSizeInBits() > narrowBits)
+    {
+        wideOp = operands[operandSlot];
+    }
+    else
+    {
+        for (MirOperand *op : operands)
+        {
+            if (op && op->getMirType() && op->getMirType()->getTotalSizeInBits() > narrowBits)
+            {
+                wideOp = op;
+                break;
+            }
+        }
+    }
+
+    if (!wideOp || !wideOp->getMirType())
+    {
+        return LegalizationResult::NotModified;
+    }
+
+    size_t origBits = wideOp->getMirType()->getTotalSizeInBits();
+    size_t numChunks = origBits / narrowBits;
+    if (numChunks < 2)
+    {
+        numChunks = 2;
+    }
+
+    MirType *carryType = typeTable->i1();
     MirInstructionBuilder ib(ctx.m_ctx, instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);
     MirOperandBuilder ob(ctx.m_ctx);
 
-    MirOperand *dstOp = operands[0];
-    MirOperand *lhsOp = operands[1];
-    MirOperand *rhsOp = operands[2];
+    bool firstInserted = false;
+    auto emitInst = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
+    {
+        ib.build(opc, instr->getSourceRef(), ops);
+        if (!firstInserted)
+        {
+            ib.changeInsertionType(InsertionType::InsertAfter);
+            firstInserted = true;
+        }
+    };
 
-    if (!dstOp || !lhsOp || !rhsOp)
+    MirOperand *dstOp = operands[0];
+    bool isCompare = (instr->getMetadata().m_category == MirInstructionCategory::MirCat_Compare);
+
+    if (isCompare)
+    {
+        if (operands.size() < 3)
+        {
+            return LegalizationResult::Failed;
+        }
+
+        auto lhsChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
+        auto rhsChunks = splitOperand(operands[2], numChunks, narrowBits, narrowType, emitInst, ob);
+
+        if (instr->getOpCode() == MirInstructionOpCode::CMP_EQ)
+        {
+            MirRegister *acc = nullptr;
+            for (size_t k = 0; k < numChunks; ++k)
+            {
+                MirRegister *eqK = ob.buildVReg(carryType);
+                emitInst(MirInstructionOpCode::CMP_EQ, { eqK, lhsChunks[k], rhsChunks[k] });
+                if (k == 0)
+                {
+                    acc = eqK;
+                }
+                else
+                {
+                    MirRegister *nextAcc = ob.buildVReg(carryType);
+                    emitInst(MirInstructionOpCode::AND, { nextAcc, acc, eqK });
+                    acc = nextAcc;
+                }
+            }
+            emitInst(MirInstructionOpCode::MOV, { dstOp, acc });
+        }
+        else if (instr->getOpCode() == MirInstructionOpCode::CMP_NE)
+        {
+            MirRegister *acc = nullptr;
+            for (size_t k = 0; k < numChunks; ++k)
+            {
+                MirRegister *neK = ob.buildVReg(carryType);
+                emitInst(MirInstructionOpCode::CMP_NE, { neK, lhsChunks[k], rhsChunks[k] });
+                if (k == 0)
+                {
+                    acc = neK;
+                }
+                else
+                {
+                    MirRegister *nextAcc = ob.buildVReg(carryType);
+                    emitInst(MirInstructionOpCode::OR, { nextAcc, acc, neK });
+                    acc = nextAcc;
+                }
+            }
+            emitInst(MirInstructionOpCode::MOV, { dstOp, acc });
+        }
+        else
+        {
+            return LegalizationResult::Failed;
+        }
+
+        instr->getOwner()->getInstructions().erase(ctx.m_it);
+        return LegalizationResult::Legalized;
+    }
+
+    std::vector<MirRegister *> dstChunks;
+    dstChunks.reserve(numChunks);
+    for (size_t k = 0; k < numChunks; ++k)
+    {
+        dstChunks.push_back(ob.buildVReg(narrowType));
+    }
+
+    if (instr->getOpCode() == MirInstructionOpCode::ADD && operands.size() >= 3)
+    {
+        auto lhsChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
+        auto rhsChunks = splitOperand(operands[2], numChunks, narrowBits, narrowType, emitInst, ob);
+
+        MirRegister *carry = ob.buildVReg(carryType);
+        emitInst(MirInstructionOpCode::UADDO, { dstChunks[0], carry, lhsChunks[0], rhsChunks[0] });
+
+        for (size_t k = 1; k < numChunks; ++k)
+        {
+            MirRegister *carryOut = ob.buildVReg(carryType);
+            emitInst(MirInstructionOpCode::UADDE, { dstChunks[k], carryOut, lhsChunks[k], rhsChunks[k], carry });
+            carry = carryOut;
+        }
+    }
+    else if (instr->getOpCode() == MirInstructionOpCode::SUB && operands.size() >= 3)
+    {
+        auto lhsChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
+        auto rhsChunks = splitOperand(operands[2], numChunks, narrowBits, narrowType, emitInst, ob);
+
+        MirRegister *borrow = ob.buildVReg(carryType);
+        emitInst(MirInstructionOpCode::USUBO, { dstChunks[0], borrow, lhsChunks[0], rhsChunks[0] });
+
+        for (size_t k = 1; k < numChunks; ++k)
+        {
+            MirRegister *borrowOut = ob.buildVReg(carryType);
+            emitInst(MirInstructionOpCode::USUBE, { dstChunks[k], borrowOut, lhsChunks[k], rhsChunks[k], borrow });
+            borrow = borrowOut;
+        }
+    }
+    else if (instr->getOpCode() == MirInstructionOpCode::NEG && operands.size() >= 2)
+    {
+        auto srcChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
+        MirInteger *zero = ob.buildInt(narrowType, FlexInt(int64_t(0), narrowBits));
+
+        MirRegister *borrow = ob.buildVReg(carryType);
+        emitInst(MirInstructionOpCode::USUBO, { dstChunks[0], borrow, zero, srcChunks[0] });
+
+        for (size_t k = 1; k < numChunks; ++k)
+        {
+            MirRegister *borrowOut = ob.buildVReg(carryType);
+            emitInst(MirInstructionOpCode::USUBE, { dstChunks[k], borrowOut, zero, srcChunks[k], borrow });
+            borrow = borrowOut;
+        }
+    }
+    else if ((instr->getOpCode() == MirInstructionOpCode::NOT || instr->getOpCode() == MirInstructionOpCode::MOV) &&
+             operands.size() >= 2)
+    {
+        auto srcChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
+        for (size_t k = 0; k < numChunks; ++k)
+        {
+            emitInst(instr->getOpCode(), { dstChunks[k], srcChunks[k] });
+        }
+    }
+    else if (operands.size() == 3)
+    {
+        auto lhsChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
+        auto rhsChunks = splitOperand(operands[2], numChunks, narrowBits, narrowType, emitInst, ob);
+
+        for (size_t k = 0; k < numChunks; ++k)
+        {
+            emitInst(instr->getOpCode(), { dstChunks[k], lhsChunks[k], rhsChunks[k] });
+        }
+    }
+    else
     {
         return LegalizationResult::Failed;
     }
 
-    // Split lhs and rhs into low and high 64-bit chunks
-    MirRegister *lhsLo = ob.buildVReg(narrowType);
-    MirRegister *lhsHi = ob.buildVReg(narrowType);
-    ib.build(MirInstructionOpCode::UNMERGE_VALUES, instr->getSourceRef(), { lhsLo, lhsHi, lhsOp });
-
-    MirRegister *rhsLo = ob.buildVReg(narrowType);
-    MirRegister *rhsHi = ob.buildVReg(narrowType);
-    ib.build(MirInstructionOpCode::UNMERGE_VALUES, instr->getSourceRef(), { rhsLo, rhsHi, rhsOp });
-
-    MirRegister *dstLo = ob.buildVReg(narrowType);
-    MirRegister *dstHi = ob.buildVReg(narrowType);
-
-    if (instr->getOpCode() == MirInstructionOpCode::ADD)
+    std::vector<MirOperand *> mergeOps;
+    mergeOps.reserve(numChunks + 1);
+    mergeOps.push_back(dstOp);
+    for (size_t k = 0; k < numChunks; ++k)
     {
-        MirRegister *carry = ob.buildVReg(carryType);
-        ib.build(MirInstructionOpCode::UADDO, instr->getSourceRef(), { dstLo, carry, lhsLo, rhsLo });
-        MirRegister *carryOut = ob.buildVReg(carryType);
-        ib.build(MirInstructionOpCode::UADDE, instr->getSourceRef(), { dstHi, carryOut, lhsHi, rhsHi, carry });
-        ib.build(MirInstructionOpCode::MERGE_VALUES, instr->getSourceRef(), { dstOp, dstLo, dstHi });
+        mergeOps.push_back(dstChunks[k]);
     }
-    else if (instr->getOpCode() == MirInstructionOpCode::SUB)
-    {
-        MirRegister *borrow = ob.buildVReg(carryType);
-        ib.build(MirInstructionOpCode::USUBO, instr->getSourceRef(), { dstLo, borrow, lhsLo, rhsLo });
-        MirRegister *borrowOut = ob.buildVReg(carryType);
-        ib.build(MirInstructionOpCode::USUBE, instr->getSourceRef(), { dstHi, borrowOut, lhsHi, rhsHi, borrow });
-        ib.build(MirInstructionOpCode::MERGE_VALUES, instr->getSourceRef(), { dstOp, dstLo, dstHi });
-    }
-    else
-    {
-        // For other instructions, unmerge and recombine
-        ib.build(instr->getOpCode(), instr->getSourceRef(), { dstLo, lhsLo, rhsLo });
-        ib.build(instr->getOpCode(), instr->getSourceRef(), { dstHi, lhsHi, rhsHi });
-        ib.build(MirInstructionOpCode::MERGE_VALUES, instr->getSourceRef(), { dstOp, dstLo, dstHi });
-    }
+    emitInst(MirInstructionOpCode::MERGE_VALUES, mergeOps);
 
     instr->getOwner()->getInstructions().erase(ctx.m_it);
     return LegalizationResult::Legalized;

@@ -48,7 +48,6 @@ struct LegalizationClauseKind
         .map(LEXY_LIT("LIBCALL"), Ast::LegalizeActionDef::LegalizeActionKind::Libcall)
         .map(LEXY_LIT("CUSTOM"), Ast::LegalizeActionDef::LegalizeActionKind::Custom)
         .map(LEXY_LIT("BITCAST"), Ast::LegalizeActionDef::LegalizeActionKind::Bitcast)
-        .map(LEXY_LIT("LOWER"), Ast::LegalizeActionDef::LegalizeActionKind::Lower)
         .map(LEXY_LIT("UNSUPPORTED"), Ast::LegalizeActionDef::LegalizeActionKind::Unsupported);
 
     static constexpr auto rule = dsl::symbol<KindTable>(dsl::identifier(dsl::ascii::alpha_underscore));
@@ -59,7 +58,8 @@ struct LegalizationClauseKind
  * Lexy parser rule for a legalization clause directive.
  *
  * Syntax:
- *   LegalizationClause := LegalizationClauseKind '(' TypeConstraint (',' TypeConstraint)* ')' ( '>>' ( StringLiteral | Identifier ) )?
+ *   LegalizationClause := LegalizationClauseKind '(' TypeConstraint (',' TypeConstraint)* ')' ( '>>' ( StringLiteral |
+ * Identifier ) )?
  *
  * Examples:
  *   LEGAL(i8, i16, i32)
@@ -163,7 +163,8 @@ struct TargetLegalizeDef
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<InstructionLegalizeDecl>);
-    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::InstructionLegalizeDecl>> >>
+    static constexpr auto value =
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::InstructionLegalizeDecl>> >>
             lexy::construct<Ast::LegalizeActionDef::TargetLegalizeDef>;
 };
 

@@ -5,10 +5,13 @@
 #include "HelperClasses/IntrusiveLinkedList.h"
 #include "Legalizer/Actions/LegalizeActionCommon.h"
 
+#include <string_view>
+
 class MirBlock;
 class MirBuilderContext;
 class MirFunction;
 class MirInstruction;
+class MirType;
 class TargetDesc;
 
 /**
@@ -36,6 +39,21 @@ class MirLegalizer
      * Legalizes a single instruction at the given iterator position.
      */
     virtual LegalizationResult legalizeInstruction(IntrusiveLinkedList<MirInstruction>::iterator it, MirBlock *block);
+
+    /**
+     * Determines the legalization action to take for a given instruction and operand slot.
+     */
+    virtual LegalizeAction getTargetLegalizeAction(const MirInstruction *inst, size_t operandSlot = 0) const;
+
+    /**
+     * Determines the target legal type for an instruction and operand slot if transformation is required.
+     */
+    virtual MirType *getTargetLegalType(const MirInstruction *inst, size_t operandSlot = 0) const;
+
+    /**
+     * Retrieves the runtime library symbol for an instruction requiring libcall lowering.
+     */
+    virtual std::string_view getLibcallSymbol(const MirInstruction *inst) const;
 
   protected:
     MirBuilderContext *m_ctx;

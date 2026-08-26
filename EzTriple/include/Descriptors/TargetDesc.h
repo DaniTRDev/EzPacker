@@ -28,7 +28,7 @@ class TargetDesc
     virtual class IMirTargetTypeLayout *getTypeLayout() = 0;
 
     /**
-     * Returns the expansion registry used during expand action.
+     * Returns the expansion registry used for custom legalization rules.
      */
     virtual class MirExpansionRuleRegistry *getExpansionRegistry() = 0;
 
@@ -56,20 +56,6 @@ class TargetDesc
      * Returns the displacement's type of a memory operand.
      */
     virtual class MirType *getMemOperandDisplacementType() = 0;
-
-    /**
-     * Returns the nearest compatible type for the given type. If the type is already legal, it is returned as-is. If no
-     * type can be used, nullptr will be returned.
-     *
-     * Examples 1: using an i1 (1-bit integer) is not possible in x64 arithmetic instructions, but might be allowed for
-     * dev convenience, it must be promoted to the first legal type, which is i8 (8-bit).
-     *
-     * TODO: Use the table-driven approach the legalizer current has to enforce the legal type directly on the
-     * definition of the legalization rule.
-     * @param type
-     * @return
-     */
-    virtual class MirType *getNearestLegalType(class MirType *type) = 0;
 
     /**
      * Returns a reference to the target's instruction pointer.

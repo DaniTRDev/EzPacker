@@ -253,3 +253,142 @@ TEST_F(MirLegalizerTest, TestFullLegalizerPass)
     EXPECT_TRUE(result.m_succeeded);
     EXPECT_TRUE(result.m_modifiedMir);
 }
+
+TEST_F(MirLegalizerTest, TestWidenCompareLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("widen_cmp_test", typeTable->i1());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i1(), "cond");
+    MirRegister *lhs = ob.buildVReg(typeTable->i8(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i8(), "rhs");
+
+    ib.CMP_EQ(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeWidenScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CMP_EQ dst is still i1 and inputs were widened
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 3); // ZEXT lhs, ZEXT rhs, CMP_EQ dst
+}
+
+TEST_F(MirLegalizerTest, TestWidenSignedArithmeticLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("widen_signed_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i8(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i8(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i8(), "rhs");
+
+    ib.IDIV(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeWidenScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    auto &instructions = block->getInstructions();
+    auto cur = instructions.begin();
+    MirInstruction *sext1 = *cur++;
+    MirInstruction *sext2 = *cur++;
+    MirInstruction *idivInst = *cur++;
+    MirInstruction *truncInst = *cur++;
+
+    EXPECT_EQ(sext1->getOpCodeName(), std::string("SEXT"));
+    EXPECT_EQ(sext2->getOpCodeName(), std::string("SEXT"));
+    EXPECT_EQ(idivInst->getOpCodeName(), std::string("IDIV"));
+    EXPECT_EQ(truncInst->getOpCodeName(), std::string("TRUNC"));
+}
+
+TEST_F(MirLegalizerTest, TestNarrowSubAndNegLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_sub_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.SUB(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify SUB was lowered to UNMERGE x2, USUBO, USUBE, MERGE
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 5);
+}
+
+TEST_F(MirLegalizerTest, TestNarrowBitwiseLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_bitwise_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.XOR(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify XOR was lowered to UNMERGE x2, XOR x2, MERGE
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 5);
+}
+
+TEST_F(MirLegalizerTest, TestNarrowCompareLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_cmp_test", typeTable->i1());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i1(), "eq");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.CMP_EQ(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CMP_EQ lowered to UNMERGE x2, CMP_EQ x2, AND, MOV dst
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 6);
+}
+

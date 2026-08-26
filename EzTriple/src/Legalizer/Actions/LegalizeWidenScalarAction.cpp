@@ -5,10 +5,13 @@
 #include "Descriptors/TargetDesc.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
+#include "Instruction/MirInstructionMetadata.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
+
+#include <vector>
 
 namespace LegalizeActions
 {
@@ -33,28 +36,31 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
     }
 
     MirType *resolvedTargetType = targetType;
-    if (!resolvedTargetType)
-    {
-        MirType *curType = operands[0] ? operands[0]->getMirType() : nullptr;
-        if (curType)
-        {
-            resolvedTargetType = ctx.m_targetDesc->getNearestLegalType(curType);
-        }
-    }
-
-    if (!resolvedTargetType)
-    {
-        return LegalizationResult::Failed;
-    }
-
     MirInstructionBuilder ib(ctx.m_ctx, instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);
     MirOperandBuilder ob(ctx.m_ctx);
+
+    bool firstInserted = false;
+    auto emitInst = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
+    {
+        ib.build(opc, instr->getSourceRef(), ops);
+        if (!firstInserted)
+        {
+            ib.changeInsertionType(InsertionType::InsertAfter);
+            firstInserted = true;
+        }
+    };
 
     std::vector<MirOperand *> newOperands;
     newOperands.reserve(operands.size());
 
-    MirRegister *origDst = nullptr;
-    MirRegister *widenedDst = nullptr;
+    struct WidenedDef
+    {
+        MirRegister *origDst;
+        MirRegister *widenedDst;
+    };
+    std::vector<WidenedDef> widenedDefs;
+
+    bool isCompare = (instr->getMetadata().m_category == MirInstructionCategory::MirCat_Compare);
 
     for (size_t i = 0; i < operands.size(); ++i)
     {
@@ -65,25 +71,57 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
             continue;
         }
 
-        // Check if index 0 is destination
-        if (i == 0 && op->isOfType<MirRegister>() && !(instr->getFlags() & MirInstructionFlags::ReadsMemory))
+        MirOperandFlag flag = instr->getOperandFlag(i);
+
+        // Destination / Def operand
+        if (flag & MirOperandFlag::Write)
         {
-            origDst = op->get<MirRegister>();
-            if (origDst->getMirType() && origDst->getMirType()->getTotalSizeInBits() < resolvedTargetType->getTotalSizeInBits())
+            // Compare instruction destination is boolean i1 and must not be widened/truncated
+            if (isCompare)
             {
-                widenedDst = ob.buildVReg(resolvedTargetType);
-                newOperands.push_back(widenedDst);
+                newOperands.push_back(op);
                 continue;
             }
+
+            if (op->isOfType<MirRegister>())
+            {
+                MirRegister *origDst = op->get<MirRegister>();
+                if (origDst->getMirType() && origDst->getMirType()->getKind() != MirTypeKind::Pointer &&
+                    origDst->getMirType()->getTotalSizeInBits() < resolvedTargetType->getTotalSizeInBits())
+                {
+                    MirRegister *widenedDst = ob.buildVReg(resolvedTargetType);
+                    newOperands.push_back(widenedDst);
+                    widenedDefs.push_back({ origDst, widenedDst });
+                    continue;
+                }
+            }
+
+            newOperands.push_back(op);
+            continue;
         }
 
+        // Source / Use operand
         if (op->isOfType<MirRegister>())
         {
             MirRegister *reg = op->get<MirRegister>();
-            if (reg->getMirType() && reg->getMirType()->getTotalSizeInBits() < resolvedTargetType->getTotalSizeInBits())
+            MirType *regType = reg->getMirType();
+            if (regType && regType->getKind() != MirTypeKind::Pointer &&
+                regType->getTotalSizeInBits() < resolvedTargetType->getTotalSizeInBits())
             {
                 MirRegister *widenReg = ob.buildVReg(resolvedTargetType);
-                ib.build(MirInstructionOpCode::ZEXT, instr->getSourceRef(), { widenReg, reg });
+                if (resolvedTargetType->getKind() == MirTypeKind::FloatingPoint ||
+                    regType->getKind() == MirTypeKind::FloatingPoint)
+                {
+                    emitInst(MirInstructionOpCode::FPEXT, { widenReg, reg });
+                }
+                else if (instr->isSigned())
+                {
+                    emitInst(MirInstructionOpCode::SEXT, { widenReg, reg });
+                }
+                else
+                {
+                    emitInst(MirInstructionOpCode::ZEXT, { widenReg, reg });
+                }
                 newOperands.push_back(widenReg);
                 continue;
             }
@@ -91,21 +129,50 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
         else if (op->isOfType<MirInteger>())
         {
             MirInteger *imm = op->get<MirInteger>();
-            MirInteger *widenImm = ob.buildInt(resolvedTargetType, imm->getValue());
-            newOperands.push_back(widenImm);
-            continue;
+            if (imm->getMirType() && imm->getMirType()->getTotalSizeInBits() < resolvedTargetType->getTotalSizeInBits())
+            {
+                FlexInt widenFlexImm = std::move(imm->getValue());
+                widenFlexImm.extend(resolvedTargetType->getTotalSizeInBits(), true);
+
+                MirInteger *widenImm = ob.buildInt(resolvedTargetType, std::move(widenFlexImm));
+                newOperands.push_back(widenImm);
+                continue;
+            }
+        }
+        else if (op->isOfType<MirFloat>())
+        {
+            MirFloat *imm = op->get<MirFloat>();
+            if (imm->getMirType() && imm->getMirType()->getTotalSizeInBits() < resolvedTargetType->getTotalSizeInBits())
+            {
+                FlexFloat widenFlexImm = std::move(imm->getValue());
+                widenFlexImm.extend(resolvedTargetType->getTotalSizeInBits());
+
+                MirFloat *widenImm = ob.buildFloat(resolvedTargetType, std::move(widenFlexImm));
+                newOperands.push_back(widenImm);
+                continue;
+            }
         }
 
         newOperands.push_back(op);
     }
 
     // Build the widened instruction
-    MirInstruction *widenedInst = ib.build(instr->getOpCode(), instr->getSourceRef(), newOperands);
+    emitInst(instr->getOpCode(), newOperands);
 
     // If destination was widened, truncate back to original destination
-    if (widenedDst && origDst)
+    for (const auto &wDef : widenedDefs)
     {
-        ib.build(MirInstructionOpCode::TRUNC, instr->getSourceRef(), { origDst, widenedDst });
+        if (wDef.origDst && wDef.widenedDst)
+        {
+            if (wDef.origDst->getMirType() && wDef.origDst->getMirType()->getKind() == MirTypeKind::FloatingPoint)
+            {
+                emitInst(MirInstructionOpCode::FPTRUNC, { wDef.origDst, wDef.widenedDst });
+            }
+            else
+            {
+                emitInst(MirInstructionOpCode::TRUNC, { wDef.origDst, wDef.widenedDst });
+            }
+        }
     }
 
     instr->getOwner()->getInstructions().erase(ctx.m_it);
