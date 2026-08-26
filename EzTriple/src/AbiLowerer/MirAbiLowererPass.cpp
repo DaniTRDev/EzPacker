@@ -16,8 +16,8 @@ const char *MirAbiLowererPass::getName() const { return "MirAbiLowererPass"; }
 
 MirPassIterationPlace MirAbiLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; };
 
-MirPassResult MirAbiLowererPass::run(std::pmr::list<MirFunction *> &funcList,
-                                     std::pmr::list<MirFunction *>::iterator it,
+MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
+                                     IntrusiveLinkedList<MirFunction>::iterator it,
                                      MirPassManager *passManager)
 {
     MirAbiLowerer abiLowerer(m_ctx);

@@ -2,6 +2,9 @@
 #define EZTRIPLE_MIR_ABI_LOWERER_H
 
 #include "EzTripleCommon.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
+
+class MirInstruction;
 
 class MirAbiLowerer
 {
@@ -18,7 +21,7 @@ class MirAbiLowerer
                             class MirBlock *targetBlock,
                             class MirFunction *func,
                             class MirType *retType,
-                            std::pmr::list<class MirInstruction *>::iterator it,
+                            IntrusiveLinkedList<MirInstruction>::iterator it,
                             std::pmr::vector<class MirInstruction *> &pushRets);
 
     /**
@@ -27,7 +30,7 @@ class MirAbiLowerer
     bool processCallBlock(class CallingConvDesc *cc,
                           class MirBlock *targetBlock,
                           class MirFunction *func,
-                          std::pmr::list<class MirInstruction *>::iterator it,
+                          IntrusiveLinkedList<MirInstruction>::iterator it,
                           std::pmr::vector<class MirInstruction *> &pushArgs);
 
     /**
@@ -36,7 +39,7 @@ class MirAbiLowerer
     bool processCallReturnBlock(class CallingConvDesc *cc,
                                 class MirBlock *targetBlock,
                                 class MirFunction *func,
-                                std::pmr::list<class MirInstruction *>::iterator it,
+                                IntrusiveLinkedList<MirInstruction>::iterator it,
                                 std::pmr::vector<class MirInstruction *> &popRet);
     /**
      * Process the given block of PUSH_ARG+CALL instructions and modifies it to follow CallingConvention's guidelines.
@@ -44,7 +47,7 @@ class MirAbiLowerer
     bool processFunctionArguments(class CallingConvDesc *cc,
                                   class MirBlock *targetBlock,
                                   class MirFunction *func,
-                                  std::pmr::list<class MirInstruction *>::iterator it,
+                                  IntrusiveLinkedList<MirInstruction>::iterator it,
                                   std::pmr::vector<class MirInstruction *> &popArgs);
 
   private:

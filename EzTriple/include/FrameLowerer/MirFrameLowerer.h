@@ -7,6 +7,8 @@
  * Execution context provided to the frame lowerer containing function,
  * target hardware, and memory resource state.
  */
+#include "HelperClasses/IntrusiveLinkedList.h"
+
 struct FrameLowererCtx
 {
     class MirBuilderContext *m_ctx;  // Shared compiler context for operand and instruction building.
@@ -14,7 +16,7 @@ struct FrameLowererCtx
     class TargetDesc *m_targetDesc;  // Hardware target descriptor containing the TargetFrameLowering implementation.
 
     // Iterator pointing to an ALLOC/DALLOC instruction. Used by lowerAlloc/lowerDAlloc.
-    std::pmr::list<class MirInstruction *>::iterator m_allocIt;
+    IntrusiveLinkedList<class MirInstruction>::iterator m_allocIt;
     std::pmr::memory_resource *m_allocator; ///< Memory allocator for temporary layout data structures.
 
     FrameLowererCtx(class MirBuilderContext *ctx,

@@ -20,7 +20,7 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
                                        MirBlock *targetBlock,
                                        MirFunction *func,
                                        MirType *retType,
-                                       std::pmr::list<MirInstruction *>::iterator it,
+                                       IntrusiveLinkedList<MirInstruction>::iterator it,
                                        std::pmr::vector<MirInstruction *> &pushRets)
 {
     MirInstruction *retInstr = *it;
@@ -148,7 +148,7 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
 bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
                                      MirBlock *targetBlock,
                                      MirFunction *func,
-                                     std::pmr::list<MirInstruction *>::iterator it,
+                                     IntrusiveLinkedList<MirInstruction>::iterator it,
                                      std::pmr::vector<MirInstruction *> &pushArgs)
 {
     MirInstruction *callInstr = *it;
@@ -283,7 +283,7 @@ bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
 bool MirAbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
                                            MirBlock *targetBlock,
                                            MirFunction *func,
-                                           std::pmr::list<MirInstruction *>::iterator it,
+                                           IntrusiveLinkedList<MirInstruction>::iterator it,
                                            std::pmr::vector<MirInstruction *> &popRets)
 {
 
@@ -404,7 +404,7 @@ bool MirAbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
 bool MirAbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                                              MirBlock *targetBlock,
                                              MirFunction *func,
-                                             std::pmr::list<MirInstruction *>::iterator it,
+                                             IntrusiveLinkedList<MirInstruction>::iterator it,
                                              std::pmr::vector<MirInstruction *> &popArgs)
 {
     // Insert parameter lowering instructions at the very top of the function's entry block

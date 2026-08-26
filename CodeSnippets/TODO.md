@@ -22,15 +22,15 @@ This document contains the **in-depth implementation details, architectural trad
    - [x] [2.1 Type Table Generator (`CppMirTypeTableGenerator`)](#21-type-table-generator-cppmirtypetablegenerator)
    - [x] [2.2 IR Instruction Definition Generator (`CppMirInstructionGenerator`)](#22-ir-instruction-definition-generator-cppmirinstructiongenerator)
    - [x] [2.3 Target Register & Bank Model Generator (`CppTargetBankGenerator`)](#23-target-register--bank-model-generator-cpptargetbankgenerator)
-   - [ ] [2.4 Target Instruction & Binary Encoder Generator (`CppTargetInstGenerator`)](#24-target-instruction--binary-encoder-generator-cpptargetinstgenerator)
-   - [ ] [2.5 Target Type Layout Generator (`CppTargetTypeLayoutGenerator`)](#25-target-type-layout-generator-cpptargettypelayoutgenerator)
-   - [ ] [2.6 2D Legality Action Matrix Generator (`CppLegalizerGenerator`)](#26-2d-legality-action-matrix-generator-cpplegalizergenerator)
-   - [ ] [2.7 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`)](#27-legalization-rewrite-rule-engine-generator-cpplegalizerrulegenerator)
-   - [ ] [2.8 Multi-Variant ISel Table Generator (`CppISelTableGenerator`)](#28-multi-variant-isel-table-generator-cppiseltablegenerator)
-   - [ ] [2.9 Calling Convention Descriptor Generator (`CppCallingConvGenerator`)](#29-calling-convention-descriptor-generator-cppcallingconvgenerator)
-   - [ ] [2.10 Target Descriptor & Binary Descriptor Glue Generator (`CppTargetDescGenerator`)](#210-target-descriptor--binary-descriptor-glue-generator-cpptargetdescgenerator)
-   - [ ] [2.11 Multi-Target Driver CLI (`EzDsl-cli`) & Target Pipeline Dispatcher](#211-multi-target-driver-cli-ezdsl-cli--target-pipeline-dispatcher)
-   - [ ] [2.12 CMake Target Integration Suite (`EzDslGenBackend.cmake`)](#212-cmake-target-integration-suite-ezdslgenbackendcmake)
+   - [x] [2.4 Target Instruction & Binary Encoder Generator (`CppTargetInstGenerator`)](#24-target-instruction--binary-encoder-generator-cpptargetinstgenerator)
+   - [x] [2.5 Target Type Layout Generator (`CppTargetTypeLayoutGenerator`)](#25-target-type-layout-generator-cpptargettypelayoutgenerator)
+   - [x] [2.6 2D Legality Action Matrix Generator (`CppLegalizerGenerator`)](#26-2d-legality-action-matrix-generator-cpplegalizergenerator)
+   - [x] [2.7 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`)](#27-legalization-rewrite-rule-engine-generator-cpplegalizerrulegenerator)
+   - [x] [2.8 Multi-Variant ISel Table Generator (`CppISelTableGenerator`)](#28-multi-variant-isel-table-generator-cppiseltablegenerator)
+   - [x] [2.9 Calling Convention Descriptor Generator (`CppCallingConvGenerator`)](#29-calling-convention-descriptor-generator-cppcallingconvgenerator)
+   - [x] [2.10 Target Descriptor & Binary Descriptor Glue Generator (`CppTargetDescGenerator`)](#210-target-descriptor--binary-descriptor-glue-generator-cpptargetdescgenerator)
+   - [x] [2.11 Multi-Target Driver CLI (`EzDsl-cli`) & Target Pipeline Dispatcher](#211-multi-target-driver-cli-ezdsl-cli--target-pipeline-dispatcher)
+   - [x] [2.12 CMake Target Integration Suite (`EzDslGenBackend.cmake`)](#212-cmake-target-integration-suite-ezdslgenbackendcmake)
 6. [Phase 3: EzMir Core & Execution Engines](#6-phase-3-ezmir-core--execution-engines)
    - [x] [3.1 Function-Scoped Monotonic Arenas & Core MIR Data Structures](#31-function-scoped-monotonic-arenas--core-mir-data-structures)
    - [x] [3.2 Core Analysis Passes (`CodeFlowAnalysisPass`, `LivenessAnalysisPass`, `NonSsaToSsaPass`)](#32-core-analysis-passes-codeflowanalysispass-livenessanalysispass-nonssatossapass)
@@ -125,14 +125,15 @@ This document contains the **in-depth implementation details, architectural trad
 | **EzDsl (Code Generators)** | `CppMirTypeTableGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppMirTypeTableGenerator.cpp`, `T_EzDslCli_GenTypeTable.cpp` |
 | **EzDsl (Code Generators)** | `CppMirInstructionGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppMirInstructionGenerator.cpp`, `T_EzDslCli_GenMirInstruction.cpp` |
 | **EzDsl (Code Generators)** | `CppTargetBankGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppTargetBankGenerator.cpp`, `T_EzDslCli_GenRegisterBanks.cpp` |
-| **EzDsl (Code Generators)** | `CppTargetInstGenerator` | ⏳ **PENDING** | *Phase 2.4: Synthesizes target opcodes, descriptors, binary encoders* |
-| **EzDsl (Code Generators)** | `CppTargetTypeLayoutGenerator` | ⏳ **PENDING** | *Phase 2.5: Synthesizes `IMirTargetTypeLayout` implementations* |
-| **EzDsl (Code Generators)** | `CppLegalizerGenerator` | ⏳ **PENDING** | *Phase 2.6: Synthesizes 2D constant-time legality action matrix* |
-| **EzDsl (Code Generators)** | `CppLegalizerRuleGenerator` | ⏳ **PENDING** | *Phase 2.7: Synthesizes AST expansion rewrite engine* |
-| **EzDsl (Code Generators)** | `CppISelTableGenerator` | ⏳ **PENDING** | *Phase 2.8: Synthesizes AddrMode matchers & decision tree selector* |
-| **EzDsl (Code Generators)** | `CppCallingConvGenerator` | ⏳ **PENDING** | *Phase 2.9: Synthesizes `CallingConvDesc` factory functions* |
-| **EzDsl (Code Generators)** | `CppTargetDescGenerator` | ⏳ **PENDING** | *Phase 2.10: Synthesizes `<Target>TargetDesc` & `TargetBinaryDesc` glue* |
-| **EzDsl (CLI Driver)** | Unified Multi-File Target Pipeline | ⏳ **PENDING** | `EzDsl/src/Driver/Main.cpp` *(Currently single-file only)* |
+| **EzDsl (Code Generators)** | `CppTargetInstGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppTargetInstGenerator.cpp`, `T_EzDslCli_GenTargetInst.cpp` |
+| **EzDsl (Code Generators)** | `CppTargetTypeLayoutGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppTargetTypeLayoutGenerator.cpp`, `T_EzDslCli_GenTargetTypeLayout.cpp` |
+| **EzDsl (Code Generators)** | `CppLegalizerGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppLegalizerGenerator.cpp`, `T_EzDslCli_GenLegalizer.cpp` |
+| **EzDsl (Code Generators)** | `CppLegalizerRuleGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppLegalizerRuleGenerator.cpp`, `T_EzDslCli_GenLegalizer.cpp` |
+| **EzDsl (Code Generators)** | `CppISelTableGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppISelTableGenerator.cpp`, `T_EzDslCli_GenISelTable.cpp` |
+| **EzDsl (Code Generators)** | `CppCallingConvGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppCallingConvGenerator.cpp`, `T_EzDslCli_GenCallingConv.cpp` |
+| **EzDsl (Code Generators)** | `CppTargetDescGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppTargetDescGenerator.cpp`, `T_EzDslCli_GenTargetDesc.cpp` |
+| **EzDsl (CLI Driver)** | Unified Multi-File Target Pipeline | ✅ **DONE** | `EzDsl/src/Driver/Main.cpp` |
+| **EzTriple (CMake)** | Target Synthesis CMake Function | ✅ **DONE** | `EzTriple/CMake/EzDslGenBackend.cmake` |
 | **EzMir (Core)** | MIR Functions, Blocks, Instructions, Operands | ✅ **DONE** | `EzMir/include/` (`MirFunction`, `MirBlock`, `MirInstruction`, `MirOperand`) |
 | **EzMir (Core)** | Monotonic PMR Buffer Arenas & Builders | ✅ **DONE** | `EzMir/include/Builder/MirBuilder.h`, `MirBuilderContext.h` |
 | **EzMir (Passes)** | `CodeFlowAnalysisPass` & `LivenessAnalysisPass` | ✅ **DONE** | `EzMir/src/MirPasses/Passes/` (`T_CodeFlowPass.cpp`, `T_LivenessAnalysis.cpp`) |

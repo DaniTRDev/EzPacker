@@ -45,25 +45,9 @@ bool RegisterBankPass::declareBanks(DiagnosticCollector *collector,
 
     const auto &targetName = file->m_name;
     Symbol *targetSym = table->getSymByName(targetName.m_node);
-    if (!targetSym)
-    {
-        Sema::Symbols::TargetSymbol targetData{ .m_name = targetName.m_node,
-                                                .m_banks = std::pmr::vector<SymbolId>{ table->getAllocator() },
-                                                .m_instructions = std::pmr::vector<SymbolId>{ table->getAllocator() },
-                                                .m_callingConvs = std::pmr::vector<SymbolId>{ table->getAllocator() },
-                                                .m_legalizeActions =
-                                                        std::pmr::vector<SymbolId>{ table->getAllocator() },
-                                                .m_iselPatterns =
-                                                        std::pmr::vector<SymbolId>{ table->getAllocator() } };
-
-        SymbolId targetSymId = table->declareSym(targetName.m_sourceRef,
-                                                 SymbolFlags::IsDefined,
-                                                 SymbolType::Target,
-                                                 std::move(targetData),
-                                                 targetName.m_node);
-        targetSym = table->getSymById(targetSymId);
-    }
-    auto *targetSymData = targetSym ? targetSym->getIf<Sema::Symbols::TargetSymbol>() : nullptr;
+    auto *targetSymData = (targetSym && targetSym->getType() == SymbolType::Target)
+            ? targetSym->getIf<Sema::Symbols::TargetSymbol>()
+            : nullptr;
 
     for (const auto &bank : file->m_regBanks)
     {

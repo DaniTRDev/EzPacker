@@ -357,11 +357,6 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
                     }
                 }
             }
-
-            if (modified)
-            {
-                inst->invalidateCachedUsedAndDefs();
-            }
         }
     }
 }
@@ -535,8 +530,6 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
             {
                 emitSpill(ctx, block, it, srcRef, spill.slot, spill.tempReg);
             }
-
-            inst->invalidateCachedUsedAndDefs();
         }
     }
 }

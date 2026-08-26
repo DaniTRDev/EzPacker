@@ -30,8 +30,8 @@ class MirFrameLowererPass : public IMirTransformPass
      *  - Insert epilogue
      *  - Rewrite instructions that use a MirReference(StackFrameObject) into a MirMemory(FP/SP + offset).
      */
-    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
-                      std::pmr::list<class MirFunction *>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
+                      IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**

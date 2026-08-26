@@ -115,7 +115,7 @@ class MirRegisterAllocator
      */
     virtual MirInstruction *emitReload(class RegisterAllocatorCtx *ctx,
                                        class MirBlock *block,
-                                       std::pmr::list<class MirInstruction *>::iterator it,
+                                       IntrusiveLinkedList<class MirInstruction>::iterator it,
                                        class SourceReference *srcRef,
                                        class MirRegister *dstReg,
                                        class StackFrameObject *spillSlot) = 0;
@@ -125,7 +125,7 @@ class MirRegisterAllocator
      */
     virtual MirInstruction *emitSpill(class RegisterAllocatorCtx *ctx,
                                       class MirBlock *block,
-                                      std::pmr::list<class MirInstruction *>::iterator it,
+                                      IntrusiveLinkedList<class MirInstruction>::iterator it,
                                       class SourceReference *srcRef,
                                       class StackFrameObject *spillSlot,
                                       class MirRegister *srcReg) = 0;
@@ -135,7 +135,7 @@ class MirRegisterAllocator
      */
     virtual class MirInstruction *reMaterialize(class RegisterAllocatorCtx *ctx,
                                                 class MirBlock *block,
-                                                std::pmr::list<class MirInstruction *>::iterator it,
+                                                IntrusiveLinkedList<class MirInstruction>::iterator it,
                                                 class SourceReference *srcRef,
                                                 class MirRegister *dstReg,
                                                 class MirInstruction *defInst) = 0;

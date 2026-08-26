@@ -125,12 +125,6 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
                     instructionModified = true;
                 }
             }
-
-            // Invalidate use-def caches if operands were rewritten
-            if (instructionModified)
-            {
-                inst->invalidateCachedUsedAndDefs();
-            }
         }
     }
 }

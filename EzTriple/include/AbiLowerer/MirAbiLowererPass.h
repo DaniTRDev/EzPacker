@@ -2,6 +2,7 @@
 #define EZTRIPLE_FUCTION_ABI_LOWERER_PASS_H
 
 #include "EzTripleCommon.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
 #include "MirPasses/IMirTransformPass.h"
 
 /**
@@ -29,7 +30,7 @@ struct UnloweredBlock
     bool m_terminated{ false }; // Is this block ended with a termination instruction? Used for error catching.
     class MirBlock *m_targetBlock{ nullptr }; // In which block was the final termination instruction.
     UnloweredBlockType m_type;
-    std::pmr::list<class MirInstruction *>::iterator m_termIt{}; // Iterator pointing to the terminator instruction.
+    IntrusiveLinkedList<class MirInstruction>::iterator m_termIt{}; // Iterator pointing to the terminator instruction.
     std::pmr::vector<class MirInstruction *> m_pushList{};       // List used to store all the PUSH_RET/PUSH_ARG.
     std::pmr::vector<class MirInstruction *> m_popList{};        // List used to store all the POP_RET/POP_ARG.
 
@@ -70,8 +71,8 @@ class MirAbiLowererPass : public IMirTransformPass
     /**
      * Runs the pass in the given function and returns the result.
      */
-    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
-                      std::pmr::list<class MirFunction *>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
+                      IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**

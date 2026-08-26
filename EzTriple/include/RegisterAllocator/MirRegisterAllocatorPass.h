@@ -37,8 +37,8 @@ class MirRegisterAllocatorPass : public IMirTransformPass
      * Runs the pass on every function. It will start traversing blocks and instructions to properly allocate registers
      * and spills.
      */
-    MirPassResult run(std::pmr::list<class MirFunction *> &funcList,
-                      std::pmr::list<class MirFunction *>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
+                      IntrusiveLinkedList<class MirFunction>::iterator it,
                       class MirPassManager *passManager) override;
 
     /**

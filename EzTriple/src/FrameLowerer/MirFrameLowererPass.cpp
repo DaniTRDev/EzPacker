@@ -5,6 +5,7 @@
 #include "FrameLowerer/MirFrameLowerer.h"
 #include "FrameLowerer/MirFrameLowererPass.h"
 #include "Function/MirFunction.h"
+#include "Instruction/MirInstruction.h"
 #include "Printer/MirPrinter.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 
@@ -17,9 +18,9 @@ const char *MirFrameLowererPass::getName() const { return "FrameLowererPass"; }
 
 MirPassIterationPlace MirFrameLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult MirFrameLowererPass::run(std::pmr::list<MirFunction *> &funcList,
-                                       std::pmr::list<MirFunction *>::iterator it,
-                                       MirPassManager *passManager)
+MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
+                                        IntrusiveLinkedList<MirFunction>::iterator it,
+                                        MirPassManager *passManager)
 {
     MirFunction *func = *it;
     if (!func || !m_targetDesc)
