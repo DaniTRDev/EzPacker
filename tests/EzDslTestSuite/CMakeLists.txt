@@ -68,6 +68,14 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_Sema_InstSelPass"
+        "EzDslTestSuite"
+        ""
+        "tests/T_Sema_InstSelPass.cpp"
+)
+
+
+EzPacker_AddTest(
         "T_Sema_IrInstructionPass"
         "EzDslTestSuite"
         ""

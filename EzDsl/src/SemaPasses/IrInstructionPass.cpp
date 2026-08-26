@@ -1,8 +1,8 @@
-#include "SemaPasses/IrInstructionPass.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/Symbols.h"
+#include "SemaPasses/IrInstructionPass.h"
 
 constexpr auto PassName = "Sema::IrInstructionPass";
 
