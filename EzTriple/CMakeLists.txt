@@ -15,6 +15,11 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/Actions/LegalizeActionCommon.h"
         "include/Legalizer/Actions/LegalizeCallAction.h"
         "include/Legalizer/Actions/LegalizeReturnAction.h"
+        "include/Legalizer/Actions/LegalizeWidenScalarAction.h"
+        "include/Legalizer/Actions/LegalizeNarrowScalarAction.h"
+        "include/Legalizer/Actions/LegalizeBitcastAction.h"
+        "include/Legalizer/Actions/LegalizeLibcallAction.h"
+        "include/Legalizer/Actions/LegalizeCustomAction.h"
         "include/RegisterAllocator/MirRegisterAllocator.h"
         "include/RegisterAllocator/MirRegisterAllocatorPass.h"
 
@@ -29,6 +34,11 @@ set(EZTRIPLE_FILES_LIST
         "src/Legalizer/MirFunctionSignatureLegalizerPass.cpp"
         "src/Legalizer/Actions/LegalizeCallAction.cpp"
         "src/Legalizer/Actions/LegalizeReturnAction.cpp"
+        "src/Legalizer/Actions/LegalizeWidenScalarAction.cpp"
+        "src/Legalizer/Actions/LegalizeNarrowScalarAction.cpp"
+        "src/Legalizer/Actions/LegalizeBitcastAction.cpp"
+        "src/Legalizer/Actions/LegalizeLibcallAction.cpp"
+        "src/Legalizer/Actions/LegalizeCustomAction.cpp"
         "src/RegisterAllocator/MirRegisterAllocator.cpp"
         "src/RegisterAllocator/MirRegisterAllocatorPass.cpp"
 )

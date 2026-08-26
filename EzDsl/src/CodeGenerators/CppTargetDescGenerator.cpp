@@ -95,12 +95,13 @@ void EmitHeader(std::ostream &out, std::string_view targetName)
 
 #include "Descriptors/TargetBinaryDesc.h"
 #include "Descriptors/TargetDesc.h"
+#include "FrameLowerer/MirFrameLowerer.h"
 #include <memory>
 #include <memory_resource>
 
 class IMirTargetTypeLayout;
+class MirBuilderContext;
 class MirExpansionRuleRegistry;
-class MirFrameLowerer;
 class MirInstructionSelector;
 class MirLegalizer;
 class MirRegisterAllocator;
@@ -145,12 +146,24 @@ class {1}WindowsBinaryDesc : public TargetBinaryDesc
 }};
 
 /**
+ * Frame lowerer implementation for {1}.
+ */
+class {1}FrameLowerer : public MirFrameLowerer
+{{
+  public:
+    void insertPrologue(FrameLowererCtx &ctx) override;
+    void insertEpilogue(FrameLowererCtx &ctx) override;
+    bool lowerAlloc(FrameLowererCtx &ctx) override;
+    bool lowerDAlloc(FrameLowererCtx &ctx) override;
+}};
+
+/**
  * Master target architecture descriptor for {1}.
  */
 class {1}TargetDesc : public TargetDesc
 {{
   public:
-    explicit {1}TargetDesc(std::pmr::memory_resource *alloc);
+    explicit {1}TargetDesc(std::pmr::memory_resource *alloc, MirBuilderContext *ctx = nullptr);
     ~{1}TargetDesc() override = default;
 
     const char *getName() const override;
@@ -169,12 +182,18 @@ class {1}TargetDesc : public TargetDesc
     std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() override;
     std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() override;
 
+    void setContext(MirBuilderContext *ctx) {{ m_ctx = ctx; }}
+    void setMemOperandDisplacementType(MirType *type) {{ m_displacementType = type; }}
+
   private:
     std::pmr::memory_resource *m_alloc;
+    MirBuilderContext *m_ctx;
+    MirType *m_displacementType;
     std::unique_ptr<IMirTargetTypeLayout> m_layout;
     std::unique_ptr<MirLegalizer> m_legalizer;
     std::unique_ptr<MirExpansionRuleRegistry> m_rules;
     std::unique_ptr<MirInstructionSelector> m_isel;
+    std::unique_ptr<MirFrameLowerer> m_frameLowerer;
     std::pmr::vector<TargetBinaryDesc *> m_binDescs;
     std::pmr::vector<CallingConvDesc *> m_callingConvs;
     std::pmr::vector<MirRegisterBank *> m_regBanks;
@@ -206,12 +225,38 @@ void EmitSource(std::ostream &out,
 #include "{1}LegalizerActionTable.h"
 #include "{1}RegisterBanks.h"
 #include "{1}TypeLayout.h"
+#include "Builder/MirBuilderContext.h"
+#include "Type/MirTypeTable.h"
 
 namespace {1}
 {{
 
-{1}TargetDesc::{1}TargetDesc(std::pmr::memory_resource *alloc) :
+void {1}FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
+{{
+    (void)ctx;
+}}
+
+void {1}FrameLowerer::insertEpilogue(FrameLowererCtx &ctx)
+{{
+    (void)ctx;
+}}
+
+bool {1}FrameLowerer::lowerAlloc(FrameLowererCtx &ctx)
+{{
+    (void)ctx;
+    return false;
+}}
+
+bool {1}FrameLowerer::lowerDAlloc(FrameLowererCtx &ctx)
+{{
+    (void)ctx;
+    return false;
+}}
+
+{1}TargetDesc::{1}TargetDesc(std::pmr::memory_resource *alloc, MirBuilderContext *ctx) :
     m_alloc(alloc),
+    m_ctx(ctx),
+    m_displacementType(nullptr),
     m_binDescs(alloc),
     m_callingConvs(alloc),
     m_regBanks(alloc)
@@ -235,7 +280,7 @@ MirExpansionRuleRegistry *{1}TargetDesc::getExpansionRegistry()
 
 MirFrameLowerer *{1}TargetDesc::getFrameLowerer()
 {{
-    return nullptr;
+    return m_frameLowerer.get();
 }}
 
 MirInstructionSelector *{1}TargetDesc::getInstructionSelector()
@@ -255,6 +300,8 @@ MirRegisterAllocator *{1}TargetDesc::getRegisterAllocator()
 
 MirType *{1}TargetDesc::getMemOperandDisplacementType()
 {{
+    if (m_displacementType) return m_displacementType;
+    if (m_ctx && m_ctx->getTypeTable()) return m_ctx->getTypeTable()->i64();
     return nullptr;
 }}
 
@@ -278,9 +325,10 @@ void {1}TargetDesc::initialize()
     m_layout = std::make_unique<{1}TargetTypeLayout>();
     m_regBanks = CreateRegisterBanks(m_alloc);
     m_callingConvs = CreateAllCallingConventions(m_alloc);
-    m_legalizer = std::make_unique<{1}Legalizer>(nullptr, this);
+    m_legalizer = std::make_unique<{1}Legalizer>(m_ctx, this);
     m_rules = std::make_unique<{1}LegalizeRules>();
     m_isel = std::make_unique<{1}InstructionSelector>();
+    m_frameLowerer = std::make_unique<{1}FrameLowerer>();
 
     static {1}LinuxBinaryDesc s_linuxDesc;
     static {1}WindowsBinaryDesc s_winDesc;

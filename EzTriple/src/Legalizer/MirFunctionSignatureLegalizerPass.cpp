@@ -11,15 +11,11 @@
 #include "Type/MirTypeTable.h"
 
 MirFunctionSignatureLegalizerPass::MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
-    m_ctx(ctx),
-    m_legalizer(targetDesc ? targetDesc->getLegalizer() : nullptr)
+    m_ctx(ctx), m_legalizer(targetDesc ? targetDesc->getLegalizer() : nullptr)
 {
 }
 
-const char *MirFunctionSignatureLegalizerPass::getName() const
-{
-    return "MirFunctionSignatureLegalizerPass";
-}
+const char *MirFunctionSignatureLegalizerPass::getName() const { return "MirFunctionSignatureLegalizerPass"; }
 
 MirPassIterationPlace MirFunctionSignatureLegalizerPass::getIterationPlace() const
 {
@@ -30,9 +26,6 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
                                                      IntrusiveLinkedList<MirFunction>::iterator it,
                                                      MirPassManager *passManager)
 {
-    (void)funcList;
-    (void)passManager;
-
     bool modified = false;
     bool succeeded = true;
     MirFunction *func = *it;
@@ -48,8 +41,11 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
     }
 
     MirInstructionBuilder builder = entryPoint->getInstructions().empty()
-        ? MirInstructionBuilder(m_ctx, entryPoint, InsertionType::Append)
-        : MirInstructionBuilder(m_ctx, entryPoint, InsertionType::InsertBefore, entryPoint->getInstructions().begin());
+            ? MirInstructionBuilder(m_ctx, entryPoint, InsertionType::Append)
+            : MirInstructionBuilder(m_ctx,
+                                    entryPoint,
+                                    InsertionType::InsertBefore,
+                                    entryPoint->getInstructions().begin());
     MirOperandBuilder opBuilder(m_ctx);
 
     CallingConvDesc *cc = func->getCallingConv();

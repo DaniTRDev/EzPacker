@@ -19,6 +19,20 @@ enum class LegalizationResult : uint8_t
 };
 
 /**
+ * Predefined legalization action kinds for target machine legalization.
+ */
+enum class LegalizeAction : uint8_t
+{
+    Legal = 0,
+    WidenScalar,
+    NarrowScalar,
+    Libcall,
+    Custom,
+    Bitcast,
+    Unsupported
+};
+
+/**
  * Context structure passed to legalization action callbacks.
  */
 struct LegalizeCtx

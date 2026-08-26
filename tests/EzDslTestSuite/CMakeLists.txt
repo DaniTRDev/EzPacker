@@ -7,8 +7,15 @@ set(EZDSLTESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzDslTestSuite"
         FILE_LIST ${EZDSLTESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER ""
-        LINKED_LIBRARIES "EzDsl;gtest;GTest::gtest_main"
+        LINKED_LIBRARIES "EzDsl;EzTriple;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include"
+)
+
+EzPacker_AddTest(
+        "T_EzDslEndToEndTargetPipeline"
+        "EzDslTestSuite"
+        ""
+        "tests/T_EzDslEndToEndTargetPipeline.cpp"
 )
 
 EzPacker_AddTest(
