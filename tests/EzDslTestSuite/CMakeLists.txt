@@ -68,12 +68,19 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_Sema_CallingConvPass"
+        "EzDslTestSuite"
+        ""
+        "tests/T_Sema_CallingConvPass.cpp"
+)
+
+
+EzPacker_AddTest(
         "T_Sema_InstSelPass"
         "EzDslTestSuite"
         ""
         "tests/T_Sema_InstSelPass.cpp"
 )
-
 
 EzPacker_AddTest(
         "T_Sema_IrInstructionPass"

@@ -264,7 +264,7 @@ struct CallingConvDefFile
     Common::Identifier m_name;
 
     // Stack & Frame Layout
-    Common::IntegerLiteral m_stackAlign;
+    Common::IntegerLiteral m_stackAlign{ 0 };
     StackDirection m_stackDirection{ StackDirection::Down };
     StackCleaner m_stackCleanup{ StackCleaner::Caller };
     Common::IntegerLiteral m_shadowSpace{ 0 };
