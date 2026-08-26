@@ -21,7 +21,7 @@ This document contains the **in-depth implementation details, architectural trad
 5. [Phase 2: EzDSL C++ Code Generators & Full EzTriple Target Synthesis](#5-phase-2-ezdsl-c-code-generators--full-eztriple-target-synthesis)
    - [x] [2.1 Type Table Generator (`CppMirTypeTableGenerator`)](#21-type-table-generator-cppmirtypetablegenerator)
    - [x] [2.2 IR Instruction Definition Generator (`CppMirInstructionGenerator`)](#22-ir-instruction-definition-generator-cppmirinstructiongenerator)
-   - [ ] [2.3 Target Register & Bank Model Generator (`CppTargetBankGenerator`)](#23-target-register--bank-model-generator-cpptargetbankgenerator)
+   - [x] [2.3 Target Register & Bank Model Generator (`CppTargetBankGenerator`)](#23-target-register--bank-model-generator-cpptargetbankgenerator)
    - [ ] [2.4 Target Instruction & Binary Encoder Generator (`CppTargetInstGenerator`)](#24-target-instruction--binary-encoder-generator-cpptargetinstgenerator)
    - [ ] [2.5 Target Type Layout Generator (`CppTargetTypeLayoutGenerator`)](#25-target-type-layout-generator-cpptargettypelayoutgenerator)
    - [ ] [2.6 2D Legality Action Matrix Generator (`CppLegalizerGenerator`)](#26-2d-legality-action-matrix-generator-cpplegalizergenerator)
@@ -124,7 +124,7 @@ This document contains the **in-depth implementation details, architectural trad
 | **EzDsl (Sema Passes)** | `IrInstructionPass` & `TypePass` | ✅ **DONE** | `EzDsl/src/SemaPasses/IrInstructionPass.cpp`, `TypePass.cpp` |
 | **EzDsl (Code Generators)** | `CppMirTypeTableGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppMirTypeTableGenerator.cpp`, `T_EzDslCli_GenTypeTable.cpp` |
 | **EzDsl (Code Generators)** | `CppMirInstructionGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppMirInstructionGenerator.cpp`, `T_EzDslCli_GenMirInstruction.cpp` |
-| **EzDsl (Code Generators)** | `CppTargetBankGenerator` | ⏳ **PENDING** | *Phase 2.3: Synthesizes registers, classes, banks, alias matrices* |
+| **EzDsl (Code Generators)** | `CppTargetBankGenerator` | ✅ **DONE** | `EzDsl/src/CodeGenerators/CppTargetBankGenerator.cpp`, `T_EzDslCli_GenRegisterBanks.cpp` |
 | **EzDsl (Code Generators)** | `CppTargetInstGenerator` | ⏳ **PENDING** | *Phase 2.4: Synthesizes target opcodes, descriptors, binary encoders* |
 | **EzDsl (Code Generators)** | `CppTargetTypeLayoutGenerator` | ⏳ **PENDING** | *Phase 2.5: Synthesizes `IMirTargetTypeLayout` implementations* |
 | **EzDsl (Code Generators)** | `CppLegalizerGenerator` | ⏳ **PENDING** | *Phase 2.6: Synthesizes 2D constant-time legality action matrix* |
@@ -479,7 +479,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.3 Target Register & Bank Model Generator (`CppTargetBankGenerator`) [TODO]
+## 2.3 Target Register & Bank Model Generator (`CppTargetBankGenerator`) [DONE]
 - **File Output:** `<Target>RegisterBanks.h`, `<Target>RegisterBanks.cpp`
 - **Input DSL:** `.tdf` (Target Definition File)
 - **Synthesized Structures:**

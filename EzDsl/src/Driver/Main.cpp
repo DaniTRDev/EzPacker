@@ -1,16 +1,20 @@
 #include "EzDslCommon.h"
 
 #include "Ast/IrInstructionDefLangAst.h"
+#include "Ast/TargetDefLangAst.h"
 #include "Ast/TypeDefLangAst.h"
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
+#include "CodeGenerators/CppTargetBankGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Parser/IrInstructionDefLang.h"
 #include "Parser/ParseContext.h"
+#include "Parser/TargetDefLang.h"
 #include "Parser/TypeDefLang.h"
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/IrInstructionPass.h"
+#include "SemaPasses/RegisterBankPass.h"
 #include "SemaPasses/TypePass.h"
 #include "SourceManager/SourceManager.h"
 
@@ -22,10 +26,13 @@ struct CliOptions
     std::filesystem::path m_inputFile;
     std::filesystem::path m_outputPath{ "." };
     std::vector<std::filesystem::path> m_includePaths;
+    std::string m_targetName;
 
     bool m_emitTypeTable{ false };
     bool m_emitInstructions{ false };
+    bool m_emitRegisterBanks{ false };
     CodeGenerators::MirTypeTableGenWorkingMode m_genMode{ CodeGenerators::MirTypeTableGenWorkingMode::Full };
+    CodeGenerators::TargetBankGenWorkingMode m_bankGenMode{ CodeGenerators::TargetBankGenWorkingMode::Full };
 
     bool m_verbose{ false };
     bool m_showHelp{ false };
@@ -41,8 +48,10 @@ void PrintHelp(std::string_view programName)
                              "  -i, --input <file>        Input EzDSL definition file (.tyf, .irdf, .tdf, .idf)\n"
                              "  -o, --output <path>       Output path (directory or root file name, default: .)\n"
                              "  -I, --include <dir>       Add directory to search paths for file inclusions\n"
+                             "  --target <name>           Specify target architecture name\n"
                              "  --emit-type-table         Synthesize EzMir TypeTable source and header files\n"
                              "  --emit-instructions       Synthesize EzMir IR instruction definition file\n"
+                             "  --emit-register-banks     Synthesize target register banks and classes files\n"
                              "  --header-only             Emit only the header file (.h) during generation\n"
                              "  --source-only             Emit only the translation unit (.cpp) during generation\n"
                              "  -v, --verbose             Enable verbose tracing output\n"
@@ -85,14 +94,31 @@ std::optional<CliOptions> ParseCommandLine(int argc, char **argv)
             opts.m_emitInstructions = true;
             continue;
         }
+        if (arg == "--emit-register-banks" || arg == "--emit-registers" || arg == "--emit-banks")
+        {
+            opts.m_emitRegisterBanks = true;
+            continue;
+        }
+        if (arg == "--target")
+        {
+            if (++i >= args.size())
+            {
+                std::cerr << "Error: Missing argument for option: " << arg << "\n";
+                return std::nullopt;
+            }
+            opts.m_targetName = args[i];
+            continue;
+        }
         if (arg == "--header-only")
         {
             opts.m_genMode = CodeGenerators::MirTypeTableGenWorkingMode::Header;
+            opts.m_bankGenMode = CodeGenerators::TargetBankGenWorkingMode::Header;
             continue;
         }
         if (arg == "--source-only")
         {
             opts.m_genMode = CodeGenerators::MirTypeTableGenWorkingMode::Source;
+            opts.m_bankGenMode = CodeGenerators::TargetBankGenWorkingMode::Source;
             continue;
         }
         if (arg == "-i" || arg == "--input")
@@ -258,9 +284,40 @@ int main(int argc, char **argv)
             }
         }
     }
+    else if (extension == ".tdf")
+    {
+        auto ast = parseCtx.parse<DSL::Parser::TargetDef::TargetDef, DSL::Ast::TargetDef::TargetDef>();
+        if (!ast)
+        {
+            collector.error("Driver", "Failed to parse Target Definition file: {}", options->m_inputFile.string());
+            return EXIT_FAILURE;
+        }
+
+        RegisterBankPass bankPass;
+        if (!bankPass.run(&collector, &symbolTable, &*ast))
+        {
+            collector.error("Driver", "Semantic analysis failed for: {}", options->m_inputFile.string());
+            return EXIT_FAILURE;
+        }
+
+        if (options->m_emitRegisterBanks || (!options->m_emitTypeTable && !options->m_emitInstructions))
+        {
+            std::string targetName =
+                    options->m_targetName.empty() ? std::string(ast->m_name.m_node) : options->m_targetName;
+            if (!CodeGenerators::GenerateTargetRegisterBanks(&collector,
+                                                             &symbolTable,
+                                                             options->m_outputPath,
+                                                             targetName,
+                                                             options->m_bankGenMode))
+            {
+                collector.error("Driver", "Code generation failed for TargetRegisterBanks.");
+                return EXIT_FAILURE;
+            }
+        }
+    }
     else
     {
-        collector.error("Driver", "Unsupported file extension '{}'. Supported: .tyf, .irdf", extension);
+        collector.error("Driver", "Unsupported file extension '{}'. Supported: .tyf, .irdf, .tdf", extension);
         return EXIT_FAILURE;
     }
 

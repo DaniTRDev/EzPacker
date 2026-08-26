@@ -33,6 +33,13 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_EzDslCli_GenRegisterBanks"
+        "EzDslTestSuite"
+        ""
+        "tests/T_EzDslCli_GenRegisterBanks.cpp"
+)
+
+EzPacker_AddTest(
         "T_InstructionDefLang"
         "EzDslTestSuite"
         ""

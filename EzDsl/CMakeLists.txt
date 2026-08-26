@@ -11,6 +11,7 @@ set(EZDSL_FILES_LIST
         "include/Ast/TypeDefLangAst.h"
         "include/CodeGenerators/CppMirInstructionGenerator.h"
         "include/CodeGenerators/CppMirTypeTableGenerator.h"
+        "include/CodeGenerators/CppTargetBankGenerator.h"
         "include/Parser/CommonParsers.h"
         "include/Parser/InstructionDefLang.h"
         "include/Parser/InstructionSelDefLang.h"
@@ -36,6 +37,7 @@ set(EZDSL_FILES_LIST
 
         "src/CodeGenerators/CppMirInstructionGenerator.cpp"
         "src/CodeGenerators/CppMirTypeTableGenerator.cpp"
+        "src/CodeGenerators/CppTargetBankGenerator.cpp"
         "src/Parser/ParseContext.cpp"
         "src/Sema/Scope.cpp"
         "src/Sema/SemaContext.cpp"

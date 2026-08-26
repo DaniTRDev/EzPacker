@@ -46,7 +46,10 @@ enum class SymbolType : uint8_t
     IrInstruction,
 
     // .ccdf Calling convention entities
-    CallingConv
+    CallingConv,
+
+    // Target entity
+    Target
 };
 
 /**
