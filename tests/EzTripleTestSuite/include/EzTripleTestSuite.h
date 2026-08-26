@@ -6,6 +6,7 @@
 #include "Builder/MirBuilderContext.h"
 #include "Descriptors/TargetDesc.h"
 #include "Diagnostics/DiagnosticCollector.h"
+#include "Diagnostics/DiagnosticLogger.h"
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
 #include "Instruction/MirInstructionBuilder.h"
@@ -17,6 +18,7 @@
 #include "Operand/MirOperands.h"
 #include "Operand/MirRegisterBank.h"
 #include "Operand/MirRegisterClass.h"
+#include "SourceManager/SourceManager.h"
 #include "Type/IMirTargetTypeLayout.h"
 #include "Type/MirTypeTable.h"
 
@@ -30,17 +32,22 @@ class MockTargetTypeLayout : public IMirTargetTypeLayout
 
     size_t getTypeAlignmentInBytes(const MirType *type) const override
     {
-        if (!type) return 1;
+        if (!type)
+            return 1;
         size_t bytes = getTypeSizeInBytes(type);
-        if (bytes >= 8) return 8;
-        if (bytes >= 4) return 4;
-        if (bytes >= 2) return 2;
+        if (bytes >= 8)
+            return 8;
+        if (bytes >= 4)
+            return 4;
+        if (bytes >= 2)
+            return 2;
         return 1;
     }
 
     size_t getTypeSizeInBytes(const MirType *type) const override
     {
-        if (!type) return 0;
+        if (!type)
+            return 0;
         return (type->getTotalSizeInBits() + 7) / 8;
     }
 };
@@ -58,18 +65,34 @@ class MockCallingConvDesc : public CallingConvDesc
     bool canReturnInRegs(MirType *type) const override;
     bool isCalleeCleanup() const override { return false; }
     bool doesStackGrowsDownwards() const override { return true; }
-    bool hasFramePointer(MirFunction *func) const override { (void)func; return true; }
+    bool hasFramePointer(MirFunction *func) const override
+    {
+        (void)func;
+        return true;
+    }
     const char *getName() const override { return "MockCallingConv"; }
     MirRegisterRef getFramePointerReg() const override { return m_rbpRef; }
     MirRegisterRef getStackPointerReg() const override { return m_rspRef; }
     size_t getStackAlignment() const override { return 16; }
     size_t getShadowSpaceSize() const override { return 0; }
-    void classify(MirType *type, std::pmr::vector<CallingConvTypeClass> &out) const override { (void)type; (void)out; }
+    void classify(MirType *type, std::pmr::vector<CallingConvTypeClass> &out) const override
+    {
+        (void)type;
+        (void)out;
+    }
 
     const std::pmr::vector<MirRegisterRef> &getAllCalleeSavedRegs() override { return m_calleeSaved; }
-    const std::pmr::vector<MirRegisterRef> &getCalleeSavedRegs(MirRegisterClass *_class) override { (void)_class; return m_calleeSaved; }
+    const std::pmr::vector<MirRegisterRef> &getCalleeSavedRegs(MirRegisterClass *_class) override
+    {
+        (void)_class;
+        return m_calleeSaved;
+    }
     const std::pmr::vector<MirRegisterRef> &getAllCallerSavedRegs() override { return m_callerSaved; }
-    const std::pmr::vector<MirRegisterRef> &getCallerSavedRegs(MirRegisterClass *_class) override { (void)_class; return m_callerSaved; }
+    const std::pmr::vector<MirRegisterRef> &getCallerSavedRegs(MirRegisterClass *_class) override
+    {
+        (void)_class;
+        return m_callerSaved;
+    }
 
     MirRegisterRef getRax() const { return m_raxRef; }
     MirRegisterRef getRdi() const { return m_rdiRef; }
@@ -122,10 +145,10 @@ class MockInstructionSelector : public MirInstructionSelector
 class MockFrameLowerer : public MirFrameLowerer
 {
   public:
-    void insertPrologue(FrameLowererCtx &ctx) override { (void)ctx; }
-    void insertEpilogue(FrameLowererCtx &ctx) override { (void)ctx; }
-    bool lowerAlloc(FrameLowererCtx &ctx) override { (void)ctx; return false; }
-    bool lowerDAlloc(FrameLowererCtx &ctx) override { (void)ctx; return false; }
+    void insertPrologue(FrameLowererCtx &ctx) override {}
+    void insertEpilogue(FrameLowererCtx &ctx) override {}
+    bool lowerAlloc(FrameLowererCtx &ctx) override { return false; }
+    bool lowerDAlloc(FrameLowererCtx &ctx) override { return false; }
 };
 
 /**
@@ -189,9 +212,11 @@ class EzTripleTestSuite : public ::testing::Test
   private:
     std::pmr::monotonic_buffer_resource m_arena;
     std::unique_ptr<DiagnosticCollector> m_diagCollector;
+    std::unique_ptr<DiagnosticLogger> m_diagLogger;
     std::unique_ptr<MirTypeTable> m_typeTable;
     std::unique_ptr<MirBuilderContext> m_builderCtx;
     std::unique_ptr<MockTargetDesc> m_targetDesc;
+    std::unique_ptr<SourceManager> m_sourceManager;
 };
 
 #endif // EZTRIPLETESTSUITE_EZ_TRIPLE_TEST_SUITE_H

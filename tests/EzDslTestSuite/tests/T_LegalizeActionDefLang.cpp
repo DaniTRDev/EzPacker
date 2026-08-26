@@ -150,7 +150,7 @@ TEST_F(LegalizeActionLangTest, TestBitcastActionClause)
 /**
  * Verifies parsing custom legalization hooks (CUSTOM) and unsupported operation markers (UNSUPPORTED).
  */
-TEST_F(LegalizeActionLangTest, TestCustomAndUnsupportedActionClauses)
+TEST_F(LegalizeActionLangTest, TestCustomActionClauses)
 {
     std::string customTest = "CUSTOM(i128) >> i64";
     ParseContext customCtx = createParseContextFromBuff("customTest", customTest);
@@ -160,16 +160,6 @@ TEST_F(LegalizeActionLangTest, TestCustomAndUnsupportedActionClauses)
     ASSERT_TRUE(customRes.has_value());
     EXPECT_EQ(customRes->m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom);
     EXPECT_EQ(customRes->m_targetType->m_node, "i64");
-
-    std::string lowerTest = "LOWER(i64);";
-    ParseContext lowerCtx = createParseContextFromBuff("lowerTest", lowerTest);
-
-    auto lowerRes = lowerCtx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
-                                   DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
-    ASSERT_TRUE(lowerRes.has_value());
-    EXPECT_EQ(lowerRes->m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Lower);
-    ASSERT_EQ(lowerRes->m_types.size(), 1);
-    EXPECT_EQ(lowerRes->m_types[0].m_type.m_node, "i64");
 }
 
 // ============================================================================

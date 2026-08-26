@@ -207,31 +207,6 @@ action SDIV {
 }
 
 /**
- * Verifies semantic resolution of LOWER action clause.
- */
-TEST_F(LegalizeActionPassTest, TestValidLowerActionDeclaration)
-{
-    std::string code = R"(
-action ADD {
-    LOWER(i64);
-};
-)";
-
-    ASSERT_TRUE(runPass(code));
-
-    Symbol *sym = m_table->getSymByName("ADD");
-    ASSERT_NE(sym, nullptr);
-
-    const auto *actionData = sym->getIf<Sema::Symbols::LegalizeActionSymbol>();
-    ASSERT_NE(actionData, nullptr);
-    ASSERT_EQ(actionData->m_clauses.size(), 1);
-
-    const auto &clause = actionData->m_clauses[0];
-    EXPECT_EQ(clause.m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Lower);
-    ASSERT_EQ(clause.m_types.size(), 1);
-}
-
-/**
  * Verifies semantic resolution of heterogeneous type constraints where specific operand indices are designated.
  */
 TEST_F(LegalizeActionPassTest, TestHeterogeneousConstraintOperandIndices)

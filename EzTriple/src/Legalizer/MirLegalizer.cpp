@@ -2,6 +2,7 @@
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Descriptors/TargetDesc.h"
+#include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionMetadata.h"
