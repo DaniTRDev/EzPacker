@@ -17,9 +17,9 @@ class MirExpansionRuleRegistry
 
     /**
      * Attempts to expand an unlowered or illegal instruction using synthesized target rewrite rules.
-     * @param ctx Active MIR builder context.
-     * @param inst Instruction to expand.
-     * @return True if the instruction was successfully matched and expanded.
+     * Active MIR builder context.
+     * Instruction to expand.
+     * True if the instruction was successfully matched and expanded.
      */
     virtual bool tryExpand(MirBuilderContext *ctx, MirInstruction *inst) = 0;
 };

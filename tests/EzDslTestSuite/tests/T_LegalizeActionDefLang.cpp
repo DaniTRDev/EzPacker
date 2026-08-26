@@ -161,13 +161,15 @@ TEST_F(LegalizeActionLangTest, TestCustomAndUnsupportedActionClauses)
     EXPECT_EQ(customRes->m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom);
     EXPECT_EQ(customRes->m_targetType->m_node, "i64");
 
-    std::string unsuppTest = "UNSUPPORTED(f128) >> f128";
-    ParseContext unsuppCtx = createParseContextFromBuff("unsuppTest", unsuppTest);
+    std::string lowerTest = "LOWER(i64);";
+    ParseContext lowerCtx = createParseContextFromBuff("lowerTest", lowerTest);
 
-    auto unsuppRes = unsuppCtx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
-                                     DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
-    ASSERT_TRUE(unsuppRes.has_value());
-    EXPECT_EQ(unsuppRes->m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Unsupported);
+    auto lowerRes = lowerCtx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
+                                   DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
+    ASSERT_TRUE(lowerRes.has_value());
+    EXPECT_EQ(lowerRes->m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Lower);
+    ASSERT_EQ(lowerRes->m_types.size(), 1);
+    EXPECT_EQ(lowerRes->m_types[0].m_type.m_node, "i64");
 }
 
 // ============================================================================

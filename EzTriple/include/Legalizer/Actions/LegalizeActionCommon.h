@@ -29,6 +29,7 @@ enum class LegalizeAction : uint8_t
     Libcall,
     Custom,
     Bitcast,
+    Lower,
     Unsupported
 };
 

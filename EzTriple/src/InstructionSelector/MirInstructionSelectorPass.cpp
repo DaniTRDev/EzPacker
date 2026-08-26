@@ -22,9 +22,6 @@ MirPassResult MirInstructionSelectorPass::run(IntrusiveLinkedList<MirFunction> &
                                               IntrusiveLinkedList<MirFunction>::iterator it,
                                               MirPassManager *passManager)
 {
-    (void)funcList;
-    (void)passManager;
-
     MirFunction *func = *it;
     if (!func)
     {

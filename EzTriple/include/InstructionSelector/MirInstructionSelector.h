@@ -22,9 +22,9 @@ class MirInstructionSelector
 
     /**
      * Selects and replaces a generic instruction with target hardware instructions.
-     * @param ctx Active builder context.
-     * @param inst Instruction to select and replace.
-     * @return True if the instruction was recognized and successfully transformed.
+     * Active builder context.
+     * Instruction to select and replace.
+     * True if the instruction was recognized and successfully transformed.
      */
     virtual bool select(MirBuilderContext *ctx, MirInstruction *inst) = 0;
 

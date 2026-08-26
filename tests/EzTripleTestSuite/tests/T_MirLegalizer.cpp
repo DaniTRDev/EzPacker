@@ -1,7 +1,12 @@
 #include "EzTripleTestSuite.h"
 #include "Instruction/MirInstruction.h"
+#include "Legalizer/Actions/LegalizeBitcastAction.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeCustomAction.h"
+#include "Legalizer/Actions/LegalizeLibcallAction.h"
+#include "Legalizer/Actions/LegalizeNarrowScalarAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
+#include "Legalizer/Actions/LegalizeWidenScalarAction.h"
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 #include "Legalizer/MirLegalizer.h"
 #include "Legalizer/MirLegalizerPass.h"
@@ -135,6 +140,93 @@ TEST_F(MirLegalizerTest, TestReturnLegalization)
 
     EXPECT_EQ(pushRet->getOpCodeName(), std::string("PUSH_RET"));
     EXPECT_EQ(retInst->getOpCodeName(), std::string("RET"));
+}
+
+TEST_F(MirLegalizerTest, TestWidenScalarLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("widen_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i8(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i8(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i8(), "rhs");
+
+    ib.ADD(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeWidenScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+}
+
+TEST_F(MirLegalizerTest, TestNarrowScalarLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i64(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i64(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i64(), "rhs");
+
+    ib.ADD(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+}
+
+TEST_F(MirLegalizerTest, TestBitcastLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("bitcast_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i32(), "dst");
+    MirRegister *src = ob.buildVReg(typeTable->f32(), "src");
+
+    ib.MOV(dst, src);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeBitcast(legCtx, 1, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+}
+
+TEST_F(MirLegalizerTest, TestLibcallLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("libcall_test", typeTable->i64());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i64(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i64(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i64(), "rhs");
+
+    ib.DIV(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, "__divdi3");
+    EXPECT_EQ(res, LegalizationResult::Legalized);
 }
 
 TEST_F(MirLegalizerTest, TestFullLegalizerPass)

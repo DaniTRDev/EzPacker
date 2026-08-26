@@ -15,7 +15,6 @@ namespace LegalizeActions
 
 LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, MirType *targetType)
 {
-    (void)operandSlot;
     if (!ctx.m_ctx || !ctx.m_targetDesc)
     {
         return LegalizationResult::Failed;
@@ -102,7 +101,6 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
 
     // Build the widened instruction
     MirInstruction *widenedInst = ib.build(instr->getOpCode(), instr->getSourceRef(), newOperands);
-    (void)widenedInst;
 
     // If destination was widened, truncate back to original destination
     if (widenedDst && origDst)
