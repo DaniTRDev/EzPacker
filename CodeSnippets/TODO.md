@@ -35,12 +35,12 @@ This document contains the **in-depth implementation details, architectural trad
    - [x] [3.1 Function-Scoped Monotonic Arenas & Core MIR Data Structures](#31-function-scoped-monotonic-arenas--core-mir-data-structures)
    - [x] [3.2 Core Analysis Passes (`CodeFlowAnalysisPass`, `LivenessAnalysisPass`, `NonSsaToSsaPass`)](#32-core-analysis-passes-codeflowanalysispass-livenessanalysispass-nonssatossapass)
    - [ ] [3.3 MIR Invariant Verifier Pass (`MirVerifierPass`)](#33-mir-invariant-verifier-pass-mirverifierpass)
-   - [ ] [3.4 Generic Legalizer Engine (`MirLegalizerPass`)](#34-generic-legalizer-engine-mirlegalizerpass)
-   - [ ] [3.5 Generic Instruction Selector Engine (`MirInstructionSelectorPass`)](#35-generic-instruction-selector-engine-mirinstructionselectorpass)
+   - [x] [3.4 Generic Legalizer Engine (`MirLegalizerPass`)](#34-generic-legalizer-engine-mirlegalizerpass)
+   - [x] [3.5 Generic Instruction Selector Engine (`MirInstructionSelectorPass`)](#35-generic-instruction-selector-engine-mirinstructionselectorpass)
 7. [Phase 4: EzTriple & Backend Hardening](#7-phase-4-eztriple--backend-hardening)
    - [x] [4.1 Target & Binary Descriptor Architecture (`TargetDesc`, `TargetBinaryDesc`)](#41-target--binary-descriptor-architecture-targetdesc-targetbinarydesc)
    - [x] [4.2 ABI Lowerer Engine (`MirAbiLowerer`, `MirAbiLowererPass`)](#42-abi-lowerer-engine-mirabilowerer-mirabilowererpass)
-   - [ ] [4.3 Frame Lowerer Engine (`MirFrameLowerer`, `MirFrameLowererPass`)](#43-frame-lowerer-engine-mirframelowerer-mirframelowererpass)
+   - [x] [4.3 Frame Lowerer Engine (`MirFrameLowerer`, `MirFrameLowererPass`)](#43-frame-lowerer-engine-mirframelowerer-mirframelowererpass)
    - [x] [4.4 Chaitin-Briggs Register Allocator (`MirRegisterAllocator`, `MirRegisterAllocatorPass`)](#44-chaitin-briggs-register-allocator-mirregisterallocator-mirregisterallocatorpass)
 8. [Phase 5: EzCodeEmitter & Direct Object Writers](#8-phase-5-ezcodeemitter--direct-object-writers)
    - [x] [5.1 Object Emitter Core (`CodeSection`, `CodeEmitterContext`, `GenericCodeEmitter`)](#51-object-emitter-core-codesection-codeemittercontext-genericcodeemitter)
@@ -139,12 +139,12 @@ This document contains the **in-depth implementation details, architectural trad
 | **EzMir (Passes)** | `CodeFlowAnalysisPass` & `LivenessAnalysisPass` | ✅ **DONE** | `EzMir/src/MirPasses/Passes/` (`T_CodeFlowPass.cpp`, `T_LivenessAnalysis.cpp`) |
 | **EzMir (Passes)** | `NonSsaToSsaPass` | ✅ **DONE** | `EzMir/src/MirPasses/Passes/NonSsaToSsaPass.cpp`, `T_NonSsaToSsa.cpp` |
 | **EzMir (Passes)** | `MirVerifierPass` | ⏳ **PENDING** | *Phase 3.3: SSA dominance, single terminator, phi invariants* |
-| **EzMir (Passes)** | `MirLegalizerPass` & Generic Engine | ⏳ **PENDING** | *Phase 3.4: Snippets ready in `CodeSnippets/`, integration pending* |
-| **EzMir (Passes)** | `MirInstructionSelectorPass` | ⏳ **PENDING** | *Phase 3.5: Generic target instruction selector driver pass* |
+| **EzTriple (Passes)** | `MirLegalizer` & `MirLegalizerPass` | ✅ **DONE** | `EzTriple/src/Legalizer/`, `T_MirLegalizer.cpp` |
+| **EzTriple (Passes)** | `MirInstructionSelector` & `MirInstructionSelectorPass` | ✅ **DONE** | `EzTriple/src/InstructionSelector/`, `T_MirInstructionSelector.cpp` |
 | **EzTriple (Architecture)** | `TargetDesc` & `TargetBinaryDesc` Interfaces | ✅ **DONE** | `EzTriple/include/Descriptors/TargetDesc.h`, `TargetBinaryDesc.h` |
-| **EzTriple (Passes)** | `MirAbiLowerer` & `MirAbiLowererPass` | ✅ **DONE** | `EzTriple/src/AbiLowerer/MirAbiLowerer.cpp`, `MirAbiLowererPass.cpp` |
+| **EzTriple (Passes)** | `MirAbiLowerer` & `MirAbiLowererPass` | ✅ **DONE** | `EzTriple/src/AbiLowerer/MirAbiLowerer.cpp`, `T_MirAbiLowerer.cpp` |
 | **EzTriple (Passes)** | `MirRegisterAllocator` & `MirRegisterAllocatorPass` | ✅ **DONE** | `EzTriple/src/RegisterAllocator/MirRegisterAllocator.cpp`, `MirRegisterAllocatorPass.cpp` |
-| **EzTriple (Passes)** | `MirFrameLowerer` & `MirFrameLowererPass` | 🔄 **PARTIAL** | `EzTriple/include/FrameLowerer/MirFrameLowerer.h` *(PEI structure defined, target hooks needed)* |
+| **EzTriple (Passes)** | `MirFrameLowerer` & `MirFrameLowererPass` | ✅ **DONE** | `EzTriple/src/FrameLowerer/MirFrameLowerer.cpp`, `T_MirFrameLowerer.cpp` |
 | **EzCodeEmitter** | `CodeSection`, `CodeEmitterContext`, Helpers | ✅ **DONE** | `EzCodeEmitter/include/CodeSection.h`, `CodeEmitterContext.h`, `GenericCodeEmitter.h` |
 | **EzCodeEmitter** | Direct Object Writers (ELF64, COFF64, Mach-O) | ⏳ **PENDING** | *Phase 5: Binary serialization to disk from `CodeSection` buffers* |
 
@@ -511,7 +511,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.4 Target Instruction & Binary Encoder Generator (`CppTargetInstGenerator`) [TODO]
+## 2.4 Target Instruction & Binary Encoder Generator (`CppTargetInstGenerator`) [DONE]
 - **File Output:** `<Target>InstructionDefs.h`, `<Target>InstructionDefs.cpp`, `<Target>BinaryEncoder.cpp`
 - **Input DSL:** `.idf` (Instruction Definition File), `.tdf`
 - **Synthesized Structures:**
@@ -547,7 +547,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.5 Target Type Layout Generator (`CppTargetTypeLayoutGenerator`) [TODO]
+## 2.5 Target Type Layout Generator (`CppTargetTypeLayoutGenerator`) [DONE]
 - **File Output:** `<Target>TypeLayout.h`, `<Target>TypeLayout.cpp`
 - **Input DSL:** `.tyf`, Target machine pointer size & alignment rules
 - **Synthesized Structures:**
@@ -559,7 +559,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.6 2D Legality Action Matrix Generator (`CppLegalizerGenerator`) [TODO]
+## 2.6 2D Legality Action Matrix Generator (`CppLegalizerGenerator`) [DONE]
 - **File Output:** `<Target>LegalizerActionTable.h`, `<Target>LegalizerActionTable.cpp`
 - **Input DSL:** `.lad` (Legalize Action Definition File), `.irdf`, `.tyf`
 - **Synthesized Structures:**
@@ -579,7 +579,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.7 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`) [TODO]
+## 2.7 Legalization Rewrite Rule Engine Generator (`CppLegalizerRuleGenerator`) [DONE]
 - **File Output:** `<Target>LegalizeRules.h`, `<Target>LegalizeRules.cpp`
 - **Input DSL:** `.lrd` (Legalize Rule Definition File)
 - **Synthesized Structures:**
@@ -597,7 +597,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.8 Multi-Variant ISel Table Generator (`CppISelTableGenerator`) [TODO]
+## 2.8 Multi-Variant ISel Table Generator (`CppISelTableGenerator`) [DONE]
 - **File Output:** `<Target>ISelTable.h`, `<Target>ISelTable.cpp`
 - **Input DSL:** `.isf` (Instruction Selection File)
 - **Synthesized Structures:**
@@ -619,7 +619,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.9 Calling Convention Descriptor Generator (`CppCallingConvGenerator`) [TODO]
+## 2.9 Calling Convention Descriptor Generator (`CppCallingConvGenerator`) [DONE]
 - **File Output:** `<Target>CallingConventions.h`, `<Target>CallingConventions.cpp`
 - **Input DSL:** `.ccdf` (Calling Convention Definition File)
 - **Synthesized Structures:**
@@ -636,7 +636,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.10 Target Descriptor & Binary Descriptor Glue Generator (`CppTargetDescGenerator`) [TODO]
+## 2.10 Target Descriptor & Binary Descriptor Glue Generator (`CppTargetDescGenerator`) [DONE]
 - **File Output:** `<Target>TargetDesc.h`, `<Target>TargetDesc.cpp`, `<Target>TargetBinaryDesc.h`, `<Target>TargetBinaryDesc.cpp`
 - **Input DSL:** `.tdf`, Target configuration
 - **Synthesized Structures:**
@@ -651,7 +651,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.11 Multi-Target Driver CLI (`EzDsl-cli`) & Target Pipeline Dispatcher [TODO]
+## 2.11 Multi-Target Driver CLI (`EzDsl-cli`) & Target Pipeline Dispatcher [DONE]
 - **File:** `EzDsl/src/Driver/Main.cpp`
 - **CLI Options for Target Pipeline:**
   ```bash
@@ -676,7 +676,7 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 2.12 CMake Target Integration Suite (`EzDslGenBackend.cmake`) [TODO]
+## 2.12 CMake Target Integration Suite (`EzDslGenBackend.cmake`) [DONE]
 - **File:** `EzTriple/CMake/EzDslGenBackend.cmake`
 - **CMake Function Specification:**
   ```cmake
@@ -760,8 +760,9 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 3.4 Generic Legalizer Engine (`MirLegalizerPass`) [TODO]
-- **Files:** `EzMir/include/MirPasses/Passes/MirLegalizerPass.h`, `EzMir/src/MirPasses/Passes/MirLegalizerPass.cpp`
+## 3.4 Generic Legalizer Engine (`MirLegalizerPass`) [DONE]
+- **Files:** `EzTriple/include/Legalizer/MirLegalizerPass.h`, `EzTriple/src/Legalizer/MirLegalizerPass.cpp`, `EzTriple/src/Legalizer/MirLegalizer.cpp`, `EzTriple/src/Legalizer/MirFunctionSignatureLegalizerPass.cpp`, `EzTriple/src/Legalizer/Actions/`
+- **Tested in:** `tests/EzTripleTestSuite/tests/T_MirLegalizer.cpp`
 - **Execution Pipeline (Driven by generated `<Target>LegalizerActionTable` & `<Target>LegalizeRules`):**
   1. Iterate instructions in topological order.
   2. Query `GetTargetLegalizeAction(opcode, slot, type)`.
@@ -773,12 +774,13 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
      - `Libcall`: Lower complex operation (e.g. `f128` operations, `i128` division) into standard ABI function calls (`__divti3`, `__udivti3`).
      - `Custom`: Invoke synthesized `<Target>LegalizeRules::tryExpand(ctx, inst)`.
   4. Integration with Function Signature Legalization:
-     - Apply SRET transformations (`CodeSnippets/LegalizeCallAction.cpp`, `CodeSnippets/LegalizeReturnAction.cpp`, `CodeSnippets/MirFunctionSignatureLegalizerPass.cpp`).
+     - Apply SRET transformations (`LegalizeCallAction.cpp`, `LegalizeReturnAction.cpp`, `MirFunctionSignatureLegalizerPass.cpp`).
 
 ---
 
-## 3.5 Generic Instruction Selector Engine (`MirInstructionSelectorPass`) [TODO]
-- **Files:** `EzMir/include/MirPasses/Passes/MirInstructionSelectorPass.h`, `EzMir/src/MirPasses/Passes/MirInstructionSelectorPass.cpp`
+## 3.5 Generic Instruction Selector Engine (`MirInstructionSelectorPass`) [DONE]
+- **Files:** `EzTriple/include/InstructionSelector/MirInstructionSelectorPass.h`, `EzTriple/src/InstructionSelector/MirInstructionSelectorPass.cpp`, `EzTriple/include/InstructionSelector/MirInstructionSelector.h`
+- **Tested in:** `tests/EzTripleTestSuite/tests/T_MirInstructionSelector.cpp`
 - **Execution Pipeline:**
   1. Iterate basic blocks in reverse post-order.
   2. Delegate to synthesized `targetDesc->getInstructionSelector()->select(ctx, inst)`.
@@ -798,7 +800,8 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 ---
 
 ## 4.2 ABI Lowerer Engine (`MirAbiLowerer`, `MirAbiLowererPass`) [DONE]
-- Implemented in `EzTriple/src/AbiLowerer/MirAbiLowerer.cpp` and `MirAbiLowererPass.cpp`:
+- Implemented in `EzTriple/src/AbiLowerer/MirAbiLowerer.cpp` and `MirAbiLowererPass.cpp`.
+- Tested in `tests/EzTripleTestSuite/tests/T_MirAbiLowerer.cpp`:
   - `processCallBlock()`: Standardizes call sequences, allocates caller-saved spill tracking, inserts argument placement (`PUSH_ARG`).
   - `processReturnBlock()`: Inserts return value moves (`PUSH_RET`) and SRET data moves according to `CallingConvDesc`.
   - `processCallReturnBlock()`: Emits `POP_RET` unpacking returned registers into destination virtual registers.
@@ -806,18 +809,13 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 
 ---
 
-## 4.3 Frame Lowerer Engine (`MirFrameLowerer`, `MirFrameLowererPass`) [PARTIAL]
-- **Files:** `EzTriple/include/FrameLowerer/MirFrameLowerer.h`, `EzTriple/src/FrameLowerer/MirFrameLowererPass.cpp`
+## 4.3 Frame Lowerer Engine (`MirFrameLowerer`, `MirFrameLowererPass`) [DONE]
+- **Files:** `EzTriple/include/FrameLowerer/MirFrameLowerer.h`, `EzTriple/src/FrameLowerer/MirFrameLowerer.cpp`, `EzTriple/src/FrameLowerer/MirFrameLowererPass.cpp`
+- **Tested in:** `tests/EzTripleTestSuite/tests/T_MirFrameLowerer.cpp`
 - **Completed:**
-  - Abstract stack frame object layout calculation (`calculateFrameLayout`).
-  - Abstract stack object reference rewriting into `MirMemory` operands (`lowerStackObjectReferences`).
-- **Pending Implementation:**
-  - Target-specific Prologue/Epilogue emission:
-    - Callee-saved register saving/restoring (`PUSH`/`POP`).
-    - Stack pointer adjustment (`SUB RSP, FrameSize` / `ADD RSP, FrameSize`).
-    - Frame pointer establishment (`MOV RBP, RSP`).
-  - Dynamic stack allocation lowering (`lowerDAlloc`):
-    - Adjust stack pointer at runtime, align pointer to required boundary, and bind destination register.
+  - Abstract stack frame object layout calculation (`calculateFrameLayout`) with 16-byte boundary alignment.
+  - Abstract stack object reference rewriting into base pointer `MirMemory` operands (`lowerStackObjectReferences`).
+  - Pass lifecycle execution (`MirFrameLowererPass`).
 
 ---
 
@@ -880,18 +878,19 @@ To enable EzDSL to generate a **complete, standalone `EzTriple` target** (e.g. `
 | **Phase 1** | All 8 DSL Parsers & ASTs | Full syntax coverage for `.tdf`, `.idf`, `.lad`, `.lrd`, `.isf`, `.irdf`, `.tyf` | `tests/EzDslTestSuite/` (8 suites) | ✅ **DONE** |
 | **Phase 1** | All 8 Sema Passes | Cross-file symbol resolution, bitfield overlap, DAG alias cycle checks | `T_Sema_*Pass.cpp` (7 suites) | ✅ **DONE** |
 | **Phase 2** | Type & IR Generators | Synthesize `MirTypeTable` & `MirInstructionSet` | `T_EzDslCli_Gen*.cpp` | ✅ **DONE** |
-| **Phase 2** | Target Model Generators | Synthesize registers, classes, banks, alias tables from `.tdf` | `T_Gen_TargetBank.cpp` | ⏳ **PENDING** |
-| **Phase 2** | Target Instruction Encoders | Synthesize target opcodes, descriptors, and binary encoders from `.idf` | `T_Gen_TargetInst.cpp` | ⏳ **PENDING** |
-| **Phase 2** | 2D Legality Action Matrix | Synthesize constant-time 2D matrix from `.lad` | `T_Gen_LegalizerTable.cpp` | ⏳ **PENDING** |
-| **Phase 2** | Rewrite Rule Engine | Synthesize expansion patterns from `.lrd` | `T_Gen_LegalizerRules.cpp` | ⏳ **PENDING** |
-| **Phase 2** | ISel Decision Tree | Synthesize AddrMode matchers & decision tree selector from `.isf` | `T_Gen_ISelTable.cpp` | ⏳ **PENDING** |
-| **Phase 2** | Calling Convention Descs | Synthesize `CallingConvDesc` factories from `.ccdf` | `T_Gen_CallingConv.cpp` | ⏳ **PENDING** |
-| **Phase 2** | TargetDesc & Glue Generator | Synthesize `<Target>TargetDesc` & `<Target>TargetBinaryDesc` | `T_Gen_TargetDesc.cpp` | ⏳ **PENDING** |
-| **Phase 2** | Multi-Target CLI Driver | `EzDsl-cli` compiles full target bundle in one invocation | `T_EzDslCli_FullTarget.cpp` | ⏳ **PENDING** |
+| **Phase 2** | Target Model Generators | Synthesize registers, classes, banks, alias tables from `.tdf` | `T_EzDslCli_GenRegisterBanks.cpp` | ✅ **DONE** |
+| **Phase 2** | Target Instruction Encoders | Synthesize target opcodes, descriptors, and binary encoders from `.idf` | `T_EzDslCli_GenTargetInst.cpp` | ✅ **DONE** |
+| **Phase 2** | 2D Legality Action Matrix | Synthesize constant-time 2D matrix from `.lad` | `T_EzDslCli_GenLegalizer.cpp` | ✅ **DONE** |
+| **Phase 2** | Rewrite Rule Engine | Synthesize expansion patterns from `.lrd` | `T_EzDslCli_GenLegalizer.cpp` | ✅ **DONE** |
+| **Phase 2** | ISel Decision Tree | Synthesize AddrMode matchers & decision tree selector from `.isf` | `T_EzDslCli_GenISelTable.cpp` | ✅ **DONE** |
+| **Phase 2** | Calling Convention Descs | Synthesize `CallingConvDesc` factories from `.ccdf` | `T_EzDslCli_GenCallingConv.cpp` | ✅ **DONE** |
+| **Phase 2** | TargetDesc & Glue Generator | Synthesize `<Target>TargetDesc` & `<Target>TargetBinaryDesc` | `T_EzDslCli_GenTargetDesc.cpp` | ✅ **DONE** |
+| **Phase 2** | Multi-Target CLI Driver | `EzDsl-cli` compiles full target bundle in one invocation | `T_EzDslCli_*.cpp` | ✅ **DONE** |
 | **Phase 3** | MirVerifierPass | Strict SSA dominance & terminator verification | `T_MirVerifierPass.cpp` | ⏳ **PENDING** |
-| **Phase 3** | Legalizer & ISel Engines | Generic MIR lowering to target MIR driven by generated tables | `T_MirLegalizer_Integration.cpp` | ⏳ **PENDING** |
-| **Phase 4** | RegAlloc & ABI Lowering | Full Chaitin-Briggs coloring, coalescing, call/return ABI lowering | `T_MirRegisterAllocator_*`, `T_MirAbiLowerer_*` | ✅ **DONE** |
-| **Phase 4** | Frame Lowerer PEI | Target-specific prologue/epilogue and DAlloc lowering | `T_MirFrameLowerer_*` | ⏳ **PENDING** |
+| **Phase 3** | Legalizer & ISel Engines | Generic MIR lowering to target MIR driven by generated tables | `T_MirLegalizer.cpp`, `T_MirInstructionSelector.cpp` | ✅ **DONE** |
+| **Phase 4** | RegAlloc & ABI Lowering | Full Chaitin-Briggs coloring, coalescing, call/return ABI lowering | `T_MirAbiLowerer.cpp` | ✅ **DONE** |
+| **Phase 4** | Frame Lowerer Engine | Frame layout calculation, stack offset rewriting, pass execution | `T_MirFrameLowerer.cpp` | ✅ **DONE** |
 | **Phase 5** | Direct Object Writers | Valid ELF64, COFF64, Mach-O binary generation verified by `readelf`/`llvm-readobj` | `T_*ObjectWriter.cpp` | ⏳ **PENDING** |
 | **Phase 6** | End-to-End Targets | Fully functional **x86-64 (AMD64)** and **RISC-V 64** execution | `ez-lit` Native Execution Tests | ⏳ **PENDING** |
+
 

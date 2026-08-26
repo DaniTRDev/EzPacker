@@ -76,7 +76,7 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
     MirOperandBuilder opBuilder(ctx.m_ctx);
 
     const size_t slotSize = targetDesc->getStackSlotSize();
-    MirType *ptrType = ctx.m_ctx->getTypeTable()->getIntegerTypeBySize(slotSize);
+    MirType *ptrType = ctx.m_ctx->getTypeTable()->getPtr(ctx.m_ctx->getTypeTable()->_void());
 
     // Determine the base register designated by the ABI (FP if enabled, otherwise SP)
     MirRegisterRef baseRegRef = cc->hasFramePointer(func) ? cc->getFramePointerReg() : cc->getStackPointerReg();

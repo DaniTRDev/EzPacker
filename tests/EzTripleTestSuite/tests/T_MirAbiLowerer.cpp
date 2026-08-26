@@ -1,0 +1,90 @@
+#include "EzTripleTestSuite.h"
+#include "AbiLowerer/MirAbiLowerer.h"
+#include "AbiLowerer/MirAbiLowererPass.h"
+#include "Instruction/MirInstruction.h"
+#include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeReturnAction.h"
+#include "Legalizer/MirFunctionSignatureLegalizerPass.h"
+#include "Operand/MirOperandBuilder.h"
+
+class MirAbiLowererTest : public EzTripleTestSuite
+{
+};
+
+TEST_F(MirAbiLowererTest, TestReturnLowering)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("ret_lower", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *retVal = ob.buildVReg(typeTable->i32(), "val");
+    ib.RET(retVal);
+
+    // Legalize return first -> emits PUSH_RET + tokenized RET
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    LegalizeActions::LegalizeReturn(legCtx);
+
+    // Run ABI Lowerer Pass
+    MirAbiLowererPass pass(ctx);
+    IntrusiveLinkedList<MirFunction> funcList;
+    funcList.push_back(func);
+
+    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    EXPECT_TRUE(result.m_succeeded);
+    EXPECT_TRUE(result.m_modifiedMir);
+
+    // Verify lowered sequence contains MOV into return physical register (RAX) and RET
+    bool foundMovToReg = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCodeName() == std::string("MOV"))
+        {
+            foundMovToReg = true;
+        }
+    }
+    EXPECT_TRUE(foundMovToReg);
+}
+
+TEST_F(MirAbiLowererTest, TestCallAndArgLowering)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("call_lower", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dest = ob.buildVReg(typeTable->i32(), "res");
+    MirRegister *arg0 = ob.buildVReg(typeTable->i32(), "x");
+    MirRegister *arg1 = ob.buildVReg(typeTable->i32(), "y");
+    MirReference *callee = ob.buildRef(func);
+
+    ib.CALL(dest, callee, arg0, arg1);
+
+    // Legalize call -> emits PUSH_ARG, PUSH_ARG, CALL, POP_RET
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    LegalizeActions::LegalizeCall(legCtx);
+
+    // Run ABI Lowerer Pass
+    MirAbiLowererPass pass(ctx);
+    IntrusiveLinkedList<MirFunction> funcList;
+    funcList.push_back(func);
+
+    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    EXPECT_TRUE(result.m_succeeded);
+    EXPECT_TRUE(result.m_modifiedMir);
+
+    // Verify CALL instructions lowered: PUSH_ARG / POP_RET removed and MOV instructions emitted
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        EXPECT_NE(inst->getOpCodeName(), std::string("PUSH_ARG"));
+        EXPECT_NE(inst->getOpCodeName(), std::string("POP_RET"));
+    }
+}

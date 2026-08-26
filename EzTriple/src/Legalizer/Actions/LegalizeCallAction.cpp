@@ -26,7 +26,7 @@ LegalizationResult LegalizeCall(LegalizeCtx &ctx)
         return LegalizationResult::NotModified;
     }
 
-    MirInstructionBuilder builder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
+    MirInstructionBuilder beforeBuilder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
     MirOperandBuilder opBuilder(builderCtx);
 
     /*
@@ -48,27 +48,7 @@ LegalizationResult LegalizeCall(LegalizeCtx &ctx)
         // We need to allocate the data before actually passing it.
         MirType *ptrType = builderCtx->getTypeTable()->getPtr(retType);
         sretAddrReg = opBuilder.buildVReg(ptrType, "sRetPtr", instr->getSourceRef());
-
-        builder.ALLOC(instr->getSourceRef(), sretAddrReg);
-
-        // Since this call uses SRET, the actual destination register receives data indirectly.
-        // Convert the CALL node to a tokenized tracking format.
-        operands[0] = callToken;
-    }
-    else if (returnDest && returnDest->isOfType<MirRegister>())
-    {
-        // Insert POP_RET AFTER THE CALL, structurally tied to this call's token.
-        builder.changeInsertionType(InsertionType::InsertAfter);
-        builder.POP_RET(instr->getSourceRef(), callToken, returnDest);
-        builder.changeInsertionType(InsertionType::InsertBefore);
-
-        // Swap the target return destination inside the CALL with our tracking token.
-        operands[0] = callToken;
-    }
-    else
-    {
-        // For void functions, place the callToken at index 0.
-        operands.insert(operands.begin(), callToken);
+        beforeBuilder.build(MirInstructionOpCode::ALLOC, instr->getSourceRef(), { sretAddrReg });
     }
 
     // Standardized layout: index 0 is callToken, index 1 is callee, index 2+ are args.
@@ -77,13 +57,30 @@ LegalizationResult LegalizeCall(LegalizeCtx &ctx)
     // Inject the implicit SRET pointer argument if required by the ABI
     if (isSretCall && sretAddrReg)
     {
-        builder.PUSH_ARG(instr->getSourceRef(), callToken, sretAddrReg);
+        beforeBuilder.build(MirInstructionOpCode::PUSH_ARG, instr->getSourceRef(), { callToken, sretAddrReg });
     }
 
     // Insert PUSH_ARG instructions BEFORE THE CALL for all user arguments
     for (size_t i = startingId; i < operands.size(); ++i)
     {
-        builder.PUSH_ARG(instr->getSourceRef(), callToken, operands[i]);
+        beforeBuilder.build(MirInstructionOpCode::PUSH_ARG, instr->getSourceRef(), { callToken, operands[i] });
+    }
+
+    if (!isSretCall && returnDest && returnDest->isOfType<MirRegister>())
+    {
+        // Insert POP_RET AFTER THE CALL, structurally tied to this call's token.
+        MirInstructionBuilder afterBuilder(builderCtx, instr->getOwner(), InsertionType::InsertAfter, it);
+        afterBuilder.build(MirInstructionOpCode::POP_RET, instr->getSourceRef(), { callToken, returnDest });
+        operands[0] = callToken;
+    }
+    else if (isSretCall)
+    {
+        operands[0] = callToken;
+    }
+    else
+    {
+        // For void functions, place the callToken at index 0.
+        operands.insert(operands.begin(), callToken);
     }
 
     // Clear the high-level parameter list out of the core CALL instruction.

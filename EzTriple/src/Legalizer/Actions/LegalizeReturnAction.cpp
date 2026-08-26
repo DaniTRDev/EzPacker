@@ -43,14 +43,14 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
 
             // Emit: STORE sourceRef, memDest, returnVal
             MirOperand *memDest = opBuilder.buildMem(retType, sretPtr, FlexInt(int64_t(0)));
-            insertBeforeBuilder.STORE(instr->getSourceRef(), memDest, returnVal);
+            insertBeforeBuilder.build(MirInstructionOpCode::STORE, instr->getSourceRef(), { memDest, returnVal });
 
             // Forward sretPtr as returnVal if required
             returnVal = sretPtr;
         }
 
-        // PUSH_RET groups: (sourceRef, retToken, returnVal)
-        insertBeforeBuilder.PUSH_RET(instr->getSourceRef(), retToken, returnVal);
+        // PUSH_RET groups: (retToken, returnVal)
+        insertBeforeBuilder.build(MirInstructionOpCode::PUSH_RET, instr->getSourceRef(), { retToken, returnVal });
 
         // Replace the RET operand with the tracking token
         operands[0] = retToken;

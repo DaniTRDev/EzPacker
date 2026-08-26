@@ -47,10 +47,9 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
         return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
     }
 
-    MirInstructionBuilder builder(m_ctx,
-                                  entryPoint,
-                                  InsertionType::InsertBefore,
-                                  entryPoint->getInstructions().begin());
+    MirInstructionBuilder builder = entryPoint->getInstructions().empty()
+        ? MirInstructionBuilder(m_ctx, entryPoint, InsertionType::Append)
+        : MirInstructionBuilder(m_ctx, entryPoint, InsertionType::InsertBefore, entryPoint->getInstructions().begin());
     MirOperandBuilder opBuilder(m_ctx);
 
     CallingConvDesc *cc = func->getCallingConv();
@@ -66,13 +65,20 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
     }
 
     MirRegister *token = opBuilder.buildVReg(m_ctx->getTypeTable()->__bindToken());
+    bool firstInserted = false;
+
     for (MirRegister *param : func->getParameters())
     {
-        builder.POP_ARG(param->getSourceRef(), token, param);
+        builder.build(MirInstructionOpCode::POP_ARG, param->getSourceRef(), { token, param });
+        if (!firstInserted && !entryPoint->getInstructions().empty())
+        {
+            builder.changeInsertionType(InsertionType::InsertAfter);
+            firstInserted = true;
+        }
         modified = true;
     }
 
-    builder.END_ARG(func->getSourceRef(), token);
+    builder.build(MirInstructionOpCode::END_ARG, func->getSourceRef(), { token });
     modified = true;
 
     return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = succeeded };

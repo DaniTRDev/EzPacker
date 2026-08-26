@@ -44,5 +44,8 @@ if (EZPACKER_BUILD_TESTS)
     message(STATUS "Configuring EzDslTestSuite")
     add_subdirectory(tests/EzDslTestSuite)
 
+    message(STATUS "Configuring EzTripleTestSuite")
+    add_subdirectory(tests/EzTripleTestSuite)
+
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
 endif ()
