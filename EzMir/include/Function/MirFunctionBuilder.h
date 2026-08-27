@@ -26,7 +26,8 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
     MirFunctionBuilder(class MirBuilderContext *ctx, std::pmr::vector<class MirFunction *> *owner);
 
     /**
-     * Creates and returns a MirBlockBuilder configured to append blocks to this function.
+     * Creates and returns a MirBlockBuilder configured to append blocks to the LAST function built, if no function was
+     * built, an invalid builder is returned.
      */
     MirBlockBuilder blockBuilder();
 
@@ -46,31 +47,17 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
     MirFunctionBuilder &addPhysRegUse(MirFunction *func, const class MirRegisterRef &ref);
 
     /**
-     * Finalizes and instantiates the MirFunction in the arena with return type, name, and source location.
+     * Finalizes and instantiates the MirFunction in the arena with the given calling conv, return type, name, and
+     * source location. If calling convention is nullptr, the default one will be used (provided by the context)
      */
-    MirFunction *
-    build(class MirType *returnType, const std::pmr::string &name = "", class SourceReference *sourceRef = nullptr);
-
-    /**
-     * Adds an incoming virtual register parameter to the function signature under construction.
-     */
-    MirFunctionBuilder &
-    buildParam(class MirType *type, const std::pmr::string &name = "", class SourceReference *sourceRef = nullptr);
-
-    /**
-     * Appends an existing MirRegister parameter to the function under construction.
-     */
-    MirFunctionBuilder &buildParam(class MirRegister *param);
-
-    /**
-     * Sets the target calling convention descriptor for the function under construction.
-     */
-    MirFunctionBuilder &setCallingConvention(class CallingConvDesc *cc);
+    MirFunction *build(class MirType *returnType,
+                       std::initializer_list<MirRegister *> parameters,
+                       const std::string_view &name = "",
+                       class CallingConvDesc *cc = nullptr,
+                       class SourceReference *sourceRef = nullptr);
 
   private:
-    class CallingConvDesc *m_callingConv;
     class MirBuilderContext *m_ctx;
-    std::pmr::list<class MirRegister *> m_parameters;
     std::pmr::vector<class MirFunction *> *m_owner;
 };
 

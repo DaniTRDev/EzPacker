@@ -206,8 +206,8 @@ class EzTripleTestSuite : public ::testing::Test
   public:
     MirBuilderContext *getBuilderCtx() { return m_builderCtx.get(); }
     MockTargetDesc *getTargetDesc() { return m_targetDesc.get(); }
-    MirFunction *createTestFunction(const std::string &name = "test_func", MirType *retType = nullptr);
-    MirBlock *createBlock(MirFunction *func, const std::string &name = "entry");
+    MirFunction *createTestFunction(const std::string_view &name = "test_func", MirType *retType = nullptr);
+    MirBlock *createBlock(MirFunction *func, const std::string_view &name = "entry");
 
   private:
     std::pmr::monotonic_buffer_resource m_arena;

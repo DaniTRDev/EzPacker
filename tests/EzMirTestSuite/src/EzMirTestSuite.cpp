@@ -60,7 +60,7 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
 
     m_builderCtx->setDefaultCallingConvention(m_callingConv.get());
 
-    m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->_void(), "TEST");
+    m_testFunction = MirFunctionBuilder(m_builderCtx.get()).build(m_typeTable->_void(), {}, "TEST");
 
     m_diagCollector->builder(Diag_Debug, "EzMirTestSuite")
             << "Created pass manager in test mode (skip dependency resolution)";

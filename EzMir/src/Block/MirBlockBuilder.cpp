@@ -15,13 +15,14 @@ MirBlockBuilder::MirBlockBuilder(MirBuilderContext *ctx, MirFunction *owner) : m
  * Allocates and builds a new basic block in the arena, records it with context and function,
  * and sets up default append insertion point.
  */
-MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::string &name)
+MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::string_view &name)
 {
     std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
     std::pmr::polymorphic_allocator alloc(arena);
 
     // Construct in-place without node wrapper allocations
-    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, m_ownerFunc, name);
+    std::pmr::string pmrName(name, arena);
+    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, m_ownerFunc, std::move(pmrName));
 
     m_ctx->getDiagCollector()->trace("MirBlockBuilder", "Built block with id: {}", block->getId()) << sourceRef;
 

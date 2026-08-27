@@ -20,10 +20,11 @@ class MirBlockBuilder : public MirBuilder<class MirBlock>
      * Allocates and initializes a new basic block with optional source reference and label name,
      * appending it to the builder context and owning function.
      */
-    MirBlock *build(class SourceReference *sourceRef = nullptr, const std::pmr::string &name = "");
+    MirBlock *build(class SourceReference *sourceRef = nullptr, const std::string_view &name = "");
 
     /**
-     * Creates an instruction builder configured to append instructions into this built basic block.
+     * Creates an instruction builder configured to append instructions into the LAST built basic block. If no basic
+     * block was built, an invalid builder is returned.
      */
     MirInstructionBuilder instrBuilder();
 

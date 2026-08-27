@@ -21,10 +21,7 @@ class MirBlock
     /**
      * Constructs a basic block with a unique MIR ID, optional source reference, owning function, and name.
      */
-    MirBlock(MirId id,
-             class SourceReference *sourceRef,
-             class MirFunction *owner = nullptr,
-             const std::pmr::string &name = "");
+    MirBlock(MirId id, class SourceReference *sourceRef, class MirFunction *owner, const std::pmr::string &name = "");
 
     /**
      * Returns the immutable intrusive instruction list for this basic block.

@@ -11,10 +11,7 @@
 #include "Printer/MirPrinter.h"
 #include "Type/MirTypeTable.h"
 
-MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) :
-    m_callingConv(nullptr), m_ctx(ctx), m_parameters(ctx->getGlobalAllocator()), m_owner(nullptr)
-{
-}
+MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_owner(nullptr) {}
 
 MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::vector<MirFunction *> *owner) :
     MirFunctionBuilder(ctx)
@@ -52,7 +49,11 @@ MirFunctionBuilder &MirFunctionBuilder::addPhysRegUse(MirFunction *func, const c
     return *this;
 }
 
-MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::string &name, SourceReference *sourceRef)
+MirFunction *MirFunctionBuilder::build(class MirType *returnType,
+                                       std::initializer_list<MirRegister *> parameters,
+                                       const std::string_view &name,
+                                       class CallingConvDesc *cc,
+                                       class SourceReference *sourceRef)
 {
     const auto &t = m_ctx->getTypeTable();
     std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
@@ -61,33 +62,32 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
 
     auto *stackFrame =
             funcStackFrameAlloc.new_object<MirFunctionStackFrame>(std::pmr::vector<StackFrameObject *>(arena));
-    MirType *funcType = t->getFuncType(returnType, m_parameters, name);
+    MirType *funcType = t->getFuncType(returnType, parameters, name);
 
-    if (!m_callingConv)
+    if (!cc)
     {
-        m_callingConv = m_ctx->getDefaultCallingConvention();
+        cc = m_ctx->getDefaultCallingConvention();
     }
 
-    MirFunction *func = funcAlloc.new_object<MirFunction>(m_callingConv,
-                                                          nullptr,
+    std::pmr::string pmrName(name, arena);
+    MirFunction *func = funcAlloc.new_object<MirFunction>(cc,
                                                           stackFrame,
                                                           returnType,
                                                           funcType,
                                                           m_ctx->createId(),
                                                           sourceRef,
-                                                          m_parameters,
-                                                          name,
+                                                          std::move(pmrName),
                                                           arena);
 
     MirBlockBuilder builder(m_ctx, func);
     MirBlock *entryPoint = builder.build(sourceRef, "entryPoint");
 
-    entryPoint->setOwner(func);
     func->setEntryPoint(entryPoint);
+    func->m_parameters.insert(func->m_parameters.begin(), parameters.begin(), parameters.end());
 
     auto diagBuilder = m_ctx->getDiagCollector()->trace("MirFunctionBuilder", "Built func with id: {}", func->getId());
     diagBuilder.appendNote(sourceRef, MirPrinter::printToString(func, MirPrinterDetail::Detailed));
-    diagBuilder.appendNote("Using calling convention: {}", m_callingConv->getName());
+    diagBuilder.appendNote("Using calling convention: {}", cc->getName());
 
     if (!m_ctx->appendFunction(func))
     {
@@ -101,24 +101,4 @@ MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::stri
 
     setBuildResult(func);
     return func;
-}
-
-MirFunctionBuilder &
-MirFunctionBuilder::buildParam(MirType *type, const std::pmr::string &name, SourceReference *sourceRef)
-{
-    MirOperandBuilder builder(m_ctx);
-    m_parameters.push_back(builder.buildVReg(type, name, sourceRef));
-    return *this;
-}
-
-MirFunctionBuilder &MirFunctionBuilder::buildParam(MirRegister *param)
-{
-    m_parameters.push_back(param);
-    return *this;
-}
-
-MirFunctionBuilder &MirFunctionBuilder::setCallingConvention(CallingConvDesc *cc)
-{
-    m_callingConv = cc;
-    return *this;
 }

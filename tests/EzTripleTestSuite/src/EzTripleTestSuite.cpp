@@ -125,21 +125,18 @@ void EzTripleTestSuite::TearDown()
     m_sourceManager.reset();
 }
 
-MirFunction *EzTripleTestSuite::createTestFunction(const std::string &name, MirType *retType)
+MirFunction *EzTripleTestSuite::createTestFunction(const std::string_view &name, MirType *retType)
 {
     if (!retType)
     {
         retType = m_typeTable->i32();
     }
     MirFunctionBuilder builder(m_builderCtx.get());
-    builder.setCallingConvention(m_targetDesc->getMockCallingConv());
-    std::pmr::string pmrName(name, m_builderCtx->getGlobalAllocator());
-    return builder.build(retType, pmrName);
+    return builder.build(retType, {}, name);
 }
 
-MirBlock *EzTripleTestSuite::createBlock(MirFunction *func, const std::string &name)
+MirBlock *EzTripleTestSuite::createBlock(MirFunction *func, const std::string_view &name)
 {
     MirBlockBuilder builder(m_builderCtx.get(), func);
-    std::pmr::string pmrName(name, m_builderCtx->getGlobalAllocator());
-    return builder.build(nullptr, pmrName);
+    return builder.build(nullptr, name);
 }

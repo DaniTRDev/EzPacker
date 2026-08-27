@@ -22,7 +22,8 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
     /**
      * Builds a floating-point constant operand (MirFloat).
      * If the value's bit-width is smaller than the target type, it is extended with a diagnostic warning.
-     * If greater, the type is promoted to the closest matching floating-point type; if none matches, an error is reported.
+     * If greater, the type is promoted to the closest matching floating-point type; if none matches, an error is
+     * reported.
      */
     class MirFloat *buildFloat(class MirType *type, const FlexFloat &value, class SourceReference *ref = nullptr);
 
@@ -54,7 +55,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * registering it in the context register tracking list.
      */
     class MirRegister *buildVReg(MirType *type,
-                                 std::pmr::string name = "",
+                                 std::string_view name = "",
                                  class SourceReference *ref = nullptr,
                                  class MirRegisterClass *_class = nullptr);
 
@@ -63,7 +64,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      */
     class MirRegister *buildPhysReg(class MirType *type,
                                     MirPhysicalRegId physId,
-                                    std::pmr::string name = "",
+                                    std::string_view name = "",
                                     class MirRegisterClass *_class = nullptr,
                                     class SourceReference *ref = nullptr);
 

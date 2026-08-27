@@ -4,6 +4,7 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionStackFrame.h"
+#include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
@@ -116,9 +117,9 @@ TEST_F(FunctionTest, TestFunc1Parameter)
     MirBuilderContext *ctx = getBuilderCtx();
     MirTypeTable *types = ctx->getTypeTable();
     MirFunctionBuilder builder(ctx);
+    MirOperandBuilder oBuilder(ctx);
 
-    builder.buildParam(types->i8(), "testParam");
-    MirFunction *func = builder.build(types->i8(), "myFunc");
+    MirFunction *func = builder.build(types->i8(), { oBuilder.buildVReg(types->i8(), "testParam") }, "myFunc");
 
     EXPECT_TRUE(FuncSignature(func, types->i8(), 1, 0, "myFunc"));
     EXPECT_TRUE(FuncParam(func, 0, types->i8(), "testParam"));
@@ -132,13 +133,14 @@ TEST_F(FunctionTest, TestFuncNParameters)
     MirBuilderContext *ctx = getBuilderCtx();
     MirTypeTable *types = ctx->getTypeTable();
     MirFunctionBuilder builder(ctx);
+    MirOperandBuilder oBuilder(ctx);
 
-    builder.buildParam(types->i8(), "testParam");
-    builder.buildParam(types->i16(), "testParam2");
-    builder.buildParam(types->i32(), "testParam3");
-    builder.buildParam(types->i64(), "testParam4");
-
-    MirFunction *func = builder.build(types->i8(), "myFunc");
+    MirFunction *func = builder.build(types->i8(),
+                                      { oBuilder.buildVReg(types->i8(), "testParam"),
+                                        oBuilder.buildVReg(types->i16(), "testParam2"),
+                                        oBuilder.buildVReg(types->i32(), "testParam3"),
+                                        oBuilder.buildVReg(types->i64(), "testParam4") },
+                                      "myFunc");
 
     EXPECT_TRUE(FuncSignature(func, types->i8(), 4, 0, "myFunc"));
     EXPECT_TRUE(FuncParam(func, 0, types->i8(), "testParam"));
@@ -156,7 +158,7 @@ TEST_F(FunctionTest, TestFunc1LocalStackObj)
     MirFunctionBuilder builder(ctx);
 
     MirType *i8 = ctx->getTypeTable()->i8();
-    MirFunction *func = builder.build(i8, "myFunc");
+    MirFunction *func = builder.build(i8, {}, "myFunc");
     StackFrameObject *obj = func->getStackFrame()->createStaticStackObj(i8);
 
     EXPECT_TRUE(FuncSignature(func, i8, 0, 1, "myFunc"));
@@ -174,7 +176,7 @@ TEST_F(FunctionTest, TestFuncNLocalStackObj)
     MirType *i8 = ctx->getTypeTable()->i8();
     MirType *i16 = ctx->getTypeTable()->i16();
 
-    MirFunction *func = builder.build(i8, "myFunc");
+    MirFunction *func = builder.build(i8, {}, "myFunc");
     StackFrameObject *obj = func->getStackFrame()->createStaticStackObj(i8);
     StackFrameObject *obj2 = func->getStackFrame()->createStaticStackObj(i16);
 
@@ -192,7 +194,7 @@ TEST_F(FunctionTest, TestFunc1Spill1StackObj)
     MirFunctionBuilder builder(ctx);
 
     MirType *i8 = ctx->getTypeTable()->i8();
-    MirFunction *func = builder.build(i8, "myFunc");
+    MirFunction *func = builder.build(i8, {}, "myFunc");
     StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8);
 
     EXPECT_TRUE(FuncSignature(func, i8, 0, 1, "myFunc"));
@@ -210,7 +212,7 @@ TEST_F(FunctionTest, TestFunc1SpillNStackObj)
     MirType *i8 = ctx->getTypeTable()->i8();
     MirType *i16 = ctx->getTypeTable()->i16();
 
-    MirFunction *func = builder.build(i8, "myFunc");
+    MirFunction *func = builder.build(i8, {}, "myFunc");
     StackFrameObject *obj = func->getStackFrame()->createStackSpill(i8);
     StackFrameObject *obj2 = func->getStackFrame()->createStackSpill(i16);
 
@@ -230,7 +232,7 @@ TEST_F(FunctionTest, TestFunc1ParameterNStackObj)
     MirType *i8 = ctx->getTypeTable()->i8();
     MirType *i16 = ctx->getTypeTable()->i16();
 
-    MirFunction *func = builder.build(i8, "myFunc");
+    MirFunction *func = builder.build(i8, {}, "myFunc");
     StackFrameObject *obj = func->getStackFrame()->createStackParam(i8);
     StackFrameObject *obj2 = func->getStackFrame()->createStackParam(i16);
     StackFrameObject *obj3 = func->getStackFrame()->createStackParam(i16);

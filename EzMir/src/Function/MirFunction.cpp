@@ -7,23 +7,17 @@
 #include "Type/MirType.h"
 
 MirFunction::MirFunction(CallingConvDesc *callingConv,
-                         MirBlock *entryPoint,
                          MirFunctionStackFrame *stackFrame,
                          MirType *returnType,
                          MirType *type,
                          MirId id,
                          SourceReference *sourceRef,
-                         std::pmr::list<MirRegister *> parameters,
                          std::pmr::string name,
                          std::pmr::memory_resource *alloc) :
-    m_callingConv(callingConv), m_entryPoint(entryPoint), m_stackFrame(stackFrame), m_returnType(returnType),
-    m_type(type), m_id(id), m_sourceRef(sourceRef), m_parameters(std::move(parameters)), m_blockIdToBlock(alloc),
-    m_name(std::move(name)), m_usedCalleeSavedRegs(alloc)
+    m_callingConv(callingConv), m_entryPoint(nullptr), m_stackFrame(stackFrame), m_returnType(returnType), m_type(type),
+    m_id(id), m_sourceRef(sourceRef), m_parameters(alloc), m_blockIdToBlock(alloc), m_name(std::move(name)),
+    m_usedCalleeSavedRegs(alloc)
 {
-    if (entryPoint)
-    {
-        appendBlock(entryPoint);
-    }
 }
 
 CallingConvDesc *MirFunction::getCallingConv() const { return m_callingConv; }

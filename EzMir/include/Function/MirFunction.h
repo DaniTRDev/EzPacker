@@ -35,13 +35,11 @@ class MirFunction
      * Constructs a MIR function instance with arena memory resource and initializes its CFG entry block.
      */
     MirFunction(class CallingConvDesc *callingConv,
-                class MirBlock *entryPoint,
                 class MirFunctionStackFrame *stackFrame,
                 class MirType *returnType,
                 class MirType *type,
                 MirId id,
                 class SourceReference *sourceRef,
-                std::pmr::list<class MirRegister *> parameters,
                 std::pmr::string name,
                 std::pmr::memory_resource *alloc);
 
@@ -150,7 +148,7 @@ class MirFunction
      * Records a callee-saved register consumed by this function requiring prologue preservation.
      */
     void addCalleeSavedRegUse(const class MirRegisterRef &reg);
-
+    
     /**
      * Updates the entry basic block pointer without inserting it into the block list.
      */

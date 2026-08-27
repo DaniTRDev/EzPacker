@@ -128,7 +128,8 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInte
 }
 
 /**
- * Constructs a base-plus-displacement memory operand converting an immediate FlexInt offset to a 64-bit integer operand.
+ * Constructs a base-plus-displacement memory operand converting an immediate FlexInt offset to a 64-bit integer
+ * operand.
  */
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const FlexInt &displ, SourceReference *ref)
 {
@@ -149,9 +150,10 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const F
  * Allocates and registers a new virtual SSA register operand with a unique MIR ID.
  */
 MirRegister *
-MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReference *ref, MirRegisterClass *_class)
+MirOperandBuilder::buildVReg(MirType *type, std::string_view name, SourceReference *ref, MirRegisterClass *_class)
 {
-    MirRegister *reg = build<MirRegister>(type, true, m_ctx->createId(), ref, _class, name);
+    std::pmr::string pmrName(name, m_allocator);
+    MirRegister *reg = build<MirRegister>(type, true, m_ctx->createId(), ref, _class, std::move(pmrName));
     m_ctx->appendRegister(reg);
 
     return reg;
@@ -161,9 +163,10 @@ MirOperandBuilder::buildVReg(MirType *type, std::pmr::string name, SourceReferen
  * Allocates a physical hardware register operand bound to a physical register ID and register class.
  */
 MirRegister *MirOperandBuilder::buildPhysReg(
-        MirType *type, MirPhysicalRegId physId, std::pmr::string name, MirRegisterClass *_class, SourceReference *ref)
+        MirType *type, MirPhysicalRegId physId, std::string_view name, MirRegisterClass *_class, SourceReference *ref)
 {
-    return build<MirRegister>(type, false, physId, ref, _class, name);
+    std::pmr::string pmrName(name, m_allocator);
+    return build<MirRegister>(type, false, physId, ref, _class, std::move(pmrName));
 }
 
 /**
