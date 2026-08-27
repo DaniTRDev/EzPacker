@@ -138,18 +138,14 @@ struct InstructionLegalizeDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = Common::Keyword<"action">::rule >>
-            (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<LegalizationClause> + dsl::lit_c<';'>) +
-             dsl::opt(dsl::lit_c<';'>));
+            (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<LegalizationClause> + dsl::lit_c<';'>)) >>
+            dsl::lit_c<';'>;
 
     static constexpr auto value =
             Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause>> >>
             lexy::callback<Ast::LegalizeActionDef::InstructionLegalizeDecl>(
                     [](Ast::Common::Identifier name,
                        std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause> actions)
-                    { return Ast::LegalizeActionDef::InstructionLegalizeDecl{ std::move(name), std::move(actions) }; },
-                    [](Ast::Common::Identifier name,
-                       std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause> actions,
-                       lexy::nullopt)
                     { return Ast::LegalizeActionDef::InstructionLegalizeDecl{ std::move(name), std::move(actions) }; });
 };
 
