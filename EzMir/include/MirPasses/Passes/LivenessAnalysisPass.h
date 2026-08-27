@@ -67,16 +67,11 @@ class LivenessAnalysisPass : public IMirAnalysisPass
 
   private:
     /**
-     * Iteratively solves the backward dataflow equations:
+     * Solves backward dataflow equations using sparse bitsets for cross-block registers:
      * LiveIn[B] = Use[B] U (LiveOut[B] - Def[B])
      * LiveOut[B] = U { LiveIn[S] for S in Successors(B) }
      */
-    void computeGlobalLiveness(const class MirFunction *func, class CodeFlowResult *cfg);
-
-    /**
-     * Computes the local Def and Use register sets for all basic blocks within the function.
-     */
-    void computeLocalLiveness(const class MirFunction *func);
+    void computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
 
   private:
     LivenessResult m_result;

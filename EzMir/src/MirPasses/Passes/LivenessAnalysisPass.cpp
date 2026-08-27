@@ -1,18 +1,21 @@
+#include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
+#include "Function/MirFunctionRegisterInfo.h"
 #include "Instruction/MirInstruction.h"
-#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
-#include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "Printer/MirPrinter.h"
+
+#include <vector>
 
 std::string printMirRegMap(MirBuilderContext *ctx,
                            const std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> &map)
 {
     std::string res;
-    for (auto &[blockId, defs] : map)
+    for (const auto &[blockId, defs] : map)
     {
         res += MirPrinter::printToString(ctx->getBlockById(blockId), MirPrinterDetail::General);
 
@@ -22,7 +25,7 @@ std::string printMirRegMap(MirBuilderContext *ctx,
         }
         else
         {
-            for (auto &def : defs)
+            for (const auto &def : defs)
             {
                 res += "\t" + MirPrinter::printToString(def) + "\n";
             }
@@ -43,42 +46,6 @@ LivenessResult *LivenessAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace LivenessAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
-                                        class MirPassManager *passManager)
-{
-    const MirFunction *func = *it;
-    auto diag = passManager->getDiagCollector();
-    diag->trace(getName(), "Analyzing register liveness spans for function: '{}'", func->getName());
-
-    // Recover the pre-computed Control Flow Graph directly from the Pass Manager cache
-    auto cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
-
-    // Initialize and extract block-local Gen (Use) and Kill (Def) sets
-    computeLocalLiveness(func);
-
-    // Solve global fixed-point backward equations across our CFG topology paths
-    computeGlobalLiveness(func, cfg);
-
-    return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
-}
-
-void LivenessAnalysisPass::printResult()
-{
-    auto diag = m_ctx->getDiagCollector();
-
-    // Guard against running expensive map stringification if trace logging is off
-    if (!diag->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
-        return;
-
-    const auto res = getResult();
-
-    auto log = diag->trace(getName(), "Final Liveness Analysis");
-    log.appendNote("Def\n{}", printMirRegMap(m_ctx, res->m_def));
-    log.appendNote("Use\n{}", printMirRegMap(m_ctx, res->m_use));
-    log.appendNote("LiveIn\n{}", printMirRegMap(m_ctx, res->m_liveIn));
-    log.appendNote("LiveOut\n{}", printMirRegMap(m_ctx, res->m_liveOut));
-}
-
 void LivenessAnalysisPass::reset()
 {
     m_result.m_def.clear();
@@ -87,157 +54,251 @@ void LivenessAnalysisPass::reset()
     m_result.m_liveOut.clear();
 }
 
-void LivenessAnalysisPass::computeGlobalLiveness(const MirFunction *func, CodeFlowResult *cfg)
+MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
+                                        MirPassManager *passManager)
 {
-    m_ctx->getDiagCollector()->trace(getName(),
-                                     "Analyzing global variable generation rules (live IN / OUT calculation)...");
+    MirFunction *func = *it;
 
+    auto *cfgPass = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx);
+    auto *cfg = cfgPass->getResult();
+
+    reset();
+    computeGlobalLiveness(func, cfg);
+
+    return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
+}
+
+void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResult *cfg)
+{
     const auto &blocks = func->getBlocks();
-
-    // 1. Build a dense mapping for all unique registers referenced in this function
-    std::vector<MirRegisterRef> regUniverse;
-    std::unordered_map<MirRegisterRef, size_t> regToIdx;
-
-    for (auto block : blocks)
-    {
-        size_t blockId = block->getId();
-        for (const auto &reg : m_result.m_def[blockId])
-        {
-            if (regToIdx.emplace(reg, regUniverse.size()).second)
-                regUniverse.push_back(reg);
-        }
-        for (const auto &reg : m_result.m_use[blockId])
-        {
-            if (regToIdx.emplace(reg, regUniverse.size()).second)
-                regUniverse.push_back(reg);
-        }
-    }
-
-    if (regUniverse.empty())
+    const size_t numBlocks = blocks.size();
+    if (numBlocks == 0)
         return;
 
-    size_t numBits = regUniverse.size();
+    // -------------------------------------------------------------------------
+    // 1. Assign Contiguous [0, numBlocks) Indices to Basic Blocks
+    // -------------------------------------------------------------------------
+    std::pmr::vector<const MirBlock *> blockList(m_arena);
+    blockList.reserve(numBlocks);
 
-    // 2. Pre-allocate bitsets for all blocks (0 allocations during fixed-point loop)
-    std::unordered_map<size_t, DenseBitSet> defBits;
-    std::unordered_map<size_t, DenseBitSet> useBits;
-    std::unordered_map<size_t, DenseBitSet> liveInBits;
-    std::unordered_map<size_t, DenseBitSet> liveOutBits;
+    std::pmr::unordered_map<MirId, uint32_t> blockIdToDenseIdx(numBlocks * 2, m_arena);
 
-    for (auto block : blocks)
+    uint32_t bIdx = 0;
+    for (const MirBlock *block : blocks)
     {
-        size_t blockId = block->getId();
-        defBits.emplace(blockId, DenseBitSet(numBits));
-        useBits.emplace(blockId, DenseBitSet(numBits));
-        liveInBits.emplace(blockId, DenseBitSet(numBits));
-        liveOutBits.emplace(blockId, DenseBitSet(numBits));
+        blockList.push_back(block);
+        blockIdToDenseIdx.emplace(block->getId(), bIdx++);
 
-        for (const auto &reg : m_result.m_def[blockId])
-            defBits[blockId].set(regToIdx[reg]);
-
-        for (const auto &reg : m_result.m_use[blockId])
-            useBits[blockId].set(regToIdx[reg]);
+        MirId bId = block->getId();
+        m_result.m_def.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
+        m_result.m_use.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
+        m_result.m_liveIn.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
+        m_result.m_liveOut.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
     }
 
-    bool changed = true;
-    size_t iterations = 0;
+    const auto *regInfo = func->getRegisterInfo();
 
-    // 3. Fixed-point solver loop using word-level bitwise operations
-    while (changed)
+    // -------------------------------------------------------------------------
+    // 2. Compute Exact Block-Local Def / Use Sets (Upward Exposed Uses)
+    // -------------------------------------------------------------------------
+    for (size_t i = 0; i < numBlocks; ++i)
     {
-        changed = false;
-        iterations++;
+        const MirBlock *block = blockList[i];
+        MirId blockId = block->getId();
+        auto &defSet = m_result.m_def[blockId];
+        auto &useSet = m_result.m_use[blockId];
 
-        // Walk basic blocks BACKWARD to converge faster
-        for (auto blockIt = blocks.rbegin(); blockIt != blocks.rend(); ++blockIt)
+        for (const MirInstruction *instr : block->getInstructions())
         {
-            MirBlock *block = *blockIt;
-            size_t blockId = block->getId();
-
-            auto &liveOut = liveOutBits[blockId];
-            auto &liveIn = liveInBits[blockId];
-
-            // Equation 1: LiveOut[B] = Union of LiveIn[S] for all Successors S
-            if (cfg->m_successors.contains(blockId))
+            // Upward-exposed use: register read before defined in this block
+            for (const auto &reg : instr->getUsedRegisters())
             {
-                for (size_t succ : cfg->m_successors.at(blockId))
+                if (!defSet.contains(reg))
+                    useSet.insert(reg);
+            }
+
+            // Defs kill upward uses for subsequent instructions
+            for (const auto &reg : instr->getDefinedRegisters())
+            {
+                defSet.insert(reg);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Build Global Register Universe
+    // -------------------------------------------------------------------------
+    std::pmr::vector<MirRegisterRef> globalRegUniverse(m_arena);
+    std::pmr::unordered_map<MirRegisterRef, uint32_t> globalRegToIdx(m_arena);
+
+    auto getOrAddGlobalReg = [&](const MirRegisterRef &reg) -> uint32_t
+    {
+        auto [it, inserted] = globalRegToIdx.emplace(reg, static_cast<uint32_t>(globalRegUniverse.size()));
+        if (inserted)
+            globalRegUniverse.push_back(reg);
+        return it->second;
+    };
+
+    // Upward-exposed uses are live-in across block boundaries
+    for (size_t i = 0; i < numBlocks; ++i)
+    {
+        MirId blockId = blockList[i]->getId();
+        for (const auto &reg : m_result.m_use[blockId])
+        {
+            getOrAddGlobalReg(reg);
+        }
+    }
+
+    // Registers defined in one block and used in another
+    if (regInfo)
+    {
+        for (size_t i = 0; i < numBlocks; ++i)
+        {
+            MirId blockId = blockList[i]->getId();
+            for (const auto &reg : m_result.m_def[blockId])
+            {
+                if (!reg.isVirtual())
                 {
-                    if (liveInBits.contains(succ))
+                    getOrAddGlobalReg(reg);
+                    continue;
+                }
+
+                auto usesOpt = regInfo->getUses(reg.getId());
+                if (usesOpt && !usesOpt->empty())
+                {
+                    for (const auto &use : *usesOpt)
                     {
-                        if (liveOut.unionWith(liveInBits.at(succ)))
+                        if (use.m_userInst && use.m_userInst->getOwner() != blockList[i])
                         {
-                            changed = true;
+                            getOrAddGlobalReg(reg);
+                            break;
                         }
                     }
                 }
             }
+        }
+    }
 
-            // Equation 2: LiveIn[B] = Use[B] Union (LiveOut[B] Except Def[B])
-            if (liveIn.computeLiveIn(useBits[blockId], liveOut, defBits[blockId]))
+    const size_t numGlobalBits = globalRegUniverse.size();
+    if (numGlobalBits == 0)
+        return;
+
+    // -------------------------------------------------------------------------
+    // 4. Populate Compact Global Def/Use BitSets
+    // -------------------------------------------------------------------------
+    std::pmr::vector<DenseBitSet> globalDefBits(m_arena);
+    std::pmr::vector<DenseBitSet> globalUseBits(m_arena);
+    std::pmr::vector<DenseBitSet> globalLiveInBits(m_arena);
+    std::pmr::vector<DenseBitSet> globalLiveOutBits(m_arena);
+
+    globalDefBits.reserve(numBlocks);
+    globalUseBits.reserve(numBlocks);
+    globalLiveInBits.reserve(numBlocks);
+    globalLiveOutBits.reserve(numBlocks);
+
+    for (size_t i = 0; i < numBlocks; ++i)
+    {
+        globalDefBits.emplace_back(numGlobalBits);
+        globalUseBits.emplace_back(numGlobalBits);
+        globalLiveInBits.emplace_back(numGlobalBits);
+        globalLiveOutBits.emplace_back(numGlobalBits);
+
+        MirId blockId = blockList[i]->getId();
+
+        for (const auto &reg : m_result.m_def[blockId])
+        {
+            auto it = globalRegToIdx.find(reg);
+            if (it != globalRegToIdx.end())
+                globalDefBits[i].set(it->second);
+        }
+
+        for (const auto &reg : m_result.m_use[blockId])
+        {
+            auto it = globalRegToIdx.find(reg);
+            if (it != globalRegToIdx.end())
+                globalUseBits[i].set(it->second);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Flatten CFG Successor Indices
+    // -------------------------------------------------------------------------
+    std::pmr::vector<std::pmr::vector<uint32_t>> denseSuccessors(numBlocks, m_arena);
+    for (size_t i = 0; i < numBlocks; ++i)
+    {
+        MirId blockId = blockList[i]->getId();
+
+        auto it = cfg->m_successors.find(blockId);
+        if (it != cfg->m_successors.end())
+        {
+            denseSuccessors[i].reserve(it->second.size());
+            for (MirId succId : it->second)
             {
-                changed = true;
+                auto succIt = blockIdToDenseIdx.find(succId);
+                if (succIt != blockIdToDenseIdx.end())
+                    denseSuccessors[i].push_back(succIt->second);
             }
         }
     }
 
-    // 4. Materialize final bitsets into m_result once
-    for (auto block : blocks)
+    // -------------------------------------------------------------------------
+    // 6. Fixed-Point Solver Loop (Backwards CFG Iteration)
+    // -------------------------------------------------------------------------
+    bool changed = true;
+    while (changed)
     {
-        size_t blockId = block->getId();
-        auto &liveInSet = m_result.m_liveIn[blockId];
-        auto &liveOutSet = m_result.m_liveOut[blockId];
+        changed = false;
 
-        liveInSet.clear();
-        liveOutSet.clear();
+        for (int64_t i = static_cast<int64_t>(numBlocks) - 1; i >= 0; --i)
+        {
+            auto &liveOut = globalLiveOutBits[i];
+            auto &liveIn = globalLiveInBits[i];
 
-        const auto &inBits = liveInBits[blockId];
-        const auto &outBits = liveOutBits[blockId];
+            // LiveOut[B] = Union of LiveIn[S] for all Successors S
+            for (uint32_t succIdx : denseSuccessors[i])
+            {
+                if (liveOut.unionWith(globalLiveInBits[succIdx]))
+                    changed = true;
+            }
 
-        for (size_t bit = 0; bit < regUniverse.size(); ++bit)
+            // LiveIn[B] = Use[B] | (LiveOut[B] & ~Def[B])
+            if (liveIn.computeLiveIn(globalUseBits[i], liveOut, globalDefBits[i]))
+                changed = true;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. Materialize Global LiveIn / LiveOut Sets
+    // -------------------------------------------------------------------------
+    for (size_t i = 0; i < numBlocks; ++i)
+    {
+        MirId blockId = blockList[i]->getId();
+        auto &inSet = m_result.m_liveIn[blockId];
+        auto &outSet = m_result.m_liveOut[blockId];
+
+        const auto &inBits = globalLiveInBits[i];
+        const auto &outBits = globalLiveOutBits[i];
+
+        for (size_t bit = 0; bit < numGlobalBits; ++bit)
         {
             if (inBits.test(bit))
-                liveInSet.insert(regUniverse[bit]);
+                inSet.insert(globalRegUniverse[bit]);
             if (outBits.test(bit))
-                liveOutSet.insert(regUniverse[bit]);
+                outSet.insert(globalRegUniverse[bit]);
         }
     }
 }
 
-void LivenessAnalysisPass::computeLocalLiveness(const MirFunction *func)
+void LivenessAnalysisPass::printResult()
 {
-    m_ctx->getDiagCollector()->trace(getName(),
-                                     "Analyzing block-local variable generation rules (USE / DEF calculation)...");
+    auto *diag = m_ctx->getDiagCollector();
+    if (!diag->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+        return;
 
-    for (const MirBlock *block : func->getBlocks())
-    {
-        size_t blockId = block->getId();
-        m_result.m_def[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
-        m_result.m_use[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
-        m_result.m_liveIn[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
-        m_result.m_liveOut[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
-
-        auto &defs = m_result.m_def[blockId];
-        auto &uses = m_result.m_use[blockId];
-
-        for (const MirInstruction *instr : block->getInstructions())
-        {
-            const auto &localDefs = instr->getDefinedRegisters();
-            const auto &localUses = instr->getUsedRegisters();
-
-            // Any register used before being defined in this block belongs in 'uses' (Gen)
-            for (const auto &regRef : localUses)
-            {
-                if (!defs.contains(regRef))
-                {
-                    uses.insert(regRef);
-                }
-            }
-
-            // Any register defined in this block belongs in 'defs' (Kill)
-            for (const auto &regRef : localDefs)
-            {
-                defs.insert(regRef);
-            }
-        }
-    }
+    const auto *res = getResult();
+    auto log = diag->trace(getName(), "Final Liveness Analysis");
+    log.appendNote("Def\n{}", printMirRegMap(m_ctx, res->m_def));
+    log.appendNote("Use\n{}", printMirRegMap(m_ctx, res->m_use));
+    log.appendNote("LiveIn\n{}", printMirRegMap(m_ctx, res->m_liveIn));
+    log.appendNote("LiveOut\n{}", printMirRegMap(m_ctx, res->m_liveOut));
 }

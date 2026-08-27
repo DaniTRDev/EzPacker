@@ -2,10 +2,38 @@
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionRegisterInfo.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionSet.h"
-#include "Operand/MirOperand.h"
+#include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
+
+MirFunctionRegisterInfo *getRegInfo(MirInstruction *instr)
+{
+    MirBlock *block = instr->getOwner();
+    if (block && block->getOwner())
+    {
+        return block->getOwner()->getRegisterInfo();
+    }
+    return nullptr;
+}
+
+static void forEachVReg(MirOperand *op, auto &&callback)
+{
+    if (!op)
+        return;
+    if (auto *reg = op->get<MirRegister>())
+    {
+        if (reg->isVirtual())
+            callback(reg->getRegId());
+    }
+    else if (auto *mem = op->get<MirMemory>())
+    {
+        if (mem->getBase() && mem->getBase()->isVirtual())
+            callback(mem->getBase()->getRegId());
+    }
+}
 
 /**
  * Initializes the instruction builder with parent context and insertion cursor.
@@ -24,6 +52,220 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
                                              IntrusiveLinkedList<MirInstruction>::iterator it) :
     m_ctx(ctx), m_insertionPoint(MirInstructionInsertionPoint{ .m_type = type, .m_block = block, .m_iterator = it })
 {
+}
+
+/**
+ * Builds an instruction from opcode, source reference, and initializer_list of operands.
+ */
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
+                                             SourceReference *ref,
+                                             const std::initializer_list<MirOperand *> &operands)
+{
+    MirInstruction *instr = createInstruction(opcode, ref);
+    for (MirOperand *op : operands)
+    {
+        addOperand(instr, op);
+    }
+
+    finalizeInstruction(instr, ref);
+    return instr;
+}
+
+/**
+ * Builds an instruction from opcode, source reference, and std::vector of operands.
+ */
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
+                                             SourceReference *ref,
+                                             const std::vector<MirOperand *> &operands)
+{
+    MirInstruction *instr = createInstruction(opcode, ref);
+    for (MirOperand *op : operands)
+    {
+        addOperand(instr, op);
+    }
+
+    finalizeInstruction(instr, ref);
+    return instr;
+}
+
+/**
+ * Builds an instruction from opcode, source reference, and PMR vector of operands.
+ */
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
+                                             SourceReference *ref,
+                                             const std::pmr::vector<MirOperand *> &operands)
+{
+    MirInstruction *instr = createInstruction(opcode, ref);
+
+    for (MirOperand *op : operands)
+    {
+        addOperand(instr, op);
+    }
+
+    finalizeInstruction(instr, ref);
+    return instr;
+}
+
+/**
+ * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
+ */
+MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
+                                                   SourceReference *srcRef,
+                                                   std::initializer_list<MirOperand *> operands)
+{
+    MirInstruction *instr = build(MirInstructionOpCode::TARGET_INST, srcRef, operands);
+    if (instr)
+    {
+        instr->setTargetDesc(targetDesc);
+    }
+    return instr;
+}
+
+/**
+ * Stream operator overload for chaining and appending operands to the active instruction.
+ */
+MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
+{
+    if (!isBuilt() || !operand)
+    {
+        throw std::runtime_error("Internal Compiler Error: The instruction is not built or the operand is not valid");
+    }
+
+    m_ctx->getDiagCollector()->trace("MirInstructionBuilder",
+                                     "Appended operand to inst: {}",
+                                     MirPrinter::printToString(operand))
+            << operand->getSourceRef();
+
+    addOperand(getBuiltObj(), operand);
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::addOperand(MirInstruction *instr, MirOperand *operand)
+{
+    auto &operands = instr->m_operands;
+    operands.push_back(operand);
+    registerOperand(instr, operand, operands.size() - 1);
+
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::addOperandFront(MirInstruction *instr, MirOperand *operand)
+{
+    for (size_t i = 0; i < instr->m_operands.size(); ++i)
+    {
+        unregisterOperand(instr, instr->m_operands[i], i);
+    }
+
+    instr->m_operands.insert(instr->m_operands.begin(), operand);
+
+    // Re-register with shifted indices
+    for (size_t i = 0; i < instr->m_operands.size(); ++i)
+    {
+        registerOperand(instr, instr->m_operands[i], i);
+    }
+
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::clearOperands(MirInstruction *instr)
+{
+    // Unregister all defs and uses
+    for (size_t i = 0; i < instr->m_operands.size(); ++i)
+    {
+        unregisterOperand(instr, instr->m_operands[i], i);
+    }
+
+    instr->m_operands.clear();
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::clearOperand(MirInstruction *instr, size_t pos)
+{
+    auto &operands = instr->m_operands;
+    if (pos >= operands.size())
+    {
+        return *this;
+    }
+
+    for (size_t i = pos; i < operands.size(); ++i)
+    {
+        unregisterOperand(instr, operands[i], i);
+    }
+
+    operands.erase(operands.begin() + pos);
+
+    // Re-register remaining shifted elements
+    for (size_t i = pos; i < operands.size(); ++i)
+    {
+        registerOperand(instr, operands[i], i);
+    }
+
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
+{
+    for (size_t i = 0; i < instr->m_operands.size(); ++i)
+    {
+        unregisterOperand(instr, instr->m_operands[i], i);
+    }
+
+    auto owner = instr->getOwner();
+    if (owner)
+    {
+        owner->m_instructions.remove(instr);
+    }
+
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index)
+{
+    auto &operands = instr->m_operands;
+
+    if (index >= operands.size())
+    {
+        return *this;
+    }
+
+    unregisterOperand(instr, operands[index], index);
+    operands[index] = newOperand;
+    registerOperand(instr, newOperand, index);
+
+    return *this;
+}
+
+/**
+ * Modifies the insertion mode (Append, InsertBefore, InsertAfter) of the active insertion point.
+ */
+void MirInstructionBuilder::changeInsertionType(InsertionType type) { m_insertionPoint.m_type = type; }
+
+/**
+ * Sets the insertion point structure.
+ */
+void MirInstructionBuilder::setInsertionPoint(MirInstructionInsertionPoint insertionPoint)
+{
+    m_insertionPoint = std::move(insertionPoint);
+}
+
+/**
+ * Configures the insertion point with target block, insertion mode, and list iterator.
+ */
+void MirInstructionBuilder::setInsertionPoint(MirBlock *block,
+                                              InsertionType type,
+                                              IntrusiveLinkedList<MirInstruction>::iterator it)
+{
+    m_insertionPoint = MirInstructionInsertionPoint{ .m_type = type, .m_block = block, .m_iterator = it };
+}
+
+MirFunctionRegisterInfo *MirInstructionBuilder::getRegInfo(MirInstruction *instr) const
+{
+    MirBlock *block = (instr && instr->getOwner()) ? instr->getOwner() : m_insertionPoint.m_block;
+    if (block && block->getOwner())
+    {
+        return block->getOwner()->getRegisterInfo();
+    }
+    return nullptr;
 }
 
 /**
@@ -90,162 +332,38 @@ void MirInstructionBuilder::finalizeInstruction(MirInstruction *instr, SourceRef
     setBuildResult(instr);
 }
 
-/**
- * Builds an instruction from opcode, source reference, and initializer_list of operands.
- */
-MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
-                                             SourceReference *ref,
-                                             const std::initializer_list<MirOperand *> &operands)
+void MirInstructionBuilder::registerOperand(MirInstruction *instr, MirOperand *op, size_t index)
 {
-    MirInstruction *instr = createInstruction(opcode, ref);
-    for (MirOperand *op : operands)
-    {
-        instr->addOperand(op);
-    }
+    auto *regInfo = getRegInfo(instr);
+    if (!regInfo || !op)
+        return;
 
-    finalizeInstruction(instr, ref);
-    return instr;
+    MirOperandFlag flag = instr->getOperandFlag(index);
+    forEachVReg(op,
+                [&](MirId vregId)
+                {
+                    if (flag & MirOperandFlag::Write)
+                        regInfo->recordDef(vregId, instr);
+
+                    if (flag & MirOperandFlag::Read)
+                        regInfo->recordUse(vregId, instr, index);
+                });
 }
 
-/**
- * Builds an instruction from opcode, source reference, and std::vector of operands.
- */
-MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
-                                             SourceReference *ref,
-                                             const std::vector<MirOperand *> &operands)
+void MirInstructionBuilder::unregisterOperand(MirInstruction *instr, MirOperand *op, size_t index)
 {
-    MirInstruction *instr = createInstruction(opcode, ref);
-    for (MirOperand *op : operands)
-    {
-        instr->addOperand(op);
-    }
+    auto *regInfo = getRegInfo(instr);
+    if (!regInfo || !op)
+        return;
 
-    finalizeInstruction(instr, ref);
-    return instr;
-}
+    MirOperandFlag flag = instr->getOperandFlag(index);
+    forEachVReg(op,
+                [&](MirId vregId)
+                {
+                    if (flag & MirOperandFlag::Write)
+                        regInfo->clearDef(vregId);
 
-/**
- * Builds an instruction from opcode, source reference, and PMR vector of operands.
- */
-MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
-                                             SourceReference *ref,
-                                             const std::pmr::vector<MirOperand *> &operands)
-{
-    MirInstruction *instr = createInstruction(opcode, ref);
-
-    if (!operands.empty())
-    {
-        instr->setOperands(operands);
-    }
-
-    finalizeInstruction(instr, ref);
-    return instr;
-}
-
-/**
- * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
- */
-MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
-                                                   SourceReference *srcRef,
-                                                   std::initializer_list<MirOperand *> operands)
-{
-    MirInstruction *instr = build(MirInstructionOpCode::TARGET_INST, srcRef, operands);
-    if (instr)
-    {
-        instr->setTargetDesc(targetDesc);
-    }
-    return instr;
-}
-
-/**
- * Stream operator overload for chaining and appending operands to the active instruction.
- */
-MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
-{
-    if (!isBuilt() || !operand)
-    {
-        throw std::runtime_error("Internal Compiler Error: The instruction is not built or the operand is not valid");
-    }
-
-    m_ctx->getDiagCollector()->trace("MirInstructionBuilder",
-                                     "Appended operand to inst: {}",
-                                     MirPrinter::printToString(operand))
-            << operand->getSourceRef();
-
-    getBuiltObj()->addOperand(operand);
-    return *this;
-}
-
-MirInstructionBuilder &MirInstructionBuilder::addOperand(MirInstruction *instr, MirOperand *operand)
-{
-    instr->addOperand(operand);
-    return *this;
-}
-
-MirInstructionBuilder &MirInstructionBuilder::addOperandFront(MirInstruction *instr, MirOperand *operand)
-{
-    instr->m_operands.insert(instr->m_operands.begin(), operand);
-    return *this;
-}
-
-MirInstructionBuilder &MirInstructionBuilder::clearOperands(MirInstruction *instr)
-{
-    instr->m_operands.clear();
-    return *this;
-}
-
-MirInstructionBuilder &MirInstructionBuilder::clearOperand(MirInstruction *instr, size_t pos)
-{
-    auto &operands = instr->m_operands;
-    if (pos >= operands.size())
-    {
-        return *this;
-    }
-
-    operands.erase(operands.begin() + pos);
-    return *this;
-}
-
-MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
-{
-    auto owner = instr->getOwner();
-    owner->m_instructions.remove(instr);
-
-    return *this;
-}
-
-MirInstructionBuilder &MirInstructionBuilder::swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index)
-{
-    auto &operands = instr->m_operands;
-
-    if (index >= operands.size())
-    {
-        return *this;
-    }
-
-    operands[index] = newOperand;
-    return *this;
-}
-
-/**
- * Modifies the insertion mode (Append, InsertBefore, InsertAfter) of the active insertion point.
- */
-void MirInstructionBuilder::changeInsertionType(InsertionType type) { m_insertionPoint.m_type = type; }
-
-/**
- * Sets the insertion point structure.
- */
-void MirInstructionBuilder::setInsertionPoint(MirInstructionInsertionPoint insertionPoint)
-{
-    m_insertionPoint = std::move(insertionPoint);
-}
-
-/**
- * Configures the insertion point with target block, insertion mode, and list iterator.
- */
-void MirInstructionBuilder::setInsertionPoint(MirBlock *block,
-                                              InsertionType type,
-                                              IntrusiveLinkedList<MirInstruction>::iterator it)
-{
-    m_insertionPoint = MirInstructionInsertionPoint{ .m_type = type, .m_block = block, .m_iterator = it };
+                    if (flag & MirOperandFlag::Read)
+                        regInfo->removeUse(vregId, instr);
+                });
 }

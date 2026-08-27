@@ -160,6 +160,12 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
 
   private:
     /**
+     * Returns the register info of the instruction either by getting the instr owners or using the owner of the linked
+     * block.
+     */
+    class MirFunctionRegisterInfo *getRegInfo(MirInstruction *instr) const;
+
+    /**
      * Allocates an unlinked MirInstruction instance in the arena allocator.
      */
     MirInstruction *createInstruction(MirInstructionOpCode opcode, SourceReference *ref);
@@ -168,6 +174,16 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
      * Logs diagnostic trace and splices the instruction into the basic block intrusive list.
      */
     void finalizeInstruction(MirInstruction *instr, SourceReference *ref);
+
+    /**
+     * Register the operand in the register information of the owning func.
+     */
+    void registerOperand(MirInstruction *instr, MirOperand *op, size_t index);
+
+    /**
+     * Unregisters the operand in the register information of the owning func.
+     */
+    void unregisterOperand(MirInstruction *instr, MirOperand *op, size_t index);
 
   private:
     /**

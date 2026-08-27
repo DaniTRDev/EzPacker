@@ -297,19 +297,9 @@ std::string MirInstruction::toString() const
 }
 
 /**
- * Appends a new operand to the instruction's operand list.
- */
-void MirInstruction::addOperand(MirOperand *operand) { m_operands.push_back(operand); }
-
-/**
  * Updates the instruction's opcode.
  */
 void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
-
-/**
- * Replaces the instruction's operand list.
- */
-void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands) { m_operands = operands; }
 
 /**
  * Attaches a target machine instruction descriptor.

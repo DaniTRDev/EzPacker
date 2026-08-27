@@ -2,6 +2,7 @@
 #define EZMIR_MIR_FUNCTION_H
 
 #include "EzMirCommon.h"
+#include "MirFunctionRegisterInfo.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
 
 /**
@@ -89,6 +90,11 @@ class MirFunction
     MirFunctionAnalysisData *getAnalysisData();
 
     /**
+     * Returns the register info holder for this function.
+     */
+    MirFunctionRegisterInfo *getRegisterInfo();
+
+    /**
      * Returns the stack frame layout descriptor for this function.
      */
     class MirFunctionStackFrame *getStackFrame() const;
@@ -148,7 +154,7 @@ class MirFunction
      * Records a callee-saved register consumed by this function requiring prologue preservation.
      */
     void addCalleeSavedRegUse(const class MirRegisterRef &reg);
-    
+
     /**
      * Updates the entry basic block pointer without inserting it into the block list.
      */
@@ -169,8 +175,8 @@ class MirFunction
     class MirBlock *m_entryPoint;
     MirFunction *m_next{ nullptr };
     MirFunction *m_prev{ nullptr };
-
     MirFunctionAnalysisData m_analysisData;
+    MirFunctionRegisterInfo m_regInfo;
     class MirFunctionStackFrame *m_stackFrame;
     class MirType *m_returnType;
     class MirType *m_type;

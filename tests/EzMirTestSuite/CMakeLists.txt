@@ -58,6 +58,13 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
+        "T_MirFunctionRegisterInfo"
+        "EzMirTestSuite"
+        ""
+        "tests/T_MirFunctionRegisterInfo.cpp"
+)
+
+EzPacker_AddTest(
         "T_NonSsaToSsa"
         "EzMirTestSuite"
         ""

@@ -168,11 +168,6 @@ class MirInstruction
 
   private:
     /**
-     * Appends an operand to the end of the operand list.
-     */
-    void addOperand(MirOperand *operand);
-
-    /**
      * Updates the opcode of this instruction.
      */
     void setOpcode(MirInstructionOpCode opcode);
@@ -181,12 +176,7 @@ class MirInstruction
      * Associates a target machine instruction descriptor for lowered instructions.
      */
     void setTargetDesc(MirTargetInstructionDesc *desc);
-
-    /**
-     * Replaces the entire operand list of this instruction.
-     */
-    void setOperands(const std::pmr::vector<class MirOperand *> &operands);
-
+    
     /**
      * Sets the preceding instruction in the block's intrusive list.
      */

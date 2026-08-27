@@ -14,9 +14,9 @@ MirFunction::MirFunction(CallingConvDesc *callingConv,
                          SourceReference *sourceRef,
                          std::pmr::string name,
                          std::pmr::memory_resource *alloc) :
-    m_callingConv(callingConv), m_entryPoint(nullptr), m_stackFrame(stackFrame), m_returnType(returnType), m_type(type),
-    m_id(id), m_sourceRef(sourceRef), m_parameters(alloc), m_blockIdToBlock(alloc), m_name(std::move(name)),
-    m_usedCalleeSavedRegs(alloc)
+    m_callingConv(callingConv), m_entryPoint(nullptr), m_regInfo(alloc), m_stackFrame(stackFrame),
+    m_returnType(returnType), m_type(type), m_id(id), m_sourceRef(sourceRef), m_parameters(alloc),
+    m_blockIdToBlock(alloc), m_name(std::move(name)), m_usedCalleeSavedRegs(alloc)
 {
 }
 
@@ -44,6 +44,8 @@ MirFunction *MirFunction::getPrev() const { return m_prev; }
 MirFunction *MirFunction::getNext() const { return m_next; }
 
 MirFunctionAnalysisData *MirFunction::getAnalysisData() { return &m_analysisData; }
+
+MirFunctionRegisterInfo *MirFunction::getRegisterInfo() { return &m_regInfo; }
 
 MirFunctionStackFrame *MirFunction::getStackFrame() const { return m_stackFrame; }
 
