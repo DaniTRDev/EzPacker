@@ -55,7 +55,7 @@ void MirInstructionBuilder::finalizeInstruction(MirInstruction *instr, SourceRef
 
     if (m_insertionPoint.m_block)
     {
-        auto &instructions = m_insertionPoint.m_block->getInstructions();
+        auto &instructions = m_insertionPoint.m_block->m_instructions;
 
         switch (m_insertionPoint.m_type)
         {
@@ -173,6 +173,57 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
             << operand->getSourceRef();
 
     getBuiltObj()->addOperand(operand);
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::addOperand(MirInstruction *instr, MirOperand *operand)
+{
+    instr->addOperand(operand);
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::addOperandFront(MirInstruction *instr, MirOperand *operand)
+{
+    instr->m_operands.insert(instr->m_operands.begin(), operand);
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::clearOperands(MirInstruction *instr)
+{
+    instr->m_operands.clear();
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::clearOperand(MirInstruction *instr, size_t pos)
+{
+    auto &operands = instr->m_operands;
+    if (pos >= operands.size())
+    {
+        return *this;
+    }
+
+    operands.erase(operands.begin() + pos);
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
+{
+    auto owner = instr->getOwner();
+    owner->m_instructions.remove(instr);
+
+    return *this;
+}
+
+MirInstructionBuilder &MirInstructionBuilder::swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index)
+{
+    auto &operands = instr->m_operands;
+
+    if (index >= operands.size())
+    {
+        return *this;
+    }
+
+    operands[index] = newOperand;
     return *this;
 }
 

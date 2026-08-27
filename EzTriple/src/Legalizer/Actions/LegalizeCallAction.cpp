@@ -30,7 +30,8 @@ LegalizationResult LegalizeCall(LegalizeCtx &ctx)
     MirOperandBuilder opBuilder(builderCtx);
 
     bool firstBeforeInserted = false;
-    auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops) {
+    auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
+    {
         beforeBuilder.build(opc, instr->getSourceRef(), ops);
         if (!firstBeforeInserted)
         {
@@ -98,12 +99,8 @@ LegalizationResult LegalizeCall(LegalizeCtx &ctx)
         afterBuilder.build(MirInstructionOpCode::POP_RET, instr->getSourceRef(), { callToken, returnDest });
     }
 
-    operands.clear();
-    operands.push_back(callToken);
-    operands.push_back(callee);
-
+    beforeBuilder.clearOperands(instr).addOperand(instr, callToken).addOperand(instr, callee);
     return LegalizationResult::Legalized;
 }
 
 } // namespace LegalizeActions
-

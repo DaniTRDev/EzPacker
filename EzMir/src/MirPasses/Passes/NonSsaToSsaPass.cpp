@@ -19,9 +19,7 @@ const char *NonSsaToSsaPass::getName() const { return "NonSsaToSsaPass"; }
 
 MirPassIterationPlace NonSsaToSsaPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult NonSsaToSsaPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                   IntrusiveLinkedList<MirFunction>::iterator it,
-                                   MirPassManager *passManager)
+MirPassResult NonSsaToSsaPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
     CodeFlowResult *cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
     MirFunction *func = *it;
@@ -54,7 +52,7 @@ NonSsaToSsaPass::createPhiInstruction(MirInstructionBuilder *iBuilder, MirId reg
 
     for (size_t i = 0; i < numPredecessors; ++i)
     {
-        phi->addOperand(reg);
+        iBuilder->addOperand(phi, reg);
     }
 
     return phi;
@@ -63,11 +61,11 @@ NonSsaToSsaPass::createPhiInstruction(MirInstructionBuilder *iBuilder, MirId reg
 void NonSsaToSsaPass::buildVirtualRegDefPlaces(MirFunction *func)
 {
     auto &defSites = m_result.m_defSites;
-    for (MirBlock *block : func->getBlocks())
+    for (const MirBlock *block : func->getBlocks())
     {
         MirId bId = block->getId();
 
-        for (MirInstruction *inst : block->getInstructions())
+        for (const MirInstruction *inst : block->getInstructions())
         {
             for (const auto &def : inst->getDefinedRegisters())
             {
@@ -88,12 +86,11 @@ void NonSsaToSsaPass::buildVirtualRegDefPlaces(MirFunction *func)
 
 void NonSsaToSsaPass::buildDominanceFrontier(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager)
 {
-    auto &blocks = func->getBlocks();
     auto &domFrontier = m_result.m_domFrontier;
     auto &idom = m_result.m_immDomTree;
     auto &predecessors = cfg->m_predecessors;
 
-    for (MirBlock *b : blocks)
+    for (MirBlock *b : func->getBlocks())
     {
         MirId bId = b->getId();
 
@@ -277,7 +274,7 @@ void NonSsaToSsaPass::insertPhiNodes(CodeFlowResult *cfg, MirFunction *func)
                 {
                     hasPhi.insert(dfBlockId);
 
-                    MirBlock *targetBlock = m_ctx->getBlockById(dfBlockId);
+                    MirBlock *targetBlock = func->getBlock(dfBlockId);
                     iBuilder.setInsertionPoint(targetBlock, InsertionType::InsertBefore, targetBlock->begin());
 
                     size_t numPreds = cfg->m_predecessors[dfBlockId].size();
@@ -349,6 +346,7 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
 
         collector->trace("NonSsaToSsaPass", "---> Visiting block {} for renaming", blockId);
 
+        MirInstructionBuilder iBuilder(m_ctx, block, InsertionType::Append);
         std::pmr::vector<MirId> pushedRegisters(m_resc);
 
         // --- A. Process PHI destinations ---
@@ -369,8 +367,7 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
                                                      dst->getSourceRef(),
                                                      dst->getRegClass());
 
-            auto &ops = inst->getOperands();
-            ops[0] = newReg;
+            iBuilder.swapOperand(inst, newReg, 0);
 
             varStacks[origReg].push_back(newReg);
             pushedRegisters.push_back(origReg);
@@ -403,7 +400,7 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
 
                         if (!stack.empty())
                         {
-                            ops[i] = stack.back();
+                            iBuilder.swapOperand(inst, stack.back(), i);
 
                             collector->trace("NonSsaToSsaPass",
                                              "Renamed READ operand from base reg {} -> reaching definition reg {}",
@@ -420,7 +417,8 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
                                                                         op->getSourceRef(),
                                                                         op->getRegClass());
                             }
-                            ops[i] = undefRegs[origReg];
+
+                            iBuilder.swapOperand(inst, undefRegs[origReg], i);
 
                             auto diag = collector->trace(
                                     "NonSsaToSsaPass",
@@ -451,7 +449,7 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
                                                    op->getSourceRef(),
                                                    op->getRegClass());
 
-                        ops[i] = newReg;
+                        iBuilder.swapOperand(inst, newReg, i);
                         varStacks[origReg].push_back(newReg);
                         pushedRegisters.push_back(origReg);
 
@@ -512,8 +510,7 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
                 auto &ops = inst->getOperands();
                 if ((1 + predIndex) < ops.size())
                 {
-                    ops[1 + predIndex] = activeReg;
-
+                    iBuilder.swapOperand(inst, activeReg, 1 + predIndex);
                     collector->trace("NonSsaToSsaPass",
                                      "Populated PHI incoming val in block {} (path from {}) for base reg {} -> "
                                      "resolved to reg {}",

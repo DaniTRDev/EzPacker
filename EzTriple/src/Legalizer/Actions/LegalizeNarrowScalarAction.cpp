@@ -200,7 +200,7 @@ LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, Mi
             return LegalizationResult::Failed;
         }
 
-        instr->getOwner()->getInstructions().erase(ctx.m_it);
+        ib.erase(instr);
         return LegalizationResult::Legalized;
     }
 
@@ -289,7 +289,7 @@ LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, Mi
     }
     emitInst(MirInstructionOpCode::MERGE_VALUES, mergeOps);
 
-    instr->getOwner()->getInstructions().erase(ctx.m_it);
+    ib.erase(instr);
     return LegalizationResult::Legalized;
 }
 

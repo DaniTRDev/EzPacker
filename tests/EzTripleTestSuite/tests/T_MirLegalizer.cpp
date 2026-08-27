@@ -1,4 +1,5 @@
 #include "EzTripleTestSuite.h"
+#include "Function/MirFunctionBuilder.h"
 #include "Instruction/MirInstruction.h"
 #include "Legalizer/Actions/LegalizeBitcastAction.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
@@ -26,14 +27,13 @@ TEST_F(MirLegalizerTest, TestFunctionSignatureLegalization)
     MirOperandBuilder opBuilder(ctx);
     MirRegister *p0 = opBuilder.buildVReg(typeTable->i32(), "a");
     MirRegister *p1 = opBuilder.buildVReg(typeTable->i32(), "b");
-    func->getParameters().push_back(p0);
-    func->getParameters().push_back(p1);
+    MirFunctionBuilder(ctx).addParam(func, p0).addParam(func, p1);
 
     MirFunctionSignatureLegalizerPass sigPass(ctx, getTargetDesc());
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
 
-    auto result = sigPass.run(funcList, funcList.begin(), nullptr);
+    auto result = sigPass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
     EXPECT_TRUE(result.m_modifiedMir);
 
@@ -60,13 +60,13 @@ TEST_F(MirLegalizerTest, TestSretFunctionSignatureLegalization)
 
     MirOperandBuilder opBuilder(ctx);
     MirRegister *p0 = opBuilder.buildVReg(typeTable->i32(), "val");
-    func->getParameters().push_back(p0);
+    MirFunctionBuilder(ctx).addParam(func, p0);
 
     MirFunctionSignatureLegalizerPass sigPass(ctx, getTargetDesc());
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
 
-    auto result = sigPass.run(funcList, funcList.begin(), nullptr);
+    auto result = sigPass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
     EXPECT_TRUE(result.m_modifiedMir);
 
@@ -240,7 +240,7 @@ TEST_F(MirLegalizerTest, TestFullLegalizerPass)
     MirOperandBuilder ob(ctx);
 
     MirRegister *p0 = ob.buildVReg(typeTable->i32(), "x");
-    func->getParameters().push_back(p0);
+    MirFunctionBuilder(ctx).addParam(func, p0);
 
     MirRegister *retVal = ob.buildVReg(typeTable->i32(), "y");
     ib.RET(retVal);
@@ -249,7 +249,7 @@ TEST_F(MirLegalizerTest, TestFullLegalizerPass)
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
 
-    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    auto result = pass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
     EXPECT_TRUE(result.m_modifiedMir);
 }
@@ -391,4 +391,3 @@ TEST_F(MirLegalizerTest, TestNarrowCompareLegalization)
     auto &instructions = block->getInstructions();
     EXPECT_EQ(instructions.size(), 6);
 }
-

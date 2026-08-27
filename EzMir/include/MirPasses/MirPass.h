@@ -45,8 +45,7 @@ class MirPass
     /**
      * Executes the pass over an individual MirFunction in the intrusive function list.
      */
-    virtual MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
-                              IntrusiveLinkedList<class MirFunction>::iterator it,
+    virtual MirPassResult run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                               class MirPassManager *passManager)
     {
         return {};
@@ -55,9 +54,7 @@ class MirPass
     /**
      * Executes the pass over an individual MirBlock in the function's block chain.
      */
-    virtual MirPassResult run(IntrusiveLinkedList<class MirBlock> &blockList,
-                              IntrusiveLinkedList<class MirBlock>::iterator it,
-                              class MirPassManager *passManager)
+    virtual MirPassResult run(IntrusiveLinkedList<class MirBlock>::const_iterator it, class MirPassManager *passManager)
     {
         return {};
     }
@@ -65,8 +62,7 @@ class MirPass
     /**
      * Executes the pass over an individual MirInstruction in a block's instruction chain.
      */
-    virtual MirPassResult run(IntrusiveLinkedList<class MirInstruction> &instrList,
-                              IntrusiveLinkedList<class MirInstruction>::iterator it,
+    virtual MirPassResult run(IntrusiveLinkedList<class MirInstruction>::const_iterator it,
                               class MirPassManager *passManager)
     {
         return {};

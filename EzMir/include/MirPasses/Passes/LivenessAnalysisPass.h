@@ -52,8 +52,7 @@ class LivenessAnalysisPass : public IMirAnalysisPass
     /**
      * Executes local and global backward dataflow analysis over the function.
      */
-    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
-                      IntrusiveLinkedList<class MirFunction>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                       class MirPassManager *passManager) override;
 
     /**
@@ -72,12 +71,12 @@ class LivenessAnalysisPass : public IMirAnalysisPass
      * LiveIn[B] = Use[B] U (LiveOut[B] - Def[B])
      * LiveOut[B] = U { LiveIn[S] for S in Successors(B) }
      */
-    void computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
+    void computeGlobalLiveness(const class MirFunction *func, class CodeFlowResult *cfg);
 
     /**
      * Computes the local Def and Use register sets for all basic blocks within the function.
      */
-    void computeLocalLiveness(class MirFunction *func);
+    void computeLocalLiveness(const class MirFunction *func);
 
   private:
     LivenessResult m_result;

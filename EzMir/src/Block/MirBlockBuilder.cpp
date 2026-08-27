@@ -35,7 +35,7 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::pmr::str
         {
             m_ownerFunc->appendBlock(block);
         }
-        
+
         setBuildResult(block);
 
         return block;
@@ -57,4 +57,10 @@ MirInstructionBuilder MirBlockBuilder::instrBuilder()
     }
 
     return MirInstructionBuilder(m_ctx, m_insertPoint);
+}
+
+void MirBlockBuilder::erase(MirBlock *block)
+{
+    auto owner = block->getOwner();
+    owner->m_blocks.remove(block);
 }

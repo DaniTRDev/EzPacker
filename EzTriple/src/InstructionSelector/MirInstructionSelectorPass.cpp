@@ -8,18 +8,11 @@ MirInstructionSelectorPass::MirInstructionSelectorPass(MirBuilderContext *ctx, T
 {
 }
 
-const char *MirInstructionSelectorPass::getName() const
-{
-    return "MirInstructionSelectorPass";
-}
+const char *MirInstructionSelectorPass::getName() const { return "MirInstructionSelectorPass"; }
 
-MirPassIterationPlace MirInstructionSelectorPass::getIterationPlace() const
-{
-    return MirPassIterationPlace::Function;
-}
+MirPassIterationPlace MirInstructionSelectorPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult MirInstructionSelectorPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                              IntrusiveLinkedList<MirFunction>::iterator it,
+MirPassResult MirInstructionSelectorPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                               MirPassManager *passManager)
 {
     MirFunction *func = *it;

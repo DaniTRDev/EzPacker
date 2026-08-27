@@ -43,11 +43,10 @@ LivenessResult *LivenessAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace LivenessAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                        IntrusiveLinkedList<MirFunction>::iterator it,
+MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                         class MirPassManager *passManager)
 {
-    MirFunction *func = *it;
+    const MirFunction *func = *it;
     auto diag = passManager->getDiagCollector();
     diag->trace(getName(), "Analyzing register liveness spans for function: '{}'", func->getName());
 
@@ -88,12 +87,12 @@ void LivenessAnalysisPass::reset()
     m_result.m_liveOut.clear();
 }
 
-void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResult *cfg)
+void LivenessAnalysisPass::computeGlobalLiveness(const MirFunction *func, CodeFlowResult *cfg)
 {
     m_ctx->getDiagCollector()->trace(getName(),
                                      "Analyzing global variable generation rules (live IN / OUT calculation)...");
 
-    auto &blocks = func->getBlocks();
+    const auto &blocks = func->getBlocks();
 
     // 1. Build a dense mapping for all unique registers referenced in this function
     std::vector<MirRegisterRef> regUniverse;
@@ -204,12 +203,12 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     }
 }
 
-void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func)
+void LivenessAnalysisPass::computeLocalLiveness(const MirFunction *func)
 {
     m_ctx->getDiagCollector()->trace(getName(),
                                      "Analyzing block-local variable generation rules (USE / DEF calculation)...");
 
-    for (auto block : func->getBlocks())
+    for (const MirBlock *block : func->getBlocks())
     {
         size_t blockId = block->getId();
         m_result.m_def[blockId] = std::pmr::unordered_set<MirRegisterRef>(m_arena);
@@ -220,7 +219,7 @@ void LivenessAnalysisPass::computeLocalLiveness(MirFunction *func)
         auto &defs = m_result.m_def[blockId];
         auto &uses = m_result.m_use[blockId];
 
-        for (const auto &instr : block->getInstructions())
+        for (const MirInstruction *instr : block->getInstructions())
         {
             const auto &localDefs = instr->getDefinedRegisters();
             const auto &localUses = instr->getUsedRegisters();

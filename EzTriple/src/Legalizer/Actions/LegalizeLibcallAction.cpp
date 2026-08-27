@@ -59,12 +59,10 @@ LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSym
     }
 
     MirInstruction *callInst = ib.build(MirInstructionOpCode::CALL, instr->getSourceRef(), callOps);
-    ownerBlock->getInstructions().erase(ctx.m_it);
+    ib.erase(instr);
 
     // Run LegalizeCall on the newly formed CALL instruction
-    auto callIt = std::find(ownerBlock->getInstructions().begin(),
-                            ownerBlock->getInstructions().end(),
-                            callInst);
+    auto callIt = std::find(ownerBlock->getInstructions().begin(), ownerBlock->getInstructions().end(), callInst);
     if (callIt != ownerBlock->getInstructions().end())
     {
         LegalizeCtx newCtx(ctx.m_ctx, ctx.m_targetDesc, callIt);
@@ -75,4 +73,3 @@ LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSym
 }
 
 } // namespace LegalizeActions
-

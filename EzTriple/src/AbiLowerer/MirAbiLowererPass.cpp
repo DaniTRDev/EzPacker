@@ -6,6 +6,7 @@
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirInstructionBuilder.h"
 #include "Instruction/MirInstructionSet.h"
 #include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
@@ -16,12 +17,10 @@ const char *MirAbiLowererPass::getName() const { return "MirAbiLowererPass"; }
 
 MirPassIterationPlace MirAbiLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; };
 
-MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                     IntrusiveLinkedList<MirFunction>::iterator it,
-                                     MirPassManager *passManager)
+MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
-    MirAbiLowerer abiLowerer(m_ctx);
     bool modifiedMir = false;
+    MirAbiLowerer abiLowerer(m_ctx);
     MirFunction *func = *it;
     CallingConvDesc *cc = func->getCallingConv();
 
@@ -30,6 +29,8 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
     for (MirBlock *block : func->getBlocks())
     {
         auto &instructions = block->getInstructions();
+        MirInstructionBuilder iBuilder(m_ctx, block, InsertionType::Append);
+
         for (auto instrIt = instructions.begin(); instrIt != instructions.end();)
         {
             MirInstruction *instr = *instrIt;
@@ -42,7 +43,9 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
                         pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Call, m_ctx->getGlobalAllocator());
                 mapIt->second.m_pushList.push_back(instr);
 
-                instrIt = instructions.erase(instrIt);
+                instrIt++;
+                iBuilder.erase(instr);
+
                 modifiedMir = true;
                 continue;
             }
@@ -53,7 +56,9 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
                         pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Return, m_ctx->getGlobalAllocator());
                 mapIt->second.m_pushList.push_back(instr);
 
-                instrIt = instructions.erase(instrIt);
+                instrIt++;
+                iBuilder.erase(instr);
+
                 modifiedMir = true;
                 continue;
             }
@@ -91,7 +96,9 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
                                                             m_ctx->getGlobalAllocator());
                 mapIt->second.m_popList.push_back(instr);
 
-                instrIt = instructions.erase(instrIt);
+                instrIt++;
+                iBuilder.erase(instr);
+
                 modifiedMir = true;
                 continue;
             }
@@ -103,7 +110,9 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
                                                             m_ctx->getGlobalAllocator());
                 mapIt->second.m_popList.push_back(instr);
 
-                instrIt = instructions.erase(instrIt);
+                instrIt++;
+                iBuilder.erase(instr);
+
                 modifiedMir = true;
                 continue;
             }

@@ -55,7 +55,7 @@ TEST_F(MirInstructionSelectorTest, TestInstructionSelectorPass)
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
 
-    auto res = pass.run(funcList, funcList.begin(), nullptr);
+    auto res = pass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(res.m_succeeded);
     EXPECT_TRUE(res.m_executed);
 

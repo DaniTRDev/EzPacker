@@ -31,6 +31,21 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
     MirBlockBuilder blockBuilder();
 
     /**
+     * Adds a parameter to the END of the given function.
+     */
+    MirFunctionBuilder &addParam(MirFunction *func, class MirRegister *param);
+
+    /**
+     * Adds a parameter to the FRONT of the given function.
+     */
+    MirFunctionBuilder &addParamFront(MirFunction *func, class MirRegister *param);
+
+    /**
+     * Adds a physical register usage to the function.
+     */
+    MirFunctionBuilder &addPhysRegUse(MirFunction *func, const class MirRegisterRef &ref);
+
+    /**
      * Finalizes and instantiates the MirFunction in the arena with return type, name, and source location.
      */
     MirFunction *

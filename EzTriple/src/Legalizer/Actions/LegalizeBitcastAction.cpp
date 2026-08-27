@@ -55,7 +55,7 @@ LegalizationResult LegalizeBitcast(LegalizeCtx &ctx, size_t operandSlot, MirType
     {
         if (slot >= operands.size() || !operands[slot])
             return;
-            
+
         MirOperand *op = operands[slot];
         if (!op->getMirType() || op->getMirType() == targetType)
             return;
@@ -98,7 +98,7 @@ LegalizationResult LegalizeBitcast(LegalizeCtx &ctx, size_t operandSlot, MirType
         emitInst(MirInstructionOpCode::BITCAST, { bDef.origDst, bDef.tempDst });
     }
 
-    instr->getOwner()->getInstructions().erase(ctx.m_it);
+    ib.erase(instr);
     return LegalizationResult::Legalized;
 }
 

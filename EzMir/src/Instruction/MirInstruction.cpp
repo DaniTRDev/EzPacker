@@ -200,47 +200,13 @@ size_t MirInstruction::getOperandCount() const { return m_operands.size(); }
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 
 /**
- * Appends a new operand to the instruction's operand list.
- */
-void MirInstruction::addOperand(MirOperand *operand) { m_operands.push_back(operand); }
-
-/**
- * Updates the instruction's opcode.
- */
-void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
-
-/**
- * Replaces the instruction's operand list.
- */
-void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands) { m_operands = operands; }
-
-/**
- * Attaches a target machine instruction descriptor.
- */
-void MirInstruction::setTargetDesc(MirTargetInstructionDesc *desc) { m_targetDesc = desc; }
-
-/**
- * Sets the previous instruction in the intrusive list.
- */
-void MirInstruction::setPrev(MirInstruction *prev) { m_prev = prev; }
-
-/**
- * Sets the next instruction in the intrusive list.
- */
-void MirInstruction::setNext(MirInstruction *next) { m_next = next; }
-
-/**
  * Returns const reference to the operand list.
  */
 const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
 
 /**
- * Returns mutable reference to the operand list.
- */
-std::pmr::vector<MirOperand *> &MirInstruction::getOperands() { return m_operands; }
-
-/**
- * Identifies all register definitions (DEFs) written by this instruction, including explicit write operands and target implicit defs.
+ * Identifies all register definitions (DEFs) written by this instruction, including explicit write operands and target
+ * implicit defs.
  */
 std::vector<MirRegisterRef> MirInstruction::getDefinedRegisters() const
 {
@@ -274,7 +240,8 @@ std::vector<MirRegisterRef> MirInstruction::getDefinedRegisters() const
 }
 
 /**
- * Identifies all register uses (USEs) read by this instruction, including explicit read operands, memory bases, and target implicit uses.
+ * Identifies all register uses (USEs) read by this instruction, including explicit read operands, memory bases, and
+ * target implicit uses.
  */
 std::vector<MirRegisterRef> MirInstruction::getUsedRegisters() const
 {
@@ -328,3 +295,33 @@ std::string MirInstruction::toString() const
     }
     return res;
 }
+
+/**
+ * Appends a new operand to the instruction's operand list.
+ */
+void MirInstruction::addOperand(MirOperand *operand) { m_operands.push_back(operand); }
+
+/**
+ * Updates the instruction's opcode.
+ */
+void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode; }
+
+/**
+ * Replaces the instruction's operand list.
+ */
+void MirInstruction::setOperands(const std::pmr::vector<MirOperand *> &operands) { m_operands = operands; }
+
+/**
+ * Attaches a target machine instruction descriptor.
+ */
+void MirInstruction::setTargetDesc(MirTargetInstructionDesc *desc) { m_targetDesc = desc; }
+
+/**
+ * Sets the previous instruction in the intrusive list.
+ */
+void MirInstruction::setPrev(MirInstruction *prev) { m_prev = prev; }
+
+/**
+ * Sets the next instruction in the intrusive list.
+ */
+void MirInstruction::setNext(MirInstruction *next) { m_next = next; }

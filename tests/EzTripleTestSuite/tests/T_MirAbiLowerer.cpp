@@ -1,6 +1,7 @@
 #include "EzTripleTestSuite.h"
 #include "AbiLowerer/MirAbiLowerer.h"
 #include "AbiLowerer/MirAbiLowererPass.h"
+#include "Function/MirFunctionBuilder.h"
 #include "Instruction/MirInstruction.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
@@ -34,7 +35,7 @@ TEST_F(MirAbiLowererTest, TestReturnLowering)
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
 
-    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    auto result = pass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
     EXPECT_TRUE(result.m_modifiedMir);
 
@@ -77,7 +78,7 @@ TEST_F(MirAbiLowererTest, TestCallAndArgLowering)
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
 
-    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    auto result = pass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
     EXPECT_TRUE(result.m_modifiedMir);
 
@@ -99,18 +100,17 @@ TEST_F(MirAbiLowererTest, TestParameterLowering)
     MirOperandBuilder ob(ctx);
     MirRegister *p0 = ob.buildVReg(typeTable->i32(), "p0");
     MirRegister *p1 = ob.buildVReg(typeTable->i32(), "p1");
-    func->getParameters().push_back(p0);
-    func->getParameters().push_back(p1);
+    MirFunctionBuilder(ctx).addParam(func, p0).addParam(func, p1);
 
     // Legalize signature -> emits POP_ARG, POP_ARG, END_ARG
     MirFunctionSignatureLegalizerPass sigPass(ctx, getTargetDesc());
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
-    sigPass.run(funcList, funcList.begin(), nullptr);
+    sigPass.run(funcList.begin(), nullptr);
 
     // Run ABI lowerer
     MirAbiLowererPass pass(ctx);
-    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    auto result = pass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
 
     // Verify POP_ARG replaced by MOV from argument registers (RDI, RSI)
@@ -137,7 +137,7 @@ TEST_F(MirAbiLowererTest, TestSretLowering)
     MirFunctionSignatureLegalizerPass sigPass(ctx, getTargetDesc());
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
-    sigPass.run(funcList, funcList.begin(), nullptr);
+    sigPass.run(funcList.begin(), nullptr);
 
     // Return legalization
     auto it = --block->getInstructions().end();
@@ -146,6 +146,6 @@ TEST_F(MirAbiLowererTest, TestSretLowering)
 
     // ABI Lowering
     MirAbiLowererPass pass(ctx);
-    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    auto result = pass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
 }

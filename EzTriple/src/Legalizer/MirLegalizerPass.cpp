@@ -13,9 +13,7 @@ const char *MirLegalizerPass::getName() const { return "MirLegalizerPass"; }
 
 MirPassIterationPlace MirLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult MirLegalizerPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                    IntrusiveLinkedList<MirFunction>::iterator it,
-                                    MirPassManager *passManager)
+MirPassResult MirLegalizerPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
     MirFunction *func = *it;
     if (!func)
@@ -27,7 +25,7 @@ MirPassResult MirLegalizerPass::run(IntrusiveLinkedList<MirFunction> &funcList,
 
     // 1. Legalize Function Signature (SRET param, POP_ARG, END_ARG)
     MirFunctionSignatureLegalizerPass sigPass(m_ctx, m_targetDesc);
-    auto sigRes = sigPass.run(funcList, it, passManager);
+    auto sigRes = sigPass.run(it, passManager);
     if (!sigRes.m_succeeded)
     {
         return sigRes;

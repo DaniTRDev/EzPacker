@@ -31,8 +31,8 @@ struct UnloweredBlock
     class MirBlock *m_targetBlock{ nullptr }; // In which block was the final termination instruction.
     UnloweredBlockType m_type;
     IntrusiveLinkedList<class MirInstruction>::iterator m_termIt{}; // Iterator pointing to the terminator instruction.
-    std::pmr::vector<class MirInstruction *> m_pushList{};       // List used to store all the PUSH_RET/PUSH_ARG.
-    std::pmr::vector<class MirInstruction *> m_popList{};        // List used to store all the POP_RET/POP_ARG.
+    std::pmr::vector<class MirInstruction *> m_pushList{};          // List used to store all the PUSH_RET/PUSH_ARG.
+    std::pmr::vector<class MirInstruction *> m_popList{};           // List used to store all the POP_RET/POP_ARG.
 
     explicit UnloweredBlock(UnloweredBlockType type, std::pmr::polymorphic_allocator<std::byte> alloc) :
         m_type(type), m_pushList(alloc), m_popList(alloc)
@@ -71,8 +71,7 @@ class MirAbiLowererPass : public IMirTransformPass
     /**
      * Runs the pass in the given function and returns the result.
      */
-    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
-                      IntrusiveLinkedList<class MirFunction>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                       class MirPassManager *passManager) override;
 
     /**

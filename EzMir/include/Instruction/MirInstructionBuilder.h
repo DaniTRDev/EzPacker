@@ -111,6 +111,35 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
 
 #include "Instruction/MirInstructionSetDefs.h"
 #undef INSTRUCTION
+    /**
+     * Adds an operand to END the given instruction operand list.
+     */
+    MirInstructionBuilder &addOperand(MirInstruction *instr, MirOperand *operand);
+
+    /**
+     * Adds an operand to BEGIN the given instruction operand list.
+     */
+    MirInstructionBuilder &addOperandFront(MirInstruction *instr, MirOperand *operand);
+
+    /**
+     * Clears the operands of a given instruction.
+     */
+    MirInstructionBuilder &clearOperands(MirInstruction *instr);
+
+    /**
+     * Clears the operand at the given position. This function does nothing if the operand does not exist.
+     */
+    MirInstructionBuilder &clearOperand(MirInstruction *instr, size_t pos);
+
+    /**
+     * Erases an instruction from its owning list, block and function.
+     */
+    MirInstructionBuilder &erase(MirInstruction *instr);
+
+    /**
+     * Swap operand at the given index with the one provided. If there's no operand at given index, nothing is done.
+     */
+    MirInstructionBuilder &swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index);
 
     /**
      * Updates the insertion mode (Append, InsertBefore, InsertAfter) at the current cursor.

@@ -37,7 +37,8 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
     MirOperandBuilder opBuilder(builderCtx);
 
     bool firstInserted = false;
-    auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops) {
+    auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
+    {
         insertBeforeBuilder.build(opc, instr->getSourceRef(), ops);
         if (!firstInserted)
         {
@@ -72,15 +73,14 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
         emitBefore(MirInstructionOpCode::PUSH_RET, { retToken, returnVal });
 
         // Replace the RET operand with the tracking token
-        operands[0] = retToken;
+        insertBeforeBuilder.swapOperand(instr, retToken, 0);
     }
     else
     {
-        operands.push_back(retToken);
+        insertBeforeBuilder.addOperand(instr, retToken);
     }
 
     return LegalizationResult::Legalized;
 }
 
 } // namespace LegalizeActions
-

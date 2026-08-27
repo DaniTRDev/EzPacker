@@ -27,6 +27,10 @@ struct MirFunctionAnalysisData
 class MirFunction
 {
   public:
+    friend class IntrusiveLinkedList<MirFunction>;
+    friend class MirBlockBuilder;
+    friend class MirFunctionBuilder;
+
     /**
      * Constructs a MIR function instance with arena memory resource and initializes its CFG entry block.
      */
@@ -42,34 +46,24 @@ class MirFunction
                 std::pmr::memory_resource *alloc);
 
     /**
-     * Appends a basic block to the end of the function's block chain. Returns false if already inserted.
-     */
-    bool appendBlock(MirBlock *block);
-
-    /**
      * Returns the target calling convention descriptor for this function.
      */
     class CallingConvDesc *getCallingConv() const;
 
     /**
-     * Returns a mutable reference to the intrusive linked list of basic blocks comprising this function.
+     * Returns an inmutable reference to the intrusive linked list of basic blocks comprising this function.
      */
-    IntrusiveLinkedList<class MirBlock> &getBlocks();
-
-    /**
-     * Returns a pointer to the intrusive linked list of basic blocks.
-     */
-    IntrusiveLinkedList<class MirBlock> *getBlocksPtr();
+    const IntrusiveLinkedList<class MirBlock> &getBlocks() const;
 
     /**
      * Returns an iterator to the entry block of the function.
      */
-    IntrusiveLinkedList<class MirBlock>::iterator begin();
+    IntrusiveLinkedList<class MirBlock>::const_iterator begin() const;
 
     /**
      * Returns an end iterator past the last block of the function.
      */
-    IntrusiveLinkedList<class MirBlock>::iterator end();
+    IntrusiveLinkedList<class MirBlock>::const_iterator end() const;
 
     /**
      * Retrieves a basic block by its numeric MirId. Returns nullptr if not found in this function.
@@ -132,6 +126,27 @@ class MirFunction
     class SourceReference *getSourceRef() const;
 
     /**
+     * Returns the inmutable list of incoming virtual/physical parameter registers.
+     */
+    const std::pmr::list<class MirRegister *> &getParameters() const;
+
+    /**
+     * Returns the collection of callee-saved registers modified in this function body.
+     */
+    const std::pmr::vector<class MirRegisterRef> &getUsedCalleeSavedRegs() const;
+
+    /**
+     * Returns the symbol name of this function.
+     */
+    const std::pmr::string &getName() const;
+
+  private:
+    /**
+     * Appends a basic block to the end of the function's block chain. Returns false if already inserted.
+     */
+    bool appendBlock(MirBlock *block);
+
+    /**
      * Records a callee-saved register consumed by this function requiring prologue preservation.
      */
     void addCalleeSavedRegUse(const class MirRegisterRef &reg);
@@ -150,21 +165,6 @@ class MirFunction
      * Links the preceding function in the intrusive module chain.
      */
     void setPrev(MirFunction *prev);
-
-    /**
-     * Returns the mutable list of incoming virtual/physical parameter registers.
-     */
-    std::pmr::list<class MirRegister *> &getParameters();
-
-    /**
-     * Returns the collection of callee-saved registers modified in this function body.
-     */
-    const std::pmr::vector<class MirRegisterRef> &getUsedCalleeSavedRegs() const;
-
-    /**
-     * Returns the symbol name of this function.
-     */
-    const std::pmr::string &getName();
 
   private:
     class CallingConvDesc *m_callingConv;

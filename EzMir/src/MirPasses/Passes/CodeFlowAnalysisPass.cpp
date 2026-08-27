@@ -19,23 +19,22 @@ CodeFlowResult *CodeFlowAnalysisPass::getResult() { return &m_result; }
 
 MirPassIterationPlace CodeFlowAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                        IntrusiveLinkedList<MirFunction>::iterator it,
+MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                         class MirPassManager *passManager)
 {
-    MirFunction *func = *it;
+    const MirFunction *func = *it;
     auto diag = passManager->getDiagCollector();
 
     // Direct lazy formatting without eager allocations
     diag->trace(getName(), "Computing Control Flow Graph (CFG) topology for: '{}'", func->getName());
 
-    auto &blockList = func->getBlocks();
+    const auto &blockList = func->getBlocks();
     auto &predecessors = m_result.m_predecessors;
     auto &successors = m_result.m_successors;
 
     for (auto blockIt = blockList.begin(); blockIt != blockList.end(); ++blockIt)
     {
-        MirBlock *currentBlock = *blockIt;
+        const MirBlock *currentBlock = *blockIt;
 
         // Ensure our maps are initialized for every block, even terminal ones with zero edges
         if (!successors.contains(currentBlock->getId()))
@@ -179,7 +178,7 @@ void CodeFlowAnalysisPass::reset()
     m_result.m_predecessors.clear();
 }
 
-void CodeFlowAnalysisPass::addEdge(MirBlock *from, MirBlock *to)
+void CodeFlowAnalysisPass::addEdge(const MirBlock *from, const MirBlock *to)
 {
     if (!from || !to)
         return;

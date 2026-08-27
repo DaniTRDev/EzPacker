@@ -7,6 +7,7 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirInstructionBuilder.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
@@ -84,7 +85,9 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
 
     for (MirBlock *block : func->getBlocks())
     {
+        MirInstructionBuilder builder(ctx.m_ctx, block, InsertionType::Append);
         auto &instructionList = block->getInstructions();
+
         for (MirInstruction *inst : instructionList)
         {
             bool instructionModified = false;
@@ -121,7 +124,7 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
                     MirMemory *memOp = opBuilder.buildMem(ref->getMirType(), baseReg, imm);
 
                     // Replace abstract stack reference with concrete memory operand
-                    operands[i] = memOp;
+                    builder.swapOperand(inst, memOp, i);
                     instructionModified = true;
                 }
             }

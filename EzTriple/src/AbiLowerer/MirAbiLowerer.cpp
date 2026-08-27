@@ -24,24 +24,24 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
                                        std::pmr::vector<MirInstruction *> &pushRets)
 {
     MirInstruction *retInstr = *it;
+    MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
+
     if (func->getReturnType()->getKind() == MirTypeKind::Void)
     {
-        // Void methods do not need anything.
-        retInstr->getOperands().clear(); // Clear the operands of the return (binding token).
-
+        // Void methods do not need anything. // Clear the operands of the return (binding token).
+        iBuilder.clearOperands(retInstr);
         return true;
     }
 
     CallLoweringState st(cc, m_ctx, func);
     ArgumentLocationDesc loc = cc->getReturnLoc(retType, &st);
-    MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
     MirOperandBuilder oBuilder(m_ctx);
 
     switch (loc.getType())
     {
         case ArgLocationType::Register:
         {
-            // Standard non-expanded or single-register.
+            // Standard single-register.
             const RegLoc &reg = loc.getReg();
             if (pushRets.size() != 1)
             {
@@ -65,9 +65,6 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
         case ArgLocationType::Split:
         {
             const SplitLoc &split = loc.getSplit();
-
-            // Case A: The upstream scalar expander already split this wide value into distinct, smaller sequential
-            // PUSH_RET nodes.
             if (pushRets.size() <= split.m_parts.size())
             {
                 for (size_t p = 0; p < split.m_parts.size(); ++p)
@@ -82,15 +79,6 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
 
                     iBuilder.MOV(destVal, sliceVal);
                 }
-            }
-            // Case B: The value hasn't been expanded, but the ABI requires it split across registers.
-            else if (pushRets.size() == 1)
-            {
-                m_ctx->getDiagCollector()->builder(Diag_Error, "ReturnAbiLowerer")
-                        << pushRets.front()->getSourceRef()
-                        << "Calling convention dictates this value must be split across registers, but it hasn't been "
-                           "expanded during previous scalar legalization passes.";
-                return false;
             }
             else
             {
@@ -141,7 +129,8 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
         }
     }
 
-    retInstr->getOperands().clear(); // Clear the operands of the return.
+    // Clear the operands of the return (binding token).; // Clear the operands of the return.
+    iBuilder.clearOperands(retInstr);
     return true;
 }
 
@@ -274,9 +263,8 @@ bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
         }
     }
 
-    // Clear token binding operands from the CALL instruction so it becomes a standard MIR call.
-    callInstr->getOperands().erase(callInstr->getOperands().begin());
-
+    // Clear token binding operand from the CALL instruction so it becomes a standard MIR call.
+    iBuilder.clearOperand(callInstr, 0);
     return true;
 }
 
@@ -517,6 +505,6 @@ bool MirAbiLowerer::processFunctionArguments(CallingConvDesc *cc,
         }
     }
 
-    targetBlock->getInstructions().erase(it);
+    iBuilder.erase(*it);
     return true;
 }

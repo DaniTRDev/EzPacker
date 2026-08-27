@@ -19,8 +19,7 @@ class MirInstructionSelectorPass : public IMirTransformPass
     const char *getName() const override;
     MirPassIterationPlace getIterationPlace() const override;
 
-    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
-                      IntrusiveLinkedList<class MirFunction>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                       class MirPassManager *passManager) override;
 
   private:

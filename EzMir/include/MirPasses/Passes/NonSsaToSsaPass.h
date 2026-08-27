@@ -53,8 +53,7 @@ class NonSsaToSsaPass : public IMirTransformPass
     /**
      * Executes the SSA transformation pipeline over the targeted function.
      */
-    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
-                      IntrusiveLinkedList<class MirFunction>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                       class MirPassManager *passManager) override;
 
     /**

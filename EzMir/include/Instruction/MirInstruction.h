@@ -5,6 +5,7 @@
 #include "MirInstructionMetadata.h"
 #include "Operand/MirOperand.h"
 #include "Operand/MirRegisterReference.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
 
 #include <vector>
 
@@ -18,6 +19,11 @@
 class MirInstruction
 {
   public:
+    friend class IntrusiveLinkedList<MirInstruction>;
+    friend class MirBlockBuilder;
+    friend class MirFunctionBuilder;
+    friend class MirInstructionBuilder;
+
     /**
      * Constructs an instruction record within an owning basic block with opcode, source ref, and operand list.
      */
@@ -140,6 +146,28 @@ class MirInstruction
     }
 
     /**
+     * Returns the inmutable reference to the internal operand vector.
+     */
+    const std::pmr::vector<class MirOperand *> &getOperands() const;
+
+    /**
+     * Computes the set of registers defined (written) by this instruction, including explicit and target implicit defs.
+     */
+    std::vector<MirRegisterRef> getDefinedRegisters() const;
+
+    /**
+     * Computes the set of registers used (read) by this instruction, including explicit, memory base, and implicit
+     * uses.
+     */
+    std::vector<MirRegisterRef> getUsedRegisters() const;
+
+    /**
+     * Formats the instruction into assembly text format.
+     */
+    std::string toString() const;
+
+  private:
+    /**
      * Appends an operand to the end of the operand list.
      */
     void addOperand(MirOperand *operand);
@@ -168,31 +196,6 @@ class MirInstruction
      * Sets the subsequent instruction in the block's intrusive list.
      */
     void setNext(MirInstruction *next);
-
-    /**
-     * Returns const reference to the internal operand vector.
-     */
-    const std::pmr::vector<class MirOperand *> &getOperands() const;
-
-    /**
-     * Returns mutable reference to the internal operand vector.
-     */
-    std::pmr::vector<class MirOperand *> &getOperands();
-
-    /**
-     * Computes the set of registers defined (written) by this instruction, including explicit and target implicit defs.
-     */
-    std::vector<MirRegisterRef> getDefinedRegisters() const;
-
-    /**
-     * Computes the set of registers used (read) by this instruction, including explicit, memory base, and implicit uses.
-     */
-    std::vector<MirRegisterRef> getUsedRegisters() const;
-
-    /**
-     * Formats the instruction into assembly text format.
-     */
-    std::string toString() const;
 
   private:
     /**

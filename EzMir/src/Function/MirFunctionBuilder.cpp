@@ -7,6 +7,7 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Operand/MirOperandBuilder.h"
+#include "Operand/MirRegisterReference.h"
 #include "Printer/MirPrinter.h"
 #include "Type/MirTypeTable.h"
 
@@ -31,6 +32,24 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
     }
 
     return MirBlockBuilder(m_ctx, obj);
+}
+
+MirFunctionBuilder &MirFunctionBuilder::addParam(MirFunction *func, MirRegister *param)
+{
+    func->m_parameters.push_back(param);
+    return *this;
+}
+
+MirFunctionBuilder &MirFunctionBuilder::addParamFront(MirFunction *func, MirRegister *param)
+{
+    func->m_parameters.push_front(param);
+    return *this;
+}
+
+MirFunctionBuilder &MirFunctionBuilder::addPhysRegUse(MirFunction *func, const class MirRegisterRef &ref)
+{
+    func->m_usedCalleeSavedRegs.push_back(ref);
+    return *this;
 }
 
 MirFunction *MirFunctionBuilder::build(MirType *returnType, const std::pmr::string &name, SourceReference *sourceRef)

@@ -47,8 +47,7 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     /**
      * Executes CFG construction over the targeted function.
      */
-    MirPassResult run(IntrusiveLinkedList<class MirFunction> &funcList,
-                      IntrusiveLinkedList<class MirFunction>::iterator it,
+    MirPassResult run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                       class MirPassManager *passManager) override;
 
     /**
@@ -65,7 +64,7 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     /**
      * Adds a directed control flow edge from the source basic block to the destination basic block.
      */
-    void addEdge(class MirBlock *from, class MirBlock *to);
+    void addEdge(const class MirBlock *from, const class MirBlock *to);
 
   private:
     CodeFlowResult m_result;

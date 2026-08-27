@@ -81,6 +81,6 @@ TEST_F(MirFrameLowererTest, TestFrameLowererPassRun)
     IntrusiveLinkedList<MirFunction> funcList;
     funcList.push_back(func);
 
-    auto result = pass.run(funcList, funcList.begin(), nullptr);
+    auto result = pass.run(funcList.begin(), nullptr);
     EXPECT_TRUE(result.m_succeeded);
 }

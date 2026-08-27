@@ -27,6 +27,11 @@ class MirBlockBuilder : public MirBuilder<class MirBlock>
      */
     MirInstructionBuilder instrBuilder();
 
+    /**
+     * Erases a blocks from its owning list and function.
+     */
+    void erase(MirBlock *block);
+
   private:
     /**
      * Context providing memory arena and global tracking.

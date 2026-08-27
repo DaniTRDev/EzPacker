@@ -18,8 +18,7 @@ const char *MirRegisterAllocatorPass::getName() const { return "RegisterAllocato
 
 MirPassIterationPlace MirRegisterAllocatorPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunction> &funcList,
-                                            IntrusiveLinkedList<class MirFunction>::iterator it,
+MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                                             class MirPassManager *passManager)
 {
     bool allocationComplete = false;

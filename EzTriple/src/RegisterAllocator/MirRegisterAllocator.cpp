@@ -3,6 +3,7 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
+#include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Instruction/MirInstruction.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
@@ -224,6 +225,7 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
 
 bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
 {
+    MirFunctionBuilder fBuilder(ctx->m_ctx);
     std::pmr::unordered_set<MirRegisterRef> spilledNodes(ctx->m_allocator);
 
     while (!ctx->m_selectStack.empty())
@@ -280,7 +282,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             {
                 if (reg == physRef)
                 {
-                    ctx->m_targetFunction->addCalleeSavedRegUse(reg);
+                    fBuilder.addPhysRegUse(ctx->m_targetFunction, reg);
                     break;
                 }
             }
@@ -443,15 +445,10 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
     // 3. Rewrite instruction operands
     for (MirBlock *block : func->getBlocks())
     {
-        std::vector<MirInstruction *> origInstructions(block->getInstructions().begin(),
-                                                       block->getInstructions().end());
-
-        for (MirInstruction *inst : origInstructions)
+        MirInstructionBuilder iBuilder(ctx->m_ctx, block, InsertionType::Append);
+        for (auto it = block->begin(); it != block->end(); it++)
         {
-            auto it = std::find(block->getInstructions().begin(), block->getInstructions().end(), inst);
-            if (it == block->getInstructions().end())
-                continue;
-
+            MirInstruction *inst = *it;
             SourceReference *srcRef = inst->getSourceRef();
             auto &operands = inst->getOperands();
 
@@ -523,7 +520,7 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
                     }
                 }
 
-                operands[i] = tempVReg;
+                iBuilder.swapOperand(inst, tempVReg, i);
             }
 
             for (const auto &spill : postSpills)

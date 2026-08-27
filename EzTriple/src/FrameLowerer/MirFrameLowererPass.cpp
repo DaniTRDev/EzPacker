@@ -18,9 +18,7 @@ const char *MirFrameLowererPass::getName() const { return "FrameLowererPass"; }
 
 MirPassIterationPlace MirFrameLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
-MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                        IntrusiveLinkedList<MirFunction>::iterator it,
-                                        MirPassManager *passManager)
+MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
     MirFunction *func = *it;
     if (!func || !m_targetDesc)

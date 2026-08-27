@@ -18,8 +18,8 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
     m_diagCollector->trace("MirPassManager", "Running pass {}", pass->getName());
     pass->reset(); // Resets pass' previous results.
 
-    auto &functionList = ctx->getFunctions();
-    auto &globalList = ctx->getGlobalVars();
+    const auto &functionList = ctx->getFunctions();
+    const auto &globalList = ctx->getGlobalVars();
     MirPassResult combinedResult{ .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 
     switch (pass->getIterationPlace())
@@ -42,7 +42,7 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
         {
             for (auto it = functionList.begin(); it != functionList.end(); ++it)
             {
-                MirPassResult r = pass->run(functionList, it, this);
+                MirPassResult r = pass->run(it, this);
                 combinedResult.m_modifiedMir |= r.m_modifiedMir;
                 if (!r.m_succeeded)
                 {
@@ -54,12 +54,12 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
         }
         case MirPassIterationPlace::Block:
         {
-            for (auto *func : functionList)
+            for (const auto *func : functionList)
             {
-                auto &blocks = func->getBlocks();
+                const auto &blocks = func->getBlocks();
                 for (auto it = blocks.begin(); it != blocks.end(); ++it)
                 {
-                    MirPassResult r = pass->run(blocks, it, this);
+                    MirPassResult r = pass->run(it, this);
                     combinedResult.m_modifiedMir |= r.m_modifiedMir;
                     if (!r.m_succeeded)
                     {
@@ -76,15 +76,15 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
         }
         case MirPassIterationPlace::Instruction:
         {
-            for (auto *func : functionList)
+            for (const auto *func : functionList)
             {
-                for (auto *block : func->getBlocks())
+                for (const auto *block : func->getBlocks())
                 {
-                    auto &instructions = block->getInstructions();
+                    const auto &instructions = block->getInstructions();
                     for (auto it = instructions.begin(); it != instructions.end();)
                     {
                         auto nextIt = std::next(it);
-                        MirPassResult r = pass->run(instructions, it, this);
+                        MirPassResult r = pass->run(it, this);
                         combinedResult.m_modifiedMir |= r.m_modifiedMir;
                         if (!r.m_succeeded)
                         {

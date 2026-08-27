@@ -13,6 +13,11 @@
 class MirBlock
 {
   public:
+    friend class MirBlockBuilder;
+    friend class MirFunctionBuilder;
+    friend class IntrusiveLinkedList<MirBlock>;
+    friend class MirInstructionBuilder;
+
     /**
      * Constructs a basic block with a unique MIR ID, optional source reference, owning function, and name.
      */
@@ -22,29 +27,19 @@ class MirBlock
              const std::pmr::string &name = "");
 
     /**
-     * Returns the mutable intrusive instruction list for this basic block.
-     */
-    IntrusiveLinkedList<class MirInstruction> &getInstructions();
-
-    /**
      * Returns the immutable intrusive instruction list for this basic block.
      */
     const IntrusiveLinkedList<class MirInstruction> &getInstructions() const;
 
     /**
-     * Returns a pointer to the mutable intrusive instruction list.
+     * Returns a const iterator pointing to the first instruction in the block.
      */
-    IntrusiveLinkedList<class MirInstruction> *getInstructionsPtr();
+    IntrusiveLinkedList<MirInstruction>::const_iterator begin() const;
 
     /**
-     * Returns an iterator pointing to the first instruction in the block.
+     * Returns a const iterator pointing past the last instruction in the block.
      */
-    IntrusiveLinkedList<MirInstruction>::iterator begin();
-
-    /**
-     * Returns an iterator pointing past the last instruction in the block.
-     */
-    IntrusiveLinkedList<MirInstruction>::iterator end();
+    IntrusiveLinkedList<MirInstruction>::const_iterator end() const;
 
     /**
      * Returns the preceding basic block in the function's intrusive layout sequence.
@@ -82,6 +77,12 @@ class MirBlock
     size_t getInstrCount() const;
 
     /**
+     * Returns the label name of the basic block.
+     */
+    const std::pmr::string &getName() const;
+
+  private:
+    /**
      * Sets the subsequent basic block in the intrusive list.
      */
     void setNext(MirBlock *next);
@@ -95,11 +96,6 @@ class MirBlock
      * Sets the preceding basic block in the intrusive list.
      */
     void setPrev(MirBlock *prev);
-
-    /**
-     * Returns the label name of the basic block.
-     */
-    const std::pmr::string &getName() const;
 
   private:
     /**

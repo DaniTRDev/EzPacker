@@ -11,29 +11,19 @@ MirBlock::MirBlock(MirId id, SourceReference *sourceRef, MirFunction *owner, con
 }
 
 /**
- * Returns mutable reference to the block's intrusive instruction list.
- */
-IntrusiveLinkedList<MirInstruction> &MirBlock::getInstructions() { return m_instructions; }
-
-/**
  * Returns const reference to the block's intrusive instruction list.
  */
 const IntrusiveLinkedList<MirInstruction> &MirBlock::getInstructions() const { return m_instructions; }
 
 /**
- * Returns pointer to the block's intrusive instruction list.
+ * Returns const iterator to the first instruction.
  */
-IntrusiveLinkedList<MirInstruction> *MirBlock::getInstructionsPtr() { return &m_instructions; }
+IntrusiveLinkedList<MirInstruction>::const_iterator MirBlock::begin() const { return m_instructions.begin(); }
 
 /**
- * Returns iterator to the first instruction.
+ * Returns const iterator past the last instruction.
  */
-IntrusiveLinkedList<MirInstruction>::iterator MirBlock::begin() { return m_instructions.begin(); }
-
-/**
- * Returns iterator past the last instruction.
- */
-IntrusiveLinkedList<MirInstruction>::iterator MirBlock::end() { return m_instructions.end(); }
+IntrusiveLinkedList<MirInstruction>::const_iterator MirBlock::end() const { return m_instructions.end(); }
 
 /**
  * Returns preceding basic block in the layout sequence.
@@ -80,6 +70,11 @@ SourceReference *MirBlock::getSourceRef() const { return m_sourceRef; }
 size_t MirBlock::getInstrCount() const { return m_instructions.size(); }
 
 /**
+ * Returns the label name of the block.
+ */
+const std::pmr::string &MirBlock::getName() const { return m_name; }
+
+/**
  * Links the subsequent block in the intrusive sequence.
  */
 void MirBlock::setNext(MirBlock *next) { m_next = next; }
@@ -93,8 +88,3 @@ void MirBlock::setOwner(MirFunction *func) { m_owner = func; }
  * Links the preceding block in the intrusive sequence.
  */
 void MirBlock::setPrev(MirBlock *prev) { m_prev = prev; }
-
-/**
- * Returns the label name of the block.
- */
-const std::pmr::string &MirBlock::getName() const { return m_name; }

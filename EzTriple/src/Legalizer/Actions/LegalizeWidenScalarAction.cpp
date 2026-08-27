@@ -175,7 +175,7 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
         }
     }
 
-    instr->getOwner()->getInstructions().erase(ctx.m_it);
+    ib.erase(instr);
     return LegalizationResult::Legalized;
 }
 

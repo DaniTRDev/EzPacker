@@ -26,26 +26,13 @@ MirFunction::MirFunction(CallingConvDesc *callingConv,
     }
 }
 
-bool MirFunction::appendBlock(MirBlock *block)
-{
-    if (m_blockIdToBlock.contains(block->getId()))
-        return false;
-
-    m_blockIdToBlock.insert({ block->getId(), block });
-    m_blocks.push_back(block);
-
-    return true;
-}
-
 CallingConvDesc *MirFunction::getCallingConv() const { return m_callingConv; }
 
-IntrusiveLinkedList<class MirBlock> &MirFunction::getBlocks() { return m_blocks; }
+const IntrusiveLinkedList<class MirBlock> &MirFunction::getBlocks() const { return m_blocks; }
 
-IntrusiveLinkedList<class MirBlock> *MirFunction::getBlocksPtr() { return &m_blocks; }
+IntrusiveLinkedList<class MirBlock>::const_iterator MirFunction::begin() const { return m_blocks.begin(); }
 
-IntrusiveLinkedList<class MirBlock>::iterator MirFunction::begin() { return m_blocks.begin(); }
-
-IntrusiveLinkedList<class MirBlock>::iterator MirFunction::end() { return m_blocks.end(); }
+IntrusiveLinkedList<class MirBlock>::const_iterator MirFunction::end() const { return m_blocks.end(); }
 
 MirBlock *MirFunction::getBlock(MirId id) const
 {
@@ -78,6 +65,23 @@ size_t MirFunction::getParamCount() const { return m_parameters.size(); }
 
 SourceReference *MirFunction::getSourceRef() const { return m_sourceRef; }
 
+const std::pmr::list<MirRegister *> &MirFunction::getParameters() const { return m_parameters; }
+
+const std::pmr::string &MirFunction::getName() const { return m_name; }
+
+const std::pmr::vector<MirRegisterRef> &MirFunction::getUsedCalleeSavedRegs() const { return m_usedCalleeSavedRegs; }
+
+bool MirFunction::appendBlock(MirBlock *block)
+{
+    if (m_blockIdToBlock.contains(block->getId()))
+        return false;
+
+    m_blockIdToBlock.insert({ block->getId(), block });
+    m_blocks.push_back(block);
+
+    return true;
+}
+
 void MirFunction::addCalleeSavedRegUse(const MirRegisterRef &reg) { m_usedCalleeSavedRegs.push_back(reg); }
 
 void MirFunction::setEntryPoint(MirBlock *entryPoint) { m_entryPoint = entryPoint; }
@@ -85,9 +89,3 @@ void MirFunction::setEntryPoint(MirBlock *entryPoint) { m_entryPoint = entryPoin
 void MirFunction::setNext(MirFunction *next) { m_next = next; }
 
 void MirFunction::setPrev(MirFunction *prev) { m_prev = prev; }
-
-std::pmr::list<MirRegister *> &MirFunction::getParameters() { return m_parameters; }
-
-const std::pmr::string &MirFunction::getName() { return m_name; }
-
-const std::pmr::vector<MirRegisterRef> &MirFunction::getUsedCalleeSavedRegs() const { return m_usedCalleeSavedRegs; }

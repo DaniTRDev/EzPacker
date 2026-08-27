@@ -4,6 +4,7 @@
 #include "Descriptors/TargetDesc.h"
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
+#include "Function/MirFunctionBuilder.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
 #include "Operand/MirOperandBuilder.h"
@@ -23,13 +24,9 @@ MirPassIterationPlace MirFunctionSignatureLegalizerPass::getIterationPlace() con
     return MirPassIterationPlace::Function;
 }
 
-MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunction> &funcList,
-                                                     IntrusiveLinkedList<MirFunction>::iterator it,
+MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                                      MirPassManager *passManager)
 {
-    (void)funcList;
-    (void)passManager;
-
     bool modified = false;
     bool succeeded = true;
     MirFunction *func = *it;
@@ -54,6 +51,7 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
         }
     }
 
+    MirFunctionBuilder fBuilder(m_ctx);
     MirInstructionBuilder builder = entryPoint->getInstructions().empty()
             ? MirInstructionBuilder(m_ctx, entryPoint, InsertionType::Append)
             : MirInstructionBuilder(m_ctx,
@@ -66,9 +64,8 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
     if (cc && func->getReturnType() && !cc->canReturnInRegs(func->getReturnType()))
     {
         // Check if SRET pointer is already present
-        bool hasSretParam = !func->getParameters().empty() &&
-                            func->getParameters().front()->getMirType() &&
-                            func->getParameters().front()->getMirType()->getKind() == MirTypeKind::Pointer;
+        bool hasSretParam = !func->getParameters().empty() && func->getParameters().front()->getMirType() &&
+                func->getParameters().front()->getMirType()->getKind() == MirTypeKind::Pointer;
         if (!hasSretParam)
         {
             // Allocate a hidden implicit SRET pointer register
@@ -76,7 +73,7 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
             MirRegister *sretPtrParam = opBuilder.buildVReg(ptrType, "sret_ptr", func->getSourceRef());
 
             // Prepend this implicit argument directly to the front of the parameters
-            func->getParameters().push_front(sretPtrParam);
+            fBuilder.addParamFront(func, sretPtrParam);
             modified = true;
         }
     }
@@ -100,4 +97,3 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
 
     return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = succeeded };
 }
-
