@@ -63,6 +63,8 @@ MirInstruction *MirInstruction::getPrev() const { return m_prev; }
  */
 MirInstruction *MirInstruction::getNext() const { return m_next; }
 
+MirInstructionCategory MirInstruction::getCategory() const { return getMetadata().m_category; }
+
 /**
  * Returns the opcode enumeration value.
  */

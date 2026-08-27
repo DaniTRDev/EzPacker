@@ -20,6 +20,7 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/Actions/LegalizeBitcastAction.h"
         "include/Legalizer/Actions/LegalizeLibcallAction.h"
         "include/Legalizer/Actions/LegalizeCustomAction.h"
+        "include/Predicates/Predicates.h"
         "include/RegisterAllocator/MirRegisterAllocator.h"
         "include/RegisterAllocator/MirRegisterAllocatorPass.h"
 
@@ -39,6 +40,7 @@ set(EZTRIPLE_FILES_LIST
         "src/Legalizer/Actions/LegalizeBitcastAction.cpp"
         "src/Legalizer/Actions/LegalizeLibcallAction.cpp"
         "src/Legalizer/Actions/LegalizeCustomAction.cpp"
+        "src/Predicates/Predicates.cpp"
         "src/RegisterAllocator/MirRegisterAllocator.cpp"
         "src/RegisterAllocator/MirRegisterAllocatorPass.cpp"
 )

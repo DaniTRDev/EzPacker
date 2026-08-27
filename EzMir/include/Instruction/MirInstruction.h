@@ -73,6 +73,11 @@ class MirInstruction
     MirInstruction *getNext() const;
 
     /**
+     * Returns the category of this instruction.
+     */
+    MirInstructionCategory getCategory() const;
+
+    /**
      * Returns the static metadata associated with this instruction's opcode.
      */
     const MirInstructionMetadata &getMetadata() const;
@@ -176,7 +181,7 @@ class MirInstruction
      * Associates a target machine instruction descriptor for lowered instructions.
      */
     void setTargetDesc(MirTargetInstructionDesc *desc);
-    
+
     /**
      * Sets the preceding instruction in the block's intrusive list.
      */

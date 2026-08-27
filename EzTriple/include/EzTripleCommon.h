@@ -1,6 +1,8 @@
 #ifndef EZTRIPLE_EZ_TRIPLE_COMMON_H
 #define EZTRIPLE_EZ_TRIPLE_COMMON_H
 
+#include <bit>
+#include <climits>
 #include <cstring>
 #include <cstdint>
 #include <string>
