@@ -279,7 +279,7 @@ TEST_F(LegalizeActionPassTest, TestInvalidCustomAction)
 {
     std::string code = R"(
 action SDIV {
-    CUSTOM() >> MyAction;
+    CUSTOM() >> MyActionInvalid;
 };
 )";
 

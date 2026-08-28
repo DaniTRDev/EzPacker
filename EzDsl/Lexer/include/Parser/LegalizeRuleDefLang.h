@@ -68,10 +68,9 @@ struct RulePredicate
     static constexpr auto rule = []
     {
         auto name = dsl::p<Common::Identifier>;
-        auto args = dsl::parenthesized(
-                dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore | dsl::lit_c<'$'> | dsl::lit_c<'-'> |
-                                   dsl::lit_c<'+'>) >>
-                         dsl::p<ArgList>));
+        auto args = dsl::parenthesized(dsl::opt(
+                dsl::peek(dsl::ascii::alpha_digit_underscore | dsl::lit_c<'$'> | dsl::lit_c<'-'> | dsl::lit_c<'+'>) >>
+                dsl::p<ArgList>));
         return name + args + dsl::lit_c<';'>;
     }();
 
@@ -102,8 +101,7 @@ struct CustomTransformOperand
         static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::Common::Identifier>>;
     };
 
-    static constexpr auto rule =
-            dsl::p<Common::Identifier> + dsl::parenthesized(dsl::p<VarList>);
+    static constexpr auto rule = dsl::p<Common::Identifier> + dsl::parenthesized(dsl::p<VarList>);
 
     static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
             [](Ast::Common::Identifier funcName, std::pmr::vector<Ast::Common::Identifier> args)
@@ -255,8 +253,7 @@ struct RuleInstruction
         }();
 
         static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleInstruction>(
-                [](Ast::Common::Identifier opcode, std::pmr::vector<Ast::LegalizeRuleDef::RuleOperand> operands)
-                {
+                [](Ast::Common::Identifier opcode, std::pmr::vector<Ast::LegalizeRuleDef::RuleOperand> operands) {
                     return Ast::LegalizeRuleDef::RuleInstruction{ .m_opcode = std::move(opcode),
                                                                   .m_operands = std::move(operands) };
                 },

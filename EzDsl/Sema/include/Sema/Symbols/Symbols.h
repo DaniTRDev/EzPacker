@@ -245,7 +245,7 @@ struct LegalizeConstraintSymbol
 };
 
 /**
- * Semantic symbol for a legalization directive clause (.lad).
+ * Semantic symbol for a legalization action clause (.lad).
  */
 struct LegalizeClauseSymbol
 {
@@ -257,7 +257,7 @@ struct LegalizeClauseSymbol
 };
 
 /**
- * Semantic symbol grouping all legalization rules for a generic IR opcode (.lad).
+ * Semantic symbol grouping all legalization actions for a generic IR opcode (.lad).
  */
 struct LegalizeActionSymbol
 {

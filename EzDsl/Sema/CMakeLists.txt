@@ -1,0 +1,37 @@
+set(EZDSL_SEMA_FILES_LIST
+    "include/Sema/Scope.h"
+    "include/Sema/SemaContext.h"
+    "include/Sema/Symbol.h"
+    "include/Sema/SymbolTable.h"
+    "include/Sema/Symbols/Symbols.h"
+    "include/SemaPasses/CallingConvPass.h"
+    "include/SemaPasses/InstSelPass.h"
+    "include/SemaPasses/IrInstructionPass.h"
+    "include/SemaPasses/LegalizeActionPass.h"
+    "include/SemaPasses/LegalizeRulePass.h"
+    "include/SemaPasses/RegisterBankPass.h"
+    "include/SemaPasses/TargetDefPass.h"
+    "include/SemaPasses/TargetInstPass.h"
+    "include/SemaPasses/TypePass.h"
+
+    "src/Sema/Scope.cpp"
+    "src/Sema/SemaContext.cpp"
+    "src/Sema/Symbol.cpp"
+    "src/Sema/SymbolTable.cpp"
+    "src/SemaPasses/CallingConvPass.cpp"
+    "src/SemaPasses/InstSelPass.cpp"
+    "src/SemaPasses/IrInstructionPass.cpp"
+    "src/SemaPasses/LegalizeActionPass.cpp"
+    "src/SemaPasses/LegalizeRulePass.cpp"
+    "src/SemaPasses/RegisterBankPass.cpp"
+    "src/SemaPasses/TargetDefPass.cpp"
+    "src/SemaPasses/TargetInstPass.cpp"
+    "src/SemaPasses/TypePass.cpp"
+)
+
+EzCMK_ConfigureLib(NAME "EzDslSema"
+        FILE_LIST ${EZDSL_SEMA_FILES_LIST}
+        PRECOMPILED_HEADER "include/EzDslSemaCommon.h"
+        LINKED_LIBRARIES "EzDslLexer"
+        INCLUDED_DIRS "include"
+)

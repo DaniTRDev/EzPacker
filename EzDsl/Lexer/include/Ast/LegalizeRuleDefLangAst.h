@@ -12,7 +12,7 @@ namespace DSL::Ast::LegalizeRuleDef
 {
 
 /**
- * Kind of operand appearing within rewrite rule patterns or expansion templates.
+ * Kind of operand appearing within rewrite rule patterns.
  */
 enum class OperandKind : uint8_t
 {
@@ -42,7 +42,7 @@ enum class OperandKind : uint8_t
  */
 struct RuleOperand
 {
-    OperandKind m_kind = OperandKind::SsaRegister;
+    OperandKind m_kind;
     Common::Identifier m_name;                          // Variable or transform function name
     std::optional<Common::Identifier> m_type;           // Base type or classifier ("i32", "imm", "GPR")
     std::optional<Common::Identifier> m_typeParam;      // Optional parameter ("i32" in "imm(i32):$c")
@@ -60,7 +60,6 @@ struct RuleOperand
  * Examples:
  *   ADD $dst, $lhs, $rhs;
  *   RET $val;
- *   $dst;
  */
 struct RuleInstruction
 {

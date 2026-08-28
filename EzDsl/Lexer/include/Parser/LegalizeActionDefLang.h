@@ -27,10 +27,15 @@ struct TypeConstraint
             dsl::p<Common::Identifier> + dsl::opt(dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>);
 
     static constexpr auto value = lexy::callback<Ast::LegalizeActionDef::TypeConstraint>(
-            [](Ast::Common::Identifier typeName, Ast::Common::IntegerLiteral index)
-            { return Ast::LegalizeActionDef::TypeConstraint{ std::move(typeName), index }; },
-            [](Ast::Common::Identifier typeName, lexy::nullopt)
-            { return Ast::LegalizeActionDef::TypeConstraint{ std::move(typeName), std::nullopt }; });
+            [](Ast::Common::Identifier typeName, auto index)
+            {
+                if constexpr (std::is_same_v<std::decay_t<decltype(index)>, Ast::Common::IntegerLiteral>)
+                {
+                    return Ast::LegalizeActionDef::TypeConstraint{ std::move(typeName), std::move(index) };
+                }
+
+                return Ast::LegalizeActionDef::TypeConstraint{ std::move(typeName), std::nullopt };
+            });
 };
 
 /**
@@ -108,87 +113,42 @@ struct LegalizationClause
     static constexpr auto value =
             Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::TypeConstraint>> >>
             lexy::callback<Ast::LegalizeActionDef::LegalizeActionClause>(
-                    // 1. Types present, Target present
-                    [](Ast::LegalizeActionDef::LegalizeActionKind kind,
-                       std::pmr::vector<Ast::LegalizeActionDef::TypeConstraint> constraints,
-                       TargetVariant target)
-                    {
-                        Ast::LegalizeActionDef::LegalizeActionClause clause;
-                        clause.m_kind = kind;
-                        clause.m_types = std::move(constraints);
-
-                        std::visit(
-                                [&](auto &&val)
-                                {
-                                    using T = std::decay_t<decltype(val)>;
-                                    if constexpr (std::is_same_v<T, Ast::Common::StringLiteral>)
-                                    {
-                                        clause.m_libcallSymbol = val;
-                                    }
-                                    else if constexpr (std::is_same_v<T, std::pmr::vector<Ast::Common::Identifier>>)
-                                    {
-                                        if (clause.m_kind == Ast::LegalizeActionDef::LegalizeActionKind::Custom)
-                                        {
-                                            clause.m_customRules = std::move(val);
-                                        }
-                                        else if (!val.empty())
-                                        {
-                                            clause.m_targetType = std::move(val.front());
-                                        }
-                                    }
-                                },
-                                target);
-
-                        return clause;
-                    },
-
-                    // 2. Types present, Target absent
-                    [](Ast::LegalizeActionDef::LegalizeActionKind kind,
-                       std::pmr::vector<Ast::LegalizeActionDef::TypeConstraint> constraints,
-                       lexy::nullopt)
-                    {
-                        Ast::LegalizeActionDef::LegalizeActionClause clause;
-                        clause.m_kind = kind;
-                        clause.m_types = std::move(constraints);
-                        return clause;
-                    },
-
-                    // 3. Types absent (), Target present
-                    [](Ast::LegalizeActionDef::LegalizeActionKind kind, lexy::nullopt, TargetVariant target)
+                    [](Ast::LegalizeActionDef::LegalizeActionKind kind, auto constraints, auto target)
                     {
                         Ast::LegalizeActionDef::LegalizeActionClause clause;
                         clause.m_kind = kind;
 
-                        std::visit(
-                                [&](auto &&val)
-                                {
-                                    using T = std::decay_t<decltype(val)>;
-                                    if constexpr (std::is_same_v<T, Ast::Common::StringLiteral>)
-                                    {
-                                        clause.m_libcallSymbol = val;
-                                    }
-                                    else if constexpr (std::is_same_v<T, std::pmr::vector<Ast::Common::Identifier>>)
-                                    {
-                                        if (clause.m_kind == Ast::LegalizeActionDef::LegalizeActionKind::Custom)
-                                        {
-                                            clause.m_customRules = std::move(val);
-                                        }
-                                        else if (!val.empty())
-                                        {
-                                            clause.m_targetType = std::move(val.front());
-                                        }
-                                    }
-                                },
-                                target);
+                        if constexpr (std::is_same_v<std::decay_t<decltype(constraints)>,
+                                                     std::pmr::vector<Ast::LegalizeActionDef::TypeConstraint>>)
+                        {
+                            clause.m_types = std::move(constraints);
+                        }
 
-                        return clause;
-                    },
+                        if constexpr (std::is_same_v<std::decay_t<decltype(target)>, TargetVariant>)
+                        {
+                            std::visit(
+                                    [&](auto &&val)
+                                    {
+                                        using T = std::decay_t<decltype(val)>;
+                                        if constexpr (std::is_same_v<T, Ast::Common::StringLiteral>)
+                                        {
+                                            clause.m_libcallSymbol = val;
+                                        }
+                                        else if constexpr (std::is_same_v<T, std::pmr::vector<Ast::Common::Identifier>>)
+                                        {
+                                            if (clause.m_kind == Ast::LegalizeActionDef::LegalizeActionKind::Custom)
+                                            {
+                                                clause.m_customRules = std::move(val);
+                                            }
+                                            else if (!val.empty())
+                                            {
+                                                clause.m_targetType = std::move(val.front());
+                                            }
+                                        }
+                                    },
+                                    target);
+                        }
 
-                    // 4. Types absent (), Target absent
-                    [](Ast::LegalizeActionDef::LegalizeActionKind kind, lexy::nullopt, lexy::nullopt)
-                    {
-                        Ast::LegalizeActionDef::LegalizeActionClause clause;
-                        clause.m_kind = kind;
                         return clause;
                     });
 };

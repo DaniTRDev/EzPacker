@@ -32,7 +32,7 @@ endif ()
 
 add_subdirectory(LibBf) # https://bellard.org/libbf/
 add_subdirectory(EzCore)
-add_subdirectory(EzMir)
+#add_subdirectory(EzMir)
 add_subdirectory(EzDsl)
 add_subdirectory(EzTriple)
 add_subdirectory(EzCodeEmitter)

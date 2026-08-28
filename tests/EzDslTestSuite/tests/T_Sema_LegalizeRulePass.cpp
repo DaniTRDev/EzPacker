@@ -131,7 +131,7 @@ rule AddZeroToCopy {
 
     Symbol *sym = m_table->getSymByName("AddZeroToCopy");
     ASSERT_NE(sym, nullptr);
-    EXPECT_EQ(sym->getType(), SymbolType::ISelPattern);
+    EXPECT_EQ(sym->getType(), SymbolType::LegalizeRule);
 
     const auto *ruleData = sym->getIf<Sema::Symbols::LegalizeRewriteRuleSymbol>();
     ASSERT_NE(ruleData, nullptr);

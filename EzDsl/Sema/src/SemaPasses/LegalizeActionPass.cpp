@@ -57,7 +57,7 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
 
     if (symId == InvalidSymbolId)
     {
-        collector->error(PassName, "Redefinition of legalization actions for opcode '{}'", instIdentifier.m_node)
+        collector->error(PassName, "Redefinition of legalization action for opcode '{}'", instIdentifier.m_node)
                 << instIdentifier.m_sourceRef;
         return false;
     }
@@ -72,7 +72,7 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
     bool success = true;
     size_t maxOperandIndex = 0;
 
-    for (const auto &clause : decl.m_actions)
+    for (const auto &clause : decl.m_actionClauses)
     {
         Sema::Symbols::LegalizeClauseSymbol clauseSym{
             .m_kind = clause.m_kind,
@@ -91,11 +91,12 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
         actionData->m_clauses.push_back(std::move(clauseSym));
     }
 
-    // Records highest operand slot index constrained (determines table dimensionality: 1D, 2D, 3D)
+    // Records highest operand slot index constrained (determines table dimensionality: 1D, 2D, 3D for querying in
+    // legalization)
     actionData->m_maxOperandIndex = maxOperandIndex;
 
     collector->trace(PassName,
-                     "Registered {} legalization clauses for opcode '{}'",
+                     "Registered {} legalization action clauses for opcode '{}'",
                      actionData->m_clauses.size(),
                      instIdentifier.m_node);
 
@@ -188,11 +189,6 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
                     Symbol *srcSym = table->getSymById(constraintSym.m_typeId);
                     const auto *srcData = srcSym ? srcSym->getIf<Sema::Symbols::TypeSymbol>() : nullptr;
 
-                    if (!srcData || srcData->m_bitWidth == 0)
-                    {
-                        continue;
-                    }
-
                     if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::WidenScalar &&
                         targetData->m_bitWidth <= srcData->m_bitWidth)
                     {
@@ -265,6 +261,12 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
 
         case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom:
         {
+            if (!clause.m_types.empty())
+            {
+                collector->error(PassName, "CUSTOM clause does not accept input types");
+                success = false;
+            }
+
             if (clause.m_targetType.has_value())
             {
                 collector->error(PassName, "CUSTOM clause does not accept a target type transformation")

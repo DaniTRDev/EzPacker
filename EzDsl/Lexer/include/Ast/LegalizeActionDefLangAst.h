@@ -34,7 +34,7 @@ enum class LegalizeActionKind : uint8_t
  *   OperandSlotIndex := IntegerLiteral
  *
  * Examples:
- *   - "i32"     -> Homogeneous check on default type index 0
+ *   - "i32"     -> Homogeneous check on default operand slot index 0
  *   - "i8:1"    -> Heterogeneous check targeting operand slot index 1
  */
 struct TypeConstraint
@@ -82,7 +82,7 @@ struct LegalizeActionClause
 struct InstructionLegalizeDecl
 {
     Common::Identifier m_instName;
-    std::pmr::vector<LegalizeActionClause> m_actions;
+    std::pmr::vector<LegalizeActionClause> m_actionClauses;
 };
 
 /**

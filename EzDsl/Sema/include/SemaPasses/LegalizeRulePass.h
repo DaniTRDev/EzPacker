@@ -37,31 +37,20 @@ class LegalizeRulePass
                             class SymbolTable *table,
                             const DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule &rule);
 
-    /**
-     * Validates match pattern instructions and records defined SSA variables into the local rule scope.
-     */
-    static bool processMatchPattern(class DiagnosticCollector *collector,
-                                    class SymbolTable *table,
-                                    const DSL::Ast::LegalizeRuleDef::RuleInstruction &inst,
-                                    std::string_view ruleName,
-                                    Sema::Symbols::RuleInstructionSymbol &outInst);
-
-    /**
-     * Validates semantic guard predicates and verifies that variable arguments were defined in the match block.
-     */
-    static bool processPredicate(class DiagnosticCollector *collector,
-                                 class SymbolTable *table,
+    static bool processPredicate(DiagnosticCollector *collector,
+                                 SymbolTable *table,
                                  const DSL::Ast::LegalizeRuleDef::RulePredicate &predicate,
                                  std::string_view ruleName);
 
     /**
-     * Validates expansion instructions and ensures all referenced SSA variables were bound in match patterns.
+     * Validates semantic guard predicates and verifies that variable arguments were defined in the match block.
      */
-    static bool processExpandInstruction(class DiagnosticCollector *collector,
-                                         class SymbolTable *table,
-                                         const DSL::Ast::LegalizeRuleDef::RuleInstruction &inst,
-                                         std::string_view ruleName,
-                                         Sema::Symbols::RuleInstructionSymbol &outInst);
+    static bool processInstruction(DiagnosticCollector *collector,
+                                   SymbolTable *table,
+                                   const DSL::Ast::LegalizeRuleDef::RuleInstruction &inst,
+                                   std::string_view ruleName,
+                                   bool isMatchPattern,
+                                   Sema::Symbols::RuleInstructionSymbol &outInst);
 
     /**
      * Resolves rule operands (SSA variables, constants, type prefixes, custom transforms).

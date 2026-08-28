@@ -148,18 +148,19 @@ TEST_F(LegalizeActionLangTest, TestBitcastActionClause)
 }
 
 /**
- * Verifies parsing custom legalization hooks (CUSTOM) and unsupported operation markers (UNSUPPORTED).
+ * Verifies parsing custom legalization hooks (CUSTOM).
  */
 TEST_F(LegalizeActionLangTest, TestCustomActionClauses)
 {
-    std::string customTest = "CUSTOM(i128) >> i64";
+    std::string customTest = "CUSTOM() >> i64";
     ParseContext customCtx = createParseContextFromBuff("customTest", customTest);
 
     auto customRes = customCtx.parse<DSL::Parser::LegalizeActionDef::LegalizationClause,
                                      DSL::Ast::LegalizeActionDef::LegalizeActionClause>();
     ASSERT_TRUE(customRes.has_value());
     EXPECT_EQ(customRes->m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom);
-    EXPECT_EQ(customRes->m_targetType->m_node, "i64");
+    ASSERT_TRUE(customRes->m_customRules.has_value());
+    EXPECT_EQ(customRes->m_customRules.value()[0].m_node, "i64");
 }
 
 // ============================================================================
@@ -184,18 +185,18 @@ action ADD {
                          DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl>();
     ASSERT_TRUE(res.has_value());
     EXPECT_EQ(res->m_instName.m_node, "ADD");
-    ASSERT_EQ(res->m_actions.size(), 3);
+    ASSERT_EQ(res->m_actionClauses.size(), 3);
 
-    EXPECT_EQ(res->m_actions[0].m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Legal);
-    ASSERT_EQ(res->m_actions[0].m_types.size(), 2);
-    EXPECT_EQ(res->m_actions[0].m_types[0].m_type.m_node, "i32");
-    EXPECT_EQ(res->m_actions[0].m_types[1].m_type.m_node, "f32");
+    EXPECT_EQ(res->m_actionClauses[0].m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Legal);
+    ASSERT_EQ(res->m_actionClauses[0].m_types.size(), 2);
+    EXPECT_EQ(res->m_actionClauses[0].m_types[0].m_type.m_node, "i32");
+    EXPECT_EQ(res->m_actionClauses[0].m_types[1].m_type.m_node, "f32");
 
-    EXPECT_EQ(res->m_actions[1].m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::WidenScalar);
-    EXPECT_EQ(res->m_actions[1].m_targetType->m_node, "i32");
+    EXPECT_EQ(res->m_actionClauses[1].m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::WidenScalar);
+    EXPECT_EQ(res->m_actionClauses[1].m_targetType->m_node, "i32");
 
-    EXPECT_EQ(res->m_actions[2].m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::NarrowScalar);
-    EXPECT_EQ(res->m_actions[2].m_targetType->m_node, "i32");
+    EXPECT_EQ(res->m_actionClauses[2].m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::NarrowScalar);
+    EXPECT_EQ(res->m_actionClauses[2].m_targetType->m_node, "i32");
 }
 
 /**
@@ -215,12 +216,12 @@ action SEXT {
                          DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl>();
     ASSERT_TRUE(res.has_value());
     EXPECT_EQ(res->m_instName.m_node, "SEXT");
-    ASSERT_EQ(res->m_actions.size(), 2);
+    ASSERT_EQ(res->m_actionClauses.size(), 2);
 
-    ASSERT_EQ(res->m_actions[1].m_types.size(), 3);
-    EXPECT_EQ(res->m_actions[1].m_types[0].m_type.m_node, "i1");
-    ASSERT_TRUE(res->m_actions[1].m_types[0].m_operandIndex.has_value());
-    EXPECT_EQ(res->m_actions[1].m_types[0].m_operandIndex->m_node, 1);
+    ASSERT_EQ(res->m_actionClauses[1].m_types.size(), 3);
+    EXPECT_EQ(res->m_actionClauses[1].m_types[0].m_type.m_node, "i1");
+    ASSERT_TRUE(res->m_actionClauses[1].m_types[0].m_operandIndex.has_value());
+    EXPECT_EQ(res->m_actionClauses[1].m_types[0].m_operandIndex->m_node, 1);
 }
 
 // ============================================================================
@@ -259,16 +260,16 @@ action BITCAST {
     ASSERT_EQ(res->m_instructionActions.size(), 3);
 
     EXPECT_EQ(res->m_instructionActions[0].m_instName.m_node, "ADD");
-    EXPECT_EQ(res->m_instructionActions[0].m_actions.size(), 3);
+    EXPECT_EQ(res->m_instructionActions[0].m_actionClauses.size(), 3);
 
     EXPECT_EQ(res->m_instructionActions[1].m_instName.m_node, "SDIV");
-    EXPECT_EQ(res->m_instructionActions[1].m_actions.size(), 3);
-    EXPECT_EQ(res->m_instructionActions[1].m_actions[1].m_kind,
+    EXPECT_EQ(res->m_instructionActions[1].m_actionClauses.size(), 3);
+    EXPECT_EQ(res->m_instructionActions[1].m_actionClauses[1].m_kind,
               DSL::Ast::LegalizeActionDef::LegalizeActionKind::Libcall);
-    EXPECT_EQ(res->m_instructionActions[1].m_actions[1].m_libcallSymbol->m_node, "__divdi3");
+    EXPECT_EQ(res->m_instructionActions[1].m_actionClauses[1].m_libcallSymbol->m_node, "__divdi3");
 
     EXPECT_EQ(res->m_instructionActions[2].m_instName.m_node, "BITCAST");
-    EXPECT_EQ(res->m_instructionActions[2].m_actions.size(), 2);
+    EXPECT_EQ(res->m_instructionActions[2].m_actionClauses.size(), 2);
 }
 
 // ============================================================================
