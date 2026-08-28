@@ -8,12 +8,11 @@
 #include "Instruction/MirInstructionMetadata.h"
 #include "Legalizer/Actions/LegalizeBitcastAction.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
-#include "Legalizer/Actions/LegalizeCustomAction.h"
 #include "Legalizer/Actions/LegalizeLibcallAction.h"
 #include "Legalizer/Actions/LegalizeNarrowScalarAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
 #include "Legalizer/Actions/LegalizeWidenScalarAction.h"
-#include "Legalizer/MirExpansionRuleRegistry.h"
+#include "Legalizer/MirLegalizeActionTable.h"
 #include "Operand/MirOperand.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
@@ -64,6 +63,7 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
             {
                 return false;
             }
+
             if (res == LegalizationResult::Legalized)
             {
                 changed = true;
@@ -87,7 +87,6 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
 
     LegalizeCtx ctx(m_ctx, m_targetDesc, it);
 
-    // 1. High-level calling convention instructions
     if (inst->getFlags() & MirInstructionFlags::IsCall)
     {
         return LegalizeActions::LegalizeCall(ctx);
@@ -97,86 +96,113 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
         return LegalizeActions::LegalizeReturn(ctx);
     }
 
-    // 2. Custom expansion rewrite rules (.lrd)
-    if (m_targetDesc)
+    const auto *actionTable = m_targetDesc->getLegalizeActionTable();
+    if (!actionTable)
     {
-        auto *expRules = m_targetDesc->getExpansionRegistry();
-        if (expRules && expRules->tryExpand(m_ctx, inst))
-        {
-            return LegalizationResult::Legalized;
-        }
+        m_ctx->getDiagCollector()->error("MirLegalizer", "Target does not provide a MirLegalizeActionTable")
+                << inst->getSourceRef();
+        return LegalizationResult::Failed;
     }
 
-    // 3. Action query per operand slot
-    for (size_t slot = 0; slot < inst->getOperandCount(); ++slot)
+    // Extract compact type IDs for up to 3 operands (0 represents unset / default)
+    uint8_t t0 = 0;
+    uint8_t t1 = 0;
+    uint8_t t2 = 0;
+
+    size_t opCount = inst->getOperandCount();
+    if (opCount > 0 && inst->getOperand(0) && inst->getOperand(0)->getMirType())
+        t0 = inst->getOperand(0)->getMirType()->getCompactId();
+
+    if (opCount > 1 && inst->getOperand(1) && inst->getOperand(1)->getMirType())
+        t1 = inst->getOperand(1)->getMirType()->getCompactId();
+
+    if (opCount > 2 && inst->getOperand(2) && inst->getOperand(2)->getMirType())
+        t2 = inst->getOperand(2)->getMirType()->getCompactId();
+
+    // Query the action table in O(1) time
+    LegalizeQueryResult decision = actionTable->query(inst->getOpCode(), t0, t1, t2);
+
+    /*
+     * Fast path: instruction is natively supported. This instrinsic allows the compiler to optimize the cmp + jump to
+     * ensure CPU's branch prediction does not waste its effort.
+     */
+    if (__builtin_expect(decision.m_action == LegalizeAction::Legal, 1))
     {
-        LegalizeAction action = getTargetLegalizeAction(inst, slot);
-        MirType *targetType = getTargetLegalType(inst, slot);
+        return LegalizationResult::NotModified;
+    }
 
-        if (action == LegalizeAction::Unsupported)
-        {
-            m_ctx->getDiagCollector()->error("MirLegalizer",
-                                             "Invalid target legalize action for instruction's operand slot: {}",
-                                             slot)
-                    << inst->getSourceRef();
-            return LegalizationResult::Failed;
-        }
+    MirType *targetType = m_ctx->getTypeTable()->getTypeByCompactId(decision.m_compactId);
+    switch (decision.m_action)
+    {
+        case LegalizeAction::Legal:
+            return LegalizationResult::NotModified;
 
-        if (!targetType)
+        case LegalizeAction::WidenScalar:
         {
-            m_ctx->getDiagCollector()->error("MirLegalizer",
-                                             "Invalid target type for instruction's operand slot: {}",
-                                             slot)
-                    << inst->getSourceRef();
-            return LegalizationResult::Failed;
-        }
-
-        switch (action)
-        {
-            case LegalizeAction::Legal:
-                break;
-            case LegalizeAction::WidenScalar:
-                return LegalizeActions::LegalizeWidenScalar(ctx, slot, targetType);
-            case LegalizeAction::NarrowScalar:
-                return LegalizeActions::LegalizeNarrowScalar(ctx, slot, targetType);
-            case LegalizeAction::Bitcast:
-                return LegalizeActions::LegalizeBitcast(ctx, slot, targetType);
-            case LegalizeAction::Libcall:
+            if (!targetType)
             {
-                std::string_view sym = getLibcallSymbol(inst);
-                if (!sym.empty())
-                {
-                    return LegalizeActions::LegalizeLibcall(ctx, sym);
-                }
-
-                m_ctx->getDiagCollector()->error("MirLegalizer", "Invalid liball for instruction")
+                m_ctx->getDiagCollector()->error("MirLegalizer",
+                                                 "Target type not found for WidenScalar on opcode '{}'",
+                                                 inst->getOpCodeName())
                         << inst->getSourceRef();
-                break;
-            }
-            case LegalizeAction::Custom:
-                // This should not trigger and tryExpand should have already fired the rule, but just in case.
-                return LegalizeActions::LegalizeCustom(ctx);
-            case LegalizeAction::Unsupported:
                 return LegalizationResult::Failed;
+            }
+            return LegalizeActions::LegalizeWidenScalar(ctx, decision.m_slot, targetType);
         }
+
+        case LegalizeAction::NarrowScalar:
+        {
+            if (!targetType)
+            {
+                m_ctx->getDiagCollector()->error("MirLegalizer",
+                                                 "Target type not found for NarrowScalar on opcode '{}'",
+                                                 inst->getOpCodeName())
+                        << inst->getSourceRef();
+                return LegalizationResult::Failed;
+            }
+            return LegalizeActions::LegalizeNarrowScalar(ctx, decision.m_slot, targetType);
+        }
+
+        case LegalizeAction::Bitcast:
+        {
+            if (!targetType)
+            {
+                m_ctx->getDiagCollector()->error("MirLegalizer",
+                                                 "Target type not found for Bitcast on opcode '{}'",
+                                                 inst->getOpCodeName())
+                        << inst->getSourceRef();
+                return LegalizationResult::Failed;
+            }
+            return LegalizeActions::LegalizeBitcast(ctx, decision.m_slot, targetType);
+        }
+
+        case LegalizeAction::Libcall:
+        {
+            std::string_view sym = m_targetDesc->getLibcallStr(decision.m_libcallOffset);
+            if (!sym.empty())
+            {
+                return LegalizeActions::LegalizeLibcall(ctx, sym);
+            }
+
+            m_ctx->getDiagCollector()->error("MirLegalizer",
+                                             "Invalid libcall symbol for opcode '{}'",
+                                             inst->getOpCodeName())
+                    << inst->getSourceRef();
+            return LegalizationResult::Failed;
+        }
+
+        case LegalizeAction::Custom:
+            return actionTable->executeCustomAction(&ctx, decision.m_customActionId);
+
+        case LegalizeAction::Unsupported:
+        default:
+            m_ctx->getDiagCollector()->error("MirLegalizer",
+                                             "Unsupported type combination for opcode '{}' (t0: {}, t1: {}, t2: {})",
+                                             inst->getOpCodeName(),
+                                             t0,
+                                             t1,
+                                             t2)
+                    << inst->getSourceRef();
+            return LegalizationResult::Failed;
     }
-
-    return LegalizationResult::NotModified;
-}
-
-LegalizeAction MirLegalizer::getTargetLegalizeAction(const MirInstruction *inst, size_t operandSlot) const
-{
-    return LegalizeAction::Unsupported;
-}
-
-MirType *MirLegalizer::getTargetLegalType(const MirInstruction *inst, size_t operandSlot) const { return nullptr; }
-
-std::string_view MirLegalizer::getLibcallSymbol(const MirInstruction *inst) const
-{
-    if (!inst)
-    {
-        return {};
-    }
-
-    return {};
 }

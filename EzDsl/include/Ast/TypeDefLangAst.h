@@ -20,26 +20,29 @@ enum class TypeKind : uint8_t
 };
 
 /**
- * AST node for primitive and special type declarations in .tyf files.
+ * AST node for primitive and special type declarations in .tyf files. If no alignment is given, the type size is used
+ * for alignment.
  *
  * Syntax:
- *   TypeDescriptor := TypeKindName TypeName ('(' BitWidth ')')? ';'
+ *   TypeDescriptor := TypeKindName TypeName ('(' BitWidth '), '(' Alignment ')')? ';'
  *   TypeKindName   := 'integer' | 'float' | 'void' | 'bindingToken' | 'pointer'
  *   TypeName       := Identifier
  *   BitWidth       := IntegerLiteral
+ *   Alignment      := IntegerLiteral
  *
  * Examples:
- *   integer i32(32);
- *   float f64(64);
+ *   integer i32(32, 32);
+ *   float f64(64, 64);
  *   void void_t;
  *   bindingToken __token;
- *   pointer ptr(64);
+ *   pointer ptr(64, 64);
  */
 struct TypeDescriptor
 {
     TypeKind m_kind;
     Common::Identifier m_name;
     std::optional<Common::IntegerLiteral> m_bitSize;
+    std::optional<Common::IntegerLiteral> m_alignment;
 };
 
 /**

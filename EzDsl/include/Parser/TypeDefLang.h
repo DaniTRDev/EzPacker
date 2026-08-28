@@ -33,18 +33,19 @@ struct TypeKind
  * Lexy parser rule for a single type definition statement.
  *
  * Syntax:
- *   TypeDescriptor := TypeKind Identifier ( '(' IntegerLiteral ')' )?
- *
+ *   TypeDescriptor := TypeKind Identifier ( '(' IntegerLiteral '), (' IntegerLiteral ')' )?
+ *  If an alignment is not provided, the default alignment (align = size) will be used.
  * Examples:
- *   integer i32(32)
- *   float f64(64)
- *   void void_t
+ *   integer i32(32, 32);
+ *   float f64(64, 64);
+ *   void void_t();
  */
 struct TypeDescriptor
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::p<TypeKind> + dsl::p<Common::Identifier> +
-            dsl::opt(dsl::parenthesized(dsl::p<Common::IntegerLiteral>));
+            dsl::parenthesized(dsl::opt(dsl::peek(dsl::ascii::digit) >> dsl::p<Common::IntegerLiteral>) +
+                               dsl::opt(dsl::lit_c<','> >> dsl::p<Common::IntegerLiteral>));
     static constexpr auto value = lexy::construct<Ast::TypeDef::TypeDescriptor>;
 };
 

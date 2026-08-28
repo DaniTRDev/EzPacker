@@ -1,6 +1,5 @@
 #include "EzMirTestSuite.h"
 #include "EzMirTestSuiteCallingConv.h"
-#include "EzMirTestSuiteTypeLayout.h"
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Diagnostics/DiagnosticCollector.h"
@@ -49,13 +48,11 @@ void EzMirTestSuite::create(const std::filesystem::path &workingPath)
     m_passManager = std::make_shared<MirPassManager>(m_diagCollector.get(), &m_arena);
 
     m_callingConv = std::make_shared<EzMirTestSuiteCallingConv>();
-    m_typeLayout = std::make_shared<EzMirTestSuiteTypeLayout>();
-
     m_diagCollector->addListener(m_diagLogger.get());
     m_diagCollector->enableDiag(Diag_Trace);
     m_diagCollector->enableDiag(Diag_Debug);
 
-    m_typeTable->initialize(m_typeLayout.get());
+    m_typeTable->initialize(64);
     m_passManager->setTestMode();
 
     m_builderCtx->setDefaultCallingConvention(m_callingConv.get());

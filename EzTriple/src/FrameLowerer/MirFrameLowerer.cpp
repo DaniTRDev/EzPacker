@@ -35,7 +35,7 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
     for (StackFrameObject *obj : func->getStackFrame()->getObjects())
     {
         size_t objSize = obj->m_type->getTotalSizeInBytes();
-        size_t objAlign = std::max(obj->m_type->getMaxAlignmentInBytes(), slotSize);
+        size_t objAlign = std::max(obj->m_type->getMaxAlignmentInBits(), slotSize);
 
         // Align current byte offset upwards to object's alignment requirement
         currentOffset = (currentOffset + objAlign - 1) & ~(objAlign - 1);

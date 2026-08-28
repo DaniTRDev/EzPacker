@@ -62,6 +62,7 @@ struct LegalizeActionClause
     std::pmr::vector<TypeConstraint> m_types;
     std::optional<Common::Identifier> m_targetType;
     std::optional<Common::StringLiteral> m_libcallSymbol;
+    std::optional<std::pmr::vector<Common::Identifier>> m_customRules;
 };
 
 /**

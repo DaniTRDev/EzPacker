@@ -26,6 +26,7 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         registerDefaultIrInstructions();
 
         m_table->enterScope("TargetScope");
+        registerCustomActions();
     }
 
     /**
@@ -37,6 +38,12 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
                                            .m_kind = static_cast<DSL::Ast::TypeDef::TypeKind>(0),
                                            .m_bitWidth = bitWidth };
         m_table->declareSym(nullptr, SymbolFlags::IsDefined, SymbolType::Type, typeSym, name);
+    }
+
+    void registerCustomAct(std::string_view name)
+    {
+        Sema::Symbols::LegalizeRewriteRuleSymbol sym{};
+        m_table->declareSym(nullptr, SymbolFlags::IsReferenced, SymbolType::LegalizeRule, sym, name);
     }
 
     /**
@@ -52,6 +59,12 @@ class LegalizeActionPassTest : public DslTestSuiteAsGtest
         registerType("i128", 128);
         registerType("f32", 32);
         registerType("f64", 64);
+    }
+
+    void registerCustomActions()
+    {
+        registerCustomAct("MyAction");
+        registerCustomAct("MyAction2");
     }
 
     /**
@@ -129,6 +142,7 @@ action ADD {
     const auto *actionData = sym->getIf<Sema::Symbols::LegalizeActionSymbol>();
     ASSERT_NE(actionData, nullptr);
     EXPECT_EQ(actionData->m_genericOpcode, "ADD");
+    EXPECT_EQ(actionData->m_maxOperandIndex, 0);
     ASSERT_EQ(actionData->m_clauses.size(), 1);
 
     const auto &clause = actionData->m_clauses[0];
@@ -162,6 +176,8 @@ action CONV {
 
     Symbol *i32Sym = m_table->getSymByName("i32");
     ASSERT_NE(i32Sym, nullptr);
+
+    EXPECT_EQ(actionData->m_maxOperandIndex, 0);
 
     // Clause 1: WIDENS
     EXPECT_EQ(actionData->m_clauses[0].m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::WidenScalar);
@@ -198,12 +214,76 @@ action SDIV {
     const auto *actionData = sym->getIf<Sema::Symbols::LegalizeActionSymbol>();
     ASSERT_NE(actionData, nullptr);
     ASSERT_EQ(actionData->m_clauses.size(), 1);
+    EXPECT_EQ(actionData->m_maxOperandIndex, 0);
 
     const auto &clause = actionData->m_clauses[0];
     EXPECT_EQ(clause.m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Libcall);
     ASSERT_TRUE(clause.m_libcallSymbol.has_value());
     EXPECT_EQ(*clause.m_libcallSymbol, "__divdi3");
     EXPECT_FALSE(clause.m_targetTypeId.has_value());
+}
+
+TEST_F(LegalizeActionPassTest, TestValidCustomAction)
+{
+    std::string code = R"(
+action SDIV {
+    CUSTOM() >> MyAction;
+};
+)";
+
+    ASSERT_TRUE(runPass(code));
+
+    Symbol *sym = m_table->getSymByName("SDIV");
+    ASSERT_NE(sym, nullptr);
+
+    const auto *actionData = sym->getIf<Sema::Symbols::LegalizeActionSymbol>();
+    ASSERT_NE(actionData, nullptr);
+    ASSERT_EQ(actionData->m_clauses.size(), 1);
+    EXPECT_EQ(actionData->m_maxOperandIndex, 0);
+
+    const auto &clause = actionData->m_clauses[0];
+    EXPECT_EQ(clause.m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom);
+    ASSERT_TRUE(clause.m_customRules.has_value());
+
+    auto rules = clause.m_customRules.value();
+    ASSERT_EQ(rules.size(), 1);
+}
+
+TEST_F(LegalizeActionPassTest, TestValidCustomAction2)
+{
+    std::string code = R"(
+action SDIV {
+    CUSTOM() >> MyAction >> MyAction2;
+};
+)";
+
+    ASSERT_TRUE(runPass(code));
+
+    Symbol *sym = m_table->getSymByName("SDIV");
+    ASSERT_NE(sym, nullptr);
+
+    const auto *actionData = sym->getIf<Sema::Symbols::LegalizeActionSymbol>();
+    ASSERT_NE(actionData, nullptr);
+    ASSERT_EQ(actionData->m_clauses.size(), 1);
+    EXPECT_EQ(actionData->m_maxOperandIndex, 0);
+
+    const auto &clause = actionData->m_clauses[0];
+    EXPECT_EQ(clause.m_kind, DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom);
+    ASSERT_TRUE(clause.m_customRules.has_value());
+
+    auto rules = clause.m_customRules.value();
+    ASSERT_EQ(rules.size(), 2);
+}
+
+TEST_F(LegalizeActionPassTest, TestInvalidCustomAction)
+{
+    std::string code = R"(
+action SDIV {
+    CUSTOM() >> MyAction;
+};
+)";
+
+    ASSERT_FALSE(runPass(code));
 }
 
 /**
@@ -226,6 +306,7 @@ action SEXT {
     const auto *actionData = sym->getIf<Sema::Symbols::LegalizeActionSymbol>();
     ASSERT_NE(actionData, nullptr);
     ASSERT_EQ(actionData->m_clauses.size(), 2);
+    EXPECT_EQ(actionData->m_maxOperandIndex, 1);
 
     const auto &widenClause = actionData->m_clauses[1];
     ASSERT_EQ(widenClause.m_types.size(), 2);

@@ -3,7 +3,6 @@
 #include "Instruction/MirInstruction.h"
 #include "Legalizer/Actions/LegalizeBitcastAction.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
-#include "Legalizer/Actions/LegalizeCustomAction.h"
 #include "Legalizer/Actions/LegalizeLibcallAction.h"
 #include "Legalizer/Actions/LegalizeNarrowScalarAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"

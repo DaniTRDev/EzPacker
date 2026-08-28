@@ -70,13 +70,13 @@ class MirTypeTableGeneratorTest : public DslTestSuiteAsGtest
 TEST_F(MirTypeTableGeneratorTest, GeneratesHeaderAndSourceWithValidTypes)
 {
     std::string dslContent = R"(
-        void _void;
+        void _void();
         bindingToken __bindToken;
         integer i8(8);
         integer i32(32);
         float f32(32);
         float f64(64);
-        pointer ptr;
+        pointer ptr();
     )";
 
     // 1. Parse .tyf DSL

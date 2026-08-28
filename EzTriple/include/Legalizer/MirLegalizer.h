@@ -40,21 +40,6 @@ class MirLegalizer
      */
     virtual LegalizationResult legalizeInstruction(IntrusiveLinkedList<MirInstruction>::iterator it, MirBlock *block);
 
-    /**
-     * Determines the legalization action to take for a given instruction and operand slot.
-     */
-    virtual LegalizeAction getTargetLegalizeAction(const MirInstruction *inst, size_t operandSlot = 0) const;
-
-    /**
-     * Determines the target legal type for an instruction and operand slot if transformation is required.
-     */
-    virtual MirType *getTargetLegalType(const MirInstruction *inst, size_t operandSlot = 0) const;
-
-    /**
-     * Retrieves the runtime library symbol for an instruction requiring libcall lowering.
-     */
-    virtual std::string_view getLibcallSymbol(const MirInstruction *inst) const;
-
   protected:
     MirBuilderContext *m_ctx;
     TargetDesc *m_targetDesc;

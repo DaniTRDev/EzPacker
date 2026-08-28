@@ -10,9 +10,10 @@ MirType::MirType(MirTypeKind kind,
                  size_t totalSize,
                  std::pmr::string name,
                  std::pmr::vector<MirType *> subTypes,
+                 uint8_t compactId,
                  bool isTrivial) :
-    m_kind(kind), m_owner(owner), m_id(id), m_maxAlignmentInBytes(maxAlignmentInBytes), m_totalSizeInBits(totalSize),
-    m_subTypes(subTypes), m_name(name), m_isTrivial(isTrivial)
+    m_kind(kind), m_owner(owner), m_id(id), m_maxAlignmentInBits(maxAlignmentInBytes), m_totalSizeInBits(totalSize),
+    m_subTypes(subTypes), m_name(name), m_compactId(compactId), m_isTrivial(isTrivial)
 {
 }
 
@@ -24,7 +25,7 @@ bool MirType::isTrivial() const { return m_isTrivial; }
 /**
  * Checks whether this type has no alignment requirements (alignment = 0).
  */
-bool MirType::isUnAligned() const { return m_maxAlignmentInBytes == 0; }
+bool MirType::isUnAligned() const { return m_maxAlignmentInBits == 0; }
 
 /**
  * Retrieves the element type for array types stored as the first subtype entry.
@@ -81,7 +82,7 @@ size_t MirType::getId() const { return m_id; }
 /**
  * Retrieves the maximum memory alignment requirement in bytes.
  */
-size_t MirType::getMaxAlignmentInBytes() const { return m_maxAlignmentInBytes; }
+size_t MirType::getMaxAlignmentInBits() const { return m_maxAlignmentInBits; }
 
 /**
  * Retrieves the total bit width of this type.
@@ -92,6 +93,8 @@ size_t MirType::getTotalSizeInBits() const { return m_totalSizeInBits; }
  * Computes and returns the total byte width of this type.
  */
 size_t MirType::getTotalSizeInBytes() const { return getTotalSizeInBits() / 8; }
+
+uint8_t MirType::getCompactId() const { return m_compactId; }
 
 /**
  * Sets the triviality flag to false, indicating custom destructor logic is required.
@@ -107,4 +110,3 @@ const std::pmr::string &MirType::getName() const { return m_name; }
  * Retrieves the collection of subtype pointers (element types, pointee types, etc.).
  */
 const std::pmr::vector<MirType *> &MirType::getSubTypes() const { return m_subTypes; }
-

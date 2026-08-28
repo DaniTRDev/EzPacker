@@ -8,14 +8,14 @@
  */
 enum class MirTypeKind : uint8_t
 {
-    Invalid = 0,    // Uninitialized or invalid type sentinel
-    Integer,        // Fixed-width integer types (e.g., i8, i16, i32, i64, i128)
-    FloatingPoint,  // IEEE floating-point types (e.g., f32, f64, f128)
-    Function,       // Function signature type encapsulating return and parameter types
-    Pointer,        // Pointer type referencing a pointee MirType
-    Array,          // Homogeneous sequential collection of elements of a base type (e.g., i32[3])
-    Void,           // Unit or empty type representing lack of value
-    BindingToken    // Token type used for control-flow or lowering bindings (e.g., PUSH_ARGS to CALL, PUSH_RET to RET)
+    Invalid = 0,   // Uninitialized or invalid type sentinel
+    Integer,       // Fixed-width integer types (e.g., i8, i16, i32, i64, i128)
+    FloatingPoint, // IEEE floating-point types (e.g., f32, f64, f128)
+    Function,      // Function signature type encapsulating return and parameter types
+    Pointer,       // Pointer type referencing a pointee MirType
+    Array,         // Homogeneous sequential collection of elements of a base type (e.g., i32[3])
+    Void,          // Unit or empty type representing lack of value
+    BindingToken   // Token type used for control-flow or lowering bindings (e.g., PUSH_ARGS to CALL, PUSH_RET to RET)
 };
 
 /**
@@ -36,10 +36,11 @@ class MirType
     MirType(MirTypeKind kind,
             class MirTypeTable *owner,
             size_t id,
-            size_t maxAlignmentInBytes,
+            size_t maxAlignmentInBits,
             size_t totalSizeInBits,
             std::pmr::string name,
             std::pmr::vector<MirType *> subTypes,
+            uint8_t compactId,
             bool isTrivial = true);
 
     /**
@@ -83,9 +84,9 @@ class MirType
     size_t getId() const;
 
     /**
-     * Returns the maximum alignment requirement in bytes.
+     * Returns the maximum alignment requirement in bits.
      */
-    size_t getMaxAlignmentInBytes() const;
+    size_t getMaxAlignmentInBits() const;
 
     /**
      * Returns the total bit width of this type.
@@ -96,6 +97,11 @@ class MirType
      * Returns the total byte width of this type (bits divided by 8).
      */
     size_t getTotalSizeInBytes() const;
+
+    /**
+     * Return the compact ID of this type.
+     */
+    uint8_t getCompactId() const;
 
     /**
      * Marks this type as non-trivial, indicating custom destruction semantics are required.
@@ -137,12 +143,17 @@ class MirType
     /**
      * Byte alignment requirement for memory storage of this type.
      */
-    size_t m_maxAlignmentInBytes;
+    size_t m_maxAlignmentInBits;
 
     /**
      * Total bit width of this type.
      */
     size_t m_totalSizeInBits;
+
+    /**
+     * Returns the compact type id of this type for fast index lookups.
+     */
+    uint8_t m_compactId;
 
     /**
      * Informational/diagnostic type name string.

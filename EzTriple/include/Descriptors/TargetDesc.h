@@ -23,16 +23,6 @@ class TargetDesc
     virtual const char *getName() const = 0;
 
     /**
-     * Returns the type layout for this target.
-     */
-    virtual class IMirTargetTypeLayout *getTypeLayout() = 0;
-
-    /**
-     * Returns the expansion registry used for custom legalization rules.
-     */
-    virtual class MirExpansionRuleRegistry *getExpansionRegistry() = 0;
-
-    /**
      * Returns the frame lowerer for this target.
      */
     virtual class MirFrameLowerer *getFrameLowerer() = 0;
@@ -46,6 +36,11 @@ class TargetDesc
      * Returns the legalizer needed for this target.
      */
     virtual class MirLegalizer *getLegalizer() = 0;
+
+    /**
+     * Returns the legalize action table for this target
+     */
+    virtual class MirLegalizeActionTable *getLegalizeActionTable() = 0;
 
     /**
      * Returns the register allocator needed for this target.
@@ -71,6 +66,11 @@ class TargetDesc
      * Initializes the target descriptor. This is the function that starts creating everything needed by the descriptor.
      */
     virtual void initialize() = 0;
+
+    /**
+     * Returns the name of the libcall symbol pointed by the given libcall symbol Id.
+     */
+    virtual std::string_view getLibcallStr(uint8_t symId) = 0;
 
     /**
      * Returns a list with the available binary descriptors.

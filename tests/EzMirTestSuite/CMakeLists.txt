@@ -1,11 +1,9 @@
 set(EZMIRTESTSUITE_FILES_LIST
         "include/EzMirTestSuite.h"
         "include/EzMirTestSuiteCallingConv.h"
-        "include/EzMirTestSuiteTypeLayout.h"
 
         "src/EzMirTestSuite.cpp"
         "src/EzMirTestSuiteCallingConv.cpp"
-        "src/EzMirTestSuiteTypeLayout.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzMirTestSuite"

@@ -36,6 +36,7 @@ enum class SymbolType : uint8_t
 
     // .lrd / .isf Patterns & SSA entities
     SsaVariable,
+    LegalizeRule,
     AddrMode,
     ISelPattern,
 

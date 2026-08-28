@@ -120,7 +120,6 @@ class EzMirTestSuite
     MirFunction *m_testFunction; // Pre-created function used to be able to create quick tests easily.
     MirInstructionInsertionPoint m_insertPoint;
     std::shared_ptr<EzMirTestSuiteCallingConv> m_callingConv;
-    std::shared_ptr<EzMirTestSuiteTypeLayout> m_typeLayout;
     std::pmr::monotonic_buffer_resource m_arena;
     std::shared_ptr<DiagnosticCollector> m_diagCollector;
     std::shared_ptr<DiagnosticLogger> m_diagLogger;

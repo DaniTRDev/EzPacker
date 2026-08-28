@@ -69,6 +69,8 @@ struct TypeSymbol
     std::string_view m_name;
     DSL::Ast::TypeDef::TypeKind m_kind;
     uint32_t m_bitWidth{ 0 };
+    uint32_t m_alignment{ 0 };
+    uint8_t m_compactId{ 0 }; // Fast O(1) index for table driven legalizer/selector.
 };
 
 /**
@@ -238,8 +240,8 @@ struct IrInstructionSymbol
  */
 struct LegalizeConstraintSymbol
 {
-    SymbolId m_typeId{ InvalidSymbolId }; // Resolved type ID (e.g. i32)
-    std::optional<uint32_t> m_operandIndex;  // Operand slot index (0, 1, etc.)
+    SymbolId m_typeId{ InvalidSymbolId };   // Resolved type ID (e.g. i32)
+    std::optional<uint32_t> m_operandIndex; // Operand slot index (0, 1, etc.)
 };
 
 /**
@@ -251,6 +253,7 @@ struct LegalizeClauseSymbol
     std::pmr::vector<LegalizeConstraintSymbol> m_types;
     std::optional<SymbolId> m_targetTypeId; // Widen/Narrow/Bitcast target
     std::optional<std::string_view> m_libcallSymbol;
+    std::optional<std::pmr::vector<SymbolId>> m_customRules;
 };
 
 /**
@@ -259,6 +262,8 @@ struct LegalizeClauseSymbol
 struct LegalizeActionSymbol
 {
     std::string_view m_genericOpcode;
+    size_t m_maxOperandIndex; // The maximum index found. Eg: i32:0 -> maxIndex = 0, i32:0, i32:1 -> maxIndex = 1. Used
+                              // to calculate query table dimension.
     std::pmr::vector<LegalizeClauseSymbol> m_clauses;
 };
 

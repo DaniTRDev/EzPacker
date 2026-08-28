@@ -23,7 +23,7 @@ class TypeDefLangTest : public DslTestSuiteAsGtest
  */
 TEST_F(TypeDefLangTest, TestIntegerTypeDescriptor)
 {
-    std::string test = "integer i32(32)";
+    std::string test = "integer i32(32, 64);";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
@@ -32,6 +32,8 @@ TEST_F(TypeDefLangTest, TestIntegerTypeDescriptor)
     EXPECT_EQ(res->m_name.m_node, "i32");
     ASSERT_TRUE(res->m_bitSize.has_value());
     EXPECT_EQ(res->m_bitSize->m_node, 32);
+    ASSERT_TRUE(res->m_alignment.has_value());
+    EXPECT_EQ(res->m_alignment->m_node, 64);
 }
 
 /**
@@ -39,7 +41,7 @@ TEST_F(TypeDefLangTest, TestIntegerTypeDescriptor)
  */
 TEST_F(TypeDefLangTest, TestFloatTypeDescriptor)
 {
-    std::string test = "float f64(64)";
+    std::string test = "float f64(64);";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
@@ -48,6 +50,7 @@ TEST_F(TypeDefLangTest, TestFloatTypeDescriptor)
     EXPECT_EQ(res->m_name.m_node, "f64");
     ASSERT_TRUE(res->m_bitSize.has_value());
     EXPECT_EQ(res->m_bitSize->m_node, 64);
+    ASSERT_FALSE(res->m_alignment.has_value());
 }
 
 /**
@@ -71,7 +74,7 @@ TEST_F(TypeDefLangTest, TestCustomBitWidths)
  */
 TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithoutBitSize)
 {
-    std::string test = "void void";
+    std::string test = "void void()";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
@@ -86,7 +89,7 @@ TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithoutBitSize)
  */
 TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithBitSize)
 {
-    std::string test = "void void(0)";
+    std::string test = "void void(0);";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
@@ -102,7 +105,7 @@ TEST_F(TypeDefLangTest, TestVoidTypeDescriptorWithBitSize)
  */
 TEST_F(TypeDefLangTest, TestBindingTokenTypeDescriptor)
 {
-    std::string test = "bindingToken __bindToken";
+    std::string test = "bindingToken __bindToken();";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TypeDef::TypeDescriptor, DSL::Ast::TypeDef::TypeDescriptor>();
@@ -146,8 +149,8 @@ TEST_F(TypeDefLangTest, TestMultipleTypesInFile)
         integer i64(64);
         float f32(32);
         float f64(64);
-        void void;
-        bindingToken __bindToken;
+        void void();
+        bindingToken __bindToken();
     )";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
@@ -240,18 +243,6 @@ TEST_F(TypeDefLangTest, TestMissingBitSizeParenthesesFails)
 TEST_F(TypeDefLangTest, TestMissingTypeNameFails)
 {
     std::string test = "integer (32);";
-    ParseContext ctx = createParseContextFromBuff("test", test);
-
-    auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
-    EXPECT_FALSE(res.has_value());
-}
-
-/**
- * Verifies syntax error rejection when bit size parameter parentheses are empty.
- */
-TEST_F(TypeDefLangTest, TestEmptyBitSizeParameterFails)
-{
-    std::string test = "integer i32();";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
     auto res = ctx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();

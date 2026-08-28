@@ -62,16 +62,6 @@ bool MockCallingConvDesc::canReturnInRegs(MirType *type) const
     return type->getTotalSizeInBits() <= 128;
 }
 
-bool MockExpansionRules::tryExpand(MirBuilderContext *ctx, MirInstruction *inst)
-{
-    if (!inst)
-        return false;
-
-    m_expandInvoked = true;
-    m_lastExpandedOpCode = inst->getOpCode();
-    return true;
-}
-
 bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (!inst)
@@ -107,7 +97,7 @@ void EzTripleTestSuite::SetUp()
     m_targetDesc = std::make_unique<MockTargetDesc>(m_builderCtx.get());
     m_sourceManager = std::make_unique<SourceManager>(std::filesystem::current_path(), &m_arena);
     m_diagLogger = std::make_unique<DiagnosticLogger>(m_sourceManager.get());
-    m_typeTable->initialize(m_targetDesc->getTypeLayout());
+    m_typeTable->initialize(64);
     m_builderCtx->setDefaultCallingConvention(m_targetDesc->getMockCallingConv());
 
     m_diagCollector->addListener(m_diagLogger.get());
