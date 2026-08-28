@@ -287,6 +287,40 @@ LegalizeQueryResult queryMov(size_t op1Type, size_t op2Type, size_t /*op3Type*/)
     return defaultUnsupportedQuery(op1Type, op2Type, 0);
 }
 
+// 5. Data Movement (POP_ARG)
+// - LEGAL:   i32
+LegalizeQueryResult queryPopArg(size_t op1Type, size_t op2Type, size_t /*op3Type*/)
+{
+    auto dstType = static_cast<MirTypeCompactId>(op1Type);
+    auto srcType = static_cast<MirTypeCompactId>(op2Type);
+
+    if (dstType == MirTypeCompactId::__bindToken && srcType == MirTypeCompactId::i32)
+    {
+        return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
+                                    .m_compactId = 0,
+                                    .m_slot = 0,
+                                    .m_libcallOffset = 0 };
+    }
+
+    return defaultUnsupportedQuery(op1Type, op2Type, 0);
+}
+
+// 5. Data Movement (POP_ARG)
+// - LEGAL:   bindngtoken
+LegalizeQueryResult queryEndArg(size_t op1Type, size_t op2Type, size_t /*op3Type*/)
+{
+    auto dstType = static_cast<MirTypeCompactId>(op1Type);
+    if (dstType == MirTypeCompactId::__bindToken)
+    {
+        return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
+                                    .m_compactId = 0,
+                                    .m_slot = 0,
+                                    .m_libcallOffset = 0 };
+    }
+
+    return defaultUnsupportedQuery(op1Type, op2Type, 0);
+}
+
 } // anonymous namespace
 
 /**
@@ -311,7 +345,7 @@ class MockTargetDesc : public TargetDesc
         constexpr size_t OpcodeCount = static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT);
         for (size_t i = 0; i <= OpcodeCount; ++i)
         {
-            m_mockActionTable.m_queryTable[i] = &defaultUnsupportedQuery;
+            m_mockActionTable.m_queryTable[static_cast<uint16_t>(i)] = &defaultUnsupportedQuery;
         }
 
         // Register test opcodes
@@ -323,6 +357,9 @@ class MockTargetDesc : public TargetDesc
         m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::CMP_EQ)] = &queryCmp;
         m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::SEXT)] = &querySext;
         m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::MOV)] = &queryMov;
+        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::POP_ARG)] = &queryPopArg;
+        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::END_ARG)] = &queryEndArg;
+        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::PUSH_RET)] = &queryPopArg;
     }
     std::string_view getLibcallStr(uint8_t symId)
     {

@@ -100,6 +100,8 @@ void EzTripleTestSuite::SetUp()
     m_typeTable->initialize(64);
     m_builderCtx->setDefaultCallingConvention(m_targetDesc->getMockCallingConv());
 
+    m_targetDesc->initialize();
+
     m_diagCollector->addListener(m_diagLogger.get());
     m_diagCollector->enableDiag(Diag_Trace);
     m_diagCollector->enableDiag(Diag_Debug);
