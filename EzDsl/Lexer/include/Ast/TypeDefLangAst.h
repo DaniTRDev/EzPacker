@@ -1,15 +1,12 @@
-#ifndef EZDSL_TYPE_DESCRIPTOR_AST_H
-#define EZDSL_TYPE_DESCRIPTOR_AST_H
+#ifndef EZDSLLEXER_TYPE_DESCRIPTOR_AST_H
+#define EZDSLLEXER_TYPE_DESCRIPTOR_AST_H
 
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include "CommonAstNodes.h"
 
 namespace DSL::Ast::TypeDef
 {
 
-/**
- * Enumeration of primitive and special type categories definable in .tyf files.
- */
 enum class TypeKind : uint8_t
 {
     Integer,
@@ -19,24 +16,6 @@ enum class TypeKind : uint8_t
     Pointer
 };
 
-/**
- * AST node for primitive and special type declarations in .tyf files. If no alignment is given, the type size is used
- * for alignment.
- *
- * Syntax:
- *   TypeDescriptor := TypeKindName TypeName ('(' BitWidth '), '(' Alignment ')')? ';'
- *   TypeKindName   := 'integer' | 'float' | 'void' | 'bindingToken' | 'pointer'
- *   TypeName       := Identifier
- *   BitWidth       := IntegerLiteral
- *   Alignment      := IntegerLiteral
- *
- * Examples:
- *   integer i32(32, 32);
- *   float f64(64, 64);
- *   void void_t;
- *   bindingToken __token;
- *   pointer ptr(64, 64);
- */
 struct TypeDescriptor
 {
     TypeKind m_kind;
@@ -45,12 +24,6 @@ struct TypeDescriptor
     std::optional<Common::IntegerLiteral> m_alignment;
 };
 
-/**
- * Top-level AST root representing a parsed .tyf type definitions file.
- *
- * Syntax:
- *   TypeDefFile := ( TypeDescriptor )* EOF
- */
 struct TypeDefFile
 {
     std::pmr::vector<TypeDescriptor> m_types;
@@ -58,4 +31,4 @@ struct TypeDefFile
 
 }; // namespace DSL::Ast::TypeDef
 
-#endif // EZDSL_TYPE_DESCRIPTOR_AST_H
+#endif // EZDSLLEXER_TYPE_DESCRIPTOR_AST_H

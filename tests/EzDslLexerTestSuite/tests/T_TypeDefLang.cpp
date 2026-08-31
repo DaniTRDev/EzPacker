@@ -1,4 +1,4 @@
-#include "EzDslTestSuite.h"
+#include "EzDslLexerTestSuite.h"
 #include "Ast/TypeDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
@@ -9,7 +9,7 @@
 /**
  * Test fixture for Type Definition Language (.tyf) parser, scalar type descriptors, and AST generation.
  */
-class TypeDefLangTest : public DslTestSuiteAsGtest
+class TypeDefLangTest : public DslLexerTestSuiteAsGtest
 {
   public:
 };

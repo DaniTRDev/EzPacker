@@ -1,7 +1,7 @@
 #ifndef EZDSLTESTSUITE_EZ_DSL_TEST_SUITE_H
 #define EZDSLTESTSUITE_EZ_DSL_TEST_SUITE_H
 
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include <gtest/gtest.h>
 
 /**
@@ -9,7 +9,7 @@
  * Manages monotonic buffer allocation, diagnostic reporting, source buffers,
  * and lexy-based DSL parsing contexts.
  */
-class EzDslTestSuite
+class EzDslLexerTestSuite
 {
   public:
     /**
@@ -55,9 +55,9 @@ class EzDslTestSuite
 };
 
 /**
- * GoogleTest fixture wrapper that manages the lifecycle of EzDslTestSuite in SetUp() and TearDown().
+ * GoogleTest fixture wrapper that manages the lifecycle of EzDslLexerTestSuite in SetUp() and TearDown().
  */
-class DslTestSuiteAsGtest : public EzDslTestSuite, public ::testing::Test
+class DslLexerTestSuiteAsGtest : public EzDslLexerTestSuite, public ::testing::Test
 {
   public:
     /**

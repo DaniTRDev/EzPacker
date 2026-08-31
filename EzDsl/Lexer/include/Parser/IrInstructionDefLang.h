@@ -3,21 +3,13 @@
 
 #include "Ast/CommonAstNodes.h"
 #include "Ast/IrInstructionDefLangAst.h"
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include "Parser/CommonParsers.h"
 
 namespace DSL::Parser::IrInstDef
 {
 namespace dsl = ::lexy::dsl;
 
-/**
- * Lexy symbol table mapping operand type identifiers to Ast::IrInstDef::IrOperandType enum values.
- *
- * Syntax:
- *   OperandType := 'Register' | 'Integer' | 'FloatingPoint' | 'Memory' | 'Reference' | 'RuntimeSymbol'
- *                | 'VariadicArgs' | 'Immediate' | 'RegIntImm' | 'RegFloatImm' | 'RegImm' | 'AddressSource'
- *                | 'AnyValue' | 'Any'
- */
 struct OperandType
 {
     static constexpr auto Table =
@@ -41,12 +33,6 @@ struct OperandType
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrOperandType>;
 };
 
-/**
- * Lexy symbol table mapping operand dataflow directions to Ast::IrInstDef::IrOperandDir enum values.
- *
- * Syntax:
- *   Direction := 'IN' | 'OUT' | 'INOUT'
- */
 struct Direction
 {
     static constexpr auto Table =
@@ -59,16 +45,6 @@ struct Direction
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrOperandDir>;
 };
 
-/**
- * Lexy parser rule for a typed IR operand in an instruction signature.
- *
- * Syntax:
- *   IrOperand := OperandType ':' Identifier Direction
- *
- * Examples:
- *   Register:dst OUT
- *   RegImm:rhs IN
- */
 struct IrOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -79,13 +55,6 @@ struct IrOperand
             { return Ast::IrInstDef::IrOperand{ .m_type = type, .m_name = std::move(name), .m_dir = dir }; });
 };
 
-/**
- * Lexy symbol table mapping instruction category names.
- *
- * Syntax:
- *   Category := 'DataMovement' | 'Memory' | 'Arithmetic' | 'Bitwise' | 'Compare'
- *             | 'ControlFlow' | 'Casting' | 'System'
- */
 struct Category
 {
     static constexpr auto Table =
@@ -103,12 +72,6 @@ struct Category
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstCategory>;
 };
 
-/**
- * Lexy symbol table mapping instruction abstraction tiers.
- *
- * Syntax:
- *   Tier := 'HighLevel' | 'PassInternal' | 'TargetLow'
- */
 struct Tier
 {
     static constexpr auto Table =
@@ -121,15 +84,6 @@ struct Tier
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstTier>;
 };
 
-/**
- * Lexy symbol table mapping instruction verification and behavioral flags.
- *
- * Syntax:
- *   InstFlag := 'SizeMatch' | 'DestLarger' | 'DestSmaller' | 'ReadsMemory' | 'WritesMemory'
- *             | 'IsTerminator' | 'IsBranch' | 'IsCall' | 'IsReturn' | 'HasSideEffect'
- *             | 'IsCommutative' | 'ReadsCPUFlags' | 'WritesCPUFlags' | 'TreatAsSigned'
- *             | 'VariadicArgs'
- */
 struct InstFlag
 {
     static constexpr auto Table =
@@ -154,14 +108,6 @@ struct InstFlag
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstFlag>;
 };
 
-/**
- * Lexy parser rule for individual instruction body statements (CATEGORY, TIER, or FLAGS).
- *
- * Syntax:
- *   BodyItem := 'CATEGORY' '(' Category ')' ';'
- *             | 'TIER' '(' Tier ')' ';'
- *             | 'FLAGS' '(' ( InstFlag (',' InstFlag)* )? ')' ';'
- */
 struct BodyItem
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -199,19 +145,6 @@ struct BodyItem
                                                                std::pmr::vector<Ast::IrInstDef::IrInstFlag>>>;
 };
 
-/**
- * Lexy parser rule for a complete IR instruction declaration.
- *
- * Syntax:
- *   IrInstDecl := 'ir_inst' Identifier '(' ( IrOperand (',' IrOperand)* )? ')' '{' ( BodyItem )* '}' ';'?
- *
- * Example:
- *   ir_inst ADD(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
- *       CATEGORY(Arithmetic);
- *       TIER(HighLevel);
- *       FLAGS(SizeMatch, IsCommutative);
- *   }
- */
 struct IrInstDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -275,12 +208,6 @@ struct IrInstDecl
             });
 };
 
-/**
- * Top-level Lexy file parser for .irdf IR instruction definition files.
- *
- * Syntax:
- *   IrInstDefFile := ( IrInstDecl )* EOF
- */
 struct IrInstDefFile
 {
     static constexpr auto whitespace = Common::Whitespace;

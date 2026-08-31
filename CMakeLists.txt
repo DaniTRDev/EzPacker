@@ -41,8 +41,8 @@ if (EZPACKER_BUILD_TESTS)
     message(STATUS "Configuring EzMirTestSuite")
     add_subdirectory(tests/EzMirTestSuite)
 
-    message(STATUS "Configuring EzDslTestSuite")
-    add_subdirectory(tests/EzDslTestSuite)
+    message(STATUS "Configuring EzDslLexerTestSuite")
+    add_subdirectory(tests/EzDslLexerTestSuite)
 
     message(STATUS "Configuring EzTripleTestSuite")
     add_subdirectory(tests/EzTripleTestSuite)

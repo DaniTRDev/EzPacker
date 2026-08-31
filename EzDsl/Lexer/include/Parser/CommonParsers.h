@@ -2,21 +2,13 @@
 #define EZDSL_COMMON_PARSERS_H
 
 #include "Ast/CommonAstNodes.h"
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include "ParseContext.h"
-
-#include <charconv>
 
 namespace DSL::Parser::Common
 {
 namespace dsl = ::lexy::dsl;
 
-/**
- * Lexy parser rule matching an exact keyword token with word boundary enforcement.
- *
- * Syntax:
- *   Keyword<Str> := Str !( [a-zA-Z0-9_] )
- */
 template <lexy::_detail::string_literal KeywordStr> struct Keyword
 {
     static constexpr auto rule = []
@@ -30,37 +22,34 @@ template <lexy::_detail::string_literal KeywordStr> struct Keyword
     static constexpr auto value = lexy::constant(true);
 };
 
-/**
- * Lexy parser rule matching a single character literal.
- */
 template <char C> struct SingleChar
 {
     static constexpr auto rule = dsl::lit_c<C>;
     static constexpr auto value = lexy::constant(true);
 };
 
-/**
- * Lexy parser rule for single-line comments extending to the next newline.
- *
- * Syntax:
- *   Comment := '//' [^\n]* '\n'
- */
 struct Comment
 {
     static constexpr auto rule = dsl::lit_c<'/'> >> dsl::lit_c<'/'> >> dsl::until(dsl::newline);
 };
 
 /**
- * Common whitespace parser rule skipping ASCII whitespace, newlines, and inline comments.
+ * Lexy symbol table matching boolean literal tokens ('true', 'false', case-insensitive).
  */
+struct BooleanLit
+{
+    static constexpr auto Table = lexy::symbol_table<bool>
+        .map(LEXY_LIT("true"), true)
+        .map(LEXY_LIT("TRUE"), true)
+        .map(LEXY_LIT("false"), false)
+        .map(LEXY_LIT("FALSE"), false);
+
+    static constexpr auto rule = dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha));
+    static constexpr auto value = lexy::forward<bool>;
+};
+
 static constexpr auto Whitespace = dsl::ascii::space | dsl::inline_<Comment> | dsl::ascii::newline;
 
-/**
- * Lexy parser rule producing an Ast::Common::Identifier with attached SourceReference.
- *
- * Syntax:
- *   Identifier := [a-zA-Z_] [a-zA-Z0-9_]*
- */
 struct Identifier
 {
     static constexpr auto rule = dsl::position +
@@ -78,17 +67,6 @@ struct Identifier
                        lexy::values);
 };
 
-/**
- * Lexy parser rule producing an Ast::Common::IntegerLiteral with attached SourceReference.
- * Supports decimal, hexadecimal (0x/0X), binary (0b/0B), and octal (0o/0O) with optional '-' sign.
- *
- * Syntax:
- *   IntegerLiteral := '-'? ( HexLiteral | BinLiteral | OctLiteral | DecLiteral )
- *   HexLiteral     := ('0x' | '0X') [0-9a-fA-F]+
- *   BinLiteral     := ('0b' | '0B') [01]+
- *   OctLiteral     := ('0o' | '0O') [0-7]+
- *   DecLiteral     := [0-9]+
- */
 struct IntegerLiteral
 {
     static constexpr auto rule = []
@@ -126,12 +104,6 @@ struct IntegerLiteral
             lexy::values);
 };
 
-/**
- * Lexy parser rule producing an Ast::Common::RealLiteral with attached SourceReference.
- *
- * Syntax:
- *   RealLiteral := [0-9]+ '.' [0-9]+
- */
 struct RealLiteral
 {
     static constexpr auto FloatRule =
@@ -152,12 +124,6 @@ struct RealLiteral
                        lexy::values);
 };
 
-/**
- * Lexy parser rule producing an Ast::Common::StringLiteral with attached SourceReference.
- *
- * Syntax:
- *   StringLiteral := '"' [^"\\]* '"'
- */
 struct StringLiteral
 {
     static constexpr auto rule = []

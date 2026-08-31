@@ -2,23 +2,13 @@
 #define EZDSL_LEGALIZE_ACTION_LANG_H
 
 #include "Ast/LegalizeActionDefLangAst.h"
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include "Parser/CommonParsers.h"
 
 namespace DSL::Parser::LegalizeActionDef
 {
 namespace dsl = ::lexy::dsl;
 
-/**
- * Lexy parser rule for a type constraint optionally bound to an explicit operand slot index.
- *
- * Syntax:
- *   TypeConstraint := Identifier ( ':' IntegerLiteral )?
- *
- * Examples:
- *   i32
- *   i8:1
- */
 struct TypeConstraint
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -38,12 +28,6 @@ struct TypeConstraint
             });
 };
 
-/**
- * Lexy symbol table mapping legalization action keywords.
- *
- * Syntax:
- *   LegalizationClauseKind := 'LEGAL' | 'WIDENS' | 'NARROWS' | 'LIBCALL' | 'CUSTOM' | 'BITCAST' | 'UNSUPPORTED'
- */
 struct LegalizationClauseKind
 {
     static constexpr auto KindTable = lexy::symbol_table<Ast::LegalizeActionDef::LegalizeActionKind>
@@ -59,20 +43,6 @@ struct LegalizationClauseKind
     static constexpr auto value = lexy::forward<Ast::LegalizeActionDef::LegalizeActionKind>;
 };
 
-/**
- * Lexy parser rule for a legalization clause directive.
- *
- * Syntax:
- *   LegalizationClause := LegalizationClauseKind '(' ( TypeConstraint (',' TypeConstraint)* )? ')'
- *                         ( '>>' ( StringLiteral | Identifier ( '>>' Identifier )* ) )?
- *
- * Examples:
- *   LEGAL(i8, i16, i32)
- *   WIDENS(i1, i2, i4) >> i32
- *   LIBCALL(i64) >> "__divdi3"
- *   CUSTOM(i64) >> ExpandUremViaDivMulSub
- *   CUSTOM(v4i32) >> ExpandVectorUrem >> ScalarizeVectorUrem
- */
 struct LegalizationClause
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -153,19 +123,7 @@ struct LegalizationClause
                     });
 };
 
-/**
- * Lexy parser rule for an opcode legalization action block.
- *
- * Syntax:
- *   InstructionLegalizeDecl := 'action' Identifier '{' ( LegalizationClause ';' )* '}' ';'?
- *
- * Example:
- *   action ADD {
- *       LEGAL(i32, f32);
- *       WIDENS(i1, i8, i16) >> i32;
- *   };
- */
-struct InstructionLegalizeDecl
+struct LegalizeInstructionDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = Common::Keyword<"action">::rule >>
@@ -174,25 +132,19 @@ struct InstructionLegalizeDecl
 
     static constexpr auto value =
             Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause>> >>
-            lexy::callback<Ast::LegalizeActionDef::InstructionLegalizeDecl>(
+            lexy::callback<Ast::LegalizeActionDef::LegalizeInstructionDecl>(
                     [](Ast::Common::Identifier name,
                        std::pmr::vector<Ast::LegalizeActionDef::LegalizeActionClause> actions)
-                    { return Ast::LegalizeActionDef::InstructionLegalizeDecl{ std::move(name), std::move(actions) }; });
+                    { return Ast::LegalizeActionDef::LegalizeInstructionDecl{ std::move(name), std::move(actions) }; });
 };
 
-/**
- * Top-level Lexy file parser for .lad legalization action definition files.
- *
- * Syntax:
- *   TargetLegalizeDef := ( InstructionLegalizeDecl )* EOF
- */
-struct TargetLegalizeDef
+struct LegalizeActionFile
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<InstructionLegalizeDecl>);
+    static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<LegalizeInstructionDecl>);
     static constexpr auto value =
-            Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::InstructionLegalizeDecl>> >>
-            lexy::construct<Ast::LegalizeActionDef::TargetLegalizeDef>;
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeActionDef::LegalizeInstructionDecl>> >>
+            lexy::construct<Ast::LegalizeActionDef::LegalizeActionFile>;
 };
 
 } // namespace DSL::Parser::LegalizeActionDef

@@ -1,7 +1,7 @@
 #ifndef EZDSL_PARSE_CONTEXT_H
 #define EZDSL_PARSE_CONTEXT_H
 
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include "SourceManager/GenericSourceManager.h"
 
 /**

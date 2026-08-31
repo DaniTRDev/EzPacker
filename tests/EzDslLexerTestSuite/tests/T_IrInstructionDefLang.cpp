@@ -1,4 +1,4 @@
-#include "EzDslTestSuite.h"
+#include "EzDslLexerTestSuite.h"
 #include "Ast/IrInstructionDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
@@ -9,7 +9,7 @@
 /**
  * Test fixture for IR Instruction Definition Language (.irdf) parser, operand constraints, and AST validation.
  */
-class IrInstDefLangTest : public DslTestSuiteAsGtest
+class IrInstDefLangTest : public DslLexerTestSuiteAsGtest
 {
   public:
 };

@@ -3,23 +3,13 @@
 
 #include "Ast/CommonAstNodes.h"
 #include "Ast/LegalizeRuleDefLangAst.h"
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include "Parser/CommonParsers.h"
 
 namespace DSL::Parser::LegalizeRuleDef
 {
 namespace dsl = ::lexy::dsl;
 
-/**
- * Lexy parser rule for SSA variable references ($name).
- *
- * Syntax:
- *   SsaVarName := '$' Identifier
- *
- * Examples:
- *   $dst
- *   $src
- */
 struct SsaVarName
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -27,12 +17,6 @@ struct SsaVarName
     static constexpr auto value = lexy::forward<Ast::Common::Identifier>;
 };
 
-/**
- * Lexy parser rule for arguments to semantic guard predicates ($var, integer literal, or identifier).
- *
- * Syntax:
- *   PredicateArg := SsaVarName | IntegerLiteral | Identifier
- */
 struct PredicateArg
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -45,16 +29,7 @@ struct PredicateArg
             [](Ast::Common::IntegerLiteral lit) { return Ast::LegalizeRuleDef::PredicateArg{ lit }; });
 };
 
-/**
- * Lexy parser rule for semantic guard predicate calls.
- *
- * Syntax:
- *   RulePredicate := Identifier '(' ( PredicateArg (',' PredicateArg)* )? ')' ';'
- *
- * Example:
- *   is_simm12($c);
- */
-struct RulePredicate
+struct RuleWhen
 {
     static constexpr auto whitespace = Common::Whitespace;
 
@@ -74,22 +49,15 @@ struct RulePredicate
         return name + args + dsl::lit_c<';'>;
     }();
 
-    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RulePredicate>(
-            [](Ast::Common::Identifier name, std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg> args)
-            { return Ast::LegalizeRuleDef::RulePredicate{ std::move(name), std::move(args) }; },
+    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleWhen>(
+            [](Ast::Common::Identifier name, std::pmr::vector<Ast::LegalizeRuleDef::PredicateArg> args) {
+                return Ast::LegalizeRuleDef::RuleWhen{ .m_predicateName = std::move(name),
+                                                       .m_arguments = std::move(args) };
+            },
             [](Ast::Common::Identifier name, lexy::nullopt)
-            { return Ast::LegalizeRuleDef::RulePredicate{ std::move(name), {} }; });
+            { return Ast::LegalizeRuleDef::RuleWhen{ .m_predicateName = std::move(name), .m_arguments = {} }; });
 };
 
-/**
- * Lexy parser rule for custom compile-time transform calls in rule operands.
- *
- * Syntax:
- *   CustomTransformOperand := Identifier '(' SsaVarName (',' SsaVarName)* ')'
- *
- * Example:
- *   log2($c)
- */
 struct CustomTransformOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -103,27 +71,17 @@ struct CustomTransformOperand
 
     static constexpr auto rule = dsl::p<Common::Identifier> + dsl::parenthesized(dsl::p<VarList>);
 
-    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
+    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleInstructionOperand>(
             [](Ast::Common::Identifier funcName, std::pmr::vector<Ast::Common::Identifier> args)
             {
-                Ast::LegalizeRuleDef::RuleOperand op;
-                op.m_kind = Ast::LegalizeRuleDef::OperandKind::CustomTransform;
+                Ast::LegalizeRuleDef::RuleInstructionOperand op{};
+                op.m_kind = Ast::LegalizeRuleDef::RuleOperandKind::CustomTransform;
                 op.m_name = std::move(funcName);
                 op.m_callArgs = std::move(args);
                 return op;
             });
 };
 
-/**
- * Lexy parser rule for type-annotated SSA operand references.
- *
- * Syntax:
- *   TypedPrefixSsaOperand := TypeName ('(' TypeParam ')')? ':' SsaVarName
- *
- * Examples:
- *   i32:$lhs
- *   simm(i12):$c
- */
 struct TypedPrefixSsaOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -133,70 +91,61 @@ struct TypedPrefixSsaOperand
         return dsl::p<Common::Identifier> + dsl::opt(typeParam) + dsl::lit_c<':'> + dsl::p<SsaVarName>;
     }();
 
-    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
+    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleInstructionOperand>(
             [](Ast::Common::Identifier type, Ast::Common::Identifier typeParam, Ast::Common::Identifier name)
             {
-                const bool isImm = (type.m_node == "imm" || type.m_node == "simm" || type.m_node == "uimm");
-                return Ast::LegalizeRuleDef::RuleOperand{ .m_kind = isImm
-                                                                  ? Ast::LegalizeRuleDef::OperandKind::ImmediateSymbol
-                                                                  : Ast::LegalizeRuleDef::OperandKind::SsaRegister,
-                                                          .m_name = std::move(name),
-                                                          .m_type = std::move(type),
-                                                          .m_typeParam = std::move(typeParam) };
+                const bool isImm = type.m_node == "imm";
+                return Ast::LegalizeRuleDef::RuleInstructionOperand{
+                    .m_kind = isImm ? Ast::LegalizeRuleDef::RuleOperandKind::ImmediateSymbol
+                                    : Ast::LegalizeRuleDef::RuleOperandKind::SsaRegister,
+                    .m_name = std::move(name),
+                    .m_type = std::move(type),
+                    .m_typeParam = std::move(typeParam)
+                };
             },
             [](Ast::Common::Identifier type, lexy::nullopt, Ast::Common::Identifier name)
             {
-                const bool isImm = (type.m_node == "imm" || type.m_node == "simm" || type.m_node == "uimm");
-                return Ast::LegalizeRuleDef::RuleOperand{ .m_kind = isImm
-                                                                  ? Ast::LegalizeRuleDef::OperandKind::ImmediateSymbol
-                                                                  : Ast::LegalizeRuleDef::OperandKind::SsaRegister,
-                                                          .m_name = std::move(name),
-                                                          .m_type = std::move(type),
-                                                          .m_typeParam = std::nullopt };
+                const bool isImm = type.m_node == "imm";
+                return Ast::LegalizeRuleDef::RuleInstructionOperand{
+                    .m_kind = isImm ? Ast::LegalizeRuleDef::RuleOperandKind::ImmediateSymbol
+                                    : Ast::LegalizeRuleDef::RuleOperandKind::SsaRegister,
+                    .m_name = std::move(name),
+                    .m_type = std::move(type),
+                    .m_typeParam = std::nullopt
+                };
             });
 };
 
-/**
- * Lexy parser rule for bare SSA operand variables ($var).
- *
- * Syntax:
- *   BareSsaOperand := '$' Identifier
- */
 struct BareSsaOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::p<SsaVarName>;
 
-    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
+    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleInstructionOperand>(
             [](Ast::Common::Identifier name)
             {
-                return Ast::LegalizeRuleDef::RuleOperand{ .m_kind = Ast::LegalizeRuleDef::OperandKind::SsaRegister,
-                                                          .m_name = std::move(name) };
+                return Ast::LegalizeRuleDef::RuleInstructionOperand{
+                    .m_kind = Ast::LegalizeRuleDef::RuleOperandKind::SsaRegister,
+                    .m_name = std::move(name)
+                };
             });
 };
 
-/**
- * Lexy parser rule for immediate integer literals in rule operands.
- *
- * Syntax:
- *   LiteralOperand := IntegerLiteral
- */
 struct LiteralOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::p<Common::IntegerLiteral>;
 
-    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleOperand>(
+    static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleInstructionOperand>(
             [](Ast::Common::IntegerLiteral lit)
             {
-                return Ast::LegalizeRuleDef::RuleOperand{ .m_kind = Ast::LegalizeRuleDef::OperandKind::ImmediateLiteral,
-                                                          .m_immLiteral = lit };
+                return Ast::LegalizeRuleDef::RuleInstructionOperand{
+                    .m_kind = Ast::LegalizeRuleDef::RuleOperandKind::ImmediateLiteral,
+                    .m_immLiteral = lit
+                };
             });
 };
 
-/**
- * Lexy parser rule dispatching between custom transforms, typed SSA operands, bare SSA variables, and literals.
- */
 struct RuleOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -213,14 +162,14 @@ struct RuleOperand
         return customTransform | typedPrefix | dollarVar | literal;
     }();
 
-    static constexpr auto value = lexy::forward<Ast::LegalizeRuleDef::RuleOperand>;
+    static constexpr auto value = lexy::forward<Ast::LegalizeRuleDef::RuleInstructionOperand>;
 };
 
 struct InstructionOperandList
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::list(dsl::p<RuleOperand>, dsl::sep(dsl::lit_c<','>));
-    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleOperand>>;
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstructionOperand>>;
 };
 
 struct RuleInstruction
@@ -232,7 +181,7 @@ struct RuleInstruction
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = dsl::p<RuleOperand> + dsl::lit_c<';'>;
         static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleInstruction>(
-                [](Ast::LegalizeRuleDef::RuleOperand op)
+                [](Ast::LegalizeRuleDef::RuleInstructionOperand op)
                 {
                     Ast::LegalizeRuleDef::RuleInstruction inst;
                     inst.m_opcode = op.m_type.has_value() ? *op.m_type : op.m_name;
@@ -253,7 +202,8 @@ struct RuleInstruction
         }();
 
         static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::RuleInstruction>(
-                [](Ast::Common::Identifier opcode, std::pmr::vector<Ast::LegalizeRuleDef::RuleOperand> operands) {
+                [](Ast::Common::Identifier opcode,
+                   std::pmr::vector<Ast::LegalizeRuleDef::RuleInstructionOperand> operands) {
                     return Ast::LegalizeRuleDef::RuleInstruction{ .m_opcode = std::move(opcode),
                                                                   .m_operands = std::move(operands) };
                 },
@@ -282,15 +232,15 @@ struct MatchClause
 
 struct WhenClause
 {
-    std::pmr::vector<Ast::LegalizeRuleDef::RulePredicate> predicates;
+    std::pmr::vector<Ast::LegalizeRuleDef::RuleWhen> clauses;
 };
 
-struct ExpandClause
+struct EmitClause
 {
     std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction> instructions;
 };
 
-using RuleBlockClause = std::variant<MatchClause, WhenClause, ExpandClause>;
+using RuleBlockClause = std::variant<MatchClause, WhenClause, EmitClause>;
 
 struct MatchBlockBody
 {
@@ -303,17 +253,17 @@ struct MatchBlockBody
 struct WhenBlockBody
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<RulePredicate>);
+    static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<RuleWhen>);
     static constexpr auto value =
-            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RulePredicate>> >> lexy::construct<WhenClause>;
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleWhen>> >> lexy::construct<WhenClause>;
 };
 
-struct ExpandBlockBody
+struct EmitBlockBody
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<RuleInstruction>);
     static constexpr auto value =
-            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<ExpandClause>;
+            Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<EmitClause>;
 };
 
 struct RuleBlock
@@ -321,22 +271,22 @@ struct RuleBlock
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = (Common::Keyword<"match">::rule >> dsl::p<MatchBlockBody>) |
             (Common::Keyword<"when">::rule >> dsl::p<WhenBlockBody>) |
-            (Common::Keyword<"expand">::rule >> dsl::p<ExpandBlockBody>);
+            ((Common::Keyword<"emit">::rule | Common::Keyword<"expand">::rule) >> dsl::p<EmitBlockBody>);
 
     static constexpr auto value = lexy::construct<RuleBlockClause>;
 };
 
-struct LegalizeRewriteRule
+struct LegalizeRule
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = Common::Keyword<"rule">::rule >>
             (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<RuleBlock> + dsl::lit_c<';'>));
 
     static constexpr auto value = Common::PmrAsList<std::pmr::vector<RuleBlockClause>> >>
-            lexy::callback<Ast::LegalizeRuleDef::LegalizeRewriteRule>(
+            lexy::callback<Ast::LegalizeRuleDef::LegalizeRule>(
                                           [](Ast::Common::Identifier name, std::pmr::vector<RuleBlockClause> clauses)
                                           {
-                                              Ast::LegalizeRuleDef::LegalizeRewriteRule rule;
+                                              Ast::LegalizeRuleDef::LegalizeRule rule;
                                               rule.m_ruleName = std::move(name);
 
                                               for (auto &clause : clauses)
@@ -346,12 +296,11 @@ struct LegalizeRewriteRule
                                                           {
                                                               using T = std::decay_t<decltype(val)>;
                                                               if constexpr (std::is_same_v<T, MatchClause>)
-                                                                  rule.m_matchPatterns = std::move(val.instructions);
+                                                                  rule.m_matchClauses = std::move(val.instructions);
                                                               else if constexpr (std::is_same_v<T, WhenClause>)
-                                                                  rule.m_predicates = std::move(val.predicates);
-                                                              else if constexpr (std::is_same_v<T, ExpandClause>)
-                                                                  rule.m_expansionSequence =
-                                                                          std::move(val.instructions);
+                                                                  rule.m_whenClauses = std::move(val.clauses);
+                                                              else if constexpr (std::is_same_v<T, EmitClause>)
+                                                                  rule.m_emitClauses = std::move(val.instructions);
                                                           },
                                                           clause);
                                               }
@@ -359,13 +308,13 @@ struct LegalizeRewriteRule
                                           });
 };
 
-struct TargetLegalizeRuleDef
+struct LegalizeRuleFile
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<LegalizeRewriteRule> + dsl::lit_c<';'>);
+    static constexpr auto rule = dsl::terminator(dsl::eof).list(dsl::p<LegalizeRule> + dsl::lit_c<';'>);
 
-    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::LegalizeRewriteRule>> >>
-            lexy::construct<Ast::LegalizeRuleDef::TargetLegalizeRuleDef>;
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::LegalizeRule>> >>
+            lexy::construct<Ast::LegalizeRuleDef::LegalizeRuleFile>;
 };
 
 } // namespace DSL::Parser::LegalizeRuleDef

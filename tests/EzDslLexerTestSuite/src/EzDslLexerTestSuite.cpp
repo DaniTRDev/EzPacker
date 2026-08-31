@@ -1,14 +1,14 @@
-#include "EzDslTestSuite.h"
+#include "EzDslLexerTestSuite.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
 // Retrieves the active diagnostic collector.
-DiagnosticCollector *EzDslTestSuite::getDiagCollector() { return m_diagnosticCollector; }
+DiagnosticCollector *EzDslLexerTestSuite::getDiagCollector() { return m_diagnosticCollector; }
 
 // Retrieves the diagnostic logger.
-DiagnosticLogger *EzDslTestSuite::getDiagLogger() { return m_diagnosticLogger; }
+DiagnosticLogger *EzDslLexerTestSuite::getDiagLogger() { return m_diagnosticLogger; }
 
 /**
  * Creates a ParseContext bound to an in-memory string buffer:
@@ -16,7 +16,7 @@ DiagnosticLogger *EzDslTestSuite::getDiagLogger() { return m_diagnosticLogger; }
  * 2. Throws an exception if registration fails.
  * 3. Constructs and returns a ParseContext configured with the test allocator and diagnostics.
  */
-ParseContext EzDslTestSuite::createParseContextFromBuff(const std::string &sourceName, const std::string &sourceContent)
+ParseContext EzDslLexerTestSuite::createParseContextFromBuff(const std::string &sourceName, const std::string &sourceContent)
 {
     size_t sourceId = m_sourceManager->addSourceContent(sourceName, sourceContent);
     if (sourceId == 0)
@@ -28,13 +28,13 @@ ParseContext EzDslTestSuite::createParseContextFromBuff(const std::string &sourc
 }
 
 // Retrieves the source manager.
-SourceManager *EzDslTestSuite::getSourceManager() { return m_sourceManager; }
+SourceManager *EzDslLexerTestSuite::getSourceManager() { return m_sourceManager; }
 
 /**
  * Initializes the test suite by allocating the diagnostic collector, source manager,
  * and diagnostic logger from the internal PMR buffer resource, enabling trace and debug logs.
  */
-void EzDslTestSuite::create()
+void EzDslLexerTestSuite::create()
 {
     std::pmr::polymorphic_allocator<> alloc(&m_allocator);
     m_diagnosticCollector = alloc.new_object<DiagnosticCollector>();
@@ -49,7 +49,7 @@ void EzDslTestSuite::create()
 /**
  * Destroys all allocated diagnostic and source manager objects.
  */
-void EzDslTestSuite::destroy()
+void EzDslLexerTestSuite::destroy()
 {
     std::pmr::polymorphic_allocator<> alloc(&m_allocator);
     alloc.delete_object(m_sourceManager);
@@ -58,18 +58,18 @@ void EzDslTestSuite::destroy()
 }
 
 // Retrieves the monotonic memory resource.
-std::pmr::memory_resource *EzDslTestSuite::getAllocator() { return &m_allocator; }
+std::pmr::memory_resource *EzDslLexerTestSuite::getAllocator() { return &m_allocator; }
 
-// Sets up the test fixture by initializing EzDslTestSuite.
-void DslTestSuiteAsGtest::SetUp()
+// Sets up the test fixture by initializing EzDslLexerTestSuite.
+void DslLexerTestSuiteAsGtest::SetUp()
 {
     Test::SetUp();
-    EzDslTestSuite::create();
+    EzDslLexerTestSuite::create();
 }
 
-// Tears down the test fixture by destroying EzDslTestSuite.
-void DslTestSuiteAsGtest::TearDown()
+// Tears down the test fixture by destroying EzDslLexerTestSuite.
+void DslLexerTestSuiteAsGtest::TearDown()
 {
-    EzDslTestSuite::destroy();
+    EzDslLexerTestSuite::destroy();
     Test::TearDown();
 }

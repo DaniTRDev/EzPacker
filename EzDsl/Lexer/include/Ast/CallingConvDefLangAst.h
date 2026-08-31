@@ -1,293 +1,149 @@
-#ifndef EZDSL_CALLING_CONV_DEF_LANG_AST_H
-#define EZDSL_CALLING_CONV_DEF_LANG_AST_H
+#ifndef EZDSLLEXER_CALLING_CONV_DEF_LANG_AST_H
+#define EZDSLLEXER_CALLING_CONV_DEF_LANG_AST_H
 
-#include "EzDslCommon.h"
 #include "CommonAstNodes.h"
-#include "Ast/InstructionDefLangAst.h"
+#include "EzDslLexerCommon.h"
 
 namespace DSL::Ast::CallingConvDef
 {
-/**
- * Determines the direction of growth of the stack.
- *
- * Valid keywords:
- *   'DOWN' -> Stack pointer decrements on allocation
- *   'UP'   -> Stack pointer increments on allocation
- */
-enum class StackDirection : uint8_t
+
+enum class StackGrowth : uint8_t
 {
-    Down = 0,
+    Down,
     Up
 };
-
-/**
- * Determines who is responsible for cleaning up stack arguments.
- *
- * Valid keywords:
- *   'CALLER', 'CALLEE'
- */
-enum class StackCleaner : uint8_t
+enum class StackCleanup : uint8_t
 {
-    Caller = 0,
+    Caller,
     Callee
 };
-
-/**
- * Register allocation strategy for multi-register / chunk arguments.
- *
- * Valid keywords:
- *   'ALL_OR_NOTHING', 'INDEPENDENT'
- */
 enum class AllocPolicy : uint8_t
 {
-    AllOrNothing = 0, // If any chunk/register is unavailable, the entire argument spills
-    Independent       // Assign available registers and spill only the remaining parts
+    AllOrNothing,
+    SplitRegAndStack
 };
 
-/**
- * Register assignment mechanism.
- */
-enum class RegAssignKind : uint8_t
+struct StackDef
 {
-    Sequence, // Sequential register pool consumption (e.g., SysV: RDI, RSI, RDX...)
-    Slots     // Paired argument slot consumption (e.g., Win64: Slot 0 = RCX/XMM0...)
+    Common::IntegerLiteral m_alignment;
+    StackGrowth m_growth;
+    StackCleanup m_cleanup;
+    Common::IntegerLiteral m_shadowSpace; // 0 if unused
+    Common::Identifier m_stackPointer;
+    Common::Identifier m_framePointer;
 };
 
-/**
- * Predicate kind used in aggregate classification.
- */
-enum class AggregatePredicateKind : uint8_t
+struct AggregateCondition
 {
-    SizeGt,      // IF_SIZE_GT(N)
-    SizeLe,      // IF_SIZE_LE(N)
-    SizeIn,      // IF_SIZE_IN(1, 2, 4, 8)
-    Homogeneous, // IF_HOMOGENEOUS(FLOAT, MAX: 4)
-    Unaligned,   // IF_UNALIGNED
-    NonTrivial,  // IF_NON_TRIVIAL
-    Default      // DEFAULT
+    enum class Kind : uint8_t
+    {
+        NonTrivial,
+        Unaligned,
+        SizeGreaterThan,
+        SizeLessThanOrEqual,
+        SizeIn,
+        HomogeneousAggregate, // e.g. HFA/HVA
+        Default
+    } m_kind;
+
+    std::optional<Common::IntegerLiteral> m_sizeLimit;
+    std::pmr::vector<Common::IntegerLiteral> m_sizeSet;
+    std::optional<Common::Identifier> m_homoBaseType;     // e.g. "float"
+    std::optional<Common::IntegerLiteral> m_homoMaxCount; // e.g. 4
+
+    Common::Identifier m_resultClass; // e.g. "integer", "by_ref", "memory"
+    bool m_implicitCopy{ false };     // True for Win64-style by_ref stack copy
 };
 
-/**
- * Action to perform when lowering an argument or return value.
- */
-enum class LoweringActionKind : uint8_t
+struct AggregatePipeline
 {
-    RegisterAssign, // REG_SEQ(...) or REG_SLOTS(...)
-    ExpandTo,       // EXPAND_TO(targetClass) (e.g. HFA unpacking)
-    PassAsPointer,  // PASS_AS_POINTER >> targetClass (e.g. ByRef)
-    Stack,          // Directly allocate to stack
-    Sret            // Lower to hidden struct-return pointer
+    std::pmr::vector<AggregateCondition> m_conditions;
+    std::optional<Common::IntegerLiteral> m_sliceChunkSize; // e.g. 8 bytes for SysV eightbytes
+    std::pmr::vector<Common::Identifier> m_mergePrecedence;
+    AllocPolicy m_policy{ AllocPolicy::AllOrNothing };
 };
 
-/**
- * Register reference with register class qualifier.
- *
- * Syntax:
- *   RegisterRef := ClassName ':' RegName
- *   ClassName   := Identifier
- *   RegName     := Identifier
- *
- * Examples:
- *   GPR:rdi
- *   FPR:xmm0
- */
-struct RegisterRef
-{
-    Common::Identifier m_className;
-    Common::Identifier m_regName;
-};
-
-/**
- * Stack placement configuration and alignment constraints.
- *
- * Syntax:
- *   StackPlacement := 'STACK' ( '(' ( 'ALIGN' ':' )? IntegerLiteral ')' )?
- *
- * Examples:
- *   STACK
- *   STACK(8)
- *   STACK(ALIGN: 16)
- */
-struct StackPlacement
-{
-    std::optional<Common::IntegerLiteral> m_alignment;
-};
-
-/**
- * Scalar primitive classification rule in a calling convention.
- *
- * Syntax:
- *   PrimitiveClassifyRule := 'TYPE' '(' TypeName (',' TypeName)* ')' '>>' AbiClass ';'
- *   TypeName              := Identifier
- *   AbiClass              := Identifier
- *
- * Example:
- *   TYPE(i1, i8, i16, i32, i64, ptr) >> INTEGER;
- */
-struct PrimitiveClassifyRule
+struct PrimitiveRule
 {
     std::pmr::vector<Common::Identifier> m_types;
     Common::Identifier m_targetClass;
 };
 
-/**
- * Aggregate classification predicate mapping aggregate properties to ABI classes.
- *
- * Syntax:
- *   AggregatePredicate := PredicateBranch ';'
- *   PredicateBranch    := ( 'IF_SIZE_GT' '(' IntegerLiteral ')'
- *                         | 'IF_SIZE_LE' '(' IntegerLiteral ')'
- *                         | 'IF_SIZE_IN' '(' IntegerLiteral (',' IntegerLiteral)* ')'
- *                         | 'IF_HOMOGENEOUS' '(' ClassName ',' ( 'MAX' ':' )? IntegerLiteral ')'
- *                         | 'IF_UNALIGNED'
- *                         | 'IF_NON_TRIVIAL'
- *                         | 'DEFAULT' ) '>>' ResultClass
- *
- * Examples:
- *   IF_SIZE_GT(16) >> MEMORY;
- *   IF_HOMOGENEOUS(FLOAT, MAX: 4) >> HFA;
- *   DEFAULT >> INTEGER;
- */
-struct AggregatePredicate
+struct ClassificationDef
 {
-    AggregatePredicateKind m_kind;
-    std::optional<Common::IntegerLiteral> m_size;         // For SizeGt, SizeLe
-    std::pmr::vector<Common::IntegerLiteral> m_sizes;     // For SizeIn
-    std::optional<Common::Identifier> m_homogeneousClass; // For Homogeneous (e.g. FLOAT)
-    std::optional<Common::IntegerLiteral> m_maxElements;  // For Homogeneous MAX
-    Common::Identifier m_resultClass;                     // Target ABI class (e.g. MEMORY, HFA, BY_REF)
+    std::pmr::vector<PrimitiveRule> m_primitives;
+    std::optional<AggregatePipeline> m_aggregate;
 };
 
-/**
- * Aggregate slicing, precedence, and policy definition block.
- *
- * Syntax:
- *   AggregateClassifyDef := 'AGGREGATE' '{' ( AggregateItem )* '}' ';'?
- *   AggregateItem        := AggregatePredicate | ChunkSizeDecl | MergePrecedenceDecl | AllocPolicyDecl
- *   ChunkSizeDecl        := 'CHUNK_SIZE' '(' IntegerLiteral ')' ';'
- *   MergePrecedenceDecl  := 'MERGE_PRECEDENCE' '>>' ClassName ( '>' ClassName )* ';'
- *   AllocPolicyDecl      := 'ALLOC_POLICY' '(' ('ALL_OR_NOTHING' | 'INDEPENDENT') ')' ';'
- */
-struct AggregateClassifyDef
+struct StackFallback
 {
-    std::pmr::vector<AggregatePredicate> m_predicates;
-    std::optional<Common::IntegerLiteral> m_chunkSize;      // Slicing chunk size (e.g., 8 bytes)
-    std::pmr::vector<Common::Identifier> m_mergePrecedence; // Precedence chain: MEMORY > INTEGER > FLOAT
-    AllocPolicy m_allocPolicy{ AllocPolicy::AllOrNothing };
+    Common::IntegerLiteral m_slotSize;
+    std::optional<Common::IntegerLiteral> m_alignment;
 };
 
-/**
- * CLASSIFY block grouping primitive and aggregate classification rules.
- *
- * Syntax:
- *   ClassifyBlock := 'CLASSIFY' '{' ( PrimitiveClassifyRule | AggregateClassifyDef )* '}' ';'?
- */
-struct ClassifyBlock
+struct RegisterSequence
 {
-    std::pmr::vector<PrimitiveClassifyRule> m_primitiveRules;
-    std::optional<AggregateClassifyDef> m_aggregateDef;
+    enum class Kind : uint8_t
+    {
+        Sequential,
+        ConsecutiveBlock
+    } m_kind{ Kind::Sequential };
+    std::pmr::vector<Common::Identifier> m_registers;
 };
 
-/**
- * Action descriptor detailing how an ABI class is passed or returned.
- *
- * Syntax:
- *   LoweringAction := 'REG_SEQ' '(' RegisterRef (',' RegisterRef)* ')' ( '>>' StackPlacement )?
- *                   | 'REG_SLOTS' '(' RegisterRef (',' RegisterRef)* ')' ( '>>' StackPlacement )?
- *                   | 'EXPAND_TO' '(' ClassName ')'
- *                   | 'PASS_AS_POINTER' '>>' ClassName
- *                   | StackPlacement
- *                   | 'SRET'
- */
-struct LoweringAction
-{
-    LoweringActionKind m_kind;
-    RegAssignKind m_regAssignKind{ RegAssignKind::Sequence };
-    std::pmr::vector<RegisterRef> m_registers;       // Candidate registers
-    std::optional<Common::Identifier> m_targetClass; // Target for ExpandTo / PassAsPointer
-    std::optional<StackPlacement> m_stackFallback;   // Fallback: >> STACK(ALIGN: 8)
-};
-
-/**
- * Mapping rule from an ABI class to a lowering action.
- *
- * Syntax:
- *   DispatchRule := AbiClass '>>' LoweringAction ';'
- *   AbiClass     := Identifier
- *
- * Examples:
- *   INTEGER >> REG_SEQ(GPR:rdi, GPR:rsi, GPR:rdx) >> STACK(ALIGN: 8);
- *   FLOAT   >> REG_SEQ(FPR:xmm0, FPR:xmm1) >> STACK(8);
- */
-struct DispatchRule
+struct SlotBinding
 {
     Common::Identifier m_abiClass;
-    LoweringAction m_action;
+    Common::Identifier m_register;
 };
 
-/**
- * Struct Return (SRET) specific ABI behavior configuration.
- *
- * Syntax:
- *   SretConfig := 'SRET_CONFIG' '{' ( SretItem )* '}' ';'?
- *   SretItem   := 'PASS_IN_REG' '(' RegisterRef ')' ';'
- *               | 'CONSUMES_ARG_SLOT' '(' ('true' | 'false') ')' ';'
- *               | 'RETURN_REG' '(' ( RegisterRef | 'NONE' ) ')' ';'
- */
-struct SretConfig
+struct UnifiedSlot
 {
-    RegisterRef m_passInReg;                // Register carrying pointer (e.g., GPR:rdi or GPR:x8)
-    bool m_consumesArgSlot{ true };         // True if it steals the first argument register
-    std::optional<RegisterRef> m_returnReg; // Echoed return register (e.g., GPR:rax or std::nullopt)
+    std::pmr::vector<SlotBinding> m_bindings; // e.g. [{ "integer", rcx }, { "float", xmm0 }]
 };
 
-/**
- * Complete top-level calling convention definition AST root in a .cdf file.
- *
- * Syntax:
- *   CallingConvDefFile := 'calling_conv' ConvName '{' ( Directive )* '}' ';'? EOF
- *   ConvName  := Identifier
- *   Directive := 'STACK_ALIGN' '(' IntegerLiteral ')' ';'
- *              | 'STACK_DIRECTION' '(' ('DOWN' | 'UP') ')' ';'
- *              | 'STACK_CLEANUP' '(' ('CALLER' | 'CALLEE') ')' ';'
- *              | 'SHADOW_SPACE' '(' IntegerLiteral ')' ';'
- *              | 'STACK_POINTER' '(' RegisterRef ')' ';'
- *              | 'FRAME_POINTER' '(' RegisterRef ')' ';'
- *              | 'CALLEE_SAVED' '(' RegisterRef (',' RegisterRef)* ')' ';'
- *              | 'CALLER_SAVED' '(' RegisterRef (',' RegisterRef)* ')' ';'
- *              | ClassifyBlock
- *              | 'PASS' '{' ( DispatchRule )* '}' ';'?
- *              | 'RETURN' '{' ( DispatchRule | SretConfig )* '}' ';'?
- */
-struct CallingConvDefFile
+struct PassRule
+{
+    Common::Identifier m_abiClass;
+
+    // Direct register pool, alias/forward (e.g. by_ref => integer), or pure stack (monostate)
+    std::variant<RegisterSequence, Common::Identifier, std::monostate> m_source;
+    std::optional<StackFallback> m_fallback;
+};
+
+struct ArgumentPassingDef
+{
+    std::pmr::vector<UnifiedSlot> m_unifiedSlots; // Slot-based ABIs (e.g. Win64)
+    std::pmr::vector<PassRule> m_rules;           // Bank-based ABIs (e.g. SysV, AAPCS)
+    std::optional<StackFallback> m_defaultStackFallback;
+};
+
+struct StructReturnDef
+{
+    Common::Identifier m_pointerRegister;
+    bool m_consumesArgSlot;
+    std::optional<Common::Identifier> m_returnRegister; // e.g. RAX echoed return
+};
+
+struct ReturnDef
+{
+    std::optional<StructReturnDef> m_sret;
+    std::pmr::vector<PassRule> m_rules;
+};
+
+struct CallingConventionDefFile
 {
     Common::Identifier m_name;
+    StackDef m_stack;
 
-    // Stack & Frame Layout
-    Common::IntegerLiteral m_stackAlign{ 0 };
-    StackDirection m_stackDirection{ StackDirection::Down };
-    StackCleaner m_stackCleanup{ StackCleaner::Caller };
-    Common::IntegerLiteral m_shadowSpace{ 0 };
-    Common::IntegerLiteral m_redZone{ 0 };
+    std::pmr::vector<Common::Identifier> m_calleeSaved;
+    std::pmr::vector<Common::Identifier> m_callerSaved;
 
-    RegisterRef m_stackPointer;
-    RegisterRef m_framePointer;
-
-    // Register Preservation
-    std::pmr::vector<RegisterRef> m_calleeSaved;
-    std::pmr::vector<RegisterRef> m_callerSaved;
-
-    // 1. Classification
-    ClassifyBlock m_classify;
-
-    // 2. Argument Dispatch (PASS)
-    std::pmr::vector<DispatchRule> m_passRules;
-
-    // 3. Return Dispatch & SRET (RETURN)
-    std::pmr::vector<DispatchRule> m_returnRules;
-    std::optional<SretConfig> m_sretConfig;
+    ClassificationDef m_classification;
+    ArgumentPassingDef m_arguments;
+    ReturnDef m_returns;
 };
 
 } // namespace DSL::Ast::CallingConvDef
 
-#endif // EZDSL_CALLING_CONV_DEF_LANG_AST_H
+#endif // EZDSLLEXER_CALLING_CONV_DEF_LANG_AST_H
