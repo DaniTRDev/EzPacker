@@ -1,7 +1,7 @@
 #ifndef EZDSL_IR_INSTRUCTION_PASS_h
 #define EZDSL_IR_INSTRUCTION_PASS_h
 
-#include "EzDslCommon.h"
+#include "EzDslSemaCommon.h"
 #include "Ast/IrInstructionDefLangAst.h"
 
 /**

@@ -1,10 +1,7 @@
 #ifndef EZDSL_SEMA_CONTEXT_H
 #define EZDSL_SEMA_CONTEXT_H
 
-#include "EzDslCommon.h"
-
-using SemaId = size_t;
-constexpr size_t SEMAID_INVALID = 0;
+#include "EzDslSemaCommon.h"
 
 /**
  * Unified context passed across semantic analysis passes in EzDsl.

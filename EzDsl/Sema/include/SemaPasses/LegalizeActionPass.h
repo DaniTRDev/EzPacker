@@ -1,13 +1,17 @@
-#ifndef EZDSL_LEGALIZE_ACTION_PASS_H
-#define EZDSL_LEGALIZE_ACTION_PASS_H
+#ifndef EZDSLSEMA_LEGALIZE_ACTION_PASS_H
+#define EZDSLSEMA_LEGALIZE_ACTION_PASS_H
 
-#include "EzDslCommon.h"
+#include "EzDslSemaCommon.h"
 #include "Ast/LegalizeActionDefLangAst.h"
 
-namespace Sema::Symbols
+/**
+ * Forward declarations.
+ */
+namespace Symbols
 {
-class LegalizeClauseSymbol;
-}
+class LegalizeActionClauseSymbol;
+class LegalizeActionConstraintSymbol;
+} // namespace Symbols
 
 /**
  * Semantic analysis pass validating target legalization actions (.lad).
@@ -23,15 +27,15 @@ class LegalizeActionPass
      */
     static bool run(class DiagnosticCollector *collector,
                     class SymbolTable *table,
-                    DSL::Ast::LegalizeActionDef::TargetLegalizeDef *file);
+                    DSL::Ast::LegalizeActionDef::LegalizeActionFile *file);
 
   private:
     /**
      * Processes and declares legalization action symbols for a single generic IR opcode.
      */
     static bool processInstructionDecl(class DiagnosticCollector *collector,
-                                       class SymbolTable *table,
-                                       const DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl &decl);
+                                       SymbolTable *table,
+                                       const DSL::Ast::LegalizeActionDef::LegalizeInstructionDecl &decl);
 
     /**
      * Validates a single action clause (LEGAL, WIDENS, NARROWS, LIBCALL) and resolves its target types.
@@ -40,7 +44,7 @@ class LegalizeActionPass
                               class SymbolTable *table,
                               const DSL::Ast::LegalizeActionDef::LegalizeActionClause &clause,
                               std::string_view instName,
-                              Sema::Symbols::LegalizeClauseSymbol &outClause,
+                              Symbols::LegalizeActionClauseSymbol &outClause,
                               size_t &maxOperandIndex);
 
     /**
@@ -49,7 +53,7 @@ class LegalizeActionPass
     static bool resolveConstraint(class DiagnosticCollector *collector,
                                   class SymbolTable *table,
                                   const DSL::Ast::LegalizeActionDef::TypeConstraint &constraint,
-                                  Sema::Symbols::LegalizeConstraintSymbol &outConstraint);
+                                  Symbols::LegalizeActionConstraintSymbol &outConstraint);
 };
 
-#endif // EZDSL_LEGALIZE_ACTION_PASS_H
+#endif // EZDSLSEMA_LEGALIZE_ACTION_PASS_H

@@ -1,17 +1,18 @@
-#ifndef EZDSL_LEGALIZE_RULE_PASS_H
-#define EZDSL_LEGALIZE_RULE_PASS_H
+#ifndef EZDSLSEMA_LEGALIZE_RULE_PASS_H
+#define EZDSLSEMA_LEGALIZE_RULE_PASS_H
 
-#include "EzDslCommon.h"
+#include "EzDslSemaCommon.h"
 #include "Ast/LegalizeRuleDefLangAst.h"
+#include "Ast/IrInstructionDefLangAst.h"
 
 /**
  * Forward declarations.
  */
-namespace Sema::Symbols
+namespace Symbols
 {
-class RuleInstructionSymbol;
-class RuleOperandSymbol;
-}; // namespace Sema::Symbols
+class LegalizeRuleInstructionSymbol;
+class LegalizeRuleOperandSymbol;
+}; // namespace Symbols
 
 /**
  * Semantic analysis pass validating IR rewrite rules (.lrd).
@@ -27,7 +28,7 @@ class LegalizeRulePass
      */
     static bool run(class DiagnosticCollector *collector,
                     class SymbolTable *table,
-                    DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef *file);
+                    DSL::Ast::LegalizeRuleDef::LegalizeRuleFile *file);
 
   private:
     /**
@@ -35,11 +36,11 @@ class LegalizeRulePass
      */
     static bool processRule(class DiagnosticCollector *collector,
                             class SymbolTable *table,
-                            const DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule &rule);
+                            const DSL::Ast::LegalizeRuleDef::LegalizeRule &rule);
 
     static bool processPredicate(DiagnosticCollector *collector,
                                  SymbolTable *table,
-                                 const DSL::Ast::LegalizeRuleDef::RulePredicate &predicate,
+                                 const DSL::Ast::LegalizeRuleDef::RuleWhen &predicate,
                                  std::string_view ruleName);
 
     /**
@@ -50,17 +51,17 @@ class LegalizeRulePass
                                    const DSL::Ast::LegalizeRuleDef::RuleInstruction &inst,
                                    std::string_view ruleName,
                                    bool isMatchPattern,
-                                   Sema::Symbols::RuleInstructionSymbol &outInst);
+                                   Symbols::LegalizeRuleInstructionSymbol &outInst);
 
     /**
      * Resolves rule operands (SSA variables, constants, type prefixes, custom transforms).
      */
     static bool resolveOperand(class DiagnosticCollector *collector,
                                class SymbolTable *table,
-                               const DSL::Ast::LegalizeRuleDef::RuleOperand &operand,
+                               const DSL::Ast::LegalizeRuleDef::RuleInstructionOperand &operand,
                                std::string_view ruleName,
                                bool isMatchPattern,
-                               Sema::Symbols::RuleOperandSymbol &outOperand);
+                               Symbols::LegalizeRuleOperandSymbol &outOperand);
 };
 
-#endif // EZDSL_LEGALIZE_RULE_PASS_H
+#endif // EZDSLSEMA_LEGALIZE_RULE_PASS_H

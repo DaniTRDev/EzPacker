@@ -1,13 +1,78 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeActionPass.h"
-#include "Sema/Symbols/Symbols.h"
+#include "Sema/Symbol.h"
+#include "SourceManager/GenericSourceManager.h"
 
 constexpr auto PassName = "Sema::LegalizeActionPass";
 
+namespace
+{
+using namespace DSL::Ast::LegalizeActionDef;
+
+bool validateBitwidths(DiagnosticCollector *collector,
+                       SymbolTable *table,
+                       LegalizeActionKind kind,
+                       const Symbols::TypeSymbol *targetData,
+                       const std::pmr::vector<Symbols::LegalizeActionConstraintSymbol> &types,
+                       SourceReference *sourceRef)
+{
+    if (!targetData || targetData->m_bitWidth == 0)
+    {
+        return true;
+    }
+
+    bool success = true;
+    for (const auto &constraintSym : types)
+    {
+        Symbol *srcSym = table->getSymById(constraintSym.m_typeId);
+        const auto *srcData = srcSym ? srcSym->getIf<Symbols::TypeSymbol>() : nullptr;
+        if (!srcData || srcData->m_bitWidth == 0)
+        {
+            continue;
+        }
+
+        bool violation = false;
+        std::string_view relationText;
+
+        switch (kind)
+        {
+            case LegalizeActionKind::WidenScalar:
+                violation = (targetData->m_bitWidth <= srcData->m_bitWidth);
+                relationText = "larger than";
+                break;
+            case LegalizeActionKind::NarrowScalar:
+                violation = (targetData->m_bitWidth >= srcData->m_bitWidth);
+                relationText = "smaller than";
+                break;
+            case LegalizeActionKind::Bitcast:
+                violation = (targetData->m_bitWidth != srcData->m_bitWidth);
+                relationText = "equal to";
+                break;
+            default:
+                break;
+        }
+
+        if (violation)
+        {
+            collector->error(PassName,
+                             "Target type '{}' ({} bits) must be {} source type '{}' ({} bits)",
+                             targetData->m_name,
+                             targetData->m_bitWidth,
+                             relationText,
+                             srcData->m_name,
+                             srcData->m_bitWidth)
+                    << sourceRef;
+            success = false;
+        }
+    }
+    return success;
+}
+} // namespace
+
 bool LegalizeActionPass::run(DiagnosticCollector *collector,
                              SymbolTable *table,
-                             DSL::Ast::LegalizeActionDef::TargetLegalizeDef *file)
+                             DSL::Ast::LegalizeActionDef::LegalizeActionFile *file)
 {
     if (!collector || !table || !file)
     {
@@ -17,7 +82,7 @@ bool LegalizeActionPass::run(DiagnosticCollector *collector,
     collector->trace(PassName, "Running semantic validation for legalization actions");
 
     bool success = true;
-    for (const auto &decl : file->m_instructionActions)
+    for (const auto &decl : file->m_legalizeInstrDecls)
     {
         if (!processInstructionDecl(collector, table, decl))
         {
@@ -30,11 +95,11 @@ bool LegalizeActionPass::run(DiagnosticCollector *collector,
 
 bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
                                                 SymbolTable *table,
-                                                const DSL::Ast::LegalizeActionDef::InstructionLegalizeDecl &decl)
+                                                const DSL::Ast::LegalizeActionDef::LegalizeInstructionDecl &decl)
 {
     const auto &instIdentifier = decl.m_instName;
 
-    // 1. Verify that the target IR opcode is defined and is a valid IR Instruction
+    // Verify that the target IR opcode is defined and is a valid IR Instruction
     Symbol *irSym = table->getSymByName(instIdentifier.m_node);
     if (!irSym || irSym->getType() != SymbolType::IrInstruction)
     {
@@ -43,14 +108,13 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
         return false;
     }
 
-    // 2. Declare the legalization action symbol for this opcode
-    Sema::Symbols::LegalizeActionSymbol actionSym{ .m_genericOpcode = instIdentifier.m_node,
-                                                   .m_maxOperandIndex = 0,
-                                                   .m_clauses = std::pmr::vector<Sema::Symbols::LegalizeClauseSymbol>{
-                                                           table->getAllocator() } };
+    // Declare the legalization action symbol for this opcode
+    Symbols::LegalizeActionSymbol actionSym{ .m_genericOpcode = instIdentifier.m_node,
+                                             .m_maxOperandIndex = 0,
+                                             .m_clauses = std::pmr::vector<Symbols::LegalizeActionClauseSymbol>{
+                                                     table->getAllocator() } };
 
     SymbolId symId = table->declareSym(instIdentifier.m_sourceRef,
-                                       SymbolFlags::IsDefined,
                                        SymbolType::LegalizeAction,
                                        std::move(actionSym),
                                        instIdentifier.m_node);
@@ -63,7 +127,7 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
     }
 
     Symbol *registeredSymbol = table->getSymById(symId);
-    auto *actionData = registeredSymbol ? registeredSymbol->getIf<Sema::Symbols::LegalizeActionSymbol>() : nullptr;
+    auto *actionData = registeredSymbol ? registeredSymbol->getIf<Symbols::LegalizeActionSymbol>() : nullptr;
     if (!actionData)
     {
         return false;
@@ -74,9 +138,9 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
 
     for (const auto &clause : decl.m_actionClauses)
     {
-        Sema::Symbols::LegalizeClauseSymbol clauseSym{
+        Symbols::LegalizeActionClauseSymbol clauseSym{
             .m_kind = clause.m_kind,
-            .m_types = std::pmr::vector<Sema::Symbols::LegalizeConstraintSymbol>{ table->getAllocator() },
+            .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{ table->getAllocator() },
             .m_targetTypeId = std::nullopt,
             .m_libcallSymbol = std::nullopt,
             .m_customRules = std::nullopt
@@ -91,8 +155,6 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
         actionData->m_clauses.push_back(std::move(clauseSym));
     }
 
-    // Records highest operand slot index constrained (determines table dimensionality: 1D, 2D, 3D for querying in
-    // legalization)
     actionData->m_maxOperandIndex = maxOperandIndex;
 
     collector->trace(PassName,
@@ -107,15 +169,45 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
                                        SymbolTable *table,
                                        const DSL::Ast::LegalizeActionDef::LegalizeActionClause &clause,
                                        std::string_view instName,
-                                       Sema::Symbols::LegalizeClauseSymbol &outClause,
+                                       Symbols::LegalizeActionClauseSymbol &outClause,
                                        size_t &maxOperandIndex)
 {
     bool success = true;
 
-    // 1. Resolve and validate matched type constraints
+    // Helper checks for clause mutual exclusivity
+    auto ensureNoTargetType = [&]()
+    {
+        if (clause.m_targetType.has_value())
+        {
+            collector->error(PassName, "Action does not accept a target type transformation")
+                    << clause.m_targetType->m_sourceRef;
+            success = false;
+        }
+    };
+
+    auto ensureNoLibcall = [&]()
+    {
+        if (clause.m_libcallSymbol.has_value())
+        {
+            collector->error(PassName, "Action does not accept a libcall symbol target")
+                    << clause.m_libcallSymbol->m_sourceRef;
+            success = false;
+        }
+    };
+
+    auto ensureNoCustomRules = [&]()
+    {
+        if (clause.m_customRules.has_value())
+        {
+            collector->error(PassName, "Action does not accept custom rule targets");
+            success = false;
+        }
+    };
+
+    // Resolve and validate matched type constraints
     for (const auto &typeConstraint : clause.m_types)
     {
-        Sema::Symbols::LegalizeConstraintSymbol constraintSym;
+        Symbols::LegalizeActionConstraintSymbol constraintSym;
         if (!resolveConstraint(collector, table, typeConstraint, constraintSym))
         {
             success = false;
@@ -124,18 +216,13 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
 
         if (constraintSym.m_operandIndex.has_value())
         {
-            uint32_t operandIndex = constraintSym.m_operandIndex.value();
-            if (operandIndex > maxOperandIndex)
-            {
-                maxOperandIndex = operandIndex;
-            }
+            maxOperandIndex = std::max(maxOperandIndex, static_cast<size_t>(*constraintSym.m_operandIndex));
         }
 
         outClause.m_types.push_back(constraintSym);
     }
 
-    // Non-CUSTOM actions must declare at least one type constraint
-    if (outClause.m_types.empty() && clause.m_kind != DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom)
+    if (outClause.m_types.empty() && clause.m_kind != LegalizeActionKind::Custom)
     {
         collector->error(PassName,
                          "Legalization clause for opcode '{}' must declare at least one type constraint",
@@ -143,25 +230,15 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
         success = false;
     }
 
-    // 2. Kind-specific target and symbol validation
+    // Kind-specific target and symbol validation
     switch (clause.m_kind)
     {
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::WidenScalar:
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::NarrowScalar:
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Bitcast:
+        case LegalizeActionKind::WidenScalar:
+        case LegalizeActionKind::NarrowScalar:
+        case LegalizeActionKind::Bitcast:
         {
-            if (clause.m_customRules.has_value())
-            {
-                collector->error(PassName, "Action does not accept custom rule targets");
-                success = false;
-            }
-
-            if (clause.m_libcallSymbol.has_value())
-            {
-                collector->error(PassName, "Action does not accept a libcall symbol target")
-                        << clause.m_libcallSymbol->m_sourceRef;
-                success = false;
-            }
+            ensureNoCustomRules();
+            ensureNoLibcall();
 
             if (!clause.m_targetType.has_value())
             {
@@ -179,74 +256,24 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
             }
 
             outClause.m_targetTypeId = targetSym->getId();
-            const auto *targetData = targetSym->getIf<Sema::Symbols::TypeSymbol>();
+            const auto *targetData = targetSym->getIf<Symbols::TypeSymbol>();
 
-            // Bitwidth verification against source types
-            if (targetData && targetData->m_bitWidth > 0)
+            if (!validateBitwidths(collector,
+                                   table,
+                                   clause.m_kind,
+                                   targetData,
+                                   outClause.m_types,
+                                   targetTypeId.m_sourceRef))
             {
-                for (const auto &constraintSym : outClause.m_types)
-                {
-                    Symbol *srcSym = table->getSymById(constraintSym.m_typeId);
-                    const auto *srcData = srcSym ? srcSym->getIf<Sema::Symbols::TypeSymbol>() : nullptr;
-
-                    if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::WidenScalar &&
-                        targetData->m_bitWidth <= srcData->m_bitWidth)
-                    {
-                        collector->error(
-                                PassName,
-                                "WIDENS target type '{}' ({} bits) must be larger than source type '{}' ({} bits)",
-                                targetData->m_name,
-                                targetData->m_bitWidth,
-                                srcData->m_name,
-                                srcData->m_bitWidth)
-                                << targetTypeId.m_sourceRef;
-                        success = false;
-                    }
-                    else if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::NarrowScalar &&
-                             targetData->m_bitWidth >= srcData->m_bitWidth)
-                    {
-                        collector->error(
-                                PassName,
-                                "NARROWS target type '{}' ({} bits) must be smaller than source type '{}' ({} bits)",
-                                targetData->m_name,
-                                targetData->m_bitWidth,
-                                srcData->m_name,
-                                srcData->m_bitWidth)
-                                << targetTypeId.m_sourceRef;
-                        success = false;
-                    }
-                    else if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::Bitcast &&
-                             targetData->m_bitWidth != srcData->m_bitWidth)
-                    {
-                        collector->error(
-                                PassName,
-                                "BITCAST target type '{}' ({} bits) must match source type '{}' ({} bits) width",
-                                targetData->m_name,
-                                targetData->m_bitWidth,
-                                srcData->m_name,
-                                srcData->m_bitWidth)
-                                << targetTypeId.m_sourceRef;
-                        success = false;
-                    }
-                }
+                success = false;
             }
             break;
         }
 
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Libcall:
+        case LegalizeActionKind::Libcall:
         {
-            if (clause.m_customRules.has_value())
-            {
-                collector->error(PassName, "LIBCALL action does not accept custom rule targets");
-                success = false;
-            }
-
-            if (clause.m_targetType.has_value())
-            {
-                collector->error(PassName, "LIBCALL action does not accept a target type")
-                        << clause.m_targetType->m_sourceRef;
-                success = false;
-            }
+            ensureNoCustomRules();
+            ensureNoTargetType();
 
             if (!clause.m_libcallSymbol.has_value() || clause.m_libcallSymbol->m_node.empty())
             {
@@ -259,25 +286,14 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
             break;
         }
 
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Custom:
+        case LegalizeActionKind::Custom:
         {
+            ensureNoTargetType();
+            ensureNoLibcall();
+
             if (!clause.m_types.empty())
             {
                 collector->error(PassName, "CUSTOM clause does not accept input types");
-                success = false;
-            }
-
-            if (clause.m_targetType.has_value())
-            {
-                collector->error(PassName, "CUSTOM clause does not accept a target type transformation")
-                        << clause.m_targetType->m_sourceRef;
-                success = false;
-            }
-
-            if (clause.m_libcallSymbol.has_value())
-            {
-                collector->error(PassName, "CUSTOM clause does not accept a libcall symbol")
-                        << clause.m_libcallSymbol->m_sourceRef;
                 success = false;
             }
 
@@ -288,11 +304,10 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
             }
             else
             {
-                const auto &rules = *clause.m_customRules;
                 std::pmr::vector<SymbolId> resolvedRules(table->getAllocator());
-                resolvedRules.reserve(rules.size());
+                resolvedRules.reserve(clause.m_customRules->size());
 
-                for (const auto &rule : rules)
+                for (const auto &rule : *clause.m_customRules)
                 {
                     Symbol *sym = table->getSymByName(rule.m_node);
                     if (!sym || sym->getType() != SymbolType::LegalizeRule)
@@ -302,7 +317,6 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
                         success = false;
                         continue;
                     }
-
                     resolvedRules.push_back(sym->getId());
                 }
 
@@ -311,27 +325,12 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
             break;
         }
 
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Legal:
-        case DSL::Ast::LegalizeActionDef::LegalizeActionKind::Unsupported:
+        case LegalizeActionKind::Legal:
+        case LegalizeActionKind::Unsupported:
         {
-            if (clause.m_targetType.has_value())
-            {
-                collector->error(PassName, "Clause does not accept a target type") << clause.m_targetType->m_sourceRef;
-                success = false;
-            }
-
-            if (clause.m_libcallSymbol.has_value())
-            {
-                collector->error(PassName, "Clause does not accept a libcall symbol")
-                        << clause.m_libcallSymbol->m_sourceRef;
-                success = false;
-            }
-
-            if (clause.m_customRules.has_value())
-            {
-                collector->error(PassName, "Clause does not accept custom rule targets");
-                success = false;
-            }
+            ensureNoTargetType();
+            ensureNoLibcall();
+            ensureNoCustomRules();
             break;
         }
     }
@@ -342,7 +341,7 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
 bool LegalizeActionPass::resolveConstraint(DiagnosticCollector *collector,
                                            SymbolTable *table,
                                            const DSL::Ast::LegalizeActionDef::TypeConstraint &constraint,
-                                           Sema::Symbols::LegalizeConstraintSymbol &outConstraint)
+                                           Symbols::LegalizeActionConstraintSymbol &outConstraint)
 {
     const auto &typeName = constraint.m_type;
     Symbol *typeSym = table->getSymByName(typeName.m_node);

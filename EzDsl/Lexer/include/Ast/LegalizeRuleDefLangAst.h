@@ -1,5 +1,5 @@
-#ifndef EZDSLexer_LEGALIZE_RULE_DEF_LANG_AST_H
-#define EZDSLexer_LEGALIZE_RULE_DEF_LANG_AST_H
+#ifndef EZDSLLEXER_LEGALIZE_RULE_DEF_LANG_AST_H
+#define EZDSLLEXER_LEGALIZE_RULE_DEF_LANG_AST_H
 
 #include "Ast/CommonAstNodes.h"
 #include "EzDslLexerCommon.h"
@@ -54,4 +54,4 @@ struct LegalizeRuleFile
 
 } // namespace DSL::Ast::LegalizeRuleDef
 
-#endif // EZDSLexer_LEGALIZE_RULE_DEF_LANG_AST_H
+#endif // EZDSLLEXER_LEGALIZE_RULE_DEF_LANG_AST_H

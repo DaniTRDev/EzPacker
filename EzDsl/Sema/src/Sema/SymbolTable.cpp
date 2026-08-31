@@ -54,7 +54,6 @@ Symbol *SymbolTable::getSymByName(const std::string_view &name, std::optional<Sc
 }
 
 SymbolId SymbolTable::declareSym(class SourceReference *sourceRef,
-                                 SymbolFlags flags,
                                  SymbolType type,
                                  Symbol::SymbolData data,
                                  std::string_view name)
@@ -66,7 +65,7 @@ SymbolId SymbolTable::declareSym(class SourceReference *sourceRef,
     }
 
     std::pmr::polymorphic_allocator<> alloc(m_alloc);
-    Symbol *symbol = alloc.new_object<Symbol>(sourceRef, flags, m_currentScopeId, m_symbols.size(), type, name);
+    Symbol *symbol = alloc.new_object<Symbol>(sourceRef, m_currentScopeId, m_symbols.size(), type, name);
     symbol->setData(std::move(data));
 
     SymbolId symId = symbol->getId();

@@ -1,7 +1,7 @@
-#ifndef EZDSL_TYPE_PASS_H
-#define EZDSL_TYPE_PASS_H
+#ifndef EZDSLSEMA_TYPE_PASS_H
+#define EZDSLSEMA_TYPE_PASS_H
 
-#include "EzDslCommon.h"
+#include "EzDslSemaCommon.h"
 #include "Ast/TypeDefLangAst.h"
 
 /**
@@ -19,4 +19,4 @@ class TypePass
     bool run(class DiagnosticCollector *collector, class SymbolTable *table, DSL::Ast::TypeDef::TypeDefFile *file);
 };
 
-#endif // EZDSL_TYPE_PASS_H
+#endif // EZDSLSEMA_TYPE_PASS_H

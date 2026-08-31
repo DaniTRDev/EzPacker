@@ -1,13 +1,122 @@
 #include "Diagnostics/DiagnosticCollector.h"
+#include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeRulePass.h"
-#include "Sema/Symbols/Symbols.h"
 
 constexpr auto PassName = "Sema::LegalizeRulePass";
 
+namespace
+{
+using namespace DSL::Ast::LegalizeRuleDef;
+
+bool validateSsaVariable(DiagnosticCollector *collector,
+                         SymbolTable *table,
+                         const DSL::Ast::Common::Identifier &ident,
+                         std::string_view contextMsg,
+                         std::string_view ruleName)
+{
+    Symbol *varSym = table->getSymByName(ident.m_node);
+    if (!varSym || varSym->getType() != SymbolType::SsaVariable)
+    {
+        collector->error(PassName,
+                         "Undefined SSA variable '${}' in {} of rule '{}'",
+                         ident.m_node,
+                         contextMsg,
+                         ruleName)
+                << ident.m_sourceRef;
+        return false;
+    }
+    return true;
+}
+
+bool validateOperandAgainstIrDef(DiagnosticCollector *collector,
+                                 const Symbols::IrOperandSymbol &expectedOp,
+                                 const DSL::Ast::LegalizeRuleDef::RuleInstructionOperand &actualOp,
+                                 size_t opIndex,
+                                 std::string_view opcodeName,
+                                 std::string_view ruleName,
+                                 bool isMatchPattern)
+{
+    const char *context = isMatchPattern ? "match clause" : "emit clause";
+    const auto &opSourceRef = actualOp.m_name.m_sourceRef;
+
+    // Dataflow Direction: An output operand slot cannot receive literals or custom transforms
+    const bool isOutSlot = (expectedOp.m_dir == DSL::Ast::IrInstDef::IrOperandDir::ArgOut);
+    if (isOutSlot)
+    {
+        if (actualOp.m_kind == RuleOperandKind::ImmediateLiteral)
+        {
+            collector->error(
+                    PassName,
+                    "Operand {} of '{}' in {} of rule '{}' is an OUT parameter and cannot receive an immediate literal",
+                    opIndex,
+                    opcodeName,
+                    context,
+                    ruleName)
+                    << opSourceRef;
+            return false;
+        }
+
+        if (actualOp.m_kind == RuleOperandKind::CustomTransform)
+        {
+            collector->error(PassName,
+                             "Operand {} of '{}' in {} of rule '{}' is an OUT parameter and cannot receive a transform "
+                             "expression",
+                             opIndex,
+                             opcodeName,
+                             context,
+                             ruleName)
+                    << opSourceRef;
+            return false;
+        }
+    }
+
+    // Type Compatibility: Immediate Slot vs Register Slot
+    const bool isImmSlot = (expectedOp.m_type == DSL::Ast::IrInstDef::IrOperandType::Immediate);
+
+    if (isImmSlot)
+    {
+        // Slot expects an immediate, but got an SSA Virtual Register
+        if (actualOp.m_kind == RuleOperandKind::SsaRegister)
+        {
+            collector->error(PassName,
+                             "Operand {} ('{}') of instruction '{}' in {} expects an immediate value, but got SSA "
+                             "register '${}' in rule '{}'",
+                             opIndex,
+                             expectedOp.m_name,
+                             opcodeName,
+                             context,
+                             actualOp.m_name.m_node,
+                             ruleName)
+                    << opSourceRef;
+            return false;
+        }
+    }
+    else
+    {
+        // Slot expects a Register/Value, but got an Immediate literal without being an operand that accepts it
+        if (actualOp.m_kind == RuleOperandKind::ImmediateLiteral)
+        {
+            collector->error(PassName,
+                             "Operand {} ('{}') of instruction '{}' in {} expects a register operand, but got "
+                             "immediate literal in rule '{}'",
+                             opIndex,
+                             expectedOp.m_name,
+                             opcodeName,
+                             context,
+                             ruleName)
+                    << opSourceRef;
+            return false;
+        }
+    }
+
+    return true;
+}
+} // namespace
+
 bool LegalizeRulePass::run(DiagnosticCollector *collector,
                            SymbolTable *table,
-                           DSL::Ast::LegalizeRuleDef::TargetLegalizeRuleDef *file)
+                           DSL::Ast::LegalizeRuleDef::LegalizeRuleFile *file)
 {
     if (!collector || !table || !file)
     {
@@ -19,7 +128,10 @@ bool LegalizeRulePass::run(DiagnosticCollector *collector,
     bool success = true;
     for (const auto &rule : file->m_rules)
     {
-        success &= processRule(collector, table, rule);
+        if (!processRule(collector, table, rule))
+        {
+            success = false;
+        }
     }
 
     return success;
@@ -27,35 +139,29 @@ bool LegalizeRulePass::run(DiagnosticCollector *collector,
 
 bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
                                    SymbolTable *table,
-                                   const DSL::Ast::LegalizeRuleDef::LegalizeRewriteRule &rule)
+                                   const DSL::Ast::LegalizeRuleDef::LegalizeRule &rule)
 {
     const auto &ruleNameIdent = rule.m_ruleName;
     const auto &ruleName = ruleNameIdent.m_node;
 
-    // 1. Structural requirements
-    if (rule.m_matchPatterns.empty() || rule.m_expansionSequence.empty())
+    // Structural requirements
+    if (rule.m_matchClauses.empty() || rule.m_emitClauses.empty())
     {
-        const char *missingKind = rule.m_matchPatterns.empty() ? "match" : "expansion";
-        collector->error(PassName,
-                         "Legalization rule '{}' must declare at least one {} instruction",
-                         ruleName,
-                         missingKind)
+        const char *missingKind = rule.m_matchClauses.empty() ? "match" : "emit";
+        collector->error(PassName, "Legalization rule '{}' must declare at least one {} clause", ruleName, missingKind)
                 << ruleNameIdent.m_sourceRef;
         return false;
     }
 
-    // 2. Declare the rule symbol in the enclosing scope
-    Sema::Symbols::LegalizeRewriteRuleSymbol ruleSym{
+    // Declare the rule symbol in the enclosing scope
+    Symbols::LegalizeRuleSymbol ruleSym{
         .m_ruleName = ruleName,
-        .m_matchPatterns = std::pmr::vector<Sema::Symbols::RuleInstructionSymbol>(table->getAllocator()),
-        .m_expansionSequence = std::pmr::vector<Sema::Symbols::RuleInstructionSymbol>(table->getAllocator())
+        .m_matchPatterns = std::pmr::vector<Symbols::LegalizeRuleInstructionSymbol>(table->getAllocator()),
+        .m_expansionSequence = std::pmr::vector<Symbols::LegalizeRuleInstructionSymbol>(table->getAllocator())
     };
 
-    SymbolId ruleSymId = table->declareSym(ruleNameIdent.m_sourceRef,
-                                           SymbolFlags::IsDefined,
-                                           SymbolType::LegalizeRule,
-                                           std::move(ruleSym),
-                                           ruleName);
+    SymbolId ruleSymId =
+            table->declareSym(ruleNameIdent.m_sourceRef, SymbolType::LegalizeRule, std::move(ruleSym), ruleName);
 
     if (ruleSymId == InvalidSymbolId)
     {
@@ -65,22 +171,21 @@ bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
     }
 
     Symbol *registeredRule = table->getSymById(ruleSymId);
-    auto *ruleData = registeredRule ? registeredRule->getIf<Sema::Symbols::LegalizeRewriteRuleSymbol>() : nullptr;
+    auto *ruleData = registeredRule ? registeredRule->getIf<Symbols::LegalizeRuleSymbol>() : nullptr;
     if (!ruleData)
     {
         return false;
     }
 
-    // 3. Enter dedicated scope for rule SSA variables (exited via RAII)
-    table->enterScope(ruleName);
     bool success = true;
+    table->enterScope(ruleName);
 
-    // 4. Validate match patterns & bind defined SSA variables
-    for (const auto &matchInst : rule.m_matchPatterns)
+    // Validate match clauses & bind defined SSA variables
+    for (const auto &matchInst : rule.m_matchClauses)
     {
-        Sema::Symbols::RuleInstructionSymbol instSym{ .m_opcode = matchInst.m_opcode.m_node,
-                                                      .m_operands = std::pmr::vector<Sema::Symbols::RuleOperandSymbol>(
-                                                              table->getAllocator()) };
+        Symbols::LegalizeRuleInstructionSymbol instSym{ .m_opcode = matchInst.m_opcode.m_node,
+                                                .m_operands = std::pmr::vector<Symbols::LegalizeRuleOperandSymbol>(
+                                                        table->getAllocator()) };
 
         if (!processInstruction(collector, table, matchInst, ruleName, /*isMatchPattern=*/true, instSym))
         {
@@ -91,20 +196,23 @@ bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
         ruleData->m_matchPatterns.push_back(std::move(instSym));
     }
 
-    // 5. Validate 'when' predicates against declared SSA variables
-    for (const auto &predicate : rule.m_predicates)
+    // Validate 'when' predicates against declared SSA variables
+    for (const auto &predicate : rule.m_whenClauses)
     {
-        success &= processPredicate(collector, table, predicate, ruleName);
+        if (!processPredicate(collector, table, predicate, ruleName))
+        {
+            success = false;
+        }
     }
 
-    // 6. Validate expand sequence instructions and operand usages
-    for (const auto &expandInst : rule.m_expansionSequence)
+    // Validate emit clause instructions and operand usages
+    for (const auto &emitInst : rule.m_emitClauses)
     {
-        Sema::Symbols::RuleInstructionSymbol instSym{ .m_opcode = expandInst.m_opcode.m_node,
-                                                      .m_operands = std::pmr::vector<Sema::Symbols::RuleOperandSymbol>(
-                                                              table->getAllocator()) };
+        Symbols::LegalizeRuleInstructionSymbol instSym{ .m_opcode = emitInst.m_opcode.m_node,
+                                                .m_operands = std::pmr::vector<Symbols::LegalizeRuleOperandSymbol>(
+                                                        table->getAllocator()) };
 
-        if (!processInstruction(collector, table, expandInst, ruleName, /*isMatchPattern=*/false, instSym))
+        if (!processInstruction(collector, table, emitInst, ruleName, /*isMatchPattern=*/false, instSym))
         {
             success = false;
             continue;
@@ -115,7 +223,7 @@ bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
 
     table->exitScope();
     collector->trace(PassName,
-                     "Defined legalization rewrite rule '{}' ({} match patterns, {} expand instructions)",
+                     "Defined legalization rewrite rule '{}' ({} match clauses, {} emit clauses)",
                      ruleName,
                      ruleData->m_matchPatterns.size(),
                      ruleData->m_expansionSequence.size());
@@ -128,30 +236,71 @@ bool LegalizeRulePass::processInstruction(DiagnosticCollector *collector,
                                           const DSL::Ast::LegalizeRuleDef::RuleInstruction &inst,
                                           std::string_view ruleName,
                                           bool isMatchPattern,
-                                          Sema::Symbols::RuleInstructionSymbol &outInst)
+                                          Symbols::LegalizeRuleInstructionSymbol &outInst)
 {
-    Symbol *opcodeSym = table->getSymByName(inst.m_opcode.m_node);
+    const auto &opcodeIdent = inst.m_opcode;
+    Symbol *opcodeSym = table->getSymByName(opcodeIdent.m_node);
     if (!opcodeSym || opcodeSym->getType() != SymbolType::IrInstruction)
     {
-        const char *context = isMatchPattern ? "match pattern" : "expansion sequence";
+        const char *context = isMatchPattern ? "match clause" : "emit clause";
         collector->error(PassName,
                          "Unknown or undefined IR opcode '{}' in {} of rule '{}'",
-                         inst.m_opcode.m_node,
+                         opcodeIdent.m_node,
                          context,
                          ruleName)
-                << inst.m_opcode.m_sourceRef;
+                << opcodeIdent.m_sourceRef;
         return false;
     }
 
-    bool success = true;
-    for (const auto &operand : inst.m_operands)
+    const auto *irInstDef = opcodeSym->getIf<Symbols::IrInstructionSymbol>();
+    if (!irInstDef)
     {
-        Sema::Symbols::RuleOperandSymbol opSym;
+        return false;
+    }
+
+    // Arity Check: Verify operand count against IR instruction definition
+    const size_t expectedArity = irInstDef->m_operands.size();
+    const size_t actualArity = inst.m_operands.size();
+
+    if (expectedArity != actualArity)
+    {
+        const char *context = isMatchPattern ? "match clause" : "emit clause";
+        collector->error(PassName,
+                         "Instruction '{}' in {} of rule '{}' expects {} operands, but got {}",
+                         opcodeIdent.m_node,
+                         context,
+                         ruleName,
+                         expectedArity,
+                         actualArity)
+                << opcodeIdent.m_sourceRef;
+        return false;
+    }
+
+    // Resolve individual operands and validate against instruction definition signature
+    bool success = true;
+    for (size_t i = 0; i < actualArity; ++i)
+    {
+        const auto &operand = inst.m_operands[i];
+        const auto &expectedOp = irInstDef->m_operands[i];
+
+        if (!validateOperandAgainstIrDef(collector,
+                                         expectedOp,
+                                         operand,
+                                         i,
+                                         opcodeIdent.m_node,
+                                         ruleName,
+                                         isMatchPattern))
+        {
+            success = false;
+        }
+
+        Symbols::LegalizeRuleOperandSymbol opSym;
         if (!resolveOperand(collector, table, operand, ruleName, isMatchPattern, opSym))
         {
             success = false;
             continue;
         }
+
         outInst.m_operands.push_back(std::move(opSym));
     }
 
@@ -160,24 +309,18 @@ bool LegalizeRulePass::processInstruction(DiagnosticCollector *collector,
 
 bool LegalizeRulePass::processPredicate(DiagnosticCollector *collector,
                                         SymbolTable *table,
-                                        const DSL::Ast::LegalizeRuleDef::RulePredicate &predicate,
+                                        const DSL::Ast::LegalizeRuleDef::RuleWhen &predicate,
                                         std::string_view ruleName)
 {
     bool success = true;
+    std::string contextMsg = "predicate '" + std::string(predicate.m_predicateName.m_node) + "'";
 
     for (const auto &arg : predicate.m_arguments)
     {
         if (const auto *ident = std::get_if<DSL::Ast::Common::Identifier>(&arg))
         {
-            Symbol *varSym = table->getSymByName(ident->m_node);
-            if (!varSym || varSym->getType() != SymbolType::SsaVariable)
+            if (!validateSsaVariable(collector, table, *ident, contextMsg, ruleName))
             {
-                collector->error(PassName,
-                                 "Undefined SSA variable '${}' in predicate '{}' of rule '{}'",
-                                 ident->m_node,
-                                 predicate.m_predicateName.m_node,
-                                 ruleName)
-                        << ident->m_sourceRef;
                 success = false;
             }
         }
@@ -188,18 +331,18 @@ bool LegalizeRulePass::processPredicate(DiagnosticCollector *collector,
 
 bool LegalizeRulePass::resolveOperand(DiagnosticCollector *collector,
                                       SymbolTable *table,
-                                      const DSL::Ast::LegalizeRuleDef::RuleOperand &operand,
+                                      const DSL::Ast::LegalizeRuleDef::RuleInstructionOperand &operand,
                                       std::string_view ruleName,
                                       bool isMatchPattern,
-                                      Sema::Symbols::RuleOperandSymbol &outOperand)
+                                      Symbols::LegalizeRuleOperandSymbol &outOperand)
 {
-    outOperand.m_kind = operand.m_kind;
+    outOperand.m_kind = static_cast<DSL::Ast::LegalizeRuleDef::RuleOperandKind>(operand.m_kind);
     outOperand.m_name = operand.m_name.m_node;
     outOperand.m_typeOrClassId = std::nullopt;
     outOperand.m_immLiteral = std::nullopt;
 
-    // 1. Literal Operand
-    if (operand.m_kind == DSL::Ast::LegalizeRuleDef::OperandKind::ImmediateLiteral)
+    // Literal Operand
+    if (operand.m_kind == RuleOperandKind::ImmediateLiteral)
     {
         if (operand.m_immLiteral.has_value())
         {
@@ -208,45 +351,38 @@ bool LegalizeRulePass::resolveOperand(DiagnosticCollector *collector,
         return true;
     }
 
-    // 2. Custom Transform (e.g. log2($src))
-    if (operand.m_kind == DSL::Ast::LegalizeRuleDef::OperandKind::CustomTransform)
+    // Custom Transform (e.g., log2($src))
+    if (operand.m_kind == RuleOperandKind::CustomTransform)
     {
         if (isMatchPattern)
         {
-            collector->error(PassName,
-                             "Custom transform '{}' cannot be used as an input match pattern",
-                             operand.m_name.m_node)
+            collector->error(PassName, "Custom transform '{}' cannot be used in a match clause", operand.m_name.m_node)
                     << operand.m_name.m_sourceRef;
             return false;
         }
 
         bool success = true;
+        std::string contextMsg = "transform '" + std::string(operand.m_name.m_node) + "'";
         for (const auto &argIdent : operand.m_callArgs)
         {
-            Symbol *argSym = table->getSymByName(argIdent.m_node);
-            if (!argSym || argSym->getType() != SymbolType::SsaVariable)
+            if (!validateSsaVariable(collector, table, argIdent, contextMsg, ruleName))
             {
-                collector->error(PassName,
-                                 "Undefined SSA variable '${}' passed to transform '{}' in rule '{}'",
-                                 argIdent.m_node,
-                                 operand.m_name.m_node,
-                                 ruleName)
-                        << argIdent.m_sourceRef;
                 success = false;
             }
         }
         return success;
     }
 
-    // 3. Type Resolution for Typed SSA / Immediate Symbols
-    if (operand.m_type.has_value() && operand.m_kind != DSL::Ast::LegalizeRuleDef::OperandKind::ImmediateSymbol)
+    // Type Resolution for Typed SSA / Parameterized Immediate Types
+    const auto &typeToResolve = operand.m_typeParam.has_value() ? operand.m_typeParam : operand.m_type;
+    if (typeToResolve.has_value() && operand.m_kind != RuleOperandKind::ImmediateSymbol)
     {
-        const auto &typeName = *operand.m_type;
+        const auto &typeName = *typeToResolve;
         Symbol *typeSym = table->getSymByName(typeName.m_node);
         if (!typeSym || typeSym->getType() != SymbolType::Type)
         {
             collector->error(PassName,
-                             "Unknown type '{}' on SSA variable '${}' in rule '{}'",
+                             "Unknown type '{}' on operand '${}' in rule '{}'",
                              typeName.m_node,
                              operand.m_name.m_node,
                              ruleName)
@@ -256,15 +392,14 @@ bool LegalizeRulePass::resolveOperand(DiagnosticCollector *collector,
         outOperand.m_typeOrClassId = typeSym->getId();
     }
 
-    // 4. SSA Variable Registration
-    if (operand.m_kind == DSL::Ast::LegalizeRuleDef::OperandKind::SsaRegister ||
-        operand.m_kind == DSL::Ast::LegalizeRuleDef::OperandKind::ImmediateSymbol)
+    // SSA Variable Registration / Usage
+    if (operand.m_kind == RuleOperandKind::SsaRegister || operand.m_kind == RuleOperandKind::ImmediateSymbol)
     {
         if (!table->getSymByName(operand.m_name.m_node))
         {
             table->declareSym(operand.m_name.m_sourceRef,
-                              SymbolFlags::IsDefined,
-                              SymbolType::SsaVariable,
+                              operand.m_kind == RuleOperandKind::SsaRegister ? SymbolType::SsaVariable
+                                                                             : SymbolType::ImmediateVariable,
                               std::monostate{},
                               operand.m_name.m_node);
         }

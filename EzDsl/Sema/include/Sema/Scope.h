@@ -1,10 +1,7 @@
-#ifndef EZDSL_SCOPE_H
-#define EZDSL_SCOPE_H
+#ifndef EZDSLSEMA_SCOPE_H
+#define EZDSLSEMA_SCOPE_H
 
-#include "EzDslCommon.h"
-#include <string_view>
-#include <unordered_map>
-#include <vector>
+#include "EzDslSemaCommon.h"
 
 using ScopeId = size_t;
 inline constexpr ScopeId InvalidScopeId = UINT64_MAX;
@@ -59,4 +56,4 @@ class Scope
     std::string_view m_debugName;
 };
 
-#endif // EZDSL_SCOPE_H
+#endif // EZDSLSEMA_SCOPE_H

@@ -1,7 +1,7 @@
-#ifndef EZDSL_SYMBOL_TABLE_H
-#define EZDSL_SYMBOL_TABLE_H
+#ifndef EZDSLSEMA_SYMBOL_TABLE_H
+#define EZDSLSEMA_SYMBOL_TABLE_H
 
-#include "EzDslCommon.h"
+#include "EzDslSemaCommon.h"
 #include "Scope.h"
 #include "Symbol.h"
 
@@ -47,11 +47,8 @@ class SymbolTable
      * Declares a new symbol in the active scope with source reference, flags, type, semantic payload, and name.
      * Returns InvalidSymbolId if a symbol with the same name already exists in the active scope.
      */
-    SymbolId declareSym(class SourceReference *sourceRef,
-                        SymbolFlags flags,
-                        SymbolType type,
-                        Symbol::SymbolData data,
-                        std::string_view name);
+    SymbolId
+    declareSym(class SourceReference *sourceRef, SymbolType type, Symbol::SymbolData data, std::string_view name);
 
     /**
      * Creates a new child scope under the active scope and makes it the active scope.

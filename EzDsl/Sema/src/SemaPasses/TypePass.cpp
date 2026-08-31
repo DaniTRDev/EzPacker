@@ -18,17 +18,15 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
         return false;
     }
 
-    const auto &types = file->m_types;
     bool hasErrors = false;
     size_t registeredTypes = 0;
-    uint8_t compactId = 1; // 0 is reserved as error.
+    uint8_t compactId = 1; // 0 is reserved as invalid/error.
 
-    for (const auto &type : types)
+    for (const auto &type : file->m_types)
     {
         const auto &typeName = type.m_name.m_node;
         uint32_t resolvedBitWidth = 0;
 
-        // Validate bit sizes based on TypeKind
         switch (type.m_kind)
         {
             case DSL::Ast::TypeDef::TypeKind::Integer:
@@ -91,49 +89,15 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
             }
 
             case DSL::Ast::TypeDef::TypeKind::Void:
-            {
-                if (type.m_bitSize.has_value())
-                {
-                    if (type.m_bitSize->m_node != 0)
-                    {
-                        collector->error(passName, "Void type '{}' cannot have a non-zero bit size.", typeName)
-                                << type.m_bitSize->m_sourceRef;
-                        hasErrors = true;
-                        continue;
-                    }
-                }
-
-                resolvedBitWidth = 0;
-                break;
-            }
-
             case DSL::Ast::TypeDef::TypeKind::BindingToken:
-            {
-                if (type.m_bitSize.has_value())
-                {
-                    if (type.m_bitSize->m_node != 0)
-                    {
-                        collector->error(passName, "Binding token type '{}' cannot have a non-zero bit size.", typeName)
-                                << type.m_bitSize->m_sourceRef;
-                        hasErrors = true;
-                        continue;
-                    }
-                }
-
-                resolvedBitWidth = 0;
-                break;
-            }
             case DSL::Ast::TypeDef::TypeKind::Pointer:
             {
-                if (type.m_bitSize.has_value())
+                if (type.m_bitSize.has_value() && type.m_bitSize->m_node != 0)
                 {
-                    if (type.m_bitSize->m_node != 0)
-                    {
-                        collector->error(passName, "Pointer type '{}' cannot have a non-zero bit size.", typeName)
-                                << type.m_bitSize->m_sourceRef;
-                        hasErrors = true;
-                        continue;
-                    }
+                    collector->error(passName, "Type '{}' cannot have a non-zero bit size.", typeName)
+                            << type.m_bitSize->m_sourceRef;
+                    hasErrors = true;
+                    continue;
                 }
 
                 resolvedBitWidth = 0;
@@ -154,37 +118,33 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
 
             resolvedAlignment = type.m_alignment->m_node;
         }
-
-        if (resolvedAlignment == 0)
+        else
         {
             resolvedAlignment = resolvedBitWidth;
             collector->trace(passName, "Using default alignment ('{}') for type '{}'", resolvedAlignment, typeName)
-                    << type.m_alignment->m_sourceRef;
+                    << type.m_name.m_sourceRef;
         }
 
-        // 2. Declare and register the type symbol
-
-        Sema::Symbols::TypeSymbol data{ .m_name = typeName,
-                                        .m_kind = type.m_kind,
-                                        .m_bitWidth = resolvedBitWidth,
-                                        .m_alignment = resolvedAlignment,
-                                        .m_compactId = compactId == 255 ? compactId : compactId++ };
-
-        SymbolId id = table->declareSym(type.m_name.m_sourceRef,
-                                        SymbolFlags::IsDefined,
-                                        SymbolType::Type,
-                                        std::move(data),
-                                        typeName);
-        if (compactId == 255)
+        // Check compact ID limits (1-254)
+        if (compactId >= 255)
         {
-            collector->error(
-                    passName,
-                    "Reached end of compact IDs for machine types. For optimization purposes this number is limited to "
-                    "254. Move out of the .tyf file any type that is not STRICTLY used in legalization and "
-                    "instruction selection.")
+            collector->error(passName,
+                             "Reached end of compact IDs for machine types. For optimization purposes this number is "
+                             "limited to 254. "
+                             "Move out of the .tyf file any type that is not STRICTLY used in legalization and "
+                             "instruction selection.")
                     << type.m_name.m_sourceRef;
             return false;
         }
+
+        // Declare and register the type symbol
+        Symbols::TypeSymbol data{ .m_name = typeName,
+                                  .m_kind = type.m_kind,
+                                  .m_bitWidth = resolvedBitWidth,
+                                  .m_alignment = resolvedAlignment,
+                                  .m_compactId = compactId++ };
+
+        SymbolId id = table->declareSym(type.m_name.m_sourceRef, SymbolType::Type, std::move(data), typeName);
 
         if (id == InvalidSymbolId)
         {
@@ -203,6 +163,7 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
                          static_cast<int>(type.m_kind),
                          resolvedBitWidth,
                          resolvedAlignment);
+
         registeredTypes++;
     }
 
