@@ -123,7 +123,7 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
     LegalizeQueryResult decision = actionTable->query(inst->getOpCode(), t0, t1, t2);
 
     /*
-     * Fast path: instruction is natively supported. This instrinsic allows the compiler to optimize the cmp + jump to
+     * Fast path: instruction is natively supported. This intrinsic allows the compiler to optimize the cmp + jump to
      * ensure CPU's branch prediction does not waste its effort.
      */
     if (__builtin_expect(decision.m_action == LegalizeAction::Legal, 1))

@@ -241,9 +241,6 @@ bool IrInstructionPass::validateInstruction(DiagnosticCollector *collector,
         return false;
     }
 
-    // 7. Bind assigned SymbolId within symbol payload
-    Symbol *registeredSym = table->getSymById(id);
-
     collector->trace(PassName, "Added IR instruction: {}", inst.m_name.m_node);
     return true;
 }

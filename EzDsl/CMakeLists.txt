@@ -1,3 +1,3 @@
 add_subdirectory(Lexer)
 add_subdirectory(Sema)
-#add_subdirectory(Cli)
+add_subdirectory(CodeGenerators)

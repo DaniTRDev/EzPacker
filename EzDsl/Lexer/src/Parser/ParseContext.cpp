@@ -11,9 +11,9 @@ ParseContext::ParseContext(class DiagnosticCollector *diagCollector,
 {
 }
 
-class GenericSourceManager *ParseContext::getSourceManager() const { return m_sourceManager; }
+GenericSourceManager *ParseContext::getSourceManager() const { return m_sourceManager; }
 
-class DiagnosticCollector *ParseContext::getDiagCollector() const { return m_diagCollector; }
+DiagnosticCollector *ParseContext::getDiagCollector() const { return m_diagCollector; }
 
 size_t ParseContext::getSourceId() const { return m_sourceId; }
 

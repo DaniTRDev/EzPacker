@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 /**
- * Base test fixture and context manager for EzDSL compiler unit tests.
+ * Base test fixture and context manager for EzDSL lexer compiler unit tests.
  * Manages monotonic buffer allocation, diagnostic reporting, source buffers,
  * and lexy-based DSL parsing contexts.
  */

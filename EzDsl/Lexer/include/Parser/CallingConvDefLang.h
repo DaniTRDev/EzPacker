@@ -200,7 +200,8 @@ struct PrimitiveRuleParser
              dsl::p<Common::Identifier>);
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::PrimitiveRule>(
-            [](std::pmr::vector<Ast::Common::Identifier> types, Ast::Common::Identifier target) {
+            [](std::pmr::vector<Ast::Common::Identifier> types, Ast::Common::Identifier target)
+            {
                 return Ast::CallingConvDef::PrimitiveRule{ .m_types = std::move(types),
                                                            .m_targetClass = std::move(target) };
             });
@@ -622,7 +623,8 @@ struct SlotBlockParser
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = dsl::p<Common::Identifier> + dsl::lit_c<':'> + dsl::p<Common::Identifier>;
         static constexpr auto value = lexy::callback<Ast::CallingConvDef::SlotBinding>(
-                [](Ast::Common::Identifier cls, Ast::Common::Identifier reg) {
+                [](Ast::Common::Identifier cls, Ast::Common::Identifier reg)
+                {
                     return Ast::CallingConvDef::SlotBinding{ .m_abiClass = std::move(cls),
                                                              .m_register = std::move(reg) };
                 });

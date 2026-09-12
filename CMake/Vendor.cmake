@@ -24,3 +24,8 @@ EzCMK_AddVendor(https://github.com/foonathan/lexy
         c1358c4117752393e9ce27d6c885d9146846f2f9
         lexy
 )
+
+EzCMK_AddVendor(https://github.com/p-ranav/argparse
+        d924b84eba1f0f0adf38b20b7b4829f6f65b6570
+        argparse
+)

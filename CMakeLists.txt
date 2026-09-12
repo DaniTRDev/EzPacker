@@ -38,13 +38,10 @@ add_subdirectory(EzTriple)
 add_subdirectory(EzCodeEmitter)
 
 if (EZPACKER_BUILD_TESTS)
-    message(STATUS "Configuring EzMirTestSuite")
     add_subdirectory(tests/EzMirTestSuite)
-
-    message(STATUS "Configuring EzDslLexerTestSuite")
     add_subdirectory(tests/EzDslLexerTestSuite)
-
-    message(STATUS "Configuring EzTripleTestSuite")
+    add_subdirectory(tests/EzDslSemaTestSuite)
+    add_subdirectory(tests/EzDslCodeGeneratorsTestSuite)
     add_subdirectory(tests/EzTripleTestSuite)
 
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
