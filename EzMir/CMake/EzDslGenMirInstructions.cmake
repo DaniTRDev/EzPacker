@@ -5,7 +5,7 @@ EzDslGenMirInstructions
 ---------------------------
 
 Binds an .irdf IR instruction specification file to a target library
-by executing EzDsl-cli and generating MirInstructionSetDefs.h.
+by executing EzDslCli and generating MirInstructionSetDefs.h.
 
 Usage:
   EzDslGenMirInstructions(
@@ -38,11 +38,11 @@ function(EzDslGenMirInstructions)
     # Build custom command with dependency tracking
     add_custom_command(
         OUTPUT "${GEN_HEADER}"
-        COMMAND $<TARGET_FILE:EzDsl-cli>
+        COMMAND $<TARGET_FILE:EzDslCli>
                 -i "${EZDSL_INPUT}"
                 -o "${EZDSL_OUTPUT_DIR}"
                 --emit-instructions
-        DEPENDS EzDsl-cli "${EZDSL_INPUT}"
+        DEPENDS EzDslCli "${EZDSL_INPUT}"
         COMMENT "[EzDSL] Synthesizing MirInstructionSetDefs.h from ${EZDSL_INPUT}"
         VERBATIM
     )

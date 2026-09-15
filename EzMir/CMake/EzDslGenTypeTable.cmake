@@ -4,7 +4,7 @@
 EzDslGenerateTypeTable
 -----------------------------
 
-Binds a .tyf type specification to a target library by executing ezdsl-gen
+Binds a .tyf type specification to a target library by executing EzDslCli
 and attaching the generated MirTypeTable.h and MirTypeTable.cpp files.
 
 Usage:
@@ -39,12 +39,12 @@ function(EzDslGenerateTypeTable)
     # Build custom command with dependency tracking
     add_custom_command(
         OUTPUT "${GEN_HEADER}" "${GEN_SOURCE}"
-        COMMAND EzDsl-cli
+        COMMAND EzDslCli
                 -i "${EZDSL_INPUT}"
                 -o "${EZDSL_OUTPUT_DIR}"
                 --emit-type-table
-        DEPENDS EzDsl-cli "${EZDSL_INPUT}"
-        COMMENT "[EzDSL] Synthesizing MirTypeTable from ${EZDSL_INPUT}"
+        DEPENDS EzDslCli "${EZDSL_INPUT}"
+        COMMENT ""
         VERBATIM
     )
 

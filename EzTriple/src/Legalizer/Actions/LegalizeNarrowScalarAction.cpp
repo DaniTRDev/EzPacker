@@ -34,9 +34,8 @@ splitOperand(MirOperand *op,
         {
             chunks.push_back(ob.buildVReg(narrowType));
         }
-        std::vector<MirOperand *> unmergeOps = chunks;
-        unmergeOps.push_back(op);
-        emitInst(MirInstructionOpCode::UNMERGE_VALUES, unmergeOps);
+        chunks.push_back(op);
+        emitInst(MirInstructionOpCode::UNMERGE_VALUES, chunks);
         return chunks;
     }
 

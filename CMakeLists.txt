@@ -11,7 +11,6 @@ set(EZPACKER_BUILD_STATIC OFF CACHE BOOL "Builds EzPacker as STATIC" FORCE)
 
 include(FetchContent)
 message(STATUS "Retrieving EzLib")
-enable_testing()
 
 set(EZLIB_BUILD_TESTS OFF CACHE BOOL "Builds tests for EzLib" FORCE)
 set(EZLIB_BUILD_STATIC OFF CACHE BOOL "Build EzLib as a SHARED lib" FORCE)
@@ -27,12 +26,13 @@ include("CMake/Vendor.cmake") # Fetch 3rd party libs.
 include("CMake/TestWrapper.cmake")
 
 if (EZPACKER_BUILD_TESTS)
+    enable_testing()
     EzCMK_EnableTestsForCurrentProject()
 endif ()
 
 add_subdirectory(LibBf) # https://bellard.org/libbf/
 add_subdirectory(EzCore)
-#add_subdirectory(EzMir)
+add_subdirectory(EzMir)
 add_subdirectory(EzDsl)
 add_subdirectory(EzTriple)
 add_subdirectory(EzCodeEmitter)
@@ -42,6 +42,7 @@ if (EZPACKER_BUILD_TESTS)
     add_subdirectory(tests/EzDslLexerTestSuite)
     add_subdirectory(tests/EzDslSemaTestSuite)
     add_subdirectory(tests/EzDslCodeGeneratorsTestSuite)
+    add_subdirectory(tests/EzDslCliTestSuite)
     add_subdirectory(tests/EzTripleTestSuite)
 
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
