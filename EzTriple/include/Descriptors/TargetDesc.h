@@ -43,6 +43,11 @@ class TargetDesc
     virtual class MirLegalizeActionTable *getLegalizeActionTable() = 0;
 
     /**
+     * Returns the LegalizerInfo containing table-driven legality definitions for this target.
+     */
+    virtual class LegalizerInfo *getLegalizerInfo() { return nullptr; }
+
+    /**
      * Returns the register allocator needed for this target.
      */
     virtual class MirRegisterAllocator *getRegisterAllocator() = 0;

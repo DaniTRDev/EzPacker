@@ -42,6 +42,7 @@ class SymbolTable
      * Climbs the parent scope chain until found or the root scope is exceeded.
      */
     Symbol *getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope = std::nullopt);
+    Symbol *getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope = std::nullopt);
 
     /**
      * Declares a new symbol in the active scope with source reference, flags, type, semantic payload, and name.
@@ -74,7 +75,7 @@ class SymbolTable
     /**
      * Looks up a symbol name within a single specific scope without ascending to parents.
      */
-    Symbol *getSymInScope(ScopeId id, const std::string_view &name) const;
+    Symbol *getSymInScope(ScopeId id, const std::string_view &name, std::optional<SymbolType> type = std::nullopt) const;
 
   private:
     ScopeId m_currentScopeId;

@@ -16,7 +16,8 @@ bool validateSsaVariable(DiagnosticCollector *collector,
                          std::string_view ruleName)
 {
     Symbol *varSym = table->getSymByName(ident.m_node);
-    if (!varSym || varSym->getType() != SymbolType::SsaVariable)
+    if (!varSym || (varSym->getType() != SymbolType::SsaVariable &&
+                    varSym->getType() != SymbolType::ImmediateVariable))
     {
         collector->error(PassName,
                          "Undefined SSA variable '${}' in {} of rule '{}'",
@@ -72,42 +73,38 @@ bool validateOperandAgainstIrDef(DiagnosticCollector *collector,
     }
 
     // Type Compatibility: Immediate Slot vs Register Slot
-    const bool isImmSlot = (expectedOp.m_type == DSL::Ast::IrInstDef::IrOperandType::Immediate);
+    const uint16_t opTypeMask = static_cast<uint16_t>(expectedOp.m_type);
+    const bool acceptsImm = (opTypeMask & static_cast<uint16_t>(DSL::Ast::IrInstDef::IrOperandType::Immediate)) != 0;
+    const bool acceptsReg = (opTypeMask & static_cast<uint16_t>(DSL::Ast::IrInstDef::IrOperandType::Register)) != 0;
 
-    if (isImmSlot)
+    if (actualOp.m_kind == RuleOperandKind::SsaRegister && !acceptsReg)
     {
         // Slot expects an immediate, but got an SSA Virtual Register
-        if (actualOp.m_kind == RuleOperandKind::SsaRegister)
-        {
-            collector->error(PassName,
-                             "Operand {} ('{}') of instruction '{}' in {} expects an immediate value, but got SSA "
-                             "register '${}' in rule '{}'",
-                             opIndex,
-                             expectedOp.m_name,
-                             opcodeName,
-                             context,
-                             actualOp.m_name.m_node,
-                             ruleName)
-                    << opSourceRef;
-            return false;
-        }
+        collector->error(PassName,
+                         "Operand {} ('{}') of instruction '{}' in {} expects an immediate value, but got SSA "
+                         "register '${}' in rule '{}'",
+                         opIndex,
+                         expectedOp.m_name,
+                         opcodeName,
+                         context,
+                         actualOp.m_name.m_node,
+                         ruleName)
+                << opSourceRef;
+        return false;
     }
-    else
+
+    if ((actualOp.m_kind == RuleOperandKind::ImmediateLiteral || actualOp.m_kind == RuleOperandKind::ImmediateSymbol) && !acceptsImm)
     {
-        // Slot expects a Register/Value, but got an Immediate literal without being an operand that accepts it
-        if (actualOp.m_kind == RuleOperandKind::ImmediateLiteral)
-        {
-            collector->error(PassName,
-                             "Operand {} ('{}') of instruction '{}' in {} expects a register operand, but got "
-                             "immediate literal in rule '{}'",
-                             opIndex,
-                             expectedOp.m_name,
-                             opcodeName,
-                             context,
-                             ruleName)
-                    << opSourceRef;
-            return false;
-        }
+        collector->error(PassName,
+                         "Operand {} ('{}') of instruction '{}' in {} expects a register operand, but got "
+                         "immediate in rule '{}'",
+                         opIndex,
+                         expectedOp.m_name,
+                         opcodeName,
+                         context,
+                         ruleName)
+                << opSourceRef;
+        return false;
     }
 
     return true;
@@ -157,6 +154,7 @@ bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
     Symbols::LegalizeRuleSymbol ruleSym{
         .m_ruleName = ruleName,
         .m_matchPatterns = std::pmr::vector<Symbols::LegalizeRuleInstructionSymbol>(table->getAllocator()),
+        .m_predicates = std::pmr::vector<Symbols::LegalizeRulePredicateSymbol>(table->getAllocator()),
         .m_expansionSequence = std::pmr::vector<Symbols::LegalizeRuleInstructionSymbol>(table->getAllocator())
     };
 
@@ -203,6 +201,23 @@ bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
         {
             success = false;
         }
+
+        Symbols::LegalizeRulePredicateSymbol predSym{
+            .m_name = predicate.m_predicateName.m_node,
+            .m_args = std::pmr::vector<std::variant<std::string_view, int64_t>>(table->getAllocator())
+        };
+        for (const auto &arg : predicate.m_arguments)
+        {
+            if (const auto *ident = std::get_if<DSL::Ast::Common::Identifier>(&arg))
+            {
+                predSym.m_args.push_back(ident->m_node);
+            }
+            else if (const auto *lit = std::get_if<DSL::Ast::Common::IntegerLiteral>(&arg))
+            {
+                predSym.m_args.push_back(lit->m_node);
+            }
+        }
+        ruleData->m_predicates.push_back(std::move(predSym));
     }
 
     // Validate emit clause instructions and operand usages
@@ -340,6 +355,7 @@ bool LegalizeRulePass::resolveOperand(DiagnosticCollector *collector,
     outOperand.m_name = operand.m_name.m_node;
     outOperand.m_typeOrClassId = std::nullopt;
     outOperand.m_immLiteral = std::nullopt;
+    outOperand.m_callArgs = std::pmr::vector<std::string_view>(table->getAllocator());
 
     // Literal Operand
     if (operand.m_kind == RuleOperandKind::ImmediateLiteral)
@@ -354,6 +370,11 @@ bool LegalizeRulePass::resolveOperand(DiagnosticCollector *collector,
     // Custom Transform (e.g., log2($src))
     if (operand.m_kind == RuleOperandKind::CustomTransform)
     {
+        for (const auto &argIdent : operand.m_callArgs)
+        {
+            outOperand.m_callArgs.push_back(argIdent.m_node);
+        }
+
         if (isMatchPattern)
         {
             collector->error(PassName, "Custom transform '{}' cannot be used in a match clause", operand.m_name.m_node)
@@ -374,8 +395,10 @@ bool LegalizeRulePass::resolveOperand(DiagnosticCollector *collector,
     }
 
     // Type Resolution for Typed SSA / Parameterized Immediate Types
-    const auto &typeToResolve = operand.m_typeParam.has_value() ? operand.m_typeParam : operand.m_type;
-    if (typeToResolve.has_value() && operand.m_kind != RuleOperandKind::ImmediateSymbol)
+    const auto &typeToResolve = operand.m_typeParam.has_value()
+            ? operand.m_typeParam
+            : (operand.m_kind != RuleOperandKind::ImmediateSymbol ? operand.m_type : std::nullopt);
+    if (typeToResolve.has_value())
     {
         const auto &typeName = *typeToResolve;
         Symbol *typeSym = table->getSymByName(typeName.m_node);

@@ -12,6 +12,8 @@
 #include "Legalizer/Actions/LegalizeNarrowScalarAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
 #include "Legalizer/Actions/LegalizeWidenScalarAction.h"
+#include "Legalizer/InsertionTracker.h"
+#include "Legalizer/LegalizerInfo.h"
 #include "Legalizer/MirLegalizeActionTable.h"
 #include "Operand/MirOperand.h"
 #include "Operand/MirOperands.h"
@@ -38,38 +40,91 @@ bool MirLegalizer::legalizeFunction(MirFunction *func)
 
 bool MirLegalizer::legalizeBlock(MirBlock *block)
 {
-    if (!block)
+    if (!block || !m_ctx)
         return false;
 
-    constexpr size_t MaxPasses = 32;
-    size_t passCount = 0;
-    bool changed = true;
-
-    while (changed && passCount < MaxPasses)
+    // 1. Initialize worklist with all instructions in the block in reverse order
+    // so popping from the back processes instructions in forward sequence.
+    std::pmr::vector<MirInstruction *> worklist(m_ctx->getGlobalAllocator());
+    worklist.reserve(block->getInstructions().size());
+    for (auto it = block->getInstructions().rbegin(); it != block->getInstructions().rend(); ++it)
     {
-        changed = false;
-        passCount++;
+        worklist.push_back(*it);
+    }
 
-        auto &instList = block->getInstructions();
-        auto it = instList.begin();
+    // 2. Cycle detection budget (proportional to block size)
+    const size_t maxSteps = worklist.size() * 32 + 256;
+    size_t stepsTaken = 0;
 
-        while (it != instList.end())
+    while (!worklist.empty())
+    {
+        if (++stepsTaken > maxSteps)
         {
-            auto curIt = it;
-            ++it;
+            m_ctx->getDiagCollector()->error(
+                "MirLegalizer",
+                "Infinite legalization cycle detected in block '{}'",
+                block->getName());
+            return false;
+        }
 
-            LegalizationResult res = legalizeInstruction(curIt, block);
-            if (res == LegalizationResult::Failed)
-            {
-                return false;
-            }
+        MirInstruction *inst = worklist.back();
+        worklist.pop_back();
 
-            if (res == LegalizationResult::Legalized)
-            {
-                changed = true;
-                // Restart iteration on this block to ensure newly introduced instructions are legalized
-                break;
-            }
+        // Skip instructions erased by prior lowering actions
+        if (!inst || inst->isErased())
+            continue;
+
+        // 3. Formulate Legality Query
+        LegalityQuery query = buildQuery(inst);
+
+        // 4. Query target legality
+        LegalityResponse response;
+        if (m_targetDesc && m_targetDesc->getLegalizerInfo())
+        {
+            response = m_targetDesc->getLegalizerInfo()->query(query);
+        }
+        else if (m_targetDesc && m_targetDesc->getLegalizeActionTable())
+        {
+            uint8_t t0 = query.m_compactIds[0];
+            uint8_t t1 = query.m_compactIds[1];
+            uint8_t t2 = query.m_compactIds[2];
+            auto decision = m_targetDesc->getLegalizeActionTable()->query(inst->getOpCode(), t0, t1, t2);
+            response.m_action = static_cast<LegalizeActionKind>(decision.m_action);
+            response.m_targetCompactId = decision.m_compactId;
+            response.m_slot = decision.m_slot;
+            response.m_handlerOrStringId = (decision.m_action == LegalizeAction::Libcall)
+                    ? decision.m_libcallOffset
+                    : decision.m_customActionId;
+        }
+
+        // Fast path: instruction is already legal
+        if (response.isLegal())
+            continue;
+
+        if (response.isUnsupported())
+        {
+            m_ctx->getDiagCollector()->error(
+                "MirLegalizer",
+                "Unsupported instruction '{}' with operand type(s)",
+                inst->getOpCodeName()) << inst->getSourceRef();
+            return false;
+        }
+
+        // 5. Track insertion of new instructions during transformation
+        InsertionTracker tracker(block, inst);
+        LegalizeCtx ctx(m_ctx, m_targetDesc, tracker.getIterator());
+
+        LegalizationResult result = executeAction(response, ctx, inst);
+        if (result == LegalizationResult::Failed)
+        {
+            return false;
+        }
+
+        // 6. Push newly synthesized instructions onto worklist in reverse order for recursive verification
+        auto produced = tracker.getProducedInstructions();
+        for (auto it = produced.rbegin(); it != produced.rend(); ++it)
+        {
+            worklist.push_back(*it);
         }
     }
 
@@ -82,62 +137,118 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
         return LegalizationResult::Failed;
 
     MirInstruction *inst = *it;
-    if (!inst)
+    if (!inst || inst->isErased())
         return LegalizationResult::NotModified;
 
-    LegalizeCtx ctx(m_ctx, m_targetDesc, it);
+    LegalityQuery query = buildQuery(inst);
 
-    if (inst->getFlags() & MirInstructionFlags::IsCall)
+    LegalityResponse response;
+    if (m_targetDesc && m_targetDesc->getLegalizerInfo())
     {
-        return LegalizeActions::LegalizeCall(ctx);
+        response = m_targetDesc->getLegalizerInfo()->query(query);
     }
-    if (inst->getFlags() & MirInstructionFlags::IsReturn)
+    else if (m_targetDesc && m_targetDesc->getLegalizeActionTable())
     {
-        return LegalizeActions::LegalizeReturn(ctx);
+        uint8_t t0 = query.m_compactIds[0];
+        uint8_t t1 = query.m_compactIds[1];
+        uint8_t t2 = query.m_compactIds[2];
+        auto decision = m_targetDesc->getLegalizeActionTable()->query(inst->getOpCode(), t0, t1, t2);
+        response.m_action = static_cast<LegalizeActionKind>(decision.m_action);
+        response.m_targetCompactId = decision.m_compactId;
+        response.m_slot = decision.m_slot;
+        response.m_handlerOrStringId = (decision.m_action == LegalizeAction::Libcall)
+                ? decision.m_libcallOffset
+                : decision.m_customActionId;
     }
 
-    const auto *actionTable = m_targetDesc->getLegalizeActionTable();
-    if (!actionTable)
+    if (response.isLegal())
     {
-        m_ctx->getDiagCollector()->error("MirLegalizer", "Target does not provide a MirLegalizeActionTable")
+        return LegalizationResult::NotModified;
+    }
+
+    if (response.isUnsupported())
+    {
+        m_ctx->getDiagCollector()->error("MirLegalizer",
+                                         "Unsupported instruction '{}'",
+                                         inst->getOpCodeName())
                 << inst->getSourceRef();
         return LegalizationResult::Failed;
     }
 
-    // Extract compact type IDs for up to 3 operands (0 represents unset / default)
-    uint8_t t0 = 0;
-    uint8_t t1 = 0;
-    uint8_t t2 = 0;
+    LegalizeCtx ctx(m_ctx, m_targetDesc, it);
+    return executeAction(response, ctx, inst);
+}
 
-    size_t opCount = inst->getOperandCount();
-    if (opCount > 0 && inst->getOperand(0) && inst->getOperand(0)->getMirType())
-        t0 = inst->getOperand(0)->getMirType()->getCompactId();
+LegalityQuery MirLegalizer::buildQuery(MirInstruction *inst)
+{
+    LegalityQuery q;
+    if (!inst)
+        return q;
 
-    if (opCount > 1 && inst->getOperand(1) && inst->getOperand(1)->getMirType())
-        t1 = inst->getOperand(1)->getMirType()->getCompactId();
+    q.m_opcode = inst->getOpCode();
+    q.m_flags = static_cast<uint32_t>(inst->getFlags());
+    q.m_operandCount = inst->getOperandCount();
 
-    if (opCount > 2 && inst->getOperand(2) && inst->getOperand(2)->getMirType())
-        t2 = inst->getOperand(2)->getMirType()->getCompactId();
-
-    // Query the action table in O(1) time
-    LegalizeQueryResult decision = actionTable->query(inst->getOpCode(), t0, t1, t2);
-
-    /*
-     * Fast path: instruction is natively supported. This intrinsic allows the compiler to optimize the cmp + jump to
-     * ensure CPU's branch prediction does not waste its effort.
-     */
-    if (__builtin_expect(decision.m_action == LegalizeAction::Legal, 1))
+    size_t limit = std::min(inst->getOperandCount(), size_t(4));
+    for (size_t i = 0; i < limit; ++i)
     {
-        return LegalizationResult::NotModified;
+        MirOperand *op = inst->getOperand(i);
+        if (op)
+        {
+            q.m_types[i] = op->getMirType();
+            if (op->getMirType())
+            {
+                q.m_compactIds[i] = op->getMirType()->getCompactId();
+            }
+
+            if (op->isOfType<MirRegister>())
+            {
+                q.m_operandKinds[i] = ExpectedOperandType::Register;
+            }
+            else if (op->isOfType<MirInteger>())
+            {
+                q.m_operandKinds[i] = ExpectedOperandType::Integer;
+                if (!q.m_hasImm)
+                {
+                    q.m_hasImm = true;
+                    q.m_immValue = op->get<MirInteger>()->getValue().getI64();
+                }
+            }
+            else if (op->isOfType<MirFloat>())
+            {
+                q.m_operandKinds[i] = ExpectedOperandType::FloatingPoint;
+            }
+            else if (op->isOfType<MirMemory>())
+            {
+                q.m_operandKinds[i] = ExpectedOperandType::Memory;
+            }
+            else if (op->isOfType<MirReference>())
+            {
+                q.m_operandKinds[i] = ExpectedOperandType::Reference;
+            }
+            else if (op->isOfType<MirRuntimeSymbol>())
+            {
+                q.m_operandKinds[i] = ExpectedOperandType::RuntimeSymbol;
+            }
+        }
+    }
+    return q;
+}
+
+LegalizationResult MirLegalizer::executeAction(const LegalityResponse &response, LegalizeCtx &ctx, MirInstruction *inst)
+{
+    MirType *targetType = nullptr;
+    if (response.m_targetCompactId != 0)
+    {
+        targetType = m_ctx->getTypeTable()->getTypeByCompactId(response.m_targetCompactId);
     }
 
-    MirType *targetType = m_ctx->getTypeTable()->getTypeByCompactId(decision.m_compactId);
-    switch (decision.m_action)
+    switch (response.m_action)
     {
-        case LegalizeAction::Legal:
+        case LegalizeActionKind::Legal:
             return LegalizationResult::NotModified;
 
-        case LegalizeAction::WidenScalar:
+        case LegalizeActionKind::WidenScalar:
         {
             if (!targetType)
             {
@@ -147,10 +258,10 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
                         << inst->getSourceRef();
                 return LegalizationResult::Failed;
             }
-            return LegalizeActions::LegalizeWidenScalar(ctx, decision.m_slot, targetType);
+            return LegalizeActions::LegalizeWidenScalar(ctx, response.m_slot, targetType);
         }
 
-        case LegalizeAction::NarrowScalar:
+        case LegalizeActionKind::NarrowScalar:
         {
             if (!targetType)
             {
@@ -160,10 +271,10 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
                         << inst->getSourceRef();
                 return LegalizationResult::Failed;
             }
-            return LegalizeActions::LegalizeNarrowScalar(ctx, decision.m_slot, targetType);
+            return LegalizeActions::LegalizeNarrowScalar(ctx, response.m_slot, targetType);
         }
 
-        case LegalizeAction::Bitcast:
+        case LegalizeActionKind::Bitcast:
         {
             if (!targetType)
             {
@@ -173,12 +284,20 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
                         << inst->getSourceRef();
                 return LegalizationResult::Failed;
             }
-            return LegalizeActions::LegalizeBitcast(ctx, decision.m_slot, targetType);
+            return LegalizeActions::LegalizeBitcast(ctx, response.m_slot, targetType);
         }
 
-        case LegalizeAction::Libcall:
+        case LegalizeActionKind::Libcall:
         {
-            std::string_view sym = m_targetDesc->getLibcallStr(decision.m_libcallOffset);
+            std::string_view sym;
+            if (m_targetDesc && m_targetDesc->getLegalizerInfo())
+            {
+                sym = m_targetDesc->getLegalizerInfo()->getLibcallSymbol(response.m_handlerOrStringId);
+            }
+            if (sym.empty() && m_targetDesc)
+            {
+                sym = m_targetDesc->getLibcallStr(static_cast<uint8_t>(response.m_handlerOrStringId));
+            }
             if (!sym.empty())
             {
                 return LegalizeActions::LegalizeLibcall(ctx, sym);
@@ -191,17 +310,25 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
             return LegalizationResult::Failed;
         }
 
-        case LegalizeAction::Custom:
-            return actionTable->executeCustomAction(&ctx, decision.m_customActionId);
+        case LegalizeActionKind::Lower:
+        case LegalizeActionKind::Custom:
+        {
+            if (m_targetDesc && m_targetDesc->getLegalizerInfo())
+            {
+                return m_targetDesc->getLegalizerInfo()->executeCustom(ctx, response.m_handlerOrStringId);
+            }
+            if (m_targetDesc && m_targetDesc->getLegalizeActionTable())
+            {
+                return m_targetDesc->getLegalizeActionTable()->executeCustomAction(&ctx, static_cast<uint8_t>(response.m_handlerOrStringId));
+            }
+            return LegalizationResult::Failed;
+        }
 
-        case LegalizeAction::Unsupported:
+        case LegalizeActionKind::Unsupported:
         default:
             m_ctx->getDiagCollector()->error("MirLegalizer",
-                                             "Unsupported type combination for opcode '{}' (t0: {}, t1: {}, t2: {})",
-                                             inst->getOpCodeName(),
-                                             t0,
-                                             t1,
-                                             t2)
+                                             "Unsupported action for opcode '{}'",
+                                             inst->getOpCodeName())
                     << inst->getSourceRef();
             return LegalizationResult::Failed;
     }

@@ -39,8 +39,38 @@ void CommandLineParser::setupArguments()
             .default_value(false)
             .implicit_value(true);
 
+    m_program->add_argument("--emit-legalizer")
+            .help("Synthesize Target LegalizerActionTable (.h and .cpp)")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("--emit-rules")
+            .help("Synthesize Target LegalizerRules (.h and .cpp) from .lrd")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("--rules")
+            .help("Path to companion .lrd rewrite rules file")
+            .metavar("<file>")
+            .default_value(std::string(""));
+
+    m_program->add_argument("--types")
+            .help("Path to dependency .tyf type definition file")
+            .metavar("<file>")
+            .default_value(std::string(""));
+
+    m_program->add_argument("--instructions")
+            .help("Path to dependency .irdf instruction definition file")
+            .metavar("<file>")
+            .default_value(std::string(""));
+
+    m_program->add_argument("--target")
+            .help("Target architecture name for code generation (e.g. AMD64, AArch64)")
+            .metavar("<target>")
+            .default_value(std::string(""));
+
     m_program->add_argument("--generator")
-            .help("Explicit generator to execute: 'type-table', 'instructions', or 'auto'")
+            .help("Explicit generator to execute: 'type-table', 'instructions', 'legalizer', or 'auto'")
             .metavar("<gen>")
             .default_value(std::string("auto"));
 
@@ -161,8 +191,17 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
         opts.format = OutputFormat::Text;
     }
 
+    opts.targetName = m_program->get<std::string>("--target");
+
+    opts.rulesFilePath = m_program->get<std::string>("--rules");
+    opts.typesFilePath = m_program->get<std::string>("--types");
+    opts.instructionsFilePath = m_program->get<std::string>("--instructions");
+    opts.emitRules = m_program->get<bool>("--emit-rules");
+
     bool emitTypeTable = m_program->get<bool>("--emit-type-table");
     bool emitInstructions = m_program->get<bool>("--emit-instructions");
+    bool emitLegalizer = m_program->get<bool>("--emit-legalizer");
+    bool emitRules = opts.emitRules;
     std::string explicitGen = m_program->get<std::string>("--generator");
     std::transform(explicitGen.begin(), explicitGen.end(), explicitGen.begin(),
                    [](unsigned char c) { return std::tolower(c); });
@@ -170,6 +209,13 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     if (emitTypeTable && emitInstructions)
     {
         errorMessage = "Cannot specify both --emit-type-table and --emit-instructions simultaneously.";
+        return std::nullopt;
+    }
+
+    size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) + (emitRules ? 1 : 0);
+    if (emitCount > 1)
+    {
+        errorMessage = "Cannot specify multiple generator emission flags simultaneously.";
         return std::nullopt;
     }
 
@@ -181,6 +227,14 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     {
         opts.generator = GeneratorKind::Instructions;
     }
+    else if (emitLegalizer)
+    {
+        opts.generator = GeneratorKind::Legalizer;
+    }
+    else if (emitRules)
+    {
+        opts.generator = GeneratorKind::Rules;
+    }
     else if (explicitGen == "type-table" || explicitGen == "typetable")
     {
         opts.generator = GeneratorKind::TypeTable;
@@ -188,6 +242,14 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     else if (explicitGen == "instructions" || explicitGen == "instruction")
     {
         opts.generator = GeneratorKind::Instructions;
+    }
+    else if (explicitGen == "legalizer" || explicitGen == "legalize")
+    {
+        opts.generator = GeneratorKind::Legalizer;
+    }
+    else if (explicitGen == "rules" || explicitGen == "rule")
+    {
+        opts.generator = GeneratorKind::Rules;
     }
     else
     {

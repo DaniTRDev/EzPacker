@@ -38,3 +38,10 @@ EzPacker_AddTest(
         "EzDslCliLib"
         "tests/T_EzMirIntegration.cpp"
 )
+
+EzPacker_AddTest(
+        "T_DriverLegalizeRules"
+        "EzDslCliTestSuite"
+        "EzDslCliLib"
+        "tests/T_DriverLegalizeRules.cpp"
+)

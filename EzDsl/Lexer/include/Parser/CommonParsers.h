@@ -173,7 +173,13 @@ template <typename Target> struct PmrListSink
 
         explicit _sink(std::pmr::memory_resource *mr) : _cont(mr ? mr : std::pmr::get_default_resource()) {}
 
-        template <typename U> void operator()(U &&item) { _cont.push_back(std::forward<U>(item)); }
+        template <typename U> void operator()(U &&item)
+        {
+            if constexpr (!std::is_same_v<std::decay_t<U>, lexy::nullopt>)
+            {
+                _cont.push_back(std::forward<U>(item));
+            }
+        }
 
         return_type finish() && { return std::move(_cont); }
     };

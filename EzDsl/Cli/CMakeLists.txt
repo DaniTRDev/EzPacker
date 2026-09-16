@@ -16,6 +16,8 @@ EzCMK_ConfigureLib(NAME "EzDslCliLib"
         INCLUDED_DIRS "include"
 )
 
+target_compile_options(EzDslCliLib PRIVATE -Wa,-mbig-obj)
+
 EzCMK_AddExecutable(NAME "EzDslCli"
         FILE_LIST "src/Main.cpp"
         PRECOMPILED_HEADER "include/EzDslCliCommon.h"

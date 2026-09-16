@@ -214,6 +214,7 @@ MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
     if (owner)
     {
         owner->m_instructions.remove(instr);
+        instr->m_owner = nullptr;
     }
 
     return *this;

@@ -18,19 +18,7 @@ enum class LegalizationResult : uint8_t
     Failed
 };
 
-/**
- * Predefined legalization action kinds for target machine legalization.
- */
-enum class LegalizeAction : uint8_t
-{
-    Legal = 0,
-    WidenScalar,
-    NarrowScalar,
-    Libcall,
-    Custom,
-    Bitcast,
-    Unsupported
-};
+#include "Legalizer/LegalityQuery.h"
 
 /**
  * Context structure passed to legalization action callbacks.

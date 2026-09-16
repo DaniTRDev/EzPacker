@@ -8,9 +8,11 @@ namespace Cli
 
 enum class GeneratorKind
 {
-    Auto,        // Inferred from file extension (.tyf -> TypeTable, .irdf -> Instructions)
-    TypeTable,   // CppMirTypeTableGenerator
-    Instructions // CppMirInstructionGenerator
+    Auto,         // Inferred from file extension (.tyf -> TypeTable, .irdf -> Instructions, .lad -> Legalizer, .lrd -> Rules)
+    TypeTable,    // CppMirTypeTableGenerator
+    Instructions, // CppMirInstructionGenerator
+    Legalizer,    // CppLegalizerGenerator
+    Rules         // CppLegalizeRuleGenerator
 };
 
 enum class OutputFormat
@@ -32,7 +34,13 @@ struct CliOptions
 {
     std::string inputFilePath;
     std::string outputPath{ "." };
+    std::string targetName;
     std::vector<std::string> includeDirs;
+
+    std::string rulesFilePath;        // --rules <file.lrd>
+    std::string typesFilePath;        // --types <file.tyf>
+    std::string instructionsFilePath; // --instructions <file.irdf>
+    bool emitRules{ false };          // --emit-rules
 
     GeneratorKind generator{ GeneratorKind::Auto };
     LanguageDialect dialect{ LanguageDialect::Auto };

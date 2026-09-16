@@ -44,7 +44,24 @@ Symbol *SymbolTable::getSymByName(const std::string_view &name, std::optional<Sc
     {
         Scope *scope = m_scopes[cursor];
 
-        if (Symbol *sym = getSymInScope(cursor, name); sym)
+        if (Symbol *sym = getSymInScope(cursor, name, std::nullopt); sym)
+            return sym;
+
+        cursor = scope->getParentId();
+    }
+
+    return nullptr;
+}
+
+Symbol *SymbolTable::getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope)
+{
+    ScopeId cursor = startingScope.value_or(m_currentScopeId);
+
+    while (cursor != InvalidScopeId)
+    {
+        Scope *scope = m_scopes[cursor];
+
+        if (Symbol *sym = getSymInScope(cursor, name, type); sym)
             return sym;
 
         cursor = scope->getParentId();
@@ -58,8 +75,19 @@ SymbolId SymbolTable::declareSym(class SourceReference *sourceRef,
                                  Symbol::SymbolData data,
                                  std::string_view name)
 {
-    // Only verify duplicates within the current scope to allow lexical shadowing
-    if (getSymInScope(m_currentScopeId, name) != nullptr)
+    // Check for duplicate symbols of the same kind within the current scope
+    bool duplicate = false;
+    if (type == SymbolType::Type || type == SymbolType::TypeSet)
+    {
+        duplicate = (getSymInScope(m_currentScopeId, name, SymbolType::Type) != nullptr) ||
+                    (getSymInScope(m_currentScopeId, name, SymbolType::TypeSet) != nullptr);
+    }
+    else
+    {
+        duplicate = (getSymInScope(m_currentScopeId, name, type) != nullptr);
+    }
+
+    if (duplicate)
     {
         return InvalidSymbolId;
     }
@@ -94,7 +122,7 @@ std::pmr::memory_resource *SymbolTable::getAllocator() { return m_alloc; }
 
 const std::pmr::vector<Symbol *> &SymbolTable::getSymbols() const { return m_symbols; }
 
-Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name) const
+Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name, std::optional<SymbolType> type) const
 {
     if (id >= m_scopes.size())
         return nullptr;
@@ -103,10 +131,18 @@ Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name) con
     if (!scope)
         return nullptr;
 
-    ScopeId symId = scope->findSymbol(name);
-    if (symId != InvalidScopeId && symId < m_symbols.size())
+    auto [begin, end] = scope->findSymbols(name);
+    for (auto it = begin; it != end; ++it)
     {
-        return m_symbols[symId];
+        ScopeId symId = it->second;
+        if (symId < m_symbols.size())
+        {
+            Symbol *sym = m_symbols[symId];
+            if (!type.has_value() || sym->getType() == *type)
+            {
+                return sym;
+            }
+        }
     }
 
     return nullptr;

@@ -37,6 +37,7 @@ bool MirInstruction::isSelected() const
  * Checks if the instruction treats its operands as signed quantities.
  */
 bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstructionFlags::TreatAsSigned; }
+bool MirInstruction::isErased() const { return m_owner == nullptr; }
 
 /**
  * Returns the opcode mnemonic string.

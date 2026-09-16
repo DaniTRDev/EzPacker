@@ -38,3 +38,17 @@ EzPacker_AddTest(
         "EzDslCodeGenerators"
         "tests/T_CppMirTypeTableGenerator.cpp"
 )
+
+EzPacker_AddTest(
+        "T_CppLegalizerGenerator"
+        "EzDslCodeGeneratorsTestSuite"
+        "EzDslCodeGenerators"
+        "tests/T_CppLegalizerGenerator.cpp"
+)
+
+EzPacker_AddTest(
+        "T_CppLegalizeRuleGenerator"
+        "EzDslCodeGeneratorsTestSuite"
+        "EzDslCodeGenerators"
+        "tests/T_CppLegalizeRuleGenerator.cpp"
+)

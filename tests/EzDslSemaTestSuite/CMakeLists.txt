@@ -25,4 +25,11 @@ EzPacker_AddTest(
         "tests/T_TypeDefLang.cpp"
 )
 
+EzPacker_AddTest(
+        "T_LegalizeActionDefLang"
+        "EzDslSemaTestSuite"
+        ""
+        "tests/T_LegalizeActionDefLang.cpp"
+)
+
 

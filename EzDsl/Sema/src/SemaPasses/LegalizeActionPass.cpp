@@ -1,8 +1,11 @@
+#include "Ast/TypeDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeActionPass.h"
 #include "Sema/Symbol.h"
 #include "SourceManager/GenericSourceManager.h"
+
+#include <algorithm>
 
 constexpr auto PassName = "Sema::LegalizeActionPass";
 
@@ -68,6 +71,25 @@ bool validateBitwidths(DiagnosticCollector *collector,
     }
     return success;
 }
+
+void generateCartesianProduct(
+        const std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> &lists,
+        size_t depth,
+        std::vector<Symbols::LegalizeActionConstraintSymbol> &current,
+        std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> &result)
+{
+    if (depth == lists.size())
+    {
+        result.push_back(current);
+        return;
+    }
+    for (const auto &item : lists[depth])
+    {
+        current.push_back(item);
+        generateCartesianProduct(lists, depth + 1, current, result);
+        current.pop_back();
+    }
+}
 } // namespace
 
 bool LegalizeActionPass::run(DiagnosticCollector *collector,
@@ -79,9 +101,44 @@ bool LegalizeActionPass::run(DiagnosticCollector *collector,
         return false;
     }
 
-    collector->trace(PassName, "Running semantic validation for legalization actions");
+    if (file->m_targetName.has_value())
+    {
+        collector->trace(PassName, "Running legalization validation for target '{}'", file->m_targetName->m_node);
+    }
+    else
+    {
+        collector->trace(PassName, "Running semantic validation for legalization actions");
+    }
 
     bool success = true;
+
+    // 1. Process type_set declarations
+    for (const auto &typeSet : file->m_typeSets)
+    {
+        if (!processTypeSetDecl(collector, table, typeSet))
+        {
+            success = false;
+        }
+    }
+
+    // 2. Process group declarations
+    for (const auto &group : file->m_groups)
+    {
+        for (const auto &instId : group.m_instructions)
+        {
+            DSL::Ast::LegalizeActionDef::LegalizeInstructionDecl synthDecl;
+            synthDecl.m_instName = instId;
+            synthDecl.m_clampClause = group.m_clampClause;
+            synthDecl.m_actionClauses = group.m_actionClauses;
+
+            if (!processInstructionDecl(collector, table, synthDecl))
+            {
+                success = false;
+            }
+        }
+    }
+
+    // 3. Process direct action declarations
     for (const auto &decl : file->m_legalizeInstrDecls)
     {
         if (!processInstructionDecl(collector, table, decl))
@@ -93,6 +150,169 @@ bool LegalizeActionPass::run(DiagnosticCollector *collector,
     return success;
 }
 
+bool LegalizeActionPass::processTypeSetDecl(DiagnosticCollector *collector,
+                                           SymbolTable *table,
+                                           const DSL::Ast::LegalizeActionDef::TypeSetDecl &decl)
+{
+    std::pmr::vector<SymbolId> resolvedTypeIds(table->getAllocator());
+    bool valid = true;
+
+    for (const auto &typeId : decl.m_types)
+    {
+        Symbol *typeSym = table->getSymByName(typeId.m_node);
+        if (!typeSym || typeSym->getType() != SymbolType::Type)
+        {
+            collector->error(PassName, "Unknown type '{}' in type_set '{}'", typeId.m_node, decl.m_name.m_node)
+                    << typeId.m_sourceRef;
+            valid = false;
+            continue;
+        }
+        resolvedTypeIds.push_back(typeSym->getId());
+    }
+
+    if (!valid)
+    {
+        return false;
+    }
+
+    Symbols::TypeSetSymbol symData{ .m_name = decl.m_name.m_node, .m_typeIds = std::move(resolvedTypeIds) };
+    SymbolId symId = table->declareSym(decl.m_name.m_sourceRef, SymbolType::TypeSet, std::move(symData), decl.m_name.m_node);
+
+    if (symId == InvalidSymbolId)
+    {
+        collector->error(PassName, "Redefinition of type_set '{}'", decl.m_name.m_node)
+                << decl.m_name.m_sourceRef;
+        return false;
+    }
+
+    collector->trace(PassName, "Registered type_set '{}' with {} types", decl.m_name.m_node, decl.m_types.size());
+    return true;
+}
+
+bool LegalizeActionPass::applyClampScalar(DiagnosticCollector *collector,
+                                         SymbolTable *table,
+                                         const DSL::Ast::LegalizeActionDef::ClampScalarClause &clamp,
+                                         std::string_view instName,
+                                         Symbols::LegalizeActionSymbol &actionData)
+{
+    Symbol *minSym = table->getSymByName(clamp.m_minType.m_node);
+    Symbol *maxSym = table->getSymByName(clamp.m_maxType.m_node);
+
+    if (!minSym || minSym->getType() != SymbolType::Type)
+    {
+        collector->error(PassName, "Unknown minimum type '{}' in CLAMP_SCALAR for opcode '{}'",
+                         clamp.m_minType.m_node, instName)
+                << clamp.m_minType.m_sourceRef;
+        return false;
+    }
+
+    if (!maxSym || maxSym->getType() != SymbolType::Type)
+    {
+        collector->error(PassName, "Unknown maximum type '{}' in CLAMP_SCALAR for opcode '{}'",
+                         clamp.m_maxType.m_node, instName)
+                << clamp.m_maxType.m_sourceRef;
+        return false;
+    }
+
+    const auto *minData = minSym->getIf<Symbols::TypeSymbol>();
+    const auto *maxData = maxSym->getIf<Symbols::TypeSymbol>();
+
+    if (!minData || minData->m_kind != DSL::Ast::TypeDef::TypeKind::Integer)
+    {
+        collector->error(PassName, "Minimum type '{}' in CLAMP_SCALAR must be an integer type",
+                         clamp.m_minType.m_node)
+                << clamp.m_minType.m_sourceRef;
+        return false;
+    }
+
+    if (!maxData || maxData->m_kind != DSL::Ast::TypeDef::TypeKind::Integer)
+    {
+        collector->error(PassName, "Maximum type '{}' in CLAMP_SCALAR must be an integer type",
+                         clamp.m_maxType.m_node)
+                << clamp.m_maxType.m_sourceRef;
+        return false;
+    }
+
+    if (minData->m_bitWidth > maxData->m_bitWidth)
+    {
+        collector->error(PassName,
+                         "Clamp min type '{}' ({} bits) cannot be larger than max type '{}' ({} bits)",
+                         clamp.m_minType.m_node, minData->m_bitWidth,
+                         clamp.m_maxType.m_node, maxData->m_bitWidth)
+                << clamp.m_minType.m_sourceRef;
+        return false;
+    }
+
+    struct IntTypeInfo
+    {
+        SymbolId id;
+        uint32_t bitWidth;
+    };
+    std::vector<IntTypeInfo> intTypes;
+    for (Symbol *sym : table->getSymbols())
+    {
+        if (sym && sym->getType() == SymbolType::Type)
+        {
+            if (const auto *td = sym->getIf<Symbols::TypeSymbol>())
+            {
+                if (td->m_kind == DSL::Ast::TypeDef::TypeKind::Integer && td->m_bitWidth > 0)
+                {
+                    intTypes.push_back({ sym->getId(), td->m_bitWidth });
+                }
+            }
+        }
+    }
+
+    std::sort(intTypes.begin(), intTypes.end(), [](const auto &a, const auto &b) {
+        return a.bitWidth < b.bitWidth;
+    });
+
+    for (const auto &t : intTypes)
+    {
+        if (t.bitWidth < minData->m_bitWidth)
+        {
+            Symbols::LegalizeActionClauseSymbol widenClause{
+                .m_kind = DSL::Ast::LegalizeActionDef::LegalizeActionKind::WidenScalar,
+                .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{ table->getAllocator() },
+                .m_targetTypeId = minSym->getId(),
+                .m_libcallSymbol = std::nullopt,
+                .m_lowerHandler = std::nullopt,
+                .m_customRules = std::nullopt
+            };
+            widenClause.m_types.push_back({ .m_typeId = t.id, .m_operandIndex = std::nullopt });
+            actionData.m_clauses.push_back(std::move(widenClause));
+        }
+        else if (t.bitWidth <= maxData->m_bitWidth)
+        {
+            Symbols::LegalizeActionClauseSymbol legalClause{
+                .m_kind = DSL::Ast::LegalizeActionDef::LegalizeActionKind::Legal,
+                .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{ table->getAllocator() },
+                .m_targetTypeId = std::nullopt,
+                .m_libcallSymbol = std::nullopt,
+                .m_lowerHandler = std::nullopt,
+                .m_customRules = std::nullopt
+            };
+            legalClause.m_types.push_back({ .m_typeId = t.id, .m_operandIndex = std::nullopt });
+            actionData.m_clauses.push_back(std::move(legalClause));
+        }
+        else
+        {
+            Symbols::LegalizeActionClauseSymbol narrowClause{
+                .m_kind = DSL::Ast::LegalizeActionDef::LegalizeActionKind::NarrowScalar,
+                .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{ table->getAllocator() },
+                .m_targetTypeId = maxSym->getId(),
+                .m_libcallSymbol = std::nullopt,
+                .m_lowerHandler = std::nullopt,
+                .m_customRules = std::nullopt
+            };
+            narrowClause.m_types.push_back({ .m_typeId = t.id, .m_operandIndex = std::nullopt });
+            actionData.m_clauses.push_back(std::move(narrowClause));
+        }
+    }
+
+    return true;
+}
+
 bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
                                                 SymbolTable *table,
                                                 const DSL::Ast::LegalizeActionDef::LegalizeInstructionDecl &decl)
@@ -100,59 +320,190 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
     const auto &instIdentifier = decl.m_instName;
 
     // Verify that the target IR opcode is defined and is a valid IR Instruction
-    Symbol *irSym = table->getSymByName(instIdentifier.m_node);
-    if (!irSym || irSym->getType() != SymbolType::IrInstruction)
+    Symbol *irSym = table->getSymByName(instIdentifier.m_node, SymbolType::IrInstruction);
+    if (!irSym)
     {
         collector->error(PassName, "Unknown or undefined IR opcode '{}'", instIdentifier.m_node)
                 << instIdentifier.m_sourceRef;
         return false;
     }
 
-    // Declare the legalization action symbol for this opcode
-    Symbols::LegalizeActionSymbol actionSym{ .m_genericOpcode = instIdentifier.m_node,
-                                             .m_maxOperandIndex = 0,
-                                             .m_clauses = std::pmr::vector<Symbols::LegalizeActionClauseSymbol>{
-                                                     table->getAllocator() } };
-
-    SymbolId symId = table->declareSym(instIdentifier.m_sourceRef,
-                                       SymbolType::LegalizeAction,
-                                       std::move(actionSym),
-                                       instIdentifier.m_node);
-
-    if (symId == InvalidSymbolId)
+    // Check if an action symbol was already declared for this opcode (e.g. from group + specific action)
+    Symbols::LegalizeActionSymbol *actionData = nullptr;
+    Symbol *actSym = table->getSymByName(instIdentifier.m_node, SymbolType::LegalizeAction);
+    if (actSym)
     {
-        collector->error(PassName, "Redefinition of legalization action for opcode '{}'", instIdentifier.m_node)
-                << instIdentifier.m_sourceRef;
-        return false;
+        actionData = actSym->getIf<Symbols::LegalizeActionSymbol>();
     }
 
-    Symbol *registeredSymbol = table->getSymById(symId);
-    auto *actionData = registeredSymbol ? registeredSymbol->getIf<Symbols::LegalizeActionSymbol>() : nullptr;
     if (!actionData)
     {
-        return false;
+        Symbols::LegalizeActionSymbol actionSym{ .m_genericOpcode = instIdentifier.m_node,
+                                                 .m_maxOperandIndex = 0,
+                                                 .m_clauses = std::pmr::vector<Symbols::LegalizeActionClauseSymbol>{
+                                                         table->getAllocator() } };
+
+        SymbolId symId = table->declareSym(instIdentifier.m_sourceRef,
+                                           SymbolType::LegalizeAction,
+                                           std::move(actionSym),
+                                           instIdentifier.m_node);
+
+        if (symId == InvalidSymbolId)
+        {
+            collector->error(PassName, "Redefinition of legalization action for opcode '{}'", instIdentifier.m_node)
+                    << instIdentifier.m_sourceRef;
+            return false;
+        }
+
+        Symbol *registeredSymbol = table->getSymById(symId);
+        actionData = registeredSymbol ? registeredSymbol->getIf<Symbols::LegalizeActionSymbol>() : nullptr;
+        if (!actionData)
+        {
+            return false;
+        }
     }
 
     bool success = true;
-    size_t maxOperandIndex = 0;
+
+    // Apply clamping clause if present
+    if (decl.m_clampClause.has_value())
+    {
+        if (!applyClampScalar(collector, table, *decl.m_clampClause, instIdentifier.m_node, *actionData))
+        {
+            success = false;
+        }
+    }
+
+    size_t maxOperandIndex = actionData->m_maxOperandIndex;
 
     for (const auto &clause : decl.m_actionClauses)
     {
-        Symbols::LegalizeActionClauseSymbol clauseSym{
-            .m_kind = clause.m_kind,
-            .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{ table->getAllocator() },
-            .m_targetTypeId = std::nullopt,
-            .m_libcallSymbol = std::nullopt,
-            .m_customRules = std::nullopt
-        };
+        // Resolve constraints, expanding type sets
+        std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> constraintLists;
+        bool hasTypeSetWithIndex = false;
+        bool resolveSuccess = true;
 
-        if (!processClause(collector, table, clause, instIdentifier.m_node, clauseSym, maxOperandIndex))
+        for (const auto &typeConstraint : clause.m_types)
+        {
+            const auto &typeName = typeConstraint.m_type;
+            Symbol *sym = table->getSymByName(typeName.m_node);
+            if (!sym)
+            {
+                collector->error(PassName, "Unknown type or type_set '{}' in type constraint", typeName.m_node)
+                        << typeName.m_sourceRef;
+                resolveSuccess = false;
+                continue;
+            }
+
+            std::optional<uint32_t> opIdx;
+            if (typeConstraint.m_operandIndex.has_value())
+            {
+                const auto &indexLit = *typeConstraint.m_operandIndex;
+                if (indexLit.m_node < 0)
+                {
+                    collector->error(PassName, "Type index cannot be negative (got {})", indexLit.m_node)
+                            << indexLit.m_sourceRef;
+                    resolveSuccess = false;
+                    continue;
+                }
+                opIdx = static_cast<uint32_t>(indexLit.m_node);
+                maxOperandIndex = std::max(maxOperandIndex, static_cast<size_t>(*opIdx));
+            }
+
+            std::vector<Symbols::LegalizeActionConstraintSymbol> resolved;
+            if (sym->getType() == SymbolType::Type)
+            {
+                resolved.push_back({ .m_typeId = sym->getId(), .m_operandIndex = opIdx });
+            }
+            else if (sym->getType() == SymbolType::TypeSet)
+            {
+                const auto *tsData = sym->getIf<Symbols::TypeSetSymbol>();
+                if (tsData)
+                {
+                    for (SymbolId tid : tsData->m_typeIds)
+                    {
+                        resolved.push_back({ .m_typeId = tid, .m_operandIndex = opIdx });
+                    }
+                }
+                if (opIdx.has_value())
+                {
+                    hasTypeSetWithIndex = true;
+                }
+            }
+            else
+            {
+                collector->error(PassName, "Symbol '{}' is neither a Type nor a TypeSet", typeName.m_node)
+                        << typeName.m_sourceRef;
+                resolveSuccess = false;
+                continue;
+            }
+
+            constraintLists.push_back(std::move(resolved));
+        }
+
+        if (!resolveSuccess)
         {
             success = false;
             continue;
         }
 
-        actionData->m_clauses.push_back(std::move(clauseSym));
+        if (hasTypeSetWithIndex && constraintLists.size() > 1)
+        {
+            // Cartesian product for heterogeneous indexed clauses (e.g. STORE LEGAL(GPR_SCALARS:0, ptr:1))
+            std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> combinations;
+            std::vector<Symbols::LegalizeActionConstraintSymbol> current;
+            generateCartesianProduct(constraintLists, 0, current, combinations);
+
+            for (const auto &comb : combinations)
+            {
+                Symbols::LegalizeActionClauseSymbol clauseSym{
+                    .m_kind = clause.m_kind,
+                    .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{
+                            comb.begin(), comb.end(), table->getAllocator() },
+                    .m_targetTypeId = std::nullopt,
+                    .m_libcallSymbol = std::nullopt,
+                    .m_lowerHandler = std::nullopt,
+                    .m_customRules = std::nullopt
+                };
+
+                size_t dummyMax = 0;
+                if (!processClause(collector, table, clause, instIdentifier.m_node, clauseSym, dummyMax))
+                {
+                    success = false;
+                    continue;
+                }
+
+                actionData->m_clauses.push_back(std::move(clauseSym));
+            }
+        }
+        else
+        {
+            Symbols::LegalizeActionClauseSymbol clauseSym{
+                .m_kind = clause.m_kind,
+                .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{ table->getAllocator() },
+                .m_targetTypeId = std::nullopt,
+                .m_libcallSymbol = std::nullopt,
+                .m_lowerHandler = std::nullopt,
+                .m_customRules = std::nullopt
+            };
+
+            for (const auto &list : constraintLists)
+            {
+                for (const auto &c : list)
+                {
+                    clauseSym.m_types.push_back(c);
+                }
+            }
+
+            size_t dummyMax = 0;
+            if (!processClause(collector, table, clause, instIdentifier.m_node, clauseSym, dummyMax))
+            {
+                success = false;
+                continue;
+            }
+
+            actionData->m_clauses.push_back(std::move(clauseSym));
+        }
     }
 
     actionData->m_maxOperandIndex = maxOperandIndex;
@@ -195,6 +546,16 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
         }
     };
 
+    auto ensureNoLowerHandler = [&]()
+    {
+        if (clause.m_lowerHandler.has_value())
+        {
+            collector->error(PassName, "Action does not accept a lowering handler target")
+                    << clause.m_lowerHandler->m_sourceRef;
+            success = false;
+        }
+    };
+
     auto ensureNoCustomRules = [&]()
     {
         if (clause.m_customRules.has_value())
@@ -204,25 +565,7 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
         }
     };
 
-    // Resolve and validate matched type constraints
-    for (const auto &typeConstraint : clause.m_types)
-    {
-        Symbols::LegalizeActionConstraintSymbol constraintSym;
-        if (!resolveConstraint(collector, table, typeConstraint, constraintSym))
-        {
-            success = false;
-            continue;
-        }
-
-        if (constraintSym.m_operandIndex.has_value())
-        {
-            maxOperandIndex = std::max(maxOperandIndex, static_cast<size_t>(*constraintSym.m_operandIndex));
-        }
-
-        outClause.m_types.push_back(constraintSym);
-    }
-
-    if (outClause.m_types.empty() && clause.m_kind != LegalizeActionKind::Custom)
+    if (outClause.m_types.empty() && clause.m_kind != LegalizeActionKind::Custom && clause.m_kind != LegalizeActionKind::Lower)
     {
         collector->error(PassName,
                          "Legalization clause for opcode '{}' must declare at least one type constraint",
@@ -239,6 +582,7 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
         {
             ensureNoCustomRules();
             ensureNoLibcall();
+            ensureNoLowerHandler();
 
             if (!clause.m_targetType.has_value())
             {
@@ -274,6 +618,7 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
         {
             ensureNoCustomRules();
             ensureNoTargetType();
+            ensureNoLowerHandler();
 
             if (!clause.m_libcallSymbol.has_value() || clause.m_libcallSymbol->m_node.empty())
             {
@@ -286,10 +631,28 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
             break;
         }
 
+        case LegalizeActionKind::Lower:
+        {
+            ensureNoCustomRules();
+            ensureNoTargetType();
+            ensureNoLibcall();
+
+            if (!clause.m_lowerHandler.has_value() || clause.m_lowerHandler->m_node.empty())
+            {
+                collector->error(PassName,
+                                 "LOWER action requires a target lowering handler ('>> TargetLowering')");
+                return false;
+            }
+
+            outClause.m_lowerHandler = clause.m_lowerHandler->m_node;
+            break;
+        }
+
         case LegalizeActionKind::Custom:
         {
             ensureNoTargetType();
             ensureNoLibcall();
+            ensureNoLowerHandler();
 
             if (!clause.m_types.empty())
             {
@@ -330,6 +693,7 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
         {
             ensureNoTargetType();
             ensureNoLibcall();
+            ensureNoLowerHandler();
             ensureNoCustomRules();
             break;
         }

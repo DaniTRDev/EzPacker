@@ -1,12 +1,16 @@
 #include "Cli/Driver.h"
 #include "Cli/InfoDumper.h"
 
+#include "CodeGenerators/CppLegalizeRuleGenerator.h"
+#include "CodeGenerators/CppLegalizerGenerator.h"
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
 
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 
+#include "Ast/IrInstructionDefLangAst.h"
+#include "Ast/TypeDefLangAst.h"
 #include "Parser/IrInstructionDefLang.h"
 #include "Parser/LegalizeActionDefLang.h"
 #include "Parser/LegalizeRuleDefLang.h"
@@ -14,6 +18,8 @@
 #include "Parser/TypeDefLang.h"
 
 #include "Sema/SymbolTable.h"
+#include "Sema/Symbols/IrSymbols.h"
+#include "Sema/Symbols/TypeSymbols.h"
 #include "SemaPasses/IrInstructionPass.h"
 #include "SemaPasses/LegalizeActionPass.h"
 #include "SemaPasses/LegalizeRulePass.h"
@@ -51,6 +57,209 @@ class ErrorTrackingListener : public DiagnosticListener
     size_t m_warnings{ 0 };
 };
 
+void initializeStandardTypes(SymbolTable &table)
+{
+    struct BuiltinType
+    {
+        std::string_view name;
+        DSL::Ast::TypeDef::TypeKind kind;
+        uint32_t bitWidth;
+        uint32_t alignment;
+    };
+
+    static constexpr BuiltinType builtinTypes[] = {
+        { "_void", DSL::Ast::TypeDef::TypeKind::Void, 0, 0 },
+        { "__bindToken", DSL::Ast::TypeDef::TypeKind::BindingToken, 0, 0 },
+        { "ptr", DSL::Ast::TypeDef::TypeKind::Pointer, 0, 0 },
+        { "i1", DSL::Ast::TypeDef::TypeKind::Integer, 1, 1 },
+        { "i8", DSL::Ast::TypeDef::TypeKind::Integer, 8, 8 },
+        { "i16", DSL::Ast::TypeDef::TypeKind::Integer, 16, 16 },
+        { "i32", DSL::Ast::TypeDef::TypeKind::Integer, 32, 32 },
+        { "i64", DSL::Ast::TypeDef::TypeKind::Integer, 64, 64 },
+        { "i128", DSL::Ast::TypeDef::TypeKind::Integer, 128, 128 },
+        { "i256", DSL::Ast::TypeDef::TypeKind::Integer, 256, 256 },
+        { "f32", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 32, 32 },
+        { "f64", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 64, 64 },
+        { "f128", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 128, 128 }
+    };
+
+    uint8_t compactId = 1;
+    for (const auto &t : builtinTypes)
+    {
+        if (table.getSymByName(t.name) != nullptr)
+        {
+            compactId++;
+            continue;
+        }
+
+        Symbols::TypeSymbol symData{
+            .m_name = t.name,
+            .m_kind = t.kind,
+            .m_bitWidth = t.bitWidth,
+            .m_alignment = t.alignment,
+            .m_compactId = compactId++
+        };
+        table.declareSym(nullptr, SymbolType::Type, std::move(symData), t.name);
+    }
+}
+
+void registerFallbackIrInstruction(SymbolTable &table,
+                                   std::string_view name,
+                                   DSL::Ast::IrInstDef::IrInstCategory category,
+                                   DSL::Ast::IrInstDef::IrInstTier tier,
+                                   DSL::Ast::IrInstDef::IrInstFlag flags,
+                                   std::initializer_list<Symbols::IrOperandSymbol> operands)
+{
+    if (table.getSymByName(name) != nullptr)
+        return;
+
+    std::pmr::vector<Symbols::IrOperandSymbol> semaOperands(table.getAllocator());
+    for (const auto &op : operands)
+    {
+        semaOperands.push_back(op);
+    }
+
+    Symbols::IrInstructionSymbol data{
+        .m_name = name,
+        .m_category = category,
+        .m_tier = tier,
+        .m_flags = flags,
+        .m_operands = std::move(semaOperands)
+    };
+
+    table.declareSym(nullptr, SymbolType::IrInstruction, std::move(data), name);
+}
+
+void initializeStandardIrInstructions(SymbolTable &table)
+{
+    using namespace DSL::Ast::IrInstDef;
+
+    auto binaryAlu = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
+        registerFallbackIrInstruction(table, name, IrInstCategory::Arithmetic, IrInstTier::HighLevel,
+            static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) | static_cast<uint32_t>(extraFlags)),
+            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+              { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+              { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
+    };
+
+    auto binaryBitwise = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
+        registerFallbackIrInstruction(table, name, IrInstCategory::Bitwise, IrInstTier::HighLevel,
+            static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) | static_cast<uint32_t>(extraFlags)),
+            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+              { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+              { IrOperandType::RegIntImm, "rhs", IrOperandDir::ArgIn } });
+    };
+
+    auto shiftOp = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
+        registerFallbackIrInstruction(table, name, IrInstCategory::Bitwise, IrInstTier::HighLevel,
+            extraFlags,
+            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+              { IrOperandType::Register, "val", IrOperandDir::ArgIn },
+              { IrOperandType::RegIntImm, "amt", IrOperandDir::ArgIn } });
+    };
+
+    auto compareOp = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
+        registerFallbackIrInstruction(table, name, IrInstCategory::Compare, IrInstTier::HighLevel,
+            static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) | static_cast<uint32_t>(extraFlags)),
+            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+              { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+              { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
+    };
+
+    // Arithmetic
+    binaryAlu("ADD", IrInstFlag::IsCommutative);
+    binaryAlu("SUB");
+    binaryAlu("MUL", IrInstFlag::IsCommutative);
+    binaryAlu("IMUL", static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsCommutative) | static_cast<uint32_t>(IrInstFlag::TreatAsSigned)));
+    binaryAlu("DIV");
+    binaryAlu("IDIV", IrInstFlag::TreatAsSigned);
+    binaryAlu("SDIV", IrInstFlag::TreatAsSigned);
+    binaryAlu("UDIV");
+    binaryAlu("REM");
+    binaryAlu("SREM", IrInstFlag::TreatAsSigned);
+    binaryAlu("UREM");
+
+    registerFallbackIrInstruction(table, "NEG", IrInstCategory::Arithmetic, IrInstTier::HighLevel,
+        IrInstFlag::None,
+        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+          { IrOperandType::Register, "src", IrOperandDir::ArgIn } });
+
+    // Bitwise
+    binaryBitwise("AND", IrInstFlag::IsCommutative);
+    binaryBitwise("OR", IrInstFlag::IsCommutative);
+    binaryBitwise("XOR", IrInstFlag::IsCommutative);
+    registerFallbackIrInstruction(table, "NOT", IrInstCategory::Bitwise, IrInstTier::HighLevel,
+        IrInstFlag::None,
+        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+          { IrOperandType::Register, "src", IrOperandDir::ArgIn } });
+
+    // Shifts
+    shiftOp("SHL");
+    shiftOp("SHR");
+    shiftOp("SAR", IrInstFlag::TreatAsSigned);
+    shiftOp("ROTL");
+    shiftOp("ROTR");
+
+    // Comparisons
+    compareOp("CMP_EQ", IrInstFlag::IsCommutative);
+    compareOp("CMP_NE", IrInstFlag::IsCommutative);
+    compareOp("CMP_SLT", IrInstFlag::TreatAsSigned);
+    compareOp("CMP_SLE", IrInstFlag::TreatAsSigned);
+    compareOp("CMP_SGT", IrInstFlag::TreatAsSigned);
+    compareOp("CMP_SGE", IrInstFlag::TreatAsSigned);
+    compareOp("CMP_ULT");
+    compareOp("CMP_ULE");
+    compareOp("CMP_UGT");
+    compareOp("CMP_UGE");
+
+    // Data movement
+    registerFallbackIrInstruction(table, "MOV", IrInstCategory::DataMovement, IrInstTier::HighLevel,
+        IrInstFlag::None,
+        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+          { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn } });
+
+    // Memory
+    registerFallbackIrInstruction(table, "LOAD", IrInstCategory::Memory, IrInstTier::HighLevel,
+        IrInstFlag::ReadsMemory,
+        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+          { IrOperandType::AddressSource, "src", IrOperandDir::ArgIn } });
+
+    registerFallbackIrInstruction(table, "STORE", IrInstCategory::Memory, IrInstTier::HighLevel,
+        static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::WritesMemory) | static_cast<uint32_t>(IrInstFlag::HasSideEffect)),
+        { { IrOperandType::AddressSource, "dst", IrOperandDir::ArgIn },
+          { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn } });
+
+    registerFallbackIrInstruction(table, "ALLOC", IrInstCategory::Memory, IrInstTier::HighLevel,
+        IrInstFlag::HasSideEffect,
+        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut } });
+
+    // Control flow / system
+    registerFallbackIrInstruction(table, "CALL", IrInstCategory::System, IrInstTier::HighLevel,
+        static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsCall) | static_cast<uint32_t>(IrInstFlag::HasSideEffect)),
+        { { IrOperandType::AnyValue, "callee", IrOperandDir::ArgIn } });
+
+    registerFallbackIrInstruction(table, "RET", IrInstCategory::System, IrInstTier::HighLevel,
+        static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsReturn) | static_cast<uint32_t>(IrInstFlag::IsTerminator)),
+        { { IrOperandType::AnyValue, "val", IrOperandDir::ArgIn } });
+}
+
+std::filesystem::path findInstructionsIrdf()
+{
+    std::filesystem::path cur = std::filesystem::current_path();
+    for (int i = 0; i < 6; ++i)
+    {
+        auto cand = cur / "EzMir" / "instructions.irdf";
+        std::error_code ec;
+        if (std::filesystem::exists(cand, ec))
+            return cand;
+        if (cur.has_parent_path() && cur.parent_path() != cur)
+            cur = cur.parent_path();
+        else
+            break;
+    }
+    return {};
+}
+
 } // namespace
 
 Driver::Driver(CliOptions options) : m_options(std::move(options))
@@ -80,6 +289,10 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return LanguageDialect::TypeDef;
     if (m_options.generator == GeneratorKind::Instructions)
         return LanguageDialect::IrInstDef;
+    if (m_options.generator == GeneratorKind::Legalizer)
+        return LanguageDialect::LegalizeAction;
+    if (m_options.generator == GeneratorKind::Rules)
+        return LanguageDialect::LegalizeRule;
 
     return LanguageDialect::Auto;
 }
@@ -97,6 +310,10 @@ GeneratorKind Driver::resolveGeneratorKind(LanguageDialect dialect) const
             return GeneratorKind::TypeTable;
         case LanguageDialect::IrInstDef:
             return GeneratorKind::Instructions;
+        case LanguageDialect::LegalizeAction:
+            return GeneratorKind::Legalizer;
+        case LanguageDialect::LegalizeRule:
+            return GeneratorKind::Rules;
         default:
             return GeneratorKind::Auto;
     }
@@ -167,6 +384,79 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         {
             auto hPath = resolveSingleFile(outDir, "MirInstructionSetDefs.h");
             outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+    }
+    else if (genKind == GeneratorKind::Legalizer)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        std::string baseName = std::format("{}LegalizerActionTable", target);
+        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
+
+        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
+        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
+
+        if (emitHeader)
+        {
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+        if (emitSource)
+        {
+            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
+        }
+
+        bool hasRules = !m_options.rulesFilePath.empty();
+        if (!hasRules && !m_options.inputFilePath.empty())
+        {
+            auto adj = std::filesystem::path(m_options.inputFilePath);
+            adj.replace_extension(".lrd");
+            std::error_code ec;
+            if (std::filesystem::exists(adj, ec))
+            {
+                hasRules = true;
+            }
+        }
+        if (hasRules)
+        {
+            std::string rulesBaseName = std::format("{}LegalizerRules", target);
+            auto [rhPath, rsPath] = resolveHeaderAndSource(outDir, rulesBaseName);
+            if (emitHeader)
+            {
+                outputs.push_back({ .role = "header", .path = rhPath, .exists = std::filesystem::exists(rhPath) });
+            }
+            if (emitSource)
+            {
+                outputs.push_back({ .role = "source", .path = rsPath, .exists = std::filesystem::exists(rsPath) });
+            }
+        }
+    }
+    else if (genKind == GeneratorKind::Rules)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        std::string baseName = std::format("{}LegalizerRules", target);
+        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
+
+        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
+        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
+
+        if (emitHeader)
+        {
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+        if (emitSource)
+        {
+            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
         }
     }
 
@@ -247,6 +537,138 @@ DriverResult Driver::run()
     ParseContext parseCtx(&diagCollector, &sourceManager, sourceId, &arena);
     SymbolTable symbolTable(&arena);
     size_t constructCount = 0;
+    bool hasLoadedRules = false;
+
+    // Multi-dialect prelude & dependency ingestion
+    if (dialect == LanguageDialect::LegalizeRule || dialect == LanguageDialect::LegalizeAction)
+    {
+        // 1. Ingest Types
+        if (!m_options.typesFilePath.empty())
+        {
+            std::filesystem::path typesPath(m_options.typesFilePath);
+            auto typesSourceId = sourceManager.loadFile(typesPath);
+            if (!typesSourceId.has_value())
+            {
+                result.success = false;
+                result.errorMessage = std::format("Failed to load types file '{}'.", typesPath.string());
+                return result;
+            }
+            ParseContext typesParseCtx(&diagCollector, &sourceManager, *typesSourceId, &arena);
+            auto typesAst = typesParseCtx.parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+            if (!typesAst.has_value() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = std::format("Syntax parsing failed for types file '{}'.", typesPath.string());
+                return result;
+            }
+            TypePass typePass;
+            if (!typePass.run(&diagCollector, &symbolTable, &typesAst.value()) || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = std::format("Semantic analysis failed for types file '{}'.", typesPath.string());
+                return result;
+            }
+        }
+        else
+        {
+            initializeStandardTypes(symbolTable);
+        }
+
+        // 2. Ingest IR Instructions
+        if (!m_options.instructionsFilePath.empty())
+        {
+            std::filesystem::path instPath(m_options.instructionsFilePath);
+            auto instSourceId = sourceManager.loadFile(instPath);
+            if (!instSourceId.has_value())
+            {
+                result.success = false;
+                result.errorMessage = std::format("Failed to load instructions file '{}'.", instPath.string());
+                return result;
+            }
+            ParseContext instParseCtx(&diagCollector, &sourceManager, *instSourceId, &arena);
+            auto instAst = instParseCtx.parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
+            if (!instAst.has_value() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = std::format("Syntax parsing failed for instructions file '{}'.", instPath.string());
+                return result;
+            }
+            IrInstructionPass instPass;
+            if (!instPass.run(&diagCollector, &symbolTable, &instAst.value()) || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = std::format("Semantic analysis failed for instructions file '{}'.", instPath.string());
+                return result;
+            }
+        }
+        else
+        {
+            auto autoIrdf = findInstructionsIrdf();
+            if (!autoIrdf.empty())
+            {
+                auto instSourceId = sourceManager.loadFile(autoIrdf);
+                if (instSourceId.has_value())
+                {
+                    ParseContext instParseCtx(&diagCollector, &sourceManager, *instSourceId, &arena);
+                    auto instAst = instParseCtx.parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
+                    if (instAst.has_value() && !errorTracker.hasErrors())
+                    {
+                        IrInstructionPass instPass;
+                        instPass.run(&diagCollector, &symbolTable, &instAst.value());
+                    }
+                }
+            }
+            initializeStandardIrInstructions(symbolTable);
+        }
+
+        // 3. Paired discovery of rewrite rules for LegalizeAction (.lad)
+        if (dialect == LanguageDialect::LegalizeAction)
+        {
+            std::filesystem::path rulesPath;
+            if (!m_options.rulesFilePath.empty())
+            {
+                rulesPath = m_options.rulesFilePath;
+            }
+            else
+            {
+                auto adj = inputPath;
+                adj.replace_extension(".lrd");
+                std::error_code ec;
+                if (std::filesystem::exists(adj, ec))
+                {
+                    rulesPath = adj;
+                }
+            }
+
+            if (!rulesPath.empty())
+            {
+                auto rulesSourceId = sourceManager.loadFile(rulesPath);
+                if (!rulesSourceId.has_value())
+                {
+                    result.success = false;
+                    result.errorMessage = std::format("Failed to load companion rules file '{}'.", rulesPath.string());
+                    return result;
+                }
+                ParseContext rulesParseCtx(&diagCollector, &sourceManager, *rulesSourceId, &arena);
+                auto rulesAst = rulesParseCtx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRuleFile,
+                                                    DSL::Ast::LegalizeRuleDef::LegalizeRuleFile>();
+                if (!rulesAst.has_value() || errorTracker.hasErrors())
+                {
+                    result.success = false;
+                    result.errorMessage = std::format("Syntax parsing failed for companion rules file '{}'.", rulesPath.string());
+                    return result;
+                }
+
+                if (!LegalizeRulePass::run(&diagCollector, &symbolTable, &rulesAst.value()) || errorTracker.hasErrors())
+                {
+                    result.success = false;
+                    result.errorMessage = std::format("Semantic analysis failed for companion rules file '{}'.", rulesPath.string());
+                    return result;
+                }
+                hasLoadedRules = true;
+            }
+        }
+    }
 
     switch (dialect)
     {
@@ -393,6 +815,8 @@ DriverResult Driver::run()
         {
             case GeneratorKind::TypeTable: gInfo.generatorName = "CppMirTypeTableGenerator"; break;
             case GeneratorKind::Instructions: gInfo.generatorName = "CppMirInstructionGenerator"; break;
+            case GeneratorKind::Legalizer: gInfo.generatorName = "CppLegalizerGenerator"; break;
+            case GeneratorKind::Rules: gInfo.generatorName = "CppLegalizeRuleGenerator"; break;
             default: gInfo.generatorName = "None"; break;
         }
 
@@ -459,9 +883,56 @@ DriverResult Driver::run()
             }
         }
     }
+    else if (genKind == GeneratorKind::Legalizer)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        CppLegalizerGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during LegalizerActionTable synthesis.";
+            return result;
+        }
+
+        if (hasLoadedRules)
+        {
+            CppLegalizeRuleGenerator ruleGen(&diagCollector, &symbolTable, m_options.outputPath, target);
+            if (!ruleGen.run() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Code generation failed during companion LegalizerRules synthesis.";
+                return result;
+            }
+        }
+    }
+    else if (genKind == GeneratorKind::Rules)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        CppLegalizeRuleGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during LegalizerRules synthesis.";
+            return result;
+        }
+    }
     else
     {
-        // No generator available (e.g. .lad or .lrd without code generators yet)
+        // No generator available
         if (!m_options.dumpFiles && !m_options.dumpAst && !m_options.dumpSymbols && !m_options.dumpInfo)
         {
             result.success = false;

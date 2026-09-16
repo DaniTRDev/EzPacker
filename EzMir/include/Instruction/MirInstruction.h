@@ -53,6 +53,11 @@ class MirInstruction
     bool isSigned() const;
 
     /**
+     * Checks if this instruction has been removed/erased from its basic block.
+     */
+    bool isErased() const;
+
+    /**
      * Returns the mnemonic name of the instruction opcode.
      */
     const char *getOpCodeName() const;

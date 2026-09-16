@@ -211,6 +211,20 @@ ir_inst IDIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
     FLAGS(SizeMatch, TreatAsSigned);
 }
 
+// Signed Integer Division (alias): dst = lhs / rhs.
+ir_inst SDIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, TreatAsSigned);
+}
+
+// Unsigned Integer Division (alias): dst = lhs / rhs.
+ir_inst UDIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
 // Integer Remainder / Modulo: dst = lhs % rhs.
 ir_inst REM(Register:dst OUT, Register:lhs IN, RegIntImm:rhs IN) {
     CATEGORY(Arithmetic);

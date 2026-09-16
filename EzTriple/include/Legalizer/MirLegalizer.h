@@ -40,6 +40,16 @@ class MirLegalizer
      */
     virtual LegalizationResult legalizeInstruction(IntrusiveLinkedList<MirInstruction>::iterator it, MirBlock *block);
 
+    /**
+     * Builds a LegalityQuery capturing all operands, types, and flags for an instruction.
+     */
+    virtual LegalityQuery buildQuery(MirInstruction *inst);
+
+    /**
+     * Executes the legalization action specified in the legality response.
+     */
+    virtual LegalizationResult executeAction(const LegalityResponse &response, LegalizeCtx &ctx, MirInstruction *inst);
+
   protected:
     MirBuilderContext *m_ctx;
     TargetDesc *m_targetDesc;

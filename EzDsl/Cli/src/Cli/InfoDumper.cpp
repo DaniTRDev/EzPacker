@@ -390,30 +390,258 @@ void InfoDumper::dumpLegalizeRuleAst(const DSL::Ast::LegalizeRuleDef::LegalizeRu
                                    OutputFormat format,
                                    std::ostream &os)
 {
+    auto opKindToStr = [](DSL::Ast::LegalizeRuleDef::RuleOperandKind kind) -> std::string_view {
+        switch (kind)
+        {
+            case DSL::Ast::LegalizeRuleDef::RuleOperandKind::SsaRegister: return "SsaRegister";
+            case DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateSymbol: return "ImmediateSymbol";
+            case DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateLiteral: return "ImmediateLiteral";
+            case DSL::Ast::LegalizeRuleDef::RuleOperandKind::CustomTransform: return "CustomTransform";
+        }
+        return "Unknown";
+    };
+
     if (format == OutputFormat::Json)
     {
         os << "{\n";
         os << "  \"rules\": [\n";
-        for (size_t i = 0; i < file.m_rules.size(); ++i)
+        for (size_t rIdx = 0; rIdx < file.m_rules.size(); ++rIdx)
         {
-            const auto &r = file.m_rules[i];
+            const auto &r = file.m_rules[rIdx];
             os << "    {\n";
             os << std::format("      \"name\": \"{}\",\n", escapeJson(r.m_ruleName.m_node));
-            os << std::format("      \"match_count\": {},\n", r.m_matchClauses.size());
-            os << std::format("      \"emit_count\": {}\n", r.m_emitClauses.size());
-            os << (i + 1 < file.m_rules.size() ? "    },\n" : "    }\n");
+
+            // Matches
+            os << "      \"matches\": [\n";
+            for (size_t mIdx = 0; mIdx < r.m_matchClauses.size(); ++mIdx)
+            {
+                const auto &m = r.m_matchClauses[mIdx];
+                os << "        {\n";
+                os << std::format("          \"opcode\": \"{}\",\n", escapeJson(m.m_opcode.m_node));
+                os << "          \"operands\": [\n";
+                for (size_t oIdx = 0; oIdx < m.m_operands.size(); ++oIdx)
+                {
+                    const auto &op = m.m_operands[oIdx];
+                    os << "            {\n";
+                    os << std::format("              \"kind\": \"{}\",\n", opKindToStr(op.m_kind));
+                    if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateLiteral)
+                    {
+                        os << std::format("              \"val\": {}\n", op.m_immLiteral ? op.m_immLiteral->m_node : 0);
+                    }
+                    else
+                    {
+                        os << std::format("              \"name\": \"{}\"", escapeJson(op.m_name.m_node));
+                        std::string typeStr;
+                        if (op.m_typeParam.has_value())
+                            typeStr = std::string(op.m_typeParam->m_node);
+                        else if (op.m_type.has_value() && op.m_type->m_node != "imm")
+                            typeStr = std::string(op.m_type->m_node);
+                        if (!typeStr.empty())
+                        {
+                            os << ",\n" << std::format("              \"type\": \"{}\"\n", escapeJson(typeStr));
+                        }
+                        else
+                        {
+                            os << "\n";
+                        }
+                    }
+                    os << (oIdx + 1 < m.m_operands.size() ? "            },\n" : "            }\n");
+                }
+                os << "          ]\n";
+                os << (mIdx + 1 < r.m_matchClauses.size() ? "        },\n" : "        }\n");
+            }
+            os << "      ],\n";
+
+            // Predicates
+            os << "      \"predicates\": [\n";
+            for (size_t pIdx = 0; pIdx < r.m_whenClauses.size(); ++pIdx)
+            {
+                const auto &p = r.m_whenClauses[pIdx];
+                os << "        {\n";
+                os << std::format("          \"name\": \"{}\",\n", escapeJson(p.m_predicateName.m_node));
+                os << "          \"args\": [";
+                for (size_t aIdx = 0; aIdx < p.m_arguments.size(); ++aIdx)
+                {
+                    if (aIdx > 0) os << ", ";
+                    if (const auto *ident = std::get_if<DSL::Ast::Common::Identifier>(&p.m_arguments[aIdx]))
+                    {
+                        os << std::format("\"{}\"", escapeJson(ident->m_node));
+                    }
+                    else if (const auto *lit = std::get_if<DSL::Ast::Common::IntegerLiteral>(&p.m_arguments[aIdx]))
+                    {
+                        os << lit->m_node;
+                    }
+                }
+                os << "]\n";
+                os << (pIdx + 1 < r.m_whenClauses.size() ? "        },\n" : "        }\n");
+            }
+            os << "      ],\n";
+
+            // Emits
+            os << "      \"emits\": [\n";
+            for (size_t eIdx = 0; eIdx < r.m_emitClauses.size(); ++eIdx)
+            {
+                const auto &e = r.m_emitClauses[eIdx];
+                os << "        {\n";
+                os << std::format("          \"opcode\": \"{}\",\n", escapeJson(e.m_opcode.m_node));
+                os << "          \"operands\": [\n";
+                for (size_t oIdx = 0; oIdx < e.m_operands.size(); ++oIdx)
+                {
+                    const auto &op = e.m_operands[oIdx];
+                    os << "            {\n";
+                    os << std::format("              \"kind\": \"{}\",\n", opKindToStr(op.m_kind));
+                    if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::CustomTransform)
+                    {
+                        os << std::format("              \"func\": \"{}\",\n", escapeJson(op.m_name.m_node));
+                        os << "              \"args\": [";
+                        for (size_t aIdx = 0; aIdx < op.m_callArgs.size(); ++aIdx)
+                        {
+                            if (aIdx > 0) os << ", ";
+                            os << std::format("\"{}\"", escapeJson(op.m_callArgs[aIdx].m_node));
+                        }
+                        os << "]\n";
+                    }
+                    else if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateLiteral)
+                    {
+                        os << std::format("              \"val\": {}\n", op.m_immLiteral ? op.m_immLiteral->m_node : 0);
+                    }
+                    else
+                    {
+                        os << std::format("              \"name\": \"{}\"", escapeJson(op.m_name.m_node));
+                        std::string typeStr;
+                        if (op.m_typeParam.has_value())
+                            typeStr = std::string(op.m_typeParam->m_node);
+                        else if (op.m_type.has_value() && op.m_type->m_node != "imm")
+                            typeStr = std::string(op.m_type->m_node);
+                        if (!typeStr.empty())
+                        {
+                            os << ",\n" << std::format("              \"type\": \"{}\"\n", escapeJson(typeStr));
+                        }
+                        else
+                        {
+                            os << "\n";
+                        }
+                    }
+                    os << (oIdx + 1 < e.m_operands.size() ? "            },\n" : "            }\n");
+                }
+                os << "          ]\n";
+                os << (eIdx + 1 < r.m_emitClauses.size() ? "        },\n" : "        }\n");
+            }
+            os << "      ]\n";
+
+            os << (rIdx + 1 < file.m_rules.size() ? "    },\n" : "    }\n");
         }
         os << "  ]\n";
         os << "}\n";
     }
     else
     {
-        os << "=== LegalizeRule AST Summary (" << file.m_rules.size() << " rewrite rules) ===\n";
+        os << "======================================================================\n";
+        os << std::format("LegalizeRule AST Dump ({} rules)\n", file.m_rules.size());
+        os << "======================================================================\n";
         for (const auto &r : file.m_rules)
         {
-            os << std::format("  Rule: {} (matches: {}, emits: {})\n", r.m_ruleName.m_node,
-                              r.m_matchClauses.size(), r.m_emitClauses.size());
+            os << std::format("  Rule: {}\n", r.m_ruleName.m_node);
+
+            os << "    [Match Pattern]\n";
+            for (const auto &m : r.m_matchClauses)
+            {
+                os << std::format("      - {} (operands: {})\n", m.m_opcode.m_node, m.m_operands.size());
+                for (size_t i = 0; i < m.m_operands.size(); ++i)
+                {
+                    const auto &op = m.m_operands[i];
+                    os << std::format("          #{}: ", i);
+                    if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::SsaRegister)
+                    {
+                        os << "SSA Register $" << op.m_name.m_node;
+                        if (op.m_type.has_value())
+                            os << " (type: " << op.m_type->m_node << ")";
+                    }
+                    else if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateSymbol)
+                    {
+                        os << "Symbolic Immediate $" << op.m_name.m_node;
+                        if (op.m_typeParam.has_value())
+                            os << " (type: " << op.m_typeParam->m_node << ")";
+                        else if (op.m_type.has_value())
+                            os << " (type: " << op.m_type->m_node << ")";
+                    }
+                    else if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateLiteral)
+                    {
+                        os << "Immediate Literal " << (op.m_immLiteral.has_value() ? op.m_immLiteral->m_node : 0);
+                    }
+                    else if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::CustomTransform)
+                    {
+                        os << "Custom Transform " << op.m_name.m_node << "(";
+                        for (size_t a = 0; a < op.m_callArgs.size(); ++a)
+                        {
+                            if (a > 0) os << ", ";
+                            os << "$" << op.m_callArgs[a].m_node;
+                        }
+                        os << ")";
+                    }
+                    os << "\n";
+                }
+            }
+
+            if (!r.m_whenClauses.empty())
+            {
+                os << "    [When Predicates]\n";
+                for (const auto &w : r.m_whenClauses)
+                {
+                    os << std::format("      - {}(", w.m_predicateName.m_node);
+                    for (size_t a = 0; a < w.m_arguments.size(); ++a)
+                    {
+                        if (a > 0) os << ", ";
+                        if (const auto *ident = std::get_if<DSL::Ast::Common::Identifier>(&w.m_arguments[a]))
+                            os << "$" << ident->m_node;
+                        else if (const auto *lit = std::get_if<DSL::Ast::Common::IntegerLiteral>(&w.m_arguments[a]))
+                            os << lit->m_node;
+                    }
+                    os << ")\n";
+                }
+            }
+
+            os << "    [Emit Sequence]\n";
+            for (const auto &e : r.m_emitClauses)
+            {
+                os << std::format("      - {} (operands: {})\n", e.m_opcode.m_node, e.m_operands.size());
+                for (size_t i = 0; i < e.m_operands.size(); ++i)
+                {
+                    const auto &op = e.m_operands[i];
+                    os << std::format("          #{}: ", i);
+                    if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::SsaRegister)
+                    {
+                        os << "SSA Register $" << op.m_name.m_node;
+                        if (op.m_type.has_value())
+                            os << " (type: " << op.m_type->m_node << ")";
+                    }
+                    else if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateSymbol)
+                    {
+                        os << "Symbolic Immediate $" << op.m_name.m_node;
+                        if (op.m_typeParam.has_value())
+                            os << " (type: " << op.m_typeParam->m_node << ")";
+                        else if (op.m_type.has_value())
+                            os << " (type: " << op.m_type->m_node << ")";
+                    }
+                    else if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::ImmediateLiteral)
+                    {
+                        os << "Immediate Literal " << (op.m_immLiteral.has_value() ? op.m_immLiteral->m_node : 0);
+                    }
+                    else if (op.m_kind == DSL::Ast::LegalizeRuleDef::RuleOperandKind::CustomTransform)
+                    {
+                        os << "Custom Transform " << op.m_name.m_node << "(";
+                        for (size_t a = 0; a < op.m_callArgs.size(); ++a)
+                        {
+                            if (a > 0) os << ", ";
+                            os << "$" << op.m_callArgs[a].m_node;
+                        }
+                        os << ")";
+                    }
+                    os << "\n";
+                }
+            }
         }
+        os << "======================================================================\n";
     }
 }
 
@@ -492,7 +720,15 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                 case SymbolType::LegalizeRule:
                 {
                     os << "      \"type\": \"LegalizeRule\",\n";
-                    os << "      \"details\": null\n";
+                    if (const auto *rd = sym->getIf<Symbols::LegalizeRuleSymbol>())
+                    {
+                        os << std::format("      \"match_count\": {},\n", rd->m_matchPatterns.size());
+                        os << std::format("      \"emit_count\": {}\n", rd->m_expansionSequence.size());
+                    }
+                    else
+                    {
+                        os << "      \"details\": null\n";
+                    }
                     break;
                 }
                 default:
@@ -549,8 +785,20 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                 }
                 case SymbolType::LegalizeRule:
                 {
-                    os << std::format("  [LegalizeRule] ID: {:<3} Scope: {:<2} Name: {}\n", sym->getId(),
-                                      sym->getDefiningScopeId(), sym->getName());
+                    if (const auto *rd = sym->getIf<Symbols::LegalizeRuleSymbol>())
+                    {
+                        std::string matchOp = rd->m_matchPatterns.empty() ? "?" : std::string(rd->m_matchPatterns[0].m_opcode);
+                        std::string emitOp = rd->m_expansionSequence.empty() ? "?" : std::string(rd->m_expansionSequence[0].m_opcode);
+                        os << std::format("  [LegalizeRule] ID: {:<3} Scope: {:<2} Name: {:<16} Matches: {:<2} Emits: {:<2} [{} -> {}]\n",
+                                          sym->getId(), sym->getDefiningScopeId(), sym->getName(),
+                                          rd->m_matchPatterns.size(), rd->m_expansionSequence.size(),
+                                          matchOp, emitOp);
+                    }
+                    else
+                    {
+                        os << std::format("  [LegalizeRule] ID: {:<3} Scope: {:<2} Name: {}\n", sym->getId(),
+                                          sym->getDefiningScopeId(), sym->getName());
+                    }
                     break;
                 }
                 default:

@@ -3,6 +3,7 @@
 
 #include "EzMirCommon.h"
 #include "Operand/MirRegisterReference.h"
+#include <variant>
 
 /**
  * Type alias representing a target physical hardware register ID.

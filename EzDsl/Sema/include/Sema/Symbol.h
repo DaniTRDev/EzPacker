@@ -20,6 +20,7 @@ enum class SymbolType : uint8_t
 
     // .lad files.
     LegalizeAction,
+    TypeSet,
 
     // .lrd files.
     LegalizeRule,
@@ -43,6 +44,7 @@ class Symbol
                                     Symbols::LegalizeActionConstraintSymbol,
                                     Symbols::LegalizeActionClauseSymbol,
                                     Symbols::LegalizeActionSymbol,
+                                    Symbols::TypeSetSymbol,
                                     Symbols::LegalizeRuleOperandSymbol,
                                     Symbols::LegalizeRuleInstructionSymbol,
                                     Symbols::LegalizeRuleSymbol>;

@@ -42,7 +42,17 @@ struct LegalizeActionClauseSymbol
     std::pmr::vector<LegalizeActionConstraintSymbol> m_types;
     std::optional<SymbolId> m_targetTypeId; // Widen/Narrow/Bitcast target
     std::optional<std::string_view> m_libcallSymbol;
+    std::optional<std::string_view> m_lowerHandler;
     std::optional<std::pmr::vector<SymbolId>> m_customRules;
+};
+
+/**
+ * Semantic symbol for a reusable type set (.lad).
+ */
+struct TypeSetSymbol
+{
+    std::string_view m_name;
+    std::pmr::vector<SymbolId> m_typeIds;
 };
 
 /**
@@ -56,12 +66,19 @@ struct LegalizeActionSymbol
     std::pmr::vector<LegalizeActionClauseSymbol> m_clauses;
 };
 
+struct LegalizeRulePredicateSymbol
+{
+    std::string_view m_name;
+    std::pmr::vector<std::variant<std::string_view, int64_t>> m_args;
+};
+
 struct LegalizeRuleOperandSymbol
 {
     DSL::Ast::LegalizeRuleDef::RuleOperandKind m_kind;
     std::string_view m_name;
     std::optional<SymbolId> m_typeOrClassId;
     std::optional<int64_t> m_immLiteral;
+    std::pmr::vector<std::string_view> m_callArgs;
 };
 
 /**
@@ -80,6 +97,7 @@ struct LegalizeRuleSymbol
 {
     std::string_view m_ruleName;
     std::pmr::vector<LegalizeRuleInstructionSymbol> m_matchPatterns;
+    std::pmr::vector<LegalizeRulePredicateSymbol> m_predicates;
     std::pmr::vector<LegalizeRuleInstructionSymbol> m_expansionSequence;
 };
 

@@ -3,6 +3,8 @@
 
 #include "EzDslSemaCommon.h"
 
+#include <unordered_map>
+
 using ScopeId = size_t;
 inline constexpr ScopeId InvalidScopeId = UINT64_MAX;
 
@@ -34,6 +36,14 @@ class Scope
     ScopeId findSymbol(std::string_view name) const;
 
     /**
+     * Finds all locally declared symbol IDs by name.
+     */
+    auto findSymbols(std::string_view name) const
+    {
+        return m_symbolMap.equal_range(name);
+    }
+
+    /**
      * Registers a symbol name and its SymbolId into this scope's lookup table and ordered list.
      */
     void addSymbol(std::string_view name, ScopeId symbolId);
@@ -52,7 +62,7 @@ class Scope
     ScopeId m_id;
     ScopeId m_parentId;
     std::pmr::vector<ScopeId> m_symbols;
-    std::pmr::unordered_map<std::string_view, ScopeId> m_symbolMap;
+    std::pmr::unordered_multimap<std::string_view, ScopeId> m_symbolMap;
     std::string_view m_debugName;
 };
 

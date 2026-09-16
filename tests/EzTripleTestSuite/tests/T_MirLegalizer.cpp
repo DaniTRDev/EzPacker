@@ -390,3 +390,98 @@ TEST_F(MirLegalizerTest, TestNarrowCompareLegalization)
     auto &instructions = block->getInstructions();
     EXPECT_EQ(instructions.size(), 6);
 }
+
+TEST_F(MirLegalizerTest, TestWorklistBlockLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("worklist_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    // Add 1: i8 ADD (needs widening to i32)
+    MirRegister *d1 = ob.buildVReg(typeTable->i8(), "d1");
+    MirRegister *s1 = ob.buildVReg(typeTable->i8(), "s1");
+    MirRegister *s2 = ob.buildVReg(typeTable->i8(), "s2");
+    ib.ADD(d1, s1, s2);
+
+    // Add 2: i16 SUB (needs widening to i32)
+    MirRegister *d2 = ob.buildVReg(typeTable->i16(), "d2");
+    MirRegister *s3 = ob.buildVReg(typeTable->i16(), "s3");
+    MirRegister *s4 = ob.buildVReg(typeTable->i16(), "s4");
+    ib.SUB(d2, s3, s4);
+
+    // Add 3: i32 ADD (already legal)
+    MirRegister *d3 = ob.buildVReg(typeTable->i32(), "d3");
+    MirRegister *s5 = ob.buildVReg(typeTable->i32(), "s5");
+    MirRegister *s6 = ob.buildVReg(typeTable->i32(), "s6");
+    ib.ADD(d3, s5, s6);
+
+    MirLegalizer legalizer(ctx, getTargetDesc());
+    bool ok = legalizer.legalizeBlock(block);
+    EXPECT_TRUE(ok);
+
+    // All instructions in the block must now be legal according to getTargetDesc()->getLegalizerInfo()
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst && !inst->isErased())
+        {
+            auto q = legalizer.buildQuery(inst);
+            auto resp = getTargetDesc()->getLegalizerInfo()->query(q);
+            EXPECT_TRUE(resp.isLegal()) << "Instruction " << inst->getOpCodeName() << " should be legal";
+        }
+    }
+}
+
+class CyclicMockLegalizerInfo : public LegalizerInfo
+{
+  public:
+    CyclicMockLegalizerInfo(MirTypeTable *tt)
+    {
+        auto *i8 = tt->i8();
+        auto *i16 = tt->i16();
+
+        // Intentionally create a cycle: i8 widens to i16, and i16 narrows to i8
+        getActionDefinitions(MirInstructionOpCode::ADD)
+            .widenScalarTo(0, { i8 }, i16)
+            .narrowScalarTo(0, { i16 }, i8);
+    }
+};
+
+TEST_F(MirLegalizerTest, TestLegalizerCycleDetection)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("cycle_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *d = ob.buildVReg(typeTable->i8(), "d");
+    MirRegister *s1 = ob.buildVReg(typeTable->i8(), "s1");
+    MirRegister *s2 = ob.buildVReg(typeTable->i8(), "s2");
+    ib.ADD(d, s1, s2);
+
+    // Use a custom TargetDesc that returns CyclicMockLegalizerInfo
+    class CyclicTargetDesc : public MockTargetDesc
+    {
+      public:
+        CyclicTargetDesc(MirBuilderContext *bCtx) : MockTargetDesc(bCtx)
+        {
+            m_cyclicInfo = std::make_unique<CyclicMockLegalizerInfo>(bCtx->getTypeTable());
+        }
+        LegalizerInfo *getLegalizerInfo() override { return m_cyclicInfo.get(); }
+      private:
+        std::unique_ptr<CyclicMockLegalizerInfo> m_cyclicInfo;
+    };
+
+    CyclicTargetDesc cyclicTarget(ctx);
+    MirLegalizer legalizer(ctx, &cyclicTarget);
+
+    // The cycle detection budget should catch the cycle and abort cleanly returning false
+    bool ok = legalizer.legalizeBlock(block);
+    EXPECT_FALSE(ok);
+}

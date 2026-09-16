@@ -31,6 +31,22 @@ class LegalizeActionPass
 
   private:
     /**
+     * Processes and declares type set symbols for reusable type groups (.lad).
+     */
+    static bool processTypeSetDecl(class DiagnosticCollector *collector,
+                                   SymbolTable *table,
+                                   const DSL::Ast::LegalizeActionDef::TypeSetDecl &decl);
+
+    /**
+     * Applies clamp scalar macro expansion to an instruction's legalization actions.
+     */
+    static bool applyClampScalar(class DiagnosticCollector *collector,
+                                 SymbolTable *table,
+                                 const DSL::Ast::LegalizeActionDef::ClampScalarClause &clamp,
+                                 std::string_view instName,
+                                 Symbols::LegalizeActionSymbol &actionData);
+
+    /**
      * Processes and declares legalization action symbols for a single generic IR opcode.
      */
     static bool processInstructionDecl(class DiagnosticCollector *collector,
@@ -38,7 +54,7 @@ class LegalizeActionPass
                                        const DSL::Ast::LegalizeActionDef::LegalizeInstructionDecl &decl);
 
     /**
-     * Validates a single action clause (LEGAL, WIDENS, NARROWS, LIBCALL) and resolves its target types.
+     * Validates a single action clause (LEGAL, WIDENS, NARROWS, LIBCALL, LOWER) and resolves its target types.
      */
     static bool processClause(class DiagnosticCollector *collector,
                               class SymbolTable *table,

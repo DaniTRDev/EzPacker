@@ -13,6 +13,9 @@
 #include "InstructionSelector/MirInstructionSelector.h"
 #include "Legalizer/MirLegalizeActionTable.h"
 #include "Legalizer/MirLegalizer.h"
+#include "Legalizer/LegalizerInfo.h"
+#include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeReturnAction.h"
 #include "MirPasses/MirPassManager.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
@@ -324,6 +327,83 @@ LegalizeQueryResult queryEndArg(size_t op1Type, size_t op2Type, size_t /*op3Type
 } // anonymous namespace
 
 /**
+ * Modern fluent table-driven legalizer specification for MockTarget.
+ */
+class MockTargetLegalizerInfo : public LegalizerInfo
+{
+  public:
+    MockTargetLegalizerInfo(MirTypeTable *tt)
+    {
+        auto *i1 = tt->i1();
+        auto *i8 = tt->i8();
+        auto *i16 = tt->i16();
+        auto *i32 = tt->i32();
+        auto *i64 = tt->i64();
+        auto *i128 = tt->i128();
+        auto *i256 = tt->i256();
+        auto *f32 = tt->f32();
+        auto *f64 = tt->f64();
+        auto *bindToken = tt->__bindToken();
+
+        // 1. Homogeneous Arithmetic & Bitwise (ADD, SUB, XOR, AND, OR)
+        getActionDefinitions({ MirInstructionOpCode::ADD,
+                               MirInstructionOpCode::SUB,
+                               MirInstructionOpCode::XOR,
+                               MirInstructionOpCode::AND,
+                               MirInstructionOpCode::OR })
+            .legalFor({ i32, i64, f32, f64 })
+            .widenScalarTo(0, { i1, i8, i16 }, i32)
+            .narrowScalarTo(0, { i128, i256 }, i64);
+
+        // 2. Division & Libcalls
+        getActionDefinitions({ MirInstructionOpCode::DIV, MirInstructionOpCode::IDIV })
+            .legalFor({ i32 })
+            .widenScalarTo(0, { i1, i8, i16 }, i32)
+            .libcallFor(i64, "__divdi3")
+            .narrowScalarTo(0, { i128 }, i64);
+
+        // 3. Comparisons
+        getActionDefinitions({ MirInstructionOpCode::CMP_EQ, MirInstructionOpCode::CMP_NE })
+            .legalForTypesWithSource({ i32, i64, f32, f64 })
+            .widenScalarSourceTo({ i1, i8, i16 }, i32)
+            .narrowScalarSourceTo({ i128 }, i64);
+
+        // 4. Extensions & Truncations
+        getActionDefinitions(MirInstructionOpCode::ZEXT)
+            .legalFor({ { i8, i1 }, { i16, i1 }, { i32, i1 }, { i64, i1 }, { i32, i8 }, { i32, i16 }, { i64, i8 }, { i64, i16 }, { i64, i32 } });
+
+        getActionDefinitions(MirInstructionOpCode::SEXT)
+            .legalFor({ { i32, i8 }, { i32, i16 }, { i64, i8 }, { i64, i16 }, { i64, i32 } })
+            .widenScalarTo(1, { i1 }, i8);
+
+        getActionDefinitions(MirInstructionOpCode::TRUNC)
+            .legalFor({ { i8, i32 }, { i16, i32 }, { i8, i64 }, { i16, i64 }, { i32, i64 }, { i1, i32 }, { i1, i64 }, { i8, i16 }, { i1, i8 }, { i1, i16 } });
+
+        // 5. Data Movement & Bitcasts
+        getActionDefinitions(MirInstructionOpCode::MOV)
+            .legalIfSameType()
+            .bitcastBetween(i32, f32);
+
+        // 6. High-Level Procedural Lowerings
+        getActionDefinitions(MirInstructionOpCode::CALL)
+            .lowerWith(&LegalizeActions::LegalizeCall);
+
+        getActionDefinitions(MirInstructionOpCode::RET)
+            .lowerWith(&LegalizeActions::LegalizeReturn);
+
+        // 7. ABI Token Lowering Primitives
+        getActionDefinitions({ MirInstructionOpCode::POP_ARG,
+                               MirInstructionOpCode::PUSH_ARG,
+                               MirInstructionOpCode::PUSH_RET,
+                               MirInstructionOpCode::POP_RET })
+            .legalFor({ { bindToken, i32 }, { bindToken, i64 }, { bindToken, f32 }, { bindToken, f64 }, { bindToken, i8 }, { bindToken, i16 } });
+
+        getActionDefinitions(MirInstructionOpCode::END_ARG)
+            .legalFor({ bindToken });
+    }
+};
+
+/**
  * Mock Target Descriptor.
  */
 class MockTargetDesc : public TargetDesc
@@ -335,13 +415,16 @@ class MockTargetDesc : public TargetDesc
     MirFrameLowerer *getFrameLowerer() override { return &m_frameLowerer; }
     MirInstructionSelector *getInstructionSelector() override { return &m_isel; }
     MirLegalizer *getLegalizer() override { return m_legalizer.get(); }
-    MirLegalizeActionTable *getLegalizeActionTable() { return &m_mockActionTable; }
+    MirLegalizeActionTable *getLegalizeActionTable() override { return &m_mockActionTable; }
+    LegalizerInfo *getLegalizerInfo() override { return m_legalizerInfo.get(); }
     MirRegisterAllocator *getRegisterAllocator() override { return nullptr; }
     MirType *getMemOperandDisplacementType() override;
     MirRegisterRef getInstructionPtrReg() const override { return {}; }
     size_t getStackSlotSize() const override { return 8; }
     void initialize() override
     {
+        m_legalizerInfo = std::make_unique<MockTargetLegalizerInfo>(m_ctx->getTypeTable());
+
         constexpr size_t OpcodeCount = static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT);
         for (size_t i = 0; i <= OpcodeCount; ++i)
         {
@@ -361,7 +444,7 @@ class MockTargetDesc : public TargetDesc
         m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::END_ARG)] = &queryEndArg;
         m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::PUSH_RET)] = &queryPopArg;
     }
-    std::string_view getLibcallStr(uint8_t symId)
+    std::string_view getLibcallStr(uint8_t symId) override
     {
         switch (symId)
         {
@@ -391,6 +474,7 @@ class MockTargetDesc : public TargetDesc
 
   private:
     MirLegalizeActionTable m_mockActionTable;
+    std::unique_ptr<LegalizerInfo> m_legalizerInfo;
     MockInstructionSelector m_isel;
     MockFrameLowerer m_frameLowerer;
     std::unique_ptr<MockCallingConvDesc> m_mockCc;
