@@ -1,0 +1,39 @@
+target MockTarget;
+
+target_inst ADD64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("add");
+    FLAGS(IsCommutative);
+};
+
+target_inst ADD64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+    MNEMONIC("add");
+};
+
+target_inst ADD64rm(GPR64:dst OUT, GPR64:src1 IN, Mem64:addr IN) {
+    MNEMONIC("add");
+    FLAGS(ReadsMemory);
+};
+
+target_inst SUB64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("sub");
+};
+
+target_inst LOAD64(GPR64:dst OUT, Mem64:addr IN) {
+    MNEMONIC("mov");
+    FLAGS(ReadsMemory);
+};
+
+target_inst STORE64(Mem64:addr IN, GPR64:val IN) {
+    MNEMONIC("mov");
+    FLAGS(WritesMemory);
+};
+
+target_inst MOV64rr(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("mov");
+    FLAGS(IsMove);
+};
+
+target_inst RET(GPR64:val IN) {
+    MNEMONIC("ret");
+    FLAGS(IsTerminator);
+};
