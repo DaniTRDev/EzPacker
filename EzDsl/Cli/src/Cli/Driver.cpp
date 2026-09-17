@@ -5,25 +5,40 @@
 #include "CodeGenerators/CppLegalizerGenerator.h"
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
+#include "CodeGenerators/CppTargetInstructionGenerator.h"
+#include "CodeGenerators/CppInstructionSelectorGenerator.h"
+#include "CodeGenerators/CppCallingConvGenerator.h"
 
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 
 #include "Ast/IrInstructionDefLangAst.h"
 #include "Ast/TypeDefLangAst.h"
+#include "Ast/TargetInstDefLangAst.h"
+#include "Ast/InstructionSelectDefLangAst.h"
+#include "Ast/CallingConvDefLangAst.h"
 #include "Parser/IrInstructionDefLang.h"
 #include "Parser/LegalizeActionDefLang.h"
 #include "Parser/LegalizeRuleDefLang.h"
 #include "Parser/ParseContext.h"
 #include "Parser/TypeDefLang.h"
+#include "Parser/TargetInstDefLang.h"
+#include "Parser/InstructionSelectDefLang.h"
+#include "Parser/CallingConvDefLang.h"
 
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/IrSymbols.h"
 #include "Sema/Symbols/TypeSymbols.h"
+#include "Sema/Symbols/TargetSymbols.h"
+#include "Sema/Symbols/InstructionSelectSymbols.h"
+#include "Sema/Symbols/CallingConvSymbols.h"
 #include "SemaPasses/IrInstructionPass.h"
 #include "SemaPasses/LegalizeActionPass.h"
 #include "SemaPasses/LegalizeRulePass.h"
 #include "SemaPasses/TypePass.h"
+#include "SemaPasses/TargetInstPass.h"
+#include "SemaPasses/InstructionSelectPass.h"
+#include "SemaPasses/CallingConvPass.h"
 
 #include "SourceManager/SourceManager.h"
 
@@ -284,6 +299,12 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return LanguageDialect::LegalizeAction;
     if (ext == ".lrd")
         return LanguageDialect::LegalizeRule;
+    if (ext == ".idf")
+        return LanguageDialect::TargetInstDef;
+    if (ext == ".isf")
+        return LanguageDialect::InstructionSelect;
+    if (ext == ".ezcc" || ext == ".ccd")
+        return LanguageDialect::CallingConv;
 
     if (m_options.generator == GeneratorKind::TypeTable)
         return LanguageDialect::TypeDef;
@@ -293,6 +314,12 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return LanguageDialect::LegalizeAction;
     if (m_options.generator == GeneratorKind::Rules)
         return LanguageDialect::LegalizeRule;
+    if (m_options.generator == GeneratorKind::TargetInstructions)
+        return LanguageDialect::TargetInstDef;
+    if (m_options.generator == GeneratorKind::InstructionSelector)
+        return LanguageDialect::InstructionSelect;
+    if (m_options.generator == GeneratorKind::CallingConv)
+        return LanguageDialect::CallingConv;
 
     return LanguageDialect::Auto;
 }
@@ -314,6 +341,12 @@ GeneratorKind Driver::resolveGeneratorKind(LanguageDialect dialect) const
             return GeneratorKind::Legalizer;
         case LanguageDialect::LegalizeRule:
             return GeneratorKind::Rules;
+        case LanguageDialect::TargetInstDef:
+            return GeneratorKind::TargetInstructions;
+        case LanguageDialect::InstructionSelect:
+            return GeneratorKind::InstructionSelector;
+        case LanguageDialect::CallingConv:
+            return GeneratorKind::CallingConv;
         default:
             return GeneratorKind::Auto;
     }
@@ -459,6 +492,78 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
         }
     }
+    else if (genKind == GeneratorKind::TargetInstructions)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        std::string baseName = std::format("{}TargetInstructionTable", target);
+        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
+
+        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
+        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
+
+        if (emitHeader)
+        {
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+        if (emitSource)
+        {
+            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
+        }
+    }
+    else if (genKind == GeneratorKind::InstructionSelector)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        std::string baseName = std::format("{}InstructionSelector", target);
+        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
+
+        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
+        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
+
+        if (emitHeader)
+        {
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+        if (emitSource)
+        {
+            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
+        }
+    }
+    else if (genKind == GeneratorKind::CallingConv)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "CallingConv";
+
+        std::string baseName = std::format("{}CallingConvDesc", target);
+        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
+
+        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
+        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
+
+        if (emitHeader)
+        {
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+        if (emitSource)
+        {
+            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
+        }
+    }
 
     return outputs;
 }
@@ -538,6 +643,7 @@ DriverResult Driver::run()
     SymbolTable symbolTable(&arena);
     size_t constructCount = 0;
     bool hasLoadedRules = false;
+    std::optional<DSL::Ast::CallingConvDef::CallingConventionDefFile> ccAst;
 
     // Multi-dialect prelude & dependency ingestion
     if (dialect == LanguageDialect::LegalizeRule || dialect == LanguageDialect::LegalizeAction)
@@ -780,6 +886,77 @@ DriverResult Driver::run()
             break;
         }
 
+        case LanguageDialect::TargetInstDef:
+        {
+            auto ast = parseCtx.parse<DSL::Parser::TargetInstDef::TargetInstFile,
+                                      DSL::Ast::TargetInstDef::TargetInstFile>();
+            if (!ast.has_value() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Syntax parsing failed for Target Instruction Definition file.";
+                return result;
+            }
+
+            constructCount = ast->m_instructions.size();
+
+            if (!TargetInstPass::run(&diagCollector, &symbolTable, &ast.value()) || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Semantic analysis failed for Target Instruction Definition file.";
+                return result;
+            }
+            break;
+        }
+
+        case LanguageDialect::InstructionSelect:
+        {
+            auto ast = parseCtx.parse<DSL::Parser::InstructionSelectDef::InstructionSelectFile,
+                                      DSL::Ast::InstructionSelectDef::InstructionSelectFile>();
+            if (!ast.has_value() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Syntax parsing failed for Instruction Selection Definition file.";
+                return result;
+            }
+
+            constructCount = ast->m_patterns.size();
+
+            if (!InstructionSelectPass::run(&diagCollector, &symbolTable, &ast.value()) || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Semantic analysis failed for Instruction Selection Definition file.";
+                return result;
+            }
+            break;
+        }
+
+        case LanguageDialect::CallingConv:
+        {
+            ccAst = parseCtx.parse<DSL::Parser::CallingConvDef::CallingConvDefFile,
+                                   DSL::Ast::CallingConvDef::CallingConventionDefFile>();
+            if (!ccAst.has_value() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Syntax parsing failed for Calling Convention Definition file.";
+                return result;
+            }
+
+            constructCount = 1;
+
+            if (m_options.dumpAst)
+            {
+                InfoDumper::dumpCallingConvAst(*ccAst, m_options.format, std::cout);
+            }
+
+            if (!CallingConvPass::run(&diagCollector, &symbolTable, &ccAst.value()) || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Semantic analysis failed for Calling Convention Definition file.";
+                return result;
+            }
+            break;
+        }
+
         default:
             break;
     }
@@ -807,6 +984,9 @@ DriverResult Driver::run()
             case LanguageDialect::IrInstDef: gInfo.dialectName = "IrInstDef (.irdf)"; break;
             case LanguageDialect::LegalizeAction: gInfo.dialectName = "LegalizeAction (.lad)"; break;
             case LanguageDialect::LegalizeRule: gInfo.dialectName = "LegalizeRule (.lrd)"; break;
+            case LanguageDialect::TargetInstDef: gInfo.dialectName = "TargetInstDef (.idf)"; break;
+            case LanguageDialect::InstructionSelect: gInfo.dialectName = "InstructionSelect (.isf)"; break;
+            case LanguageDialect::CallingConv: gInfo.dialectName = "CallingConv (.ezcc, .ccd)"; break;
             default: gInfo.dialectName = "Unknown"; break;
         }
         gInfo.constructCount = constructCount;
@@ -817,6 +997,9 @@ DriverResult Driver::run()
             case GeneratorKind::Instructions: gInfo.generatorName = "CppMirInstructionGenerator"; break;
             case GeneratorKind::Legalizer: gInfo.generatorName = "CppLegalizerGenerator"; break;
             case GeneratorKind::Rules: gInfo.generatorName = "CppLegalizeRuleGenerator"; break;
+            case GeneratorKind::TargetInstructions: gInfo.generatorName = "CppTargetInstructionGenerator"; break;
+            case GeneratorKind::InstructionSelector: gInfo.generatorName = "CppInstructionSelectorGenerator"; break;
+            case GeneratorKind::CallingConv: gInfo.generatorName = "CppCallingConvGenerator"; break;
             default: gInfo.generatorName = "None"; break;
         }
 
@@ -927,6 +1110,60 @@ DriverResult Driver::run()
         {
             result.success = false;
             result.errorMessage = "Code generation failed during LegalizerRules synthesis.";
+            return result;
+        }
+    }
+    else if (genKind == GeneratorKind::TargetInstructions)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        CppTargetInstructionGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during TargetInstructionTable synthesis.";
+            return result;
+        }
+    }
+    else if (genKind == GeneratorKind::InstructionSelector)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        CppInstructionSelectorGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during InstructionSelector synthesis.";
+            return result;
+        }
+    }
+    else if (genKind == GeneratorKind::CallingConv)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "CallingConv";
+
+        CppCallingConvGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during CallingConvDesc synthesis.";
             return result;
         }
     }

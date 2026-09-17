@@ -10,6 +10,7 @@
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirTargetInstructionDesc.h"
 #include "Instruction/MirInstructionBuilder.h"
 #include "InstructionSelector/MirInstructionSelector.h"
 #include "Legalizer/MirLegalizer.h"
@@ -82,9 +83,19 @@ class MockCallingConvDesc : public CallingConvDesc
 class MockInstructionSelector : public MirInstructionSelector
 {
   public:
+    explicit MockInstructionSelector(class MockTargetDesc *targetDesc = nullptr) :
+        MirInstructionSelector(reinterpret_cast<TargetDesc *>(targetDesc))
+    {
+    }
+    void setTargetDesc(class MockTargetDesc *targetDesc)
+    {
+        MirInstructionSelector::setTargetDesc(reinterpret_cast<TargetDesc *>(targetDesc));
+    }
+
     bool select(MirBuilderContext *ctx, MirInstruction *inst) override;
 
     size_t m_selectedCount{ 0 };
+    size_t m_foldedCount{ 0 };
 };
 
 #include "FrameLowerer/MirFrameLowerer.h"
@@ -341,11 +352,23 @@ class MockTargetDesc : public TargetDesc
     MockCallingConvDesc *getMockCallingConv() { return m_mockCc.get(); }
     MockInstructionSelector *getMockInstructionSelector() { return &m_isel; }
     MockFrameLowerer *getMockFrameLowerer() { return &m_frameLowerer; }
-    MirRegisterClass *getGprClass() { return m_gprClass; }
+    MirRegisterClass *getGprClass() override { return m_gprClass; }
+    MirAddressingModeMatcher *getAddressingModeMatcher() override { return &m_modeMatcher; }
+
+    MirTargetInstructionDesc *getDescADD64rr() const { return m_descADD64rr.get(); }
+    MirTargetInstructionDesc *getDescADD64ri() const { return m_descADD64ri.get(); }
+    MirTargetInstructionDesc *getDescADD64rm() const { return m_descADD64rm.get(); }
+    MirTargetInstructionDesc *getDescSUB64rr() const { return m_descSUB64rr.get(); }
+    MirTargetInstructionDesc *getDescLOAD64() const { return m_descLOAD64.get(); }
+    MirTargetInstructionDesc *getDescSTORE64() const { return m_descSTORE64.get(); }
+    MirTargetInstructionDesc *getDescBR_COND() const { return m_descBR_COND.get(); }
+    MirTargetInstructionDesc *getDescRET() const { return m_descRET.get(); }
+    MirTargetInstructionDesc *getDescMOV64rr() const { return m_descMOV64rr.get(); }
 
   private:
     std::unique_ptr<LegalizerInfo> m_legalizerInfo;
     MockInstructionSelector m_isel;
+    X86AddressingModeMatcher m_modeMatcher;
     MockFrameLowerer m_frameLowerer;
     MockRegisterAllocator m_regAlloc;
     std::unique_ptr<MockCallingConvDesc> m_mockCc;
@@ -355,6 +378,16 @@ class MockTargetDesc : public TargetDesc
     MirRegisterBank *m_gprBank{ nullptr };
     std::pmr::vector<MirRegisterBank *> m_banks;
     std::pmr::vector<CallingConvDesc *> m_convs;
+
+    std::unique_ptr<MirTargetInstructionDesc> m_descADD64rr;
+    std::unique_ptr<MirTargetInstructionDesc> m_descADD64ri;
+    std::unique_ptr<MirTargetInstructionDesc> m_descADD64rm;
+    std::unique_ptr<MirTargetInstructionDesc> m_descSUB64rr;
+    std::unique_ptr<MirTargetInstructionDesc> m_descLOAD64;
+    std::unique_ptr<MirTargetInstructionDesc> m_descSTORE64;
+    std::unique_ptr<MirTargetInstructionDesc> m_descBR_COND;
+    std::unique_ptr<MirTargetInstructionDesc> m_descRET;
+    std::unique_ptr<MirTargetInstructionDesc> m_descMOV64rr;
 };
 
 /**

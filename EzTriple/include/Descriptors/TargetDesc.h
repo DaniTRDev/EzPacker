@@ -33,6 +33,16 @@ class TargetDesc
     virtual class MirInstructionSelector *getInstructionSelector() = 0;
 
     /**
+     * Returns the addressing mode matcher required for this target, or nullptr if none.
+     */
+    virtual class MirAddressingModeMatcher *getAddressingModeMatcher() { return nullptr; }
+
+    /**
+     * Returns the general-purpose integer register class for this target, or nullptr if unspecified.
+     */
+    virtual class MirRegisterClass *getGprClass() { return nullptr; }
+
+    /**
      * Returns the legalizer needed for this target.
      */
     virtual class MirLegalizer *getLegalizer() = 0;

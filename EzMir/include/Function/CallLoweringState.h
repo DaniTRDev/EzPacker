@@ -39,6 +39,43 @@ class CallLoweringState
      */
     class StackFrameObject *allocateStack(class MirType *type) const;
 
+    /**
+     * Returns the CallingConvDesc associated with this lowering state.
+     */
+    class CallingConvDesc *getCallingConv() const { return m_callingConv; }
+
+    /**
+     * Returns the target MirFunction being lowered.
+     */
+    class MirFunction *getFunction() const { return m_func; }
+
+    /**
+     * Returns the builder context.
+     */
+    class MirBuilderContext *getContext() const { return m_ctx; }
+
+    /**
+     * Current parameter slot index (for slot-based calling conventions, e.g. Win64).
+     */
+    size_t getSlotIndex() const { return m_slotIndex; }
+    void advanceSlot() { ++m_slotIndex; }
+
+    /**
+     * Current logical argument index.
+     */
+    size_t getArgIndex() const { return m_argIndex; }
+    void advanceArg() { ++m_argIndex; }
+
+    /**
+     * Returns the current cursor index within a named register bank.
+     */
+    size_t getBankCursor(std::string_view bank) const;
+
+    /**
+     * Advances the cursor for a named register bank by one.
+     */
+    void advanceBankCursor(std::string_view bank);
+
   private:
     /**
      * Calling convention providing ABI classification rules.
@@ -49,6 +86,26 @@ class CallLoweringState
      * Target function undergoing call lowering.
      */
     class MirFunction *m_func;
+
+    /**
+     * Builder context owning allocator and symbols.
+     */
+    class MirBuilderContext *m_ctx;
+
+    /**
+     * Current parameter slot index.
+     */
+    size_t m_slotIndex{ 0 };
+
+    /**
+     * Current logical argument index.
+     */
+    size_t m_argIndex{ 0 };
+
+    /**
+     * Cursors for named register banks (e.g. "integer", "float").
+     */
+    std::pmr::unordered_map<std::string, size_t> m_bankCursors;
 
     /**
      * Registers allocated so far, partitioned by register class.

@@ -34,6 +34,10 @@ struct StringLiteral : SourcedAstNode<std::string_view>
 {
 };
 
+struct BooleanLiteral : SourcedAstNode<bool>
+{
+};
+
 } // namespace DSL::Ast::Common
 
 #endif // EZDSLLEXER_COMMON_AST_NODES_H

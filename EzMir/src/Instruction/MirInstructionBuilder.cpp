@@ -32,6 +32,8 @@ static void forEachVReg(MirOperand *op, auto &&callback)
     {
         if (mem->getBase() && mem->getBase()->isVirtual())
             callback(mem->getBase()->getRegId());
+        if (mem->getIndex() && mem->getIndex()->isVirtual())
+            callback(mem->getIndex()->getRegId());
     }
 }
 
@@ -51,6 +53,19 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
                                              InsertionType type,
                                              IntrusiveLinkedList<MirInstruction>::iterator it) :
     m_ctx(ctx), m_insertionPoint(MirInstructionInsertionPoint{ .m_type = type, .m_block = block, .m_iterator = it })
+{
+}
+
+/**
+ * Constructs an instruction builder positioned relative to an existing instruction.
+ */
+MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstruction *inst, InsertionType type) :
+    m_ctx(ctx),
+    m_insertionPoint(inst && inst->getOwner()
+                         ? MirInstructionInsertionPoint{ .m_type = type,
+                                                         .m_block = inst->getOwner(),
+                                                         .m_iterator = inst->getOwner()->getInstructions().to_iterator(inst) }
+                         : MirInstructionInsertionPoint{})
 {
 }
 
@@ -113,11 +128,56 @@ MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *tar
                                                    SourceReference *srcRef,
                                                    std::initializer_list<MirOperand *> operands)
 {
-    MirInstruction *instr = build(MirInstructionOpCode::TARGET_INST, srcRef, operands);
+    MirInstruction *instr = createInstruction(MirInstructionOpCode::TARGET_INST, srcRef);
     if (instr)
     {
         instr->setTargetDesc(targetDesc);
     }
+    for (MirOperand *op : operands)
+    {
+        addOperand(instr, op);
+    }
+    finalizeInstruction(instr, srcRef);
+    return instr;
+}
+
+/**
+ * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
+ */
+MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
+                                                   SourceReference *srcRef,
+                                                   const std::vector<MirOperand *> &operands)
+{
+    MirInstruction *instr = createInstruction(MirInstructionOpCode::TARGET_INST, srcRef);
+    if (instr)
+    {
+        instr->setTargetDesc(targetDesc);
+    }
+    for (MirOperand *op : operands)
+    {
+        addOperand(instr, op);
+    }
+    finalizeInstruction(instr, srcRef);
+    return instr;
+}
+
+/**
+ * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
+ */
+MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
+                                                   SourceReference *srcRef,
+                                                   const std::pmr::vector<MirOperand *> &operands)
+{
+    MirInstruction *instr = createInstruction(MirInstructionOpCode::TARGET_INST, srcRef);
+    if (instr)
+    {
+        instr->setTargetDesc(targetDesc);
+    }
+    for (MirOperand *op : operands)
+    {
+        addOperand(instr, op);
+    }
+    finalizeInstruction(instr, srcRef);
     return instr;
 }
 

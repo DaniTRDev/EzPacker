@@ -59,6 +59,13 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
                           IntrusiveLinkedList<MirInstruction>::iterator it = {});
 
     /**
+     * Constructs an instruction builder positioned relative to an existing instruction.
+     */
+    MirInstructionBuilder(class MirBuilderContext *ctx,
+                          class MirInstruction *inst,
+                          InsertionType type = InsertionType::InsertBefore);
+
+    /**
      * Builds and inserts an instruction with opcode, source ref, and initializer list of operand pointers.
      */
     MirInstruction *build(MirInstructionOpCode opcode,
@@ -85,6 +92,20 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
     MirInstruction *buildTarget(class MirTargetInstructionDesc *targetDesc,
                                 class SourceReference *srcRef,
                                 std::initializer_list<class MirOperand *> operands);
+
+    /**
+     * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
+     */
+    MirInstruction *buildTarget(class MirTargetInstructionDesc *targetDesc,
+                                class SourceReference *srcRef,
+                                const std::vector<class MirOperand *> &operands);
+
+    /**
+     * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
+     */
+    MirInstruction *buildTarget(class MirTargetInstructionDesc *targetDesc,
+                                class SourceReference *srcRef,
+                                const std::pmr::vector<class MirOperand *> &operands);
 
     /**
      * Appends an operand to the instruction currently being constructed.

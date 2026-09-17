@@ -5,6 +5,9 @@
 #include "Symbols/IrSymbols.h"
 #include "Symbols/TypeSymbols.h"
 #include "Symbols/LegalizeSymbols.h"
+#include "Symbols/TargetSymbols.h"
+#include "Symbols/InstructionSelectSymbols.h"
+#include "Symbols/CallingConvSymbols.h"
 
 /**
  * Discriminator enum identifying the syntactic/semantic category of a Symbol.
@@ -24,6 +27,17 @@ enum class SymbolType : uint8_t
 
     // .lrd files.
     LegalizeRule,
+
+    // .idf Target Instruction files.
+    TargetInstruction,
+    TargetOperand,
+
+    // .isf Instruction Selection files.
+    AddressingMode,
+    SelectionPattern,
+
+    // .ezcc / .ccd Calling Convention files.
+    CallingConv,
 
     // Reusable symbol types.
     SsaVariable,
@@ -47,7 +61,12 @@ class Symbol
                                     Symbols::TypeSetSymbol,
                                     Symbols::LegalizeRuleOperandSymbol,
                                     Symbols::LegalizeRuleInstructionSymbol,
-                                    Symbols::LegalizeRuleSymbol>;
+                                    Symbols::LegalizeRuleSymbol,
+                                    Symbols::TargetOperandSymbol,
+                                    Symbols::TargetInstructionSymbol,
+                                    Symbols::AddrModeSymbol,
+                                    Symbols::SelectionPatternSymbol,
+                                    Symbols::CallingConvSymbol>;
 
     /**
      * Constructs a symbol with source location span, flags, defining scope ID, unique symbol ID, type, and name.

@@ -1,0 +1,72 @@
+target AMD64;
+
+target_inst ADD32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+    MNEMONIC("addl");
+    FLAGS(IsCommutative);
+};
+
+target_inst ADD32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
+    MNEMONIC("addl");
+};
+
+target_inst ADD32rm(GPR32:dst OUT, GPR32:src1 IN, Mem32:addr IN) {
+    MNEMONIC("addl");
+    FLAGS(ReadsMemory);
+};
+
+target_inst ADD64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("addq");
+    FLAGS(IsCommutative);
+};
+
+target_inst ADD64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+    MNEMONIC("addq");
+};
+
+target_inst ADD64rm(GPR64:dst OUT, GPR64:src1 IN, Mem64:addr IN) {
+    MNEMONIC("addq");
+    FLAGS(ReadsMemory);
+};
+
+target_inst SUB32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+    MNEMONIC("subl");
+};
+
+target_inst SUB64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("subq");
+};
+
+target_inst LOAD32(GPR32:dst OUT, Mem32:addr IN) {
+    MNEMONIC("movl");
+    FLAGS(ReadsMemory);
+};
+
+target_inst LOAD64(GPR64:dst OUT, Mem64:addr IN) {
+    MNEMONIC("movq");
+    FLAGS(ReadsMemory);
+};
+
+target_inst STORE32(Mem32:addr IN, GPR32:val IN) {
+    MNEMONIC("movl");
+    FLAGS(WritesMemory);
+};
+
+target_inst STORE64(Mem64:addr IN, GPR64:val IN) {
+    MNEMONIC("movq");
+    FLAGS(WritesMemory);
+};
+
+target_inst MOV32rr(GPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("movl");
+    FLAGS(IsMove);
+};
+
+target_inst MOV64rr(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("movq");
+    FLAGS(IsMove);
+};
+
+target_inst RET(GPR64:val IN) {
+    MNEMONIC("ret");
+    FLAGS(IsTerminator);
+};

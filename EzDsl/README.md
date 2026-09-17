@@ -90,29 +90,26 @@ target x86_64 {
 ```
 
 ### Target Instruction Definitions (`.idf`)
-Specifies binary formats, bitfield assignments, flags, and assembly templates:
+Specifies machine instruction encodings, operand constraints, register directions, mnemonics, and side-effect flags:
 ```dsl
-format RType(32) {
-    opcode[6:0]   = 0b0110011;
-    rd[11:7]      = 0;
-    funct3[14:12] = 0;
-    rs1[19:15]    = 0;
-    rs2[24:20]    = 0;
-    funct7[31:25] = 0;
+target AMD64;
+
+target_inst ADD32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+    MNEMONIC("addl");
+    FLAGS(IsCommutative);
+    IMPLICIT_DEFS(EFLAGS);
 };
 
-inst ADD(GPR:rd OUT, GPR:rs1 IN, GPR:rs2 IN) format RType {
-    FORMAT(
-        rd = rd,
-        rs1 = rs1,
-        rs2 = rs2,
-        funct3 = 0b000,
-        funct7 = 0b0000000
-    );
-    ASM("add ${rd}, ${rs1}, ${rs2}");
-    LATENCY(1);
-    FLAGS(commutative);
-}
+target_inst ADD32rm(GPR32:dst OUT, GPR32:src IN, Mem32:addr IN) {
+    MNEMONIC("addl");
+    FLAGS(ReadsMemory);
+    IMPLICIT_DEFS(EFLAGS);
+};
+
+target_inst MOV32mr(Mem32:addr OUT, GPR32:src IN) {
+    MNEMONIC("movl");
+    FLAGS(WritesMemory);
+};
 ```
 
 ### Calling Convention Definitions (`.ccdf` / `.cdf`)
@@ -205,33 +202,58 @@ rule NarrowAddi64 {
 ```
 
 ### Instruction Selection Patterns (`.isf`)
-Declares complex multi-variant addressing modes and generic-to-target selection patterns:
+Declares complex multi-variant addressing modes (`addrmode`) and generic-to-target selection patterns (`pattern`):
 ```dsl
-addrmode AddrModeRegImm12(GPR:base, simm(i12):offset = 0) {
-    variant OffsetAddr {
+target AMD64;
+
+addrmode AddrModeRegImm(GPR64:base, simm32:disp = 0) {
+    variant BaseDisp {
         match {
-            ADDI $addr, GPR:$base, simm(i12):$offset;
+            ADD ptr:$base, imm(i32):$disp;
         };
         when {
-            hasOneUse($addr);
-            immInRange($offset, -2048, 2047);
+            isSimm32($disp);
         };
     };
     variant BaseOnly {
         match {
-            GPR:$base;
+            ptr:$base;
         };
     };
 };
 
-pattern Select_LW {
+pattern Select_ADD64rm [cost = 2] {
     match {
-        LOAD i32:$dst, AddrModeRegImm12($base, $offset);
+        ADD i64:$dst, i64:$src1, (LOAD i64:$tmp, AddrModeRegImm($base, $disp));
     };
-    emit {
-        LW GPR:$dst, GPR:$base, $offset;
+    when {
+        hasOneUse($tmp);
+        noInterveningStore($tmp);
     };
-    cost(1);
+    select {
+        ADD64rm GPR64:$dst, GPR64:$src1, [$base, $disp];
+    };
+};
+
+pattern Select_ADD64ri [cost = 1] {
+    match {
+        ADD i64:$dst, i64:$src1, imm(i64):$imm;
+    };
+    when {
+        isSimm32($imm);
+    };
+    select {
+        ADD64ri GPR64:$dst, GPR64:$src1, $imm;
+    };
+};
+
+pattern Select_ADD64rr [cost = 1] {
+    match {
+        ADD i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        ADD64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
 };
 ```
 
@@ -262,6 +284,8 @@ EzDSL features a dedicated semantic validation pipeline (`EzDsl/include/Sema/`, 
 - **`InstructionDefPass`**: Ingests `InstDefFile` ASTs, checks format bitfield boundaries, operand classes, assembly placeholders, and `FORMAT` assignments.
 - **`LegalizeActionPass`**: Ingests `TargetLegalizeDef` ASTs, validates legality matrices, type constraints, and widening/narrowing targets.
 - **`LegalizeRulePass`**: Ingests `TargetLegalizeRuleDef` ASTs, checks SSA variable scoping between match and expand templates, and validates guard predicates.
+- **`TargetInstPass`**: Ingests `TargetInstDefFile` (`.idf`) ASTs, verifies operand names/directions, operand class constraints, instruction flags (`IsCommutative`, `ReadsMemory`, `WritesMemory`, `HasSideEffects`, `IsTerminator`, `IsBranch`, `IsCall`, `IsReturn`), and implicit physical register definitions and uses.
+- **`InstructionSelectPass`**: Ingests `InstructionSelectDefFile` (`.isf`) ASTs, verifies target architecture consistency, addressing mode declarations and variant consistency, pattern tree structures and nesting, predicate references (`hasOneUse`, `noInterveningStore`), and ensures target instructions emitted in `select` blocks are defined in the target instruction catalog with matching operand constraints.
 
 ---
 
@@ -271,17 +295,29 @@ EzDSL translates verified AST and symbol table models into production C++ source
 
 - **`GenerateMirTypeTable`**: Synthesizes `MirTypeTable.h` and `MirTypeTable.cpp`. Generates direct accessor methods (`i32()`, `f64()`, `getPtr()`, `getArray()`, `getClass()`), memory-interning structures, and layout initialization logic via `IMirTargetTypeLayout`.
 - **`GenerateMirIrInstructionDefs`**: Synthesizes `MirInstructionSetDefs.h`. Emits `INSTRUCTION(name, tier, category, operands, flags)` macro tables defining opcodes, instruction categories, and operand validation metadata.
+- **`CppTargetInstructionGenerator`**: Synthesizes `<Target>TargetInstructionTable.h` and `<Target>TargetInstructionTable.cpp`. Generates the target opcode enumeration, static instruction descriptor table (`MirTargetInstructionDesc[]`) with operand classes, directionality, latency, execution flags, and implicit registers, and exposes `create<Target>TargetInstructionTable(std::pmr::memory_resource*)`.
+- **`CppInstructionSelectorGenerator`**: Synthesizes `<Target>InstructionSelector.h` and `<Target>InstructionSelector.cpp`. Generates a target-specialized `MirInstructionSelector` subclass that embodies Maximal Munch pattern matching tables, tree pattern predicates, addressing mode matching routines, and target instruction emission lowering.
 
 ---
 
 ## 6. CLI Driver (`EzDsl-cli`) & Options
 
-`EzDsl-cli` (`ezdsl-gen`) is the standalone executable driver used to process `.tyf` and `.irdf` definitions during build time.
+`EzDsl-cli` (`ezdsl-gen`) is the standalone executable driver used to process EzDSL backend definitions during build time.
 
 ### CLI Usage:
 ```bash
 ezdsl-gen [options] -i <input_file>
 ```
+
+### Auto-Discovery by File Extension:
+| File Extension | Default Language Dialect | Default Code Generator |
+|:---|:---|:---|
+| `.tyf` | `TypeDef` | `TypeTable` (`CppMirTypeTableGenerator`) |
+| `.irdf` | `IrInstDef` | `Instructions` (`CppMirInstructionGenerator`) |
+| `.lad` | `LegalizeAction` | `Legalizer` (`CppLegalizerGenerator`) |
+| `.lrd` | `LegalizeRule` | `Rules` (`CppLegalizeRuleGenerator`) |
+| `.idf` | `TargetInstDef` | `TargetInstructions` (`CppTargetInstructionGenerator`) |
+| `.isf` | `InstructionSelect` | `InstructionSelector` (`CppInstructionSelectorGenerator`) |
 
 ### Available Options:
 | Flag | Description |
@@ -289,10 +325,20 @@ ezdsl-gen [options] -i <input_file>
 | `-i, --input <file>` | Input EzDSL definition file (`.tyf`, `.irdf`, `.tdf`, `.idf`, `.ccdf`, `.lad`, `.lrd`, `.isf`). |
 | `-o, --output <path>` | Output destination directory or file path (default: `.`). |
 | `-I, --include <dir>` | Directory to search for file inclusions (`include idf "..."`). |
+| `--target <name>` | Target architecture name (e.g. `AMD64`, `MockTarget`). |
+| `--generator <gen>` | Explicit generator override: `type-table`, `instructions`, `legalizer`, `rules`, `target-instructions`, `instruction-selector`, or `auto`. |
 | `--emit-type-table` | Synthesize EzMir `MirTypeTable.h` and `MirTypeTable.cpp`. |
 | `--emit-instructions`| Synthesize EzMir `MirInstructionSetDefs.h`. |
+| `--emit-legalizer` | Synthesize Target `LegalizerActionTable.h` and `.cpp`. |
+| `--emit-rules` | Synthesize Target `LegalizerRules.h` and `.cpp`. |
+| `--emit-target-instructions` | Synthesize Target `TargetInstructionTable.h` and `.cpp`. |
+| `--emit-instruction-selector` | Synthesize Target `InstructionSelector.h` and `.cpp`. |
 | `--header-only` | Synthesize only the `.h` header file. |
 | `--source-only` | Synthesize only the `.cpp` translation unit. |
+| `--check-only` | Perform syntax and semantic validation without code generation. |
+| `--dry-run` | Validate and compute outputs without writing to disk. |
+| `--dump-ast` | Dump parsed AST to stdout. |
+| `--dump-symbols` | Dump populated symbol table to stdout. |
 | `-v, --verbose` | Enable verbose diagnostic trace logs. |
 | `-h, --help` | Display command-line options. |
 
@@ -300,7 +346,7 @@ ezdsl-gen [options] -i <input_file>
 
 ## 7. CMake Build System Integration
 
-EzDSL integrates cleanly into CMake build workflows via helper modules in `EzMir/CMake/`:
+EzDSL integrates cleanly into CMake build workflows via helper modules in `EzMir/CMake/` and `EzTriple/CMake/`:
 
 ```cmake
 # Generate C++ MirTypeTable class from types.tyf
@@ -315,6 +361,22 @@ EzDslGenMirInstructions(
     TARGET EzMir
     INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/instructions.irdf
     OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/Instruction
+)
+
+# Generate C++ Target Instruction Table from instructions.idf
+EzDslGenTargetInstructions(
+    TARGET EzTriple
+    INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/AMD64Instructions.idf
+    TARGET_NAME AMD64
+    OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/Instruction
+)
+
+# Generate C++ Instruction Selector from patterns.isf
+EzDslGenInstructionSelector(
+    TARGET EzTriple
+    INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/AMD64Patterns.isf
+    TARGET_NAME AMD64
+    OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/ISel
 )
 ```
 

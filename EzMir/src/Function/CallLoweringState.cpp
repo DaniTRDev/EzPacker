@@ -6,12 +6,20 @@
 #include "Operand/MirRegisterClass.h"
 
 CallLoweringState::CallLoweringState(CallingConvDesc *cc, MirBuilderContext *ctx, MirFunction *func) :
-    m_callingConv(cc), m_func(func), m_allocatedRegs(ctx->getGlobalAllocator()), m_usableRegs(ctx->getGlobalAllocator())
+    m_callingConv(cc),
+    m_func(func),
+    m_ctx(ctx),
+    m_bankCursors(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),
+    m_allocatedRegs(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),
+    m_usableRegs(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource())
 {
-    const auto &callerSavedRegs = cc->getAllCallerSavedRegs();
-    for (const auto &reg : callerSavedRegs)
+    if (cc)
     {
-        m_usableRegs[reg.getClass()].push_back(reg);
+        const auto &callerSavedRegs = cc->getAllCallerSavedRegs();
+        for (const auto &reg : callerSavedRegs)
+        {
+            m_usableRegs[reg.getClass()].push_back(reg);
+        }
     }
 }
 
@@ -63,4 +71,15 @@ size_t CallLoweringState::getUsedRegCount(MirRegisterClass *_class) const
 StackFrameObject *CallLoweringState::allocateStack(MirType *type) const
 {
     return m_func->getStackFrame()->createStackParam(type);
+}
+
+size_t CallLoweringState::getBankCursor(std::string_view bank) const
+{
+    auto it = m_bankCursors.find(std::string(bank));
+    return (it != m_bankCursors.end()) ? it->second : 0;
+}
+
+void CallLoweringState::advanceBankCursor(std::string_view bank)
+{
+    m_bankCursors[std::string(bank)]++;
 }

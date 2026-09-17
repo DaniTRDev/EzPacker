@@ -5,12 +5,14 @@
 #include "Ast/LegalizeActionDefLangAst.h"
 #include "Ast/LegalizeRuleDefLangAst.h"
 #include "Ast/TypeDefLangAst.h"
+#include "Ast/CallingConvDefLangAst.h"
 
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/IrSymbols.h"
 #include "Sema/Symbols/LegalizeSymbols.h"
 #include "Sema/Symbols/TypeSymbols.h"
+#include "Sema/Symbols/CallingConvSymbols.h"
 
 namespace Cli
 {
@@ -645,6 +647,36 @@ void InfoDumper::dumpLegalizeRuleAst(const DSL::Ast::LegalizeRuleDef::LegalizeRu
     }
 }
 
+void InfoDumper::dumpCallingConvAst(const DSL::Ast::CallingConvDef::CallingConventionDefFile &file,
+                                   OutputFormat format,
+                                   std::ostream &os)
+{
+    if (format == OutputFormat::Json)
+    {
+        os << "{\n";
+        os << std::format("  \"name\": \"{}\",\n", escapeJson(file.m_name.m_node));
+        os << std::format("  \"stack_align\": {},\n", file.m_stack.m_alignment.m_node);
+        os << std::format("  \"stack_growth\": \"{}\",\n", file.m_stack.m_growth == DSL::Ast::CallingConvDef::StackGrowth::Down ? "down" : "up");
+        os << std::format("  \"shadow_space\": {},\n", file.m_stack.m_shadowSpace.m_node);
+        os << std::format("  \"red_zone\": {}\n", file.m_stack.m_redZone ? file.m_stack.m_redZone->m_node : 0);
+        os << "}\n";
+    }
+    else
+    {
+        os << "======================================================================\n";
+        os << std::format("CallingConvention AST Dump: {}\n", file.m_name.m_node);
+        os << "======================================================================\n";
+        os << std::format("  Stack Alignment: {}\n", file.m_stack.m_alignment.m_node);
+        os << std::format("  Stack Growth:    {}\n", file.m_stack.m_growth == DSL::Ast::CallingConvDef::StackGrowth::Down ? "down" : "up");
+        os << std::format("  Shadow Space:    {} bytes\n", file.m_stack.m_shadowSpace.m_node);
+        if (file.m_stack.m_redZone)
+            os << std::format("  Red Zone:        {} bytes\n", file.m_stack.m_redZone->m_node);
+        os << std::format("  Argument Rules:  {}\n", file.m_arguments.m_rules.size());
+        os << std::format("  Return Rules:    {}\n", file.m_returns.m_rules.size());
+        os << "======================================================================\n";
+    }
+}
+
 void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format, std::ostream &os)
 {
     const auto &symbols = symbolTable.getSymbols();
@@ -731,6 +763,12 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                     }
                     break;
                 }
+                case SymbolType::CallingConv:
+                {
+                    os << "      \"type\": \"CallingConv\",\n";
+                    os << "      \"details\": null\n";
+                    break;
+                }
                 default:
                 {
                     os << "      \"type\": \"Other\",\n";
@@ -799,6 +837,12 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                         os << std::format("  [LegalizeRule] ID: {:<3} Scope: {:<2} Name: {}\n", sym->getId(),
                                           sym->getDefiningScopeId(), sym->getName());
                     }
+                    break;
+                }
+                case SymbolType::CallingConv:
+                {
+                    os << std::format("  [CallingConv] ID: {:<3} Scope: {:<2} Name: {}\n", sym->getId(),
+                                      sym->getDefiningScopeId(), sym->getName());
                     break;
                 }
                 default:

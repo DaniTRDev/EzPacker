@@ -31,6 +31,8 @@ struct StackDef
     Common::IntegerLiteral m_shadowSpace; // 0 if unused
     Common::Identifier m_stackPointer;
     Common::Identifier m_framePointer;
+    std::optional<Common::IntegerLiteral> m_redZone;
+    std::optional<Common::Identifier> m_linkRegister;
 };
 
 struct AggregateCondition
@@ -131,7 +133,14 @@ struct ReturnDef
     std::pmr::vector<PassRule> m_rules;
 };
 
-struct CallingConventionDefFile
+struct VarargsDef
+{
+    std::optional<Common::Identifier> m_vectorCountReg;
+    bool m_duplicateFloatsToGpr{ false };
+    std::optional<Common::IntegerLiteral> m_stackAlign;
+};
+
+struct CallingConventionDecl
 {
     Common::Identifier m_name;
     StackDef m_stack;
@@ -142,6 +151,12 @@ struct CallingConventionDefFile
     ClassificationDef m_classification;
     ArgumentPassingDef m_arguments;
     ReturnDef m_returns;
+    std::optional<VarargsDef> m_varargs;
+};
+
+struct CallingConventionDefFile : public CallingConventionDecl
+{
+    std::pmr::vector<CallingConventionDecl> m_conventions;
 };
 
 } // namespace DSL::Ast::CallingConvDef

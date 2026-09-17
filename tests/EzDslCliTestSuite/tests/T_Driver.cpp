@@ -248,3 +248,92 @@ TEST_F(DriverTest, DumpAllOptionsInTextAndJson)
     auto resultJson = runDriver(opts);
     EXPECT_TRUE(resultJson.success);
 }
+
+// ============================================================================
+// 8. Calling Convention Driver Execution
+// ============================================================================
+
+TEST_F(DriverTest, CallingConvDriverExecution)
+{
+    std::string ccSource = R"(
+    calling_convention Win64 {
+        stack {
+            align: 16,
+            growth: down,
+            cleanup: caller,
+            shadow_space: 32,
+            sp: rsp,
+            fp: rbp
+        }
+
+        preserve callee: [rbx, rbp, rdi, rsi, r12, r13, r14, r15]
+        preserve caller: [rax, rcx, rdx, r8, r9, r10, r11]
+
+        classify {
+            types [i8, i16, i32, i64, ptr] => integer
+            types [f32, f64] => sse
+            aggregate {
+                when non_trivial || unaligned || size > 64 => memory,
+                slice: 8 bytes,
+                precedence: [memory, integer, sse],
+                policy: all_or_nothing
+            }
+        }
+
+        arguments {
+            pass integer => seq([rcx, rdx, r8, r9]), fallback: stack(8)
+            pass sse => seq([xmm0, xmm1, xmm2, xmm3]), fallback: stack(8)
+            pass memory => stack(8)
+        }
+
+        returns {
+            sret {
+                ptr: rcx,
+                consumes_slot: true,
+                returns: rax
+            }
+            pass integer => seq([rax])
+            pass sse => seq([xmm0])
+        }
+    }
+    )";
+
+    auto tempFile = createTempFile(m_testTempDir, "win64.ezcc", ccSource);
+
+    CliOptions opts;
+    opts.inputFilePath = tempFile.string();
+    opts.outputPath = m_testTempDir.string();
+    opts.targetName = "Win64";
+
+    auto result = runDriver(opts);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(std::filesystem::exists(m_testTempDir / "Win64CallingConvDesc.h"));
+    EXPECT_TRUE(std::filesystem::exists(m_testTempDir / "Win64CallingConvDesc.cpp"));
+}
+
+TEST_F(DriverTest, CallingConvDriverSemanticErrorFails)
+{
+    std::string ccBadSource = R"(
+    calling_convention BadCC {
+        stack {
+            align: 15,
+            growth: down,
+            cleanup: caller,
+            shadow_space: 0,
+            sp: rsp,
+            fp: rbp
+        }
+    }
+    )";
+
+    auto tempFile = createTempFile(m_testTempDir, "bad_cc.ezcc", ccBadSource);
+
+    CliOptions opts;
+    opts.inputFilePath = tempFile.string();
+    opts.outputPath = m_testTempDir.string();
+    opts.quiet = true;
+
+    auto result = runDriver(opts);
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.errorMessage.find("Semantic analysis failed") != std::string::npos);
+}

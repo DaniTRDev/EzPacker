@@ -38,3 +38,24 @@ EzPacker_AddTest(
         ""
         "tests/T_TypeDefLang.cpp"
 )
+
+EzPacker_AddTest(
+        "T_TargetInstDefLang"
+        "EzDslLexerTestSuite"
+        ""
+        "tests/T_TargetInstDefLang.cpp"
+)
+
+EzPacker_AddTest(
+        "T_InstructionSelectDefLang"
+        "EzDslLexerTestSuite"
+        ""
+        "tests/T_InstructionSelectDefLang.cpp"
+)
+
+EzPacker_AddTest(
+        "T_CallingConvDefLang"
+        "EzDslLexerTestSuite"
+        ""
+        "tests/T_CallingConvDefLang.cpp"
+)

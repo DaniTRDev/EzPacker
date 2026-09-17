@@ -1,0 +1,48 @@
+target AMD64;
+
+type_set GPR_SCALARS = (i8, i16, i32, i64);
+
+action ADD {
+    LEGAL(i32, i64);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action SUB {
+    LEGAL(i32, i64);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action MUL {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+};
+
+action SDIV {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__divti3";
+};
+
+action UDIV {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__udivti3";
+};
+
+action LOAD {
+    LEGAL(GPR_SCALARS:0, ptr:1);
+    WIDENS(i1:0) >> i8;
+};
+
+action STORE {
+    LEGAL(ptr:0, GPR_SCALARS:1);
+    WIDENS(i1:1) >> i8;
+};
+
+action CALL {
+    LOWER >> AMD64CallLowering;
+};
+
+action RET {
+    LOWER >> AMD64ReturnLowering;
+};

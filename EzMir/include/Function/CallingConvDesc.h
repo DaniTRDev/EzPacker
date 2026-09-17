@@ -24,6 +24,23 @@ enum class CallingConvTypeClass : uint8_t
 class CallingConvDesc
 {
   public:
+    virtual ~CallingConvDesc() = default;
+
+    /**
+     * Returns the size of the stack red zone in bytes (e.g. 128 bytes on SysV AMD64, 0 on Win64).
+     */
+    virtual size_t getRedZoneSize() const { return 0; }
+
+    /**
+     * Returns the hardware link register reference if this ABI uses one (e.g. LR/X30 on AArch64).
+     */
+    virtual std::optional<MirRegisterRef> getLinkRegister() const { return std::nullopt; }
+
+    /**
+     * Returns true if an implicit struct return (sret) pointer consumes a normal argument slot (e.g. Win64 RCX).
+     */
+    virtual bool consumesSretSlot() const { return false; }
+
     /**
      * Computes the concrete argument location (register, stack, split, or indirect) for the given type and call state.
      */

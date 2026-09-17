@@ -115,16 +115,19 @@ MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, Sou
  */
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref)
 {
-    MirType *baseType = base->getMirType();
-    if (baseType->getKind() != MirTypeKind::Pointer)
+    if (base)
     {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                << ref << "Can't create a memory operand if the base register doesn't have pointer type "
-                << type->getName();
-        return nullptr;
+        MirType *baseType = base->getMirType();
+        if (baseType->getKind() != MirTypeKind::Pointer)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
+                    << type->getName();
+            return nullptr;
+        }
     }
 
-    return build<MirMemory>(type, base, displ, ref);
+    return build<MirMemory>(type, base, displ, nullptr, 1, ref);
 }
 
 /**
@@ -133,17 +136,94 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInte
  */
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const FlexInt &displ, SourceReference *ref)
 {
-    MirType *baseType = base->getMirType();
-    if (baseType->getKind() != MirTypeKind::Pointer)
+    if (base)
     {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                << ref << "Can't create a memory operand if the base register doesn't have pointer type "
-                << type->getName();
-        return nullptr;
+        MirType *baseType = base->getMirType();
+        if (baseType->getKind() != MirTypeKind::Pointer)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
+                    << type->getName();
+            return nullptr;
+        }
     }
 
     MirTypeTable *t = m_ctx->getTypeTable();
-    return build<MirMemory>(type, base, build<MirInteger>(t->i64(), displ, nullptr), ref);
+    return build<MirMemory>(type, base, build<MirInteger>(t->i64(), displ, nullptr), nullptr, 1, ref);
+}
+
+/**
+ * Constructs a memory operand [base + index*scale + displ] using an existing MirInteger displacement operand.
+ */
+MirMemory *MirOperandBuilder::buildMem(MirType *type,
+                                      MirRegister *base,
+                                      MirInteger *displ,
+                                      MirRegister *index,
+                                      uint8_t scale,
+                                      SourceReference *ref)
+{
+    if (base)
+    {
+        MirType *baseType = base->getMirType();
+        if (baseType->getKind() != MirTypeKind::Pointer)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
+                    << type->getName();
+            return nullptr;
+        }
+    }
+    if (index)
+    {
+        MirType *indexType = index->getMirType();
+        if (indexType->getKind() != MirTypeKind::Integer && indexType->getKind() != MirTypeKind::Pointer)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't create a memory operand if the index register doesn't have integer or pointer type "
+                    << type->getName();
+            return nullptr;
+        }
+    }
+
+    return build<MirMemory>(type, base, displ, index, scale, ref);
+}
+
+/**
+ * Constructs a memory operand [base + index*scale + displ] converting an immediate FlexInt offset to a 64-bit integer
+ * operand.
+ */
+MirMemory *MirOperandBuilder::buildMem(MirType *type,
+                                      MirRegister *base,
+                                      const FlexInt &displ,
+                                      MirRegister *index,
+                                      uint8_t scale,
+                                      SourceReference *ref)
+{
+    if (base)
+    {
+        MirType *baseType = base->getMirType();
+        if (baseType->getKind() != MirTypeKind::Pointer)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
+                    << type->getName();
+            return nullptr;
+        }
+    }
+    if (index)
+    {
+        MirType *indexType = index->getMirType();
+        if (indexType->getKind() != MirTypeKind::Integer && indexType->getKind() != MirTypeKind::Pointer)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't create a memory operand if the index register doesn't have integer or pointer type "
+                    << type->getName();
+            return nullptr;
+        }
+    }
+
+    MirTypeTable *t = m_ctx->getTypeTable();
+    return build<MirMemory>(type, base, build<MirInteger>(t->i64(), displ, nullptr), index, scale, ref);
 }
 
 /**

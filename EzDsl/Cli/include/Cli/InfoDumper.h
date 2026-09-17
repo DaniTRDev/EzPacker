@@ -27,6 +27,11 @@ namespace DSL::Ast::LegalizeRuleDef
 struct LegalizeRuleFile;
 }
 
+namespace DSL::Ast::CallingConvDef
+{
+struct CallingConventionDefFile;
+}
+
 class SymbolTable;
 
 namespace Cli
@@ -70,6 +75,10 @@ class InfoDumper
     static void dumpLegalizeRuleAst(const DSL::Ast::LegalizeRuleDef::LegalizeRuleFile &file,
                                    OutputFormat format,
                                    std::ostream &os);
+
+    static void dumpCallingConvAst(const DSL::Ast::CallingConvDef::CallingConventionDefFile &file,
+                                  OutputFormat format,
+                                  std::ostream &os);
 
     static void dumpSymbols(const SymbolTable &symbolTable, OutputFormat format, std::ostream &os);
 

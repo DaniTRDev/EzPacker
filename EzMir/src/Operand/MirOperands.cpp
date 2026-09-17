@@ -113,30 +113,62 @@ std::string MirRegister::toString() const
 }
 
 /**
- * Initializes a base-plus-displacement memory operand [base + displ] with pointer type and source reference.
+ * Initializes a memory operand [base + index*scale + displ] with pointer type and source reference.
  */
-MirMemory::MirMemory(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref) :
-    MirOperand(type, ref), m_base(base), m_displ(displ)
+MirMemory::MirMemory(MirType *type,
+                     MirRegister *base,
+                     MirInteger *displ,
+                     MirRegister *index,
+                     uint8_t scale,
+                     SourceReference *ref) :
+    MirOperand(type, ref), m_base(base), m_displ(displ), m_index(index), m_scale(scale)
 {
 }
 
 /**
- * Formats the memory addressing operand as "<type> ptr [<base> +/- <displacement>]".
+ * Formats the memory addressing operand as "<type> ptr [<base> + <index>*<scale> +/- <displacement>]".
  */
 std::string MirMemory::toString() const
 {
-    std::string baseStr = m_base ? m_base->toString() : "0";
-    std::pmr::string typePrefix = getMirType()->getName();
+    std::pmr::string typePrefix = getMirType() ? getMirType()->getName() : "void";
+    std::string addrStr;
+
+    if (m_base)
+    {
+        addrStr = m_base->toString();
+    }
+
+    if (m_index)
+    {
+        std::string indexStr = m_index->toString();
+        if (m_scale > 1)
+        {
+            indexStr = std::format("{} * {}", indexStr, m_scale);
+        }
+        if (!addrStr.empty())
+        {
+            addrStr = std::format("{} + {}", addrStr, indexStr);
+        }
+        else
+        {
+            addrStr = indexStr;
+        }
+    }
+
+    if (addrStr.empty())
+    {
+        addrStr = "0";
+    }
 
     if (m_displ && !m_displ->getValue().isZero())
     {
         int64_t offset = m_displ->getValue().getI64();
         if (offset >= 0)
         {
-            return std::format("{} ptr [{} + 0x{:X}]", typePrefix, baseStr, offset);
+            return std::format("{} ptr [{} + 0x{:X}]", typePrefix, addrStr, offset);
         }
-        return std::format("{} ptr [{} - 0x{:X}]", typePrefix, baseStr, -offset);
+        return std::format("{} ptr [{} - 0x{:X}]", typePrefix, addrStr, -offset);
     }
 
-    return std::format("{} ptr [{}]", typePrefix, baseStr);
+    return std::format("{} ptr [{}]", typePrefix, addrStr);
 }

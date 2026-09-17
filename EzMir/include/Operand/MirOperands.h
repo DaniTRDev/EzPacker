@@ -313,9 +313,14 @@ class MirMemory : public MirOperand
     static constexpr MirOperandType OpKind = MirOperandType::Memory;
 
     /**
-     * Constructs a memory operand with base pointer register and integer displacement offset.
+     * Constructs a memory operand with base pointer register, displacement, optional index register, and scale.
      */
-    MirMemory(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref);
+    MirMemory(MirType *type,
+              MirRegister *base,
+              MirInteger *displ,
+              MirRegister *index = nullptr,
+              uint8_t scale = 1,
+              SourceReference *ref = nullptr);
 
     /**
      * Returns pointer register holding the base address.
@@ -328,9 +333,29 @@ class MirMemory : public MirOperand
     MirInteger *getDisplacement() const { return m_displ; }
 
     /**
+     * Returns index register holding scaled offset, or nullptr.
+     */
+    MirRegister *getIndex() const { return m_index; }
+
+    /**
+     * Returns scale multiplier for index register (1, 2, 4, 8).
+     */
+    uint8_t getScale() const { return m_scale; }
+
+    /**
      * Returns true if a valid base register is set.
      */
     bool hasBaseReg() const { return m_base != nullptr; }
+
+    /**
+     * Returns true if a valid index register is set.
+     */
+    bool hasIndexReg() const { return m_index != nullptr; }
+
+    /**
+     * Returns true if this is simple [base + displacement] with no index.
+     */
+    bool isSimpleBaseDisp() const { return m_index == nullptr && m_scale <= 1; }
 
     /**
      * Returns MirOperandType::Memory.
@@ -338,7 +363,7 @@ class MirMemory : public MirOperand
     MirOperandType getType() const override { return OpKind; }
 
     /**
-     * Formats memory operand as ptr [base + offset].
+     * Formats memory operand as ptr [base + index*scale + offset].
      */
     std::string toString() const override;
 
@@ -346,12 +371,22 @@ class MirMemory : public MirOperand
     /**
      * Base register pointer.
      */
-    MirRegister *m_base;
+    MirRegister *m_base{ nullptr };
 
     /**
      * Displacement offset operand.
      */
-    MirInteger *m_displ;
+    MirInteger *m_displ{ nullptr };
+
+    /**
+     * Optional index register pointer.
+     */
+    MirRegister *m_index{ nullptr };
+
+    /**
+     * Scale multiplier for index register (typically 1, 2, 4, 8).
+     */
+    uint8_t m_scale{ 1 };
 };
 
 #endif // EZMIR_MIR_OPERANDS_H

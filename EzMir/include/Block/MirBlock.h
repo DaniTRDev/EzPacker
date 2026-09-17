@@ -17,6 +17,7 @@ class MirBlock
     friend class MirFunctionBuilder;
     friend class IntrusiveLinkedList<MirBlock>;
     friend class MirInstructionBuilder;
+    friend class MirInstruction;
 
     /**
      * Constructs a basic block with a unique MIR ID, optional source reference, owning function, and name.
@@ -24,9 +25,24 @@ class MirBlock
     MirBlock(MirId id, class SourceReference *sourceRef, class MirFunction *owner, const std::pmr::string &name = "");
 
     /**
+     * Returns the mutable intrusive instruction list for this basic block.
+     */
+    IntrusiveLinkedList<class MirInstruction> &getInstructions() { return m_instructions; }
+
+    /**
      * Returns the immutable intrusive instruction list for this basic block.
      */
     const IntrusiveLinkedList<class MirInstruction> &getInstructions() const;
+
+    /**
+     * Returns the last instruction in the basic block, or nullptr if empty.
+     */
+    class MirInstruction *back() const { return m_instructions.back(); }
+
+    /**
+     * Returns the first instruction in the basic block, or nullptr if empty.
+     */
+    class MirInstruction *front() const { return m_instructions.front(); }
 
     /**
      * Returns a const iterator pointing to the first instruction in the block.

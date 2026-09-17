@@ -48,6 +48,21 @@ struct BooleanLit
     static constexpr auto value = lexy::forward<bool>;
 };
 
+struct BooleanLiteral
+{
+    static constexpr auto rule = dsl::position + dsl::p<BooleanLit> + dsl::position;
+
+    static constexpr auto value = lexy::bind(
+            lexy::callback<Ast::Common::BooleanLiteral>(
+                    [](ParseContext &ctx, const char *startIter, bool val, const char *endIter)
+                    {
+                        SourceReference *ref = ctx.createRef(startIter, endIter);
+                        return Ast::Common::BooleanLiteral{ val, ref };
+                    }),
+            lexy::parse_state,
+            lexy::values);
+};
+
 static constexpr auto Whitespace = dsl::ascii::space | dsl::inline_<Comment> | dsl::ascii::newline;
 
 struct Identifier
@@ -165,6 +180,25 @@ template <typename Target> struct PmrListSink
 {
     using traits = PmrContainerTraits<Target>;
     using return_type = typename traits::container_type;
+
+    constexpr return_type operator()(return_type &&container) const
+    {
+        return std::move(container);
+    }
+
+    constexpr return_type operator()(lexy::nullopt) const
+    {
+        return return_type(std::pmr::get_default_resource());
+    }
+
+    template <typename State>
+    constexpr return_type operator()(lexy::nullopt, State &state) const
+    {
+        if constexpr (requires { state.getAllocator(); })
+            return return_type(state.getAllocator());
+        else
+            return return_type(std::pmr::get_default_resource());
+    }
 
     struct _sink
     {

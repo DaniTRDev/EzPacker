@@ -8,11 +8,14 @@ namespace Cli
 
 enum class GeneratorKind
 {
-    Auto,         // Inferred from file extension (.tyf -> TypeTable, .irdf -> Instructions, .lad -> Legalizer, .lrd -> Rules)
+    Auto,         // Inferred from file extension (.tyf -> TypeTable, .irdf -> Instructions, .lad -> Legalizer, .lrd -> Rules, .idf -> TargetInstructions, .isf -> InstructionSelector, .ezcc/.ccd -> CallingConv)
     TypeTable,    // CppMirTypeTableGenerator
     Instructions, // CppMirInstructionGenerator
     Legalizer,    // CppLegalizerGenerator
-    Rules         // CppLegalizeRuleGenerator
+    Rules,        // CppLegalizeRuleGenerator
+    TargetInstructions, // CppTargetInstructionGenerator
+    InstructionSelector, // CppInstructionSelectorGenerator
+    CallingConv   // CppCallingConvGenerator
 };
 
 enum class OutputFormat
@@ -24,10 +27,13 @@ enum class OutputFormat
 enum class LanguageDialect
 {
     Auto,
-    TypeDef,        // .tyf
-    IrInstDef,      // .irdf
-    LegalizeAction, // .lad
-    LegalizeRule    // .lrd
+    TypeDef,           // .tyf
+    IrInstDef,         // .irdf
+    LegalizeAction,    // .lad
+    LegalizeRule,      // .lrd
+    TargetInstDef,     // .idf
+    InstructionSelect, // .isf
+    CallingConv        // .ezcc, .ccd
 };
 
 struct CliOptions
@@ -41,6 +47,9 @@ struct CliOptions
     std::string typesFilePath;        // --types <file.tyf>
     std::string instructionsFilePath; // --instructions <file.irdf>
     bool emitRules{ false };          // --emit-rules
+    bool emitTargetInstructions{ false }; // --emit-target-instructions
+    bool emitInstructionSelector{ false }; // --emit-instruction-selector
+    bool emitCallingConv{ false };    // --emit-calling-conv
 
     GeneratorKind generator{ GeneratorKind::Auto };
     LanguageDialect dialect{ LanguageDialect::Auto };

@@ -1,5 +1,7 @@
 #include "Instruction/MirInstruction.h"
 #include "Block/MirBlock.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionRegisterInfo.h"
 #include "Instruction/MirInstructionSet.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Operand/MirOperands.h"
@@ -270,6 +272,10 @@ std::vector<MirRegisterRef> MirInstruction::getUsedRegisters() const
             {
                 uses.push_back(mem->getBase()->getRef());
             }
+            if (mem->getIndex())
+            {
+                uses.push_back(mem->getIndex()->getRef());
+            }
         }
     }
 
@@ -282,6 +288,49 @@ std::vector<MirRegisterRef> MirInstruction::getUsedRegisters() const
     }
 
     return uses;
+}
+
+/**
+ * Unlinks and erases this instruction from its owning basic block, updating register def/use tracking.
+ */
+void MirInstruction::eraseFromOwner()
+{
+    if (!m_owner)
+        return;
+
+    MirFunction *func = m_owner->getOwner();
+    MirFunctionRegisterInfo *regInfo = func ? func->getRegisterInfo() : nullptr;
+    if (regInfo)
+    {
+        for (size_t i = 0; i < m_operands.size(); ++i)
+        {
+            MirOperand *op = m_operands[i];
+            if (!op)
+                continue;
+
+            MirOperandFlag flag = getOperandFlag(i);
+            if (auto *reg = op->get<MirRegister>())
+            {
+                if (reg->isVirtual())
+                {
+                    if (flag & MirOperandFlag::Write)
+                        regInfo->clearDef(reg->getRegId());
+                    if (flag & MirOperandFlag::Read)
+                        regInfo->removeUse(reg->getRegId(), this);
+                }
+            }
+            else if (auto *mem = op->get<MirMemory>())
+            {
+                if (mem->getBase() && mem->getBase()->isVirtual())
+                    regInfo->removeUse(mem->getBase()->getRegId(), this);
+                if (mem->getIndex() && mem->getIndex()->isVirtual())
+                    regInfo->removeUse(mem->getIndex()->getRegId(), this);
+            }
+        }
+    }
+
+    m_owner->m_instructions.remove(this);
+    m_owner = nullptr;
 }
 
 /**

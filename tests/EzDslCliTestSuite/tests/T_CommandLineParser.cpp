@@ -130,13 +130,90 @@ TEST_F(CommandLineParserTest, ExplicitGeneratorFlagAuto)
     EXPECT_EQ(opts->generator, GeneratorKind::Auto);
 }
 
+TEST_F(CommandLineParserTest, EmitTargetInstructionsFlag)
+{
+    std::string err;
+    auto opts = parseArgs({ "-i", "instructions.idf", "--emit-target-instructions" }, err);
+    ASSERT_TRUE(opts.has_value());
+    EXPECT_EQ(opts->generator, GeneratorKind::TargetInstructions);
+}
+
+TEST_F(CommandLineParserTest, EmitInstructionSelectorFlag)
+{
+    std::string err;
+    auto opts = parseArgs({ "-i", "patterns.isf", "--emit-instruction-selector" }, err);
+    ASSERT_TRUE(opts.has_value());
+    EXPECT_EQ(opts->generator, GeneratorKind::InstructionSelector);
+}
+
+TEST_F(CommandLineParserTest, ExplicitGeneratorFlagTargetInstructions)
+{
+    std::string err;
+    auto opts1 = parseArgs({ "-i", "instructions.idf", "--generator", "target-instructions" }, err);
+    ASSERT_TRUE(opts1.has_value());
+    EXPECT_EQ(opts1->generator, GeneratorKind::TargetInstructions);
+
+    auto opts2 = parseArgs({ "-i", "instructions.idf", "--generator", "target_instructions" }, err);
+    ASSERT_TRUE(opts2.has_value());
+    EXPECT_EQ(opts2->generator, GeneratorKind::TargetInstructions);
+
+    auto opts3 = parseArgs({ "-i", "instructions.idf", "--generator", "target-inst" }, err);
+    ASSERT_TRUE(opts3.has_value());
+    EXPECT_EQ(opts3->generator, GeneratorKind::TargetInstructions);
+}
+
+TEST_F(CommandLineParserTest, ExplicitGeneratorFlagInstructionSelector)
+{
+    std::string err;
+    auto opts1 = parseArgs({ "-i", "patterns.isf", "--generator", "instruction-selector" }, err);
+    ASSERT_TRUE(opts1.has_value());
+    EXPECT_EQ(opts1->generator, GeneratorKind::InstructionSelector);
+
+    auto opts2 = parseArgs({ "-i", "patterns.isf", "--generator", "instruction_selector" }, err);
+    ASSERT_TRUE(opts2.has_value());
+    EXPECT_EQ(opts2->generator, GeneratorKind::InstructionSelector);
+
+    auto opts3 = parseArgs({ "-i", "patterns.isf", "--generator", "isel" }, err);
+    ASSERT_TRUE(opts3.has_value());
+    EXPECT_EQ(opts3->generator, GeneratorKind::InstructionSelector);
+}
+
+TEST_F(CommandLineParserTest, EmitCallingConvFlag)
+{
+    std::string err;
+    auto opts = parseArgs({ "-i", "callingconv.ezcc", "--emit-calling-conv" }, err);
+    ASSERT_TRUE(opts.has_value());
+    EXPECT_EQ(opts->generator, GeneratorKind::CallingConv);
+}
+
+TEST_F(CommandLineParserTest, ExplicitGeneratorFlagCallingConv)
+{
+    std::string err;
+    auto opts1 = parseArgs({ "-i", "callingconv.ezcc", "--generator", "calling-conv" }, err);
+    ASSERT_TRUE(opts1.has_value());
+    EXPECT_EQ(opts1->generator, GeneratorKind::CallingConv);
+
+    auto opts2 = parseArgs({ "-i", "callingconv.ezcc", "--generator", "calling_conv" }, err);
+    ASSERT_TRUE(opts2.has_value());
+    EXPECT_EQ(opts2->generator, GeneratorKind::CallingConv);
+
+    auto opts3 = parseArgs({ "-i", "callingconv.ezcc", "--generator", "cc" }, err);
+    ASSERT_TRUE(opts3.has_value());
+    EXPECT_EQ(opts3->generator, GeneratorKind::CallingConv);
+}
+
 TEST_F(CommandLineParserTest, ConflictingGeneratorsFail)
 {
     std::string err;
     auto opts = parseArgs({ "-i", "types.tyf", "--emit-type-table", "--emit-instructions" }, err);
     EXPECT_FALSE(opts.has_value());
-    EXPECT_TRUE(err.find("Cannot specify both --emit-type-table and --emit-instructions simultaneously.") !=
-                std::string::npos);
+    EXPECT_TRUE(err.find("Cannot specify multiple generator emission flags") != std::string::npos ||
+                err.find("Cannot specify both --emit-type-table and --emit-instructions simultaneously.") != std::string::npos);
+
+    err.clear();
+    auto opts2 = parseArgs({ "-i", "instructions.idf", "--emit-target-instructions", "--emit-instruction-selector" }, err);
+    EXPECT_FALSE(opts2.has_value());
+    EXPECT_TRUE(err.find("Cannot specify multiple generator emission flags") != std::string::npos);
 }
 
 // ============================================================================

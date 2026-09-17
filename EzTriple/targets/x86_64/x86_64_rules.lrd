@@ -1,0 +1,24 @@
+rule SDivPow2 {
+    match {
+        SDIV i32:$dst, i32:$lhs, imm(i32):$c;
+    };
+    when {
+        isPowTwo($c);
+        isPositiveConst($c);
+    };
+    emit {
+        SAR i32:$dst, i32:$lhs, log2($c);
+    };
+};
+
+rule UDivPow2 {
+    match {
+        UDIV i32:$dst, i32:$lhs, imm(i32):$c;
+    };
+    when {
+        isPowTwo($c);
+    };
+    emit {
+        SHR i32:$dst, i32:$lhs, log2($c);
+    };
+};

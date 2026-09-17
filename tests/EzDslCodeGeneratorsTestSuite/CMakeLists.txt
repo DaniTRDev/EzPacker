@@ -52,3 +52,25 @@ EzPacker_AddTest(
         "EzDslCodeGenerators"
         "tests/T_CppLegalizeRuleGenerator.cpp"
 )
+
+EzPacker_AddTest(
+        "T_CppTargetInstructionGenerator"
+        "EzDslCodeGeneratorsTestSuite"
+        "EzDslCodeGenerators"
+        "tests/T_CppTargetInstructionGenerator.cpp"
+)
+
+EzPacker_AddTest(
+        "T_CppInstructionSelectorGenerator"
+        "EzDslCodeGeneratorsTestSuite"
+        "EzDslCodeGenerators"
+        "tests/T_CppInstructionSelectorGenerator.cpp"
+)
+
+EzPacker_AddTest(
+        "T_CppCallingConvGenerator"
+        "EzDslCodeGeneratorsTestSuite"
+        "EzDslCodeGenerators"
+        "tests/T_CppCallingConvGenerator.cpp"
+)
+

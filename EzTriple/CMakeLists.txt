@@ -6,6 +6,7 @@ set(EZTRIPLE_FILES_LIST
         "include/FrameLowerer/MirFrameLowererPass.h"
         "include/Descriptors/TargetDesc.h"
         "include/Descriptors/TargetBinaryDesc.h"
+        "include/InstructionSelector/MirAddressingModeMatcher.h"
         "include/InstructionSelector/MirInstructionSelector.h"
         "include/InstructionSelector/MirInstructionSelectorPass.h"
         "include/Legalizer/MirLegalizer.h"
@@ -26,6 +27,7 @@ set(EZTRIPLE_FILES_LIST
         "src/AbiLowerer/MirAbiLowererPass.cpp"
         "src/FrameLowerer/MirFrameLowerer.cpp"
         "src/FrameLowerer/MirFrameLowererPass.cpp"
+        "src/InstructionSelector/MirAddressingModeMatcher.cpp"
         "src/InstructionSelector/MirInstructionSelector.cpp"
         "src/InstructionSelector/MirInstructionSelectorPass.cpp"
         "src/Legalizer/MirLegalizer.cpp"
@@ -47,3 +49,14 @@ EzCMK_ConfigureLib(NAME "EzTriple"
         PRECOMPILED_HEADER "include/EzTripleCommon.h"
         LINKED_LIBRARIES "EzMir"
         INCLUDED_DIRS "include")
+
+include(CMake/EzDslGenCallingConv.cmake)
+include(CMake/EzDslGenTargetInstructions.cmake)
+include(CMake/EzDslGenInstructionSelector.cmake)
+
+EzDslGenCallingConv(
+    TARGET EzTriple
+    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64_calling_conv.ezcc"
+    TARGET_NAME "x86_64"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
+)

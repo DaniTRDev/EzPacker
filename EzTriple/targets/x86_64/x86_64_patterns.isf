@@ -1,0 +1,60 @@
+target AMD64;
+
+addrmode AddrModeRegImm(GPR64:base, simm32:disp = 0) {
+    variant BaseDisp {
+        match {
+            ADD ptr:$base, imm(i32):$disp;
+        };
+        when {
+            isSimm32($disp);
+        };
+    };
+    variant BaseOnly {
+        match {
+            ptr:$base;
+        };
+    };
+};
+
+pattern Select_ADD64rm [cost = 2] {
+    match {
+        ADD i64:$dst, i64:$src1, (LOAD i64:$tmp, AddrModeRegImm($base, $disp));
+    };
+    when {
+        hasOneUse($tmp);
+        noInterveningStore($tmp);
+    };
+    select {
+        ADD64rm GPR64:$dst, GPR64:$src1, [$base, $disp];
+    };
+};
+
+pattern Select_ADD64ri [cost = 1] {
+    match {
+        ADD i64:$dst, i64:$src1, imm(i64):$imm;
+    };
+    when {
+        isSimm32($imm);
+    };
+    select {
+        ADD64ri GPR64:$dst, GPR64:$src1, $imm;
+    };
+};
+
+pattern Select_ADD64rr [cost = 1] {
+    match {
+        ADD i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        ADD64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_SUB64rr [cost = 1] {
+    match {
+        SUB i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        SUB64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};

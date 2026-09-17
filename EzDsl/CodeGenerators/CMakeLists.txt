@@ -6,6 +6,9 @@ set(EZDSL_CODE_GENERATORS_FILES_LIST
         "include/CodeGenerators/CppMirTypeTableGenerator.h"
         "include/CodeGenerators/CppLegalizerGenerator.h"
         "include/CodeGenerators/CppLegalizeRuleGenerator.h"
+        "include/CodeGenerators/CppTargetInstructionGenerator.h"
+        "include/CodeGenerators/CppInstructionSelectorGenerator.h"
+        "include/CodeGenerators/CppCallingConvGenerator.h"
 
         "src/CodeGenerators/CppSourceEmitter.cpp"
         "src/CodeGenerators/CodeGenerator.cpp"
@@ -13,6 +16,9 @@ set(EZDSL_CODE_GENERATORS_FILES_LIST
         "src/CodeGenerators/CppMirTypeTableGenerator.cpp"
         "src/CodeGenerators/CppLegalizerGenerator.cpp"
         "src/CodeGenerators/CppLegalizeRuleGenerator.cpp"
+        "src/CodeGenerators/CppTargetInstructionGenerator.cpp"
+        "src/CodeGenerators/CppInstructionSelectorGenerator.cpp"
+        "src/CodeGenerators/CppCallingConvGenerator.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzDslCodeGenerators"

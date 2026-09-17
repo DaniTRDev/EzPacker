@@ -3,7 +3,7 @@
 
 #include "Ast/CallingConvDefLangAst.h"
 #include "Ast/CommonAstNodes.h"
-#include "EzDslCommon.h"
+#include "EzDslLexerCommon.h"
 #include "Parser/CommonParsers.h"
 
 namespace DSL::Parser::CallingConvDef
@@ -66,17 +66,15 @@ struct StackFallbackRule
         static constexpr auto rule = dsl::parenthesized(dsl::p<Common::IntegerLiteral> +
                                                         dsl::opt(dsl::lit_c<','> >> dsl::p<Common::IntegerLiteral>));
         static constexpr auto value = lexy::callback<Ast::CallingConvDef::StackFallback>(
-                [](Ast::Common::IntegerLiteral slot, auto align)
+                [](Ast::Common::IntegerLiteral slot, Ast::Common::IntegerLiteral align)
                 {
-                    Ast::CallingConvDef::StackFallback fallback;
-                    fallback.m_slotSize = std::move(slot);
-
-                    if constexpr (std::is_same_v<std::decay_t<(decltype(&align))>, Ast::Common::IntegerLiteral>)
-                    {
-                        fallback.m_align = std::move(align);
-                    }
-
-                    return fallback;
+                    return Ast::CallingConvDef::StackFallback{ .m_slotSize = std::move(slot),
+                                                               .m_alignment = std::move(align) };
+                },
+                [](Ast::Common::IntegerLiteral slot, lexy::nullopt)
+                {
+                    return Ast::CallingConvDef::StackFallback{ .m_slotSize = std::move(slot),
+                                                               .m_alignment = std::nullopt };
                 });
     };
 
@@ -92,76 +90,121 @@ struct StackSection
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    struct AlignDecl
-    {
-        static constexpr auto rule = Common::Keyword<"align">::rule >>
-                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>);
-    };
-    struct GrowthDecl
-    {
-        static constexpr auto rule = Common::Keyword<"growth">::rule >> (dsl::lit_c<':'> >> dsl::p<StackGrowthRule>);
-    };
-    struct CleanupDecl
-    {
-        static constexpr auto rule = Common::Keyword<"cleanup">::rule >> (dsl::lit_c<':'> >> dsl::p<StackCleanupRule>);
-    };
-    struct ShadowDecl
-    {
-        static constexpr auto rule = Common::Keyword<"shadow_space">::rule >>
-                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>);
-    };
-    struct SpDecl
-    {
-        static constexpr auto rule = Common::Keyword<"sp">::rule >> (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
-    };
-    struct FpDecl
-    {
-        static constexpr auto rule = Common::Keyword<"fp">::rule >> (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
-    };
-
     using FieldVariant = std::variant<std::pair<Common::Keyword<"align">, Ast::Common::IntegerLiteral>,
                                       std::pair<Common::Keyword<"growth">, Ast::CallingConvDef::StackGrowth>,
                                       std::pair<Common::Keyword<"cleanup">, Ast::CallingConvDef::StackCleanup>,
                                       std::pair<Common::Keyword<"shadow_space">, Ast::Common::IntegerLiteral>,
+                                      std::pair<Common::Keyword<"red_zone">, Ast::Common::IntegerLiteral>,
                                       std::pair<Common::Keyword<"sp">, Ast::Common::Identifier>,
-                                      std::pair<Common::Keyword<"fp">, Ast::Common::Identifier>>;
+                                      std::pair<Common::Keyword<"fp">, Ast::Common::Identifier>,
+                                      std::pair<Common::Keyword<"lr">, Ast::Common::Identifier>>;
+
+    struct AlignDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"align">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::Common::IntegerLiteral lit)
+                { return std::make_pair(Common::Keyword<"align">{}, lit); });
+    };
+
+    struct GrowthDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"growth">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<StackGrowthRule>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::CallingConvDef::StackGrowth g)
+                { return std::make_pair(Common::Keyword<"growth">{}, g); });
+    };
+
+    struct CleanupDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"cleanup">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<StackCleanupRule>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::CallingConvDef::StackCleanup c)
+                { return std::make_pair(Common::Keyword<"cleanup">{}, c); });
+    };
+
+    struct ShadowDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"shadow_space">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::Common::IntegerLiteral lit)
+                { return std::make_pair(Common::Keyword<"shadow_space">{}, lit); });
+    };
+
+    struct RedZoneDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"red_zone">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::Common::IntegerLiteral lit)
+                { return std::make_pair(Common::Keyword<"red_zone">{}, lit); });
+    };
+
+    struct SpDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"sp">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::Common::Identifier id)
+                { return std::make_pair(Common::Keyword<"sp">{}, std::move(id)); });
+    };
+
+    struct FpDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"fp">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::Common::Identifier id)
+                { return std::make_pair(Common::Keyword<"fp">{}, std::move(id)); });
+    };
+
+    struct LrDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"lr">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
+        static constexpr auto value = lexy::callback<FieldVariant>(
+                [](Ast::Common::Identifier id)
+                { return std::make_pair(Common::Keyword<"lr">{}, std::move(id)); });
+    };
 
     struct Entry
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto a = dsl::peek(Common::Keyword<"align">::rule) >>
-                    (dsl::p<AlignDecl> >>
-                     lexy::callback<FieldVariant>([](auto v)
-                                                  { return std::make_pair(Common::Keyword<"align">{}, v); }));
-            auto g = dsl::peek(Common::Keyword<"growth">::rule) >>
-                    (dsl::p<GrowthDecl> >>
-                     lexy::callback<FieldVariant>([](auto v)
-                                                  { return std::make_pair(Common::Keyword<"growth">{}, v); }));
-            auto c = dsl::peek(Common::Keyword<"cleanup">::rule) >>
-                    (dsl::p<CleanupDecl> >>
-                     lexy::callback<FieldVariant>([](auto v)
-                                                  { return std::make_pair(Common::Keyword<"cleanup">{}, v); }));
-            auto s = dsl::peek(Common::Keyword<"shadow_space">::rule) >>
-                    (dsl::p<ShadowDecl> >>
-                     lexy::callback<FieldVariant>([](auto v)
-                                                  { return std::make_pair(Common::Keyword<"shadow_space">{}, v); }));
-            auto sp = dsl::peek(Common::Keyword<"sp">::rule) >>
-                    (dsl::p<SpDecl> >>
-                     lexy::callback<FieldVariant>([](auto v)
-                                                  { return std::make_pair(Common::Keyword<"sp">{}, std::move(v)); }));
-            auto fp = dsl::peek(Common::Keyword<"fp">::rule) >>
-                    (dsl::p<FpDecl> >>
-                     lexy::callback<FieldVariant>([](auto v)
-                                                  { return std::make_pair(Common::Keyword<"fp">{}, std::move(v)); }));
-            return a | g | c | s | sp | fp;
+            auto a = dsl::peek(Common::Keyword<"align">::rule) >> dsl::p<AlignDecl>;
+            auto g = dsl::peek(Common::Keyword<"growth">::rule) >> dsl::p<GrowthDecl>;
+            auto c = dsl::peek(Common::Keyword<"cleanup">::rule) >> dsl::p<CleanupDecl>;
+            auto s = dsl::peek(Common::Keyword<"shadow_space">::rule) >> dsl::p<ShadowDecl>;
+            auto rz = dsl::peek(Common::Keyword<"red_zone">::rule) >> dsl::p<RedZoneDecl>;
+            auto sp = dsl::peek(Common::Keyword<"sp">::rule) >> dsl::p<SpDecl>;
+            auto fp = dsl::peek(Common::Keyword<"fp">::rule) >> dsl::p<FpDecl>;
+            auto lr = dsl::peek(Common::Keyword<"lr">::rule) >> dsl::p<LrDecl>;
+            return a | g | c | s | rz | sp | fp | lr;
         }();
         static constexpr auto value = lexy::forward<FieldVariant>;
     };
 
-    static constexpr auto rule = Common::Keyword<"stack">::rule >>
-            dsl::curly_bracketed.opt_list(dsl::p<Entry>, dsl::sep(dsl::lit_c<','>));
+    struct EntryList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.opt_list(dsl::p<Entry>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<FieldVariant>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"stack">::rule >> dsl::p<EntryList>;
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::StackDef>(
             [](std::pmr::vector<FieldVariant> fields)
@@ -181,10 +224,14 @@ struct StackSection
                                     def.m_cleanup = item.second;
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"shadow_space">>)
                                     def.m_shadowSpace = item.second;
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"red_zone">>)
+                                    def.m_redZone = item.second;
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"sp">>)
                                     def.m_stackPointer = std::move(item.second);
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"fp">>)
                                     def.m_framePointer = std::move(item.second);
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"lr">>)
+                                    def.m_linkRegister = std::move(item.second);
                             },
                             f);
                 }
@@ -192,12 +239,23 @@ struct StackSection
             });
 };
 
+// =============================================================================
+// 2. CLASSIFY BLOCK
+// =============================================================================
+
 struct PrimitiveRuleParser
 {
     static constexpr auto whitespace = Common::Whitespace;
+
+    struct TypeList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::square_bracketed.list(dsl::p<Common::Identifier>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<Ast::Common::Identifier>;
+    };
+
     static constexpr auto rule = Common::Keyword<"types">::rule >>
-            (dsl::square_bracketed.list(dsl::p<Common::Identifier>, dsl::sep(dsl::lit_c<','>)) + LEXY_LIT("=>") +
-             dsl::p<Common::Identifier>);
+            (dsl::p<TypeList> + LEXY_LIT("=>") + dsl::p<Common::Identifier>);
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::PrimitiveRule>(
             [](std::pmr::vector<Ast::Common::Identifier> types, Ast::Common::Identifier target)
@@ -225,17 +283,23 @@ struct TargetClassSpec
         static constexpr auto rule = Common::Keyword<"by_ref">::rule >> dsl::opt(dsl::parenthesized(dsl::p<OptCopy>));
         static constexpr auto value = lexy::callback<std::pair<Ast::Common::Identifier, bool>>(
                 [](Ast::Common::BooleanLiteral copy)
-                { return std::make_pair(Ast::Common::Identifier{ .m_name = "by_ref" }, copy.m_value); },
-                [](auto...) { return std::make_pair(Ast::Common::Identifier{ .m_name = "by_ref" }, false); });
+                { return std::make_pair(Ast::Common::Identifier{ "by_ref", nullptr }, copy.m_node); },
+                [](lexy::nullopt) { return std::make_pair(Ast::Common::Identifier{ "by_ref", nullptr }, false); });
+    };
+
+    struct IdSpec
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<Common::Identifier>;
+        static constexpr auto value = lexy::callback<std::pair<Ast::Common::Identifier, bool>>(
+                [](Ast::Common::Identifier target)
+                { return std::make_pair(std::move(target), false); });
     };
 
     static constexpr auto rule = []
     {
         auto byRef = dsl::peek(Common::Keyword<"by_ref">::rule) >> dsl::p<ByRefSpec>;
-        auto id = dsl::else_ >>
-                (dsl::p<Common::Identifier> >> lexy::callback<std::pair<Ast::Common::Identifier, bool>>(
-                                                       [](Ast::Common::Identifier target)
-                                                       { return std::make_pair(std::move(target), false); }));
+        auto id = dsl::else_ >> dsl::p<IdSpec>;
         return byRef | id;
     }();
 
@@ -246,50 +310,64 @@ struct AggregateConditionParser
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    struct SizeGt
+    struct SizeCond
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"size">::rule >>
-                (dsl::lit_c<'>'> >> dsl::p<Common::IntegerLiteral>);
-        static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregateCondition>(
-                [](Ast::Common::IntegerLiteral val)
-                {
-                    return Ast::CallingConvDef::AggregateCondition{
-                        .m_kind = Ast::CallingConvDef::AggregateCondition::Kind::SizeGreaterThan,
-                        .m_sizeLimit = val
-                    };
-                });
-    };
 
-    struct SizeLe
-    {
-        static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"size">::rule >>
-                (LEXY_LIT("<=") >> dsl::p<Common::IntegerLiteral>);
-        static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregateCondition>(
-                [](Ast::Common::IntegerLiteral val)
-                {
-                    return Ast::CallingConvDef::AggregateCondition{
-                        .m_kind = Ast::CallingConvDef::AggregateCondition::Kind::SizeLessThanOrEqual,
-                        .m_sizeLimit = val
-                    };
-                });
-    };
+        struct GtBranch
+        {
+            static constexpr auto whitespace = Common::Whitespace;
+            static constexpr auto rule = dsl::lit_c<'>'> >> dsl::p<Common::IntegerLiteral>;
+            static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregateCondition>(
+                    [](Ast::Common::IntegerLiteral val)
+                    {
+                        return Ast::CallingConvDef::AggregateCondition{
+                            .m_kind = Ast::CallingConvDef::AggregateCondition::Kind::SizeGreaterThan,
+                            .m_sizeLimit = val
+                        };
+                    });
+        };
 
-    struct SizeIn
-    {
-        static constexpr auto whitespace = Common::Whitespace;
+        struct LeBranch
+        {
+            static constexpr auto whitespace = Common::Whitespace;
+            static constexpr auto rule = LEXY_LIT("<=") >> dsl::p<Common::IntegerLiteral>;
+            static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregateCondition>(
+                    [](Ast::Common::IntegerLiteral val)
+                    {
+                        return Ast::CallingConvDef::AggregateCondition{
+                            .m_kind = Ast::CallingConvDef::AggregateCondition::Kind::SizeLessThanOrEqual,
+                            .m_sizeLimit = val
+                        };
+                    });
+        };
+
+        struct InBranch
+        {
+            static constexpr auto whitespace = Common::Whitespace;
+            struct SizeList
+            {
+                static constexpr auto whitespace = Common::Whitespace;
+                static constexpr auto rule = dsl::square_bracketed.list(dsl::p<Common::IntegerLiteral>, dsl::sep(dsl::lit_c<','>));
+                static constexpr auto value = Common::PmrAsList<Ast::Common::IntegerLiteral>;
+            };
+
+            static constexpr auto rule = Common::Keyword<"in">::rule >> dsl::p<SizeList>;
+            static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregateCondition>(
+                    [](std::pmr::vector<Ast::Common::IntegerLiteral> sizes)
+                    {
+                        return Ast::CallingConvDef::AggregateCondition{
+                            .m_kind = Ast::CallingConvDef::AggregateCondition::Kind::SizeIn,
+                            .m_sizeSet = std::move(sizes)
+                        };
+                    });
+        };
+
         static constexpr auto rule = Common::Keyword<"size">::rule >>
-                (Common::Keyword<"in">::rule >>
-                 dsl::square_bracketed.list(dsl::p<Common::IntegerLiteral>, dsl::sep(dsl::lit_c<','>)));
-        static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregateCondition>(
-                [](std::pmr::vector<Ast::Common::IntegerLiteral> sizes)
-                {
-                    return Ast::CallingConvDef::AggregateCondition{
-                        .m_kind = Ast::CallingConvDef::AggregateCondition::Kind::SizeIn,
-                        .m_sizeSet = std::move(sizes)
-                    };
-                });
+                ((dsl::peek(dsl::lit_c<'>'>) >> dsl::p<GtBranch>) |
+                 (dsl::peek(LEXY_LIT("<=")) >> dsl::p<LeBranch>) |
+                 (dsl::peek(Common::Keyword<"in">::rule) >> dsl::p<InBranch>));
+        static constexpr auto value = lexy::forward<Ast::CallingConvDef::AggregateCondition>;
     };
 
     struct HfaHva
@@ -322,14 +400,11 @@ struct AggregateConditionParser
     struct SimpleFlags
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = []
-        {
-            auto nt = Common::Keyword<"non_trivial">::rule >>
-                    lexy::constant(Ast::CallingConvDef::AggregateCondition::Kind::NonTrivial);
-            auto un = Common::Keyword<"unaligned">::rule >>
-                    lexy::constant(Ast::CallingConvDef::AggregateCondition::Kind::Unaligned);
-            return nt | un;
-        }();
+        static constexpr auto Table = lexy::symbol_table<Ast::CallingConvDef::AggregateCondition::Kind>
+            .map(LEXY_LIT("non_trivial"), Ast::CallingConvDef::AggregateCondition::Kind::NonTrivial)
+            .map(LEXY_LIT("unaligned"),   Ast::CallingConvDef::AggregateCondition::Kind::Unaligned);
+
+        static constexpr auto rule = dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha_underscore));
         static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregateCondition>(
                 [](Ast::CallingConvDef::AggregateCondition::Kind kind)
                 { return Ast::CallingConvDef::AggregateCondition{ .m_kind = kind }; });
@@ -340,14 +415,19 @@ struct AggregateConditionParser
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto sizeGt = dsl::peek(Common::Keyword<"size">::rule >> dsl::lit_c<'>'>) >> dsl::p<SizeGt>;
-            auto sizeLe = dsl::peek(Common::Keyword<"size">::rule >> LEXY_LIT("<=")) >> dsl::p<SizeLe>;
-            auto sizeIn = dsl::peek(Common::Keyword<"size">::rule >> Common::Keyword<"in">::rule) >> dsl::p<SizeIn>;
+            auto size = dsl::peek(Common::Keyword<"size">::rule) >> dsl::p<SizeCond>;
             auto hfa = dsl::peek(Common::Keyword<"hfa">::rule | Common::Keyword<"hva">::rule) >> dsl::p<HfaHva>;
             auto flag = dsl::else_ >> dsl::p<SimpleFlags>;
-            return sizeGt | sizeLe | sizeIn | hfa | flag;
+            return size | hfa | flag;
         }();
         static constexpr auto value = lexy::forward<Ast::CallingConvDef::AggregateCondition>;
+    };
+
+    struct CondTermList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::list(dsl::p<CondTerm>, dsl::sep(LEXY_LIT("||")));
+        static constexpr auto value = Common::PmrAsList<Ast::CallingConvDef::AggregateCondition>;
     };
 
     // Parses: when <cond> (|| <cond>)* => <target>
@@ -355,7 +435,7 @@ struct AggregateConditionParser
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = Common::Keyword<"when">::rule >>
-                (dsl::list(dsl::p<CondTerm>, dsl::sep(LEXY_LIT("||"))) + LEXY_LIT("=>") + dsl::p<TargetClassSpec>);
+                (dsl::p<CondTermList> + LEXY_LIT("=>") + dsl::p<TargetClassSpec>);
 
         static constexpr auto value = lexy::callback<std::pmr::vector<Ast::CallingConvDef::AggregateCondition>>(
                 [](std::pmr::vector<Ast::CallingConvDef::AggregateCondition> conds,
@@ -399,61 +479,79 @@ struct AggregatePipelineParser
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    struct SliceDecl
-    {
-        static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"slice">::rule >>
-                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral> >> dsl::opt(Common::Keyword<"bytes">::rule));
-        static constexpr auto value = lexy::forward<Ast::Common::IntegerLiteral>;
-    };
-
-    struct PrecedenceDecl
-    {
-        static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"precedence">::rule >>
-                (dsl::lit_c<':'> >> dsl::square_bracketed.list(dsl::p<Common::Identifier>, dsl::sep(dsl::lit_c<','>)));
-        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::Common::Identifier>>;
-    };
-
-    struct PolicyDecl
-    {
-        static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"policy">::rule >> (dsl::lit_c<':'> >> dsl::p<AllocPolicyRule>);
-        static constexpr auto value = lexy::forward<Ast::CallingConvDef::AllocPolicy>;
-    };
-
     using ItemVariant =
             std::variant<std::pmr::vector<Ast::CallingConvDef::AggregateCondition>,
                          std::pair<Common::Keyword<"slice">, Ast::Common::IntegerLiteral>,
                          std::pair<Common::Keyword<"precedence">, std::pmr::vector<Ast::Common::Identifier>>,
                          std::pair<Common::Keyword<"policy">, Ast::CallingConvDef::AllocPolicy>>;
 
+    struct CondDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<AggregateConditionParser>;
+        static constexpr auto value = lexy::callback<ItemVariant>(
+                [](std::pmr::vector<Ast::CallingConvDef::AggregateCondition> conds)
+                { return ItemVariant{ std::move(conds) }; });
+    };
+
+    struct SliceDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"slice">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral> >> dsl::opt(Common::Keyword<"bytes">::rule));
+        static constexpr auto value = lexy::callback<ItemVariant>(
+                [](Ast::Common::IntegerLiteral lit, auto...)
+                { return std::make_pair(Common::Keyword<"slice">{}, lit); });
+    };
+
+    struct PrecedenceDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        struct PrecedenceList
+        {
+            static constexpr auto whitespace = Common::Whitespace;
+            static constexpr auto rule = dsl::square_bracketed.list(dsl::p<Common::Identifier>, dsl::sep(dsl::lit_c<','>));
+            static constexpr auto value = Common::PmrAsList<Ast::Common::Identifier>;
+        };
+
+        static constexpr auto rule = Common::Keyword<"precedence">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<PrecedenceList>);
+        static constexpr auto value = lexy::callback<ItemVariant>(
+                [](std::pmr::vector<Ast::Common::Identifier> v)
+                { return std::make_pair(Common::Keyword<"precedence">{}, std::move(v)); });
+    };
+
+    struct PolicyDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"policy">::rule >> (dsl::lit_c<':'> >> dsl::p<AllocPolicyRule>);
+        static constexpr auto value = lexy::callback<ItemVariant>(
+                [](Ast::CallingConvDef::AllocPolicy pol)
+                { return std::make_pair(Common::Keyword<"policy">{}, pol); });
+    };
+
     struct Entry
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto cond = dsl::peek(Common::Keyword<"when">::rule | Common::Keyword<"default">::rule) >>
-                    (dsl::p<AggregateConditionParser> >>
-                     lexy::callback<ItemVariant>([](auto v) { return ItemVariant{ std::move(v) }; }));
-            auto slice = dsl::peek(Common::Keyword<"slice">::rule) >>
-                    (dsl::p<SliceDecl> >>
-                     lexy::callback<ItemVariant>([](auto v) { return std::make_pair(Common::Keyword<"slice">{}, v); }));
-            auto prec = dsl::peek(Common::Keyword<"precedence">::rule) >>
-                    (dsl::p<PrecedenceDecl> >>
-                     lexy::callback<ItemVariant>(
-                             [](auto v) { return std::make_pair(Common::Keyword<"precedence">{}, std::move(v)); }));
-            auto pol = dsl::peek(Common::Keyword<"policy">::rule) >>
-                    (dsl::p<PolicyDecl> >>
-                     lexy::callback<ItemVariant>([](auto v)
-                                                 { return std::make_pair(Common::Keyword<"policy">{}, v); }));
+            auto cond = dsl::peek(Common::Keyword<"when">::rule | Common::Keyword<"default">::rule) >> dsl::p<CondDecl>;
+            auto slice = dsl::peek(Common::Keyword<"slice">::rule) >> dsl::p<SliceDecl>;
+            auto prec = dsl::peek(Common::Keyword<"precedence">::rule) >> dsl::p<PrecedenceDecl>;
+            auto pol = dsl::peek(Common::Keyword<"policy">::rule) >> dsl::p<PolicyDecl>;
             return cond | slice | prec | pol;
         }();
         static constexpr auto value = lexy::forward<ItemVariant>;
     };
 
-    static constexpr auto rule = Common::Keyword<"aggregate">::rule >>
-            dsl::curly_bracketed.opt_list(dsl::p<Entry>, dsl::sep(dsl::lit_c<','>));
+    struct EntryList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.opt_list(dsl::p<Entry>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<ItemVariant>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"aggregate">::rule >> dsl::p<EntryList>;
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::AggregatePipeline>(
             [](std::pmr::vector<ItemVariant> items)
@@ -502,20 +600,42 @@ struct ClassifySection
 
     using EntryVariant = std::variant<Ast::CallingConvDef::PrimitiveRule, Ast::CallingConvDef::AggregatePipeline>;
 
+    struct PrimDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<PrimitiveRuleParser>;
+        static constexpr auto value = lexy::callback<EntryVariant>(
+                [](Ast::CallingConvDef::PrimitiveRule r) { return EntryVariant{ std::move(r) }; });
+    };
+
+    struct AggDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<AggregatePipelineParser>;
+        static constexpr auto value = lexy::callback<EntryVariant>(
+                [](Ast::CallingConvDef::AggregatePipeline p) { return EntryVariant{ std::move(p) }; });
+    };
+
     struct Entry
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto prim = dsl::peek(Common::Keyword<"types">::rule) >>
-                    (dsl::p<PrimitiveRuleParser> >> lexy::construct<EntryVariant>);
-            auto agg = dsl::else_ >> (dsl::p<AggregatePipelineParser> >> lexy::construct<EntryVariant>);
+            auto prim = dsl::peek(Common::Keyword<"types">::rule) >> dsl::p<PrimDecl>;
+            auto agg = dsl::else_ >> dsl::p<AggDecl>;
             return prim | agg;
         }();
         static constexpr auto value = lexy::forward<EntryVariant>;
     };
 
-    static constexpr auto rule = Common::Keyword<"classify">::rule >> dsl::curly_bracketed.list(dsl::p<Entry>);
+    struct EntryList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<Entry>);
+        static constexpr auto value = Common::PmrAsList<EntryVariant>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"classify">::rule >> dsl::p<EntryList>;
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::ClassificationDef>(
             [](std::pmr::vector<EntryVariant> entries)
@@ -532,32 +652,48 @@ struct ClassifySection
             });
 };
 
+// =============================================================================
+// 3. ARGUMENTS AND RETURNS BLOCKS
+// =============================================================================
+
 struct SeqOrConsecutiveRule
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    struct SeqRule
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"seq">::rule >>
+                dsl::parenthesized(dsl::p<RegisterListRule>);
+        static constexpr auto value = lexy::callback<Ast::CallingConvDef::RegisterSequence>(
+                [](std::pmr::vector<Ast::Common::Identifier> r)
+                {
+                    return Ast::CallingConvDef::RegisterSequence{
+                        .m_kind = Ast::CallingConvDef::RegisterSequence::Kind::Sequential,
+                        .m_registers = std::move(r)
+                    };
+                });
+    };
+
+    struct ConRule
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"consecutive">::rule >>
+                dsl::parenthesized(dsl::p<RegisterListRule>);
+        static constexpr auto value = lexy::callback<Ast::CallingConvDef::RegisterSequence>(
+                [](std::pmr::vector<Ast::Common::Identifier> r)
+                {
+                    return Ast::CallingConvDef::RegisterSequence{
+                        .m_kind = Ast::CallingConvDef::RegisterSequence::Kind::ConsecutiveBlock,
+                        .m_registers = std::move(r)
+                    };
+                });
+    };
+
     static constexpr auto rule = []
     {
-        auto seq = Common::Keyword<"seq">::rule >>
-                (dsl::parenthesized(dsl::p<RegisterListRule>) >>
-                 lexy::callback<Ast::CallingConvDef::RegisterSequence>(
-                         [](std::pmr::vector<Ast::Common::Identifier> r)
-                         {
-                             return Ast::CallingConvDef::RegisterSequence{
-                                 .m_kind = Ast::CallingConvDef::RegisterSequence::Kind::Sequential,
-                                 .m_registers = std::move(r)
-                             };
-                         }));
-        auto con = Common::Keyword<"consecutive">::rule >>
-                (dsl::parenthesized(dsl::p<RegisterListRule>) >>
-                 lexy::callback<Ast::CallingConvDef::RegisterSequence>(
-                         [](std::pmr::vector<Ast::Common::Identifier> r)
-                         {
-                             return Ast::CallingConvDef::RegisterSequence{
-                                 .m_kind = Ast::CallingConvDef::RegisterSequence::Kind::ConsecutiveBlock,
-                                 .m_registers = std::move(r)
-                             };
-                         }));
+        auto seq = dsl::peek(Common::Keyword<"seq">::rule) >> dsl::p<SeqRule>;
+        auto con = dsl::else_ >> dsl::p<ConRule>;
         return seq | con;
     }();
 
@@ -568,28 +704,45 @@ struct PassRuleParser
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    using SourceVariant = std::variant<Ast::CallingConvDef::RegisterSequence,
+                                       Ast::Common::Identifier,
+                                       std::monostate>;
+
+    struct SeqSource
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<SeqOrConsecutiveRule>;
+        static constexpr auto value = lexy::callback<SourceVariant>(
+                [](Ast::CallingConvDef::RegisterSequence s) { return SourceVariant{ std::move(s) }; });
+    };
+
+    struct StackSource
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<StackFallbackRule>;
+        static constexpr auto value = lexy::callback<SourceVariant>(
+                [](auto...) { return SourceVariant{ std::monostate{} }; });
+    };
+
+    struct AliasSource
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<Common::Identifier>;
+        static constexpr auto value = lexy::callback<SourceVariant>(
+                [](Ast::Common::Identifier id) { return SourceVariant{ std::move(id) }; });
+    };
+
     struct PassSourceSpec
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto seq = dsl::peek(Common::Keyword<"seq">::rule | Common::Keyword<"consecutive">::rule) >>
-                    (dsl::p<SeqOrConsecutiveRule> >> lexy::construct<std::variant<Ast::CallingConvDef::RegisterSequence,
-                                                                                  Ast::Common::Identifier,
-                                                                                  std::monostate>>);
-            auto stack = dsl::peek(Common::Keyword<"stack">::rule) >>
-                    (dsl::p<StackFallbackRule> >>
-                     lexy::callback<std::variant<Ast::CallingConvDef::RegisterSequence,
-                                                 Ast::Common::Identifier,
-                                                 std::monostate>>([](auto...) { return std::monostate{}; }));
-            auto alias = dsl::else_ >>
-                    (dsl::p<Common::Identifier> >> lexy::construct<std::variant<Ast::CallingConvDef::RegisterSequence,
-                                                                                Ast::Common::Identifier,
-                                                                                std::monostate>>);
+            auto seq = dsl::peek(Common::Keyword<"seq">::rule | Common::Keyword<"consecutive">::rule) >> dsl::p<SeqSource>;
+            auto stack = dsl::peek(Common::Keyword<"stack">::rule) >> dsl::p<StackSource>;
+            auto alias = dsl::else_ >> dsl::p<AliasSource>;
             return seq | stack | alias;
         }();
-        static constexpr auto value = lexy::forward<
-                std::variant<Ast::CallingConvDef::RegisterSequence, Ast::Common::Identifier, std::monostate>>;
+        static constexpr auto value = lexy::forward<SourceVariant>;
     };
 
     struct FallbackOpt
@@ -597,7 +750,9 @@ struct PassRuleParser
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = dsl::opt(dsl::lit_c<','> >> Common::Keyword<"fallback">::rule >> dsl::lit_c<':'> >>
                                               dsl::p<StackFallbackRule>);
-        static constexpr auto value = lexy::forward<std::optional<Ast::CallingConvDef::StackFallback>>;
+        static constexpr auto value = lexy::callback<std::optional<Ast::CallingConvDef::StackFallback>>(
+                [](Ast::CallingConvDef::StackFallback fb) { return std::optional(std::move(fb)); },
+                [](lexy::nullopt) { return std::nullopt; });
     };
 
     static constexpr auto rule = Common::Keyword<"pass">::rule >>
@@ -605,7 +760,7 @@ struct PassRuleParser
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::PassRule>(
             [](Ast::Common::Identifier abiClass,
-               std::variant<Ast::CallingConvDef::RegisterSequence, Ast::Common::Identifier, std::monostate> src,
+               SourceVariant src,
                std::optional<Ast::CallingConvDef::StackFallback> fb)
             {
                 return Ast::CallingConvDef::PassRule{ .m_abiClass = std::move(abiClass),
@@ -630,13 +785,27 @@ struct SlotBlockParser
                 });
     };
 
-    struct UnifiedSlotRule
+    struct BindingList
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<Binding>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<Ast::CallingConvDef::SlotBinding>;
+    };
+
+    struct UnifiedSlotRule
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<BindingList>;
         static constexpr auto value = lexy::callback<Ast::CallingConvDef::UnifiedSlot>(
                 [](std::pmr::vector<Ast::CallingConvDef::SlotBinding> bindings)
                 { return Ast::CallingConvDef::UnifiedSlot{ .m_bindings = std::move(bindings) }; });
+    };
+
+    struct UnifiedSlotList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::square_bracketed.list(dsl::p<UnifiedSlotRule>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<Ast::CallingConvDef::UnifiedSlot>;
     };
 
     struct SlotPayload
@@ -646,17 +815,15 @@ struct SlotBlockParser
     };
 
     static constexpr auto rule = Common::Keyword<"slots">::rule >>
-            (dsl::square_bracketed.list(dsl::p<UnifiedSlotRule>, dsl::sep(dsl::lit_c<','>)) +
+            (dsl::p<UnifiedSlotList> +
              dsl::opt(dsl::lit_c<','> >> Common::Keyword<"fallback">::rule >> dsl::lit_c<':'> >>
                       dsl::p<StackFallbackRule>));
 
     static constexpr auto value = lexy::callback<SlotPayload>(
             [](std::pmr::vector<Ast::CallingConvDef::UnifiedSlot> slots,
-               std::optional<Ast::CallingConvDef::StackFallback> fb)
-            { return SlotPayload{ .m_slots = std::move(slots), .m_fallback = fb }; },
+               Ast::CallingConvDef::StackFallback fb)
+            { return SlotPayload{ .m_slots = std::move(slots), .m_fallback = std::move(fb) }; },
             [](std::pmr::vector<Ast::CallingConvDef::UnifiedSlot> slots, lexy::nullopt)
-            { return SlotPayload{ .m_slots = std::move(slots), .m_fallback = std::nullopt }; },
-            [](std::pmr::vector<Ast::CallingConvDef::UnifiedSlot> slots, auto...)
             { return SlotPayload{ .m_slots = std::move(slots), .m_fallback = std::nullopt }; });
 };
 
@@ -666,20 +833,42 @@ struct ArgumentsSection
 
     using ArgEntryVariant = std::variant<SlotBlockParser::SlotPayload, Ast::CallingConvDef::PassRule>;
 
+    struct SlotEntry
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<SlotBlockParser>;
+        static constexpr auto value = lexy::callback<ArgEntryVariant>(
+                [](SlotBlockParser::SlotPayload p) { return ArgEntryVariant{ std::move(p) }; });
+    };
+
+    struct PassEntry
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<PassRuleParser>;
+        static constexpr auto value = lexy::callback<ArgEntryVariant>(
+                [](Ast::CallingConvDef::PassRule r) { return ArgEntryVariant{ std::move(r) }; });
+    };
+
     struct Entry
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto sl = dsl::peek(Common::Keyword<"slots">::rule) >>
-                    (dsl::p<SlotBlockParser> >> lexy::construct<ArgEntryVariant>);
-            auto ps = dsl::else_ >> (dsl::p<PassRuleParser> >> lexy::construct<ArgEntryVariant>);
+            auto sl = dsl::peek(Common::Keyword<"slots">::rule) >> dsl::p<SlotEntry>;
+            auto ps = dsl::else_ >> dsl::p<PassEntry>;
             return sl | ps;
         }();
         static constexpr auto value = lexy::forward<ArgEntryVariant>;
     };
 
-    static constexpr auto rule = Common::Keyword<"arguments">::rule >> dsl::curly_bracketed.list(dsl::p<Entry>);
+    struct EntryList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<Entry>);
+        static constexpr auto value = Common::PmrAsList<ArgEntryVariant>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"arguments">::rule >> dsl::p<EntryList>;
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::ArgumentPassingDef>(
             [](std::pmr::vector<ArgEntryVariant> entries)
@@ -706,49 +895,57 @@ struct SretDefParser
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    struct PtrDecl
-    {
-        static constexpr auto rule = Common::Keyword<"ptr">::rule >> (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
-    };
-    struct ConsumesDecl
-    {
-        static constexpr auto rule = Common::Keyword<"consumes_slot">::rule >>
-                (dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>);
-    };
-    struct RetRegDecl
-    {
-        static constexpr auto rule = Common::Keyword<"returns">::rule >>
-                (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
-    };
-
     using Field = std::variant<std::pair<Common::Keyword<"ptr">, Ast::Common::Identifier>,
                                std::pair<Common::Keyword<"consumes_slot">, Ast::Common::BooleanLiteral>,
                                std::pair<Common::Keyword<"returns">, Ast::Common::Identifier>>;
+
+    struct PtrDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"ptr">::rule >> (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
+        static constexpr auto value = lexy::callback<Field>(
+                [](Ast::Common::Identifier id) { return std::make_pair(Common::Keyword<"ptr">{}, std::move(id)); });
+    };
+
+    struct ConsumesDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"consumes_slot">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>);
+        static constexpr auto value = lexy::callback<Field>(
+                [](Ast::Common::BooleanLiteral b) { return std::make_pair(Common::Keyword<"consumes_slot">{}, b); });
+    };
+
+    struct RetRegDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"returns">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
+        static constexpr auto value = lexy::callback<Field>(
+                [](Ast::Common::Identifier id) { return std::make_pair(Common::Keyword<"returns">{}, std::move(id)); });
+    };
 
     struct Entry
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto ptr = dsl::peek(Common::Keyword<"ptr">::rule) >>
-                    (dsl::p<PtrDecl> >>
-                     lexy::callback<Field>([](auto v)
-                                           { return std::make_pair(Common::Keyword<"ptr">{}, std::move(v)); }));
-            auto con = dsl::peek(Common::Keyword<"consumes_slot">::rule) >>
-                    (dsl::p<ConsumesDecl> >>
-                     lexy::callback<Field>([](auto v)
-                                           { return std::make_pair(Common::Keyword<"consumes_slot">{}, v); }));
-            auto ret = dsl::peek(Common::Keyword<"returns">::rule) >>
-                    (dsl::p<RetRegDecl> >>
-                     lexy::callback<Field>([](auto v)
-                                           { return std::make_pair(Common::Keyword<"returns">{}, std::move(v)); }));
+            auto ptr = dsl::peek(Common::Keyword<"ptr">::rule) >> dsl::p<PtrDecl>;
+            auto con = dsl::peek(Common::Keyword<"consumes_slot">::rule) >> dsl::p<ConsumesDecl>;
+            auto ret = dsl::peek(Common::Keyword<"returns">::rule) >> dsl::p<RetRegDecl>;
             return ptr | con | ret;
         }();
         static constexpr auto value = lexy::forward<Field>;
     };
 
-    static constexpr auto rule = Common::Keyword<"sret">::rule >>
-            dsl::curly_bracketed.opt_list(dsl::p<Entry>, dsl::sep(dsl::lit_c<','>));
+    struct EntryList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.opt_list(dsl::p<Entry>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<Field>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"sret">::rule >> dsl::p<EntryList>;
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::StructReturnDef>(
             [](std::pmr::vector<Field> fields)
@@ -763,7 +960,7 @@ struct SretDefParser
                                 if constexpr (std::is_same_v<T, Common::Keyword<"ptr">>)
                                     sret.m_pointerRegister = std::move(item.second);
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"consumes_slot">>)
-                                    sret.m_consumesArgSlot = item.second.m_value;
+                                    sret.m_consumesArgSlot = item.second.m_node;
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"returns">>)
                                     sret.m_returnRegister = std::move(item.second);
                             },
@@ -779,20 +976,42 @@ struct ReturnsSection
 
     using EntryVariant = std::variant<Ast::CallingConvDef::StructReturnDef, Ast::CallingConvDef::PassRule>;
 
+    struct SretEntry
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<SretDefParser>;
+        static constexpr auto value = lexy::callback<EntryVariant>(
+                [](Ast::CallingConvDef::StructReturnDef s) { return EntryVariant{ std::move(s) }; });
+    };
+
+    struct PassEntry
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<PassRuleParser>;
+        static constexpr auto value = lexy::callback<EntryVariant>(
+                [](Ast::CallingConvDef::PassRule r) { return EntryVariant{ std::move(r) }; });
+    };
+
     struct Entry
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = []
         {
-            auto sr = dsl::peek(Common::Keyword<"sret">::rule) >>
-                    (dsl::p<SretDefParser> >> lexy::construct<EntryVariant>);
-            auto ps = dsl::else_ >> (dsl::p<PassRuleParser> >> lexy::construct<EntryVariant>);
+            auto sr = dsl::peek(Common::Keyword<"sret">::rule) >> dsl::p<SretEntry>;
+            auto ps = dsl::else_ >> dsl::p<PassEntry>;
             return sr | ps;
         }();
         static constexpr auto value = lexy::forward<EntryVariant>;
     };
 
-    static constexpr auto rule = Common::Keyword<"returns">::rule >> dsl::curly_bracketed.list(dsl::p<Entry>);
+    struct EntryList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<Entry>);
+        static constexpr auto value = Common::PmrAsList<EntryVariant>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"returns">::rule >> dsl::p<EntryList>;
 
     static constexpr auto value = lexy::callback<Ast::CallingConvDef::ReturnDef>(
             [](std::pmr::vector<EntryVariant> entries)
@@ -809,68 +1028,211 @@ struct ReturnsSection
             });
 };
 
-struct CalleeSavedPreserve
+// =============================================================================
+// 4. PRESERVE LISTS
+// =============================================================================
+
+using CallingConvTopLevelItem = std::variant<Ast::CallingConvDef::StackDef,
+                                             std::pair<Common::Keyword<"callee">, std::pmr::vector<Ast::Common::Identifier>>,
+                                             std::pair<Common::Keyword<"caller">, std::pmr::vector<Ast::Common::Identifier>>,
+                                             Ast::CallingConvDef::ClassificationDef,
+                                             Ast::CallingConvDef::ArgumentPassingDef,
+                                             Ast::CallingConvDef::ReturnDef,
+                                             Ast::CallingConvDef::VarargsDef>;
+
+struct PreserveSection
 {
     static constexpr auto whitespace = Common::Whitespace;
+
+    struct CalleeBranch
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"callee">::rule >> (dsl::lit_c<':'> >> dsl::p<RegisterListRule>);
+        static constexpr auto value = lexy::callback<CallingConvTopLevelItem>(
+                [](std::pmr::vector<Ast::Common::Identifier> v) {
+                    return CallingConvTopLevelItem{ std::make_pair(Common::Keyword<"callee">{}, std::move(v)) };
+                });
+    };
+
+    struct CallerBranch
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"caller">::rule >> (dsl::lit_c<':'> >> dsl::p<RegisterListRule>);
+        static constexpr auto value = lexy::callback<CallingConvTopLevelItem>(
+                [](std::pmr::vector<Ast::Common::Identifier> v) {
+                    return CallingConvTopLevelItem{ std::make_pair(Common::Keyword<"caller">{}, std::move(v)) };
+                });
+    };
+
     static constexpr auto rule = Common::Keyword<"preserve">::rule >>
-            (Common::Keyword<"callee">::rule >> dsl::lit_c<':'> >> dsl::p<RegisterListRule>);
-    static constexpr auto value = lexy::forward<std::pmr::vector<Ast::Common::Identifier>>;
+            ((dsl::peek(Common::Keyword<"callee">::rule) >> dsl::p<CalleeBranch>) |
+             (dsl::peek(Common::Keyword<"caller">::rule) >> dsl::p<CallerBranch>));
+    static constexpr auto value = lexy::forward<CallingConvTopLevelItem>;
 };
 
-struct CallerSavedPreserve
+// =============================================================================
+// 5. VARARGS SECTION
+// =============================================================================
+
+struct VarargsSection
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = Common::Keyword<"preserve">::rule >>
-            (Common::Keyword<"caller">::rule >> dsl::lit_c<':'> >> dsl::p<RegisterListRule>);
-    static constexpr auto value = lexy::forward<std::pmr::vector<Ast::Common::Identifier>>;
+
+    using Field = std::variant<std::pair<Common::Keyword<"vector_count_reg">, Ast::Common::Identifier>,
+                               std::pair<Common::Keyword<"duplicate_floats_to_gpr">, Ast::Common::BooleanLiteral>,
+                               std::pair<Common::Keyword<"stack_align">, Ast::Common::IntegerLiteral>>;
+
+    struct VectorCountDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"vector_count_reg">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::Identifier>);
+        static constexpr auto value = lexy::callback<Field>(
+                [](Ast::Common::Identifier id) { return std::make_pair(Common::Keyword<"vector_count_reg">{}, std::move(id)); });
+    };
+
+    struct DuplicateFloatsDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"duplicate_floats_to_gpr">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>);
+        static constexpr auto value = lexy::callback<Field>(
+                [](Ast::Common::BooleanLiteral b) { return std::make_pair(Common::Keyword<"duplicate_floats_to_gpr">{}, b); });
+    };
+
+    struct StackAlignDecl
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"stack_align">::rule >>
+                (dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>);
+        static constexpr auto value = lexy::callback<Field>(
+                [](Ast::Common::IntegerLiteral lit) { return std::make_pair(Common::Keyword<"stack_align">{}, lit); });
+    };
+
+    struct Entry
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = []
+        {
+            auto vc = dsl::peek(Common::Keyword<"vector_count_reg">::rule) >> dsl::p<VectorCountDecl>;
+            auto df = dsl::peek(Common::Keyword<"duplicate_floats_to_gpr">::rule) >> dsl::p<DuplicateFloatsDecl>;
+            auto sa = dsl::peek(Common::Keyword<"stack_align">::rule) >> dsl::p<StackAlignDecl>;
+            return vc | df | sa;
+        }();
+        static constexpr auto value = lexy::forward<Field>;
+    };
+
+    struct EntryList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.opt_list(dsl::p<Entry>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto value = Common::PmrAsList<Field>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"varargs">::rule >> dsl::p<EntryList>;
+
+    static constexpr auto value = lexy::callback<Ast::CallingConvDef::VarargsDef>(
+            [](std::pmr::vector<Field> fields)
+            {
+                Ast::CallingConvDef::VarargsDef def{};
+                for (auto &f : fields)
+                {
+                    std::visit(
+                            [&](auto &&item)
+                            {
+                                using T = std::decay_t<decltype(item.first)>;
+                                if constexpr (std::is_same_v<T, Common::Keyword<"vector_count_reg">>)
+                                    def.m_vectorCountReg = std::move(item.second);
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"duplicate_floats_to_gpr">>)
+                                    def.m_duplicateFloatsToGpr = item.second.m_node;
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"stack_align">>)
+                                    def.m_stackAlign = item.second;
+                            },
+                            f);
+                }
+                return def;
+            });
+};
+
+// =============================================================================
+// 6. TOP LEVEL CALLING CONVENTION
+// =============================================================================
+
+struct StackTopLevel
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::p<StackSection>;
+    static constexpr auto value = lexy::callback<CallingConvTopLevelItem>(
+            [](Ast::CallingConvDef::StackDef s) { return CallingConvTopLevelItem{ std::move(s) }; });
+};
+
+struct ClassifyTopLevel
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::p<ClassifySection>;
+    static constexpr auto value = lexy::callback<CallingConvTopLevelItem>(
+            [](Ast::CallingConvDef::ClassificationDef c) { return CallingConvTopLevelItem{ std::move(c) }; });
+};
+
+struct ArgsTopLevel
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::p<ArgumentsSection>;
+    static constexpr auto value = lexy::callback<CallingConvTopLevelItem>(
+            [](Ast::CallingConvDef::ArgumentPassingDef a) { return CallingConvTopLevelItem{ std::move(a) }; });
+};
+
+struct ReturnsTopLevel
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::p<ReturnsSection>;
+    static constexpr auto value = lexy::callback<CallingConvTopLevelItem>(
+            [](Ast::CallingConvDef::ReturnDef r) { return CallingConvTopLevelItem{ std::move(r) }; });
+};
+
+struct VarargsTopLevel
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::p<VarargsSection>;
+    static constexpr auto value = lexy::callback<CallingConvTopLevelItem>(
+            [](Ast::CallingConvDef::VarargsDef v) { return CallingConvTopLevelItem{ std::move(v) }; });
+};
+
+struct CallingConvBodyEntry
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = []
+    {
+        auto stack = dsl::peek(Common::Keyword<"stack">::rule) >> dsl::p<StackTopLevel>;
+        auto preserve = dsl::peek(Common::Keyword<"preserve">::rule) >> dsl::p<PreserveSection>;
+        auto cls = dsl::peek(Common::Keyword<"classify">::rule) >> dsl::p<ClassifyTopLevel>;
+        auto args = dsl::peek(Common::Keyword<"arguments">::rule) >> dsl::p<ArgsTopLevel>;
+        auto rets = dsl::peek(Common::Keyword<"returns">::rule) >> dsl::p<ReturnsTopLevel>;
+        auto va = dsl::peek(Common::Keyword<"varargs">::rule) >> dsl::p<VarargsTopLevel>;
+
+        return stack | preserve | cls | args | rets | va;
+    }();
+    static constexpr auto value = lexy::forward<CallingConvTopLevelItem>;
 };
 
 struct CallingConventionBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    using TopLevelItem = std::variant<Ast::CallingConvDef::StackDef,
-                                      std::pair<Common::Keyword<"callee">, std::pmr::vector<Ast::Common::Identifier>>,
-                                      std::pair<Common::Keyword<"caller">, std::pmr::vector<Ast::Common::Identifier>>,
-                                      Ast::CallingConvDef::ClassificationDef,
-                                      Ast::CallingConvDef::ArgumentPassingDef,
-                                      Ast::CallingConvDef::ReturnDef>;
-
-    struct BodyEntry
+    struct BodyList
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = []
-        {
-            auto stack = dsl::peek(Common::Keyword<"stack">::rule) >>
-                    (dsl::p<StackSection> >> lexy::construct<TopLevelItem>);
-            auto callee = dsl::peek(Common::Keyword<"preserve">::rule >> Common::Keyword<"callee">::rule) >>
-                    (dsl::p<CalleeSavedPreserve> >>
-                     lexy::callback<TopLevelItem>(
-                             [](auto v) { return std::make_pair(Common::Keyword<"callee">{}, std::move(v)); }));
-            auto caller = dsl::peek(Common::Keyword<"preserve">::rule >> Common::Keyword<"caller">::rule) >>
-                    (dsl::p<CallerSavedPreserve> >>
-                     lexy::callback<TopLevelItem>(
-                             [](auto v) { return std::make_pair(Common::Keyword<"caller">{}, std::move(v)); }));
-            auto cls = dsl::peek(Common::Keyword<"classify">::rule) >>
-                    (dsl::p<ClassifySection> >> lexy::construct<TopLevelItem>);
-            auto args = dsl::peek(Common::Keyword<"arguments">::rule) >>
-                    (dsl::p<ArgumentsSection> >> lexy::construct<TopLevelItem>);
-            auto rets = dsl::peek(Common::Keyword<"returns">::rule) >>
-                    (dsl::p<ReturnsSection> >> lexy::construct<TopLevelItem>);
-
-            return stack | callee | caller | cls | args | rets;
-        }();
-        static constexpr auto value = lexy::forward<TopLevelItem>;
+        static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<CallingConvBodyEntry>);
+        static constexpr auto value = Common::PmrAsList<CallingConvTopLevelItem>;
     };
 
-    static constexpr auto rule =
-            dsl::terminator(dsl::eof).opt(Common::Keyword<"calling_convention">::rule >>
-                                          (dsl::p<Common::Identifier> + dsl::curly_bracketed.list(dsl::p<BodyEntry>)));
+    static constexpr auto rule = Common::Keyword<"calling_convention">::rule >>
+            (dsl::p<Common::Identifier> + dsl::p<BodyList>);
 
-    static constexpr auto value = lexy::callback<Ast::CallingConvDef::CallingConventionDefFile>(
-            [](Ast::Common::Identifier name, std::pmr::vector<TopLevelItem> items)
+    static constexpr auto value = lexy::callback<Ast::CallingConvDef::CallingConventionDecl>(
+            [](Ast::Common::Identifier name, std::pmr::vector<CallingConvTopLevelItem> items)
             {
-                Ast::CallingConvDef::CallingConventionDef def{};
+                Ast::CallingConvDef::CallingConventionDecl def{};
                 def.m_name = std::move(name);
 
                 for (auto &item : items)
@@ -895,19 +1257,39 @@ struct CallingConventionBlock
                                     def.m_arguments = std::move(val);
                                 else if constexpr (std::is_same_v<T, Ast::CallingConvDef::ReturnDef>)
                                     def.m_returns = std::move(val);
+                                else if constexpr (std::is_same_v<T, Ast::CallingConvDef::VarargsDef>)
+                                    def.m_varargs = std::move(val);
                             },
                             item);
                 }
                 return def;
-            },
-            [](auto...) { return Ast::CallingConvDef::CallingConventionDefFile{}; });
+            });
 };
 
 struct CallingConvDefFile
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::p<CallingConventionBlock>;
-    static constexpr auto value = lexy::construct<Ast::CallingConvDef::CallingConventionDefFile>;
+
+    struct ConvList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::list(dsl::peek(Common::Keyword<"calling_convention">::rule) >> dsl::p<CallingConventionBlock>);
+        static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::CallingConvDef::CallingConventionDecl>>;
+    };
+
+    static constexpr auto rule = dsl::terminator(dsl::eof)(dsl::p<ConvList>);
+
+    static constexpr auto value = lexy::callback<Ast::CallingConvDef::CallingConventionDefFile>(
+            [](std::pmr::vector<Ast::CallingConvDef::CallingConventionDecl> decls)
+            {
+                Ast::CallingConvDef::CallingConventionDefFile file;
+                if (!decls.empty())
+                {
+                    static_cast<Ast::CallingConvDef::CallingConventionDecl &>(file) = decls.front();
+                    file.m_conventions = std::move(decls);
+                }
+                return file;
+            });
 };
 
 } // namespace DSL::Parser::CallingConvDef

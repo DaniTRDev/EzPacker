@@ -36,7 +36,7 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
 
     /**
      * Builds a memory address operand [base + displ] with an existing MirInteger displacement.
-     * Validates that the base register operand has pointer type.
+     * Validates that the base register operand has pointer or integer type.
      */
     class MirMemory *buildMem(class MirType *type,
                               class MirRegister *base,
@@ -45,10 +45,34 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
 
     /**
      * Builds a memory address operand [base + displ] converting an immediate FlexInt displacement into a MirInteger.
-     * Validates that the base register operand has pointer type.
+     * Validates that the base register operand has pointer or integer type.
      */
-    class MirMemory *
-    buildMem(class MirType *type, class MirRegister *base, const FlexInt &displ, class SourceReference *ref = nullptr);
+    class MirMemory *buildMem(class MirType *type,
+                              class MirRegister *base,
+                              const FlexInt &displ,
+                              class SourceReference *ref = nullptr);
+
+    /**
+     * Builds a memory address operand [base + index*scale + displ] with an existing MirInteger displacement.
+     * Validates that the base register operand has pointer or integer type.
+     */
+    class MirMemory *buildMem(class MirType *type,
+                              class MirRegister *base,
+                              class MirInteger *displ,
+                              class MirRegister *index,
+                              uint8_t scale = 1,
+                              class SourceReference *ref = nullptr);
+
+    /**
+     * Builds a memory address operand [base + index*scale + displ] converting an immediate FlexInt displacement into a MirInteger.
+     * Validates that the base register operand has pointer or integer type.
+     */
+    class MirMemory *buildMem(class MirType *type,
+                              class MirRegister *base,
+                              const FlexInt &displ,
+                              class MirRegister *index,
+                              uint8_t scale = 1,
+                              class SourceReference *ref = nullptr);
 
     /**
      * Allocates a new virtual register operand (MirRegister) with a unique MIR ID,

@@ -49,6 +49,21 @@ void CommandLineParser::setupArguments()
             .default_value(false)
             .implicit_value(true);
 
+    m_program->add_argument("--emit-target-instructions")
+            .help("Synthesize Target TargetInstructionTable (.h and .cpp) from .idf")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("--emit-instruction-selector")
+            .help("Synthesize Target InstructionSelector (.h and .cpp) from .isf")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("--emit-calling-conv")
+            .help("Synthesize Target CallingConvDesc (.h and .cpp) from .ezcc / .ccd")
+            .default_value(false)
+            .implicit_value(true);
+
     m_program->add_argument("--rules")
             .help("Path to companion .lrd rewrite rules file")
             .metavar("<file>")
@@ -197,11 +212,17 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     opts.typesFilePath = m_program->get<std::string>("--types");
     opts.instructionsFilePath = m_program->get<std::string>("--instructions");
     opts.emitRules = m_program->get<bool>("--emit-rules");
+    opts.emitTargetInstructions = m_program->get<bool>("--emit-target-instructions");
+    opts.emitInstructionSelector = m_program->get<bool>("--emit-instruction-selector");
+    opts.emitCallingConv = m_program->get<bool>("--emit-calling-conv");
 
     bool emitTypeTable = m_program->get<bool>("--emit-type-table");
     bool emitInstructions = m_program->get<bool>("--emit-instructions");
     bool emitLegalizer = m_program->get<bool>("--emit-legalizer");
     bool emitRules = opts.emitRules;
+    bool emitTargetInstructions = opts.emitTargetInstructions;
+    bool emitInstructionSelector = opts.emitInstructionSelector;
+    bool emitCallingConv = opts.emitCallingConv;
     std::string explicitGen = m_program->get<std::string>("--generator");
     std::transform(explicitGen.begin(), explicitGen.end(), explicitGen.begin(),
                    [](unsigned char c) { return std::tolower(c); });
@@ -212,7 +233,8 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
         return std::nullopt;
     }
 
-    size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) + (emitRules ? 1 : 0);
+    size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) + (emitRules ? 1 : 0)
+                     + (emitTargetInstructions ? 1 : 0) + (emitInstructionSelector ? 1 : 0) + (emitCallingConv ? 1 : 0);
     if (emitCount > 1)
     {
         errorMessage = "Cannot specify multiple generator emission flags simultaneously.";
@@ -235,6 +257,18 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     {
         opts.generator = GeneratorKind::Rules;
     }
+    else if (emitTargetInstructions)
+    {
+        opts.generator = GeneratorKind::TargetInstructions;
+    }
+    else if (emitInstructionSelector)
+    {
+        opts.generator = GeneratorKind::InstructionSelector;
+    }
+    else if (emitCallingConv)
+    {
+        opts.generator = GeneratorKind::CallingConv;
+    }
     else if (explicitGen == "type-table" || explicitGen == "typetable")
     {
         opts.generator = GeneratorKind::TypeTable;
@@ -250,6 +284,18 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     else if (explicitGen == "rules" || explicitGen == "rule")
     {
         opts.generator = GeneratorKind::Rules;
+    }
+    else if (explicitGen == "target-instructions" || explicitGen == "target_instructions" || explicitGen == "target-inst")
+    {
+        opts.generator = GeneratorKind::TargetInstructions;
+    }
+    else if (explicitGen == "instruction-selector" || explicitGen == "instruction_selector" || explicitGen == "isel")
+    {
+        opts.generator = GeneratorKind::InstructionSelector;
+    }
+    else if (explicitGen == "calling-conv" || explicitGen == "calling_conv" || explicitGen == "callingconv" || explicitGen == "cc")
+    {
+        opts.generator = GeneratorKind::CallingConv;
     }
     else
     {
