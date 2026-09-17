@@ -9,9 +9,9 @@
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
+#include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
 #include "InstructionSelector/MirInstructionSelector.h"
-#include "Legalizer/MirLegalizeActionTable.h"
 #include "Legalizer/MirLegalizer.h"
 #include "Legalizer/LegalizerInfo.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
@@ -95,236 +95,126 @@ class MockInstructionSelector : public MirInstructionSelector
 class MockFrameLowerer : public MirFrameLowerer
 {
   public:
-    void insertPrologue(FrameLowererCtx &ctx) override {}
-    void insertEpilogue(FrameLowererCtx &ctx) override {}
-    bool lowerAlloc(FrameLowererCtx &ctx) override { return false; }
-    bool lowerDAlloc(FrameLowererCtx &ctx) override { return false; }
+    void insertPrologue(FrameLowererCtx &ctx) override
+    {
+        m_prologueInserted = true;
+    }
+    void insertEpilogue(FrameLowererCtx &ctx) override
+    {
+        m_epilogueInserted = true;
+    }
+    bool lowerAlloc(FrameLowererCtx &ctx) override
+    {
+        m_allocLoweredCount++;
+        return true;
+    }
+    bool lowerDAlloc(FrameLowererCtx &ctx) override
+    {
+        m_dallocLoweredCount++;
+        return true;
+    }
+
+    void reset()
+    {
+        m_prologueInserted = false;
+        m_epilogueInserted = false;
+        m_allocLoweredCount = 0;
+        m_dallocLoweredCount = 0;
+    }
+
+    bool m_prologueInserted{ false };
+    bool m_epilogueInserted{ false };
+    size_t m_allocLoweredCount{ 0 };
+    size_t m_dallocLoweredCount{ 0 };
 };
 
-namespace
-{
+#include "RegisterAllocator/MirRegisterAllocator.h"
+#include "Instruction/MirInstructionSet.h"
 
-LegalizeQueryResult defaultUnsupportedQuery(size_t /*op1Type*/, size_t /*op2Type*/, size_t /*op3Type*/)
+/**
+ * Mock Register Allocator.
+ */
+class MockRegisterAllocator : public MirRegisterAllocator
 {
-    return LegalizeQueryResult{ .m_action = LegalizeAction::Unsupported,
-                                .m_compactId = 0,
-                                .m_slot = 0,
-                                .m_libcallOffset = 0 };
-}
+  public:
+    size_t m_spillCount{ 0 };
+    size_t m_reloadCount{ 0 };
+    size_t m_rematCount{ 0 };
 
-// 1. Homogeneous Arithmetic & Bitwise (ADD, SUB, XOR)
-// - LEGAL:   i32, i64, f32, f64
-// - WIDENS:  i1, i8, i16 -> i32 (slot 0)
-// - NARROWS: i128, i256  -> i64 (slot 0)
-LegalizeQueryResult queryAlu(size_t op1Type, size_t /*op2Type*/, size_t /*op3Type*/)
-{
-    auto t0 = static_cast<MirTypeCompactId>(op1Type);
-
-    switch (t0)
+    void reset()
     {
-        case MirTypeCompactId::i32:
-        case MirTypeCompactId::i64:
-        case MirTypeCompactId::f32:
-        case MirTypeCompactId::f64:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
-                                        .m_compactId = static_cast<uint8_t>(t0),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        case MirTypeCompactId::i1:
-        case MirTypeCompactId::i8:
-        case MirTypeCompactId::i16:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::WidenScalar,
-                                        .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i32),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        case MirTypeCompactId::i128:
-        case MirTypeCompactId::i256:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::NarrowScalar,
-                                        .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i64),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        default:
-            return defaultUnsupportedQuery(op1Type, 0, 0);
-    }
-}
-
-// 2. Division (DIV, IDIV)
-// - LEGAL:   i32
-// - WIDENS:  i8, i16 -> i32 (slot 0)
-// - LIBCALL: i64     -> __divdi3 (offset 1)
-// - NARROWS: i128    -> i64 (slot 0)
-LegalizeQueryResult queryDiv(size_t op1Type, size_t /*op2Type*/, size_t /*op3Type*/)
-{
-    auto t0 = static_cast<MirTypeCompactId>(op1Type);
-
-    switch (t0)
-    {
-        case MirTypeCompactId::i32:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
-                                        .m_compactId = static_cast<uint8_t>(t0),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        case MirTypeCompactId::i1:
-        case MirTypeCompactId::i8:
-        case MirTypeCompactId::i16:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::WidenScalar,
-                                        .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i32),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        case MirTypeCompactId::i64:
-            return LegalizeQueryResult{
-                .m_action = LegalizeAction::Libcall,
-                .m_compactId = static_cast<uint8_t>(t0),
-                .m_slot = 0,
-                .m_libcallOffset = 1 // Offset in string pool: "__divdi3\0"
-            };
-
-        case MirTypeCompactId::i128:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::NarrowScalar,
-                                        .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i64),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        default:
-            return defaultUnsupportedQuery(op1Type, 0, 0);
-    }
-}
-
-// 3. Comparisons (CMP_EQ, etc.)
-// - Condition dest is always i1
-// - Check operand 1 (first source operand)
-// - LEGAL:   i32, i64, f32, f64
-// - WIDENS:  i8, i16 -> i32 (slot 0 triggers widening of input registers)
-// - NARROWS: i128    -> i64
-LegalizeQueryResult queryCmp(size_t /*dstType*/, size_t srcType, size_t /*src2Type*/)
-{
-    auto tSrc = static_cast<MirTypeCompactId>(srcType);
-
-    switch (tSrc)
-    {
-        case MirTypeCompactId::i32:
-        case MirTypeCompactId::i64:
-        case MirTypeCompactId::f32:
-        case MirTypeCompactId::f64:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
-                                        .m_compactId = static_cast<uint8_t>(tSrc),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        case MirTypeCompactId::i1:
-        case MirTypeCompactId::i8:
-        case MirTypeCompactId::i16:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::WidenScalar,
-                                        .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i32),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        case MirTypeCompactId::i128:
-            return LegalizeQueryResult{ .m_action = LegalizeAction::NarrowScalar,
-                                        .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i64),
-                                        .m_slot = 0,
-                                        .m_libcallOffset = 0 };
-
-        default:
-            return defaultUnsupportedQuery(srcType, 0, 0);
-    }
-}
-
-// 4. Heterogeneous Sign Extension (SEXT)
-// - LEGAL:   (i32:0, i8:1), (i64:0, i32:1)
-// - WIDENS:  (slot 1 is i1) -> widen slot 1 to i8
-LegalizeQueryResult querySext(size_t op1Type, size_t op2Type, size_t /*op3Type*/)
-{
-    auto dstType = static_cast<MirTypeCompactId>(op1Type);
-    auto srcType = static_cast<MirTypeCompactId>(op2Type);
-
-    if ((dstType == MirTypeCompactId::i32 && srcType == MirTypeCompactId::i8) ||
-        (dstType == MirTypeCompactId::i64 && srcType == MirTypeCompactId::i32))
-    {
-        return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
-                                    .m_compactId = static_cast<uint8_t>(dstType),
-                                    .m_slot = 0,
-                                    .m_libcallOffset = 0 };
+        m_spillCount = 0;
+        m_reloadCount = 0;
+        m_rematCount = 0;
     }
 
-    if (srcType == MirTypeCompactId::i1)
+  protected:
+    bool isInstructionDAlloc(MirInstruction *instr) override
     {
-        return LegalizeQueryResult{ .m_action = LegalizeAction::WidenScalar,
-                                    .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i8),
-                                    .m_slot = 1,
-                                    .m_libcallOffset = 0 };
+        return instr && instr->getOpCode() == MirInstructionOpCode::DALLOC;
     }
 
-    return defaultUnsupportedQuery(op1Type, op2Type, 0);
-}
-
-// 5. Data Movement (MOV)
-// - LEGAL:   Equal types (i32 -> i32, f32 -> f32)
-// - BITCAST: i32 <-> f32 (slot 1)
-LegalizeQueryResult queryMov(size_t op1Type, size_t op2Type, size_t /*op3Type*/)
-{
-    auto dstType = static_cast<MirTypeCompactId>(op1Type);
-    auto srcType = static_cast<MirTypeCompactId>(op2Type);
-
-    if (dstType == srcType)
+    bool isRematerializable(MirRegister *vreg, MirInstruction *definingInst) override
     {
-        return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
-                                    .m_compactId = static_cast<uint8_t>(dstType),
-                                    .m_slot = 0,
-                                    .m_libcallOffset = 0 };
+        if (!definingInst)
+            return false;
+
+        if (definingInst->getOpCode() == MirInstructionOpCode::MOV && definingInst->getOperands().size() >= 2)
+        {
+            auto *srcOp = definingInst->getOperands()[1];
+            return srcOp && (srcOp->getType() == MirOperandType::Integer || srcOp->getType() == MirOperandType::FloatingPoint);
+        }
+        return false;
     }
 
-    if (dstType == MirTypeCompactId::i32 && srcType == MirTypeCompactId::f32)
+    MirInstruction *emitReload(RegisterAllocatorCtx *ctx,
+                               MirBlock *block,
+                               IntrusiveLinkedList<MirInstruction>::iterator it,
+                               SourceReference *srcRef,
+                               MirRegister *dstReg,
+                               StackFrameObject *spillSlot) override
     {
-        return LegalizeQueryResult{ .m_action = LegalizeAction::Bitcast,
-                                    .m_compactId = static_cast<uint8_t>(MirTypeCompactId::i32),
-                                    .m_slot = 1,
-                                    .m_libcallOffset = 0 };
+        m_reloadCount++;
+        MirOperandBuilder opBuilder(ctx->m_ctx);
+        MirInstructionBuilder iBuilder(ctx->m_ctx, block, InsertionType::InsertBefore, it);
+        MirReference *slotRef = opBuilder.buildRef(spillSlot, srcRef);
+        return iBuilder.LOAD(srcRef, dstReg, slotRef);
     }
 
-    return defaultUnsupportedQuery(op1Type, op2Type, 0);
-}
-
-// 5. Data Movement (POP_ARG)
-// - LEGAL:   i32
-LegalizeQueryResult queryPopArg(size_t op1Type, size_t op2Type, size_t /*op3Type*/)
-{
-    auto dstType = static_cast<MirTypeCompactId>(op1Type);
-    auto srcType = static_cast<MirTypeCompactId>(op2Type);
-
-    if (dstType == MirTypeCompactId::__bindToken && srcType == MirTypeCompactId::i32)
+    MirInstruction *emitSpill(RegisterAllocatorCtx *ctx,
+                              MirBlock *block,
+                              IntrusiveLinkedList<MirInstruction>::iterator it,
+                              SourceReference *srcRef,
+                              StackFrameObject *spillSlot,
+                              MirRegister *srcReg) override
     {
-        return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
-                                    .m_compactId = 0,
-                                    .m_slot = 0,
-                                    .m_libcallOffset = 0 };
+        m_spillCount++;
+        MirOperandBuilder opBuilder(ctx->m_ctx);
+        MirInstructionBuilder iBuilder(ctx->m_ctx, block, InsertionType::InsertAfter, it);
+        MirReference *slotRef = opBuilder.buildRef(spillSlot, srcRef);
+        return iBuilder.STORE(srcRef, slotRef, srcReg);
     }
 
-    return defaultUnsupportedQuery(op1Type, op2Type, 0);
-}
-
-// 5. Data Movement (POP_ARG)
-// - LEGAL:   bindngtoken
-LegalizeQueryResult queryEndArg(size_t op1Type, size_t op2Type, size_t /*op3Type*/)
-{
-    auto dstType = static_cast<MirTypeCompactId>(op1Type);
-    if (dstType == MirTypeCompactId::__bindToken)
+    MirInstruction *reMaterialize(RegisterAllocatorCtx *ctx,
+                                  MirBlock *block,
+                                  IntrusiveLinkedList<MirInstruction>::iterator it,
+                                  SourceReference *srcRef,
+                                  MirRegister *dstReg,
+                                  MirInstruction *defInst) override
     {
-        return LegalizeQueryResult{ .m_action = LegalizeAction::Legal,
-                                    .m_compactId = 0,
-                                    .m_slot = 0,
-                                    .m_libcallOffset = 0 };
+        m_rematCount++;
+        MirInstructionBuilder iBuilder(ctx->m_ctx, block, InsertionType::InsertBefore, it);
+        std::pmr::vector<MirOperand *> ops(ctx->m_allocator);
+        ops.push_back(dstReg);
+        for (size_t i = 1; i < defInst->getOperands().size(); ++i)
+        {
+            ops.push_back(defInst->getOperands()[i]);
+        }
+        return iBuilder.build(defInst->getOpCode(), srcRef, ops);
     }
+};
 
-    return defaultUnsupportedQuery(op1Type, op2Type, 0);
-}
 
-} // anonymous namespace
 
 /**
  * Modern fluent table-driven legalizer specification for MockTarget.
@@ -415,34 +305,15 @@ class MockTargetDesc : public TargetDesc
     MirFrameLowerer *getFrameLowerer() override { return &m_frameLowerer; }
     MirInstructionSelector *getInstructionSelector() override { return &m_isel; }
     MirLegalizer *getLegalizer() override { return m_legalizer.get(); }
-    MirLegalizeActionTable *getLegalizeActionTable() override { return &m_mockActionTable; }
     LegalizerInfo *getLegalizerInfo() override { return m_legalizerInfo.get(); }
-    MirRegisterAllocator *getRegisterAllocator() override { return nullptr; }
+    MirRegisterAllocator *getRegisterAllocator() override { return &m_regAlloc; }
+    MockRegisterAllocator *getMockRegisterAllocator() { return &m_regAlloc; }
     MirType *getMemOperandDisplacementType() override;
     MirRegisterRef getInstructionPtrReg() const override { return {}; }
     size_t getStackSlotSize() const override { return 8; }
     void initialize() override
     {
         m_legalizerInfo = std::make_unique<MockTargetLegalizerInfo>(m_ctx->getTypeTable());
-
-        constexpr size_t OpcodeCount = static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT);
-        for (size_t i = 0; i <= OpcodeCount; ++i)
-        {
-            m_mockActionTable.m_queryTable[static_cast<uint16_t>(i)] = &defaultUnsupportedQuery;
-        }
-
-        // Register test opcodes
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::ADD)] = &queryAlu;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::SUB)] = &queryAlu;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::XOR)] = &queryAlu;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::DIV)] = &queryDiv;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::IDIV)] = &queryDiv;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::CMP_EQ)] = &queryCmp;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::SEXT)] = &querySext;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::MOV)] = &queryMov;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::POP_ARG)] = &queryPopArg;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::END_ARG)] = &queryEndArg;
-        m_mockActionTable.m_queryTable[static_cast<uint16_t>(MirInstructionOpCode::PUSH_RET)] = &queryPopArg;
     }
     std::string_view getLibcallStr(uint8_t symId) override
     {
@@ -473,10 +344,10 @@ class MockTargetDesc : public TargetDesc
     MirRegisterClass *getGprClass() { return m_gprClass; }
 
   private:
-    MirLegalizeActionTable m_mockActionTable;
     std::unique_ptr<LegalizerInfo> m_legalizerInfo;
     MockInstructionSelector m_isel;
     MockFrameLowerer m_frameLowerer;
+    MockRegisterAllocator m_regAlloc;
     std::unique_ptr<MockCallingConvDesc> m_mockCc;
     std::unique_ptr<MirLegalizer> m_legalizer;
     MirBuilderContext *m_ctx;

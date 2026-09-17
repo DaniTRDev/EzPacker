@@ -6,6 +6,7 @@
 #include "FrameLowerer/MirFrameLowererPass.h"
 #include "Function/MirFunction.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirInstructionSet.h"
 #include "Printer/MirPrinter.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 
@@ -40,7 +41,11 @@ MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_i
             MirInstruction *instr = *it;
             ctx.m_allocIt = it;
 
-            if (!lowerer->lowerAlloc(ctx))
+            if (instr && instr->getOpCode() == MirInstructionOpCode::ALLOC)
+            {
+                lowerer->lowerAlloc(ctx);
+            }
+            else if (instr && instr->getOpCode() == MirInstructionOpCode::DALLOC)
             {
                 lowerer->lowerDAlloc(ctx);
             }

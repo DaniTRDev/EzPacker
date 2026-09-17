@@ -85,6 +85,13 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
         ctx->m_reservedRegs.insert(fpReg);
     }
 
+    // Reserve physical Stack Pointer register if physical
+    MirRegisterRef spReg = cc->getStackPointerReg();
+    if (spReg.isPhysical())
+    {
+        ctx->m_reservedRegs.insert(spReg);
+    }
+
     return true;
 }
 

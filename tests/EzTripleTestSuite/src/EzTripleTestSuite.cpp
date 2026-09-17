@@ -80,6 +80,23 @@ MockTargetDesc::MockTargetDesc(MirBuilderContext *ctx) :
     m_gprClass = alloc.new_object<MirRegisterClass>("GPR64", m_gprBank, ctx->getGlobalAllocator());
     m_gprBank->addClass("GPR64", m_gprClass);
 
+    m_gprClass->addRegister("rax", 64, 0, {});
+    m_gprClass->addRegister("rdi", 64, 0, {});
+    m_gprClass->addRegister("rsi", 64, 0, {});
+    m_gprClass->addRegister("rdx", 64, 0, {});
+    m_gprClass->addRegister("rcx", 64, 0, {});
+    m_gprClass->addRegister("r8", 64, 0, {});
+    m_gprClass->addRegister("r9", 64, 0, {});
+    m_gprClass->addRegister("rbp", 64, 0, {});
+    m_gprClass->addRegister("rsp", 64, 0, {});
+    m_gprClass->addRegister("rbx", 64, 0, {});
+    m_gprClass->addRegister("r10", 64, 0, {});
+    m_gprClass->addRegister("r11", 64, 0, {});
+    m_gprClass->addRegister("r12", 64, 0, {});
+    m_gprClass->addRegister("r13", 64, 0, {});
+    m_gprClass->addRegister("r14", 64, 0, {});
+    m_gprClass->addRegister("r15", 64, 0, {});
+
     m_mockCc = std::make_unique<MockCallingConvDesc>(ctx, m_gprClass);
     m_legalizer = std::make_unique<MirLegalizer>(ctx, this);
 

@@ -35,26 +35,26 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
     for (StackFrameObject *obj : func->getStackFrame()->getObjects())
     {
         size_t objSize = obj->m_type->getTotalSizeInBytes();
-        size_t objAlign = std::max(obj->m_type->getMaxAlignmentInBits(), slotSize);
-
-        // Align current byte offset upwards to object's alignment requirement
-        currentOffset = (currentOffset + objAlign - 1) & ~(objAlign - 1);
+        size_t objAlign = std::max((obj->m_type->getMaxAlignmentInBits() + 7) / 8, slotSize);
 
         // Assign object offset relative to Frame Pointer (FP)
         if (growsDown)
         {
+            currentOffset += objSize;
+            currentOffset = (currentOffset + objAlign - 1) & ~(objAlign - 1);
             obj->m_offset = -static_cast<int64_t>(currentOffset); // Negative displacement from FP
         }
         else
         {
+            // Align current byte offset upwards to object's alignment requirement
+            currentOffset = (currentOffset + objAlign - 1) & ~(objAlign - 1);
             obj->m_offset = static_cast<int64_t>(currentOffset); // Positive displacement
+            currentOffset += objSize;
         }
 
         auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
         log << "Lowered stack frame object" << func->getSourceRef();
         log.appendNote(func->getSourceRef(), "{}", MirPrinter::printToString(obj));
-
-        currentOffset += objSize;
     }
 
     // Include ABI shadow space (e.g., 32 bytes on Win64 ABI)

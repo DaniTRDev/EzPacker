@@ -37,3 +37,10 @@ EzPacker_AddTest(
         ""
         "tests/T_MirFrameLowerer.cpp"
 )
+
+EzPacker_AddTest(
+        "T_MirRegisterAllocator"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_MirRegisterAllocator.cpp"
+)

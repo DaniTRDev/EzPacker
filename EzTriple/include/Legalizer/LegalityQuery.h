@@ -25,9 +25,6 @@ enum class LegalizeActionKind : uint8_t
     Unsupported    // Explicitly rejected combination. Emits a compiler diagnostic error.
 };
 
-// Backwards compatibility alias for existing code using LegalizeAction
-using LegalizeAction = LegalizeActionKind;
-
 /**
  * Query descriptor capturing all relevant properties of a MIR instruction to determine its legality.
  */
@@ -36,9 +33,12 @@ struct LegalityQuery
     MirInstructionOpCode m_opcode{ MirInstructionOpCode::INVALID };
     uint32_t m_flags{ 0 };                     // MirInstructionFlags (IsCall, IsReturn, IsSigned, etc.)
     size_t m_operandCount{ 0 };
-    std::array<MirType *, 4> m_types{ nullptr, nullptr, nullptr, nullptr };     // Concrete MirType pointers for first 4 operands
-    std::array<uint8_t, 4> m_compactIds{ 0, 0, 0, 0 };  // Compact type IDs for fast indexing
-    std::array<ExpectedOperandType, 4> m_operandKinds{ ExpectedOperandType::None, ExpectedOperandType::None, ExpectedOperandType::None, ExpectedOperandType::None }; // Register, Immediate, Memory, etc.
+    std::array<MirType *, 6> m_types{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };     // Concrete MirType pointers for operands
+    std::array<uint8_t, 6> m_compactIds{ 0, 0, 0, 0, 0, 0 };  // Compact type IDs for fast indexing
+    std::array<ExpectedOperandType, 6> m_operandKinds{
+        ExpectedOperandType::None, ExpectedOperandType::None, ExpectedOperandType::None,
+        ExpectedOperandType::None, ExpectedOperandType::None, ExpectedOperandType::None
+    }; // Register, Immediate, Memory, etc.
     int64_t m_immValue{ 0 };              // Immediate constant value if second operand is imm
     bool m_hasImm{ false };
 };

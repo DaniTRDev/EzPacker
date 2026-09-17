@@ -14,7 +14,6 @@
 #include "Legalizer/Actions/LegalizeWidenScalarAction.h"
 #include "Legalizer/InsertionTracker.h"
 #include "Legalizer/LegalizerInfo.h"
-#include "Legalizer/MirLegalizeActionTable.h"
 #include "Operand/MirOperand.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
@@ -83,19 +82,6 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
         {
             response = m_targetDesc->getLegalizerInfo()->query(query);
         }
-        else if (m_targetDesc && m_targetDesc->getLegalizeActionTable())
-        {
-            uint8_t t0 = query.m_compactIds[0];
-            uint8_t t1 = query.m_compactIds[1];
-            uint8_t t2 = query.m_compactIds[2];
-            auto decision = m_targetDesc->getLegalizeActionTable()->query(inst->getOpCode(), t0, t1, t2);
-            response.m_action = static_cast<LegalizeActionKind>(decision.m_action);
-            response.m_targetCompactId = decision.m_compactId;
-            response.m_slot = decision.m_slot;
-            response.m_handlerOrStringId = (decision.m_action == LegalizeAction::Libcall)
-                    ? decision.m_libcallOffset
-                    : decision.m_customActionId;
-        }
 
         // Fast path: instruction is already legal
         if (response.isLegal())
@@ -147,19 +133,6 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
     {
         response = m_targetDesc->getLegalizerInfo()->query(query);
     }
-    else if (m_targetDesc && m_targetDesc->getLegalizeActionTable())
-    {
-        uint8_t t0 = query.m_compactIds[0];
-        uint8_t t1 = query.m_compactIds[1];
-        uint8_t t2 = query.m_compactIds[2];
-        auto decision = m_targetDesc->getLegalizeActionTable()->query(inst->getOpCode(), t0, t1, t2);
-        response.m_action = static_cast<LegalizeActionKind>(decision.m_action);
-        response.m_targetCompactId = decision.m_compactId;
-        response.m_slot = decision.m_slot;
-        response.m_handlerOrStringId = (decision.m_action == LegalizeAction::Libcall)
-                ? decision.m_libcallOffset
-                : decision.m_customActionId;
-    }
 
     if (response.isLegal())
     {
@@ -189,7 +162,7 @@ LegalityQuery MirLegalizer::buildQuery(MirInstruction *inst)
     q.m_flags = static_cast<uint32_t>(inst->getFlags());
     q.m_operandCount = inst->getOperandCount();
 
-    size_t limit = std::min(inst->getOperandCount(), size_t(4));
+    size_t limit = std::min(inst->getOperandCount(), q.m_types.size());
     for (size_t i = 0; i < limit; ++i)
     {
         MirOperand *op = inst->getOperand(i);
@@ -316,10 +289,6 @@ LegalizationResult MirLegalizer::executeAction(const LegalityResponse &response,
             if (m_targetDesc && m_targetDesc->getLegalizerInfo())
             {
                 return m_targetDesc->getLegalizerInfo()->executeCustom(ctx, response.m_handlerOrStringId);
-            }
-            if (m_targetDesc && m_targetDesc->getLegalizeActionTable())
-            {
-                return m_targetDesc->getLegalizeActionTable()->executeCustomAction(&ctx, static_cast<uint8_t>(response.m_handlerOrStringId));
             }
             return LegalizationResult::Failed;
         }

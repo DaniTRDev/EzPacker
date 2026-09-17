@@ -39,24 +39,6 @@ std::string ActionKindToCpp(DSL::Ast::LegalizeActionDef::LegalizeActionKind kind
     return "LegalizeActionKind::Unsupported";
 }
 
-uint8_t resolveFallbackCompactId(std::string_view name)
-{
-    if (name == "_void") return 1;
-    if (name == "__bindToken") return 2;
-    if (name == "ptr") return 3;
-    if (name == "i1") return 4;
-    if (name == "i8") return 5;
-    if (name == "i16") return 6;
-    if (name == "i32") return 7;
-    if (name == "i64") return 8;
-    if (name == "i128") return 9;
-    if (name == "i256") return 10;
-    if (name == "f32") return 11;
-    if (name == "f64") return 12;
-    if (name == "f128") return 13;
-    return 0;
-}
-
 std::string ToUpper(std::string_view s)
 {
     std::string res(s);
@@ -178,12 +160,7 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
         {
             if (const auto *tdata = sym->getIf<Symbols::TypeSymbol>())
             {
-                uint8_t cid = tdata->m_compactId;
-                if (cid == 0)
-                {
-                    cid = resolveFallbackCompactId(sym->getName());
-                }
-                typeMap[sym->getId()] = TypeEntry{ std::string(sym->getName()), cid };
+                typeMap[sym->getId()] = TypeEntry{ std::string(sym->getName()), tdata->m_compactId };
             }
         }
     }

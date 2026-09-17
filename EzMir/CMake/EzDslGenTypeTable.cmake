@@ -36,10 +36,16 @@ function(EzDslGenerateTypeTable)
     # Ensure output directory exists
     file(MAKE_DIRECTORY "${EZDSL_OUTPUT_DIR}")
 
+    set(ENV_WRAPPER "")
+    if(WIN32)
+        get_filename_component(COMPILER_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        set(ENV_WRAPPER ${CMAKE_COMMAND} -E env "PATH=${CMAKE_BINARY_DIR}/bin\;${COMPILER_DIR}\;C:/Windows/system32\;C:/Windows" --)
+    endif()
+
     # Build custom command with dependency tracking
     add_custom_command(
         OUTPUT "${GEN_HEADER}" "${GEN_SOURCE}"
-        COMMAND EzDslCli
+        COMMAND ${ENV_WRAPPER} $<TARGET_FILE:EzDslCli>
                 -i "${EZDSL_INPUT}"
                 -o "${EZDSL_OUTPUT_DIR}"
                 --emit-type-table
@@ -55,16 +61,6 @@ function(EzDslGenerateTypeTable)
     )
 
     # Expose output directory to target's include path
-    target_include_directories(${EZDSL_TARGET} PUBLIC
-        "$<BUILD_INTERFACE:${EZDSL_OUTPUT_DIR}>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
-    )
-
-    target_sources(${EZDSL_TARGET} PRIVATE
-        "${GEN_HEADER}"
-        "${GEN_SOURCE}"
-    )
-
     target_include_directories(${EZDSL_TARGET} PUBLIC
         "$<BUILD_INTERFACE:${EZDSL_OUTPUT_DIR}>"
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>"
