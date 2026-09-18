@@ -120,6 +120,7 @@ void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
     emitter.emitBlankLine();
 
     emitter.emitInclude("Instruction/MirTargetInstructionDesc.h");
+    emitter.emitInclude("Descriptors/TargetDesc.h");
     emitter.emitLine("#include <cstdint>");
     emitter.emitLine("#include <cstddef>");
     emitter.emitBlankLine();
@@ -145,7 +146,7 @@ void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitBlankLine();
 
         emitter.emitLine("const MirTargetInstructionDesc *getTargetDesc(OpCode op);");
-        emitter.emitLine("void initializeTargetInstructionTable(class TargetDesc *target);");
+        emitter.emitLine("void initializeTargetInstructionTable(::TargetDesc *target);");
     }
 
     emitter.emitBlankLine();
@@ -228,7 +229,7 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
         emitter.emitBlankLine();
 
         // initializeTargetInstructionTable
-        emitter.emitLine("void initializeTargetInstructionTable(TargetDesc *target)");
+        emitter.emitLine("void initializeTargetInstructionTable(::TargetDesc *target)");
         {
             auto fnScope = emitter.enterBlock();
             emitter.emitLine("if (!target) return;");

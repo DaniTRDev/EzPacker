@@ -67,6 +67,8 @@ struct RegisterAllocatorCtx
 class MirRegisterAllocator
 {
   public:
+    virtual ~MirRegisterAllocator() = default;
+
     /**
      * Builds the interference graph from the given context and liveness analysis.
      */

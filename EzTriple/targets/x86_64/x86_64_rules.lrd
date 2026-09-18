@@ -1,4 +1,8 @@
-rule SDivPow2 {
+// ============================================================================
+// Power-of-2 Division Strength Reductions
+// ============================================================================
+
+rule SDivPow2_32 {
     match {
         SDIV i32:$dst, i32:$lhs, imm(i32):$c;
     };
@@ -11,7 +15,20 @@ rule SDivPow2 {
     };
 };
 
-rule UDivPow2 {
+rule SDivPow2_64 {
+    match {
+        SDIV i64:$dst, i64:$lhs, imm(i64):$c;
+    };
+    when {
+        isPowTwo($c);
+        isPositiveConst($c);
+    };
+    emit {
+        SAR i64:$dst, i64:$lhs, log2($c);
+    };
+};
+
+rule UDivPow2_32 {
     match {
         UDIV i32:$dst, i32:$lhs, imm(i32):$c;
     };
@@ -20,5 +37,85 @@ rule UDivPow2 {
     };
     emit {
         SHR i32:$dst, i32:$lhs, log2($c);
+    };
+};
+
+rule UDivPow2_64 {
+    match {
+        UDIV i64:$dst, i64:$lhs, imm(i64):$c;
+    };
+    when {
+        isPowTwo($c);
+    };
+    emit {
+        SHR i64:$dst, i64:$lhs, log2($c);
+    };
+};
+
+// ============================================================================
+// Power-of-2 Remainder (Modulo) Strength Reductions
+// ============================================================================
+
+rule URemPow2_32 {
+    match {
+        REM i32:$dst, i32:$lhs, imm(i32):$c;
+    };
+    when {
+        isPowTwo($c);
+    };
+    emit {
+        AND i32:$dst, i32:$lhs, sub1($c);
+    };
+};
+
+rule URemPow2_64 {
+    match {
+        REM i64:$dst, i64:$lhs, imm(i64):$c;
+    };
+    when {
+        isPowTwo($c);
+    };
+    emit {
+        AND i64:$dst, i64:$lhs, sub1($c);
+    };
+};
+
+// ============================================================================
+// Identity Arithmetic Simplifications
+// ============================================================================
+
+rule AddZero_32 {
+    match {
+        ADD i32:$dst, i32:$lhs, 0;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule AddZero_64 {
+    match {
+        ADD i64:$dst, i64:$lhs, 0;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
+
+rule SubZero_32 {
+    match {
+        SUB i32:$dst, i32:$lhs, 0;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule SubZero_64 {
+    match {
+        SUB i64:$dst, i64:$lhs, 0;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
     };
 };

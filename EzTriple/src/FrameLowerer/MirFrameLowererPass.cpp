@@ -39,7 +39,8 @@ MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_i
         while (it != instrList.end())
         {
             MirInstruction *instr = *it;
-            ctx.m_allocIt = it;
+            auto currIt = it++;
+            ctx.m_allocIt = currIt;
 
             if (instr && instr->getOpCode() == MirInstructionOpCode::ALLOC)
             {
@@ -49,8 +50,6 @@ MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_i
             {
                 lowerer->lowerDAlloc(ctx);
             }
-
-            it++;
         }
     }
 

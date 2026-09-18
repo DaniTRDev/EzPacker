@@ -116,7 +116,8 @@ enum class MirInstructionFlags : uint32_t
     ReadsCPUFlags = 1 << 11, // Instruction inspects hardware status flags
     WritesCPUFlags = 1 << 12,// Instruction modifies hardware status flags
     TreatAsSigned = 1 << 13, // Arithmetic or comparison treats operands as signed integers
-    VariadicArgs = 1 << 14   // Instruction accepts variable number of operands (e.g. CALL, PHI)
+    VariadicArgs = 1 << 14,  // Instruction accepts variable number of operands (e.g. CALL, PHI)
+    IsMove = 1 << 15         // Instruction is a register-to-register or direct value move
 };
 
 /**

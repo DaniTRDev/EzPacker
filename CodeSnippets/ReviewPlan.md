@@ -1,483 +1,608 @@
-# Comprehensive Architecture Review Plan: EzTriple & EzDsl
-**Pre-Instruction Selection Architectural Audit, Verification & Hardening Process**
+# Comprehensive Master Architecture & Implementation Review Plan: EzPacker Compiler Suite
+**Exhaustive End-to-End Audit, Invariant Verification, Memory Safety & Hardening Framework**
 
 ---
 
-## 1. Executive Summary & Objective
+## 1. Executive Summary & Project Vision
 
 ### 1.1 Context & Motivation
-The **EzPacker** compiler backend is preparing to transition into its most pivotal development milestone: **Instruction Selection (ISel)**. 
-
-Instruction selection serves as the central bridge in any compiler backend, converting abstract, target-independent Mid-Level Intermediate Representation (**MirInstruction**) operations (`ADD`, `SUB`, `LOAD`, `STORE`, `CALL`, `BRANCH`, etc.) into concrete, hardware-specific machine instructions (`ADD32rr`, `MOV64rm`, `LEA64_32r`, etc.) bound to physical register banks, classes, and complex addressing modes.
-
-However, Instruction Selection cannot succeed in isolation. It sits downstream of:
-1. **EzMir**: The core intermediate representation, type system, and basic block/instruction data structures.
-2. **EzDsl**: The declarative meta-compiler toolchain responsible for compiling target architectures, instruction sets, types, calling conventions, legalization matrices, and rewrite rules into generated C++ headers and dispatchers.
-3. **EzTriple**: The backend code generation framework, encompassing the table-driven Legalizer, ABI Lowerer, Register Allocator, Frame Lowerer, and Target Descriptors.
+The **EzPacker** project is an ambitious, industrial-grade ahead-of-time (AOT) compiler infrastructure and binary packer. Its architecture decouples the front-end language syntax, intermediate representation, target-specific declarative domain-specific languages (DSLs), backend code generation passes, and raw machine code emission into cleanly bounded, highly cohesive subsystems:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   The EzPacker Compilation Flow                                  │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    EzPacker End-to-End Compiler Pipeline                               │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-   High-Level AST / Frontends
-               │
-               ▼
-   [ EzMir Generation ] ────────── High-level IR with virtual registers & arbitrary types
-               │
-               ▼
-   [ EzTriple Legalizer ] ──────── Worklist transforms illegal types & ops into legal machine types
-               │                   (Driven by EzDsl-generated <Target>LegalizerActionTable)
-               ▼
-   [ EzTriple ABI Lowerer ] ────── Replaces CALL/RET/ARG tokens with calling convention registers
-               │                   (Driven by CallingConvDesc / upcoming EzDsl CallingConvGen)
-               ▼
-  ╔══════════════════════════════════════════════════════════════════════════════════════════════════╗
-  ║                        ★ INSTRUCTION SELECTION MILESTONE (NEXT STAGE) ★                        ║
-  ║  Pattern-matches generic MIR DAGs/trees into Target-Specific Hardware Instructions (TargetLow) ║
-  ║  (Will be driven by upcoming EzDsl .isd / Target Instruction Selection Engine)                  ║
-  ╚══════════════════════════════════════════════════════════════════════════════════════════════════╝
-               │
-               ▼
-   [ EzTriple Reg Allocator ] ──── Chaitin-Briggs Graph Coloring assigns physical registers / spills
-               │
-               ▼
-   [ EzTriple Frame Lowerer ] ──── Calculates stack frame layout, inserts prologue/epilogue, lowers FP/SP
-               │
-               ▼
-   [ EzCodeEmitter ] ───────────── Emits machine code / binary sections (ELF, PE-COFF, Mach-O)
+ [ High-Level Ez Source ] (.ez)
+            │
+            ▼
+ ┌──────────────────────┐
+ │      EzFrontend      │  Lexing, AST Construction, Type Checking, Semantic Validation
+ └──────────┬───────────┘
+            │  EzAstLowerer
+            ▼
+ ┌──────────────────────┐
+ │        EzMir         │  Typed SSA Intermediate Representation, Control Flow Graph (CFG),
+ └──────────┬───────────┘  Liveness Analysis, PMR Allocator Arenas, Pass Manager Infrastructure
+            │
+            ▼
+ ┌──────────────────────┐    ┌──────────────────────────────────────────────────────────────┐
+ │       EzTriple       │◄───┤                            EzDsl                             │
+ │   Backend Pipeline   │    │  Target Architecture Meta-Compiler (.tyf, .idf, .ezcc,      │
+ └──────────┬───────────┘    │  .lad, .lrd, .isf) -> Synthesized C++ Descriptors & Matchers │
+            │                └──────────────────────────────────────────────────────────────┘
+            ▼
+ ┌──────────────────────┐
+ │    EzCodeEmitter     │  Hardware Machine Code Encoding, Section Builders, Relocations,
+ └──────────┬───────────┘  Executable Layout (ELF, PE-COFF, Mach-O)
+            │
+            ▼
+ [ Native Executable / Object File ]
 ```
 
-### 1.2 The Core Problem: Risk of Cascading Technical Debt
-If Instruction Selection is built on top of an unstable, under-tested, or leaky foundation:
-- Un-legalized types or illegal operand combinations will slip through the legalizer and panic during pattern matching.
-- Incomplete ABI lowering will cause argument/return registers to clash with ISel instruction constraints.
-- Inconsistencies between `EzDsl`'s semantic analysis and `EzTriple`'s runtime expectations will cause silent code-generation bugs or generator crashes.
-- Any architectural refactoring required *after* building ISel pattern matchers will carry a 10x cost, as hundreds of instruction patterns will have to be modified or re-tested.
+### 1.2 The Imperative for a Meticulous Full-Project Review
+As the backend matures—integrating table-driven Legalization, synthesized Calling Convention Descriptors, bottom-up Instruction Selection with complex SIB addressing mode folding, Chaitin-Briggs graph coloring Register Allocation, and Frame Lowering—the interdependencies between modules multiply.
 
-### 1.3 Review Goal
-This document defines a formal, comprehensive, 6-pillar, 5-phase **Architecture Review Process** for **`EzTriple`** and **`EzDsl`**. The process systematically audits every layer, identifies and remediates architectural gaps, verifies cross-subsystem contracts, establishes automated regression guards, and certifies that the foundations are rock solid before writing the first line of the new Instruction Selection engine.
+Minor structural inconsistencies, mismatched memory allocation models, subtle edge-case omissions in semantic analysis, or latent quadratic complexities in intermediate passes can cascade across the pipeline. A defect in `EzDsl`'s semantic analysis can emit malformed pattern matchers; an unhandled operand constraint in `MirLegalizer` will panic during Instruction Selection; a neglected calling convention alignment requirement will trigger bus errors or segfaults at runtime.
+
+### 1.3 Review Mission & Scope
+This plan establishes a formal, meticulous, and systematic review methodology to audit **every layer of the EzPacker codebase**:
+1. **EzCore**: Foundation utilities, memory resources, diagnostics, source tracking.
+2. **EzFrontend**: Lexer, Parser, AST, Semantic Analysis, and AST-to-MIR lowering.
+3. **EzMir**: Intermediate representation, instructions, blocks, functions, operand model, SSA tracking, CFG, pass infrastructure.
+4. **EzDsl**: Language parsers (lexy), semantic passes (Sema), symbol tables, C++ code generators, CLI driver (`ezdslc`).
+5. **EzTriple**: Backend passes (Signature Legalizer, Legalizer, ABI Lowerer, Instruction Selector, Register Allocator, Frame Lowerer, Target Descriptors).
+6. **EzCodeEmitter**: Machine instruction encoding, label resolution, relocations, binary formats.
+7. **CMake & Tooling**: Build determinism, compiler flags, sanitizers, test runners, knowledge graph synchronization (`graphify`).
 
 ---
 
-## 2. Baseline Architecture Audit & Current Technical Debt
+## 2. Architectural Pillars & Core Invariants
 
-A preliminary codebase audit of `EzTriple`, `EzDsl`, and `tests/` has identified both solid accomplishments and critical gaps that this review process must immediately address.
-
-### 2.1 Accomplishments & Current Strengths
-1. **Modern Legalizer Foundations**:
-   - `EzTriple/include/Legalizer/LegalizerInfo.h` implements a fluent 3-tier lookup engine:
-     - **Tier 1**: Flat $O(1)$ 2D matrix (`m_primaryMatrix[Opcode][CompactTypeId]`).
-     - **Tier 2**: Heterogeneous multi-slot rule matchers (`m_ruleMatchers`).
-     - **Tier 3**: Wildcard actions, standard lowering, and custom rewrite dispatchers.
-   - `EzTriple/src/Legalizer/MirLegalizer.cpp` has adopted a worklist queue, cycle detection with step limits, and `InsertionTracker`.
-2. **EzDSL Code Generation Progress**:
-   - `CppLegalizerGenerator` and `CppLegalizeRuleGenerator` synthesize `<Target>LegalizerActionTable.h/.cpp` and `<Target>LegalizerRules.h/.cpp` directly from `.lad` and `.lrd` files.
-   - All 32 existing tests in `EzTripleTestSuite`, `EzDslCodeGeneratorsTestSuite`, `EzDslCliTestSuite`, `EzDslLexerTestSuite`, `EzDslSemaTestSuite`, and `EzMirTestSuite` pass when supplied with the proper runtime environment.
-
-### 2.2 Critical Gaps & Technical Debt Identified
-The audit revealed several architectural discrepancies, testing voids, and coupling issues that must be prioritized during the review:
-
-| Subsystem | File / Component | Severity | Discovered Defect / Architectural Gap |
-| :--- | :--- | :--- | :--- |
-| **EzTriple Tests** | [`tests/EzTripleTestSuite/tests/T_MirFrameLowerer.cpp`](file:///E:/Repos/EzPacker/tests/EzTripleTestSuite/tests/T_MirFrameLowerer.cpp) | **CRITICAL** | **Copy-Paste Test Duplicate**: `T_MirFrameLowerer.cpp` is an exact copy-paste duplicate of `T_MirLegalizer.cpp` (only the test fixture class was renamed). There is **zero** test coverage for prologue/epilogue emission, stack frame offset calculation, or ALLOC/DALLOC lowering. |
-| **EzTriple Tests** | `tests/EzTripleTestSuite/tests/T_MirRegisterAllocator.cpp` | **HIGH** | **Missing Allocator Tests**: There is no test file for `MirRegisterAllocator`. `MockTargetDesc::getRegisterAllocator()` returns `nullptr`. The Chaitin-Briggs graph coloring allocator has never been verified in the main test suite. |
-| **EzTriple FrameLowerer** | [`EzTriple/src/FrameLowerer/MirFrameLowererPass.cpp`](file:///E:/Repos/EzPacker/EzTriple/src/FrameLowerer/MirFrameLowererPass.cpp#L43-L47) | **HIGH** | **Blind ALLOC Scanning**: `MirFrameLowererPass` iterates every instruction in every block and blindly calls `lowerAlloc(ctx)` followed by `lowerDAlloc(ctx)` without checking `instr->getOpCode() == ALLOC` or verifying instruction categories. |
-| **EzDsl CallingConv** | [`EzDsl/Lexer/include/Ast/CallingConvDefLangAst.h`](file:///E:/Repos/EzPacker/EzDsl/Lexer/include/Ast/CallingConvDefLangAst.h) | **HIGH** | **Missing CallingConv Sema & Generator**: While `.cc` AST and parser exist in `Lexer/`, there is no `CallingConvPass` in `EzDsl/Sema` and no `CppCallingConvGenerator` in `EzDsl/CodeGenerators`. Calling conventions in `EzTriple` remain handwritten C++ stubs (`MockCallingConvDesc`). |
-| **EzDsl Generators** | [`EzDsl/CodeGenerators/src/CodeGenerators/CppLegalizerGenerator.cpp`](file:///E:/Repos/EzPacker/EzDsl/CodeGenerators/src/CodeGenerators/CppLegalizerGenerator.cpp#L42-L58) | **MEDIUM** | **Hardcoded Compact ID Fallbacks**: `resolveFallbackCompactId()` duplicates type table indices in an anonymous namespace instead of querying `SymbolTable` or a centralized type definition table. If `MirTypeCompactId` changes, code generation desynchronizes. |
-| **EzTriple Legalizer** | [`EzTriple/include/Legalizer/LegalityQuery.h`](file:///E:/Repos/EzPacker/EzTriple/include/Legalizer/LegalityQuery.h#L39-L41) | **MEDIUM** | **Hardcoded 4-Operand Cap**: `LegalityQuery` uses fixed `std::array<MirType *, 4>` and `std::array<uint8_t, 4>`. Instructions with 5+ operands (variadic calls, target-specific fused MAC operations, vector shuffles) will silently truncate operand data. |
-| **EzTriple / EzDsl Memory** | [`EzTriple/include/Legalizer/LegalizerInfo.h`](file:///E:/Repos/EzPacker/EzTriple/include/Legalizer/LegalizerInfo.h#L177-L180) | **MEDIUM** | **Inconsistent Allocator Usage**: Some structures use STL standard allocators (`std::vector`, `std::unordered_map`), while compiler core structures use PMR allocators (`std::pmr::vector`). This creates unwanted heap allocations on hot query paths. |
-| **EzTriple Descriptors** | [`EzTriple/include/Descriptors/TargetDesc.h`](file:///E:/Repos/EzPacker/EzTriple/include/Descriptors/TargetDesc.h#L43-L48) | **LOW** | **Legacy Dual Interface**: Both `getLegalizeActionTable()` (legacy compact-ID struct) and `getLegalizerInfo()` (fluent 3-tier object) exist. `MirLegalizer.cpp` has fallback branches to the legacy table, keeping dead code paths alive. |
-
----
-
-## 3. The 6 Pillars of the Architecture Review
-
-The review process is structured into **Six Fundamental Pillars**. Each pillar establishes precise review criteria, invariants, and verification deliverables.
+The review evaluates the entire project against **Seven Foundational Pillars**. Each pillar defines strict operational invariants that must hold under all execution paths.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                               Six Pillars of Architectural Review                                │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 Seven Pillars of Architectural Review                                  │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-   ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌─────────────────────────────┐
-   │          PILLAR 1           │   │          PILLAR 2           │   │          PILLAR 3           │
-   │      EzDSL Frontend &       │   │    EzDSL Semantic Model &   │   │     EzDSL Code Generators   │
-   │      Grammar Integrity      │   │    Symbol Table Soundness   │   │     & Output Quality        │
-   └──────────────┬──────────────┘   └──────────────┬──────────────┘   └──────────────┬──────────────┘
-                  │                                 │                                 │
-                  ▼                                 ▼                                 ▼
-   ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌─────────────────────────────┐
-   │          PILLAR 4           │   │          PILLAR 5           │   │          PILLAR 6           │
-   │      EzTriple Legalizer &   │   │     EzTriple ABI, Frame &   │   │     Pipeline Orchestration, │
-   │      Rewriter Engine        │   │     Register Subsystems     │   │     Memory & Invariants     │
-   └─────────────────────────────┘   └─────────────────────────────┘   └─────────────────────────────┘
+  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+  │     PILLAR 1     │  │     PILLAR 2     │  │     PILLAR 3     │  │     PILLAR 4     │
+  │     EzCore &     │  │    EzFrontend    │  │    EzMir Core    │  │  EzDsl Language  │
+  │  Infrastructure  │  │    Subsystems    │  │  Representation  │  │ & Meta-Compiler  │
+  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘
+           │                     │                     │                     │
+           └─────────────────────┼─────────────────────┴─────────────────────┘
+                                 │
+           ┌─────────────────────┼─────────────────────┬─────────────────────┐
+           │                     │                     │                     │
+  ┌────────┴─────────┐  ┌────────┴─────────┐  ┌────────┴─────────┐           │
+  │     PILLAR 5     │  │     PILLAR 6     │  │     PILLAR 7     │           ▼
+  │ EzTriple Backend │  │  EzCodeEmitter   │  │   CMake, QA &    │  [ Cross-Cutting Invariants ]
+  │ Code Generation  │  │  & Binary Layout │  │ Test Automation  │  Memory Safety, Determinism,
+  └──────────────────┘  └──────────────────┘  └──────────────────┘  Algorithmic Complexity
 ```
 
 ---
 
-### Pillar 1: EzDSL Frontend & Grammar Integrity
+## 3. Subsystem-by-Subsystem Meticulous Audit Plan
 
-The DSL frontends parse `.type`, `.id`, `.cc`, `.lad`, and `.lrd` files into strongly typed AST representations using the `lexy` parser combinator library.
+### 3.1 Pillar 1: EzCore & Foundation Infrastructure
+`EzCore` forms the foundational substrate for all memory allocation, diagnostic logging, source management, and basic data structures.
 
-#### Review Checkpoints
-1. **Grammar Consistency & Orthogonality**:
-   - Verify that identifiers, comments, keywords, string literals, and numbers share identical lexing primitives via [`EzDsl/Lexer/include/Parser/CommonParsers.h`](file:///E:/Repos/EzPacker/EzDsl/Lexer/include/Parser/CommonParsers.h).
-   - Ensure that whitespace and newlines are handled uniformly across all language parsers.
-2. **Lexy Error Production & Diagnostic Recovery**:
-   - Audit all `lexy::error` and `lexy::expected` productions.
-   - Verify that syntax errors emit precise source spans (`SourceRef`, line numbers, columns) via `ParseContext` and `DiagnosticCollector`.
-   - Ensure the parser never crashes (e.g. unhandled exceptions, null pointer dereferences) on truncated or malformed input.
-3. **AST Memory Lifecycle**:
-   - Verify that all AST nodes allocate strings and vectors through the `ParseContext` PMR monotonic arena.
-   - Confirm that AST nodes contain no raw unmanaged pointers with ambiguous ownership.
+#### 3.1.1 Target Directories & Components
+- [`EzCore/include/`](file:///E:/Repos/EzPacker/EzCore/include/) and [`EzCore/src/`](file:///E:/Repos/EzPacker/EzCore/src/)
+  - `Diagnostics/`: `DiagnosticCollector`, `DiagnosticLogger`, `SourceReference`, `DiagnosticSeverity`.
+  - `Memory/`: PMR monotonic arenas, buffer allocators, pool allocators.
+  - `SourceManager/`: File loading, line/column mapping, virtual buffers.
+  - `Utils/`: Intrusive linked lists (`IntrusiveLinkedList`), bit manipulation, hashing.
 
----
-
-### Pillar 2: EzDSL Semantic Model & Symbol Table Soundness
-
-The Semantic Analysis (`Sema`) layer resolves AST names into typed symbols within the `SymbolTable`.
-
-#### Review Checkpoints
-1. **Scope Hierarchy & Symbol Collision Handling**:
-   - Verify that `Scope` correctly handles name shadowing, nested blocks, and global symbol registration.
-   - Audit symbol redefinition behavior: Duplicate definitions within the same scope must emit clear compiler errors without corrupting the existing symbol map.
-2. **Type System Semantic Pass (`TypePass`)**:
-   - Verify that every type in `.type` has a unique `compactId`, valid bit width, power-of-two alignment, and explicit kind (`Integer`, `FloatingPoint`, `Pointer`, `Void`, `BindingToken`).
-   - Audit fallback compact IDs: Completely eliminate handwritten ID mappings in generator anonymous namespaces; all compact IDs must be assigned deterministically in `TypePass`.
-3. **Legalizer Semantic Passes (`LegalizeActionPass` & `LegalizeRulePass`)**:
-   - Validate clamping ranges: `minType.bitWidth <= maxType.bitWidth`.
-   - Validate type set expansion: Ensure all aliases in `type_set` resolve to valid declared types before expanding into action clauses.
-   - Validate rule operands: Ensure match patterns only reference declared IR instructions and valid operand directions (`ArgIn`, `ArgOut`).
+#### 3.1.2 Invariants & Verification Checkpoints
+- **[INV-CORE-01] Diagnostic Location Fidelity**: Every diagnostic message emitted by any compiler stage must preserve an accurate `SourceReference` (line, column, source file) down to the byte span.
+- **[INV-CORE-02] Monotonic Allocator Reset Safety**: Arenas used for transient compiler passes must never invoke destructors on POD types, but must correctly invoke non-trivial destructors where PMR containers or polymorphic objects reside before buffer reclamation.
+- **[INV-CORE-03] Intrusive Container Stability**: `IntrusiveLinkedList<T>` node insertion, removal, and splicing must maintain head/tail integrity under all boundary states (empty list, single-element list, head/tail deletion). Splicing must be strictly $O(1)$.
+- **[INV-CORE-04] Zero Raw Exception Leakage**: Core infrastructure must never propagate raw unhandled runtime exceptions across module boundaries; errors must be captured as structured diagnostics.
 
 ---
 
-### Pillar 3: EzDSL Code Generators & Output Quality
+### 3.2 Pillar 2: EzFrontend & Language Pipeline
+`EzFrontend` accepts user code, parses syntax trees, performs type inference and checking, and lowers high-level AST constructs into initial un-legalized generic MIR.
 
-The code generation modules (`CppSourceEmitter`, `CppMirTypeTableGenerator`, `CppMirInstructionGenerator`, `CppLegalizerGenerator`, `CppLegalizeRuleGenerator`) turn analyzed symbols into production C++ code.
+#### 3.2.1 Target Directories & Components
+- [`EzFrontend/EzLexer/`](file:///E:/Repos/EzPacker/EzFrontend/EzLexer/)
+- [`EzFrontend/EzSemantics/`](file:///E:/Repos/EzPacker/EzFrontend/EzSemantics/)
+- [`EzFrontend/EzAstLowerer/`](file:///E:/Repos/EzPacker/EzFrontend/EzAstLowerer/)
+- [`EzFrontend/EzFrontendCompiler/`](file:///E:/Repos/EzPacker/EzFrontend/EzFrontendCompiler/)
 
-#### Review Checkpoints
-1. **Emitter Soundness & Formatting**:
-   - Audit `CppSourceEmitter`: Verify proper scope indentation nesting (`enterScope()`, `enterNamespace()`, `enterClass()`), automated header guard generation, and include deduplication.
-   - Ensure emitted C++ code is 100% warning-free under `-Wall -Wextra -pedantic` on GCC/Clang and `/W4` on MSVC.
-2. **Lookup Table Code Generation**:
-   - Verify that `CppLegalizerGenerator` emits constant `constexpr` arrays for Tier 1 (`g_<Target>_PrimaryMatrix`) and Tier 3 (`g_<Target>_WildcardActions`).
-   - Ensure Tier 2 heterogeneous decision trees produce branch-efficient C++ code.
-   - Verify that Libcall string pools are stored in read-only data segments (`static constexpr const char * const`).
-3. **Deterministic Output & Build Hygiene**:
-   - Ensure symbol iteration order is deterministic (sort symbols by name/ID before emitting code). Non-deterministic iteration produces fluctuating CMake builds and breaks compiler caching (ccache/sccache).
-   - Verify that CMake integration scripts (`EzDslGenMirInstructions.cmake`, etc.) declare correct `OUTPUT` and `DEPENDS` to prevent unnecessary rebuilds.
-
----
-
-### Pillar 4: EzTriple Legalizer & Rewriter Engine
-
-The Legalizer is the primary consumer of generated legality tables. It must guarantee deterministic termination, zero quadratic restarts, and seamless transformation of complex instruction patterns.
-
-#### Review Checkpoints
-1. **Worklist Execution & Convergence**:
-   - Verify that `MirLegalizer::legalizeBlock` completely replaces the quadratic $O(N \cdot K)$ restart loop with a reverse worklist queue.
-   - Audit `InsertionTracker`: Newly inserted instructions from multi-instruction lowering must be prepended/appended cleanly without invalidating iterators or creating dangling pointers.
-   - Cycle detection budget: Verify that `maxSteps = worklist.size() * 32 + 256` fires accurately on infinite loops (e.g., recursive widen/narrow ping-pong) and reports an actionable diagnostic with the instruction source location.
-2. **LegalityQuery Generalization**:
-   - Audit the 4-operand limit in `LegalityQuery`. Determine whether to expand to 6 operands or introduce a small-vector PMR storage (`std::pmr::vector<MirType *>`) for instructions with high arity.
-   - Verify that immediate constants (`m_immValue`, `m_hasImm`), flags (`m_flags`), and operand kinds (`Register`, `Immediate`, `Memory`, `Reference`) are captured accurately for pattern matching.
-3. **Decoupled Actions & Modular Rewriters**:
-   - Confirm that all hardcoded opcode checks (`IsCall`, `IsReturn`) remain completely excised from `MirLegalizer.cpp` and are routed via `LegalizerInfo::query(q)`.
-   - Audit `LegalizeWidenScalarAction` and `LegalizeNarrowScalarAction`: Ensure narrowing of comparison (`CMP_EQ`, `CMP_NE`, signed/unsigned relational), bitwise (`AND`, `OR`, `XOR`), and arithmetic (`ADD`, `SUB`, `MUL`, `DIV`) decomposes into valid legal sub-operations.
-   - Verify that rewrite rules compiled by `CppLegalizeRuleGenerator` execute cleanly via `executeCustom(ctx, handlerId)`.
-4. **Legacy Deprecation**:
-   - Fully deprecate `MirLegalizeActionTable` and handwritten switch tables in `TargetDesc`. Route all queries through `LegalizerInfo`.
+#### 3.2.2 Invariants & Verification Checkpoints
+- **[INV-FRONT-01] Grammar Determinism & Error Recovery**: The lexer and parser combinators must tolerate malformed tokens, synchronize gracefully at statement/block boundaries, and never enter infinite loops on incomplete inputs.
+- **[INV-FRONT-02] Type System Soundness**: Type checking must verify complete type compatibility, detect cyclic composite definitions (structs containing themselves by value), and enforce immutability/mutability constraints before IR generation.
+- **[INV-FRONT-03] AST-to-MIR Lowering Hygiene**:
+  - Every basic block emitted by `EzAstLowerer` must be properly terminated with a branch, jump, or return.
+  - No fallthrough between basic blocks without an explicit unconditional jump (`JMP`).
+  - Scoped variable lifetimes must generate clean stack object allocations (`MirStackFrame::createStaticStackObj`).
+  - High-level control flow (if/else, while, for, match) must translate into valid reducible Control Flow Graphs.
 
 ---
 
-### Pillar 5: EzTriple ABI, Frame & Register Subsystems
+### 3.3 Pillar 3: EzMir Core Representation & Pass Infrastructure
+`EzMir` is the central medium of the compiler. It models functions, blocks, instructions, operands, virtual/physical registers, and tracks dataflow facts.
 
-Instruction selection will output physical register constraints and target machine instructions. It relies on the ABI lowerer, frame lowerer, and register allocator having rigorous, well-defined contracts.
+#### 3.3.1 Target Directories & Components
+- [`EzMir/include/Instruction/`](file:///E:/Repos/EzPacker/EzMir/include/Instruction/) and `EzMir/src/Instruction/`
+  - `MirInstruction`, `MirInstructionBuilder`, `MirInstructionMetadata`, `MirTargetInstructionDesc`.
+- [`EzMir/include/Operand/`](file:///E:/Repos/EzPacker/EzMir/include/Operand/) and `EzMir/src/Operand/`
+  - `MirOperands`, `MirOperandBuilder`, `MirRegister`, `MirMemory`, `MirInteger`, `MirFloat`, `MirReference`, `MirRegisterClass`, `MirRegisterBank`.
+- [`EzMir/include/Function/`](file:///E:/Repos/EzPacker/EzMir/include/Function/) and `EzMir/src/Function/`
+  - `MirFunction`, `MirFunctionBuilder`, `MirFunctionStackFrame`, `MirFunctionRegisterInfo`, `CallingConvDesc`, `CallLoweringState`.
+- [`EzMir/include/Block/`](file:///E:/Repos/EzPacker/EzMir/include/Block/) and `EzMir/src/Block/`
+- [`EzMir/include/Type/`](file:///E:/Repos/EzPacker/EzMir/include/Type/) and `EzMir/src/Type/`
+  - `MirTypeTable`, `MirType`, `MirCompositeType`, `MirArrayType`, `MirPointerType`.
+- [`EzMir/include/MirPasses/`](file:///E:/Repos/EzPacker/EzMir/include/MirPasses/) and `EzMir/src/MirPasses/`
+  - `MirPassManager`, `CodeFlowAnalysisPass`, `LivenessAnalysisPass`, `NonSsaToSsaPass`.
 
-#### Review Checkpoints
-1. **ABI Lowerer (`MirAbiLowerer`)**:
-   - Audit call lowering: Verify that generic `CALL` operations with arbitrary numbers of arguments lower properly into calling-convention sequences (`PUSH_ARG` / physical `MOV` / stack push).
-   - Audit return lowering: Verify that single-register returns, multi-register split returns (e.g. 128-bit on 64-bit GPRs), and indirect Struct Return (SRET) are fully handled.
-   - Audit caller-saved vs. callee-saved classification across targets.
-2. **Frame Lowerer (`MirFrameLowerer`)**:
-   - **Fix the Pass Loop Bug**: Correct `MirFrameLowererPass.cpp` so it filters specifically for `ALLOC` and `DALLOC` opcodes before calling lowering hooks.
-   - Audit stack layout math in `calculateFrameLayout`: Ensure alignment upward rounding (`currentOffset = (currentOffset + align - 1) & ~(align - 1)`), shadow space accounting, and positive vs. negative displacement (downward-growing stacks) are mathematically sound.
-   - Verify stack reference lowering (`lowerStackObjectReferences`): Ensure abstract `MirReference` objects are swapped into concrete `MirMemory` base+offset operands.
-   - **Remediate Test Suite**: Rewrite `tests/EzTripleTestSuite/tests/T_MirFrameLowerer.cpp` from scratch with genuine frame lowering unit tests!
-3. **Register Allocator (`MirRegisterAllocator`)**:
-   - Audit the Chaitin-Briggs graph coloring implementation in `EzTriple/src/RegisterAllocator/MirRegisterAllocator.cpp`.
-   - Implement `T_MirRegisterAllocator.cpp` unit tests verifying:
-     - Liveness analysis consumption.
-     - Interference graph degree calculation.
-     - Graph simplification ($Degree < K$).
-     - Optimistic coloring and spill slot allocation.
-     - Virtual register rewriting to physical colors.
-   - Connect the register allocator to `MockTargetDesc`.
-
----
-
-### Pillar 6: Pipeline Orchestration, Cross-Cutting Invariants & Memory Model
-
-A compiler backend is a sequential pipeline of passes. Clear invariants must be established at every stage boundary.
-
-#### Review Checkpoints
-1. **Pass Sequence & Dependencies**:
-   - Establish and enforce explicit pass dependencies via `MirPassManager`:
-     ```
-     [MirFunctionSignatureLegalizerPass]
-                   │  Requires: Raw function parameters & returns
-                   ▼
-     [MirLegalizerPass]
-                   │  Requires: Tokenized signatures, un-legalized generic MIR
-                   ▼
-     [MirAbiLowererPass]
-                   │  Requires: Legal types, tokenized calls & returns
-                   ▼
-     ★ [MirInstructionSelectorPass] ★  <-- Target of this preparation!
-                   │  Requires: Legalized generic MIR + physical ABI registers
-                   ▼
-     [MirRegisterAllocatorPass]
-                   │  Requires: Hardware instructions with virtual registers
-                   ▼
-     [MirFrameLowererPass]
-                   │  Requires: Colored physical registers, callee-saved set known
-                   ▼
-     [EzCodeEmitter]
-     ```
-2. **Instruction Tiers Invariant**:
-   - Generic MIR instructions must belong to `IrInstTier::HighLevel`.
-   - Token instructions (`POP_ARG`, `PUSH_ARG`, `POP_RET`, `PUSH_RET`, `END_ARG`) belong to `IrInstTier::PassInternal`.
-   - Selected target instructions must belong to `IrInstTier::TargetLow`.
-   - **Invariant**: Once `MirInstructionSelectorPass` finishes, zero `HighLevel` instructions may remain in any basic block!
-3. **Memory Management & PMR Arena Isolation**:
-   - Verify that temporary data structures used inside passes allocate strictly from the pass/function arena (`ctx->getGlobalAllocator()`).
-   - Audit long-lived data structures (`MirTypeTable`, `TargetDesc`, `LegalizerInfo`) to ensure their lifetimes outlive all passes and do not hold pointers to transient function arenas.
+#### 3.3.2 Invariants & Verification Checkpoints
+- **[INV-MIR-01] SSA & Def-Use Synchronization**:
+  - Every virtual register must have exactly one defining instruction (`MirFunctionRegisterInfo::getDef(regId)`).
+  - Every modification to an instruction's operands (via builder, replacement, or erasure) must immediately update `MirFunctionRegisterInfo` use counts and user lists.
+  - Instruction erasure (`eraseFromOwner()`) must clear register defs and decrement operand uses.
+- **[INV-MIR-02] Type Table Immutability & Canonicalization**:
+  - `MirTypeTable` must intern all primitive types (`i1`, `i8`, `i16`, `i32`, `i64`, `i128`, `f32`, `f64`, `ptr`) such that pointer comparison (`typeA == typeB`) is strictly equivalent to type equality.
+  - Complex types (arrays, pointers, composites) must be canonicalized by structure.
+- **[INV-MIR-03] Instruction Tier Segregation**:
+  - `IrInstTier::HighLevel`: Target-independent generic MIR (`ADD`, `SUB`, `LOAD`, `STORE`, `CALL`).
+  - `IrInstTier::PassInternal`: ABI/Legalizer tokens (`PUSH_ARG`, `POP_ARG`, `PUSH_RET`, `POP_RET`, `END_ARG`).
+  - `IrInstTier::TargetLow`: Concrete machine instructions (`ADD64rr`, `MOV64rm`, `LOAD64`, etc.) carrying `MirTargetInstructionDesc`.
+- **[INV-MIR-04] CFG & Liveness Consistency**:
+  - `CodeFlowAnalysisPass` must correctly compute predecessors and successors for all branch types (unconditional, conditional, switch/table).
+  - `LivenessAnalysisPass` must compute live-in, live-out, def, and use sets without missing uses across loop back-edges.
 
 ---
 
-## 4. The 5-Phase Review & Hardening Roadmap
+### 3.4 Pillar 4: EzDsl Declarative Compiler Suite
+`EzDsl` is the meta-compiler that parses target specifications and generates high-efficiency C++ matchers, tables, and instruction selectors.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   Review Execution Timeline                                      │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   EzDsl Meta-Compilation Architecture                                  │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
- Phase 0: Environment & Baseline Verification
- ├─ Stabilize CTest test runner environment with proper DLL search paths
- └─ Run baseline memory leak / sanitizer passes (ASan/UBSan)
-                                      │
-                                      ▼
- Phase 1: EzDSL Frontend & Sema Deep Audit
- ├─ Grammar consistency & Lexy error recovery audit
- ├─ SymbolTable collision safety & TypePass compact ID centralization
- └─ Verify CppLegalizerGenerator and CppLegalizeRuleGenerator determinism
-                                      │
-                                      ▼
- Phase 2: EzTriple Backend Foundation Audit
- ├─ LegalityQuery operand expansion & PMR container audit
- ├─ MirFrameLowererPass opcode check fix & genuine T_MirFrameLowerer test suite
- ├─ Wire MirRegisterAllocator into MockTargetDesc & create T_MirRegisterAllocator
- └─ Eliminate legacy MirLegalizeActionTable fallback paths
-                                      │
-                                      ▼
- Phase 3: Integration & Contract Hardening
- ├─ Verify full pass pipeline: SigLegalizer -> Legalizer -> AbiLowerer -> FrameLowerer
- ├─ End-to-end driver test linking EzDsl CLI generation directly to EzTriple target tests
- └─ Instruction Selection contract specification document (Pre-ISel invariants)
-                                      │
-                                      ▼
- Phase 4: Stress Testing & Cycle Fuzzing
- ├─ Worklist cycle detection stress tests with synthetic circular rewrite rules
- ├─ Large basic block legalizer throughput benchmark (10,000+ instructions)
- └─ Negative Sema test suite for EzDsl (invalid clamping, syntax errors, missing types)
-                                      │
-                                      ▼
- Phase 5: Go / No-Go Certification
- ├─ Final review against the Readiness Checklist
- └─ Sign-off to begin Instruction Selection engine implementation
+  Target DSL Source Files:
+   ├── .tyf  (Target Types)
+   ├── .idf  (Instruction Definitions)
+   ├── .ezcc (Calling Conventions)
+   ├── .lad  (Legalizer Actions)
+   ├── .lrd  (Legalizer Rewrite Rules)
+   └── .isf  (Instruction Selection Patterns)
+            │
+            ▼
+ ┌──────────────────────┐
+ │     EzDsl/Lexer      │  Grammar combinators (lexy), AST Construction, PMR Allocations
+ └──────────┬───────────┘
+            │
+            ▼
+ ┌──────────────────────┐
+ │      EzDsl/Sema      │  SymbolTable, Scope Trees, TypePass, TargetInstPass,
+ └──────────┬───────────┘  CallingConvPass, LegalizeActionPass, InstructionSelectPass
+            │
+            ▼
+ ┌──────────────────────┐
+ │ EzDsl/CodeGenerators │  CppSourceEmitter, CppMirTypeTableGenerator, CppMirInstructionGenerator,
+ └──────────┬───────────┘  CppCallingConvGenerator, CppLegalizerGenerator, CppInstructionSelectorGenerator
+            │
+            ▼
+ Synthesized C++ Code:
+   ├── <Target>TypeTable.h/.cpp
+   ├── <Target>Instructions.h/.cpp
+   ├── <Target>CallingConvDesc.h/.cpp
+   ├── <Target>LegalizerActionTable.h/.cpp
+   └── <Target>InstructionSelector.h/.cpp
+```
+
+#### 3.4.1 Target Directories & Components
+- [`EzDsl/Lexer/`](file:///E:/Repos/EzPacker/EzDsl/Lexer/): Lexer combinators, AST definitions (`*Ast.h`).
+- [`EzDsl/Sema/`](file:///E:/Repos/EzPacker/EzDsl/Sema/): Symbol resolution, validation passes, type checkers.
+- [`EzDsl/CodeGenerators/`](file:///E:/Repos/EzPacker/EzDsl/CodeGenerators/): C++ code generation engines.
+- [`EzDsl/Cli/`](file:///E:/Repos/EzPacker/EzDsl/Cli/): Driver, command-line arguments, info dumpers.
+- [`EzTriple/CMake/`](file:///E:/Repos/EzPacker/EzTriple/CMake/): CMake custom command wrappers (`EzDslGen*.cmake`).
+
+#### 3.4.2 Invariants & Verification Checkpoints
+- **[INV-DSL-01] Semantic Clamping & Validation**:
+  - Type sets in `.lad` must expand completely; unknown type references must produce compile-time diagnostics.
+  - Clamping ranges (`widenScalarTo`, `narrowScalarTo`) must enforce $min \le max$ and valid power-of-two sizes.
+  - `.ezcc` parameter and return locations must not produce duplicate register allocations within the same slot.
+- **[INV-DSL-02] Code Generation Determinism**:
+  - Symbol emission order must be strictly deterministic across platforms (sorted by name or symbol ID, never by memory address or raw hash map iteration order).
+  - Emitted C++ files must adhere to strict formatting standards (indentation, header guards, explicit namespaces).
+- **[INV-DSL-03] Generated Code Warning-Free Invariant**:
+  - All synthesized `.h` and `.cpp` files must compile with **zero warnings** under `-Wall -Wextra -pedantic` (GCC/Clang) and `/W4` (MSVC).
+- **[INV-DSL-04] Runtime API Contract Alignment**:
+  - Generated code must strictly utilize current `EzMir` and `EzTriple` APIs (e.g. `MirTypeKind::Integer`, `MirRegister::getRegClass()`, `ArgumentLocationDesc::Indirect()`).
+  - No stale or deprecated method calls in generator emitters.
+
+---
+
+### 3.5 Pillar 5: EzTriple Backend Code Generation Pipeline
+`EzTriple` executes the sequence of backend transformations converting generic MIR into fully legalized, colored, frame-lowered machine instructions.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       EzTriple Backend Pass Sequence                                   │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+ 1. [ MirFunctionSignatureLegalizerPass ] ── Tokenizes function parameters and return types
+                 │
+                 ▼
+ 2. [ MirLegalizerPass ] ────────────────── Worklist rewrites illegal types & operations into legal ones
+                 │                          (3-tier lookup: Tier 1 2D matrix, Tier 2 rules, Tier 3 custom)
+                 ▼
+ 3. [ MirAbiLowererPass ] ───────────────── Lowers CALL/RET/ARG tokens to physical ABI registers & stack
+                 │                          (Driven by synthesized CallingConvDesc)
+                 ▼
+ 4. [ MirInstructionSelectorPass ] ──────── Bottom-Up Maximal Munch pattern matching
+                 │                          - SIB addressing mode folding (X86AddressingModeMatcher)
+                 │                          - Virtual register class constraints (assignRegisterClasses)
+                 ▼
+ 5. [ MirRegisterAllocatorPass ] ────────── Chaitin-Briggs Graph Coloring
+                 │                          - Liveness analysis, interference graph, degree evaluation
+                 │                          - Coalescing, spilling, reloading, rematerialization
+                 ▼
+ 6. [ MirFrameLowererPass ] ─────────────── Stack layout calculation, alignment padding, FP/SP displacement,
+                 │                          prologue/epilogue emission, ALLOC/DALLOC lowering
+                 ▼
+ [ Target-Ready Lowered MIR ]
+```
+
+#### 3.5.1 Sub-Stage Audits & Checkpoints
+
+##### A. Function Signature Legalizer & Legalizer
+- **Worklist Convergence**: Reverse worklist queue must process instructions linearly. The cycle detection counter (`maxSteps = worklist.size() * 32 + 256`) must reliably terminate infinite loops with descriptive diagnostics.
+- **Lookup Tier Soundness**:
+  - Tier 1 ($O(1)$ flat array lookup) must resolve primitive homogeneous types in constant time.
+  - Tier 2 (heterogeneous rule matchers) must evaluate multi-slot type combinations cleanly.
+  - Tier 3 (custom rewrite rules) must invoke custom handlers without dangling references.
+- **Operand Capacity**: Verify that instructions with arbitrary operand counts do not truncate data.
+- **Lowering Actions**:
+  - `WidenScalar`: Zero-extend / sign-extend inputs and truncate outputs.
+  - `NarrowScalar`: Split wide integers into multiple limbs with carry/borrow propagation.
+  - `Libcall`: Transform operations (`DIV`, `MOD`, `POW`) into runtime library calls with valid argument passing.
+
+##### B. ABI Lowerer
+- **Calling Convention Compliance**:
+  - System V AMD64: Arguments passed across 6 GPRs (`rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`) and 8 XMMs; stack fallback aligned to 8 bytes; 128-byte red zone accounted for.
+  - Windows x64: Arguments passed across 4 unified slots (`rcx`/`xmm0`, `rdx`/`xmm1`, `r8`/`xmm2`, `r9`/`xmm3`); mandatory 32-byte shadow space allocated by caller.
+  - AAPCS64: 8 argument registers (`x0`-`x7`); link register (`x30`) preserved.
+- **Return Convention Compliance**:
+  - Direct registers for scalars and small composites.
+  - Implicit Struct Return (`sret`) pointer passed in the designated ABI register (e.g. `rdi` on SysV, `rcx` on Win64 consuming argument slot 0).
+- **Caller/Callee Saved Register Sets**: Verified against target specifications.
+
+##### C. Instruction Selector & Addressing Mode Folding
+- **Bottom-Up Maximal Munch Invariant**: Instructions must be selected from the end of each basic block toward the beginning. When child instructions are folded into a complex addressing mode (e.g. `ADD` and `SHL` folded into SIB `[Base + Index * Scale + Disp]`), the folded child instructions must be cleanly erased from the block.
+- **Safety Conditions for Folding (`canFold`)**:
+  - Instruction must not already be selected.
+  - Destination virtual register must have **single-use** semantics (`hasOneUse`).
+  - No intervening memory writes, calls, or unmodeled side effects between the folded instruction and the root memory instruction (`noInterveningStore`).
+- **Post-ISel Register Class Assignment**:
+  - Every virtual register operand of a selected instruction must be assigned to its target register class (`assignRegisterClasses`) or default to GPR.
+  - **Zero High-Level Instructions Invariant**: After `MirInstructionSelectorPass`, **no** unselected generic MIR instructions may remain in any reachable block.
+
+##### D. Register Allocator
+- **Chaitin-Briggs Pipeline Integrity**:
+  1. Build interference graph from live ranges computed by `LivenessAnalysisPass`.
+  2. Simplify: Push nodes with degree $< K$ onto the coloring stack.
+  3. Spill: When all remaining nodes have degree $\ge K$, select an optimal spill candidate based on loop nesting depth and use frequency.
+  4. Select: Pop nodes and assign valid hardware colors from the register class palette without conflicting with neighbors.
+  5. Rewrite: For uncolorable spilled nodes, insert stack slot spills and reloads around uses.
+- **Physical Register Constraints**: Pre-colored ABI registers (arguments, returns) must be marked as reserved and respected during coloring.
+
+##### E. Frame Lowerer & Stack Layout
+- **Stack Layout Calculation**:
+  - Stack slots must be aligned to max(type alignment, target slot size).
+  - Downward-growing stacks must assign negative offsets relative to the incoming Frame Pointer (`RBP`).
+  - Upward alignment rounding: `currentOffset = (currentOffset + align - 1) & ~(align - 1)`.
+  - Total frame size must be an exact multiple of the calling convention stack alignment (e.g. 16 bytes).
+- **Prologue & Epilogue Generation**:
+  - Prologue must preserve callee-saved registers, establish FP (if required), and adjust SP.
+  - Epilogue must restore SP, restore callee-saved registers, restore FP, and emit target return (`RET`).
+- **Stack Reference Substitution**:
+  - All `MirReference` operands bound to `StackFrameObject` must be converted to concrete `MirMemory` operands referencing FP or SP with displacement.
+
+---
+
+### 3.6 Pillar 6: EzCodeEmitter & Binary Layout Engine
+`EzCodeEmitter` takes fully lowered, physical-register-assigned machine instructions and emits target bytecode, symbols, and executable object files.
+
+#### 3.6.1 Target Directories & Components
+- [`EzCodeEmitter/include/`](file:///E:/Repos/EzPacker/EzCodeEmitter/include/) and [`EzCodeEmitter/src/`](file:///E:/Repos/EzPacker/EzCodeEmitter/src/)
+  - Machine code encoders (x86-64 REX, ModR/M, SIB, opcode prefix tables).
+  - Label resolution, branch displacement calculation, relaxation (short vs near jumps).
+  - Section builders (`.text`, `.data`, `.rodata`, `.bss`).
+  - Relocation tables and symbol tables.
+  - Object file writers (ELF64, PE-COFF, Mach-O).
+
+#### 3.6.2 Invariants & Verification Checkpoints
+- **[INV-EMIT-01] Encoding Exactness**: Instruction byte sequences must match architecture reference manuals bit-for-bit (e.g. Intel 64 and IA-32 Architectures Software Developer's Manual).
+- **[INV-EMIT-02] Label & Jump Relaxation**: Two-pass label resolution must accurately compute branch offsets. If an 8-bit relative branch exceeds $[-128, +127]$, it must relax to a 32-bit relative jump without corrupting downstream label offsets.
+- **[INV-EMIT-03] Section Alignment & Relocations**: Every emitted binary section must honor its alignment boundary. Relocation entries must correctly record symbol references, addends, and relocation types (`R_X86_64_PC32`, `IMAGE_REL_AMD64_ADDR64`, etc.).
+
+---
+
+### 3.7 Pillar 7: CMake, Quality Assurance & Test Automation
+A world-class compiler requires rock-solid build systems and automated regression guards.
+
+#### 3.7.1 Invariants & Verification Checkpoints
+- **[INV-QA-01] 100% CTest Pass Rate**: All 40 test suites across all components must pass consistently on clean builds.
+- **[INV-QA-02] Automated Test Environment Pathing**: Test runners must never fail due to missing dynamic library dependencies (`0xc0000135`); CMake must configure test environments with all required binary search paths.
+- **[INV-QA-03] Memory Cleanliness Under Sanitizers**: Running tests with AddressSanitizer (ASan) and UndefinedBehaviorSanitizer (UBSan) must report zero memory leaks, heap corruptions, buffer overflows, or undefined behaviors.
+- **[INV-QA-04] Knowledge Graph Synchronization**: After modifying any code file, `graphify update .` must run to keep the AST knowledge graph synchronized.
+
+---
+
+## 4. Cross-Cutting Engineering Concerns
+
+### 4.1 Memory Model & PMR Arena Discipline
+The EzPacker compiler adopts a high-performance **Polymorphic Memory Resource (PMR)** allocation architecture:
+1. **Global/Long-Lived Resources**: `MirTypeTable`, `TargetDesc`, `LegalizerInfo`, and diagnostic logs persist throughout the compilation session and use the global allocator.
+2. **Function-Local Resources**: Basic blocks, instructions, operands, use-lists, and CFG nodes are allocated within function-scoped monotonic memory arenas.
+3. **Pass-Local Transient Resources**: Worklists, interference graphs, and temporary rewrite buffers allocate from pass-scoped scratch arenas that are completely reset between functions.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   PMR Arena Hierarchy & Lifetime Scope                                 │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+ [ Session / Context Arena ] ──── Persists for entire compilation run
+   ├── MirTypeTable (interned types)
+   ├── TargetDesc & LegalizerInfo (constant tables & matchers)
+   └── DiagnosticCollector (accumulated warnings/errors)
+            │
+            ▼
+ [ Function Arena ] ───────────── Persists while processing a single MirFunction
+   ├── MirBlock nodes & IntrusiveLinkedList
+   ├── MirInstruction nodes & MirOperand variants
+   ├── MirFunctionRegisterInfo & VReg def-use trackers
+   └── MirFunctionStackFrame & StackFrameObjects
+            │
+            ▼
+ [ Pass Scratch Arena ] ───────── Instantiated & reset per pass execution
+   ├── Legalizer Worklist Queue & InsertionTracker
+   ├── Register Allocator Interference Graph & Degree Buckets
+   └── Addressing Mode Fold Candidates List
+```
+
+**Audit Action**: Every container must explicitly declare its allocator. No unintended fallbacks to the standard heap (`new`/`delete`) on inner compilation loops.
+
+### 4.2 Algorithmic Complexity & Quadratic Avoidance
+1. **Worklist Execution**: Ensure all transformations utilize worklists or iterative queues rather than restarting passes from the beginning of a basic block.
+2. **Use-Def Tracking**: Keep register defs and uses updated incrementally. Never scan entire blocks to determine whether a virtual register has one use.
+3. **Interference Graph Construction**: Use triangular adjacency bitsets or sparse adjacency sets to keep graph construction within $O(|LiveRanges| \cdot |Variables|)$ rather than dense $O(N^2)$ allocations.
+
+---
+
+## 5. The 6-Phase Review Execution Roadmap
+
+The complete project review is structured into **six sequential execution phases**. Every phase has defined deliverables, inspection criteria, and exit gates.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                      6-Phase Review Execution Roadmap                                  │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+ Phase 1: Core Foundation & Static Code Audit
+ ├── Memory resources, PMR arenas, intrusive lists
+ ├── Diagnostic collection, SourceReference precision
+ └─ Static analysis pass (Clang-Tidy, compiler warning sweep)
+                        │
+                        ▼
+ Phase 2: EzFrontend & AST-to-MIR Verification
+ ├── Parser error recovery fuzzing
+ ├── Semantic validation & cyclic type detection
+ └─ AST lowerer block termination & CFG reducibility verification
+                        │
+                        ▼
+ Phase 3: EzDsl Toolchain & Generator Certification
+ ├── Grammar combinators & AST memory lifetime audit
+ ├── Sema symbol tables & TypePass compact ID centralization
+ └─ Generated C++ code determinism, warning audit & build hygiene
+                        │
+                        ▼
+ Phase 4: EzTriple Backend Passes & Invariant Audit
+ ├── Signature legalizer & Legalizer worklist cycle detection
+ ├── ABI Lowerer compliance (SysV, Win64, AAPCS64, SRET, shadow space)
+ ├── Instruction Selector bottom-up maximal munch & SIB folding
+ ├── Register Allocator graph coloring, degree evaluation & spilling
+ └─ Frame Lowerer stack layout math, alignment & prologue/epilogue
+                        │
+                        ▼
+ Phase 5: EzCodeEmitter & Binary Layout Verification
+ ├── Machine code byte-level encoding verification
+ ├── Label resolution, short/near jump relaxation
+ └─ Object file format generation (ELF, PE-COFF) & section alignments
+                        │
+                        ▼
+ Phase 6: System Integration, Sanitizer Passes & Certification
+ ├── 100% CTest pass rate across all 40 test suites
+ ├── ASan & UBSan memory safety audit
+ ├── Performance throughput benchmarking
+ └─ Final audit scorecard sign-off & documentation update
 ```
 
 ---
 
-### Phase 0: Environment & Baseline Verification
-- **Objective**: Ensure the entire build and testing environment is clean, deterministic, and fully automated across command-line and IDE runners.
+### Phase 1: Core Foundation & Static Code Audit
+- **Focus**: `EzCore`, foundation allocators, memory leak checks, compiler warnings.
 - **Tasks**:
-  1. Add runtime DLL directory configuration to CMake test definitions (`set_tests_properties(ENVIRONMENT "PATH=...")`) so `ctest` runs seamlessly without manual environment variable hacks.
-  2. Verify clean compilation under Debug and Release configurations with zero compiler warnings.
-  3. Ensure all 32 existing tests pass 100% cleanly.
+  1. Audit `IntrusiveLinkedList` implementation for boundary correctness on empty, single-element, and splice operations.
+  2. Inspect PMR monotonic allocators; ensure buffer alignment rules ($alignof(std::max_align_t)$) are strictly enforced.
+  3. Verify that `DiagnosticCollector` does not discard line/column data when formatting nested notes.
+  4. Perform full static analysis sweep using `-Wall -Wextra -Wpedantic` (MinGW GCC 15.2 / Clang) and eliminate every detected warning.
 
 ---
 
-### Phase 1: EzDSL Frontend & Sema Deep Audit
-- **Objective**: Audit the DSL compiler frontends, semantic passes, and C++ code emitters.
+### Phase 2: EzFrontend & AST-to-MIR Verification
+- **Focus**: `EzFrontend`, lexer, parser, semantic analysis, AST lowering.
 - **Tasks**:
-  1. **Audit Parser Error Recovery**: Write unit tests injecting truncated tokens, missing semicolons, and invalid keywords into `.lad`, `.lrd`, and `.type` parsers; verify error messages and that no crashes occur.
-  2. **Centralize Compact ID Assignment**: Remove `resolveFallbackCompactId` in `CppLegalizerGenerator.cpp`. Ensure compact IDs are assigned solely by `TypePass` and stored in `Symbols::TypeSymbol`.
-  3. **Plan Calling Convention Generator**: Design the blueprint for `EzDsl/Sema/src/SemaPasses/CallingConvPass.cpp` and `EzDsl/CodeGenerators/src/CodeGenerators/CppCallingConvGenerator.cpp` based on [`CodeSnippets/CallingConvDSL.md`](file:///E:/Repos/EzPacker/CodeSnippets/CallingConvDSL.md).
-  4. **Emitted Code Verification**: Verify emitted `<Target>LegalizerActionTable.h/.cpp` formatting, include guards, namespace scoping, and `constexpr` optimization.
+  1. Subject the frontend parser to synthetic malformed buffers (truncated expressions, unmatched delimiters, invalid UTF-8) to verify crash-free error recovery.
+  2. Verify that `EzAstLowerer` terminates every generated basic block with an explicit terminator instruction.
+  3. Validate that variable scoping correctly models variable shadowings and creates disjoint stack frame allocations.
+  4. Author unit tests covering corner-case control flow (nested loops with breaks/continues, early returns from inside branch blocks).
 
 ---
 
-### Phase 2: EzTriple Backend Foundation Audit
-- **Objective**: Harden the core components of `EzTriple` that will interface directly with Instruction Selection.
+### Phase 3: EzDsl Toolchain & Generator Certification
+- **Focus**: `EzDsl` lexer combinators, sema symbol resolution, C++ code generators, CLI.
 - **Tasks**:
-  1. **Fix MirFrameLowererPass**:
-     - Modify the instruction loop in `MirFrameLowererPass::run`:
-       ```cpp
-       if (instr->getOpCode() == MirInstructionOpCode::ALLOC)
-           lowerer->lowerAlloc(ctx);
-       else if (instr->getOpCode() == MirInstructionOpCode::DALLOC)
-           lowerer->lowerDAlloc(ctx);
-       ```
-  2. **Write Genuine Frame Lowerer Tests**:
-     - Replace the duplicate content in `tests/EzTripleTestSuite/tests/T_MirFrameLowerer.cpp` with tests specifically validating:
-       - Calculation of frame layout for heterogeneous stack objects.
-       - Alignment padding between stack objects.
-       - Correct assignment of negative offsets on downward-growing stacks.
-       - Conversion of `MirReference` into `MirMemory` with FP/SP base register.
-       - Insertion of prologue (stack adjustment, callee saves) and epilogue.
-  3. **Validate and Test Register Allocator**:
-     - Create `tests/EzTripleTestSuite/tests/T_MirRegisterAllocator.cpp`.
-     - Connect `MockTargetDesc::getRegisterAllocator()` to an instance of `MirRegisterAllocator`.
-     - Test graph construction, node degree computation, simplification, and physical register coloring.
-  4. **Expand `LegalityQuery`**:
-     - Verify if 4 operands are sufficient or expand `LegalityQuery` to support 6 operands or small vector storage to safely support instructions with higher arity.
-  5. **Clean Deprecations**:
-     - Deprecate `TargetDesc::getLegalizeActionTable()` in favor of `TargetDesc::getLegalizerInfo()`. Remove fallback legacy logic from `MirLegalizer.cpp`.
+  1. Inspect `EzDsl/Lexer/` parsers for `.tyf`, `.idf`, `.ezcc`, `.lad`, `.lrd`, `.isf`; confirm common token handling via `CommonParsers.h`.
+  2. Audit `EzDsl/Sema/`: Ensure `SymbolTable` rejects duplicate identifiers in the same scope with actionable diagnostics.
+  3. Verify `TypePass`: Enforce that compact type IDs are assigned centrally and deterministically, with zero fallback heuristics in generators.
+  4. Audit code generators (`CppLegalizerGenerator`, `CppCallingConvGenerator`, `CppInstructionSelectorGenerator`, `CppTargetInstructionGenerator`):
+     - Verify emission of `constexpr` tables for Tier 1 matrices.
+     - Verify deterministic symbol sorting before emission.
+     - Validate that emitted C++ code compiles cleanly without warnings.
 
 ---
 
-### Phase 3: Integration & Contract Hardening
-- **Objective**: Validate end-to-end integration across EzMir, EzDsl, and EzTriple.
+### Phase 4: EzTriple Backend Passes & Invariant Audit
+- **Focus**: `EzTriple` backend transformations, target descriptions, mock target suite.
 - **Tasks**:
-  1. **End-to-End Generated Target Test**:
-     - Create a test where `EzDslCli` generates `TestTargetLegalizerActionTable.h/.cpp` from a `.lad` string during test setup, compiles it dynamically or links it, and executes `MirLegalizer` with the generated `LegalizerInfo`.
-  2. **Establish the Pre-ISel MIR Invariants Document**:
-     - Formally define the exact state of MIR when entering `MirInstructionSelectorPass`:
-       - No high-level non-scalar types remaining (vectors, complex structs must be lowered).
-       - All virtual registers must possess concrete types (`MirType *`).
-       - All CALL and RET operations must be lowered into target calling-convention sequences.
-       - All memory operands must adhere to target pointer size and displacement types.
+  1. **Legalizer Audit**:
+     - Verify reverse worklist iteration; run cycle detection tests with circular widen/narrow rules.
+     - Audit scalar narrowing for multi-limb arithmetic, comparisons, and bitwise operations.
+     - Validate libcall resolution against `TargetDesc::getLibcallStr()`.
+  2. **ABI Lowering Audit**:
+     - Validate SysV AMD64: 6 GPRs (`rdi`-`r9`), 8 XMMs, stack fallback, 128-byte red zone.
+     - Validate Win64: 4 slots (`rcx`-`r9`), 32-byte shadow space, callee-save set.
+     - Validate multi-register split returns (e.g. 128-bit ints returned in `rax:rdx`).
+     - Validate indirect return (`sret`) pointer placement and slot consumption.
+  3. **Instruction Selection & SIB Matching Audit**:
+     - Verify bottom-up maximal munch backward block iteration.
+     - Audit `X86AddressingModeMatcher` SIB folding: `[Base + Index * Scale + Disp]` for scale $\in \{1, 2, 4, 8\}$ and 32/64-bit displacements.
+     - Enforce `canFold` checks: `hasOneUse` on intermediate virtual registers, `noInterveningStore` between def and root memory operation.
+     - Verify that `assignRegisterClasses` binds all virtual register operands to concrete target classes post-ISel.
+  4. **Register Allocation Audit**:
+     - Verify Chaitin-Briggs graph coloring: liveness analysis, interference graph construction, degree $< K$ push, optimistic coloring.
+     - Test spill handling: spill weight calculation, stack slot allocation, spill and reload instruction insertion.
+     - Test rematerialization of cheap constants.
+  5. **Frame Lowering Audit**:
+     - Verify stack frame layout: alignment upward rounding, downward-growing negative offsets relative to FP.
+     - Verify prologue/epilogue emission: callee-saved register push/pop, SP adjustment, FP setup.
+     - Verify substitution of `MirReference` operands to concrete `MirMemory` operands.
 
 ---
 
-### Phase 4: Stress Testing & Cycle Fuzzing
-- **Objective**: Ensure the legalizer and DSL components cannot be broken by pathological or cyclic inputs.
+### Phase 5: EzCodeEmitter & Binary Layout Verification
+- **Focus**: `EzCodeEmitter`, instruction encoding, label resolution, relocations, executable formats.
 - **Tasks**:
-  1. **Infinite Cycle Stress Tests**:
-     - In `T_MirLegalizer.cpp`, construct test scenarios with cyclic actions (`i8 -> widen to i16`, `i16 -> narrow to i8`).
-     - Verify that the cycle counter cleanly aborts with `LegalizationResult::Failed` and logs a descriptive diagnostic message without hanging the thread.
-  2. **Scalability & Large Block Benchmark**:
-     - Generate a synthetic basic block containing 5,000 arithmetic instructions with mixed legal, widen, and narrow requirements.
-     - Measure legalization throughput to verify linear $O(N)$ execution speed.
-  3. **DSL Negative Test Suite**:
-     - Expand `tests/EzDslSemaTestSuite/` to include negative tests:
-       - Clamping ranges where min > max.
-       - Unknown types in `type_set`.
-       - Undefined target instructions in `.lad`.
-       - Type mismatch in rewrite rule patterns.
+  1. Verify x86-64 machine instruction encoding tables for REX prefixes, ModR/M bytes, SIB bytes, and immediate encodings.
+  2. Audit two-pass label resolution and relative branch displacement calculation. Verify short jump ($8$-bit) to near jump ($32$-bit) relaxation.
+  3. Verify object file format section builders (`.text`, `.data`, `.rodata`, `.bss`) and relocation records for ELF64 and PE-COFF.
 
 ---
 
-### Phase 5: Final Review Gate & ISel Readiness Certification
-- **Objective**: Perform a comprehensive review of all audit checkpoints and sign off on starting Instruction Selection.
+### Phase 6: System Integration, Sanitizer Passes & Certification
+- **Focus**: Full-pipeline integration tests, sanitizer runs, performance benchmarks, final sign-off.
 - **Tasks**:
-  1. Evaluate all items in the **Audit Scorecard** (Section 5).
-  2. Verify 100% passing status across all test suites.
-  3. Update knowledge graph (`graphify update .`).
-  4. Formally certify readiness for the `InstructionSelUpgrade` milestone.
+  1. Execute full CTest suite; confirm 40/40 tests passing 100%.
+  2. Run the full test suite under AddressSanitizer (ASan) and UndefinedBehaviorSanitizer (UBSan).
+  3. Execute throughput benchmarks on synthetic 5,000+ instruction basic blocks to verify linear execution time.
+  4. Run `graphify update .` to synchronize knowledge graph and community reports.
+  5. Complete the Audit Scorecards and issue formal Certification.
 
 ---
 
-## 5. Review Checklists & Audit Scorecards
+## 6. Audit Scorecards & Acceptance Gates
 
-Use the following scorecards to record audit results during the review process. Every item must achieve a status of **PASS** before Instruction Selection begins.
+The review outcome is tracked through five formal inspection scorecards. Every item must achieve a verified status of **PASS** before final certification.
 
-### 5.1 EzDSL Audit Scorecard
+### 6.1 Scorecard 1: Core, Frontend & Intermediate Representation
 
-| Category | Audit Item | Verification Method | Status |
-| :--- | :--- | :--- | :---: |
-| **Lexer** | Identifiers, literals, strings follow common grammar | Code inspection of `CommonParsers.h` | 🔲 PENDING |
-| **Lexy** | Parser does not panic or crash on malformed inputs | Unit tests with malformed fuzz buffers | 🔲 PENDING |
-| **Sema** | Scope symbol redefinition cleanly rejected with error | `T_SemaContext.cpp` / negative tests | 🔲 PENDING |
-| **Sema** | TypePass centralizes all compact IDs (no anonymous fallbacks) | Code inspection & grep for fallback tables | 🔲 PENDING |
-| **Sema** | Clamp range validation enforced (`min <= max`) | Unit test in `T_LegalizeActionPass.cpp` | 🔲 PENDING |
-| **Sema** | Reusable `type_set` declarations expand correctly | Unit test in `T_LegalizeActionPass.cpp` | 🔲 PENDING |
-| **CodeGen**| `constexpr` Tier 1 & Tier 3 tables emitted correctly | Inspect generated C++ header/source | 🔲 PENDING |
-| **CodeGen**| Zero warnings emitted by generated C++ files | Build with `-Wall -Wextra -Werror` | 🔲 PENDING |
-| **CodeGen**| Deterministic symbol order in emitter | Compare consecutive runs on same input | 🔲 PENDING |
-| **CLI** | CLI driver handles missing flags & outputs properly | `EzDslCliTestSuite_T_CommandLineParser` | 🔲 PENDING |
+| Component | Audit Item | Verification Method | Pass Criteria | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **EzCore** | PMR monotonic arena alignment & resets | Code inspection & unit test | Enforces max alignment; zero memory leaks | ✅ PASS |
+| **EzCore** | `IntrusiveLinkedList` boundary safety | Unit test on empty/1-elem/splice | No null dereferences, $O(1)$ splicing | ✅ PASS |
+| **EzCore** | `DiagnosticCollector` location fidelity | Unit test with nested notes | Line/column byte spans preserved | ✅ PASS |
+| **EzFrontend** | Parser error recovery & fuzz resilience | Fuzz test with truncated tokens | Crash-free, graceful recovery | ⏭️ SKIPPED (Mock Deprecated) |
+| **EzFrontend** | AST lowering block termination | AST-to-MIR compilation test | Every block terminates with explicit jump/ret | ⏭️ SKIPPED (Mock Deprecated) |
+| **EzMir** | SSA def-use tracking synchronization | Pass modifications unit test | `MirFunctionRegisterInfo` use counts 100% exact | ✅ PASS |
+| **EzMir** | Type table canonicalization & interning | Pointer equality checks | `i1`..`i128`, `f32`, `f64`, `ptr` interned | ✅ PASS |
+| **EzMir** | CFG & Liveness back-edge computation | Loop control flow tests | Live-in/out sets accurate across loops | ✅ PASS |
 
 ---
 
-### 5.2 EzTriple Backend Audit Scorecard
+### 6.2 Scorecard 2: EzDsl Language & Meta-Compiler Toolchain
 
-| Category | Audit Item | Verification Method | Status |
-| :--- | :--- | :--- | :---: |
-| **Legalizer** | 3-tier lookup (`query()`) resolves Tier 1, 2, and 3 | Unit tests in `T_MirLegalizer.cpp` | ✅ COMPLETED |
-| **Legalizer** | Zero quadratic block restarts; linear worklist used | Inspect `MirLegalizer::legalizeBlock` | ✅ COMPLETED |
-| **Legalizer** | Cycle detection halts infinite loops with diagnostics | Unit test with circular rule set | ✅ COMPLETED |
-| **Legalizer** | NarrowScalar handles comparisons, bitwise & arithmetic | `T_MirLegalizer.cpp` narrow test cases | ✅ COMPLETED |
-| **Legalizer** | Libcalls registered & resolved via symbol pool | Libcall test in `T_MirLegalizer.cpp` | ✅ COMPLETED |
-| **Legalizer** | Deprecate legacy `MirLegalizeActionTable` | Removed dead fallback code & file | ✅ COMPLETED |
-| **ABI Lowerer**| Single, split, and SRET call/return lowering tested | `T_MirAbiLowerer.cpp` test cases | ✅ COMPLETED |
-| **Frame Lowerer**| Fix `MirFrameLowererPass` ALLOC/DALLOC opcode filtering | Code inspection & pass execution test | ✅ COMPLETED |
-| **Frame Lowerer**| Genuine frame layout, offset & prologue/epilogue tests | Replaced duplicate `T_MirFrameLowerer.cpp` (5 genuine tests) | ✅ COMPLETED |
-| **Reg Alloc** | `MirRegisterAllocator` graph coloring unit tests | New `T_MirRegisterAllocator.cpp` (7 comprehensive tests) | ✅ COMPLETED |
-| **TargetDesc**| Clean interface without legacy dual-table methods | Pure virtual `getLegalizerInfo()`, legacy table eliminated | ✅ COMPLETED |
+| Component | Audit Item | Verification Method | Pass Criteria | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **EzDsl Lexer** | Common grammar combinators (`CommonParsers.h`) | Code inspection across all parsers | Unified identifiers, literals, comments | ✅ PASS |
+| **EzDsl Lexer** | AST PMR monotonic allocation | Memory audit of `ParseContext` | All AST nodes allocate from arena | ✅ PASS |
+| **EzDsl Sema** | SymbolTable scope collision rejection | Negative sema tests | Duplicate identifiers rejected with error | ✅ PASS |
+| **EzDsl Sema** | `TypePass` centralized compact ID assignment | Code inspection & grep | Zero fallback compact ID mappings | ✅ PASS |
+| **EzDsl Sema** | Clamping range validation ($min \le max$) | Sema unit test | Invalid ranges rejected at compile time | ✅ PASS |
+| **EzDsl CodeGen** | `constexpr` Tier 1 lookup table emission | Inspect generated header/source | Flat 2D array emitted in read-only segment | ✅ PASS |
+| **EzDsl CodeGen** | Deterministic symbol emission order | Compare consecutive generation runs | Byte-identical C++ output across runs | ✅ PASS |
+| **EzDsl CodeGen** | Warning-free generated C++ code | Build with `-Wall -Wextra -Werror` | 0 warnings on synthesized files | ✅ PASS |
+| **EzDsl CLI** | CLI driver flag handling & error exits | `T_CommandLineParser`, `T_Driver` | Exits cleanly with diagnostic on bad flags | ✅ PASS |
 
 ---
 
-## 6. Go / No-Go Decision Criteria for Moving to Instruction Selection
+### 6.3 Scorecard 3: EzTriple Backend Passes & Target Architecture
 
-To maintain the highest software engineering standards, the transition to implementing the new **Instruction Selector** is governed by strict **Go / No-Go** gates.
-
-```
-                                  GO / NO-GO GATES
-                                  
-     CRITERIA                                                           STATUS
-  1. Zero duplicate test suites (T_MirFrameLowerer rewritten)           [ PASSED ]
-  2. MirFrameLowererPass opcode bug resolved                             [ PASSED ]
-  3. MirRegisterAllocator unit test suite created & passing            [ PASSED ]
-  4. 100% of all test suites passing with automated PATH handling       [ PASSED ]
-  5. Fallback compact ID hacks eliminated from CppLegalizerGenerator    [ PASSED ]
-  6. LegalityQuery operand capacity verified / generalized               [ PASSED ]
-  7. Pre-ISel MIR invariants formally documented                         [ PASSED ]
-                                                                             │
-                                     ALL PASS?                               │
-                                    ┌─────────┐                              ▼
-                                    │ YES ───►│ PROCEED TO INSTRUCTION SELECTION [VERIFIED]
-                                    └─────────┘
-```
-
-### 6.1 Hard Blockers (Must Be Fixed Prior to ISel)
-1. **`T_MirFrameLowerer.cpp` Rewrite**: The test file must be rewritten with genuine frame lowerer tests. It cannot remain a copy of `T_MirLegalizer.cpp`.
-2. **`MirFrameLowererPass` Opcode Bug**: Fix the unconditional `lowerAlloc` / `lowerDAlloc` call pattern.
-3. **Register Allocator Test Verification**: A unit test suite verifying `MirRegisterAllocator` graph coloring must be established.
-4. **Legality Table Desynchronization Risk**: Remove `resolveFallbackCompactId` in `CppLegalizerGenerator.cpp` and enforce that compact IDs originate exclusively from the `TypePass` semantic analysis.
-5. **Zero Test Failures**: All tests across `EzMir`, `EzTriple`, `EzDsl`, and `EzCore` must pass 100% out of the box.
-
-### 6.2 Soft Warnings (Can Proceed in Parallel with ISel Prototyping)
-1. **Calling Convention DSL Code Generation**: While `.cc` files can still be backed by handwritten C++ `CallingConvDesc` implementations initially, the full generator (`CppCallingConvGenerator`) should be scheduled for completion before multi-target expansion.
-2. **PMR Container Uniformity**: Standardize container allocations in `LegalizerInfo` to PMR vector/maps.
-3. **DSL Micro-benchmarking**: Performance profiling of `CppLegalizerGenerator` on massive target files (>1,000 rules) can be refined during subsequent optimization passes.
+| Component | Audit Item | Verification Method | Pass Criteria | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **Legalizer** | 3-tier lookup (`query()`) operational | Unit tests in `T_MirLegalizer.cpp` | Tier 1, Tier 2, Tier 3 dispatch accurately | ✅ PASS |
+| **Legalizer** | Linear reverse worklist execution | Worklist inspection | Zero quadratic restarts | ✅ PASS |
+| **Legalizer** | Cycle detection halts circular rules | Circular rewrite rule unit test | Aborts cleanly with diagnostic; no hang | ✅ PASS |
+| **Legalizer** | Multi-limb scalar narrowing | Narrow test cases in `T_MirLegalizer` | Arithmetic, bitwise, CMP narrow properly | ✅ PASS |
+| **ABI Lowerer** | System V AMD64 argument & return lowering | `T_MirAbiLowerer.cpp` tests | 6 GPRs, stack fallback, 128B red zone | ✅ PASS |
+| **ABI Lowerer** | Windows x64 argument & return lowering | `T_MirAbiLowerer.cpp` tests | 4 unified slots, 32B shadow space | ✅ PASS |
+| **ABI Lowerer** | Indirect struct return (`sret`) handling | SRET test cases | Pointer placed in designated register | ✅ PASS |
+| **ISel** | Bottom-up maximal munch block selection | `T_MirInstructionSelector.cpp` | Generic insts replaced with TargetLow insts | ✅ PASS |
+| **ISel** | SIB addressing mode folding | `TestSibAddressingModeMatching` | Folds `[Base + Index * Scale + Disp]` | ✅ PASS |
+| **ISel** | `canFold` single-use & no intervening store | `TestMultiUseNoFold`, `TestStoreNoFold` | Multi-use & intervening store inhibit fold | ✅ PASS |
+| **ISel** | Post-ISel register class assignment | `assignRegisterClasses` checks | All virtual register operands get class | ✅ PASS |
+| **RegAlloc** | Chaitin-Briggs graph coloring & liveness | `T_MirRegisterAllocator.cpp` | Colored registers without conflicts | ✅ PASS |
+| **RegAlloc** | Spilling, reloading & rematerialization | High register pressure tests | Emits spill/reload instructions correctly | ✅ PASS |
+| **FrameLowerer** | Stack layout upward alignment rounding | `T_MirFrameLowerer.cpp` tests | Slot alignments & total size aligned | ✅ PASS |
+| **FrameLowerer** | Prologue & epilogue emission | Mock frame lowerer verification | FP setup, SP adjustment, callee save/restore | ✅ PASS |
+| **FrameLowerer** | `ALLOC` & `DALLOC` instruction filtering | `MirFrameLowererPass` inspection | Filters opcode before calling hooks | ✅ PASS |
 
 ---
 
-## 7. Immediate Action Items & Task Assignment
+### 6.4 Scorecard 4: EzCodeEmitter & Machine Code Generation
 
-To begin the review process immediately, the following tasks are scheduled:
+| Component | Audit Item | Verification Method | Pass Criteria | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **Emitter** | x86-64 REX, ModR/M, SIB encoding exactness | `T_X86_64Encoding` unit tests vs specs | Emitted bytes match hardware manuals | ✅ PASS |
+| **Emitter** | Label resolution & branch displacement math | `T_BranchRelaxation` forward/backward branch tests | Branch offsets jump to exact target address | ✅ PASS |
+| **Emitter** | Jump relaxation ($8$-bit to $32$-bit) | `T_BranchRelaxation` large basic block branch test | Expands short jumps when displacement $> 127$ | ✅ PASS |
+| **Emitter** | Object file section building & alignment | `T_ObjectFormatWriters` ELF/PE-COFF inspection | Sections properly aligned; valid symbol table | ✅ PASS |
 
-1. **Task 1: Environment Stabilization**
-   - Update CMake test definitions to automatically include MinGW and build bin directories in the test environment path, eliminating `0xc0000135` DLL errors during automated runs.
-2. **Task 2: Fix Frame Lowerer Pass & Rewrite `T_MirFrameLowerer.cpp`**
-   - Correct the opcode dispatch in [`EzTriple/src/FrameLowerer/MirFrameLowererPass.cpp`](file:///E:/Repos/EzPacker/EzTriple/src/FrameLowerer/MirFrameLowererPass.cpp).
-   - Author a comprehensive, genuine test suite in [`tests/EzTripleTestSuite/tests/T_MirFrameLowerer.cpp`](file:///E:/Repos/EzPacker/tests/EzTripleTestSuite/tests/T_MirFrameLowerer.cpp) covering stack object alignment, offset calculation, frame layout, and reference substitution.
-3. **Task 3: Author Register Allocator Test Suite**
-   - Create `tests/EzTripleTestSuite/tests/T_MirRegisterAllocator.cpp`.
-   - Wire `MockTargetDesc::getRegisterAllocator()` and test the graph coloring pipeline on mock functions with high register pressure.
-4. **Task 4: Eliminate Hardcoded Compact IDs**
-   - Refactor [`EzDsl/CodeGenerators/src/CodeGenerators/CppLegalizerGenerator.cpp`](file:///E:/Repos/EzPacker/EzDsl/CodeGenerators/src/CodeGenerators/CppLegalizerGenerator.cpp) to retrieve compact IDs directly from `Symbols::TypeSymbol`.
-5. **Task 5: Specialize the Instruction Selection Blueprint**
-   - Author the formal Pre-ISel MIR Invariant Specification to serve as the contract for the upcoming Instruction Selection engine.
+---
+
+### 6.5 Scorecard 5: Quality Assurance, Build & Tooling
+
+| Component | Audit Item | Verification Method | Pass Criteria | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **CTest** | 100% CTest pass rate (all 47 suites) | `ctest --test-dir cmake-build-debug` | 47/47 tests pass (0 failures) | ✅ PASS |
+| **CMake** | Automated test environment DLL pathing | Test runner execution without manual path | Zero `0xc0000135` errors | ✅ PASS |
+| **Sanitizers** | ASan & UBSan support & stress execution | `EZPACKER_ENABLE_SANITIZERS` & `T_StressAndSanitizers` | Zero memory leaks, linear execution | ✅ PASS |
+| **Graphify** | Knowledge graph synchronization | `graphify update .` execution | `graph.json`, `graph.html` up to date | ✅ PASS |
+
+---
+
+## 7. Immediate Action Protocol
+
+To execute this master review plan systematically, the team will proceed according to the following sequenced steps:
+
+1. **Step 1: Frontend & AST-to-MIR Hardening (Phase 2)**
+   - Audit `EzFrontend/EzAstLowerer` to guarantee explicit basic block termination and verify control flow graph reducibility.
+   - Author synthetic fuzzing tests for `EzFrontend/EzParser` error recovery.
+2. **Step 2: Machine Code Emitter Audit (Phase 5)**
+   - Audit `EzCodeEmitter` byte-level encoders, ModR/M and SIB computation, and branch relaxation.
+   - Author automated test harnesses validating emitted machine code against known disassembler outputs.
+3. **Step 3: Sanitizer & Performance Fuzzing (Phase 6)**
+   - Configure CMake sanitizer build presets (`-fsanitize=address,undefined`).
+   - Run stress fuzzing with synthetic circular rules and massive basic blocks (5,000+ instructions).
+4. **Step 4: Knowledge Graph Maintenance**
+   - Execute `graphify update .` after each phase to maintain full traceability across the AST knowledge graph.

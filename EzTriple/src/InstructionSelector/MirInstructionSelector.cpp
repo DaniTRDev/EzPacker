@@ -229,11 +229,11 @@ MirInstruction *MirInstructionSelector::getDefiningInstruction(MirBuilderContext
 
     if (ctx)
     {
-        for (auto &func : ctx->getFunctions())
+        for (auto func : ctx->getFunctions())
         {
-            if (func.getRegisterInfo())
+            if (func->getRegisterInfo())
             {
-                if (auto *def = func.getRegisterInfo()->getDef(reg->getRegId()))
+                if (auto *def = func->getRegisterInfo()->getDef(reg->getRegId()))
                     return def;
             }
         }

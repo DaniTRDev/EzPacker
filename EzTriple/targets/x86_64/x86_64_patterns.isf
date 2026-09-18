@@ -16,6 +16,10 @@ addrmode AddrModeRegImm(GPR64:base, simm32:disp = 0) {
     };
 };
 
+// ============================================================================
+// Arithmetic Patterns (with load-folding)
+// ============================================================================
+
 pattern Select_ADD64rm [cost = 2] {
     match {
         ADD i64:$dst, i64:$src1, (LOAD i64:$tmp, AddrModeRegImm($base, $disp));
@@ -50,11 +54,172 @@ pattern Select_ADD64rr [cost = 1] {
     };
 };
 
+pattern Select_ADD32ri [cost = 1] {
+    match {
+        ADD i32:$dst, i32:$src1, imm(i32):$imm;
+    };
+    when {
+        isSimm32($imm);
+    };
+    select {
+        ADD32ri GPR32:$dst, GPR32:$src1, $imm;
+    };
+};
+
+pattern Select_ADD32rr [cost = 1] {
+    match {
+        ADD i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        ADD32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_SUB64ri [cost = 1] {
+    match {
+        SUB i64:$dst, i64:$src1, imm(i64):$imm;
+    };
+    when {
+        isSimm32($imm);
+    };
+    select {
+        SUB64ri GPR64:$dst, GPR64:$src1, $imm;
+    };
+};
+
 pattern Select_SUB64rr [cost = 1] {
     match {
         SUB i64:$dst, i64:$src1, i64:$src2;
     };
     select {
         SUB64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_SUB32ri [cost = 1] {
+    match {
+        SUB i32:$dst, i32:$src1, imm(i32):$imm;
+    };
+    when {
+        isSimm32($imm);
+    };
+    select {
+        SUB32ri GPR32:$dst, GPR32:$src1, $imm;
+    };
+};
+
+pattern Select_SUB32rr [cost = 1] {
+    match {
+        SUB i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        SUB32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_IMUL64rr [cost = 1] {
+    match {
+        IMUL i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        IMUL64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_IMUL32rr [cost = 1] {
+    match {
+        IMUL i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        IMUL32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+// ============================================================================
+// Bitwise Patterns
+// ============================================================================
+
+pattern Select_AND64rr [cost = 1] {
+    match {
+        AND i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        AND64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_AND32rr [cost = 1] {
+    match {
+        AND i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        AND32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_OR64rr [cost = 1] {
+    match {
+        OR i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        OR64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_OR32rr [cost = 1] {
+    match {
+        OR i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        OR32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_XOR64rr [cost = 1] {
+    match {
+        XOR i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        XOR64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_XOR32rr [cost = 1] {
+    match {
+        XOR i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        XOR32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+// ============================================================================
+// Data Movement Patterns
+// ============================================================================
+
+pattern Select_MOV64rr [cost = 1] {
+    match {
+        MOV i64:$dst, i64:$src;
+    };
+    select {
+        MOV64rr GPR64:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_MOV32rr [cost = 1] {
+    match {
+        MOV i32:$dst, i32:$src;
+    };
+    select {
+        MOV32rr GPR32:$dst, GPR32:$src;
+    };
+};
+
+pattern Select_RET [cost = 1] {
+    match {
+        RET i64:$val;
+    };
+    select {
+        RET GPR64:$val;
     };
 };

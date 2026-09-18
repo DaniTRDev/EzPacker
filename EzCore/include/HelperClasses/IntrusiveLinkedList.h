@@ -273,6 +273,211 @@ template <typename T> class IntrusiveLinkedList
     }
 
     /**
+     * Unlinks and returns the first node in the list, or nullptr if empty.
+     */
+    T *pop_front()
+    {
+        if (empty())
+            return nullptr;
+        T *node = m_head;
+        erase(begin());
+        return node;
+    }
+
+    /**
+     * Unlinks and returns the last node in the list, or nullptr if empty.
+     */
+    T *pop_back()
+    {
+        if (empty())
+            return nullptr;
+        T *node = m_tail;
+        erase(to_iterator(m_tail));
+        return node;
+    }
+
+    /**
+     * Slices and transfers all elements from other list into this list before position pos in O(1) time.
+     */
+    void splice(iterator pos, IntrusiveLinkedList &other)
+    {
+        if (other.empty() || this == &other)
+            return;
+
+        T *first = other.m_head;
+        T *last = other.m_tail;
+        size_t count = other.m_size;
+
+        other.m_head = nullptr;
+        other.m_tail = nullptr;
+        other.m_size = 0;
+
+        if (empty())
+        {
+            m_head = first;
+            m_tail = last;
+            first->setPrev(nullptr);
+            last->setNext(nullptr);
+            m_size = count;
+            return;
+        }
+
+        if (pos.m_node == nullptr)
+        {
+            m_tail->setNext(first);
+            first->setPrev(m_tail);
+            last->setNext(nullptr);
+            m_tail = last;
+            m_size += count;
+            return;
+        }
+
+        if (pos.m_node == m_head)
+        {
+            last->setNext(m_head);
+            m_head->setPrev(last);
+            first->setPrev(nullptr);
+            m_head = first;
+            m_size += count;
+            return;
+        }
+
+        T *curr = pos.m_node;
+        T *prev = curr->getPrev();
+
+        prev->setNext(first);
+        first->setPrev(prev);
+        last->setNext(curr);
+        curr->setPrev(last);
+        m_size += count;
+    }
+
+    /**
+     * Slices and transfers a single element it from other list into this list before position pos in O(1) time.
+     */
+    void splice(iterator pos, IntrusiveLinkedList &other, iterator it)
+    {
+        if (!it.m_node)
+            return;
+
+        T *node = it.m_node;
+        if (this == &other)
+        {
+            if (pos.m_node == node || (pos.m_node && pos.m_node == node->getNext()))
+                return;
+        }
+
+        // Unlink node from other
+        T *oPrev = node->getPrev();
+        T *oNext = node->getNext();
+
+        if (oPrev)
+            oPrev->setNext(oNext);
+        else
+            other.m_head = oNext;
+
+        if (oNext)
+            oNext->setPrev(oPrev);
+        else
+            other.m_tail = oPrev;
+
+        --other.m_size;
+        node->setPrev(nullptr);
+        node->setNext(nullptr);
+
+        insert(pos, node);
+    }
+
+    /**
+     * Slices and transfers range [first, last) from other list into this list before position pos in O(1) time.
+     * Note: count must match the number of elements in [first, last).
+     */
+    void splice(iterator pos, IntrusiveLinkedList &other, iterator first, iterator last, size_t count)
+    {
+        if (count == 0 || !first.m_node || other.empty())
+            return;
+
+        if (first.m_node == other.m_head && last.m_node == nullptr && count == other.m_size)
+        {
+            splice(pos, other);
+            return;
+        }
+
+        T *firstNode = first.m_node;
+        T *lastNode = (last.m_node ? last.m_node->getPrev() : other.m_tail);
+        if (!lastNode)
+            return;
+
+        // Unlink [firstNode, lastNode] from other
+        T *oPrev = firstNode->getPrev();
+        T *oNext = lastNode->getNext();
+
+        if (oPrev)
+            oPrev->setNext(oNext);
+        else
+            other.m_head = oNext;
+
+        if (oNext)
+            oNext->setPrev(oPrev);
+        else
+            other.m_tail = oPrev;
+
+        other.m_size -= count;
+        firstNode->setPrev(nullptr);
+        lastNode->setNext(nullptr);
+
+        if (empty())
+        {
+            m_head = firstNode;
+            m_tail = lastNode;
+            m_size = count;
+            return;
+        }
+
+        if (pos.m_node == nullptr)
+        {
+            m_tail->setNext(firstNode);
+            firstNode->setPrev(m_tail);
+            m_tail = lastNode;
+            m_size += count;
+            return;
+        }
+
+        if (pos.m_node == m_head)
+        {
+            lastNode->setNext(m_head);
+            m_head->setPrev(lastNode);
+            m_head = firstNode;
+            m_size += count;
+            return;
+        }
+
+        T *curr = pos.m_node;
+        T *prev = curr->getPrev();
+
+        prev->setNext(firstNode);
+        firstNode->setPrev(prev);
+        lastNode->setNext(curr);
+        curr->setPrev(lastNode);
+        m_size += count;
+    }
+
+    /**
+     * Slices and transfers range [first, last) from other list into this list before position pos.
+     */
+    void splice(iterator pos, IntrusiveLinkedList &other, iterator first, iterator last)
+    {
+        if (first == last || !first.m_node)
+            return;
+
+        size_t count = 0;
+        for (auto it = first; it != last; ++it)
+            ++count;
+
+        splice(pos, other, first, last, count);
+    }
+
+    /**
      * Unlinks all nodes from the list and clears internal head, tail, and size states.
      */
     void clear()

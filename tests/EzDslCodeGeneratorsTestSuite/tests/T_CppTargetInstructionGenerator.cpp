@@ -67,7 +67,7 @@ TEST_F(CppTargetInstructionGeneratorTest, TestTargetInstructionTableGeneration)
     EXPECT_NE(headerContent.find("ADD32rm = 2"), std::string::npos);
     EXPECT_NE(headerContent.find("OPCODE_COUNT = 3"), std::string::npos);
     EXPECT_NE(headerContent.find("const MirTargetInstructionDesc *getTargetDesc(OpCode op);"), std::string::npos);
-    EXPECT_NE(headerContent.find("void initializeTargetInstructionTable(class TargetDesc *target);"), std::string::npos);
+    EXPECT_NE(headerContent.find("void initializeTargetInstructionTable(::TargetDesc *target);"), std::string::npos);
 
     // Verify Source
     EXPECT_NE(sourceContent.find("namespace EzTriple::AMD64TargetInst"), std::string::npos);
@@ -76,6 +76,6 @@ TEST_F(CppTargetInstructionGeneratorTest, TestTargetInstructionTableGeneration)
     EXPECT_NE(sourceContent.find("MirInstructionFlags::IsCommutative"), std::string::npos);
     EXPECT_NE(sourceContent.find("MirInstructionFlags::ReadsMemory"), std::string::npos);
     EXPECT_NE(sourceContent.find("const MirTargetInstructionDesc *getTargetDesc(OpCode op)"), std::string::npos);
-    EXPECT_NE(sourceContent.find("void initializeTargetInstructionTable(TargetDesc *target)"), std::string::npos);
+    EXPECT_NE(sourceContent.find("void initializeTargetInstructionTable(::TargetDesc *target)"), std::string::npos);
     EXPECT_NE(sourceContent.find("setOperandClass"), std::string::npos);
 }

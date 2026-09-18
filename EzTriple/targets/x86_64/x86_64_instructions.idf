@@ -1,5 +1,9 @@
 target AMD64;
 
+// ============================================================================
+// INTEGER ARITHMETIC
+// ============================================================================
+
 target_inst ADD32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("addl");
     FLAGS(IsCommutative);
@@ -32,8 +36,316 @@ target_inst SUB32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("subl");
 };
 
+target_inst SUB32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
+    MNEMONIC("subl");
+};
+
+target_inst SUB32rm(GPR32:dst OUT, GPR32:src1 IN, Mem32:addr IN) {
+    MNEMONIC("subl");
+    FLAGS(ReadsMemory);
+};
+
 target_inst SUB64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("subq");
+};
+
+target_inst SUB64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+    MNEMONIC("subq");
+};
+
+target_inst SUB64rm(GPR64:dst OUT, GPR64:src1 IN, Mem64:addr IN) {
+    MNEMONIC("subq");
+    FLAGS(ReadsMemory);
+};
+
+target_inst IMUL32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+    MNEMONIC("imull");
+    FLAGS(IsCommutative);
+};
+
+target_inst IMUL32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
+    MNEMONIC("imull");
+};
+
+target_inst IMUL64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("imulq");
+    FLAGS(IsCommutative);
+};
+
+target_inst IMUL64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+    MNEMONIC("imulq");
+};
+
+target_inst IDIV32r(GPR32:src IN) {
+    MNEMONIC("idivl");
+};
+
+target_inst IDIV64r(GPR64:src IN) {
+    MNEMONIC("idivq");
+};
+
+target_inst DIV32r(GPR32:src IN) {
+    MNEMONIC("divl");
+};
+
+target_inst DIV64r(GPR64:src IN) {
+    MNEMONIC("divq");
+};
+
+target_inst NEG32r(GPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("negl");
+};
+
+target_inst NEG64r(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("negq");
+};
+
+target_inst NOT32r(GPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("notl");
+};
+
+target_inst NOT64r(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("notq");
+};
+
+// ============================================================================
+// BITWISE & SHIFTS
+// ============================================================================
+
+target_inst AND32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+    MNEMONIC("andl");
+    FLAGS(IsCommutative);
+};
+
+target_inst AND32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
+    MNEMONIC("andl");
+};
+
+target_inst AND64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("andq");
+    FLAGS(IsCommutative);
+};
+
+target_inst AND64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+    MNEMONIC("andq");
+};
+
+target_inst OR32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+    MNEMONIC("orl");
+    FLAGS(IsCommutative);
+};
+
+target_inst OR32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
+    MNEMONIC("orl");
+};
+
+target_inst OR64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("orq");
+    FLAGS(IsCommutative);
+};
+
+target_inst OR64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+    MNEMONIC("orq");
+};
+
+target_inst XOR32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+    MNEMONIC("xorl");
+    FLAGS(IsCommutative);
+};
+
+target_inst XOR32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
+    MNEMONIC("xorl");
+};
+
+target_inst XOR64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+    MNEMONIC("xorq");
+    FLAGS(IsCommutative);
+};
+
+target_inst XOR64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+    MNEMONIC("xorq");
+};
+
+target_inst SHL32ri(GPR32:dst OUT, GPR32:src IN, i8:amt IN) {
+    MNEMONIC("shll");
+};
+
+target_inst SHL32rCL(GPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("shll");
+};
+
+target_inst SHL64ri(GPR64:dst OUT, GPR64:src IN, i8:amt IN) {
+    MNEMONIC("shlq");
+};
+
+target_inst SHL64rCL(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("shlq");
+};
+
+target_inst SHR32ri(GPR32:dst OUT, GPR32:src IN, i8:amt IN) {
+    MNEMONIC("shrl");
+};
+
+target_inst SHR32rCL(GPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("shrl");
+};
+
+target_inst SHR64ri(GPR64:dst OUT, GPR64:src IN, i8:amt IN) {
+    MNEMONIC("shrq");
+};
+
+target_inst SHR64rCL(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("shrq");
+};
+
+target_inst SAR32ri(GPR32:dst OUT, GPR32:src IN, i8:amt IN) {
+    MNEMONIC("sarl");
+};
+
+target_inst SAR32rCL(GPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("sarl");
+};
+
+target_inst SAR64ri(GPR64:dst OUT, GPR64:src IN, i8:amt IN) {
+    MNEMONIC("sarq");
+};
+
+target_inst SAR64rCL(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("sarq");
+};
+
+// ============================================================================
+// COMPARISONS & SETcc
+// ============================================================================
+
+target_inst CMP32rr(GPR32:lhs IN, GPR32:rhs IN) {
+    MNEMONIC("cmpl");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst CMP32ri(GPR32:lhs IN, i32:imm IN) {
+    MNEMONIC("cmpl");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst CMP64rr(GPR64:lhs IN, GPR64:rhs IN) {
+    MNEMONIC("cmpq");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst CMP64ri(GPR64:lhs IN, i64:imm IN) {
+    MNEMONIC("cmpq");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst TEST32rr(GPR32:lhs IN, GPR32:rhs IN) {
+    MNEMONIC("testl");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst TEST64rr(GPR64:lhs IN, GPR64:rhs IN) {
+    MNEMONIC("testq");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst SETE(GPR8:dst OUT) {
+    MNEMONIC("sete");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETNE(GPR8:dst OUT) {
+    MNEMONIC("setne");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETL(GPR8:dst OUT) {
+    MNEMONIC("setl");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETLE(GPR8:dst OUT) {
+    MNEMONIC("setle");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETG(GPR8:dst OUT) {
+    MNEMONIC("setg");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETGE(GPR8:dst OUT) {
+    MNEMONIC("setge");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETB(GPR8:dst OUT) {
+    MNEMONIC("setb");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETBE(GPR8:dst OUT) {
+    MNEMONIC("setbe");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETA(GPR8:dst OUT) {
+    MNEMONIC("seta");
+    FLAGS(ReadsCPUFlags);
+};
+
+target_inst SETAE(GPR8:dst OUT) {
+    MNEMONIC("setae");
+    FLAGS(ReadsCPUFlags);
+};
+
+// ============================================================================
+// DATA MOVEMENT & MEMORY
+// ============================================================================
+
+target_inst MOV8rr(GPR8:dst OUT, GPR8:src IN) {
+    MNEMONIC("movb");
+    FLAGS(IsMove);
+};
+
+target_inst MOV8ri(GPR8:dst OUT, i8:imm IN) {
+    MNEMONIC("movb");
+};
+
+target_inst MOV16rr(GPR16:dst OUT, GPR16:src IN) {
+    MNEMONIC("movw");
+    FLAGS(IsMove);
+};
+
+target_inst MOV16ri(GPR16:dst OUT, i16:imm IN) {
+    MNEMONIC("movw");
+};
+
+target_inst MOV32rr(GPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("movl");
+    FLAGS(IsMove);
+};
+
+target_inst MOV32ri(GPR32:dst OUT, i32:imm IN) {
+    MNEMONIC("movl");
+};
+
+target_inst MOV64rr(GPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("movq");
+    FLAGS(IsMove);
+};
+
+target_inst MOV64ri(GPR64:dst OUT, i64:imm IN) {
+    MNEMONIC("movq");
+};
+
+target_inst LOAD8(GPR8:dst OUT, Mem8:addr IN) {
+    MNEMONIC("movb");
+    FLAGS(ReadsMemory);
+};
+
+target_inst LOAD16(GPR16:dst OUT, Mem16:addr IN) {
+    MNEMONIC("movw");
+    FLAGS(ReadsMemory);
 };
 
 target_inst LOAD32(GPR32:dst OUT, Mem32:addr IN) {
@@ -46,6 +358,16 @@ target_inst LOAD64(GPR64:dst OUT, Mem64:addr IN) {
     FLAGS(ReadsMemory);
 };
 
+target_inst STORE8(Mem8:addr IN, GPR8:val IN) {
+    MNEMONIC("movb");
+    FLAGS(WritesMemory);
+};
+
+target_inst STORE16(Mem16:addr IN, GPR16:val IN) {
+    MNEMONIC("movw");
+    FLAGS(WritesMemory);
+};
+
 target_inst STORE32(Mem32:addr IN, GPR32:val IN) {
     MNEMONIC("movl");
     FLAGS(WritesMemory);
@@ -56,17 +378,206 @@ target_inst STORE64(Mem64:addr IN, GPR64:val IN) {
     FLAGS(WritesMemory);
 };
 
-target_inst MOV32rr(GPR32:dst OUT, GPR32:src IN) {
-    MNEMONIC("movl");
-    FLAGS(IsMove);
+target_inst MOVSX32_8(GPR32:dst OUT, GPR8:src IN) {
+    MNEMONIC("movsbl");
 };
 
-target_inst MOV64rr(GPR64:dst OUT, GPR64:src IN) {
-    MNEMONIC("movq");
-    FLAGS(IsMove);
+target_inst MOVSX32_16(GPR32:dst OUT, GPR16:src IN) {
+    MNEMONIC("movswl");
+};
+
+target_inst MOVSX64_8(GPR64:dst OUT, GPR8:src IN) {
+    MNEMONIC("movsbq");
+};
+
+target_inst MOVSX64_16(GPR64:dst OUT, GPR16:src IN) {
+    MNEMONIC("movswq");
+};
+
+target_inst MOVSX64_32(GPR64:dst OUT, GPR32:src IN) {
+    MNEMONIC("movslq");
+};
+
+target_inst MOVZX32_8(GPR32:dst OUT, GPR8:src IN) {
+    MNEMONIC("movzbl");
+};
+
+target_inst MOVZX32_16(GPR32:dst OUT, GPR16:src IN) {
+    MNEMONIC("movzwl");
+};
+
+target_inst MOVZX64_8(GPR64:dst OUT, GPR8:src IN) {
+    MNEMONIC("movzbq");
+};
+
+target_inst MOVZX64_16(GPR64:dst OUT, GPR16:src IN) {
+    MNEMONIC("movzwq");
+};
+
+target_inst LEA64r(GPR64:dst OUT, Mem64:addr IN) {
+    MNEMONIC("leaq");
+};
+
+// ============================================================================
+// CONTROL FLOW
+// ============================================================================
+
+target_inst JMP(i64:target IN) {
+    MNEMONIC("jmp");
+    FLAGS(IsTerminator, IsBranch);
+};
+
+target_inst JE(i64:target IN) {
+    MNEMONIC("je");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JNE(i64:target IN) {
+    MNEMONIC("jne");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JL(i64:target IN) {
+    MNEMONIC("jl");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JLE(i64:target IN) {
+    MNEMONIC("jle");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JG(i64:target IN) {
+    MNEMONIC("jg");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JGE(i64:target IN) {
+    MNEMONIC("jge");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JB(i64:target IN) {
+    MNEMONIC("jb");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JBE(i64:target IN) {
+    MNEMONIC("jbe");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JA(i64:target IN) {
+    MNEMONIC("ja");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst JAE(i64:target IN) {
+    MNEMONIC("jae");
+    FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+};
+
+target_inst CALL(GPR64:callee IN) {
+    MNEMONIC("call");
+    FLAGS(IsCall, HasSideEffect);
 };
 
 target_inst RET(GPR64:val IN) {
     MNEMONIC("ret");
-    FLAGS(IsTerminator);
+    FLAGS(IsTerminator, IsReturn, HasSideEffect);
+};
+
+target_inst PUSH64r(GPR64:src IN) {
+    MNEMONIC("pushq");
+    FLAGS(WritesMemory);
+};
+
+target_inst POP64r(GPR64:dst OUT) {
+    MNEMONIC("popq");
+    FLAGS(ReadsMemory);
+};
+
+// ============================================================================
+// FLOATING POINT (SSE / SSE2)
+// ============================================================================
+
+target_inst ADDSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
+    MNEMONIC("addss");
+};
+
+target_inst ADDSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
+    MNEMONIC("addsd");
+};
+
+target_inst SUBSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
+    MNEMONIC("subss");
+};
+
+target_inst SUBSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
+    MNEMONIC("subsd");
+};
+
+target_inst MULSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
+    MNEMONIC("mulss");
+};
+
+target_inst MULSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
+    MNEMONIC("mulsd");
+};
+
+target_inst DIVSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
+    MNEMONIC("divss");
+};
+
+target_inst DIVSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
+    MNEMONIC("divsd");
+};
+
+target_inst MOVSSrr(FPR32:dst OUT, FPR32:src IN) {
+    MNEMONIC("movss");
+    FLAGS(IsMove);
+};
+
+target_inst MOVSDrr(FPR64:dst OUT, FPR64:src IN) {
+    MNEMONIC("movsd");
+    FLAGS(IsMove);
+};
+
+target_inst UCOMISS(FPR32:lhs IN, FPR32:rhs IN) {
+    MNEMONIC("ucomiss");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst UCOMISD(FPR64:lhs IN, FPR64:rhs IN) {
+    MNEMONIC("ucomisd");
+    FLAGS(ReadsCPUFlags, WritesCPUFlags);
+};
+
+target_inst CVTSI2SS(FPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("cvtsi2ssl");
+};
+
+target_inst CVTSI2SD(FPR64:dst OUT, GPR64:src IN) {
+    MNEMONIC("cvtsi2sdq");
+};
+
+target_inst CVTTSS2SI(GPR32:dst OUT, FPR32:src IN) {
+    MNEMONIC("cvttss2sil");
+};
+
+target_inst CVTTSD2SI(GPR64:dst OUT, FPR64:src IN) {
+    MNEMONIC("cvttsd2siq");
+};
+
+// ============================================================================
+// SYSTEM
+// ============================================================================
+
+target_inst SYSCALL() {
+    MNEMONIC("syscall");
+    FLAGS(HasSideEffect);
+};
+
+target_inst NOP() {
+    MNEMONIC("nop");
 };

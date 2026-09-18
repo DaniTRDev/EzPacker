@@ -34,7 +34,7 @@ enum class TargetObjectFormat : uint8_t
 class TargetBinaryDesc
 {
   public:
-    ~TargetBinaryDesc() = default;
+    virtual ~TargetBinaryDesc() = default;
 
     /**
      * Returns true if the resulting binary needs to be encoded in little endian.

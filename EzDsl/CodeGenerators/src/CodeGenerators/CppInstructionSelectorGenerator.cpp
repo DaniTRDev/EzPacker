@@ -160,10 +160,17 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
 
     emitter.emitInclude(std::format("{}InstructionSelector.h", m_targetName));
     emitter.emitInclude(std::format("{}TargetInstructionTable.h", m_targetName));
+    emitter.emitInclude("Instruction/MirInstruction.h");
     emitter.emitInclude("Instruction/MirInstructionBuilder.h");
+    emitter.emitInclude("Operand/MirOperands.h");
     emitter.emitInclude("Operand/MirOperandBuilder.h");
     emitter.emitInclude("Operand/MirRegisterClass.h");
     emitter.emitInclude("Operand/MirRegisterBank.h");
+    emitter.emitInclude("Builder/MirBuilderContext.h");
+    emitter.emitInclude("Type/MirTypeTable.h");
+    emitter.emitInclude("Function/MirFunction.h");
+    emitter.emitInclude("Function/MirFunctionRegisterInfo.h");
+    emitter.emitInclude("FlexNumber/FlexInt.h");
     emitter.emitLine("#include <cstdint>");
     emitter.emitLine("#include <string_view>");
     emitter.emitBlankLine();
@@ -244,6 +251,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                 emitter.emitLine("return false;");
                 emitter.dedent();
             }
+            emitter.emitLine("return false;");
         }
         emitter.emitBlankLine();
 
@@ -291,7 +299,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                             const auto &nestedOp = pat->m_matchTree.m_operands[nestedOpIdx];
                             const auto &nestedTree = *nestedOp.m_nestedTree;
 
-                            emitter.emitLine("if (inst->getNumOperands() >= {})", pat->m_matchTree.m_operands.size());
+                            emitter.emitLine("if (inst->getOperandCount() >= {})", pat->m_matchTree.m_operands.size());
                             {
                                 auto ifScope = emitter.enterBlock();
                                 emitter.emitLine("auto *vregOp = inst->getOperand({})->get<MirRegister>();", nestedOpIdx);
@@ -303,7 +311,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                                      nestedTree.m_opcode.m_node);
                                     {
                                         auto defScope = emitter.enterBlock();
-                                        emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::Before);");
+                                        emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);");
                                         emitter.emitLine("MirOperandBuilder ob(ctx);");
 
                                         // Check target emit
@@ -343,7 +351,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                                     emitter.emitLine("{");
                                                     emitter.indent();
                                                     emitter.emitLine("reg->setClass(findClass(\"GPR64\"));");
-                                                    emitter.emitLine("auto *disp0 = ob.buildInt(ctx->getTypeTable()->i32(), 0);");
+                                                    emitter.emitLine("auto *disp0 = ob.buildInt(ctx->getTypeTable()->i32(), FlexInt(static_cast<int32_t>(0)));");
                                                     emitter.emitLine("emittedOps.push_back(ob.buildMem(ctx->getTypeTable()->i32(), reg, disp0));");
                                                     emitter.dedent();
                                                     emitter.emitLine("}");
@@ -368,7 +376,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
 
                                             std::string targetDescCall = std::format("{}TargetInst::getTargetDesc({}TargetInst::{})",
                                                                                      m_targetName, m_targetName, selInst.m_targetOpcode.m_node);
-                                            emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);", targetDescCall);
+                                            emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc *>({}), inst->getSourceRef(), emittedOps);", targetDescCall);
                                         }
 
                                         emitter.emitLine("defInst->eraseFromOwner();");
@@ -381,7 +389,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                         else
                         {
                             // Standard pattern without nested instructions
-                            emitter.emitLine("if (inst->getNumOperands() >= {})", pat->m_matchTree.m_operands.size());
+                            emitter.emitLine("if (inst->getOperandCount() >= {})", pat->m_matchTree.m_operands.size());
                             {
                                 auto ifScope = emitter.enterBlock();
 
@@ -400,10 +408,10 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                     // Match immediate
                                     emitter.emitLine("auto *imm = inst->getOperand({})->get<MirInteger>();",
                                                      pat->m_matchTree.m_operands.size() - 1);
-                                    emitter.emitLine("if (imm && isSimm32(imm->getValue().asInt64()))");
+                                    emitter.emitLine("if (imm && isSimm32(imm->getValue().getI64()))");
                                     {
                                         auto immScope = emitter.enterBlock();
-                                        emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::Before);");
+                                        emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);");
                                         // Assign classes
                                         for (const auto &selInst : pat->m_selectClauses)
                                         {
@@ -424,7 +432,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                             }
                                             std::string targetDescCall = std::format("{}TargetInst::getTargetDesc({}TargetInst::{})",
                                                                                      m_targetName, m_targetName, selInst.m_targetOpcode.m_node);
-                                            emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);", targetDescCall);
+                                            emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc *>({}), inst->getSourceRef(), emittedOps);", targetDescCall);
                                         }
                                         emitter.emitLine("inst->eraseFromOwner();");
                                         emitter.emitLine("return true;");
@@ -433,7 +441,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                 else
                                 {
                                     // Register-register pattern
-                                    emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::Before);");
+                                    emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);");
                                     for (const auto &selInst : pat->m_selectClauses)
                                     {
                                         for (size_t sIdx = 0; sIdx < selInst.m_operands.size(); ++sIdx)
@@ -453,7 +461,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                         }
                                         std::string targetDescCall = std::format("{}TargetInst::getTargetDesc({}TargetInst::{})",
                                                                                  m_targetName, m_targetName, selInst.m_targetOpcode.m_node);
-                                        emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);", targetDescCall);
+                                        emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc *>({}), inst->getSourceRef(), emittedOps);", targetDescCall);
                                     }
                                     emitter.emitLine("inst->eraseFromOwner();");
                                     emitter.emitLine("return true;");

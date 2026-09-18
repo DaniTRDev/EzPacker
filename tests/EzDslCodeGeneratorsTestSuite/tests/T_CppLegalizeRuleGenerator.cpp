@@ -184,7 +184,7 @@ rule SDivPow2 {
     EXPECT_NE(source.find("operands.size() != 3"), std::string::npos);
     EXPECT_NE(source.find("MirOperandType::Register"), std::string::npos);
     EXPECT_NE(source.find("MirOperandType::Integer"), std::string::npos);
-    EXPECT_NE(source.find("getBitWidth() != 32"), std::string::npos);
+    EXPECT_NE(source.find("getTotalSizeInBits() != 32"), std::string::npos);
 
     // Verify Source: when predicates & transforms
     EXPECT_NE(source.find("!isPowTwo("), std::string::npos);
@@ -193,7 +193,7 @@ rule SDivPow2 {
 
     // Verify Source: emit sequence
     EXPECT_NE(source.find("MirInstructionOpCode::SAR"), std::string::npos);
-    EXPECT_NE(source.find("block->erase(ctx.m_it);"), std::string::npos);
+    EXPECT_NE(source.find("inst->eraseFromOwner();"), std::string::npos);
     EXPECT_NE(source.find("return LegalizationResult::Legalized;"), std::string::npos);
 
     // Verify Source: dispatchers

@@ -40,4 +40,11 @@ if (EZPACKER_BUILD_TESTS)
             "gtest;GTest::gtest_main"
             "tests/T_DiagnosticLogger.cpp"
     )
+
+    EzPacker_AddTest(
+            "T_IntrusiveLinkedList"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_IntrusiveLinkedList.cpp"
+    )
 endif ()

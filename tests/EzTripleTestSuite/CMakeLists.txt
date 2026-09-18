@@ -44,3 +44,11 @@ EzPacker_AddTest(
         ""
         "tests/T_MirRegisterAllocator.cpp"
 )
+
+EzPacker_AddTest(
+        "T_X86_64TargetDesc"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_X86_64TargetDesc.cpp"
+)
+

@@ -644,6 +644,7 @@ DriverResult Driver::run()
     size_t constructCount = 0;
     bool hasLoadedRules = false;
     std::optional<DSL::Ast::CallingConvDef::CallingConventionDefFile> ccAst;
+    std::optional<DSL::Ast::InstructionSelectDef::InstructionSelectFile> isAst;
 
     // Multi-dialect prelude & dependency ingestion
     if (dialect == LanguageDialect::LegalizeRule || dialect == LanguageDialect::LegalizeAction)
@@ -910,18 +911,18 @@ DriverResult Driver::run()
 
         case LanguageDialect::InstructionSelect:
         {
-            auto ast = parseCtx.parse<DSL::Parser::InstructionSelectDef::InstructionSelectFile,
+            isAst = parseCtx.parse<DSL::Parser::InstructionSelectDef::InstructionSelectFile,
                                       DSL::Ast::InstructionSelectDef::InstructionSelectFile>();
-            if (!ast.has_value() || errorTracker.hasErrors())
+            if (!isAst.has_value() || errorTracker.hasErrors())
             {
                 result.success = false;
                 result.errorMessage = "Syntax parsing failed for Instruction Selection Definition file.";
                 return result;
             }
 
-            constructCount = ast->m_patterns.size();
+            constructCount = isAst->m_patterns.size();
 
-            if (!InstructionSelectPass::run(&diagCollector, &symbolTable, &ast.value()) || errorTracker.hasErrors())
+            if (!InstructionSelectPass::run(&diagCollector, &symbolTable, &isAst.value()) || errorTracker.hasErrors())
             {
                 result.success = false;
                 result.errorMessage = "Semantic analysis failed for Instruction Selection Definition file.";

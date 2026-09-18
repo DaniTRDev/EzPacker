@@ -5,6 +5,7 @@
 #include "Instruction/MirInstructionSet.h"
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionRegisterInfo.h"
+#include "Builder/MirBuilderContext.h"
 #include "Block/MirBlock.h"
 
 X86AddressingModeMatcher::X86AddressingModeMatcher(MirInstructionSelector *selector) :
@@ -83,11 +84,11 @@ MirInstruction *X86AddressingModeMatcher::getDef(MirBuilderContext *ctx, MirRegi
 
     if (ctx)
     {
-        for (auto &func : ctx->getFunctions())
+        for (auto func : ctx->getFunctions())
         {
-            if (func.getRegisterInfo())
+            if (func->getRegisterInfo())
             {
-                if (auto *def = func.getRegisterInfo()->getDef(reg->getRegId()))
+                if (auto *def = func->getRegisterInfo()->getDef(reg->getRegId()))
                     return def;
             }
         }

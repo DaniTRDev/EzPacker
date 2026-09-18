@@ -50,6 +50,8 @@ struct FrameLowererCtx
 class MirFrameLowerer
 {
   public:
+    virtual ~MirFrameLowerer() = default;
+
     /**
      * Runs the frame lowering pipeline on the provided function context.
      */

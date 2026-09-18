@@ -4,6 +4,9 @@
 #include "EzCodeEmitterCommon.h"
 #include "CodeEmitterContext.h"
 
+class MirOperand;
+class MirTargetInstructionDesc;
+
 /**
  * Interface used as to contain the basic functionality needed by a code emitter to be able to emit code in a target.
  *

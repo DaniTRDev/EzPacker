@@ -121,9 +121,9 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitBlankLine();
 
     emitter.emitInclude(std::format("{}.h", defaultBaseName));
-    emitter.emitInclude("Actions/LegalizeActionCommon.h");
-    emitter.emitInclude("Actions/LegalizeCallAction.h");
-    emitter.emitInclude("Actions/LegalizeReturnAction.h");
+    emitter.emitInclude("Legalizer/Actions/LegalizeActionCommon.h");
+    emitter.emitInclude("Legalizer/Actions/LegalizeCallAction.h");
+    emitter.emitInclude("Legalizer/Actions/LegalizeReturnAction.h");
     emitter.emitInclude("Instruction/MirInstructionSet.h");
     emitter.emitInclude("Legalizer/LegalityQuery.h");
     emitter.emitInclude("array", true);
@@ -219,16 +219,19 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                 {
                     hasNonEmpty = true;
                 }
-                if (clause.m_types.size() > 1)
-                {
-                    isHet = true;
-                }
+                std::set<uint8_t> slotsInClause;
                 for (const auto &tc : clause.m_types)
                 {
-                    if (tc.m_operandIndex.has_value() && *tc.m_operandIndex > 0)
+                    uint8_t slot = tc.m_operandIndex.value_or(0);
+                    slotsInClause.insert(slot);
+                    if (slot > 0)
                     {
                         isHet = true;
                     }
+                }
+                if (slotsInClause.size() > 1)
+                {
+                    isHet = true;
                 }
                 if (clause.m_libcallSymbol.has_value())
                 {
@@ -330,25 +333,45 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                 targetSlot = static_cast<uint8_t>(*clause.m_types[0].m_operandIndex);
             }
 
+            std::map<uint8_t, std::vector<uint8_t>> slotToCids;
+            for (const auto &tc : clause.m_types)
+            {
+                uint8_t cid = getCompactId(tc.m_typeId);
+                uint8_t slot = tc.m_operandIndex.value_or(0);
+                slotToCids[slot].push_back(cid);
+            }
+
             std::string cond;
-            if (clause.m_types.empty())
+            if (slotToCids.empty())
             {
                 cond = "true";
             }
             else
             {
-                for (size_t i = 0; i < clause.m_types.size(); ++i)
+                bool firstSlot = true;
+                for (const auto &[slot, cids] : slotToCids)
                 {
-                    const auto &tc = clause.m_types[i];
-                    uint8_t cid = getCompactId(tc.m_typeId);
-                    uint8_t slot = tc.m_operandIndex.value_or(0);
-                    if (i > 0) cond += " && ";
-                    cond += std::format("q.m_compactIds[{}] == {}", slot, cid);
+                    if (!firstSlot) cond += " && ";
+                    firstSlot = false;
+                    if (cids.size() == 1)
+                    {
+                        cond += std::format("q.m_compactIds[{}] == {}", slot, cids[0]);
+                    }
+                    else
+                    {
+                        cond += "(";
+                        for (size_t cIdx = 0; cIdx < cids.size(); ++cIdx)
+                        {
+                            if (cIdx > 0) cond += " || ";
+                            cond += std::format("q.m_compactIds[{}] == {}", slot, cids[cIdx]);
+                        }
+                        cond += ")";
+                    }
                 }
             }
 
             emitter.emitLine("if ({})", cond);
-            emitter.emitLine("{{");
+            emitter.emitLine("{");
             emitter.indent();
             emitter.emitLine("return LegalityResponse{{ {}, {}, {}, {} }};",
                              ActionKindToCpp(clause.m_kind),
@@ -356,10 +379,10 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                              targetCid,
                              handlerOrStrId);
             emitter.dedent();
-            emitter.emitLine("}}");
+            emitter.emitLine("}");
         }
 
-        emitter.emitLine("return LegalityResponse{{ LegalizeActionKind::Unsupported, 0, 0, 0 }};");
+        emitter.emitLine("return LegalityResponse{ LegalizeActionKind::Unsupported, 0, 0, 0 };");
         emitter.dedent();
         emitter.emitLine("}");
         emitter.emitBlankLine();
@@ -392,7 +415,7 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     }
     emitter.emitLine("return wildcards;");
     emitter.dedent();
-    emitter.emitLine("}}();");
+    emitter.emitLine("}();");
     emitter.emitBlankLine();
 
     // 7. Emit Tier 1 Dense Primary Matrix
@@ -450,7 +473,7 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
 
     emitter.emitLine("return mat;");
     emitter.dedent();
-    emitter.emitLine("}}();");
+    emitter.emitLine("}();");
     emitter.emitBlankLine();
 
     // 8. Emit Class Constructor
@@ -503,7 +526,7 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitLine("if (opIdx >= OPCODE_COUNT)");
     emitter.emitLine("{");
     emitter.indent();
-    emitter.emitLine("return LegalityResponse{{ .m_action = LegalizeActionKind::Unsupported }};");
+    emitter.emitLine("return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };");
     emitter.dedent();
     emitter.emitLine("}");
     emitter.emitBlankLine();
@@ -556,7 +579,7 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitLine("}");
     emitter.emitBlankLine();
 
-    emitter.emitLine("return LegalityResponse{{ .m_action = LegalizeActionKind::Unsupported }};");
+    emitter.emitLine("return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };");
     emitter.dedent();
     emitter.emitLine("}");
     emitter.emitBlankLine();

@@ -177,12 +177,6 @@ class MirInstruction
     std::string toString() const;
 
     /**
-     * Unlinks and erases this instruction from its owning basic block, updating register def/use tracking.
-     */
-    void eraseFromOwner();
-
-  private:
-    /**
      * Updates the opcode of this instruction.
      */
     void setOpcode(MirInstructionOpCode opcode);
@@ -192,6 +186,12 @@ class MirInstruction
      */
     void setTargetDesc(MirTargetInstructionDesc *desc);
 
+    /**
+     * Unlinks and erases this instruction from its owning basic block, updating register def/use tracking.
+     */
+    void eraseFromOwner();
+
+  private:
     /**
      * Sets the preceding instruction in the block's intrusive list.
      */
