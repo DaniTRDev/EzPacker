@@ -25,7 +25,7 @@ inline std::string StrToUpper(const std::string_view &str)
     std::string upperStr;
     upperStr.resize(str.size());
 
-    std::transform(upperStr.begin(), upperStr.end(), upperStr.begin(), toupper);
+    std::transform(str.begin(), str.end(), upperStr.begin(), toupper);
     return upperStr;
 }
 

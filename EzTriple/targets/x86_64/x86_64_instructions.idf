@@ -482,7 +482,7 @@ target_inst CALL(GPR64:callee IN) {
     FLAGS(IsCall, HasSideEffect);
 };
 
-target_inst RET(GPR64:val IN) {
+target_inst RET() {
     MNEMONIC("ret");
     FLAGS(IsTerminator, IsReturn, HasSideEffect);
 };

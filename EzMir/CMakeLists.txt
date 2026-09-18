@@ -31,6 +31,10 @@ set(EZMIR_FILES_LIST
         "include/Operand/MirRegisterBank.h"
         "include/Operand/MirRegisterClass.h"
         "include/Operand/MirRegisterReference.h"
+        "include/Parser/MirAstNodes.h"
+        "include/Parser/MirLexer.h"
+        "include/Parser/MirParserContext.h"
+        "include/Parser/MirParser.h"
         "include/Printer/MirPrinter.h"
         "include/Type/MirType.h"
         
@@ -59,6 +63,9 @@ set(EZMIR_FILES_LIST
         "src/Operand/MirRegisterBank.cpp"
         "src/Operand/MirRegisterClass.cpp"
         "src/Operand/MirRegisterReference.cpp"
+        "src/Parser/MirLexer.cpp"
+        "src/Parser/MirParserContext.cpp"
+        "src/Parser/MirParser.cpp"
         "src/Printer/MirPrinter.cpp"
         "src/Type/MirType.cpp"
 )
@@ -66,7 +73,7 @@ set(EZMIR_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzMir"
         FILE_LIST ${EZMIR_FILES_LIST}
         PRECOMPILED_HEADER "include/EzMirCommon.h"
-        LINKED_LIBRARIES "EzCore"
+        LINKED_LIBRARIES "EzCore;foonathan::lexy"
         INCLUDED_DIRS "include")
 
 include(CMake/EzDslGenTypeTable.cmake)

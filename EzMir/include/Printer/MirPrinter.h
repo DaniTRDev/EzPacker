@@ -13,12 +13,51 @@ enum MirPrinterDetail : uint8_t
 };
 
 /**
+ * Formatting mode for MIR textual emission.
+ */
+enum class MirPrinterMode : uint8_t
+{
+    Diagnostic, // Human inspection with Tier, Opcode column alignment, and unselected tags
+    Parseable   // Strict, round-trip parseable valid .mir text
+};
+
+/**
  * Textual formatter and disassembler for MIR data structures.
  * Produces readable representations of blocks, functions, global variables, instructions, operands, and stack slots.
  */
 class MirPrinter
 {
   public:
+    /**
+     * Formats an entire MIR compilation context module into a string representation.
+     */
+    static std::string printModule(class MirBuilderContext *ctx, MirPrinterMode mode = MirPrinterMode::Parseable);
+
+    /**
+     * Formats a MirFunction into a string representation according to the specified mode.
+     */
+    static std::string printFunction(class MirFunction *function, MirPrinterMode mode = MirPrinterMode::Parseable);
+
+    /**
+     * Formats a MirBlock into a string representation according to the specified mode.
+     */
+    static std::string printBlock(class MirBlock *block, MirPrinterMode mode = MirPrinterMode::Parseable);
+
+    /**
+     * Formats a MirInstruction into a string representation according to the specified mode.
+     */
+    static std::string printInstruction(class MirInstruction *instr, MirPrinterMode mode = MirPrinterMode::Parseable);
+
+    /**
+     * Formats a MirGlobalVar into a string representation according to the specified mode.
+     */
+    static std::string printGlobalVar(class MirGlobalVar *var, MirPrinterMode mode = MirPrinterMode::Parseable);
+
+    /**
+     * Formats a single MirOperand into textual representation according to the specified mode.
+     */
+    static std::string printOperand(class MirOperand *operand, MirPrinterMode mode = MirPrinterMode::Parseable);
+
     /**
      * Formats a MirBlock into a string representation.
      * General detail prints block ID and instruction count.

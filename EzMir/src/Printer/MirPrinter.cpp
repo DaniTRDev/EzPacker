@@ -1,3 +1,4 @@
+#include "Builder/MirBuilderContext.h"
 #include "Block/MirBlock.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirTargetInstructionDesc.h"
@@ -11,6 +12,324 @@
 #include "Operand/MirRegisterReference.h"
 #include "Printer/MirPrinter.h"
 #include "Type/MirType.h"
+
+std::string MirPrinter::printModule(MirBuilderContext *ctx, MirPrinterMode mode)
+{
+    if (!ctx)
+        return "";
+
+    if (mode == MirPrinterMode::Diagnostic)
+    {
+        std::string result = "=== MIR Module Diagnostic Dump ===\n";
+        for (MirGlobalVar *var : ctx->getGlobalVars())
+        {
+            result += printToString(var, MirPrinterDetail::Detailed);
+        }
+        for (MirFunction *fn : ctx->getFunctions())
+        {
+            result += printToString(fn, MirPrinterDetail::Detailed);
+        }
+        return result;
+    }
+
+    std::string result;
+    for (MirGlobalVar *var : ctx->getGlobalVars())
+    {
+        result += printGlobalVar(var, mode);
+        result += '\n';
+    }
+
+    if (!ctx->getGlobalVars().empty() && !ctx->getFunctions().empty())
+    {
+        result += '\n';
+    }
+
+    bool firstFunc = true;
+    for (MirFunction *fn : ctx->getFunctions())
+    {
+        if (!firstFunc)
+        {
+            result += '\n';
+        }
+        result += printFunction(fn, mode);
+        firstFunc = false;
+    }
+
+    return result;
+}
+
+std::string MirPrinter::printGlobalVar(MirGlobalVar *var, MirPrinterMode mode)
+{
+    if (!var)
+        return "";
+
+    if (mode == MirPrinterMode::Diagnostic)
+    {
+        return printToString(var, MirPrinterDetail::Detailed);
+    }
+
+    std::string_view linkageStr = "internal";
+    switch (var->getLinkage())
+    {
+        case MirGlobalVarLinkage::External: linkageStr = "external"; break;
+        case MirGlobalVarLinkage::Internal: linkageStr = "internal"; break;
+        case MirGlobalVarLinkage::Weak:     linkageStr = "weak"; break;
+    }
+
+    std::string result = std::format("@{} = {} {} {}",
+                                     var->getName(),
+                                     linkageStr,
+                                     var->isConstant() ? "const" : "var",
+                                     var->getType() ? var->getType()->getName() : "void");
+
+    if (var->getInitializer())
+    {
+        if (var->getInitializer()->getType() == MirOperandType::Integer)
+        {
+            auto *imm = static_cast<MirInteger *>(var->getInitializer());
+            result += std::format(" = {}", imm->getValue().getI64());
+        }
+        else if (var->getInitializer()->getType() == MirOperandType::FloatingPoint)
+        {
+            auto *fImm = static_cast<MirFloat *>(var->getInitializer());
+            result += std::format(" = {}", fImm->getValue().toString(10));
+        }
+        else
+        {
+            result += std::format(" = {}", printOperand(var->getInitializer(), mode));
+        }
+    }
+    result += ';';
+    return result;
+}
+
+std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode)
+{
+    if (!function)
+        return "";
+
+    if (mode == MirPrinterMode::Diagnostic)
+    {
+        return printToString(function, MirPrinterDetail::Detailed);
+    }
+
+    std::string fnName = !function->getName().empty() ? std::string(function->getName()) : "anonymous";
+    std::string retType = function->getReturnType() ? std::string(function->getReturnType()->getName()) : "void";
+
+    if (function->getBlocks().empty())
+    {
+        std::string result = std::format("declare @{}(", fnName);
+        bool firstParam = true;
+        for (MirRegister *param : function->getParameters())
+        {
+            if (!firstParam) result += ", ";
+            result += param->getMirType() ? param->getMirType()->getName() : "i64";
+            firstParam = false;
+        }
+        result += std::format(") -> {};\n", retType);
+        return result;
+    }
+
+    std::string result = std::format("fn @{}(", fnName);
+    bool firstParam = true;
+    for (MirRegister *param : function->getParameters())
+    {
+        if (!firstParam) result += ", ";
+        std::string typeStr = param->getMirType() ? std::string(param->getMirType()->getName()) : "i64";
+        std::string pName = !param->getName().empty() ? std::string(param->getName()) : std::format("%v{}", param->getRegId());
+        if (!pName.starts_with("%")) pName = "%" + pName;
+        result += std::format("{} {}", typeStr, pName);
+        firstParam = false;
+    }
+    result += std::format(") -> {} {{\n", retType);
+
+    for (MirBlock *block : function->getBlocks())
+    {
+        result += printBlock(block, mode);
+    }
+
+    result += "}\n";
+    return result;
+}
+
+std::string MirPrinter::printBlock(MirBlock *block, MirPrinterMode mode)
+{
+    if (!block)
+        return "";
+
+    if (mode == MirPrinterMode::Diagnostic)
+    {
+        return printToString(block, MirPrinterDetail::Detailed);
+    }
+
+    std::string blkName = !block->getName().empty() ? std::string(block->getName()) : std::format("block_{}", block->getId());
+    if (blkName.starts_with("%"))
+    {
+        blkName = blkName.substr(1);
+    }
+
+    std::string result = std::format("{}:\n", blkName);
+    for (MirInstruction *instr : block->getInstructions())
+    {
+        result += printInstruction(instr, mode);
+    }
+    return result;
+}
+
+std::string MirPrinter::printInstruction(MirInstruction *instr, MirPrinterMode mode)
+{
+    if (!instr)
+        return "";
+
+    if (mode == MirPrinterMode::Diagnostic)
+    {
+        return printToString(instr, MirPrinterDetail::Detailed);
+    }
+
+    const MirTargetInstructionDesc *desc = instr->getTargetDesc();
+    std::string opName;
+    if (instr->getOpCode() == MirInstructionOpCode::TARGET_INST && desc)
+    {
+        opName = desc->getName();
+    }
+    else
+    {
+        opName = instr->getMetadata().m_name;
+    }
+
+    std::string result = std::format("    {}", opName);
+    const auto &operands = instr->getOperands();
+    if (!operands.empty())
+    {
+        result += " ";
+        bool firstOp = true;
+        for (MirOperand *op : operands)
+        {
+            if (!firstOp)
+            {
+                result += ", ";
+            }
+            result += printOperand(op, mode);
+            firstOp = false;
+        }
+    }
+    result += ";\n";
+    return result;
+}
+
+std::string MirPrinter::printOperand(MirOperand *operand, MirPrinterMode mode)
+{
+    if (!operand)
+        return "<null>";
+
+    if (mode == MirPrinterMode::Diagnostic)
+    {
+        return printToString(operand);
+    }
+
+    switch (operand->getType())
+    {
+        case MirOperandType::Register:
+        {
+            auto *reg = static_cast<MirRegister *>(operand);
+            std::string typeStr = reg->getMirType() ? std::string(reg->getMirType()->getName()) : "i64";
+            if (reg->isVirtual())
+            {
+                std::string name = !reg->getName().empty() ? std::string(reg->getName()) : std::format("%v{}", reg->getRegId());
+                if (!name.starts_with("%")) name = "%" + name;
+                return std::format("{} {}", typeStr, name);
+            }
+            else
+            {
+                const char *className = reg->getRegClass() ? reg->getRegClass()->getName() : "unassigned";
+                return std::format("{} %p{}({})", typeStr, reg->getRegId(), className);
+            }
+        }
+        case MirOperandType::Integer:
+        {
+            auto *imm = static_cast<MirInteger *>(operand);
+            std::string typeStr = imm->getMirType() ? std::string(imm->getMirType()->getName()) : "i64";
+            return std::format("{} {}", typeStr, imm->getValue().getI64());
+        }
+        case MirOperandType::FloatingPoint:
+        {
+            auto *fImm = static_cast<MirFloat *>(operand);
+            std::string typeStr = fImm->getMirType() ? std::string(fImm->getMirType()->getName()) : "f64";
+            return std::format("{} {}", typeStr, fImm->getValue().toString(10));
+        }
+        case MirOperandType::Reference:
+        {
+            auto *ref = static_cast<MirReference *>(operand);
+            if (ref->isBlock())
+            {
+                return std::format("label %block_{}", ref->getRefId());
+            }
+            else if (ref->isGlobalVar())
+            {
+                std::string typeStr = ref->getMirType() ? std::string(ref->getMirType()->getName()) : "ptr";
+                if (ref->getOffset() > 0)
+                {
+                    return std::format("{} @global_{}+0x{:X}", typeStr, ref->getRefId(), ref->getOffset());
+                }
+                return std::format("{} @global_{}", typeStr, ref->getRefId());
+            }
+            else if (ref->isFunction())
+            {
+                return std::format("@func_{}", ref->getRefId());
+            }
+            else if (ref->isStackFrameObject())
+            {
+                return std::format("%stack[{}]", ref->getRefId());
+            }
+            return "<invalid_ref>";
+        }
+        case MirOperandType::RuntimeSymbol:
+        {
+            auto *rt = static_cast<MirRuntimeSymbol *>(operand);
+            if (rt->getSymbolName().starts_with("@"))
+            {
+                return std::string(rt->getSymbolName());
+            }
+            return std::format("@{}", rt->getSymbolName());
+        }
+        case MirOperandType::Memory:
+        {
+            auto *mem = static_cast<MirMemory *>(operand);
+            std::string baseStr = mem->getBase() ? (!mem->getBase()->getName().empty() ? std::string(mem->getBase()->getName()) : std::format("%v{}", mem->getBase()->getRegId())) : "%0";
+            if (!baseStr.starts_with("%")) baseStr = "%" + baseStr;
+
+            std::string addrStr = std::format("ptr {}", baseStr);
+            if (mem->getIndex())
+            {
+                std::string idxStr = !mem->getIndex()->getName().empty() ? std::string(mem->getIndex()->getName()) : std::format("%v{}", mem->getIndex()->getRegId());
+                if (!idxStr.starts_with("%")) idxStr = "%" + idxStr;
+                if (mem->getScale() > 1)
+                {
+                    addrStr += std::format(" + {} * {}", idxStr, mem->getScale());
+                }
+                else
+                {
+                    addrStr += std::format(" + {}", idxStr);
+                }
+            }
+            if (mem->getDisplacement() && !mem->getDisplacement()->getValue().isZero())
+            {
+                int64_t disp = mem->getDisplacement()->getValue().getI64();
+                if (disp >= 0)
+                {
+                    addrStr += std::format(" + {}", disp);
+                }
+                else
+                {
+                    addrStr += std::format(" - {}", -disp);
+                }
+            }
+            return std::format("[{}]", addrStr);
+        }
+        default:
+            return operand->toString();
+    }
+}
 
 std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
 {

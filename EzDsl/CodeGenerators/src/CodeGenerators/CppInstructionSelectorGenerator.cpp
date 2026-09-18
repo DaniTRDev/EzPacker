@@ -389,7 +389,14 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                         else
                         {
                             // Standard pattern without nested instructions
-                            emitter.emitLine("if (inst->getOperandCount() >= {})", pat->m_matchTree.m_operands.size());
+                            if (pat->m_matchTree.m_operands.empty())
+                            {
+                                emitter.emitLine("if (inst->getOperandCount() == 0)");
+                            }
+                            else
+                            {
+                                emitter.emitLine("if (inst->getOperandCount() >= {})", pat->m_matchTree.m_operands.size());
+                            }
                             {
                                 auto ifScope = emitter.enterBlock();
 
@@ -441,30 +448,56 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                 else
                                 {
                                     // Register-register pattern
-                                    emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);");
-                                    for (const auto &selInst : pat->m_selectClauses)
+                                    std::string regCond;
+                                    for (size_t opIdx = 0; opIdx < pat->m_matchTree.m_operands.size(); ++opIdx)
                                     {
-                                        for (size_t sIdx = 0; sIdx < selInst.m_operands.size(); ++sIdx)
+                                        if (pat->m_matchTree.m_operands[opIdx].m_kind ==
+                                            DSL::Ast::InstructionSelectDef::PatternOperand::Kind::SsaRegister)
                                         {
-                                            const auto &op = selInst.m_operands[sIdx];
-                                            if (op.m_kind == DSL::Ast::InstructionSelectDef::TargetEmitOperand::Kind::ClassBoundVar && op.m_regClass)
-                                            {
-                                                emitter.emitLine("if (auto *r = inst->getOperand({})->get<MirRegister>()) r->setClass(findClass(\"{}\"));",
-                                                                 sIdx, op.m_regClass->m_node);
-                                            }
+                                            if (!regCond.empty()) regCond += " && ";
+                                            regCond += std::format("inst->getOperand({})->isOfType<MirRegister>()", opIdx);
                                         }
-
-                                        emitter.emitLine("std::vector<MirOperand *> emittedOps;");
-                                        for (size_t sIdx = 0; sIdx < selInst.m_operands.size(); ++sIdx)
-                                        {
-                                            emitter.emitLine("emittedOps.push_back(inst->getOperand({}));", sIdx);
-                                        }
-                                        std::string targetDescCall = std::format("{}TargetInst::getTargetDesc({}TargetInst::{})",
-                                                                                 m_targetName, m_targetName, selInst.m_targetOpcode.m_node);
-                                        emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc *>({}), inst->getSourceRef(), emittedOps);", targetDescCall);
                                     }
-                                    emitter.emitLine("inst->eraseFromOwner();");
-                                    emitter.emitLine("return true;");
+
+                                    auto emitPatternBody = [&]() {
+                                        emitter.emitLine("MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);");
+                                        for (const auto &selInst : pat->m_selectClauses)
+                                        {
+                                            for (size_t sIdx = 0; sIdx < selInst.m_operands.size(); ++sIdx)
+                                            {
+                                                const auto &op = selInst.m_operands[sIdx];
+                                                if (op.m_kind == DSL::Ast::InstructionSelectDef::TargetEmitOperand::Kind::ClassBoundVar && op.m_regClass)
+                                                {
+                                                    emitter.emitLine("if (auto *r = inst->getOperand({})->get<MirRegister>()) r->setClass(findClass(\"{}\"));",
+                                                                     sIdx, op.m_regClass->m_node);
+                                                }
+                                            }
+
+                                            emitter.emitLine("std::vector<MirOperand *> emittedOps;");
+                                            for (size_t sIdx = 0; sIdx < selInst.m_operands.size(); ++sIdx)
+                                            {
+                                                emitter.emitLine("emittedOps.push_back(inst->getOperand({}));", sIdx);
+                                            }
+                                            std::string targetDescCall = std::format("{}TargetInst::getTargetDesc({}TargetInst::{})",
+                                                                                     m_targetName, m_targetName, selInst.m_targetOpcode.m_node);
+                                            emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc *>({}), inst->getSourceRef(), emittedOps);", targetDescCall);
+                                        }
+                                        emitter.emitLine("inst->eraseFromOwner();");
+                                        emitter.emitLine("return true;");
+                                    };
+
+                                    if (!regCond.empty())
+                                    {
+                                        emitter.emitLine("if ({})", regCond);
+                                        {
+                                            auto regScope = emitter.enterBlock();
+                                            emitPatternBody();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        emitPatternBody();
+                                    }
                                 }
                             }
                         }

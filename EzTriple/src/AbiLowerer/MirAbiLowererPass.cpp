@@ -106,7 +106,7 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             {
                 MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
-                                                            UnloweredBlockType::FunctionArgs,
+                                                            UnloweredBlockType::Call,
                                                             m_ctx->getGlobalAllocator());
                 mapIt->second.m_popList.push_back(instr);
 
@@ -120,7 +120,7 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             {
                 MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] =
-                        pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Return, m_ctx->getGlobalAllocator());
+                        pendingBlocks.try_emplace(tokenId, UnloweredBlockType::FunctionArgs, m_ctx->getGlobalAllocator());
 
                 mapIt->second.m_targetBlock = block;
                 mapIt->second.m_termIt = instrIt;

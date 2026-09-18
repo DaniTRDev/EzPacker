@@ -73,6 +73,7 @@ size_t MirBlock::getInstrCount() const { return m_instructions.size(); }
  * Returns the label name of the block.
  */
 const std::pmr::string &MirBlock::getName() const { return m_name; }
+void MirBlock::setName(const std::pmr::string &name) { m_name = name; }
 
 /**
  * Links the subsequent block in the intrusive sequence.

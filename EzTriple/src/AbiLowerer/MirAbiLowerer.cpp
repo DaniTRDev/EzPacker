@@ -395,13 +395,14 @@ bool MirAbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                                              IntrusiveLinkedList<MirInstruction>::iterator it,
                                              std::pmr::vector<MirInstruction *> &popArgs)
 {
+    MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
+
     // Insert parameter lowering instructions at the very top of the function's entry block
     if (popArgs.empty())
     {
+        iBuilder.erase(*it);
         return true;
     }
-
-    MirInstructionBuilder iBuilder(m_ctx, targetBlock, InsertionType::InsertBefore, it);
     MirOperandBuilder oBuilder(m_ctx);
 
     // Track state of physical register allocations and incoming stack slot offsets

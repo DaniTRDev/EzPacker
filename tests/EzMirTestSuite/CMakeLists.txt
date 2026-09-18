@@ -75,3 +75,10 @@ EzPacker_AddTest(
         ""
         "tests/T_Operand.cpp"
 )
+
+EzPacker_AddTest(
+        "T_MirParser"
+        "EzMirTestSuite"
+        ""
+        "tests/T_MirParser.cpp"
+)

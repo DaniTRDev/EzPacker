@@ -197,12 +197,36 @@ pattern Select_XOR32rr [cost = 1] {
 // Data Movement Patterns
 // ============================================================================
 
+pattern Select_MOV64ri [cost = 2] {
+    match {
+        MOV i64:$dst, imm(i64):$imm;
+    };
+    when {
+        isSimm32($imm);
+    };
+    select {
+        MOV64ri GPR64:$dst, $imm;
+    };
+};
+
 pattern Select_MOV64rr [cost = 1] {
     match {
         MOV i64:$dst, i64:$src;
     };
     select {
         MOV64rr GPR64:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_MOV32ri [cost = 2] {
+    match {
+        MOV i32:$dst, imm(i32):$imm;
+    };
+    when {
+        isSimm32($imm);
+    };
+    select {
+        MOV32ri GPR32:$dst, $imm;
     };
 };
 
@@ -217,9 +241,9 @@ pattern Select_MOV32rr [cost = 1] {
 
 pattern Select_RET [cost = 1] {
     match {
-        RET i64:$val;
+        RET;
     };
     select {
-        RET GPR64:$val;
+        RET;
     };
 };

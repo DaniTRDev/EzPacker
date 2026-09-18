@@ -94,6 +94,11 @@ class MirBlock
      */
     const std::pmr::string &getName() const;
 
+    /**
+     * Sets the label name of the basic block.
+     */
+    void setName(const std::pmr::string &name);
+
   private:
     /**
      * Sets the subsequent basic block in the intrusive list.

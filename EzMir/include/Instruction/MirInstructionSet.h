@@ -48,12 +48,38 @@ inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op)
  */
 inline MirInstructionOpCode getOpCodeFromStr(const std::string &str)
 {
-    auto it = g_String2MirInstruction.find(StrToLower(str));
-    if (it == g_String2MirInstruction.end())
+    auto it = g_String2MirInstruction.find(str);
+    if (it != g_String2MirInstruction.end())
     {
-        return static_cast<MirInstructionOpCode>(0);
+        return it->second;
     }
-    return it->second;
+    std::string upper = StrToUpper(str);
+    it = g_String2MirInstruction.find(upper);
+    if (it != g_String2MirInstruction.end())
+    {
+        return it->second;
+    }
+    it = g_String2MirInstruction.find(StrToLower(str));
+    if (it != g_String2MirInstruction.end())
+    {
+        return it->second;
+    }
+    // Alias 'BR' to 'JMP' (standard unconditional branch)
+    if (upper == "BR")
+    {
+        return MirInstructionOpCode::JMP;
+    }
+    // Alias 'ICMP_*' to 'CMP_*' (LLVM-style integer comparisons)
+    if (upper.rfind("ICMP_", 0) == 0)
+    {
+        std::string cmpStr = "CMP_" + upper.substr(5);
+        it = g_String2MirInstruction.find(cmpStr);
+        if (it != g_String2MirInstruction.end())
+        {
+            return it->second;
+        }
+    }
+    return static_cast<MirInstructionOpCode>(0);
 }
 
 #endif // EZMIR_MIR_INSTRUCTION_SET_H
