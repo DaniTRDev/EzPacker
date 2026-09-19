@@ -10,10 +10,15 @@
 #include "Operand/MirOperandBuilder.h"
 #include "x86_64CallingConvDesc.h"
 
+/**
+ * Fixture for MIR ABI lowering, return/call/parameter legalization, and concrete calling conventions.
+ */
 class MirAbiLowererTest : public EzTripleTestSuite
 {
 };
 
+// Verifies return legalization plus ABI lowering rewrites the return into a move to the physical return register and
+// RET.
 TEST_F(MirAbiLowererTest, TestReturnLowering)
 {
     auto *ctx = getBuilderCtx();
@@ -53,6 +58,7 @@ TEST_F(MirAbiLowererTest, TestReturnLowering)
     EXPECT_TRUE(foundMovToReg);
 }
 
+// Verifies call/argument legalization plus ABI lowering removes PUSH_ARG/POP_RET and emits register moves.
 TEST_F(MirAbiLowererTest, TestCallAndArgLowering)
 {
     auto *ctx = getBuilderCtx();
@@ -92,6 +98,7 @@ TEST_F(MirAbiLowererTest, TestCallAndArgLowering)
     }
 }
 
+// Verifies signature legalization plus ABI lowering replaces POP_ARG with moves from argument registers.
 TEST_F(MirAbiLowererTest, TestParameterLowering)
 {
     auto *ctx = getBuilderCtx();
@@ -122,6 +129,7 @@ TEST_F(MirAbiLowererTest, TestParameterLowering)
     }
 }
 
+// Verifies a large return type gets an sret pointer parameter and lowers successfully.
 TEST_F(MirAbiLowererTest, TestSretLowering)
 {
     auto *ctx = getBuilderCtx();
@@ -152,6 +160,7 @@ TEST_F(MirAbiLowererTest, TestSretLowering)
     EXPECT_TRUE(result.m_succeeded);
 }
 
+// Verifies SysV argument/return placement, stack alignment, red zone, and callee-saved registers.
 TEST_F(MirAbiLowererTest, TestSysVAMD64CallingConvention)
 {
     auto *ctx = getBuilderCtx();
@@ -197,6 +206,7 @@ TEST_F(MirAbiLowererTest, TestSysVAMD64CallingConvention)
     EXPECT_EQ(calleeSaved.size(), 7); // rbx, rsp, rbp, r12, r13, r14, r15
 }
 
+// Verifies Win64 unified argument slots, shadow space, and callee-saved registers.
 TEST_F(MirAbiLowererTest, TestWin64CallingConvention)
 {
     auto *ctx = getBuilderCtx();

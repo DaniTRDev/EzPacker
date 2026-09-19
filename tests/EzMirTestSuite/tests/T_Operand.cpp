@@ -64,7 +64,8 @@ namespace
 }
 
 /**
- * Custom GoogleTest assertion verifying reference operand type, target pointer type, and reference kind (Function/Block).
+ * Custom GoogleTest assertion verifying reference operand type, target pointer type, and reference kind
+ * (Function/Block).
  */
 ::testing::AssertionResult IsReference(MirOperand *op, MirType *expectedType, MirReferenceType expectedRefType)
 {
@@ -231,7 +232,7 @@ TEST_F(OperandTest, FloatAnySize)
 {
     MirOperandBuilder builder(getBuilderCtx());
     MirTypeTable *types = getTypeTable();
-    MirType *bigFloat = types->create(MirTypeKind::FloatingPoint, 128, 128 , {}, "f128");
+    MirType *bigFloat = types->create(MirTypeKind::FloatingPoint, 128, 128, {}, "f128");
 
     EXPECT_TRUE(IsFloat(builder.buildFloat(bigFloat, FlexFloat("2.7182818284590452353602874713526625", 128, 10)),
                         bigFloat,

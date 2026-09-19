@@ -108,8 +108,8 @@ class DiagnosticBuilder
     DiagnosticBuilder &appendNoteRaw(std::string_view str, class SourceReference *ref);
 
   private:
-    class DiagnosticCollector *m_collector;
-    DiagnosticMessage m_message;
+    class DiagnosticCollector *m_collector; // Collector that receives the message on flush; null once flushed/moved.
+    DiagnosticMessage m_message;            // The pending message being assembled by this builder.
 };
 
 #endif // EZCORE_DIAGNOSTIC_BUILDER_H

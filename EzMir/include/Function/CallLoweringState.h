@@ -58,12 +58,18 @@ class CallLoweringState
      * Current parameter slot index (for slot-based calling conventions, e.g. Win64).
      */
     size_t getSlotIndex() const { return m_slotIndex; }
+    /**
+     * Moves to the next parameter slot index.
+     */
     void advanceSlot() { ++m_slotIndex; }
 
     /**
      * Current logical argument index.
      */
     size_t getArgIndex() const { return m_argIndex; }
+    /**
+     * Moves to the next logical argument index.
+     */
     void advanceArg() { ++m_argIndex; }
 
     /**

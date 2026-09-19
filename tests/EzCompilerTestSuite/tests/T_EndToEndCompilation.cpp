@@ -5,6 +5,7 @@
 
 using namespace EzCompiler;
 
+// Compiles a `return 42` function through the full pipeline to an ELF object and validates the ELF header fields.
 TEST_F(EzCompilerTestSuite, TestFullCompilationToElf64)
 {
     const std::string outPath = "test_ezc_elf.o";
@@ -61,6 +62,7 @@ TEST_F(EzCompilerTestSuite, TestFullCompilationToElf64)
     std::filesystem::remove(outPath);
 }
 
+// Compiles an arithmetic function through the full pipeline to a COFF object and checks the machine type.
 TEST_F(EzCompilerTestSuite, TestFullCompilationToCoff)
 {
     const std::string outPath = "test_ezc_coff.obj";
@@ -105,6 +107,7 @@ TEST_F(EzCompilerTestSuite, TestFullCompilationToCoff)
     std::filesystem::remove(outPath);
 }
 
+// Verifies the GenericMir and Assembly stages stop the pipeline at inspectable MIR and assembly output.
 TEST_F(EzCompilerTestSuite, TestPipelineInspectionGates)
 {
     // 1. Generic MIR Gate
@@ -146,6 +149,7 @@ TEST_F(EzCompilerTestSuite, TestPipelineInspectionGates)
     }
 }
 
+// Loads a .mir source file, runs the compilation pipeline, and emits an ELF object.
 TEST_F(EzCompilerTestSuite, TestCompileMirFileDirectly)
 {
     const std::string mirPath = "test_input.mir";

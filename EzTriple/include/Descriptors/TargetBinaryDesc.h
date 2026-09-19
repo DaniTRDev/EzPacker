@@ -20,9 +20,9 @@ enum class TargetCodeModel : uint8_t
  */
 enum class TargetObjectFormat : uint8_t
 {
-    ELF = 0,
-    COFF,
-    MachO
+    ELF = 0, ///< Executable and Linkable Format (System V, Linux/BSD).
+    COFF,    ///< Common Object File Format (Windows).
+    MachO    ///< Mach Object format (macOS/iOS).
 };
 
 /**

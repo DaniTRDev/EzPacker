@@ -17,24 +17,25 @@
 namespace EzMir
 {
 
+/**
+ * Binds the context to its builder, diagnostics, arena and optional source manager, falling back
+ * to the default PMR resource when no arena is supplied.
+ */
 MirParserContext::MirParserContext(MirBuilderContext *bCtx,
                                    DiagnosticCollector *diagCollector,
                                    std::pmr::memory_resource *arena,
                                    GenericSourceManager *sourceMgr,
                                    size_t sourceId) :
-    m_bCtx(bCtx),
-    m_diag(diagCollector),
-    m_arena(arena ? arena : std::pmr::get_default_resource()),
-    m_sourceMgr(sourceMgr),
-    m_sourceId(sourceId),
-    m_registers(m_arena),
-    m_blocks(m_arena),
-    m_globals(m_arena),
-    m_functions(m_arena),
-    m_pendingFixups(m_arena)
+    m_bCtx(bCtx), m_diag(diagCollector), m_arena(arena ? arena : std::pmr::get_default_resource()),
+    m_sourceMgr(sourceMgr), m_sourceId(sourceId), m_registers(m_arena), m_blocks(m_arena), m_globals(m_arena),
+    m_functions(m_arena), m_pendingFixups(m_arena)
 {
 }
 
+/**
+ * Enters a function scope, clearing function-local tables and seeding them with the function's
+ * existing named parameters and entry block.
+ */
 void MirParserContext::enterFunction(MirFunction *func)
 {
     m_currentFunction = func;
@@ -67,6 +68,9 @@ void MirParserContext::enterFunction(MirFunction *func)
     }
 }
 
+/**
+ * Patches pending block/register references, then clears the function scope.
+ */
 void MirParserContext::exitFunction()
 {
     resolvePendingFunctionFixups();
@@ -75,6 +79,9 @@ void MirParserContext::exitFunction()
     m_currentFunction = nullptr;
 }
 
+/**
+ * Creates a source reference for the given offset/length, or nullptr when no source manager is set.
+ */
 SourceReference *MirParserContext::createRef(size_t offset, size_t length)
 {
     if (!m_sourceMgr)
@@ -84,6 +91,10 @@ SourceReference *MirParserContext::createRef(size_t offset, size_t length)
     return m_sourceMgr->createReference(offset, length, m_sourceId);
 }
 
+/**
+ * Materializes an AST type node into a MirType from the builder's type table, recursing through
+ * pointer and array element types; reports unknown primitive types as errors.
+ */
 MirType *MirParserContext::resolveType(const Ast::MirAstType *astType)
 {
     if (!astType || !m_bCtx)
@@ -106,19 +117,32 @@ MirType *MirParserContext::resolveType(const Ast::MirAstType *astType)
         case Ast::TypeKind::Primitive:
         {
             std::string_view name = astType->m_name;
-            if (name == "i1") return tt->i1();
-            if (name == "i8") return tt->i8();
-            if (name == "i16") return tt->i16();
-            if (name == "i32") return tt->i32();
-            if (name == "i64") return tt->i64();
-            if (name == "i128") return tt->i128();
-            if (name == "i256") return tt->i256();
-            if (name == "f32") return tt->f32();
-            if (name == "f64") return tt->f64();
-            if (name == "f128") return tt->f128();
-            if (name == "void" || name == "_void") return tt->_void();
-            if (name == "token" || name == "__bindToken") return tt->__bindToken();
-            if (name == "ptr") return tt->getPtr(tt->i8());
+            if (name == "i1")
+                return tt->i1();
+            if (name == "i8")
+                return tt->i8();
+            if (name == "i16")
+                return tt->i16();
+            if (name == "i32")
+                return tt->i32();
+            if (name == "i64")
+                return tt->i64();
+            if (name == "i128")
+                return tt->i128();
+            if (name == "i256")
+                return tt->i256();
+            if (name == "f32")
+                return tt->f32();
+            if (name == "f64")
+                return tt->f64();
+            if (name == "f128")
+                return tt->f128();
+            if (name == "void" || name == "_void")
+                return tt->_void();
+            if (name == "token" || name == "__bindToken")
+                return tt->__bindToken();
+            if (name == "ptr")
+                return tt->getPtr(tt->i8());
 
             if (m_diag)
             {
@@ -164,6 +188,11 @@ MirType *MirParserContext::resolveType(const Ast::MirAstType *astType)
     return nullptr;
 }
 
+/**
+ * Declares a named register in the current function scope, defaulting to i64 when no type is
+ * given. Names beginning with "p"/"%p" create physical registers; all others create virtual ones.
+ * Re-declaration is an error and returns the existing register.
+ */
 MirRegister *MirParserContext::declareRegister(std::string_view name,
                                                MirType *type,
                                                SourceReference *ref,
@@ -206,6 +235,9 @@ MirRegister *MirParserContext::declareRegister(std::string_view name,
     return reg;
 }
 
+/**
+ * Looks up a register by name in the current function scope, or nullptr when undefined.
+ */
 MirRegister *MirParserContext::resolveRegister(std::string_view name, SourceReference * /*ref*/)
 {
     std::pmr::string key(name, m_arena);
@@ -217,6 +249,10 @@ MirRegister *MirParserContext::resolveRegister(std::string_view name, SourceRefe
     return nullptr;
 }
 
+/**
+ * Returns the named register, creating it on first use (physical for "p"/"%p" names, virtual
+ * otherwise) so references to not-yet-declared registers can be resolved later.
+ */
 MirRegister *MirParserContext::getOrCreateRegister(std::string_view name,
                                                    MirType *type,
                                                    SourceReference *ref,
@@ -253,6 +289,11 @@ MirRegister *MirParserContext::getOrCreateRegister(std::string_view name,
     return reg;
 }
 
+/**
+ * Declares a named block, reusing the function's empty skeleton entry block for the first declared
+ * block if possible. Errors when called outside a function definition; an already-declared name
+ * returns the existing block.
+ */
 MirBlock *MirParserContext::declareBlock(std::string_view name, SourceReference *ref)
 {
     if (!m_currentFunction)
@@ -289,6 +330,10 @@ MirBlock *MirParserContext::declareBlock(std::string_view name, SourceReference 
     return blk;
 }
 
+/**
+ * Returns the named block, creating a new one on first use so forward branch targets can be
+ * referenced before their definition. Returns nullptr outside a function.
+ */
 MirBlock *MirParserContext::getOrCreateBlock(std::string_view name, SourceReference *ref)
 {
     if (!m_currentFunction)
@@ -309,6 +354,9 @@ MirBlock *MirParserContext::getOrCreateBlock(std::string_view name, SourceRefere
     return blk;
 }
 
+/**
+ * Looks up a block by label, or nullptr when undefined.
+ */
 MirBlock *MirParserContext::resolveBlock(std::string_view name, SourceReference * /*ref*/)
 {
     std::pmr::string key(name, m_arena);
@@ -320,6 +368,9 @@ MirBlock *MirParserContext::resolveBlock(std::string_view name, SourceReference 
     return nullptr;
 }
 
+/**
+ * Registers a global variable under its name in the module scope, replacing any previous entry.
+ */
 MirGlobalVar *MirParserContext::declareGlobal(std::string_view name, MirGlobalVar *var)
 {
     std::pmr::string key(name, m_arena);
@@ -327,6 +378,9 @@ MirGlobalVar *MirParserContext::declareGlobal(std::string_view name, MirGlobalVa
     return var;
 }
 
+/**
+ * Looks up a global variable by name, or nullptr when undefined.
+ */
 MirGlobalVar *MirParserContext::resolveGlobal(std::string_view name, SourceReference * /*ref*/)
 {
     std::pmr::string key(name, m_arena);
@@ -338,6 +392,9 @@ MirGlobalVar *MirParserContext::resolveGlobal(std::string_view name, SourceRefer
     return nullptr;
 }
 
+/**
+ * Registers a function under its name in the module scope, replacing any previous entry.
+ */
 MirFunction *MirParserContext::declareFunction(std::string_view name, MirFunction *func)
 {
     std::pmr::string key(name, m_arena);
@@ -345,6 +402,9 @@ MirFunction *MirParserContext::declareFunction(std::string_view name, MirFunctio
     return func;
 }
 
+/**
+ * Looks up a function by name, or nullptr when undefined.
+ */
 MirFunction *MirParserContext::resolveFunction(std::string_view name, SourceReference * /*ref*/)
 {
     std::pmr::string key(name, m_arena);
@@ -356,15 +416,20 @@ MirFunction *MirParserContext::resolveFunction(std::string_view name, SourceRefe
     return nullptr;
 }
 
-void MirParserContext::recordForwardReference(std::string_view name,
-                                              MirInstruction *inst,
-                                              size_t operandIdx,
-                                              SymbolKind kind,
-                                              SourceReference *ref)
+/**
+ * Queues a not-yet-resolvable symbol reference for later patching, capturing its name and the
+ * operand slot to replace.
+ */
+void MirParserContext::recordForwardReference(
+        std::string_view name, MirInstruction *inst, size_t operandIdx, SymbolKind kind, SourceReference *ref)
 {
     m_pendingFixups.emplace_back(name, inst, operandIdx, kind, ref, m_arena);
 }
 
+/**
+ * Patches queued basic-block and register references against the current function scope, removing
+ * each resolved entry. Undefined symbols are reported as errors; returns false if any failed.
+ */
 bool MirParserContext::resolvePendingFunctionFixups()
 {
     bool success = true;
@@ -421,6 +486,10 @@ bool MirParserContext::resolvePendingFunctionFixups()
     return success;
 }
 
+/**
+ * Patches all remaining queued references (functions and globals) after block/register fixups,
+ * clears the worklist and returns false if any symbol could not be resolved.
+ */
 bool MirParserContext::resolveAllPendingFixups()
 {
     bool success = resolvePendingFunctionFixups();

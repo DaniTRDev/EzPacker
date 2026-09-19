@@ -6,6 +6,7 @@ namespace EzTriple
 namespace
 {
 
+/// Stores a 32-bit value in little-endian order at the given byte offset.
 void writeLittleEndian32(std::span<uint8_t> text, uint64_t offset, uint32_t value)
 {
     text[offset + 0] = static_cast<uint8_t>(value & 0xFF);
@@ -16,6 +17,11 @@ void writeLittleEndian32(std::span<uint8_t> text, uint64_t offset, uint32_t valu
 
 } // namespace
 
+/**
+ * Patches near branch/call displacements (BranchRel32) by inspecting the opcode to find the
+ * displacement field and the address of the next instruction, or patches a bare RIP-relative
+ * 32-bit field (PCRel32).
+ */
 bool X86_64RelocationResolver::patch(std::span<uint8_t> text,
                                      const CodeRelocation &reloc,
                                      uint64_t targetOffset,
@@ -53,6 +59,7 @@ bool X86_64RelocationResolver::patch(std::span<uint8_t> text,
             return false;
         }
 
+        // x86 relative branches are encoded as target - address_of_next_instruction.
         const int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) - static_cast<int64_t>(nextRip));
         writeLittleEndian32(text, dispOffset, static_cast<uint32_t>(disp));
         return true;
@@ -66,6 +73,7 @@ bool X86_64RelocationResolver::patch(std::span<uint8_t> text,
             return false;
         }
 
+        // A RIP-relative field is measured from the end of the 4-byte field itself.
         const int32_t disp =
                 static_cast<int32_t>(static_cast<int64_t>(targetOffset) - static_cast<int64_t>(fieldOffset + 4));
         writeLittleEndian32(text, fieldOffset, static_cast<uint32_t>(disp));

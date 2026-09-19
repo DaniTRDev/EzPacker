@@ -80,7 +80,7 @@ class MirAbiLowererPass : public IMirTransformPass
     void printResult() override;
 
   private:
-    class MirBuilderContext *m_ctx;
+    class MirBuilderContext *m_ctx;               ///< Shared builder context used to rewrite instructions.
     std::pmr::list<LoweredBlock> m_loweredBlocks; // List of blocks in which at least a CALL or RET was lowered.
 };
 

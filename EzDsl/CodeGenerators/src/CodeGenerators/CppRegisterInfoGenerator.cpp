@@ -17,29 +17,33 @@ namespace CodeGenerators
 namespace
 {
 
+// One flattened register-to-class binding row destined for the generated flat table.
 struct RegisterEntryRow
 {
-    std::string m_bank;
-    std::string m_class;
-    uint32_t m_bitSize{ 0 };
-    uint32_t m_hwEncoding{ 0 };
-    std::string m_asmName;
+    std::string m_bank;         ///< Bank the register belongs to.
+    std::string m_class;        ///< Register class the binding exposes.
+    uint32_t m_bitSize{ 0 };    ///< Width of the class in bits.
+    uint32_t m_hwEncoding{ 0 }; ///< Hardware encoding of the register.
+    std::string m_asmName;      ///< Assembly name of this class binding.
 };
 
+// A wide/narrow aliasing relationship between two register-class bindings.
 struct SubRegEdgeRow
 {
-    std::string m_parentClass;
-    std::string m_parentAsm;
-    std::string m_childClass;
-    std::string m_childAsm;
+    std::string m_parentClass; ///< Class of the wider register.
+    std::string m_parentAsm;   ///< Assembly name of the wider register.
+    std::string m_childClass;  ///< Class of the narrower sub-register.
+    std::string m_childAsm;    ///< Assembly name of the narrower sub-register.
 };
 
+// A named special register and its numeric identifier.
 struct SpecialRow
 {
-    std::string m_name;
-    uint32_t m_id{ 0 };
+    std::string m_name; ///< Canonical special-register name.
+    uint32_t m_id{ 0 }; ///< Numeric id assigned by the definition.
 };
 
+// Rewrites raw into a valid C++ identifier, substituting illegal characters and prefixing leading digits.
 std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
 {
     std::string result;
@@ -67,14 +71,16 @@ std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
     return result;
 }
 
+// Aggregated register metadata extracted from the symbol table for one generation run.
 struct CollectedRegisterData
 {
-    std::vector<RegisterEntryRow> m_entries;
-    std::vector<SubRegEdgeRow> m_edges;
-    std::vector<SpecialRow> m_specials;
-    std::string m_targetName;
+    std::vector<RegisterEntryRow> m_entries; ///< Flat register/class bindings.
+    std::vector<SubRegEdgeRow> m_edges;      ///< Wide/narrow aliasing relationships.
+    std::vector<SpecialRow> m_specials;      ///< Declared special registers.
+    std::string m_targetName;                ///< Target name used during collection.
 };
 
+// Locates the single RegisterFile symbol and flattens its banks/classes/registers into table rows.
 CollectedRegisterData collectData(const SymbolTable *table, std::string_view targetName)
 {
     CollectedRegisterData data;
@@ -85,6 +91,7 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
         return data;
     }
 
+    // Exactly one register file is expected; the first one found wins.
     const DSL::Ast::RegisterDef::RegisterFile *file = nullptr;
     for (const Symbol *sym : table->getSymbols())
     {
@@ -108,6 +115,7 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
     {
         const std::string bankName(bank.m_name.m_node);
 
+        // Cache each class's bit width so register bindings can be resolved in O(1).
         std::map<std::string_view, uint32_t> classBits;
         for (const auto &cls : bank.m_classes)
         {
@@ -118,6 +126,7 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
         {
             const uint32_t encoding = static_cast<uint32_t>(reg.m_encoding.m_node);
 
+            // Each register may expose several class/assembly-name bindings.
             for (const auto &binding : reg.m_names)
             {
                 auto bitIt = classBits.find(binding.m_className.m_node);
@@ -150,6 +159,7 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
                     }
                 }
 
+                // Only emit an edge when both ends resolved to actual assembly names on this register.
                 if (!parentAsm.empty() && !childAsm.empty())
                 {
                     data.m_edges.push_back(SubRegEdgeRow{ .m_parentClass = std::string(edge.m_wideClass.m_node),
@@ -163,8 +173,8 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
 
     for (const auto &special : file->m_specialRegs)
     {
-        data.m_specials.push_back(
-                SpecialRow{ .m_name = std::string(special.m_name.m_node), .m_id = static_cast<uint32_t>(special.m_id.m_node) });
+        data.m_specials.push_back(SpecialRow{ .m_name = std::string(special.m_name.m_node),
+                                              .m_id = static_cast<uint32_t>(special.m_id.m_node) });
     }
 
     return data;
@@ -172,6 +182,7 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
 
 } // namespace
 
+// Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
 CppRegisterInfoGenerator::CppRegisterInfoGenerator(DiagnosticCollector *collector,
                                                    SymbolTable *table,
                                                    std::filesystem::path outPath,
@@ -185,6 +196,7 @@ CppRegisterInfoGenerator::CppRegisterInfoGenerator(DiagnosticCollector *collecto
     }
 }
 
+// Emits the self-contained, header-only flat register tables and bank construction helper.
 void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
     const auto data = collectData(getSymbolTable(), m_targetName);
@@ -211,8 +223,10 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
         auto nsScope = emitter.enterNamespace(emissionNs);
         emitter.emitBlankLine();
 
-        emitter.emitComment("Flat register table consumed by EzTriple (bank/class setup) and EzCodeEmitter (encoding lookup).");
+        emitter.emitComment(
+                "Flat register table consumed by EzTriple (bank/class setup) and EzCodeEmitter (encoding lookup).");
         {
+            // POD row describing one register-class binding.
             auto s = emitter.enterStruct("RegisterInfoEntry");
             emitter.emitLine("const char *bankName;");
             emitter.emitLine("const char *className;");
@@ -223,6 +237,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitBlankLine();
 
         {
+            // POD row describing a wide/narrow aliasing relationship.
             auto s = emitter.enterStruct("SubRegEdge");
             emitter.emitLine("const char *parentClass;");
             emitter.emitLine("const char *parentAsm;");
@@ -232,6 +247,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitBlankLine();
 
         {
+            // POD row describing a named special register.
             auto s = emitter.enterStruct("SpecialRegInfo");
             emitter.emitLine("const char *name;");
             emitter.emitLine("uint32_t id;");
@@ -242,6 +258,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitLine("inline constexpr RegisterInfoEntry s_registerEntries[] =");
         {
             auto s = emitter.enterScope("{", "};");
+            // A zeroed sentinel keeps the array well-formed when there are no definitions.
             if (data.m_entries.empty())
             {
                 emitter.emitLine("RegisterInfoEntry{ nullptr, nullptr, 0, 0, nullptr },");
@@ -251,7 +268,11 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
                 for (const auto &e : data.m_entries)
                 {
                     emitter.emitLine("RegisterInfoEntry{{ \"{}\", \"{}\", {}, {}, \"{}\" }},",
-                                     e.m_bank, e.m_class, e.m_bitSize, e.m_hwEncoding, e.m_asmName);
+                                     e.m_bank,
+                                     e.m_class,
+                                     e.m_bitSize,
+                                     e.m_hwEncoding,
+                                     e.m_asmName);
                 }
             }
         }
@@ -271,7 +292,10 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
                 for (const auto &e : data.m_edges)
                 {
                     emitter.emitLine("SubRegEdge{{ \"{}\", \"{}\", \"{}\", \"{}\" }},",
-                                     e.m_parentClass, e.m_parentAsm, e.m_childClass, e.m_childAsm);
+                                     e.m_parentClass,
+                                     e.m_parentAsm,
+                                     e.m_childClass,
+                                     e.m_childAsm);
                 }
             }
         }
@@ -297,6 +321,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitLine("inline constexpr std::size_t s_specialRegCount = {};", data.m_specials.size());
         emitter.emitBlankLine();
 
+        // Lightweight accessors over the constexpr tables.
         emitter.emitLine("inline const RegisterInfoEntry *getRegisterEntries() { return s_registerEntries; }");
         emitter.emitLine("inline std::size_t getRegisterEntryCount() { return s_registerEntryCount; }");
         emitter.emitLine("inline const SubRegEdge *getSubRegEdges() { return s_subRegEdges; }");
@@ -305,6 +330,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitLine("inline std::size_t getSpecialRegCount() { return s_specialRegCount; }");
         emitter.emitBlankLine();
 
+        // Linear scan returning the sentinel ~0 for unknown names.
         emitter.emitLine("inline uint32_t getSpecialRegId(const char *name)");
         {
             auto s = emitter.enterScope();
@@ -321,8 +347,10 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
         }
         emitter.emitBlankLine();
 
-        emitter.emitComment("Constructs the register banks, classes, registers and aliasing described by the tables above.");
-        emitter.emitLine("inline std::pmr::vector<MirRegisterBank *> initializeRegisterBanks(std::pmr::memory_resource *alloc)");
+        emitter.emitComment(
+                "Constructs the register banks, classes, registers and aliasing described by the tables above.");
+        emitter.emitLine(
+                "inline std::pmr::vector<MirRegisterBank *> initializeRegisterBanks(std::pmr::memory_resource *alloc)");
         {
             auto s = emitter.enterScope();
             emitter.emitLine("std::pmr::vector<MirRegisterBank *> banks(alloc);");
@@ -332,6 +360,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
             emitter.emitLine("std::pmr::polymorphic_allocator<MirRegisterClass> classAlloc(alloc);");
             emitter.emitBlankLine();
 
+            // Pass 1: create banks, deduplicated by name.
             emitter.emitLine("for (std::size_t i = 0; i < s_registerEntryCount; ++i)");
             {
                 auto f = emitter.enterScope();
@@ -346,6 +375,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
             }
             emitter.emitBlankLine();
 
+            // Pass 2: create register classes and attach them to their owning banks.
             emitter.emitLine("for (std::size_t i = 0; i < s_registerEntryCount; ++i)");
             {
                 auto f = emitter.enterScope();
@@ -354,21 +384,25 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
                 {
                     auto g = emitter.enterScope();
                     emitter.emitLine("auto *bank = bankMap.at(entry.bankName);");
-                    emitter.emitLine("auto *cls = classAlloc.new_object<MirRegisterClass>(entry.className, bank, alloc);");
+                    emitter.emitLine(
+                            "auto *cls = classAlloc.new_object<MirRegisterClass>(entry.className, bank, alloc);");
                     emitter.emitLine("bank->addClass(entry.className, cls);");
                     emitter.emitLine("classMap.emplace(entry.className, cls);");
                 }
             }
             emitter.emitBlankLine();
 
+            // Pass 3: register each concrete assembly name in its class.
             emitter.emitLine("for (std::size_t i = 0; i < s_registerEntryCount; ++i)");
             {
                 auto f = emitter.enterScope();
                 emitter.emitLine("const auto &entry = s_registerEntries[i];");
-                emitter.emitLine("classMap.at(entry.className)->addRegister(entry.asmName, entry.bitSize, 0, {}, entry.hwEncoding);");
+                emitter.emitLine("classMap.at(entry.className)->addRegister(entry.asmName, entry.bitSize, 0, {}, "
+                                 "entry.hwEncoding);");
             }
             emitter.emitBlankLine();
 
+            // Pass 4: link wide registers to their narrow sub-register parts.
             emitter.emitLine("for (std::size_t i = 0; i < s_subRegEdgeCount; ++i)");
             {
                 auto f = emitter.enterScope();
@@ -387,6 +421,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
     }
 }
 
+// Collects register data, emits the header, and writes it as a single file.
 bool CppRegisterInfoGenerator::run()
 {
     if (!validate())
@@ -400,6 +435,7 @@ bool CppRegisterInfoGenerator::run()
         trace("No register definitions found; emitting an empty register info header.");
     }
 
+    // Pick a target-qualified file name and derive the destination path.
     const std::string baseName = std::format("{}RegisterInfo", sanitizeIdentifier(m_targetName, "Target"));
     const auto targetFilePath = resolveSingleFilePath(baseName + ".h");
 
@@ -420,6 +456,7 @@ bool CppRegisterInfoGenerator::run()
     return true;
 }
 
+// Convenience wrapper retained for callers that do not need to configure a generator object.
 bool GenerateRegisterInfo(DiagnosticCollector *collector,
                           SymbolTable *table,
                           std::filesystem::path outPath,

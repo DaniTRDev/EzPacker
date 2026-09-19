@@ -12,9 +12,13 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Fixture for stack frame layout, stack-reference lowering, and the frame lowerer pass.
+ */
 class MirFrameLowererTest : public EzTripleTestSuite
 {
   protected:
+    // Resets the mock frame lowerer counters before each test.
     void SetUp() override
     {
         EzTripleTestSuite::SetUp();
@@ -74,6 +78,7 @@ TEST_F(MirFrameLowererTest, TestBasicFrameLayoutCalculation)
     EXPECT_EQ(analysisData->m_totalFrameSize % getTargetDesc()->getMockCallingConv()->getStackAlignment(), 0);
 }
 
+// Verifies used callee-saved registers are accounted for and stack objects sit past the saved area.
 TEST_F(MirFrameLowererTest, TestFrameLayoutWithCalleeSavedRegisters)
 {
     auto *ctx = getBuilderCtx();
@@ -82,8 +87,7 @@ TEST_F(MirFrameLowererTest, TestFrameLayoutWithCalleeSavedRegisters)
 
     // Register two used callee-saved registers (e.g. RBP, RSP)
     auto *cc = getTargetDesc()->getMockCallingConv();
-    MirFunctionBuilder(ctx).addPhysRegUse(func, cc->getFramePointerReg())
-                           .addPhysRegUse(func, cc->getStackPointerReg());
+    MirFunctionBuilder(ctx).addPhysRegUse(func, cc->getFramePointerReg()).addPhysRegUse(func, cc->getStackPointerReg());
 
     auto *obj = func->getStackFrame()->createStaticStackObj(typeTable->i64());
 
@@ -197,6 +201,7 @@ TEST_F(MirFrameLowererTest, TestFrameLowererPassRun)
     EXPECT_TRUE(loweredInst->getOperand(1)->isOfType<MirMemory>());
 }
 
+// Verifies ALLOC and DALLOC instructions dispatch to the mock lowerAlloc/lowerDAlloc hooks.
 TEST_F(MirFrameLowererTest, TestAllocAndDAllocDispatch)
 {
     auto *ctx = getBuilderCtx();

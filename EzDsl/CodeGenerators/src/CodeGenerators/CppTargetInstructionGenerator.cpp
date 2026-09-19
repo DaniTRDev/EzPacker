@@ -12,6 +12,7 @@ namespace CodeGenerators
 namespace
 {
 
+// Uppercases an ASCII string, used to build include-guard names from the target name.
 std::string ToUpper(std::string_view s)
 {
     std::string res(s);
@@ -22,6 +23,7 @@ std::string ToUpper(std::string_view s)
     return res;
 }
 
+// Maps a target-operand direction to the MirOperandFlag read/write flag it implies.
 std::string DirectionToFlag(DSL::Ast::TargetInstDef::OperandDirection dir)
 {
     switch (dir)
@@ -36,6 +38,7 @@ std::string DirectionToFlag(DSL::Ast::TargetInstDef::OperandDirection dir)
     }
 }
 
+// Joins the declared flag names into a `|`-separated MirInstructionFlags expression.
 std::string FlagsToCpp(const std::pmr::vector<std::string_view> &flags)
 {
     if (flags.empty())
@@ -57,6 +60,7 @@ std::string FlagsToCpp(const std::pmr::vector<std::string_view> &flags)
 
 } // namespace
 
+// Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
 CppTargetInstructionGenerator::CppTargetInstructionGenerator(DiagnosticCollector *collector,
                                                              SymbolTable *table,
                                                              std::filesystem::path outPath,
@@ -70,6 +74,7 @@ CppTargetInstructionGenerator::CppTargetInstructionGenerator(DiagnosticCollector
     }
 }
 
+// Collects the parsed target instruction symbols that are attached to the symbol table.
 std::vector<const Symbol *> CppTargetInstructionGenerator::collectInstructionSymbols() const
 {
     std::vector<const Symbol *> results;
@@ -89,6 +94,7 @@ std::vector<const Symbol *> CppTargetInstructionGenerator::collectInstructionSym
     return results;
 }
 
+// Resolves the header/source destinations, emits both artifacts, and reports combined success.
 bool CppTargetInstructionGenerator::run()
 {
     if (!validate())
@@ -111,6 +117,7 @@ bool CppTargetInstructionGenerator::run()
     return headerOk && sourceOk;
 }
 
+// Emits an include-guarded header declaring the compact opcode enum and lookup entry points.
 void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
     std::string guard = std::format("EZTRIPLE_{}_TARGET_INSTRUCTION_TABLE_H", ToUpper(m_targetName));
@@ -153,6 +160,7 @@ void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
     emitter.emitIncludeGuardEnd(guard);
 }
 
+// Emits the static descriptor table plus the opcode lookup and initialization routines.
 void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
 {
     emitter.emitBanner("CppTargetInstructionGenerator");
@@ -183,7 +191,8 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
                 std::string flagsList = "{ ";
                 for (size_t opIdx = 0; opIdx < data->m_operands.size(); ++opIdx)
                 {
-                    if (opIdx > 0) flagsList += ", ";
+                    if (opIdx > 0)
+                        flagsList += ", ";
                     flagsList += DirectionToFlag(data->m_operands[opIdx].m_direction);
                 }
                 flagsList += " }";
@@ -192,13 +201,15 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
                 std::string classList = "{ ";
                 for (size_t opIdx = 0; opIdx < data->m_operands.size(); ++opIdx)
                 {
-                    if (opIdx > 0) classList += ", ";
+                    if (opIdx > 0)
+                        classList += ", ";
                     classList += "nullptr";
                 }
                 classList += " }";
 
                 std::string targetFlagsStr = FlagsToCpp(data->m_flags);
 
+                // Each entry is keyed off its enumerator; operand constraints/banks are filled in later.
                 emitter.emitLine("MirTargetInstructionDesc(");
                 emitter.indent();
                 emitter.emitLine("\"{}\",", data->m_name);
@@ -234,6 +245,7 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
             auto fnScope = emitter.enterBlock();
             emitter.emitLine("if (!target) return;");
             emitter.emitBlankLine();
+            // Encoding ids are 1-based to match the opcode enum, which reserves 0 for invalid.
             emitter.emitLine("for (size_t i = 0; i < static_cast<size_t>(OPCODE_COUNT) - 1; ++i)");
             {
                 auto loopScope = emitter.enterBlock();
@@ -254,6 +266,7 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
             emitter.emitLine("};");
             emitter.emitBlankLine();
 
+            // Resolve every declared operand register class against the target's register banks.
             for (size_t i = 0; i < instSymbols.size(); ++i)
             {
                 const auto *sym = instSymbols[i];
@@ -264,7 +277,9 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
                     if (!op.m_regClassOrType.empty())
                     {
                         emitter.emitLine("s_descs[{}].setOperandClass({}, findClass(\"{}\"));",
-                                         i, opIdx, op.m_regClassOrType);
+                                         i,
+                                         opIdx,
+                                         op.m_regClassOrType);
                     }
                 }
             }
@@ -272,6 +287,7 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
     }
 }
 
+// Convenience wrapper retained for callers that do not need to configure a generator object.
 bool GenerateTargetInstructionTable(DiagnosticCollector *collector,
                                     SymbolTable *table,
                                     std::filesystem::path outPath,

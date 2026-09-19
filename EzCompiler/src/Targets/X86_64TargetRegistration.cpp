@@ -33,6 +33,7 @@ struct X86_64TargetRegistration
                     auto target = std::make_unique<EzTriple::X86_64TargetDesc>(mirCtx);
                     target->initialize();
 
+                    // Windows uses the Win64 ABI with COFF; every other triple uses SysV + ELF.
                     if (triple.isWindows())
                     {
                         result.m_callingConv = target->getWin64CallingConv();

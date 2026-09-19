@@ -15,9 +15,13 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating C++ legalizer rules from legalize-rule (.lrd) sources.
+ */
 class CppLegalizeRuleGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Declares the standard types and IR instructions needed by the rule generator tests.
     void SetUp() override
     {
         EzDslCodeGeneratorsTestSuiteAsGtest::SetUp();
@@ -25,16 +29,17 @@ class CppLegalizeRuleGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
         declareStandardIrInstructions();
     }
 
+    // Registers the primitive integer, float, and pointer types in the symbol table.
     void declareStandardTypes()
     {
-        auto declareType = [&](std::string_view name, DSL::Ast::TypeDef::TypeKind kind, uint32_t bitWidth, uint8_t compactId) {
-            Symbols::TypeSymbol symData{
-                .m_name = name,
-                .m_kind = kind,
-                .m_bitWidth = bitWidth,
-                .m_alignment = bitWidth,
-                .m_compactId = compactId
-            };
+        auto declareType =
+                [&](std::string_view name, DSL::Ast::TypeDef::TypeKind kind, uint32_t bitWidth, uint8_t compactId)
+        {
+            Symbols::TypeSymbol symData{ .m_name = name,
+                                         .m_kind = kind,
+                                         .m_bitWidth = bitWidth,
+                                         .m_alignment = bitWidth,
+                                         .m_compactId = compactId };
             getSymbolTable()->declareSym(nullptr, SymbolType::Type, std::move(symData), name);
         };
 
@@ -49,55 +54,53 @@ class CppLegalizeRuleGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
         declareType("ptr", DSL::Ast::TypeDef::TypeKind::Pointer, 64, 3);
     }
 
+    // Registers the IR instructions referenced by the legalize-rule test sources.
     void declareStandardIrInstructions()
     {
         using namespace DSL::Ast::IrInstDef;
 
-        auto declareInst = [&](std::string_view name, std::initializer_list<Symbols::IrOperandSymbol> operands) {
+        auto declareInst = [&](std::string_view name, std::initializer_list<Symbols::IrOperandSymbol> operands)
+        {
             std::pmr::vector<Symbols::IrOperandSymbol> ops(getSymbolTable()->getAllocator());
-            for (const auto &op : operands) ops.push_back(op);
+            for (const auto &op : operands)
+                ops.push_back(op);
 
-            Symbols::IrInstructionSymbol symData{
-                .m_name = name,
-                .m_category = IrInstCategory::Arithmetic,
-                .m_tier = IrInstTier::HighLevel,
-                .m_flags = IrInstFlag::None,
-                .m_operands = std::move(ops)
-            };
+            Symbols::IrInstructionSymbol symData{ .m_name = name,
+                                                  .m_category = IrInstCategory::Arithmetic,
+                                                  .m_tier = IrInstTier::HighLevel,
+                                                  .m_flags = IrInstFlag::None,
+                                                  .m_operands = std::move(ops) };
             getSymbolTable()->declareSym(nullptr, SymbolType::IrInstruction, std::move(symData), name);
         };
 
-        declareInst("SDIV", {
-            { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-            { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
-            { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn }
-        });
+        declareInst("SDIV",
+                    { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                      { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+                      { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
 
-        declareInst("SAR", {
-            { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-            { IrOperandType::Register, "val", IrOperandDir::ArgIn },
-            { IrOperandType::RegIntImm, "amt", IrOperandDir::ArgIn }
-        });
+        declareInst("SAR",
+                    { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                      { IrOperandType::Register, "val", IrOperandDir::ArgIn },
+                      { IrOperandType::RegIntImm, "amt", IrOperandDir::ArgIn } });
 
-        declareInst("SUB", {
-            { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-            { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
-            { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn }
-        });
+        declareInst("SUB",
+                    { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                      { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+                      { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
 
-        declareInst("MOV", {
-            { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-            { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn }
-        });
+        declareInst("MOV",
+                    { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                      { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn } });
     }
 
+    // Parses legalize-rule (.lrd) source into an AST using a unique source name.
     std::optional<DSL::Ast::LegalizeRuleDef::LegalizeRuleFile> parseLrd(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.lrd", m_testId++), source);
-        return ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRuleFile,
-                         DSL::Ast::LegalizeRuleDef::LegalizeRuleFile>();
+        return ctx.parse<DSL::Parser::LegalizeRuleDef::LegalizeRuleFile, DSL::Ast::LegalizeRuleDef::LegalizeRuleFile>();
     }
 
+    // Reads a generated file into a string for content assertions.
     std::string readFile(const std::filesystem::path &path)
     {
         std::ifstream file(path);
@@ -110,6 +113,7 @@ class CppLegalizeRuleGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
     size_t m_testId{ 0 };
 };
 
+// Generates rules for an empty symbol table and verifies the boilerplate header/source and no-op result.
 TEST_F(CppLegalizeRuleGeneratorTest, TestEmptyRulesGeneration)
 {
     CppLegalizeRuleGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "AMD64");
@@ -133,6 +137,7 @@ TEST_F(CppLegalizeRuleGeneratorTest, TestEmptyRulesGeneration)
     EXPECT_NE(source.find("return LegalizationResult::NotModified;"), std::string::npos);
 }
 
+// Generates the SDivPow2 rule and verifies matching, predicates, transforms, emit sequence, and dispatchers.
 TEST_F(CppLegalizeRuleGeneratorTest, TestSDivPow2RuleGeneration)
 {
     std::string sourceText = R"dsl(
@@ -170,7 +175,8 @@ rule SDivPow2 {
 
     // Verify Header
     EXPECT_NE(header.find("LegalizationResult Rule_SDivPow2(LegalizeCtx &ctx);"), std::string::npos);
-    EXPECT_NE(header.find("LegalizationResult applyRules(LegalizeCtx &ctx, MirInstructionOpCode opcode);"), std::string::npos);
+    EXPECT_NE(header.find("LegalizationResult applyRules(LegalizeCtx &ctx, MirInstructionOpCode opcode);"),
+              std::string::npos);
     EXPECT_NE(header.find("LegalizationResult applyRuleById(LegalizeCtx &ctx, uint16_t ruleId);"), std::string::npos);
 
     // Verify Source: extern forward declarations
@@ -201,6 +207,7 @@ rule SDivPow2 {
     EXPECT_NE(source.find("case 0: return Rule_SDivPow2(ctx);"), std::string::npos);
 }
 
+// Generates two rules and verifies both appear in the header and the dispatch switches.
 TEST_F(CppLegalizeRuleGeneratorTest, TestMultipleRulesGeneration)
 {
     std::string sourceText = R"dsl(

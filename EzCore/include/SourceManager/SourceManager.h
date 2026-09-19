@@ -74,7 +74,8 @@ class SourceManager : public GenericSourceManager
                                    const std::optional<std::filesystem::path> &relativeTo = std::nullopt) override;
 
     /**
-     * Returns a direct pointer to the arena-backed string buffer for the specified source file ID, or nullptr if invalid.
+     * Returns a direct pointer to the arena-backed string buffer for the specified source file ID, or nullptr if
+     * invalid.
      */
     const std::pmr::string *getSourceBuffer(size_t id) const;
 
@@ -104,11 +105,11 @@ class SourceManager : public GenericSourceManager
     std::string_view getSourceName(size_t id) const override;
 
   private:
-    std::filesystem::path m_workingPath;
-    std::pmr::memory_resource *m_alloc;
-    std::pmr::vector<std::filesystem::path> m_includePaths;
-    std::pmr::unordered_map<std::string_view, size_t> m_pathToIdMap;
-    std::pmr::vector<SourceFileEntry *> m_sourceFiles;
+    std::filesystem::path m_workingPath; // Base directory used to resolve relative source paths.
+    std::pmr::memory_resource *m_alloc;  // Arena that owns file entries and their buffer/line storage.
+    std::pmr::vector<std::filesystem::path> m_includePaths;          // Search directories for include resolution.
+    std::pmr::unordered_map<std::string_view, size_t> m_pathToIdMap; // Canonical path/name -> 1-based source ID.
+    std::pmr::vector<SourceFileEntry *> m_sourceFiles; // Indexed by (ID - 1); owns each loaded file entry.
 };
 
 #endif // EZCORE_SOURCE_MANAGER_H

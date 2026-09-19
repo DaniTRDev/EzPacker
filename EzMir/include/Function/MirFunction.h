@@ -171,23 +171,23 @@ class MirFunction
     void setPrev(MirFunction *prev);
 
   private:
-    class CallingConvDesc *m_callingConv;
-    class MirBlock *m_entryPoint;
-    MirFunction *m_next{ nullptr };
-    MirFunction *m_prev{ nullptr };
-    MirFunctionAnalysisData m_analysisData;
-    MirFunctionRegisterInfo m_regInfo;
-    class MirFunctionStackFrame *m_stackFrame;
-    class MirType *m_returnType;
-    class MirType *m_type;
-    MirId m_id;
-    class SourceReference *m_sourceRef;
+    class CallingConvDesc *m_callingConv;      // ABI rules for this function.
+    class MirBlock *m_entryPoint;              // First block executed on entry, or nullptr before building.
+    MirFunction *m_next{ nullptr };            // Next function in the owning intrusive module list.
+    MirFunction *m_prev{ nullptr };            // Previous function in the owning intrusive module list.
+    MirFunctionAnalysisData m_analysisData;    // Pass-produced metrics (calls, frame sizes, etc.).
+    MirFunctionRegisterInfo m_regInfo;         // SSA def/use tracking for this function's registers.
+    class MirFunctionStackFrame *m_stackFrame; // Stack frame layout owned by this function.
+    class MirType *m_returnType;               // Declared return type.
+    class MirType *m_type;                     // Composite signature type of the function.
+    MirId m_id;                                // Unique MIR identifier.
+    class SourceReference *m_sourceRef;        // Source location of the definition.
 
-    IntrusiveLinkedList<class MirBlock> m_blocks;
-    std::pmr::list<class MirRegister *> m_parameters;
-    std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock;
+    IntrusiveLinkedList<class MirBlock> m_blocks;            // CFG blocks in layout order.
+    std::pmr::list<class MirRegister *> m_parameters;        // Incoming parameter registers, in declaration order.
+    std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock; // Block lookup by ID.
 
-    std::pmr::string m_name;
+    std::pmr::string m_name; // Function symbol name.
 
     // Set filled by MirRegisterAllocatorPass that contains which callee-saved registers were consume by this function.
     std::pmr::vector<class MirRegisterRef> m_usedCalleeSavedRegs;

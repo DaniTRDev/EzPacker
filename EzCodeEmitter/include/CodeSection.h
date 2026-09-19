@@ -8,17 +8,17 @@
  */
 enum class SectionType : uint8_t
 {
-    Text,
-    ReadOnly,
-    ReadOnlyWithRel,
-    CString,
-    Const4,
-    Const8,
-    Const16AndBigger,
-    Data,
-    DataWithRel,
-    NonInitialized,
-    Custom
+    Text,             ///< Executable machine code (".text").
+    ReadOnly,         ///< Read-only constants without relocations (".rodata").
+    ReadOnlyWithRel,  ///< Read-only data that still requires relocations (".data.rel.ro").
+    CString,          ///< Null-terminated string literals.
+    Const4,           ///< 4-byte scalar constants (floats/integers).
+    Const8,           ///< 8-byte scalar constants (doubles/integers).
+    Const16AndBigger, ///< 16-byte-or-larger constants (vectors/SIMD).
+    Data,             ///< Mutable initialized data (".data").
+    DataWithRel,      ///< Mutable data that requires relocations.
+    NonInitialized,   ///< Zero-initialized storage with no file bytes (".bss").
+    Custom            ///< Target-specific metadata/exception tables.
 };
 
 /**
@@ -26,9 +26,9 @@ enum class SectionType : uint8_t
  */
 struct SectionFlags
 {
-    bool m_readable{ true };
-    bool m_writable{ false };
-    bool m_executable{ false };
+    bool m_readable{ true };    ///< True when the section contents may be read at runtime.
+    bool m_writable{ false };   ///< True when the section contents may be modified at runtime.
+    bool m_executable{ false }; ///< True when the section may be executed as code.
 };
 
 /**
@@ -36,8 +36,8 @@ struct SectionFlags
  */
 enum class TargetEndianness : uint8_t
 {
-    Little,
-    Big
+    Little, ///< Least-significant byte emitted first (x86/x86-64).
+    Big     ///< Most-significant byte emitted first.
 };
 
 // =========================================================================
@@ -59,20 +59,20 @@ enum class SectionNodeKind : uint8_t
  */
 struct SectionNode
 {
-    SectionNodeKind m_kind;
-    SectionNode *m_prev{ nullptr };
-    SectionNode *m_next{ nullptr };
+    SectionNodeKind m_kind;         ///< Discriminant selecting which payload below is active.
+    SectionNode *m_prev{ nullptr }; ///< Previous node in the doubly-linked stream (nullptr at head).
+    SectionNode *m_next{ nullptr }; ///< Next node in the doubly-linked stream (nullptr at tail).
 
     // Payload for NodeKind::Data
-    std::pmr::vector<uint8_t> m_data;
+    std::pmr::vector<uint8_t> m_data; ///< Raw bytes accumulated for this data chunk.
 
     // Payload for NodeKind::Label
-    MirId m_labelId{ MIRID_INVALID };
-    uint64_t m_calculatedOffset{ 0 };
+    MirId m_labelId{ MIRID_INVALID }; ///< MIR id of the label marker.
+    uint64_t m_calculatedOffset{ 0 }; ///< Byte offset resolved during finalize().
 
     // Payload for NodeKind::Align
-    size_t m_alignment{ 1 };
-    uint8_t m_padByte{ 0 };
+    size_t m_alignment{ 1 }; ///< Required power-of-two alignment in bytes.
+    uint8_t m_padByte{ 0 };  ///< Fill byte inserted to satisfy the alignment.
 
     SectionNode(SectionNodeKind kind, std::pmr::memory_resource *alloc) : m_kind(kind), m_data(alloc) {}
 };
@@ -205,30 +205,43 @@ class CodeSection
     std::span<const uint8_t> getData() const;
 
   private:
+    /**
+     * Allocates and constructs a fresh Data node from the section allocator.
+     */
     SectionNode *createDataNode();
+
+    /**
+     * Allocates a node of the given kind and links it immediately after target
+     * (or at the head when target is nullptr), advancing the cursor to the new node.
+     */
     SectionNode *insertNodeAfter(SectionNode *target, SectionNodeKind kind);
+
+    /**
+     * Returns the cursor's data buffer, inserting a new Data node first when the
+     * cursor does not already point at one.
+     */
     std::pmr::vector<uint8_t> &getActiveDataBuffer();
 
   private:
-    bool m_isFinalized;
-    SectionFlags m_flags;
+    bool m_isFinalized;   ///< True once finalize() has flattened the node stream.
+    SectionFlags m_flags; ///< Runtime access permissions of the section.
 
     // Linked List of Nodes
-    SectionNode *m_head;
-    SectionNode *m_tail;
-    SectionNode *m_cursor;
+    SectionNode *m_head;   ///< First node of the stream.
+    SectionNode *m_tail;   ///< Last node of the stream.
+    SectionNode *m_cursor; ///< Node where subsequent emits/insertions take place.
 
-    SectionType m_type;
-    size_t m_alignment;
-    TargetEndianness m_endianness;
-    uint8_t m_padByte;
+    SectionType m_type;            ///< Output section classification.
+    size_t m_alignment;            ///< Alignment applied when the section is laid out.
+    TargetEndianness m_endianness; ///< Byte order used by the multi-byte emit helpers.
+    uint8_t m_padByte;             ///< Fill byte used for alignment and padding.
 
-    std::string_view m_name;
+    std::string_view m_name; ///< Non-owning section name (e.g. ".text").
 
     // Final Serialized Data
-    std::pmr::vector<uint8_t> m_buffer;
+    std::pmr::vector<uint8_t> m_buffer; ///< Flattened bytes produced by finalize().
 
-    std::pmr::memory_resource *m_alloc;
+    std::pmr::memory_resource *m_alloc; ///< Allocator used for nodes and buffers.
 };
 
 #endif // EZPACKER_CODESECTION_H

@@ -9,6 +9,7 @@ namespace
 {
 
 #pragma pack(push, 1)
+// IMAGE_FILE_HEADER: fixed-size header preceding the section table.
 struct CoffFileHeader
 {
     uint16_t Machine;
@@ -20,9 +21,10 @@ struct CoffFileHeader
     uint16_t Characteristics;
 };
 
+// IMAGE_SECTION_HEADER: describes one section's location and attributes.
 struct CoffSectionHeader
 {
-    uint8_t  Name[8];
+    uint8_t Name[8];
     uint32_t VirtualSize;
     uint32_t VirtualAddress;
     uint32_t SizeOfRawData;
@@ -34,13 +36,15 @@ struct CoffSectionHeader
     uint32_t Characteristics;
 };
 
+// IMAGE_RELOCATION: one entry in a section's relocation table.
 struct CoffRelocation
 {
-    uint32_t VirtualAddress;
-    uint32_t SymbolTableIndex;
-    uint16_t Type;
+    uint32_t VirtualAddress;   // Offset of the field to patch within the section.
+    uint32_t SymbolTableIndex; // Index of the target symbol in the symbol table.
+    uint16_t Type;             // COFF relocation type (AMD64_*).
 };
 
+// COFF symbol table record, including the 8-byte/4-byte name union.
 struct CoffSymbol
 {
     union
@@ -53,33 +57,36 @@ struct CoffSymbol
         } LongName;
     } N;
     uint32_t Value;
-    int16_t  SectionNumber;
+    int16_t SectionNumber;
     uint16_t Type;
-    uint8_t  StorageClass;
-    uint8_t  NumberOfAuxSymbols;
+    uint8_t StorageClass;
+    uint8_t NumberOfAuxSymbols;
 };
 #pragma pack(pop)
 
-constexpr uint16_t COFF_MACHINE_AMD64 = 0x8664;
+constexpr uint16_t COFF_MACHINE_AMD64 = 0x8664; // IMAGE_FILE_MACHINE_AMD64.
 
 constexpr uint32_t SCN_TEXT = 0x60500020;  // Code, Execute, Read, Align 16
 constexpr uint32_t SCN_RDATA = 0x40500040; // InitData, Read, Align 16
 constexpr uint32_t SCN_DATA = 0xC0300040;  // InitData, Read, Write, Align 8
 constexpr uint32_t SCN_BSS = 0xC0300080;   // UninitData, Read, Write, Align 8
 
-constexpr uint16_t COFF_REL_AMD64_ADDR64 = 0x0001;
-constexpr uint16_t COFF_REL_AMD64_ADDR32 = 0x0002;
-constexpr uint16_t COFF_REL_AMD64_REL32  = 0x0004;
+constexpr uint16_t COFF_REL_AMD64_ADDR64 = 0x0001; // 64-bit absolute address.
+constexpr uint16_t COFF_REL_AMD64_ADDR32 = 0x0002; // 32-bit absolute address.
+constexpr uint16_t COFF_REL_AMD64_REL32 = 0x0004;  // 32-bit PC-relative address.
 
-constexpr uint8_t COFF_SYM_CLASS_EXTERNAL = 2;
-constexpr uint8_t COFF_SYM_CLASS_STATIC   = 3;
+constexpr uint8_t COFF_SYM_CLASS_EXTERNAL = 2; // Externally visible symbol.
+constexpr uint8_t COFF_SYM_CLASS_STATIC = 3;   // File-local symbol.
 
+// Translates a target-agnostic relocation kind into its COFF AMD64 encoding; 0 = none.
 uint16_t mapCoffRelocType(TargetCodeRelocationType type)
 {
     switch (type)
     {
-        case TargetCodeRelocationType::Absolute64: return COFF_REL_AMD64_ADDR64;
-        case TargetCodeRelocationType::Absolute32: return COFF_REL_AMD64_ADDR32;
+        case TargetCodeRelocationType::Absolute64:
+            return COFF_REL_AMD64_ADDR64;
+        case TargetCodeRelocationType::Absolute32:
+            return COFF_REL_AMD64_ADDR32;
         case TargetCodeRelocationType::PCRel32:
         case TargetCodeRelocationType::BranchRel32:
         case TargetCodeRelocationType::PLTRel32:
@@ -90,23 +97,19 @@ uint16_t mapCoffRelocType(TargetCodeRelocationType type)
     }
 }
 
+// Rounds offset up to the next multiple of alignment (alignment assumed power-of-two).
 uint64_t alignTo(uint64_t offset, uint64_t alignment)
 {
-    if (alignment <= 1) return offset;
+    if (alignment <= 1)
+        return offset;
     return (offset + alignment - 1) & ~(alignment - 1);
 }
 
 } // namespace
 
-void CoffWriter::addSymbol(const ObjectSymbol &sym)
-{
-    m_symbols.push_back(sym);
-}
+void CoffWriter::addSymbol(const ObjectSymbol &sym) { m_symbols.push_back(sym); }
 
-void CoffWriter::addRelocation(const ObjectRelocEntry &reloc)
-{
-    m_relocs.push_back(reloc);
-}
+void CoffWriter::addRelocation(const ObjectRelocEntry &reloc) { m_relocs.push_back(reloc); }
 
 void CoffWriter::clear()
 {
@@ -118,6 +121,7 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
 {
     std::vector<uint8_t> fileBuf;
 
+    // Internal per-section staging record used while laying out the COFF file.
     struct SectionInfo
     {
         std::string name;
@@ -132,7 +136,9 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     std::vector<SectionInfo> secInfos;
     std::unordered_map<SectionType, int16_t> sectionIndexMap; // 1-based for COFF
 
-    auto addSec = [&](SectionType type, const char *name, uint32_t charact, uint32_t align) {
+    // Copies a code section (if present) into the staging list and records its 1-based index.
+    auto addSec = [&](SectionType type, const char *name, uint32_t charact, uint32_t align)
+    {
         auto it = sections.find(type);
         if (it != sections.end() && it->second)
         {
@@ -168,7 +174,8 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     // Initial 4 bytes are size of string table
     stringTable.resize(4, 0);
 
-    auto addCoffString = [&](std::string_view str) -> uint32_t {
+    auto addCoffString = [&](std::string_view str) -> uint32_t
+    {
         uint32_t offset = static_cast<uint32_t>(stringTable.size());
         stringTable.insert(stringTable.end(), str.begin(), str.end());
         stringTable.push_back(0);
@@ -280,7 +287,8 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     // Symbol Table
     currentOffset = static_cast<uint32_t>(alignTo(currentOffset, 4));
     uint32_t symTableOffset = symbolRecords.empty() ? 0 : currentOffset;
-    uint32_t totalFileSize = currentOffset + static_cast<uint32_t>(symbolRecords.size() * sizeof(CoffSymbol)) + strTableSize;
+    uint32_t totalFileSize =
+            currentOffset + static_cast<uint32_t>(symbolRecords.size() * sizeof(CoffSymbol)) + strTableSize;
 
     fileBuf.resize(totalFileSize, 0);
 
@@ -328,9 +336,7 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     // Write Symbol Table
     if (symTableOffset != 0 && !symbolRecords.empty())
     {
-        std::memcpy(fileBuf.data() + symTableOffset,
-                    symbolRecords.data(),
-                    symbolRecords.size() * sizeof(CoffSymbol));
+        std::memcpy(fileBuf.data() + symTableOffset, symbolRecords.data(), symbolRecords.size() * sizeof(CoffSymbol));
     }
 
     // Write String Table

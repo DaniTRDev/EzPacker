@@ -7,6 +7,9 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for the legalize rule definition dialect parser.
+ */
 class LegalizeRuleDefLangTest : public DslLexerTestSuiteAsGtest
 {
 };
@@ -15,6 +18,9 @@ class LegalizeRuleDefLangTest : public DslLexerTestSuiteAsGtest
 // 1. Operand Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies a type-prefixed SSA operand (i32:$dst) records its kind, name, and type.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixSsaOperand)
 {
     std::string test = "i32:$dst";
@@ -30,6 +36,9 @@ TEST_F(LegalizeRuleDefLangTest, TestTypedPrefixSsaOperand)
     EXPECT_FALSE(res->m_typeParam.has_value());
 }
 
+/**
+ * Verifies an immediate symbol operand (imm:$c) is recognized with its name.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestImmediateSymbolOperand)
 {
     std::string test = "imm:$c";
@@ -45,6 +54,10 @@ TEST_F(LegalizeRuleDefLangTest, TestImmediateSymbolOperand)
     EXPECT_FALSE(res->m_typeParam.has_value());
 }
 
+/**
+ * Verifies parameterized immediate symbols (imm(i32):$c) parse the type
+ * parameter as either a type name or an explicit bit width.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestParameterizedImmediateSymbolOperand)
 {
     std::string testTyped = "imm(i32):$c";
@@ -74,6 +87,9 @@ TEST_F(LegalizeRuleDefLangTest, TestParameterizedImmediateSymbolOperand)
     EXPECT_EQ(resWidth->m_typeParam->m_node, "i12");
 }
 
+/**
+ * Verifies a bare SSA operand ($src) parses with no type or type parameter.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestBareSsaOperand)
 {
     std::string test = "$src";
@@ -88,6 +104,10 @@ TEST_F(LegalizeRuleDefLangTest, TestBareSsaOperand)
     EXPECT_FALSE(res->m_typeParam.has_value());
 }
 
+/**
+ * Verifies decimal, negative, and hexadecimal immediate literals parse to
+ * their expected integer values.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
 {
     // Decimal literal
@@ -127,6 +147,10 @@ TEST_F(LegalizeRuleDefLangTest, TestLiteralImmediateOperands)
     }
 }
 
+/**
+ * Verifies custom transform operands parse both single- and multi-argument
+ * call forms with their argument names.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestCustomTransformOperands)
 {
     // Single-argument transform
@@ -157,6 +181,10 @@ TEST_F(LegalizeRuleDefLangTest, TestCustomTransformOperands)
     }
 }
 
+/**
+ * Verifies malformed operand syntax (postfix type annotations and lone dollar
+ * signs) is rejected.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestDisallowedOperandFormats)
 {
     // Postfix type notation ($c:imm) in an instruction statement
@@ -191,6 +219,10 @@ TEST_F(LegalizeRuleDefLangTest, TestDisallowedOperandFormats)
 // 2. RuleInstruction Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies various rule instruction shapes parse: opcode-only, bare/typed SSA
+ * destination, and a mixed operand list.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestInstructionVariations)
 {
     {
@@ -246,6 +278,10 @@ TEST_F(LegalizeRuleDefLangTest, TestInstructionVariations)
 // 3. RuleWhen (Predicate Guard) Tests
 // ============================================================================
 
+/**
+ * Verifies when predicates parse a zero-argument call and a multi-argument
+ * call mixing identifiers and integer literals.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestRuleWhenPredicates)
 {
     {
@@ -283,6 +319,10 @@ TEST_F(LegalizeRuleDefLangTest, TestRuleWhenPredicates)
 // 4. LegalizeRule Tests (Ordering, Blocks & Synonyms)
 // ============================================================================
 
+/**
+ * Verifies a complete legalize rule parses match, when, and emit blocks in the
+ * standard order, including a custom transform in the emitted operands.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestCompleteLegalizeRuleStandardOrder)
 {
     std::string test = R"dsl(
@@ -322,6 +362,10 @@ rule SDivPow2 {
     EXPECT_EQ(res->m_emitClauses[0].m_operands[2].m_name.m_node, "log2");
 }
 
+/**
+ * Verifies blocks may appear in any order and that the `expand` keyword is
+ * accepted as a synonym for `emit`.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestPermutedBlocksAndExpandKeywordSynonym)
 {
     std::string test = R"dsl(
@@ -347,6 +391,10 @@ rule PermutedOrder {
     ASSERT_EQ(res->m_emitClauses.size(), 1);
 }
 
+/**
+ * Verifies a legalize rule with no when block parses and preserves all emitted
+ * instructions.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestRuleWithoutWhenBlock)
 {
     std::string test = R"dsl(
@@ -377,6 +425,10 @@ rule NarrowAddi64 {
 // 5. Full File / Translation Unit Tests
 // ============================================================================
 
+/**
+ * Verifies a full legalize rule file parses multiple rules with both emit and
+ * expand blocks.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestFullLegalizeRuleFile)
 {
     std::string test = R"dsl(
@@ -415,6 +467,9 @@ rule NarrowAddi64 {
 // 6. Syntax Error Tests
 // ============================================================================
 
+/**
+ * Verifies a missing semicolon after a match instruction is rejected.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestMissingSemicolonInInstructionError)
 {
     std::string test = R"dsl(
@@ -432,6 +487,9 @@ rule BadRule {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies a missing semicolon after a when predicate is rejected.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestMissingSemicolonInWhenPredicateError)
 {
     std::string test = R"dsl(
@@ -452,6 +510,9 @@ rule BadRule {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies an unclosed brace in an emit block is rejected.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestUnclosedBraceInEmitBlockError)
 {
     std::string test = R"dsl(
@@ -467,6 +528,9 @@ rule BadRule {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies an unrecognized rule block keyword (transform) is rejected.
+ */
 TEST_F(LegalizeRuleDefLangTest, TestInvalidBlockKeywordError)
 {
     std::string test = R"dsl(

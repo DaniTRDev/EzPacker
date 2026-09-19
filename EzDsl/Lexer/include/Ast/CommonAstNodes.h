@@ -14,26 +14,41 @@ namespace DSL::Ast::Common
  */
 template <typename Node> struct SourcedAstNode
 {
-    Node m_node;
-    SourceReference *m_sourceRef{ nullptr };
+    Node m_node;                             // The actual parsed payload value.
+    SourceReference *m_sourceRef{ nullptr }; // Source span covering the parsed token(s).
 };
 
+/**
+ * A signed decimal integer literal token.
+ */
 struct IntegerLiteral : SourcedAstNode<int64_t>
 {
 };
 
+/**
+ * A floating-point literal token parsed via std::from_chars.
+ */
 struct RealLiteral : SourcedAstNode<double>
 {
 };
 
+/**
+ * A bare identifier token, stored as a view into the source buffer.
+ */
 struct Identifier : SourcedAstNode<std::string_view>
 {
 };
 
+/**
+ * A double-quoted string literal token, stored as a view into the source buffer.
+ */
 struct StringLiteral : SourcedAstNode<std::string_view>
 {
 };
 
+/**
+ * A case-insensitive boolean literal token ('true'/'false').
+ */
 struct BooleanLiteral : SourcedAstNode<bool>
 {
 };

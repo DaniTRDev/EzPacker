@@ -21,9 +21,9 @@ namespace Symbols
  */
 struct RegisterBankSymbol
 {
-    std::string_view m_name;
-    std::string_view m_target;
-    const DSL::Ast::RegisterDef::RegisterBankDecl *m_astNode{ nullptr };
+    std::string_view m_name;                                             // Bank name.
+    std::string_view m_target;                                           // Target the bank belongs to.
+    const DSL::Ast::RegisterDef::RegisterBankDecl *m_astNode{ nullptr }; // Backing AST declaration.
 };
 
 /**
@@ -31,10 +31,10 @@ struct RegisterBankSymbol
  */
 struct RegisterClassSymbol
 {
-    std::string_view m_name;
-    std::string_view m_bankName;
-    uint32_t m_bitSize{ 0 };
-    const DSL::Ast::RegisterDef::RegisterClassDecl *m_astNode{ nullptr };
+    std::string_view m_name;                                              // Class name.
+    std::string_view m_bankName;                                          // Owning bank name.
+    uint32_t m_bitSize{ 0 };                                              // Class width in bits.
+    const DSL::Ast::RegisterDef::RegisterClassDecl *m_astNode{ nullptr }; // Backing AST declaration.
 };
 
 /**
@@ -43,10 +43,10 @@ struct RegisterClassSymbol
  */
 struct RegisterSymbol
 {
-    std::string_view m_name;      // Canonical (widest) assembly name.
-    std::string_view m_bankName;
-    uint32_t m_hwEncoding{ 0 };
-    const DSL::Ast::RegisterDef::RegisterDecl *m_astNode{ nullptr };
+    std::string_view m_name;                                         // Canonical (widest) assembly name.
+    std::string_view m_bankName;                                     // Owning bank name.
+    uint32_t m_hwEncoding{ 0 };                                      // Hardware encoding within the bank.
+    const DSL::Ast::RegisterDef::RegisterDecl *m_astNode{ nullptr }; // Backing AST declaration.
 };
 
 /**
@@ -54,10 +54,10 @@ struct RegisterSymbol
  */
 struct SpecialRegisterSymbol
 {
-    std::string_view m_name;
-    std::string_view m_target;
-    uint32_t m_id{ 0 };
-    const DSL::Ast::RegisterDef::SpecialRegDecl *m_astNode{ nullptr };
+    std::string_view m_name;                                           // Pseudo-register name.
+    std::string_view m_target;                                         // Target it belongs to.
+    uint32_t m_id{ 0 };                                                // Reserved pseudo-register id.
+    const DSL::Ast::RegisterDef::SpecialRegDecl *m_astNode{ nullptr }; // Backing AST declaration.
 };
 
 /**
@@ -65,8 +65,8 @@ struct SpecialRegisterSymbol
  */
 struct RegisterFileSymbol
 {
-    std::string_view m_target;
-    const DSL::Ast::RegisterDef::RegisterFile *m_astNode{ nullptr };
+    std::string_view m_target;                                       // Target described by the file.
+    const DSL::Ast::RegisterDef::RegisterFile *m_astNode{ nullptr }; // Backing AST root.
 };
 
 } // namespace Symbols

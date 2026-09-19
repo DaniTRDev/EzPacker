@@ -19,6 +19,7 @@ using namespace CodeGenerators;
 class CppTargetDescGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Parses a target descriptor and runs the target-descriptor semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("gen_tdesc_{}.tdesc", m_sourceId++), source);
@@ -65,6 +66,7 @@ target X86_64 {
     std::optional<DSL::Ast::TargetDesc::TargetDescFile> m_ast;
 };
 
+// Generates a target descriptor header/source and verifies metadata, object formats, libcalls, and component counts.
 TEST_F(CppTargetDescGeneratorTest, EmitsTargetDescriptorHeaderAndSource)
 {
     ASSERT_TRUE(parseAndRunPass(s_validManifest));
@@ -99,9 +101,11 @@ TEST_F(CppTargetDescGeneratorTest, EmitsTargetDescriptorHeaderAndSource)
     EXPECT_NE(source.find("getSpecialRegId(\"rip\")"), std::string::npos);
     EXPECT_NE(source.find("case 0: return \"__returnNothing\";"), std::string::npos);
     EXPECT_NE(source.find("case 2: return \"__udivdi3\";"), std::string::npos);
-    EXPECT_NE(source.find("MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)"), std::string::npos);
+    EXPECT_NE(source.find("MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)"),
+              std::string::npos);
 }
 
+// Verifies non-identifier target names are sanitized for file names and namespaces.
 TEST_F(CppTargetDescGeneratorTest, SanitizesTargetName)
 {
     ASSERT_TRUE(parseAndRunPass(s_validManifest));
@@ -117,6 +121,7 @@ TEST_F(CppTargetDescGeneratorTest, SanitizesTargetName)
     EXPECT_NE(header.find("class x86_64TargetDesc : public TargetDesc"), std::string::npos);
 }
 
+// Verifies generation creates and writes both files into a nested output directory.
 TEST_F(CppTargetDescGeneratorTest, WritesIntoNestedOutputDirectory)
 {
     ASSERT_TRUE(parseAndRunPass(s_validManifest));
@@ -129,6 +134,7 @@ TEST_F(CppTargetDescGeneratorTest, WritesIntoNestedOutputDirectory)
     }
 }
 
+// Verifies the convenience entry point regenerates without changing the timestamp when content is unchanged.
 TEST_F(CppTargetDescGeneratorTest, ConvenienceFunctionAndTimestampPreservation)
 {
     ASSERT_TRUE(parseAndRunPass(s_validManifest));
@@ -146,6 +152,7 @@ TEST_F(CppTargetDescGeneratorTest, ConvenienceFunctionAndTimestampPreservation)
     EXPECT_EQ(mtime1, mtime2);
 }
 
+// Verifies generation fails with a missing target symbol, a null collector, or a null symbol table.
 TEST_F(CppTargetDescGeneratorTest, FailsWithoutTargetSymbolAndOnNullInputs)
 {
     // Empty symbol table: no target descriptor symbol.

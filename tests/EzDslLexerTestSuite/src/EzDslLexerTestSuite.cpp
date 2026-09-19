@@ -16,7 +16,8 @@ DiagnosticLogger *EzDslLexerTestSuite::getDiagLogger() { return m_diagnosticLogg
  * 2. Throws an exception if registration fails.
  * 3. Constructs and returns a ParseContext configured with the test allocator and diagnostics.
  */
-ParseContext EzDslLexerTestSuite::createParseContextFromBuff(const std::string &sourceName, const std::string &sourceContent)
+ParseContext EzDslLexerTestSuite::createParseContextFromBuff(const std::string &sourceName,
+                                                             const std::string &sourceContent)
 {
     size_t sourceId = m_sourceManager->addSourceContent(sourceName, sourceContent);
     if (sourceId == 0)

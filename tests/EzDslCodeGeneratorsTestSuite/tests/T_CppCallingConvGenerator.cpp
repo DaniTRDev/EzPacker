@@ -13,9 +13,13 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating C++ calling-convention descriptor classes from .ezcc sources.
+ */
 class CppCallingConvGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Parses calling-convention source into an AST using a unique .ezcc source name.
     std::optional<DSL::Ast::CallingConvDef::CallingConventionDefFile> parseCallingConv(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.ezcc", m_testId++), source);
@@ -27,6 +31,7 @@ class CppCallingConvGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
     size_t m_testId{ 0 };
 };
 
+// Generates a SysV_AMD64 descriptor and checks the emitted header/source for the expected accessors.
 TEST_F(CppCallingConvGeneratorTest, TestFullCallingConvGeneration)
 {
     std::string source = R"(
@@ -123,6 +128,7 @@ TEST_F(CppCallingConvGeneratorTest, TestFullCallingConvGeneration)
     std::filesystem::remove_all(outDir, ec);
 }
 
+// Generates a Win64 descriptor and verifies shadow-space and sret-slot handling in the output.
 TEST_F(CppCallingConvGeneratorTest, TestWin64CallingConvGeneration)
 {
     std::string source = R"(
@@ -201,6 +207,7 @@ TEST_F(CppCallingConvGeneratorTest, TestWin64CallingConvGeneration)
     std::filesystem::remove_all(outDir, ec);
 }
 
+// Generates an AAPCS64 descriptor and verifies link-register and sret handling in the output.
 TEST_F(CppCallingConvGeneratorTest, TestAArch64CallingConvGeneration)
 {
     std::string source = R"(
@@ -277,4 +284,3 @@ TEST_F(CppCallingConvGeneratorTest, TestAArch64CallingConvGeneration)
     std::error_code ec;
     std::filesystem::remove_all(outDir, ec);
 }
-

@@ -27,13 +27,20 @@ class ActionDefinitionBuilder;
 class LegalizerInfo
 {
   public:
-    static constexpr size_t OPCODE_COUNT = static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT) + 1;
-    static constexpr size_t MAX_COMPACT_TYPES = 32;
+    static constexpr size_t OPCODE_COUNT = static_cast<size_t>(MirInstructionOpCode::OPCODE_COUNT) +
+            1;                                      ///< Number of opcode rows in the primary matrix.
+    static constexpr size_t MAX_COMPACT_TYPES = 32; ///< Number of compact type columns in the primary matrix.
 
-    using LegalizeHandler = LegalizationResult (*)(LegalizeCtx &ctx);
-    using RuleMatcher = std::function<LegalityResponse(const LegalityQuery &)>;
+    using LegalizeHandler =
+            LegalizationResult (*)(LegalizeCtx &ctx); ///< Callable that performs a Custom/Lower rewrite.
+    using RuleMatcher = std::function<LegalityResponse(const LegalityQuery &)>; ///< Predicate mapping a query to a
+                                                                                ///< legality response.
 
   public:
+    /**
+     * Initializes the primary matrix and wildcard tables to Unsupported so unregistered
+     * combinations are rejected by default.
+     */
     LegalizerInfo()
     {
         for (size_t op = 0; op < OPCODE_COUNT; ++op)
@@ -119,9 +126,13 @@ class LegalizerInfo
 
     // --- Fluent API Helpers ---
 
+    /// Starts a fluent rule definition for a single opcode.
     ActionDefinitionBuilder getActionDefinitions(MirInstructionOpCode op);
+
+    /// Starts a fluent rule definition applying the same rules to several opcodes at once.
     ActionDefinitionBuilder getActionDefinitions(std::initializer_list<MirInstructionOpCode> ops);
 
+    /// Stores a Tier 1 dense-matrix response for the given opcode and primary type.
     void setPrimaryMatrix(MirInstructionOpCode op, uint8_t typeId, LegalityResponse resp)
     {
         size_t opIdx = static_cast<size_t>(op);
@@ -131,6 +142,7 @@ class LegalizerInfo
         }
     }
 
+    /// Stores a Tier 3 wildcard response that applies to every operand shape of an opcode.
     void setWildcardAction(MirInstructionOpCode op, LegalityResponse resp)
     {
         size_t opIdx = static_cast<size_t>(op);
@@ -140,17 +152,20 @@ class LegalizerInfo
         }
     }
 
+    /// Appends a Tier 2 signature matcher consulted in registration order.
     void addRuleMatcher(MirInstructionOpCode op, RuleMatcher matcher)
     {
         m_ruleMatchers[op].push_back(std::move(matcher));
     }
 
+    /// Registers a Custom/Lower callback and returns the id stored in LegalityResponse.
     uint16_t registerHandler(LegalizeHandler handler)
     {
         m_handlers.push_back(handler);
         return static_cast<uint16_t>(m_handlers.size() - 1);
     }
 
+    /// Interns a libcall symbol name, returning an existing id when already present.
     uint16_t registerLibcallSymbol(std::string_view sym)
     {
         for (size_t i = 0; i < m_libcallSymbols.size(); ++i)
@@ -162,6 +177,7 @@ class LegalizerInfo
         return static_cast<uint16_t>(m_libcallSymbols.size() - 1);
     }
 
+    /// Resolves a libcall id previously returned by registerLibcallSymbol.
     std::string_view getLibcallSymbol(uint16_t id) const
     {
         if (id < m_libcallSymbols.size())
@@ -172,11 +188,12 @@ class LegalizerInfo
     }
 
   protected:
-    LegalityResponse m_primaryMatrix[OPCODE_COUNT][MAX_COMPACT_TYPES];
-    LegalityResponse m_wildcardActions[OPCODE_COUNT];
-    std::unordered_map<MirInstructionOpCode, std::vector<RuleMatcher>> m_ruleMatchers;
-    std::vector<LegalizeHandler> m_handlers;
-    std::vector<std::string> m_libcallSymbols;
+    LegalityResponse m_primaryMatrix[OPCODE_COUNT][MAX_COMPACT_TYPES]; ///< Tier 1 opcode x type legality table.
+    LegalityResponse m_wildcardActions[OPCODE_COUNT];                  ///< Tier 3 unconditional per-opcode actions.
+    std::unordered_map<MirInstructionOpCode, std::vector<RuleMatcher>>
+            m_ruleMatchers;                    ///< Tier 2 per-opcode matcher chains.
+    std::vector<LegalizeHandler> m_handlers;   ///< Registered Custom/Lower callbacks.
+    std::vector<std::string> m_libcallSymbols; ///< Interned libcall symbol names.
 };
 
 /**
@@ -185,11 +202,17 @@ class LegalizerInfo
 class ActionDefinitionBuilder
 {
   public:
+    /**
+     * Creates a builder that applies its rules to every opcode in opcodes on the given LegalizerInfo.
+     */
     ActionDefinitionBuilder(LegalizerInfo *info, std::vector<MirInstructionOpCode> opcodes) :
         m_info(info), m_opcodes(std::move(opcodes))
     {
     }
 
+    /**
+     * Marks operations whose primary operand has one of the listed types as Legal (Tier 1).
+     */
     ActionDefinitionBuilder &legalFor(std::initializer_list<MirType *> types)
     {
         for (auto op : m_opcodes)
@@ -198,16 +221,21 @@ class ActionDefinitionBuilder
             {
                 if (t && t->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
                 {
-                    m_info->setPrimaryMatrix(op, t->getCompactId(),
-                        LegalityResponse{ .m_action = LegalizeActionKind::Legal,
-                                          .m_slot = 0,
-                                          .m_targetCompactId = t->getCompactId() });
+                    m_info->setPrimaryMatrix(op,
+                                             t->getCompactId(),
+                                             LegalityResponse{ .m_action = LegalizeActionKind::Legal,
+                                                               .m_slot = 0,
+                                                               .m_targetCompactId = t->getCompactId() });
                 }
             }
         }
         return *this;
     }
 
+    /**
+     * Marks operations Legal only when the full multi-operand type signature matches one of
+     * the supplied tuples, installed as a Tier 2 matcher.
+     */
     ActionDefinitionBuilder &legalFor(std::initializer_list<std::vector<MirType *>> multiSlotTypes)
     {
         for (auto op : m_opcodes)
@@ -223,34 +251,41 @@ class ActionDefinitionBuilder
                 sigs.push_back(std::move(ids));
             }
 
-            m_info->addRuleMatcher(op, [sigs](const LegalityQuery &q) -> LegalityResponse {
-                for (const auto &sig : sigs)
-                {
-                    if (q.m_operandCount >= sig.size())
+            m_info->addRuleMatcher(
+                    op,
+                    [sigs](const LegalityQuery &q) -> LegalityResponse
                     {
-                        bool match = true;
-                        for (size_t i = 0; i < sig.size(); ++i)
+                        for (const auto &sig : sigs)
                         {
-                            if (q.m_compactIds[i] != sig[i])
+                            if (q.m_operandCount >= sig.size())
                             {
-                                match = false;
-                                break;
+                                bool match = true;
+                                for (size_t i = 0; i < sig.size(); ++i)
+                                {
+                                    if (q.m_compactIds[i] != sig[i])
+                                    {
+                                        match = false;
+                                        break;
+                                    }
+                                }
+                                if (match)
+                                {
+                                    return LegalityResponse{ .m_action = LegalizeActionKind::Legal,
+                                                             .m_slot = 0,
+                                                             .m_targetCompactId = sig.empty() ? uint8_t(0) : sig[0] };
+                                }
                             }
                         }
-                        if (match)
-                        {
-                            return LegalityResponse{ .m_action = LegalizeActionKind::Legal,
-                                                      .m_slot = 0,
-                                                      .m_targetCompactId = sig.empty() ? uint8_t(0) : sig[0] };
-                        }
-                    }
-                }
-                return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            });
+                        return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                    });
         }
         return *this;
     }
 
+    /**
+     * Requests that values of fromTypes be promoted to toType before the operation runs.
+     * Slot 0 uses the dense primary matrix; other slots install a Tier 2 matcher on that operand.
+     */
     ActionDefinitionBuilder &widenScalarTo(size_t slot, std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
         uint8_t toId = toType ? toType->getCompactId() : 0;
@@ -262,10 +297,11 @@ class ActionDefinitionBuilder
                 {
                     if (t && t->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
                     {
-                        m_info->setPrimaryMatrix(op, t->getCompactId(),
-                            LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
-                                              .m_slot = 0,
-                                              .m_targetCompactId = toId });
+                        m_info->setPrimaryMatrix(op,
+                                                 t->getCompactId(),
+                                                 LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
+                                                                   .m_slot = 0,
+                                                                   .m_targetCompactId = toId });
                     }
                 }
             }
@@ -274,28 +310,36 @@ class ActionDefinitionBuilder
                 std::vector<uint8_t> fromIds;
                 for (auto *t : fromTypes)
                 {
-                    if (t) fromIds.push_back(t->getCompactId());
+                    if (t)
+                        fromIds.push_back(t->getCompactId());
                 }
-                m_info->addRuleMatcher(op, [slot, fromIds, toId](const LegalityQuery &q) -> LegalityResponse {
-                    if (q.m_operandCount > slot)
-                    {
-                        for (uint8_t fid : fromIds)
+                m_info->addRuleMatcher(
+                        op,
+                        [slot, fromIds, toId](const LegalityQuery &q) -> LegalityResponse
                         {
-                            if (q.m_compactIds[slot] == fid)
+                            if (q.m_operandCount > slot)
                             {
-                                return LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
-                                                          .m_slot = static_cast<uint8_t>(slot),
-                                                          .m_targetCompactId = toId };
+                                for (uint8_t fid : fromIds)
+                                {
+                                    if (q.m_compactIds[slot] == fid)
+                                    {
+                                        return LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
+                                                                 .m_slot = static_cast<uint8_t>(slot),
+                                                                 .m_targetCompactId = toId };
+                                    }
+                                }
                             }
-                        }
-                    }
-                    return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-                });
+                            return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                        });
             }
         }
         return *this;
     }
 
+    /**
+     * Requests that values of fromTypes be split into toType before the operation runs.
+     * Slot 0 uses the dense primary matrix; other slots install a Tier 2 matcher on that operand.
+     */
     ActionDefinitionBuilder &narrowScalarTo(size_t slot, std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
         uint8_t toId = toType ? toType->getCompactId() : 0;
@@ -307,10 +351,11 @@ class ActionDefinitionBuilder
                 {
                     if (t && t->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
                     {
-                        m_info->setPrimaryMatrix(op, t->getCompactId(),
-                            LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
-                                              .m_slot = 0,
-                                              .m_targetCompactId = toId });
+                        m_info->setPrimaryMatrix(op,
+                                                 t->getCompactId(),
+                                                 LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
+                                                                   .m_slot = 0,
+                                                                   .m_targetCompactId = toId });
                     }
                 }
             }
@@ -319,28 +364,35 @@ class ActionDefinitionBuilder
                 std::vector<uint8_t> fromIds;
                 for (auto *t : fromTypes)
                 {
-                    if (t) fromIds.push_back(t->getCompactId());
+                    if (t)
+                        fromIds.push_back(t->getCompactId());
                 }
-                m_info->addRuleMatcher(op, [slot, fromIds, toId](const LegalityQuery &q) -> LegalityResponse {
-                    if (q.m_operandCount > slot)
-                    {
-                        for (uint8_t fid : fromIds)
+                m_info->addRuleMatcher(
+                        op,
+                        [slot, fromIds, toId](const LegalityQuery &q) -> LegalityResponse
                         {
-                            if (q.m_compactIds[slot] == fid)
+                            if (q.m_operandCount > slot)
                             {
-                                return LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
-                                                          .m_slot = static_cast<uint8_t>(slot),
-                                                          .m_targetCompactId = toId };
+                                for (uint8_t fid : fromIds)
+                                {
+                                    if (q.m_compactIds[slot] == fid)
+                                    {
+                                        return LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
+                                                                 .m_slot = static_cast<uint8_t>(slot),
+                                                                 .m_targetCompactId = toId };
+                                    }
+                                }
                             }
-                        }
-                    }
-                    return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-                });
+                            return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                        });
             }
         }
         return *this;
     }
 
+    /**
+     * Rewrites operations on the given type into a call to the named runtime library function.
+     */
     ActionDefinitionBuilder &libcallFor(MirType *type, std::string_view symbol)
     {
         uint16_t strId = m_info->registerLibcallSymbol(symbol);
@@ -348,173 +400,213 @@ class ActionDefinitionBuilder
         {
             if (type && type->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
             {
-                m_info->setPrimaryMatrix(op, type->getCompactId(),
-                    LegalityResponse{ .m_action = LegalizeActionKind::Libcall,
-                                      .m_slot = 0,
-                                      .m_targetCompactId = type->getCompactId(),
-                                      .m_handlerOrStringId = strId });
+                m_info->setPrimaryMatrix(op,
+                                         type->getCompactId(),
+                                         LegalityResponse{ .m_action = LegalizeActionKind::Libcall,
+                                                           .m_slot = 0,
+                                                           .m_targetCompactId = type->getCompactId(),
+                                                           .m_handlerOrStringId = strId });
             }
         }
         return *this;
     }
 
+    /**
+     * Registers a wildcard Lower handler that decomposes the operation into target MIR primitives.
+     */
     ActionDefinitionBuilder &lowerWith(LegalizerInfo::LegalizeHandler handler)
     {
         uint16_t hId = m_info->registerHandler(handler);
         for (auto op : m_opcodes)
         {
-            m_info->setWildcardAction(op,
-                LegalityResponse{ .m_action = LegalizeActionKind::Lower,
-                                  .m_slot = 0,
-                                  .m_handlerOrStringId = hId });
+            m_info->setWildcardAction(
+                    op,
+                    LegalityResponse{ .m_action = LegalizeActionKind::Lower, .m_slot = 0, .m_handlerOrStringId = hId });
         }
         return *this;
     }
 
+    /**
+     * Registers a wildcard Custom handler that performs a target-defined rewrite of the operation.
+     */
     ActionDefinitionBuilder &customWith(LegalizerInfo::LegalizeHandler handler)
     {
         uint16_t hId = m_info->registerHandler(handler);
         for (auto op : m_opcodes)
         {
             m_info->setWildcardAction(op,
-                LegalityResponse{ .m_action = LegalizeActionKind::Custom,
-                                  .m_slot = 0,
-                                  .m_handlerOrStringId = hId });
+                                      LegalityResponse{ .m_action = LegalizeActionKind::Custom,
+                                                        .m_slot = 0,
+                                                        .m_handlerOrStringId = hId });
         }
         return *this;
     }
 
+    /**
+     * Marks operations Legal when their second operand (the source) has one of sourceTypes.
+     */
     ActionDefinitionBuilder &legalForTypesWithSource(std::initializer_list<MirType *> sourceTypes)
     {
         std::vector<uint8_t> sIds;
         for (auto *t : sourceTypes)
         {
-            if (t) sIds.push_back(t->getCompactId());
+            if (t)
+                sIds.push_back(t->getCompactId());
         }
         for (auto op : m_opcodes)
         {
-            m_info->addRuleMatcher(op, [sIds](const LegalityQuery &q) -> LegalityResponse {
-                if (q.m_operandCount > 1)
-                {
-                    for (uint8_t sid : sIds)
-                    {
-                        if (q.m_compactIds[1] == sid)
-                        {
-                            return LegalityResponse{ .m_action = LegalizeActionKind::Legal,
-                                                      .m_slot = 0,
-                                                      .m_targetCompactId = sid };
-                        }
-                    }
-                }
-                return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            });
+            m_info->addRuleMatcher(op,
+                                   [sIds](const LegalityQuery &q) -> LegalityResponse
+                                   {
+                                       if (q.m_operandCount > 1)
+                                       {
+                                           for (uint8_t sid : sIds)
+                                           {
+                                               if (q.m_compactIds[1] == sid)
+                                               {
+                                                   return LegalityResponse{ .m_action = LegalizeActionKind::Legal,
+                                                                            .m_slot = 0,
+                                                                            .m_targetCompactId = sid };
+                                               }
+                                           }
+                                       }
+                                       return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                                   });
         }
         return *this;
     }
 
+    /**
+     * Widens the second (source) operand from any of fromTypes to toType, matching on that slot.
+     */
     ActionDefinitionBuilder &widenScalarSourceTo(std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
         uint8_t toId = toType ? toType->getCompactId() : 0;
         std::vector<uint8_t> fromIds;
         for (auto *t : fromTypes)
         {
-            if (t) fromIds.push_back(t->getCompactId());
+            if (t)
+                fromIds.push_back(t->getCompactId());
         }
         for (auto op : m_opcodes)
         {
-            m_info->addRuleMatcher(op, [fromIds, toId](const LegalityQuery &q) -> LegalityResponse {
-                if (q.m_operandCount > 1)
-                {
-                    for (uint8_t fid : fromIds)
-                    {
-                        if (q.m_compactIds[1] == fid)
-                        {
-                            return LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
-                                                      .m_slot = 0,
-                                                      .m_targetCompactId = toId };
-                        }
-                    }
-                }
-                return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            });
+            m_info->addRuleMatcher(op,
+                                   [fromIds, toId](const LegalityQuery &q) -> LegalityResponse
+                                   {
+                                       if (q.m_operandCount > 1)
+                                       {
+                                           for (uint8_t fid : fromIds)
+                                           {
+                                               if (q.m_compactIds[1] == fid)
+                                               {
+                                                   return LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
+                                                                            .m_slot = 0,
+                                                                            .m_targetCompactId = toId };
+                                               }
+                                           }
+                                       }
+                                       return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                                   });
         }
         return *this;
     }
 
+    /**
+     * Narrows the second (source) operand from any of fromTypes to toType, matching on that slot.
+     */
     ActionDefinitionBuilder &narrowScalarSourceTo(std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
         uint8_t toId = toType ? toType->getCompactId() : 0;
         std::vector<uint8_t> fromIds;
         for (auto *t : fromTypes)
         {
-            if (t) fromIds.push_back(t->getCompactId());
+            if (t)
+                fromIds.push_back(t->getCompactId());
         }
         for (auto op : m_opcodes)
         {
-            m_info->addRuleMatcher(op, [fromIds, toId](const LegalityQuery &q) -> LegalityResponse {
-                if (q.m_operandCount > 1)
-                {
-                    for (uint8_t fid : fromIds)
+            m_info->addRuleMatcher(
+                    op,
+                    [fromIds, toId](const LegalityQuery &q) -> LegalityResponse
                     {
-                        if (q.m_compactIds[1] == fid)
+                        if (q.m_operandCount > 1)
                         {
-                            return LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
-                                                      .m_slot = 0,
-                                                      .m_targetCompactId = toId };
+                            for (uint8_t fid : fromIds)
+                            {
+                                if (q.m_compactIds[1] == fid)
+                                {
+                                    return LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
+                                                             .m_slot = 0,
+                                                             .m_targetCompactId = toId };
+                                }
+                            }
                         }
-                    }
-                }
-                return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            });
+                        return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                    });
         }
         return *this;
     }
 
+    /**
+     * Marks an operation Legal when its first two operands share the same non-zero compact type.
+     */
     ActionDefinitionBuilder &legalIfSameType()
     {
         for (auto op : m_opcodes)
         {
-            m_info->addRuleMatcher(op, [](const LegalityQuery &q) -> LegalityResponse {
-                if (q.m_operandCount >= 2 && q.m_compactIds[0] != 0 && q.m_compactIds[0] == q.m_compactIds[1])
-                {
-                    return LegalityResponse{ .m_action = LegalizeActionKind::Legal,
-                                              .m_slot = 0,
-                                              .m_targetCompactId = q.m_compactIds[0] };
-                }
-                return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            });
+            m_info->addRuleMatcher(
+                    op,
+                    [](const LegalityQuery &q) -> LegalityResponse
+                    {
+                        if (q.m_operandCount >= 2 && q.m_compactIds[0] != 0 && q.m_compactIds[0] == q.m_compactIds[1])
+                        {
+                            return LegalityResponse{ .m_action = LegalizeActionKind::Legal,
+                                                     .m_slot = 0,
+                                                     .m_targetCompactId = q.m_compactIds[0] };
+                        }
+                        return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                    });
         }
         return *this;
     }
 
+    /**
+     * Allows an operation mixing typeA and typeB by bitcasting the mismatching operand to the other type.
+     */
     ActionDefinitionBuilder &bitcastBetween(MirType *typeA, MirType *typeB)
     {
         uint8_t idA = typeA ? typeA->getCompactId() : 0;
         uint8_t idB = typeB ? typeB->getCompactId() : 0;
         for (auto op : m_opcodes)
         {
-            m_info->addRuleMatcher(op, [idA, idB](const LegalityQuery &q) -> LegalityResponse {
-                if (q.m_operandCount >= 2)
-                {
-                    if (q.m_compactIds[0] == idA && q.m_compactIds[1] == idB)
-                    {
-                        return LegalityResponse{ .m_action = LegalizeActionKind::Bitcast,
-                                                  .m_slot = 1,
-                                                  .m_targetCompactId = idA };
-                    }
-                    if (q.m_compactIds[0] == idB && q.m_compactIds[1] == idA)
-                    {
-                        return LegalityResponse{ .m_action = LegalizeActionKind::Bitcast,
-                                                  .m_slot = 1,
-                                                  .m_targetCompactId = idB };
-                    }
-                }
-                return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            });
+            m_info->addRuleMatcher(op,
+                                   [idA, idB](const LegalityQuery &q) -> LegalityResponse
+                                   {
+                                       if (q.m_operandCount >= 2)
+                                       {
+                                           if (q.m_compactIds[0] == idA && q.m_compactIds[1] == idB)
+                                           {
+                                               return LegalityResponse{ .m_action = LegalizeActionKind::Bitcast,
+                                                                        .m_slot = 1,
+                                                                        .m_targetCompactId = idA };
+                                           }
+                                           if (q.m_compactIds[0] == idB && q.m_compactIds[1] == idA)
+                                           {
+                                               return LegalityResponse{ .m_action = LegalizeActionKind::Bitcast,
+                                                                        .m_slot = 1,
+                                                                        .m_targetCompactId = idB };
+                                           }
+                                       }
+                                       return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                                   });
         }
         return *this;
     }
 
+    /**
+     * Convenience rule clamping scalar support to the [minType, maxType] range: smaller types are
+     * widened up to minType, the range itself is legal, and larger types are narrowed down to maxType.
+     */
     ActionDefinitionBuilder &clampScalar(MirType *minType, MirType *maxType, MirTypeTable *tt)
     {
         if (tt)
@@ -527,8 +619,8 @@ class ActionDefinitionBuilder
     }
 
   private:
-    LegalizerInfo *m_info;
-    std::vector<MirInstructionOpCode> m_opcodes;
+    LegalizerInfo *m_info;                       ///< LegalizerInfo receiving the rules being defined.
+    std::vector<MirInstructionOpCode> m_opcodes; ///< Opcodes the builder applies each rule to.
 };
 
 inline ActionDefinitionBuilder LegalizerInfo::getActionDefinitions(MirInstructionOpCode op)

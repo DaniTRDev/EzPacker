@@ -11,6 +11,7 @@ int main(int argc, char **argv)
     EzCompiler::CommandLineOptions options;
     std::string err;
 
+    // An empty error on parse failure means help/version was handled successfully.
     if (!parser.parse(argc, argv, options, err))
     {
         if (!err.empty())
@@ -21,6 +22,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    // Set up allocators, diagnostics and target descriptors for the chosen triple.
     EzCompiler::DriverContext ctx(options);
     if (!ctx.initialize())
     {
@@ -28,12 +30,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Translate the input into generic MIR.
     EzCompiler::MirModuleLoader loader;
     if (!loader.compileSourceToMir(ctx, options.inputFilePath, *ctx.getBuilderContext()))
     {
         return 1;
     }
 
+    // Run the middle-end and backend pass pipeline.
     EzCompiler::CompilationPipeline pipeline(ctx);
     if (!pipeline.runPipeline())
     {

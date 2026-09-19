@@ -155,12 +155,8 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const F
 /**
  * Constructs a memory operand [base + index*scale + displ] using an existing MirInteger displacement operand.
  */
-MirMemory *MirOperandBuilder::buildMem(MirType *type,
-                                      MirRegister *base,
-                                      MirInteger *displ,
-                                      MirRegister *index,
-                                      uint8_t scale,
-                                      SourceReference *ref)
+MirMemory *MirOperandBuilder::buildMem(
+        MirType *type, MirRegister *base, MirInteger *displ, MirRegister *index, uint8_t scale, SourceReference *ref)
 {
     if (base)
     {
@@ -179,7 +175,8 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type,
         if (indexType->getKind() != MirTypeKind::Integer && indexType->getKind() != MirTypeKind::Pointer)
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref << "Can't create a memory operand if the index register doesn't have integer or pointer type "
+                    << ref
+                    << "Can't create a memory operand if the index register doesn't have integer or pointer type "
                     << type->getName();
             return nullptr;
         }
@@ -192,12 +189,8 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type,
  * Constructs a memory operand [base + index*scale + displ] converting an immediate FlexInt offset to a 64-bit integer
  * operand.
  */
-MirMemory *MirOperandBuilder::buildMem(MirType *type,
-                                      MirRegister *base,
-                                      const FlexInt &displ,
-                                      MirRegister *index,
-                                      uint8_t scale,
-                                      SourceReference *ref)
+MirMemory *MirOperandBuilder::buildMem(
+        MirType *type, MirRegister *base, const FlexInt &displ, MirRegister *index, uint8_t scale, SourceReference *ref)
 {
     if (base)
     {
@@ -216,7 +209,8 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type,
         if (indexType->getKind() != MirTypeKind::Integer && indexType->getKind() != MirTypeKind::Pointer)
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref << "Can't create a memory operand if the index register doesn't have integer or pointer type "
+                    << ref
+                    << "Can't create a memory operand if the index register doesn't have integer or pointer type "
                     << type->getName();
             return nullptr;
         }

@@ -15,9 +15,7 @@
 namespace EzCompiler
 {
 
-bool MirModuleLoader::compileSourceToMir(DriverContext &ctx,
-                                         std::string_view sourcePath,
-                                         MirBuilderContext &outMirCtx)
+bool MirModuleLoader::compileSourceToMir(DriverContext &ctx, std::string_view sourcePath, MirBuilderContext &outMirCtx)
 {
     if (sourcePath.empty())
     {
@@ -44,9 +42,7 @@ bool MirModuleLoader::compileSourceToMir(DriverContext &ctx,
     return true;
 }
 
-bool MirModuleLoader::loadMirFile(DriverContext &ctx,
-                                  std::string_view mirPath,
-                                  MirBuilderContext &outMirCtx)
+bool MirModuleLoader::loadMirFile(DriverContext &ctx, std::string_view mirPath, MirBuilderContext &outMirCtx)
 {
     std::filesystem::path p(mirPath);
     if (!std::filesystem::exists(p))
@@ -62,9 +58,11 @@ bool MirModuleLoader::loadMirFile(DriverContext &ctx,
         return false;
     }
 
+    // Slurp the whole MIR file into memory for the parser.
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
     EzMir::MirParserOptions parserOptions;
+    // Enforce SSA well-formedness only when optimizing, where the invariant matters.
     parserOptions.verifySsa = (ctx.getOptions().optLevel != OptimizationLevel::O0);
 
     EzMir::MirParser parser(&outMirCtx, ctx.getDiagCollector(), parserOptions);
@@ -77,9 +75,7 @@ bool MirModuleLoader::loadMirFile(DriverContext &ctx,
     return true;
 }
 
-MirFunction *MirModuleLoader::createReturnConstFunction(DriverContext &ctx,
-                                                       std::string_view funcName,
-                                                       int64_t retVal)
+MirFunction *MirModuleLoader::createReturnConstFunction(DriverContext &ctx, std::string_view funcName, int64_t retVal)
 {
     MirBuilderContext *bCtx = ctx.getBuilderContext();
     auto *typeTable = ctx.getTypeTable();
@@ -96,14 +92,14 @@ MirFunction *MirModuleLoader::createReturnConstFunction(DriverContext &ctx,
     MirRegister *vreg0 = opBuilder.buildVReg(i64);
     MirInteger *immVal = opBuilder.buildInt(i64, FlexInt(retVal, 64));
 
+    // Emit: %vreg0 = mov retVal; ret %vreg0.
     instBuilder.MOV(vreg0, immVal);
     instBuilder.RET(vreg0);
 
     return func;
 }
 
-MirFunction *MirModuleLoader::createArithmeticFunction(DriverContext &ctx,
-                                                      std::string_view funcName)
+MirFunction *MirModuleLoader::createArithmeticFunction(DriverContext &ctx, std::string_view funcName)
 {
     MirBuilderContext *bCtx = ctx.getBuilderContext();
     auto *typeTable = ctx.getTypeTable();
@@ -124,6 +120,7 @@ MirFunction *MirModuleLoader::createArithmeticFunction(DriverContext &ctx,
     MirInteger *imm10 = opBuilder.buildInt(i64, FlexInt(10, 64));
     MirInteger *imm32 = opBuilder.buildInt(i64, FlexInt(32, 64));
 
+    // Emit: v0 = 10; v1 = 32; v2 = v0 + v1; ret v2.
     instBuilder.MOV(v0, imm10);
     instBuilder.MOV(v1, imm32);
     instBuilder.ADD(v2, v0, v1);

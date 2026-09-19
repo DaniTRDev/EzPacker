@@ -218,10 +218,10 @@ class FlexFloat
     libbf::limb_t getPrecBits() const;
 
   private:
-    libbf::bf_context_t m_bfCtx;
-    libbf::bf_t m_number;
-    int m_lastErr;
-    size_t m_bitWidth;
+    libbf::bf_context_t m_bfCtx; // Per-instance libbf allocator/context owning this number's memory.
+    libbf::bf_t m_number;        // The underlying arbitrary-precision bf_t value, bound to m_bfCtx.
+    int m_lastErr;               // libbf status flags (e.g. BF_ST_MEM_ERROR) from the last operation.
+    size_t m_bitWidth;           // Configured storage width in bits that determines precision and range.
 };
 
 #endif // EZCORE_FLEX_FLOAT_H

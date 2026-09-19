@@ -14,6 +14,10 @@
 namespace LegalizeActions
 {
 
+/**
+ * Rewrites a high-level CALL into a token-bound sequence: optional SRET ALLOC/PUSH_ARG, one
+ * PUSH_ARG per argument, the CALL itself, and a trailing POP_RET that captures the result.
+ */
 LegalizationResult LegalizeCall(LegalizeCtx &ctx)
 {
     auto it = ctx.m_it;

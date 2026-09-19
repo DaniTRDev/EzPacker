@@ -33,16 +33,16 @@ TEST_F(CppSourceEmitterTest, TestBasicIndentation)
     EXPECT_EQ(emitter.getIndentLevel(), 0);
     emitter.emitLine("int e = 4;");
 
-    std::string expected =
-            "int a = 0;\n"
-            "    int b = 1;\n"
-            "        int c = 2;\n"
-            "    int d = 3;\n"
-            "int e = 4;\n";
+    std::string expected = "int a = 0;\n"
+                           "    int b = 1;\n"
+                           "        int c = 2;\n"
+                           "    int d = 3;\n"
+                           "int e = 4;\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies a custom indent string applies per level and can be switched mid-stream.
 TEST_F(CppSourceEmitterTest, TestCustomIndentString)
 {
     CppSourceEmitter emitter(1024, "  "); // 2-space indentation
@@ -60,16 +60,16 @@ TEST_F(CppSourceEmitterTest, TestCustomIndentString)
     emitter.dedent();
     emitter.emitLine("tab_level1");
 
-    std::string expected =
-            "root\n"
-            "  level1\n"
-            "    level2\n"
-            "\t\ttab_level2\n"
-            "\ttab_level1\n";
+    std::string expected = "root\n"
+                           "  level1\n"
+                           "    level2\n"
+                           "\t\ttab_level2\n"
+                           "\ttab_level1\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies dedent() below level 0 clamps without underflow and setIndentLevel overrides the level.
 TEST_F(CppSourceEmitterTest, TestDedentBoundaryAtZeroLevel)
 {
     CppSourceEmitter emitter;
@@ -105,19 +105,19 @@ TEST_F(CppSourceEmitterTest, TestNamespaceAndClassScopes)
         }
     }
 
-    std::string expected =
-            "namespace MyNamespace\n"
-            "{\n"
-            "    class MyClass : public Base\n"
-            "    {\n"
-            "        public:\n"
-            "            void foo();\n"
-            "    };\n"
-            "} // namespace MyNamespace\n";
+    std::string expected = "namespace MyNamespace\n"
+                           "{\n"
+                           "    class MyClass : public Base\n"
+                           "    {\n"
+                           "        public:\n"
+                           "            void foo();\n"
+                           "    };\n"
+                           "} // namespace MyNamespace\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies class/struct scopes emit trailing semicolons and optional base clauses correctly.
 TEST_F(CppSourceEmitterTest, TestClassAndStructWithoutBase)
 {
     CppSourceEmitter emitter;
@@ -137,25 +137,25 @@ TEST_F(CppSourceEmitterTest, TestClassAndStructWithoutBase)
         emitter.emitLine("int z{ 0 };");
     }
 
-    std::string expected =
-            "class StandaloneClass\n"
-            "{\n"
-            "    int x{ 0 };\n"
-            "};\n"
-            "\n"
-            "struct StandaloneStruct\n"
-            "{\n"
-            "    int y{ 0 };\n"
-            "};\n"
-            "\n"
-            "struct DerivedStruct : BaseStruct\n"
-            "{\n"
-            "    int z{ 0 };\n"
-            "};\n";
+    std::string expected = "class StandaloneClass\n"
+                           "{\n"
+                           "    int x{ 0 };\n"
+                           "};\n"
+                           "\n"
+                           "struct StandaloneStruct\n"
+                           "{\n"
+                           "    int y{ 0 };\n"
+                           "};\n"
+                           "\n"
+                           "struct DerivedStruct : BaseStruct\n"
+                           "{\n"
+                           "    int z{ 0 };\n"
+                           "};\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies scoped and legacy enums, with and without underlying types, render correctly.
 TEST_F(CppSourceEmitterTest, TestEnumDeclarations)
 {
     CppSourceEmitter emitter;
@@ -195,35 +195,35 @@ TEST_F(CppSourceEmitterTest, TestEnumDeclarations)
         emitter.emitLine("ValB");
     }
 
-    std::string expected =
-            "enum class Status : uint8_t\n"
-            "{\n"
-            "    Active = 1,\n"
-            "    Inactive = 2\n"
-            "};\n"
-            "\n"
-            "enum class Color\n"
-            "{\n"
-            "    Red,\n"
-            "    Green,\n"
-            "    Blue\n"
-            "};\n"
-            "\n"
-            "enum Flags : uint32_t\n"
-            "{\n"
-            "    FlagA = 0x1,\n"
-            "    FlagB = 0x2\n"
-            "};\n"
-            "\n"
-            "enum SimpleEnum\n"
-            "{\n"
-            "    ValA,\n"
-            "    ValB\n"
-            "};\n";
+    std::string expected = "enum class Status : uint8_t\n"
+                           "{\n"
+                           "    Active = 1,\n"
+                           "    Inactive = 2\n"
+                           "};\n"
+                           "\n"
+                           "enum class Color\n"
+                           "{\n"
+                           "    Red,\n"
+                           "    Green,\n"
+                           "    Blue\n"
+                           "};\n"
+                           "\n"
+                           "enum Flags : uint32_t\n"
+                           "{\n"
+                           "    FlagA = 0x1,\n"
+                           "    FlagB = 0x2\n"
+                           "};\n"
+                           "\n"
+                           "enum SimpleEnum\n"
+                           "{\n"
+                           "    ValA,\n"
+                           "    ValB\n"
+                           "};\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies ifdef/ifndef scopes emit matching #endif comments.
 TEST_F(CppSourceEmitterTest, TestPreprocessorConditionals)
 {
     CppSourceEmitter emitter;
@@ -240,18 +240,18 @@ TEST_F(CppSourceEmitterTest, TestPreprocessorConditionals)
         emitter.emitLine("void featureB();");
     }
 
-    std::string expected =
-            "#ifdef ENABLE_FEATURE_A\n"
-            "void featureA();\n"
-            "#endif // ENABLE_FEATURE_A\n"
-            "\n"
-            "#ifndef DISABLE_FEATURE_B\n"
-            "void featureB();\n"
-            "#endif // DISABLE_FEATURE_B\n";
+    std::string expected = "#ifdef ENABLE_FEATURE_A\n"
+                           "void featureA();\n"
+                           "#endif // ENABLE_FEATURE_A\n"
+                           "\n"
+                           "#ifndef DISABLE_FEATURE_B\n"
+                           "void featureB();\n"
+                           "#endif // DISABLE_FEATURE_B\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies named and anonymous enterBlock scopes emit the correct brace lines.
 TEST_F(CppSourceEmitterTest, TestEnterBlockWithAndWithoutPrefix)
 {
     CppSourceEmitter emitter;
@@ -268,15 +268,14 @@ TEST_F(CppSourceEmitterTest, TestEnterBlockWithAndWithoutPrefix)
         emitter.emitLine("anonymousScope();");
     }
 
-    std::string expected =
-            "if (condition)\n"
-            "{\n"
-            "    doSomething();\n"
-            "}\n"
-            "\n"
-            "{\n"
-            "    anonymousScope();\n"
-            "}\n";
+    std::string expected = "if (condition)\n"
+                           "{\n"
+                           "    doSomething();\n"
+                           "}\n"
+                           "\n"
+                           "{\n"
+                           "    anonymousScope();\n"
+                           "}\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
@@ -296,15 +295,15 @@ TEST_F(CppSourceEmitterTest, TestScopeExplicitClose)
         // Subsequent destructor execution should be a no-op
     }
 
-    std::string expected =
-            "void test() {\n"
-            "    return;\n"
-            "}\n";
+    std::string expected = "void test() {\n"
+                           "    return;\n"
+                           "}\n";
 
     EXPECT_EQ(emitter.str(), expected);
     EXPECT_EQ(emitter.getIndentLevel(), 0);
 }
 
+// Verifies move-constructing a scope transfers ownership without double-closing the block.
 TEST_F(CppSourceEmitterTest, TestScopeMoveConstruction)
 {
     CppSourceEmitter emitter;
@@ -318,17 +317,17 @@ TEST_F(CppSourceEmitterTest, TestScopeMoveConstruction)
         emitter.emitLine("step2();");
     }
 
-    std::string expected =
-            "while (true)\n"
-            "{\n"
-            "    step1();\n"
-            "    step2();\n"
-            "}\n";
+    std::string expected = "while (true)\n"
+                           "{\n"
+                           "    step1();\n"
+                           "    step2();\n"
+                           "}\n";
 
     EXPECT_EQ(emitter.str(), expected);
     EXPECT_EQ(emitter.getIndentLevel(), 0);
 }
 
+// Verifies move-assignment closes the target scope before taking over the source scope.
 TEST_F(CppSourceEmitterTest, TestScopeMoveAssignment)
 {
     CppSourceEmitter emitter;
@@ -344,15 +343,14 @@ TEST_F(CppSourceEmitterTest, TestScopeMoveAssignment)
         sc2 = std::move(sc1);
     }
 
-    std::string expected =
-            "if (a)\n"
-            "{\n"
-            "    actionA();\n"
-            "    if (b)\n"
-            "    {\n"
-            "        actionB();\n"
-            "    }\n"
-            "}\n";
+    std::string expected = "if (a)\n"
+                           "{\n"
+                           "    actionA();\n"
+                           "    if (b)\n"
+                           "    {\n"
+                           "        actionB();\n"
+                           "    }\n"
+                           "}\n";
 
     EXPECT_EQ(emitter.str(), expected);
     EXPECT_EQ(emitter.getIndentLevel(), 0);
@@ -374,10 +372,9 @@ TEST_F(CppSourceEmitterTest, TestBlankLineDeduplication)
     emitter.emitBlankLine();
     emitter.emitLine("line 2;");
 
-    std::string expected =
-            "line 1;\n"
-            "\n"
-            "line 2;\n";
+    std::string expected = "line 1;\n"
+                           "\n"
+                           "line 2;\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
@@ -392,23 +389,22 @@ TEST_F(CppSourceEmitterTest, TestMultilineUnixAndWindowsLineEndings)
     emitter.indent();
     emitter.emitLines("first line\nsecond line\r\nthird line\r\nfourth line");
 
-    std::string expected =
-            "    first line\n"
-            "    second line\n"
-            "    third line\n"
-            "    fourth line\n";
+    std::string expected = "    first line\n"
+                           "    second line\n"
+                           "    third line\n"
+                           "    fourth line\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies a trailing newline in multiline input does not add an extra blank line.
 TEST_F(CppSourceEmitterTest, TestMultilineTrailingNewline)
 {
     CppSourceEmitter emitter;
     emitter.emitLines("line 1\nline 2\n");
 
-    std::string expected =
-            "line 1\n"
-            "line 2\n";
+    std::string expected = "line 1\n"
+                           "line 2\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
@@ -431,14 +427,14 @@ TEST_F(CppSourceEmitterTest, TestFormattedAndPartialEmission)
     // Raw emission: should not prepend indentation
     emitter.emitRaw("#define RAW_MACRO 1\n");
 
-    std::string expected =
-            "    int value = 42;\n"
-            "    const char *name = \"EzPacker\";\n"
-            "#define RAW_MACRO 1\n";
+    std::string expected = "    int value = 42;\n"
+                           "    const char *name = \"EzPacker\";\n"
+                           "#define RAW_MACRO 1\n";
 
     EXPECT_EQ(emitter.str(), expected);
 }
 
+// Verifies empty emissions are ignored and emitLine("") delegates to a blank line.
 TEST_F(CppSourceEmitterTest, TestEmitEmptyStrings)
 {
     CppSourceEmitter emitter;

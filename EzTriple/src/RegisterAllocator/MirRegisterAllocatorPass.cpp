@@ -8,16 +8,25 @@
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 #include "Printer/MirPrinter.h"
 
+/**
+ * Caches the builder context, target allocator and result storage for this pass.
+ */
 MirRegisterAllocatorPass::MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
     m_ctx(ctx), m_regAllocator(targetDesc->getRegisterAllocator()), m_result(ctx->getGlobalAllocator()),
     m_targetDesc(targetDesc)
 {
 }
 
+/// Returns the diagnostic name of this pass.
 const char *MirRegisterAllocatorPass::getName() const { return "RegisterAllocatorPass"; }
 
+/// Runs once per function rather than once per module.
 MirPassIterationPlace MirRegisterAllocatorPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
+/**
+ * Builds and colors the interference graph for the function, iterating until no spills remain
+ * or the iteration cap is reached, then rewrites virtual registers to physical ones.
+ */
 MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunction>::const_iterator it,
                                             class MirPassManager *passManager)
 {
@@ -90,8 +99,12 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
     return { .m_modifiedMir = true, .m_executed = true, .m_succeeded = true };
 }
 
+/// Returns the per-function allocation results accumulated by run().
 const MirRegisterAllocatorPassResult &MirRegisterAllocatorPass::getResult() const { return m_result; }
 
+/**
+ * Releases every per-function allocator context and clears the result sets.
+ */
 void MirRegisterAllocatorPass::reset()
 {
     std::pmr::polymorphic_allocator<> alloc(m_ctx->getGlobalAllocator());
@@ -104,6 +117,9 @@ void MirRegisterAllocatorPass::reset()
     m_result.m_resolvedFunctions.clear();
 }
 
+/**
+ * Emits a debug dump of each function that completed register allocation.
+ */
 void MirRegisterAllocatorPass::printResult()
 {
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirRegisterAllocatorPass");
@@ -116,6 +132,7 @@ void MirRegisterAllocatorPass::printResult()
     }
 }
 
+/// Declares the analysis passes required before allocation (currently none).
 std::vector<std::type_index> MirRegisterAllocatorPass::getDependencies() const
 {
     // TODO: FIll with instruction selector pass.

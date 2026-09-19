@@ -17,9 +17,9 @@ namespace EzCompiler
 
 struct ResolvedTarget
 {
-    std::unique_ptr<TargetDesc> m_targetDesc;
-    CallingConvDesc *m_callingConv{ nullptr };
-    TargetBinaryDesc *m_binaryDesc{ nullptr };
+    std::unique_ptr<TargetDesc> m_targetDesc;  ///< Owning pointer to the selected target descriptor.
+    CallingConvDesc *m_callingConv{ nullptr }; ///< Non-owning calling convention from the target.
+    TargetBinaryDesc *m_binaryDesc{ nullptr }; ///< Non-owning binary descriptor from the target.
 };
 
 /**

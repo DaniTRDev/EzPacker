@@ -14,6 +14,7 @@
 
 using namespace EzTriple;
 
+// Verifies basic descriptor metadata, displacement type, RIP register id, and GPR class.
 TEST_F(EzTripleTestSuite, TestX86_64TargetDescInitialization)
 {
     X86_64TargetDesc target(getBuilderCtx());
@@ -35,6 +36,7 @@ TEST_F(EzTripleTestSuite, TestX86_64TargetDescInitialization)
     EXPECT_STREQ(gpr->getName(), "GPR64");
 }
 
+// Verifies the GPR and FPR banks expose their classes, register counts, and aliases.
 TEST_F(EzTripleTestSuite, TestX86_64RegisterBanksAndClasses)
 {
     X86_64TargetDesc target(getBuilderCtx());
@@ -51,24 +53,24 @@ TEST_F(EzTripleTestSuite, TestX86_64RegisterBanksAndClasses)
     MirRegisterClass *gpr64 = gprBank->getClass("GPR64");
     MirRegisterClass *gpr32 = gprBank->getClass("GPR32");
     MirRegisterClass *gpr16 = gprBank->getClass("GPR16");
-    MirRegisterClass *gpr8  = gprBank->getClass("GPR8");
+    MirRegisterClass *gpr8 = gprBank->getClass("GPR8");
 
     ASSERT_NE(gpr64, nullptr);
     ASSERT_NE(gpr32, nullptr);
     ASSERT_NE(gpr16, nullptr);
-    ASSERT_NE(gpr8,  nullptr);
+    ASSERT_NE(gpr8, nullptr);
 
     // Check register count in GPR bank (16 registers)
     EXPECT_EQ(gpr64->getRegs().size(), 16u);
     EXPECT_EQ(gpr32->getRegs().size(), 16u);
     EXPECT_EQ(gpr16->getRegs().size(), 16u);
-    EXPECT_EQ(gpr8->getRegs().size(),  16u);
+    EXPECT_EQ(gpr8->getRegs().size(), 16u);
 
     // Check register lookups
     EXPECT_NE(gpr64->getReg("rax"), nullptr);
     EXPECT_NE(gpr32->getReg("eax"), nullptr);
-    EXPECT_NE(gpr16->getReg("ax"),  nullptr);
-    EXPECT_NE(gpr8->getReg("al"),   nullptr);
+    EXPECT_NE(gpr16->getReg("ax"), nullptr);
+    EXPECT_NE(gpr8->getReg("al"), nullptr);
 
     EXPECT_NE(gpr64->getReg("rsp"), nullptr);
     EXPECT_NE(gpr64->getReg("rbp"), nullptr);
@@ -89,6 +91,7 @@ TEST_F(EzTripleTestSuite, TestX86_64RegisterBanksAndClasses)
     EXPECT_NE(fpr64->getReg("xmm15"), nullptr);
 }
 
+// Verifies the SysV and Win64 conventions with alignment, shadow space, and stack direction.
 TEST_F(EzTripleTestSuite, TestX86_64CallingConventions)
 {
     X86_64TargetDesc target(getBuilderCtx());
@@ -112,6 +115,7 @@ TEST_F(EzTripleTestSuite, TestX86_64CallingConventions)
     EXPECT_TRUE(win64->doesStackGrowsDownwards());
 }
 
+// Verifies all target subsystems, target instruction descriptors, and libcall mappings.
 TEST_F(EzTripleTestSuite, TestX86_64Subsystems)
 {
     X86_64TargetDesc target(getBuilderCtx());
@@ -141,6 +145,7 @@ TEST_F(EzTripleTestSuite, TestX86_64Subsystems)
     EXPECT_EQ(target.getLibcallStr(5), "__muldi3");
 }
 
+// Verifies the ELF and COFF binary descriptors and their standard sections.
 TEST_F(EzTripleTestSuite, TestX86_64BinaryDescriptors)
 {
     X86_64TargetDesc target(getBuilderCtx());
@@ -168,6 +173,7 @@ TEST_F(EzTripleTestSuite, TestX86_64BinaryDescriptors)
     EXPECT_NE(coff->getSection(SectionType::NonInitialized), nullptr);
 }
 
+// Verifies the emitter factory, register bank factory, and stable relocation resolver.
 TEST_F(EzTripleTestSuite, TestX86_64EmitterBankFactoryAndResolverSurface)
 {
     X86_64TargetDesc target(getBuilderCtx());

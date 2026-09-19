@@ -61,7 +61,8 @@ size_t MirRegisterRef::getId() const { return m_id; }
 void MirRegisterRef::setClass(MirRegisterClass *_class) { m_class = _class; }
 
 /**
- * Checks equality between two register references. Virtual registers match by ID; physical registers must also match class.
+ * Checks equality between two register references. Virtual registers match by ID; physical registers must also match
+ * class.
  */
 bool MirRegisterRef::operator==(const MirRegisterRef &other) const
 {

@@ -47,10 +47,8 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
      * Builds a memory address operand [base + displ] converting an immediate FlexInt displacement into a MirInteger.
      * Validates that the base register operand has pointer or integer type.
      */
-    class MirMemory *buildMem(class MirType *type,
-                              class MirRegister *base,
-                              const FlexInt &displ,
-                              class SourceReference *ref = nullptr);
+    class MirMemory *
+    buildMem(class MirType *type, class MirRegister *base, const FlexInt &displ, class SourceReference *ref = nullptr);
 
     /**
      * Builds a memory address operand [base + index*scale + displ] with an existing MirInteger displacement.
@@ -64,8 +62,8 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
                               class SourceReference *ref = nullptr);
 
     /**
-     * Builds a memory address operand [base + index*scale + displ] converting an immediate FlexInt displacement into a MirInteger.
-     * Validates that the base register operand has pointer or integer type.
+     * Builds a memory address operand [base + index*scale + displ] converting an immediate FlexInt displacement into a
+     * MirInteger. Validates that the base register operand has pointer or integer type.
      */
     class MirMemory *buildMem(class MirType *type,
                               class MirRegister *base,

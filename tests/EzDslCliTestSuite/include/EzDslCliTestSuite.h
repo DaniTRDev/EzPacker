@@ -101,15 +101,13 @@ class EzDslCliTestSuite
     /**
      * Helper to create a temporary file in a specified directory with given content.
      */
-    static std::filesystem::path createTempFile(const std::filesystem::path &dir,
-                                                const std::string &fileName,
-                                                const std::string &content);
+    static std::filesystem::path
+    createTempFile(const std::filesystem::path &dir, const std::string &fileName, const std::string &content);
 
     /**
      * Parses command line arguments using Cli::CommandLineParser without process spawning.
      */
-    static std::optional<Cli::CliOptions> parseArgs(const std::vector<std::string> &args,
-                                                    std::string &errorMessage);
+    static std::optional<Cli::CliOptions> parseArgs(const std::vector<std::string> &args, std::string &errorMessage);
 
     /**
      * Directly runs the Cli::Driver in-process with the provided options.

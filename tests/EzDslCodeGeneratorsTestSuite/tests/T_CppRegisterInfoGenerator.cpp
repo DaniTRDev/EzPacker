@@ -19,6 +19,7 @@ using namespace CodeGenerators;
 class CppRegisterInfoGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Parses a register definition and runs the register semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("gen_reg_{}.reg", m_sourceId++), source);
@@ -61,6 +62,7 @@ special {
     std::optional<DSL::Ast::RegisterDef::RegisterFile> m_ast;
 };
 
+// Generates flat register tables and verifies encodings, aliases, special regs, and count constants.
 TEST_F(CppRegisterInfoGeneratorTest, EmitsFlatTablesWithEncodingsAndAliases)
 {
     ASSERT_TRUE(parseAndRunPass(s_validRegisterFile));
@@ -100,6 +102,7 @@ TEST_F(CppRegisterInfoGeneratorTest, EmitsFlatTablesWithEncodingsAndAliases)
     EXPECT_NE(content.find("parent->addSubPart(child)"), std::string::npos);
 }
 
+// Verifies target names are sanitized for both the output file name and namespace.
 TEST_F(CppRegisterInfoGeneratorTest, SanitizesTargetNameForFileAndNamespace)
 {
     ASSERT_TRUE(parseAndRunPass(s_validRegisterFile));
@@ -114,6 +117,7 @@ TEST_F(CppRegisterInfoGeneratorTest, SanitizesTargetNameForFileAndNamespace)
     EXPECT_NE(content.find("namespace EzCodeEmitter::TableGen::x86_64"), std::string::npos);
 }
 
+// Verifies an empty symbol table still yields a valid header with zero counts.
 TEST_F(CppRegisterInfoGeneratorTest, EmitsValidEmptyHeaderForEmptySymbolTable)
 {
     CppRegisterInfoGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "Empty");
@@ -127,6 +131,7 @@ TEST_F(CppRegisterInfoGeneratorTest, EmitsValidEmptyHeaderForEmptySymbolTable)
     EXPECT_NE(content.find("SpecialRegInfo{ nullptr, 0 },"), std::string::npos);
 }
 
+// Verifies the convenience entry point preserves the timestamp on unchanged regeneration.
 TEST_F(CppRegisterInfoGeneratorTest, ConvenienceFunctionAndTimestampPreservation)
 {
     ASSERT_TRUE(parseAndRunPass(s_validRegisterFile));
@@ -144,6 +149,7 @@ TEST_F(CppRegisterInfoGeneratorTest, ConvenienceFunctionAndTimestampPreservation
     EXPECT_EQ(mtime1, mtime2);
 }
 
+// Verifies generation fails for a null collector/table or an empty output path.
 TEST_F(CppRegisterInfoGeneratorTest, FailsOnNullInputs)
 {
     CppRegisterInfoGenerator genNullCollector(nullptr, getSymbolTable(), m_testTempDir, "X86_64");

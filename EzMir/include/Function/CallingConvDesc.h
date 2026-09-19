@@ -57,7 +57,8 @@ class CallingConvDesc
     virtual bool canReturnInRegs(class MirType *type) const = 0;
 
     /**
-     * Returns true if the callee cleans up stack arguments (stdcall/thiscall), or false for caller-cleanup (cdecl/SysV).
+     * Returns true if the callee cleans up stack arguments (stdcall/thiscall), or false for caller-cleanup
+     * (cdecl/SysV).
      */
     virtual bool isCalleeCleanup() const = 0;
 

@@ -1,6 +1,7 @@
 #include "EzCodeEmitterTestSuite.h"
 #include <filesystem>
 
+// Allocates diagnostics, source manager, type table, and builder context before each test.
 void EzCodeEmitterTestSuite::SetUp()
 {
     m_diagCollector = std::make_unique<DiagnosticCollector>();
@@ -15,6 +16,7 @@ void EzCodeEmitterTestSuite::SetUp()
     m_diagCollector->enableDiag(Diag_Debug);
 }
 
+// Releases fixture-owned objects after each test.
 void EzCodeEmitterTestSuite::TearDown()
 {
     m_diagLogger.reset();

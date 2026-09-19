@@ -106,9 +106,9 @@ class MirBuilderContext
 
   private:
     class CallingConvDesc *m_defaultCallingConv; // Default calling convention used when building functions.
-    class DiagnosticCollector *m_diagCollector;
-    MirId m_currentId{ 0 };
-    class MirTypeTable *m_typeTable;
+    class DiagnosticCollector *m_diagCollector;  // Sink for errors/traces raised while building MIR.
+    MirId m_currentId{ 0 };                      // Next ID to hand out; advanced by createId().
+    class MirTypeTable *m_typeTable;             // Deduplicating table used to create/query MIR types.
 
     // Pools.
     std::pmr::monotonic_buffer_resource *m_globalResource;

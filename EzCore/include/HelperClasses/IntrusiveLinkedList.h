@@ -19,8 +19,8 @@ template <typename T> class IntrusiveLinkedList
     class iterator
     {
         friend class IntrusiveLinkedList;
-        T *m_node{ nullptr };
-        const IntrusiveLinkedList *m_list{ nullptr };
+        T *m_node{ nullptr };                         // Current node, or nullptr for the past-the-end sentinel.
+        const IntrusiveLinkedList *m_list{ nullptr }; // Owning list, needed to resolve --end().
 
       public:
         using iterator_category = std::bidirectional_iterator_tag;
@@ -29,11 +29,26 @@ template <typename T> class IntrusiveLinkedList
         using pointer = T **;
         using reference = T *&;
 
+        /**
+         * Creates the past-the-end sentinel iterator.
+         */
         iterator() = default;
+        /**
+         * Binds the iterator to a node and the list that owns it.
+         */
         iterator(T *node, const IntrusiveLinkedList *list) : m_node(node), m_list(list) {}
 
+        /**
+         * Dereferences to the underlying node pointer.
+         */
         T *operator*() const { return m_node; }
+        /**
+         * Member-access through the underlying node pointer.
+         */
         T *operator->() const { return m_node; }
+        /**
+         * Returns the raw node pointer held by the iterator.
+         */
         T *get() const { return m_node; }
 
         /**
@@ -78,15 +93,28 @@ template <typename T> class IntrusiveLinkedList
             return tmp;
         }
 
+        /**
+         * Equality compares the node positions, ignoring which list owns them.
+         */
         bool operator==(const iterator &other) const { return m_node == other.m_node; }
+        /**
+         * Inequality compares the node positions, ignoring which list owns them.
+         */
         bool operator!=(const iterator &other) const { return m_node != other.m_node; }
     };
 
-    using const_iterator = iterator;
-    using reverse_iterator = std::reverse_iterator<iterator>;
-    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+    using const_iterator = iterator; // Iteration never mutates nodes, so const and mutable iterators match.
+    using reverse_iterator = std::reverse_iterator<iterator>; // Reverse traversal built from the mutable iterator.
+    using const_reverse_iterator =
+            std::reverse_iterator<const_iterator>; // Reverse traversal built from the const iterator.
 
+    /**
+     * Creates an empty list.
+     */
     IntrusiveLinkedList() = default;
+    /**
+     * Destroys the list; nodes are owned externally and are not freed here.
+     */
     ~IntrusiveLinkedList() = default;
 
     IntrusiveLinkedList(const IntrusiveLinkedList &) = delete;
@@ -140,12 +168,30 @@ template <typename T> class IntrusiveLinkedList
      */
     const_iterator end() const { return const_iterator(nullptr, this); }
 
+    /**
+     * Returns a const iterator to the first node.
+     */
     const_iterator cbegin() const { return begin(); }
+    /**
+     * Returns a const past-the-end iterator.
+     */
     const_iterator cend() const { return end(); }
 
+    /**
+     * Returns a reverse iterator starting at the tail (i.e. before rend()).
+     */
     reverse_iterator rbegin() { return reverse_iterator(end()); }
+    /**
+     * Returns the reverse past-the-end iterator (before the head).
+     */
     reverse_iterator rend() { return reverse_iterator(begin()); }
+    /**
+     * Returns a const reverse iterator starting at the tail.
+     */
     const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
+    /**
+     * Returns the const reverse past-the-end iterator.
+     */
     const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
 
     /**
@@ -506,9 +552,9 @@ template <typename T> class IntrusiveLinkedList
     const_iterator to_iterator(const T *node) const { return const_iterator(const_cast<T *>(node), this); }
 
   private:
-    T *m_head{ nullptr };
-    T *m_tail{ nullptr };
-    size_t m_size{ 0 };
+    T *m_head{ nullptr }; // First node in the list, or nullptr when empty.
+    T *m_tail{ nullptr }; // Last node in the list, or nullptr when empty.
+    size_t m_size{ 0 };   // Cached element count kept in sync by link/unlink operations.
 };
 
 #endif // EZCORE_INTRUSIVE_LIST_H

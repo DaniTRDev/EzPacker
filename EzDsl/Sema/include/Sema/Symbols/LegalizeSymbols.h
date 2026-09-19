@@ -66,19 +66,25 @@ struct LegalizeActionSymbol
     std::pmr::vector<LegalizeActionClauseSymbol> m_clauses;
 };
 
+/**
+ * Semantic symbol for a resolved `when` predicate and its evaluated arguments (.lrd).
+ */
 struct LegalizeRulePredicateSymbol
 {
-    std::string_view m_name;
-    std::pmr::vector<std::variant<std::string_view, int64_t>> m_args;
+    std::string_view m_name;                                          // Predicate name.
+    std::pmr::vector<std::variant<std::string_view, int64_t>> m_args; // Resolved variable/int arguments.
 };
 
+/**
+ * Semantic symbol for one resolved operand of a rewrite rule instruction (.lrd).
+ */
 struct LegalizeRuleOperandSymbol
 {
-    DSL::Ast::LegalizeRuleDef::RuleOperandKind m_kind;
-    std::string_view m_name;
-    std::optional<SymbolId> m_typeOrClassId;
-    std::optional<int64_t> m_immLiteral;
-    std::pmr::vector<std::string_view> m_callArgs;
+    DSL::Ast::LegalizeRuleDef::RuleOperandKind m_kind; // Operand form.
+    std::string_view m_name;                           // Variable or transform name.
+    std::optional<SymbolId> m_typeOrClassId;           // Resolved type/class symbol, if any.
+    std::optional<int64_t> m_immLiteral;               // Immediate value for literal operands.
+    std::pmr::vector<std::string_view> m_callArgs;     // Resolved transform call arguments.
 };
 
 /**

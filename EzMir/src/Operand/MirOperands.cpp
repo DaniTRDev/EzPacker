@@ -115,12 +115,8 @@ std::string MirRegister::toString() const
 /**
  * Initializes a memory operand [base + index*scale + displ] with pointer type and source reference.
  */
-MirMemory::MirMemory(MirType *type,
-                     MirRegister *base,
-                     MirInteger *displ,
-                     MirRegister *index,
-                     uint8_t scale,
-                     SourceReference *ref) :
+MirMemory::MirMemory(
+        MirType *type, MirRegister *base, MirInteger *displ, MirRegister *index, uint8_t scale, SourceReference *ref) :
     MirOperand(type, ref), m_base(base), m_displ(displ), m_index(index), m_scale(scale)
 {
 }

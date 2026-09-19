@@ -14,6 +14,10 @@ namespace EzTriple
 class X86_64RelocationResolver : public TargetRelocationResolver
 {
   public:
+    /**
+     * Writes the PC-relative or absolute field described by reloc into the section bytes.
+     * @return True when the relocation kind is supported and patched.
+     */
     bool patch(std::span<uint8_t> text,
                const CodeRelocation &reloc,
                uint64_t targetOffset,

@@ -21,14 +21,21 @@
 namespace EzTriple
 {
 
+/**
+ * Records the builder context and sets up the PMR-backed bank/convention/binary registries.
+ */
 X86_64TargetDesc::X86_64TargetDesc(MirBuilderContext *ctx) :
-    m_ctx(ctx),
-    m_banks(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),
+    m_ctx(ctx), m_banks(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),
     m_convs(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),
     m_binaries(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource())
 {
 }
 
+/**
+ * Builds all x86-64 sub-components in dependency order: register banks/classes, calling
+ * conventions, target instruction table, legalizer, selector, allocator, frame lowerer and
+ * ELF/COFF binary descriptors.
+ */
 void X86_64TargetDesc::initialize()
 {
     if (!m_ctx)
@@ -49,12 +56,12 @@ void X86_64TargetDesc::initialize()
     m_gpr64 = classAlloc.new_object<MirRegisterClass>("GPR64", m_gprBank, alloc);
     m_gpr32 = classAlloc.new_object<MirRegisterClass>("GPR32", m_gprBank, alloc);
     m_gpr16 = classAlloc.new_object<MirRegisterClass>("GPR16", m_gprBank, alloc);
-    m_gpr8  = classAlloc.new_object<MirRegisterClass>("GPR8",  m_gprBank, alloc);
+    m_gpr8 = classAlloc.new_object<MirRegisterClass>("GPR8", m_gprBank, alloc);
 
     m_gprBank->addClass("GPR64", m_gpr64);
     m_gprBank->addClass("GPR32", m_gpr32);
     m_gprBank->addClass("GPR16", m_gpr16);
-    m_gprBank->addClass("GPR8",  m_gpr8);
+    m_gprBank->addClass("GPR8", m_gpr8);
 
     m_fpr64 = classAlloc.new_object<MirRegisterClass>("FPR64", m_fprBank, alloc);
     m_fpr32 = classAlloc.new_object<MirRegisterClass>("FPR32", m_fprBank, alloc);
@@ -78,16 +85,16 @@ void X86_64TargetDesc::initialize()
     };
 
     static constexpr GprDef s_gprs[] = {
-        { "rax", "eax", "ax", "al"  }, // 0
-        { "rcx", "ecx", "cx", "cl"  }, // 1
-        { "rdx", "edx", "dx", "dl"  }, // 2
-        { "rbx", "ebx", "bx", "bl"  }, // 3
-        { "rsp", "esp", "sp", "spl" }, // 4
-        { "rbp", "ebp", "bp", "bpl" }, // 5
-        { "rsi", "esi", "si", "sil" }, // 6
-        { "rdi", "edi", "di", "dil" }, // 7
-        { "r8",  "r8d", "r8w", "r8b" }, // 8
-        { "r9",  "r9d", "r9w", "r9b" }, // 9
+        { "rax", "eax", "ax", "al" },      // 0
+        { "rcx", "ecx", "cx", "cl" },      // 1
+        { "rdx", "edx", "dx", "dl" },      // 2
+        { "rbx", "ebx", "bx", "bl" },      // 3
+        { "rsp", "esp", "sp", "spl" },     // 4
+        { "rbp", "ebp", "bp", "bpl" },     // 5
+        { "rsi", "esi", "si", "sil" },     // 6
+        { "rdi", "edi", "di", "dil" },     // 7
+        { "r8", "r8d", "r8w", "r8b" },     // 8
+        { "r9", "r9d", "r9w", "r9b" },     // 9
         { "r10", "r10d", "r10w", "r10b" }, // 10
         { "r11", "r11d", "r11w", "r11b" }, // 11
         { "r12", "r12d", "r12w", "r12b" }, // 12
@@ -106,7 +113,7 @@ void X86_64TargetDesc::initialize()
 
     // 4. Register FPRs (xmm0..xmm15)
     static constexpr std::string_view s_xmms[] = {
-        "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
+        "xmm0", "xmm1", "xmm2",  "xmm3",  "xmm4",  "xmm5",  "xmm6",  "xmm7",
         "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
     };
     for (const auto &xmm : s_xmms)
@@ -150,80 +157,70 @@ void X86_64TargetDesc::initialize()
     m_binaries.push_back(m_coffBinary.get());
 }
 
-MirFrameLowerer *X86_64TargetDesc::getFrameLowerer()
-{
-    return m_frameLowerer.get();
-}
+/// Returns the x86-64 frame lowerer created by initialize().
+MirFrameLowerer *X86_64TargetDesc::getFrameLowerer() { return m_frameLowerer.get(); }
 
-MirInstructionSelector *X86_64TargetDesc::getInstructionSelector()
-{
-    return m_isel.get();
-}
+/// Returns the x86-64 instruction selector created by initialize().
+MirInstructionSelector *X86_64TargetDesc::getInstructionSelector() { return m_isel.get(); }
 
-MirAddressingModeMatcher *X86_64TargetDesc::getAddressingModeMatcher()
-{
-    return m_modeMatcher.get();
-}
+/// Returns the x86-64 addressing mode matcher created by initialize().
+MirAddressingModeMatcher *X86_64TargetDesc::getAddressingModeMatcher() { return m_modeMatcher.get(); }
 
-MirRegisterClass *X86_64TargetDesc::getGprClass()
-{
-    return m_gpr64;
-}
+/// Returns the 64-bit GPR class as the target's default integer register class.
+MirRegisterClass *X86_64TargetDesc::getGprClass() { return m_gpr64; }
 
-MirLegalizer *X86_64TargetDesc::getLegalizer()
-{
-    return m_legalizer.get();
-}
+/// Returns the generic MIR legalizer driven by the x86-64 legality table.
+MirLegalizer *X86_64TargetDesc::getLegalizer() { return m_legalizer.get(); }
 
-LegalizerInfo *X86_64TargetDesc::getLegalizerInfo()
-{
-    return m_legalizerInfo.get();
-}
+/// Returns the x86-64 table-driven legality definitions.
+LegalizerInfo *X86_64TargetDesc::getLegalizerInfo() { return m_legalizerInfo.get(); }
 
-MirRegisterAllocator *X86_64TargetDesc::getRegisterAllocator()
-{
-    return m_regAlloc.get();
-}
+/// Returns the x86-64 graph-coloring register allocator.
+MirRegisterAllocator *X86_64TargetDesc::getRegisterAllocator() { return m_regAlloc.get(); }
 
-MirType *X86_64TargetDesc::getMemOperandDisplacementType()
-{
-    return m_ctx ? m_ctx->getTypeTable()->i64() : nullptr;
-}
+/// Memory displacements are 64-bit integers on x86-64.
+MirType *X86_64TargetDesc::getMemOperandDisplacementType() { return m_ctx ? m_ctx->getTypeTable()->i64() : nullptr; }
 
+/// Returns a pseudo register reference for RIP, encoded as GPR64 slot 16.
 MirRegisterRef X86_64TargetDesc::getInstructionPtrReg() const
 {
     return MirRegisterRef(m_gpr64, 16); // rip pseudo-ref
 }
 
+/// Maps a legality-table libcall symbol id to the runtime symbol name it should call.
 std::string_view X86_64TargetDesc::getLibcallStr(uint8_t symId)
 {
     switch (symId)
     {
-        case 0: return "__returnNothing";
-        case 1: return "__divdi3";
-        case 2: return "__udivdi3";
-        case 3: return "__moddi3";
-        case 4: return "__umoddi3";
-        case 5: return "__muldi3";
-        default: return {};
+        case 0:
+            return "__returnNothing";
+        case 1:
+            return "__divdi3";
+        case 2:
+            return "__udivdi3";
+        case 3:
+            return "__moddi3";
+        case 4:
+            return "__umoddi3";
+        case 5:
+            return "__muldi3";
+        default:
+            return {};
     }
 }
 
-std::pmr::vector<TargetBinaryDesc *> X86_64TargetDesc::getAvailableBinaryDescriptors()
-{
-    return m_binaries;
-}
+/// Returns the ELF and COFF binary descriptors registered for x86-64.
+std::pmr::vector<TargetBinaryDesc *> X86_64TargetDesc::getAvailableBinaryDescriptors() { return m_binaries; }
 
-std::pmr::vector<CallingConvDesc *> X86_64TargetDesc::getAvailableCallingConventions()
-{
-    return m_convs;
-}
+/// Returns the System V and Win64 calling conventions registered for x86-64.
+std::pmr::vector<CallingConvDesc *> X86_64TargetDesc::getAvailableCallingConventions() { return m_convs; }
 
-std::pmr::vector<MirRegisterBank *> X86_64TargetDesc::getAvailableRegisterBanks()
-{
-    return m_banks;
-}
+/// Returns the GPR and FPR register banks registered for x86-64.
+std::pmr::vector<MirRegisterBank *> X86_64TargetDesc::getAvailableRegisterBanks() { return m_banks; }
 
+/**
+ * Allocates a new register bank from the global allocator and registers it for later lookup.
+ */
 MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)
 {
     if (!m_ctx || !name)
@@ -238,35 +235,44 @@ MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)
     return bank;
 }
 
+/**
+ * Creates the x86-64 code emitter and installs a resolver that maps an instruction's encoding id
+ * (falling back to its name) to the generated TableGen encoding description.
+ *
+ * Caller takes ownership of the returned emitter.
+ */
 GenericCodeEmitter *X86_64TargetDesc::createCodeEmitter()
 {
     auto *emitter = new EzCodeEmitter::X86_64::X86_64CodeEmitter();
     emitter->setEncodingResolver(
-        [this](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::TableGen::EncodingDesc *
-        {
-            if (!desc)
+            [this](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::TableGen::EncodingDesc *
             {
-                return nullptr;
-            }
-            if (const auto *enc = getEncodingDesc(desc->getEncodingId()))
-            {
-                return enc;
-            }
-            return findEncodingDesc(desc->getName());
-        });
+                if (!desc)
+                {
+                    return nullptr;
+                }
+                if (const auto *enc = getEncodingDesc(desc->getEncodingId()))
+                {
+                    return enc;
+                }
+                return findEncodingDesc(desc->getName());
+            });
     return emitter;
 }
 
+/// Looks up a generated x86-64 encoding description by table id.
 const EzCodeEmitter::TableGen::EncodingDesc *X86_64TargetDesc::getEncodingDesc(size_t id)
 {
     return EzCodeEmitter::TableGen::x86_64::getEncodingDesc(id);
 }
 
+/// Looks up a generated x86-64 encoding description by instruction name.
 const EzCodeEmitter::TableGen::EncodingDesc *X86_64TargetDesc::findEncodingDesc(const char *name)
 {
     return EzCodeEmitter::TableGen::x86_64::findEncodingDesc(name);
 }
 
+/// Lazily creates and returns the x86-64 relocation resolver.
 TargetRelocationResolver *X86_64TargetDesc::getRelocationResolver()
 {
     if (!m_relocResolver)

@@ -4,15 +4,23 @@
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 #include "Legalizer/MirLegalizer.h"
 
+/**
+ * Stores the shared context and target descriptor used to construct the legalizer.
+ */
 MirLegalizerPass::MirLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
     m_ctx(ctx), m_targetDesc(targetDesc)
 {
 }
 
+/// Returns the diagnostic name of this pass.
 const char *MirLegalizerPass::getName() const { return "MirLegalizerPass"; }
 
+/// Runs once per function rather than once per module.
 MirPassIterationPlace MirLegalizerPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
+/**
+ * Runs signature legalization followed by instruction legalization on the given function.
+ */
 MirPassResult MirLegalizerPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
     MirFunction *func = *it;

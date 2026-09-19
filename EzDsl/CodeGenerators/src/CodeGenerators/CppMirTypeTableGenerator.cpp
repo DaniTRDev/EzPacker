@@ -9,6 +9,7 @@ namespace CodeGenerators
 namespace
 {
 
+// Maps a DSL type kind to the generated MirTypeKind enumerator.
 std::string KindToEnumString(DSL::Ast::TypeDef::TypeKind kind)
 {
     switch (kind)
@@ -29,15 +30,16 @@ std::string KindToEnumString(DSL::Ast::TypeDef::TypeKind kind)
 
 } // namespace
 
+// Binds the generator to its diagnostics/symbols and records which artifacts may be emitted.
 CppMirTypeTableGenerator::CppMirTypeTableGenerator(DiagnosticCollector *collector,
                                                    SymbolTable *table,
                                                    std::filesystem::path outPath,
                                                    MirTypeTableGenWorkingMode mode) :
-    CodeGenerator("CodeGenerators::MirTypeTable", collector, table, std::move(outPath)),
-    m_mode(mode)
+    CodeGenerator("CodeGenerators::MirTypeTable", collector, table, std::move(outPath)), m_mode(mode)
 {
 }
 
+// Flattens every type symbol into a TypeEntry with derived field/getter names and compact id.
 std::vector<CppMirTypeTableGenerator::TypeEntry> CppMirTypeTableGenerator::collectTypes() const
 {
     std::vector<TypeEntry> collectedTypes;
@@ -73,6 +75,7 @@ std::vector<CppMirTypeTableGenerator::TypeEntry> CppMirTypeTableGenerator::colle
     return collectedTypes;
 }
 
+// Emits the generated MirTypeTable header: compact ids, accessors, fields and interning caches.
 void CppMirTypeTableGenerator::emitHeader(CppSourceEmitter &emitter, const std::vector<TypeEntry> &types) const
 {
     emitter.emitIncludeGuardStart("EZMIR_MIR_TYPE_TABLE_H");
@@ -91,6 +94,7 @@ void CppMirTypeTableGenerator::emitHeader(CppSourceEmitter &emitter, const std::
     emitter.emitInclude("vector", true);
     emitter.emitBlankLine();
 
+    // Pointer types are interned dynamically, so only non-pointer primitives get compact ids.
     size_t primitiveCount = 0;
     for (const auto &type : types)
     {
@@ -149,13 +153,15 @@ void CppMirTypeTableGenerator::emitHeader(CppSourceEmitter &emitter, const std::
         emitter.emitLine("                uint8_t compactId = CustomCompactId);");
         emitter.emitBlankLine();
 
-        emitter.emitDocComment("Creates a function type with the given parameters. Returns existing if previously created.");
+        emitter.emitDocComment(
+                "Creates a function type with the given parameters. Returns existing if previously created.");
         emitter.emitLine("MirType *getFuncType(MirType *returnType,");
         emitter.emitLine("                     const std::pmr::list<class MirRegister *> &parameters,");
         emitter.emitLine("                     const std::string_view &funcName);");
         emitter.emitBlankLine();
 
-        emitter.emitDocComment("Interns pointer types. Guarantees that getPtr(T) always returns the exact same type instance pointer.");
+        emitter.emitDocComment("Interns pointer types. Guarantees that getPtr(T) always returns the exact same type "
+                               "instance pointer.");
         emitter.emitLine("MirType *getPtr(MirType *srcType);");
         emitter.emitBlankLine();
 
@@ -171,11 +177,13 @@ void CppMirTypeTableGenerator::emitHeader(CppSourceEmitter &emitter, const std::
         emitter.emitLine("MirType *getIntegerTypeBySize(size_t sizeInBits) const;");
         emitter.emitBlankLine();
 
-        emitter.emitDocComment("Searches the table for the given ID and returns its type, if any. Returns nullptr if not created.");
+        emitter.emitDocComment(
+                "Searches the table for the given ID and returns its type, if any. Returns nullptr if not created.");
         emitter.emitLine("MirType *getMirTypeById(size_t id) const;");
         emitter.emitBlankLine();
 
-        emitter.emitDocComment("Fast O(1) array lookup using dense compact machine type IDs for legalization and ISel tables.");
+        emitter.emitDocComment(
+                "Fast O(1) array lookup using dense compact machine type IDs for legalization and ISel tables.");
         emitter.emitLine("MirType *getTypeByCompactId(uint8_t compactId) const;");
         emitter.emitBlankLine();
 
@@ -198,7 +206,8 @@ void CppMirTypeTableGenerator::emitHeader(CppSourceEmitter &emitter, const std::
         }
         emitter.emitBlankLine();
 
-        emitter.emitDocComment("Initializes the type table with the basic primitive types using the given pointer size.");
+        emitter.emitDocComment(
+                "Initializes the type table with the basic primitive types using the given pointer size.");
         emitter.emitLine("void initialize(size_t pointerBitWidth);");
         emitter.emitBlankLine();
 
@@ -238,6 +247,7 @@ void CppMirTypeTableGenerator::emitHeader(CppSourceEmitter &emitter, const std::
     emitter.emitIncludeGuardEnd("EZMIR_MIR_TYPE_TABLE_H");
 }
 
+// Emits the generated MirTypeTable method definitions and per-type accessor bodies.
 void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::vector<TypeEntry> &types) const
 {
     emitter.emitBanner("CppMirTypeTableGenerator");
@@ -261,6 +271,7 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
     }
     emitter.emitBlankLine();
 
+    // Interns a type by name, reusing any previously created instance with the same name.
     emitter.emitLine("MirType *MirTypeTable::create(MirTypeKind kind,");
     emitter.emitLine("                              size_t totalSizeInBits,");
     emitter.emitLine("                              size_t totalAlignmentInBits,");
@@ -313,6 +324,7 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
     }
     emitter.emitBlankLine();
 
+    // Function types are interned on a structural signature built from return and parameter names.
     emitter.emitLine("MirType *MirTypeTable::getFuncType(MirType *returnType,");
     emitter.emitLine("                                   const std::pmr::list<MirRegister *> &parameters,");
     emitter.emitLine("                                   const std::string_view &funcName)");
@@ -364,10 +376,12 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
         }
         emitter.emitBlankLine();
 
-        emitter.emitLine("return create(MirTypeKind::Function, m_pointerBitWidth, m_pointerBitWidth, std::move(subTypes), lookupKey, CustomCompactId);");
+        emitter.emitLine("return create(MirTypeKind::Function, m_pointerBitWidth, m_pointerBitWidth, "
+                         "std::move(subTypes), lookupKey, CustomCompactId);");
     }
     emitter.emitBlankLine();
 
+    // Pointer types are cached one-to-one per source type so the returned pointer is stable.
     emitter.emitLine("MirType *MirTypeTable::getPtr(MirType *srcType)");
     {
         auto fnScope = emitter.enterBlock();
@@ -392,7 +406,8 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
 
         emitter.emitLine("MirType *newPointerType =");
         emitter.indent();
-        emitter.emitLine("create(MirTypeKind::Pointer, m_pointerBitWidth, m_pointerBitWidth, std::move(childTarget), formattedName, CustomCompactId);");
+        emitter.emitLine("create(MirTypeKind::Pointer, m_pointerBitWidth, m_pointerBitWidth, std::move(childTarget), "
+                         "formattedName, CustomCompactId);");
         emitter.dedent();
         emitter.emitBlankLine();
 
@@ -401,6 +416,7 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
     }
     emitter.emitBlankLine();
 
+    // Arrays are interned by a name of the form Element[N].
     emitter.emitLine("MirType *MirTypeTable::getArray(MirType *elementType, size_t elementCount)");
     {
         auto fnScope = emitter.enterBlock();
@@ -428,10 +444,12 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
         emitter.emitLine("std::pmr::vector<MirType *> childType({ elementType }, m_arena);");
         emitter.emitBlankLine();
 
-        emitter.emitLine("return create(MirTypeKind::Array, totalSizeInBits, alignmentInBits, std::move(childType), lookupName, CustomCompactId);");
+        emitter.emitLine("return create(MirTypeKind::Array, totalSizeInBits, alignmentInBits, std::move(childType), "
+                         "lookupName, CustomCompactId);");
     }
     emitter.emitBlankLine();
 
+    // Scans all types for the smallest floating type whose width is at least sizeInBits.
     emitter.emitLine("MirType *MirTypeTable::getFloatingTypeBySize(size_t sizeInBits) const");
     {
         auto fnScope = emitter.enterBlock();
@@ -460,6 +478,7 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
     }
     emitter.emitBlankLine();
 
+    // Scans all types for the smallest integer type whose width is at least sizeInBits.
     emitter.emitLine("MirType *MirTypeTable::getIntegerTypeBySize(size_t sizeInBits) const");
     {
         auto fnScope = emitter.enterBlock();
@@ -520,6 +539,7 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
     }
     emitter.emitBlankLine();
 
+    // Materializes the declared primitive types into the table's fields.
     emitter.emitLine("void MirTypeTable::initialize(size_t pointerBitWidth)");
     {
         auto fnScope = emitter.enterBlock();
@@ -541,6 +561,7 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
     }
 }
 
+// Collects the type definitions and emits only the artifacts enabled by the working mode.
 bool CppMirTypeTableGenerator::run()
 {
     if (!validate())
@@ -553,6 +574,7 @@ bool CppMirTypeTableGenerator::run()
     auto collectedTypes = collectTypes();
     auto paths = resolveHeaderAndSourcePaths("MirTypeTable");
 
+    // The mode bitmask decides independently whether the header and/or source are written.
     if (m_mode & MirTypeTableGenWorkingMode::Header)
     {
         CppSourceEmitter headerEmitter;
@@ -577,6 +599,7 @@ bool CppMirTypeTableGenerator::run()
     return true;
 }
 
+// Convenience wrapper retained for callers that do not need to configure a generator object.
 bool GenerateMirTypeTable(DiagnosticCollector *collector,
                           SymbolTable *table,
                           std::filesystem::path outPath,

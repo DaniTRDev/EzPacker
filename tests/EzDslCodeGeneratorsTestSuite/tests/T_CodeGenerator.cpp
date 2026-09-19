@@ -16,10 +16,9 @@ class TestableCodeGenerator : public CodeGenerator
 {
   public:
     TestableCodeGenerator(std::string_view name,
-                           DiagnosticCollector *collector,
-                           SymbolTable *table,
-                           std::filesystem::path outPath) :
-        CodeGenerator(name, collector, table, std::move(outPath))
+                          DiagnosticCollector *collector,
+                          SymbolTable *table,
+                          std::filesystem::path outPath) : CodeGenerator(name, collector, table, std::move(outPath))
     {
     }
 
@@ -43,6 +42,9 @@ class TestableCodeGenerator : public CodeGenerator
     using CodeGenerator::writeOutput;
 };
 
+/**
+ * Fixture exposing the concrete TestableCodeGenerator to exercise CodeGenerator base-class helpers.
+ */
 class CodeGeneratorBaseTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
 };
@@ -66,6 +68,7 @@ TEST_F(CodeGeneratorBaseTest, TestValidationFailsOnNullPointers)
     EXPECT_TRUE(genValid.validate());
 }
 
+// Verifies the base-class accessors return the configured name, collector, symbol table, and path.
 TEST_F(CodeGeneratorBaseTest, TestAccessors)
 {
     TestableCodeGenerator gen("CustomGenerator", getDiagCollector(), getSymbolTable(), m_testTempDir);
@@ -96,6 +99,7 @@ TEST_F(CodeGeneratorBaseTest, TestSingleFilePathResolution)
     EXPECT_EQ(genFile.resolveSingleFilePath("Default.h"), explicitFile);
 }
 
+// Verifies header/source path pairing for directory, .h, .hpp, .cpp, and .cxx output paths.
 TEST_F(CodeGeneratorBaseTest, TestHeaderAndSourcePathsResolution)
 {
     // Case 1: Directory or extensionless output path
@@ -147,6 +151,7 @@ TEST_F(CodeGeneratorBaseTest, TestWriteFileIfChangedNewFileAndParentDirCreation)
     EXPECT_EQ(readFileContent(nestedFile), content);
 }
 
+// Verifies unchanged content preserves the timestamp while changed content updates content and mtime.
 TEST_F(CodeGeneratorBaseTest, TestWriteFileIfChangedPreservesMtime)
 {
     auto testFile = m_testTempDir / "mtime_file.txt";
@@ -174,6 +179,7 @@ TEST_F(CodeGeneratorBaseTest, TestWriteFileIfChangedPreservesMtime)
     EXPECT_EQ(readFileContent(testFile), content2);
 }
 
+// Verifies WriteFileIfChanged reports an error when a parent path component is an ordinary file.
 TEST_F(CodeGeneratorBaseTest, TestWriteFileIfChangedErrorOnInvalidPath)
 {
     // Create a regular file

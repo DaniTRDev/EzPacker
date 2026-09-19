@@ -39,6 +39,9 @@ bool MirInstruction::isSelected() const
  * Checks if the instruction treats its operands as signed quantities.
  */
 bool MirInstruction::isSigned() const { return getMetadata().m_flags & MirInstructionFlags::TreatAsSigned; }
+/**
+ * Returns true once the instruction has been unlinked from its owning block.
+ */
 bool MirInstruction::isErased() const { return m_owner == nullptr; }
 
 /**
@@ -66,6 +69,9 @@ MirInstruction *MirInstruction::getPrev() const { return m_prev; }
  */
 MirInstruction *MirInstruction::getNext() const { return m_next; }
 
+/**
+ * Returns the functional category of the instruction from its opcode metadata.
+ */
 MirInstructionCategory MirInstruction::getCategory() const { return getMetadata().m_category; }
 
 /**

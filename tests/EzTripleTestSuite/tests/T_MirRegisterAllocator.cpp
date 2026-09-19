@@ -18,9 +18,13 @@
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Fixture for interference-graph construction, coloring, spilling, and the register allocator pass.
+ */
 class MirRegisterAllocatorTest : public EzTripleTestSuite
 {
   protected:
+    // Resets the mock register allocator counters before each test.
     void SetUp() override
     {
         EzTripleTestSuite::SetUp();
@@ -91,6 +95,7 @@ TEST_F(MirRegisterAllocatorTest, TestInterferenceGraphNonOverlapping)
     EXPECT_FALSE(it1->second.contains(v0->getRef()));
 }
 
+// Verifies simultaneously live virtual registers interfere symmetrically.
 TEST_F(MirRegisterAllocatorTest, TestInterferenceGraphOverlapping)
 {
     auto *ctx = getBuilderCtx();
@@ -310,7 +315,7 @@ TEST_F(MirRegisterAllocatorTest, TestRewriteColorsInMir)
             {
                 auto *reg = op->get<MirRegister>();
                 EXPECT_TRUE(reg->getRef().isPhysical())
-                    << "Instruction " << inst->getOpCodeName() << " operand register is still virtual!";
+                        << "Instruction " << inst->getOpCodeName() << " operand register is still virtual!";
             }
         }
     }

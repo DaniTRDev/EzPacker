@@ -2,6 +2,9 @@
 
 using namespace Cli;
 
+/**
+ * Fixture for exercising the EzDslCli command-line parser.
+ */
 class CommandLineParserTest : public EzDslCliTestSuiteAsGtest
 {
 };
@@ -24,6 +27,7 @@ TEST_F(CommandLineParserTest, MissingInputFails)
     EXPECT_TRUE(err.find("Missing required input file") != std::string::npos);
 }
 
+// Verifies -i/-o parse and leave all optional flags at their defaults.
 TEST_F(CommandLineParserTest, BasicInputAndOutputShortFlags)
 {
     std::string err;
@@ -42,6 +46,7 @@ TEST_F(CommandLineParserTest, BasicInputAndOutputShortFlags)
     EXPECT_EQ(opts->format, OutputFormat::Text);
 }
 
+// Verifies the long-form --input/--output flags parse.
 TEST_F(CommandLineParserTest, BasicInputAndOutputLongFlags)
 {
     std::string err;
@@ -51,6 +56,7 @@ TEST_F(CommandLineParserTest, BasicInputAndOutputLongFlags)
     EXPECT_EQ(opts->outputPath, "custom/bin");
 }
 
+// Verifies the output path defaults to the current directory when omitted.
 TEST_F(CommandLineParserTest, DefaultOutputPathIsCurrentDirectory)
 {
     std::string err;
@@ -86,6 +92,7 @@ TEST_F(CommandLineParserTest, EmitTypeTableFlag)
     EXPECT_EQ(opts->generator, GeneratorKind::TypeTable);
 }
 
+// Verifies --emit-instructions selects the instructions generator.
 TEST_F(CommandLineParserTest, EmitInstructionsFlag)
 {
     std::string err;
@@ -94,6 +101,7 @@ TEST_F(CommandLineParserTest, EmitInstructionsFlag)
     EXPECT_EQ(opts->generator, GeneratorKind::Instructions);
 }
 
+// Verifies --generator accepts type-table spellings and case variants.
 TEST_F(CommandLineParserTest, ExplicitGeneratorFlagTypeTable)
 {
     std::string err;
@@ -110,6 +118,7 @@ TEST_F(CommandLineParserTest, ExplicitGeneratorFlagTypeTable)
     EXPECT_EQ(opts3->generator, GeneratorKind::TypeTable);
 }
 
+// Verifies --generator accepts instructions/instruction spellings.
 TEST_F(CommandLineParserTest, ExplicitGeneratorFlagInstructions)
 {
     std::string err;
@@ -122,6 +131,7 @@ TEST_F(CommandLineParserTest, ExplicitGeneratorFlagInstructions)
     EXPECT_EQ(opts2->generator, GeneratorKind::Instructions);
 }
 
+// Verifies --generator auto selects automatic dialect/generator detection.
 TEST_F(CommandLineParserTest, ExplicitGeneratorFlagAuto)
 {
     std::string err;
@@ -130,6 +140,7 @@ TEST_F(CommandLineParserTest, ExplicitGeneratorFlagAuto)
     EXPECT_EQ(opts->generator, GeneratorKind::Auto);
 }
 
+// Verifies --emit-target-instructions selects the target-instructions generator.
 TEST_F(CommandLineParserTest, EmitTargetInstructionsFlag)
 {
     std::string err;
@@ -138,6 +149,7 @@ TEST_F(CommandLineParserTest, EmitTargetInstructionsFlag)
     EXPECT_EQ(opts->generator, GeneratorKind::TargetInstructions);
 }
 
+// Verifies --emit-instruction-selector selects the instruction-selector generator.
 TEST_F(CommandLineParserTest, EmitInstructionSelectorFlag)
 {
     std::string err;
@@ -146,6 +158,7 @@ TEST_F(CommandLineParserTest, EmitInstructionSelectorFlag)
     EXPECT_EQ(opts->generator, GeneratorKind::InstructionSelector);
 }
 
+// Verifies --generator accepts target-instruction spellings and abbreviations.
 TEST_F(CommandLineParserTest, ExplicitGeneratorFlagTargetInstructions)
 {
     std::string err;
@@ -162,6 +175,7 @@ TEST_F(CommandLineParserTest, ExplicitGeneratorFlagTargetInstructions)
     EXPECT_EQ(opts3->generator, GeneratorKind::TargetInstructions);
 }
 
+// Verifies --generator accepts instruction-selector spellings and the isel abbreviation.
 TEST_F(CommandLineParserTest, ExplicitGeneratorFlagInstructionSelector)
 {
     std::string err;
@@ -178,6 +192,7 @@ TEST_F(CommandLineParserTest, ExplicitGeneratorFlagInstructionSelector)
     EXPECT_EQ(opts3->generator, GeneratorKind::InstructionSelector);
 }
 
+// Verifies --emit-calling-conv selects the calling-convention generator.
 TEST_F(CommandLineParserTest, EmitCallingConvFlag)
 {
     std::string err;
@@ -186,6 +201,7 @@ TEST_F(CommandLineParserTest, EmitCallingConvFlag)
     EXPECT_EQ(opts->generator, GeneratorKind::CallingConv);
 }
 
+// Verifies --generator accepts calling-convention spellings and the cc abbreviation.
 TEST_F(CommandLineParserTest, ExplicitGeneratorFlagCallingConv)
 {
     std::string err;
@@ -202,16 +218,19 @@ TEST_F(CommandLineParserTest, ExplicitGeneratorFlagCallingConv)
     EXPECT_EQ(opts3->generator, GeneratorKind::CallingConv);
 }
 
+// Verifies specifying multiple emission flags is rejected with an explanatory error.
 TEST_F(CommandLineParserTest, ConflictingGeneratorsFail)
 {
     std::string err;
     auto opts = parseArgs({ "-i", "types.tyf", "--emit-type-table", "--emit-instructions" }, err);
     EXPECT_FALSE(opts.has_value());
     EXPECT_TRUE(err.find("Cannot specify multiple generator emission flags") != std::string::npos ||
-                err.find("Cannot specify both --emit-type-table and --emit-instructions simultaneously.") != std::string::npos);
+                err.find("Cannot specify both --emit-type-table and --emit-instructions simultaneously.") !=
+                        std::string::npos);
 
     err.clear();
-    auto opts2 = parseArgs({ "-i", "instructions.idf", "--emit-target-instructions", "--emit-instruction-selector" }, err);
+    auto opts2 =
+            parseArgs({ "-i", "instructions.idf", "--emit-target-instructions", "--emit-instruction-selector" }, err);
     EXPECT_FALSE(opts2.has_value());
     EXPECT_TRUE(err.find("Cannot specify multiple generator emission flags") != std::string::npos);
 }
@@ -234,6 +253,7 @@ TEST_F(CommandLineParserTest, HeaderOnlyAndSourceOnlyFlags)
     EXPECT_TRUE(optsS->sourceOnly);
 }
 
+// Verifies --check-only and --dry-run set their respective mode flags.
 TEST_F(CommandLineParserTest, CheckOnlyAndDryRunFlags)
 {
     std::string err;
@@ -246,6 +266,7 @@ TEST_F(CommandLineParserTest, CheckOnlyAndDryRunFlags)
     EXPECT_TRUE(optsDry->dryRun);
 }
 
+// Verifies short and long forms of the verbose and quiet flags.
 TEST_F(CommandLineParserTest, VerboseAndQuietFlags)
 {
     std::string err;
@@ -281,6 +302,7 @@ TEST_F(CommandLineParserTest, DumpFlags)
     EXPECT_TRUE(opts->dumpFiles);
 }
 
+// Verifies --format parses text/JSON values case-insensitively.
 TEST_F(CommandLineParserTest, FormatFlagTextAndJson)
 {
     std::string err;
@@ -309,6 +331,7 @@ TEST_F(CommandLineParserTest, VersionFlagReturnsNulloptWithoutError)
     EXPECT_TRUE(err.empty());
 }
 
+// Verifies the version and help strings include the program name and key flags.
 TEST_F(CommandLineParserTest, VersionAndHelpStrings)
 {
     CommandLineParser parser;
@@ -321,6 +344,7 @@ TEST_F(CommandLineParserTest, VersionAndHelpStrings)
     EXPECT_TRUE(help.find("--emit-instructions") != std::string::npos);
 }
 
+// Verifies an unrecognized argument is rejected with a non-empty error.
 TEST_F(CommandLineParserTest, UnknownArgumentFails)
 {
     std::string err;

@@ -11,9 +11,13 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating target instruction tables from target-instruction (.idf) sources.
+ */
 class CppTargetInstructionGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Parses target-instruction source and runs the target-instruction semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff("target_test", source);
@@ -27,6 +31,7 @@ class CppTargetInstructionGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsG
     }
 };
 
+// Generates a target instruction table and verifies the opcode enum, descriptor array, flags, and initializer.
 TEST_F(CppTargetInstructionGeneratorTest, TestTargetInstructionTableGeneration)
 {
     std::string idfSource = R"(

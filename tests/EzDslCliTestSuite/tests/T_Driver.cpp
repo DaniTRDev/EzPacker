@@ -5,6 +5,9 @@
 
 using namespace Cli;
 
+/**
+ * Fixture for exercising the EzDslCli driver end to end with temporary source files.
+ */
 class DriverTest : public EzDslCliTestSuiteAsGtest
 {
 };
@@ -23,6 +26,7 @@ TEST_F(DriverTest, MissingInputFileReturnsError)
     EXPECT_TRUE(result.errorMessage.find("does not exist") != std::string::npos);
 }
 
+// Verifies an unknown file extension with no explicit generator fails dialect detection.
 TEST_F(DriverTest, UnknownExtensionWithoutGeneratorReturnsError)
 {
     auto tempFile = createTempFile(m_testTempDir, "unknown.xyz", "integer i32(32);");
@@ -55,6 +59,7 @@ TEST_F(DriverTest, ExplicitGeneratorOverridesUnknownExtension)
     EXPECT_TRUE(std::filesystem::exists(m_testTempDir / "MirTypeTable.cpp"));
 }
 
+// Verifies an explicit instructions generator works despite an unknown extension.
 TEST_F(DriverTest, ExplicitInstructionsGeneratorOverridesUnknownExtension)
 {
     std::string irCode = R"(
@@ -94,6 +99,7 @@ TEST_F(DriverTest, CheckOnlyModeDoesNotProduceFiles)
     EXPECT_FALSE(std::filesystem::exists(m_testTempDir / "MirTypeTable.cpp"));
 }
 
+// Verifies --dry-run runs the pipeline but writes no output files.
 TEST_F(DriverTest, DryRunModeDoesNotProduceFiles)
 {
     auto tempFile = createTempFile(m_testTempDir, "types.tyf", "integer i32(32); float f64(64);");
@@ -130,6 +136,7 @@ TEST_F(DriverTest, HeaderOnlyModeGeneratesOnlyHeader)
     EXPECT_EQ(result.generatedFiles[0].role, "header");
 }
 
+// Verifies source-only mode emits just the source and reports a single source artifact.
 TEST_F(DriverTest, SourceOnlyModeGeneratesOnlySource)
 {
     auto tempFile = createTempFile(m_testTempDir, "types.tyf", "integer i16(16);");
@@ -206,6 +213,7 @@ TEST_F(DriverTest, SyntaxErrorFailsDriver)
     EXPECT_TRUE(result.errorMessage.find("Syntax parsing failed") != std::string::npos);
 }
 
+// Verifies a semantic error (duplicate type) aborts the driver with a semantic failure message.
 TEST_F(DriverTest, SemanticErrorFailsDriver)
 {
     // Duplicate type definition fails semantic analysis
@@ -311,6 +319,7 @@ TEST_F(DriverTest, CallingConvDriverExecution)
     EXPECT_TRUE(std::filesystem::exists(m_testTempDir / "Win64CallingConvDesc.cpp"));
 }
 
+// Verifies an invalid stack alignment aborts calling-convention generation.
 TEST_F(DriverTest, CallingConvDriverSemanticErrorFails)
 {
     std::string ccBadSource = R"(

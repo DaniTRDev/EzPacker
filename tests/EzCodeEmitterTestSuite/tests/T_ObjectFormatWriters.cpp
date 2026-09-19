@@ -6,6 +6,7 @@
 using namespace EzCodeEmitter;
 using namespace EzCodeEmitter::ObjectFormat;
 
+// Serializes text/rodata sections plus symbols and relocations into an ELF64 object and validates the header fields.
 TEST_F(EzCodeEmitterTestSuite, TestElf64ObjectWriter)
 {
     std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
@@ -27,33 +28,27 @@ TEST_F(EzCodeEmitterTestSuite, TestElf64ObjectWriter)
     rodataSec->finalize();
 
     Elf64Writer elfWriter;
-    ObjectSymbol symMain{
-        .m_name = "main",
-        .m_section = SectionType::Text,
-        .m_offset = 0,
-        .m_size = 6,
-        .m_isGlobal = true,
-        .m_isFunction = true
-    };
+    ObjectSymbol symMain{ .m_name = "main",
+                          .m_section = SectionType::Text,
+                          .m_offset = 0,
+                          .m_size = 6,
+                          .m_isGlobal = true,
+                          .m_isFunction = true };
     elfWriter.addSymbol(symMain);
 
-    ObjectSymbol symStr{
-        .m_name = "hello_str",
-        .m_section = SectionType::ReadOnly,
-        .m_offset = 0,
-        .m_size = std::strlen(helloStr) + 1,
-        .m_isGlobal = false,
-        .m_isFunction = false
-    };
+    ObjectSymbol symStr{ .m_name = "hello_str",
+                         .m_section = SectionType::ReadOnly,
+                         .m_offset = 0,
+                         .m_size = std::strlen(helloStr) + 1,
+                         .m_isGlobal = false,
+                         .m_isFunction = false };
     elfWriter.addSymbol(symStr);
 
-    ObjectRelocEntry reloc{
-        .m_section = SectionType::Text,
-        .m_offset = 1, // Offset of imm32 in mov
-        .m_symbolName = "hello_str",
-        .m_type = TargetCodeRelocationType::PCRel32,
-        .m_addend = -4
-    };
+    ObjectRelocEntry reloc{ .m_section = SectionType::Text,
+                            .m_offset = 1, // Offset of imm32 in mov
+                            .m_symbolName = "hello_str",
+                            .m_type = TargetCodeRelocationType::PCRel32,
+                            .m_addend = -4 };
     elfWriter.addRelocation(reloc);
 
     std::vector<uint8_t> elfBytes = elfWriter.write(sections);
@@ -96,6 +91,7 @@ TEST_F(EzCodeEmitterTestSuite, TestElf64ObjectWriter)
     EXPECT_GE(e_shnum, 6u); // NULL, .text, .rodata, .symtab, .strtab, .shstrtab, .rela.text
 }
 
+// Serializes text/data sections plus symbols and relocations into a COFF object and validates the header fields.
 TEST_F(EzCodeEmitterTestSuite, TestCoffObjectWriter)
 {
     std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
@@ -116,33 +112,27 @@ TEST_F(EzCodeEmitterTestSuite, TestCoffObjectWriter)
     dataSec->finalize();
 
     CoffWriter coffWriter;
-    ObjectSymbol symFunc{
-        .m_name = "my_function_with_long_name",
-        .m_section = SectionType::Text,
-        .m_offset = 0,
-        .m_size = 6,
-        .m_isGlobal = true,
-        .m_isFunction = true
-    };
+    ObjectSymbol symFunc{ .m_name = "my_function_with_long_name",
+                          .m_section = SectionType::Text,
+                          .m_offset = 0,
+                          .m_size = 6,
+                          .m_isGlobal = true,
+                          .m_isFunction = true };
     coffWriter.addSymbol(symFunc);
 
-    ObjectSymbol symData{
-        .m_name = "global_var",
-        .m_section = SectionType::Data,
-        .m_offset = 0,
-        .m_size = 4,
-        .m_isGlobal = true,
-        .m_isFunction = false
-    };
+    ObjectSymbol symData{ .m_name = "global_var",
+                          .m_section = SectionType::Data,
+                          .m_offset = 0,
+                          .m_size = 4,
+                          .m_isGlobal = true,
+                          .m_isFunction = false };
     coffWriter.addSymbol(symData);
 
-    ObjectRelocEntry reloc{
-        .m_section = SectionType::Text,
-        .m_offset = 1,
-        .m_symbolName = "global_var",
-        .m_type = TargetCodeRelocationType::PCRel32,
-        .m_addend = 0
-    };
+    ObjectRelocEntry reloc{ .m_section = SectionType::Text,
+                            .m_offset = 1,
+                            .m_symbolName = "global_var",
+                            .m_type = TargetCodeRelocationType::PCRel32,
+                            .m_addend = 0 };
     coffWriter.addRelocation(reloc);
 
     std::vector<uint8_t> coffBytes = coffWriter.write(sections);

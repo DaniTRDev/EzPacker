@@ -38,6 +38,9 @@ class LegalizeRulePass
                             class SymbolTable *table,
                             const DSL::Ast::LegalizeRuleDef::LegalizeRule &rule);
 
+    /**
+     * Validates a single `when` predicate, resolving its variable arguments against the scope.
+     */
     static bool processPredicate(DiagnosticCollector *collector,
                                  SymbolTable *table,
                                  const DSL::Ast::LegalizeRuleDef::RuleWhen &predicate,

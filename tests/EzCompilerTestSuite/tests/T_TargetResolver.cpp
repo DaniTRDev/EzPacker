@@ -2,6 +2,7 @@
 
 using namespace EzCompiler;
 
+// Verifies parsing 4-component, 2-component, and host triples into arch/vendor/sys/abi with derived predicates.
 TEST_F(EzCompilerTestSuite, TestTargetTripleParsing)
 {
     // 4 components
@@ -42,6 +43,8 @@ TEST_F(EzCompilerTestSuite, TestTargetTripleParsing)
     EXPECT_TRUE(host.isX86_64());
 }
 
+// Verifies resolving Linux and Windows triples selects the expected target descriptor, calling convention, and binary
+// descriptor.
 TEST_F(EzCompilerTestSuite, TestTargetResolverResolution)
 {
     CommandLineOptions optLinux;

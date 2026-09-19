@@ -8,10 +8,13 @@
 namespace Symbols
 {
 
+/**
+ * Semantic symbol for a validated calling convention declaration (.ezcc / .ccd).
+ */
 struct CallingConvSymbol
 {
-    std::string_view m_name;
-    const DSL::Ast::CallingConvDef::CallingConventionDecl *m_astNode{ nullptr };
+    std::string_view m_name;                                                     // Convention name.
+    const DSL::Ast::CallingConvDef::CallingConventionDecl *m_astNode{ nullptr }; // Backing AST declaration.
 };
 
 } // namespace Symbols

@@ -23,6 +23,10 @@ namespace EzMir
 namespace
 {
 
+/**
+ * Builds an integer operand from a raw literal value at the destination type's width, translating
+ * FlexInt overflow/errors into a parser diagnostic and a recorded parse error.
+ */
 MirInteger *buildIntSafe(MirOperandBuilder &opBuilder,
                          MirType *type,
                          int64_t rawVal,
@@ -37,9 +41,7 @@ MirInteger *buildIntSafe(MirOperandBuilder &opBuilder,
     size_t bitWidth = type->getTotalSizeInBits();
     try
     {
-        FlexInt val = (rawVal >= 0)
-                          ? FlexInt(static_cast<uint64_t>(rawVal), bitWidth)
-                          : FlexInt(rawVal, bitWidth);
+        FlexInt val = (rawVal >= 0) ? FlexInt(static_cast<uint64_t>(rawVal), bitWidth) : FlexInt(rawVal, bitWidth);
         return opBuilder.buildInt(type, val, ref);
     }
     catch (const std::exception &ex)
@@ -55,13 +57,17 @@ MirInteger *buildIntSafe(MirOperandBuilder &opBuilder,
 
 } // anonymous namespace
 
+/**
+ * Creates the parser, defaulting the diagnostic collector to the builder context's collector.
+ */
 MirParser::MirParser(MirBuilderContext *ctx, DiagnosticCollector *diagCollector, MirParserOptions options) :
-    m_ctx(ctx),
-    m_diag(diagCollector ? diagCollector : (ctx ? ctx->getDiagCollector() : nullptr)),
-    m_options(options)
+    m_ctx(ctx), m_diag(diagCollector ? diagCollector : (ctx ? ctx->getDiagCollector() : nullptr)), m_options(options)
 {
 }
 
+/**
+ * Requires the next token to be of the given kind; on mismatch reports errorMsg and returns false.
+ */
 bool MirParser::matchToken(Parser::MirLexer &lexer, Parser::MirTokenKind kind, std::string_view errorMsg)
 {
     const auto &tok = lexer.peekToken();
@@ -77,6 +83,10 @@ bool MirParser::matchToken(Parser::MirLexer &lexer, Parser::MirTokenKind kind, s
     return true;
 }
 
+/**
+ * Parses a type expression into its AST form: "ptr[<type>]", "[N x type]", "void", "token",
+ * primitive iN/fN types and bare identifier type names.
+ */
 Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserContext &pCtx)
 {
     const auto &tok = lexer.peekToken();
@@ -191,6 +201,11 @@ Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserConte
     return nullptr;
 }
 
+/**
+ * Parses an optional constant initializer, accepting integer/float/string literals, bracketed array
+ * constants, and zero-initializer spellings (with an optional type prefix consumed first). Returns
+ * nullopt when the next token does not begin an initializer.
+ */
 std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirLexer &lexer, MirParserContext &pCtx)
 {
     // Optional type prefix: e.g. i64 100, f32 1.5
@@ -260,8 +275,7 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
     }
 
     // Zero-initializer identifier or <zeroinit>
-    if (tok.m_kind == Parser::MirTokenKind::Identifier &&
-        (tok.m_text == "zeroinitializer" || tok.m_text == "zeroinit"))
+    if (tok.m_kind == Parser::MirTokenKind::Identifier && (tok.m_text == "zeroinitializer" || tok.m_text == "zeroinit"))
     {
         lexer.nextToken();
         Ast::MirAstConstantInit init(mr);
@@ -284,6 +298,9 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
     return std::nullopt;
 }
 
+/**
+ * Parses a target directive (target = triple;) and stores it on the module.
+ */
 bool MirParser::parseTargetDirective(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module)
 {
     lexer.nextToken(); // Consume 'target'
@@ -315,6 +332,10 @@ bool MirParser::parseTargetDirective(Parser::MirLexer &lexer, MirParserContext &
     return true;
 }
 
+/**
+ * Parses a global variable declaration (@name = [linkage] [const|var] type [= init];), builds the
+ * MirGlobalVar, registers it in the context and the parser symbol table.
+ */
 bool MirParser::parseGlobalVarDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule & /*module*/)
 {
     const auto nameTok = lexer.nextToken(); // Consume GlobalName (@...)
@@ -414,8 +435,7 @@ bool MirParser::parseGlobalVarDecl(Parser::MirLexer &lexer, MirParserContext &pC
         {
             try
             {
-                gvBuilder.setInitializer(
-                    opBuilder.buildFloat(type, FlexFloat(initOpt->m_floatVal), initOpt->m_ref));
+                gvBuilder.setInitializer(opBuilder.buildFloat(type, FlexFloat(initOpt->m_floatVal), initOpt->m_ref));
             }
             catch (const std::exception &ex)
             {
@@ -437,6 +457,10 @@ bool MirParser::parseGlobalVarDecl(Parser::MirLexer &lexer, MirParserContext &pC
     return true;
 }
 
+/**
+ * Parses a function prototype (declare @name(params) -> ret;), building a MirFunction with no body
+ * and registering it in the parser symbol table.
+ */
 bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule & /*module*/)
 {
     lexer.nextToken(); // Consume 'declare'
@@ -510,6 +534,10 @@ bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCt
     return true;
 }
 
+/**
+ * Parses a function definition (fn @name(params) -> ret [attrs] { blocks }): builds the function
+ * and its parameter registers, enters its scope and parses each basic block until the closing brace.
+ */
 bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule & /*module*/)
 {
     const auto fnTok = lexer.nextToken(); // Consume 'fn'
@@ -633,6 +661,10 @@ bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx
     return true;
 }
 
+/**
+ * Parses one labeled basic block (label: instructions...) by declaring/reusing the block and
+ * parsing instruction statements until the next label, the function's closing brace or EOF.
+ */
 bool MirParser::parseBasicBlock(Parser::MirLexer &lexer, MirParserContext &pCtx, MirFunction *func)
 {
     const auto labelTok = lexer.nextToken();
@@ -774,9 +806,12 @@ bool MirParser::parseBasicBlock(Parser::MirLexer &lexer, MirParserContext &pCtx,
     return true;
 }
 
-MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer,
-                                                     MirParserContext &pCtx,
-                                                     MirBlock *block)
+/**
+ * Parses a single instruction statement, supporting both assignment form (dst = opcode type ops;)
+ * and prefix form (opcode type ops;), then appends it to block. Returns nullptr on error or when
+ * the next token ends the block.
+ */
+MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, MirParserContext &pCtx, MirBlock *block)
 {
     const auto &firstTok = lexer.peekToken();
     if (firstTok.m_kind == Parser::MirTokenKind::EndOfFile || firstTok.m_kind == Parser::MirTokenKind::RBrace)
@@ -861,6 +896,10 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer,
     return instBuilder.build(opCode, instRef, operands);
 }
 
+/**
+ * Parses the body of a bracketed memory operand (base [+ index[*scale]] [+/- disp]) into a
+ * MirMemory, defaulting the value type to i64 when none was given.
+ */
 MirMemory *MirParser::parseMemoryOperand(Parser::MirLexer &lexer,
                                          MirParserContext &pCtx,
                                          MirType *memType,
@@ -917,6 +956,12 @@ MirMemory *MirParser::parseMemoryOperand(Parser::MirLexer &lexer,
     return opBuilder.buildMem(memType, baseReg, displVal, indexReg, scale, startRef);
 }
 
+/**
+ * Parses one instruction operand, dispatching on the token: label references, bracketed memory or
+ * PHI pairs, @global/@function/runtime symbols, %stack slots, %register class bindings, integer
+ * and float immediates, and explicit type prefixes. Unresolved symbols are queued as forward
+ * references.
+ */
 MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                                     MirParserContext &pCtx,
                                     MirInstruction *targetInst,
@@ -978,8 +1023,8 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                 else if (valTok.m_kind == Parser::MirTokenKind::IntegerLiteral)
                 {
                     MirType *immType = (expectedType && expectedType->getKind() == MirTypeKind::Integer)
-                                           ? expectedType
-                                           : m_ctx->getTypeTable()->i64();
+                            ? expectedType
+                            : m_ctx->getTypeTable()->i64();
                     return buildIntSafe(opBuilder, immType, valTok.m_intVal, valTok.m_ref, m_diag, pCtx);
                 }
             }
@@ -1020,7 +1065,8 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
             }
 
             matchToken(lexer, Parser::MirTokenKind::RBracket, "Expected ']' at end of memory operand");
-            if (!expectedType) expectedType = m_ctx->getTypeTable()->i64();
+            if (!expectedType)
+                expectedType = m_ctx->getTypeTable()->i64();
             FlexInt displVal(disp, 64);
             return opBuilder.buildMem(expectedType, baseReg, displVal, indexReg, scale, startRef);
         }
@@ -1134,8 +1180,8 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
     {
         auto fTok = lexer.nextToken();
         MirType *fType = (expectedType && expectedType->getKind() == MirTypeKind::FloatingPoint)
-                             ? expectedType
-                             : m_ctx->getTypeTable()->f64();
+                ? expectedType
+                : m_ctx->getTypeTable()->f64();
         try
         {
             return opBuilder.buildFloat(fType, FlexFloat(fTok.m_floatVal), fTok.m_ref);
@@ -1170,6 +1216,10 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
     return nullptr;
 }
 
+/**
+ * Dispatches a top-level construct to the target/global/declare/fn parser, reporting an error for
+ * any other token.
+ */
 bool MirParser::parseTopLevelDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module)
 {
     const auto &tok = lexer.peekToken();
@@ -1202,6 +1252,11 @@ bool MirParser::parseTopLevelDecl(Parser::MirLexer &lexer, MirParserContext &pCt
     return false;
 }
 
+/**
+ * Parses a complete module from source into the builder context: creates a local source manager
+ * and parser context, loops over top-level declarations, resolves all pending forward references
+ * and reports success. Exceptions are caught and reported as diagnostics.
+ */
 bool MirParser::parseModule(std::string_view source, std::string_view bufferName)
 {
     if (!m_ctx)
@@ -1263,6 +1318,10 @@ bool MirParser::parseModule(std::string_view source, std::string_view bufferName
     }
 }
 
+/**
+ * Parses a single "fn" definition from source and returns the resulting function (resolving
+ * pending fixups first), or nullptr when the input does not begin with a function.
+ */
 MirFunction *MirParser::parseFunction(std::string_view source)
 {
     if (!m_ctx)
@@ -1290,6 +1349,10 @@ MirFunction *MirParser::parseFunction(std::string_view source)
     return nullptr;
 }
 
+/**
+ * Parses a single instruction statement from source and appends it to targetBlock, entering and
+ * leaving the block's function scope around parsing so local registers resolve correctly.
+ */
 MirInstruction *MirParser::parseInstruction(std::string_view source, MirBlock *targetBlock)
 {
     if (!m_ctx || !targetBlock)

@@ -51,8 +51,8 @@ class MirLegalizer
     virtual LegalizationResult executeAction(const LegalityResponse &response, LegalizeCtx &ctx, MirInstruction *inst);
 
   protected:
-    MirBuilderContext *m_ctx;
-    TargetDesc *m_targetDesc;
+    MirBuilderContext *m_ctx; ///< Shared builder context used to create rewrites.
+    TargetDesc *m_targetDesc; ///< Target providing legality info and legalization actions.
 };
 
 #endif // EZTRIPLE_MIR_LEGALIZER_H

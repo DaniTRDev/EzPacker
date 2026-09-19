@@ -6,11 +6,16 @@
 namespace EzMir::Parser
 {
 
-MirLexer::MirLexer(std::string_view source, MirParserContext &context) :
-    m_source(source), m_cursor(0), m_ctx(context)
+/**
+ * Binds the lexer to the source buffer and parser context, starting at offset 0.
+ */
+MirLexer::MirLexer(std::string_view source, MirParserContext &context) : m_source(source), m_cursor(0), m_ctx(context)
 {
 }
 
+/**
+ * Returns the character at the cursor without consuming it, or '\0' at end of input.
+ */
 char MirLexer::peekChar() const
 {
     if (m_cursor >= m_source.size())
@@ -20,6 +25,9 @@ char MirLexer::peekChar() const
     return m_source[m_cursor];
 }
 
+/**
+ * Consumes and returns the character at the cursor, or '\0' if the input is exhausted.
+ */
 char MirLexer::getChar()
 {
     if (m_cursor >= m_source.size())
@@ -29,6 +37,9 @@ char MirLexer::getChar()
     return m_source[m_cursor++];
 }
 
+/**
+ * Returns the character after the cursor without consuming either, or '\0' at end of input.
+ */
 char MirLexer::peekNextChar() const
 {
     if (m_cursor + 1 >= m_source.size())
@@ -38,11 +49,15 @@ char MirLexer::peekNextChar() const
     return m_source[m_cursor + 1];
 }
 
-bool MirLexer::isAtEnd() const
-{
-    return m_cursor >= m_source.size();
-}
+/**
+ * Returns true once the cursor has reached the end of the source.
+ */
+bool MirLexer::isAtEnd() const { return m_cursor >= m_source.size(); }
 
+/**
+ * Advances past spaces/newlines, // line comments, and ';' line comments that appear at the start
+ * of a line.
+ */
 void MirLexer::skipWhitespaceAndComments()
 {
     bool atStartOfLine = (m_cursor == 0);
@@ -90,6 +105,9 @@ void MirLexer::skipWhitespaceAndComments()
     }
 }
 
+/**
+ * Returns the next token, lexing and caching it on first call.
+ */
 const MirToken &MirLexer::peekToken()
 {
     if (!m_peeked.has_value())
@@ -99,6 +117,11 @@ const MirToken &MirLexer::peekToken()
     return *m_peeked;
 }
 
+/**
+ * Returns the next token, consuming and clearing any cached lookahead first. Dispatches to the
+ * number/string/identifier scanners and otherwise classifies punctuation, including a leading '-'
+ * on a digit as a negative number.
+ */
 MirToken MirLexer::nextToken()
 {
     if (m_peeked.has_value())
@@ -148,8 +171,8 @@ MirToken MirLexer::nextToken()
         getChar(); // Consume '@'
         size_t idStart = m_cursor;
         while (m_cursor < m_source.size() &&
-               (std::isalnum(static_cast<unsigned char>(m_source[m_cursor])) ||
-                m_source[m_cursor] == '_' || m_source[m_cursor] == '.'))
+               (std::isalnum(static_cast<unsigned char>(m_source[m_cursor])) || m_source[m_cursor] == '_' ||
+                m_source[m_cursor] == '.'))
         {
             ++m_cursor;
         }
@@ -167,8 +190,8 @@ MirToken MirLexer::nextToken()
         getChar(); // Consume '%'
         size_t idStart = m_cursor;
         while (m_cursor < m_source.size() &&
-               (std::isalnum(static_cast<unsigned char>(m_source[m_cursor])) ||
-                m_source[m_cursor] == '_' || m_source[m_cursor] == '.'))
+               (std::isalnum(static_cast<unsigned char>(m_source[m_cursor])) || m_source[m_cursor] == '_' ||
+                m_source[m_cursor] == '.'))
         {
             ++m_cursor;
         }
@@ -218,27 +241,63 @@ MirToken MirLexer::nextToken()
 
     switch (c)
     {
-        case '=': tok.m_kind = MirTokenKind::Equal; break;
-        case ':': tok.m_kind = MirTokenKind::Colon; break;
-        case ';': tok.m_kind = MirTokenKind::Semicolon; break;
-        case ',': tok.m_kind = MirTokenKind::Comma; break;
-        case '(': tok.m_kind = MirTokenKind::LParen; break;
-        case ')': tok.m_kind = MirTokenKind::RParen; break;
-        case '[': tok.m_kind = MirTokenKind::LBracket; break;
-        case ']': tok.m_kind = MirTokenKind::RBracket; break;
-        case '{': tok.m_kind = MirTokenKind::LBrace; break;
-        case '}': tok.m_kind = MirTokenKind::RBrace; break;
-        case '+': tok.m_kind = MirTokenKind::Plus; break;
-        case '-': tok.m_kind = MirTokenKind::Minus; break;
-        case '*': tok.m_kind = MirTokenKind::Star; break;
-        case '<': tok.m_kind = MirTokenKind::LAngle; break;
-        case '>': tok.m_kind = MirTokenKind::RAngle; break;
-        default:  tok.m_kind = MirTokenKind::Unknown; break;
+        case '=':
+            tok.m_kind = MirTokenKind::Equal;
+            break;
+        case ':':
+            tok.m_kind = MirTokenKind::Colon;
+            break;
+        case ';':
+            tok.m_kind = MirTokenKind::Semicolon;
+            break;
+        case ',':
+            tok.m_kind = MirTokenKind::Comma;
+            break;
+        case '(':
+            tok.m_kind = MirTokenKind::LParen;
+            break;
+        case ')':
+            tok.m_kind = MirTokenKind::RParen;
+            break;
+        case '[':
+            tok.m_kind = MirTokenKind::LBracket;
+            break;
+        case ']':
+            tok.m_kind = MirTokenKind::RBracket;
+            break;
+        case '{':
+            tok.m_kind = MirTokenKind::LBrace;
+            break;
+        case '}':
+            tok.m_kind = MirTokenKind::RBrace;
+            break;
+        case '+':
+            tok.m_kind = MirTokenKind::Plus;
+            break;
+        case '-':
+            tok.m_kind = MirTokenKind::Minus;
+            break;
+        case '*':
+            tok.m_kind = MirTokenKind::Star;
+            break;
+        case '<':
+            tok.m_kind = MirTokenKind::LAngle;
+            break;
+        case '>':
+            tok.m_kind = MirTokenKind::RAngle;
+            break;
+        default:
+            tok.m_kind = MirTokenKind::Unknown;
+            break;
     }
 
     return tok;
 }
 
+/**
+ * Scans an integer (decimal, 0x/0X hex) or floating-point (fractional and/or exponent) literal
+ * beginning at startPos and decodes its value.
+ */
 MirToken MirLexer::lexNumber(size_t startPos)
 {
     MirToken tok(m_ctx.getArena());
@@ -284,8 +343,8 @@ MirToken MirLexer::lexNumber(size_t startPos)
         ++m_cursor;
     }
 
-    if (m_cursor < m_source.size() && m_source[m_cursor] == '.' &&
-        m_cursor + 1 < m_source.size() && std::isdigit(static_cast<unsigned char>(m_source[m_cursor + 1])))
+    if (m_cursor < m_source.size() && m_source[m_cursor] == '.' && m_cursor + 1 < m_source.size() &&
+        std::isdigit(static_cast<unsigned char>(m_source[m_cursor + 1])))
     {
         isFloat = true;
         ++m_cursor; // Consume '.'
@@ -331,6 +390,10 @@ MirToken MirLexer::lexNumber(size_t startPos)
     return tok;
 }
 
+/**
+ * Scans a double-quoted string literal starting at startPos, decoding the standard escape
+ * sequences (\n, \t, \r, \\, \", \0xx and \xXX).
+ */
 MirToken MirLexer::lexString(size_t startPos)
 {
     MirToken tok(m_ctx.getArena());
@@ -349,13 +412,17 @@ MirToken MirLexer::lexString(size_t startPos)
         if (c == '\\' && m_cursor < m_source.size())
         {
             char esc = getChar();
-            if (esc == 'n') tok.m_strVal += '\n';
-            else if (esc == 't') tok.m_strVal += '\t';
-            else if (esc == 'r') tok.m_strVal += '\r';
-            else if (esc == '\\') tok.m_strVal += '\\';
-            else if (esc == '"') tok.m_strVal += '"';
-            else if (esc == '0' && m_cursor < m_source.size() &&
-                     std::isxdigit(static_cast<unsigned char>(peekChar())))
+            if (esc == 'n')
+                tok.m_strVal += '\n';
+            else if (esc == 't')
+                tok.m_strVal += '\t';
+            else if (esc == 'r')
+                tok.m_strVal += '\r';
+            else if (esc == '\\')
+                tok.m_strVal += '\\';
+            else if (esc == '"')
+                tok.m_strVal += '"';
+            else if (esc == '0' && m_cursor < m_source.size() && std::isxdigit(static_cast<unsigned char>(peekChar())))
             {
                 // Hex escape like \0A or \00
                 char hex[3] = { '0', peekChar(), '\0' };
@@ -391,6 +458,10 @@ MirToken MirLexer::lexString(size_t startPos)
     return tok;
 }
 
+/**
+ * Scans an identifier starting at startPos and classifies it as a keyword, a primitive type
+ * keyword, or a plain Identifier.
+ */
 MirToken MirLexer::lexIdentifierOrKeyword(size_t startPos)
 {
     MirToken tok(m_ctx.getArena());
@@ -417,30 +488,118 @@ MirToken MirLexer::lexIdentifierOrKeyword(size_t startPos)
     std::string_view t = tok.m_text;
 
     // Check keywords
-    if (t == "fn") { tok.m_kind = MirTokenKind::KwFn; return tok; }
-    if (t == "declare") { tok.m_kind = MirTokenKind::KwDeclare; return tok; }
-    if (t == "const") { tok.m_kind = MirTokenKind::KwConst; return tok; }
-    if (t == "var") { tok.m_kind = MirTokenKind::KwVar; return tok; }
-    if (t == "external") { tok.m_kind = MirTokenKind::KwExternal; return tok; }
-    if (t == "internal") { tok.m_kind = MirTokenKind::KwInternal; return tok; }
-    if (t == "weak") { tok.m_kind = MirTokenKind::KwWeak; return tok; }
-    if (t == "label") { tok.m_kind = MirTokenKind::KwLabel; return tok; }
-    if (t == "target") { tok.m_kind = MirTokenKind::KwTarget; return tok; }
+    if (t == "fn")
+    {
+        tok.m_kind = MirTokenKind::KwFn;
+        return tok;
+    }
+    if (t == "declare")
+    {
+        tok.m_kind = MirTokenKind::KwDeclare;
+        return tok;
+    }
+    if (t == "const")
+    {
+        tok.m_kind = MirTokenKind::KwConst;
+        return tok;
+    }
+    if (t == "var")
+    {
+        tok.m_kind = MirTokenKind::KwVar;
+        return tok;
+    }
+    if (t == "external")
+    {
+        tok.m_kind = MirTokenKind::KwExternal;
+        return tok;
+    }
+    if (t == "internal")
+    {
+        tok.m_kind = MirTokenKind::KwInternal;
+        return tok;
+    }
+    if (t == "weak")
+    {
+        tok.m_kind = MirTokenKind::KwWeak;
+        return tok;
+    }
+    if (t == "label")
+    {
+        tok.m_kind = MirTokenKind::KwLabel;
+        return tok;
+    }
+    if (t == "target")
+    {
+        tok.m_kind = MirTokenKind::KwTarget;
+        return tok;
+    }
 
     // Check primitive types
-    if (t == "i1") { tok.m_kind = MirTokenKind::TypeI1; return tok; }
-    if (t == "i8") { tok.m_kind = MirTokenKind::TypeI8; return tok; }
-    if (t == "i16") { tok.m_kind = MirTokenKind::TypeI16; return tok; }
-    if (t == "i32") { tok.m_kind = MirTokenKind::TypeI32; return tok; }
-    if (t == "i64") { tok.m_kind = MirTokenKind::TypeI64; return tok; }
-    if (t == "i128") { tok.m_kind = MirTokenKind::TypeI128; return tok; }
-    if (t == "i256") { tok.m_kind = MirTokenKind::TypeI256; return tok; }
-    if (t == "f32") { tok.m_kind = MirTokenKind::TypeF32; return tok; }
-    if (t == "f64") { tok.m_kind = MirTokenKind::TypeF64; return tok; }
-    if (t == "f128") { tok.m_kind = MirTokenKind::TypeF128; return tok; }
-    if (t == "ptr") { tok.m_kind = MirTokenKind::TypePtr; return tok; }
-    if (t == "void" || t == "_void") { tok.m_kind = MirTokenKind::TypeVoid; return tok; }
-    if (t == "token" || t == "__bindToken") { tok.m_kind = MirTokenKind::TypeToken; return tok; }
+    if (t == "i1")
+    {
+        tok.m_kind = MirTokenKind::TypeI1;
+        return tok;
+    }
+    if (t == "i8")
+    {
+        tok.m_kind = MirTokenKind::TypeI8;
+        return tok;
+    }
+    if (t == "i16")
+    {
+        tok.m_kind = MirTokenKind::TypeI16;
+        return tok;
+    }
+    if (t == "i32")
+    {
+        tok.m_kind = MirTokenKind::TypeI32;
+        return tok;
+    }
+    if (t == "i64")
+    {
+        tok.m_kind = MirTokenKind::TypeI64;
+        return tok;
+    }
+    if (t == "i128")
+    {
+        tok.m_kind = MirTokenKind::TypeI128;
+        return tok;
+    }
+    if (t == "i256")
+    {
+        tok.m_kind = MirTokenKind::TypeI256;
+        return tok;
+    }
+    if (t == "f32")
+    {
+        tok.m_kind = MirTokenKind::TypeF32;
+        return tok;
+    }
+    if (t == "f64")
+    {
+        tok.m_kind = MirTokenKind::TypeF64;
+        return tok;
+    }
+    if (t == "f128")
+    {
+        tok.m_kind = MirTokenKind::TypeF128;
+        return tok;
+    }
+    if (t == "ptr")
+    {
+        tok.m_kind = MirTokenKind::TypePtr;
+        return tok;
+    }
+    if (t == "void" || t == "_void")
+    {
+        tok.m_kind = MirTokenKind::TypeVoid;
+        return tok;
+    }
+    if (t == "token" || t == "__bindToken")
+    {
+        tok.m_kind = MirTokenKind::TypeToken;
+        return tok;
+    }
 
     tok.m_kind = MirTokenKind::Identifier;
     return tok;

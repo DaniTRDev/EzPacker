@@ -9,6 +9,10 @@ namespace
 {
 using namespace DSL::Ast::LegalizeRuleDef;
 
+/**
+ * Checks that an identifier refers to an SSA or immediate variable declared earlier in the rule
+ * scope, reporting an error otherwise.
+ */
 bool validateSsaVariable(DiagnosticCollector *collector,
                          SymbolTable *table,
                          const DSL::Ast::Common::Identifier &ident,
@@ -16,8 +20,7 @@ bool validateSsaVariable(DiagnosticCollector *collector,
                          std::string_view ruleName)
 {
     Symbol *varSym = table->getSymByName(ident.m_node);
-    if (!varSym || (varSym->getType() != SymbolType::SsaVariable &&
-                    varSym->getType() != SymbolType::ImmediateVariable))
+    if (!varSym || (varSym->getType() != SymbolType::SsaVariable && varSym->getType() != SymbolType::ImmediateVariable))
     {
         collector->error(PassName,
                          "Undefined SSA variable '${}' in {} of rule '{}'",
@@ -30,6 +33,10 @@ bool validateSsaVariable(DiagnosticCollector *collector,
     return true;
 }
 
+/**
+ * Ensures an actual rule operand is compatible with the IR operand slot it fills, checking
+ * dataflow direction and immediate-versus-register compatibility.
+ */
 bool validateOperandAgainstIrDef(DiagnosticCollector *collector,
                                  const Symbols::IrOperandSymbol &expectedOp,
                                  const DSL::Ast::LegalizeRuleDef::RuleInstructionOperand &actualOp,
@@ -93,7 +100,8 @@ bool validateOperandAgainstIrDef(DiagnosticCollector *collector,
         return false;
     }
 
-    if ((actualOp.m_kind == RuleOperandKind::ImmediateLiteral || actualOp.m_kind == RuleOperandKind::ImmediateSymbol) && !acceptsImm)
+    if ((actualOp.m_kind == RuleOperandKind::ImmediateLiteral || actualOp.m_kind == RuleOperandKind::ImmediateSymbol) &&
+        !acceptsImm)
     {
         collector->error(PassName,
                          "Operand {} ('{}') of instruction '{}' in {} expects a register operand, but got "
@@ -181,9 +189,10 @@ bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
     // Validate match clauses & bind defined SSA variables
     for (const auto &matchInst : rule.m_matchClauses)
     {
-        Symbols::LegalizeRuleInstructionSymbol instSym{ .m_opcode = matchInst.m_opcode.m_node,
-                                                .m_operands = std::pmr::vector<Symbols::LegalizeRuleOperandSymbol>(
-                                                        table->getAllocator()) };
+        Symbols::LegalizeRuleInstructionSymbol instSym{
+            .m_opcode = matchInst.m_opcode.m_node,
+            .m_operands = std::pmr::vector<Symbols::LegalizeRuleOperandSymbol>(table->getAllocator())
+        };
 
         if (!processInstruction(collector, table, matchInst, ruleName, /*isMatchPattern=*/true, instSym))
         {
@@ -223,9 +232,10 @@ bool LegalizeRulePass::processRule(DiagnosticCollector *collector,
     // Validate emit clause instructions and operand usages
     for (const auto &emitInst : rule.m_emitClauses)
     {
-        Symbols::LegalizeRuleInstructionSymbol instSym{ .m_opcode = emitInst.m_opcode.m_node,
-                                                .m_operands = std::pmr::vector<Symbols::LegalizeRuleOperandSymbol>(
-                                                        table->getAllocator()) };
+        Symbols::LegalizeRuleInstructionSymbol instSym{
+            .m_opcode = emitInst.m_opcode.m_node,
+            .m_operands = std::pmr::vector<Symbols::LegalizeRuleOperandSymbol>(table->getAllocator())
+        };
 
         if (!processInstruction(collector, table, emitInst, ruleName, /*isMatchPattern=*/false, instSym))
         {

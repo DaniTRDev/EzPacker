@@ -15,6 +15,7 @@ namespace CodeGenerators
 namespace
 {
 
+// Maps a parsed legalize action kind to the generated LegalizeActionKind enumerator.
 std::string ActionKindToCpp(DSL::Ast::LegalizeActionDef::LegalizeActionKind kind)
 {
     switch (kind)
@@ -39,6 +40,7 @@ std::string ActionKindToCpp(DSL::Ast::LegalizeActionDef::LegalizeActionKind kind
     return "LegalizeActionKind::Unsupported";
 }
 
+// Uppercases an ASCII string, used to build include-guard names from the target name.
 std::string ToUpper(std::string_view s)
 {
     std::string res(s);
@@ -51,6 +53,7 @@ std::string ToUpper(std::string_view s)
 
 } // namespace
 
+// Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
 CppLegalizerGenerator::CppLegalizerGenerator(DiagnosticCollector *collector,
                                              SymbolTable *table,
                                              std::filesystem::path outPath,
@@ -64,6 +67,7 @@ CppLegalizerGenerator::CppLegalizerGenerator(DiagnosticCollector *collector,
     }
 }
 
+// Resolves the header/source destinations, emits both artifacts, and reports combined success.
 bool CppLegalizerGenerator::run()
 {
     if (!validate())
@@ -86,6 +90,7 @@ bool CppLegalizerGenerator::run()
     return headerOk && sourceOk;
 }
 
+// Emits the LegalizerInfo subclass declaration exposing query() and executeCustom().
 void CppLegalizerGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
     std::string guardName = std::format("EZTRIPLE_{}_LEGALIZER_ACTION_TABLE_H", ToUpper(m_targetName));
@@ -114,6 +119,7 @@ void CppLegalizerGenerator::emitHeader(CppSourceEmitter &emitter) const
     emitter.emitIncludeGuardEnd(guardName);
 }
 
+// Emits the action tables, match functions, query dispatcher and lowering dispatcher.
 void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
 {
     std::string defaultBaseName = std::format("{}LegalizerActionTable", m_targetName);
@@ -150,9 +156,10 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     // 1. Build Type Compact ID Map from SymbolTable
     struct TypeEntry
     {
-        std::string name;
-        uint8_t compactId{ 0 };
+        std::string name;       ///< DSL type name.
+        uint8_t compactId{ 0 }; ///< Dense compact id used by the legality query.
     };
+    // Capture the compact id of every declared type so clauses can be lowered to matrix indices.
     std::unordered_map<SymbolId, TypeEntry> typeMap;
     for (const Symbol *sym : m_table->getSymbols())
     {
@@ -165,7 +172,9 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
         }
     }
 
-    auto getCompactId = [&](SymbolId tid) -> uint8_t {
+    // Returns 0 for unknown types, which the tables treat as the invalid compact id.
+    auto getCompactId = [&](SymbolId tid) -> uint8_t
+    {
         auto it = typeMap.find(tid);
         if (it != typeMap.end())
         {
@@ -176,40 +185,49 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
 
     // 2. Collect Actions, Libcalls, and Handlers
     std::vector<std::string> libcalls;
-    auto getOrAddLibcall = [&](std::string_view sym) -> uint16_t {
+    // Interns a libcall symbol name and returns its dense pool index, reusing existing entries.
+    auto getOrAddLibcall = [&](std::string_view sym) -> uint16_t
+    {
         for (size_t i = 0; i < libcalls.size(); ++i)
         {
-            if (libcalls[i] == sym) return static_cast<uint16_t>(i);
+            if (libcalls[i] == sym)
+                return static_cast<uint16_t>(i);
         }
         libcalls.emplace_back(sym);
         return static_cast<uint16_t>(libcalls.size() - 1);
     };
 
     std::vector<std::string> handlers;
-    auto getOrAddHandler = [&](std::string_view h) -> uint16_t {
+    // Interns a custom lowering handler name and returns its dense handler index.
+    auto getOrAddHandler = [&](std::string_view h) -> uint16_t
+    {
         for (size_t i = 0; i < handlers.size(); ++i)
         {
-            if (handlers[i] == h) return static_cast<uint16_t>(i);
+            if (handlers[i] == h)
+                return static_cast<uint16_t>(i);
         }
         handlers.emplace_back(h);
         return static_cast<uint16_t>(handlers.size() - 1);
     };
 
+    // Flattened per-opcode action metadata used to choose which table a clause belongs to.
     struct OpcodeActionInfo
     {
-        std::string opcode;
-        const Symbols::LegalizeActionSymbol *data{ nullptr };
-        bool isHeterogeneous{ false };
-        bool isWildcard{ false };
+        std::string opcode;                                   ///< Mnemonic of the target opcode.
+        const Symbols::LegalizeActionSymbol *data{ nullptr }; ///< Source symbol carrying the clauses.
+        bool isHeterogeneous{ false };                        ///< True when clauses constrain multiple operand slots.
+        bool isWildcard{ false };                             ///< True when the action ignores operand types entirely.
     };
     std::vector<OpcodeActionInfo> actionInfos;
 
+    // Classify each declared action and pre-intern its libcall/handler references.
     for (const Symbol *sym : m_table->getSymbols())
     {
         if (sym && sym->getType() == SymbolType::LegalizeAction)
         {
             const auto *data = sym->getIf<Symbols::LegalizeActionSymbol>();
-            if (!data) continue;
+            if (!data)
+                continue;
 
             bool isHet = false;
             bool hasNonEmpty = false;
@@ -248,8 +266,11 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
         }
     }
 
+    // Rule-backed handlers are numbered after all directly-declared lowering handlers.
     uint16_t ruleBaseId = static_cast<uint16_t>(handlers.size());
-    auto getRuleIndex = [&](SymbolId ruleSymId) -> uint16_t {
+    // Maps a rule symbol id to its index within the collected rules list.
+    auto getRuleIndex = [&](SymbolId ruleSymId) -> uint16_t
+    {
         const Symbol *ruleSym = m_table->getSymById(ruleSymId);
         if (ruleSym)
         {
@@ -295,7 +316,8 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     std::vector<std::string> heterogeneousOpcodes;
     for (const auto &info : actionInfos)
     {
-        if (!info.isHeterogeneous) continue;
+        if (!info.isHeterogeneous)
+            continue;
         heterogeneousOpcodes.push_back(info.opcode);
 
         emitter.emitLine("static LegalityResponse match_{}(const LegalityQuery &q)", info.opcode);
@@ -306,7 +328,8 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
         {
             uint8_t targetCid = clause.m_targetTypeId.has_value() ? getCompactId(*clause.m_targetTypeId) : 0;
             uint16_t handlerOrStrId = 0;
-            if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::Libcall && clause.m_libcallSymbol.has_value())
+            if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::Libcall &&
+                clause.m_libcallSymbol.has_value())
             {
                 handlerOrStrId = getOrAddLibcall(*clause.m_libcallSymbol);
             }
@@ -341,6 +364,7 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                 slotToCids[slot].push_back(cid);
             }
 
+            // Build a boolean guard matching each operand slot against its allowed compact ids.
             std::string cond;
             if (slotToCids.empty())
             {
@@ -351,7 +375,8 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                 bool firstSlot = true;
                 for (const auto &[slot, cids] : slotToCids)
                 {
-                    if (!firstSlot) cond += " && ";
+                    if (!firstSlot)
+                        cond += " && ";
                     firstSlot = false;
                     if (cids.size() == 1)
                     {
@@ -362,7 +387,8 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                         cond += "(";
                         for (size_t cIdx = 0; cIdx < cids.size(); ++cIdx)
                         {
-                            if (cIdx > 0) cond += " || ";
+                            if (cIdx > 0)
+                                cond += " || ";
                             cond += std::format("q.m_compactIds[{}] == {}", slot, cids[cIdx]);
                         }
                         cond += ")";
@@ -407,10 +433,11 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
             {
                 handlerId = ruleBaseId + getRuleIndex(clause.m_customRules->front());
             }
-            emitter.emitLine("wildcards[static_cast<size_t>(MirInstructionOpCode::{})] = LegalityResponse{{ {}, 0, 0, {} }};",
-                             info.opcode,
-                             ActionKindToCpp(clause.m_kind),
-                             handlerId);
+            emitter.emitLine(
+                    "wildcards[static_cast<size_t>(MirInstructionOpCode::{})] = LegalityResponse{{ {}, 0, 0, {} }};",
+                    info.opcode,
+                    ActionKindToCpp(clause.m_kind),
+                    handlerId);
         }
     }
     emitter.emitLine("return wildcards;");
@@ -422,17 +449,20 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitSectionComment("Tier 1 Dense Primary Matrix (O(1))");
     emitter.emitLine("static constexpr auto g_{}_PrimaryMatrix = []() {{", m_targetName);
     emitter.indent();
-    emitter.emitLine("std::array<std::array<LegalityResponse, LegalizerInfo::MAX_COMPACT_TYPES>, LegalizerInfo::OPCODE_COUNT> mat{{}};");
+    emitter.emitLine("std::array<std::array<LegalityResponse, LegalizerInfo::MAX_COMPACT_TYPES>, "
+                     "LegalizerInfo::OPCODE_COUNT> mat{{}};");
 
     for (const auto &info : actionInfos)
     {
-        if (info.isHeterogeneous || info.isWildcard) continue;
+        if (info.isHeterogeneous || info.isWildcard)
+            continue;
 
         for (const auto &clause : info.data->m_clauses)
         {
             uint8_t targetCid = clause.m_targetTypeId.has_value() ? getCompactId(*clause.m_targetTypeId) : 0;
             uint16_t handlerOrStrId = 0;
-            if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::Libcall && clause.m_libcallSymbol.has_value())
+            if (clause.m_kind == DSL::Ast::LegalizeActionDef::LegalizeActionKind::Libcall &&
+                clause.m_libcallSymbol.has_value())
             {
                 handlerOrStrId = getOrAddLibcall(*clause.m_libcallSymbol);
             }
@@ -457,9 +487,11 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
             {
                 uint8_t cid = getCompactId(tc.m_typeId);
                 uint8_t slot = tc.m_operandIndex.value_or(0);
+                // The dense matrix reserves MAX_COMPACT_TYPES entries; wider ids fall through.
                 if (cid < 32)
                 {
-                    emitter.emitLine("mat[static_cast<size_t>(MirInstructionOpCode::{})][{}] = LegalityResponse{{ {}, {}, {}, {} }};",
+                    emitter.emitLine("mat[static_cast<size_t>(MirInstructionOpCode::{})][{}] = LegalityResponse{{ {}, "
+                                     "{}, {}, {} }};",
                                      info.opcode,
                                      cid,
                                      ActionKindToCpp(clause.m_kind),
@@ -629,6 +661,7 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitLine("}");
 }
 
+// Convenience wrapper retained for callers that do not need to configure a generator object.
 bool GenerateLegalizerActionTable(DiagnosticCollector *collector,
                                   SymbolTable *table,
                                   std::filesystem::path outPath,

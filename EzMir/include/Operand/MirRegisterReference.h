@@ -4,7 +4,8 @@
 #include "EzMirCommon.h"
 
 /**
- * Encapsulates a reference to either a virtual register (SSA/pre-allocation) or a physical register (hardware-assigned).
+ * Encapsulates a reference to either a virtual register (SSA/pre-allocation) or a physical register
+ * (hardware-assigned).
  *
  * Virtual registers originate without a register class. When instruction selection assigns a target register class,
  * the virtual register receives the associated MirRegisterClass descriptor.
@@ -39,7 +40,8 @@ class MirRegisterRef
     bool isPhysical() const;
 
     /**
-     * Returns the register class descriptor (assigned during/after instruction selection for virtuals, or inherent for physicals).
+     * Returns the register class descriptor (assigned during/after instruction selection for virtuals, or inherent for
+     * physicals).
      */
     class MirRegisterClass *getClass() const;
 

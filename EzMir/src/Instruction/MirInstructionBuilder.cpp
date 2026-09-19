@@ -9,6 +9,10 @@
 #include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
 
+/**
+ * Resolves the register information of the function owning the instruction, or nullptr when the
+ * instruction is detached from any function.
+ */
 MirFunctionRegisterInfo *getRegInfo(MirInstruction *instr)
 {
     MirBlock *block = instr->getOwner();
@@ -19,6 +23,10 @@ MirFunctionRegisterInfo *getRegInfo(MirInstruction *instr)
     return nullptr;
 }
 
+/**
+ * Invokes callback with the register ID of every virtual register referenced by an operand,
+ * including the base and index registers of a memory operand. Null operands are ignored.
+ */
 static void forEachVReg(MirOperand *op, auto &&callback)
 {
     if (!op)
@@ -61,11 +69,13 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx,
  */
 MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstruction *inst, InsertionType type) :
     m_ctx(ctx),
-    m_insertionPoint(inst && inst->getOwner()
-                         ? MirInstructionInsertionPoint{ .m_type = type,
-                                                         .m_block = inst->getOwner(),
-                                                         .m_iterator = inst->getOwner()->getInstructions().to_iterator(inst) }
-                         : MirInstructionInsertionPoint{})
+    m_insertionPoint(
+            inst && inst->getOwner()
+                    ? MirInstructionInsertionPoint{ .m_type = type,
+                                                    .m_block = inst->getOwner(),
+                                                    .m_iterator =
+                                                            inst->getOwner()->getInstructions().to_iterator(inst) }
+                    : MirInstructionInsertionPoint{})
 {
 }
 
@@ -200,6 +210,9 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
     return *this;
 }
 
+/**
+ * Appends an operand to the instruction and records its def/use in the owning function's register info.
+ */
 MirInstructionBuilder &MirInstructionBuilder::addOperand(MirInstruction *instr, MirOperand *operand)
 {
     auto &operands = instr->m_operands;
@@ -209,6 +222,9 @@ MirInstructionBuilder &MirInstructionBuilder::addOperand(MirInstruction *instr, 
     return *this;
 }
 
+/**
+ * Prepends an operand, re-registering all following operands because their indices shift by one.
+ */
 MirInstructionBuilder &MirInstructionBuilder::addOperandFront(MirInstruction *instr, MirOperand *operand)
 {
     for (size_t i = 0; i < instr->m_operands.size(); ++i)
@@ -227,6 +243,9 @@ MirInstructionBuilder &MirInstructionBuilder::addOperandFront(MirInstruction *in
     return *this;
 }
 
+/**
+ * Removes every operand, unregistering their defs/uses from the function's register info.
+ */
 MirInstructionBuilder &MirInstructionBuilder::clearOperands(MirInstruction *instr)
 {
     // Unregister all defs and uses
@@ -239,6 +258,9 @@ MirInstructionBuilder &MirInstructionBuilder::clearOperands(MirInstruction *inst
     return *this;
 }
 
+/**
+ * Erases the operand at pos and re-registers the shifted trailing operands with their new indices.
+ */
 MirInstructionBuilder &MirInstructionBuilder::clearOperand(MirInstruction *instr, size_t pos)
 {
     auto &operands = instr->m_operands;
@@ -263,6 +285,9 @@ MirInstructionBuilder &MirInstructionBuilder::clearOperand(MirInstruction *instr
     return *this;
 }
 
+/**
+ * Unregisters all operands, then unlinks the instruction from its owning block and clears its owner.
+ */
 MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
 {
     for (size_t i = 0; i < instr->m_operands.size(); ++i)
@@ -280,6 +305,9 @@ MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
     return *this;
 }
 
+/**
+ * Replaces the operand at index, unregistering the old operand and registering the new one.
+ */
 MirInstructionBuilder &MirInstructionBuilder::swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index)
 {
     auto &operands = instr->m_operands;
@@ -319,6 +347,10 @@ void MirInstructionBuilder::setInsertionPoint(MirBlock *block,
     m_insertionPoint = MirInstructionInsertionPoint{ .m_type = type, .m_block = block, .m_iterator = it };
 }
 
+/**
+ * Resolves the register info from the instruction's own block, falling back to the builder's
+ * insertion-point block for instructions not yet linked into a block.
+ */
 MirFunctionRegisterInfo *MirInstructionBuilder::getRegInfo(MirInstruction *instr) const
 {
     MirBlock *block = (instr && instr->getOwner()) ? instr->getOwner() : m_insertionPoint.m_block;
@@ -393,6 +425,10 @@ void MirInstructionBuilder::finalizeInstruction(MirInstruction *instr, SourceRef
     setBuildResult(instr);
 }
 
+/**
+ * Records the operand's virtual-register def/use in the function's register info according to the
+ * operand's access flag at the given index.
+ */
 void MirInstructionBuilder::registerOperand(MirInstruction *instr, MirOperand *op, size_t index)
 {
     auto *regInfo = getRegInfo(instr);
@@ -411,6 +447,9 @@ void MirInstructionBuilder::registerOperand(MirInstruction *instr, MirOperand *o
                 });
 }
 
+/**
+ * Removes the operand's virtual-register def/use records from the function's register info.
+ */
 void MirInstructionBuilder::unregisterOperand(MirInstruction *instr, MirOperand *op, size_t index)
 {
     auto *regInfo = getRegInfo(instr);

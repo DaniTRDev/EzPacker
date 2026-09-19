@@ -5,14 +5,25 @@
 #include "Instruction/MirInstruction.h"
 #include "Function/MirFunction.h"
 
+/**
+ * Initializes the manager in non-test mode with all internal containers backed by globalArena.
+ */
 MirPassManager::MirPassManager(DiagnosticCollector *diagCollector, std::pmr::memory_resource *globalArena) :
     m_testMode(false), m_diagCollector(diagCollector), m_validAnalyses(globalArena), m_passesBlueprint(globalArena),
     m_savedResults(globalArena), m_executionPipeline(globalArena)
 {
 }
 
+/**
+ * Returns the diagnostic collector used to report pass activity and errors.
+ */
 DiagnosticCollector *MirPassManager::getDiagCollector() const { return m_diagCollector; }
 
+/**
+ * Executes a pass once per entity dictated by its iteration place (function, block, instruction or
+ * global), aggregating modification/success flags, invalidating cached analyses when MIR changed,
+ * and storing/printing the result.
+ */
 MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
 {
     m_diagCollector->trace("MirPassManager", "Running pass {}", pass->getName());
@@ -127,6 +138,9 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
     return combinedResult;
 }
 
+/**
+ * Resets and drops every cached analysis, forcing recomputation after a mutating pass.
+ */
 void MirPassManager::invalidateAnalysis()
 {
     for (auto &analysis : m_validAnalyses)
@@ -135,6 +149,10 @@ void MirPassManager::invalidateAnalysis()
     m_validAnalyses.clear();
 }
 
+/**
+ * Runs each transform pass in the generated pipeline in order; analysis passes are skipped here
+ * and instead executed on demand.
+ */
 void MirPassManager::runPipeline(MirBuilderContext *ctx)
 {
     for (MirPass *pass : m_executionPipeline)
@@ -146,8 +164,15 @@ void MirPassManager::runPipeline(MirBuilderContext *ctx)
     }
 }
 
+/**
+ * Enables test mode, which relaxes prerequisite dependency resolution during pipeline building.
+ */
 void MirPassManager::setTestMode() { m_testMode = true; }
 
+/**
+ * Returns the cached analysis instance for passId, resolving and running its dependencies first
+ * when not cached. Throws std::runtime_error when the pass was never registered.
+ */
 MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderContext *ctx)
 {
     // Cache Check (handles downstream nested dependencies)
@@ -180,6 +205,10 @@ MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderConte
     return analysisPass;
 }
 
+/**
+ * Builds the execution pipeline by topologically resolving dependencies of every registered
+ * transform pass (analysis passes run on demand and are excluded).
+ */
 void MirPassManager::generatePipeline()
 {
     m_diagCollector->trace("MirPassManager", "Calculating pass dependency pipeline");
@@ -205,6 +234,10 @@ void MirPassManager::generatePipeline()
     }
 }
 
+/**
+ * Depth-first resolution that appends passId after its dependencies, detecting cycles via
+ * seenInCurrentPath and throwing std::runtime_error when a cycle or missing pass is found.
+ */
 void MirPassManager::resolveDependencies(std::type_index passId,
                                          std::unordered_set<std::type_index> &resolved,
                                          std::unordered_set<std::type_index> &seenInCurrentPath)

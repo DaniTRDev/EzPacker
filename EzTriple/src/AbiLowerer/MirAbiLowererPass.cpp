@@ -11,12 +11,19 @@
 #include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
 
+/// Stores the builder context used to inspect and rewrite instructions.
 MirAbiLowererPass::MirAbiLowererPass(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
+/// Returns the diagnostic name of this pass.
 const char *MirAbiLowererPass::getName() const { return "MirAbiLowererPass"; }
 
+/// Runs once per function rather than once per module.
 MirPassIterationPlace MirAbiLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; };
 
+/**
+ * Groups token-bound ABI instruction sequences by token id, removes them from the MIR, and
+ * delegates each completed group to the matching MirAbiLowerer routine.
+ */
 MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
     bool modifiedMir = false;
@@ -24,6 +31,7 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
     MirFunction *func = *it;
     CallingConvDesc *cc = func->getCallingConv();
 
+    // Token id -> the still-unlowered PUSH/POP group accumulated for that call/return/args token.
     std::pmr::map<MirId, UnloweredBlock> pendingBlocks{ m_ctx->getGlobalAllocator() };
 
     for (MirBlock *block : func->getBlocks())
@@ -105,9 +113,8 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             else if (op == MirInstructionOpCode::POP_RET)
             {
                 MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
-                auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
-                                                            UnloweredBlockType::Call,
-                                                            m_ctx->getGlobalAllocator());
+                auto [mapIt, _] =
+                        pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Call, m_ctx->getGlobalAllocator());
                 mapIt->second.m_popList.push_back(instr);
 
                 instrIt++;
@@ -119,8 +126,9 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             else if (op == MirInstructionOpCode::END_ARG)
             {
                 MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
-                auto [mapIt, _] =
-                        pendingBlocks.try_emplace(tokenId, UnloweredBlockType::FunctionArgs, m_ctx->getGlobalAllocator());
+                auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
+                                                            UnloweredBlockType::FunctionArgs,
+                                                            m_ctx->getGlobalAllocator());
 
                 mapIt->second.m_targetBlock = block;
                 mapIt->second.m_termIt = instrIt;
@@ -194,6 +202,9 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
     return { .m_modifiedMir = modifiedMir, .m_executed = true, .m_succeeded = true };
 }
 
+/**
+ * Emits a trace dump of every block that was ABI-lowered.
+ */
 void MirAbiLowererPass::printResult()
 {
     auto diag = m_ctx->getDiagCollector()->builder(Diag_Trace, "ReturnAbiLowerer");

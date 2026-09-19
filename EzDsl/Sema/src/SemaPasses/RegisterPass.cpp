@@ -12,7 +12,9 @@ namespace
 constexpr auto PassName = "Sema::RegisterPass";
 } // namespace
 
-bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *table, DSL::Ast::RegisterDef::RegisterFile *file)
+bool RegisterPass::run(class DiagnosticCollector *collector,
+                       class SymbolTable *table,
+                       DSL::Ast::RegisterDef::RegisterFile *file)
 {
     if (!collector)
     {
@@ -83,8 +85,10 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
 
             if (bits <= 0 || bits > 4096)
             {
-                collector->error(PassName, "Register class '{}' has invalid bit size {} (must be in 1..4096).",
-                                 className, bits)
+                collector->error(PassName,
+                                 "Register class '{}' has invalid bit size {} (must be in 1..4096).",
+                                 className,
+                                 bits)
                         << cls.m_bitSize.m_sourceRef;
                 hasErrors = true;
                 continue;
@@ -97,7 +101,8 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
             if (table->declareSym(cls.m_name.m_sourceRef, SymbolType::RegisterClass, std::move(symData), className) ==
                 InvalidSymbolId)
             {
-                collector->error(PassName, "Failed to register class symbol '{}'.", className) << cls.m_name.m_sourceRef;
+                collector->error(PassName, "Failed to register class symbol '{}'.", className)
+                        << cls.m_name.m_sourceRef;
                 hasErrors = true;
             }
         }
@@ -113,15 +118,19 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
 
             if (wideIt == bankClasses.end())
             {
-                collector->error(PassName, "Sub-register edge references undeclared class '{}' in bank '{}'.",
-                                 wide, bankName)
+                collector->error(PassName,
+                                 "Sub-register edge references undeclared class '{}' in bank '{}'.",
+                                 wide,
+                                 bankName)
                         << edge.m_wideClass.m_sourceRef;
                 hasErrors = true;
             }
             if (narrowIt == bankClasses.end())
             {
-                collector->error(PassName, "Sub-register edge references undeclared class '{}' in bank '{}'.",
-                                 narrow, bankName)
+                collector->error(PassName,
+                                 "Sub-register edge references undeclared class '{}' in bank '{}'.",
+                                 narrow,
+                                 bankName)
                         << edge.m_narrowClass.m_sourceRef;
                 hasErrors = true;
             }
@@ -130,7 +139,10 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
                 collector->error(PassName,
                                  "Sub-register edge '{} <: {}' must map a wider class onto a narrower one "
                                  "({} bits <= {} bits).",
-                                 wide, narrow, wideIt->second, narrowIt->second)
+                                 wide,
+                                 narrow,
+                                 wideIt->second,
+                                 narrowIt->second)
                         << edge.m_wideClass.m_sourceRef;
                 hasErrors = true;
             }
@@ -195,7 +207,10 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
                 {
                     collector->error(PassName,
                                      "Register '{}' binds name '{}' to undeclared class '{}' in bank '{}'.",
-                                     canonical, asmName, className, bankName)
+                                     canonical,
+                                     asmName,
+                                     className,
+                                     bankName)
                             << binding.m_className.m_sourceRef;
                     hasErrors = true;
                     continue;
@@ -203,7 +218,10 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
 
                 if (!boundClasses.insert(className).second)
                 {
-                    collector->error(PassName, "Register '{}' declares class '{}' more than once.", canonical, className)
+                    collector->error(PassName,
+                                     "Register '{}' declares class '{}' more than once.",
+                                     canonical,
+                                     className)
                             << binding.m_className.m_sourceRef;
                     hasErrors = true;
                 }
@@ -213,8 +231,10 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
                                              .m_bankName = bankName,
                                              .m_hwEncoding = encoding,
                                              .m_astNode = &reg };
-            if (table->declareSym(reg.m_canonicalName.m_sourceRef, SymbolType::Register, std::move(symData), canonical) ==
-                InvalidSymbolId)
+            if (table->declareSym(reg.m_canonicalName.m_sourceRef,
+                                  SymbolType::Register,
+                                  std::move(symData),
+                                  canonical) == InvalidSymbolId)
             {
                 collector->error(PassName, "Failed to register physical register symbol '{}'.", canonical)
                         << reg.m_canonicalName.m_sourceRef;
@@ -222,7 +242,9 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
             }
         }
 
-        Symbols::RegisterBankSymbol bankSym{ .m_name = bankName, .m_target = file->m_target.m_node, .m_astNode = &bank };
+        Symbols::RegisterBankSymbol bankSym{ .m_name = bankName,
+                                             .m_target = file->m_target.m_node,
+                                             .m_astNode = &bank };
         if (table->declareSym(bank.m_name.m_sourceRef, SymbolType::RegisterBank, std::move(bankSym), bankName) ==
             InvalidSymbolId)
         {
@@ -265,7 +287,8 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
         {
             collector->error(PassName,
                              "Special register '{}' id {} collides with an allocatable register encoding.",
-                             name, resolvedId)
+                             name,
+                             resolvedId)
                     << special.m_id.m_sourceRef;
             hasErrors = true;
         }
@@ -285,8 +308,10 @@ bool RegisterPass::run(class DiagnosticCollector *collector, class SymbolTable *
 
     // Root symbol holding the whole register file for code generation.
     Symbols::RegisterFileSymbol fileSym{ .m_target = file->m_target.m_node, .m_astNode = file };
-    if (table->declareSym(file->m_target.m_sourceRef, SymbolType::RegisterFile, std::move(fileSym), file->m_target.m_node) ==
-        InvalidSymbolId)
+    if (table->declareSym(file->m_target.m_sourceRef,
+                          SymbolType::RegisterFile,
+                          std::move(fileSym),
+                          file->m_target.m_node) == InvalidSymbolId)
     {
         collector->error(PassName, "Failed to register register-file symbol '{}'.", file->m_target.m_node)
                 << file->m_target.m_sourceRef;

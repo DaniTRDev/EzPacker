@@ -5,10 +5,7 @@
 namespace EzCompiler
 {
 
-TargetTriple::TargetTriple(std::string_view arch,
-                           std::string_view vendor,
-                           std::string_view sys,
-                           std::string_view abi) :
+TargetTriple::TargetTriple(std::string_view arch, std::string_view vendor, std::string_view sys, std::string_view abi) :
     m_arch(arch), m_vendor(vendor), m_sys(sys), m_abi(abi)
 {
 }
@@ -52,6 +49,7 @@ TargetTriple TargetTriple::parse(std::string_view tripleStr)
         return TargetTriple(parts[0], "unknown", "none", "elf");
     }
 
+    // Two components are interpreted as <arch>-<os/format> shorthand.
     if (parts.size() == 2)
     {
         const std::string &p0 = parts[0];
@@ -69,6 +67,7 @@ TargetTriple TargetTriple::parse(std::string_view tripleStr)
         return TargetTriple(p0, "unknown", p1, "none");
     }
 
+    // Three components collapse to <arch>-<vendor>-<os/format>; otherwise vendor-abi are assumed.
     if (parts.size() == 3)
     {
         const std::string &p0 = parts[0];
@@ -96,47 +95,30 @@ TargetTriple TargetTriple::getHostTriple()
 #endif
 }
 
-std::string TargetTriple::toString() const
-{
-    return std::format("{}-{}-{}-{}", m_arch, m_vendor, m_sys, m_abi);
-}
+std::string TargetTriple::toString() const { return std::format("{}-{}-{}-{}", m_arch, m_vendor, m_sys, m_abi); }
 
-bool TargetTriple::isX86_64() const
-{
-    return m_arch == "x86_64" || m_arch == "amd64" || m_arch == "x64";
-}
+bool TargetTriple::isX86_64() const { return m_arch == "x86_64" || m_arch == "amd64" || m_arch == "x64"; }
 
 bool TargetTriple::isWindows() const
 {
     return m_sys == "windows" || m_sys == "win32" || m_abi == "msvc" || m_abi == "coff";
 }
 
-bool TargetTriple::isLinux() const
-{
-    return m_sys == "linux";
-}
+bool TargetTriple::isLinux() const { return m_sys == "linux"; }
 
 bool TargetTriple::isElf() const
 {
+    // Fall back to ELF for any target that is neither Windows nor explicitly Mach-O.
     return m_abi == "elf" || m_abi == "gnu" || m_sys == "linux" || (!isWindows() && m_abi != "macho");
 }
 
-bool TargetTriple::isCoff() const
-{
-    return isWindows();
-}
+bool TargetTriple::isCoff() const { return isWindows(); }
 
 bool TargetTriple::operator==(const TargetTriple &other) const
 {
-    return m_arch == other.m_arch &&
-           m_vendor == other.m_vendor &&
-           m_sys == other.m_sys &&
-           m_abi == other.m_abi;
+    return m_arch == other.m_arch && m_vendor == other.m_vendor && m_sys == other.m_sys && m_abi == other.m_abi;
 }
 
-bool TargetTriple::operator!=(const TargetTriple &other) const
-{
-    return !(*this == other);
-}
+bool TargetTriple::operator!=(const TargetTriple &other) const { return !(*this == other); }
 
 } // namespace EzCompiler

@@ -14,8 +14,13 @@
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+/// Stores the builder context used to emit the lowered ABI instructions.
 MirAbiLowerer::MirAbiLowerer(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
+/**
+ * Lowers an accumulated PUSH_RET group plus its RET by moving the pushed values into the
+ * calling convention's return registers (or SRET pointer) and clearing the RET's token operand.
+ */
 bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
                                        MirBlock *targetBlock,
                                        MirFunction *func,
@@ -134,6 +139,10 @@ bool MirAbiLowerer::processReturnBlock(CallingConvDesc *cc,
     return true;
 }
 
+/**
+ * Assigns each accumulated PUSH_ARG value to the location (register, split parts, by-value stack
+ * copy, or indirect pointer) required by the calling convention, then clears the CALL token.
+ */
 bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
                                      MirBlock *targetBlock,
                                      MirFunction *func,
@@ -268,6 +277,10 @@ bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
     return true;
 }
 
+/**
+ * Extracts the call result from the calling convention's return registers immediately after the
+ * CALL, storing split chunks into the destination struct or moving pointer results into vregs.
+ */
 bool MirAbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
                                            MirBlock *targetBlock,
                                            MirFunction *func,
@@ -389,6 +402,10 @@ bool MirAbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
     return true;
 }
 
+/**
+ * Materializes incoming parameters at function entry: reads each POP_ARG value from its ABI
+ * location (register, split chunks, indirect pointer, or incoming stack slot) into the vreg.
+ */
 bool MirAbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                                              MirBlock *targetBlock,
                                              MirFunction *func,

@@ -5,9 +5,13 @@
 
 using namespace Cli;
 
+/**
+ * Fixture for driver execution of legalize-rule (.lrd) files, including prelude resolution.
+ */
 class DriverLegalizeRulesTest : public EzDslCliTestSuiteAsGtest
 {
   protected:
+    // Reads a generated file into a string for content assertions.
     std::string readFile(const std::filesystem::path &filePath)
     {
         std::ifstream file(filePath);

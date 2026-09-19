@@ -4,6 +4,10 @@
 #include "EzTripleCommon.h"
 #include "MirPasses/IMirTransformPass.h"
 
+/**
+ * Driver pass running Prologue/Epilogue Insertion over every function in the module and
+ * rewriting abstract stack object references into concrete frame-pointer/stack-pointer operands.
+ */
 class MirFrameLowererPass : public IMirTransformPass
 {
   public:
@@ -49,9 +53,9 @@ class MirFrameLowererPass : public IMirTransformPass
     std::vector<std::type_index> getDependencies() const override;
 
   private:
-    class MirBuilderContext *m_ctx;
-    class TargetDesc *m_targetDesc;
-    std::pmr::list<class MirFunction *> m_loweredFunctions;
+    class MirBuilderContext *m_ctx;                         ///< Shared builder context used to emit frame instructions.
+    class TargetDesc *m_targetDesc;                         ///< Target providing the concrete frame lowerer.
+    std::pmr::list<class MirFunction *> m_loweredFunctions; ///< Functions already frame-lowered, for printResult.
 };
 
 #endif // EZMIR_MIR_FRAME_LOWERER_PASS_H

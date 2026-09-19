@@ -3,17 +3,16 @@
 namespace CodeGenerators
 {
 
+// Stores the generator identity and the diagnostics/symbol/output dependencies shared by all passes.
 CodeGenerator::CodeGenerator(std::string_view generatorName,
                              DiagnosticCollector *collector,
                              SymbolTable *table,
                              std::filesystem::path outPath) :
-    m_generatorName(generatorName),
-    m_collector(collector),
-    m_table(table),
-    m_outputPath(std::move(outPath))
+    m_generatorName(generatorName), m_collector(collector), m_table(table), m_outputPath(std::move(outPath))
 {
 }
 
+// Confirms the collector and symbol table are non-null and an output path was supplied.
 bool CodeGenerator::validate() const
 {
     if (!m_collector)
@@ -36,6 +35,7 @@ bool CodeGenerator::validate() const
     return true;
 }
 
+// Treats the output path as a directory unless it already names a file with an extension.
 std::filesystem::path CodeGenerator::resolveSingleFilePath(std::string_view defaultFileName) const
 {
     if (std::filesystem::is_directory(m_outputPath) || !m_outputPath.has_extension())
@@ -45,6 +45,7 @@ std::filesystem::path CodeGenerator::resolveSingleFilePath(std::string_view defa
     return m_outputPath;
 }
 
+// Derives the header/source pair, honoring an explicit .h/.hpp/.cpp/.cxx output path when given.
 CodeGenerator::HeaderAndSourcePaths CodeGenerator::resolveHeaderAndSourcePaths(std::string_view defaultBaseName) const
 {
     HeaderAndSourcePaths result;
@@ -74,9 +75,10 @@ CodeGenerator::HeaderAndSourcePaths CodeGenerator::resolveHeaderAndSourcePaths(s
     return result;
 }
 
+// Reads and compares the destination, creating parent directories and writing atomically only on change.
 bool CodeGenerator::WriteFileIfChanged(const std::filesystem::path &filePath,
-                                      std::string_view newContent,
-                                      std::string *errorOut)
+                                       std::string_view newContent,
+                                       std::string *errorOut)
 {
     // Check if the file already exists and has identical content
     if (std::filesystem::exists(filePath))
@@ -135,6 +137,7 @@ bool CodeGenerator::WriteFileIfChanged(const std::filesystem::path &filePath,
     return true;
 }
 
+// Writes the file after a content comparison, then records a trace diagnostic on success.
 bool CodeGenerator::writeOutput(const std::filesystem::path &filePath, std::string_view content) const
 {
     std::string err;

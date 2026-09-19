@@ -17,10 +17,13 @@ namespace CodeGenerators
 class CodeGenerator
 {
   public:
+    /**
+     * Pair of resolved output paths for generators that emit a C++ header/source couple.
+     */
     struct HeaderAndSourcePaths
     {
-        std::filesystem::path m_headerPath;
-        std::filesystem::path m_sourcePath;
+        std::filesystem::path m_headerPath; ///< Resolved destination of the generated header.
+        std::filesystem::path m_sourcePath; ///< Resolved destination of the generated source.
     };
 
   public:
@@ -80,8 +83,8 @@ class CodeGenerator
 
     // --- Diagnostic Logging Helpers ---
 
-    template <typename... Args>
-    void trace(std::format_string<Args...> fmt, Args &&...args) const
+    /** Forwards a trace-level diagnostic to the collector, prefixed with the generator name. */
+    template <typename... Args> void trace(std::format_string<Args...> fmt, Args &&...args) const
     {
         if (m_collector)
         {
@@ -89,8 +92,8 @@ class CodeGenerator
         }
     }
 
-    template <typename... Args>
-    void error(std::format_string<Args...> fmt, Args &&...args) const
+    /** Forwards an error-level diagnostic to the collector, prefixed with the generator name. */
+    template <typename... Args> void error(std::format_string<Args...> fmt, Args &&...args) const
     {
         if (m_collector)
         {
@@ -98,8 +101,8 @@ class CodeGenerator
         }
     }
 
-    template <typename... Args>
-    void warn(std::format_string<Args...> fmt, Args &&...args) const
+    /** Emits a warning diagnostic, skipping formatting entirely when warnings are disabled for the collector. */
+    template <typename... Args> void warn(std::format_string<Args...> fmt, Args &&...args) const
     {
         if (m_collector)
         {
@@ -112,10 +115,10 @@ class CodeGenerator
     }
 
   protected:
-    std::string m_generatorName;
-    DiagnosticCollector *m_collector{ nullptr };
-    SymbolTable *m_table{ nullptr };
-    std::filesystem::path m_outputPath;
+    std::string m_generatorName;                 ///< Name attached to diagnostics and generated-file banners.
+    DiagnosticCollector *m_collector{ nullptr }; ///< Sink for diagnostics; may be null for silent operation.
+    SymbolTable *m_table{ nullptr };             ///< Parsed DSL symbols consumed by the generator.
+    std::filesystem::path m_outputPath;          ///< Destination file or directory for generated artifacts.
 };
 
 } // namespace CodeGenerators

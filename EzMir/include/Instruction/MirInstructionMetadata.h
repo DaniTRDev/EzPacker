@@ -8,13 +8,13 @@
  */
 enum class ExpectedOperandType : uint16_t
 {
-    None = 1 << 0,          // No operand expected
-    Register = 1 << 1,      // Virtual or physical register operand (MirRegister)
-    Integer = 1 << 2,       // Immediate integer constant (MirInteger)
-    FloatingPoint = 1 << 3, // Immediate floating-point constant (MirFloat)
-    Memory = 1 << 4,        // Memory reference addressing operand (MirMemory)
-    Reference = 1 << 5,     // Symbolic reference (MirReference to Block, Function, Global, Stack slot)
-    RuntimeSymbol = 1 << 6, // Named runtime library symbol (MirRuntimeSymbol)
+    None = 1 << 0,           // No operand expected
+    Register = 1 << 1,       // Virtual or physical register operand (MirRegister)
+    Integer = 1 << 2,        // Immediate integer constant (MirInteger)
+    FloatingPoint = 1 << 3,  // Immediate floating-point constant (MirFloat)
+    Memory = 1 << 4,         // Memory reference addressing operand (MirMemory)
+    Reference = 1 << 5,      // Symbolic reference (MirReference to Block, Function, Global, Stack slot)
+    RuntimeSymbol = 1 << 6,  // Named runtime library symbol (MirRuntimeSymbol)
     VariadicArgs = (1 << 7), // Variadic argument expansion slot
 
     // --- Composite Helper Masks ---
@@ -59,8 +59,8 @@ inline constexpr bool operator&(ExpectedOperandType a, ExpectedOperandType b)
 enum class MirOperandFlag : uint8_t
 {
     None = 0,
-    Read = 1 << 0,          // Operand is consumed/read by the instruction (USE)
-    Write = 1 << 1,         // Operand is defined/written by the instruction (DEF)
+    Read = 1 << 0,           // Operand is consumed/read by the instruction (USE)
+    Write = 1 << 1,          // Operand is defined/written by the instruction (DEF)
     ReadWrite = Read | Write // Operand is modified (both DEF and USE)
 };
 
@@ -102,22 +102,22 @@ struct MirOperandMetadata
 enum class MirInstructionFlags : uint32_t
 {
     None = 0,
-    SizeMatch = 1 << 0,      // All operands must share identical bit-width
-    DestLarger = 1 << 1,     // Destination operand bit-width must exceed source bit-width
-    DestSmaller = 1 << 2,    // Destination operand bit-width must be smaller than source bit-width
-    ReadsMemory = 1 << 3,    // Instruction performs memory load operations
-    WritesMemory = 1 << 4,   // Instruction performs memory store operations
-    IsTerminator = 1 << 5,   // Instruction terminates a basic block (branches, jumps, returns)
-    IsBranch = 1 << 6,       // Conditional or unconditional control-flow branch
-    IsCall = 1 << 7,         // Procedure call instruction
-    IsReturn = 1 << 8,       // Function return instruction
-    HasSideEffect = 1 << 9,  // Instruction has unmodeled side effects preventing DCE
-    IsCommutative = 1 << 10, // Binary operation is commutative: op(a, b) == op(b, a)
-    ReadsCPUFlags = 1 << 11, // Instruction inspects hardware status flags
-    WritesCPUFlags = 1 << 12,// Instruction modifies hardware status flags
-    TreatAsSigned = 1 << 13, // Arithmetic or comparison treats operands as signed integers
-    VariadicArgs = 1 << 14,  // Instruction accepts variable number of operands (e.g. CALL, PHI)
-    IsMove = 1 << 15         // Instruction is a register-to-register or direct value move
+    SizeMatch = 1 << 0,       // All operands must share identical bit-width
+    DestLarger = 1 << 1,      // Destination operand bit-width must exceed source bit-width
+    DestSmaller = 1 << 2,     // Destination operand bit-width must be smaller than source bit-width
+    ReadsMemory = 1 << 3,     // Instruction performs memory load operations
+    WritesMemory = 1 << 4,    // Instruction performs memory store operations
+    IsTerminator = 1 << 5,    // Instruction terminates a basic block (branches, jumps, returns)
+    IsBranch = 1 << 6,        // Conditional or unconditional control-flow branch
+    IsCall = 1 << 7,          // Procedure call instruction
+    IsReturn = 1 << 8,        // Function return instruction
+    HasSideEffect = 1 << 9,   // Instruction has unmodeled side effects preventing DCE
+    IsCommutative = 1 << 10,  // Binary operation is commutative: op(a, b) == op(b, a)
+    ReadsCPUFlags = 1 << 11,  // Instruction inspects hardware status flags
+    WritesCPUFlags = 1 << 12, // Instruction modifies hardware status flags
+    TreatAsSigned = 1 << 13,  // Arithmetic or comparison treats operands as signed integers
+    VariadicArgs = 1 << 14,   // Instruction accepts variable number of operands (e.g. CALL, PHI)
+    IsMove = 1 << 15          // Instruction is a register-to-register or direct value move
 };
 
 /**
@@ -143,15 +143,15 @@ inline constexpr bool operator&(MirInstructionFlags a, MirInstructionFlags b)
  */
 enum MirInstructionCategory : uint8_t
 {
-    MirCat_Invalid = 0,     // Invalid or uninitialized category
-    MirCat_DataMovement,    // Register moves, constant loading (MOV)
-    MirCat_Memory,          // Memory loads and stores (LOAD, STORE)
-    MirCat_Arithmetic,      // Arithmetic computations (ADD, SUB, MUL, DIV, NEG)
-    MirCat_Bitwise,         // Bitwise logic and shifts (AND, OR, XOR, SHL, SHR)
-    MirCat_Compare,         // Relational comparisons (CMP_EQ, CMP_NE, CMP_LT, etc.)
-    MirCat_ControlFlow,     // Branches, jumps, calls, returns, phi nodes (BR, JMP, CALL, RET, PHI)
-    MirCat_Casting,         // Type conversions, truncations, extensions (CAST, TRUNC, ZEXT, SEXT)
-    MirCat_System           // System calls, interrupts, inline assembly
+    MirCat_Invalid = 0,  // Invalid or uninitialized category
+    MirCat_DataMovement, // Register moves, constant loading (MOV)
+    MirCat_Memory,       // Memory loads and stores (LOAD, STORE)
+    MirCat_Arithmetic,   // Arithmetic computations (ADD, SUB, MUL, DIV, NEG)
+    MirCat_Bitwise,      // Bitwise logic and shifts (AND, OR, XOR, SHL, SHR)
+    MirCat_Compare,      // Relational comparisons (CMP_EQ, CMP_NE, CMP_LT, etc.)
+    MirCat_ControlFlow,  // Branches, jumps, calls, returns, phi nodes (BR, JMP, CALL, RET, PHI)
+    MirCat_Casting,      // Type conversions, truncations, extensions (CAST, TRUNC, ZEXT, SEXT)
+    MirCat_System        // System calls, interrupts, inline assembly
 };
 
 /**
@@ -175,7 +175,8 @@ inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2St
 enum class MirInstructionTier : uint8_t
 {
     HighLevel,    // Standard IR opcodes emitted by the frontend/IRBuilder (ADD, SUB, CALL, RET, etc.)
-    PassInternal, // Intermediate lowering opcodes generated/consumed by passes (PUSH_ARG, POP_ARG, PUSH_RET, POP_RET, etc.)
+    PassInternal, // Intermediate lowering opcodes generated/consumed by passes (PUSH_ARG, POP_ARG, PUSH_RET, POP_RET,
+                  // etc.)
     TargetLow     // Machine-specific target instructions produced by instruction selection
 };
 

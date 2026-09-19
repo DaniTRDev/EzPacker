@@ -12,8 +12,8 @@ namespace DSL::Ast::RegisterDef
  */
 struct RegisterClassDecl
 {
-    Common::Identifier m_name;
-    Common::IntegerLiteral m_bitSize;
+    Common::Identifier m_name;        // Class name (e.g. GPR8).
+    Common::IntegerLiteral m_bitSize; // Width in bits shared by all registers in the class.
 };
 
 /**
@@ -22,8 +22,8 @@ struct RegisterClassDecl
  */
 struct SubRegisterEdge
 {
-    Common::Identifier m_wideClass;
-    Common::Identifier m_narrowClass;
+    Common::Identifier m_wideClass;   // Wider (parent) class.
+    Common::Identifier m_narrowClass; // Narrower (sub-register) class carved from the wide class.
 };
 
 /**
@@ -31,8 +31,8 @@ struct SubRegisterEdge
  */
 struct RegisterNameBinding
 {
-    Common::Identifier m_asmName;
-    Common::Identifier m_className;
+    Common::Identifier m_asmName;   // Printable assembly name at the bound width.
+    Common::Identifier m_className; // Class whose width this name applies to.
 };
 
 /**
@@ -41,9 +41,9 @@ struct RegisterNameBinding
  */
 struct RegisterDecl
 {
-    Common::Identifier m_canonicalName;
-    Common::IntegerLiteral m_encoding;
-    std::pmr::vector<RegisterNameBinding> m_names;
+    Common::Identifier m_canonicalName;            // Widest/primary assembly name.
+    Common::IntegerLiteral m_encoding;             // Hardware encoding shared across the bank.
+    std::pmr::vector<RegisterNameBinding> m_names; // Per-class assembly-name aliases.
 };
 
 /**
@@ -52,10 +52,10 @@ struct RegisterDecl
  */
 struct RegisterBankDecl
 {
-    Common::Identifier m_name;
-    std::pmr::vector<RegisterClassDecl> m_classes;
-    std::pmr::vector<SubRegisterEdge> m_subRegisterEdges;
-    std::pmr::vector<RegisterDecl> m_registers;
+    Common::Identifier m_name;                            // Bank name.
+    std::pmr::vector<RegisterClassDecl> m_classes;        // Width classes declared in the bank.
+    std::pmr::vector<SubRegisterEdge> m_subRegisterEdges; // Wide-to-narrow class relations.
+    std::pmr::vector<RegisterDecl> m_registers;           // Physical registers in the bank.
 };
 
 /**
@@ -63,8 +63,8 @@ struct RegisterBankDecl
  */
 struct SpecialRegDecl
 {
-    Common::Identifier m_name;
-    Common::IntegerLiteral m_id;
+    Common::Identifier m_name;   // Pseudo-register name.
+    Common::IntegerLiteral m_id; // Identifier reserved outside allocatable encodings.
 };
 
 /**
@@ -72,9 +72,9 @@ struct SpecialRegDecl
  */
 struct RegisterFile
 {
-    Common::Identifier m_target;
-    std::pmr::vector<RegisterBankDecl> m_banks;
-    std::pmr::vector<SpecialRegDecl> m_specialRegs;
+    Common::Identifier m_target;                    // Target name this register file describes.
+    std::pmr::vector<RegisterBankDecl> m_banks;     // All declared register banks.
+    std::pmr::vector<SpecialRegDecl> m_specialRegs; // All declared special/pseudo registers.
 };
 
 } // namespace DSL::Ast::RegisterDef

@@ -11,17 +11,21 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating a C++ instruction selector from instruction-select (.isf) patterns.
+ */
 class CppInstructionSelectorGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
     std::optional<ParseContext> m_ctx;
     std::optional<DSL::Ast::InstructionSelectDef::InstructionSelectFile> m_ast;
 
+    // Parses ISF source and runs the instruction-select semantic pass, returning success.
     bool parseAndRunPass(const std::string &source)
     {
         m_ctx.emplace(createParseContextFromBuff("isel_test", source));
         m_ast = m_ctx->parse<DSL::Parser::InstructionSelectDef::InstructionSelectFile,
-                              DSL::Ast::InstructionSelectDef::InstructionSelectFile>();
+                             DSL::Ast::InstructionSelectDef::InstructionSelectFile>();
         if (!m_ast.has_value())
         {
             return false;
@@ -38,6 +42,7 @@ class CppInstructionSelectorGeneratorTest : public EzDslCodeGeneratorsTestSuiteA
     }
 };
 
+// Generates an instruction selector and checks the emitted dispatch, selection helpers, and predicates.
 TEST_F(CppInstructionSelectorGeneratorTest, TestInstructionSelectorGeneration)
 {
     std::string isfSource = R"(
@@ -111,13 +116,17 @@ TEST_F(CppInstructionSelectorGeneratorTest, TestInstructionSelectorGeneration)
     // Verify Header
     EXPECT_NE(headerContent.find("EZTRIPLE_AMD64_INSTRUCTION_SELECTOR_H"), std::string::npos);
     EXPECT_NE(headerContent.find("class AMD64InstructionSelector : public MirInstructionSelector"), std::string::npos);
-    EXPECT_NE(headerContent.find("bool select(MirBuilderContext *ctx, MirInstruction *inst) override;"), std::string::npos);
+    EXPECT_NE(headerContent.find("bool select(MirBuilderContext *ctx, MirInstruction *inst) override;"),
+              std::string::npos);
     EXPECT_NE(headerContent.find("bool selectADD(MirBuilderContext *ctx, MirInstruction *inst);"), std::string::npos);
 
     // Verify Source
-    EXPECT_NE(sourceContent.find("AMD64InstructionSelector::select(MirBuilderContext *ctx, MirInstruction *inst)"), std::string::npos);
+    EXPECT_NE(sourceContent.find("AMD64InstructionSelector::select(MirBuilderContext *ctx, MirInstruction *inst)"),
+              std::string::npos);
     EXPECT_NE(sourceContent.find("case MirInstructionOpCode::ADD:"), std::string::npos);
-    EXPECT_NE(sourceContent.find("bool AMD64InstructionSelector::selectADD(MirBuilderContext *ctx, MirInstruction *inst)"), std::string::npos);
+    EXPECT_NE(sourceContent.find(
+                      "bool AMD64InstructionSelector::selectADD(MirBuilderContext *ctx, MirInstruction *inst)"),
+              std::string::npos);
     EXPECT_NE(sourceContent.find("findClass(\"GPR32\")"), std::string::npos);
     EXPECT_NE(sourceContent.find("AMD64TargetInst::getTargetDesc(AMD64TargetInst::ADD32rm)"), std::string::npos);
     EXPECT_NE(sourceContent.find("AMD64TargetInst::getTargetDesc(AMD64TargetInst::ADD32rr)"), std::string::npos);

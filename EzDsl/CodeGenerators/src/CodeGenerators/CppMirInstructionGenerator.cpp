@@ -10,6 +10,7 @@ namespace CodeGenerators
 namespace
 {
 
+// Maps a parsed IR instruction category to the generated MirCat_* enum spelling.
 std::string CategoryToString(DSL::Ast::IrInstDef::IrInstCategory category)
 {
     using namespace DSL::Ast::IrInstDef;
@@ -37,6 +38,7 @@ std::string CategoryToString(DSL::Ast::IrInstDef::IrInstCategory category)
     }
 }
 
+// Maps a parsed IR tier to the generated T(...) macro argument spelling.
 std::string TierToString(DSL::Ast::IrInstDef::IrInstTier tier)
 {
     using namespace DSL::Ast::IrInstDef;
@@ -52,6 +54,7 @@ std::string TierToString(DSL::Ast::IrInstDef::IrInstTier tier)
     return "T(HighLevel)";
 }
 
+// Maps a parsed operand type constraint to the generated ExpectedOperandType enumerator.
 std::string OperandTypeToString(DSL::Ast::IrInstDef::IrOperandType type)
 {
     using namespace DSL::Ast::IrInstDef;
@@ -89,6 +92,7 @@ std::string OperandTypeToString(DSL::Ast::IrInstDef::IrOperandType type)
     }
 }
 
+// Maps a parsed operand direction to the generated MirOperandFlag read/write flag.
 std::string OperandDirToString(DSL::Ast::IrInstDef::IrOperandDir dir)
 {
     using namespace DSL::Ast::IrInstDef;
@@ -104,6 +108,7 @@ std::string OperandDirToString(DSL::Ast::IrInstDef::IrOperandDir dir)
     return "MirOperandFlag::Read";
 }
 
+// Expands the instruction flag bitmask into an OR-expression of F(...) macro invocations.
 std::string FlagsToString(DSL::Ast::IrInstDef::IrInstFlag flags)
 {
     using namespace DSL::Ast::IrInstDef;
@@ -114,6 +119,7 @@ std::string FlagsToString(DSL::Ast::IrInstDef::IrInstFlag flags)
     }
 
     std::vector<std::string> flagNames;
+    // Appends F(<name>) to flagNames only when the matching bit is set in flags.
     auto checkFlag = [&](IrInstFlag flag, std::string_view name)
     {
         if ((static_cast<uint32_t>(flags) & static_cast<uint32_t>(flag)) != 0)
@@ -157,6 +163,7 @@ std::string FlagsToString(DSL::Ast::IrInstDef::IrInstFlag flags)
 
 } // namespace
 
+// Binds the generator to its diagnostic collector and symbol table using a fixed diagnostic prefix.
 CppMirInstructionGenerator::CppMirInstructionGenerator(DiagnosticCollector *collector,
                                                        SymbolTable *table,
                                                        std::filesystem::path outPath) :
@@ -164,6 +171,7 @@ CppMirInstructionGenerator::CppMirInstructionGenerator(DiagnosticCollector *coll
 {
 }
 
+// Collects every IR instruction symbol recorded by Sema, preserving symbol-table order.
 std::vector<const Symbol *> CppMirInstructionGenerator::collectInstructionSymbols() const
 {
     std::vector<const Symbol *> instSymbols;
@@ -182,12 +190,14 @@ std::vector<const Symbol *> CppMirInstructionGenerator::collectInstructionSymbol
     return instSymbols;
 }
 
+// Serializes the parsed IR instructions into the X-macro form consumed by EzMir.
 void CppMirInstructionGenerator::emitInstructionDefs(CppSourceEmitter &emitter,
-                                                    const std::vector<const Symbol *> &instSymbols) const
+                                                     const std::vector<const Symbol *> &instSymbols) const
 {
     emitter.emitBanner("CppMirInstructionGenerator");
     emitter.emitBlankLine();
 
+    // The INSTRUCTION X-macro is provided by the including translation unit.
     emitter.emitLine("#ifdef INSTRUCTION");
     emitter.emitBlankLine();
 
@@ -199,12 +209,14 @@ void CppMirInstructionGenerator::emitInstructionDefs(CppSourceEmitter &emitter,
     emitter.emitLine("#endif");
     emitter.emitBlankLine();
 
+    // Convenience macros keep the generated registration lines compact and readable.
     emitter.emitLine("#define OPERAND_CONSTRAINTS(...) { __VA_ARGS__ }");
     emitter.emitComment("Helper to keep the flags readable without polluting the global namespace");
     emitter.emitLine("#define F(x) MirInstructionFlags::x");
     emitter.emitLine("#define T(x) MirInstructionTier::x");
     emitter.emitBlankLine();
 
+    // Opcode 0 is reserved as the invalid/sentinel instruction.
     emitter.emitLine("INSTRUCTION(INVALID, T(HighLevel), MirCat_Invalid, OPERAND_CONSTRAINTS(), F(None))");
 
     for (const Symbol *sym : instSymbols)
@@ -227,6 +239,7 @@ void CppMirInstructionGenerator::emitInstructionDefs(CppSourceEmitter &emitter,
         }
         else
         {
+            // Render each operand as an { ExpectedType, Read/WriteFlag } constraint pair.
             std::vector<std::string> constraints;
             for (const auto &op : data->m_operands)
             {
@@ -268,6 +281,7 @@ void CppMirInstructionGenerator::emitInstructionDefs(CppSourceEmitter &emitter,
     }
 
     emitter.emitBlankLine();
+    // Drop the locally-defined helper macros so they cannot leak into the consumer.
     emitter.emitLine("#undef T");
     emitter.emitLine("#undef F");
     emitter.emitLine("#undef OPERAND_CONSTRAINTS");
@@ -282,6 +296,7 @@ void CppMirInstructionGenerator::emitInstructionDefs(CppSourceEmitter &emitter,
     emitter.emitLine("#endif // INSTRUCTION");
 }
 
+// Validates prerequisites, emits the definitions, and writes the single output header.
 bool CppMirInstructionGenerator::run()
 {
     if (!validate())
@@ -309,9 +324,8 @@ bool CppMirInstructionGenerator::run()
     return true;
 }
 
-bool GenerateMirIrInstructionDefs(DiagnosticCollector *collector,
-                                 SymbolTable *table,
-                                 std::filesystem::path outPath)
+// Convenience wrapper retained for callers that do not need to configure a generator object.
+bool GenerateMirIrInstructionDefs(DiagnosticCollector *collector, SymbolTable *table, std::filesystem::path outPath)
 {
     CppMirInstructionGenerator generator(collector, table, std::move(outPath));
     return generator.run();

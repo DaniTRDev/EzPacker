@@ -9,9 +9,10 @@ namespace
 {
 
 #pragma pack(push, 1)
+// ELF64 file header (Elf64_Ehdr): identifies the object and locates the section table.
 struct Elf64_Ehdr
 {
-    uint8_t  e_ident[16];
+    uint8_t e_ident[16];
     uint16_t e_type;
     uint16_t e_machine;
     uint32_t e_version;
@@ -27,6 +28,7 @@ struct Elf64_Ehdr
     uint16_t e_shstrndx;
 };
 
+// ELF64 section header (Elf64_Shdr): describes one section's type, flags and file location.
 struct Elf64_Shdr
 {
     uint32_t sh_name;
@@ -41,24 +43,27 @@ struct Elf64_Shdr
     uint64_t sh_entsize;
 };
 
+// ELF64 symbol table entry (Elf64_Sym): name offset, binding/type, section and value.
 struct Elf64_Sym
 {
     uint32_t st_name;
-    uint8_t  st_info;
-    uint8_t  st_other;
+    uint8_t st_info;
+    uint8_t st_other;
     uint16_t st_shndx;
     uint64_t st_value;
     uint64_t st_size;
 };
 
+// ELF64 relocation with explicit addend (Elf64_Rela): offset, symbol+type, addend.
 struct Elf64_Rela
 {
     uint64_t r_offset;
     uint64_t r_info;
-    int64_t  r_addend;
+    int64_t r_addend;
 };
 #pragma pack(pop)
 
+// Section type (sh_type) values.
 constexpr uint32_t SHT_NULL = 0;
 constexpr uint32_t SHT_PROGBITS = 1;
 constexpr uint32_t SHT_SYMTAB = 2;
@@ -66,11 +71,13 @@ constexpr uint32_t SHT_STRTAB = 3;
 constexpr uint32_t SHT_RELA = 4;
 constexpr uint32_t SHT_NOBITS = 8;
 
+// Section attribute (sh_flags) bits.
 constexpr uint64_t SHF_WRITE = 0x1;
 constexpr uint64_t SHF_ALLOC = 0x2;
 constexpr uint64_t SHF_EXECINSTR = 0x4;
 constexpr uint64_t SHF_INFO_LINK = 0x40;
 
+// Symbol binding (high nibble of st_info) and type (low nibble).
 constexpr uint8_t STB_LOCAL = 0;
 constexpr uint8_t STB_GLOBAL = 1;
 constexpr uint8_t STT_NOTYPE = 0;
@@ -78,32 +85,44 @@ constexpr uint8_t STT_OBJECT = 1;
 constexpr uint8_t STT_FUNC = 2;
 constexpr uint8_t STT_SECTION = 3;
 
+// x86-64 relocation types (R_X86_64_*).
 constexpr uint32_t R_X86_64_NONE = 0;
 constexpr uint32_t R_X86_64_64 = 1;
 constexpr uint32_t R_X86_64_PC32 = 2;
 constexpr uint32_t R_X86_64_PLT32 = 4;
 constexpr uint32_t R_X86_64_GOTPCREL = 9;
 
+// Translates a target-agnostic relocation kind into its x86-64 ELF type; NONE = no fixup.
 uint32_t mapRelocType(TargetCodeRelocationType type)
 {
     switch (type)
     {
-        case TargetCodeRelocationType::Absolute64: return R_X86_64_64;
-        case TargetCodeRelocationType::Absolute32: return 10; // R_X86_64_32
-        case TargetCodeRelocationType::PCRel32: return R_X86_64_PC32;
-        case TargetCodeRelocationType::BranchRel32: return R_X86_64_PLT32;
-        case TargetCodeRelocationType::GOTPCREL: return R_X86_64_GOTPCREL;
-        case TargetCodeRelocationType::PLTRel32: return R_X86_64_PLT32;
-        default: return R_X86_64_NONE;
+        case TargetCodeRelocationType::Absolute64:
+            return R_X86_64_64;
+        case TargetCodeRelocationType::Absolute32:
+            return 10; // R_X86_64_32
+        case TargetCodeRelocationType::PCRel32:
+            return R_X86_64_PC32;
+        case TargetCodeRelocationType::BranchRel32:
+            return R_X86_64_PLT32;
+        case TargetCodeRelocationType::GOTPCREL:
+            return R_X86_64_GOTPCREL;
+        case TargetCodeRelocationType::PLTRel32:
+            return R_X86_64_PLT32;
+        default:
+            return R_X86_64_NONE;
     }
 }
 
+// Rounds offset up to the next multiple of alignment (alignment assumed power-of-two).
 uint64_t alignTo(uint64_t offset, uint64_t alignment)
 {
-    if (alignment <= 1) return offset;
+    if (alignment <= 1)
+        return offset;
     return (offset + alignment - 1) & ~(alignment - 1);
 }
 
+// Grows buf with padByte until it reaches targetOffset.
 void padTo(std::vector<uint8_t> &buf, uint64_t targetOffset, uint8_t padByte = 0)
 {
     if (buf.size() < targetOffset)
@@ -112,6 +131,7 @@ void padTo(std::vector<uint8_t> &buf, uint64_t targetOffset, uint8_t padByte = 0
     }
 }
 
+// Interns str into a string table, returning its byte offset (0 for the empty initial entry).
 uint32_t addString(std::vector<uint8_t> &strtab, std::string_view str)
 {
     if (strtab.empty())
@@ -130,15 +150,9 @@ uint32_t addString(std::vector<uint8_t> &strtab, std::string_view str)
 
 } // namespace
 
-void Elf64Writer::addSymbol(const ObjectSymbol &sym)
-{
-    m_symbols.push_back(sym);
-}
+void Elf64Writer::addSymbol(const ObjectSymbol &sym) { m_symbols.push_back(sym); }
 
-void Elf64Writer::addRelocation(const ObjectRelocEntry &reloc)
-{
-    m_relocs.push_back(reloc);
-}
+void Elf64Writer::addRelocation(const ObjectRelocEntry &reloc) { m_relocs.push_back(reloc); }
 
 void Elf64Writer::clear()
 {
@@ -179,7 +193,10 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
     // Mapping from SectionType to 1-based section header index
     std::unordered_map<SectionType, uint16_t> sectionIndexMap;
 
-    auto processCodeSection = [&](SectionType type, const char *secName, uint32_t shType, uint64_t flags, uint64_t alignment) {
+    // Copies a code section (if present) into the section list, recording NOBITS for .bss.
+    auto processCodeSection =
+            [&](SectionType type, const char *secName, uint32_t shType, uint64_t flags, uint64_t alignment)
+    {
         auto it = sections.find(type);
         if (it != sections.end() && it->second)
         {
@@ -226,6 +243,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
         elfSym.st_name = addString(strtab, sym.m_name);
         uint8_t bind = sym.m_isGlobal ? STB_GLOBAL : STB_LOCAL;
         uint8_t symType = sym.m_isFunction ? STT_FUNC : STT_OBJECT;
+        // st_info packs binding in the high nibble and symbol type in the low nibble.
         elfSym.st_info = (bind << 4) | (symType & 0x0F);
         elfSym.st_other = 0;
         auto itSec = sectionIndexMap.find(sym.m_section);
@@ -253,6 +271,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
                 symIdx = itSym->second;
             }
             uint32_t rType = mapRelocType(reloc.m_type);
+            // r_info packs the symbol index in the high 32 bits and the type in the low 32.
             r.r_info = (static_cast<uint64_t>(symIdx) << 32) | (rType & 0xFFFFFFFFULL);
             r.r_addend = reloc.m_addend;
             relaTable.push_back(r);

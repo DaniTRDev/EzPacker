@@ -18,8 +18,8 @@ namespace Symbols
  */
 struct TargetDescSymbol
 {
-    std::string_view m_name;
-    const DSL::Ast::TargetDesc::TargetDescDecl *m_astNode{ nullptr };
+    std::string_view m_name;                                          // Target name.
+    const DSL::Ast::TargetDesc::TargetDescDecl *m_astNode{ nullptr }; // Backing AST manifest.
 };
 
 } // namespace Symbols

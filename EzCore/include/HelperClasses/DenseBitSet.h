@@ -46,7 +46,7 @@ class DenseBitSet
     bool computeLiveIn(const DenseBitSet &use, const DenseBitSet &liveOut, const DenseBitSet &def);
 
   private:
-    std::vector<uint64_t> m_words;
+    std::vector<uint64_t> m_words; // Backing storage; each word holds 64 consecutive bits.
 };
 
 #endif // EZCORE_DENSE_BIT_SET_H

@@ -9,9 +9,12 @@
  */
 struct CodeFlowResult
 {
-    std::pmr::map<MirId, std::pmr::set<MirId>> m_successors;
-    std::pmr::map<MirId, std::pmr::set<MirId>> m_predecessors;
+    std::pmr::map<MirId, std::pmr::set<MirId>> m_successors;   // Block ID -> successor block IDs.
+    std::pmr::map<MirId, std::pmr::set<MirId>> m_predecessors; // Block ID -> predecessor block IDs.
 
+    /**
+     * Allocates both adjacency maps from the given arena.
+     */
     CodeFlowResult(std::pmr::memory_resource *arena) : m_successors(arena), m_predecessors(arena) {}
 };
 
@@ -67,9 +70,9 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     void addEdge(const class MirBlock *from, const class MirBlock *to);
 
   private:
-    CodeFlowResult m_result;
-    class MirBuilderContext *m_ctx;
-    std::pmr::memory_resource *m_arena;
+    CodeFlowResult m_result;            // Last computed CFG adjacency mappings.
+    class MirBuilderContext *m_ctx;     // Context whose functions are inspected.
+    std::pmr::memory_resource *m_arena; // Arena backing the result containers.
 };
 
 #endif // EZPACKER_CODEFLOWANALYSIS_H

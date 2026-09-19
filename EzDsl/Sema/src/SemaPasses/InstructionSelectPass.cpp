@@ -9,6 +9,10 @@ namespace
 {
 constexpr auto PassName = "Sema::InstructionSelectPass";
 
+/**
+ * Recursively gathers every variable name bound by a match tree (SSA registers, immediate
+ * symbols, address-mode arguments, and nested trees) so later clauses can be checked against them.
+ */
 void collectBoundVars(const DSL::Ast::InstructionSelectDef::PatternTree &tree,
                       std::unordered_set<std::string_view> &boundVars)
 {
@@ -49,8 +53,10 @@ bool InstructionSelectPass::run(DiagnosticCollector *collector,
         return false;
     }
 
-    collector->trace(PassName, "Running semantic validation for {} addressing modes and {} selection patterns",
-                     file->m_addressingModes.size(), file->m_patterns.size());
+    collector->trace(PassName,
+                     "Running semantic validation for {} addressing modes and {} selection patterns",
+                     file->m_addressingModes.size(),
+                     file->m_patterns.size());
 
     bool hasErrors = false;
 
@@ -81,8 +87,7 @@ bool InstructionSelectPass::validateAddrMode(DiagnosticCollector *collector,
 
     if (table->getSymByName(mode.m_modeName.m_node) != nullptr)
     {
-        collector->error(PassName, "Addressing mode '{}': Duplicate symbol declaration", mode.m_modeName.m_node)
-            << ref;
+        collector->error(PassName, "Addressing mode '{}': Duplicate symbol declaration", mode.m_modeName.m_node) << ref;
         return false;
     }
 
@@ -91,17 +96,16 @@ bool InstructionSelectPass::validateAddrMode(DiagnosticCollector *collector,
     {
         if (!paramNames.insert(param.m_name.m_node).second)
         {
-            collector->error(PassName, "Addressing mode '{}': Duplicate parameter name '{}'",
-                             mode.m_modeName.m_node, param.m_name.m_node)
-                << param.m_name.m_sourceRef;
+            collector->error(PassName,
+                             "Addressing mode '{}': Duplicate parameter name '{}'",
+                             mode.m_modeName.m_node,
+                             param.m_name.m_node)
+                    << param.m_name.m_sourceRef;
             return false;
         }
     }
 
-    Symbols::AddrModeSymbol symData{
-        .m_name = mode.m_modeName.m_node,
-        .m_astNode = &mode
-    };
+    Symbols::AddrModeSymbol symData{ .m_name = mode.m_modeName.m_node, .m_astNode = &mode };
 
     SymbolId id = table->declareSym(ref, SymbolType::AddressingMode, std::move(symData), mode.m_modeName.m_node);
     if (id == InvalidSymbolId)
@@ -115,15 +119,15 @@ bool InstructionSelectPass::validateAddrMode(DiagnosticCollector *collector,
 }
 
 bool InstructionSelectPass::validatePattern(DiagnosticCollector *collector,
-                                           SymbolTable *table,
-                                           const DSL::Ast::InstructionSelectDef::SelectionPattern &pattern)
+                                            SymbolTable *table,
+                                            const DSL::Ast::InstructionSelectDef::SelectionPattern &pattern)
 {
     SourceReference *ref = pattern.m_name.m_sourceRef;
 
     if (table->getSymByName(pattern.m_name.m_node) != nullptr)
     {
         collector->error(PassName, "Selection pattern '{}': Duplicate symbol declaration", pattern.m_name.m_node)
-            << ref;
+                << ref;
         return false;
     }
 
@@ -137,9 +141,11 @@ bool InstructionSelectPass::validatePattern(DiagnosticCollector *collector,
         {
             if (boundVars.find(arg.m_node) == boundVars.end())
             {
-                collector->error(PassName, "Pattern '{}': 'when' clause references unbound variable '${}'",
-                                 pattern.m_name.m_node, arg.m_node)
-                    << arg.m_sourceRef;
+                collector->error(PassName,
+                                 "Pattern '{}': 'when' clause references unbound variable '${}'",
+                                 pattern.m_name.m_node,
+                                 arg.m_node)
+                        << arg.m_sourceRef;
                 return false;
             }
         }
@@ -155,9 +161,11 @@ bool InstructionSelectPass::validatePattern(DiagnosticCollector *collector,
             {
                 if (boundVars.find(op.m_name.m_node) == boundVars.end())
                 {
-                    collector->error(PassName, "Pattern '{}': 'select' clause references unbound variable '${}'",
-                                     pattern.m_name.m_node, op.m_name.m_node)
-                        << op.m_name.m_sourceRef;
+                    collector->error(PassName,
+                                     "Pattern '{}': 'select' clause references unbound variable '${}'",
+                                     pattern.m_name.m_node,
+                                     op.m_name.m_node)
+                            << op.m_name.m_sourceRef;
                     return false;
                 }
             }
@@ -167,9 +175,11 @@ bool InstructionSelectPass::validatePattern(DiagnosticCollector *collector,
                 {
                     if (boundVars.find(memOp.m_node) == boundVars.end())
                     {
-                        collector->error(PassName, "Pattern '{}': Memory operand references unbound variable '${}'",
-                                         pattern.m_name.m_node, memOp.m_node)
-                            << memOp.m_sourceRef;
+                        collector->error(PassName,
+                                         "Pattern '{}': Memory operand references unbound variable '${}'",
+                                         pattern.m_name.m_node,
+                                         memOp.m_node)
+                                << memOp.m_sourceRef;
                         return false;
                     }
                 }
@@ -177,11 +187,9 @@ bool InstructionSelectPass::validatePattern(DiagnosticCollector *collector,
         }
     }
 
-    Symbols::SelectionPatternSymbol symData{
-        .m_name = pattern.m_name.m_node,
-        .m_cost = pattern.m_cost,
-        .m_astNode = &pattern
-    };
+    Symbols::SelectionPatternSymbol symData{ .m_name = pattern.m_name.m_node,
+                                             .m_cost = pattern.m_cost,
+                                             .m_astNode = &pattern };
 
     SymbolId id = table->declareSym(ref, SymbolType::SelectionPattern, std::move(symData), pattern.m_name.m_node);
     if (id == InvalidSymbolId)

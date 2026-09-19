@@ -63,6 +63,10 @@ enum class SymbolType : uint8_t
 class Symbol
 {
   public:
+    /**
+     * Variant holding the typed semantic payload for any supported declaration kind; the active
+     * alternative is determined by the symbol's SymbolType.
+     */
     using SymbolData = std::variant<std::monostate,
                                     Symbols::TypeSymbol,
                                     Symbols::IrInstructionSymbol,
@@ -141,12 +145,12 @@ class Symbol
     const std::string_view &getName() const;
 
   private:
-    class SourceReference *m_sourceRef;
-    SymbolData m_data;
-    SymbolId m_definingScopeId; // Same datatype as ScopeId but we can't use here...
-    SymbolId m_id;
-    SymbolType m_type;
-    std::string_view m_name;
+    class SourceReference *m_sourceRef; // Source span of the declaration.
+    SymbolData m_data;                  // Typed semantic payload.
+    SymbolId m_definingScopeId;         // Same datatype as ScopeId but we can't use here...
+    SymbolId m_id;                      // Unique ID within the symbol table.
+    SymbolType m_type;                  // Classification of the symbol.
+    std::string_view m_name;            // Declared identifier name.
 };
 
 #endif // EZDSLSEMA_SYMBOL_H

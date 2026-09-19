@@ -4,33 +4,25 @@
 #include <bit>
 #include <cstdint>
 
-LegalizationResult AMD64CallLowering(LegalizeCtx &ctx)
-{
-    return LegalizeActions::LegalizeCall(ctx);
-}
+/// Entry point registered as the AMD64 CALL/lower handler; dispatches to the shared call legalizer.
+LegalizationResult AMD64CallLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeCall(ctx); }
 
-LegalizationResult AMD64ReturnLowering(LegalizeCtx &ctx)
-{
-    return LegalizeActions::LegalizeReturn(ctx);
-}
+/// Entry point registered as the AMD64 RET/lower handler; dispatches to the shared return legalizer.
+LegalizationResult AMD64ReturnLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeReturn(ctx); }
 
-bool isPowTwo(int64_t val)
-{
-    return val > 0 && (val & (val - 1)) == 0;
-}
+/// Predicate used by legalization rules: true when val is a positive power of two.
+bool isPowTwo(int64_t val) { return val > 0 && (val & (val - 1)) == 0; }
 
-bool isPositiveConst(int64_t val)
-{
-    return val > 0;
-}
+/// Predicate used by legalization rules: true when val is a strictly positive constant.
+bool isPositiveConst(int64_t val) { return val > 0; }
 
+/// Returns floor(log2(val)) for val > 0, or 0 for non-positive values (used to derive shift amounts).
 int64_t log2(int64_t val)
 {
-    if (val <= 0) return 0;
+    if (val <= 0)
+        return 0;
     return std::countr_zero(static_cast<uint64_t>(val));
 }
 
-int64_t sub1(int64_t val)
-{
-    return val - 1;
-}
+/// Returns val - 1, used by rule predicates that match a power-of-two-plus-one pattern.
+int64_t sub1(int64_t val) { return val - 1; }

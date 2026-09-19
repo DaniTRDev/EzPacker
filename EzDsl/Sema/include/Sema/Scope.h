@@ -5,8 +5,8 @@
 
 #include <unordered_map>
 
-using ScopeId = size_t;
-inline constexpr ScopeId InvalidScopeId = UINT64_MAX;
+using ScopeId = size_t;                               // Index of a scope within the SymbolTable's scope arena.
+inline constexpr ScopeId InvalidScopeId = UINT64_MAX; // Sentinel for "no scope".
 
 /**
  * Lexical and semantic scope tracking locally declared symbols in an arena-backed hash table.
@@ -38,10 +38,7 @@ class Scope
     /**
      * Finds all locally declared symbol IDs by name.
      */
-    auto findSymbols(std::string_view name) const
-    {
-        return m_symbolMap.equal_range(name);
-    }
+    auto findSymbols(std::string_view name) const { return m_symbolMap.equal_range(name); }
 
     /**
      * Registers a symbol name and its SymbolId into this scope's lookup table and ordered list.
@@ -59,11 +56,11 @@ class Scope
     const std::string_view &getDebugName() const;
 
   private:
-    ScopeId m_id;
-    ScopeId m_parentId;
-    std::pmr::vector<ScopeId> m_symbols;
-    std::pmr::unordered_multimap<std::string_view, ScopeId> m_symbolMap;
-    std::string_view m_debugName;
+    ScopeId m_id;                        // Unique ID of this scope.
+    ScopeId m_parentId;                  // Enclosing scope ID, or InvalidScopeId at the root.
+    std::pmr::vector<ScopeId> m_symbols; // Symbols declared here, in declaration order.
+    std::pmr::unordered_multimap<std::string_view, ScopeId> m_symbolMap; // Name-to-symbol lookup within this scope.
+    std::string_view m_debugName;                                        // Human-readable label for diagnostics.
 };
 
 #endif // EZDSLSEMA_SCOPE_H

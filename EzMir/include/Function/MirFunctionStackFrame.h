@@ -21,9 +21,9 @@ struct StackFrameObject
 {
     // Byte offset relative to frame pointer / stack pointer calculated during frame lowering
     int64_t m_offset{ 0 };
-    class MirType *m_type;
-    size_t m_id;
-    StackFrameObjectSource m_source;
+    class MirType *m_type;           // Type describing the size/alignment of the object.
+    size_t m_id;                     // Sequential ID assigned from the object's position in the frame.
+    StackFrameObjectSource m_source; // Why the object exists (parameter, local or spill).
 };
 
 /**
@@ -73,7 +73,7 @@ class MirFunctionStackFrame
     const std::pmr::vector<StackFrameObject *> &getObjects() const;
 
   private:
-    std::pmr::vector<StackFrameObject *> m_stackFrameObjects;
+    std::pmr::vector<StackFrameObject *> m_stackFrameObjects; // Allocated objects; index doubles as their ID.
 };
 
 #endif // EZMIR_MIR_FUNCTION_STACK_FRAME_H

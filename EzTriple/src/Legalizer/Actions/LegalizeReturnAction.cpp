@@ -14,6 +14,10 @@
 namespace LegalizeActions
 {
 
+/**
+ * Converts a plain RET into a token-bound PUSH_RET/RET pair, spilling a non-register-returnable
+ * value to the hidden SRET pointer before pushing the token.
+ */
 LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
 {
     auto it = ctx.m_it;
@@ -36,6 +40,7 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
     MirInstructionBuilder insertBeforeBuilder(builderCtx, owningBlock, InsertionType::InsertBefore, it);
     MirOperandBuilder opBuilder(builderCtx);
 
+    // Inserts the first emitted instruction before RET and subsequent ones after it, preserving order.
     bool firstInserted = false;
     auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
     {

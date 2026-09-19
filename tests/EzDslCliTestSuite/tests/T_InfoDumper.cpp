@@ -17,6 +17,9 @@
 
 using namespace Cli;
 
+/**
+ * Fixture for the InfoDumper text/JSON rendering helpers.
+ */
 class InfoDumperTest : public EzDslCliTestSuiteAsGtest
 {
 };

@@ -13,9 +13,13 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating the C++ MirTypeTable from type-definition DSL sources.
+ */
 class CppMirTypeTableGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Parses a type-definition source and runs the type semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
         auto ast = parseTypeDefFile(source);
@@ -91,8 +95,10 @@ TEST_F(CppMirTypeTableGeneratorTest, TestStandardTypeTableGenerationViaDsl)
     // --- Verify Source Content ---
     std::string sContent = readFileContent(sourcePath);
 
-    EXPECT_TRUE(sContent.find("MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena, size_t pointerBitWidth) :") !=
-                std::string::npos);
+    EXPECT_TRUE(
+            sContent.find(
+                    "MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena, size_t pointerBitWidth) :") !=
+            std::string::npos);
     EXPECT_TRUE(sContent.find("m_compactIdToType.fill(nullptr);") != std::string::npos);
     EXPECT_TRUE(sContent.find("MirType *MirTypeTable::create(") != std::string::npos);
     EXPECT_TRUE(sContent.find("MirType *MirTypeTable::getFuncType(") != std::string::npos);
@@ -105,7 +111,8 @@ TEST_F(CppMirTypeTableGeneratorTest, TestStandardTypeTableGenerationViaDsl)
                 std::string::npos);
     EXPECT_TRUE(sContent.find("MirType *MirTypeTable::i32() { return m_i32Type; }") != std::string::npos);
     EXPECT_TRUE(sContent.find("void MirTypeTable::initialize(size_t pointerBitWidth)") != std::string::npos);
-    EXPECT_TRUE(sContent.find("m_i32Type = create(MirTypeKind::Integer, 32, 32, {}, \"i32\", 3);") != std::string::npos);
+    EXPECT_TRUE(sContent.find("m_i32Type = create(MirTypeKind::Integer, 32, 32, {}, \"i32\", 3);") !=
+                std::string::npos);
     EXPECT_TRUE(sContent.find("m_f64Type = create(MirTypeKind::FloatingPoint, 64, 64, {}, \"f64\", 5);") !=
                 std::string::npos);
 }
@@ -128,9 +135,9 @@ TEST_F(CppMirTypeTableGeneratorTest, TestWorkingModes)
     auto headerOnlyDir = m_testTempDir / "header_only";
     std::filesystem::create_directories(headerOnlyDir);
     CppMirTypeTableGenerator genHeaderOnly(getDiagCollector(),
-                                          getSymbolTable(),
-                                          headerOnlyDir,
-                                          MirTypeTableGenWorkingMode::Header);
+                                           getSymbolTable(),
+                                           headerOnlyDir,
+                                           MirTypeTableGenWorkingMode::Header);
     EXPECT_TRUE(genHeaderOnly.run());
     EXPECT_TRUE(std::filesystem::exists(headerOnlyDir / "MirTypeTable.h"));
     EXPECT_FALSE(std::filesystem::exists(headerOnlyDir / "MirTypeTable.cpp"));
@@ -139,9 +146,9 @@ TEST_F(CppMirTypeTableGeneratorTest, TestWorkingModes)
     auto sourceOnlyDir = m_testTempDir / "source_only";
     std::filesystem::create_directories(sourceOnlyDir);
     CppMirTypeTableGenerator genSourceOnly(getDiagCollector(),
-                                          getSymbolTable(),
-                                          sourceOnlyDir,
-                                          MirTypeTableGenWorkingMode::Source);
+                                           getSymbolTable(),
+                                           sourceOnlyDir,
+                                           MirTypeTableGenWorkingMode::Source);
     EXPECT_TRUE(genSourceOnly.run());
     EXPECT_FALSE(std::filesystem::exists(sourceOnlyDir / "MirTypeTable.h"));
     EXPECT_TRUE(std::filesystem::exists(sourceOnlyDir / "MirTypeTable.cpp"));
@@ -194,6 +201,7 @@ TEST_F(CppMirTypeTableGeneratorTest, TestOutputPathVariationsAndConvenienceFunct
     EXPECT_TRUE(std::filesystem::exists(customCppPath));
 }
 
+// Verifies regenerating unchanged content preserves the timestamps of both output files.
 TEST_F(CppMirTypeTableGeneratorTest, TestTimestampPreservationOnUnchangedGeneration)
 {
     registerType("i16", DSL::Ast::TypeDef::TypeKind::Integer, 16, 16, 1);
@@ -240,6 +248,7 @@ TEST_F(CppMirTypeTableGeneratorTest, TestEmptySymbolTableGeneratesValidOutput)
     EXPECT_TRUE(hContent.find("static constexpr size_t MachineDefinedTypeCount = 0;") != std::string::npos);
 }
 
+// Verifies pointer types are excluded from the generated compact-id enum and primitive count.
 TEST_F(CppMirTypeTableGeneratorTest, TestOnlyPointerTypesGeneratesZeroPrimitives)
 {
     registerType("ptr_a", DSL::Ast::TypeDef::TypeKind::Pointer, 64, 64, 1);
@@ -254,6 +263,7 @@ TEST_F(CppMirTypeTableGeneratorTest, TestOnlyPointerTypesGeneratesZeroPrimitives
     EXPECT_TRUE(hContent.find("ptr_b =") == std::string::npos);
 }
 
+// Verifies non-type symbols in the table are not emitted as types.
 TEST_F(CppMirTypeTableGeneratorTest, TestIgnoresNonTypeSymbols)
 {
     // Register an instruction symbol into the table
@@ -270,6 +280,7 @@ TEST_F(CppMirTypeTableGeneratorTest, TestIgnoresNonTypeSymbols)
     EXPECT_TRUE(hContent.find("DummyInst") == std::string::npos);
 }
 
+// Verifies generation fails for a null collector/table or an empty output path.
 TEST_F(CppMirTypeTableGeneratorTest, TestNullPointersAndEmptyPathFailValidation)
 {
     CppMirTypeTableGenerator genNullCollector(nullptr, getSymbolTable(), m_testTempDir);

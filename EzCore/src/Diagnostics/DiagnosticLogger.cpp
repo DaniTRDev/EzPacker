@@ -2,11 +2,18 @@
 #include "SourceManager/SourceManager.h"
 #include <algorithm>
 
+/**
+ * Creates the source manager lookup and the synchronous EzLogger sink used for output.
+ */
 DiagnosticLogger::DiagnosticLogger(class SourceManager *sourceManager) :
     m_sourceManager(sourceManager), m_logger(EzLogger::createSyncLogger("EzPacker"))
 {
 }
 
+/**
+ * Formats a diagnostic as a single log line: sender, colored severity, main message, optional
+ * primary source excerpt and any attached notes, then pushes it to the logger.
+ */
 void DiagnosticLogger::onDiag(const DiagnosticMessage &msg)
 {
     LogMessage log = LogMessage();
@@ -32,6 +39,9 @@ void DiagnosticLogger::onDiag(const DiagnosticMessage &msg)
     m_logger->pushLog(std::move(log));
 }
 
+/**
+ * Appends an indented, magenta "note:" line and, when present, its source reference.
+ */
 void DiagnosticLogger::logNote(LogMessage &msg, const DiagnosticNote &note)
 {
     std::string noteContentStr(note.m_noteContent.begin(), note.m_noteContent.end());
@@ -46,6 +56,9 @@ void DiagnosticLogger::logNote(LogMessage &msg, const DiagnosticNote &note)
     }
 }
 
+/**
+ * Maps a diagnostic severity to its colored textual prefix (Error/Warning/Trace/Debug).
+ */
 void DiagnosticLogger::logType(LogMessage &msg, DiagnosticMessageType type)
 {
     switch (type)
@@ -73,6 +86,11 @@ void DiagnosticLogger::logType(LogMessage &msg, DiagnosticMessageType type)
     }
 }
 
+/**
+ * Renders a source excerpt for the given reference: a blue file:line:column locator, the raw
+ * source line indented under a separator, and a green caret/tilde squiggle under the referenced
+ * span. Silently does nothing when the manager, reference or line range cannot be resolved.
+ */
 void DiagnosticLogger::logSourceRef(LogMessage &msg, class SourceReference *sourceRef)
 {
     if (!m_sourceManager || !sourceRef)

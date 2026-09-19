@@ -10,15 +10,29 @@
 #include "Operand/MirOperands.h"
 #include "Operand/MirOperandBuilder.h"
 
+/**
+ * Initializes the SSA construction pass and its intermediate data using the context's global arena.
+ */
 NonSsaToSsaPass::NonSsaToSsaPass(class MirBuilderContext *ctx) :
     m_ctx(ctx), m_result(ctx->getGlobalAllocator()), m_resc(ctx->getGlobalAllocator())
 {
 }
 
+/**
+ * Returns the pass identifier.
+ */
 const char *NonSsaToSsaPass::getName() const { return "NonSsaToSsaPass"; }
 
+/**
+ * Runs once per function.
+ */
 MirPassIterationPlace NonSsaToSsaPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
+/**
+ * Runs the full SSA construction pipeline on the target function: collect def sites, compute
+ * post-order/dominators, build dominance frontiers, insert phi nodes and rename variables. Always
+ * reports that the MIR was modified.
+ */
 MirPassResult NonSsaToSsaPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
     CodeFlowResult *cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
@@ -38,12 +52,25 @@ MirPassResult NonSsaToSsaPass::run(IntrusiveLinkedList<MirFunction>::const_itera
     return { .m_modifiedMir = true, .m_executed = true, .m_succeeded = true };
 }
 
+/**
+ * Returns the intermediate dominator/frontier data collected during the last run.
+ */
 NonSsaToSsaPassResult *NonSsaToSsaPass::getResult() { return &m_result; }
 
+/**
+ * No-op; this pass does not emit a dedicated result report.
+ */
 void NonSsaToSsaPass::printResult() {}
 
+/**
+ * No-op; per-function data is rebuilt from scratch on each run.
+ */
 void NonSsaToSsaPass::reset() {}
 
+/**
+ * Creates a PHI instruction for regId with numPredecessors identical incoming operands, which the
+ * rename phase later replaces with the reaching definitions.
+ */
 MirInstruction *
 NonSsaToSsaPass::createPhiInstruction(MirInstructionBuilder *iBuilder, MirId regId, size_t numPredecessors)
 {
@@ -58,6 +85,9 @@ NonSsaToSsaPass::createPhiInstruction(MirInstructionBuilder *iBuilder, MirId reg
     return phi;
 }
 
+/**
+ * Scans every block/instruction to record, per virtual register, the set of blocks that define it.
+ */
 void NonSsaToSsaPass::buildVirtualRegDefPlaces(MirFunction *func)
 {
     auto &defSites = m_result.m_defSites;
@@ -84,6 +114,11 @@ void NonSsaToSsaPass::buildVirtualRegDefPlaces(MirFunction *func)
     }
 }
 
+/**
+ * Computes dominance frontiers using the classic "runner walks up the dominator tree" method: for
+ * each join block, each predecessor is advanced toward the block's immediate dominator, adding the
+ * block to every node along the way.
+ */
 void NonSsaToSsaPass::buildDominanceFrontier(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager)
 {
     auto &domFrontier = m_result.m_domFrontier;
@@ -131,6 +166,11 @@ void NonSsaToSsaPass::buildDominanceFrontier(CodeFlowResult *cfg, MirFunction *f
     }
 }
 
+/**
+ * Computes the immediate dominator tree using the Cooper-Harvey-Kennedy iterative algorithm: the
+ * entry dominates itself and each block's idom is the intersection of its processed predecessors,
+ * iterated to a fixed point.
+ */
 void NonSsaToSsaPass::buildImmDomTree(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager)
 {
     auto &domTree = m_result.m_immDomTree;
@@ -206,6 +246,10 @@ void NonSsaToSsaPass::buildImmDomTree(CodeFlowResult *cfg, MirFunction *func, Mi
     }
 }
 
+/**
+ * Produces a depth-first post-order of reachable blocks starting from the entry point and assigns
+ * each block an index used by the dominator intersection routine.
+ */
 void NonSsaToSsaPass::buildPostOrderIndexList(CodeFlowResult *cfg, MirFunction *func, MirPassManager *passManager)
 {
     MirId entryId = func->getEntryPoint()->getId();
@@ -238,6 +282,11 @@ void NonSsaToSsaPass::buildPostOrderIndexList(CodeFlowResult *cfg, MirFunction *
     }
 }
 
+/**
+ * Places PHI nodes using the iterated dominance-frontier algorithm: for each register's definition
+ * sites, walk the frontier worklist, inserting a PHI at each unvisited frontier block and
+ * continuing to that block's frontier.
+ */
 void NonSsaToSsaPass::insertPhiNodes(CodeFlowResult *cfg, MirFunction *func)
 {
     auto &domFrontier = m_result.m_domFrontier;
@@ -298,6 +347,13 @@ void NonSsaToSsaPass::insertPhiNodes(CodeFlowResult *cfg, MirFunction *func)
     }
 }
 
+/**
+ * Renames definitions and uses to SSA form during a dominator-tree walk: PHI destinations and WRITE
+ * operands get fresh registers pushed onto a per-base-register stack, READ operands are replaced
+ * with the current reaching definition (or an "undef" register when none exists), and PHI
+ * successor slots are filled in. Stacks are rolled back after each subtree to preserve dominator
+ * scoping.
+ */
 void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
 {
     DiagnosticCollector *collector = m_ctx->getDiagCollector();

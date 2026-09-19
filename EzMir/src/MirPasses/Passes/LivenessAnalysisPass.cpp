@@ -11,6 +11,10 @@
 
 #include <vector>
 
+/**
+ * Formats a block-ID -> register-set map as indented text, listing "empty" for blocks with no
+ * registers. Used only by diagnostic output.
+ */
 std::string printMirRegMap(MirBuilderContext *ctx,
                            const std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> &map)
 {
@@ -35,17 +39,32 @@ std::string printMirRegMap(MirBuilderContext *ctx,
     return res;
 }
 
+/**
+ * Initializes the liveness pass and its result storage using the context's global arena.
+ */
 LivenessAnalysisPass::LivenessAnalysisPass(MirBuilderContext *ctx) :
     m_result(ctx->getGlobalAllocator()), m_ctx(ctx), m_arena(ctx->getGlobalAllocator())
 {
 }
 
+/**
+ * Returns the pass identifier.
+ */
 const char *LivenessAnalysisPass::getName() const { return "LivenessAnalysisPass"; }
 
+/**
+ * Returns the computed liveness sets.
+ */
 LivenessResult *LivenessAnalysisPass::getResult() { return &m_result; }
 
+/**
+ * Runs once per function.
+ */
 MirPassIterationPlace LivenessAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
+/**
+ * Clears all def/use/live-in/live-out sets so the pass can run on another function.
+ */
 void LivenessAnalysisPass::reset()
 {
     m_result.m_def.clear();
@@ -54,6 +73,10 @@ void LivenessAnalysisPass::reset()
     m_result.m_liveOut.clear();
 }
 
+/**
+ * Obtains (or computes) the CFG analysis, resets prior state and runs the global liveness solver
+ * over the target function.
+ */
 MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                         MirPassManager *passManager)
 {
@@ -68,6 +91,11 @@ MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
+/**
+ * Solves the backward liveness dataflow equations: assigns dense indices to blocks, computes
+ * block-local def/use (upward-exposed uses), builds a global register universe, runs a fixed-point
+ * iteration over the CFG using DenseBitSets, then materializes the resulting live-in/live-out sets.
+ */
 void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResult *cfg)
 {
     const auto &blocks = func->getBlocks();
@@ -289,6 +317,10 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     }
 }
 
+/**
+ * Traces the final def, use, live-in and live-out sets; skips all work when trace diagnostics are
+ * disabled.
+ */
 void LivenessAnalysisPass::printResult()
 {
     auto *diag = m_ctx->getDiagCollector();

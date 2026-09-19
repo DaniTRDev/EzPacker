@@ -27,6 +27,7 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
         const auto &typeName = type.m_name.m_node;
         uint32_t resolvedBitWidth = 0;
 
+        // Resolve the effective bit width according to the declared type kind.
         switch (type.m_kind)
         {
             case DSL::Ast::TypeDef::TypeKind::Integer:
@@ -92,6 +93,7 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
             case DSL::Ast::TypeDef::TypeKind::BindingToken:
             case DSL::Ast::TypeDef::TypeKind::Pointer:
             {
+                // Non-scalar kinds carry no width and must not declare one.
                 if (type.m_bitSize.has_value() && type.m_bitSize->m_node != 0)
                 {
                     collector->error(passName, "Type '{}' cannot have a non-zero bit size.", typeName)
@@ -105,6 +107,7 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
             }
         }
 
+        // Resolve alignment, defaulting to the bit width when the declaration omits it.
         uint32_t resolvedAlignment = 0;
         if (type.m_alignment.has_value())
         {

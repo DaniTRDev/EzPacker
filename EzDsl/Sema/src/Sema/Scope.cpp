@@ -11,6 +11,7 @@ ScopeId Scope::getParentId() const { return m_parentId; }
 
 ScopeId Scope::findSymbol(std::string_view name) const
 {
+    // Look up a single declaration by name; report absence via the InvalidScopeId sentinel.
     auto it = m_symbolMap.find(name);
     if (it != m_symbolMap.end())
     {
@@ -21,6 +22,7 @@ ScopeId Scope::findSymbol(std::string_view name) const
 
 void Scope::addSymbol(std::string_view name, ScopeId symbolId)
 {
+    // Record the symbol both in declaration order and in the name-to-id multimap.
     m_symbols.push_back(symbolId);
     m_symbolMap.emplace(name, symbolId);
 }

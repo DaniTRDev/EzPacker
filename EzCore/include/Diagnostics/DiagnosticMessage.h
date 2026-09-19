@@ -20,8 +20,8 @@ enum DiagnosticMessageType : uint8_t
  */
 struct DiagnosticNote
 {
-    class SourceReference *m_sourceRef{ nullptr };
-    std::pmr::string m_noteContent{};
+    class SourceReference *m_sourceRef{ nullptr }; // Source span this note refers to, or nullptr.
+    std::pmr::string m_noteContent{};              // Arena-allocated note text.
 };
 
 /**
@@ -100,7 +100,7 @@ class DiagnosticMessage
                       const std::list<DiagnosticNote> &notes = {});
 
   private:
-    DiagnosticMessageType m_type;
+    DiagnosticMessageType m_type; // Severity classification of this message.
 
     // A reference to the parent scope/object that executed a traverse operation and created a diagnostic in any of
     // its sub-steps.

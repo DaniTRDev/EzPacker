@@ -3,10 +3,17 @@
 #include "Parser/InstructionSelectDefLang.h"
 #include "Parser/ParseContext.h"
 
+/**
+ * Test fixture for the instruction selection pattern (.isd) dialect parser.
+ */
 class InstructionSelectDefLangTest : public DslLexerTestSuiteAsGtest
 {
 };
 
+/**
+ * Verifies an addressing mode declaration parses its typed parameters (with
+ * default value) and match/when variants.
+ */
 TEST_F(InstructionSelectDefLangTest, TestAddrModeDeclaration)
 {
     std::string test = R"(
@@ -51,6 +58,10 @@ TEST_F(InstructionSelectDefLangTest, TestAddrModeDeclaration)
     EXPECT_EQ(res->m_variants[1].m_variantName.m_node, "BaseOnly");
 }
 
+/**
+ * Verifies a basic selection pattern parses its name, cost, match tree, and
+ * register-class-annotated select operands.
+ */
 TEST_F(InstructionSelectDefLangTest, TestSimpleSelectionPattern)
 {
     std::string test = R"(
@@ -82,6 +93,10 @@ TEST_F(InstructionSelectDefLangTest, TestSimpleSelectionPattern)
     EXPECT_EQ(res->m_selectClauses[0].m_operands[0].m_regClass->m_node, "GPR32");
 }
 
+/**
+ * Verifies a memory-folded pattern parses a nested LOAD operand, an addressing
+ * mode reference with arguments, when clauses, and a memory select operand.
+ */
 TEST_F(InstructionSelectDefLangTest, TestMemoryFoldedSelectionPattern)
 {
     std::string test = R"(
@@ -115,7 +130,8 @@ TEST_F(InstructionSelectDefLangTest, TestMemoryFoldedSelectionPattern)
     EXPECT_EQ(nestedOp.m_nestedTree->m_opcode.m_node, "LOAD");
     ASSERT_EQ(nestedOp.m_nestedTree->m_operands.size(), 2);
     EXPECT_EQ(nestedOp.m_nestedTree->m_operands[0].m_name.m_node, "tmp");
-    EXPECT_EQ(nestedOp.m_nestedTree->m_operands[1].m_kind, DSL::Ast::InstructionSelectDef::PatternOperand::Kind::AddrModeRef);
+    EXPECT_EQ(nestedOp.m_nestedTree->m_operands[1].m_kind,
+              DSL::Ast::InstructionSelectDef::PatternOperand::Kind::AddrModeRef);
     EXPECT_EQ(nestedOp.m_nestedTree->m_operands[1].m_name.m_node, "AddrModeRegImm");
     ASSERT_EQ(nestedOp.m_nestedTree->m_operands[1].m_addrModeArgs.size(), 2);
     EXPECT_EQ(nestedOp.m_nestedTree->m_operands[1].m_addrModeArgs[0].m_node, "base");
@@ -137,6 +153,10 @@ TEST_F(InstructionSelectDefLangTest, TestMemoryFoldedSelectionPattern)
     EXPECT_EQ(res->m_selectClauses[0].m_operands[2].m_memOperands[1].m_node, "disp");
 }
 
+/**
+ * Verifies a full instruction select file parses the target name and multiple
+ * selection patterns.
+ */
 TEST_F(InstructionSelectDefLangTest, TestInstructionSelectFile)
 {
     std::string test = R"(

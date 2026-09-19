@@ -21,10 +21,7 @@
 namespace EzCompiler
 {
 
-CompilationPipeline::CompilationPipeline(DriverContext &ctx) :
-    m_ctx(ctx)
-{
-}
+CompilationPipeline::CompilationPipeline(DriverContext &ctx) : m_ctx(ctx) {}
 
 bool CompilationPipeline::runPipeline()
 {
@@ -78,6 +75,7 @@ bool CompilationPipeline::runMiddleEndPasses(MirFunction *func)
     MirBuilderContext *bCtx = m_ctx.getBuilderContext();
     auto it = bCtx->getFunctions().to_iterator(func);
     MirPassManager passManager(m_ctx.getDiagCollector(), m_ctx.getSessionAllocator());
+    // Test mode lets passes be invoked explicitly instead of through the manager's schedule.
     passManager.setTestMode();
     passManager.addPass<CodeFlowAnalysisPass>(bCtx);
 
@@ -85,6 +83,7 @@ bool CompilationPipeline::runMiddleEndPasses(MirFunction *func)
     {
         std::cout << "[Pass] Running CodeFlowAnalysisPass on " << func->getName() << "\n";
     }
+    // Materialize the CFG analysis so subsequent passes can retrieve it from the manager.
     CodeFlowAnalysisPass *cfPass = passManager.getAnalysis<CodeFlowAnalysisPass>(bCtx);
     (void)cfPass;
 
@@ -205,19 +204,23 @@ std::string CompilationPipeline::dumpCurrentMir() const
 {
     std::ostringstream oss;
     MirBuilderContext *bCtx = m_ctx.getBuilderContext();
-    if (!bCtx) return {};
+    if (!bCtx)
+        return {};
 
     for (MirFunction *func : bCtx->getFunctions())
     {
-        if (!func) continue;
+        if (!func)
+            continue;
         oss << "function @" << func->getName() << "() {\n";
         for (MirBlock *block : func->getBlocks())
         {
-            if (!block) continue;
+            if (!block)
+                continue;
             oss << block->getName() << ":\n";
             for (MirInstruction *inst : block->getInstructions())
             {
-                if (!inst) continue;
+                if (!inst)
+                    continue;
                 oss << "    " << inst->toString() << "\n";
             }
         }
@@ -230,20 +233,24 @@ std::string CompilationPipeline::dumpAssembly() const
 {
     std::ostringstream oss;
     MirBuilderContext *bCtx = m_ctx.getBuilderContext();
-    if (!bCtx) return {};
+    if (!bCtx)
+        return {};
 
     for (MirFunction *func : bCtx->getFunctions())
     {
-        if (!func) continue;
+        if (!func)
+            continue;
         oss << ".globl " << func->getName() << "\n";
         oss << func->getName() << ":\n";
         for (MirBlock *block : func->getBlocks())
         {
-            if (!block) continue;
+            if (!block)
+                continue;
             oss << "." << func->getName() << "_" << block->getName() << ":\n";
             for (MirInstruction *inst : block->getInstructions())
             {
-                if (!inst) continue;
+                if (!inst)
+                    continue;
                 if (inst->getTargetDesc())
                 {
                     oss << "    " << inst->getTargetDesc()->getName();

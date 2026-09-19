@@ -1,5 +1,9 @@
 #include "Diagnostics/DiagnosticCollector.h"
 
+/**
+ * Initializes the arena-backed message/scope containers, enables error and warning diagnostics by
+ * default and installs the permanent root scope.
+ */
 DiagnosticCollector::DiagnosticCollector()
 {
     m_enabledDiags = Diag_Error | Diag_Warning;
@@ -8,13 +12,23 @@ DiagnosticCollector::DiagnosticCollector()
     m_scopes.emplace_back(&m_diagScopePool); // Ensure there's at least 1 scope available.
 }
 
+/**
+ * Returns true when the given type's bit is set among the enabled diagnostics.
+ */
 bool DiagnosticCollector::isDiagEnabledForType(DiagnosticMessageType type) const { return m_enabledDiags & type; }
 
+/**
+ * Creates a builder attached to this collector with the given type and sender.
+ */
 DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const std::string_view &sender)
 {
     return DiagnosticBuilder(this, type, sender);
 }
 
+/**
+ * Creates an error builder and appends the message only when error diagnostics are enabled;
+ * otherwise the returned inactive builder silently absorbs further chained operations.
+ */
 DiagnosticBuilder DiagnosticCollector::error(const std::string_view &sender, const std::string_view &message)
 {
     auto b = builder(Diag_Error, sender);
@@ -29,6 +43,9 @@ DiagnosticBuilder DiagnosticCollector::error(const std::string_view &sender, con
     return b;
 }
 
+/**
+ * Creates a trace builder and appends the message only when trace diagnostics are enabled.
+ */
 DiagnosticBuilder DiagnosticCollector::trace(const std::string_view &sender, const std::string_view &message)
 {
     auto b = builder(Diag_Trace, sender);
@@ -41,12 +58,18 @@ DiagnosticBuilder DiagnosticCollector::trace(const std::string_view &sender, con
     return b;
 }
 
+/**
+ * Registers a listener under the collector mutex so it receives committed diagnostics.
+ */
 void DiagnosticCollector::addListener(DiagnosticListener *listener)
 {
     std::lock_guard lock(m_mutex);
     m_listeners.push_back(listener);
 }
 
+/**
+ * Pushes a new scope, configured with the given commit/discard/propagate action, onto the scope stack.
+ */
 void DiagnosticCollector::beginScope(DiagnosticScopeAction action)
 {
     DiagnosticScope scope(&m_diagScopePool);
@@ -56,8 +79,16 @@ void DiagnosticCollector::beginScope(DiagnosticScopeAction action)
     m_scopes.push_back(std::move(scope));
 }
 
+/**
+ * Adds the given diagnostic type to the enabled bitmask.
+ */
 void DiagnosticCollector::enableDiag(DiagnosticMessageType type) { m_enabledDiags |= type; }
 
+/**
+ * Pops the innermost scope and applies its action: Commit forwards messages to listeners and the
+ * permanent record, Propagate moves them to the parent scope, Discard drops them. Throws if the
+ * root scope is the only one remaining.
+ */
 void DiagnosticCollector::endScope()
 {
     std::lock_guard lock(m_mutex);
@@ -104,6 +135,9 @@ void DiagnosticCollector::endScope()
     }
 }
 
+/**
+ * Changes the action of the current scope, ignoring the request when only the root scope exists.
+ */
 void DiagnosticCollector::setScopeAction(DiagnosticScopeAction action)
 {
     std::lock_guard lock(m_mutex);
@@ -113,6 +147,11 @@ void DiagnosticCollector::setScopeAction(DiagnosticScopeAction action)
     }
 }
 
+/**
+ * Receives a message from a builder. At the root scope it notifies listeners immediately and
+ * records the message; inside nested scopes it buffers the message. Error messages additionally
+ * mark the current scope as having fatal errors.
+ */
 void DiagnosticCollector::onDiag(DiagnosticMessage message)
 {
     std::scoped_lock lock(m_mutex);
@@ -147,4 +186,7 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
     }
 }
 
+/**
+ * Exposes the synchronized pool used to allocate diagnostic messages and scopes.
+ */
 std::pmr::memory_resource *DiagnosticCollector::getAllocator() { return &m_diagScopePool; }

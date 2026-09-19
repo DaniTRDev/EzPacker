@@ -42,8 +42,8 @@ class CoffWriter
     void clear();
 
   private:
-    std::vector<ObjectSymbol> m_symbols;
-    std::vector<ObjectRelocEntry> m_relocs;
+    std::vector<ObjectSymbol> m_symbols;    ///< Symbols to materialize in the COFF symbol table.
+    std::vector<ObjectRelocEntry> m_relocs; ///< Relocations to materialize per section.
 };
 
 } // namespace EzCodeEmitter::ObjectFormat

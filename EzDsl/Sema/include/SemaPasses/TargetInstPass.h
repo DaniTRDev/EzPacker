@@ -19,9 +19,7 @@ class TargetInstPass
      * Executes the target instruction semantic validation pass across all declared opcodes in the AST.
      * Returns true if all instructions were successfully validated and registered.
      */
-    static bool run(DiagnosticCollector *collector,
-                    SymbolTable *table,
-                    DSL::Ast::TargetInstDef::TargetInstFile *file);
+    static bool run(DiagnosticCollector *collector, SymbolTable *table, DSL::Ast::TargetInstDef::TargetInstFile *file);
 
   private:
     /**

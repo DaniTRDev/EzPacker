@@ -16,9 +16,7 @@ class InsertionTracker
 {
   public:
     InsertionTracker(MirBlock *block, MirInstruction *targetInst) :
-        m_block(block),
-        m_targetInst(targetInst),
-        m_prevBefore(targetInst ? targetInst->getPrev() : nullptr),
+        m_block(block), m_targetInst(targetInst), m_prevBefore(targetInst ? targetInst->getPrev() : nullptr),
         m_nextBefore(targetInst ? targetInst->getNext() : nullptr)
     {
     }

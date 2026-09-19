@@ -57,8 +57,8 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
                        class SourceReference *sourceRef = nullptr);
 
   private:
-    class MirBuilderContext *m_ctx;
-    std::pmr::vector<class MirFunction *> *m_owner;
+    class MirBuilderContext *m_ctx;                 // Context providing the arena, diagnostics and registration.
+    std::pmr::vector<class MirFunction *> *m_owner; // Optional external container the built function is appended to.
 };
 
 #endif // EZMIR_MIR_FUNCTION_BUILDER_H

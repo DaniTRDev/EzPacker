@@ -15,9 +15,13 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating a C++ legalizer action table from legalize-action (.lad) sources.
+ */
 class CppLegalizerGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Declares the standard types and IR instructions needed by the legalizer generator tests.
     void SetUp() override
     {
         EzDslCodeGeneratorsTestSuiteAsGtest::SetUp();
@@ -25,16 +29,17 @@ class CppLegalizerGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
         declareStandardIrInstructions();
     }
 
+    // Registers the primitive integer, float, and pointer types in the symbol table.
     void declareStandardTypes()
     {
-        auto declareType = [&](std::string_view name, DSL::Ast::TypeDef::TypeKind kind, uint32_t bitWidth, uint8_t compactId) {
-            Symbols::TypeSymbol symData{
-                .m_name = name,
-                .m_kind = kind,
-                .m_bitWidth = bitWidth,
-                .m_alignment = bitWidth,
-                .m_compactId = compactId
-            };
+        auto declareType =
+                [&](std::string_view name, DSL::Ast::TypeDef::TypeKind kind, uint32_t bitWidth, uint8_t compactId)
+        {
+            Symbols::TypeSymbol symData{ .m_name = name,
+                                         .m_kind = kind,
+                                         .m_bitWidth = bitWidth,
+                                         .m_alignment = bitWidth,
+                                         .m_compactId = compactId };
             getSymbolTable()->declareSym(nullptr, SymbolType::Type, std::move(symData), name);
         };
 
@@ -49,16 +54,17 @@ class CppLegalizerGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
         declareType("ptr", DSL::Ast::TypeDef::TypeKind::Pointer, 64, 3);
     }
 
+    // Registers a standard set of IR instruction symbols used by the LAD test sources.
     void declareStandardIrInstructions()
     {
-        auto declareInst = [&](std::string_view name) {
-            Symbols::IrInstructionSymbol symData{
-                .m_name = name,
-                .m_category = DSL::Ast::IrInstDef::IrInstCategory::Arithmetic,
-                .m_tier = DSL::Ast::IrInstDef::IrInstTier::HighLevel,
-                .m_flags = DSL::Ast::IrInstDef::IrInstFlag::None,
-                .m_operands = std::pmr::vector<Symbols::IrOperandSymbol>{ getSymbolTable()->getAllocator() }
-            };
+        auto declareInst = [&](std::string_view name)
+        {
+            Symbols::IrInstructionSymbol symData{ .m_name = name,
+                                                  .m_category = DSL::Ast::IrInstDef::IrInstCategory::Arithmetic,
+                                                  .m_tier = DSL::Ast::IrInstDef::IrInstTier::HighLevel,
+                                                  .m_flags = DSL::Ast::IrInstDef::IrInstFlag::None,
+                                                  .m_operands = std::pmr::vector<Symbols::IrOperandSymbol>{
+                                                          getSymbolTable()->getAllocator() } };
             getSymbolTable()->declareSym(nullptr, SymbolType::IrInstruction, std::move(symData), name);
         };
 
@@ -75,6 +81,7 @@ class CppLegalizerGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
         declareInst("ALLOC");
     }
 
+    // Parses legalize-action (.lad) source into an AST using a unique source name.
     std::optional<DSL::Ast::LegalizeActionDef::LegalizeActionFile> parseLad(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.lad", m_testId++), source);
@@ -86,6 +93,7 @@ class CppLegalizerGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
     size_t m_testId{ 0 };
 };
 
+// Generates a legalizer action table and checks its matcher tiers, libcall pool, and lowering hooks.
 TEST_F(CppLegalizerGeneratorTest, TestFullTargetGeneration)
 {
     std::string source = R"dsl(
@@ -141,7 +149,8 @@ action RET {
     std::string hContent((std::istreambuf_iterator<char>(hFile)), std::istreambuf_iterator<char>());
     EXPECT_NE(hContent.find("class AMD64LegalizerInfo : public LegalizerInfo"), std::string::npos);
     EXPECT_NE(hContent.find("LegalityResponse query(const LegalityQuery &q) const override;"), std::string::npos);
-    EXPECT_NE(hContent.find("LegalizationResult executeCustom(LegalizeCtx &ctx, uint16_t handlerId) override;"), std::string::npos);
+    EXPECT_NE(hContent.find("LegalizationResult executeCustom(LegalizeCtx &ctx, uint16_t handlerId) override;"),
+              std::string::npos);
 
     // Inspect source contents
     std::ifstream sFile(sourcePath);

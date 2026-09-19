@@ -40,8 +40,8 @@ class DiagnosticLogger : public DiagnosticListener
     void logSourceRef(LogMessage &msg, class SourceReference *sourceRef);
 
   private:
-    SourceManager *m_sourceManager;
-    std::unique_ptr<Logger> m_logger;
+    SourceManager *m_sourceManager;   // Resolves source references into file/line text for log output.
+    std::unique_ptr<Logger> m_logger; // Underlying EzLogger sink that receives each formatted diagnostic line.
 };
 
 #endif // EZCORE_DIAGNOSTIC_LOGGER_H

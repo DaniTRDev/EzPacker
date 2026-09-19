@@ -11,10 +11,16 @@
 #include "CompilationPipeline.h"
 #include "EmissionEngine.h"
 
+/**
+ * Base test fixture for the EzCompiler test suite; provides no shared state
+ * beyond the standard GoogleTest lifecycle hooks.
+ */
 class EzCompilerTestSuite : public ::testing::Test
 {
   protected:
+    // Per-test setup hook (no-op).
     void SetUp() override {}
+    // Per-test teardown hook (no-op).
     void TearDown() override {}
 };
 

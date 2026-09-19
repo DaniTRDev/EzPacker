@@ -5,10 +5,17 @@
 #include "Sema/SymbolTable.h"
 #include "SourceManager/SourceManager.h"
 
+// Retrieves the active diagnostic collector.
 DiagnosticCollector *EzDslSemaTestSuite::getDiagCollector() { return m_diagnosticCollector; }
 
+// Retrieves the diagnostic logger.
 DiagnosticLogger *EzDslSemaTestSuite::getDiagLogger() { return m_diagnosticLogger; }
 
+/**
+ * Registers an in-memory source buffer with the source manager and returns a
+ * ParseContext bound to the test allocator and diagnostics. Throws if the
+ * source name was already registered.
+ */
 ParseContext EzDslSemaTestSuite::createParseContextFromBuff(const std::string &sourceName,
                                                             const std::string &sourceContent)
 {
@@ -21,10 +28,16 @@ ParseContext EzDslSemaTestSuite::createParseContextFromBuff(const std::string &s
     return ParseContext(m_diagnosticCollector, m_sourceManager, sourceId, &m_allocator);
 }
 
+// Retrieves the source manager.
 SourceManager *EzDslSemaTestSuite::getSourceManager() { return m_sourceManager; }
 
+// Retrieves the symbol table.
 SymbolTable *EzDslSemaTestSuite::getSymbolTable() { return m_symbolTable; }
 
+/**
+ * Allocates the diagnostic collector, logger, source manager, and symbol table
+ * from the internal PMR buffer resource and enables trace/debug diagnostics.
+ */
 void EzDslSemaTestSuite::create()
 {
     std::pmr::polymorphic_allocator<> alloc(&m_allocator);
@@ -38,6 +51,9 @@ void EzDslSemaTestSuite::create()
     m_diagnosticCollector->enableDiag(Diag_Debug);
 }
 
+/**
+ * Destroys all allocated semantic resources and releases the PMR buffer.
+ */
 void EzDslSemaTestSuite::destroy()
 {
     std::pmr::polymorphic_allocator<> alloc(&m_allocator);
@@ -48,6 +64,10 @@ void EzDslSemaTestSuite::destroy()
     m_allocator.release();
 }
 
+/**
+ * Declares a type symbol with the given name, kind, bit width, alignment, and
+ * compact id into the suite's symbol table.
+ */
 void EzDslSemaTestSuite::registerType(std::string_view name,
                                       DSL::Ast::TypeDef::TypeKind kind,
                                       uint32_t bitWidth,
@@ -63,14 +83,17 @@ void EzDslSemaTestSuite::registerType(std::string_view name,
     m_symbolTable->declareSym(nullptr, SymbolType::Type, std::move(typeSym), name);
 }
 
+// Retrieves the monotonic memory resource.
 std::pmr::memory_resource *EzDslSemaTestSuite::getAllocator() { return &m_allocator; }
 
+// GoogleTest SetUp hook: initializes the semantic test suite context.
 void EzDslSemaTestSuiteAsGtest::SetUp()
 {
     Test::SetUp();
     EzDslSemaTestSuite::create();
 }
 
+// GoogleTest TearDown hook: destroys the semantic test suite context.
 void EzDslSemaTestSuiteAsGtest::TearDown()
 {
     EzDslSemaTestSuite::destroy();

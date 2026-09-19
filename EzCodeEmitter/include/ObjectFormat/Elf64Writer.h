@@ -41,8 +41,8 @@ class Elf64Writer
     void clear();
 
   private:
-    std::vector<ObjectSymbol> m_symbols;
-    std::vector<ObjectRelocEntry> m_relocs;
+    std::vector<ObjectSymbol> m_symbols;    ///< Symbols to materialize in .symtab.
+    std::vector<ObjectRelocEntry> m_relocs; ///< Relocations to materialize in .rela.text.
 };
 
 } // namespace EzCodeEmitter::ObjectFormat

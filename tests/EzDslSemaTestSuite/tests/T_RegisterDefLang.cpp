@@ -16,6 +16,7 @@ using namespace DSL;
 class RegisterPassTest : public EzDslSemaTestSuiteAsGtest
 {
   protected:
+    // Parses register definition source and runs the register semantic pass.
     bool parseAndRun(const std::string &sourceContent)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.reg", m_currentTestId++), sourceContent);
@@ -33,6 +34,7 @@ class RegisterPassTest : public EzDslSemaTestSuiteAsGtest
     size_t m_currentTestId{ 0 };
 };
 
+// Verifies a valid x86-like register file declares file, bank, class, register, and special-register symbols.
 TEST_F(RegisterPassTest, AcceptsValidX86LikeRegisterFile)
 {
     std::string source = R"(
@@ -81,6 +83,7 @@ special {
     EXPECT_EQ(specialSym->getIf<Symbols::SpecialRegisterSymbol>()->m_id, 16u);
 }
 
+// Verifies two register banks sharing a name are rejected.
 TEST_F(RegisterPassTest, RejectsDuplicateBankNames)
 {
     std::string source = R"(
@@ -91,6 +94,7 @@ register_bank GPR { classes { G8: 8 } registers { r1 enc 1 names { r1: G8 } } }
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies two registers in a bank sharing an encoding are rejected.
 TEST_F(RegisterPassTest, RejectsDuplicateEncodingWithinBank)
 {
     std::string source = R"(
@@ -106,6 +110,7 @@ register_bank GPR {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies a sub-register edge to an undeclared class is rejected.
 TEST_F(RegisterPassTest, RejectsSubRegisterEdgeToUndeclaredClass)
 {
     std::string source = R"(
@@ -119,6 +124,7 @@ register_bank GPR {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies a sub-register edge where the narrow class is not smaller is rejected.
 TEST_F(RegisterPassTest, RejectsNonNarrowingSubRegisterEdge)
 {
     std::string source = R"(
@@ -132,6 +138,7 @@ register_bank GPR {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies a register alias bound to an undeclared class is rejected.
 TEST_F(RegisterPassTest, RejectsNameBindingToUndeclaredClass)
 {
     std::string source = R"(
@@ -144,6 +151,7 @@ register_bank GPR {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies a special register id colliding with a register encoding is rejected.
 TEST_F(RegisterPassTest, RejectsSpecialRegisterIdCollision)
 {
     std::string source = R"(
@@ -157,6 +165,7 @@ special { rip: 0 }
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies the same class name declared in two different banks is rejected.
 TEST_F(RegisterPassTest, RejectsDuplicateClassAcrossBanks)
 {
     std::string source = R"(

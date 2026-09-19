@@ -23,9 +23,7 @@ class IFrontendAdapter
     /**
      * Translates the specified source file into generic MIR functions in outMirCtx.
      */
-    virtual bool compileSourceToMir(DriverContext &ctx,
-                                   std::string_view sourcePath,
-                                   MirBuilderContext &outMirCtx) = 0;
+    virtual bool compileSourceToMir(DriverContext &ctx, std::string_view sourcePath, MirBuilderContext &outMirCtx) = 0;
 };
 
 /**
@@ -38,29 +36,25 @@ class MirModuleLoader : public IFrontendAdapter
     MirModuleLoader() = default;
     ~MirModuleLoader() override = default;
 
-    bool compileSourceToMir(DriverContext &ctx,
-                            std::string_view sourcePath,
-                            MirBuilderContext &outMirCtx) override;
+    /**
+     * Loads a .mir file, or synthesizes a default entrypoint when sourcePath is empty.
+     */
+    bool compileSourceToMir(DriverContext &ctx, std::string_view sourcePath, MirBuilderContext &outMirCtx) override;
 
     /**
      * Loads and parses a textual .mir file into outMirCtx using MirParser.
      */
-    static bool loadMirFile(DriverContext &ctx,
-                            std::string_view mirPath,
-                            MirBuilderContext &outMirCtx);
+    static bool loadMirFile(DriverContext &ctx, std::string_view mirPath, MirBuilderContext &outMirCtx);
 
     /**
      * Creates a synthetic test function returning an integer constant (e.g. return 42;).
      */
-    static MirFunction *createReturnConstFunction(DriverContext &ctx,
-                                                 std::string_view funcName,
-                                                 int64_t retVal);
+    static MirFunction *createReturnConstFunction(DriverContext &ctx, std::string_view funcName, int64_t retVal);
 
     /**
      * Creates a synthetic test function performing arithmetic on two 64-bit integers.
      */
-    static MirFunction *createArithmeticFunction(DriverContext &ctx,
-                                                std::string_view funcName);
+    static MirFunction *createArithmeticFunction(DriverContext &ctx, std::string_view funcName);
 };
 
 } // namespace EzCompiler

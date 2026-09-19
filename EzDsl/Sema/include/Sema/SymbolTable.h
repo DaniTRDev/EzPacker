@@ -42,7 +42,8 @@ class SymbolTable
      * Climbs the parent scope chain until found or the root scope is exceeded.
      */
     Symbol *getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope = std::nullopt);
-    Symbol *getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope = std::nullopt);
+    Symbol *
+    getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope = std::nullopt);
 
     /**
      * Declares a new symbol in the active scope with source reference, flags, type, semantic payload, and name.
@@ -75,13 +76,14 @@ class SymbolTable
     /**
      * Looks up a symbol name within a single specific scope without ascending to parents.
      */
-    Symbol *getSymInScope(ScopeId id, const std::string_view &name, std::optional<SymbolType> type = std::nullopt) const;
+    Symbol *
+    getSymInScope(ScopeId id, const std::string_view &name, std::optional<SymbolType> type = std::nullopt) const;
 
   private:
-    ScopeId m_currentScopeId;
-    std::pmr::memory_resource *m_alloc;
-    std::pmr::vector<Scope *> m_scopes;
-    std::pmr::vector<Symbol *> m_symbols;
+    ScopeId m_currentScopeId;             // Scope receiving newly declared symbols.
+    std::pmr::memory_resource *m_alloc;   // Arena used to allocate scopes and symbols.
+    std::pmr::vector<Scope *> m_scopes;   // All scopes indexed by ScopeId.
+    std::pmr::vector<Symbol *> m_symbols; // All symbols indexed by SymbolId.
 };
 
 #endif // EZDSL_SYMBOL_TABLE_H

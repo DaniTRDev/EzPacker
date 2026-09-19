@@ -8,6 +8,10 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Initializes the context, assigning IDs starting at 1 and backing all lookup tables with the
+ * supplied global arena.
+ */
 MirBuilderContext::MirBuilderContext(CallingConvDesc *defaultCallingConv,
                                      DiagnosticCollector *diagCollector,
                                      MirTypeTable *typeTable,
@@ -19,6 +23,9 @@ MirBuilderContext::MirBuilderContext(CallingConvDesc *defaultCallingConv,
 {
 }
 
+/**
+ * Registers a block in the ID lookup map, rejecting null pointers and duplicate IDs.
+ */
 bool MirBuilderContext::appendBlock(MirBlock *block)
 {
     if (!block)
@@ -40,6 +47,10 @@ bool MirBuilderContext::appendBlock(MirBlock *block)
     return true;
 }
 
+/**
+ * Registers a function in both the intrusive function list and the ID map, rejecting null
+ * pointers and duplicate IDs.
+ */
 bool MirBuilderContext::appendFunction(MirFunction *func)
 {
     if (!func)
@@ -62,6 +73,10 @@ bool MirBuilderContext::appendFunction(MirFunction *func)
     return true;
 }
 
+/**
+ * Registers a global variable in both the global variable list and the ID map, rejecting null
+ * pointers and duplicate IDs.
+ */
 bool MirBuilderContext::appendGlobalVar(MirGlobalVar *globalVar)
 {
     if (!globalVar)
@@ -87,6 +102,10 @@ bool MirBuilderContext::appendGlobalVar(MirGlobalVar *globalVar)
     return true;
 }
 
+/**
+ * Tracks a virtual register by its ID so it can be resolved later. Physical registers are not
+ * stored (no ID uniqueness is enforced for them) and are accepted as a no-op.
+ */
 bool MirBuilderContext::appendRegister(MirRegister *reg)
 {
     if (!reg)
@@ -95,6 +114,7 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
         return false;
     }
 
+    // Only virtual registers participate in ID-based lookup; physical registers are ignored.
     if (reg->isVirtual())
     {
         auto it = m_registerIdToRegister.find(reg->getRegId());
@@ -111,12 +131,24 @@ bool MirBuilderContext::appendRegister(MirRegister *reg)
     return true;
 }
 
+/**
+ * Returns the calling convention used when an entity does not specify one explicitly.
+ */
 CallingConvDesc *MirBuilderContext::getDefaultCallingConvention() const { return m_defaultCallingConv; }
 
+/**
+ * Returns the collector used for error and trace diagnostics raised while building MIR.
+ */
 DiagnosticCollector *MirBuilderContext::getDiagCollector() { return m_diagCollector; }
 
+/**
+ * Returns the mutable list of functions registered in this context.
+ */
 IntrusiveLinkedList<MirFunction> &MirBuilderContext::getFunctions() { return m_functions; }
 
+/**
+ * Looks up a block by ID, returning nullptr when no such block is registered.
+ */
 MirBlock *MirBuilderContext::getBlockById(MirId id) const
 {
     auto it = m_blockIdToBlock.find(id);
@@ -128,6 +160,9 @@ MirBlock *MirBuilderContext::getBlockById(MirId id) const
     return nullptr;
 }
 
+/**
+ * Looks up a function by ID, returning nullptr when no such function is registered.
+ */
 MirFunction *MirBuilderContext::getFuncById(MirId id) const
 {
     auto it = m_functionIdToFunc.find(id);
@@ -139,6 +174,9 @@ MirFunction *MirBuilderContext::getFuncById(MirId id) const
     return nullptr;
 }
 
+/**
+ * Looks up a global variable by ID, returning nullptr when no such variable is registered.
+ */
 MirGlobalVar *MirBuilderContext::getGVarById(MirId id) const
 {
     auto it = m_globalVarIdToGVar.find(id);
@@ -150,8 +188,14 @@ MirGlobalVar *MirBuilderContext::getGVarById(MirId id) const
     return nullptr;
 }
 
+/**
+ * Returns the next unused ID and advances the monotonic counter.
+ */
 MirId MirBuilderContext::createId() { return m_currentId++; }
 
+/**
+ * Looks up a virtual register by ID, returning nullptr when it was never registered.
+ */
 MirRegister *MirBuilderContext::getRegisterById(MirId id) const
 {
     auto it = m_registerIdToRegister.find(id);
@@ -162,13 +206,25 @@ MirRegister *MirBuilderContext::getRegisterById(MirId id) const
     return nullptr;
 }
 
+/**
+ * Returns the type table used to build and deduplicate MIR types.
+ */
 MirTypeTable *MirBuilderContext::getTypeTable() { return m_typeTable; }
 
+/**
+ * Replaces the calling convention applied to entities without an explicit convention.
+ */
 void MirBuilderContext::setDefaultCallingConvention(CallingConvDesc *defaultCallingConv)
 {
     m_defaultCallingConv = defaultCallingConv;
 }
 
+/**
+ * Returns the arena that owns all context-lifetime objects and lookup tables.
+ */
 std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { return m_globalResource; }
 
+/**
+ * Returns the mutable list of global variables registered in this context.
+ */
 std::pmr::list<MirGlobalVar *> &MirBuilderContext::getGlobalVars() { return m_globalVars; }

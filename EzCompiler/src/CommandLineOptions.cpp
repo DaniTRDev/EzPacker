@@ -4,10 +4,7 @@
 namespace EzCompiler
 {
 
-CommandLineParser::CommandLineParser()
-{
-    setupArguments();
-}
+CommandLineParser::CommandLineParser() { setupArguments(); }
 
 void CommandLineParser::setupArguments()
 {
@@ -15,99 +12,90 @@ void CommandLineParser::setupArguments()
     m_program->add_description("EzPacker Ahead-Of-Time Compiler Driver");
 
     m_program->add_argument("input")
-        .help("Input source file (.ez) or intermediate representation (.mir)")
-        .default_value(std::string(""))
-        .nargs(argparse::nargs_pattern::optional);
+            .help("Input source file (.ez) or intermediate representation (.mir)")
+            .default_value(std::string(""))
+            .nargs(argparse::nargs_pattern::optional);
 
     m_program->add_argument("-o", "--output")
-        .help("Output file path (default: a.out or a.obj depending on target)")
-        .metavar("<path>")
-        .default_value(std::string(""));
+            .help("Output file path (default: a.out or a.obj depending on target)")
+            .metavar("<path>")
+            .default_value(std::string(""));
 
     m_program->add_argument("-c")
-        .help("Compile and assemble, but do not link")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Compile and assemble, but do not link")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("-S")
-        .help("Stop after compilation; emit assembly text")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Stop after compilation; emit assembly text")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("--target")
-        .help("Target architecture and OS triple (e.g. x86_64-linux-gnu, x86_64-windows-msvc)")
-        .metavar("<triple>")
-        .default_value(std::string(""));
+            .help("Target architecture and OS triple (e.g. x86_64-linux-gnu, x86_64-windows-msvc)")
+            .metavar("<triple>")
+            .default_value(std::string(""));
 
     m_program->add_argument("--emit-mir")
-        .help("Dump generic SSA MIR after frontend lowering")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Dump generic SSA MIR after frontend lowering")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("--emit-legalized-mir")
-        .help("Dump MIR after type and opcode legalization")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Dump MIR after type and opcode legalization")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("--emit-lowered-mir")
-        .help("Dump target-lowered MIR post register allocation and frame lowering")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Dump target-lowered MIR post register allocation and frame lowering")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("--emit-obj")
-        .help("Emit native object format (ELF64 or PE-COFF)")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Emit native object format (ELF64 or PE-COFF)")
+            .default_value(false)
+            .implicit_value(true);
 
-    m_program->add_argument("-O0")
-        .help("Disable optimizations")
-        .default_value(false)
-        .implicit_value(true);
+    m_program->add_argument("-O0").help("Disable optimizations").default_value(false).implicit_value(true);
 
-    m_program->add_argument("-O1")
-        .help("Basic optimizations")
-        .default_value(false)
-        .implicit_value(true);
+    m_program->add_argument("-O1").help("Basic optimizations").default_value(false).implicit_value(true);
 
     m_program->add_argument("-O2")
-        .help("Full optimizations (SSA, SIB folding, coloring)")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Full optimizations (SSA, SIB folding, coloring)")
+            .default_value(false)
+            .implicit_value(true);
 
-    m_program->add_argument("-Os")
-        .help("Optimize for code size")
-        .default_value(false)
-        .implicit_value(true);
+    m_program->add_argument("-Os").help("Optimize for code size").default_value(false).implicit_value(true);
 
     m_program->add_argument("-v", "--verbose")
-        .help("Enable verbose compiler diagnostic logging")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Enable verbose compiler diagnostic logging")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("--print-passes")
-        .help("Print compiler pass names in execution order")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Print compiler pass names in execution order")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("--time-passes")
-        .help("Report execution time per compiler pass")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Report execution time per compiler pass")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("-fPIC")
-        .help("Generate position-independent code")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Generate position-independent code")
+            .default_value(false)
+            .implicit_value(true);
 
     m_program->add_argument("--diag-level")
-        .help("Minimum diagnostic severity threshold (error, warning, info, trace, debug)")
-        .metavar("<level>")
-        .default_value(std::string("warning"));
+            .help("Minimum diagnostic severity threshold (error, warning, info, trace, debug)")
+            .metavar("<level>")
+            .default_value(std::string("warning"));
 
     m_program->add_argument("-V", "--version")
-        .help("Print version information")
-        .default_value(false)
-        .implicit_value(true);
+            .help("Print version information")
+            .default_value(false)
+            .implicit_value(true);
 }
 
 bool CommandLineParser::parse(int argc, const char *const *argv, CommandLineOptions &outOptions, std::string &outError)
@@ -121,7 +109,9 @@ bool CommandLineParser::parse(int argc, const char *const *argv, CommandLineOpti
     return parse(args, outOptions, outError);
 }
 
-bool CommandLineParser::parse(const std::vector<std::string> &args, CommandLineOptions &outOptions, std::string &outError)
+bool CommandLineParser::parse(const std::vector<std::string> &args,
+                              CommandLineOptions &outOptions,
+                              std::string &outError)
 {
     setupArguments();
     outOptions = CommandLineOptions();
@@ -136,6 +126,7 @@ bool CommandLineParser::parse(const std::vector<std::string> &args, CommandLineO
         return false;
     }
 
+    // A version request short-circuits compilation after printing the banner.
     if (m_program->get<bool>("-V"))
     {
         printVersion();
@@ -216,7 +207,7 @@ bool CommandLineParser::parse(const std::vector<std::string> &args, CommandLineO
     outOptions.isPositionIndependent = m_program->get<bool>("-fPIC");
     outOptions.compileOnly = m_program->get<bool>("-c");
 
-    // Diag level
+    // Diag level: unrecognized values (including "info") keep the default threshold.
     std::string diagLvl = m_program->get<std::string>("--diag-level");
     if (diagLvl == "error")
     {
@@ -238,10 +229,7 @@ bool CommandLineParser::parse(const std::vector<std::string> &args, CommandLineO
     return true;
 }
 
-void CommandLineParser::printHelp() const
-{
-    std::cout << m_program->help().str() << "\n";
-}
+void CommandLineParser::printHelp() const { std::cout << m_program->help().str() << "\n"; }
 
 void CommandLineParser::printVersion() const
 {

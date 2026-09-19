@@ -13,9 +13,13 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating the C++ instruction-set definitions from IR-instruction DSL sources.
+ */
 class CppMirInstructionGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Parses an IR-instruction source and runs the IR-instruction semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
         auto ast = parseIrInstDefFile(source);
@@ -28,6 +32,7 @@ class CppMirInstructionGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtes
         return instPass.run(getDiagCollector(), getSymbolTable(), &ast.value());
     }
 
+    // Declares an IR instruction symbol directly, bypassing the DSL, for generator tests.
     void declareRawInstruction(std::string_view name,
                                DSL::Ast::IrInstDef::IrInstCategory category,
                                DSL::Ast::IrInstDef::IrInstTier tier,
@@ -220,6 +225,7 @@ TEST_F(CppMirInstructionGeneratorTest, TestAllCategoriesAndTiers)
     EXPECT_TRUE(content.find("T(TargetLow)") != std::string::npos);
 }
 
+// Verifies the None flag and a combined multi-flag mask render correctly in the generated definitions.
 TEST_F(CppMirInstructionGeneratorTest, TestCombinedFlagsAndNoneFlag)
 {
     using namespace DSL::Ast::IrInstDef;
@@ -229,7 +235,7 @@ TEST_F(CppMirInstructionGeneratorTest, TestCombinedFlagsAndNoneFlag)
 
     // Combined multi-flags
     auto multiFlags = IrInstFlag::ReadsMemory | IrInstFlag::WritesMemory | IrInstFlag::HasSideEffect |
-                      IrInstFlag::WritesCPUFlags | IrInstFlag::TreatAsSigned;
+            IrInstFlag::WritesCPUFlags | IrInstFlag::TreatAsSigned;
     declareRawInstruction("InstMultiFlags", IrInstCategory::Memory, IrInstTier::HighLevel, multiFlags);
 
     auto outHeader = m_testTempDir / "FlagsDefs.h";
@@ -241,7 +247,8 @@ TEST_F(CppMirInstructionGeneratorTest, TestCombinedFlagsAndNoneFlag)
     EXPECT_TRUE(content.find("INSTRUCTION(InstNoFlags, T(HighLevel), MirCat_System, OPERAND_CONSTRAINTS(), F(None))") !=
                 std::string::npos);
 
-    EXPECT_TRUE(content.find("F(ReadsMemory) | F(WritesMemory) | F(HasSideEffect) | F(WritesCPUFlags) | F(TreatAsSigned)") !=
+    EXPECT_TRUE(content.find(
+                        "F(ReadsMemory) | F(WritesMemory) | F(HasSideEffect) | F(WritesCPUFlags) | F(TreatAsSigned)") !=
                 std::string::npos);
 }
 
@@ -288,6 +295,7 @@ TEST_F(CppMirInstructionGeneratorTest, TestEmptySymbolTableGeneratesValidHeader)
                 std::string::npos);
 }
 
+// Verifies type symbols in the table are not emitted as instructions.
 TEST_F(CppMirInstructionGeneratorTest, TestIgnoresNonInstructionSymbols)
 {
     // Declare type symbols into the table
@@ -304,6 +312,7 @@ TEST_F(CppMirInstructionGeneratorTest, TestIgnoresNonInstructionSymbols)
     EXPECT_TRUE(content.find("INSTRUCTION(f64") == std::string::npos);
 }
 
+// Verifies generation fails for a null collector/table or an empty output path.
 TEST_F(CppMirInstructionGeneratorTest, TestNullPointersAndEmptyPathFailValidation)
 {
     CppMirInstructionGenerator genNullCollector(nullptr, getSymbolTable(), m_testTempDir);
@@ -316,6 +325,7 @@ TEST_F(CppMirInstructionGeneratorTest, TestNullPointersAndEmptyPathFailValidatio
     EXPECT_FALSE(genEmptyPath.run());
 }
 
+// Verifies a directory output path gets the default MirInstructionSetDefs.h file name appended.
 TEST_F(CppMirInstructionGeneratorTest, TestDirectoryPathAppendsDefaultFilename)
 {
     declareRawInstruction("InstDir",

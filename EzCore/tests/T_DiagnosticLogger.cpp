@@ -44,13 +44,16 @@ class DiagTest : public ::testing::Test
         ASSERT_NE(m_sourceFileId, 0u) << "Critical: Failed to ingest mock source content.";
     }
 
+    /**
+     * No teardown work is needed; resources are released by the unique_ptr members.
+     */
     void TearDown() override {}
 
   public:
-    size_t m_sourceFileId{ 0 };
-    std::unique_ptr<DiagnosticCollector> m_diagCollector;
-    std::unique_ptr<DiagnosticLogger> m_diagLogger;
-    std::unique_ptr<SourceManager> m_sourceManager;
+    size_t m_sourceFileId{ 0 };                           // 1-based ID of the mock source buffer.
+    std::unique_ptr<DiagnosticCollector> m_diagCollector; // Collector driving the diagnostic pipeline.
+    std::unique_ptr<DiagnosticLogger> m_diagLogger;       // Listener that formats and logs diagnostics.
+    std::unique_ptr<SourceManager> m_sourceManager;       // Owns the mock source content and references.
 };
 
 /**

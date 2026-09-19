@@ -12,18 +12,25 @@ using namespace EzTriple;
 namespace
 {
 
+/**
+ * Reads a little-endian 32-bit value from a fixed byte array at the given offset.
+ */
 uint32_t read32(const std::array<uint8_t, 16> &bytes, size_t offset)
 {
     return static_cast<uint32_t>(bytes[offset]) | (static_cast<uint32_t>(bytes[offset + 1]) << 8) |
-           (static_cast<uint32_t>(bytes[offset + 2]) << 16) | (static_cast<uint32_t>(bytes[offset + 3]) << 24);
+            (static_cast<uint32_t>(bytes[offset + 2]) << 16) | (static_cast<uint32_t>(bytes[offset + 3]) << 24);
 }
 
 } // namespace
 
+/**
+ * Fixture for the x86-64 relocation resolver's patch behavior.
+ */
 class X86_64RelocationResolverTest : public ::testing::Test
 {
 };
 
+// Verifies a JMP rel32 is patched relative to the end of the 5-byte instruction.
 TEST_F(X86_64RelocationResolverTest, PatchesNearJumpRel32)
 {
     std::array<uint8_t, 16> bytes{};
@@ -39,6 +46,7 @@ TEST_F(X86_64RelocationResolverTest, PatchesNearJumpRel32)
     EXPECT_EQ(read32(bytes, 1), 0x100u - 5u);
 }
 
+// Verifies a CALL rel32 is patched relative to the end of the 5-byte instruction.
 TEST_F(X86_64RelocationResolverTest, PatchesNearCallRel32)
 {
     std::array<uint8_t, 16> bytes{};
@@ -54,6 +62,7 @@ TEST_F(X86_64RelocationResolverTest, PatchesNearCallRel32)
     EXPECT_EQ(read32(bytes, 1), 0x40u - 5u);
 }
 
+// Verifies a Jcc rel32 is patched relative to the end of the 6-byte instruction.
 TEST_F(X86_64RelocationResolverTest, PatchesNearConditionalJumpRel32)
 {
     std::array<uint8_t, 16> bytes{};
@@ -70,6 +79,7 @@ TEST_F(X86_64RelocationResolverTest, PatchesNearConditionalJumpRel32)
     EXPECT_EQ(read32(bytes, 2), 0x200u - 6u);
 }
 
+// Verifies a PCRel32 relocation at a non-zero field computes the displacement from the field's end.
 TEST_F(X86_64RelocationResolverTest, PatchesPcRelative32AtField)
 {
     std::array<uint8_t, 16> bytes{};
@@ -84,6 +94,7 @@ TEST_F(X86_64RelocationResolverTest, PatchesPcRelative32AtField)
     EXPECT_EQ(read32(bytes, 2), 0x10u - 6u);
 }
 
+// Verifies an unrecognized opcode or relocation type is rejected.
 TEST_F(X86_64RelocationResolverTest, RejectsUnhandledTypesAndOpcodes)
 {
     std::array<uint8_t, 16> bytes{};
@@ -95,10 +106,13 @@ TEST_F(X86_64RelocationResolverTest, RejectsUnhandledTypesAndOpcodes)
 
     X86_64RelocationResolver resolver;
     EXPECT_FALSE(resolver.patch(std::span<uint8_t>(bytes.data(), bytes.size()), reloc, 0x10, reloc.m_relocType));
-    EXPECT_FALSE(resolver.patch(std::span<uint8_t>(bytes.data(), bytes.size()), reloc, 0x10,
+    EXPECT_FALSE(resolver.patch(std::span<uint8_t>(bytes.data(), bytes.size()),
+                                reloc,
+                                0x10,
                                 TargetCodeRelocationType::Absolute32));
 }
 
+// Verifies a relocation that would write past the end of the buffer is rejected.
 TEST_F(X86_64RelocationResolverTest, RejectsOutOfBoundsOffsets)
 {
     std::array<uint8_t, 4> bytes{};

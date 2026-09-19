@@ -8,23 +8,32 @@
 namespace Symbols
 {
 
+/**
+ * Resolved semantic operand of a target machine instruction.
+ */
 struct TargetOperandSymbol
 {
-    std::string_view m_regClassOrType;
-    std::string_view m_name;
-    DSL::Ast::TargetInstDef::OperandDirection m_direction;
+    std::string_view m_regClassOrType;                     // Expected register class or operand type.
+    std::string_view m_name;                               // Operand name.
+    DSL::Ast::TargetInstDef::OperandDirection m_direction; // Dataflow direction.
 };
 
+/**
+ * Resolved semantic definition of a target machine instruction.
+ */
 struct TargetInstructionSymbol
 {
-    std::string_view m_name;
-    std::string_view m_mnemonic;
-    std::pmr::vector<TargetOperandSymbol> m_operands;
-    std::pmr::vector<std::string_view> m_flags;
-    std::pmr::vector<std::string_view> m_implicitDefs;
-    std::pmr::vector<std::string_view> m_implicitUses;
-    std::optional<DSL::Ast::TargetInstDef::EncodingDecl> m_encoding;
+    std::string_view m_name;                                         // Opcode name.
+    std::string_view m_mnemonic;                                     // Assembly mnemonic.
+    std::pmr::vector<TargetOperandSymbol> m_operands;                // Operand signature.
+    std::pmr::vector<std::string_view> m_flags;                      // Behavioral flags.
+    std::pmr::vector<std::string_view> m_implicitDefs;               // Implicitly defined registers.
+    std::pmr::vector<std::string_view> m_implicitUses;               // Implicitly used registers.
+    std::optional<DSL::Ast::TargetInstDef::EncodingDecl> m_encoding; // Optional machine encoding.
 
+    /**
+     * Checks whether the instruction carries the named behavioral flag.
+     */
     bool hasFlag(std::string_view flag) const noexcept
     {
         for (const auto &f : m_flags)

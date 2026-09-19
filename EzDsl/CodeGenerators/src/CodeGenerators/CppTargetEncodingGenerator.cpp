@@ -16,6 +16,7 @@ namespace
 {
 namespace AstEnc = DSL::Ast::TargetInstDef;
 
+// Rewrites raw into a valid C++ identifier, substituting illegal characters and prefixing leading digits.
 std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
 {
     std::string result;
@@ -43,6 +44,7 @@ std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
     return result;
 }
 
+// Maps a parsed encoding form to the generated EncForm enumerator.
 std::string_view formToString(AstEnc::EncForm form)
 {
     switch (form)
@@ -103,6 +105,7 @@ std::string_view formToString(AstEnc::EncForm form)
     }
 }
 
+// Maps a parsed operand slot kind to the generated EncSlotKind enumerator.
 std::string_view slotToString(AstEnc::EncSlotKind slot)
 {
     switch (slot)
@@ -135,6 +138,7 @@ std::string_view slotToString(AstEnc::EncSlotKind slot)
     }
 }
 
+// Classifies a DSL operand type/class name into the generated encoder register class.
 const char *regClassToString(std::string_view type)
 {
     if (type.rfind("FPR", 0) == 0)
@@ -148,6 +152,7 @@ const char *regClassToString(std::string_view type)
     return "EncRegClass::Any";
 }
 
+// Renders a byte vector as a C++ brace-initializer list of 0xNN literals.
 std::string toByteList(const std::pmr::vector<uint8_t> &bytes)
 {
     std::string result = "{ ";
@@ -167,12 +172,14 @@ std::string toByteList(const std::pmr::vector<uint8_t> &bytes)
     return result;
 }
 
+// Name/description pair used when accumulating encodings for the generated table.
 struct CollectedEncoding
 {
-    std::string m_name;
-    std::string m_desc;
+    std::string m_name; ///< Instruction mnemonic.
+    std::string m_desc; ///< Generated EncodingDesc initializer text.
 };
 
+// Serializes a single parsed ENCODING declaration into an EncodingDesc brace initializer.
 std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const AstEnc::EncodingDecl &enc)
 {
     // Resolve an operand name to its index within the instruction signature.
@@ -210,17 +217,20 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
     }
     operands += " }";
 
+    // The size operand is optional and supplies the operation width at emission time.
     uint8_t sizeOperand = 0xFF;
     if (enc.m_sizeOperand.has_value())
     {
         sizeOperand = operandIndex(enc.m_sizeOperand.value());
     }
+    // Coalescing sources the encoding's register from another operand when the two must match.
     uint8_t coalesceSrc = 0xFF;
     if (enc.m_coalesce.has_value())
     {
         coalesceSrc = operandIndex(enc.m_coalesce.value());
     }
 
+    // Any Rel8/Rel32 slot is the branch target that needs relocation.
     uint8_t relocOperand = 0xFF;
     for (const auto &binding : enc.m_operands)
     {
@@ -231,6 +241,7 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
         }
     }
 
+    // 0 = never REX.W, 1 = always REX.W, 2 = infer from operand size.
     uint8_t rexPolicy = enc.m_rexWBySize ? 2 : (enc.m_rexW ? 1 : 0);
 
     return std::format("EncodingDesc{{"
@@ -262,6 +273,7 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
 
 } // namespace
 
+// Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
 CppTargetEncodingGenerator::CppTargetEncodingGenerator(DiagnosticCollector *collector,
                                                        SymbolTable *table,
                                                        std::filesystem::path outPath,
@@ -275,6 +287,7 @@ CppTargetEncodingGenerator::CppTargetEncodingGenerator(DiagnosticCollector *coll
     }
 }
 
+// Emits the header-only encoding descriptor table and its id/name lookup helpers.
 void CppTargetEncodingGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
     std::string ns = std::format("EzCodeEmitter::TableGen::{}", sanitizeIdentifier(m_targetName, "Target"));
@@ -293,6 +306,7 @@ void CppTargetEncodingGenerator::emitHeader(CppSourceEmitter &emitter) const
         auto nsScope = emitter.enterNamespace(ns);
         emitter.emitBlankLine();
 
+        // Collect target instructions in symbol-table order; encodings stay index-aligned with them.
         std::vector<const Symbol *> instSymbols;
         if (m_table)
         {
@@ -370,6 +384,7 @@ void CppTargetEncodingGenerator::emitHeader(CppSourceEmitter &emitter) const
     }
 }
 
+// Emits the encoding table for the current symbol table and writes the single output header.
 bool CppTargetEncodingGenerator::run()
 {
     if (!validate())
@@ -392,6 +407,7 @@ bool CppTargetEncodingGenerator::run()
     return true;
 }
 
+// Convenience wrapper retained for callers that do not need to configure a generator object.
 bool GenerateTargetEncodingTable(DiagnosticCollector *collector,
                                  SymbolTable *table,
                                  std::filesystem::path outPath,

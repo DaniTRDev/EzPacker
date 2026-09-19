@@ -14,6 +14,11 @@
 #include "Printer/MirPrinter.h"
 #include "RegisterAllocator/MirRegisterAllocator.h"
 
+/**
+ * Builds the interference graph from backward liveness: live-out sets seed the nodes, each
+ * definition interferes with every simultaneously-live value, calls clobber caller-saved
+ * registers, and the frame/stack pointers are reserved.
+ */
 bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, RegisterAllocatorCtx *ctx)
 {
     MirFunction *func = ctx->m_targetFunction;
@@ -49,8 +54,9 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             }
 
             bool isCall = (inst->getOpCode() == MirInstructionOpCode::CALL) ||
-                          (inst->getTargetDesc() && ((inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsCall) ||
-                                                     std::string_view(inst->getTargetDesc()->getName()) == "CALL"));
+                    (inst->getTargetDesc() &&
+                     ((inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsCall) ||
+                      std::string_view(inst->getTargetDesc()->getName()) == "CALL"));
             if (isCall)
             {
                 analysisData->m_hasCalls = true;
@@ -120,6 +126,10 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
     return true;
 }
 
+/**
+ * Chaitin-Briggs simplification: repeatedly remove low-degree virtual nodes onto the select
+ * stack; when none remain, optimistically spill the node with the best cost/degree ratio.
+ */
 bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
 {
     size_t totalVirtualNodes = 0;
@@ -255,6 +265,10 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
     return true;
 }
 
+/**
+ * Pops nodes off the select stack and assigns the first free physical color not taken by an
+ * interfering neighbor; nodes with no color are recorded as spills. Returns true on success.
+ */
 bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
 {
     MirFunctionBuilder fBuilder(ctx->m_ctx);
@@ -281,8 +295,11 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
         }
 
         // 2. Lock colors taken by interfering neighbors in the same register bank/family
-        auto isSameBank = [](MirRegisterClass *c1, MirRegisterClass *c2) {
-            if (!c1 || !c2) return true;
+        // GPR and FPR families only compete within their own family (names starting with "FPR").
+        auto isSameBank = [](MirRegisterClass *c1, MirRegisterClass *c2)
+        {
+            if (!c1 || !c2)
+                return true;
             std::string_view n1(c1->getName());
             std::string_view n2(c2->getName());
             bool f1 = (n1.rfind("FPR", 0) == 0);
@@ -367,6 +384,10 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
     return true;
 }
 
+/**
+ * Recomputes each node's degree and pins physical registers to infinite degree so they are
+ * never simplified away.
+ */
 void MirRegisterAllocator::evaluateInterferenceGraphDegree(RegisterAllocatorCtx *ctx)
 {
     ctx->m_degree.clear();
@@ -385,6 +406,9 @@ void MirRegisterAllocator::evaluateInterferenceGraphDegree(RegisterAllocatorCtx 
     }
 }
 
+/**
+ * Replaces every virtual register operand in the function with its assigned physical register.
+ */
 void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
 {
     MirFunction *func = ctx->m_targetFunction;
@@ -417,6 +441,10 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
     }
 }
 
+/**
+ * Estimates how expensive it is to spill node by summing its definitions and uses; loop depths
+ * are intended to weight uses more heavily (currently all weights are 1).
+ */
 double MirRegisterAllocator::calculateSpillCost(MirRegisterRef node, RegisterAllocatorCtx *ctx)
 {
     double totalCost = 0.0;
@@ -444,6 +472,9 @@ double MirRegisterAllocator::calculateSpillCost(MirRegisterRef node, RegisterAll
     return totalCost;
 }
 
+/**
+ * Inserts an undirected interference edge between u and v, ignoring self-edges.
+ */
 void MirRegisterAllocator::addEdge(const MirRegisterRef &u, const MirRegisterRef &v, RegisterAllocatorCtx *ctx)
 {
     if (u == v)
@@ -453,11 +484,19 @@ void MirRegisterAllocator::addEdge(const MirRegisterRef &u, const MirRegisterRef
     ctx->m_iGraph[v].insert(u);
 }
 
+/**
+ * Ensures the interference graph has an (initially empty) node for v.
+ */
 void MirRegisterAllocator::addNode(const MirRegisterRef &v, RegisterAllocatorCtx *ctx)
 {
     ctx->m_iGraph.try_emplace(v, std::pmr::set<MirRegisterRef>(ctx->m_ctx->getGlobalAllocator()));
 }
 
+/**
+ * Rewrites the function for spilled registers: rematerializes cheap definitions, otherwise
+ * creates stack slots and inserts reloads before / spills after each affected instruction.
+ * Spill slots persist in the context across iterations so repeated runs converge.
+ */
 void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set<MirRegisterRef> &spilledNodes,
                                                    RegisterAllocatorCtx *ctx)
 {
@@ -506,6 +545,7 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
             SourceReference *srcRef = inst->getSourceRef();
             auto &operands = inst->getOperands();
 
+            // Writes must be spilled after the instruction executes, so they are queued here.
             struct DeferredSpill
             {
                 MirRegister *tempReg;

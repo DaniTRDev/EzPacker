@@ -60,6 +60,9 @@ MirInstructionBuilder MirBlockBuilder::instrBuilder()
     return MirInstructionBuilder(m_ctx, m_insertPoint);
 }
 
+/**
+ * Unlinks the block from its owning function's block list without freeing it in the arena.
+ */
 void MirBlockBuilder::erase(MirBlock *block)
 {
     auto owner = block->getOwner();

@@ -272,10 +272,10 @@ class FlexInt
     void clampToTwosComplement();
 
   private:
-    bool m_isSigned;
-    mp_err m_lastErr;
-    mp_int m_number;
-    size_t m_bitWidth;
+    bool m_isSigned;   // Whether the value is interpreted with two's-complement signed semantics.
+    mp_err m_lastErr;  // Status code from the most recent libtommath operation (MP_OKAY on success).
+    mp_int m_number;   // Underlying libtommath multi-precision integer holding the magnitude/sign.
+    size_t m_bitWidth; // Configured storage width in bits used for clamping and serialization.
 };
 
 #endif // EZCORE_FLEX_INT_H

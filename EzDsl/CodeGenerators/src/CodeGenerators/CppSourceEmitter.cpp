@@ -7,29 +7,25 @@ namespace CodeGenerators
 // CppSourceEmitter::Scope Implementation
 // ============================================================================
 
+// Captures the owning emitter, the closing footer text and whether the body is indented.
 CppSourceEmitter::Scope::Scope(CppSourceEmitter &emitter, std::string footer, bool indentBody) :
-    m_emitter(&emitter),
-    m_footer(std::move(footer)),
-    m_indentBody(indentBody),
-    m_active(true)
+    m_emitter(&emitter), m_footer(std::move(footer)), m_indentBody(indentBody), m_active(true)
 {
 }
 
-CppSourceEmitter::Scope::~Scope()
-{
-    close();
-}
+// Closes the scope on destruction if it was not closed explicitly.
+CppSourceEmitter::Scope::~Scope() { close(); }
 
+// Transfers ownership of the open scope, disarming the moved-from object.
 CppSourceEmitter::Scope::Scope(Scope &&other) noexcept :
-    m_emitter(other.m_emitter),
-    m_footer(std::move(other.m_footer)),
-    m_indentBody(other.m_indentBody),
+    m_emitter(other.m_emitter), m_footer(std::move(other.m_footer)), m_indentBody(other.m_indentBody),
     m_active(other.m_active)
 {
     other.m_active = false;
     other.m_emitter = nullptr;
 }
 
+// Closes any currently held scope before taking over other's scope.
 CppSourceEmitter::Scope &CppSourceEmitter::Scope::operator=(Scope &&other) noexcept
 {
     if (this != &other)
@@ -46,6 +42,7 @@ CppSourceEmitter::Scope &CppSourceEmitter::Scope::operator=(Scope &&other) noexc
     return *this;
 }
 
+// Emits the footer exactly once and restores the indentation it added.
 void CppSourceEmitter::Scope::close()
 {
     if (m_active && m_emitter)
@@ -67,20 +64,17 @@ void CppSourceEmitter::Scope::close()
 // CppSourceEmitter Implementation
 // ============================================================================
 
+// Reserves buffer space up front and records the indent string used for each nesting level.
 CppSourceEmitter::CppSourceEmitter(size_t initialCapacity, std::string_view indentString) :
-    m_indentLevel(0),
-    m_indentString(indentString),
-    m_atStartOfLine(true),
-    m_lastWasBlank(false)
+    m_indentLevel(0), m_indentString(indentString), m_atStartOfLine(true), m_lastWasBlank(false)
 {
     m_buffer.reserve(initialCapacity);
 }
 
-void CppSourceEmitter::indent() noexcept
-{
-    ++m_indentLevel;
-}
+// Increases the indentation depth applied to subsequent lines.
+void CppSourceEmitter::indent() noexcept { ++m_indentLevel; }
 
+// Decreases the indentation depth, saturating at zero.
 void CppSourceEmitter::dedent() noexcept
 {
     if (m_indentLevel > 0)
@@ -89,26 +83,15 @@ void CppSourceEmitter::dedent() noexcept
     }
 }
 
-size_t CppSourceEmitter::getIndentLevel() const noexcept
-{
-    return m_indentLevel;
-}
+size_t CppSourceEmitter::getIndentLevel() const noexcept { return m_indentLevel; }
 
-void CppSourceEmitter::setIndentLevel(size_t level) noexcept
-{
-    m_indentLevel = level;
-}
+void CppSourceEmitter::setIndentLevel(size_t level) noexcept { m_indentLevel = level; }
 
-std::string_view CppSourceEmitter::getIndentString() const noexcept
-{
-    return m_indentString;
-}
+std::string_view CppSourceEmitter::getIndentString() const noexcept { return m_indentString; }
 
-void CppSourceEmitter::setIndentString(std::string_view indentStr)
-{
-    m_indentString = indentStr;
-}
+void CppSourceEmitter::setIndentString(std::string_view indentStr) { m_indentString = indentStr; }
 
+// Appends the configured indentation once per level at the start of a fresh line.
 void CppSourceEmitter::applyIndent()
 {
     if (m_atStartOfLine && m_indentLevel > 0)
@@ -121,9 +104,8 @@ void CppSourceEmitter::applyIndent()
     }
 }
 
-CppSourceEmitter::Scope CppSourceEmitter::enterScope(std::string_view header,
-                                                     std::string_view footer,
-                                                     bool indentBody)
+// Emits the header, optionally indents the body, and hands back the RAII closer.
+CppSourceEmitter::Scope CppSourceEmitter::enterScope(std::string_view header, std::string_view footer, bool indentBody)
 {
     if (!header.empty())
     {
@@ -136,6 +118,7 @@ CppSourceEmitter::Scope CppSourceEmitter::enterScope(std::string_view header,
     return Scope(*this, std::string(footer), indentBody);
 }
 
+// Enters a braced block, optionally preceded by a statement prefix such as `if (x)`.
 CppSourceEmitter::Scope CppSourceEmitter::enterBlock(std::string_view prefix)
 {
     if (prefix.empty())
@@ -146,12 +129,14 @@ CppSourceEmitter::Scope CppSourceEmitter::enterBlock(std::string_view prefix)
     return enterScope("{", "}");
 }
 
+// Opens a namespace block whose closing footer echoes the namespace name.
 CppSourceEmitter::Scope CppSourceEmitter::enterNamespace(std::string_view name)
 {
     emitLine(std::format("namespace {}", name));
     return enterScope("{", std::format("}} // namespace {}", name));
 }
 
+// Opens a class definition, including an optional base-clause.
 CppSourceEmitter::Scope CppSourceEmitter::enterClass(std::string_view name, std::string_view base)
 {
     if (base.empty())
@@ -165,6 +150,7 @@ CppSourceEmitter::Scope CppSourceEmitter::enterClass(std::string_view name, std:
     return enterScope("{", "};");
 }
 
+// Opens a struct definition, including an optional base-clause.
 CppSourceEmitter::Scope CppSourceEmitter::enterStruct(std::string_view name, std::string_view base)
 {
     if (base.empty())
@@ -178,9 +164,9 @@ CppSourceEmitter::Scope CppSourceEmitter::enterStruct(std::string_view name, std
     return enterScope("{", "};");
 }
 
-CppSourceEmitter::Scope CppSourceEmitter::enterEnum(std::string_view name,
-                                                    std::string_view underlyingType,
-                                                    bool isClass)
+// Opens an enum or enum class with an optional fixed underlying type.
+CppSourceEmitter::Scope
+CppSourceEmitter::enterEnum(std::string_view name, std::string_view underlyingType, bool isClass)
 {
     std::string decl = isClass ? std::format("enum class {}", name) : std::format("enum {}", name);
     if (!underlyingType.empty())
@@ -191,18 +177,21 @@ CppSourceEmitter::Scope CppSourceEmitter::enterEnum(std::string_view name,
     return enterScope("{", "};");
 }
 
+// Opens an `#ifdef` block whose footer is the matching `#endif`.
 CppSourceEmitter::Scope CppSourceEmitter::enterIfdef(std::string_view condition)
 {
     emitLine(std::format("#ifdef {}", condition));
     return Scope(*this, std::format("#endif // {}", condition), false);
 }
 
+// Opens an `#ifndef` block whose footer is the matching `#endif`.
 CppSourceEmitter::Scope CppSourceEmitter::enterIfndef(std::string_view condition)
 {
     emitLine(std::format("#ifndef {}", condition));
     return Scope(*this, std::format("#endif // {}", condition), false);
 }
 
+// Emits one line (or a blank line when empty), prefixing the current indentation.
 void CppSourceEmitter::emitLine(std::string_view line)
 {
     if (line.empty())
@@ -218,6 +207,7 @@ void CppSourceEmitter::emitLine(std::string_view line)
     m_lastWasBlank = false;
 }
 
+// Appends text verbatim, tracking whether the buffer now sits at a line start.
 void CppSourceEmitter::emit(std::string_view text)
 {
     if (text.empty())
@@ -231,6 +221,7 @@ void CppSourceEmitter::emit(std::string_view text)
     m_lastWasBlank = false;
 }
 
+// Appends text with no indentation applied, preserving it byte for byte.
 void CppSourceEmitter::emitRaw(std::string_view rawText)
 {
     if (rawText.empty())
@@ -243,6 +234,7 @@ void CppSourceEmitter::emitRaw(std::string_view rawText)
     m_lastWasBlank = false;
 }
 
+// Splits multiline text on newlines, stripping carriage returns and re-indenting each line.
 void CppSourceEmitter::emitLines(std::string_view multilineText)
 {
     size_t start = 0;
@@ -270,6 +262,7 @@ void CppSourceEmitter::emitLines(std::string_view multilineText)
     }
 }
 
+// Emits a single blank line, collapsing consecutive blanks and leading blanks.
 void CppSourceEmitter::emitBlankLine()
 {
     if (!m_lastWasBlank && !m_buffer.empty())
@@ -280,6 +273,7 @@ void CppSourceEmitter::emitBlankLine()
     }
 }
 
+// Emits the standard three-line auto-generation banner.
 void CppSourceEmitter::emitBanner(std::string_view generatorName, std::string_view notice)
 {
     emitLine("// ============================================================================");
@@ -287,11 +281,10 @@ void CppSourceEmitter::emitBanner(std::string_view generatorName, std::string_vi
     emitLine("// ============================================================================");
 }
 
-void CppSourceEmitter::emitComment(std::string_view comment)
-{
-    emitLine(std::format("// {}", comment));
-}
+// Emits a single-line `//` comment.
+void CppSourceEmitter::emitComment(std::string_view comment) { emitLine(std::format("// {}", comment)); }
 
+// Emits a Doxygen block comment, re-indenting each line of the supplied documentation.
 void CppSourceEmitter::emitDocComment(std::string_view doc)
 {
     emitLine("/**");
@@ -299,6 +292,7 @@ void CppSourceEmitter::emitDocComment(std::string_view doc)
     emitLine(" */");
 }
 
+// Emits a `// --- title ---` divider surrounded by blank lines.
 void CppSourceEmitter::emitSectionComment(std::string_view title)
 {
     emitBlankLine();
@@ -306,6 +300,7 @@ void CppSourceEmitter::emitSectionComment(std::string_view title)
     emitBlankLine();
 }
 
+// Emits an `#include` choosing angle brackets for system headers and quotes otherwise.
 void CppSourceEmitter::emitInclude(std::string_view header, bool isSystem)
 {
     if (isSystem)
@@ -318,32 +313,27 @@ void CppSourceEmitter::emitInclude(std::string_view header, bool isSystem)
     }
 }
 
-void CppSourceEmitter::emitPragmaOnce()
-{
-    emitLine("#pragma once");
-}
+// Emits `#pragma once`.
+void CppSourceEmitter::emitPragmaOnce() { emitLine("#pragma once"); }
 
+// Emits the `#ifndef`/`#define` pair that opens an include guard.
 void CppSourceEmitter::emitIncludeGuardStart(std::string_view guardName)
 {
     emitLine(std::format("#ifndef {}", guardName));
     emitLine(std::format("#define {}", guardName));
 }
 
+// Emits the `#endif` that closes an include guard.
 void CppSourceEmitter::emitIncludeGuardEnd(std::string_view guardName)
 {
     emitLine(std::format("#endif // {}", guardName));
 }
 
-const std::string &CppSourceEmitter::str() const noexcept
-{
-    return m_buffer;
-}
+const std::string &CppSourceEmitter::str() const noexcept { return m_buffer; }
 
-std::string_view CppSourceEmitter::view() const noexcept
-{
-    return m_buffer;
-}
+std::string_view CppSourceEmitter::view() const noexcept { return m_buffer; }
 
+// Moves out the accumulated output and resets all emitter state.
 std::string CppSourceEmitter::takeStr()
 {
     std::string res = std::move(m_buffer);
@@ -354,6 +344,7 @@ std::string CppSourceEmitter::takeStr()
     return res;
 }
 
+// Discards the accumulated output and resets all emitter state.
 void CppSourceEmitter::clear()
 {
     m_buffer.clear();
@@ -362,14 +353,8 @@ void CppSourceEmitter::clear()
     m_lastWasBlank = false;
 }
 
-size_t CppSourceEmitter::size() const noexcept
-{
-    return m_buffer.size();
-}
+size_t CppSourceEmitter::size() const noexcept { return m_buffer.size(); }
 
-bool CppSourceEmitter::empty() const noexcept
-{
-    return m_buffer.empty();
-}
+bool CppSourceEmitter::empty() const noexcept { return m_buffer.empty(); }
 
 } // namespace CodeGenerators

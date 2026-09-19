@@ -4,10 +4,9 @@
 CodeEmitterContext::CodeEmitterContext(DiagnosticCollector *diagCollector,
                                        const std::pmr::unordered_map<SectionType, CodeSection *> &sections,
                                        std::pmr::memory_resource *alloc) :
-    m_currentLabel(nullptr), m_diagCollector(diagCollector), m_alloc(alloc),
-    m_currentFuncLabels(alloc), m_currentFuncRelocs(alloc), m_labels(alloc),
-    m_relocations(alloc), m_allocatedLabels(alloc), m_allocatedRelocs(alloc),
-    m_allLabels(alloc), m_sections(sections)
+    m_currentLabel(nullptr), m_diagCollector(diagCollector), m_alloc(alloc), m_currentFuncLabels(alloc),
+    m_currentFuncRelocs(alloc), m_labels(alloc), m_relocations(alloc), m_allocatedLabels(alloc),
+    m_allocatedRelocs(alloc), m_allLabels(alloc), m_sections(sections)
 {
 }
 
@@ -15,6 +14,7 @@ CodeEmitterContext::~CodeEmitterContext()
 {
     std::pmr::polymorphic_allocator<> pAlloc(m_alloc);
 
+    // Free labels before clearing the maps that point at them.
     for (auto *label : m_allocatedLabels)
     {
         if (label != nullptr)
@@ -78,7 +78,8 @@ CodeRelocation *CodeEmitterContext::addReloc(MirReference *srcRef, TargetCodeRel
     return addRelocAt(srcRef, relocType, sec ? sec->getCurrentOffset() : 0);
 }
 
-CodeRelocation *CodeEmitterContext::addRelocAt(MirReference *srcRef, TargetCodeRelocationType relocType, uint64_t address)
+CodeRelocation *
+CodeEmitterContext::addRelocAt(MirReference *srcRef, TargetCodeRelocationType relocType, uint64_t address)
 {
     CodeSection *sec = getCurrentSection();
 
@@ -89,6 +90,7 @@ CodeRelocation *CodeEmitterContext::addRelocAt(MirReference *srcRef, TargetCodeR
     newReloc->m_srcRef = srcRef;
     newReloc->m_address = address;
 
+    // Record the relocation both for lifetime management and for the active function.
     m_allocatedRelocs.push_back(newReloc);
     m_currentFuncRelocs.push_back(newReloc);
     return newReloc;
@@ -166,7 +168,8 @@ CodeLabel *CodeEmitterContext::findLabel(MirId id) const
     return nullptr;
 }
 
-const std::pmr::unordered_map<CodeSection *, std::pmr::vector<CodeRelocation *>> &CodeEmitterContext::getRelocations() const
+const std::pmr::unordered_map<CodeSection *, std::pmr::vector<CodeRelocation *>> &
+CodeEmitterContext::getRelocations() const
 {
     return m_relocations;
 }

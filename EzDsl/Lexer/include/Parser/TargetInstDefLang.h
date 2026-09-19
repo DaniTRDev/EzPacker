@@ -10,6 +10,9 @@ namespace DSL::Parser::TargetInstDef
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Parses an operand direction keyword (IN/OUT/INOUT) into OperandDirection.
+ */
 struct Direction
 {
     static constexpr auto Table =
@@ -22,6 +25,9 @@ struct Direction
     static constexpr auto value = lexy::forward<Ast::TargetInstDef::OperandDirection>;
 };
 
+/**
+ * Parses `RegClassOrType:name DIR` into a TargetOperandDecl.
+ */
 struct TargetOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -57,6 +63,9 @@ struct ByteLiteral
     static constexpr auto value = lexy::forward<uint8_t>;
 };
 
+/**
+ * Parses a `[ 0x0F, 0xB6 ]` list of raw opcode bytes into a PMR vector<uint8_t>.
+ */
 struct ByteList
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -64,6 +73,9 @@ struct ByteList
     static constexpr auto value = Common::PmrAsList<std::pmr::vector<uint8_t>>;
 };
 
+/**
+ * Parses an encoding-form keyword (rr, rm, movzx, jcc, ...) into EncForm.
+ */
 struct EncFormSymbol
 {
     static constexpr auto Table =
@@ -99,6 +111,9 @@ struct EncFormSymbol
     static constexpr auto value = lexy::forward<Ast::TargetInstDef::EncForm>;
 };
 
+/**
+ * Parses an encoding-slot keyword (reg, rm_reg, imm32, rel32, ...) into EncSlotKind.
+ */
 struct EncSlotSymbol
 {
     static constexpr auto Table =
@@ -120,6 +135,9 @@ struct EncSlotSymbol
     static constexpr auto value = lexy::forward<Ast::TargetInstDef::EncSlotKind>;
 };
 
+/**
+ * Parses an x86 prefix keyword (P66, F2, ...) into its one-bit prefix mask value.
+ */
 struct PrefixSymbol
 {
     static constexpr auto Table =
@@ -134,6 +152,9 @@ struct PrefixSymbol
     static constexpr auto value = lexy::forward<uint8_t>;
 };
 
+/**
+ * Parses a `name => slot` operand binding inside an ENCODING operands block.
+ */
 struct EncOperandBindingParser
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -143,6 +164,9 @@ struct EncOperandBindingParser
             { return Ast::TargetInstDef::EncOperandBinding{ .m_name = std::move(name), .m_slot = slot }; });
 };
 
+/**
+ * Parses an `operands { name => slot; ... }` block into a PMR list of EncOperandBinding.
+ */
 struct EncOperandsBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -151,65 +175,70 @@ struct EncOperandsBlock
     static constexpr auto value = Common::PmrAsList<Ast::TargetInstDef::EncOperandBinding>;
 };
 
+/**
+ * Parses an `ENCODING { ... }` block, collecting each field variant and folding it into an
+ * EncodingDecl.
+ */
 struct EncodingDeclParser
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    // Tag structs wrap each parsed ENCODING field so the ItemVariant can distinguish them.
     struct TagForm
     {
-        Ast::TargetInstDef::EncForm val;
+        Ast::TargetInstDef::EncForm val; // Encoding form.
     };
     struct TagOpcode
     {
-        std::pmr::vector<uint8_t> val;
+        std::pmr::vector<uint8_t> val; // Primary opcode bytes.
     };
     struct TagOpcodeDigit
     {
-        uint8_t val;
+        uint8_t val; // ModRM /digit field.
     };
     struct TagRexW
     {
-        bool val;
+        bool val; // Always-set REX.W.
     };
     struct TagRexWBySize
     {
-        bool val;
+        bool val; // REX.W selected from the size operand.
     };
     struct TagPrefixes
     {
-        uint8_t val;
+        uint8_t val; // Legacy prefix bitmask.
     };
     struct TagOperands
     {
-        std::pmr::vector<Ast::TargetInstDef::EncOperandBinding> val;
+        std::pmr::vector<Ast::TargetInstDef::EncOperandBinding> val; // Operand-to-slot bindings.
     };
     struct TagCoalesce
     {
-        Ast::Common::Identifier val;
+        Ast::Common::Identifier val; // Two-address source operand name.
     };
     struct TagSize
     {
-        Ast::Common::Identifier val;
+        Ast::Common::Identifier val; // Operand determining operation size.
     };
     struct TagShiftCl
     {
-        bool val;
+        bool val; // Shift amount fixed to CL.
     };
     struct TagByteRex
     {
-        bool val;
+        bool val; // Force REX on byte forms.
     };
     struct TagCond
     {
-        uint8_t val;
+        uint8_t val; // Condition-code digit.
     };
     struct TagSsePrefix
     {
-        uint8_t val;
+        uint8_t val; // SSE prefix bitmask.
     };
     struct TagSseOpcode
     {
-        std::pmr::vector<uint8_t> val;
+        std::pmr::vector<uint8_t> val; // SSE opcode bytes.
     };
 
     using ItemVariant = std::variant<TagForm,
@@ -227,6 +256,9 @@ struct EncodingDeclParser
                                      TagSsePrefix,
                                      TagSseOpcode>;
 
+    /**
+     * Parses `form: FORM` into a TagForm.
+     */
     struct FormItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -235,6 +267,9 @@ struct EncodingDeclParser
                 lexy::callback<TagForm>([](Ast::TargetInstDef::EncForm f) { return TagForm{ f }; });
     };
 
+    /**
+     * Parses `opcode: [...]` into a TagOpcode.
+     */
     struct OpcodeItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -243,6 +278,9 @@ struct EncodingDeclParser
                                                                 { return TagOpcode{ std::move(bytes) }; });
     };
 
+    /**
+     * Parses `opcode_digit: N` into a TagOpcodeDigit.
+     */
     struct OpcodeDigitItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -252,6 +290,9 @@ struct EncodingDeclParser
                 [](Ast::Common::IntegerLiteral v) { return TagOpcodeDigit{ static_cast<uint8_t>(v.m_node) }; });
     };
 
+    /**
+     * Parses `rex_w: bool` into a TagRexW.
+     */
     struct RexWItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -261,6 +302,9 @@ struct EncodingDeclParser
                 lexy::callback<TagRexW>([](Ast::Common::BooleanLiteral v) { return TagRexW{ v.m_node }; });
     };
 
+    /**
+     * Parses `rex_w_size: bool` into a TagRexWBySize.
+     */
     struct RexWBySizeItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -270,6 +314,9 @@ struct EncodingDeclParser
                 lexy::callback<TagRexWBySize>([](Ast::Common::BooleanLiteral v) { return TagRexWBySize{ v.m_node }; });
     };
 
+    /**
+     * Parses `prefixes: PREFIX` into a TagPrefixes.
+     */
     struct PrefixesItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -277,6 +324,9 @@ struct EncodingDeclParser
         static constexpr auto value = lexy::callback<TagPrefixes>([](uint8_t v) { return TagPrefixes{ v }; });
     };
 
+    /**
+     * Parses an `operands { ... }` block into a TagOperands.
+     */
     struct OperandsItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -286,6 +336,9 @@ struct EncodingDeclParser
                                             { return TagOperands{ std::move(ops) }; });
     };
 
+    /**
+     * Parses `coalesce: OPERAND` into a TagCoalesce.
+     */
     struct CoalesceItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -294,6 +347,9 @@ struct EncodingDeclParser
                 lexy::callback<TagCoalesce>([](Ast::Common::Identifier id) { return TagCoalesce{ std::move(id) }; });
     };
 
+    /**
+     * Parses `size: OPERAND` into a TagSize.
+     */
     struct SizeItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -302,6 +358,9 @@ struct EncodingDeclParser
                 lexy::callback<TagSize>([](Ast::Common::Identifier id) { return TagSize{ std::move(id) }; });
     };
 
+    /**
+     * Parses `shift_cl: bool` into a TagShiftCl.
+     */
     struct ShiftClItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -311,6 +370,9 @@ struct EncodingDeclParser
                 lexy::callback<TagShiftCl>([](Ast::Common::BooleanLiteral v) { return TagShiftCl{ v.m_node }; });
     };
 
+    /**
+     * Parses `byte_rex: bool` into a TagByteRex.
+     */
     struct ByteRexItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -320,6 +382,9 @@ struct EncodingDeclParser
                 lexy::callback<TagByteRex>([](Ast::Common::BooleanLiteral v) { return TagByteRex{ v.m_node }; });
     };
 
+    /**
+     * Parses `cond: N` into a TagCond.
+     */
     struct CondItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -328,6 +393,9 @@ struct EncodingDeclParser
                                                               { return TagCond{ static_cast<uint8_t>(v.m_node) }; });
     };
 
+    /**
+     * Parses `sse_prefix: PREFIX` into a TagSsePrefix.
+     */
     struct SsePrefixItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -335,6 +403,9 @@ struct EncodingDeclParser
         static constexpr auto value = lexy::callback<TagSsePrefix>([](uint8_t v) { return TagSsePrefix{ v }; });
     };
 
+    /**
+     * Parses `sse_opcode: [...]` into a TagSseOpcode.
+     */
     struct SseOpcodeItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -343,6 +414,9 @@ struct EncodingDeclParser
                                                                    { return TagSseOpcode{ std::move(bytes) }; });
     };
 
+    /**
+     * Dispatches one ENCODING field keyword to its item parser.
+     */
     struct Item
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -364,6 +438,9 @@ struct EncodingDeclParser
         static constexpr auto value = lexy::forward<ItemVariant>;
     };
 
+    /**
+     * Parses the `;`-separated ENCODING fields into a PMR vector of item variants.
+     */
     struct ItemList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -424,33 +501,41 @@ struct EncodingDeclParser
             });
 };
 
+/**
+ * One statement inside a `target_inst { ... }` body (MNEMONIC, FLAGS, implicit effects, or
+ * ENCODING), exposed as a variant.
+ */
 struct BodyItem
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    // Tag structs wrap each parsed body field so ItemVariant can distinguish them.
     struct TagMnemonic
     {
-        Ast::Common::StringLiteral val;
+        Ast::Common::StringLiteral val; // Assembly mnemonic.
     };
     struct TagFlags
     {
-        std::pmr::vector<Ast::Common::Identifier> val;
+        std::pmr::vector<Ast::Common::Identifier> val; // Behavioral flags.
     };
     struct TagImplicitDefs
     {
-        std::pmr::vector<Ast::Common::Identifier> val;
+        std::pmr::vector<Ast::Common::Identifier> val; // Implicitly defined registers.
     };
     struct TagImplicitUses
     {
-        std::pmr::vector<Ast::Common::Identifier> val;
+        std::pmr::vector<Ast::Common::Identifier> val; // Implicitly used registers.
     };
     struct TagEncoding
     {
-        Ast::TargetInstDef::EncodingDecl val;
+        Ast::TargetInstDef::EncodingDecl val; // Machine encoding.
     };
 
     using ItemVariant = std::variant<TagMnemonic, TagFlags, TagImplicitDefs, TagImplicitUses, TagEncoding>;
 
+    /**
+     * Parses a `,`-separated identifier list into a PMR vector.
+     */
     struct IdList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -458,6 +543,9 @@ struct BodyItem
         static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::Common::Identifier>>;
     };
 
+    /**
+     * Parses an optional parenthesized identifier list, yielding an empty vector when omitted.
+     */
     struct OptIdList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -468,6 +556,9 @@ struct BodyItem
                 [](lexy::nullopt) { return std::pmr::vector<Ast::Common::Identifier>{}; });
     };
 
+    /**
+     * Parses `MNEMONIC("text");` into a TagMnemonic.
+     */
     struct MnemonicDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -477,6 +568,9 @@ struct BodyItem
                 lexy::callback<TagMnemonic>([](Ast::Common::StringLiteral s) { return TagMnemonic{ std::move(s) }; });
     };
 
+    /**
+     * Parses `FLAGS(...);` into a TagFlags.
+     */
     struct FlagsDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -485,6 +579,9 @@ struct BodyItem
                                                                { return TagFlags{ std::move(list) }; });
     };
 
+    /**
+     * Parses `IMPLICIT_DEFS(...);` into a TagImplicitDefs.
+     */
     struct ImplicitDefsDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -493,6 +590,9 @@ struct BodyItem
                                                                       { return TagImplicitDefs{ std::move(list) }; });
     };
 
+    /**
+     * Parses `IMPLICIT_USES(...);` into a TagImplicitUses.
+     */
     struct ImplicitUsesDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -501,6 +601,9 @@ struct BodyItem
                                                                       { return TagImplicitUses{ std::move(list) }; });
     };
 
+    /**
+     * Parses an `ENCODING { ... }` block into a TagEncoding.
+     */
     struct EncodingDeclItem
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -518,10 +621,17 @@ struct BodyItem
     static constexpr auto value = lexy::forward<ItemVariant>;
 };
 
+/**
+ * Parses one `target_inst name(operands) { body }` declaration and folds the body into a
+ * TargetInstDecl.
+ */
 struct TargetInstDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    /**
+     * Parses a `,`-separated list of target operands into a PMR vector.
+     */
     struct NonEmptyOperandList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -529,6 +639,9 @@ struct TargetInstDecl
         static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl>>;
     };
 
+    /**
+     * Parses the parenthesized operand signature, allowing an empty `()` list.
+     */
     struct OperandList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -539,6 +652,9 @@ struct TargetInstDecl
                 [](lexy::nullopt) { return std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl>{}; });
     };
 
+    /**
+     * Parses the curly-braced body as a list of BodyItem variants.
+     */
     struct BodyList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -582,22 +698,34 @@ struct TargetInstDecl
             });
 };
 
+/**
+ * Parses the optional `target NAME;` header and forwards the target identifier.
+ */
 struct TargetHeader
 {
     static constexpr auto rule = Common::Keyword<"target">::rule >> (dsl::p<Common::Identifier> + dsl::lit_c<';'>);
     static constexpr auto value = lexy::forward<Ast::Common::Identifier>;
 };
 
+/**
+ * Recognizes a `target_inst` declaration and forwards the parsed TargetInstDecl.
+ */
 struct InstItemParser
 {
     static constexpr auto rule = dsl::peek(Common::Keyword<"target_inst">::rule) >> dsl::p<TargetInstDecl>;
     static constexpr auto value = lexy::forward<Ast::TargetInstDef::TargetInstDecl>;
 };
 
+/**
+ * Parses a whole `.idf` file as an optional target header plus an EOF-terminated instruction list.
+ */
 struct TargetInstFile
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    /**
+     * Parses the sequence of target instruction declarations into a PMR vector.
+     */
     struct InstList
     {
         static constexpr auto rule = dsl::list(dsl::p<InstItemParser>);

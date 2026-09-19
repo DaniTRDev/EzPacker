@@ -15,6 +15,10 @@
 namespace LegalizeActions
 {
 
+/**
+ * Reinterprets the operand at operandSlot (or every operand when the slot is out of range) to
+ * targetType via temporary BITCAST registers, re-emitting the original instruction over them.
+ */
 LegalizationResult LegalizeBitcast(LegalizeCtx &ctx, size_t operandSlot, MirType *targetType)
 {
     if (!ctx.m_ctx || !targetType)
@@ -44,6 +48,7 @@ LegalizationResult LegalizeBitcast(LegalizeCtx &ctx, size_t operandSlot, MirType
     };
 
     std::vector<MirOperand *> newOperands(operands.begin(), operands.end());
+    // A write operand is bitcast after the instruction; a read operand is bitcast before it.
     struct BitcastDef
     {
         MirRegister *origDst;
@@ -65,6 +70,7 @@ LegalizationResult LegalizeBitcast(LegalizeCtx &ctx, size_t operandSlot, MirType
         {
             if (op->isOfType<MirRegister>())
             {
+                // Let the instruction write into a wider temp, then BITCAST the temp back to the original.
                 MirRegister *origDst = op->get<MirRegister>();
                 MirRegister *tempDst = ob.buildVReg(targetType);
                 newOperands[slot] = tempDst;
@@ -73,6 +79,7 @@ LegalizationResult LegalizeBitcast(LegalizeCtx &ctx, size_t operandSlot, MirType
         }
         else
         {
+            // Materialize a bit-compatible read value before the instruction.
             MirRegister *castReg = ob.buildVReg(targetType);
             emitInst(MirInstructionOpCode::BITCAST, { castReg, op });
             newOperands[slot] = castReg;

@@ -19,8 +19,12 @@
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+/// Stores the builder context and target descriptor used to query legality and emit rewrites.
 MirLegalizer::MirLegalizer(MirBuilderContext *ctx, TargetDesc *targetDesc) : m_ctx(ctx), m_targetDesc(targetDesc) {}
 
+/**
+ * Legalizes every block of func, returning false if any block failed to legalize.
+ */
 bool MirLegalizer::legalizeFunction(MirFunction *func)
 {
     if (!func)
@@ -37,6 +41,10 @@ bool MirLegalizer::legalizeFunction(MirFunction *func)
     return allSucceeded;
 }
 
+/**
+ * Legalizes a block with a worklist: each instruction is queried, rewritten if illegal, and the
+ * newly produced instructions are fed back for verification. A step budget detects cycles.
+ */
 bool MirLegalizer::legalizeBlock(MirBlock *block)
 {
     if (!block || !m_ctx)
@@ -59,10 +67,9 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
     {
         if (++stepsTaken > maxSteps)
         {
-            m_ctx->getDiagCollector()->error(
-                "MirLegalizer",
-                "Infinite legalization cycle detected in block '{}'",
-                block->getName());
+            m_ctx->getDiagCollector()->error("MirLegalizer",
+                                             "Infinite legalization cycle detected in block '{}'",
+                                             block->getName());
             return false;
         }
 
@@ -89,10 +96,10 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
 
         if (response.isUnsupported())
         {
-            m_ctx->getDiagCollector()->error(
-                "MirLegalizer",
-                "Unsupported instruction '{}' with operand type(s)",
-                inst->getOpCodeName()) << inst->getSourceRef();
+            m_ctx->getDiagCollector()->error("MirLegalizer",
+                                             "Unsupported instruction '{}' with operand type(s)",
+                                             inst->getOpCodeName())
+                    << inst->getSourceRef();
             return false;
         }
 
@@ -117,6 +124,10 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
     return true;
 }
 
+/**
+ * Legalizes exactly one instruction at the given iterator without a worklist.
+ * Returns NotModified when it is already legal, and Failed when unsupported.
+ */
 LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInstruction>::iterator it, MirBlock *block)
 {
     if (!m_ctx)
@@ -141,9 +152,7 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
 
     if (response.isUnsupported())
     {
-        m_ctx->getDiagCollector()->error("MirLegalizer",
-                                         "Unsupported instruction '{}'",
-                                         inst->getOpCodeName())
+        m_ctx->getDiagCollector()->error("MirLegalizer", "Unsupported instruction '{}'", inst->getOpCodeName())
                 << inst->getSourceRef();
         return LegalizationResult::Failed;
     }
@@ -152,6 +161,10 @@ LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInst
     return executeAction(response, ctx, inst);
 }
 
+/**
+ * Fills a LegalityQuery from an instruction's opcode, flags, operand types, compact ids and
+ * operand kinds (register/immediate/memory/...), recording the first immediate encountered.
+ */
 LegalityQuery MirLegalizer::buildQuery(MirInstruction *inst)
 {
     LegalityQuery q;
@@ -215,6 +228,10 @@ LegalityQuery MirLegalizer::buildQuery(MirInstruction *inst)
     return q;
 }
 
+/**
+ * Dispatches a legality response to the concrete legalization action, resolving the target type
+ * for type-changing actions and the symbol/handler for libcalls and custom lowering.
+ */
 LegalizationResult MirLegalizer::executeAction(const LegalityResponse &response, LegalizeCtx &ctx, MirInstruction *inst)
 {
     MirType *targetType = nullptr;

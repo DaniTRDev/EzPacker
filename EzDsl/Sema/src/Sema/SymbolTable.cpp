@@ -13,6 +13,7 @@ ScopeId SymbolTable::getCurrentScopeId() const { return m_currentScopeId; }
 
 ScopeId SymbolTable::createScope(ScopeId parentId, const std::string_view &debugName)
 {
+    // Allocate the scope in the arena; its id is its index in the scope list.
     std::pmr::polymorphic_allocator<> alloc(m_alloc);
     Scope *scope = alloc.new_object<Scope>(m_scopes.size(), parentId, debugName, m_alloc);
 
@@ -38,6 +39,7 @@ Symbol *SymbolTable::getSymById(SymbolId id) const
 
 Symbol *SymbolTable::getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope)
 {
+    // Walk the parent scope chain from the starting (or current) scope up to the root.
     ScopeId cursor = startingScope.value_or(m_currentScopeId);
 
     while (cursor != InvalidScopeId)
@@ -55,6 +57,7 @@ Symbol *SymbolTable::getSymByName(const std::string_view &name, std::optional<Sc
 
 Symbol *SymbolTable::getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope)
 {
+    // Same bottom-up lookup as the untyped overload, but only matching the requested symbol type.
     ScopeId cursor = startingScope.value_or(m_currentScopeId);
 
     while (cursor != InvalidScopeId)
@@ -80,7 +83,7 @@ SymbolId SymbolTable::declareSym(class SourceReference *sourceRef,
     if (type == SymbolType::Type || type == SymbolType::TypeSet)
     {
         duplicate = (getSymInScope(m_currentScopeId, name, SymbolType::Type) != nullptr) ||
-                    (getSymInScope(m_currentScopeId, name, SymbolType::TypeSet) != nullptr);
+                (getSymInScope(m_currentScopeId, name, SymbolType::TypeSet) != nullptr);
     }
     else
     {
@@ -131,6 +134,7 @@ Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name, std
     if (!scope)
         return nullptr;
 
+    // Iterate every declaration sharing the name and return the first matching the optional type.
     auto [begin, end] = scope->findSymbols(name);
     for (auto it = begin; it != end; ++it)
     {

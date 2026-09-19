@@ -4,10 +4,14 @@
 #include "InstructionSelector/MirInstructionSelectorPass.h"
 #include "Operand/MirOperandBuilder.h"
 
+/**
+ * Fixture for MIR instruction selection, memory folding, addressing modes, and full-pipeline audits.
+ */
 class MirInstructionSelectorTest : public EzTripleTestSuite
 {
 };
 
+// Verifies selectBlock dispatches each generic instruction to the mock selector.
 TEST_F(MirInstructionSelectorTest, TestInstructionSelectionDispatch)
 {
     auto *ctx = getBuilderCtx();
@@ -35,6 +39,7 @@ TEST_F(MirInstructionSelectorTest, TestInstructionSelectionDispatch)
     EXPECT_EQ(mockIsel->m_selectedCount, 2);
 }
 
+// Verifies the instruction selector pass selects instructions across all blocks in a function.
 TEST_F(MirInstructionSelectorTest, TestInstructionSelectorPass)
 {
     auto *ctx = getBuilderCtx();
@@ -63,6 +68,7 @@ TEST_F(MirInstructionSelectorTest, TestInstructionSelectorPass)
     EXPECT_EQ(mockIsel->m_selectedCount, 2);
 }
 
+// Verifies a single-use LOAD folds into an ADD memory operand and constrains registers to GPR64.
 TEST_F(MirInstructionSelectorTest, TestMemoryFold)
 {
     auto *ctx = getBuilderCtx();
@@ -105,6 +111,7 @@ TEST_F(MirInstructionSelectorTest, TestMemoryFold)
     EXPECT_EQ(ptrReg->getRegClass(), getTargetDesc()->getGprClass());
 }
 
+// Verifies a multiply-used loaded value is not folded into its consumer.
 TEST_F(MirInstructionSelectorTest, TestMultiUseNoFold)
 {
     auto *ctx = getBuilderCtx();
@@ -137,6 +144,7 @@ TEST_F(MirInstructionSelectorTest, TestMultiUseNoFold)
     EXPECT_EQ(block->getInstructions().size(), 3);
 }
 
+// Verifies a store between a load and its use prevents folding.
 TEST_F(MirInstructionSelectorTest, TestInterveningStoreNoFold)
 {
     auto *ctx = getBuilderCtx();
@@ -175,6 +183,7 @@ TEST_F(MirInstructionSelectorTest, TestInterveningStoreNoFold)
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 
+// Verifies selection constrains all virtual registers before the register allocator runs.
 TEST_F(MirInstructionSelectorTest, TestEndToEndWithRegisterAllocator)
 {
     auto *ctx = getBuilderCtx();
@@ -233,6 +242,7 @@ TEST_F(MirInstructionSelectorTest, TestEndToEndWithRegisterAllocator)
 #include "FrameLowerer/MirFrameLowererPass.h"
 #include "Function/MirFunctionStackFrame.h"
 
+// Runs select, allocate, and frame-lower passes and audits selected-instruction and memory invariants.
 TEST_F(MirInstructionSelectorTest, TestFullPipelineAndInvariantAudit)
 {
     auto *ctx = getBuilderCtx();
@@ -324,6 +334,7 @@ TEST_F(MirInstructionSelectorTest, TestFullPipelineAndInvariantAudit)
     EXPECT_TRUE(mockLowerer->m_epilogueInserted);
 }
 
+// Verifies shift/add/load chains match a SIB addressing mode and fold into a single LOAD64.
 TEST_F(MirInstructionSelectorTest, TestSibAddressingModeMatching)
 {
     auto *ctx = getBuilderCtx();
@@ -392,5 +403,3 @@ TEST_F(MirInstructionSelectorTest, TestSibAddressingModeMatching)
     EXPECT_EQ(idxReg->getRegClass(), getTargetDesc()->getGprClass());
     EXPECT_EQ(val->getRegClass(), getTargetDesc()->getGprClass());
 }
-
-

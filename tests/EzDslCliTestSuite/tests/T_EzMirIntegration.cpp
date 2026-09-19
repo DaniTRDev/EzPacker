@@ -5,12 +5,16 @@
 
 using namespace Cli;
 
+/**
+ * Integration fixture that runs the EzDsl CLI against the real EzMir DSL source files.
+ */
 class EzMirIntegrationTest : public EzDslCliTestSuiteAsGtest
 {
   protected:
     std::filesystem::path m_typesPath;
     std::filesystem::path m_instructionsPath;
 
+    // Resolves the bundled EzMir types and instructions source paths before each test.
     void SetUp() override
     {
         EzDslCliTestSuiteAsGtest::SetUp();
@@ -50,6 +54,7 @@ TEST_F(EzMirIntegrationTest, CheckOnlyPassesOnEzMirTypes)
     EXPECT_FALSE(std::filesystem::exists(m_testTempDir / "MirTypeTable.cpp"));
 }
 
+// Verifies --check-only succeeds on the real EzMir instructions file without writing output.
 TEST_F(EzMirIntegrationTest, CheckOnlyPassesOnEzMirInstructions)
 {
     CliOptions opts;
@@ -135,15 +140,19 @@ TEST_F(EzMirIntegrationTest, GenerateAndVerifyEzMirTypeTable)
     EXPECT_TRUE(hContent.find("void initialize(size_t pointerBitWidth);") != std::string::npos);
 
     // --- Source File Verification ---
-    EXPECT_TRUE(sContent.find("MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena, size_t pointerBitWidth) :") !=
-                std::string::npos);
+    EXPECT_TRUE(
+            sContent.find(
+                    "MirTypeTable::MirTypeTable(std::pmr::memory_resource *globalArena, size_t pointerBitWidth) :") !=
+            std::string::npos);
     EXPECT_TRUE(sContent.find("m_compactIdToType.fill(nullptr);") != std::string::npos);
     EXPECT_TRUE(sContent.find("MirType *MirTypeTable::i32() { return m_i32Type; }") != std::string::npos);
     EXPECT_TRUE(sContent.find("MirType *MirTypeTable::f64() { return m_f64Type; }") != std::string::npos);
     // Initialization checks
     EXPECT_TRUE(sContent.find("m_i1Type = create(MirTypeKind::Integer, 1, 1, {}, \"i1\", 4);") != std::string::npos);
-    EXPECT_TRUE(sContent.find("m_i32Type = create(MirTypeKind::Integer, 32, 32, {}, \"i32\", 7);") != std::string::npos);
-    EXPECT_TRUE(sContent.find("m_i64Type = create(MirTypeKind::Integer, 64, 64, {}, \"i64\", 8);") != std::string::npos);
+    EXPECT_TRUE(sContent.find("m_i32Type = create(MirTypeKind::Integer, 32, 32, {}, \"i32\", 7);") !=
+                std::string::npos);
+    EXPECT_TRUE(sContent.find("m_i64Type = create(MirTypeKind::Integer, 64, 64, {}, \"i64\", 8);") !=
+                std::string::npos);
     EXPECT_TRUE(sContent.find("m_f32Type = create(MirTypeKind::FloatingPoint, 32, 32, {}, \"f32\", 11);") !=
                 std::string::npos);
     EXPECT_TRUE(sContent.find("m_f64Type = create(MirTypeKind::FloatingPoint, 64, 64, {}, \"f64\", 12);") !=
@@ -266,11 +275,13 @@ TEST_F(EzMirIntegrationTest, CMakeTypeTableGenerationContract)
     EXPECT_EQ(mtimeS1, mtimeS2);
 }
 
+// Simulates the CMake instruction-defs generation contract, including timestamp preservation on re-run.
 TEST_F(EzMirIntegrationTest, CMakeInstructionDefsGenerationContract)
 {
     // Simulates EzDslGenMirInstructions(TARGET EzMir INPUT instructions.irdf OUTPUT_DIR ...)
     std::string err;
-    auto opts = parseArgs({ "-i", m_instructionsPath.string(), "-o", m_testTempDir.string(), "--emit-instructions" }, err);
+    auto opts =
+            parseArgs({ "-i", m_instructionsPath.string(), "-o", m_testTempDir.string(), "--emit-instructions" }, err);
     ASSERT_TRUE(opts.has_value()) << "CLI argument parsing failed: " << err;
 
     auto result1 = runDriver(*opts);
@@ -308,6 +319,7 @@ TEST_F(EzMirIntegrationTest, DumpEzMirTypesJsonMetadata)
     EXPECT_TRUE(result.success);
 }
 
+// Verifies dumping info and symbols for the real instructions file in JSON mode succeeds.
 TEST_F(EzMirIntegrationTest, DumpEzMirInstructionsJsonMetadata)
 {
     CliOptions opts;
@@ -345,7 +357,8 @@ TEST_F(EzMirIntegrationTest, RunEzDslCliSubprocessOnEzMir)
     // 2. Process instructions.irdf
     std::string instOutDir = (m_testTempDir / "proc_inst").string();
     std::string stdOutInst;
-    int codeInst = runCliProcess({ "-i", m_instructionsPath.string(), "-o", instOutDir, "--emit-instructions" }, stdOutInst);
+    int codeInst =
+            runCliProcess({ "-i", m_instructionsPath.string(), "-o", instOutDir, "--emit-instructions" }, stdOutInst);
     EXPECT_EQ(codeInst, 0) << "CLI failed with output:\n" << stdOutInst;
     EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(instOutDir) / "MirInstructionSetDefs.h"));
 }

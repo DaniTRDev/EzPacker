@@ -15,6 +15,10 @@
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Assigns each stack object a frame-pointer-relative offset and computes the total frame size,
+ * honoring the ABI's growth direction, alignment, callee-saved area and shadow space.
+ */
 void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
 {
     MirFunction *func = ctx.m_targetFunc;
@@ -69,6 +73,10 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
     log.appendNote(func->getSourceRef(), "Total size: {:X}", analysisData->m_totalFrameSize);
 }
 
+/**
+ * Replaces every abstract StackFrameObject reference in the function with a concrete memory
+ * operand of the form [baseReg + offset] using the ABI-selected frame or stack pointer.
+ */
 void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
 {
     MirFunction *func = ctx.m_targetFunc;

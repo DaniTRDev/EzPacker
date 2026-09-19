@@ -16,12 +16,18 @@
 namespace EzTriple
 {
 
+/**
+ * Forwards the target descriptor to the generated base selector and caches it for findClass().
+ */
 X86_64TargetInstructionSelector::X86_64TargetInstructionSelector(TargetDesc *targetDesc) :
-    x86_64InstructionSelector(targetDesc),
-    m_targetDesc(targetDesc)
+    x86_64InstructionSelector(targetDesc), m_targetDesc(targetDesc)
 {
 }
 
+/**
+ * Searches every register bank of the target for a class with the given declarative name.
+ * @return The matching class, or nullptr when the target has no such class.
+ */
 MirRegisterClass *X86_64TargetInstructionSelector::findClass(std::string_view name)
 {
     if (!m_targetDesc)
@@ -42,6 +48,10 @@ MirRegisterClass *X86_64TargetInstructionSelector::findClass(std::string_view na
     return nullptr;
 }
 
+/**
+ * Selects an instruction by first delegating to the generated base selector, then falling back to
+ * the hand-written rules for control flow, calls, comparisons, memory and floating point.
+ */
 bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (!ctx || !inst)
@@ -98,6 +108,9 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
     return false;
 }
 
+/**
+ * Replaces a generic JMP with a target JMP to its destination operand.
+ */
 bool X86_64TargetInstructionSelector::selectJMP(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 1)
@@ -113,6 +126,10 @@ bool X86_64TargetInstructionSelector::selectJMP(MirBuilderContext *ctx, MirInstr
     return true;
 }
 
+/**
+ * Lowers a conditional branch into CMP against zero followed by JNE to the true block and JMP to
+ * the false block.
+ */
 bool X86_64TargetInstructionSelector::selectBR_COND(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 3)
@@ -157,6 +174,10 @@ bool X86_64TargetInstructionSelector::selectBR_COND(MirBuilderContext *ctx, MirI
     return true;
 }
 
+/**
+ * Lowers a CALL, choosing the first reference or non-token register operand as the callee and
+ * pinning it to a 64-bit GPR when unconstrained.
+ */
 bool X86_64TargetInstructionSelector::selectCALL(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 1)
@@ -168,9 +189,10 @@ bool X86_64TargetInstructionSelector::selectCALL(MirBuilderContext *ctx, MirInst
     for (size_t i = 0; i < inst->getOperandCount(); ++i)
     {
         auto *op = inst->getOperand(i);
-        if (op && (op->getType() == MirOperandType::Reference ||
-                   (op->getType() == MirOperandType::Register &&
-                    op->getMirType() && op->getMirType()->getKind() != MirTypeKind::BindingToken)))
+        if (op &&
+            (op->getType() == MirOperandType::Reference ||
+             (op->getType() == MirOperandType::Register && op->getMirType() &&
+              op->getMirType()->getKind() != MirTypeKind::BindingToken)))
         {
             callee = op;
             break;
@@ -194,6 +216,10 @@ bool X86_64TargetInstructionSelector::selectCALL(MirBuilderContext *ctx, MirInst
     return true;
 }
 
+/**
+ * Lowers a comparison into a zeroed destination, a CMP of the two operands, and the matching
+ * SETcc that materializes the boolean result.
+ */
 bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 3)
@@ -264,17 +290,38 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
     x86_64TargetInst::OpCode setccOp = x86_64TargetInst::SETE;
     switch (inst->getOpCode())
     {
-        case MirInstructionOpCode::CMP_EQ:  setccOp = x86_64TargetInst::SETE;  break;
-        case MirInstructionOpCode::CMP_NE:  setccOp = x86_64TargetInst::SETNE; break;
-        case MirInstructionOpCode::CMP_SLT: setccOp = x86_64TargetInst::SETL;  break;
-        case MirInstructionOpCode::CMP_SLE: setccOp = x86_64TargetInst::SETLE; break;
-        case MirInstructionOpCode::CMP_SGT: setccOp = x86_64TargetInst::SETG;  break;
-        case MirInstructionOpCode::CMP_SGE: setccOp = x86_64TargetInst::SETGE; break;
-        case MirInstructionOpCode::CMP_ULT: setccOp = x86_64TargetInst::SETB;  break;
-        case MirInstructionOpCode::CMP_ULE: setccOp = x86_64TargetInst::SETBE; break;
-        case MirInstructionOpCode::CMP_UGT: setccOp = x86_64TargetInst::SETA;  break;
-        case MirInstructionOpCode::CMP_UGE: setccOp = x86_64TargetInst::SETAE; break;
-        default: return false;
+        case MirInstructionOpCode::CMP_EQ:
+            setccOp = x86_64TargetInst::SETE;
+            break;
+        case MirInstructionOpCode::CMP_NE:
+            setccOp = x86_64TargetInst::SETNE;
+            break;
+        case MirInstructionOpCode::CMP_SLT:
+            setccOp = x86_64TargetInst::SETL;
+            break;
+        case MirInstructionOpCode::CMP_SLE:
+            setccOp = x86_64TargetInst::SETLE;
+            break;
+        case MirInstructionOpCode::CMP_SGT:
+            setccOp = x86_64TargetInst::SETG;
+            break;
+        case MirInstructionOpCode::CMP_SGE:
+            setccOp = x86_64TargetInst::SETGE;
+            break;
+        case MirInstructionOpCode::CMP_ULT:
+            setccOp = x86_64TargetInst::SETB;
+            break;
+        case MirInstructionOpCode::CMP_ULE:
+            setccOp = x86_64TargetInst::SETBE;
+            break;
+        case MirInstructionOpCode::CMP_UGT:
+            setccOp = x86_64TargetInst::SETA;
+            break;
+        case MirInstructionOpCode::CMP_UGE:
+            setccOp = x86_64TargetInst::SETAE;
+            break;
+        default:
+            return false;
     }
 
     ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(setccOp)),
@@ -285,6 +332,10 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
     return true;
 }
 
+/**
+ * Lowers a LOAD, selecting an integer/float and sized variant (8/16/32/64) from the destination
+ * type, and wrapping a bare register source into [reg + 0].
+ */
 bool X86_64TargetInstructionSelector::selectLOAD(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 2)
@@ -372,6 +423,10 @@ bool X86_64TargetInstructionSelector::selectLOAD(MirBuilderContext *ctx, MirInst
     return true;
 }
 
+/**
+ * Lowers a STORE, selecting an integer/float and sized variant from the value type, and wrapping
+ * a bare register destination into [reg + 0].
+ */
 bool X86_64TargetInstructionSelector::selectSTORE(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 2)
@@ -459,6 +514,11 @@ bool X86_64TargetInstructionSelector::selectSTORE(MirBuilderContext *ctx, MirIns
     return true;
 }
 
+/**
+ * Eliminates a PHI by inserting a MOV into the destination virtual register at the end of each
+ * predecessor block, in block-id order matching the incoming operand slots. Erases the PHI,
+ * including when its destination is unused or undefined.
+ */
 bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 1)
@@ -485,10 +545,12 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
     bool isUsed = false;
     for (MirBlock *b : func->getBlocks())
     {
-        if (!b) continue;
+        if (!b)
+            continue;
         for (MirInstruction *i : b->getInstructions())
         {
-            if (i == inst) continue;
+            if (i == inst)
+                continue;
             for (MirOperand *op : i->getOperands())
             {
                 if (op && op->isOfType<MirRegister>() && op->get<MirRegister>()->getRegId() == dst->getRegId())
@@ -497,9 +559,11 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
                     break;
                 }
             }
-            if (isUsed) break;
+            if (isUsed)
+                break;
         }
-        if (isUsed) break;
+        if (isUsed)
+            break;
     }
 
     if (!isUsed)
@@ -520,7 +584,8 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
     std::map<MirId, MirBlock *> sortedPreds;
     for (MirBlock *b : func->getBlocks())
     {
-        if (!b || b == currBlock) continue;
+        if (!b || b == currBlock)
+            continue;
         for (MirInstruction *i : b->getInstructions())
         {
             for (MirOperand *op : i->getOperands())
@@ -555,11 +620,12 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
 
                     // Insert MOV %dst, %inReg before the first branch / jump instruction in predBlock
                     auto it = predBlock->getInstructions().end();
-                    for (auto bit = predBlock->getInstructions().begin(); bit != predBlock->getInstructions().end(); ++bit)
+                    for (auto bit = predBlock->getInstructions().begin(); bit != predBlock->getInstructions().end();
+                         ++bit)
                     {
                         bool isBr = bool((*bit)->getFlags() & MirInstructionFlags::IsBranch) ||
-                                    ((*bit)->getOpCode() == MirInstructionOpCode::JMP) ||
-                                    ((*bit)->getOpCode() == MirInstructionOpCode::BR_COND);
+                                ((*bit)->getOpCode() == MirInstructionOpCode::JMP) ||
+                                ((*bit)->getOpCode() == MirInstructionOpCode::BR_COND);
                         if (isBr)
                         {
                             it = bit;
@@ -578,6 +644,10 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
     return true;
 }
 
+/**
+ * Lowers a scalar floating-point arithmetic instruction to the matching SSE opcode, choosing the
+ * single- or double-precision form from the destination type.
+ */
 bool X86_64TargetInstructionSelector::selectFloatALU(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 3)
@@ -594,25 +664,37 @@ bool X86_64TargetInstructionSelector::selectFloatALU(MirBuilderContext *ctx, Mir
 
     if (auto *r = dst->get<MirRegister>())
     {
-        if (!r->getRegClass()) r->setClass(findClass(fprClass));
+        if (!r->getRegClass())
+            r->setClass(findClass(fprClass));
     }
     if (auto *r = lhs->get<MirRegister>())
     {
-        if (!r->getRegClass()) r->setClass(findClass(fprClass));
+        if (!r->getRegClass())
+            r->setClass(findClass(fprClass));
     }
     if (auto *r = rhs->get<MirRegister>())
     {
-        if (!r->getRegClass()) r->setClass(findClass(fprClass));
+        if (!r->getRegClass())
+            r->setClass(findClass(fprClass));
     }
 
     x86_64TargetInst::OpCode op = x86_64TargetInst::ADDSS;
     switch (inst->getOpCode())
     {
-        case MirInstructionOpCode::FADD: op = isDouble ? x86_64TargetInst::ADDSD : x86_64TargetInst::ADDSS; break;
-        case MirInstructionOpCode::FSUB: op = isDouble ? x86_64TargetInst::SUBSD : x86_64TargetInst::SUBSS; break;
-        case MirInstructionOpCode::FMUL: op = isDouble ? x86_64TargetInst::MULSD : x86_64TargetInst::MULSS; break;
-        case MirInstructionOpCode::FDIV: op = isDouble ? x86_64TargetInst::DIVSD : x86_64TargetInst::DIVSS; break;
-        default: return false;
+        case MirInstructionOpCode::FADD:
+            op = isDouble ? x86_64TargetInst::ADDSD : x86_64TargetInst::ADDSS;
+            break;
+        case MirInstructionOpCode::FSUB:
+            op = isDouble ? x86_64TargetInst::SUBSD : x86_64TargetInst::SUBSS;
+            break;
+        case MirInstructionOpCode::FMUL:
+            op = isDouble ? x86_64TargetInst::MULSD : x86_64TargetInst::MULSS;
+            break;
+        case MirInstructionOpCode::FDIV:
+            op = isDouble ? x86_64TargetInst::DIVSD : x86_64TargetInst::DIVSS;
+            break;
+        default:
+            return false;
     }
 
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
@@ -623,6 +705,10 @@ bool X86_64TargetInstructionSelector::selectFloatALU(MirBuilderContext *ctx, Mir
     return true;
 }
 
+/**
+ * Lowers integer-to-float (SITOFP) and float-to-integer (FPTOSI) conversions to CVTSI2SS/SD and
+ * CVTTSS2SI/CVTTSD2SI, picking the GPR/FPR classes from the operand widths.
+ */
 bool X86_64TargetInstructionSelector::selectFloatCvt(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 2)
@@ -642,11 +728,13 @@ bool X86_64TargetInstructionSelector::selectFloatCvt(MirBuilderContext *ctx, Mir
 
         if (auto *r = dst->get<MirRegister>())
         {
-            if (!r->getRegClass()) r->setClass(findClass(isDstDouble ? "FPR64" : "FPR32"));
+            if (!r->getRegClass())
+                r->setClass(findClass(isDstDouble ? "FPR64" : "FPR32"));
         }
         if (auto *r = src->get<MirRegister>())
         {
-            if (!r->getRegClass()) r->setClass(findClass(isSrc64 ? "GPR64" : "GPR32"));
+            if (!r->getRegClass())
+                r->setClass(findClass(isSrc64 ? "GPR64" : "GPR32"));
         }
 
         auto op = isDstDouble ? x86_64TargetInst::CVTSI2SD : x86_64TargetInst::CVTSI2SS;
@@ -661,11 +749,13 @@ bool X86_64TargetInstructionSelector::selectFloatCvt(MirBuilderContext *ctx, Mir
 
         if (auto *r = dst->get<MirRegister>())
         {
-            if (!r->getRegClass()) r->setClass(findClass(isDst64 ? "GPR64" : "GPR32"));
+            if (!r->getRegClass())
+                r->setClass(findClass(isDst64 ? "GPR64" : "GPR32"));
         }
         if (auto *r = src->get<MirRegister>())
         {
-            if (!r->getRegClass()) r->setClass(findClass(isSrcDouble ? "FPR64" : "FPR32"));
+            if (!r->getRegClass())
+                r->setClass(findClass(isSrcDouble ? "FPR64" : "FPR32"));
         }
 
         auto op = isSrcDouble ? x86_64TargetInst::CVTTSD2SI : x86_64TargetInst::CVTTSS2SI;
@@ -682,6 +772,10 @@ bool X86_64TargetInstructionSelector::selectFloatCvt(MirBuilderContext *ctx, Mir
     return true;
 }
 
+/**
+ * Lowers a MOV: address-of global/stack references become LEA64r, float moves use
+ * MOVSSrr/MOVSDrr, and integer moves use MOV32/64rr or MOV32/64ri.
+ */
 bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (inst->getOperandCount() < 2)
@@ -702,11 +796,13 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
         {
             if (auto *r = dst->get<MirRegister>())
             {
-                if (!r->getRegClass()) r->setClass(findClass("GPR64"));
+                if (!r->getRegClass())
+                    r->setClass(findClass("GPR64"));
             }
-            ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::LEA64r)),
-                           inst->getSourceRef(),
-                           { dst, src });
+            ib.buildTarget(
+                    const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::LEA64r)),
+                    inst->getSourceRef(),
+                    { dst, src });
             inst->eraseFromOwner();
             return true;
         }
@@ -718,8 +814,16 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
     {
         bool isDouble = (dst->getMirType()->getTotalSizeInBits() == 64);
         std::string_view fprClass = isDouble ? "FPR64" : "FPR32";
-        if (auto *r = dst->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(fprClass)); }
-        if (auto *r = src->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(fprClass)); }
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass(fprClass));
+        }
+        if (auto *r = src->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass(fprClass));
+        }
 
         auto op = isDouble ? x86_64TargetInst::MOVSDrr : x86_64TargetInst::MOVSSrr;
         ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
@@ -732,11 +836,19 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
     // 3. Fallback for general register-to-register or integer immediate
     size_t sizeInBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64;
     std::string_view gprClass = (sizeInBits == 64) ? "GPR64" : "GPR32";
-    if (auto *r = dst->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(gprClass)); }
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(gprClass));
+    }
 
     if (src->getType() == MirOperandType::Register)
     {
-        if (auto *r = src->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(gprClass)); }
+        if (auto *r = src->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass(gprClass));
+        }
         auto op = (sizeInBits == 64) ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
         ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
                        inst->getSourceRef(),

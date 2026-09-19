@@ -9,6 +9,9 @@ namespace DSL::Parser::Common
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Matches a reserved keyword as a whole identifier (word-boundary aware) and yields `true`.
+ */
 template <lexy::_detail::string_literal KeywordStr> struct Keyword
 {
     static constexpr auto rule = []
@@ -22,12 +25,18 @@ template <lexy::_detail::string_literal KeywordStr> struct Keyword
     static constexpr auto value = lexy::constant(true);
 };
 
+/**
+ * Matches a single literal character and yields `true`.
+ */
 template <char C> struct SingleChar
 {
     static constexpr auto rule = dsl::lit_c<C>;
     static constexpr auto value = lexy::constant(true);
 };
 
+/**
+ * Matches a `// ...` line comment up to (but not including) the newline.
+ */
 struct Comment
 {
     static constexpr auto rule = dsl::lit_c<'/'> >> dsl::lit_c<'/'> >> dsl::until(dsl::newline);
@@ -48,23 +57,30 @@ struct BooleanLit
     static constexpr auto value = lexy::forward<bool>;
 };
 
+/**
+ * Parses a boolean literal with surrounding positions and produces a located Common::BooleanLiteral.
+ */
 struct BooleanLiteral
 {
     static constexpr auto rule = dsl::position + dsl::p<BooleanLit> + dsl::position;
 
-    static constexpr auto value = lexy::bind(
-            lexy::callback<Ast::Common::BooleanLiteral>(
-                    [](ParseContext &ctx, const char *startIter, bool val, const char *endIter)
-                    {
-                        SourceReference *ref = ctx.createRef(startIter, endIter);
-                        return Ast::Common::BooleanLiteral{ val, ref };
-                    }),
-            lexy::parse_state,
-            lexy::values);
+    static constexpr auto value =
+            lexy::bind(lexy::callback<Ast::Common::BooleanLiteral>(
+                               [](ParseContext &ctx, const char *startIter, bool val, const char *endIter)
+                               {
+                                   SourceReference *ref = ctx.createRef(startIter, endIter);
+                                   return Ast::Common::BooleanLiteral{ val, ref };
+                               }),
+                       lexy::parse_state,
+                       lexy::values);
 };
 
 static constexpr auto Whitespace = dsl::ascii::space | dsl::inline_<Comment> | dsl::ascii::newline;
 
+/**
+ * Parses an identifier with surrounding positions and produces a located Common::Identifier
+ * holding a view into the source buffer.
+ */
 struct Identifier
 {
     static constexpr auto rule = dsl::position +
@@ -82,6 +98,10 @@ struct Identifier
                        lexy::values);
 };
 
+/**
+ * Parses a signed integer literal in decimal, hex (0x), binary (0b), or octal (0o) form and
+ * produces a located Common::IntegerLiteral with sign applied.
+ */
 struct IntegerLiteral
 {
     static constexpr auto rule = []
@@ -119,6 +139,10 @@ struct IntegerLiteral
             lexy::values);
 };
 
+/**
+ * Parses a floating-point literal (with mandatory fractional part) and produces a located
+ * Common::RealLiteral parsed via std::from_chars.
+ */
 struct RealLiteral
 {
     static constexpr auto FloatRule =
@@ -139,6 +163,10 @@ struct RealLiteral
                        lexy::values);
 };
 
+/**
+ * Parses a double-quoted string literal and produces a located Common::StringLiteral holding a
+ * view of its contents.
+ */
 struct StringLiteral
 {
     static constexpr auto rule = []
@@ -161,12 +189,19 @@ struct StringLiteral
                        lexy::values);
 };
 
+/**
+ * Maps an element type to the container type a list rule should produce; defaults to
+ * std::pmr::vector so parsed lists land in the arena.
+ */
 template <typename T> struct PmrContainerTraits
 {
     using container_type = std::pmr::vector<T>;
     using value_type = T;
 };
 
+/**
+ * Specialization that preserves an explicitly supplied standard-allocator vector type.
+ */
 template <typename T, typename Alloc> struct PmrContainerTraits<std::vector<T, Alloc>>
 {
     using container_type = std::vector<T, Alloc>;
@@ -181,18 +216,11 @@ template <typename Target> struct PmrListSink
     using traits = PmrContainerTraits<Target>;
     using return_type = typename traits::container_type;
 
-    constexpr return_type operator()(return_type &&container) const
-    {
-        return std::move(container);
-    }
+    constexpr return_type operator()(return_type &&container) const { return std::move(container); }
 
-    constexpr return_type operator()(lexy::nullopt) const
-    {
-        return return_type(std::pmr::get_default_resource());
-    }
+    constexpr return_type operator()(lexy::nullopt) const { return return_type(std::pmr::get_default_resource()); }
 
-    template <typename State>
-    constexpr return_type operator()(lexy::nullopt, State &state) const
+    template <typename State> constexpr return_type operator()(lexy::nullopt, State &state) const
     {
         if constexpr (requires { state.getAllocator(); })
             return return_type(state.getAllocator());
@@ -200,6 +228,9 @@ template <typename Target> struct PmrListSink
             return return_type(std::pmr::get_default_resource());
     }
 
+    /**
+     * Accumulates parsed elements into a container allocated from the associated memory resource.
+     */
     struct _sink
     {
         using return_type = typename traits::container_type;

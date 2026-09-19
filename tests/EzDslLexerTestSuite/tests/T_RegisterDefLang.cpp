@@ -12,6 +12,9 @@ using namespace DSL;
 class RegisterDefLangTest : public DslLexerTestSuiteAsGtest
 {
   protected:
+    /**
+     * Parses register definition source into an AST, using a unique source name per call.
+     */
     std::optional<Ast::RegisterDef::RegisterFile> parse(const std::string &sourceContent)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.reg", m_currentTestId++), sourceContent);
@@ -22,6 +25,10 @@ class RegisterDefLangTest : public DslLexerTestSuiteAsGtest
     size_t m_currentTestId{ 0 };
 };
 
+/**
+ * Verifies a register bank parses its classes, sub-register widening edges,
+ * register encodings with per-class aliases, and special registers.
+ */
 TEST_F(RegisterDefLangTest, ParsesRegisterBanksClassesAndAliases)
 {
     std::string source = R"(
@@ -79,6 +86,10 @@ special {
     EXPECT_EQ(ast->m_specialRegs[0].m_id.m_node, 16);
 }
 
+/**
+ * Verifies the sub_register block is optional and that a register may expose
+ * multiple aliases across classes.
+ */
 TEST_F(RegisterDefLangTest, SubRegisterBlockIsOptional)
 {
     std::string source = R"(
@@ -100,6 +111,10 @@ register_bank FPR {
     EXPECT_EQ(ast->m_banks[0].m_registers[0].m_names.size(), 2u);
 }
 
+/**
+ * Verifies multiple register banks parse in one file and that a trailing
+ * semicolon after a bank is optional.
+ */
 TEST_F(RegisterDefLangTest, ParsesMultipleBanksAndOptionalSemicolon)
 {
     std::string source = R"(
@@ -124,6 +139,9 @@ register_bank B {
     EXPECT_EQ(ast->m_target.m_node, "Foo");
 }
 
+/**
+ * Verifies parsing fails when the required `target` declaration is missing.
+ */
 TEST_F(RegisterDefLangTest, RejectsMissingTarget)
 {
     auto ast = parse("register_bank GPR { classes { G8: 8 } registers { r0 enc 0 names { r0: G8 } } }");

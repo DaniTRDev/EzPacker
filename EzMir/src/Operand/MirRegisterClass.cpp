@@ -25,8 +25,13 @@ bool MirRegisterClass::addRegister(const std::string_view &name,
 
     std::pmr::polymorphic_allocator<MirRegisterDescriptor> alloc(m_alloc);
 
-    auto desc = alloc.new_object<MirRegisterDescriptor>(
-            name, this, bitSize, m_registers.size(), partOffsetInBits, m_alloc, hwEncoding);
+    auto desc = alloc.new_object<MirRegisterDescriptor>(name,
+                                                        this,
+                                                        bitSize,
+                                                        m_registers.size(),
+                                                        partOffsetInBits,
+                                                        m_alloc,
+                                                        hwEncoding);
     desc->m_subParts.insert(desc->m_subParts.begin(), subParts.begin(), subParts.end());
 
     m_registers[name] = desc;

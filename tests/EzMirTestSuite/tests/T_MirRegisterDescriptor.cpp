@@ -16,6 +16,10 @@ class MirRegisterDescriptorTest : public ::testing::Test
     std::pmr::monotonic_buffer_resource m_arena;
 };
 
+/**
+ * Verifies that when no explicit encoding is given, hardware encoding follows
+ * registration order and matches the register id.
+ */
 TEST_F(MirRegisterDescriptorTest, HardwareEncodingDefaultsToRegistrationOrder)
 {
     auto *bank = bankAlloc.new_object<MirRegisterBank>("GPR", &m_arena);
@@ -30,6 +34,10 @@ TEST_F(MirRegisterDescriptorTest, HardwareEncodingDefaultsToRegistrationOrder)
     EXPECT_EQ(cls->getReg("rcx")->m_id, 1u);
 }
 
+/**
+ * Verifies that an explicit hardware encoding overrides registration order
+ * while the internal register id still reflects insertion order.
+ */
 TEST_F(MirRegisterDescriptorTest, ExplicitHardwareEncodingOverridesRegistrationOrder)
 {
     auto *bank = bankAlloc.new_object<MirRegisterBank>("GPR", &m_arena);
@@ -43,6 +51,10 @@ TEST_F(MirRegisterDescriptorTest, ExplicitHardwareEncodingOverridesRegistrationO
     EXPECT_EQ(cls->getReg("rcx")->m_id, 1u);
 }
 
+/**
+ * Verifies addSubPart links wider registers to their narrower aliases and
+ * ignores null sub-parts.
+ */
 TEST_F(MirRegisterDescriptorTest, AddSubPartBuildsAliasingHierarchy)
 {
     auto *bank = bankAlloc.new_object<MirRegisterBank>("GPR", &m_arena);
@@ -68,6 +80,9 @@ TEST_F(MirRegisterDescriptorTest, AddSubPartBuildsAliasingHierarchy)
     EXPECT_EQ(eax->m_subParts[0], ax);
 }
 
+/**
+ * Verifies registering the same name twice fails, leaving the original intact.
+ */
 TEST_F(MirRegisterDescriptorTest, DuplicateRegisterNamesAreRejected)
 {
     auto *bank = bankAlloc.new_object<MirRegisterBank>("GPR", &m_arena);

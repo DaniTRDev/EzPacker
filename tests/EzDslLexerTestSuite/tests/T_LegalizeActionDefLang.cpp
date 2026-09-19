@@ -6,6 +6,9 @@
 #include "Parser/ParseContext.h"
 #include "SourceManager/SourceManager.h"
 
+/**
+ * Test fixture for the legalize action definition (.lad) dialect parser.
+ */
 class LegalizeActionLangTest : public DslLexerTestSuiteAsGtest
 {
   public:
@@ -15,6 +18,9 @@ class LegalizeActionLangTest : public DslLexerTestSuiteAsGtest
 // 1. TypeConstraint Parsing
 // ============================================================================
 
+/**
+ * Verifies a plain type constraint parses a type with no operand index.
+ */
 TEST_F(LegalizeActionLangTest, TestHomogeneousTypeConstraint)
 {
     std::string test = "i32";
@@ -26,6 +32,9 @@ TEST_F(LegalizeActionLangTest, TestHomogeneousTypeConstraint)
     EXPECT_FALSE(res->m_operandIndex.has_value());
 }
 
+/**
+ * Verifies a type constraint with an explicit operand index (i8:1) parses both.
+ */
 TEST_F(LegalizeActionLangTest, TestHeterogeneousTypeConstraintWithIndex)
 {
     std::string test = "i8:1";
@@ -38,6 +47,10 @@ TEST_F(LegalizeActionLangTest, TestHeterogeneousTypeConstraintWithIndex)
     EXPECT_EQ(res->m_operandIndex->m_node, 1);
 }
 
+/**
+ * Verifies vector and pointer-like type tokens (e.g. v4f32) are accepted as
+ * type constraints.
+ */
 TEST_F(LegalizeActionLangTest, TestPointerAndVectorTypeConstraints)
 {
     std::string test = "v4f32";
@@ -53,6 +66,9 @@ TEST_F(LegalizeActionLangTest, TestPointerAndVectorTypeConstraints)
 // 2. LegalizationClause Parsing
 // ============================================================================
 
+/**
+ * Verifies a WIDENS clause parses its source type list and target type.
+ */
 TEST_F(LegalizeActionLangTest, TestWidenActionClause)
 {
     std::string test = "WIDENS(i1, i8, i16) >> i32";
@@ -72,6 +88,9 @@ TEST_F(LegalizeActionLangTest, TestWidenActionClause)
     EXPECT_FALSE(res->m_libcallSymbol.has_value());
 }
 
+/**
+ * Verifies a NARROWS clause parses its source type list and target type.
+ */
 TEST_F(LegalizeActionLangTest, TestNarrowActionClause)
 {
     std::string test = "NARROWS(i64) >> i32";
@@ -89,6 +108,9 @@ TEST_F(LegalizeActionLangTest, TestNarrowActionClause)
     EXPECT_FALSE(res->m_libcallSymbol.has_value());
 }
 
+/**
+ * Verifies a LIBCALL clause parses the source type and the quoted helper symbol.
+ */
 TEST_F(LegalizeActionLangTest, TestLibcallActionClause)
 {
     std::string test = "LIBCALL(i64) >> \"__divdi3\"";
@@ -106,6 +128,9 @@ TEST_F(LegalizeActionLangTest, TestLibcallActionClause)
     EXPECT_FALSE(res->m_targetType.has_value());
 }
 
+/**
+ * Verifies a BITCAST clause parses its source type and target type.
+ */
 TEST_F(LegalizeActionLangTest, TestBitcastActionClause)
 {
     std::string test = "BITCAST(f32) >> i32";
@@ -123,6 +148,9 @@ TEST_F(LegalizeActionLangTest, TestBitcastActionClause)
     EXPECT_FALSE(res->m_libcallSymbol.has_value());
 }
 
+/**
+ * Verifies a CUSTOM clause parses the named custom action handler.
+ */
 TEST_F(LegalizeActionLangTest, TestCustomActionClauses)
 {
     std::string customTest = "CUSTOM() >> MyCustomAct";
@@ -140,6 +168,10 @@ TEST_F(LegalizeActionLangTest, TestCustomActionClauses)
 // 3. LegalizeInstructionDecl Parsing
 // ============================================================================
 
+/**
+ * Verifies an action declaration parses its name and all LEGAL, WIDENS, and
+ * NARROWS clauses with their target types.
+ */
 TEST_F(LegalizeActionLangTest, TestInstructionLegalizeDeclaration)
 {
     std::string test = R"(
@@ -169,6 +201,10 @@ action ADD {
     EXPECT_EQ(res->m_actionClauses[2].m_targetType->m_node, "i32");
 }
 
+/**
+ * Verifies an action declaration parses clauses whose type constraints carry
+ * explicit operand indices.
+ */
 TEST_F(LegalizeActionLangTest, TestHeterogeneousInstructionDeclaration)
 {
     std::string test = R"(
@@ -195,6 +231,10 @@ action SEXT {
 // 4. LegalizeActionFile Full Parsing
 // ============================================================================
 
+/**
+ * Verifies a full legalize action file parses multiple action declarations,
+ * including libcall and bitcast clauses.
+ */
 TEST_F(LegalizeActionLangTest, TestFullTargetLegalizeDefinitionFile)
 {
     std::string test = R"dsl(
@@ -240,6 +280,9 @@ action BITCAST {
 // 5. Negative & Error Parsing Tests
 // ============================================================================
 
+/**
+ * Verifies a missing semicolon between action clauses is rejected.
+ */
 TEST_F(LegalizeActionLangTest, TestMissingSemicolonInActionClauseError)
 {
     std::string test = R"(
@@ -255,6 +298,9 @@ action ADD {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies an unclosed action declaration is rejected.
+ */
 TEST_F(LegalizeActionLangTest, TestMissingClosingBraceError)
 {
     std::string test = R"(
@@ -268,6 +314,9 @@ action ADD {
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies a type constraint ending in a dangling colon is rejected.
+ */
 TEST_F(LegalizeActionLangTest, TestDanglingColonInTypeConstraintError)
 {
     std::string test = "i32:";
@@ -277,6 +326,9 @@ TEST_F(LegalizeActionLangTest, TestDanglingColonInTypeConstraintError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies that omitting the comma separator between type constraints is rejected.
+ */
 TEST_F(LegalizeActionLangTest, TestMissingCommaSeparatorInTypesError)
 {
     std::string test = "WIDENS(i8 i16) >> i32";
@@ -287,6 +339,9 @@ TEST_F(LegalizeActionLangTest, TestMissingCommaSeparatorInTypesError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies an unrecognized action keyword is rejected.
+ */
 TEST_F(LegalizeActionLangTest, TestUnknownActionKindError)
 {
     std::string test = "UNKNOWN_ACTION(i32) >> i64";
@@ -297,6 +352,9 @@ TEST_F(LegalizeActionLangTest, TestUnknownActionKindError)
     EXPECT_FALSE(res.has_value());
 }
 
+/**
+ * Verifies parsing fails when the leading `action` keyword is omitted.
+ */
 TEST_F(LegalizeActionLangTest, TestMissingActionKeywordError)
 {
     std::string test = R"(
@@ -315,6 +373,9 @@ ADD {
 // 6. Extended EzDSL Legalizer (.lad) Features
 // ============================================================================
 
+/**
+ * Verifies a CLAMP_SCALAR clause parses its minimum and maximum type bounds.
+ */
 TEST_F(LegalizeActionLangTest, TestClampScalarClause)
 {
     std::string test = "CLAMP_SCALAR(i32, i64)";
@@ -327,6 +388,9 @@ TEST_F(LegalizeActionLangTest, TestClampScalarClause)
     EXPECT_EQ(res->m_maxType.m_node, "i64");
 }
 
+/**
+ * Verifies a LOWER clause parses the named lowering handler.
+ */
 TEST_F(LegalizeActionLangTest, TestLowerActionClause)
 {
     std::string test = "LOWER >> AMD64CallLowering";
@@ -340,13 +404,15 @@ TEST_F(LegalizeActionLangTest, TestLowerActionClause)
     EXPECT_EQ(res->m_lowerHandler->m_node, "AMD64CallLowering");
 }
 
+/**
+ * Verifies a type_set declaration parses its name and member type list.
+ */
 TEST_F(LegalizeActionLangTest, TestTypeSetDeclaration)
 {
     std::string test = "type_set GPR_SCALARS = (i8, i16, i32, i64);";
     ParseContext ctx = createParseContextFromBuff("test", test);
 
-    auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeSetDecl,
-                         DSL::Ast::LegalizeActionDef::TypeSetDecl>();
+    auto res = ctx.parse<DSL::Parser::LegalizeActionDef::TypeSetDecl, DSL::Ast::LegalizeActionDef::TypeSetDecl>();
     ASSERT_TRUE(res.has_value());
     EXPECT_EQ(res->m_name.m_node, "GPR_SCALARS");
     ASSERT_EQ(res->m_types.size(), 4);
@@ -356,6 +422,10 @@ TEST_F(LegalizeActionLangTest, TestTypeSetDeclaration)
     EXPECT_EQ(res->m_types[3].m_node, "i64");
 }
 
+/**
+ * Verifies an instruction group declaration parses its member instructions and
+ * shared clamp clause.
+ */
 TEST_F(LegalizeActionLangTest, TestInstructionGroupDeclaration)
 {
     std::string test = R"(
@@ -379,6 +449,10 @@ group IntegerALU = (SUB, AND, OR, XOR) {
     EXPECT_EQ(res->m_clampClause->m_maxType.m_node, "i64");
 }
 
+/**
+ * Verifies a full legalize file parses its target header, type sets,
+ * instruction groups, and action declarations together.
+ */
 TEST_F(LegalizeActionLangTest, TestFullTargetWithTargetHeaderAndGroups)
 {
     std::string test = R"dsl(
@@ -420,6 +494,5 @@ action CALL {
     ASSERT_EQ(res->m_legalizeInstrDecls[1].m_actionClauses.size(), 1);
     EXPECT_EQ(res->m_legalizeInstrDecls[1].m_actionClauses[0].m_kind,
               DSL::Ast::LegalizeActionDef::LegalizeActionKind::Lower);
-    EXPECT_EQ(res->m_legalizeInstrDecls[1].m_actionClauses[0].m_lowerHandler->m_node,
-              "AMD64CallLowering");
+    EXPECT_EQ(res->m_legalizeInstrDecls[1].m_actionClauses[0].m_lowerHandler->m_node, "AMD64CallLowering");
 }

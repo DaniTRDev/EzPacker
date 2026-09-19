@@ -10,10 +10,10 @@ namespace
 {
 constexpr auto PassName = "Sema::TargetDescPass";
 
-bool isPowerOfTwo(int64_t val)
-{
-    return val > 0 && (val & (val - 1)) == 0;
-}
+/**
+ * Returns true when val is a strictly positive power of two (used for stack slot sizes).
+ */
+bool isPowerOfTwo(int64_t val) { return val > 0 && (val & (val - 1)) == 0; }
 } // namespace
 
 bool TargetDescPass::run(class DiagnosticCollector *collector,
@@ -56,7 +56,8 @@ bool TargetDescPass::run(class DiagnosticCollector *collector,
     {
         if (!isPowerOfTwo(file->m_stackSlot->m_node))
         {
-            collector->error(PassName, "stack_slot must be a positive power of two (got {}).",
+            collector->error(PassName,
+                             "stack_slot must be a positive power of two (got {}).",
                              file->m_stackSlot->m_node)
                     << file->m_stackSlot->m_sourceRef;
             hasErrors = true;
@@ -111,7 +112,8 @@ bool TargetDescPass::run(class DiagnosticCollector *collector,
     }
 
     Symbols::TargetDescSymbol symData{ .m_name = name, .m_astNode = file };
-    if (table->declareSym(file->m_name.m_sourceRef, SymbolType::TargetDesc, std::move(symData), name) == InvalidSymbolId)
+    if (table->declareSym(file->m_name.m_sourceRef, SymbolType::TargetDesc, std::move(symData), name) ==
+        InvalidSymbolId)
     {
         collector->error(PassName, "Failed to register target descriptor symbol '{}'.", name)
                 << file->m_name.m_sourceRef;

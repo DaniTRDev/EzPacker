@@ -50,10 +50,7 @@ struct CodeLabel
     uint64_t m_labelAddress{ 0 };  // Offset from the start of the section
     std::string_view m_name{};
 
-    uint64_t getAddress() const
-    {
-        return m_node ? m_node->m_calculatedOffset : m_labelAddress;
-    }
+    uint64_t getAddress() const { return m_node ? m_node->m_calculatedOffset : m_labelAddress; }
 };
 
 /**

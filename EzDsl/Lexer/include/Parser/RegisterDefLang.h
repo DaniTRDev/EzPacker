@@ -30,6 +30,9 @@ struct RegisterClassEntry
             { return RegisterClassDecl{ .m_name = std::move(name), .m_bitSize = std::move(bits) }; });
 };
 
+/**
+ * Parses a `classes { ... }` block into a PMR list of RegisterClassDecl.
+ */
 struct ClassesBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -50,6 +53,9 @@ struct SubRegisterEntry
             { return SubRegisterEdge{ .m_wideClass = std::move(wide), .m_narrowClass = std::move(narrow) }; });
 };
 
+/**
+ * Parses a `sub_register { ... }` block into a PMR list of SubRegisterEdge relations.
+ */
 struct SubRegisterBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -70,6 +76,9 @@ struct RegisterNameEntry
             { return RegisterNameBinding{ .m_asmName = std::move(asmName), .m_className = std::move(className) }; });
 };
 
+/**
+ * Parses a `names { ... }` block into a PMR list of per-class assembly-name bindings.
+ */
 struct RegisterNameBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -84,22 +93,26 @@ struct RegisterNameBlock
 struct RegisterEntry
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::p<Common::Identifier> + LEXY_LIT("enc") + dsl::p<Common::IntegerLiteral> +
-            dsl::p<RegisterNameBlock>;
+    static constexpr auto rule =
+            dsl::p<Common::Identifier> + LEXY_LIT("enc") + dsl::p<Common::IntegerLiteral> + dsl::p<RegisterNameBlock>;
     static constexpr auto value = lexy::callback<RegisterDecl>(
             [](Ast::Common::Identifier name,
                Ast::Common::IntegerLiteral enc,
                std::pmr::vector<RegisterNameBinding> names)
-            { return RegisterDecl{ .m_canonicalName = std::move(name),
-                                   .m_encoding = std::move(enc),
-                                   .m_names = std::move(names) }; });
+            {
+                return RegisterDecl{ .m_canonicalName = std::move(name),
+                                     .m_encoding = std::move(enc),
+                                     .m_names = std::move(names) };
+            });
 };
 
+/**
+ * Parses a `registers { ... }` block into a PMR list of physical RegisterDecls.
+ */
 struct RegistersBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = Common::Keyword<"registers">::rule >>
-            dsl::curly_bracketed.list(dsl::p<RegisterEntry>);
+    static constexpr auto rule = Common::Keyword<"registers">::rule >> dsl::curly_bracketed.list(dsl::p<RegisterEntry>);
     static constexpr auto value = Common::PmrAsList<RegisterDecl>;
 };
 
@@ -147,6 +160,9 @@ struct SpecialRegEntry
             { return SpecialRegDecl{ .m_name = std::move(name), .m_id = std::move(id) }; });
 };
 
+/**
+ * Parses a `special { ... }` block into a PMR list of pseudo-register declarations.
+ */
 struct SpecialBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -160,28 +176,37 @@ struct SpecialBlock
  */
 using TopLevelItem = std::variant<RegisterBankDecl, std::pmr::vector<SpecialRegDecl>>;
 
+/**
+ * Wraps a parsed register bank as a top-level item.
+ */
 struct RegisterBankTopLevel
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::p<RegisterBankParser>;
-    static constexpr auto value = lexy::callback<TopLevelItem>(
-            [](RegisterBankDecl bank) { return TopLevelItem{ std::move(bank) }; });
+    static constexpr auto value =
+            lexy::callback<TopLevelItem>([](RegisterBankDecl bank) { return TopLevelItem{ std::move(bank) }; });
 };
 
+/**
+ * Wraps a parsed special-register block as a top-level item.
+ */
 struct SpecialTopLevel
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = dsl::p<SpecialBlock>;
-    static constexpr auto value = lexy::callback<TopLevelItem>(
-            [](std::pmr::vector<SpecialRegDecl> special) { return TopLevelItem{ std::move(special) }; });
+    static constexpr auto value = lexy::callback<TopLevelItem>([](std::pmr::vector<SpecialRegDecl> special)
+                                                               { return TopLevelItem{ std::move(special) }; });
 };
 
+/**
+ * Parses the sequence of register banks and special blocks at file scope.
+ */
 struct TopLevelList
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::list(
-            (dsl::peek(Common::Keyword<"register_bank">::rule) >> dsl::p<RegisterBankTopLevel>) |
-            (dsl::peek(Common::Keyword<"special">::rule) >> dsl::p<SpecialTopLevel>));
+    static constexpr auto rule =
+            dsl::list((dsl::peek(Common::Keyword<"register_bank">::rule) >> dsl::p<RegisterBankTopLevel>) |
+                      (dsl::peek(Common::Keyword<"special">::rule) >> dsl::p<SpecialTopLevel>));
     static constexpr auto value = Common::PmrAsList<TopLevelItem>;
 };
 
@@ -192,7 +217,7 @@ struct RegisterDefFile
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = Common::Keyword<"target">::rule >>
-            ((dsl::p<Common::Identifier> + dsl::lit_c<';'>) + dsl::p<TopLevelList>);
+            ((dsl::p<Common::Identifier> + dsl::lit_c<';'>)+dsl::p<TopLevelList>);
     static constexpr auto value = lexy::callback<RegisterFile>(
             [](Ast::Common::Identifier target, std::pmr::vector<TopLevelItem> items)
             {

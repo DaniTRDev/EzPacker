@@ -9,10 +9,10 @@ namespace
 {
 constexpr auto PassName = "Sema::CallingConvPass";
 
-bool isPowerOfTwo(int64_t val)
-{
-    return val > 0 && (val & (val - 1)) == 0;
-}
+/**
+ * Returns true when val is a strictly positive power of two (alignments and slot sizes).
+ */
+bool isPowerOfTwo(int64_t val) { return val > 0 && (val & (val - 1)) == 0; }
 } // namespace
 
 bool CallingConvPass::validateSingleCallingConv(DiagnosticCollector *collector,
@@ -32,7 +32,7 @@ bool CallingConvPass::validateSingleCallingConv(DiagnosticCollector *collector,
     else if (table->getSymByName(decl.m_name.m_node) != nullptr)
     {
         collector->error(PassName, "Calling convention '{}': Duplicate symbol declaration", decl.m_name.m_node)
-            << nameRef;
+                << nameRef;
         hasErrors = true;
     }
 
@@ -61,9 +61,10 @@ bool CallingConvPass::validateSingleCallingConv(DiagnosticCollector *collector,
         const auto &va = *decl.m_varargs;
         if (va.m_stackAlign.has_value() && !isPowerOfTwo(va.m_stackAlign->m_node))
         {
-            collector->error(PassName, "Varargs stack_align must be a positive power of two (got {})",
+            collector->error(PassName,
+                             "Varargs stack_align must be a positive power of two (got {})",
                              va.m_stackAlign->m_node)
-                << va.m_stackAlign->m_sourceRef;
+                    << va.m_stackAlign->m_sourceRef;
             hasErrors = true;
         }
     }
@@ -73,10 +74,7 @@ bool CallingConvPass::validateSingleCallingConv(DiagnosticCollector *collector,
         return false;
     }
 
-    Symbols::CallingConvSymbol symData{
-        .m_name = decl.m_name.m_node,
-        .m_astNode = &decl
-    };
+    Symbols::CallingConvSymbol symData{ .m_name = decl.m_name.m_node, .m_astNode = &decl };
 
     SymbolId id = table->declareSym(nameRef, SymbolType::CallingConv, std::move(symData), decl.m_name.m_node);
     if (id == InvalidSymbolId)
@@ -98,6 +96,7 @@ bool CallingConvPass::run(DiagnosticCollector *collector,
         return false;
     }
 
+    // A file that declares a single convention without a list uses itself as that convention.
     if (file->m_conventions.empty())
     {
         file->m_conventions.push_back(*file);
@@ -114,22 +113,21 @@ bool CallingConvPass::run(DiagnosticCollector *collector,
     return allOk;
 }
 
-bool CallingConvPass::validateStack(DiagnosticCollector *collector,
-                                    const DSL::Ast::CallingConvDef::StackDef &stack)
+bool CallingConvPass::validateStack(DiagnosticCollector *collector, const DSL::Ast::CallingConvDef::StackDef &stack)
 {
     bool valid = true;
 
     if (!isPowerOfTwo(stack.m_alignment.m_node))
     {
         collector->error(PassName, "Stack alignment must be a positive power of two (got {})", stack.m_alignment.m_node)
-            << stack.m_alignment.m_sourceRef;
+                << stack.m_alignment.m_sourceRef;
         valid = false;
     }
 
     if (stack.m_shadowSpace.m_node < 0)
     {
         collector->error(PassName, "Shadow space size cannot be negative (got {})", stack.m_shadowSpace.m_node)
-            << stack.m_shadowSpace.m_sourceRef;
+                << stack.m_shadowSpace.m_sourceRef;
         valid = false;
     }
 
@@ -142,7 +140,7 @@ bool CallingConvPass::validateStack(DiagnosticCollector *collector,
     if (stack.m_redZone.has_value() && stack.m_redZone->m_node < 0)
     {
         collector->error(PassName, "Red zone size cannot be negative (got {})", stack.m_redZone->m_node)
-            << stack.m_redZone->m_sourceRef;
+                << stack.m_redZone->m_sourceRef;
         valid = false;
     }
 
@@ -150,7 +148,7 @@ bool CallingConvPass::validateStack(DiagnosticCollector *collector,
 }
 
 bool CallingConvPass::validateRegisters(DiagnosticCollector *collector,
-                                       const DSL::Ast::CallingConvDef::CallingConventionDecl &file)
+                                        const DSL::Ast::CallingConvDef::CallingConventionDecl &file)
 {
     bool valid = true;
     std::unordered_set<std::string_view> calleeSaved;
@@ -161,7 +159,7 @@ bool CallingConvPass::validateRegisters(DiagnosticCollector *collector,
         if (!calleeSaved.insert(reg.m_node).second)
         {
             collector->error(PassName, "Duplicate register '{}' in callee-saved preserve list", reg.m_node)
-                << reg.m_sourceRef;
+                    << reg.m_sourceRef;
             valid = false;
         }
     }
@@ -171,14 +169,14 @@ bool CallingConvPass::validateRegisters(DiagnosticCollector *collector,
         if (!callerSaved.insert(reg.m_node).second)
         {
             collector->error(PassName, "Duplicate register '{}' in caller-saved preserve list", reg.m_node)
-                << reg.m_sourceRef;
+                    << reg.m_sourceRef;
             valid = false;
         }
 
         if (calleeSaved.contains(reg.m_node))
         {
             collector->error(PassName, "Register '{}' cannot be both callee-saved and caller-saved", reg.m_node)
-                << reg.m_sourceRef;
+                    << reg.m_sourceRef;
             valid = false;
         }
     }
@@ -199,8 +197,11 @@ bool CallingConvPass::validateArguments(DiagnosticCollector *collector,
         {
             if (!boundClasses.insert(b.m_abiClass.m_node).second)
             {
-                collector->error(PassName, "Unified slot {}: Duplicate binding for ABI class '{}'", i, b.m_abiClass.m_node)
-                    << b.m_abiClass.m_sourceRef;
+                collector->error(PassName,
+                                 "Unified slot {}: Duplicate binding for ABI class '{}'",
+                                 i,
+                                 b.m_abiClass.m_node)
+                        << b.m_abiClass.m_sourceRef;
                 valid = false;
             }
         }
@@ -210,7 +211,8 @@ bool CallingConvPass::validateArguments(DiagnosticCollector *collector,
     {
         if (rule.m_abiClass.m_node.empty())
         {
-            collector->error(PassName, "Argument pass rule ABI class name must not be empty") << rule.m_abiClass.m_sourceRef;
+            collector->error(PassName, "Argument pass rule ABI class name must not be empty")
+                    << rule.m_abiClass.m_sourceRef;
             valid = false;
         }
 
@@ -218,9 +220,10 @@ bool CallingConvPass::validateArguments(DiagnosticCollector *collector,
         {
             if (!isPowerOfTwo(rule.m_fallback->m_slotSize.m_node))
             {
-                collector->error(PassName, "Fallback stack slot size for ABI class '{}' must be a positive power of two",
+                collector->error(PassName,
+                                 "Fallback stack slot size for ABI class '{}' must be a positive power of two",
                                  rule.m_abiClass.m_node)
-                    << rule.m_fallback->m_slotSize.m_sourceRef;
+                        << rule.m_fallback->m_slotSize.m_sourceRef;
                 valid = false;
             }
         }
@@ -231,7 +234,7 @@ bool CallingConvPass::validateArguments(DiagnosticCollector *collector,
         if (!isPowerOfTwo(args.m_defaultStackFallback->m_slotSize.m_node))
         {
             collector->error(PassName, "Default argument stack fallback slot size must be a positive power of two")
-                << args.m_defaultStackFallback->m_slotSize.m_sourceRef;
+                    << args.m_defaultStackFallback->m_slotSize.m_sourceRef;
             valid = false;
         }
     }
@@ -239,8 +242,7 @@ bool CallingConvPass::validateArguments(DiagnosticCollector *collector,
     return valid;
 }
 
-bool CallingConvPass::validateReturns(DiagnosticCollector *collector,
-                                      const DSL::Ast::CallingConvDef::ReturnDef &rets)
+bool CallingConvPass::validateReturns(DiagnosticCollector *collector, const DSL::Ast::CallingConvDef::ReturnDef &rets)
 {
     bool valid = true;
 
@@ -258,7 +260,8 @@ bool CallingConvPass::validateReturns(DiagnosticCollector *collector,
     {
         if (rule.m_abiClass.m_node.empty())
         {
-            collector->error(PassName, "Return pass rule ABI class name must not be empty") << rule.m_abiClass.m_sourceRef;
+            collector->error(PassName, "Return pass rule ABI class name must not be empty")
+                    << rule.m_abiClass.m_sourceRef;
             valid = false;
         }
     }

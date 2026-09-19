@@ -18,14 +18,25 @@ namespace CodeGenerators
 class CppRegisterInfoGenerator : public CodeGenerator
 {
   public:
+    /**
+     * Constructs a generator that writes the register-info header for the given target.
+     * @param collector Receives diagnostics emitted while generating.
+     * @param table Symbol table holding the parsed .reg definitions.
+     * @param outPath Destination file or directory for the generated header.
+     * @param targetName Target identifier substituted into generated table names.
+     */
     CppRegisterInfoGenerator(DiagnosticCollector *collector,
                              SymbolTable *table,
                              std::filesystem::path outPath,
                              std::string targetName = "Target");
 
+    /** Generates the register-info header; returns false if validation or emission fails. */
     bool run() override;
 
+    /** Returns the target identifier used to name generated tables. */
     const std::string &getTargetName() const noexcept { return m_targetName; }
+
+    /** Overrides the target identifier used to name generated tables. */
     void setTargetName(std::string targetName) { m_targetName = std::move(targetName); }
 
     /**
@@ -34,6 +45,7 @@ class CppRegisterInfoGenerator : public CodeGenerator
     void emitHeader(CppSourceEmitter &emitter) const;
 
   private:
+    /** Target identifier substituted into generated table and include names. */
     std::string m_targetName;
 };
 

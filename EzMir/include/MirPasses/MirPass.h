@@ -114,7 +114,7 @@ class MirPass
     virtual std::vector<std::type_index> getDependencies() const { return {}; }
 
   private:
-    MirPassResult m_result;
+    MirPassResult m_result; // Cached outcome of the most recent run, returned by getResult().
 };
 
 #endif // EZPACKER_MIRPASS_H

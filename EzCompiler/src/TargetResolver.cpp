@@ -10,6 +10,7 @@ namespace EzCompiler
 namespace
 {
 
+// Lowercases an architecture name and maps '-' to '_' so lookups are case/separator insensitive.
 std::string normalizeArch(std::string_view arch)
 {
     std::string result(arch);
@@ -25,6 +26,7 @@ std::string normalizeArch(std::string_view arch)
     return result;
 }
 
+// Process-wide registry of architecture factories; function-local static avoids init-order issues.
 std::map<std::string, TargetFactory, std::less<>> &targetRegistry()
 {
     static std::map<std::string, TargetFactory, std::less<>> registry;
@@ -44,6 +46,7 @@ ResolvedTarget TargetResolver::resolve(const TargetTriple &triple, MirBuilderCon
     auto it = registry.find(normalizeArch(triple.getArch()));
     if (it == registry.end())
     {
+        // Unknown architecture: report an empty target so the driver can diagnose it.
         return {};
     }
 

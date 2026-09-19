@@ -15,6 +15,7 @@ namespace CodeGenerators
 namespace
 {
 
+// Returns the AST node of the (single) target descriptor symbol, or null when none exists.
 const DSL::Ast::TargetDesc::TargetDescDecl *findTargetDesc(const SymbolTable *table)
 {
     if (!table)
@@ -35,6 +36,7 @@ const DSL::Ast::TargetDesc::TargetDescDecl *findTargetDesc(const SymbolTable *ta
     return nullptr;
 }
 
+// Rewrites raw into a valid C++ identifier, substituting illegal characters and prefixing leading digits.
 std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
 {
     std::string result;
@@ -62,6 +64,7 @@ std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
     return result;
 }
 
+// Escapes characters that would otherwise break the generated C++ string literal.
 std::string escapeString(std::string_view value)
 {
     std::string result;
@@ -70,16 +73,27 @@ std::string escapeString(std::string_view value)
     {
         switch (c)
         {
-            case '\\': result += "\\\\"; break;
-            case '"': result += "\\\""; break;
-            case '\n': result += "\\n"; break;
-            case '\t': result += "\\t"; break;
-            default: result.push_back(c); break;
+            case '\\':
+                result += "\\\\";
+                break;
+            case '"':
+                result += "\\\"";
+                break;
+            case '\n':
+                result += "\\n";
+                break;
+            case '\t':
+                result += "\\t";
+                break;
+            default:
+                result.push_back(c);
+                break;
         }
     }
     return result;
 }
 
+// Emits an inline constexpr array of escaped strings plus its element-count constant.
 template <typename Node>
 void emitStringArray(CppSourceEmitter &emitter,
                      std::string_view arrayName,
@@ -106,14 +120,13 @@ void emitStringArray(CppSourceEmitter &emitter,
             }
         }
     }
-    emitter.emitLine("inline constexpr std::size_t {}Count = {};",
-                     arrayName,
-                     values ? values->size() : 0);
+    emitter.emitLine("inline constexpr std::size_t {}Count = {};", arrayName, values ? values->size() : 0);
     emitter.emitBlankLine();
 }
 
 } // namespace
 
+// Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
 CppTargetDescGenerator::CppTargetDescGenerator(DiagnosticCollector *collector,
                                                SymbolTable *table,
                                                std::filesystem::path outPath,
@@ -127,6 +140,7 @@ CppTargetDescGenerator::CppTargetDescGenerator(DiagnosticCollector *collector,
     }
 }
 
+// Emits the generated TargetDesc subclass declaration plus its static metadata tables.
 void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
     const auto *decl = findTargetDesc(getSymbolTable());
@@ -157,9 +171,13 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitBlankLine();
 
         emitter.emitComment("Declarative metadata extracted from the .tdesc manifest.");
-        emitStringArray(emitter, "s_objectFormats", "Object format names declared by the manifest.",
+        emitStringArray(emitter,
+                        "s_objectFormats",
+                        "Object format names declared by the manifest.",
                         decl ? &decl->mObjectFormats : nullptr);
-        emitStringArray(emitter, "s_callingConvs", "Calling convention config file paths declared by the manifest.",
+        emitStringArray(emitter,
+                        "s_callingConvs",
+                        "Calling convention config file paths declared by the manifest.",
                         decl ? &decl->m_callingConvs : nullptr);
 
         emitter.emitLine("inline constexpr const char *s_componentSlots[] =");
@@ -239,10 +257,10 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
                              decl && decl->m_stackSlot.has_value() ? decl->m_stackSlot->m_node : 8);
             emitter.emitLine("void initialize() override;");
             emitter.emitLine("std::string_view getLibcallStr(uint8_t symId) override;");
-            emitter.emitLine(
-                    "std::pmr::vector<TargetBinaryDesc *> getAvailableBinaryDescriptors() override { return m_binaries; }");
-            emitter.emitLine(
-                    "std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() override { return m_convs; }");
+            emitter.emitLine("std::pmr::vector<TargetBinaryDesc *> getAvailableBinaryDescriptors() override { return "
+                             "m_binaries; }");
+            emitter.emitLine("std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() override { return "
+                             "m_convs; }");
             emitter.emitLine(
                     "std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() override { return m_banks; }");
             emitter.emitLine("MirRegisterBank *createRegisterBank(const char *name) override;");
@@ -258,6 +276,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
     }
 }
 
+// Emits the out-of-line TargetDesc method definitions and component wiring.
 void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter) const
 {
     const auto *decl = findTargetDesc(getSymbolTable());
@@ -318,10 +337,13 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter) const
             auto s = emitter.enterScope();
             if (decl && decl->mInstructionPointer.has_value())
             {
+                // Resolve the declared instruction-pointer special register by name.
                 emitter.emitLine("const uint32_t id = {}::getSpecialRegId(\"{}\");",
-                                 registerNs, escapeString(decl->mInstructionPointer->m_node));
+                                 registerNs,
+                                 escapeString(decl->mInstructionPointer->m_node));
                 emitter.emitLine("if (!m_banks.empty())");
                 {
+                    // Pick the widest register class in the first bank to hold the pointer.
                     auto bank = emitter.enterScope();
                     emitter.emitLine("MirRegisterClass *bestClass = nullptr;");
                     emitter.emitLine("std::size_t bestBits = 0;");
@@ -360,7 +382,9 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter) const
                     auto sw = emitter.enterScope();
                     for (size_t i = 0; i < decl->mLibcalls.size(); ++i)
                     {
-                        emitter.emitLine("case {}: return \"{}\";", i, escapeString(decl->mLibcalls[i].m_symbol.m_node));
+                        emitter.emitLine("case {}: return \"{}\";",
+                                         i,
+                                         escapeString(decl->mLibcalls[i].m_symbol.m_node));
                     }
                     emitter.emitLine("default: return {};");
                 }
@@ -394,6 +418,7 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter) const
     }
 }
 
+// Requires a .tdesc manifest, then emits and writes the descriptor header/source pair.
 bool CppTargetDescGenerator::run()
 {
     if (!validate())
@@ -401,6 +426,7 @@ bool CppTargetDescGenerator::run()
         return false;
     }
 
+    // Without a target descriptor symbol there is nothing meaningful to generate.
     if (!findTargetDesc(getSymbolTable()))
     {
         error("No target descriptor symbol found in symbol table.");
@@ -429,6 +455,7 @@ bool CppTargetDescGenerator::run()
     return true;
 }
 
+// Convenience wrapper retained for callers that do not need to configure a generator object.
 bool GenerateTargetDescriptor(DiagnosticCollector *collector,
                               SymbolTable *table,
                               std::filesystem::path outPath,

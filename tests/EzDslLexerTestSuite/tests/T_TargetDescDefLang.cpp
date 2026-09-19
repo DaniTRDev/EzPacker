@@ -12,6 +12,9 @@ using namespace DSL;
 class TargetDescDefLangTest : public DslLexerTestSuiteAsGtest
 {
   protected:
+    /**
+     * Parses target descriptor source into an AST, using a unique source name per call.
+     */
     std::optional<Ast::TargetDesc::TargetDescFile> parse(const std::string &sourceContent)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.tdesc", m_currentTestId++), sourceContent);
@@ -22,6 +25,11 @@ class TargetDescDefLangTest : public DslLexerTestSuiteAsGtest
     size_t m_currentTestId{ 0 };
 };
 
+/**
+ * Verifies a complete target descriptor parses all fields: file references,
+ * sizes, instruction pointer, memory displacement type, object formats,
+ * default calling convention, libcalls, and components.
+ */
 TEST_F(TargetDescDefLangTest, ParsesFullManifest)
 {
     std::string source = R"(
@@ -89,6 +97,10 @@ target X86_64 {
     EXPECT_EQ(ast->mComponents[1].m_slot.m_node, "instruction_selector");
 }
 
+/**
+ * Verifies the minimal set of required fields parses, leaving optional
+ * file references, libcalls, and components absent.
+ */
 TEST_F(TargetDescDefLangTest, ParsesMinimalManifest)
 {
     std::string source = R"(
@@ -108,6 +120,9 @@ target AArch64 {
     EXPECT_TRUE(ast->mComponents.empty());
 }
 
+/**
+ * Verifies parsing fails when the leading `target` keyword is omitted.
+ */
 TEST_F(TargetDescDefLangTest, RejectsMissingTargetKeyword)
 {
     auto ast = parse("X86_64 { pointer_size: 8; }");

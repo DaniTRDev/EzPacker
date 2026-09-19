@@ -26,8 +26,7 @@ MirTargetInstructionDesc::MirTargetInstructionDesc(const char *name,
                                                    std::initializer_list<MirRegisterRef> implicitDefs,
                                                    std::initializer_list<MirRegisterRef> implicitUses,
                                                    MirInstructionFlags targetFlags) :
-    m_name(name), m_id(id), m_implicitDefs(implicitDefs), m_implicitUses(implicitUses),
-    m_targetFlags(targetFlags)
+    m_name(name), m_id(id), m_implicitDefs(implicitDefs), m_implicitUses(implicitUses), m_targetFlags(targetFlags)
 {
     m_operandsFlags.insert(m_operandsFlags.begin(), operandFlags.begin(), operandFlags.end());
 }
@@ -64,6 +63,9 @@ MirRegisterClass *MirTargetInstructionDesc::getOperandClass(size_t index) const
     return nullptr;
 }
 
+/**
+ * Sets the register class for the operand at index, growing the vector with null entries as needed.
+ */
 void MirTargetInstructionDesc::setOperandClass(size_t index, MirRegisterClass *regClass)
 {
     if (index >= m_operandClasses.size())
@@ -73,6 +75,9 @@ void MirTargetInstructionDesc::setOperandClass(size_t index, MirRegisterClass *r
     m_operandClasses[index] = regClass;
 }
 
+/**
+ * Replaces the full operand register class constraint vector.
+ */
 void MirTargetInstructionDesc::setOperandClasses(std::vector<MirRegisterClass *> classes)
 {
     m_operandClasses = std::move(classes);

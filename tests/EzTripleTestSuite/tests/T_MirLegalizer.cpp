@@ -12,10 +12,14 @@
 #include "Legalizer/MirLegalizerPass.h"
 #include "Operand/MirOperandBuilder.h"
 
+/**
+ * Fixture for MIR legalization actions, signature legalization, and the legalizer pass.
+ */
 class MirLegalizerTest : public EzTripleTestSuite
 {
 };
 
+// Verifies signature legalization inserts POP_ARG for each parameter and an END_ARG.
 TEST_F(MirLegalizerTest, TestFunctionSignatureLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -50,6 +54,7 @@ TEST_F(MirLegalizerTest, TestFunctionSignatureLegalization)
     EXPECT_EQ(endArg->getOpCodeName(), std::string("END_ARG"));
 }
 
+// Verifies a large return type prepends a pointer sret parameter.
 TEST_F(MirLegalizerTest, TestSretFunctionSignatureLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -75,6 +80,7 @@ TEST_F(MirLegalizerTest, TestSretFunctionSignatureLegalization)
     EXPECT_EQ(sretPtr->getMirType()->getKind(), MirTypeKind::Pointer);
 }
 
+// Verifies call legalization wraps the call with PUSH_ARG and POP_RET.
 TEST_F(MirLegalizerTest, TestCallLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -111,6 +117,7 @@ TEST_F(MirLegalizerTest, TestCallLegalization)
     EXPECT_EQ(popInst->getOpCodeName(), std::string("POP_RET"));
 }
 
+// Verifies return legalization emits PUSH_RET before the tokenized RET.
 TEST_F(MirLegalizerTest, TestReturnLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -141,6 +148,7 @@ TEST_F(MirLegalizerTest, TestReturnLegalization)
     EXPECT_EQ(retInst->getOpCodeName(), std::string("RET"));
 }
 
+// Verifies widen-scalar legalization reports a successful legalization.
 TEST_F(MirLegalizerTest, TestWidenScalarLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -163,6 +171,7 @@ TEST_F(MirLegalizerTest, TestWidenScalarLegalization)
     EXPECT_EQ(res, LegalizationResult::Legalized);
 }
 
+// Verifies narrow-scalar legalization reports a successful legalization.
 TEST_F(MirLegalizerTest, TestNarrowScalarLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -185,6 +194,7 @@ TEST_F(MirLegalizerTest, TestNarrowScalarLegalization)
     EXPECT_EQ(res, LegalizationResult::Legalized);
 }
 
+// Verifies a float-to-int bitcast legalization reports success.
 TEST_F(MirLegalizerTest, TestBitcastLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -206,6 +216,7 @@ TEST_F(MirLegalizerTest, TestBitcastLegalization)
     EXPECT_EQ(res, LegalizationResult::Legalized);
 }
 
+// Verifies a division is lowered to the requested libcall helper.
 TEST_F(MirLegalizerTest, TestLibcallLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -228,6 +239,7 @@ TEST_F(MirLegalizerTest, TestLibcallLegalization)
     EXPECT_EQ(res, LegalizationResult::Legalized);
 }
 
+// Verifies the full legalizer pass legalizes a function with a parameter and return.
 TEST_F(MirLegalizerTest, TestFullLegalizerPass)
 {
     auto *ctx = getBuilderCtx();
@@ -253,6 +265,7 @@ TEST_F(MirLegalizerTest, TestFullLegalizerPass)
     EXPECT_TRUE(result.m_modifiedMir);
 }
 
+// Verifies widening a compare's inputs inserts ZEXTs while leaving the i1 result.
 TEST_F(MirLegalizerTest, TestWidenCompareLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -279,6 +292,7 @@ TEST_F(MirLegalizerTest, TestWidenCompareLegalization)
     EXPECT_EQ(instructions.size(), 3); // ZEXT lhs, ZEXT rhs, CMP_EQ dst
 }
 
+// Verifies widening a signed division emits SEXTs, the widened IDIV, and a TRUNC.
 TEST_F(MirLegalizerTest, TestWidenSignedArithmeticLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -313,6 +327,7 @@ TEST_F(MirLegalizerTest, TestWidenSignedArithmeticLegalization)
     EXPECT_EQ(truncInst->getOpCodeName(), std::string("TRUNC"));
 }
 
+// Verifies narrowing a wide SUB expands into unmerge/bottom/merge sequences.
 TEST_F(MirLegalizerTest, TestNarrowSubAndNegLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -339,6 +354,7 @@ TEST_F(MirLegalizerTest, TestNarrowSubAndNegLegalization)
     EXPECT_EQ(instructions.size(), 5);
 }
 
+// Verifies narrowing a wide XOR expands into unmerge/bitwise/merge sequences.
 TEST_F(MirLegalizerTest, TestNarrowBitwiseLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -365,6 +381,7 @@ TEST_F(MirLegalizerTest, TestNarrowBitwiseLegalization)
     EXPECT_EQ(instructions.size(), 5);
 }
 
+// Verifies narrowing a wide compare expands into unmerge, two compares, and an AND.
 TEST_F(MirLegalizerTest, TestNarrowCompareLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -391,6 +408,7 @@ TEST_F(MirLegalizerTest, TestNarrowCompareLegalization)
     EXPECT_EQ(instructions.size(), 6);
 }
 
+// Verifies the worklist legalizer leaves every instruction in the block legal.
 TEST_F(MirLegalizerTest, TestWorklistBlockLegalization)
 {
     auto *ctx = getBuilderCtx();
@@ -435,6 +453,9 @@ TEST_F(MirLegalizerTest, TestWorklistBlockLegalization)
     }
 }
 
+/**
+ * Legalizer info that intentionally defines a widen/narrow cycle for cycle-detection testing.
+ */
 class CyclicMockLegalizerInfo : public LegalizerInfo
 {
   public:
@@ -444,12 +465,11 @@ class CyclicMockLegalizerInfo : public LegalizerInfo
         auto *i16 = tt->i16();
 
         // Intentionally create a cycle: i8 widens to i16, and i16 narrows to i8
-        getActionDefinitions(MirInstructionOpCode::ADD)
-            .widenScalarTo(0, { i8 }, i16)
-            .narrowScalarTo(0, { i16 }, i8);
+        getActionDefinitions(MirInstructionOpCode::ADD).widenScalarTo(0, { i8 }, i16).narrowScalarTo(0, { i16 }, i8);
     }
 };
 
+// Verifies a cyclic legalizer definition is detected and aborts cleanly.
 TEST_F(MirLegalizerTest, TestLegalizerCycleDetection)
 {
     auto *ctx = getBuilderCtx();
@@ -474,6 +494,7 @@ TEST_F(MirLegalizerTest, TestLegalizerCycleDetection)
             m_cyclicInfo = std::make_unique<CyclicMockLegalizerInfo>(bCtx->getTypeTable());
         }
         LegalizerInfo *getLegalizerInfo() override { return m_cyclicInfo.get(); }
+
       private:
         std::unique_ptr<CyclicMockLegalizerInfo> m_cyclicInfo;
     };

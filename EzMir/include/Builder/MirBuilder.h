@@ -25,7 +25,7 @@ template <typename T> class MirBuilder
     void setBuildResult(T *obj) { m_builtObj = obj; }
 
   private:
-    T *m_builtObj{ nullptr };
+    T *m_builtObj{ nullptr }; // Result produced by the derived builder, or nullptr until finalized.
 };
 
 #endif // EZMIR_MIR_BUILDER_H

@@ -3,17 +3,26 @@
 
 #include "EzMirCommon.h"
 
+/**
+ * One read of a virtual register: the instruction performing the read and the operand position.
+ */
 struct MirVRegUse
 {
-    class MirInstruction *m_userInst{ nullptr };
-    size_t m_operandIndex{ 0 };
+    class MirInstruction *m_userInst{ nullptr }; // Instruction that reads the register.
+    size_t m_operandIndex{ 0 };                  // Index of the operand within that instruction.
 };
 
+/**
+ * Per-register SSA bookkeeping: its single defining instruction and all use sites.
+ */
 struct MirVRegData
 {
-    class MirInstruction *m_defInst{ nullptr };
-    std::pmr::vector<MirVRegUse> m_uses;
+    class MirInstruction *m_defInst{ nullptr }; // Instruction that defines the register, or nullptr.
+    std::pmr::vector<MirVRegUse> m_uses;        // All recorded reads of the register.
 
+    /**
+     * Allocates the use list from the given arena.
+     */
     explicit MirVRegData(std::pmr::memory_resource *alloc) : m_uses(alloc) {}
 };
 
@@ -26,6 +35,9 @@ struct MirVRegData
 class MirFunctionRegisterInfo
 {
   public:
+    /**
+     * Creates the register tracker backed by the supplied arena.
+     */
     explicit MirFunctionRegisterInfo(std::pmr::memory_resource *alloc);
 
     /**
@@ -74,7 +86,7 @@ class MirFunctionRegisterInfo
     std::optional<const std::pmr::vector<MirVRegUse>> getUses(MirId regId) const;
 
   private:
-    std::pmr::unordered_map<MirId, MirVRegData> m_vregs;
+    std::pmr::unordered_map<MirId, MirVRegData> m_vregs; // Register ID -> SSA def/use information.
 };
 
 #endif // EZMIR_MIR_FUNCTION_REGISTER_INFO_H

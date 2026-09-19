@@ -2,6 +2,7 @@
 
 using namespace EzCompiler;
 
+// Parses a bare input file and applies the default object stage, O0 optimization, and off flags.
 TEST_F(EzCompilerTestSuite, TestDefaultCommandLineOptions)
 {
     CommandLineParser parser;
@@ -19,6 +20,7 @@ TEST_F(EzCompilerTestSuite, TestDefaultCommandLineOptions)
     EXPECT_FALSE(options.isPositionIndependent);
 }
 
+// Parses -o and --target, resolving the target triple into its arch, system, and ABI parts.
 TEST_F(EzCompilerTestSuite, TestCustomOutputAndTarget)
 {
     CommandLineParser parser;
@@ -38,6 +40,7 @@ TEST_F(EzCompilerTestSuite, TestCustomOutputAndTarget)
     EXPECT_TRUE(options.target.isElf());
 }
 
+// Verifies each emission-stage flag maps to the expected pipeline stage, including -S for assembly.
 TEST_F(EzCompilerTestSuite, TestEmissionStageFlags)
 {
     CommandLineParser parser;
@@ -73,6 +76,7 @@ TEST_F(EzCompilerTestSuite, TestEmissionStageFlags)
     }
 }
 
+// Parses combined optimization, verbosity, pass-reporting, and position-independent flags.
 TEST_F(EzCompilerTestSuite, TestOptimizationAndVerboseFlags)
 {
     CommandLineParser parser;
@@ -90,6 +94,7 @@ TEST_F(EzCompilerTestSuite, TestOptimizationAndVerboseFlags)
     EXPECT_TRUE(options.isPositionIndependent);
 }
 
+// Rejects an unrecognized flag and reports a non-empty error message.
 TEST_F(EzCompilerTestSuite, TestInvalidFlagHandling)
 {
     CommandLineParser parser;

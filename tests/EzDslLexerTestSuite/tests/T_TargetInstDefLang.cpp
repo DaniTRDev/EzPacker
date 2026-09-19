@@ -3,10 +3,16 @@
 #include "Parser/ParseContext.h"
 #include "Parser/TargetInstDefLang.h"
 
+/**
+ * Test fixture for the target instruction definition (.idf) dialect parser.
+ */
 class TargetInstDefLangTest : public DslLexerTestSuiteAsGtest
 {
 };
 
+/**
+ * Verifies parsing an input-direction operand (class:name IN).
+ */
 TEST_F(TargetInstDefLangTest, TestTargetOperandIn)
 {
     std::string test = "GPR32:src IN";
@@ -19,6 +25,9 @@ TEST_F(TargetInstDefLangTest, TestTargetOperandIn)
     EXPECT_EQ(res->m_direction, DSL::Ast::TargetInstDef::OperandDirection::In);
 }
 
+/**
+ * Verifies parsing an output-direction operand (class:name OUT).
+ */
 TEST_F(TargetInstDefLangTest, TestTargetOperandOut)
 {
     std::string test = "GPR64:dst OUT";
@@ -31,6 +40,9 @@ TEST_F(TargetInstDefLangTest, TestTargetOperandOut)
     EXPECT_EQ(res->m_direction, DSL::Ast::TargetInstDef::OperandDirection::Out);
 }
 
+/**
+ * Verifies parsing a read/write operand (class:name INOUT).
+ */
 TEST_F(TargetInstDefLangTest, TestTargetOperandInOut)
 {
     std::string test = "Mem32:addr INOUT";
@@ -43,6 +55,10 @@ TEST_F(TargetInstDefLangTest, TestTargetOperandInOut)
     EXPECT_EQ(res->m_direction, DSL::Ast::TargetInstDef::OperandDirection::InOut);
 }
 
+/**
+ * Verifies a target instruction declaration parses its operands plus the
+ * MNEMONIC, FLAGS, IMPLICIT_DEFS, and IMPLICIT_USES attributes.
+ */
 TEST_F(TargetInstDefLangTest, TestTargetInstructionDeclaration)
 {
     std::string test = R"(
@@ -78,6 +94,10 @@ TEST_F(TargetInstDefLangTest, TestTargetInstructionDeclaration)
     EXPECT_EQ(res->m_implicitUses[1].m_node, "EDX");
 }
 
+/**
+ * Verifies a full target instruction file parses the target name and multiple
+ * instruction declarations, including one with no operands.
+ */
 TEST_F(TargetInstDefLangTest, TestTargetInstructionFile)
 {
     std::string test = R"(

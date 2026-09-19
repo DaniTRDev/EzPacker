@@ -3,11 +3,10 @@
 namespace Cli
 {
 
-CommandLineParser::CommandLineParser()
-{
-    setupArguments();
-}
+// Installs all argument/option definitions used by parse().
+CommandLineParser::CommandLineParser() { setupArguments(); }
 
+// Registers every supported flag, option and positional argument with the argparse program.
 void CommandLineParser::setupArguments()
 {
     m_program = std::make_unique<argparse::ArgumentParser>("EzDslCli", "1.0.0", argparse::default_arguments::help);
@@ -165,6 +164,7 @@ void CommandLineParser::setupArguments()
             .implicit_value(true);
 }
 
+// Parses argv, applies validation and resolves the requested generator; returns nullopt on help/version/error.
 std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::string &errorMessage)
 {
     try
@@ -173,10 +173,12 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     }
     catch (const std::exception &err)
     {
+        // argparse reports malformed usage by throwing; surface the message to the caller.
         errorMessage = err.what();
         return std::nullopt;
     }
 
+    // --version short-circuits before any further validation.
     if (m_program->get<bool>("--version"))
     {
         std::cout << getVersion() << "\n";
@@ -199,6 +201,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
         opts.includeDirs = m_program->get<std::vector<std::string>>("-I");
     }
 
+    // Simple boolean and string switches map directly onto the options structure.
     opts.headerOnly = m_program->get<bool>("--header-only");
     opts.sourceOnly = m_program->get<bool>("--source-only");
     opts.dumpInfo = m_program->get<bool>("--dump-info");
@@ -210,8 +213,12 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     opts.verbose = m_program->get<bool>("-v");
     opts.quiet = m_program->get<bool>("-q");
 
+    // --format is case-insensitive; anything other than "json" falls back to text.
     std::string formatStr = m_program->get<std::string>("--format");
-    std::transform(formatStr.begin(), formatStr.end(), formatStr.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(formatStr.begin(),
+                   formatStr.end(),
+                   formatStr.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
     if (formatStr == "json")
     {
         opts.format = OutputFormat::Json;
@@ -234,6 +241,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     opts.emitRegisterInfo = m_program->get<bool>("--emit-registers");
     opts.emitTargetDesc = m_program->get<bool>("--emit-target-desc");
 
+    // Emission flags and the explicit --generator value are reconciled below.
     bool emitTypeTable = m_program->get<bool>("--emit-type-table");
     bool emitInstructions = m_program->get<bool>("--emit-instructions");
     bool emitLegalizer = m_program->get<bool>("--emit-legalizer");
@@ -245,7 +253,9 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     bool emitRegisterInfo = opts.emitRegisterInfo;
     bool emitTargetDesc = opts.emitTargetDesc;
     std::string explicitGen = m_program->get<std::string>("--generator");
-    std::transform(explicitGen.begin(), explicitGen.end(), explicitGen.begin(),
+    std::transform(explicitGen.begin(),
+                   explicitGen.end(),
+                   explicitGen.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
     if (emitTypeTable && emitInstructions)
@@ -254,16 +264,18 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
         return std::nullopt;
     }
 
-    size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) + (emitRules ? 1 : 0)
-                     + (emitTargetInstructions ? 1 : 0) + (emitTargetEncodings ? 1 : 0)
-                     + (emitInstructionSelector ? 1 : 0) + (emitCallingConv ? 1 : 0)
-                     + (emitRegisterInfo ? 1 : 0) + (emitTargetDesc ? 1 : 0);
+    // Reject ambiguous invocations that request more than one generator at once.
+    size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) +
+            (emitRules ? 1 : 0) + (emitTargetInstructions ? 1 : 0) + (emitTargetEncodings ? 1 : 0) +
+            (emitInstructionSelector ? 1 : 0) + (emitCallingConv ? 1 : 0) + (emitRegisterInfo ? 1 : 0) +
+            (emitTargetDesc ? 1 : 0);
     if (emitCount > 1)
     {
         errorMessage = "Cannot specify multiple generator emission flags simultaneously.";
         return std::nullopt;
     }
 
+    // Emission flags take precedence over --generator; otherwise match the explicit name, else Auto.
     if (emitTypeTable)
     {
         opts.generator = GeneratorKind::TypeTable;
@@ -320,7 +332,8 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     {
         opts.generator = GeneratorKind::Rules;
     }
-    else if (explicitGen == "target-instructions" || explicitGen == "target_instructions" || explicitGen == "target-inst")
+    else if (explicitGen == "target-instructions" || explicitGen == "target_instructions" ||
+             explicitGen == "target-inst")
     {
         opts.generator = GeneratorKind::TargetInstructions;
     }
@@ -332,15 +345,18 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     {
         opts.generator = GeneratorKind::InstructionSelector;
     }
-    else if (explicitGen == "calling-conv" || explicitGen == "calling_conv" || explicitGen == "callingconv" || explicitGen == "cc")
+    else if (explicitGen == "calling-conv" || explicitGen == "calling_conv" || explicitGen == "callingconv" ||
+             explicitGen == "cc")
     {
         opts.generator = GeneratorKind::CallingConv;
     }
-    else if (explicitGen == "registers" || explicitGen == "register" || explicitGen == "register-info" || explicitGen == "reg")
+    else if (explicitGen == "registers" || explicitGen == "register" || explicitGen == "register-info" ||
+             explicitGen == "reg")
     {
         opts.generator = GeneratorKind::RegisterInfo;
     }
-    else if (explicitGen == "target-desc" || explicitGen == "target_desc" || explicitGen == "targetdesc" || explicitGen == "tdesc")
+    else if (explicitGen == "target-desc" || explicitGen == "target_desc" || explicitGen == "targetdesc" ||
+             explicitGen == "tdesc")
     {
         opts.generator = GeneratorKind::TargetDesc;
     }
@@ -352,6 +368,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     return opts;
 }
 
+// Returns argparse's usage/help text, or an empty string if the program was never built.
 std::string CommandLineParser::getHelp() const
 {
     if (!m_program)
@@ -361,9 +378,7 @@ std::string CommandLineParser::getHelp() const
     return m_program->help().str();
 }
 
-std::string CommandLineParser::getVersion() const
-{
-    return "EzDslCli version 1.0.0 (EzPacker Compiler Suite)";
-}
+// Returns the static tool version banner.
+std::string CommandLineParser::getVersion() const { return "EzDslCli version 1.0.0 (EzPacker Compiler Suite)"; }
 
 } // namespace Cli

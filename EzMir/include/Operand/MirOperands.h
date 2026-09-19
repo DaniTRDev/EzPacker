@@ -17,11 +17,11 @@ class MirRegisterClass;
  */
 enum class MirReferenceType : uint8_t
 {
-    Invalid = 0,      // Invalid or unassigned reference type sentinel
-    Block,            // Reference to a MirBlock label (branch / jump target)
-    Function,         // Reference to a MirFunction entry point (call target)
-    GlobalVar,        // Reference to a MirGlobalVar memory location
-    StackFrameObject  // Reference to a local stack slot inside the function's MirFunctionStackFrame
+    Invalid = 0,     // Invalid or unassigned reference type sentinel
+    Block,           // Reference to a MirBlock label (branch / jump target)
+    Function,        // Reference to a MirFunction entry point (call target)
+    GlobalVar,       // Reference to a MirGlobalVar memory location
+    StackFrameObject // Reference to a local stack slot inside the function's MirFunctionStackFrame
 };
 
 /**

@@ -8,14 +8,14 @@
  */
 enum class MirOperandType : uint8_t
 {
-    Invalid = 0,    // Uninitialized / invalid operand kind sentinel
-    FloatingPoint,  // Immediate floating-point constant value (MirFloat)
-    Integer,        // Immediate integer constant value (MirInteger)
-    Reference,      // Symbolic reference to a block, function, global variable, or stack slot (MirReference)
-    Register,       // Virtual or physical register identifier (MirRegister)
-    RuntimeSymbol,  // Named runtime library symbol (MirRuntimeSymbol)
-    Memory,         // Base-plus-displacement memory addressing mode [base + displacement] (MirMemory)
-    MaxOperandType  // Operand count sentinel
+    Invalid = 0,   // Uninitialized / invalid operand kind sentinel
+    FloatingPoint, // Immediate floating-point constant value (MirFloat)
+    Integer,       // Immediate integer constant value (MirInteger)
+    Reference,     // Symbolic reference to a block, function, global variable, or stack slot (MirReference)
+    Register,      // Virtual or physical register identifier (MirRegister)
+    RuntimeSymbol, // Named runtime library symbol (MirRuntimeSymbol)
+    Memory,        // Base-plus-displacement memory addressing mode [base + displacement] (MirMemory)
+    MaxOperandType // Operand count sentinel
 };
 
 /**

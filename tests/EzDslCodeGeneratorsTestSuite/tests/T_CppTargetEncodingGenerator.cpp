@@ -11,9 +11,13 @@
 
 using namespace CodeGenerators;
 
+/**
+ * Fixture for generating table-driven encoding descriptors from target-instruction (.idf) sources.
+ */
 class CppTargetEncodingGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
+    // Parses target-instruction source and runs the target-instruction semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff("target_enc_test", source);
@@ -27,6 +31,7 @@ class CppTargetEncodingGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtes
     }
 };
 
+// Generates encoding descriptors and verifies RR/RM forms, REX/SSE fields, coalescing, and lookup helpers.
 TEST_F(CppTargetEncodingGeneratorTest, TestEncodingTableGeneration)
 {
     std::string idfSource = R"(
@@ -102,6 +107,7 @@ TEST_F(CppTargetEncodingGeneratorTest, TestEncodingTableGeneration)
     EXPECT_NE(header.find("\"PLAIN\""), std::string::npos);
 }
 
+// Rejects an encoding that binds an operand absent from the instruction signature.
 TEST_F(CppTargetEncodingGeneratorTest, TestInvalidEncodingIsRejected)
 {
     // The binding references an operand that does not exist in the signature.
@@ -120,6 +126,7 @@ TEST_F(CppTargetEncodingGeneratorTest, TestInvalidEncodingIsRejected)
     EXPECT_FALSE(parseAndRunPass(idfSource));
 }
 
+// Rejects a jcc encoding that omits the required condition code.
 TEST_F(CppTargetEncodingGeneratorTest, TestJccRequiresConditionCode)
 {
     std::string idfSource = R"(

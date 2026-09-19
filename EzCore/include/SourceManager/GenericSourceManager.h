@@ -11,9 +11,9 @@
  */
 struct SourceReference
 {
-    size_t m_beginOffset{ 0 };
-    size_t m_endOffset{ 0 };
-    size_t m_sourceFileId{ 0 };
+    size_t m_beginOffset{ 0 };  // Byte offset of the first character of the span.
+    size_t m_endOffset{ 0 };    // Byte offset one past the last character of the span.
+    size_t m_sourceFileId{ 0 }; // Numeric ID of the source file this span belongs to.
 
     /**
      * Returns the span length in bytes (m_endOffset - m_beginOffset).
@@ -26,9 +26,9 @@ struct SourceReference
  */
 struct SourceLineRange
 {
-    size_t m_beginOffset{ 0 };
-    size_t m_endOffset{ 0 };
-    size_t m_lineNumber{ 0 };
+    size_t m_beginOffset{ 0 }; // Byte offset where the line content begins.
+    size_t m_endOffset{ 0 };   // Byte offset just past the line content (terminators excluded).
+    size_t m_lineNumber{ 0 };  // 1-based line number displayed in diagnostics.
 
     /**
      * Returns the byte length of this line excluding line terminator characters.
@@ -42,9 +42,9 @@ struct SourceLineRange
  */
 struct SourceFileEntry
 {
-    std::pmr::string m_content;
-    std::pmr::string m_name;
-    std::pmr::vector<SourceLineRange> m_lines;
+    std::pmr::string m_content;                // Full text of the source file, owned by the compilation arena.
+    std::pmr::string m_name;                   // Display name/path used to identify the file in diagnostics.
+    std::pmr::vector<SourceLineRange> m_lines; // Precomputed line spans, sorted by offset for binary search.
 };
 
 /**

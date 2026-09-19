@@ -12,18 +12,27 @@
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+/**
+ * Stores the builder context and caches the target legalizer used for ABI classification.
+ */
 MirFunctionSignatureLegalizerPass::MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
     m_ctx(ctx), m_legalizer(targetDesc ? targetDesc->getLegalizer() : nullptr)
 {
 }
 
+/// Returns the diagnostic name of this pass.
 const char *MirFunctionSignatureLegalizerPass::getName() const { return "MirFunctionSignatureLegalizerPass"; }
 
+/// Runs once per function rather than once per module.
 MirPassIterationPlace MirFunctionSignatureLegalizerPass::getIterationPlace() const
 {
     return MirPassIterationPlace::Function;
 }
 
+/**
+ * Prepends an SRET parameter when needed and synthesizes the token-bound POP_ARG/END_ARG
+ * prologue that materializes the incoming arguments.
+ */
 MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                                      MirPassManager *passManager)
 {
@@ -51,6 +60,7 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
         }
     }
 
+    // Append to an empty entry block, otherwise insert at the very start, before existing code.
     MirFunctionBuilder fBuilder(m_ctx);
     MirInstructionBuilder builder = entryPoint->getInstructions().empty()
             ? MirInstructionBuilder(m_ctx, entryPoint, InsertionType::Append)

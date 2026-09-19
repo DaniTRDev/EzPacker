@@ -9,9 +9,13 @@
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeActionPass.h"
 
+/**
+ * Fixture for the legalize-action semantic pass with standard types and IR instructions predeclared.
+ */
 class LegalizeActionPassTest : public EzDslSemaTestSuiteAsGtest
 {
   protected:
+    // Declares the standard types and IR instructions used by the legalize-action tests.
     void SetUp() override
     {
         EzDslSemaTestSuiteAsGtest::SetUp();
@@ -19,16 +23,16 @@ class LegalizeActionPassTest : public EzDslSemaTestSuiteAsGtest
         declareStandardIrInstructions();
     }
 
+    // Registers the primitive integer, float, and pointer types in the symbol table.
     void declareStandardTypes()
     {
-        auto declareType = [&](std::string_view name, DSL::Ast::TypeDef::TypeKind kind, uint32_t bitWidth) {
-            Symbols::TypeSymbol symData{
-                .m_name = name,
-                .m_kind = kind,
-                .m_bitWidth = bitWidth,
-                .m_alignment = bitWidth,
-                .m_compactId = 0
-            };
+        auto declareType = [&](std::string_view name, DSL::Ast::TypeDef::TypeKind kind, uint32_t bitWidth)
+        {
+            Symbols::TypeSymbol symData{ .m_name = name,
+                                         .m_kind = kind,
+                                         .m_bitWidth = bitWidth,
+                                         .m_alignment = bitWidth,
+                                         .m_compactId = 0 };
             getSymbolTable()->declareSym(nullptr, SymbolType::Type, std::move(symData), name);
         };
 
@@ -43,16 +47,17 @@ class LegalizeActionPassTest : public EzDslSemaTestSuiteAsGtest
         declareType("ptr", DSL::Ast::TypeDef::TypeKind::Pointer, 64);
     }
 
+    // Registers a standard set of IR instruction symbols used by the test sources.
     void declareStandardIrInstructions()
     {
-        auto declareInst = [&](std::string_view name) {
-            Symbols::IrInstructionSymbol symData{
-                .m_name = name,
-                .m_category = DSL::Ast::IrInstDef::IrInstCategory::Arithmetic,
-                .m_tier = DSL::Ast::IrInstDef::IrInstTier::HighLevel,
-                .m_flags = DSL::Ast::IrInstDef::IrInstFlag::None,
-                .m_operands = std::pmr::vector<Symbols::IrOperandSymbol>{ getSymbolTable()->getAllocator() }
-            };
+        auto declareInst = [&](std::string_view name)
+        {
+            Symbols::IrInstructionSymbol symData{ .m_name = name,
+                                                  .m_category = DSL::Ast::IrInstDef::IrInstCategory::Arithmetic,
+                                                  .m_tier = DSL::Ast::IrInstDef::IrInstTier::HighLevel,
+                                                  .m_flags = DSL::Ast::IrInstDef::IrInstFlag::None,
+                                                  .m_operands = std::pmr::vector<Symbols::IrOperandSymbol>{
+                                                          getSymbolTable()->getAllocator() } };
             getSymbolTable()->declareSym(nullptr, SymbolType::IrInstruction, std::move(symData), name);
         };
 
@@ -69,6 +74,7 @@ class LegalizeActionPassTest : public EzDslSemaTestSuiteAsGtest
         declareInst("ALLOC");
     }
 
+    // Parses a legalize-action source into an AST using a unique .lad source name.
     std::optional<DSL::Ast::LegalizeActionDef::LegalizeActionFile> parseFile(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.lad", m_testId++), source);
@@ -80,6 +86,7 @@ class LegalizeActionPassTest : public EzDslSemaTestSuiteAsGtest
     size_t m_testId{ 0 };
 };
 
+// Verifies a type_set declaration registers a TypeSet symbol with its member types.
 TEST_F(LegalizeActionPassTest, TestTypeSetRegistration)
 {
     std::string source = R"(
@@ -102,6 +109,7 @@ TEST_F(LegalizeActionPassTest, TestTypeSetRegistration)
     EXPECT_EQ(tsData->m_typeIds.size(), 4);
 }
 
+// Verifies CLAMP_SCALAR expands into widen/legal/narrow clauses for the type range.
 TEST_F(LegalizeActionPassTest, TestClampScalarExpansion)
 {
     std::string source = R"(
@@ -163,6 +171,7 @@ TEST_F(LegalizeActionPassTest, TestClampScalarExpansion)
     EXPECT_EQ(narrowCount, 1);
 }
 
+// Verifies a clamp with min greater than max is rejected.
 TEST_F(LegalizeActionPassTest, TestInvalidClampRangeError)
 {
     std::string source = R"(
@@ -178,6 +187,7 @@ TEST_F(LegalizeActionPassTest, TestInvalidClampRangeError)
     EXPECT_FALSE(success);
 }
 
+// Verifies an instruction group expands its clauses to each member instruction.
 TEST_F(LegalizeActionPassTest, TestGroupExpansion)
 {
     std::string source = R"(
@@ -210,6 +220,7 @@ TEST_F(LegalizeActionPassTest, TestGroupExpansion)
     }
 }
 
+// Verifies a LOWER clause records its named lowering handler on the action symbol.
 TEST_F(LegalizeActionPassTest, TestLowerAction)
 {
     std::string source = R"(
@@ -242,6 +253,7 @@ TEST_F(LegalizeActionPassTest, TestLowerAction)
     EXPECT_EQ(*actData->m_clauses[0].m_lowerHandler, "AMD64CallLowering");
 }
 
+// Verifies a type_set in an indexed constraint expands into the Cartesian product of LEGAL clauses.
 TEST_F(LegalizeActionPassTest, TestHeterogeneousTypeSetExpansion)
 {
     std::string source = R"(

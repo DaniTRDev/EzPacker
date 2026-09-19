@@ -8,9 +8,13 @@
 #include "Sema/Symbols/CallingConvSymbols.h"
 #include "SemaPasses/CallingConvPass.h"
 
+/**
+ * Fixture for the calling-convention semantic pass.
+ */
 class CallingConvPassTest : public EzDslSemaTestSuiteAsGtest
 {
   protected:
+    // Parses calling-convention source into an AST using a unique .ezcc source name.
     std::optional<DSL::Ast::CallingConvDef::CallingConventionDefFile> parseCallingConv(const std::string &source)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.ezcc", m_currentTestId++), source);
@@ -22,6 +26,7 @@ class CallingConvPassTest : public EzDslSemaTestSuiteAsGtest
     size_t m_currentTestId{ 0 };
 };
 
+// Verifies a valid System V convention passes and declares a CallingConv symbol.
 TEST_F(CallingConvPassTest, TestValidSysVCallingConv)
 {
     std::string source = R"(
@@ -89,6 +94,7 @@ TEST_F(CallingConvPassTest, TestValidSysVCallingConv)
     EXPECT_NE(data->m_astNode, nullptr);
 }
 
+// Verifies a valid Win64 convention with unified slots passes semantic analysis.
 TEST_F(CallingConvPassTest, TestValidWin64CallingConv)
 {
     std::string source = R"(
@@ -152,6 +158,7 @@ TEST_F(CallingConvPassTest, TestValidWin64CallingConv)
     EXPECT_EQ(sym->getType(), SymbolType::CallingConv);
 }
 
+// Verifies a non-power-of-two stack alignment is rejected.
 TEST_F(CallingConvPassTest, TestInvalidStackAlignment)
 {
     std::string source = R"(
@@ -176,6 +183,7 @@ TEST_F(CallingConvPassTest, TestInvalidStackAlignment)
     EXPECT_FALSE(success);
 }
 
+// Verifies a register listed as both callee- and caller-saved is rejected.
 TEST_F(CallingConvPassTest, TestConflictingRegisterPreservation)
 {
     std::string source = R"(

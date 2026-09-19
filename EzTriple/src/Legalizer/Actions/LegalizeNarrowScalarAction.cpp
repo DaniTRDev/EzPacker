@@ -17,6 +17,11 @@
 namespace LegalizeActions
 {
 
+/**
+ * Breaks a wide operand into numChunks narrow values. Registers are split with an
+ * UNMERGE_VALUES instruction, integer constants are sliced directly, and any other operand is
+ * simply replicated across the chunks.
+ */
 static std::vector<MirOperand *>
 splitOperand(MirOperand *op,
              size_t numChunks,
@@ -68,6 +73,11 @@ splitOperand(MirOperand *op,
     return chunks;
 }
 
+/**
+ * Rewrites operations on a wide type into a chain of narrower operations. Register and constant
+ * operands are split with UNMERGE_VALUES, arithmetic uses explicit carry/borrow chains, and the
+ * per-chunk results are recombined with MERGE_VALUES.
+ */
 LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, MirType *targetType)
 {
     if (!ctx.m_ctx || !ctx.m_targetDesc)
@@ -144,6 +154,7 @@ LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, Mi
     MirOperand *dstOp = operands[0];
     bool isCompare = (instr->getMetadata().m_category == MirInstructionCategory::MirCat_Compare);
 
+    // Equality comparisons combine per-chunk results with AND (=) or OR (!=) into a single boolean.
     if (isCompare)
     {
         if (operands.size() < 3)
@@ -215,6 +226,7 @@ LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, Mi
         auto lhsChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
         auto rhsChunks = splitOperand(operands[2], numChunks, narrowBits, narrowType, emitInst, ob);
 
+        // Low chunk produces the initial carry, then each UADDE consumes and forwards carry-out.
         MirRegister *carry = ob.buildVReg(carryType);
         emitInst(MirInstructionOpCode::UADDO, { dstChunks[0], carry, lhsChunks[0], rhsChunks[0] });
 
@@ -230,6 +242,7 @@ LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, Mi
         auto lhsChunks = splitOperand(operands[1], numChunks, narrowBits, narrowType, emitInst, ob);
         auto rhsChunks = splitOperand(operands[2], numChunks, narrowBits, narrowType, emitInst, ob);
 
+        // Low chunk produces the initial borrow, then each USUBE consumes and forwards borrow-out.
         MirRegister *borrow = ob.buildVReg(carryType);
         emitInst(MirInstructionOpCode::USUBO, { dstChunks[0], borrow, lhsChunks[0], rhsChunks[0] });
 

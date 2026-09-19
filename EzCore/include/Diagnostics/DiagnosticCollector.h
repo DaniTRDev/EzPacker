@@ -113,13 +113,13 @@ class DiagnosticCollector
     std::pmr::memory_resource *getAllocator();
 
   private:
-    uint8_t m_enabledDiags; // Used to know which diagnostic types are enabled.
-    std::list<DiagnosticListener *> m_listeners;
-    std::pmr::synchronized_pool_resource m_diagScopePool;
+    uint8_t m_enabledDiags;                               // Used to know which diagnostic types are enabled.
+    std::list<DiagnosticListener *> m_listeners;          // Registered observers notified when messages are committed.
+    std::pmr::synchronized_pool_resource m_diagScopePool; // Thread-safe arena backing all messages and scopes.
     std::pmr::vector<DiagnosticMessage> m_messages; // A set of notified messages. Will be filled with elements that
                                                     // were actually notified to the listener.
-    std::pmr::vector<DiagnosticScope> m_scopes;
-    std::recursive_mutex m_mutex;
+    std::pmr::vector<DiagnosticScope> m_scopes;     // Stack of active scopes; index 0 is the always-present root scope.
+    std::recursive_mutex m_mutex;                   // Guards listeners, scopes and messages from concurrent access.
 };
 
 #endif // EZCORE_DIAGNOSTIC_COLLECTOR_H

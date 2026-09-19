@@ -45,13 +45,13 @@ class ParseContext
      */
     struct LexyDiagnosticHandler
     {
-        ParseContext &ctx;
+        ParseContext &ctx; // Context used to resolve source locations for errors.
 
         struct ErrorSink
         {
-            ParseContext &ctx;
-            std::size_t _count;
-            using return_type = std::size_t;
+            ParseContext &ctx;               // Owning parse context.
+            std::size_t _count;              // Number of errors reported by this sink.
+            using return_type = std::size_t; // Sink result type required by Lexy.
 
             template <typename Input, typename Reader, typename Tag>
             void operator()(const lexy::error_context<Input> &context, const lexy::error<Reader, Tag> &error)
@@ -133,11 +133,11 @@ class ParseContext
     void pushToCollector(std::string_view sourceName, std::string_view message, class SourceReference *sourceRef);
 
   private:
-    class DiagnosticCollector *m_diagCollector;
-    class GenericSourceManager *m_sourceManager;
-    LexyDiagnosticHandler m_handler;
-    size_t m_sourceId;
-    std::pmr::memory_resource *m_alloc;
+    class DiagnosticCollector *m_diagCollector;  // Collector receiving syntax diagnostics.
+    class GenericSourceManager *m_sourceManager; // Manager owning the source buffers.
+    LexyDiagnosticHandler m_handler;             // Lexy error callback adapter.
+    size_t m_sourceId;                           // ID of the file currently being parsed.
+    std::pmr::memory_resource *m_alloc;          // Arena used for AST and list allocation.
 };
 
 #endif // EZDSL_PARSE_CONTEXT_H

@@ -9,14 +9,18 @@
  */
 struct NonSsaToSsaPassResult
 {
-    std::pmr::unordered_map<MirId, MirId> m_immDomTree;
-    std::pmr::unordered_map<MirId, size_t> m_postOrderIndexes;
+    std::pmr::unordered_map<MirId, MirId> m_immDomTree;        // Block ID -> immediate dominator block ID.
+    std::pmr::unordered_map<MirId, size_t> m_postOrderIndexes; // Block ID -> index in reverse post-order.
 
     // Virtual Register ID, Set of blocks that write to it (DEFs).
-    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirId>> m_defSites;
-    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirId>> m_domFrontier;
-    std::pmr::vector<MirId> m_postOrderNodes;
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirId>> m_defSites; // Register ID -> blocks defining it.
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirId>>
+            m_domFrontier;                    // Block ID -> dominance frontier blocks.
+    std::pmr::vector<MirId> m_postOrderNodes; // Blocks in computed post-order.
 
+    /**
+     * Allocates all analysis maps/vectors from the given arena.
+     */
     NonSsaToSsaPassResult(std::pmr::memory_resource *alloc) :
         m_immDomTree(alloc), m_postOrderIndexes(alloc), m_defSites(alloc), m_domFrontier(alloc), m_postOrderNodes(alloc)
     {
@@ -108,9 +112,9 @@ class NonSsaToSsaPass : public IMirTransformPass
     void renameVariables(CodeFlowResult *cfg, MirFunction *func);
 
   private:
-    class MirBuilderContext *m_ctx;
-    NonSsaToSsaPassResult m_result;
-    std::pmr::memory_resource *m_resc;
+    class MirBuilderContext *m_ctx;    // Context providing functions/instructions to transform.
+    NonSsaToSsaPassResult m_result;    // Intermediate SSA construction data.
+    std::pmr::memory_resource *m_resc; // Arena backing the result containers.
 };
 
 #endif // EZMIR_NON_SSA_TO_SSA_PASS_H

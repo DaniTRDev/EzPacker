@@ -9,12 +9,16 @@
  */
 struct MirRegisterAllocatorPassResult
 {
-    std::pmr::unordered_map<class MirFunction *, class RegisterAllocatorCtx *> m_contexts;
-    std::pmr::unordered_set<class MirFunction *> m_resolvedFunctions;
+    std::pmr::unordered_map<class MirFunction *, class RegisterAllocatorCtx *>
+            m_contexts;                                               ///< Per-function allocator state.
+    std::pmr::unordered_set<class MirFunction *> m_resolvedFunctions; ///< Functions that finished allocation.
 
     MirRegisterAllocatorPassResult(std::pmr::memory_resource *alloc) : m_contexts(alloc), m_resolvedFunctions(alloc) {}
 };
 
+/**
+ * Transformation pass driving graph-coloring register allocation for every function in the module.
+ */
 class MirRegisterAllocatorPass : public IMirTransformPass
 {
   public:
@@ -61,10 +65,10 @@ class MirRegisterAllocatorPass : public IMirTransformPass
     std::vector<std::type_index> getDependencies() const override;
 
   private:
-    class MirBuilderContext *m_ctx;
-    class MirRegisterAllocator *m_regAllocator;
-    MirRegisterAllocatorPassResult m_result;
-    class TargetDesc *m_targetDesc;
+    class MirBuilderContext *m_ctx;             ///< Shared builder context used to emit spill/reload code.
+    class MirRegisterAllocator *m_regAllocator; ///< Concrete target allocator implementing the coloring algorithm.
+    MirRegisterAllocatorPassResult m_result;    ///< Accumulated per-function allocation results.
+    class TargetDesc *m_targetDesc;             ///< Target supplying the allocator and register classes.
 };
 
 #endif // EZPACKER_REGISTERALLOCATORPASS_H

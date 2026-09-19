@@ -12,8 +12,8 @@ namespace DSL::Ast::TargetDesc
  */
 struct LibcallEntry
 {
-    Common::Identifier m_name;
-    Common::StringLiteral m_symbol;
+    Common::Identifier m_name;      // Symbolic libcall id referenced by legalization.
+    Common::StringLiteral m_symbol; // Runtime/linker symbol the id maps to.
 };
 
 /**
@@ -21,8 +21,8 @@ struct LibcallEntry
  */
 struct ComponentBinding
 {
-    Common::Identifier m_slot;
-    Common::Identifier m_type;
+    Common::Identifier m_slot; // Well-known strategy slot name (e.g. frame_lowerer).
+    Common::Identifier m_type; // Concrete C++ type plugged into that slot.
 };
 
 /**
@@ -30,23 +30,23 @@ struct ComponentBinding
  */
 struct TargetDescDecl
 {
-    Common::Identifier m_name;
+    Common::Identifier m_name; // Target name (also its symbol).
 
-    std::optional<Common::StringLiteral> m_registers;
-    std::optional<Common::StringLiteral> m_instructions;
-    std::pmr::vector<Common::StringLiteral> m_callingConvs;
+    std::optional<Common::StringLiteral> m_registers;       // Path to the sibling `.reg` file.
+    std::optional<Common::StringLiteral> m_instructions;    // Path to the sibling `.idf` file.
+    std::pmr::vector<Common::StringLiteral> m_callingConvs; // Paths to calling convention files.
 
-    std::optional<Common::IntegerLiteral> m_pointerSize;
-    std::optional<Common::IntegerLiteral> m_stackSlot;
+    std::optional<Common::IntegerLiteral> m_pointerSize; // Target pointer width in bits.
+    std::optional<Common::IntegerLiteral> m_stackSlot;   // Natural stack slot size (power of two).
 
-    std::optional<Common::Identifier> mInstructionPointer;
-    std::optional<Common::Identifier> mMemDispType;
+    std::optional<Common::Identifier> mInstructionPointer; // Special register naming the instruction pointer.
+    std::optional<Common::Identifier> mMemDispType;        // Type used for memory displacement immediates.
 
-    std::pmr::vector<Common::Identifier> mObjectFormats;
-    std::optional<Common::Identifier> mDefaultCallingConv;
+    std::pmr::vector<Common::Identifier> mObjectFormats;   // Supported object file formats.
+    std::optional<Common::Identifier> mDefaultCallingConv; // Convention used when none is specified.
 
-    std::pmr::vector<LibcallEntry> mLibcalls;
-    std::pmr::vector<ComponentBinding> mComponents;
+    std::pmr::vector<LibcallEntry> mLibcalls;       // Libcall id-to-symbol mappings.
+    std::pmr::vector<ComponentBinding> mComponents; // Strategy-slot to C++ type bindings.
 };
 
 /**

@@ -14,6 +14,11 @@ class CallingConvDefLangTest : public DslLexerTestSuiteAsGtest
 // 1. System V AMD64 Calling Convention
 // ============================================================================
 
+/**
+ * Verifies the System V AMD64 convention parses stack config, callee/caller
+ * saved registers, aggregation classification, argument/return passing rules,
+ * SRET, and varargs metadata.
+ */
 TEST_F(CallingConvDefLangTest, TestSysVCallingConvParsing)
 {
     std::string source = R"(
@@ -105,8 +110,7 @@ calling_convention x86_64_sysv {
               DSL::Ast::CallingConvDef::AggregateCondition::Kind::SizeGreaterThan);
     ASSERT_TRUE(res->m_classification.m_aggregate->m_sliceChunkSize.has_value());
     EXPECT_EQ(res->m_classification.m_aggregate->m_sliceChunkSize->m_node, 8);
-    EXPECT_EQ(res->m_classification.m_aggregate->m_policy,
-              DSL::Ast::CallingConvDef::AllocPolicy::AllOrNothing);
+    EXPECT_EQ(res->m_classification.m_aggregate->m_policy, DSL::Ast::CallingConvDef::AllocPolicy::AllOrNothing);
 
     // Arguments assertions
     EXPECT_EQ(res->m_arguments.m_rules.size(), 3);
@@ -135,6 +139,11 @@ calling_convention x86_64_sysv {
 // 2. Microsoft Windows x64 Calling Convention
 // ============================================================================
 
+/**
+ * Verifies the Windows x64 convention parses the 32-byte shadow space,
+ * size-based aggregate conditions, unified argument slots, and the
+ * duplicate-floats-to-GPR varargs policy.
+ */
 TEST_F(CallingConvDefLangTest, TestWin64CallingConvParsing)
 {
     std::string source = R"(
@@ -222,6 +231,11 @@ calling_convention x86_64_windows {
 // 3. ARM AArch64 AAPCS64 Calling Convention
 // ============================================================================
 
+/**
+ * Verifies the AArch64 AAPCS64 convention parses the link register, homogeneous
+ * floating aggregate conditions, consecutive register blocks, and SRET without
+ * argument-slot consumption.
+ */
 TEST_F(CallingConvDefLangTest, TestAArch64CallingConvParsing)
 {
     std::string source = R"(
@@ -308,6 +322,10 @@ calling_convention aarch64_aapcs {
 // 4. x86 32-Bit stdcall Calling Convention
 // ============================================================================
 
+/**
+ * Verifies the 32-bit stdcall convention parses 4-byte stack alignment and
+ * callee cleanup semantics.
+ */
 TEST_F(CallingConvDefLangTest, TestStdcallCallingConvParsing)
 {
     std::string source = R"(

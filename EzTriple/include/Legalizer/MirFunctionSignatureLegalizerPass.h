@@ -26,8 +26,8 @@ class MirFunctionSignatureLegalizerPass : public IMirTransformPass
                       class MirPassManager *passManager) override;
 
   private:
-    MirBuilderContext *m_ctx;
-    MirLegalizer *m_legalizer;
+    MirBuilderContext *m_ctx;  ///< Shared builder context used to synthesize the prologue.
+    MirLegalizer *m_legalizer; ///< Target legalizer used for ABI return classification.
 };
 
 #endif // EZTRIPLE_MIR_FUNCTION_SIGNATURE_LEGALIZER_PASS_H

@@ -10,6 +10,7 @@
 #include "Operand/MirOperandBuilder.h"
 #include "Type/MirTypeTable.h"
 
+// Creates the mock physical registers and seeds the caller/callee-saved lists.
 MockCallingConvDesc::MockCallingConvDesc(MirBuilderContext *ctx, MirRegisterClass *gprClass) :
     m_calleeSaved(ctx->getGlobalAllocator()), m_callerSaved(ctx->getGlobalAllocator())
 {
@@ -37,6 +38,7 @@ MockCallingConvDesc::MockCallingConvDesc(MirBuilderContext *ctx, MirRegisterClas
     m_calleeSaved.push_back(m_rspRef);
 }
 
+// Allocates a caller-saved register for the argument, falling back to a stack slot.
 ArgumentLocationDesc MockCallingConvDesc::getArgLoc(MirType *type, CallLoweringState *callState)
 {
     size_t sizeInBytes = (type ? type->getTotalSizeInBits() + 7 : 64) / 8;
@@ -48,12 +50,14 @@ ArgumentLocationDesc MockCallingConvDesc::getArgLoc(MirType *type, CallLoweringS
     return ArgumentLocationDesc::Stack(sizeInBytes, callState ? callState->allocateStack(type) : nullptr);
 }
 
+// Returns the value in RAX with the type's byte size.
 ArgumentLocationDesc MockCallingConvDesc::getReturnLoc(MirType *type, CallLoweringState *callState)
 {
     size_t sizeInBytes = (type ? type->getTotalSizeInBits() + 7 : 64) / 8;
     return ArgumentLocationDesc::Reg(m_raxRef, sizeInBytes);
 }
 
+// Register returns are allowed for types up to 128 bits (null types allowed).
 bool MockCallingConvDesc::canReturnInRegs(MirType *type) const
 {
     if (!type)
@@ -65,6 +69,12 @@ bool MockCallingConvDesc::canReturnInRegs(MirType *type) const
 #include "Instruction/MirInstructionBuilder.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 
+/**
+ * Lowers MIR instructions to mock target instructions. ADD attempts to fold a
+ * single-use LOAD into a memory operand (checking both operand orders); LOAD
+ * and STORE fold addressing modes; all other opcodes map directly to a single
+ * mock target descriptor. Erases the original instruction on success.
+ */
 bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *inst)
 {
     if (!inst)
@@ -94,15 +104,20 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
             if (src2Reg)
             {
                 MirInstruction *def = getDefiningInstruction(src2Reg);
-                if (def && def->getOpCode() == MirInstructionOpCode::LOAD && hasOneUse(src2Reg) && noInterveningStore(def, inst))
+                if (def && def->getOpCode() == MirInstructionOpCode::LOAD && hasOneUse(src2Reg) &&
+                    noInterveningStore(def, inst))
                 {
-                    if (dst && gpr) dst->setClass(gpr);
-                    if (src1 && gpr) src1->setClass(gpr);
+                    if (dst && gpr)
+                        dst->setClass(gpr);
+                    if (src1 && gpr)
+                        src1->setClass(gpr);
                     MirOperand *memOp = def->getOperand(1);
                     if (auto *mem = memOp ? memOp->get<MirMemory>() : nullptr)
                     {
-                        if (mem->getBase() && gpr) mem->getBase()->setClass(gpr);
-                        if (mem->getIndex() && gpr) mem->getIndex()->setClass(gpr);
+                        if (mem->getBase() && gpr)
+                            mem->getBase()->setClass(gpr);
+                        if (mem->getIndex() && gpr)
+                            mem->getIndex()->setClass(gpr);
                     }
                     ib.buildTarget(mockTarget ? mockTarget->getDescADD64rm() : nullptr, srcRef, { dst, src1, memOp });
                     def->eraseFromOwner();
@@ -117,17 +132,24 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
             if (src1 && src2Reg)
             {
                 MirInstruction *def = getDefiningInstruction(src1);
-                if (def && def->getOpCode() == MirInstructionOpCode::LOAD && hasOneUse(src1) && noInterveningStore(def, inst))
+                if (def && def->getOpCode() == MirInstructionOpCode::LOAD && hasOneUse(src1) &&
+                    noInterveningStore(def, inst))
                 {
-                    if (dst && gpr) dst->setClass(gpr);
-                    if (src2Reg && gpr) src2Reg->setClass(gpr);
+                    if (dst && gpr)
+                        dst->setClass(gpr);
+                    if (src2Reg && gpr)
+                        src2Reg->setClass(gpr);
                     MirOperand *memOp = def->getOperand(1);
                     if (auto *mem = memOp ? memOp->get<MirMemory>() : nullptr)
                     {
-                        if (mem->getBase() && gpr) mem->getBase()->setClass(gpr);
-                        if (mem->getIndex() && gpr) mem->getIndex()->setClass(gpr);
+                        if (mem->getBase() && gpr)
+                            mem->getBase()->setClass(gpr);
+                        if (mem->getIndex() && gpr)
+                            mem->getIndex()->setClass(gpr);
                     }
-                    ib.buildTarget(mockTarget ? mockTarget->getDescADD64rm() : nullptr, srcRef, { dst, src2Reg, memOp });
+                    ib.buildTarget(mockTarget ? mockTarget->getDescADD64rm() : nullptr,
+                                   srcRef,
+                                   { dst, src2Reg, memOp });
                     def->eraseFromOwner();
                     inst->eraseFromOwner();
                     m_selectedCount++;
@@ -138,8 +160,10 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
 
             if (src2Imm)
             {
-                if (dst && gpr) dst->setClass(gpr);
-                if (src1 && gpr) src1->setClass(gpr);
+                if (dst && gpr)
+                    dst->setClass(gpr);
+                if (src1 && gpr)
+                    src1->setClass(gpr);
                 ib.buildTarget(mockTarget ? mockTarget->getDescADD64ri() : nullptr, srcRef, { dst, src1, src2Imm });
                 inst->eraseFromOwner();
                 m_selectedCount++;
@@ -148,9 +172,12 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
 
             if (src2Reg)
             {
-                if (dst && gpr) dst->setClass(gpr);
-                if (src1 && gpr) src1->setClass(gpr);
-                if (src2Reg && gpr) src2Reg->setClass(gpr);
+                if (dst && gpr)
+                    dst->setClass(gpr);
+                if (src1 && gpr)
+                    src1->setClass(gpr);
+                if (src2Reg && gpr)
+                    src2Reg->setClass(gpr);
                 ib.buildTarget(mockTarget ? mockTarget->getDescADD64rr() : nullptr, srcRef, { dst, src1, src2Reg });
                 inst->eraseFromOwner();
                 m_selectedCount++;
@@ -163,9 +190,12 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
             auto *dst = inst->getOpAs<MirRegister>(0);
             auto *src1 = inst->getOpAs<MirRegister>(1);
             auto *src2 = inst->getOpAs<MirRegister>(2);
-            if (dst && gpr) dst->setClass(gpr);
-            if (src1 && gpr) src1->setClass(gpr);
-            if (src2 && gpr) src2->setClass(gpr);
+            if (dst && gpr)
+                dst->setClass(gpr);
+            if (src1 && gpr)
+                src1->setClass(gpr);
+            if (src2 && gpr)
+                src2->setClass(gpr);
             ib.buildTarget(mockTarget ? mockTarget->getDescSUB64rr() : nullptr, srcRef, { dst, src1, src2 });
             inst->eraseFromOwner();
             m_selectedCount++;
@@ -180,17 +210,27 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
             {
                 if (!mode.m_foldedInstructions.empty())
                 {
-                    MirInteger *dispOp = mode.m_disp != 0 ? ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(mode.m_disp), srcRef) : nullptr;
-                    memOp = ob.buildMem(ctx->getTypeTable()->i64(), mode.m_base, dispOp, mode.m_index, mode.m_scale, srcRef);
+                    MirInteger *dispOp = mode.m_disp != 0
+                            ? ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(mode.m_disp), srcRef)
+                            : nullptr;
+                    memOp = ob.buildMem(ctx->getTypeTable()->i64(),
+                                        mode.m_base,
+                                        dispOp,
+                                        mode.m_index,
+                                        mode.m_scale,
+                                        srcRef);
                     eraseFoldedInstructions(mode.m_foldedInstructions);
                     m_foldedCount += mode.m_foldedInstructions.size();
                 }
             }
-            if (dst && gpr) dst->setClass(gpr);
+            if (dst && gpr)
+                dst->setClass(gpr);
             if (auto *mem = memOp ? memOp->get<MirMemory>() : nullptr)
             {
-                if (mem->getBase() && gpr) mem->getBase()->setClass(gpr);
-                if (mem->getIndex() && gpr) mem->getIndex()->setClass(gpr);
+                if (mem->getBase() && gpr)
+                    mem->getBase()->setClass(gpr);
+                if (mem->getIndex() && gpr)
+                    mem->getIndex()->setClass(gpr);
             }
             ib.buildTarget(mockTarget ? mockTarget->getDescLOAD64() : nullptr, srcRef, { dst, memOp });
             inst->eraseFromOwner();
@@ -206,17 +246,27 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
             {
                 if (!mode.m_foldedInstructions.empty())
                 {
-                    MirInteger *dispOp = mode.m_disp != 0 ? ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(mode.m_disp), srcRef) : nullptr;
-                    memOp = ob.buildMem(ctx->getTypeTable()->i64(), mode.m_base, dispOp, mode.m_index, mode.m_scale, srcRef);
+                    MirInteger *dispOp = mode.m_disp != 0
+                            ? ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(mode.m_disp), srcRef)
+                            : nullptr;
+                    memOp = ob.buildMem(ctx->getTypeTable()->i64(),
+                                        mode.m_base,
+                                        dispOp,
+                                        mode.m_index,
+                                        mode.m_scale,
+                                        srcRef);
                     eraseFoldedInstructions(mode.m_foldedInstructions);
                     m_foldedCount += mode.m_foldedInstructions.size();
                 }
             }
-            if (val && gpr) val->setClass(gpr);
+            if (val && gpr)
+                val->setClass(gpr);
             if (auto *mem = memOp ? memOp->get<MirMemory>() : nullptr)
             {
-                if (mem->getBase() && gpr) mem->getBase()->setClass(gpr);
-                if (mem->getIndex() && gpr) mem->getIndex()->setClass(gpr);
+                if (mem->getBase() && gpr)
+                    mem->getBase()->setClass(gpr);
+                if (mem->getIndex() && gpr)
+                    mem->getIndex()->setClass(gpr);
             }
             ib.buildTarget(mockTarget ? mockTarget->getDescSTORE64() : nullptr, srcRef, { memOp, val });
             inst->eraseFromOwner();
@@ -228,8 +278,11 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
             auto *cond = inst->getOpAs<MirRegister>(0);
             auto *trueTarget = inst->getOperand(1);
             auto *falseTarget = inst->getOperand(2);
-            if (cond && gpr) cond->setClass(gpr);
-            ib.buildTarget(mockTarget ? mockTarget->getDescBR_COND() : nullptr, srcRef, { cond, trueTarget, falseTarget });
+            if (cond && gpr)
+                cond->setClass(gpr);
+            ib.buildTarget(mockTarget ? mockTarget->getDescBR_COND() : nullptr,
+                           srcRef,
+                           { cond, trueTarget, falseTarget });
             inst->eraseFromOwner();
             m_selectedCount++;
             return true;
@@ -238,10 +291,12 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
         {
             auto *dst = inst->getOpAs<MirRegister>(0);
             auto *src = inst->getOperand(1);
-            if (dst && gpr) dst->setClass(gpr);
+            if (dst && gpr)
+                dst->setClass(gpr);
             if (auto *srcReg = src ? src->get<MirRegister>() : nullptr)
             {
-                if (gpr) srcReg->setClass(gpr);
+                if (gpr)
+                    srcReg->setClass(gpr);
             }
             ib.buildTarget(mockTarget ? mockTarget->getDescMOV64rr() : nullptr, srcRef, { dst, src });
             inst->eraseFromOwner();
@@ -256,7 +311,8 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
                 auto *opnd = inst->getOperand(i);
                 if (auto *reg = opnd ? opnd->get<MirRegister>() : nullptr)
                 {
-                    if (gpr) reg->setClass(gpr);
+                    if (gpr)
+                        reg->setClass(gpr);
                 }
                 ops.push_back(opnd);
             }
@@ -272,7 +328,8 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
                 auto *opnd = inst->getOperand(i);
                 if (auto *reg = opnd ? opnd->get<MirRegister>() : nullptr)
                 {
-                    if (gpr) reg->setClass(gpr);
+                    if (gpr)
+                        reg->setClass(gpr);
                 }
             }
             std::vector<MirOperand *> ops;
@@ -290,6 +347,11 @@ bool MockInstructionSelector::select(MirBuilderContext *ctx, MirInstruction *ins
     return false;
 }
 
+/**
+ * Builds the mock GPR bank/class with the x86-64 register names, wires up the
+ * mock calling convention and legalizer, and constructs the target instruction
+ * descriptors used by the mock instruction selector.
+ */
 MockTargetDesc::MockTargetDesc(MirBuilderContext *ctx) :
     m_ctx(ctx), m_banks(ctx->getGlobalAllocator()), m_convs(ctx->getGlobalAllocator()), m_modeMatcher(&m_isel)
 {
@@ -325,73 +387,87 @@ MockTargetDesc::MockTargetDesc(MirBuilderContext *ctx) :
     m_convs.push_back(m_mockCc.get());
 
     m_descADD64rr = std::make_unique<MirTargetInstructionDesc>(
-        "ADD64rr", 1,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, m_gprClass },
-        std::initializer_list<MirRegisterRef>{},
-        std::initializer_list<MirRegisterRef>{},
-        MirInstructionFlags::IsCommutative);
+            "ADD64rr",
+            1,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, m_gprClass },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{},
+            MirInstructionFlags::IsCommutative);
 
     m_descADD64ri = std::make_unique<MirTargetInstructionDesc>(
-        "ADD64ri", 2,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, nullptr },
-        std::initializer_list<MirRegisterRef>{},
-        std::initializer_list<MirRegisterRef>{});
+            "ADD64ri",
+            2,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, nullptr },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{});
 
     m_descADD64rm = std::make_unique<MirTargetInstructionDesc>(
-        "ADD64rm", 3,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, nullptr },
-        std::initializer_list<MirRegisterRef>{},
-        std::initializer_list<MirRegisterRef>{},
-        MirInstructionFlags::ReadsMemory);
+            "ADD64rm",
+            3,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, nullptr },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{},
+            MirInstructionFlags::ReadsMemory);
 
     m_descSUB64rr = std::make_unique<MirTargetInstructionDesc>(
-        "SUB64rr", 4,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, m_gprClass });
+            "SUB64rr",
+            4,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass, m_gprClass });
 
     m_descLOAD64 = std::make_unique<MirTargetInstructionDesc>(
-        "LOAD64", 5,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass, nullptr },
-        std::initializer_list<MirRegisterRef>{},
-        std::initializer_list<MirRegisterRef>{},
-        MirInstructionFlags::ReadsMemory);
+            "LOAD64",
+            5,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, nullptr },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{},
+            MirInstructionFlags::ReadsMemory);
 
     m_descSTORE64 = std::make_unique<MirTargetInstructionDesc>(
-        "STORE64", 6,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ nullptr, m_gprClass },
-        std::initializer_list<MirRegisterRef>{},
-        std::initializer_list<MirRegisterRef>{},
-        MirInstructionFlags::WritesMemory);
+            "STORE64",
+            6,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ nullptr, m_gprClass },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{},
+            MirInstructionFlags::WritesMemory);
 
     m_descBR_COND = std::make_unique<MirTargetInstructionDesc>(
-        "BR_COND", 7,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Read, MirOperandFlag::Read, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass, nullptr, nullptr },
-        std::initializer_list<MirRegisterRef>{},
-        std::initializer_list<MirRegisterRef>{},
-        MirInstructionFlags::IsBranch);
+            "BR_COND",
+            7,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Read, MirOperandFlag::Read, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, nullptr, nullptr },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{},
+            MirInstructionFlags::IsBranch);
 
     m_descRET = std::make_unique<MirTargetInstructionDesc>(
-        "RET", 8,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass },
-        std::initializer_list<MirRegisterRef>{},
-        std::initializer_list<MirRegisterRef>{},
-        MirInstructionFlags::IsTerminator | MirInstructionFlags::IsReturn);
+            "RET",
+            8,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{},
+            MirInstructionFlags::IsTerminator | MirInstructionFlags::IsReturn);
 
     m_descMOV64rr = std::make_unique<MirTargetInstructionDesc>(
-        "MOV64rr", 9,
-        std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read },
-        std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass });
+            "MOV64rr",
+            9,
+            std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read },
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass });
 }
 
+// Memory operand displacements use the i64 type.
 MirType *MockTargetDesc::getMemOperandDisplacementType() { return m_ctx ? m_ctx->getTypeTable()->i64() : nullptr; }
 
+/**
+ * Initializes the diagnostics, type table, builder context, mock target, and
+ * source manager, then enables trace/debug diagnostics.
+ */
 void EzTripleTestSuite::SetUp()
 {
     m_diagCollector = std::make_unique<DiagnosticCollector>();
@@ -410,6 +486,7 @@ void EzTripleTestSuite::SetUp()
     m_diagCollector->enableDiag(Diag_Debug);
 }
 
+// Releases all fixture-owned compiler objects after each test.
 void EzTripleTestSuite::TearDown()
 {
     m_diagLogger.reset();
@@ -420,6 +497,7 @@ void EzTripleTestSuite::TearDown()
     m_sourceManager.reset();
 }
 
+// Builds a MIR function with the given return type (defaults to i32).
 MirFunction *EzTripleTestSuite::createTestFunction(const std::string_view &name, MirType *retType)
 {
     if (!retType)
@@ -430,6 +508,7 @@ MirFunction *EzTripleTestSuite::createTestFunction(const std::string_view &name,
     return builder.build(retType, {}, name);
 }
 
+// Creates an unnamed-entry basic block with the given name in func.
 MirBlock *EzTripleTestSuite::createBlock(MirFunction *func, const std::string_view &name)
 {
     MirBlockBuilder builder(m_builderCtx.get(), func);

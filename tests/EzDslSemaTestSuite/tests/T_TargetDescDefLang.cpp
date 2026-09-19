@@ -16,6 +16,7 @@ using namespace DSL;
 class TargetDescPassTest : public EzDslSemaTestSuiteAsGtest
 {
   protected:
+    // Parses target descriptor source and runs the target-descriptor semantic pass.
     bool parseAndRun(const std::string &sourceContent)
     {
         ParseContext ctx = createParseContextFromBuff(std::format("test_{}.tdesc", m_currentTestId++), sourceContent);
@@ -35,6 +36,7 @@ class TargetDescPassTest : public EzDslSemaTestSuiteAsGtest
     size_t m_currentTestId{ 0 };
 };
 
+// Verifies a valid manifest passes and declares a TargetDesc symbol.
 TEST_F(TargetDescPassTest, AcceptsValidManifestAndDeclaresSymbol)
 {
     std::string source = R"(
@@ -63,6 +65,7 @@ target X86_64 {
     EXPECT_EQ(sym->getIf<Symbols::TargetDescSymbol>()->m_name, "X86_64");
 }
 
+// Verifies a zero pointer size is rejected.
 TEST_F(TargetDescPassTest, RejectsNonPositivePointerSize)
 {
     std::string source = R"(
@@ -75,6 +78,7 @@ target Bad {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies a stack slot size that is not a power of two is rejected.
 TEST_F(TargetDescPassTest, RejectsNonPowerOfTwoStackSlot)
 {
     std::string source = R"(
@@ -88,6 +92,7 @@ target Bad {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies declaring the same component slot twice is rejected.
 TEST_F(TargetDescPassTest, RejectsDuplicateComponentSlot)
 {
     std::string source = R"(
@@ -105,6 +110,7 @@ target Bad {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies declaring the same libcall id twice is rejected.
 TEST_F(TargetDescPassTest, RejectsDuplicateLibcallId)
 {
     std::string source = R"(
@@ -122,6 +128,7 @@ target Bad {
     EXPECT_FALSE(parseAndRun(source));
 }
 
+// Verifies a second target descriptor with the same name is rejected.
 TEST_F(TargetDescPassTest, RejectsDuplicateTargetSymbol)
 {
     std::string source = R"(

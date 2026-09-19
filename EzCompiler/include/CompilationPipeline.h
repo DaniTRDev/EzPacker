@@ -19,6 +19,9 @@ class DriverContext;
 class CompilationPipeline
 {
   public:
+    /**
+     * Binds the pipeline to the driver context that owns diagnostics, allocators and targets.
+     */
     explicit CompilationPipeline(DriverContext &ctx);
 
     /**
@@ -38,12 +41,26 @@ class CompilationPipeline
     std::string dumpAssembly() const;
 
   private:
+    /**
+     * Runs CFG analysis, SSA construction and liveness analysis on a function.
+     * Returns false if a pass reports failure.
+     */
     bool runMiddleEndPasses(MirFunction *func);
+
+    /**
+     * Runs function-signature and operation legalization passes on a function.
+     * Returns false if a pass reports failure.
+     */
     bool runLegalizationPasses(MirFunction *func);
+
+    /**
+     * Runs ABI lowering, instruction selection, register allocation and frame lowering.
+     * Returns false if a pass reports failure.
+     */
     bool runTargetLoweringPasses(MirFunction *func);
 
   private:
-    DriverContext &m_ctx;
+    DriverContext &m_ctx; ///< Driver context supplying diagnostics, allocators and target descriptors.
 };
 
 } // namespace EzCompiler

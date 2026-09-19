@@ -12,11 +12,18 @@
 struct LivenessResult
 {
     // Block Id, <MirRegisterRef>.
-    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> m_liveIn;
-    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> m_liveOut;
-    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> m_def;
-    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>> m_use;
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>>
+            m_liveIn; // Registers live on entry to each block.
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>>
+            m_liveOut; // Registers live on exit from each block.
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>>
+            m_def; // Registers defined within each block.
+    std::pmr::unordered_map<MirId, std::pmr::unordered_set<MirRegisterRef>>
+            m_use; // Registers used before being defined in each block.
 
+    /**
+     * Allocates all four per-block sets from the given arena.
+     */
     LivenessResult(std::pmr::memory_resource *arena) : m_liveIn(arena), m_liveOut(arena), m_def(arena), m_use(arena) {}
 };
 
@@ -74,9 +81,9 @@ class LivenessAnalysisPass : public IMirAnalysisPass
     void computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
 
   private:
-    LivenessResult m_result;
-    class MirBuilderContext *m_ctx;
-    std::pmr::memory_resource *m_arena;
+    LivenessResult m_result;            // Last computed liveness sets.
+    class MirBuilderContext *m_ctx;     // Context whose functions are inspected.
+    std::pmr::memory_resource *m_arena; // Arena backing the result containers.
 };
 
 #endif // EZMIR_LIVENESS_ANALYSIS_H

@@ -8,11 +8,13 @@
 #include "Builder/MirBuilderContext.h"
 #include "Block/MirBlock.h"
 
-X86AddressingModeMatcher::X86AddressingModeMatcher(MirInstructionSelector *selector) :
-    m_selector(selector)
-{
-}
+/// Stores the selector used to query register uses and definitions during folding.
+X86AddressingModeMatcher::X86AddressingModeMatcher(MirInstructionSelector *selector) : m_selector(selector) {}
 
+/**
+ * Returns true when def is an unselected, single-use computation that can safely be folded into
+ * an addressing mode without crossing a memory-writing or side-effecting instruction.
+ */
 bool X86AddressingModeMatcher::canFold(MirInstruction *def) const
 {
     if (!def)
@@ -57,7 +59,12 @@ bool X86AddressingModeMatcher::canFold(MirInstruction *def) const
     return true;
 }
 
-MirInstruction *X86AddressingModeMatcher::getDef(MirBuilderContext *ctx, MirRegister *reg, MirInstruction *contextInst) const
+/**
+ * Resolves the defining instruction for a virtual register, trying the selector, the supplied
+ * context instruction, the current instruction and finally every function in the module.
+ */
+MirInstruction *
+X86AddressingModeMatcher::getDef(MirBuilderContext *ctx, MirRegister *reg, MirInstruction *contextInst) const
 {
     if (!reg || !reg->isVirtual())
         return nullptr;
@@ -97,6 +104,10 @@ MirInstruction *X86AddressingModeMatcher::getDef(MirBuilderContext *ctx, MirRegi
     return nullptr;
 }
 
+/**
+ * Recursively folds ADD/SHL address computations feeding reg into mode, accumulating the
+ * displacement and recording each folded definition. Depth is capped to keep matching bounded.
+ */
 bool X86AddressingModeMatcher::matchSubtree(MirBuilderContext *ctx,
                                             MirRegister *reg,
                                             MatchedAddressingMode &mode,
@@ -218,9 +229,11 @@ bool X86AddressingModeMatcher::matchSubtree(MirBuilderContext *ctx,
     return false;
 }
 
-bool X86AddressingModeMatcher::matchAddress(MirBuilderContext *ctx,
-                                            MirOperand *addrOp,
-                                            MatchedAddressingMode &outMode)
+/**
+ * Entry point: resets outMode and fills it from an existing memory operand, or decomposes a
+ * register/pointer computation tree, or treats a bare immediate as a displacement.
+ */
+bool X86AddressingModeMatcher::matchAddress(MirBuilderContext *ctx, MirOperand *addrOp, MatchedAddressingMode &outMode)
 {
     if (!addrOp)
         return false;

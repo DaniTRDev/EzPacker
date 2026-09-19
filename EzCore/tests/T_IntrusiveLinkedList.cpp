@@ -2,20 +2,42 @@
 #include <gtest/gtest.h>
 #include <vector>
 
+/**
+ * Minimal intrusive-list node satisfying the getPrev/setPrev/getNext/setNext contract.
+ */
 struct TestNode
 {
-    int m_value{ 0 };
-    TestNode *m_prev{ nullptr };
-    TestNode *m_next{ nullptr };
+    int m_value{ 0 };            // Payload used to identify the node in assertions.
+    TestNode *m_prev{ nullptr }; // Previous node pointer, owned by the list.
+    TestNode *m_next{ nullptr }; // Next node pointer, owned by the list.
 
+    /**
+     * Creates a node carrying the given value.
+     */
     explicit TestNode(int v = 0) : m_value(v) {}
 
+    /**
+     * Returns the previous node pointer.
+     */
     TestNode *getPrev() const { return m_prev; }
+    /**
+     * Sets the previous node pointer.
+     */
     void setPrev(TestNode *p) { m_prev = p; }
+    /**
+     * Returns the next node pointer.
+     */
     TestNode *getNext() const { return m_next; }
+    /**
+     * Sets the next node pointer.
+     */
     void setNext(TestNode *n) { m_next = n; }
 };
 
+/**
+ * Asserts that the list matches the expected value sequence and that all forward/backward links,
+ * endpoints and iterators are internally consistent.
+ */
 static void verifyListIntegrity(const IntrusiveLinkedList<TestNode> &list, const std::vector<int> &expected)
 {
     EXPECT_EQ(list.size(), expected.size());
@@ -62,6 +84,9 @@ static void verifyListIntegrity(const IntrusiveLinkedList<TestNode> &list, const
     EXPECT_EQ(rIdx, 0u);
 }
 
+/**
+ * Verifies the invariants of an empty list, including null front/back and pop/erase no-ops.
+ */
 TEST(T_IntrusiveLinkedList, TestEmptyListInvariants)
 {
     IntrusiveLinkedList<TestNode> list;
@@ -72,6 +97,9 @@ TEST(T_IntrusiveLinkedList, TestEmptyListInvariants)
     EXPECT_EQ(list.erase(list.end()), list.end());
 }
 
+/**
+ * Verifies push/pop behavior at both ends when the list holds a single element.
+ */
 TEST(T_IntrusiveLinkedList, TestSingleElementBoundary)
 {
     IntrusiveLinkedList<TestNode> list;
@@ -92,6 +120,9 @@ TEST(T_IntrusiveLinkedList, TestSingleElementBoundary)
     verifyListIntegrity(list, {});
 }
 
+/**
+ * Verifies that mixing push_back and push_front builds the expected ordering.
+ */
 TEST(T_IntrusiveLinkedList, TestPushFrontAndBack)
 {
     IntrusiveLinkedList<TestNode> list;
@@ -105,6 +136,9 @@ TEST(T_IntrusiveLinkedList, TestPushFrontAndBack)
     verifyListIntegrity(list, { 0, 1, 2, 3 });
 }
 
+/**
+ * Verifies insert at the middle, head and tail positions.
+ */
 TEST(T_IntrusiveLinkedList, TestInsertOperations)
 {
     IntrusiveLinkedList<TestNode> list;
@@ -128,6 +162,9 @@ TEST(T_IntrusiveLinkedList, TestInsertOperations)
     verifyListIntegrity(list, { 10, 1, 2, 3, 20 });
 }
 
+/**
+ * Verifies iterator erase and pointer-based removal, including removing the final element.
+ */
 TEST(T_IntrusiveLinkedList, TestEraseAndRemove)
 {
     IntrusiveLinkedList<TestNode> list;
@@ -159,6 +196,9 @@ TEST(T_IntrusiveLinkedList, TestEraseAndRemove)
     verifyListIntegrity(list, {});
 }
 
+/**
+ * Verifies that clear empties the list and resets every node's linkage pointers.
+ */
 TEST(T_IntrusiveLinkedList, TestClear)
 {
     IntrusiveLinkedList<TestNode> list;
@@ -177,6 +217,9 @@ TEST(T_IntrusiveLinkedList, TestClear)
     EXPECT_EQ(n3.getNext(), nullptr);
 }
 
+/**
+ * Verifies whole-list splice into empty, end, begin and middle positions of another list.
+ */
 TEST(T_IntrusiveLinkedList, TestSpliceEntireList)
 {
     // Splice into empty list
@@ -237,6 +280,9 @@ TEST(T_IntrusiveLinkedList, TestSpliceEntireList)
     }
 }
 
+/**
+ * Verifies splicing a single element from one list into the middle of another.
+ */
 TEST(T_IntrusiveLinkedList, TestSpliceSingleElement)
 {
     IntrusiveLinkedList<TestNode> l1, l2;
@@ -253,6 +299,9 @@ TEST(T_IntrusiveLinkedList, TestSpliceSingleElement)
     verifyListIntegrity(l2, {});
 }
 
+/**
+ * Verifies splicing an explicit [first, last) range when the count is supplied.
+ */
 TEST(T_IntrusiveLinkedList, TestSpliceRange)
 {
     IntrusiveLinkedList<TestNode> l1, l2;
@@ -264,7 +313,7 @@ TEST(T_IntrusiveLinkedList, TestSpliceRange)
     l2.push_back(&z);
 
     auto first = l2.begin(); // x
-    auto last = l2.end();   // end
+    auto last = l2.end();    // end
     auto pos = l1.begin();
     ++pos; // points to b(5)
 

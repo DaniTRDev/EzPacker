@@ -20,6 +20,9 @@ class DriverContext;
 class EmissionEngine
 {
   public:
+    /**
+     * Binds the engine to the driver context that supplies diagnostics, symbols and the allocator.
+     */
     explicit EmissionEngine(DriverContext &ctx);
 
     /**
@@ -28,10 +31,13 @@ class EmissionEngine
     bool emitModule(MirBuilderContext &mirCtx, std::string_view outputPath);
 
   private:
+    /**
+     * Emits one function's blocks and instructions through the given emitter, binding labels per block.
+     */
     bool emitFunction(MirFunction *func, GenericCodeEmitter &emitter, ::CodeEmitterContext &emitterCtx);
 
   private:
-    DriverContext &m_ctx;
+    DriverContext &m_ctx; ///< Driver context supplying diagnostics, target descriptors and allocators.
 };
 
 } // namespace EzCompiler

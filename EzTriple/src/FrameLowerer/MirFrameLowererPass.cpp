@@ -10,15 +10,24 @@
 #include "Printer/MirPrinter.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 
+/**
+ * Stores the builder context and target descriptor used to build the per-function frame context.
+ */
 MirFrameLowererPass::MirFrameLowererPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
     m_ctx(ctx), m_targetDesc(targetDesc)
 {
 }
 
+/// Returns the diagnostic name of this pass.
 const char *MirFrameLowererPass::getName() const { return "FrameLowererPass"; }
 
+/// Runs once per function rather than once per module.
 MirPassIterationPlace MirFrameLowererPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
+/**
+ * Lowers allocations, computes the frame layout, emits the prologue/epilogue and replaces stack
+ * object references for the given function.
+ */
 MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
     MirFunction *func = *it;
@@ -67,6 +76,9 @@ MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_i
     return { .m_modifiedMir = true, .m_executed = true, .m_succeeded = true };
 }
 
+/**
+ * Emits a debug dump of each lowered function to the diagnostic collector.
+ */
 void MirFrameLowererPass::printResult()
 {
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirFrameLowererPass");
@@ -79,8 +91,12 @@ void MirFrameLowererPass::printResult()
     }
 }
 
+/// Drops the list of lowered functions so the pass can run again on a fresh module.
 void MirFrameLowererPass::reset() { m_loweredFunctions.clear(); }
 
+/**
+ * Declares that this pass must run after register allocation so spill slots already exist.
+ */
 std::vector<std::type_index> MirFrameLowererPass::getDependencies() const
 {
     // Frame lowering MUST execute after register allocation!

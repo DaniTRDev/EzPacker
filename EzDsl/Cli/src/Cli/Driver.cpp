@@ -61,6 +61,7 @@ namespace Cli
 namespace
 {
 
+// Rewrites the target name into a valid C++ identifier, defaulting to "Target" when empty.
 std::string sanitizeTargetIdentifier(std::string_view raw)
 {
     std::string result;
@@ -88,9 +89,11 @@ std::string sanitizeTargetIdentifier(std::string_view raw)
     return result;
 }
 
+// Diagnostic listener that counts errors and warnings emitted during a run.
 class ErrorTrackingListener : public DiagnosticListener
 {
   public:
+    // Tallies each diagnostic by severity as it is published.
     void onDiag(const DiagnosticMessage &msg) override
     {
         if (msg.getType() == Diag_Error)
@@ -103,41 +106,47 @@ class ErrorTrackingListener : public DiagnosticListener
         }
     }
 
+    /** Returns the number of error diagnostics observed. */
     size_t getErrors() const noexcept { return m_errors; }
+
+    /** Returns the number of warning diagnostics observed. */
     size_t getWarnings() const noexcept { return m_warnings; }
+
+    /** Returns true if at least one error diagnostic was observed. */
     bool hasErrors() const noexcept { return m_errors > 0; }
 
   private:
-    size_t m_errors{ 0 };
-    size_t m_warnings{ 0 };
+    size_t m_errors{ 0 };   ///< Count of Diag_Error messages.
+    size_t m_warnings{ 0 }; ///< Count of Diag_Warning messages.
 };
 
+// Declares the built-in primitive types (integers, floats, pointer, void, ...) in the symbol table.
 void initializeStandardTypes(SymbolTable &table)
 {
+    // Compile-time description of one built-in type.
     struct BuiltinType
     {
-        std::string_view name;
-        DSL::Ast::TypeDef::TypeKind kind;
-        uint32_t bitWidth;
-        uint32_t alignment;
+        std::string_view name;            ///< DSL type name.
+        DSL::Ast::TypeDef::TypeKind kind; ///< Classification of the type.
+        uint32_t bitWidth;                ///< Width in bits.
+        uint32_t alignment;               ///< ABI alignment in bits.
     };
 
-    static constexpr BuiltinType builtinTypes[] = {
-        { "_void", DSL::Ast::TypeDef::TypeKind::Void, 0, 0 },
-        { "__bindToken", DSL::Ast::TypeDef::TypeKind::BindingToken, 0, 0 },
-        { "ptr", DSL::Ast::TypeDef::TypeKind::Pointer, 0, 0 },
-        { "i1", DSL::Ast::TypeDef::TypeKind::Integer, 1, 1 },
-        { "i8", DSL::Ast::TypeDef::TypeKind::Integer, 8, 8 },
-        { "i16", DSL::Ast::TypeDef::TypeKind::Integer, 16, 16 },
-        { "i32", DSL::Ast::TypeDef::TypeKind::Integer, 32, 32 },
-        { "i64", DSL::Ast::TypeDef::TypeKind::Integer, 64, 64 },
-        { "i128", DSL::Ast::TypeDef::TypeKind::Integer, 128, 128 },
-        { "i256", DSL::Ast::TypeDef::TypeKind::Integer, 256, 256 },
-        { "f32", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 32, 32 },
-        { "f64", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 64, 64 },
-        { "f128", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 128, 128 }
-    };
+    static constexpr BuiltinType builtinTypes[] = { { "_void", DSL::Ast::TypeDef::TypeKind::Void, 0, 0 },
+                                                    { "__bindToken", DSL::Ast::TypeDef::TypeKind::BindingToken, 0, 0 },
+                                                    { "ptr", DSL::Ast::TypeDef::TypeKind::Pointer, 0, 0 },
+                                                    { "i1", DSL::Ast::TypeDef::TypeKind::Integer, 1, 1 },
+                                                    { "i8", DSL::Ast::TypeDef::TypeKind::Integer, 8, 8 },
+                                                    { "i16", DSL::Ast::TypeDef::TypeKind::Integer, 16, 16 },
+                                                    { "i32", DSL::Ast::TypeDef::TypeKind::Integer, 32, 32 },
+                                                    { "i64", DSL::Ast::TypeDef::TypeKind::Integer, 64, 64 },
+                                                    { "i128", DSL::Ast::TypeDef::TypeKind::Integer, 128, 128 },
+                                                    { "i256", DSL::Ast::TypeDef::TypeKind::Integer, 256, 256 },
+                                                    { "f32", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 32, 32 },
+                                                    { "f64", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 64, 64 },
+                                                    { "f128", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 128, 128 } };
 
+    // Assign compact ids in declaration order, skipping names already provided by the input.
     uint8_t compactId = 1;
     for (const auto &t : builtinTypes)
     {
@@ -147,17 +156,16 @@ void initializeStandardTypes(SymbolTable &table)
             continue;
         }
 
-        Symbols::TypeSymbol symData{
-            .m_name = t.name,
-            .m_kind = t.kind,
-            .m_bitWidth = t.bitWidth,
-            .m_alignment = t.alignment,
-            .m_compactId = compactId++
-        };
+        Symbols::TypeSymbol symData{ .m_name = t.name,
+                                     .m_kind = t.kind,
+                                     .m_bitWidth = t.bitWidth,
+                                     .m_alignment = t.alignment,
+                                     .m_compactId = compactId++ };
         table.declareSym(nullptr, SymbolType::Type, std::move(symData), t.name);
     }
 }
 
+// Declares a fallback IR instruction unless a symbol of the same name already exists.
 void registerFallbackIrInstruction(SymbolTable &table,
                                    std::string_view name,
                                    DSL::Ast::IrInstDef::IrInstCategory category,
@@ -174,58 +182,82 @@ void registerFallbackIrInstruction(SymbolTable &table,
         semaOperands.push_back(op);
     }
 
-    Symbols::IrInstructionSymbol data{
-        .m_name = name,
-        .m_category = category,
-        .m_tier = tier,
-        .m_flags = flags,
-        .m_operands = std::move(semaOperands)
-    };
+    Symbols::IrInstructionSymbol data{ .m_name = name,
+                                       .m_category = category,
+                                       .m_tier = tier,
+                                       .m_flags = flags,
+                                       .m_operands = std::move(semaOperands) };
 
     table.declareSym(nullptr, SymbolType::IrInstruction, std::move(data), name);
 }
 
+// Populates the symbol table with the baseline IR instruction set used when no .irdf is supplied.
 void initializeStandardIrInstructions(SymbolTable &table)
 {
     using namespace DSL::Ast::IrInstDef;
 
-    auto binaryAlu = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
-        registerFallbackIrInstruction(table, name, IrInstCategory::Arithmetic, IrInstTier::HighLevel,
-            static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) | static_cast<uint32_t>(extraFlags)),
-            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-              { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
-              { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
+    // Declares a three-operand binary arithmetic op with the SizeMatch flag preset.
+    auto binaryAlu = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None)
+    {
+        registerFallbackIrInstruction(table,
+                                      name,
+                                      IrInstCategory::Arithmetic,
+                                      IrInstTier::HighLevel,
+                                      static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) |
+                                                              static_cast<uint32_t>(extraFlags)),
+                                      { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                        { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+                                        { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
     };
 
-    auto binaryBitwise = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
-        registerFallbackIrInstruction(table, name, IrInstCategory::Bitwise, IrInstTier::HighLevel,
-            static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) | static_cast<uint32_t>(extraFlags)),
-            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-              { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
-              { IrOperandType::RegIntImm, "rhs", IrOperandDir::ArgIn } });
+    // Declares a three-operand binary bitwise op taking a register-or-integer-immediate rhs.
+    auto binaryBitwise = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None)
+    {
+        registerFallbackIrInstruction(table,
+                                      name,
+                                      IrInstCategory::Bitwise,
+                                      IrInstTier::HighLevel,
+                                      static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) |
+                                                              static_cast<uint32_t>(extraFlags)),
+                                      { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                        { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+                                        { IrOperandType::RegIntImm, "rhs", IrOperandDir::ArgIn } });
     };
 
-    auto shiftOp = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
-        registerFallbackIrInstruction(table, name, IrInstCategory::Bitwise, IrInstTier::HighLevel,
-            extraFlags,
-            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-              { IrOperandType::Register, "val", IrOperandDir::ArgIn },
-              { IrOperandType::RegIntImm, "amt", IrOperandDir::ArgIn } });
+    // Declares a shift op taking a value and a register-or-immediate amount.
+    auto shiftOp = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None)
+    {
+        registerFallbackIrInstruction(table,
+                                      name,
+                                      IrInstCategory::Bitwise,
+                                      IrInstTier::HighLevel,
+                                      extraFlags,
+                                      { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                        { IrOperandType::Register, "val", IrOperandDir::ArgIn },
+                                        { IrOperandType::RegIntImm, "amt", IrOperandDir::ArgIn } });
     };
 
-    auto compareOp = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None) {
-        registerFallbackIrInstruction(table, name, IrInstCategory::Compare, IrInstTier::HighLevel,
-            static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) | static_cast<uint32_t>(extraFlags)),
-            { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-              { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
-              { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
+    // Declares a comparison op producing a destination plus lhs/rhs inputs.
+    auto compareOp = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None)
+    {
+        registerFallbackIrInstruction(table,
+                                      name,
+                                      IrInstCategory::Compare,
+                                      IrInstTier::HighLevel,
+                                      static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) |
+                                                              static_cast<uint32_t>(extraFlags)),
+                                      { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                        { IrOperandType::Register, "lhs", IrOperandDir::ArgIn },
+                                        { IrOperandType::RegImm, "rhs", IrOperandDir::ArgIn } });
     };
 
     // Arithmetic
     binaryAlu("ADD", IrInstFlag::IsCommutative);
     binaryAlu("SUB");
     binaryAlu("MUL", IrInstFlag::IsCommutative);
-    binaryAlu("IMUL", static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsCommutative) | static_cast<uint32_t>(IrInstFlag::TreatAsSigned)));
+    binaryAlu("IMUL",
+              static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsCommutative) |
+                                      static_cast<uint32_t>(IrInstFlag::TreatAsSigned)));
     binaryAlu("DIV");
     binaryAlu("IDIV", IrInstFlag::TreatAsSigned);
     binaryAlu("SDIV", IrInstFlag::TreatAsSigned);
@@ -234,19 +266,25 @@ void initializeStandardIrInstructions(SymbolTable &table)
     binaryAlu("SREM", IrInstFlag::TreatAsSigned);
     binaryAlu("UREM");
 
-    registerFallbackIrInstruction(table, "NEG", IrInstCategory::Arithmetic, IrInstTier::HighLevel,
-        IrInstFlag::None,
-        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-          { IrOperandType::Register, "src", IrOperandDir::ArgIn } });
+    registerFallbackIrInstruction(table,
+                                  "NEG",
+                                  IrInstCategory::Arithmetic,
+                                  IrInstTier::HighLevel,
+                                  IrInstFlag::None,
+                                  { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                    { IrOperandType::Register, "src", IrOperandDir::ArgIn } });
 
     // Bitwise
     binaryBitwise("AND", IrInstFlag::IsCommutative);
     binaryBitwise("OR", IrInstFlag::IsCommutative);
     binaryBitwise("XOR", IrInstFlag::IsCommutative);
-    registerFallbackIrInstruction(table, "NOT", IrInstCategory::Bitwise, IrInstTier::HighLevel,
-        IrInstFlag::None,
-        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-          { IrOperandType::Register, "src", IrOperandDir::ArgIn } });
+    registerFallbackIrInstruction(table,
+                                  "NOT",
+                                  IrInstCategory::Bitwise,
+                                  IrInstTier::HighLevel,
+                                  IrInstFlag::None,
+                                  { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                    { IrOperandType::Register, "src", IrOperandDir::ArgIn } });
 
     // Shifts
     shiftOp("SHL");
@@ -268,36 +306,58 @@ void initializeStandardIrInstructions(SymbolTable &table)
     compareOp("CMP_UGE");
 
     // Data movement
-    registerFallbackIrInstruction(table, "MOV", IrInstCategory::DataMovement, IrInstTier::HighLevel,
-        IrInstFlag::None,
-        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-          { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn } });
+    registerFallbackIrInstruction(table,
+                                  "MOV",
+                                  IrInstCategory::DataMovement,
+                                  IrInstTier::HighLevel,
+                                  IrInstFlag::None,
+                                  { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                    { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn } });
 
     // Memory
-    registerFallbackIrInstruction(table, "LOAD", IrInstCategory::Memory, IrInstTier::HighLevel,
-        IrInstFlag::ReadsMemory,
-        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
-          { IrOperandType::AddressSource, "src", IrOperandDir::ArgIn } });
+    registerFallbackIrInstruction(table,
+                                  "LOAD",
+                                  IrInstCategory::Memory,
+                                  IrInstTier::HighLevel,
+                                  IrInstFlag::ReadsMemory,
+                                  { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                    { IrOperandType::AddressSource, "src", IrOperandDir::ArgIn } });
 
-    registerFallbackIrInstruction(table, "STORE", IrInstCategory::Memory, IrInstTier::HighLevel,
-        static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::WritesMemory) | static_cast<uint32_t>(IrInstFlag::HasSideEffect)),
-        { { IrOperandType::AddressSource, "dst", IrOperandDir::ArgIn },
-          { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn } });
+    registerFallbackIrInstruction(table,
+                                  "STORE",
+                                  IrInstCategory::Memory,
+                                  IrInstTier::HighLevel,
+                                  static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::WritesMemory) |
+                                                          static_cast<uint32_t>(IrInstFlag::HasSideEffect)),
+                                  { { IrOperandType::AddressSource, "dst", IrOperandDir::ArgIn },
+                                    { IrOperandType::AnyValue, "src", IrOperandDir::ArgIn } });
 
-    registerFallbackIrInstruction(table, "ALLOC", IrInstCategory::Memory, IrInstTier::HighLevel,
-        IrInstFlag::HasSideEffect,
-        { { IrOperandType::Register, "dst", IrOperandDir::ArgOut } });
+    registerFallbackIrInstruction(table,
+                                  "ALLOC",
+                                  IrInstCategory::Memory,
+                                  IrInstTier::HighLevel,
+                                  IrInstFlag::HasSideEffect,
+                                  { { IrOperandType::Register, "dst", IrOperandDir::ArgOut } });
 
     // Control flow / system
-    registerFallbackIrInstruction(table, "CALL", IrInstCategory::System, IrInstTier::HighLevel,
-        static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsCall) | static_cast<uint32_t>(IrInstFlag::HasSideEffect)),
-        { { IrOperandType::AnyValue, "callee", IrOperandDir::ArgIn } });
+    registerFallbackIrInstruction(table,
+                                  "CALL",
+                                  IrInstCategory::System,
+                                  IrInstTier::HighLevel,
+                                  static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsCall) |
+                                                          static_cast<uint32_t>(IrInstFlag::HasSideEffect)),
+                                  { { IrOperandType::AnyValue, "callee", IrOperandDir::ArgIn } });
 
-    registerFallbackIrInstruction(table, "RET", IrInstCategory::System, IrInstTier::HighLevel,
-        static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsReturn) | static_cast<uint32_t>(IrInstFlag::IsTerminator)),
-        { { IrOperandType::AnyValue, "val", IrOperandDir::ArgIn } });
+    registerFallbackIrInstruction(table,
+                                  "RET",
+                                  IrInstCategory::System,
+                                  IrInstTier::HighLevel,
+                                  static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsReturn) |
+                                                          static_cast<uint32_t>(IrInstFlag::IsTerminator)),
+                                  { { IrOperandType::AnyValue, "val", IrOperandDir::ArgIn } });
 }
 
+// Walks up from the current directory looking for EzMir/instructions.irdf; empty when not found.
 std::filesystem::path findInstructionsIrdf()
 {
     std::filesystem::path cur = std::filesystem::current_path();
@@ -317,10 +377,10 @@ std::filesystem::path findInstructionsIrdf()
 
 } // namespace
 
-Driver::Driver(CliOptions options) : m_options(std::move(options))
-{
-}
+// Stores the resolved CLI options; concrete work happens in run().
+Driver::Driver(CliOptions options) : m_options(std::move(options)) {}
 
+// Resolves the input dialect from an explicit override, the file extension, or the requested generator.
 LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) const
 {
     if (m_options.dialect != LanguageDialect::Auto)
@@ -372,6 +432,7 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
     return LanguageDialect::Auto;
 }
 
+// Maps a detected dialect to the generator that consumes it, honoring an explicit --generator.
 GeneratorKind Driver::resolveGeneratorKind(LanguageDialect dialect) const
 {
     if (m_options.generator != GeneratorKind::Auto)
@@ -404,13 +465,17 @@ GeneratorKind Driver::resolveGeneratorKind(LanguageDialect dialect) const
     }
 }
 
+// Predicts the artifacts a generator will write so the driver can report and dry-run them.
 std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind,
-                                                          const std::filesystem::path &outDir) const
+                                                           const std::filesystem::path &outDir) const
 {
     std::vector<OutputFileInfo> outputs;
 
-    auto resolveHeaderAndSource = [](std::filesystem::path outPath,
-                                     std::string_view defaultBaseName) -> std::pair<std::filesystem::path, std::filesystem::path> {
+    // Applies the same header/source naming rules as the generators for reporting purposes.
+    auto resolveHeaderAndSource =
+            [](std::filesystem::path outPath,
+               std::string_view defaultBaseName) -> std::pair<std::filesystem::path, std::filesystem::path>
+    {
         if (outPath.empty())
             outPath = ".";
 
@@ -430,12 +495,13 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             return { headerPath, outPath };
         }
 
-        return { outPath / std::format("{}.h", defaultBaseName),
-                 outPath / std::format("{}.cpp", defaultBaseName) };
+        return { outPath / std::format("{}.h", defaultBaseName), outPath / std::format("{}.cpp", defaultBaseName) };
     };
 
+    // Resolves a header-only artifact, treating the path as a directory when it has no extension.
     auto resolveSingleFile = [](std::filesystem::path outPath,
-                                std::string_view defaultFileName) -> std::filesystem::path {
+                                std::string_view defaultFileName) -> std::filesystem::path
+    {
         if (outPath.empty())
             outPath = ".";
 
@@ -478,7 +544,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         std::string baseName = std::format("{}LegalizerActionTable", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -495,6 +562,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
         }
 
+        // A .lad input may be accompanied by a .lrd file, which the legalizer run also emits.
         bool hasRules = !m_options.rulesFilePath.empty();
         if (!hasRules && !m_options.inputFilePath.empty())
         {
@@ -527,7 +595,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         std::string baseName = std::format("{}LegalizerRules", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -551,7 +620,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         std::string baseName = std::format("{}TargetInstructionTable", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -576,7 +646,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
         target = sanitizeTargetIdentifier(target);
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         if (!m_options.sourceOnly || m_options.headerOnly)
         {
@@ -591,7 +662,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         std::string baseName = std::format("{}InstructionSelector", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -615,7 +687,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "CallingConv";
+        if (target.empty())
+            target = "CallingConv";
 
         std::string baseName = std::format("{}CallingConvDesc", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -640,7 +713,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
         target = sanitizeTargetIdentifier(target);
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         if (!m_options.sourceOnly || m_options.headerOnly)
         {
@@ -656,7 +730,8 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
         target = sanitizeTargetIdentifier(target);
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         std::string baseName = std::format("{}TargetDesc", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -677,11 +752,13 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     return outputs;
 }
 
+// Executes the full parse -> sema -> dump -> generate pipeline for the configured options.
 DriverResult Driver::run()
 {
     DriverResult result;
     std::filesystem::path inputPath(m_options.inputFilePath);
 
+    // Fail fast when the primary input cannot be found on disk.
     if (!std::filesystem::exists(inputPath))
     {
         result.success = false;
@@ -689,24 +766,29 @@ DriverResult Driver::run()
         return result;
     }
 
+    // Arena and diagnostics live for the duration of the run.
     std::pmr::monotonic_buffer_resource arena;
     DiagnosticCollector diagCollector;
 
+    // Verbose mode enables the most granular diagnostics.
     if (m_options.verbose)
     {
         diagCollector.enableDiag(Diag_Trace);
         diagCollector.enableDiag(Diag_Debug);
     }
 
+    // Resolve included files relative to the working directory plus any -I paths.
     SourceManager sourceManager(std::filesystem::current_path(), &arena);
     for (const auto &inc : m_options.includeDirs)
     {
         sourceManager.addIncludePath(inc);
     }
 
+    // The tracker is always attached so the driver can abort on any error diagnostic.
     ErrorTrackingListener errorTracker;
     diagCollector.addListener(&errorTracker);
 
+    // Human-readable diagnostics are suppressed under --quiet.
     std::unique_ptr<DiagnosticLogger> diagLogger;
     if (!m_options.quiet)
     {
@@ -748,6 +830,7 @@ DriverResult Driver::run()
         }
     }
 
+    // Parsing and semantic state shared by all dialects.
     ParseContext parseCtx(&diagCollector, &sourceManager, sourceId, &arena);
     SymbolTable symbolTable(&arena);
     size_t constructCount = 0;
@@ -804,18 +887,21 @@ DriverResult Driver::run()
                 return result;
             }
             ParseContext instParseCtx(&diagCollector, &sourceManager, *instSourceId, &arena);
-            auto instAst = instParseCtx.parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
+            auto instAst =
+                    instParseCtx.parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
             if (!instAst.has_value() || errorTracker.hasErrors())
             {
                 result.success = false;
-                result.errorMessage = std::format("Syntax parsing failed for instructions file '{}'.", instPath.string());
+                result.errorMessage =
+                        std::format("Syntax parsing failed for instructions file '{}'.", instPath.string());
                 return result;
             }
             IrInstructionPass instPass;
             if (!instPass.run(&diagCollector, &symbolTable, &instAst.value()) || errorTracker.hasErrors())
             {
                 result.success = false;
-                result.errorMessage = std::format("Semantic analysis failed for instructions file '{}'.", instPath.string());
+                result.errorMessage =
+                        std::format("Semantic analysis failed for instructions file '{}'.", instPath.string());
                 return result;
             }
         }
@@ -828,7 +914,9 @@ DriverResult Driver::run()
                 if (instSourceId.has_value())
                 {
                     ParseContext instParseCtx(&diagCollector, &sourceManager, *instSourceId, &arena);
-                    auto instAst = instParseCtx.parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
+                    auto instAst =
+                            instParseCtx
+                                    .parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
                     if (instAst.has_value() && !errorTracker.hasErrors())
                     {
                         IrInstructionPass instPass;
@@ -873,14 +961,16 @@ DriverResult Driver::run()
                 if (!rulesAst.has_value() || errorTracker.hasErrors())
                 {
                     result.success = false;
-                    result.errorMessage = std::format("Syntax parsing failed for companion rules file '{}'.", rulesPath.string());
+                    result.errorMessage =
+                            std::format("Syntax parsing failed for companion rules file '{}'.", rulesPath.string());
                     return result;
                 }
 
                 if (!LegalizeRulePass::run(&diagCollector, &symbolTable, &rulesAst.value()) || errorTracker.hasErrors())
                 {
                     result.success = false;
-                    result.errorMessage = std::format("Semantic analysis failed for companion rules file '{}'.", rulesPath.string());
+                    result.errorMessage =
+                            std::format("Semantic analysis failed for companion rules file '{}'.", rulesPath.string());
                     return result;
                 }
                 hasLoadedRules = true;
@@ -1023,7 +1113,7 @@ DriverResult Driver::run()
         case LanguageDialect::InstructionSelect:
         {
             isAst = parseCtx.parse<DSL::Parser::InstructionSelectDef::InstructionSelectFile,
-                                      DSL::Ast::InstructionSelectDef::InstructionSelectFile>();
+                                   DSL::Ast::InstructionSelectDef::InstructionSelectFile>();
             if (!isAst.has_value() || errorTracker.hasErrors())
             {
                 result.success = false;
@@ -1071,8 +1161,7 @@ DriverResult Driver::run()
 
         case LanguageDialect::RegisterDef:
         {
-            regAst = parseCtx.parse<DSL::Parser::RegisterDef::RegisterDefFile,
-                                     DSL::Ast::RegisterDef::RegisterFile>();
+            regAst = parseCtx.parse<DSL::Parser::RegisterDef::RegisterDefFile, DSL::Ast::RegisterDef::RegisterFile>();
             if (!regAst.has_value() || errorTracker.hasErrors())
             {
                 result.success = false;
@@ -1129,6 +1218,7 @@ DriverResult Driver::run()
             break;
     }
 
+    // Optional inspection dumps, all sent to stdout in the requested format.
     if (m_options.dumpSymbols)
     {
         InfoDumper::dumpSymbols(symbolTable, m_options.format, std::cout);
@@ -1146,34 +1236,77 @@ DriverResult Driver::run()
         std::error_code ec;
         gInfo.fileSizeBytes = std::filesystem::file_size(inputPath, ec);
         gInfo.dialect = dialect;
+        // Parse the primary file and run the dialect's semantic pass into the shared symbol table.
         switch (dialect)
         {
-            case LanguageDialect::TypeDef: gInfo.dialectName = "TypeDef (.tyf)"; break;
-            case LanguageDialect::IrInstDef: gInfo.dialectName = "IrInstDef (.irdf)"; break;
-            case LanguageDialect::LegalizeAction: gInfo.dialectName = "LegalizeAction (.lad)"; break;
-            case LanguageDialect::LegalizeRule: gInfo.dialectName = "LegalizeRule (.lrd)"; break;
-            case LanguageDialect::TargetInstDef: gInfo.dialectName = "TargetInstDef (.idf)"; break;
-            case LanguageDialect::InstructionSelect: gInfo.dialectName = "InstructionSelect (.isf)"; break;
-            case LanguageDialect::CallingConv: gInfo.dialectName = "CallingConv (.ezcc, .ccd)"; break;
-            case LanguageDialect::RegisterDef: gInfo.dialectName = "RegisterDef (.reg)"; break;
-            case LanguageDialect::TargetDesc: gInfo.dialectName = "TargetDesc (.tdesc)"; break;
-            default: gInfo.dialectName = "Unknown"; break;
+            case LanguageDialect::TypeDef:
+                gInfo.dialectName = "TypeDef (.tyf)";
+                break;
+            case LanguageDialect::IrInstDef:
+                gInfo.dialectName = "IrInstDef (.irdf)";
+                break;
+            case LanguageDialect::LegalizeAction:
+                gInfo.dialectName = "LegalizeAction (.lad)";
+                break;
+            case LanguageDialect::LegalizeRule:
+                gInfo.dialectName = "LegalizeRule (.lrd)";
+                break;
+            case LanguageDialect::TargetInstDef:
+                gInfo.dialectName = "TargetInstDef (.idf)";
+                break;
+            case LanguageDialect::InstructionSelect:
+                gInfo.dialectName = "InstructionSelect (.isf)";
+                break;
+            case LanguageDialect::CallingConv:
+                gInfo.dialectName = "CallingConv (.ezcc, .ccd)";
+                break;
+            case LanguageDialect::RegisterDef:
+                gInfo.dialectName = "RegisterDef (.reg)";
+                break;
+            case LanguageDialect::TargetDesc:
+                gInfo.dialectName = "TargetDesc (.tdesc)";
+                break;
+            default:
+                gInfo.dialectName = "Unknown";
+                break;
         }
         gInfo.constructCount = constructCount;
 
         switch (genKind)
         {
-            case GeneratorKind::TypeTable: gInfo.generatorName = "CppMirTypeTableGenerator"; break;
-            case GeneratorKind::Instructions: gInfo.generatorName = "CppMirInstructionGenerator"; break;
-            case GeneratorKind::Legalizer: gInfo.generatorName = "CppLegalizerGenerator"; break;
-            case GeneratorKind::Rules: gInfo.generatorName = "CppLegalizeRuleGenerator"; break;
-            case GeneratorKind::TargetInstructions: gInfo.generatorName = "CppTargetInstructionGenerator"; break;
-            case GeneratorKind::TargetEncodings: gInfo.generatorName = "CppTargetEncodingGenerator"; break;
-            case GeneratorKind::InstructionSelector: gInfo.generatorName = "CppInstructionSelectorGenerator"; break;
-            case GeneratorKind::CallingConv: gInfo.generatorName = "CppCallingConvGenerator"; break;
-            case GeneratorKind::RegisterInfo: gInfo.generatorName = "CppRegisterInfoGenerator"; break;
-            case GeneratorKind::TargetDesc: gInfo.generatorName = "CppTargetDescGenerator"; break;
-            default: gInfo.generatorName = "None"; break;
+            case GeneratorKind::TypeTable:
+                gInfo.generatorName = "CppMirTypeTableGenerator";
+                break;
+            case GeneratorKind::Instructions:
+                gInfo.generatorName = "CppMirInstructionGenerator";
+                break;
+            case GeneratorKind::Legalizer:
+                gInfo.generatorName = "CppLegalizerGenerator";
+                break;
+            case GeneratorKind::Rules:
+                gInfo.generatorName = "CppLegalizeRuleGenerator";
+                break;
+            case GeneratorKind::TargetInstructions:
+                gInfo.generatorName = "CppTargetInstructionGenerator";
+                break;
+            case GeneratorKind::TargetEncodings:
+                gInfo.generatorName = "CppTargetEncodingGenerator";
+                break;
+            case GeneratorKind::InstructionSelector:
+                gInfo.generatorName = "CppInstructionSelectorGenerator";
+                break;
+            case GeneratorKind::CallingConv:
+                gInfo.generatorName = "CppCallingConvGenerator";
+                break;
+            case GeneratorKind::RegisterInfo:
+                gInfo.generatorName = "CppRegisterInfoGenerator";
+                break;
+            case GeneratorKind::TargetDesc:
+                gInfo.generatorName = "CppTargetDescGenerator";
+                break;
+            default:
+                gInfo.generatorName = "None";
+                break;
         }
 
         if (m_options.headerOnly && !m_options.sourceOnly)
@@ -1189,6 +1322,7 @@ DriverResult Driver::run()
         InfoDumper::dumpGeneralInfo(gInfo, m_options.format, std::cout);
     }
 
+    // Check-only and dry-run stop after analysis and inspection without writing files.
     if (m_options.checkOnly || m_options.dryRun)
     {
         result.success = true;
@@ -1247,7 +1381,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         CppLegalizerGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1276,7 +1411,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         CppLegalizeRuleGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1294,7 +1430,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         CppTargetInstructionGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1312,7 +1449,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         CppTargetEncodingGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1330,7 +1468,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         CppInstructionSelectorGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1348,7 +1487,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "CallingConv";
+        if (target.empty())
+            target = "CallingConv";
 
         CppCallingConvGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1366,7 +1506,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         CppRegisterInfoGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1384,7 +1525,8 @@ DriverResult Driver::run()
         {
             target = std::filesystem::path(m_options.inputFilePath).stem().string();
         }
-        if (target.empty()) target = "Target";
+        if (target.empty())
+            target = "Target";
 
         CppTargetDescGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1425,6 +1567,7 @@ DriverResult Driver::run()
         }
     }
 
+    // Report the synthesized/up-to-date artifacts unless silenced by --quiet.
     if (!m_options.quiet && (!result.generatedFiles.empty() || !result.unchangedFiles.empty()))
     {
         std::cout << "[EzDSL] Code generation finished successfully.\n";

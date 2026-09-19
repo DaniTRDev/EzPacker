@@ -15,20 +15,26 @@ enum class IrOperandType : uint16_t;
 
 namespace Symbols
 {
+/**
+ * Resolved semantic operand of a generic IR instruction.
+ */
 struct IrOperandSymbol
 {
-    DSL::Ast::IrInstDef::IrOperandType m_type;
-    std::string_view m_name;
-    DSL::Ast::IrInstDef::IrOperandDir m_dir;
+    DSL::Ast::IrInstDef::IrOperandType m_type; // Accepted value kinds (bitmask).
+    std::string_view m_name;                   // Operand name.
+    DSL::Ast::IrInstDef::IrOperandDir m_dir;   // Dataflow direction.
 };
 
+/**
+ * Resolved semantic definition of a generic IR instruction.
+ */
 struct IrInstructionSymbol
 {
-    std::string_view m_name;
-    DSL::Ast::IrInstDef::IrInstCategory m_category;
-    DSL::Ast::IrInstDef::IrInstTier m_tier;
-    DSL::Ast::IrInstDef::IrInstFlag m_flags;
-    std::pmr::vector<IrOperandSymbol> m_operands;
+    std::string_view m_name;                        // Opcode name.
+    DSL::Ast::IrInstDef::IrInstCategory m_category; // Instruction category.
+    DSL::Ast::IrInstDef::IrInstTier m_tier;         // Compilation tier.
+    DSL::Ast::IrInstDef::IrInstFlag m_flags;        // Combined behavioral flags.
+    std::pmr::vector<IrOperandSymbol> m_operands;   // Operand signature.
 
     /**
      * Checks if the IR instruction has the specified flag set.

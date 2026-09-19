@@ -17,9 +17,7 @@ class RegisterPass
      * Executes the register definition semantic pass over the provided AST root.
      * Returns true if all declarations were successfully validated and declared.
      */
-    bool run(class DiagnosticCollector *collector,
-             class SymbolTable *table,
-             DSL::Ast::RegisterDef::RegisterFile *file);
+    bool run(class DiagnosticCollector *collector, class SymbolTable *table, DSL::Ast::RegisterDef::RegisterFile *file);
 };
 
 #endif // EZDSLSEMA_REGISTER_PASS_H

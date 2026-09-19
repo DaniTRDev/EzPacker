@@ -24,8 +24,8 @@ class MirLegalizerPass : public IMirTransformPass
                       class MirPassManager *passManager) override;
 
   private:
-    MirBuilderContext *m_ctx;
-    TargetDesc *m_targetDesc;
+    MirBuilderContext *m_ctx; ///< Shared builder context passed to the sub-legalizers.
+    TargetDesc *m_targetDesc; ///< Target supplying the legalizer and legality information.
 };
 
 #endif // EZTRIPLE_MIR_LEGALIZER_PASS_H

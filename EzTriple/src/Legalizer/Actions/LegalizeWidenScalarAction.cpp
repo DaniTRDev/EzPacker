@@ -16,6 +16,10 @@
 namespace LegalizeActions
 {
 
+/**
+ * Promotes the operands of an instruction to targetType. Comparisons only need their read
+ * operands extended, while other instructions also widen the definition and truncate the result.
+ */
 LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, MirType *targetType)
 {
     MirBuilderContext *builderCtx = ctx.m_ctx;
@@ -23,6 +27,7 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
     MirOperandBuilder ob(builderCtx);
     MirInstructionBuilder ib(builderCtx, instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);
 
+    // Comparisons produce a boolean, so only their inputs are widened, never their result.
     bool isCompare = (instr->getCategory() == MirInstructionCategory::MirCat_Compare ||
                       instr->getMetadata().m_category == MirInstructionCategory::MirCat_Compare);
     if (isCompare)
@@ -70,7 +75,8 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
             MirOperand *srcOp = instr->getOperand(i);
             if (srcOp && (instr->getOperandFlag(i) & MirOperandFlag::Read))
             {
-                if (srcOp->getMirType() && srcOp->getMirType()->getTotalSizeInBytes() < targetType->getTotalSizeInBytes())
+                if (srcOp->getMirType() &&
+                    srcOp->getMirType()->getTotalSizeInBytes() < targetType->getTotalSizeInBytes())
                 {
                     MirRegister *wideUse = ob.buildVReg(targetType);
                     ib.setInsertionPoint(instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);

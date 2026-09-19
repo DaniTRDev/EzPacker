@@ -8,6 +8,9 @@
 namespace DSL::Parser::TypeDef
 {
 namespace dsl = ::lexy::dsl;
+/**
+ * Parses a type-kind keyword (integer/float/void/bindingToken/pointer) into Ast::TypeDef::TypeKind.
+ */
 struct TypeKind
 {
     static constexpr auto Table =
@@ -22,6 +25,9 @@ struct TypeKind
     static constexpr auto value = lexy::forward<Ast::TypeDef::TypeKind>;
 };
 
+/**
+ * Parses `KIND name(bits)` or `KIND name(bits, alignment)` and produces a TypeDescriptor.
+ */
 struct TypeDescriptor
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -31,6 +37,9 @@ struct TypeDescriptor
     static constexpr auto value = lexy::construct<Ast::TypeDef::TypeDescriptor>;
 };
 
+/**
+ * Parses a whole `.tyf` file as a `;`-terminated list of TypeDescriptors and constructs a TypeDefFile.
+ */
 struct TypeDefFile
 {
     static constexpr auto whitespace = Common::Whitespace;

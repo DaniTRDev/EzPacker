@@ -13,6 +13,10 @@
 #include "Printer/MirPrinter.h"
 #include "Type/MirType.h"
 
+/**
+ * Formats an entire module. In Diagnostic mode it prints detailed dumps of all globals and
+ * functions; in Parseable mode it emits round-trippable global declarations followed by functions.
+ */
 std::string MirPrinter::printModule(MirBuilderContext *ctx, MirPrinterMode mode)
 {
     if (!ctx)
@@ -58,6 +62,10 @@ std::string MirPrinter::printModule(MirBuilderContext *ctx, MirPrinterMode mode)
     return result;
 }
 
+/**
+ * Formats a global variable declaration (@name = linkage const|var type [= init];), or a detailed
+ * dump in Diagnostic mode.
+ */
 std::string MirPrinter::printGlobalVar(MirGlobalVar *var, MirPrinterMode mode)
 {
     if (!var)
@@ -71,9 +79,15 @@ std::string MirPrinter::printGlobalVar(MirGlobalVar *var, MirPrinterMode mode)
     std::string_view linkageStr = "internal";
     switch (var->getLinkage())
     {
-        case MirGlobalVarLinkage::External: linkageStr = "external"; break;
-        case MirGlobalVarLinkage::Internal: linkageStr = "internal"; break;
-        case MirGlobalVarLinkage::Weak:     linkageStr = "weak"; break;
+        case MirGlobalVarLinkage::External:
+            linkageStr = "external";
+            break;
+        case MirGlobalVarLinkage::Internal:
+            linkageStr = "internal";
+            break;
+        case MirGlobalVarLinkage::Weak:
+            linkageStr = "weak";
+            break;
     }
 
     std::string result = std::format("@{} = {} {} {}",
@@ -103,6 +117,10 @@ std::string MirPrinter::printGlobalVar(MirGlobalVar *var, MirPrinterMode mode)
     return result;
 }
 
+/**
+ * Formats a function as either a "declare" prototype (no blocks) or a full "fn ... { blocks }"
+ * definition, or a detailed dump in Diagnostic mode.
+ */
 std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode)
 {
     if (!function)
@@ -122,7 +140,8 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
         bool firstParam = true;
         for (MirRegister *param : function->getParameters())
         {
-            if (!firstParam) result += ", ";
+            if (!firstParam)
+                result += ", ";
             result += param->getMirType() ? param->getMirType()->getName() : "i64";
             firstParam = false;
         }
@@ -134,10 +153,13 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
     bool firstParam = true;
     for (MirRegister *param : function->getParameters())
     {
-        if (!firstParam) result += ", ";
+        if (!firstParam)
+            result += ", ";
         std::string typeStr = param->getMirType() ? std::string(param->getMirType()->getName()) : "i64";
-        std::string pName = !param->getName().empty() ? std::string(param->getName()) : std::format("%v{}", param->getRegId());
-        if (!pName.starts_with("%")) pName = "%" + pName;
+        std::string pName =
+                !param->getName().empty() ? std::string(param->getName()) : std::format("%v{}", param->getRegId());
+        if (!pName.starts_with("%"))
+            pName = "%" + pName;
         result += std::format("{} {}", typeStr, pName);
         firstParam = false;
     }
@@ -152,6 +174,9 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
     return result;
 }
 
+/**
+ * Formats a block as "label:" followed by its instructions, or a detailed dump in Diagnostic mode.
+ */
 std::string MirPrinter::printBlock(MirBlock *block, MirPrinterMode mode)
 {
     if (!block)
@@ -162,7 +187,8 @@ std::string MirPrinter::printBlock(MirBlock *block, MirPrinterMode mode)
         return printToString(block, MirPrinterDetail::Detailed);
     }
 
-    std::string blkName = !block->getName().empty() ? std::string(block->getName()) : std::format("block_{}", block->getId());
+    std::string blkName =
+            !block->getName().empty() ? std::string(block->getName()) : std::format("block_{}", block->getId());
     if (blkName.starts_with("%"))
     {
         blkName = blkName.substr(1);
@@ -176,6 +202,10 @@ std::string MirPrinter::printBlock(MirBlock *block, MirPrinterMode mode)
     return result;
 }
 
+/**
+ * Formats an instruction as indented "opcode op, op, ...;" using the target mnemonic for selected
+ * TARGET_INST instructions, or a detailed dump in Diagnostic mode.
+ */
 std::string MirPrinter::printInstruction(MirInstruction *instr, MirPrinterMode mode)
 {
     if (!instr)
@@ -217,6 +247,11 @@ std::string MirPrinter::printInstruction(MirInstruction *instr, MirPrinterMode m
     return result;
 }
 
+/**
+ * Formats an operand in parseable syntax, switching on its concrete kind (register, immediate,
+ * reference, runtime symbol or memory address); falls back to the operand's own toString and
+ * delegates to the diagnostic formatter in Diagnostic mode.
+ */
 std::string MirPrinter::printOperand(MirOperand *operand, MirPrinterMode mode)
 {
     if (!operand)
@@ -235,8 +270,10 @@ std::string MirPrinter::printOperand(MirOperand *operand, MirPrinterMode mode)
             std::string typeStr = reg->getMirType() ? std::string(reg->getMirType()->getName()) : "i64";
             if (reg->isVirtual())
             {
-                std::string name = !reg->getName().empty() ? std::string(reg->getName()) : std::format("%v{}", reg->getRegId());
-                if (!name.starts_with("%")) name = "%" + name;
+                std::string name =
+                        !reg->getName().empty() ? std::string(reg->getName()) : std::format("%v{}", reg->getRegId());
+                if (!name.starts_with("%"))
+                    name = "%" + name;
                 return std::format("{} {}", typeStr, name);
             }
             else
@@ -295,14 +332,21 @@ std::string MirPrinter::printOperand(MirOperand *operand, MirPrinterMode mode)
         case MirOperandType::Memory:
         {
             auto *mem = static_cast<MirMemory *>(operand);
-            std::string baseStr = mem->getBase() ? (!mem->getBase()->getName().empty() ? std::string(mem->getBase()->getName()) : std::format("%v{}", mem->getBase()->getRegId())) : "%0";
-            if (!baseStr.starts_with("%")) baseStr = "%" + baseStr;
+            std::string baseStr = mem->getBase()
+                    ? (!mem->getBase()->getName().empty() ? std::string(mem->getBase()->getName())
+                                                          : std::format("%v{}", mem->getBase()->getRegId()))
+                    : "%0";
+            if (!baseStr.starts_with("%"))
+                baseStr = "%" + baseStr;
 
             std::string addrStr = std::format("ptr {}", baseStr);
             if (mem->getIndex())
             {
-                std::string idxStr = !mem->getIndex()->getName().empty() ? std::string(mem->getIndex()->getName()) : std::format("%v{}", mem->getIndex()->getRegId());
-                if (!idxStr.starts_with("%")) idxStr = "%" + idxStr;
+                std::string idxStr = !mem->getIndex()->getName().empty()
+                        ? std::string(mem->getIndex()->getName())
+                        : std::format("%v{}", mem->getIndex()->getRegId());
+                if (!idxStr.starts_with("%"))
+                    idxStr = "%" + idxStr;
                 if (mem->getScale() > 1)
                 {
                     addrStr += std::format(" + {} * {}", idxStr, mem->getScale());
@@ -331,6 +375,9 @@ std::string MirPrinter::printOperand(MirOperand *operand, MirPrinterMode mode)
     }
 }
 
+/**
+ * Formats a block's header (name, ID, instruction count) and, when Detailed, each instruction line.
+ */
 std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
 {
     if (!block)
@@ -362,6 +409,10 @@ std::string MirPrinter::printToString(MirBlock *block, MirPrinterDetail detail)
     return result;
 }
 
+/**
+ * Formats a function between decorative banners, always listing the signature and parameters and,
+ * when Detailed, the stack frame objects and all blocks/instructions.
+ */
 std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail detail)
 {
     if (!function)
@@ -426,6 +477,10 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
     return result;
 }
 
+/**
+ * Formats a global variable's header and initializer; Detailed prints the full initializer operand,
+ * otherwise only whether it is initialized.
+ */
 std::string MirPrinter::printToString(MirGlobalVar *globalVar, MirPrinterDetail detail)
 {
     if (!globalVar)
@@ -472,6 +527,10 @@ std::string MirPrinter::printToString(MirGlobalVar *globalVar, MirPrinterDetail 
     return result;
 }
 
+/**
+ * Formats an instruction with an aligned tier, opcode and target tag column followed by its
+ * operands. The detail parameter is currently unused.
+ */
 std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail /*detail*/)
 {
     if (!instr)
@@ -526,8 +585,14 @@ std::string MirPrinter::printToString(MirInstruction *instr, MirPrinterDetail /*
     return result;
 }
 
+/**
+ * Returns the operand's own textual form, or a placeholder for a null operand.
+ */
 std::string MirPrinter::printToString(MirOperand *operand) { return operand ? operand->toString() : "<null operand>"; }
 
+/**
+ * Formats a register reference as %v<n>(class) for virtual or %p<n>(class) for physical registers.
+ */
 std::string MirPrinter::printToString(const MirRegisterRef &ref)
 {
     char prefix = ref.isVirtual() ? 'v' : 'p';
@@ -535,6 +600,9 @@ std::string MirPrinter::printToString(const MirRegisterRef &ref)
     return std::format("%{}{}({})", prefix, ref.getId(), className);
 }
 
+/**
+ * Formats a stack frame object as its ID, type, signed offset and source origin.
+ */
 std::string MirPrinter::printToString(const StackFrameObject *obj)
 {
     if (!obj)

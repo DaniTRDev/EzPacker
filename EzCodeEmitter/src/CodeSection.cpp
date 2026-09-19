@@ -10,6 +10,7 @@ CodeSection::CodeSection(SectionFlags flags,
     m_isFinalized(false), m_flags(flags), m_head(nullptr), m_tail(nullptr), m_cursor(nullptr), m_type(type),
     m_alignment(alignment), m_endianness(endianness), m_padByte(padByte), m_name(name), m_buffer(alloc), m_alloc(alloc)
 {
+    // Seed the stream with a single empty data node so emits always have a target.
     m_head = createDataNode();
     m_tail = m_head;
     m_cursor = m_head;
@@ -27,6 +28,7 @@ SectionNode *CodeSection::getCursor() const { return m_cursor; }
 
 SectionNode *CodeSection::bindLabel(MirId labelId)
 {
+    // Insert a marker node; its offset is resolved later during finalize().
     auto *lblNode = insertNodeAfter(m_cursor, SectionNodeKind::Label);
     lblNode->m_labelId = labelId;
     return lblNode;
@@ -34,6 +36,7 @@ SectionNode *CodeSection::bindLabel(MirId labelId)
 
 void CodeSection::alignTo(size_t alignment)
 {
+    // Record the requested alignment as a node so it is evaluated at finalize() time.
     auto *alignNode = insertNodeAfter(m_cursor, SectionNodeKind::Align);
     alignNode->m_alignment = alignment;
     alignNode->m_padByte = m_padByte;
@@ -115,10 +118,12 @@ void CodeSection::emitBytesWithEndian(const uint8_t *data, size_t size, TargetEn
 
     if (inputEndianness == m_endianness)
     {
+        // Same byte order: copy verbatim.
         buf.insert(buf.end(), data, data + size);
     }
     else
     {
+        // Opposite byte order: emit the bytes in reverse so scalars are byte-swapped.
         for (size_t i = size; i > 0; --i)
         {
             buf.push_back(data[i - 1]);
@@ -131,6 +136,8 @@ void CodeSection::finalize()
     m_buffer.clear();
     uint64_t currentOffset = 0;
 
+    // Single pass over the stream: resolve label offsets and expand alignment padding
+    // while concatenating all data chunks into the flattened output buffer.
     for (SectionNode *node = m_head; node != nullptr; node = node->m_next)
     {
         switch (node->m_kind)
@@ -143,6 +150,7 @@ void CodeSection::finalize()
             {
                 if (node->m_alignment > 1)
                 {
+                    // Round the cursor up to the next multiple of the alignment.
                     size_t rem = currentOffset % node->m_alignment;
                     if (rem != 0)
                     {
@@ -173,6 +181,7 @@ void CodeSection::setCursor(SectionNode *node) { m_cursor = node ? node : m_tail
 
 bool CodeSection::patch32(uint64_t offset, uint32_t val)
 {
+    // Patching is only valid on the flattened buffer, so require finalize() first.
     if (!m_isFinalized || (offset + 4 > m_buffer.size()))
     {
         return false;
@@ -240,6 +249,7 @@ bool CodeSection::patchBytesWithEndian(uint64_t offset,
     }
     else
     {
+        // Reverse the patch bytes when the source and section byte orders differ.
         for (size_t i = 0; i < size; ++i)
         {
             m_buffer[offset + i] = data[size - 1 - i];
@@ -256,6 +266,7 @@ uint64_t CodeSection::getCurrentOffset() const
         return m_buffer.size();
     }
 
+    // Pre-finalize the current offset is the sum of data emitted up to the cursor.
     uint64_t sz = 0;
     for (SectionNode *n = m_head; n != nullptr; n = n->m_next)
     {
@@ -288,6 +299,7 @@ SectionNode *CodeSection::insertNodeAfter(SectionNode *target, SectionNodeKind k
 
     if (!target)
     {
+        // Empty/anchor insertion: link the new node in front of the current head.
         newNode->m_next = m_head;
         if (m_head)
         {
@@ -301,6 +313,7 @@ SectionNode *CodeSection::insertNodeAfter(SectionNode *target, SectionNodeKind k
     }
     else
     {
+        // Standard insertion immediately after target, repairing prev/next and the tail.
         newNode->m_next = target->m_next;
         newNode->m_prev = target;
         if (target->m_next)
@@ -320,6 +333,7 @@ SectionNode *CodeSection::insertNodeAfter(SectionNode *target, SectionNodeKind k
 
 std::pmr::vector<uint8_t> &CodeSection::getActiveDataBuffer()
 {
+    // Reuse the cursor's buffer when it is already a data node, otherwise start a new one.
     if (m_cursor && m_cursor->m_kind == SectionNodeKind::Data)
     {
         return m_cursor->m_data;

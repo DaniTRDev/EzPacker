@@ -20,10 +20,13 @@ class MirMemory;
 namespace EzMir
 {
 
+/**
+ * Toggles controlling parser strictness and accepted input.
+ */
 struct MirParserOptions
 {
-    bool verifySsa{ true };
-    bool allowTargetInstructions{ true };
+    bool verifySsa{ true };               // When true, enforce single-definition/use SSA constraints while parsing.
+    bool allowTargetInstructions{ true }; // When true, accept target-specific instruction syntax.
 };
 
 /**
@@ -54,34 +57,68 @@ class MirParser
     MirInstruction *parseInstruction(std::string_view source, MirBlock *targetBlock);
 
   private:
+    /**
+     * Parses a type expression into its AST node.
+     */
     Ast::MirAstType *parseAstType(Parser::MirLexer &lexer, MirParserContext &pCtx);
+    /**
+     * Parses an optional constant initializer expression for a global.
+     */
     std::optional<Ast::MirAstConstantInit> parseConstantInit(Parser::MirLexer &lexer, MirParserContext &pCtx);
 
+    /**
+     * Dispatches a single top-level declaration and appends it to module.
+     */
     bool parseTopLevelDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module);
+    /**
+     * Parses a "target" directive selecting the backend.
+     */
     bool parseTargetDirective(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module);
+    /**
+     * Parses a global variable declaration.
+     */
     bool parseGlobalVarDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module);
+    /**
+     * Parses a function prototype ("declare").
+     */
     bool parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module);
+    /**
+     * Parses a function definition body.
+     */
     bool parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module);
+    /**
+     * Parses one labeled basic block and its instructions into func.
+     */
     bool parseBasicBlock(Parser::MirLexer &lexer, MirParserContext &pCtx, MirFunction *func);
+    /**
+     * Parses a single instruction statement and inserts it into block.
+     */
     MirInstruction *parseInstructionStatement(Parser::MirLexer &lexer, MirParserContext &pCtx, MirBlock *block);
 
+    /**
+     * Parses one instruction operand, recording a forward fixup when the referenced symbol is unknown.
+     */
     MirOperand *parseOperand(Parser::MirLexer &lexer,
                              MirParserContext &pCtx,
                              MirInstruction *targetInst,
                              size_t operandIdx,
                              MirType *expectedType);
 
-    MirMemory *parseMemoryOperand(Parser::MirLexer &lexer,
-                                  MirParserContext &pCtx,
-                                  MirType *memType,
-                                  SourceReference *startRef);
+    /**
+     * Parses a bracketed memory addressing operand of the form [base + index*scale + disp].
+     */
+    MirMemory *
+    parseMemoryOperand(Parser::MirLexer &lexer, MirParserContext &pCtx, MirType *memType, SourceReference *startRef);
 
+    /**
+     * Consumes the next token, requiring it to be of the given kind; reports errorMsg otherwise.
+     */
     bool matchToken(Parser::MirLexer &lexer, Parser::MirTokenKind kind, std::string_view errorMsg);
 
   private:
-    MirBuilderContext *m_ctx{ nullptr };
-    DiagnosticCollector *m_diag{ nullptr };
-    MirParserOptions m_options;
+    MirBuilderContext *m_ctx{ nullptr };    // Context receiving constructed MIR entities.
+    DiagnosticCollector *m_diag{ nullptr }; // Collector for parser error diagnostics.
+    MirParserOptions m_options;             // Parser strictness/feature toggles.
 };
 
 } // namespace EzMir

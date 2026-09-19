@@ -205,7 +205,8 @@ ir_inst POP_RET(Register:token IN, Register:dst OUT) {
 // ============================================================================
 
 /**
- * Verifies parsing an entire .irdf file with multiple instruction declarations across data movement, memory, and control flow.
+ * Verifies parsing an entire .irdf file with multiple instruction declarations across data movement, memory, and
+ * control flow.
  */
 TEST_F(IrInstDefLangTest, TestMultipleInstructionsInFile)
 {

@@ -11,6 +11,9 @@
 #include "Operand/MirOperands.h"
 #include "Operand/MirRegisterClass.h"
 
+/**
+ * Selects every block of func, returning false if any instruction could not be selected.
+ */
 bool MirInstructionSelector::selectFunction(MirBuilderContext *ctx, MirFunction *func)
 {
     if (!ctx || !func)
@@ -29,6 +32,10 @@ bool MirInstructionSelector::selectFunction(MirBuilderContext *ctx, MirFunction 
     return allOk;
 }
 
+/**
+ * Selects all instructions in block using bottom-up maximal munch, walking backwards so
+ * definitions are visited before their uses, then assigns register classes to the results.
+ */
 bool MirInstructionSelector::selectBlock(MirBuilderContext *ctx, MirBlock *block)
 {
     if (!ctx || !block)
@@ -46,7 +53,9 @@ bool MirInstructionSelector::selectBlock(MirBuilderContext *ctx, MirBlock *block
         {
             if (!select(ctx, curr))
             {
-                ctx->getDiagCollector()->error("MirInstructionSelector", "Could not select instruction '{}'", curr->getOpCodeName())
+                ctx->getDiagCollector()->error("MirInstructionSelector",
+                                               "Could not select instruction '{}'",
+                                               curr->getOpCodeName())
                         << curr->getSourceRef();
                 return false;
             }
@@ -85,6 +94,10 @@ bool MirInstructionSelector::selectBlock(MirBuilderContext *ctx, MirBlock *block
     return true;
 }
 
+/**
+ * Gives unconstrained virtual registers the operand register class required by the selected
+ * target instruction, defaulting to the target GPR class.
+ */
 void MirInstructionSelector::assignRegisterClasses(MirInstruction *inst)
 {
     if (!inst)
@@ -133,6 +146,10 @@ void MirInstructionSelector::assignRegisterClasses(MirInstruction *inst)
     }
 }
 
+/**
+ * Asks the target addressing mode matcher to fold addrOp into a hardware addressing mode,
+ * passing the selector as context so the matcher can inspect register definitions.
+ */
 bool MirInstructionSelector::foldAddressingMode(MirBuilderContext *ctx,
                                                 MirOperand *addrOp,
                                                 MatchedAddressingMode &outMode,
@@ -151,6 +168,9 @@ bool MirInstructionSelector::foldAddressingMode(MirBuilderContext *ctx,
     return matcher->matchAddress(ctx, addrOp, outMode);
 }
 
+/**
+ * Erases every instruction absorbed by an addressing mode fold, skipping already-erased entries.
+ */
 void MirInstructionSelector::eraseFoldedInstructions(const std::vector<MirInstruction *> &folded)
 {
     for (MirInstruction *inst : folded)
@@ -162,6 +182,9 @@ void MirInstructionSelector::eraseFoldedInstructions(const std::vector<MirInstru
     }
 }
 
+/**
+ * Returns true when reg is a virtual register with exactly one use in the current function.
+ */
 bool MirInstructionSelector::hasOneUse(MirRegister *reg) const
 {
     if (!reg || !reg->isVirtual())
@@ -175,6 +198,10 @@ bool MirInstructionSelector::hasOneUse(MirRegister *reg) const
     return false;
 }
 
+/**
+ * Returns true when no instruction between from and to writes memory, has a side effect, or calls.
+ * Both instructions must belong to the same (non-null) block.
+ */
 bool MirInstructionSelector::noInterveningStore(MirInstruction *from, MirInstruction *to) const
 {
     if (!from || !to)
@@ -188,7 +215,8 @@ bool MirInstructionSelector::noInterveningStore(MirInstruction *from, MirInstruc
         if (cur->isSelected() && cur->getTargetDesc())
         {
             auto flags = cur->getTargetDesc()->getTargetFlags();
-            if (flags & (MirInstructionFlags::WritesMemory | MirInstructionFlags::HasSideEffect | MirInstructionFlags::IsCall))
+            if (flags &
+                (MirInstructionFlags::WritesMemory | MirInstructionFlags::HasSideEffect | MirInstructionFlags::IsCall))
             {
                 return false;
             }
@@ -196,7 +224,8 @@ bool MirInstructionSelector::noInterveningStore(MirInstruction *from, MirInstruc
         else
         {
             auto flags = cur->getMetadata().m_flags;
-            if (flags & (MirInstructionFlags::WritesMemory | MirInstructionFlags::HasSideEffect | MirInstructionFlags::IsCall))
+            if (flags &
+                (MirInstructionFlags::WritesMemory | MirInstructionFlags::HasSideEffect | MirInstructionFlags::IsCall))
             {
                 return false;
             }
@@ -206,6 +235,9 @@ bool MirInstructionSelector::noInterveningStore(MirInstruction *from, MirInstruc
     return cur == to;
 }
 
+/**
+ * Returns the defining instruction of a virtual register using the current function's register info.
+ */
 MirInstruction *MirInstructionSelector::getDefiningInstruction(MirRegister *reg) const
 {
     if (!reg || !reg->isVirtual())
@@ -219,6 +251,10 @@ MirInstruction *MirInstructionSelector::getDefiningInstruction(MirRegister *reg)
     return nullptr;
 }
 
+/**
+ * Like the other overload, but falls back to scanning every function in ctx when the register's
+ * definition is not visible from the currently cached function.
+ */
 MirInstruction *MirInstructionSelector::getDefiningInstruction(MirBuilderContext *ctx, MirRegister *reg) const
 {
     if (!reg || !reg->isVirtual())

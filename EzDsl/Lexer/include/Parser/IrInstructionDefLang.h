@@ -10,6 +10,9 @@ namespace DSL::Parser::IrInstDef
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Parses an operand-type keyword (Register, Integer, ...) into Ast::IrInstDef::IrOperandType.
+ */
 struct OperandType
 {
     static constexpr auto Table =
@@ -33,6 +36,9 @@ struct OperandType
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrOperandType>;
 };
 
+/**
+ * Parses an operand direction keyword (IN/OUT/INOUT) into Ast::IrInstDef::IrOperandDir.
+ */
 struct Direction
 {
     static constexpr auto Table =
@@ -45,6 +51,9 @@ struct Direction
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrOperandDir>;
 };
 
+/**
+ * Parses `Type:name DIR` (e.g. `Integer:imm IN`) and produces an IrOperand.
+ */
 struct IrOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -55,6 +64,9 @@ struct IrOperand
             { return Ast::IrInstDef::IrOperand{ .m_type = type, .m_name = std::move(name), .m_dir = dir }; });
 };
 
+/**
+ * Parses an instruction category keyword (DataMovement, Memory, ...) into IrInstCategory.
+ */
 struct Category
 {
     static constexpr auto Table =
@@ -72,6 +84,9 @@ struct Category
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstCategory>;
 };
 
+/**
+ * Parses an instruction tier keyword (HighLevel, PassInternal, TargetLow) into IrInstTier.
+ */
 struct Tier
 {
     static constexpr auto Table =
@@ -84,6 +99,9 @@ struct Tier
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstTier>;
 };
 
+/**
+ * Parses a behavioral flag keyword (SizeMatch, ReadsMemory, ...) into IrInstFlag.
+ */
 struct InstFlag
 {
     static constexpr auto Table =
@@ -108,10 +126,16 @@ struct InstFlag
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstFlag>;
 };
 
+/**
+ * One statement inside an `ir_inst { ... }` body: CATEGORY, TIER, or FLAGS, exposed as a variant.
+ */
 struct BodyItem
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    /**
+     * Parses `CATEGORY(Kind);` and forwards the IrInstCategory.
+     */
     struct CategoryDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -120,6 +144,9 @@ struct BodyItem
         static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstCategory>;
     };
 
+    /**
+     * Parses `TIER(Tier);` and forwards the IrInstTier.
+     */
     struct TierDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -128,6 +155,9 @@ struct BodyItem
         static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstTier>;
     };
 
+    /**
+     * Parses `FLAGS(A, B, ...);` into a PMR vector of IrInstFlag.
+     */
     struct FlagsDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -145,10 +175,16 @@ struct BodyItem
                                                                std::pmr::vector<Ast::IrInstDef::IrInstFlag>>>;
 };
 
+/**
+ * Parses one `ir_inst name(operands) { body }` declaration and assembles an IrInstDecl.
+ */
 struct IrInstDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    /**
+     * Parses a `,`-separated list of IrOperands into a PMR vector.
+     */
     struct NonEmptyOperandList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -156,6 +192,9 @@ struct IrInstDecl
         static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::IrInstDef::IrOperand>>;
     };
 
+    /**
+     * Parses the parenthesized operand signature, allowing an empty `()` list.
+     */
     struct OperandList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -166,6 +205,9 @@ struct IrInstDecl
                 [](lexy::nullopt) { return std::pmr::vector<Ast::IrInstDef::IrOperand>{}; });
     };
 
+    /**
+     * Parses the curly-braced body as a list of BodyItem variants.
+     */
     struct BodyList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -208,6 +250,9 @@ struct IrInstDecl
             });
 };
 
+/**
+ * Parses a whole `.irdf` file as an EOF-terminated list of IrInstDecls into an IrInstDefFile.
+ */
 struct IrInstDefFile
 {
     static constexpr auto whitespace = Common::Whitespace;

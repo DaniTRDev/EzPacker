@@ -94,6 +94,9 @@ size_t MirType::getTotalSizeInBits() const { return m_totalSizeInBits; }
  */
 size_t MirType::getTotalSizeInBytes() const { return getTotalSizeInBits() / 8; }
 
+/**
+ * Retrieves the compact 8-bit type index used for fast lookups.
+ */
 uint8_t MirType::getCompactId() const { return m_compactId; }
 
 /**

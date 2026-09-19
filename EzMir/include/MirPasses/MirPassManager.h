@@ -92,13 +92,15 @@ class MirPassManager
                              std::unordered_set<std::type_index> &seenInCurrentPath);
 
   private:
-    bool m_testMode;
-    class DiagnosticCollector *m_diagCollector;
-    std::pmr::unordered_map<std::type_index, MirPass *> m_validAnalyses;
-    std::pmr::unordered_map<std::type_index, std::unique_ptr<MirPass>> m_passesBlueprint;
+    bool m_testMode;                            // When true, dependency enforcement is relaxed for tests.
+    class DiagnosticCollector *m_diagCollector; // Collector used to report pass errors.
+    std::pmr::unordered_map<std::type_index, MirPass *>
+            m_validAnalyses; // Cache of analyses valid for the current MIR state.
+    std::pmr::unordered_map<std::type_index, std::unique_ptr<MirPass>>
+            m_passesBlueprint; // Registered pass instances keyed by type.
     // Storage to keep pass results alive safely in memory, preventing dangling pointer references
-    std::pmr::unordered_map<std::type_index, MirPassResult> m_savedResults;
-    std::pmr::vector<MirPass *> m_executionPipeline;
+    std::pmr::unordered_map<std::type_index, MirPassResult> m_savedResults; // Stable storage for per-pass results.
+    std::pmr::vector<MirPass *> m_executionPipeline; // Topologically ordered transform passes to run.
 };
 
 #endif // EZMIR_MIR_PASS_MANAGER_H

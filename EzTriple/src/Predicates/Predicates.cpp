@@ -8,6 +8,7 @@
 
 namespace Predicates
 {
+/// Returns the integer constant payload of operand, or nullptr when it is not an integer immediate.
 static const FlexInt *extractFlexInt(const MirOperand *operand)
 {
     if (!operand || operand->getType() != MirOperandType::Integer)
@@ -17,6 +18,7 @@ static const FlexInt *extractFlexInt(const MirOperand *operand)
     return &imm->getValue();
 }
 
+/// Returns the float constant payload of operand, or nullptr when it is not a float immediate.
 static const FlexFloat *extractFlexFloat(const MirOperand *operand)
 {
     if (!operand || operand->getType() != MirOperandType::FloatingPoint)
@@ -26,6 +28,7 @@ static const FlexFloat *extractFlexFloat(const MirOperand *operand)
     return &flt->getValue();
 }
 
+/// Returns the operand's width in bits derived from its MIR type, or 0 when unavailable.
 static uint32_t getOperandBitWidth(const MirOperand *operand)
 {
     if (!operand || !operand->getMirType())
@@ -194,6 +197,10 @@ bool isIntPositive(const MirOperand *operand)
     return imm ? !imm->isNeg() : false;
 }
 
+/**
+ * Proves the bits above bitWidth are zero either from the constant value or from the defining
+ * instruction (ZEXT, a masking AND, or a SHR that leaves at most bitWidth significant bits).
+ */
 bool isZeroExtendedFrom(const MirOperand *operand, uint32_t bitWidth, const MirFunctionRegisterInfo *regInfo)
 {
     if (!operand)
@@ -268,6 +275,10 @@ bool isZeroExtendedFrom(const MirOperand *operand, uint32_t bitWidth, const MirF
     return false;
 }
 
+/**
+ * Proves the bits above bitWidth replicate the sign bit either from the constant value
+ * (comparison against its own sign extension) or from a SEXT/SAR definition.
+ */
 bool isSignExtendedFrom(const MirOperand *operand, uint32_t bitWidth, const MirFunctionRegisterInfo *regInfo)
 {
     if (!operand)
@@ -328,6 +339,10 @@ bool isSignExtendedFrom(const MirOperand *operand, uint32_t bitWidth, const MirF
     return false;
 }
 
+/**
+ * Checks that every user of a register discards the bits above liveBits, either because the
+ * register is dead, consumers TRUNC to a narrow type, or consumers AND with a low mask.
+ */
 bool areHighBitsIgnored(const MirOperand *operand, uint32_t liveBits, const MirFunctionRegisterInfo *regInfo)
 {
     if (!operand || liveBits == 0)

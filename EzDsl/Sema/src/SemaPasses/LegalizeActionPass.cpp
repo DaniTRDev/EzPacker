@@ -13,6 +13,10 @@ namespace
 {
 using namespace DSL::Ast::LegalizeActionDef;
 
+/**
+ * Verifies that a transformation target type satisfies the width relation implied by its kind
+ * (wider for WIDENS, narrower for NARROWS, equal for BITCAST).
+ */
 bool validateBitwidths(DiagnosticCollector *collector,
                        SymbolTable *table,
                        LegalizeActionKind kind,
@@ -72,11 +76,14 @@ bool validateBitwidths(DiagnosticCollector *collector,
     return success;
 }
 
-void generateCartesianProduct(
-        const std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> &lists,
-        size_t depth,
-        std::vector<Symbols::LegalizeActionConstraintSymbol> &current,
-        std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> &result)
+/**
+ * Expands a list of per-operand constraint options into every combination (Cartesian product),
+ * used for clauses that constrain an indexed type set on multiple operands.
+ */
+void generateCartesianProduct(const std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> &lists,
+                              size_t depth,
+                              std::vector<Symbols::LegalizeActionConstraintSymbol> &current,
+                              std::vector<std::vector<Symbols::LegalizeActionConstraintSymbol>> &result)
 {
     if (depth == lists.size())
     {
@@ -151,8 +158,8 @@ bool LegalizeActionPass::run(DiagnosticCollector *collector,
 }
 
 bool LegalizeActionPass::processTypeSetDecl(DiagnosticCollector *collector,
-                                           SymbolTable *table,
-                                           const DSL::Ast::LegalizeActionDef::TypeSetDecl &decl)
+                                            SymbolTable *table,
+                                            const DSL::Ast::LegalizeActionDef::TypeSetDecl &decl)
 {
     std::pmr::vector<SymbolId> resolvedTypeIds(table->getAllocator());
     bool valid = true;
@@ -176,12 +183,12 @@ bool LegalizeActionPass::processTypeSetDecl(DiagnosticCollector *collector,
     }
 
     Symbols::TypeSetSymbol symData{ .m_name = decl.m_name.m_node, .m_typeIds = std::move(resolvedTypeIds) };
-    SymbolId symId = table->declareSym(decl.m_name.m_sourceRef, SymbolType::TypeSet, std::move(symData), decl.m_name.m_node);
+    SymbolId symId =
+            table->declareSym(decl.m_name.m_sourceRef, SymbolType::TypeSet, std::move(symData), decl.m_name.m_node);
 
     if (symId == InvalidSymbolId)
     {
-        collector->error(PassName, "Redefinition of type_set '{}'", decl.m_name.m_node)
-                << decl.m_name.m_sourceRef;
+        collector->error(PassName, "Redefinition of type_set '{}'", decl.m_name.m_node) << decl.m_name.m_sourceRef;
         return false;
     }
 
@@ -190,26 +197,30 @@ bool LegalizeActionPass::processTypeSetDecl(DiagnosticCollector *collector,
 }
 
 bool LegalizeActionPass::applyClampScalar(DiagnosticCollector *collector,
-                                         SymbolTable *table,
-                                         const DSL::Ast::LegalizeActionDef::ClampScalarClause &clamp,
-                                         std::string_view instName,
-                                         Symbols::LegalizeActionSymbol &actionData)
+                                          SymbolTable *table,
+                                          const DSL::Ast::LegalizeActionDef::ClampScalarClause &clamp,
+                                          std::string_view instName,
+                                          Symbols::LegalizeActionSymbol &actionData)
 {
     Symbol *minSym = table->getSymByName(clamp.m_minType.m_node);
     Symbol *maxSym = table->getSymByName(clamp.m_maxType.m_node);
 
     if (!minSym || minSym->getType() != SymbolType::Type)
     {
-        collector->error(PassName, "Unknown minimum type '{}' in CLAMP_SCALAR for opcode '{}'",
-                         clamp.m_minType.m_node, instName)
+        collector->error(PassName,
+                         "Unknown minimum type '{}' in CLAMP_SCALAR for opcode '{}'",
+                         clamp.m_minType.m_node,
+                         instName)
                 << clamp.m_minType.m_sourceRef;
         return false;
     }
 
     if (!maxSym || maxSym->getType() != SymbolType::Type)
     {
-        collector->error(PassName, "Unknown maximum type '{}' in CLAMP_SCALAR for opcode '{}'",
-                         clamp.m_maxType.m_node, instName)
+        collector->error(PassName,
+                         "Unknown maximum type '{}' in CLAMP_SCALAR for opcode '{}'",
+                         clamp.m_maxType.m_node,
+                         instName)
                 << clamp.m_maxType.m_sourceRef;
         return false;
     }
@@ -219,16 +230,14 @@ bool LegalizeActionPass::applyClampScalar(DiagnosticCollector *collector,
 
     if (!minData || minData->m_kind != DSL::Ast::TypeDef::TypeKind::Integer)
     {
-        collector->error(PassName, "Minimum type '{}' in CLAMP_SCALAR must be an integer type",
-                         clamp.m_minType.m_node)
+        collector->error(PassName, "Minimum type '{}' in CLAMP_SCALAR must be an integer type", clamp.m_minType.m_node)
                 << clamp.m_minType.m_sourceRef;
         return false;
     }
 
     if (!maxData || maxData->m_kind != DSL::Ast::TypeDef::TypeKind::Integer)
     {
-        collector->error(PassName, "Maximum type '{}' in CLAMP_SCALAR must be an integer type",
-                         clamp.m_maxType.m_node)
+        collector->error(PassName, "Maximum type '{}' in CLAMP_SCALAR must be an integer type", clamp.m_maxType.m_node)
                 << clamp.m_maxType.m_sourceRef;
         return false;
     }
@@ -237,16 +246,19 @@ bool LegalizeActionPass::applyClampScalar(DiagnosticCollector *collector,
     {
         collector->error(PassName,
                          "Clamp min type '{}' ({} bits) cannot be larger than max type '{}' ({} bits)",
-                         clamp.m_minType.m_node, minData->m_bitWidth,
-                         clamp.m_maxType.m_node, maxData->m_bitWidth)
+                         clamp.m_minType.m_node,
+                         minData->m_bitWidth,
+                         clamp.m_maxType.m_node,
+                         maxData->m_bitWidth)
                 << clamp.m_minType.m_sourceRef;
         return false;
     }
 
+    // Minimal view of declared integer types used to synthesize clamp expansion clauses.
     struct IntTypeInfo
     {
-        SymbolId id;
-        uint32_t bitWidth;
+        SymbolId id;       // Symbol id of the integer type.
+        uint32_t bitWidth; // Width in bits.
     };
     std::vector<IntTypeInfo> intTypes;
     for (Symbol *sym : table->getSymbols())
@@ -263,9 +275,7 @@ bool LegalizeActionPass::applyClampScalar(DiagnosticCollector *collector,
         }
     }
 
-    std::sort(intTypes.begin(), intTypes.end(), [](const auto &a, const auto &b) {
-        return a.bitWidth < b.bitWidth;
-    });
+    std::sort(intTypes.begin(), intTypes.end(), [](const auto &a, const auto &b) { return a.bitWidth < b.bitWidth; });
 
     for (const auto &t : intTypes)
     {
@@ -313,6 +323,10 @@ bool LegalizeActionPass::applyClampScalar(DiagnosticCollector *collector,
     return true;
 }
 
+/**
+ * Resolves all action clauses for one opcode, merging them into a shared LegalizeActionSymbol
+ * so grouped and direct declarations accumulate on the same opcode.
+ */
 bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
                                                 SymbolTable *table,
                                                 const DSL::Ast::LegalizeActionDef::LegalizeInstructionDecl &decl)
@@ -458,8 +472,9 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
             {
                 Symbols::LegalizeActionClauseSymbol clauseSym{
                     .m_kind = clause.m_kind,
-                    .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{
-                            comb.begin(), comb.end(), table->getAllocator() },
+                    .m_types = std::pmr::vector<Symbols::LegalizeActionConstraintSymbol>{ comb.begin(),
+                                                                                          comb.end(),
+                                                                                          table->getAllocator() },
                     .m_targetTypeId = std::nullopt,
                     .m_libcallSymbol = std::nullopt,
                     .m_lowerHandler = std::nullopt,
@@ -516,6 +531,9 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
     return success;
 }
 
+/**
+ * Validates one action clause's kind-specific target payload and fills the resolved clause symbol.
+ */
 bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
                                        SymbolTable *table,
                                        const DSL::Ast::LegalizeActionDef::LegalizeActionClause &clause,
@@ -565,7 +583,8 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
         }
     };
 
-    if (outClause.m_types.empty() && clause.m_kind != LegalizeActionKind::Custom && clause.m_kind != LegalizeActionKind::Lower)
+    if (outClause.m_types.empty() && clause.m_kind != LegalizeActionKind::Custom &&
+        clause.m_kind != LegalizeActionKind::Lower)
     {
         collector->error(PassName,
                          "Legalization clause for opcode '{}' must declare at least one type constraint",
@@ -639,8 +658,7 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
 
             if (!clause.m_lowerHandler.has_value() || clause.m_lowerHandler->m_node.empty())
             {
-                collector->error(PassName,
-                                 "LOWER action requires a target lowering handler ('>> TargetLowering')");
+                collector->error(PassName, "LOWER action requires a target lowering handler ('>> TargetLowering')");
                 return false;
             }
 
@@ -702,6 +720,9 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
     return success;
 }
 
+/**
+ * Resolves a type constraint to a declared type symbol and an optional operand index.
+ */
 bool LegalizeActionPass::resolveConstraint(DiagnosticCollector *collector,
                                            SymbolTable *table,
                                            const DSL::Ast::LegalizeActionDef::TypeConstraint &constraint,

@@ -4,7 +4,7 @@
 #include "Sema/Symbol.h"
 #include "SemaPasses/IrInstructionPass.h"
 
-constexpr auto PassName = "Sema::IrInstructionPass";
+constexpr auto PassName = "Sema::IrInstructionPass"; // Pass identifier used in diagnostics.
 
 bool IrInstructionPass::run(DiagnosticCollector *collector,
                             SymbolTable *table,
@@ -29,6 +29,9 @@ bool IrInstructionPass::run(DiagnosticCollector *collector,
     return !hasErrors;
 }
 
+/**
+ * Validates the operand signature and tallies input/output counts for later flag checks.
+ */
 bool IrInstructionPass::validateOperands(DiagnosticCollector *collector,
                                          const DSL::Ast::IrInstDef::IrInstDecl &inst,
                                          size_t &numIn,
@@ -84,6 +87,9 @@ bool IrInstructionPass::validateOperands(DiagnosticCollector *collector,
     return valid;
 }
 
+/**
+ * Enforces category/flag invariants that cannot be expressed by the grammar itself.
+ */
 bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
                                                  const DSL::Ast::IrInstDef::IrInstDecl &inst,
                                                  DSL::Ast::IrInstDef::IrInstFlag combinedFlags,
@@ -94,6 +100,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
     bool valid = true;
     SourceReference *ref = inst.m_name.m_sourceRef;
 
+    // Convenience predicate over the aggregated flag bitmask.
     auto hasFlag = [&](IrInstFlag flag)
     { return (static_cast<uint32_t>(combinedFlags) & static_cast<uint32_t>(flag)) != 0; };
 

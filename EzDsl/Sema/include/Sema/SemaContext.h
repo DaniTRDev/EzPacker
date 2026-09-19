@@ -33,9 +33,9 @@ class SemaContext
     class SymbolTable *getSymTable() const;
 
   private:
-    class DiagnosticCollector *m_diagCollector;
-    class SourceManager *m_sourceManager;
-    class SymbolTable *m_symbolTable;
+    class DiagnosticCollector *m_diagCollector; // Collector receiving semantic diagnostics.
+    class SourceManager *m_sourceManager;       // Source manager used to resolve diagnostic spans.
+    class SymbolTable *m_symbolTable;           // Symbol table shared across passes.
 };
 
 #endif // EZDSL_SEMA_CONTEXT_H

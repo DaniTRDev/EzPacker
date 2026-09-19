@@ -6,6 +6,10 @@
 
 class MirInstruction;
 
+/**
+ * Lowers token-bound ABI sequences (PUSH_RET/RET, PUSH_ARG/CALL, POP_ARG/END_ARG) into the concrete
+ * register/stack moves mandated by a target calling convention.
+ */
 class MirAbiLowerer
 {
   public:
@@ -51,7 +55,7 @@ class MirAbiLowerer
                                   std::pmr::vector<class MirInstruction *> &popArgs);
 
   private:
-    class MirBuilderContext *m_ctx;
+    class MirBuilderContext *m_ctx; ///< Builder context used to create the lowered move/load instructions.
 };
 
 #endif // EZTRIPLE_MIR_ABI_LOWERER_H

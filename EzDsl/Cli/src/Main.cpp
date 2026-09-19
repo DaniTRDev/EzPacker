@@ -3,6 +3,7 @@
 
 #include <iostream>
 
+// Process entry point: parse arguments, run the driver, and map failures to exit codes.
 int main(int argc, char *argv[])
 {
     try
@@ -11,6 +12,7 @@ int main(int argc, char *argv[])
         std::string errorMessage;
         auto options = parser.parse(argc, argv, errorMessage);
 
+        // A missing value signals either a parse error (message set) or an explicit help/version exit.
         if (!options.has_value())
         {
             if (!errorMessage.empty())
@@ -39,6 +41,7 @@ int main(int argc, char *argv[])
     }
     catch (const std::exception &ex)
     {
+        // Unexpected failures surface as a fatal error and a distinct exit code.
         std::cerr << "Fatal Exception: " << ex.what() << "\n";
         return 2;
     }

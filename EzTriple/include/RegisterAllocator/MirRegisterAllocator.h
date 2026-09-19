@@ -10,9 +10,9 @@
  */
 struct RegisterAllocatorCtx
 {
-    class MirBuilderContext *m_ctx;
-    class MirFunction *m_targetFunction;
-    class TargetDesc *m_targetDesc;
+    class MirBuilderContext *m_ctx;      ///< Shared builder context used when rewriting registers.
+    class MirFunction *m_targetFunction; ///< Function whose registers are being allocated.
+    class TargetDesc *m_targetDesc;      ///< Target supplying register classes and spill hooks.
 
     // Explicit PMR allocator handle for context containers
     std::pmr::memory_resource *m_allocator;

@@ -10,6 +10,9 @@ namespace DSL::Parser::LegalizeRuleDef
 {
 namespace dsl = ::lexy::dsl;
 
+/**
+ * Parses a `$name` SSA variable reference and forwards the underlying Identifier.
+ */
 struct SsaVarName
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -17,6 +20,9 @@ struct SsaVarName
     static constexpr auto value = lexy::forward<Ast::Common::Identifier>;
 };
 
+/**
+ * Parses a predicate argument: `$var`, an integer literal, or a bare identifier, as a PredicateArg variant.
+ */
 struct PredicateArg
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -29,10 +35,16 @@ struct PredicateArg
             [](Ast::Common::IntegerLiteral lit) { return Ast::LegalizeRuleDef::PredicateArg{ lit }; });
 };
 
+/**
+ * Parses a `predicate(args);` when-clause and produces a RuleWhen (empty args allowed).
+ */
 struct RuleWhen
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    /**
+     * Parses a `,`-separated predicate argument list into a PMR vector.
+     */
     struct ArgList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -58,10 +70,16 @@ struct RuleWhen
             { return Ast::LegalizeRuleDef::RuleWhen{ .m_predicateName = std::move(name), .m_arguments = {} }; });
 };
 
+/**
+ * Parses a compile-time transform call `func($a, $b)` and produces a CustomTransform operand.
+ */
 struct CustomTransformOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    /**
+     * Parses a `,`-separated list of SSA variable arguments.
+     */
     struct VarList
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -82,6 +100,10 @@ struct CustomTransformOperand
             });
 };
 
+/**
+ * Parses a type-prefixed operand `type(param)?:$var` (e.g. `i32:$dst`, `imm(i32):$c`) and
+ * classifies it as an SSA register or immediate symbol.
+ */
 struct TypedPrefixSsaOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -116,6 +138,9 @@ struct TypedPrefixSsaOperand
             });
 };
 
+/**
+ * Parses a bare `$var` operand and produces an untyped SSA register operand.
+ */
 struct BareSsaOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -131,6 +156,9 @@ struct BareSsaOperand
             });
 };
 
+/**
+ * Parses a bare integer literal operand and produces an ImmediateLiteral operand.
+ */
 struct LiteralOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -146,6 +174,9 @@ struct LiteralOperand
             });
 };
 
+/**
+ * Dispatches a rule operand to the transform, typed-prefix, bare-SSA, or literal sub-rule.
+ */
 struct RuleOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -165,6 +196,9 @@ struct RuleOperand
     static constexpr auto value = lexy::forward<Ast::LegalizeRuleDef::RuleInstructionOperand>;
 };
 
+/**
+ * Parses a `,`-separated list of rule operands into a PMR vector.
+ */
 struct InstructionOperandList
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -172,10 +206,17 @@ struct InstructionOperandList
     static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstructionOperand>>;
 };
 
+/**
+ * Parses either a full `opcode operands;` instruction or the shorthand `$var;` / `type:$var;`,
+ * producing a RuleInstruction.
+ */
 struct RuleInstruction
 {
     static constexpr auto whitespace = Common::Whitespace;
 
+    /**
+     * Parses a single-operand shorthand statement and derives the opcode from the operand type/name.
+     */
     struct SingleOperandStatement
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -190,6 +231,9 @@ struct RuleInstruction
                 });
     };
 
+    /**
+     * Parses a normal `opcode operand, ... ;` instruction with an optional operand list.
+     */
     struct StandardInstruction
     {
         static constexpr auto whitespace = Common::Whitespace;
@@ -225,23 +269,38 @@ struct RuleInstruction
     static constexpr auto value = lexy::forward<Ast::LegalizeRuleDef::RuleInstruction>;
 };
 
+/**
+ * Tag type wrapping the parsed `match { ... }` instruction list.
+ */
 struct MatchClause
 {
     std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction> instructions;
 };
 
+/**
+ * Tag type wrapping the parsed `when { ... }` predicate list.
+ */
 struct WhenClause
 {
     std::pmr::vector<Ast::LegalizeRuleDef::RuleWhen> clauses;
 };
 
+/**
+ * Tag type wrapping the parsed `emit`/`expand` instruction list.
+ */
 struct EmitClause
 {
     std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction> instructions;
 };
 
+/**
+ * Variant over the three block kinds that may appear inside a rule body.
+ */
 using RuleBlockClause = std::variant<MatchClause, WhenClause, EmitClause>;
 
+/**
+ * Parses the curly-braced body of a `match` block into a MatchClause.
+ */
 struct MatchBlockBody
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -250,6 +309,9 @@ struct MatchBlockBody
             Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<MatchClause>;
 };
 
+/**
+ * Parses the curly-braced body of a `when` block into a WhenClause.
+ */
 struct WhenBlockBody
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -258,6 +320,9 @@ struct WhenBlockBody
             Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleWhen>> >> lexy::construct<WhenClause>;
 };
 
+/**
+ * Parses the curly-braced body of an `emit`/`expand` block into an EmitClause.
+ */
 struct EmitBlockBody
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -266,6 +331,9 @@ struct EmitBlockBody
             Common::PmrAsList<std::pmr::vector<Ast::LegalizeRuleDef::RuleInstruction>> >> lexy::construct<EmitClause>;
 };
 
+/**
+ * Dispatches a rule body block to the match, when, or emit/expand grammar.
+ */
 struct RuleBlock
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -276,6 +344,10 @@ struct RuleBlock
     static constexpr auto value = lexy::construct<RuleBlockClause>;
 };
 
+/**
+ * Parses a `rule NAME { match/when/emit blocks }` declaration and sorts the parsed blocks into
+ * the match, when, and emit lists of a LegalizeRule.
+ */
 struct LegalizeRule
 {
     static constexpr auto whitespace = Common::Whitespace;
@@ -308,6 +380,9 @@ struct LegalizeRule
                                           });
 };
 
+/**
+ * Parses a whole `.lrd` file as an EOF-terminated list of `;`-terminated rules into a LegalizeRuleFile.
+ */
 struct LegalizeRuleFile
 {
     static constexpr auto whitespace = Common::Whitespace;

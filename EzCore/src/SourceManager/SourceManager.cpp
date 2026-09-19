@@ -24,6 +24,10 @@ static void populateLineRanges(SourceFileEntry *entry)
     }
 }
 
+/**
+ * Initializes the working directory and arena-backed containers, reserving slot 0 as a null
+ * sentinel so source IDs are 1-based.
+ */
 SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc) :
     m_workingPath(workingPath), m_alloc(alloc), m_includePaths(m_alloc), m_pathToIdMap(m_alloc), m_sourceFiles(m_alloc)
 {
@@ -31,6 +35,9 @@ SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr:
     m_sourceFiles.push_back(nullptr);
 }
 
+/**
+ * Explicitly runs each SourceFileEntry destructor and returns its arena memory to the resource.
+ */
 SourceManager::~SourceManager()
 {
     // Explicitly destroy and deallocate each arena-allocated SourceFileEntry
@@ -44,11 +51,18 @@ SourceManager::~SourceManager()
     }
 }
 
+/**
+ * Returns true when the name or canonical path is already present in the registry.
+ */
 bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) const
 {
     return m_pathToIdMap.find(sourceName) != m_pathToIdMap.end();
 }
 
+/**
+ * Registers in-memory content under name, precomputes its line table and returns the new 1-based
+ * ID, or 0 if the name is already registered. The entry and its strings are allocated in the arena.
+ */
 size_t SourceManager::addSourceContent(const std::string &name, const std::string_view &content)
 {
     if (doesSourceNameExist(name))
@@ -73,6 +87,10 @@ size_t SourceManager::addSourceContent(const std::string &name, const std::strin
     return newId;
 }
 
+/**
+ * Allocates a SourceReference for [startOffset, startOffset+length) in sourceId, clamping the end
+ * to the file length. Returns nullptr for invalid IDs, entries or start offsets.
+ */
 SourceReference *SourceManager::createReference(size_t startOffset, size_t length, size_t sourceId)
 {
     if (sourceId == 0 || sourceId >= m_sourceFiles.size())
@@ -98,6 +116,10 @@ SourceReference *SourceManager::createReference(size_t startOffset, size_t lengt
     return new (mem) SourceReference{ startOffset, endOffset, sourceId };
 }
 
+/**
+ * Resolves the file by name and delegates to the ID-based createReference; returns nullptr when
+ * the name is unknown.
+ */
 SourceReference *SourceManager::createReference(size_t startOffset, size_t length, const std::string_view &sourceFile)
 {
     auto it = m_pathToIdMap.find(sourceFile);
@@ -108,6 +130,10 @@ SourceReference *SourceManager::createReference(size_t startOffset, size_t lengt
     return createReference(startOffset, length, it->second);
 }
 
+/**
+ * Locates the precomputed line containing the reference's begin offset via upper_bound, then
+ * verifies the offset lies within the preceding range. Returns nullptr when no range matches.
+ */
 SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
 {
     if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
@@ -140,6 +166,10 @@ SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
     return nullptr;
 }
 
+/**
+ * Registers an include directory, canonicalizing it when it exists and storing it unchanged
+ * otherwise.
+ */
 void SourceManager::addIncludePath(const std::filesystem::path &path)
 {
     std::error_code ec;
@@ -153,6 +183,11 @@ void SourceManager::addIncludePath(const std::filesystem::path &path)
     }
 }
 
+/**
+ * Resolves a source path by trying, in order: an existing absolute path, the directory of the
+ * including file, the working directory, then each registered include path. Falls back to a
+ * working-directory-relative canonical path when nothing exists.
+ */
 std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::path &sourceFile,
                                                        const std::optional<std::filesystem::path> &relativeTo) const
 {
@@ -198,6 +233,11 @@ std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::pa
     return std::filesystem::weakly_canonical(m_workingPath / sourceFile, ec);
 }
 
+/**
+ * Resolves and reads filePath into an arena-backed entry, reusing the existing ID for an
+ * already-loaded canonical path. Returns the new ID, or std::nullopt when the file cannot be
+ * opened or read fully.
+ */
 std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &filePath,
                                               const std::optional<std::filesystem::path> &relativeTo)
 {
@@ -248,6 +288,9 @@ std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &fileP
     return newId;
 }
 
+/**
+ * Returns the arena-backed content buffer for the source ID, or nullptr when the ID is invalid.
+ */
 const std::pmr::string *SourceManager::getSourceBuffer(size_t id) const
 {
     if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
@@ -257,8 +300,15 @@ const std::pmr::string *SourceManager::getSourceBuffer(size_t id) const
     return &m_sourceFiles[id]->m_content;
 }
 
+/**
+ * Returns the registered include search paths.
+ */
 const std::pmr::vector<std::filesystem::path> &SourceManager::getIncludePaths() const { return m_includePaths; }
 
+/**
+ * Returns a view of the full line containing the reference (terminators excluded), or an empty
+ * view when the reference line cannot be resolved.
+ */
 std::string_view SourceManager::getRawLineContent(SourceReference *ref) const
 {
     SourceLineRange *lineRange = getReferenceLine(ref);
@@ -271,6 +321,10 @@ std::string_view SourceManager::getRawLineContent(SourceReference *ref) const
     return std::string_view(entry->m_content.data() + lineRange->m_beginOffset, lineRange->length());
 }
 
+/**
+ * Returns a view of the exact referenced byte span, or an empty view when the reference is
+ * invalid or its offsets fall outside the file content.
+ */
 std::string_view SourceManager::getReferenceContent(SourceReference *ref) const
 {
     if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
@@ -294,6 +348,9 @@ std::string_view SourceManager::getReferenceContent(SourceReference *ref) const
     return std::string_view(content.data() + ref->m_beginOffset, ref->length());
 }
 
+/**
+ * Returns the full content of the source with the given ID, or an empty view if invalid.
+ */
 std::string_view SourceManager::getSourceContent(size_t id) const
 {
     if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
@@ -303,6 +360,9 @@ std::string_view SourceManager::getSourceContent(size_t id) const
     return m_sourceFiles[id]->m_content;
 }
 
+/**
+ * Returns the registered display name of the source with the given ID, or an empty view if invalid.
+ */
 std::string_view SourceManager::getSourceName(size_t id) const
 {
     if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])

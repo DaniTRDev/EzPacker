@@ -8,17 +8,34 @@
 #include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
 
+/**
+ * Initializes the CFG pass and its result storage using the context's global arena.
+ */
 CodeFlowAnalysisPass::CodeFlowAnalysisPass(MirBuilderContext *ctx) :
     m_ctx(ctx), m_arena(ctx->getGlobalAllocator()), m_result(ctx->getGlobalAllocator())
 {
 }
 
+/**
+ * Returns the pass identifier.
+ */
 const char *CodeFlowAnalysisPass::getName() const { return "CodeFlowAnalysisPass"; }
 
+/**
+ * Returns the computed CFG adjacency mappings.
+ */
 CodeFlowResult *CodeFlowAnalysisPass::getResult() { return &m_result; }
 
+/**
+ * Runs once per function.
+ */
 MirPassIterationPlace CodeFlowAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
+/**
+ * Builds the CFG for the target function: initializes an adjacency entry per block, adds edges
+ * for branch-target operands, and adds the implicit fallthrough edge when a block neither ends in
+ * an unconditional branch nor a return.
+ */
 MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                         class MirPassManager *passManager)
 {
@@ -119,6 +136,10 @@ MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
 }
 
+/**
+ * Traces the successor and predecessor list of every block; skips all work when trace diagnostics
+ * are disabled.
+ */
 void CodeFlowAnalysisPass::printResult()
 {
     auto diag = m_ctx->getDiagCollector();
@@ -172,12 +193,19 @@ void CodeFlowAnalysisPass::printResult()
     }
 }
 
+/**
+ * Clears the previous successor/predecessor mappings so the pass can run on another function.
+ */
 void CodeFlowAnalysisPass::reset()
 {
     m_result.m_successors.clear();
     m_result.m_predecessors.clear();
 }
 
+/**
+ * Records a directed edge from -> to in both the successor and predecessor sets, ignoring null
+ * blocks and duplicate edges.
+ */
 void CodeFlowAnalysisPass::addEdge(const MirBlock *from, const MirBlock *to)
 {
     if (!from || !to)
