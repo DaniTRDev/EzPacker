@@ -14,6 +14,7 @@ enum class GeneratorKind
     Legalizer,    // CppLegalizerGenerator
     Rules,        // CppLegalizeRuleGenerator
     TargetInstructions, // CppTargetInstructionGenerator
+    TargetEncodings,    // CppTargetEncodingGenerator
     InstructionSelector, // CppInstructionSelectorGenerator
     CallingConv,  // CppCallingConvGenerator
     RegisterInfo, // CppRegisterInfoGenerator
@@ -52,6 +53,7 @@ struct CliOptions
     std::string instructionsFilePath; // --instructions <file.irdf>
     bool emitRules{ false };          // --emit-rules
     bool emitTargetInstructions{ false }; // --emit-target-instructions
+    bool emitTargetEncodings{ false };    // --emit-target-encodings
     bool emitInstructionSelector{ false }; // --emit-instruction-selector
     bool emitCallingConv{ false };    // --emit-calling-conv
     bool emitRegisterInfo{ false };   // --emit-registers

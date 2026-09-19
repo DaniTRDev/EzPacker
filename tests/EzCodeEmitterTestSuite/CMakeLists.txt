@@ -44,3 +44,10 @@ EzPacker_AddTest(
         ""
         "tests/T_StressAndSanitizers.cpp"
 )
+
+EzPacker_AddTest(
+        "T_TableGenEncoding"
+        "EzCodeEmitterTestSuite"
+        ""
+        "tests/T_TableGenEncoding.cpp"
+)

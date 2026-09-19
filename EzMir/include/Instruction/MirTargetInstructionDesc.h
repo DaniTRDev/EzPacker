@@ -87,6 +87,21 @@ class MirTargetInstructionDesc
      */
     MirInstructionFlags getTargetFlags() const;
 
+    /**
+     * Sentinel indicating that no encoding table entry is associated with this descriptor.
+     */
+    static constexpr size_t INVALID_ENCODING_ID = 0;
+
+    /**
+     * Returns the index into the target's generated encoding table, or INVALID_ENCODING_ID.
+     */
+    size_t getEncodingId() const;
+
+    /**
+     * Associates this descriptor with a generated encoding table entry.
+     */
+    void setEncodingId(size_t id);
+
   private:
     /**
      * Assembly mnemonic string.
@@ -122,6 +137,11 @@ class MirTargetInstructionDesc
      * Target instruction flags.
      */
     MirInstructionFlags m_targetFlags{ MirInstructionFlags::None };
+
+    /**
+     * Index into the target encoding table (0 = unassigned).
+     */
+    size_t m_encodingId{ INVALID_ENCODING_ID };
 };
 
 #endif // EZMIR_MIR_TARGET_INSTRUCTION_DESC_H

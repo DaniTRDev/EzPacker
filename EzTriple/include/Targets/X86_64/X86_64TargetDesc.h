@@ -56,6 +56,8 @@ class X86_64TargetDesc : public TargetDesc
     MirRegisterBank *createRegisterBank(const char *name) override;
     GenericCodeEmitter *createCodeEmitter() override;
     TargetRelocationResolver *getRelocationResolver() override;
+    const EzCodeEmitter::TableGen::EncodingDesc *getEncodingDesc(size_t id) override;
+    const EzCodeEmitter::TableGen::EncodingDesc *findEncodingDesc(const char *name) override;
 
     CallingConvDesc *getSysVCallingConv() const { return m_sysVConv.get(); }
     CallingConvDesc *getWin64CallingConv() const { return m_win64Conv.get(); }

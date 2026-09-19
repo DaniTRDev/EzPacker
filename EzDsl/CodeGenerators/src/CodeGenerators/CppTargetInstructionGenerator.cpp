@@ -234,6 +234,12 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
             auto fnScope = emitter.enterBlock();
             emitter.emitLine("if (!target) return;");
             emitter.emitBlankLine();
+            emitter.emitLine("for (size_t i = 0; i < static_cast<size_t>(OPCODE_COUNT) - 1; ++i)");
+            {
+                auto loopScope = emitter.enterBlock();
+                emitter.emitLine("s_descs[i].setEncodingId(i + 1);");
+            }
+            emitter.emitBlankLine();
             emitter.emitLine("auto findClass = [&](std::string_view name) -> MirRegisterClass * {");
             emitter.indent();
             emitter.emitLine("for (auto *bank : target->getAvailableRegisterBanks())");

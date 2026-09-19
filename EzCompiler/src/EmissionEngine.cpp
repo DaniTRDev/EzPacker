@@ -8,6 +8,7 @@
 #include "CodeEmitterContext.h"
 #include "CodeSection.h"
 #include "X86_64/X86_64CodeEmitter.h"
+#include "Descriptors/TargetDesc.h"
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
 #include "Operand/MirOperands.h"
@@ -44,6 +45,22 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
     ::CodeEmitterContext emitterCtx(m_ctx.getDiagCollector(), sections, m_ctx.getSessionAllocator());
     EzCodeEmitter::X86_64::X86_64CodeEmitter emitter;
+    if (TargetDesc *targetDesc = m_ctx.getTargetDesc())
+    {
+        emitter.setEncodingResolver(
+            [targetDesc](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::TableGen::EncodingDesc *
+            {
+                if (!desc)
+                {
+                    return nullptr;
+                }
+                if (const auto *enc = targetDesc->getEncodingDesc(desc->getEncodingId()))
+                {
+                    return enc;
+                }
+                return targetDesc->findEncodingDesc(desc->getName());
+            });
+    }
 
     std::vector<EzCodeEmitter::ObjectFormat::ObjectSymbol> symbols;
     std::unordered_map<size_t, MirFunction *> funcById;

@@ -11,10 +11,12 @@
 #include "Legalizer/MirLegalizer.h"
 #include "x86_64CallingConvDesc.h"
 #include "x86_64TargetInstructionTable.h"
+#include "x86_64EncodingTable.h"
 #include "x86_64LegalizerActionTable.h"
 #include "Targets/X86_64/X86_64InstructionSelector.h"
 #include "Targets/X86_64/X86_64RelocationResolver.h"
 #include "X86_64/X86_64CodeEmitter.h"
+#include "Instruction/MirTargetInstructionDesc.h"
 
 namespace EzTriple
 {
@@ -238,7 +240,31 @@ MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)
 
 GenericCodeEmitter *X86_64TargetDesc::createCodeEmitter()
 {
-    return new EzCodeEmitter::X86_64::X86_64CodeEmitter();
+    auto *emitter = new EzCodeEmitter::X86_64::X86_64CodeEmitter();
+    emitter->setEncodingResolver(
+        [this](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::TableGen::EncodingDesc *
+        {
+            if (!desc)
+            {
+                return nullptr;
+            }
+            if (const auto *enc = getEncodingDesc(desc->getEncodingId()))
+            {
+                return enc;
+            }
+            return findEncodingDesc(desc->getName());
+        });
+    return emitter;
+}
+
+const EzCodeEmitter::TableGen::EncodingDesc *X86_64TargetDesc::getEncodingDesc(size_t id)
+{
+    return EzCodeEmitter::TableGen::x86_64::getEncodingDesc(id);
+}
+
+const EzCodeEmitter::TableGen::EncodingDesc *X86_64TargetDesc::findEncodingDesc(const char *name)
+{
+    return EzCodeEmitter::TableGen::x86_64::findEncodingDesc(name);
 }
 
 TargetRelocationResolver *X86_64TargetDesc::getRelocationResolver()

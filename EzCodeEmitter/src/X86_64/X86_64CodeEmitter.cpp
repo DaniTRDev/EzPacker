@@ -6,7 +6,9 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Type/MirType.h"
+#include "TableGen/InstructionEncoder.h"
 #include <stdexcept>
+#include <string_view>
 
 namespace EzCodeEmitter::X86_64
 {
@@ -156,9 +158,271 @@ MemoryOperand X86_64CodeEmitter::mapOperandToMemory(MirOperand *op) const
     return MemoryOperand::Base(Reg::None);
 }
 
+namespace
+{
+
+uint8_t operandSizeBytes(MirOperand *op, MirRegister *reg)
+{
+    (void)reg;
+    if (op)
+    {
+        MirType *type = op->getMirType();
+        if (type)
+        {
+            size_t bits = type->getTotalSizeInBits();
+            if (bits > 0)
+            {
+                return static_cast<uint8_t>((bits + 7) / 8);
+            }
+        }
+    }
+    return 8;
+}
+
+} // namespace
+
+bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
+                                              std::span<MirOperand *> operands,
+                                              std::vector<TableGen::ResolvedOperand> &resolved) const
+{
+    resolved.assign(operands.size(), TableGen::ResolvedOperand{});
+
+    auto usesMemorySlot = [&enc](size_t index) {
+        for (uint8_t i = 0; i < enc.m_operandCount; ++i)
+        {
+            if (enc.m_operands[i].m_operandIndex == index && enc.m_operands[i].m_slot == TableGen::EncSlotKind::RmMem)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    auto buildMemory = [&](MirOperand *op) {
+        TableGen::EncMemory mem;
+        if (op->getType() == MirOperandType::Memory)
+        {
+            auto *mirMem = op->get<MirMemory>();
+            if (mirMem)
+            {
+                if (mirMem->hasBaseReg())
+                {
+                    Reg base = mapRegister(mirMem->getBase());
+                    mem.m_base = isXmmReg(base) ? getXmmId(base) : static_cast<uint8_t>(base);
+                }
+                if (mirMem->hasIndexReg())
+                {
+                    Reg index = mapRegister(mirMem->getIndex());
+                    mem.m_index = isXmmReg(index) ? getXmmId(index) : static_cast<uint8_t>(index);
+                    mem.m_scale = mirMem->getScale();
+                }
+                if (mirMem->getDisplacement())
+                {
+                    mem.m_disp = mirMem->getDisplacement()->getValue().getI64();
+                }
+            }
+        }
+        else if (op->getType() == MirOperandType::Reference)
+        {
+            auto *ref = op->get<MirReference>();
+            if (ref)
+            {
+                if (ref->isStackFrameObject())
+                {
+                    int64_t offset = static_cast<int64_t>(ref->getOffset());
+                    if (m_currentFunc && m_currentFunc->getStackFrame())
+                    {
+                        if (StackFrameObject *obj = m_currentFunc->getStackFrame()->getObjectFromId(ref->getRefId()))
+                        {
+                            offset += obj->m_offset;
+                        }
+                    }
+                    mem.m_base = static_cast<uint8_t>(Reg::RBP);
+                    mem.m_disp = offset;
+                }
+                else if (ref->isGlobalVar())
+                {
+                    mem.m_ripRel = true;
+                    mem.m_needsReloc = true;
+                    mem.m_disp = 0;
+                }
+            }
+        }
+        return mem;
+    };
+
+    for (size_t i = 0; i < operands.size(); ++i)
+    {
+        MirOperand *op = operands[i];
+        if (!op)
+        {
+            continue;
+        }
+
+        TableGen::ResolvedOperand &out = resolved[i];
+        switch (op->getType())
+        {
+            case MirOperandType::Register:
+            {
+                auto *reg = op->get<MirRegister>();
+                if (!reg)
+                {
+                    return false;
+                }
+                Reg physical = mapRegister(reg);
+                out.m_kind = TableGen::ResolvedOperand::Kind::Register;
+                out.m_isFpr = isXmmReg(physical);
+                out.m_reg = isXmmReg(physical) ? getXmmId(physical) : static_cast<uint8_t>(physical);
+                out.m_sizeBytes = operandSizeBytes(op, reg);
+                break;
+            }
+            case MirOperandType::Integer:
+            {
+                auto *imm = op->get<MirInteger>();
+                out.m_kind = TableGen::ResolvedOperand::Kind::Immediate;
+                out.m_imm = imm ? imm->getValue().getI64() : 0;
+                out.m_sizeBytes = operandSizeBytes(op, nullptr);
+                break;
+            }
+            case MirOperandType::Memory:
+            {
+                out.m_kind = TableGen::ResolvedOperand::Kind::Memory;
+                out.m_mem = buildMemory(op);
+                out.m_sizeBytes = operandSizeBytes(op, nullptr);
+                break;
+            }
+            case MirOperandType::Reference:
+            {
+                if (usesMemorySlot(i))
+                {
+                    out.m_kind = TableGen::ResolvedOperand::Kind::Memory;
+                    out.m_mem = buildMemory(op);
+                }
+                else
+                {
+                    out.m_kind = TableGen::ResolvedOperand::Kind::Immediate;
+                    out.m_needsReloc = true;
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    return true;
+}
+
+bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands)
+{
+    if (!m_encodingResolver)
+    {
+        return false;
+    }
+
+    const TableGen::EncodingDesc *enc = m_encodingResolver(desc);
+    if (!enc || enc->m_form == TableGen::EncForm::None)
+    {
+        return false;
+    }
+
+    CodeSection *sec = m_ctx->getCurrentSection();
+    if (!sec)
+    {
+        return false;
+    }
+
+    std::vector<TableGen::ResolvedOperand> resolved;
+    if (!buildResolvedOperands(*enc, operands, resolved))
+    {
+        return false;
+    }
+
+    auto toOldReg = [](const TableGen::ResolvedOperand &r) {
+        return r.m_isFpr ? static_cast<Reg>(16 + r.m_reg) : static_cast<Reg>(r.m_reg);
+    };
+
+    std::vector<uint8_t> bytes;
+
+    // Two-address coalescing: copy the source of a destructive operation into the destination.
+    if (enc->m_coalesceSrc != 0xFF && enc->m_coalesceSrc < resolved.size() && !resolved.empty())
+    {
+        const TableGen::ResolvedOperand &dst = resolved[0];
+        const TableGen::ResolvedOperand &src = resolved[enc->m_coalesceSrc];
+        if (dst.m_kind == TableGen::ResolvedOperand::Kind::Register &&
+            src.m_kind == TableGen::ResolvedOperand::Kind::Register)
+        {
+            bool sameRegister = (dst.m_reg == src.m_reg && dst.m_isFpr == src.m_isFpr);
+            if (!sameRegister)
+            {
+                if (dst.m_isFpr || src.m_isFpr)
+                {
+                    if (dst.m_sizeBytes == 4)
+                    {
+                        InstructionEncoder::emitMovssRR(bytes, toOldReg(dst), toOldReg(src));
+                    }
+                    else
+                    {
+                        InstructionEncoder::emitMovsdRR(bytes, toOldReg(dst), toOldReg(src));
+                    }
+                }
+                else
+                {
+                    InstructionEncoder::emitMovRR(bytes, toOldReg(dst), toOldReg(src), dst.m_sizeBytes);
+                }
+            }
+        }
+    }
+
+    TableGen::EncodeResult result;
+    if (!TableGen::InstructionEncoder::encode(*enc, resolved, bytes, result))
+    {
+        return false;
+    }
+
+    if (result.m_hasReloc)
+    {
+        MirReference *relocRef = nullptr;
+        for (size_t i = 0; i < resolved.size() && !relocRef; ++i)
+        {
+            bool needsReloc = resolved[i].m_needsReloc ||
+                              (resolved[i].m_kind == TableGen::ResolvedOperand::Kind::Memory &&
+                               resolved[i].m_mem.m_needsReloc);
+            if (needsReloc && operands[i]->getType() == MirOperandType::Reference)
+            {
+                relocRef = operands[i]->get<MirReference>();
+            }
+        }
+
+        if (relocRef)
+        {
+            uint64_t start = sec->getCurrentOffset();
+            if (result.m_isBranch)
+            {
+                m_ctx->addReloc(relocRef, TargetCodeRelocationType::BranchRel32);
+            }
+            else
+            {
+                m_ctx->addRelocAt(relocRef, TargetCodeRelocationType::PCRel32, start + result.m_relocOffset);
+            }
+        }
+    }
+
+    if (!bytes.empty())
+    {
+        sec->emitBytes(bytes.data(), bytes.size());
+    }
+    return true;
+}
+
 void X86_64CodeEmitter::emitInst(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands)
 {
     if (!desc || !m_ctx)
+    {
+        return;
+    }
+
+    if (tryEmitTableDriven(desc, operands))
     {
         return;
     }

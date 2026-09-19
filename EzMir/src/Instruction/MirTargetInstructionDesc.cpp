@@ -92,3 +92,13 @@ const std::vector<class MirRegisterRef> &MirTargetInstructionDesc::getImplicitUs
  * Returns the target instruction flags.
  */
 MirInstructionFlags MirTargetInstructionDesc::getTargetFlags() const { return m_targetFlags; }
+
+/**
+ * Returns the index into the generated encoding table, or INVALID_ENCODING_ID.
+ */
+size_t MirTargetInstructionDesc::getEncodingId() const { return m_encodingId; }
+
+/**
+ * Associates this descriptor with a generated encoding table entry.
+ */
+void MirTargetInstructionDesc::setEncodingId(size_t id) { m_encodingId = id; }

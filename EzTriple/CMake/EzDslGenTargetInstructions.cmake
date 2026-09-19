@@ -36,6 +36,7 @@ function(EzDslGenTargetInstructions)
 
     set(GEN_HEADER "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}TargetInstructionTable.h")
     set(GEN_SOURCE "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}TargetInstructionTable.cpp")
+    set(GEN_ENCODING_HEADER "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}EncodingTable.h")
 
     file(MAKE_DIRECTORY "${EZDSL_OUTPUT_DIR}")
 
@@ -57,9 +58,22 @@ function(EzDslGenTargetInstructions)
         VERBATIM
     )
 
+    add_custom_command(
+        OUTPUT "${GEN_ENCODING_HEADER}"
+        COMMAND ${ENV_WRAPPER} $<TARGET_FILE:EzDslCli>
+                -i "${EZDSL_INPUT}"
+                -o "${EZDSL_OUTPUT_DIR}"
+                --emit-target-encodings
+                --target "${EZDSL_TARGET_NAME}"
+        DEPENDS EzDslCli "${EZDSL_INPUT}"
+        COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}EncodingTable from ${EZDSL_INPUT}"
+        VERBATIM
+    )
+
     target_sources(${EZDSL_TARGET} PRIVATE
         "${GEN_HEADER}"
         "${GEN_SOURCE}"
+        "${GEN_ENCODING_HEADER}"
     )
 
     target_include_directories(${EZDSL_TARGET} PUBLIC

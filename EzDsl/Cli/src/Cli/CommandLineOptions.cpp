@@ -54,6 +54,11 @@ void CommandLineParser::setupArguments()
             .default_value(false)
             .implicit_value(true);
 
+    m_program->add_argument("--emit-target-encodings")
+            .help("Synthesize Target EncodingTable (.h) from .idf ENCODING blocks")
+            .default_value(false)
+            .implicit_value(true);
+
     m_program->add_argument("--emit-instruction-selector")
             .help("Synthesize Target InstructionSelector (.h and .cpp) from .isf")
             .default_value(false)
@@ -223,6 +228,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     opts.instructionsFilePath = m_program->get<std::string>("--instructions");
     opts.emitRules = m_program->get<bool>("--emit-rules");
     opts.emitTargetInstructions = m_program->get<bool>("--emit-target-instructions");
+    opts.emitTargetEncodings = m_program->get<bool>("--emit-target-encodings");
     opts.emitInstructionSelector = m_program->get<bool>("--emit-instruction-selector");
     opts.emitCallingConv = m_program->get<bool>("--emit-calling-conv");
     opts.emitRegisterInfo = m_program->get<bool>("--emit-registers");
@@ -233,6 +239,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     bool emitLegalizer = m_program->get<bool>("--emit-legalizer");
     bool emitRules = opts.emitRules;
     bool emitTargetInstructions = opts.emitTargetInstructions;
+    bool emitTargetEncodings = opts.emitTargetEncodings;
     bool emitInstructionSelector = opts.emitInstructionSelector;
     bool emitCallingConv = opts.emitCallingConv;
     bool emitRegisterInfo = opts.emitRegisterInfo;
@@ -248,7 +255,8 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     }
 
     size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) + (emitRules ? 1 : 0)
-                     + (emitTargetInstructions ? 1 : 0) + (emitInstructionSelector ? 1 : 0) + (emitCallingConv ? 1 : 0)
+                     + (emitTargetInstructions ? 1 : 0) + (emitTargetEncodings ? 1 : 0)
+                     + (emitInstructionSelector ? 1 : 0) + (emitCallingConv ? 1 : 0)
                      + (emitRegisterInfo ? 1 : 0) + (emitTargetDesc ? 1 : 0);
     if (emitCount > 1)
     {
@@ -275,6 +283,10 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     else if (emitTargetInstructions)
     {
         opts.generator = GeneratorKind::TargetInstructions;
+    }
+    else if (emitTargetEncodings)
+    {
+        opts.generator = GeneratorKind::TargetEncodings;
     }
     else if (emitInstructionSelector)
     {
@@ -311,6 +323,10 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     else if (explicitGen == "target-instructions" || explicitGen == "target_instructions" || explicitGen == "target-inst")
     {
         opts.generator = GeneratorKind::TargetInstructions;
+    }
+    else if (explicitGen == "target-encodings" || explicitGen == "target_encodings" || explicitGen == "encodings")
+    {
+        opts.generator = GeneratorKind::TargetEncodings;
     }
     else if (explicitGen == "instruction-selector" || explicitGen == "instruction_selector" || explicitGen == "isel")
     {

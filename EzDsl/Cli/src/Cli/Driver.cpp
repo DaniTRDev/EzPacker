@@ -8,6 +8,7 @@
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
 #include "CodeGenerators/CppTargetInstructionGenerator.h"
+#include "CodeGenerators/CppTargetEncodingGenerator.h"
 #include "CodeGenerators/CppInstructionSelectorGenerator.h"
 #include "CodeGenerators/CppCallingConvGenerator.h"
 #include "CodeGenerators/CppRegisterInfoGenerator.h"
@@ -565,6 +566,22 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         if (emitSource)
         {
             outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
+        }
+    }
+    else if (genKind == GeneratorKind::TargetEncodings)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        target = sanitizeTargetIdentifier(target);
+        if (target.empty()) target = "Target";
+
+        if (!m_options.sourceOnly || m_options.headerOnly)
+        {
+            auto hPath = resolveSingleFile(outDir, std::format("{}EncodingTable.h", target));
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
         }
     }
     else if (genKind == GeneratorKind::InstructionSelector)
@@ -1151,6 +1168,7 @@ DriverResult Driver::run()
             case GeneratorKind::Legalizer: gInfo.generatorName = "CppLegalizerGenerator"; break;
             case GeneratorKind::Rules: gInfo.generatorName = "CppLegalizeRuleGenerator"; break;
             case GeneratorKind::TargetInstructions: gInfo.generatorName = "CppTargetInstructionGenerator"; break;
+            case GeneratorKind::TargetEncodings: gInfo.generatorName = "CppTargetEncodingGenerator"; break;
             case GeneratorKind::InstructionSelector: gInfo.generatorName = "CppInstructionSelectorGenerator"; break;
             case GeneratorKind::CallingConv: gInfo.generatorName = "CppCallingConvGenerator"; break;
             case GeneratorKind::RegisterInfo: gInfo.generatorName = "CppRegisterInfoGenerator"; break;
@@ -1283,6 +1301,24 @@ DriverResult Driver::run()
         {
             result.success = false;
             result.errorMessage = "Code generation failed during TargetInstructionTable synthesis.";
+            return result;
+        }
+    }
+    else if (genKind == GeneratorKind::TargetEncodings)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        CppTargetEncodingGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during TargetEncodingTable synthesis.";
             return result;
         }
     }

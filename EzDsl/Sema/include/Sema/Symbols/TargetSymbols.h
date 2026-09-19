@@ -23,6 +23,7 @@ struct TargetInstructionSymbol
     std::pmr::vector<std::string_view> m_flags;
     std::pmr::vector<std::string_view> m_implicitDefs;
     std::pmr::vector<std::string_view> m_implicitUses;
+    std::optional<DSL::Ast::TargetInstDef::EncodingDecl> m_encoding;
 
     bool hasFlag(std::string_view flag) const noexcept
     {

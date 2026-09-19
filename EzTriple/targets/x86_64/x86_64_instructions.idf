@@ -7,105 +7,291 @@ target AMD64;
 target_inst ADD32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("addl");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x01];
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst ADD32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
     MNEMONIC("addl");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 0;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst ADD32rm(GPR32:dst OUT, GPR32:src1 IN, Mem32:addr IN) {
     MNEMONIC("addl");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x03];
+        operands { dst => reg; addr => rm_mem; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst ADD64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("addq");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x01];
+        rex_w: true;
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst ADD64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
     MNEMONIC("addq");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 0;
+        rex_w: true;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst ADD64rm(GPR64:dst OUT, GPR64:src1 IN, Mem64:addr IN) {
     MNEMONIC("addq");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x03];
+        rex_w: true;
+        operands { dst => reg; addr => rm_mem; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUB32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("subl");
+    ENCODING {
+        form: rr;
+        opcode: [0x29];
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUB32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
     MNEMONIC("subl");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 5;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUB32rm(GPR32:dst OUT, GPR32:src1 IN, Mem32:addr IN) {
     MNEMONIC("subl");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x2B];
+        operands { dst => reg; addr => rm_mem; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUB64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("subq");
+    ENCODING {
+        form: rr;
+        opcode: [0x29];
+        rex_w: true;
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUB64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
     MNEMONIC("subq");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 5;
+        rex_w: true;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUB64rm(GPR64:dst OUT, GPR64:src1 IN, Mem64:addr IN) {
     MNEMONIC("subq");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x2B];
+        rex_w: true;
+        operands { dst => reg; addr => rm_mem; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst IMUL32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("imull");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: imul_rr;
+        opcode: [0x0F, 0xAF];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst IMUL32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
     MNEMONIC("imull");
+    ENCODING {
+        form: imul_ri;
+        opcode: [0x69];
+        operands { dst => reg; src1 => rm_reg; imm => imm8_signed; };
+        size: dst;
+    };
 };
 
 target_inst IMUL64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("imulq");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: imul_rr;
+        opcode: [0x0F, 0xAF];
+        rex_w: true;
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst IMUL64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
     MNEMONIC("imulq");
+    ENCODING {
+        form: imul_ri;
+        opcode: [0x69];
+        rex_w: true;
+        operands { dst => reg; src1 => rm_reg; imm => imm8_signed; };
+        size: dst;
+    };
 };
 
 target_inst IDIV32r(GPR32:src IN) {
     MNEMONIC("idivl");
+    ENCODING {
+        form: div;
+        opcode: [0xF7];
+        opcode_digit: 7;
+        operands { src => rm_reg; };
+        size: src;
+    };
 };
 
 target_inst IDIV64r(GPR64:src IN) {
     MNEMONIC("idivq");
+    ENCODING {
+        form: div;
+        opcode: [0xF7];
+        opcode_digit: 7;
+        rex_w: true;
+        operands { src => rm_reg; };
+        size: src;
+    };
 };
 
 target_inst DIV32r(GPR32:src IN) {
     MNEMONIC("divl");
+    ENCODING {
+        form: div;
+        opcode: [0xF7];
+        opcode_digit: 6;
+        operands { src => rm_reg; };
+        size: src;
+    };
 };
 
 target_inst DIV64r(GPR64:src IN) {
     MNEMONIC("divq");
+    ENCODING {
+        form: div;
+        opcode: [0xF7];
+        opcode_digit: 6;
+        rex_w: true;
+        operands { src => rm_reg; };
+        size: src;
+    };
 };
 
 target_inst NEG32r(GPR32:dst OUT, GPR32:src IN) {
     MNEMONIC("negl");
+    ENCODING {
+        form: unary;
+        opcode: [0xF7];
+        opcode_digit: 3;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst NEG64r(GPR64:dst OUT, GPR64:src IN) {
     MNEMONIC("negq");
+    ENCODING {
+        form: unary;
+        opcode: [0xF7];
+        opcode_digit: 3;
+        rex_w: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst NOT32r(GPR32:dst OUT, GPR32:src IN) {
     MNEMONIC("notl");
+    ENCODING {
+        form: unary;
+        opcode: [0xF7];
+        opcode_digit: 2;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst NOT64r(GPR64:dst OUT, GPR64:src IN) {
     MNEMONIC("notq");
+    ENCODING {
+        form: unary;
+        opcode: [0xF7];
+        opcode_digit: 2;
+        rex_w: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 // ============================================================================
@@ -115,103 +301,307 @@ target_inst NOT64r(GPR64:dst OUT, GPR64:src IN) {
 target_inst AND32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("andl");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x21];
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst AND32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
     MNEMONIC("andl");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 4;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst AND64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("andq");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x21];
+        rex_w: true;
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst AND64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
     MNEMONIC("andq");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 4;
+        rex_w: true;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst OR32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("orl");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x09];
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst OR32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
     MNEMONIC("orl");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 1;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst OR64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("orq");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x09];
+        rex_w: true;
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst OR64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
     MNEMONIC("orq");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 1;
+        rex_w: true;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst XOR32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
     MNEMONIC("xorl");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x31];
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst XOR32ri(GPR32:dst OUT, GPR32:src1 IN, i32:imm IN) {
     MNEMONIC("xorl");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 6;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst XOR64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("xorq");
     FLAGS(IsCommutative);
+    ENCODING {
+        form: rr;
+        opcode: [0x31];
+        rex_w: true;
+        operands { src2 => reg; dst => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst XOR64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
     MNEMONIC("xorq");
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 6;
+        rex_w: true;
+        operands { dst => rm_reg; imm => imm8_signed; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SHL32ri(GPR32:dst OUT, GPR32:src IN, i8:amt IN) {
     MNEMONIC("shll");
+    ENCODING {
+        form: shift;
+        opcode: [0xC1];
+        opcode_digit: 4;
+        operands { dst => rm_reg; amt => imm8; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SHL32rCL(GPR32:dst OUT, GPR32:src IN) {
     MNEMONIC("shll");
+    ENCODING {
+        form: shift;
+        opcode: [0xD3];
+        opcode_digit: 4;
+        shift_cl: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SHL64ri(GPR64:dst OUT, GPR64:src IN, i8:amt IN) {
     MNEMONIC("shlq");
+    ENCODING {
+        form: shift;
+        opcode: [0xC1];
+        opcode_digit: 4;
+        rex_w: true;
+        operands { dst => rm_reg; amt => imm8; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SHL64rCL(GPR64:dst OUT, GPR64:src IN) {
     MNEMONIC("shlq");
+    ENCODING {
+        form: shift;
+        opcode: [0xD3];
+        opcode_digit: 4;
+        rex_w: true;
+        shift_cl: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SHR32ri(GPR32:dst OUT, GPR32:src IN, i8:amt IN) {
     MNEMONIC("shrl");
+    ENCODING {
+        form: shift;
+        opcode: [0xC1];
+        opcode_digit: 5;
+        operands { dst => rm_reg; amt => imm8; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SHR32rCL(GPR32:dst OUT, GPR32:src IN) {
     MNEMONIC("shrl");
+    ENCODING {
+        form: shift;
+        opcode: [0xD3];
+        opcode_digit: 5;
+        shift_cl: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SHR64ri(GPR64:dst OUT, GPR64:src IN, i8:amt IN) {
     MNEMONIC("shrq");
+    ENCODING {
+        form: shift;
+        opcode: [0xC1];
+        opcode_digit: 5;
+        rex_w: true;
+        operands { dst => rm_reg; amt => imm8; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SHR64rCL(GPR64:dst OUT, GPR64:src IN) {
     MNEMONIC("shrq");
+    ENCODING {
+        form: shift;
+        opcode: [0xD3];
+        opcode_digit: 5;
+        rex_w: true;
+        shift_cl: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SAR32ri(GPR32:dst OUT, GPR32:src IN, i8:amt IN) {
     MNEMONIC("sarl");
+    ENCODING {
+        form: shift;
+        opcode: [0xC1];
+        opcode_digit: 7;
+        operands { dst => rm_reg; amt => imm8; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SAR32rCL(GPR32:dst OUT, GPR32:src IN) {
     MNEMONIC("sarl");
+    ENCODING {
+        form: shift;
+        opcode: [0xD3];
+        opcode_digit: 7;
+        shift_cl: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SAR64ri(GPR64:dst OUT, GPR64:src IN, i8:amt IN) {
     MNEMONIC("sarq");
+    ENCODING {
+        form: shift;
+        opcode: [0xC1];
+        opcode_digit: 7;
+        rex_w: true;
+        operands { dst => rm_reg; amt => imm8; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 target_inst SAR64rCL(GPR64:dst OUT, GPR64:src IN) {
     MNEMONIC("sarq");
+    ENCODING {
+        form: shift;
+        opcode: [0xD3];
+        opcode_digit: 7;
+        rex_w: true;
+        shift_cl: true;
+        operands { dst => rm_reg; };
+        coalesce: src;
+        size: dst;
+    };
 };
 
 // ============================================================================
@@ -221,81 +611,132 @@ target_inst SAR64rCL(GPR64:dst OUT, GPR64:src IN) {
 target_inst CMP32rr(GPR32:lhs IN, GPR32:rhs IN) {
     MNEMONIC("cmpl");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: rr;
+        opcode: [0x39];
+        operands { rhs => reg; lhs => rm_reg; };
+        size: lhs;
+    };
 };
 
 target_inst CMP32ri(GPR32:lhs IN, i32:imm IN) {
     MNEMONIC("cmpl");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 7;
+        operands { lhs => rm_reg; imm => imm8_signed; };
+        size: lhs;
+    };
 };
 
 target_inst CMP64rr(GPR64:lhs IN, GPR64:rhs IN) {
     MNEMONIC("cmpq");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: rr;
+        opcode: [0x39];
+        rex_w: true;
+        operands { rhs => reg; lhs => rm_reg; };
+        size: lhs;
+    };
 };
 
 target_inst CMP64ri(GPR64:lhs IN, i64:imm IN) {
     MNEMONIC("cmpq");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: ri;
+        opcode: [0x83];
+        opcode_digit: 7;
+        rex_w: true;
+        operands { lhs => rm_reg; imm => imm8_signed; };
+        size: lhs;
+    };
 };
 
 target_inst TEST32rr(GPR32:lhs IN, GPR32:rhs IN) {
     MNEMONIC("testl");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: test;
+        opcode: [0x85];
+        operands { rhs => reg; lhs => rm_reg; };
+        size: lhs;
+    };
 };
 
 target_inst TEST64rr(GPR64:lhs IN, GPR64:rhs IN) {
     MNEMONIC("testq");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: test;
+        opcode: [0x85];
+        rex_w: true;
+        operands { rhs => reg; lhs => rm_reg; };
+        size: lhs;
+    };
 };
 
 target_inst SETE(GPR8:dst OUT) {
     MNEMONIC("sete");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 4; operands { dst => rm_reg; }; };
 };
 
 target_inst SETNE(GPR8:dst OUT) {
     MNEMONIC("setne");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 5; operands { dst => rm_reg; }; };
 };
 
 target_inst SETL(GPR8:dst OUT) {
     MNEMONIC("setl");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 12; operands { dst => rm_reg; }; };
 };
 
 target_inst SETLE(GPR8:dst OUT) {
     MNEMONIC("setle");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 14; operands { dst => rm_reg; }; };
 };
 
 target_inst SETG(GPR8:dst OUT) {
     MNEMONIC("setg");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 15; operands { dst => rm_reg; }; };
 };
 
 target_inst SETGE(GPR8:dst OUT) {
     MNEMONIC("setge");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 13; operands { dst => rm_reg; }; };
 };
 
 target_inst SETB(GPR8:dst OUT) {
     MNEMONIC("setb");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 2; operands { dst => rm_reg; }; };
 };
 
 target_inst SETBE(GPR8:dst OUT) {
     MNEMONIC("setbe");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 6; operands { dst => rm_reg; }; };
 };
 
 target_inst SETA(GPR8:dst OUT) {
     MNEMONIC("seta");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 7; operands { dst => rm_reg; }; };
 };
 
 target_inst SETAE(GPR8:dst OUT) {
     MNEMONIC("setae");
     FLAGS(ReadsCPUFlags);
+    ENCODING { form: setcc; opcode: [0x0F, 0x90]; cond: 3; operands { dst => rm_reg; }; };
 };
 
 // ============================================================================
@@ -305,117 +746,299 @@ target_inst SETAE(GPR8:dst OUT) {
 target_inst MOV8rr(GPR8:dst OUT, GPR8:src IN) {
     MNEMONIC("movb");
     FLAGS(IsMove);
+    ENCODING {
+        form: rr;
+        opcode: [0x89];
+        byte_rex: true;
+        operands { src => reg; dst => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOV8ri(GPR8:dst OUT, i8:imm IN) {
     MNEMONIC("movb");
+    ENCODING {
+        form: movri;
+        opcode: [0xB8];
+        byte_rex: true;
+        operands { dst => reg; imm => imm8; };
+        size: dst;
+    };
 };
 
 target_inst MOV16rr(GPR16:dst OUT, GPR16:src IN) {
     MNEMONIC("movw");
     FLAGS(IsMove);
+    ENCODING {
+        form: rr;
+        opcode: [0x89];
+        operands { src => reg; dst => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOV16ri(GPR16:dst OUT, i16:imm IN) {
     MNEMONIC("movw");
+    ENCODING {
+        form: movri;
+        opcode: [0xB8];
+        operands { dst => reg; imm => imm16; };
+        size: dst;
+    };
 };
 
 target_inst MOV32rr(GPR32:dst OUT, GPR32:src IN) {
     MNEMONIC("movl");
     FLAGS(IsMove);
+    ENCODING {
+        form: rr;
+        opcode: [0x89];
+        operands { src => reg; dst => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOV32ri(GPR32:dst OUT, i32:imm IN) {
     MNEMONIC("movl");
+    ENCODING {
+        form: movri;
+        opcode: [0xB8];
+        operands { dst => reg; imm => imm32; };
+        size: dst;
+    };
 };
 
 target_inst MOV64rr(GPR64:dst OUT, GPR64:src IN) {
     MNEMONIC("movq");
     FLAGS(IsMove);
+    ENCODING {
+        form: rr;
+        opcode: [0x89];
+        rex_w: true;
+        operands { src => reg; dst => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOV64ri(GPR64:dst OUT, i64:imm IN) {
     MNEMONIC("movq");
+    ENCODING {
+        form: movri;
+        opcode: [0xB8];
+        rex_w: true;
+        operands { dst => reg; imm => imm64; };
+        size: dst;
+    };
 };
 
 target_inst LOAD8(GPR8:dst OUT, Mem8:addr IN) {
     MNEMONIC("movb");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x8B];
+        byte_rex: true;
+        operands { dst => reg; addr => rm_mem; };
+        size: dst;
+    };
 };
 
 target_inst LOAD16(GPR16:dst OUT, Mem16:addr IN) {
     MNEMONIC("movw");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x8B];
+        operands { dst => reg; addr => rm_mem; };
+        size: dst;
+    };
 };
 
 target_inst LOAD32(GPR32:dst OUT, Mem32:addr IN) {
     MNEMONIC("movl");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x8B];
+        operands { dst => reg; addr => rm_mem; };
+        size: dst;
+        sse_prefix: F3;
+        sse_opcode: [0x0F, 0x10];
+    };
 };
 
 target_inst LOAD64(GPR64:dst OUT, Mem64:addr IN) {
     MNEMONIC("movq");
     FLAGS(ReadsMemory);
+    ENCODING {
+        form: rm;
+        opcode: [0x8B];
+        rex_w: true;
+        operands { dst => reg; addr => rm_mem; };
+        size: dst;
+        sse_prefix: F2;
+        sse_opcode: [0x0F, 0x10];
+    };
 };
 
 target_inst STORE8(Mem8:addr IN, GPR8:val IN) {
     MNEMONIC("movb");
     FLAGS(WritesMemory);
+    ENCODING {
+        form: mr;
+        opcode: [0x89];
+        byte_rex: true;
+        operands { addr => rm_mem; val => reg; };
+        size: val;
+    };
 };
 
 target_inst STORE16(Mem16:addr IN, GPR16:val IN) {
     MNEMONIC("movw");
     FLAGS(WritesMemory);
+    ENCODING {
+        form: mr;
+        opcode: [0x89];
+        operands { addr => rm_mem; val => reg; };
+        size: val;
+    };
 };
 
 target_inst STORE32(Mem32:addr IN, GPR32:val IN) {
     MNEMONIC("movl");
     FLAGS(WritesMemory);
+    ENCODING {
+        form: mr;
+        opcode: [0x89];
+        operands { addr => rm_mem; val => reg; };
+        size: val;
+        sse_prefix: F3;
+        sse_opcode: [0x0F, 0x11];
+    };
 };
 
 target_inst STORE64(Mem64:addr IN, GPR64:val IN) {
     MNEMONIC("movq");
     FLAGS(WritesMemory);
+    ENCODING {
+        form: mr;
+        opcode: [0x89];
+        rex_w: true;
+        operands { addr => rm_mem; val => reg; };
+        size: val;
+        sse_prefix: F2;
+        sse_opcode: [0x0F, 0x11];
+    };
 };
 
 target_inst MOVSX32_8(GPR32:dst OUT, GPR8:src IN) {
     MNEMONIC("movsbl");
+    ENCODING {
+        form: movsx;
+        opcode: [0x0F, 0xBE];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVSX32_16(GPR32:dst OUT, GPR16:src IN) {
     MNEMONIC("movswl");
+    ENCODING {
+        form: movsx;
+        opcode: [0x0F, 0xBF];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVSX64_8(GPR64:dst OUT, GPR8:src IN) {
     MNEMONIC("movsbq");
+    ENCODING {
+        form: movsx;
+        opcode: [0x0F, 0xBE];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVSX64_16(GPR64:dst OUT, GPR16:src IN) {
     MNEMONIC("movswq");
+    ENCODING {
+        form: movsx;
+        opcode: [0x0F, 0xBF];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVSX64_32(GPR64:dst OUT, GPR32:src IN) {
     MNEMONIC("movslq");
+    ENCODING {
+        form: movsx;
+        opcode: [0x63];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVZX32_8(GPR32:dst OUT, GPR8:src IN) {
     MNEMONIC("movzbl");
+    ENCODING {
+        form: movzx;
+        opcode: [0x0F, 0xB6];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVZX32_16(GPR32:dst OUT, GPR16:src IN) {
     MNEMONIC("movzwl");
+    ENCODING {
+        form: movzx;
+        opcode: [0x0F, 0xB7];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVZX64_8(GPR64:dst OUT, GPR8:src IN) {
     MNEMONIC("movzbq");
+    ENCODING {
+        form: movzx;
+        opcode: [0x0F, 0xB6];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVZX64_16(GPR64:dst OUT, GPR16:src IN) {
     MNEMONIC("movzwq");
+    ENCODING {
+        form: movzx;
+        opcode: [0x0F, 0xB7];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst LEA64r(GPR64:dst OUT, Mem64:addr IN) {
     MNEMONIC("leaq");
+    ENCODING {
+        form: lea;
+        opcode: [0x8D];
+        rex_w: true;
+        operands { dst => reg; addr => rm_mem; };
+        size: dst;
+    };
 };
 
 // ============================================================================
@@ -425,76 +1048,101 @@ target_inst LEA64r(GPR64:dst OUT, Mem64:addr IN) {
 target_inst JMP(i64:target IN) {
     MNEMONIC("jmp");
     FLAGS(IsTerminator, IsBranch);
+    ENCODING {
+        form: jmp;
+        opcode: [0xE9];
+        opcode_digit: 4;
+        operands { target => rel32; };
+    };
 };
 
 target_inst JE(i64:target IN) {
     MNEMONIC("je");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 4; operands { target => rel32; }; };
 };
 
 target_inst JNE(i64:target IN) {
     MNEMONIC("jne");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 5; operands { target => rel32; }; };
 };
 
 target_inst JL(i64:target IN) {
     MNEMONIC("jl");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 12; operands { target => rel32; }; };
 };
 
 target_inst JLE(i64:target IN) {
     MNEMONIC("jle");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 14; operands { target => rel32; }; };
 };
 
 target_inst JG(i64:target IN) {
     MNEMONIC("jg");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 15; operands { target => rel32; }; };
 };
 
 target_inst JGE(i64:target IN) {
     MNEMONIC("jge");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 13; operands { target => rel32; }; };
 };
 
 target_inst JB(i64:target IN) {
     MNEMONIC("jb");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 2; operands { target => rel32; }; };
 };
 
 target_inst JBE(i64:target IN) {
     MNEMONIC("jbe");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 6; operands { target => rel32; }; };
 };
 
 target_inst JA(i64:target IN) {
     MNEMONIC("ja");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 7; operands { target => rel32; }; };
 };
 
 target_inst JAE(i64:target IN) {
     MNEMONIC("jae");
     FLAGS(IsTerminator, IsBranch, ReadsCPUFlags);
+    ENCODING { form: jcc; opcode: [0x0F, 0x80]; cond: 3; operands { target => rel32; }; };
 };
 
 target_inst CALL(GPR64:callee IN) {
     MNEMONIC("call");
     FLAGS(IsCall, HasSideEffect);
+    ENCODING {
+        form: call;
+        opcode: [0xE8];
+        opcode_digit: 2;
+        operands { callee => rel32; };
+    };
 };
 
 target_inst RET() {
     MNEMONIC("ret");
     FLAGS(IsTerminator, IsReturn, HasSideEffect);
+    ENCODING { form: ret; opcode: [0xC3]; };
 };
 
 target_inst PUSH64r(GPR64:src IN) {
     MNEMONIC("pushq");
     FLAGS(WritesMemory);
+    ENCODING { form: push; opcode: [0x50]; operands { src => reg; }; };
 };
 
 target_inst POP64r(GPR64:dst OUT) {
     MNEMONIC("popq");
     FLAGS(ReadsMemory);
+    ENCODING { form: pop; opcode: [0x58]; operands { dst => reg; }; };
 };
 
 // ============================================================================
@@ -503,70 +1151,193 @@ target_inst POP64r(GPR64:dst OUT) {
 
 target_inst ADDSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
     MNEMONIC("addss");
+    ENCODING {
+        form: sse;
+        prefixes: F3;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst ADDSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
     MNEMONIC("addsd");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUBSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
     MNEMONIC("subss");
+    ENCODING {
+        form: sse;
+        prefixes: F3;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst SUBSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
     MNEMONIC("subsd");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst MULSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
     MNEMONIC("mulss");
+    ENCODING {
+        form: sse;
+        prefixes: F3;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst MULSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
     MNEMONIC("mulsd");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst DIVSS(FPR32:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
     MNEMONIC("divss");
+    ENCODING {
+        form: sse;
+        prefixes: F3;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst DIVSD(FPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
     MNEMONIC("divsd");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
 };
 
 target_inst MOVSSrr(FPR32:dst OUT, FPR32:src IN) {
     MNEMONIC("movss");
     FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        prefixes: F3;
+        opcode: [0x0F, 0x10];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst MOVSDrr(FPR64:dst OUT, FPR64:src IN) {
     MNEMONIC("movsd");
     FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x10];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst UCOMISS(FPR32:lhs IN, FPR32:rhs IN) {
     MNEMONIC("ucomiss");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x2E];
+        operands { lhs => reg; rhs => rm_reg; };
+        size: lhs;
+    };
 };
 
 target_inst UCOMISD(FPR64:lhs IN, FPR64:rhs IN) {
     MNEMONIC("ucomisd");
     FLAGS(ReadsCPUFlags, WritesCPUFlags);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x2E];
+        operands { lhs => reg; rhs => rm_reg; };
+        size: lhs;
+    };
 };
 
 target_inst CVTSI2SS(FPR32:dst OUT, GPR32:src IN) {
     MNEMONIC("cvtsi2ssl");
+    ENCODING {
+        form: cvt;
+        prefixes: F3;
+        opcode: [0x0F, 0x2A];
+        rex_w_size: true;
+        operands { dst => reg; src => rm_reg; };
+        size: src;
+    };
 };
 
 target_inst CVTSI2SD(FPR64:dst OUT, GPR64:src IN) {
     MNEMONIC("cvtsi2sdq");
+    ENCODING {
+        form: cvt;
+        prefixes: F2;
+        opcode: [0x0F, 0x2A];
+        rex_w_size: true;
+        operands { dst => reg; src => rm_reg; };
+        size: src;
+    };
 };
 
 target_inst CVTTSS2SI(GPR32:dst OUT, FPR32:src IN) {
     MNEMONIC("cvttss2sil");
+    ENCODING {
+        form: cvt;
+        prefixes: F3;
+        opcode: [0x0F, 0x2C];
+        rex_w_size: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 target_inst CVTTSD2SI(GPR64:dst OUT, FPR64:src IN) {
     MNEMONIC("cvttsd2siq");
+    ENCODING {
+        form: cvt;
+        prefixes: F2;
+        opcode: [0x0F, 0x2C];
+        rex_w_size: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
 };
 
 // ============================================================================
@@ -576,8 +1347,10 @@ target_inst CVTTSD2SI(GPR64:dst OUT, FPR64:src IN) {
 target_inst SYSCALL() {
     MNEMONIC("syscall");
     FLAGS(HasSideEffect);
+    ENCODING { form: syscall; opcode: [0x0F, 0x05]; };
 };
 
 target_inst NOP() {
     MNEMONIC("nop");
+    ENCODING { form: nop; opcode: [0x90]; };
 };

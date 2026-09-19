@@ -25,29 +25,431 @@ struct Direction
 struct TargetOperand
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::p<Common::Identifier> + dsl::lit_c<':'> + dsl::p<Common::Identifier> + dsl::p<Direction>;
+    static constexpr auto rule =
+            dsl::p<Common::Identifier> + dsl::lit_c<':'> + dsl::p<Common::Identifier> + dsl::p<Direction>;
 
     static constexpr auto value = lexy::callback<Ast::TargetInstDef::TargetOperandDecl>(
-        [](Ast::Common::Identifier regClassOrType, Ast::Common::Identifier name, Ast::TargetInstDef::OperandDirection dir)
-        {
-            return Ast::TargetInstDef::TargetOperandDecl{
-                .m_regClassOrType = std::move(regClassOrType),
-                .m_name = std::move(name),
-                .m_direction = dir
-            };
-        });
+            [](Ast::Common::Identifier regClassOrType,
+               Ast::Common::Identifier name,
+               Ast::TargetInstDef::OperandDirection dir)
+            {
+                return Ast::TargetInstDef::TargetOperandDecl{ .m_regClassOrType = std::move(regClassOrType),
+                                                              .m_name = std::move(name),
+                                                              .m_direction = dir };
+            });
+};
+
+// ============================================================================
+// ENCODING { ... } block
+// ============================================================================
+
+/**
+ * Parses a single raw byte literal (decimal or 0x-prefixed hex).
+ */
+struct ByteLiteral
+{
+    static constexpr auto rule = []
+    {
+        auto hex = (dsl::lit<"0x"> | dsl::lit<"0X">) >> dsl::integer<uint8_t, dsl::hex>(dsl::digits<dsl::hex>);
+        auto dec = dsl::integer<uint8_t>(dsl::digits<dsl::decimal>);
+        return hex | dec;
+    }();
+    static constexpr auto value = lexy::forward<uint8_t>;
+};
+
+struct ByteList
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::square_bracketed.list(dsl::p<ByteLiteral>, dsl::sep(dsl::lit_c<','>));
+    static constexpr auto value = Common::PmrAsList<std::pmr::vector<uint8_t>>;
+};
+
+struct EncFormSymbol
+{
+    static constexpr auto Table =
+        lexy::symbol_table<Ast::TargetInstDef::EncForm>
+            .map(LEXY_LIT("rr"), Ast::TargetInstDef::EncForm::Rr)
+            .map(LEXY_LIT("rm"), Ast::TargetInstDef::EncForm::Rm)
+            .map(LEXY_LIT("mr"), Ast::TargetInstDef::EncForm::Mr)
+            .map(LEXY_LIT("ri"), Ast::TargetInstDef::EncForm::Ri)
+            .map(LEXY_LIT("movri"), Ast::TargetInstDef::EncForm::MovRI)
+            .map(LEXY_LIT("movzx"), Ast::TargetInstDef::EncForm::Movzx)
+            .map(LEXY_LIT("movsx"), Ast::TargetInstDef::EncForm::Movsx)
+            .map(LEXY_LIT("lea"), Ast::TargetInstDef::EncForm::Lea)
+            .map(LEXY_LIT("unary"), Ast::TargetInstDef::EncForm::Unary)
+            .map(LEXY_LIT("test"), Ast::TargetInstDef::EncForm::Test)
+            .map(LEXY_LIT("shift"), Ast::TargetInstDef::EncForm::Shift)
+            .map(LEXY_LIT("imul_rr"), Ast::TargetInstDef::EncForm::ImulRR)
+            .map(LEXY_LIT("imul_ri"), Ast::TargetInstDef::EncForm::ImulRI)
+            .map(LEXY_LIT("div"), Ast::TargetInstDef::EncForm::Div)
+            .map(LEXY_LIT("jcc"), Ast::TargetInstDef::EncForm::Jcc)
+            .map(LEXY_LIT("jmp"), Ast::TargetInstDef::EncForm::Jmp)
+            .map(LEXY_LIT("call"), Ast::TargetInstDef::EncForm::Call)
+            .map(LEXY_LIT("ret"), Ast::TargetInstDef::EncForm::Ret)
+            .map(LEXY_LIT("push"), Ast::TargetInstDef::EncForm::Push)
+            .map(LEXY_LIT("pop"), Ast::TargetInstDef::EncForm::Pop)
+            .map(LEXY_LIT("nop"), Ast::TargetInstDef::EncForm::Nop)
+            .map(LEXY_LIT("syscall"), Ast::TargetInstDef::EncForm::Syscall)
+            .map(LEXY_LIT("setcc"), Ast::TargetInstDef::EncForm::Setcc)
+            .map(LEXY_LIT("sse"), Ast::TargetInstDef::EncForm::Sse)
+            .map(LEXY_LIT("cvt"), Ast::TargetInstDef::EncForm::Cvt);
+
+    static constexpr auto rule =
+            dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore));
+    static constexpr auto value = lexy::forward<Ast::TargetInstDef::EncForm>;
+};
+
+struct EncSlotSymbol
+{
+    static constexpr auto Table =
+        lexy::symbol_table<Ast::TargetInstDef::EncSlotKind>
+            .map(LEXY_LIT("reg"), Ast::TargetInstDef::EncSlotKind::Reg)
+            .map(LEXY_LIT("rm_reg"), Ast::TargetInstDef::EncSlotKind::RmReg)
+            .map(LEXY_LIT("rm_mem"), Ast::TargetInstDef::EncSlotKind::RmMem)
+            .map(LEXY_LIT("imm8"), Ast::TargetInstDef::EncSlotKind::Imm8)
+            .map(LEXY_LIT("imm16"), Ast::TargetInstDef::EncSlotKind::Imm16)
+            .map(LEXY_LIT("imm32"), Ast::TargetInstDef::EncSlotKind::Imm32)
+            .map(LEXY_LIT("imm64"), Ast::TargetInstDef::EncSlotKind::Imm64)
+            .map(LEXY_LIT("imm8_signed"), Ast::TargetInstDef::EncSlotKind::Imm8Signed)
+            .map(LEXY_LIT("rel8"), Ast::TargetInstDef::EncSlotKind::Rel8)
+            .map(LEXY_LIT("rel32"), Ast::TargetInstDef::EncSlotKind::Rel32)
+            .map(LEXY_LIT("cc"), Ast::TargetInstDef::EncSlotKind::CondCode);
+
+    static constexpr auto rule =
+            dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha_underscore, dsl::ascii::alpha_digit_underscore));
+    static constexpr auto value = lexy::forward<Ast::TargetInstDef::EncSlotKind>;
+};
+
+struct PrefixSymbol
+{
+    static constexpr auto Table =
+        lexy::symbol_table<uint8_t>
+            .map(LEXY_LIT("P66"), static_cast<uint8_t>(1u << 0))
+            .map(LEXY_LIT("P67"), static_cast<uint8_t>(1u << 1))
+            .map(LEXY_LIT("F2"), static_cast<uint8_t>(1u << 2))
+            .map(LEXY_LIT("F3"), static_cast<uint8_t>(1u << 3))
+            .map(LEXY_LIT("F0"), static_cast<uint8_t>(1u << 4));
+
+    static constexpr auto rule = dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha_digit_underscore));
+    static constexpr auto value = lexy::forward<uint8_t>;
+};
+
+struct EncOperandBindingParser
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = dsl::p<Common::Identifier> + LEXY_LIT("=>") + dsl::p<EncSlotSymbol>;
+    static constexpr auto value = lexy::callback<Ast::TargetInstDef::EncOperandBinding>(
+            [](Ast::Common::Identifier name, Ast::TargetInstDef::EncSlotKind slot)
+            { return Ast::TargetInstDef::EncOperandBinding{ .m_name = std::move(name), .m_slot = slot }; });
+};
+
+struct EncOperandsBlock
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = Common::Keyword<"operands">::rule >>
+            dsl::curly_bracketed.list(dsl::p<EncOperandBindingParser> + dsl::lit_c<';'>);
+    static constexpr auto value = Common::PmrAsList<Ast::TargetInstDef::EncOperandBinding>;
+};
+
+struct EncodingDeclParser
+{
+    static constexpr auto whitespace = Common::Whitespace;
+
+    struct TagForm
+    {
+        Ast::TargetInstDef::EncForm val;
+    };
+    struct TagOpcode
+    {
+        std::pmr::vector<uint8_t> val;
+    };
+    struct TagOpcodeDigit
+    {
+        uint8_t val;
+    };
+    struct TagRexW
+    {
+        bool val;
+    };
+    struct TagRexWBySize
+    {
+        bool val;
+    };
+    struct TagPrefixes
+    {
+        uint8_t val;
+    };
+    struct TagOperands
+    {
+        std::pmr::vector<Ast::TargetInstDef::EncOperandBinding> val;
+    };
+    struct TagCoalesce
+    {
+        Ast::Common::Identifier val;
+    };
+    struct TagSize
+    {
+        Ast::Common::Identifier val;
+    };
+    struct TagShiftCl
+    {
+        bool val;
+    };
+    struct TagByteRex
+    {
+        bool val;
+    };
+    struct TagCond
+    {
+        uint8_t val;
+    };
+    struct TagSsePrefix
+    {
+        uint8_t val;
+    };
+    struct TagSseOpcode
+    {
+        std::pmr::vector<uint8_t> val;
+    };
+
+    using ItemVariant = std::variant<TagForm,
+                                     TagOpcode,
+                                     TagOpcodeDigit,
+                                     TagRexW,
+                                     TagRexWBySize,
+                                     TagPrefixes,
+                                     TagOperands,
+                                     TagCoalesce,
+                                     TagSize,
+                                     TagShiftCl,
+                                     TagByteRex,
+                                     TagCond,
+                                     TagSsePrefix,
+                                     TagSseOpcode>;
+
+    struct FormItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"form">::rule >> dsl::lit_c<':'> >> dsl::p<EncFormSymbol>;
+        static constexpr auto value =
+                lexy::callback<TagForm>([](Ast::TargetInstDef::EncForm f) { return TagForm{ f }; });
+    };
+
+    struct OpcodeItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"opcode">::rule >> dsl::lit_c<':'> >> dsl::p<ByteList>;
+        static constexpr auto value = lexy::callback<TagOpcode>([](std::pmr::vector<uint8_t> bytes)
+                                                                { return TagOpcode{ std::move(bytes) }; });
+    };
+
+    struct OpcodeDigitItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule =
+                Common::Keyword<"opcode_digit">::rule >> dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>;
+        static constexpr auto value = lexy::callback<TagOpcodeDigit>(
+                [](Ast::Common::IntegerLiteral v) { return TagOpcodeDigit{ static_cast<uint8_t>(v.m_node) }; });
+    };
+
+    struct RexWItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule =
+                Common::Keyword<"rex_w">::rule >> dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>;
+        static constexpr auto value =
+                lexy::callback<TagRexW>([](Ast::Common::BooleanLiteral v) { return TagRexW{ v.m_node }; });
+    };
+
+    struct RexWBySizeItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule =
+                Common::Keyword<"rex_w_size">::rule >> dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>;
+        static constexpr auto value =
+                lexy::callback<TagRexWBySize>([](Ast::Common::BooleanLiteral v) { return TagRexWBySize{ v.m_node }; });
+    };
+
+    struct PrefixesItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"prefixes">::rule >> dsl::lit_c<':'> >> dsl::p<PrefixSymbol>;
+        static constexpr auto value = lexy::callback<TagPrefixes>([](uint8_t v) { return TagPrefixes{ v }; });
+    };
+
+    struct OperandsItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<EncOperandsBlock>;
+        static constexpr auto value =
+                lexy::callback<TagOperands>([](std::pmr::vector<Ast::TargetInstDef::EncOperandBinding> ops)
+                                            { return TagOperands{ std::move(ops) }; });
+    };
+
+    struct CoalesceItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"coalesce">::rule >> dsl::lit_c<':'> >> dsl::p<Common::Identifier>;
+        static constexpr auto value =
+                lexy::callback<TagCoalesce>([](Ast::Common::Identifier id) { return TagCoalesce{ std::move(id) }; });
+    };
+
+    struct SizeItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"size">::rule >> dsl::lit_c<':'> >> dsl::p<Common::Identifier>;
+        static constexpr auto value =
+                lexy::callback<TagSize>([](Ast::Common::Identifier id) { return TagSize{ std::move(id) }; });
+    };
+
+    struct ShiftClItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule =
+                Common::Keyword<"shift_cl">::rule >> dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>;
+        static constexpr auto value =
+                lexy::callback<TagShiftCl>([](Ast::Common::BooleanLiteral v) { return TagShiftCl{ v.m_node }; });
+    };
+
+    struct ByteRexItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule =
+                Common::Keyword<"byte_rex">::rule >> dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>;
+        static constexpr auto value =
+                lexy::callback<TagByteRex>([](Ast::Common::BooleanLiteral v) { return TagByteRex{ v.m_node }; });
+    };
+
+    struct CondItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"cond">::rule >> dsl::lit_c<':'> >> dsl::p<Common::IntegerLiteral>;
+        static constexpr auto value = lexy::callback<TagCond>([](Ast::Common::IntegerLiteral v)
+                                                              { return TagCond{ static_cast<uint8_t>(v.m_node) }; });
+    };
+
+    struct SsePrefixItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"sse_prefix">::rule >> dsl::lit_c<':'> >> dsl::p<PrefixSymbol>;
+        static constexpr auto value = lexy::callback<TagSsePrefix>([](uint8_t v) { return TagSsePrefix{ v }; });
+    };
+
+    struct SseOpcodeItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = Common::Keyword<"sse_opcode">::rule >> dsl::lit_c<':'> >> dsl::p<ByteList>;
+        static constexpr auto value = lexy::callback<TagSseOpcode>([](std::pmr::vector<uint8_t> bytes)
+                                                                   { return TagSseOpcode{ std::move(bytes) }; });
+    };
+
+    struct Item
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = (dsl::peek(Common::Keyword<"form">::rule) >> dsl::p<FormItem>) |
+                (dsl::peek(Common::Keyword<"opcode">::rule) >> dsl::p<OpcodeItem>) |
+                (dsl::peek(Common::Keyword<"opcode_digit">::rule) >> dsl::p<OpcodeDigitItem>) |
+                (dsl::peek(Common::Keyword<"rex_w_size">::rule) >> dsl::p<RexWBySizeItem>) |
+                (dsl::peek(Common::Keyword<"rex_w">::rule) >> dsl::p<RexWItem>) |
+                (dsl::peek(Common::Keyword<"prefixes">::rule) >> dsl::p<PrefixesItem>) |
+                (dsl::peek(Common::Keyword<"operands">::rule) >> dsl::p<OperandsItem>) |
+                (dsl::peek(Common::Keyword<"coalesce">::rule) >> dsl::p<CoalesceItem>) |
+                (dsl::peek(Common::Keyword<"size">::rule) >> dsl::p<SizeItem>) |
+                (dsl::peek(Common::Keyword<"shift_cl">::rule) >> dsl::p<ShiftClItem>) |
+                (dsl::peek(Common::Keyword<"byte_rex">::rule) >> dsl::p<ByteRexItem>) |
+                (dsl::peek(Common::Keyword<"cond">::rule) >> dsl::p<CondItem>) |
+                (dsl::peek(Common::Keyword<"sse_prefix">::rule) >> dsl::p<SsePrefixItem>) |
+                (dsl::peek(Common::Keyword<"sse_opcode">::rule) >> dsl::p<SseOpcodeItem>);
+
+        static constexpr auto value = lexy::forward<ItemVariant>;
+    };
+
+    struct ItemList
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<Item> + dsl::lit_c<';'>);
+        static constexpr auto value = Common::PmrAsList<ItemVariant>;
+    };
+
+    static constexpr auto rule = Common::Keyword<"ENCODING">::rule >> (dsl::p<ItemList> + dsl::opt(dsl::lit_c<';'>));
+
+    static constexpr auto value = lexy::callback<Ast::TargetInstDef::EncodingDecl>(
+            [](std::pmr::vector<ItemVariant> items, auto...)
+            {
+                Ast::TargetInstDef::EncodingDecl decl;
+                for (auto &item : items)
+                {
+                    std::visit(
+                            [&](auto &&val)
+                            {
+                                using T = std::decay_t<decltype(val)>;
+                                if constexpr (std::is_same_v<T, TagForm>)
+                                    decl.m_form = val.val;
+                                else if constexpr (std::is_same_v<T, TagOpcode>)
+                                    decl.m_opcode = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, TagOpcodeDigit>)
+                                    decl.m_opcodeDigit = val.val;
+                                else if constexpr (std::is_same_v<T, TagRexW>)
+                                    decl.m_rexW = val.val;
+                                else if constexpr (std::is_same_v<T, TagRexWBySize>)
+                                    decl.m_rexWBySize = val.val;
+                                else if constexpr (std::is_same_v<T, TagPrefixes>)
+                                    decl.m_prefixes = val.val;
+                                else if constexpr (std::is_same_v<T, TagOperands>)
+                                    decl.m_operands = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, TagCoalesce>)
+                                    decl.m_coalesce = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, TagSize>)
+                                    decl.m_sizeOperand = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, TagShiftCl>)
+                                    decl.m_shiftByCL = val.val;
+                                else if constexpr (std::is_same_v<T, TagByteRex>)
+                                    decl.m_byteRex = val.val;
+                                else if constexpr (std::is_same_v<T, TagCond>)
+                                    decl.m_condCode = val.val;
+                                else if constexpr (std::is_same_v<T, TagSsePrefix>)
+                                {
+                                    decl.m_ssePrefixes = val.val;
+                                    decl.m_hasSseVariant = true;
+                                }
+                                else if constexpr (std::is_same_v<T, TagSseOpcode>)
+                                {
+                                    decl.m_sseOpcode = std::move(val.val);
+                                    decl.m_hasSseVariant = true;
+                                }
+                            },
+                            item);
+                }
+                return decl;
+            });
 };
 
 struct BodyItem
 {
     static constexpr auto whitespace = Common::Whitespace;
 
-    struct TagMnemonic { Ast::Common::StringLiteral val; };
-    struct TagFlags { std::pmr::vector<Ast::Common::Identifier> val; };
-    struct TagImplicitDefs { std::pmr::vector<Ast::Common::Identifier> val; };
-    struct TagImplicitUses { std::pmr::vector<Ast::Common::Identifier> val; };
+    struct TagMnemonic
+    {
+        Ast::Common::StringLiteral val;
+    };
+    struct TagFlags
+    {
+        std::pmr::vector<Ast::Common::Identifier> val;
+    };
+    struct TagImplicitDefs
+    {
+        std::pmr::vector<Ast::Common::Identifier> val;
+    };
+    struct TagImplicitUses
+    {
+        std::pmr::vector<Ast::Common::Identifier> val;
+    };
+    struct TagEncoding
+    {
+        Ast::TargetInstDef::EncodingDecl val;
+    };
 
-    using ItemVariant = std::variant<TagMnemonic, TagFlags, TagImplicitDefs, TagImplicitUses>;
+    using ItemVariant = std::variant<TagMnemonic, TagFlags, TagImplicitDefs, TagImplicitUses, TagEncoding>;
 
     struct IdList
     {
@@ -59,53 +461,59 @@ struct BodyItem
     struct OptIdList
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = dsl::parenthesized(
-            dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore) >> dsl::p<IdList>));
+        static constexpr auto rule =
+                dsl::parenthesized(dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore) >> dsl::p<IdList>));
         static constexpr auto value = lexy::callback<std::pmr::vector<Ast::Common::Identifier>>(
-            [](std::pmr::vector<Ast::Common::Identifier> list) { return list; },
-            [](lexy::nullopt) { return std::pmr::vector<Ast::Common::Identifier>{}; });
+                [](std::pmr::vector<Ast::Common::Identifier> list) { return list; },
+                [](lexy::nullopt) { return std::pmr::vector<Ast::Common::Identifier>{}; });
     };
 
     struct MnemonicDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = Common::Keyword<"MNEMONIC">::rule >>
-            (dsl::parenthesized(dsl::p<Common::StringLiteral>) + dsl::lit_c<';'>);
-        static constexpr auto value = lexy::callback<TagMnemonic>(
-            [](Ast::Common::StringLiteral s) { return TagMnemonic{ std::move(s) }; });
+                (dsl::parenthesized(dsl::p<Common::StringLiteral>) + dsl::lit_c<';'>);
+        static constexpr auto value =
+                lexy::callback<TagMnemonic>([](Ast::Common::StringLiteral s) { return TagMnemonic{ std::move(s) }; });
     };
 
     struct FlagsDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"FLAGS">::rule >>
-            (dsl::p<OptIdList> + dsl::lit_c<';'>);
-        static constexpr auto value = lexy::callback<TagFlags>(
-            [](std::pmr::vector<Ast::Common::Identifier> list) { return TagFlags{ std::move(list) }; });
+        static constexpr auto rule = Common::Keyword<"FLAGS">::rule >> (dsl::p<OptIdList> + dsl::lit_c<';'>);
+        static constexpr auto value = lexy::callback<TagFlags>([](std::pmr::vector<Ast::Common::Identifier> list)
+                                                               { return TagFlags{ std::move(list) }; });
     };
 
     struct ImplicitDefsDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"IMPLICIT_DEFS">::rule >>
-            (dsl::p<OptIdList> + dsl::lit_c<';'>);
-        static constexpr auto value = lexy::callback<TagImplicitDefs>(
-            [](std::pmr::vector<Ast::Common::Identifier> list) { return TagImplicitDefs{ std::move(list) }; });
+        static constexpr auto rule = Common::Keyword<"IMPLICIT_DEFS">::rule >> (dsl::p<OptIdList> + dsl::lit_c<';'>);
+        static constexpr auto value = lexy::callback<TagImplicitDefs>([](std::pmr::vector<Ast::Common::Identifier> list)
+                                                                      { return TagImplicitDefs{ std::move(list) }; });
     };
 
     struct ImplicitUsesDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = Common::Keyword<"IMPLICIT_USES">::rule >>
-            (dsl::p<OptIdList> + dsl::lit_c<';'>);
-        static constexpr auto value = lexy::callback<TagImplicitUses>(
-            [](std::pmr::vector<Ast::Common::Identifier> list) { return TagImplicitUses{ std::move(list) }; });
+        static constexpr auto rule = Common::Keyword<"IMPLICIT_USES">::rule >> (dsl::p<OptIdList> + dsl::lit_c<';'>);
+        static constexpr auto value = lexy::callback<TagImplicitUses>([](std::pmr::vector<Ast::Common::Identifier> list)
+                                                                      { return TagImplicitUses{ std::move(list) }; });
+    };
+
+    struct EncodingDeclItem
+    {
+        static constexpr auto whitespace = Common::Whitespace;
+        static constexpr auto rule = dsl::p<EncodingDeclParser>;
+        static constexpr auto value = lexy::callback<TagEncoding>([](Ast::TargetInstDef::EncodingDecl d)
+                                                                  { return TagEncoding{ std::move(d) }; });
     };
 
     static constexpr auto rule = (dsl::peek(Common::Keyword<"MNEMONIC">::rule) >> dsl::p<MnemonicDecl>) |
-                                 (dsl::peek(Common::Keyword<"FLAGS">::rule) >> dsl::p<FlagsDecl>) |
-                                 (dsl::peek(Common::Keyword<"IMPLICIT_DEFS">::rule) >> dsl::p<ImplicitDefsDecl>) |
-                                 (dsl::peek(Common::Keyword<"IMPLICIT_USES">::rule) >> dsl::p<ImplicitUsesDecl>);
+            (dsl::peek(Common::Keyword<"FLAGS">::rule) >> dsl::p<FlagsDecl>) |
+            (dsl::peek(Common::Keyword<"IMPLICIT_DEFS">::rule) >> dsl::p<ImplicitDefsDecl>) |
+            (dsl::peek(Common::Keyword<"IMPLICIT_USES">::rule) >> dsl::p<ImplicitUsesDecl>) |
+            (dsl::peek(Common::Keyword<"ENCODING">::rule) >> dsl::p<EncodingDeclItem>);
 
     static constexpr auto value = lexy::forward<ItemVariant>;
 };
@@ -125,10 +533,10 @@ struct TargetInstDecl
     {
         static constexpr auto whitespace = Common::Whitespace;
         static constexpr auto rule = dsl::parenthesized(
-            dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore) >> dsl::p<NonEmptyOperandList>));
+                dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore) >> dsl::p<NonEmptyOperandList>));
         static constexpr auto value = lexy::callback<std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl>>(
-            [](std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl> list) { return list; },
-            [](lexy::nullopt) { return std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl>{}; });
+                [](std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl> list) { return list; },
+                [](lexy::nullopt) { return std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl>{}; });
     };
 
     struct BodyList
@@ -139,37 +547,39 @@ struct TargetInstDecl
     };
 
     static constexpr auto rule = Common::Keyword<"target_inst">::rule >>
-        (dsl::p<Common::Identifier> + dsl::p<OperandList> + dsl::p<BodyList> + dsl::opt(dsl::lit_c<';'>));
+            (dsl::p<Common::Identifier> + dsl::p<OperandList> + dsl::p<BodyList> + dsl::opt(dsl::lit_c<';'>));
 
     static constexpr auto value = lexy::callback<Ast::TargetInstDef::TargetInstDecl>(
-        [](Ast::Common::Identifier name,
-           std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl> operands,
-           std::pmr::vector<BodyItem::ItemVariant> bodyItems,
-           auto...)
-        {
-            Ast::TargetInstDef::TargetInstDecl decl;
-            decl.m_instName = std::move(name);
-            decl.m_operands = std::move(operands);
-
-            for (auto &item : bodyItems)
+            [](Ast::Common::Identifier name,
+               std::pmr::vector<Ast::TargetInstDef::TargetOperandDecl> operands,
+               std::pmr::vector<BodyItem::ItemVariant> bodyItems,
+               auto...)
             {
-                std::visit(
-                    [&](auto &&val)
-                    {
-                        using T = std::decay_t<decltype(val)>;
-                        if constexpr (std::is_same_v<T, BodyItem::TagMnemonic>)
-                            decl.m_mnemonic = std::move(val.val);
-                        else if constexpr (std::is_same_v<T, BodyItem::TagFlags>)
-                            decl.m_flags = std::move(val.val);
-                        else if constexpr (std::is_same_v<T, BodyItem::TagImplicitDefs>)
-                            decl.m_implicitDefs = std::move(val.val);
-                        else if constexpr (std::is_same_v<T, BodyItem::TagImplicitUses>)
-                            decl.m_implicitUses = std::move(val.val);
-                    },
-                    item);
-            }
-            return decl;
-        });
+                Ast::TargetInstDef::TargetInstDecl decl;
+                decl.m_instName = std::move(name);
+                decl.m_operands = std::move(operands);
+
+                for (auto &item : bodyItems)
+                {
+                    std::visit(
+                            [&](auto &&val)
+                            {
+                                using T = std::decay_t<decltype(val)>;
+                                if constexpr (std::is_same_v<T, BodyItem::TagMnemonic>)
+                                    decl.m_mnemonic = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, BodyItem::TagFlags>)
+                                    decl.m_flags = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, BodyItem::TagImplicitDefs>)
+                                    decl.m_implicitDefs = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, BodyItem::TagImplicitUses>)
+                                    decl.m_implicitUses = std::move(val.val);
+                                else if constexpr (std::is_same_v<T, BodyItem::TagEncoding>)
+                                    decl.m_encoding = std::move(val.val);
+                            },
+                            item);
+                }
+                return decl;
+            });
 };
 
 struct TargetHeader
@@ -197,16 +607,16 @@ struct TargetInstFile
     static constexpr auto rule = dsl::terminator(dsl::eof)(dsl::opt(dsl::p<TargetHeader>) + dsl::p<InstList>);
 
     static constexpr auto value = lexy::callback<Ast::TargetInstDef::TargetInstFile>(
-        [](auto targetOpt, std::pmr::vector<Ast::TargetInstDef::TargetInstDecl> insts)
-        {
-            Ast::TargetInstDef::TargetInstFile file;
-            if constexpr (std::is_same_v<std::decay_t<decltype(targetOpt)>, Ast::Common::Identifier>)
+            [](auto targetOpt, std::pmr::vector<Ast::TargetInstDef::TargetInstDecl> insts)
             {
-                file.m_targetName = std::move(targetOpt);
-            }
-            file.m_instructions = std::move(insts);
-            return file;
-        });
+                Ast::TargetInstDef::TargetInstFile file;
+                if constexpr (std::is_same_v<std::decay_t<decltype(targetOpt)>, Ast::Common::Identifier>)
+                {
+                    file.m_targetName = std::move(targetOpt);
+                }
+                file.m_instructions = std::move(insts);
+                return file;
+            });
 };
 
 } // namespace DSL::Parser::TargetInstDef
