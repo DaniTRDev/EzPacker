@@ -8,6 +8,7 @@
 #include "Symbols/TargetSymbols.h"
 #include "Symbols/InstructionSelectSymbols.h"
 #include "Symbols/CallingConvSymbols.h"
+#include "Symbols/RegisterSymbols.h"
 
 /**
  * Discriminator enum identifying the syntactic/semantic category of a Symbol.
@@ -39,6 +40,13 @@ enum class SymbolType : uint8_t
     // .ezcc / .ccd Calling Convention files.
     CallingConv,
 
+    // .reg Register Definition files.
+    RegisterFile,
+    RegisterBank,
+    RegisterClass,
+    Register,
+    SpecialRegister,
+
     // Reusable symbol types.
     SsaVariable,
     ImmediateVariable
@@ -66,7 +74,12 @@ class Symbol
                                     Symbols::TargetInstructionSymbol,
                                     Symbols::AddrModeSymbol,
                                     Symbols::SelectionPatternSymbol,
-                                    Symbols::CallingConvSymbol>;
+                                    Symbols::CallingConvSymbol,
+                                    Symbols::RegisterFileSymbol,
+                                    Symbols::RegisterBankSymbol,
+                                    Symbols::RegisterClassSymbol,
+                                    Symbols::RegisterSymbol,
+                                    Symbols::SpecialRegisterSymbol>;
 
     /**
      * Constructs a symbol with source location span, flags, defining scope ID, unique symbol ID, type, and name.

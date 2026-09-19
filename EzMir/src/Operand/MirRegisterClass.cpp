@@ -16,7 +16,8 @@ MirRegisterClass::MirRegisterClass(const char *name, class MirRegisterBank *owne
 bool MirRegisterClass::addRegister(const std::string_view &name,
                                    size_t bitSize,
                                    size_t partOffsetInBits,
-                                   std::initializer_list<MirRegisterDescriptor *> subParts)
+                                   std::initializer_list<MirRegisterDescriptor *> subParts,
+                                   uint32_t hwEncoding)
 {
     auto it = m_registers.find(name);
     if (it != m_registers.end())
@@ -24,8 +25,8 @@ bool MirRegisterClass::addRegister(const std::string_view &name,
 
     std::pmr::polymorphic_allocator<MirRegisterDescriptor> alloc(m_alloc);
 
-    auto desc =
-            alloc.new_object<MirRegisterDescriptor>(name, this, bitSize, m_registers.size(), partOffsetInBits, m_alloc);
+    auto desc = alloc.new_object<MirRegisterDescriptor>(
+            name, this, bitSize, m_registers.size(), partOffsetInBits, m_alloc, hwEncoding);
     desc->m_subParts.insert(desc->m_subParts.begin(), subParts.begin(), subParts.end());
 
     m_registers[name] = desc;

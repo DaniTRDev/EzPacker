@@ -32,6 +32,11 @@ namespace DSL::Ast::CallingConvDef
 struct CallingConventionDefFile;
 }
 
+namespace DSL::Ast::RegisterDef
+{
+struct RegisterFile;
+}
+
 class SymbolTable;
 
 namespace Cli
@@ -79,6 +84,10 @@ class InfoDumper
     static void dumpCallingConvAst(const DSL::Ast::CallingConvDef::CallingConventionDefFile &file,
                                   OutputFormat format,
                                   std::ostream &os);
+
+    static void dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &file,
+                                   OutputFormat format,
+                                   std::ostream &os);
 
     static void dumpSymbols(const SymbolTable &symbolTable, OutputFormat format, std::ostream &os);
 

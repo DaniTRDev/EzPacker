@@ -74,3 +74,10 @@ EzPacker_AddTest(
         "tests/T_CppCallingConvGenerator.cpp"
 )
 
+EzPacker_AddTest(
+        "T_CppRegisterInfoGenerator"
+        "EzDslCodeGeneratorsTestSuite"
+        "EzDslCodeGenerators"
+        "tests/T_CppRegisterInfoGenerator.cpp"
+)
+

@@ -6,6 +6,7 @@
 #include "Ast/LegalizeRuleDefLangAst.h"
 #include "Ast/TypeDefLangAst.h"
 #include "Ast/CallingConvDefLangAst.h"
+#include "Ast/RegisterDefLangAst.h"
 
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
@@ -673,6 +674,115 @@ void InfoDumper::dumpCallingConvAst(const DSL::Ast::CallingConvDef::CallingConve
             os << std::format("  Red Zone:        {} bytes\n", file.m_stack.m_redZone->m_node);
         os << std::format("  Argument Rules:  {}\n", file.m_arguments.m_rules.size());
         os << std::format("  Return Rules:    {}\n", file.m_returns.m_rules.size());
+        os << "======================================================================\n";
+    }
+}
+
+void InfoDumper::dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &file,
+                                    OutputFormat format,
+                                    std::ostream &os)
+{
+    if (format == OutputFormat::Json)
+    {
+        os << "{\n";
+        os << std::format("  \"target\": \"{}\",\n", escapeJson(file.m_target.m_node));
+        os << "  \"banks\": [\n";
+        for (size_t b = 0; b < file.m_banks.size(); ++b)
+        {
+            const auto &bank = file.m_banks[b];
+            os << "    {\n";
+            os << std::format("      \"name\": \"{}\",\n", escapeJson(bank.m_name.m_node));
+
+            os << "      \"classes\": [";
+            for (size_t c = 0; c < bank.m_classes.size(); ++c)
+            {
+                os << std::format("{{ \"name\": \"{}\", \"bits\": {} }}",
+                                  escapeJson(bank.m_classes[c].m_name.m_node),
+                                  bank.m_classes[c].m_bitSize.m_node);
+                if (c + 1 < bank.m_classes.size())
+                    os << ", ";
+            }
+            os << "],\n";
+
+            os << "      \"sub_register_edges\": [";
+            for (size_t e = 0; e < bank.m_subRegisterEdges.size(); ++e)
+            {
+                os << std::format("{{ \"wide\": \"{}\", \"narrow\": \"{}\" }}",
+                                  escapeJson(bank.m_subRegisterEdges[e].m_wideClass.m_node),
+                                  escapeJson(bank.m_subRegisterEdges[e].m_narrowClass.m_node));
+                if (e + 1 < bank.m_subRegisterEdges.size())
+                    os << ", ";
+            }
+            os << "],\n";
+
+            os << "      \"registers\": [\n";
+            for (size_t r = 0; r < bank.m_registers.size(); ++r)
+            {
+                const auto &reg = bank.m_registers[r];
+                os << "        {\n";
+                os << std::format("          \"name\": \"{}\",\n", escapeJson(reg.m_canonicalName.m_node));
+                os << std::format("          \"hw_encoding\": {},\n", reg.m_encoding.m_node);
+                os << "          \"names\": [";
+                for (size_t n = 0; n < reg.m_names.size(); ++n)
+                {
+                    os << std::format("{{ \"asm\": \"{}\", \"class\": \"{}\" }}",
+                                      escapeJson(reg.m_names[n].m_asmName.m_node),
+                                      escapeJson(reg.m_names[n].m_className.m_node));
+                    if (n + 1 < reg.m_names.size())
+                        os << ", ";
+                }
+                os << "]\n";
+                os << (r + 1 < bank.m_registers.size() ? "        },\n" : "        }\n");
+            }
+            os << "      ]\n";
+            os << (b + 1 < file.m_banks.size() ? "    },\n" : "    }\n");
+        }
+        os << "  ],\n";
+
+        os << "  \"special_registers\": [";
+        for (size_t s = 0; s < file.m_specialRegs.size(); ++s)
+        {
+            os << std::format("{{ \"name\": \"{}\", \"id\": {} }}",
+                              escapeJson(file.m_specialRegs[s].m_name.m_node),
+                              file.m_specialRegs[s].m_id.m_node);
+            if (s + 1 < file.m_specialRegs.size())
+                os << ", ";
+        }
+        os << "]\n";
+        os << "}\n";
+    }
+    else
+    {
+        os << "======================================================================\n";
+        os << std::format("RegisterDef AST Dump (target: {}, {} banks)\n",
+                          file.m_target.m_node, file.m_banks.size());
+        os << "======================================================================\n";
+        for (const auto &bank : file.m_banks)
+        {
+            os << std::format("  Bank: {} ({} classes, {} registers)\n",
+                              bank.m_name.m_node, bank.m_classes.size(), bank.m_registers.size());
+            for (const auto &cls : bank.m_classes)
+            {
+                os << std::format("    Class: {:<12} {} bits\n", cls.m_name.m_node, cls.m_bitSize.m_node);
+            }
+            for (const auto &edge : bank.m_subRegisterEdges)
+            {
+                os << std::format("    Sub: {} <: {}\n", edge.m_wideClass.m_node, edge.m_narrowClass.m_node);
+            }
+            for (const auto &reg : bank.m_registers)
+            {
+                os << std::format("    Reg: {:<12} enc {:<3}", reg.m_canonicalName.m_node, reg.m_encoding.m_node);
+                for (const auto &name : reg.m_names)
+                {
+                    os << std::format(" [{}: {}]", name.m_asmName.m_node, name.m_className.m_node);
+                }
+                os << "\n";
+            }
+        }
+        for (const auto &special : file.m_specialRegs)
+        {
+            os << std::format("  Special: {} = {}\n", special.m_name.m_node, special.m_id.m_node);
+        }
         os << "======================================================================\n";
     }
 }

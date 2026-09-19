@@ -41,9 +41,23 @@ struct MirRegisterDescriptor
     size_t m_partOffsetInBits;
 
     /**
+     * Hardware encoding of this register. This is the value that the encoder places in
+     * ModR/M reg/rm fields, SIB fields, or the opcode+rd low bits. It is target-defined:
+     * for x86-64 GPRs it matches 0..15, for XMM0..15 it matches 0..15, and so on.
+     *
+     * When not explicitly provided by the target's register definition, it defaults to m_id.
+     */
+    uint32_t m_hwEncoding;
+
+    /**
      * Sub-register slices that compose this register.
      */
     std::pmr::vector<MirRegisterDescriptor *> m_subParts;
+
+    /**
+     * Sentinel used to request that m_hwEncoding default to the descriptor's m_id.
+     */
+    static constexpr uint32_t INVALID_HW_ENCODING = UINT32_MAX;
 
     /**
      * Constructs a register descriptor.
@@ -53,10 +67,23 @@ struct MirRegisterDescriptor
                           size_t bitSize,
                           size_t id,
                           size_t partOffsetInBits,
-                          std::pmr::memory_resource *alloc) :
+                          std::pmr::memory_resource *alloc,
+                          uint32_t hwEncoding = INVALID_HW_ENCODING) :
         m_name(name), m_owner(owner), m_bitSize(bitSize), m_id(id), m_partOffsetInBits(partOffsetInBits),
-        m_subParts(alloc)
+        m_hwEncoding(hwEncoding == INVALID_HW_ENCODING ? static_cast<uint32_t>(id) : hwEncoding), m_subParts(alloc)
     {
+    }
+
+    /**
+     * Appends a sub-register slice to this descriptor. Used by generated register info to
+     * reconstruct aliasing hierarchies (e.g. rax -> eax -> ax -> al).
+     */
+    void addSubPart(MirRegisterDescriptor *child)
+    {
+        if (child)
+        {
+            m_subParts.push_back(child);
+        }
     }
 };
 
@@ -81,11 +108,15 @@ class MirRegisterClass
     /**
      * Inserts a register descriptor into this class if not already registered.
      * Returns true upon successful insertion, false if a register with the same name exists.
+     *
+     * @param hwEncoding Explicit hardware encoding for the encoder; defaults to m_id to
+     *                   preserve the behavior of targets that use identity-mapped encodings.
      */
     bool addRegister(const std::string_view &name,
                      size_t bitSize,
                      size_t partOffsetInBits,
-                     std::initializer_list<MirRegisterDescriptor *> subParts);
+                     std::initializer_list<MirRegisterDescriptor *> subParts,
+                     uint32_t hwEncoding = MirRegisterDescriptor::INVALID_HW_ENCODING);
 
     /**
      * Looks up a register descriptor by name within this class; returns nullptr if not found.

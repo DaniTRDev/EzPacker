@@ -39,4 +39,11 @@ EzPacker_AddTest(
         "tests/T_CallingConvDefLang.cpp"
 )
 
+EzPacker_AddTest(
+        "T_RegisterDefLang"
+        "EzDslSemaTestSuite"
+        ""
+        "tests/T_RegisterDefLang.cpp"
+)
+
 

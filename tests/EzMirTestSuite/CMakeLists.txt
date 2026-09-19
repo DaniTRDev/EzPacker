@@ -82,3 +82,10 @@ EzPacker_AddTest(
         ""
         "tests/T_MirParser.cpp"
 )
+
+EzPacker_AddTest(
+        "T_MirRegisterDescriptor"
+        "EzMirTestSuite"
+        ""
+        "tests/T_MirRegisterDescriptor.cpp"
+)

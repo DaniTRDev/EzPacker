@@ -9,6 +9,7 @@ set(EZDSL_CODE_GENERATORS_FILES_LIST
         "include/CodeGenerators/CppTargetInstructionGenerator.h"
         "include/CodeGenerators/CppInstructionSelectorGenerator.h"
         "include/CodeGenerators/CppCallingConvGenerator.h"
+        "include/CodeGenerators/CppRegisterInfoGenerator.h"
 
         "src/CodeGenerators/CppSourceEmitter.cpp"
         "src/CodeGenerators/CodeGenerator.cpp"
@@ -19,6 +20,7 @@ set(EZDSL_CODE_GENERATORS_FILES_LIST
         "src/CodeGenerators/CppTargetInstructionGenerator.cpp"
         "src/CodeGenerators/CppInstructionSelectorGenerator.cpp"
         "src/CodeGenerators/CppCallingConvGenerator.cpp"
+        "src/CodeGenerators/CppRegisterInfoGenerator.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzDslCodeGenerators"

@@ -9,6 +9,7 @@ set(EZDSL_SEMA_FILES_LIST
     "include/Sema/Symbols/TargetSymbols.h"
     "include/Sema/Symbols/InstructionSelectSymbols.h"
     "include/Sema/Symbols/CallingConvSymbols.h"
+    "include/Sema/Symbols/RegisterSymbols.h"
     "include/SemaPasses/IrInstructionPass.h"
     "include/SemaPasses/LegalizeActionPass.h"
     "include/SemaPasses/LegalizeRulePass.h"
@@ -16,6 +17,7 @@ set(EZDSL_SEMA_FILES_LIST
     "include/SemaPasses/TargetInstPass.h"
     "include/SemaPasses/InstructionSelectPass.h"
     "include/SemaPasses/CallingConvPass.h"
+    "include/SemaPasses/RegisterPass.h"
 
     "src/Sema/Scope.cpp"
     "src/Sema/SemaContext.cpp"
@@ -28,6 +30,7 @@ set(EZDSL_SEMA_FILES_LIST
     "src/SemaPasses/TargetInstPass.cpp"
     "src/SemaPasses/InstructionSelectPass.cpp"
     "src/SemaPasses/CallingConvPass.cpp"
+    "src/SemaPasses/RegisterPass.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzDslSema"

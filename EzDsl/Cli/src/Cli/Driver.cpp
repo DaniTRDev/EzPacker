@@ -1,6 +1,8 @@
 #include "Cli/Driver.h"
 #include "Cli/InfoDumper.h"
 
+#include <cctype>
+
 #include "CodeGenerators/CppLegalizeRuleGenerator.h"
 #include "CodeGenerators/CppLegalizerGenerator.h"
 #include "CodeGenerators/CppMirInstructionGenerator.h"
@@ -8,6 +10,7 @@
 #include "CodeGenerators/CppTargetInstructionGenerator.h"
 #include "CodeGenerators/CppInstructionSelectorGenerator.h"
 #include "CodeGenerators/CppCallingConvGenerator.h"
+#include "CodeGenerators/CppRegisterInfoGenerator.h"
 
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
@@ -17,6 +20,7 @@
 #include "Ast/TargetInstDefLangAst.h"
 #include "Ast/InstructionSelectDefLangAst.h"
 #include "Ast/CallingConvDefLangAst.h"
+#include "Ast/RegisterDefLangAst.h"
 #include "Parser/IrInstructionDefLang.h"
 #include "Parser/LegalizeActionDefLang.h"
 #include "Parser/LegalizeRuleDefLang.h"
@@ -25,6 +29,7 @@
 #include "Parser/TargetInstDefLang.h"
 #include "Parser/InstructionSelectDefLang.h"
 #include "Parser/CallingConvDefLang.h"
+#include "Parser/RegisterDefLang.h"
 
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/IrSymbols.h"
@@ -32,6 +37,7 @@
 #include "Sema/Symbols/TargetSymbols.h"
 #include "Sema/Symbols/InstructionSelectSymbols.h"
 #include "Sema/Symbols/CallingConvSymbols.h"
+#include "Sema/Symbols/RegisterSymbols.h"
 #include "SemaPasses/IrInstructionPass.h"
 #include "SemaPasses/LegalizeActionPass.h"
 #include "SemaPasses/LegalizeRulePass.h"
@@ -39,6 +45,7 @@
 #include "SemaPasses/TargetInstPass.h"
 #include "SemaPasses/InstructionSelectPass.h"
 #include "SemaPasses/CallingConvPass.h"
+#include "SemaPasses/RegisterPass.h"
 
 #include "SourceManager/SourceManager.h"
 
@@ -47,6 +54,33 @@ namespace Cli
 
 namespace
 {
+
+std::string sanitizeTargetIdentifier(std::string_view raw)
+{
+    std::string result;
+    result.reserve(raw.size());
+    for (char c : raw)
+    {
+        unsigned char uc = static_cast<unsigned char>(c);
+        if (std::isalnum(uc) || c == '_')
+        {
+            result.push_back(c);
+        }
+        else
+        {
+            result.push_back('_');
+        }
+    }
+    if (result.empty())
+    {
+        result = "Target";
+    }
+    if (std::isdigit(static_cast<unsigned char>(result.front())))
+    {
+        result.insert(result.begin(), '_');
+    }
+    return result;
+}
 
 class ErrorTrackingListener : public DiagnosticListener
 {
@@ -305,6 +339,8 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return LanguageDialect::InstructionSelect;
     if (ext == ".ezcc" || ext == ".ccd")
         return LanguageDialect::CallingConv;
+    if (ext == ".reg")
+        return LanguageDialect::RegisterDef;
 
     if (m_options.generator == GeneratorKind::TypeTable)
         return LanguageDialect::TypeDef;
@@ -320,6 +356,8 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return LanguageDialect::InstructionSelect;
     if (m_options.generator == GeneratorKind::CallingConv)
         return LanguageDialect::CallingConv;
+    if (m_options.generator == GeneratorKind::RegisterInfo)
+        return LanguageDialect::RegisterDef;
 
     return LanguageDialect::Auto;
 }
@@ -347,6 +385,8 @@ GeneratorKind Driver::resolveGeneratorKind(LanguageDialect dialect) const
             return GeneratorKind::InstructionSelector;
         case LanguageDialect::CallingConv:
             return GeneratorKind::CallingConv;
+        case LanguageDialect::RegisterDef:
+            return GeneratorKind::RegisterInfo;
         default:
             return GeneratorKind::Auto;
     }
@@ -564,6 +604,22 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
         }
     }
+    else if (genKind == GeneratorKind::RegisterInfo)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        target = sanitizeTargetIdentifier(target);
+        if (target.empty()) target = "Target";
+
+        if (!m_options.sourceOnly || m_options.headerOnly)
+        {
+            auto hPath = resolveSingleFile(outDir, std::format("{}RegisterInfo.h", target));
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+    }
 
     return outputs;
 }
@@ -645,6 +701,7 @@ DriverResult Driver::run()
     bool hasLoadedRules = false;
     std::optional<DSL::Ast::CallingConvDef::CallingConventionDefFile> ccAst;
     std::optional<DSL::Ast::InstructionSelectDef::InstructionSelectFile> isAst;
+    std::optional<DSL::Ast::RegisterDef::RegisterFile> regAst;
 
     // Multi-dialect prelude & dependency ingestion
     if (dialect == LanguageDialect::LegalizeRule || dialect == LanguageDialect::LegalizeAction)
@@ -958,6 +1015,34 @@ DriverResult Driver::run()
             break;
         }
 
+        case LanguageDialect::RegisterDef:
+        {
+            regAst = parseCtx.parse<DSL::Parser::RegisterDef::RegisterDefFile,
+                                     DSL::Ast::RegisterDef::RegisterFile>();
+            if (!regAst.has_value() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Syntax parsing failed for Register Definition file.";
+                return result;
+            }
+
+            constructCount = regAst->m_banks.size() + regAst->m_specialRegs.size();
+
+            if (m_options.dumpAst)
+            {
+                InfoDumper::dumpRegisterDefAst(*regAst, m_options.format, std::cout);
+            }
+
+            RegisterPass pass;
+            if (!pass.run(&diagCollector, &symbolTable, &regAst.value()) || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Semantic analysis failed for Register Definition file.";
+                return result;
+            }
+            break;
+        }
+
         default:
             break;
     }
@@ -988,6 +1073,7 @@ DriverResult Driver::run()
             case LanguageDialect::TargetInstDef: gInfo.dialectName = "TargetInstDef (.idf)"; break;
             case LanguageDialect::InstructionSelect: gInfo.dialectName = "InstructionSelect (.isf)"; break;
             case LanguageDialect::CallingConv: gInfo.dialectName = "CallingConv (.ezcc, .ccd)"; break;
+            case LanguageDialect::RegisterDef: gInfo.dialectName = "RegisterDef (.reg)"; break;
             default: gInfo.dialectName = "Unknown"; break;
         }
         gInfo.constructCount = constructCount;
@@ -1001,6 +1087,7 @@ DriverResult Driver::run()
             case GeneratorKind::TargetInstructions: gInfo.generatorName = "CppTargetInstructionGenerator"; break;
             case GeneratorKind::InstructionSelector: gInfo.generatorName = "CppInstructionSelectorGenerator"; break;
             case GeneratorKind::CallingConv: gInfo.generatorName = "CppCallingConvGenerator"; break;
+            case GeneratorKind::RegisterInfo: gInfo.generatorName = "CppRegisterInfoGenerator"; break;
             default: gInfo.generatorName = "None"; break;
         }
 
@@ -1165,6 +1252,24 @@ DriverResult Driver::run()
         {
             result.success = false;
             result.errorMessage = "Code generation failed during CallingConvDesc synthesis.";
+            return result;
+        }
+    }
+    else if (genKind == GeneratorKind::RegisterInfo)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        CppRegisterInfoGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during RegisterInfo synthesis.";
             return result;
         }
     }
