@@ -30,6 +30,7 @@ class X86_64CodeEmitter : public GenericCodeEmitter
     void beginFunction(CodeEmitterContext *ctx, std::string_view name) override;
     void bindLabel(MirId labelId) override;
     void endFunction(CodeEmitterContext *ctx) override;
+    void endFunction(CodeEmitterContext *ctx, MirFunction *func);
     void emitInst(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands) override;
 
     /**

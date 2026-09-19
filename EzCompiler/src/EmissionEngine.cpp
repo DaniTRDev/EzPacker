@@ -10,7 +10,9 @@
 #include "X86_64/X86_64CodeEmitter.h"
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
+#include "Operand/MirOperands.h"
 #include <fstream>
+#include <unordered_map>
 
 namespace EzCompiler
 {
@@ -41,11 +43,29 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
     EzCodeEmitter::X86_64::X86_64CodeEmitter emitter;
 
     std::vector<EzCodeEmitter::ObjectFormat::ObjectSymbol> symbols;
+    std::unordered_map<size_t, MirFunction *> funcById;
 
     for (MirFunction *func : mirCtx.getFunctions())
     {
         if (!func)
         {
+            continue;
+        }
+
+        funcById[func->getId()] = func;
+
+        if (func->getBlockCount() == 0)
+        {
+            // External declaration
+            EzCodeEmitter::ObjectFormat::ObjectSymbol sym{
+                .m_name = std::string(func->getName()),
+                .m_section = SectionType::Custom,
+                .m_offset = 0,
+                .m_size = 0,
+                .m_isGlobal = true,
+                .m_isFunction = true
+            };
+            symbols.push_back(sym);
             continue;
         }
 
@@ -74,7 +94,7 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             }
         }
 
-        emitter.endFunction(&emitterCtx);
+        emitter.endFunction(&emitterCtx, func);
         uint64_t fnSize = textSection->getCurrentOffset() - fnOffset;
 
         EzCodeEmitter::ObjectFormat::ObjectSymbol sym{
@@ -90,6 +110,98 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
     textSection->finalize();
 
+    // Patch intra-function branches and build object relocations
+    std::vector<EzCodeEmitter::ObjectFormat::ObjectRelocEntry> objectRelocs;
+    auto secData = textSection->getData();
+    const auto &allRelocs = emitterCtx.getRelocations();
+    auto itTextRelocs = allRelocs.find(textSection);
+    if (itTextRelocs != allRelocs.end())
+    {
+        for (CodeRelocation *reloc : itTextRelocs->second)
+        {
+            if (!reloc || !reloc->m_srcRef)
+            {
+                continue;
+            }
+
+            MirReference *ref = reloc->m_srcRef;
+            uint64_t instOffset = reloc->m_address;
+
+            if (ref->isBlock())
+            {
+                CodeLabel *targetLabel = emitterCtx.findLabel(ref->getRefId());
+                if (targetLabel && instOffset < secData.size())
+                {
+                    uint64_t targetOffset = targetLabel->getAddress();
+                    uint8_t op0 = secData[instOffset];
+                    if (op0 == 0xE9) // JMP near: 5 bytes
+                    {
+                        uint64_t dispOffset = instOffset + 1;
+                        uint64_t nextRip = instOffset + 5;
+                        int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) - static_cast<int64_t>(nextRip));
+                        textSection->patch32(dispOffset, static_cast<uint32_t>(disp));
+                    }
+                    else if (op0 == 0x0F && instOffset + 1 < secData.size() && (secData[instOffset + 1] & 0xF0) == 0x80) // Jcc near: 6 bytes
+                    {
+                        uint64_t dispOffset = instOffset + 2;
+                        uint64_t nextRip = instOffset + 6;
+                        int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) - static_cast<int64_t>(nextRip));
+                        textSection->patch32(dispOffset, static_cast<uint32_t>(disp));
+                    }
+                    else if (op0 == 0xE8) // CALL near: 5 bytes
+                    {
+                        uint64_t dispOffset = instOffset + 1;
+                        uint64_t nextRip = instOffset + 5;
+                        int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) - static_cast<int64_t>(nextRip));
+                        textSection->patch32(dispOffset, static_cast<uint32_t>(disp));
+                    }
+                }
+            }
+            else if (ref->isFunction())
+            {
+                std::string calleeName;
+                auto itFunc = funcById.find(ref->getRefId());
+                if (itFunc != funcById.end() && itFunc->second)
+                {
+                    calleeName = std::string(itFunc->second->getName());
+                }
+
+                if (!calleeName.empty())
+                {
+                    bool symExists = false;
+                    for (const auto &s : symbols)
+                    {
+                        if (s.m_name == calleeName)
+                        {
+                            symExists = true;
+                            break;
+                        }
+                    }
+                    if (!symExists)
+                    {
+                        symbols.push_back({
+                            .m_name = calleeName,
+                            .m_section = SectionType::Custom,
+                            .m_offset = 0,
+                            .m_size = 0,
+                            .m_isGlobal = true,
+                            .m_isFunction = true
+                        });
+                    }
+
+                    int64_t addend = (binDesc->getObjectFormat() == TargetObjectFormat::ELF) ? -4 : 0;
+                    objectRelocs.push_back({
+                        .m_section = SectionType::Text,
+                        .m_offset = instOffset + 1,
+                        .m_symbolName = calleeName,
+                        .m_type = TargetCodeRelocationType::BranchRel32,
+                        .m_addend = addend
+                    });
+                }
+            }
+        }
+    }
+
     std::vector<uint8_t> outputBytes;
     if (binDesc->getObjectFormat() == TargetObjectFormat::ELF)
     {
@@ -97,6 +209,10 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         for (const auto &sym : symbols)
         {
             elfWriter.addSymbol(sym);
+        }
+        for (const auto &reloc : objectRelocs)
+        {
+            elfWriter.addRelocation(reloc);
         }
         outputBytes = elfWriter.write(sections);
     }
@@ -106,6 +222,10 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         for (const auto &sym : symbols)
         {
             coffWriter.addSymbol(sym);
+        }
+        for (const auto &reloc : objectRelocs)
+        {
+            coffWriter.addRelocation(reloc);
         }
         outputBytes = coffWriter.write(sections);
     }

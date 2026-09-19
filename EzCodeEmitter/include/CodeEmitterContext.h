@@ -49,6 +49,11 @@ struct CodeLabel
     uint64_t m_currentOffset{ 0 }; // Current offset from the start of the code
     uint64_t m_labelAddress{ 0 };  // Offset from the start of the section
     std::string_view m_name{};
+
+    uint64_t getAddress() const
+    {
+        return m_node ? m_node->m_calculatedOffset : m_labelAddress;
+    }
 };
 
 /**
@@ -119,6 +124,21 @@ class CodeEmitterContext
      */
     void resetFuncState(MirFunction *currentFunc);
 
+    /**
+     * Looks up a label across the module by its MirId.
+     */
+    CodeLabel *findLabel(MirId id) const;
+
+    /**
+     * Returns module-wide relocations grouped by section.
+     */
+    const std::pmr::unordered_map<CodeSection *, std::pmr::vector<CodeRelocation *>> &getRelocations() const;
+
+    /**
+     * Returns the active function's relocations.
+     */
+    const std::pmr::vector<CodeRelocation *> &getCurrentFuncRelocs() const;
+
   private:
     CodeLabel *m_currentLabel{ nullptr };
     DiagnosticCollector *m_diagCollector{ nullptr };
@@ -133,6 +153,11 @@ class CodeEmitterContext
 
     // Persistent module-wide relocation table aggregated across all emitted code sections.
     std::pmr::unordered_map<CodeSection *, std::pmr::vector<CodeRelocation *>> m_relocations;
+
+    // Global tracking of all allocated labels and relocations for safe destruction and lookup
+    std::pmr::vector<CodeLabel *> m_allocatedLabels;
+    std::pmr::vector<CodeRelocation *> m_allocatedRelocs;
+    std::pmr::unordered_map<MirId, CodeLabel *> m_allLabels;
 
     const std::pmr::unordered_map<SectionType, CodeSection *> &m_sections;
 };

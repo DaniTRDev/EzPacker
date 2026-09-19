@@ -21,7 +21,7 @@ void X86_64CodeEmitter::beginFunction(CodeEmitterContext *ctx, std::string_view 
         return;
     }
     CodeSection *textSec = m_ctx->getSection(SectionType::Text);
-    CodeLabel *entryLabel = m_ctx->getOrCreateLabel(textSec, 1, name);
+    CodeLabel *entryLabel = m_ctx->getOrCreateLabel(textSec, MIRID_INVALID, name);
     m_ctx->bindLabel(entryLabel);
 }
 
@@ -38,9 +38,14 @@ void X86_64CodeEmitter::bindLabel(MirId labelId)
 
 void X86_64CodeEmitter::endFunction(CodeEmitterContext *ctx)
 {
+    endFunction(ctx, nullptr);
+}
+
+void X86_64CodeEmitter::endFunction(CodeEmitterContext *ctx, MirFunction *func)
+{
     if (ctx)
     {
-        ctx->resetFuncState(nullptr);
+        ctx->resetFuncState(func);
     }
     m_ctx = nullptr;
 }

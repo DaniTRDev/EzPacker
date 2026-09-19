@@ -171,7 +171,14 @@ LegalityQuery MirLegalizer::buildQuery(MirInstruction *inst)
             q.m_types[i] = op->getMirType();
             if (op->getMirType())
             {
-                q.m_compactIds[i] = op->getMirType()->getCompactId();
+                if (op->getMirType()->getKind() == MirTypeKind::Pointer)
+                {
+                    q.m_compactIds[i] = 3; // Standard compact ID for 'ptr'
+                }
+                else
+                {
+                    q.m_compactIds[i] = op->getMirType()->getCompactId();
+                }
             }
 
             if (op->isOfType<MirRegister>())

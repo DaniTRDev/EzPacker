@@ -46,7 +46,7 @@ bool MirInstructionSelector::selectBlock(MirBuilderContext *ctx, MirBlock *block
         {
             if (!select(ctx, curr))
             {
-                ctx->getDiagCollector()->error("MirInstructionSelector", "Could not select instruction")
+                ctx->getDiagCollector()->error("MirInstructionSelector", "Could not select instruction '{}'", curr->getOpCodeName())
                         << curr->getSourceRef();
                 return false;
             }

@@ -4,8 +4,10 @@
 CodeEmitterContext::CodeEmitterContext(DiagnosticCollector *diagCollector,
                                        const std::pmr::unordered_map<SectionType, CodeSection *> &sections,
                                        std::pmr::memory_resource *alloc) :
-    m_currentLabel(nullptr), m_diagCollector(diagCollector), m_alloc(alloc), m_currentFuncLabels(alloc),
-    m_currentFuncRelocs(alloc), m_labels(alloc), m_relocations(alloc), m_sections(sections)
+    m_currentLabel(nullptr), m_diagCollector(diagCollector), m_alloc(alloc),
+    m_currentFuncLabels(alloc), m_currentFuncRelocs(alloc), m_labels(alloc),
+    m_relocations(alloc), m_allocatedLabels(alloc), m_allocatedRelocs(alloc),
+    m_allLabels(alloc), m_sections(sections)
 {
 }
 
@@ -13,47 +15,27 @@ CodeEmitterContext::~CodeEmitterContext()
 {
     std::pmr::polymorphic_allocator<> pAlloc(m_alloc);
 
-    // Deallocate unflushed active function labels
-    for (auto &[id, label] : m_currentFuncLabels)
+    for (auto *label : m_allocatedLabels)
     {
         if (label != nullptr)
         {
             pAlloc.delete_object(label);
         }
     }
+    m_allocatedLabels.clear();
     m_currentFuncLabels.clear();
-
-    // Deallocate flushed labels across all functions
-    for (auto &[func, labelMap] : m_labels)
-    {
-        for (auto &[id, label] : labelMap)
-        {
-            if (label != nullptr)
-            {
-                pAlloc.delete_object(label);
-            }
-        }
-    }
     m_labels.clear();
+    m_allLabels.clear();
 
-    // Deallocate unflushed active function relocations
-    for (auto &reloc : m_currentFuncRelocs)
+    for (auto *reloc : m_allocatedRelocs)
     {
         if (reloc != nullptr)
         {
             pAlloc.delete_object(reloc);
         }
     }
+    m_allocatedRelocs.clear();
     m_currentFuncRelocs.clear();
-
-    // Deallocate persistent module-wide relocations
-    for (auto &[section, relocs] : m_relocations)
-    {
-        for (auto &reloc : relocs)
-        {
-            pAlloc.delete_object(reloc);
-        }
-    }
     m_relocations.clear();
 }
 
@@ -79,7 +61,12 @@ CodeLabel *CodeEmitterContext::getOrCreateLabel(CodeSection *definingSection, Mi
     newLabel->m_labelAddress = definingSection ? definingSection->getCurrentOffset() : 0;
     newLabel->m_name = name;
 
+    m_allocatedLabels.push_back(newLabel);
     m_currentFuncLabels.insert({ id, newLabel });
+    if (id != MIRID_INVALID)
+    {
+        m_allLabels.insert({ id, newLabel });
+    }
     return newLabel;
 }
 
@@ -96,6 +83,7 @@ CodeRelocation *CodeEmitterContext::addReloc(MirReference *srcRef, TargetCodeRel
     newReloc->m_srcRef = srcRef;
     newReloc->m_address = sec ? sec->getCurrentOffset() : 0;
 
+    m_allocatedRelocs.push_back(newReloc);
     m_currentFuncRelocs.push_back(newReloc);
     return newReloc;
 }
@@ -155,4 +143,29 @@ void CodeEmitterContext::resetFuncState(MirFunction *currentFunc)
     m_currentFuncLabels = std::pmr::unordered_map<MirId, CodeLabel *>(m_alloc);
     m_currentFuncRelocs = std::pmr::vector<CodeRelocation *>(m_alloc);
     m_currentLabel = nullptr;
+}
+
+CodeLabel *CodeEmitterContext::findLabel(MirId id) const
+{
+    auto it = m_allLabels.find(id);
+    if (it != m_allLabels.end())
+    {
+        return it->second;
+    }
+    auto it2 = m_currentFuncLabels.find(id);
+    if (it2 != m_currentFuncLabels.end())
+    {
+        return it2->second;
+    }
+    return nullptr;
+}
+
+const std::pmr::unordered_map<CodeSection *, std::pmr::vector<CodeRelocation *>> &CodeEmitterContext::getRelocations() const
+{
+    return m_relocations;
+}
+
+const std::pmr::vector<CodeRelocation *> &CodeEmitterContext::getCurrentFuncRelocs() const
+{
+    return m_currentFuncRelocs;
 }

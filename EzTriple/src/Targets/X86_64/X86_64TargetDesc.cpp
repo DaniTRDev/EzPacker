@@ -12,7 +12,7 @@
 #include "x86_64CallingConvDesc.h"
 #include "x86_64TargetInstructionTable.h"
 #include "x86_64LegalizerActionTable.h"
-#include "x86_64InstructionSelector.h"
+#include "Targets/X86_64/X86_64InstructionSelector.h"
 
 namespace EzTriple
 {
@@ -127,7 +127,7 @@ void X86_64TargetDesc::initialize()
     m_legalizer = std::make_unique<MirLegalizer>(m_ctx, this);
 
     // 8. Instruction Selector & Addressing Mode Matcher
-    m_isel = std::make_unique<x86_64InstructionSelector>(this);
+    m_isel = std::make_unique<X86_64TargetInstructionSelector>(this);
     m_modeMatcher = std::make_unique<X86AddressingModeMatcher>();
 
     // 9. Register Allocator & Frame Lowerer

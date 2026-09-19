@@ -6,6 +6,7 @@
 #include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirTargetInstructionDesc.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
@@ -45,6 +46,30 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             if (isInstructionDAlloc(inst))
             {
                 analysisData->m_hasDynamicAllocs = true;
+            }
+
+            bool isCall = (inst->getOpCode() == MirInstructionOpCode::CALL) ||
+                          (inst->getTargetDesc() && ((inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsCall) ||
+                                                     std::string_view(inst->getTargetDesc()->getName()) == "CALL"));
+            if (isCall)
+            {
+                analysisData->m_hasCalls = true;
+                if (cc)
+                {
+                    const auto &callerSaved = cc->getAllCallerSavedRegs();
+                    for (const auto &csReg : callerSaved)
+                    {
+                        addNode(csReg, ctx);
+                        for (const MirRegisterRef &liveRegRef : live)
+                        {
+                            if (csReg != liveRegRef)
+                            {
+                                ctx->m_iGraph[csReg].insert(liveRegRef);
+                                ctx->m_iGraph[liveRegRef].insert(csReg);
+                            }
+                        }
+                    }
+                }
             }
 
             // Add nodes and interference edges for DEFs
@@ -241,7 +266,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
         ctx->m_selectStack.pop_back();
 
         // Fresh set for every individual node being colored
-        std::pmr::unordered_set<MirRegisterRef> usedColorsSet(ctx->m_allocator);
+        std::pmr::unordered_set<size_t> usedColorIds(ctx->m_allocator);
 
         const auto &availableColors = node.getClass()->getRegs();
 
@@ -251,7 +276,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             MirRegisterRef ref = MirRegisterRef::preg(regDesc);
             if (ctx->m_reservedRegs.contains(ref))
             {
-                usedColorsSet.insert(ref);
+                usedColorIds.insert(ref.getId());
             }
         }
 
@@ -261,10 +286,17 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             if (ctx->m_removedNodes.contains(neighbor))
                 continue;
 
-            auto it = ctx->m_allocatedRegs.find(neighbor);
-            if (it != ctx->m_allocatedRegs.end())
+            if (neighbor.isPhysical())
             {
-                usedColorsSet.insert(it->second);
+                usedColorIds.insert(neighbor.getId());
+            }
+            else
+            {
+                auto it = ctx->m_allocatedRegs.find(neighbor);
+                if (it != ctx->m_allocatedRegs.end())
+                {
+                    usedColorIds.insert(it->second.getId());
+                }
             }
         }
 
@@ -273,7 +305,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
         for (auto &[name, regDesc] : availableColors)
         {
             MirRegisterRef ref = MirRegisterRef::preg(regDesc);
-            if (!usedColorsSet.contains(ref))
+            if (!usedColorIds.contains(ref.getId()))
             {
                 assignedPhysReg = ref;
                 break;

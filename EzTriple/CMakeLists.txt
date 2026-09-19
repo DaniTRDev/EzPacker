@@ -24,6 +24,7 @@ set(EZTRIPLE_FILES_LIST
         "include/Targets/X86_64/X86_64FrameLowerer.h"
         "include/Targets/X86_64/X86_64RegisterAllocator.h"
         "include/Targets/X86_64/X86_64TargetDesc.h"
+        "include/Targets/X86_64/X86_64InstructionSelector.h"
         "include/Targets/X86_64/X86_64ElfBinaryDesc.h"
         "include/Targets/X86_64/X86_64CoffBinaryDesc.h"
 
@@ -47,6 +48,7 @@ set(EZTRIPLE_FILES_LIST
         "src/RegisterAllocator/MirRegisterAllocator.cpp"
         "src/RegisterAllocator/MirRegisterAllocatorPass.cpp"
         "src/Targets/X86_64/X86_64Lowering.cpp"
+        "src/Targets/X86_64/X86_64InstructionSelector.cpp"
         "src/Targets/X86_64/X86_64FrameLowerer.cpp"
         "src/Targets/X86_64/X86_64RegisterAllocator.cpp"
         "src/Targets/X86_64/X86_64TargetDesc.cpp"
