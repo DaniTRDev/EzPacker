@@ -1,0 +1,30 @@
+; Module: multiple_returns.mir
+; Demonstrates functions with multiple basic blocks and distinct return paths.
+; MirFrameLowerer automatically generates separate function epilogues (stack restoration,
+; callee-saved register pops, and 'ret' instructions) for each exit basic block.
+
+fn @calculate_dual_path(i64 %base, i64 %modifier) -> i64 {
+path_alpha:
+    %sum = ADD i64 %base, %modifier;
+    %scaled = ADD i64 %sum, %sum;
+    RET i64 %scaled;
+
+path_beta:
+    %diff = SUB i64 %base, %modifier;
+    %offset = SUB i64 %diff, 10;
+    RET i64 %offset;
+}
+
+fn @multi_exit_32bit(i32 %x, i32 %y) -> i32 {
+route_add:
+    %r1 = ADD i32 %x, %y;
+    RET i32 %r1;
+
+route_sub:
+    %r2 = SUB i32 %x, %y;
+    RET i32 %r2;
+
+route_mul:
+    %r3 = IMUL i32 %x, %y;
+    RET i32 %r3;
+}

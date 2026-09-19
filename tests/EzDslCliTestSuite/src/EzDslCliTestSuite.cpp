@@ -10,6 +10,11 @@
 #include <fstream>
 #include <sstream>
 
+#if defined(_WIN32) || defined(_WIN64)
+    #define popen _popen
+    #define pclose _pclose
+#endif
+
 DiagnosticCollector *EzDslCliTestSuite::getDiagCollector()
 {
     return m_diagnosticCollector;
@@ -205,7 +210,7 @@ int EzDslCliTestSuite::runCliProcess(const std::vector<std::string> &args, std::
     }
     cmd += " 2>&1";
 
-    FILE *pipe = _popen(cmd.c_str(), "r");
+    FILE *pipe = popen(cmd.c_str(), "r");
     if (!pipe)
     {
         return -1;
@@ -217,7 +222,7 @@ int EzDslCliTestSuite::runCliProcess(const std::vector<std::string> &args, std::
         stdOut += buffer;
     }
 
-    return _pclose(pipe);
+    return pclose(pipe);
 }
 
 void EzDslCliTestSuiteAsGtest::SetUp()

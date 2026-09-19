@@ -1,0 +1,21 @@
+// EzPacker Custom MIR Module: memory_fold.mir
+// Demonstrates pointer parameters, SIB displacement addressing, and instruction
+// selector load-folding where LOAD is merged with ADD into the ADD64rm instruction.
+
+fn @accumulate_offset(i64 %seed, ptr %buf) -> i64 {
+entry:
+    %val0 = LOAD i64 [ptr %buf + 0];
+    %sum0 = ADD i64 %seed, %val0;
+    %val1 = LOAD i64 [ptr %buf + 8];
+    %sum1 = ADD i64 %sum0, %val1;
+    RET i64 %sum1;
+}
+
+fn @load_and_combine(i64 %scale, ptr %arr) -> i64 {
+entry:
+    %c_bias = MOV i64 128;
+    %init = ADD i64 %scale, %c_bias;
+    %item = LOAD i64 [ptr %arr + 16];
+    %total = ADD i64 %init, %item;
+    RET i64 %total;
+}

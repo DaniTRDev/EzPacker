@@ -1,0 +1,30 @@
+// EzPacker Custom MIR Module: arithmetic_32bit.mir
+// Demonstrates 32-bit integer arithmetic, sign-extended immediate encoding,
+// bitwise logic, and 32-bit register allocation for x86_64 targets.
+
+fn @hash_step32(i32 %val, i32 %seed) -> i32 {
+entry:
+    %c_const = MOV i32 40503;
+    %sum = ADD i32 %val, %c_const;
+    %prod = IMUL i32 %sum, %seed;
+    %diff = SUB i32 %prod, %val;
+    RET i32 %diff;
+}
+
+fn @bit_blend32(i32 %a, i32 %b) -> i32 {
+entry:
+    %and_val = AND i32 %a, %b;
+    %or_val = OR i32 %a, %b;
+    %xor_val = XOR i32 %and_val, %or_val;
+    RET i32 %xor_val;
+}
+
+fn @main() -> i32 {
+entry:
+    %arg1 = MOV i32 1024;
+    %arg2 = MOV i32 31;
+    %h = ADD i32 %arg1, %arg2;
+    %bias = MOV i32 7;
+    %res = SUB i32 %h, %bias;
+    RET i32 %res;
+}

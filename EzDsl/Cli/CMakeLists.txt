@@ -16,7 +16,13 @@ EzCMK_ConfigureLib(NAME "EzDslCliLib"
         INCLUDED_DIRS "include"
 )
 
-target_compile_options(EzDslCliLib PRIVATE -Wa,-mbig-obj)
+target_compile_options(EzDslCliLib PRIVATE
+    # MSVC and Clang-cl (Windows)
+    $<$<OR:$<CXX_COMPILER_ID:MSVC>,$<STREQUAL:${CMAKE_CXX_SIMULATE_ID},MSVC>>:/bigobj>
+    
+    # MinGW / GCC on Windows
+    $<$<BOOL:${MINGW}>:-Wa,-mbig-obj>
+)
 
 EzCMK_AddExecutable(NAME "EzDslCli"
         FILE_LIST "src/Main.cpp"
