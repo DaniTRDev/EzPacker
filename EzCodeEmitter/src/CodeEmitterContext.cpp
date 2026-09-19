@@ -75,13 +75,19 @@ CodeLabel *CodeEmitterContext::getCurrentLabel() const { return m_currentLabel; 
 CodeRelocation *CodeEmitterContext::addReloc(MirReference *srcRef, TargetCodeRelocationType relocType)
 {
     CodeSection *sec = getCurrentSection();
+    return addRelocAt(srcRef, relocType, sec ? sec->getCurrentOffset() : 0);
+}
+
+CodeRelocation *CodeEmitterContext::addRelocAt(MirReference *srcRef, TargetCodeRelocationType relocType, uint64_t address)
+{
+    CodeSection *sec = getCurrentSection();
 
     std::pmr::polymorphic_allocator<> pAlloc(m_alloc);
     CodeRelocation *newReloc = pAlloc.new_object<CodeRelocation>();
     newReloc->m_relocType = relocType;
     newReloc->m_definingSection = sec;
     newReloc->m_srcRef = srcRef;
-    newReloc->m_address = sec ? sec->getCurrentOffset() : 0;
+    newReloc->m_address = address;
 
     m_allocatedRelocs.push_back(newReloc);
     m_currentFuncRelocs.push_back(newReloc);

@@ -58,6 +58,16 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
     // 2. Fallback selection for control flow, comparisons, calls, and memory
     switch (inst->getOpCode())
     {
+        case MirInstructionOpCode::FADD:
+        case MirInstructionOpCode::FSUB:
+        case MirInstructionOpCode::FMUL:
+        case MirInstructionOpCode::FDIV:
+            return selectFloatALU(ctx, inst);
+        case MirInstructionOpCode::SITOFP:
+        case MirInstructionOpCode::FPTOSI:
+            return selectFloatCvt(ctx, inst);
+        case MirInstructionOpCode::MOV:
+            return selectMOV(ctx, inst);
         case MirInstructionOpCode::JMP:
             return selectJMP(ctx, inst);
         case MirInstructionOpCode::BR_COND:
@@ -288,24 +298,41 @@ bool X86_64TargetInstructionSelector::selectLOAD(MirBuilderContext *ctx, MirInst
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
     MirOperandBuilder ob(ctx);
 
+    bool isFloat = (dst->getMirType() && dst->getMirType()->getKind() == MirTypeKind::FloatingPoint);
     size_t sizeInBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64;
     x86_64TargetInst::OpCode loadOp = x86_64TargetInst::LOAD64;
     std::string_view dstClass = "GPR64";
 
-    if (sizeInBits <= 8)
+    if (isFloat)
     {
-        loadOp = x86_64TargetInst::LOAD8;
-        dstClass = "GPR8";
+        if (sizeInBits == 32)
+        {
+            loadOp = x86_64TargetInst::LOAD32;
+            dstClass = "FPR32";
+        }
+        else
+        {
+            loadOp = x86_64TargetInst::LOAD64;
+            dstClass = "FPR64";
+        }
     }
-    else if (sizeInBits <= 16)
+    else
     {
-        loadOp = x86_64TargetInst::LOAD16;
-        dstClass = "GPR16";
-    }
-    else if (sizeInBits <= 32)
-    {
-        loadOp = x86_64TargetInst::LOAD32;
-        dstClass = "GPR32";
+        if (sizeInBits <= 8)
+        {
+            loadOp = x86_64TargetInst::LOAD8;
+            dstClass = "GPR8";
+        }
+        else if (sizeInBits <= 16)
+        {
+            loadOp = x86_64TargetInst::LOAD16;
+            dstClass = "GPR16";
+        }
+        else if (sizeInBits <= 32)
+        {
+            loadOp = x86_64TargetInst::LOAD32;
+            dstClass = "GPR32";
+        }
     }
 
     if (auto *r = dst->get<MirRegister>())
@@ -358,24 +385,41 @@ bool X86_64TargetInstructionSelector::selectSTORE(MirBuilderContext *ctx, MirIns
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
     MirOperandBuilder ob(ctx);
 
+    bool isFloat = (val->getMirType() && val->getMirType()->getKind() == MirTypeKind::FloatingPoint);
     size_t sizeInBits = val->getMirType() ? val->getMirType()->getTotalSizeInBits() : 64;
     x86_64TargetInst::OpCode storeOp = x86_64TargetInst::STORE64;
     std::string_view valClass = "GPR64";
 
-    if (sizeInBits <= 8)
+    if (isFloat)
     {
-        storeOp = x86_64TargetInst::STORE8;
-        valClass = "GPR8";
+        if (sizeInBits == 32)
+        {
+            storeOp = x86_64TargetInst::STORE32;
+            valClass = "FPR32";
+        }
+        else
+        {
+            storeOp = x86_64TargetInst::STORE64;
+            valClass = "FPR64";
+        }
     }
-    else if (sizeInBits <= 16)
+    else
     {
-        storeOp = x86_64TargetInst::STORE16;
-        valClass = "GPR16";
-    }
-    else if (sizeInBits <= 32)
-    {
-        storeOp = x86_64TargetInst::STORE32;
-        valClass = "GPR32";
+        if (sizeInBits <= 8)
+        {
+            storeOp = x86_64TargetInst::STORE8;
+            valClass = "GPR8";
+        }
+        else if (sizeInBits <= 16)
+        {
+            storeOp = x86_64TargetInst::STORE16;
+            valClass = "GPR16";
+        }
+        else if (sizeInBits <= 32)
+        {
+            storeOp = x86_64TargetInst::STORE32;
+            valClass = "GPR32";
+        }
     }
 
     if (auto *r = val->get<MirRegister>())
@@ -532,6 +576,185 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
 
     inst->eraseFromOwner();
     return true;
+}
+
+bool X86_64TargetInstructionSelector::selectFloatALU(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    bool isDouble = (dst->getMirType() && dst->getMirType()->getTotalSizeInBits() == 64);
+    std::string_view fprClass = isDouble ? "FPR64" : "FPR32";
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass()) r->setClass(findClass(fprClass));
+    }
+    if (auto *r = lhs->get<MirRegister>())
+    {
+        if (!r->getRegClass()) r->setClass(findClass(fprClass));
+    }
+    if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass()) r->setClass(findClass(fprClass));
+    }
+
+    x86_64TargetInst::OpCode op = x86_64TargetInst::ADDSS;
+    switch (inst->getOpCode())
+    {
+        case MirInstructionOpCode::FADD: op = isDouble ? x86_64TargetInst::ADDSD : x86_64TargetInst::ADDSS; break;
+        case MirInstructionOpCode::FSUB: op = isDouble ? x86_64TargetInst::SUBSD : x86_64TargetInst::SUBSS; break;
+        case MirInstructionOpCode::FMUL: op = isDouble ? x86_64TargetInst::MULSD : x86_64TargetInst::MULSS; break;
+        case MirInstructionOpCode::FDIV: op = isDouble ? x86_64TargetInst::DIVSD : x86_64TargetInst::DIVSS; break;
+        default: return false;
+    }
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+                   inst->getSourceRef(),
+                   { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectFloatCvt(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 2)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *src = inst->getOperand(1);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+
+    if (inst->getOpCode() == MirInstructionOpCode::SITOFP)
+    {
+        bool isDstDouble = (dst->getMirType() && dst->getMirType()->getTotalSizeInBits() == 64);
+        bool isSrc64 = (src->getMirType() && src->getMirType()->getTotalSizeInBits() == 64);
+
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass()) r->setClass(findClass(isDstDouble ? "FPR64" : "FPR32"));
+        }
+        if (auto *r = src->get<MirRegister>())
+        {
+            if (!r->getRegClass()) r->setClass(findClass(isSrc64 ? "GPR64" : "GPR32"));
+        }
+
+        auto op = isDstDouble ? x86_64TargetInst::CVTSI2SD : x86_64TargetInst::CVTSI2SS;
+        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+                       inst->getSourceRef(),
+                       { dst, src });
+    }
+    else if (inst->getOpCode() == MirInstructionOpCode::FPTOSI)
+    {
+        bool isSrcDouble = (src->getMirType() && src->getMirType()->getTotalSizeInBits() == 64);
+        bool isDst64 = (dst->getMirType() && dst->getMirType()->getTotalSizeInBits() == 64);
+
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass()) r->setClass(findClass(isDst64 ? "GPR64" : "GPR32"));
+        }
+        if (auto *r = src->get<MirRegister>())
+        {
+            if (!r->getRegClass()) r->setClass(findClass(isSrcDouble ? "FPR64" : "FPR32"));
+        }
+
+        auto op = isSrcDouble ? x86_64TargetInst::CVTTSD2SI : x86_64TargetInst::CVTTSS2SI;
+        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+                       inst->getSourceRef(),
+                       { dst, src });
+    }
+    else
+    {
+        return false;
+    }
+
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 2)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *src = inst->getOperand(1);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+
+    // 1. Address-of global variable or stack slot: MOV %dst, @ref -> LEA64r %dst, @ref
+    if (src->getType() == MirOperandType::Reference)
+    {
+        auto *ref = src->get<MirReference>();
+        if (ref && (ref->isGlobalVar() || ref->isStackFrameObject()))
+        {
+            if (auto *r = dst->get<MirRegister>())
+            {
+                if (!r->getRegClass()) r->setClass(findClass("GPR64"));
+            }
+            ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::LEA64r)),
+                           inst->getSourceRef(),
+                           { dst, src });
+            inst->eraseFromOwner();
+            return true;
+        }
+    }
+
+    // 2. Floating point register moves: MOVSSrr / MOVSDrr
+    bool isFloat = (dst->getMirType() && dst->getMirType()->getKind() == MirTypeKind::FloatingPoint);
+    if (isFloat)
+    {
+        bool isDouble = (dst->getMirType()->getTotalSizeInBits() == 64);
+        std::string_view fprClass = isDouble ? "FPR64" : "FPR32";
+        if (auto *r = dst->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(fprClass)); }
+        if (auto *r = src->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(fprClass)); }
+
+        auto op = isDouble ? x86_64TargetInst::MOVSDrr : x86_64TargetInst::MOVSSrr;
+        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+                       inst->getSourceRef(),
+                       { dst, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+
+    // 3. Fallback for general register-to-register or integer immediate
+    size_t sizeInBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64;
+    std::string_view gprClass = (sizeInBits == 64) ? "GPR64" : "GPR32";
+    if (auto *r = dst->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(gprClass)); }
+
+    if (src->getType() == MirOperandType::Register)
+    {
+        if (auto *r = src->get<MirRegister>()) { if (!r->getRegClass()) r->setClass(findClass(gprClass)); }
+        auto op = (sizeInBits == 64) ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
+        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+                       inst->getSourceRef(),
+                       { dst, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+    else if (src->getType() == MirOperandType::Integer)
+    {
+        auto op = (sizeInBits == 64) ? x86_64TargetInst::MOV64ri : x86_64TargetInst::MOV32ri;
+        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+                       inst->getSourceRef(),
+                       { dst, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+
+    return false;
 }
 
 } // namespace EzTriple

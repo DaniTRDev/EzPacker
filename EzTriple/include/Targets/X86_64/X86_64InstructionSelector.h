@@ -24,6 +24,9 @@ namespace EzTriple
         bool selectLOAD(MirBuilderContext *ctx, MirInstruction *inst);
         bool selectSTORE(MirBuilderContext *ctx, MirInstruction *inst);
         bool selectPHI(MirBuilderContext *ctx, MirInstruction *inst);
+        bool selectFloatALU(MirBuilderContext *ctx, MirInstruction *inst);
+        bool selectFloatCvt(MirBuilderContext *ctx, MirInstruction *inst);
+        bool selectMOV(MirBuilderContext *ctx, MirInstruction *inst);
 
         TargetDesc *m_targetDesc{ nullptr };
     };

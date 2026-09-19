@@ -11,6 +11,9 @@
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
 #include "Operand/MirOperands.h"
+#include "GlobalVar/MirGlobalVar.h"
+#include "Type/MirType.h"
+#include "FlexNumber/FlexFloat.h"
 #include <fstream>
 #include <unordered_map>
 
@@ -44,7 +47,117 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
     std::vector<EzCodeEmitter::ObjectFormat::ObjectSymbol> symbols;
     std::unordered_map<size_t, MirFunction *> funcById;
+    std::unordered_map<size_t, MirGlobalVar *> gvarById;
 
+    // 1. Emit Global Variables (.rodata, .data, .bss)
+    for (MirGlobalVar *gvar : mirCtx.getGlobalVars())
+    {
+        if (!gvar)
+        {
+            continue;
+        }
+
+        gvarById[gvar->getId()] = gvar;
+
+        MirType *pointeeType = gvar->getType() ? gvar->getType()->getPointedType() : nullptr;
+        size_t gvSize = pointeeType ? (pointeeType->getTotalSizeInBits() + 7) / 8 : 8;
+        if (gvSize == 0)
+        {
+            gvSize = 8;
+        }
+        size_t align = std::min<size_t>(gvSize, 16);
+        if (align < 1)
+        {
+            align = 1;
+        }
+
+        SectionType targetSecType = SectionType::Data;
+        MirOperand *init = gvar->getInitializer();
+        bool hasInit = (init != nullptr);
+        bool isZero = false;
+
+        if (init && init->getType() == MirOperandType::Integer)
+        {
+            if (init->get<MirInteger>()->getValue().getI64() == 0)
+            {
+                isZero = true;
+            }
+        }
+
+        if (gvar->isConstant())
+        {
+            targetSecType = SectionType::ReadOnly;
+        }
+        else if (!hasInit || isZero)
+        {
+            targetSecType = SectionType::NonInitialized;
+        }
+        else
+        {
+            targetSecType = SectionType::Data;
+        }
+
+        CodeSection *sec = binDesc->getSection(targetSecType);
+        if (!sec)
+        {
+            sec = binDesc->getSection(SectionType::Data);
+        }
+
+        uint64_t gvOffset = 0;
+        if (sec)
+        {
+            sec->alignTo(align);
+            gvOffset = sec->getCurrentOffset();
+
+            if (targetSecType == SectionType::NonInitialized)
+            {
+                std::vector<uint8_t> zeros(gvSize, 0);
+                sec->emitBytes(zeros.data(), zeros.size());
+            }
+            else if (init && init->getType() == MirOperandType::Integer)
+            {
+                int64_t val = init->get<MirInteger>()->getValue().getI64();
+                std::vector<uint8_t> valBytes(gvSize, 0);
+                for (size_t b = 0; b < gvSize && b < 8; ++b)
+                {
+                    valBytes[b] = static_cast<uint8_t>((val >> (b * 8)) & 0xFF);
+                }
+                sec->emitBytes(valBytes.data(), valBytes.size());
+            }
+            else if (init && init->getType() == MirOperandType::FloatingPoint)
+            {
+                std::vector<uint8_t> valBytes(gvSize, 0);
+                if (gvSize == 4)
+                {
+                    float fval = init->get<MirFloat>()->getValue().getFloat();
+                    std::memcpy(valBytes.data(), &fval, 4);
+                }
+                else
+                {
+                    double dval = init->get<MirFloat>()->getValue().getDouble();
+                    std::memcpy(valBytes.data(), &dval, std::min<size_t>(gvSize, 8));
+                }
+                sec->emitBytes(valBytes.data(), valBytes.size());
+            }
+            else
+            {
+                std::vector<uint8_t> zeros(gvSize, 0);
+                sec->emitBytes(zeros.data(), zeros.size());
+            }
+        }
+
+        EzCodeEmitter::ObjectFormat::ObjectSymbol sym{
+            .m_name = std::string(gvar->getName()),
+            .m_section = targetSecType,
+            .m_offset = gvOffset,
+            .m_size = gvSize,
+            .m_isGlobal = (gvar->getLinkage() != MirGlobalVarLinkage::Internal),
+            .m_isFunction = false
+        };
+        symbols.push_back(sym);
+    }
+
+    // 2. Emit Functions (.text)
     for (MirFunction *func : mirCtx.getFunctions())
     {
         if (!func)
@@ -70,7 +183,7 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         }
 
         uint64_t fnOffset = textSection->getCurrentOffset();
-        emitter.beginFunction(&emitterCtx, func->getName());
+        emitter.beginFunction(&emitterCtx, func);
 
         for (MirBlock *block : func->getBlocks())
         {
@@ -108,7 +221,13 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         symbols.push_back(sym);
     }
 
-    textSection->finalize();
+    for (auto &[type, sec] : sections)
+    {
+        if (sec)
+        {
+            sec->finalize();
+        }
+    }
 
     // Patch intra-function branches and build object relocations
     std::vector<EzCodeEmitter::ObjectFormat::ObjectRelocEntry> objectRelocs;
@@ -195,6 +314,27 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                         .m_offset = instOffset + 1,
                         .m_symbolName = calleeName,
                         .m_type = TargetCodeRelocationType::BranchRel32,
+                        .m_addend = addend
+                    });
+                }
+            }
+            else if (ref->isGlobalVar())
+            {
+                std::string gvName;
+                auto itGv = gvarById.find(ref->getRefId());
+                if (itGv != gvarById.end() && itGv->second)
+                {
+                    gvName = std::string(itGv->second->getName());
+                }
+
+                if (!gvName.empty())
+                {
+                    int64_t addend = (binDesc->getObjectFormat() == TargetObjectFormat::ELF) ? -4 : 0;
+                    objectRelocs.push_back({
+                        .m_section = SectionType::Text,
+                        .m_offset = reloc->m_address,
+                        .m_symbolName = gvName,
+                        .m_type = TargetCodeRelocationType::PCRel32,
                         .m_addend = addend
                     });
                 }

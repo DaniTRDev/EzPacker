@@ -3,6 +3,9 @@
 #include "CodeEmitterContext.h"
 #include "Operand/MirOperands.h"
 #include "Operand/MirRegisterClass.h"
+#include "Function/MirFunction.h"
+#include "Function/MirFunctionStackFrame.h"
+#include "Type/MirType.h"
 #include <stdexcept>
 
 namespace EzCodeEmitter::X86_64
@@ -23,6 +26,12 @@ void X86_64CodeEmitter::beginFunction(CodeEmitterContext *ctx, std::string_view 
     CodeSection *textSec = m_ctx->getSection(SectionType::Text);
     CodeLabel *entryLabel = m_ctx->getOrCreateLabel(textSec, MIRID_INVALID, name);
     m_ctx->bindLabel(entryLabel);
+}
+
+void X86_64CodeEmitter::beginFunction(CodeEmitterContext *ctx, MirFunction *func)
+{
+    m_currentFunc = func;
+    beginFunction(ctx, func ? func->getName() : "");
 }
 
 void X86_64CodeEmitter::bindLabel(MirId labelId)
@@ -48,6 +57,7 @@ void X86_64CodeEmitter::endFunction(CodeEmitterContext *ctx, MirFunction *func)
         ctx->resetFuncState(func);
     }
     m_ctx = nullptr;
+    m_currentFunc = nullptr;
 }
 
 Reg X86_64CodeEmitter::mapRegister(MirRegister *reg) const
@@ -123,9 +133,24 @@ MemoryOperand X86_64CodeEmitter::mapOperandToMemory(MirOperand *op) const
     if (op->getType() == MirOperandType::Reference)
     {
         auto *ref = op->get<MirReference>();
-        if (ref && ref->isStackFrameObject())
+        if (ref)
         {
-            return MemoryOperand::BaseDisp(Reg::RBP, static_cast<int64_t>(ref->getOffset()));
+            if (ref->isStackFrameObject())
+            {
+                if (m_currentFunc && m_currentFunc->getStackFrame())
+                {
+                    StackFrameObject *obj = m_currentFunc->getStackFrame()->getObjectFromId(ref->getRefId());
+                    if (obj)
+                    {
+                        return MemoryOperand::BaseDisp(Reg::RBP, obj->m_offset + static_cast<int64_t>(ref->getOffset()));
+                    }
+                }
+                return MemoryOperand::BaseDisp(Reg::RBP, static_cast<int64_t>(ref->getOffset()));
+            }
+            if (ref->isGlobalVar())
+            {
+                return MemoryOperand::RipRel(0);
+            }
         }
     }
     return MemoryOperand::Base(Reg::None);
@@ -564,52 +589,104 @@ void X86_64CodeEmitter::emitInst(MirTargetInstructionDesc *desc, std::span<MirOp
         return;
     }
 
-    if (name == "LOAD8")
+    if (name == "LOAD8" || name == "LOAD16" || name == "LOAD32" || name == "LOAD64")
     {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRM(bytes, mapRegister(operands[0]->get<MirRegister>()), mapOperandToMemory(operands[1]), 1);
-        commitBytes();
-        return;
-    }
-    if (name == "LOAD16")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRM(bytes, mapRegister(operands[0]->get<MirRegister>()), mapOperandToMemory(operands[1]), 2);
-        commitBytes();
-        return;
-    }
-    if (name == "LOAD32")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRM(bytes, mapRegister(operands[0]->get<MirRegister>()), mapOperandToMemory(operands[1]), 4);
-        commitBytes();
-        return;
-    }
-    if (name == "LOAD64")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRM(bytes, mapRegister(operands[0]->get<MirRegister>()), mapOperandToMemory(operands[1]), 8);
+        uint8_t size = (name == "LOAD8") ? 1 : (name == "LOAD16") ? 2 : (name == "LOAD32") ? 4 : 8;
+        if (operands.size() >= 2)
+        {
+            Reg dst = mapRegister(operands[0]->get<MirRegister>());
+            MemoryOperand mem = mapOperandToMemory(operands[1]);
+            bool isXmm = (static_cast<uint8_t>(dst) >= 16 && static_cast<uint8_t>(dst) <= 31);
+            if (isXmm && size == 4)
+            {
+                bytes.push_back(0xF3);
+                RexPrefix rex;
+                rex.r = isExtendedReg(dst);
+                std::vector<uint8_t> modrmBytes;
+                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(dst), mem);
+                if (rex.isNeeded()) bytes.push_back(rex.encode());
+                bytes.push_back(0x0F);
+                bytes.push_back(0x10);
+                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
+            }
+            else if (isXmm && size == 8)
+            {
+                bytes.push_back(0xF2);
+                RexPrefix rex;
+                rex.r = isExtendedReg(dst);
+                std::vector<uint8_t> modrmBytes;
+                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(dst), mem);
+                if (rex.isNeeded()) bytes.push_back(rex.encode());
+                bytes.push_back(0x0F);
+                bytes.push_back(0x10);
+                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
+            }
+            else
+            {
+                InstructionEncoder::emitMovRM(bytes, dst, mem, size);
+            }
+
+            if (operands[1]->getType() == MirOperandType::Reference)
+            {
+                auto *ref = operands[1]->get<MirReference>();
+                if (ref && ref->isGlobalVar())
+                {
+                    uint64_t dispOffset = sec->getCurrentOffset() + bytes.size() - 4;
+                    m_ctx->addRelocAt(ref, TargetCodeRelocationType::PCRel32, dispOffset);
+                }
+            }
+        }
         commitBytes();
         return;
     }
 
-    if (name == "STORE8")
+    if (name == "STORE8" || name == "STORE16" || name == "STORE32" || name == "STORE64")
     {
-        if (operands.size() >= 2) InstructionEncoder::emitMovMR(bytes, mapOperandToMemory(operands[0]), mapRegister(operands[1]->get<MirRegister>()), 1);
-        commitBytes();
-        return;
-    }
-    if (name == "STORE16")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovMR(bytes, mapOperandToMemory(operands[0]), mapRegister(operands[1]->get<MirRegister>()), 2);
-        commitBytes();
-        return;
-    }
-    if (name == "STORE32")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovMR(bytes, mapOperandToMemory(operands[0]), mapRegister(operands[1]->get<MirRegister>()), 4);
-        commitBytes();
-        return;
-    }
-    if (name == "STORE64")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovMR(bytes, mapOperandToMemory(operands[0]), mapRegister(operands[1]->get<MirRegister>()), 8);
+        uint8_t size = (name == "STORE8") ? 1 : (name == "STORE16") ? 2 : (name == "STORE32") ? 4 : 8;
+        if (operands.size() >= 2)
+        {
+            MemoryOperand mem = mapOperandToMemory(operands[0]);
+            Reg src = mapRegister(operands[1]->get<MirRegister>());
+            bool isXmm = (static_cast<uint8_t>(src) >= 16 && static_cast<uint8_t>(src) <= 31);
+            if (isXmm && size == 4)
+            {
+                bytes.push_back(0xF3);
+                RexPrefix rex;
+                rex.r = isExtendedReg(src);
+                std::vector<uint8_t> modrmBytes;
+                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(src), mem);
+                if (rex.isNeeded()) bytes.push_back(rex.encode());
+                bytes.push_back(0x0F);
+                bytes.push_back(0x11);
+                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
+            }
+            else if (isXmm && size == 8)
+            {
+                bytes.push_back(0xF2);
+                RexPrefix rex;
+                rex.r = isExtendedReg(src);
+                std::vector<uint8_t> modrmBytes;
+                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(src), mem);
+                if (rex.isNeeded()) bytes.push_back(rex.encode());
+                bytes.push_back(0x0F);
+                bytes.push_back(0x11);
+                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
+            }
+            else
+            {
+                InstructionEncoder::emitMovMR(bytes, mem, src, size);
+            }
+
+            if (operands[0]->getType() == MirOperandType::Reference)
+            {
+                auto *ref = operands[0]->get<MirReference>();
+                if (ref && ref->isGlobalVar())
+                {
+                    uint64_t dispOffset = sec->getCurrentOffset() + bytes.size() - 4;
+                    m_ctx->addRelocAt(ref, TargetCodeRelocationType::PCRel32, dispOffset);
+                }
+            }
+        }
         commitBytes();
         return;
     }
@@ -631,6 +708,15 @@ void X86_64CodeEmitter::emitInst(MirTargetInstructionDesc *desc, std::span<MirOp
         {
             auto *dst = operands[0]->get<MirRegister>();
             InstructionEncoder::emitLea(bytes, mapRegister(dst), mapOperandToMemory(operands[1]), 8);
+            if (operands[1]->getType() == MirOperandType::Reference)
+            {
+                auto *ref = operands[1]->get<MirReference>();
+                if (ref && ref->isGlobalVar())
+                {
+                    uint64_t dispOffset = sec->getCurrentOffset() + bytes.size() - 4;
+                    m_ctx->addRelocAt(ref, TargetCodeRelocationType::PCRel32, dispOffset);
+                }
+            }
         }
         commitBytes();
         return;
@@ -865,25 +951,41 @@ void X86_64CodeEmitter::emitInst(MirTargetInstructionDesc *desc, std::span<MirOp
 
     if (name == "CVTSI2SS")
     {
-        if (operands.size() >= 2) InstructionEncoder::emitCvtsi2ss(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 4);
+        if (operands.size() >= 2)
+        {
+            uint8_t srcSize = (operands[1]->getMirType() && operands[1]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
+            InstructionEncoder::emitCvtsi2ss(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), srcSize);
+        }
         commitBytes();
         return;
     }
     if (name == "CVTSI2SD")
     {
-        if (operands.size() >= 2) InstructionEncoder::emitCvtsi2sd(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 8);
+        if (operands.size() >= 2)
+        {
+            uint8_t srcSize = (operands[1]->getMirType() && operands[1]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
+            InstructionEncoder::emitCvtsi2sd(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), srcSize);
+        }
         commitBytes();
         return;
     }
     if (name == "CVTTSS2SI")
     {
-        if (operands.size() >= 2) InstructionEncoder::emitCvttss2si(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 4);
+        if (operands.size() >= 2)
+        {
+            uint8_t dstSize = (operands[0]->getMirType() && operands[0]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
+            InstructionEncoder::emitCvttss2si(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), dstSize);
+        }
         commitBytes();
         return;
     }
     if (name == "CVTTSD2SI")
     {
-        if (operands.size() >= 2) InstructionEncoder::emitCvttsd2si(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 8);
+        if (operands.size() >= 2)
+        {
+            uint8_t dstSize = (operands[0]->getMirType() && operands[0]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
+            InstructionEncoder::emitCvttsd2si(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), dstSize);
+        }
         commitBytes();
         return;
     }

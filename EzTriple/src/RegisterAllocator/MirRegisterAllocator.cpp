@@ -280,7 +280,16 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             }
         }
 
-        // 2. Lock colors taken by interfering neighbors
+        // 2. Lock colors taken by interfering neighbors in the same register bank/family
+        auto isSameBank = [](MirRegisterClass *c1, MirRegisterClass *c2) {
+            if (!c1 || !c2) return true;
+            std::string_view n1(c1->getName());
+            std::string_view n2(c2->getName());
+            bool f1 = (n1.rfind("FPR", 0) == 0);
+            bool f2 = (n2.rfind("FPR", 0) == 0);
+            return f1 == f2;
+        };
+
         for (const MirRegisterRef &neighbor : ctx->m_iGraph[node])
         {
             if (ctx->m_removedNodes.contains(neighbor))
@@ -288,14 +297,20 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
 
             if (neighbor.isPhysical())
             {
-                usedColorIds.insert(neighbor.getId());
+                if (isSameBank(neighbor.getClass(), node.getClass()))
+                {
+                    usedColorIds.insert(neighbor.getId());
+                }
             }
             else
             {
                 auto it = ctx->m_allocatedRegs.find(neighbor);
                 if (it != ctx->m_allocatedRegs.end())
                 {
-                    usedColorIds.insert(it->second.getId());
+                    if (isSameBank(it->second.getClass(), node.getClass()))
+                    {
+                        usedColorIds.insert(it->second.getId());
+                    }
                 }
             }
         }

@@ -28,6 +28,7 @@ class X86_64CodeEmitter : public GenericCodeEmitter
     ~X86_64CodeEmitter() override = default;
 
     void beginFunction(CodeEmitterContext *ctx, std::string_view name) override;
+    void beginFunction(CodeEmitterContext *ctx, MirFunction *func);
     void bindLabel(MirId labelId) override;
     void endFunction(CodeEmitterContext *ctx) override;
     void endFunction(CodeEmitterContext *ctx, MirFunction *func);
@@ -45,6 +46,7 @@ class X86_64CodeEmitter : public GenericCodeEmitter
 
   private:
     CodeEmitterContext *m_ctx{ nullptr };
+    MirFunction *m_currentFunc{ nullptr };
     RegMapper m_regMapper;
 };
 

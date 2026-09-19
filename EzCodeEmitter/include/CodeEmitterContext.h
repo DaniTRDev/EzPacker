@@ -104,6 +104,11 @@ class CodeEmitterContext
     CodeRelocation *addReloc(MirReference *srcRef, TargetCodeRelocationType relocType);
 
     /**
+     * Creates a relocation defined in the CURRENT LABEL'S SECTION at the SPECIFIED ADDRESS.
+     */
+    CodeRelocation *addRelocAt(MirReference *srcRef, TargetCodeRelocationType relocType, uint64_t address);
+
+    /**
      * Returns the current section of the current bound label in the context.
      */
     CodeSection *getCurrentSection() const;
