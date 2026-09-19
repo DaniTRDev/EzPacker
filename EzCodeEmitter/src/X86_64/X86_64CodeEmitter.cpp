@@ -7,16 +7,49 @@
 #include "Function/MirFunctionStackFrame.h"
 #include "Type/MirType.h"
 #include "TableGen/InstructionEncoder.h"
-#include <stdexcept>
 #include <string_view>
 
 namespace EzCodeEmitter::X86_64
 {
 
-X86_64CodeEmitter::X86_64CodeEmitter(RegMapper regMapper) :
-    m_regMapper(std::move(regMapper))
+namespace
 {
+
+/// Sentinel returned when a register cannot be mapped to a hardware encoding.
+constexpr uint8_t InvalidRegister = 0xFF;
+
+/// Returns true when a hardware encoding identifies an FPR/XMM register.
+constexpr bool isFprEncoding(uint8_t encoding) { return encoding >= 16; }
+
+/// Converts an FPR/XMM hardware encoding into its 0..15 register index.
+constexpr uint8_t fprIndex(uint8_t encoding) { return static_cast<uint8_t>(encoding - 16); }
+
+/// Hardware encoding of the frame-pointer register used for stack-slot addressing.
+constexpr uint8_t FramePointerEncoding = 5; // RBP
+
+/**
+ * Returns the size in bytes of an operand, preferring its MIR type and falling back to a
+ * machine-word default when the type is unknown.
+ */
+uint8_t operandSizeBytes(MirOperand *op, MirRegister *reg)
+{
+    (void)reg;
+    if (op)
+    {
+        MirType *type = op->getMirType();
+        if (type)
+        {
+            size_t bits = type->getTotalSizeInBits();
+            if (bits > 0)
+            {
+                return static_cast<uint8_t>((bits + 7) / 8);
+            }
+        }
+    }
+    return 8;
 }
+
+} // namespace
 
 void X86_64CodeEmitter::beginFunction(CodeEmitterContext *ctx, std::string_view name)
 {
@@ -47,10 +80,7 @@ void X86_64CodeEmitter::bindLabel(MirId labelId)
     m_ctx->bindLabel(label);
 }
 
-void X86_64CodeEmitter::endFunction(CodeEmitterContext *ctx)
-{
-    endFunction(ctx, nullptr);
-}
+void X86_64CodeEmitter::endFunction(CodeEmitterContext *ctx) { endFunction(ctx, nullptr); }
 
 void X86_64CodeEmitter::endFunction(CodeEmitterContext *ctx, MirFunction *func)
 {
@@ -62,124 +92,28 @@ void X86_64CodeEmitter::endFunction(CodeEmitterContext *ctx, MirFunction *func)
     m_currentFunc = nullptr;
 }
 
-Reg X86_64CodeEmitter::mapRegister(MirRegister *reg) const
+uint8_t X86_64CodeEmitter::mapRegister(MirRegister *reg) const
 {
     if (!reg)
     {
-        return Reg::None;
+        return InvalidRegister;
     }
+
     size_t id = reg->getRegId();
-    if (m_regMapper)
+
+    // FPR/XMM registers live in the >= 16 half of the unified encoding space.
+    if (MirRegisterClass *regClass = reg->getRegClass())
     {
-        return m_regMapper(id);
-    }
-    if (reg->getRegClass())
-    {
-        std::string_view clsName = reg->getRegClass()->getName();
-        if (clsName.find("FPR") != std::string_view::npos)
+        std::string_view className = regClass->getName();
+        if (className.find("FPR") != std::string_view::npos && id < 16)
         {
-            if (id < 16)
-            {
-                return static_cast<Reg>(16 + id);
-            }
+            return static_cast<uint8_t>(16 + id);
         }
     }
-    if (id < 32)
-    {
-        return static_cast<Reg>(id);
-    }
-    return Reg::None;
+
+    // Integer registers pass through directly; anything beyond the 32-register space is invalid.
+    return id < 32 ? static_cast<uint8_t>(id) : InvalidRegister;
 }
-
-MemoryOperand X86_64CodeEmitter::mapMemory(MirMemory *mem) const
-{
-    if (!mem)
-    {
-        return MemoryOperand::Base(Reg::None);
-    }
-
-    Reg baseReg = mem->hasBaseReg() ? mapRegister(mem->getBase()) : Reg::None;
-    int64_t disp = 0;
-    if (mem->getDisplacement())
-    {
-        disp = mem->getDisplacement()->getValue().getI64();
-    }
-
-    if (mem->hasIndexReg())
-    {
-        Reg indexReg = mapRegister(mem->getIndex());
-        uint8_t scale = mem->getScale();
-        if (baseReg != Reg::None)
-        {
-            return MemoryOperand::BaseIndex(baseReg, indexReg, scale, disp);
-        }
-        else
-        {
-            return MemoryOperand::IndexDisp(indexReg, scale, disp);
-        }
-    }
-
-    return MemoryOperand::BaseDisp(baseReg, disp);
-}
-
-MemoryOperand X86_64CodeEmitter::mapOperandToMemory(MirOperand *op) const
-{
-    if (!op)
-    {
-        return MemoryOperand::Base(Reg::None);
-    }
-    if (op->getType() == MirOperandType::Memory)
-    {
-        return mapMemory(op->get<MirMemory>());
-    }
-    if (op->getType() == MirOperandType::Reference)
-    {
-        auto *ref = op->get<MirReference>();
-        if (ref)
-        {
-            if (ref->isStackFrameObject())
-            {
-                if (m_currentFunc && m_currentFunc->getStackFrame())
-                {
-                    StackFrameObject *obj = m_currentFunc->getStackFrame()->getObjectFromId(ref->getRefId());
-                    if (obj)
-                    {
-                        return MemoryOperand::BaseDisp(Reg::RBP, obj->m_offset + static_cast<int64_t>(ref->getOffset()));
-                    }
-                }
-                return MemoryOperand::BaseDisp(Reg::RBP, static_cast<int64_t>(ref->getOffset()));
-            }
-            if (ref->isGlobalVar())
-            {
-                return MemoryOperand::RipRel(0);
-            }
-        }
-    }
-    return MemoryOperand::Base(Reg::None);
-}
-
-namespace
-{
-
-uint8_t operandSizeBytes(MirOperand *op, MirRegister *reg)
-{
-    (void)reg;
-    if (op)
-    {
-        MirType *type = op->getMirType();
-        if (type)
-        {
-            size_t bits = type->getTotalSizeInBits();
-            if (bits > 0)
-            {
-                return static_cast<uint8_t>((bits + 7) / 8);
-            }
-        }
-    }
-    return 8;
-}
-
-} // namespace
 
 bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
                                               std::span<MirOperand *> operands,
@@ -187,7 +121,9 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
 {
     resolved.assign(operands.size(), TableGen::ResolvedOperand{});
 
-    auto usesMemorySlot = [&enc](size_t index) {
+    // Returns true when the operand at index is bound to a memory slot in this encoding.
+    auto usesMemorySlot = [&enc](size_t index)
+    {
         for (uint8_t i = 0; i < enc.m_operandCount; ++i)
         {
             if (enc.m_operands[i].m_operandIndex == index && enc.m_operands[i].m_slot == TableGen::EncSlotKind::RmMem)
@@ -198,7 +134,9 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
         return false;
     };
 
-    auto buildMemory = [&](MirOperand *op) {
+    // Converts a MIR memory/reference operand into a target-neutral EncMemory form.
+    auto buildMemory = [&](MirOperand *op)
+    {
         TableGen::EncMemory mem;
         if (op->getType() == MirOperandType::Memory)
         {
@@ -207,13 +145,13 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
             {
                 if (mirMem->hasBaseReg())
                 {
-                    Reg base = mapRegister(mirMem->getBase());
-                    mem.m_base = isXmmReg(base) ? getXmmId(base) : static_cast<uint8_t>(base);
+                    uint8_t base = mapRegister(mirMem->getBase());
+                    mem.m_base = isFprEncoding(base) ? fprIndex(base) : base;
                 }
                 if (mirMem->hasIndexReg())
                 {
-                    Reg index = mapRegister(mirMem->getIndex());
-                    mem.m_index = isXmmReg(index) ? getXmmId(index) : static_cast<uint8_t>(index);
+                    uint8_t index = mapRegister(mirMem->getIndex());
+                    mem.m_index = isFprEncoding(index) ? fprIndex(index) : index;
                     mem.m_scale = mirMem->getScale();
                 }
                 if (mirMem->getDisplacement())
@@ -229,6 +167,7 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
             {
                 if (ref->isStackFrameObject())
                 {
+                    // Address stack slots as [rbp + (reference offset + allocated frame offset)].
                     int64_t offset = static_cast<int64_t>(ref->getOffset());
                     if (m_currentFunc && m_currentFunc->getStackFrame())
                     {
@@ -237,11 +176,12 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
                             offset += obj->m_offset;
                         }
                     }
-                    mem.m_base = static_cast<uint8_t>(Reg::RBP);
+                    mem.m_base = FramePointerEncoding;
                     mem.m_disp = offset;
                 }
                 else if (ref->isGlobalVar())
                 {
+                    // Globals are addressed RIP-relative, with the fixup recorded as a relocation.
                     mem.m_ripRel = true;
                     mem.m_needsReloc = true;
                     mem.m_disp = 0;
@@ -269,10 +209,10 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
                 {
                     return false;
                 }
-                Reg physical = mapRegister(reg);
+                uint8_t physical = mapRegister(reg);
                 out.m_kind = TableGen::ResolvedOperand::Kind::Register;
-                out.m_isFpr = isXmmReg(physical);
-                out.m_reg = isXmmReg(physical) ? getXmmId(physical) : static_cast<uint8_t>(physical);
+                out.m_isFpr = isFprEncoding(physical);
+                out.m_reg = isFprEncoding(physical) ? fprIndex(physical) : physical;
                 out.m_sizeBytes = operandSizeBytes(op, reg);
                 break;
             }
@@ -338,39 +278,19 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
         return false;
     }
 
-    auto toOldReg = [](const TableGen::ResolvedOperand &r) {
-        return r.m_isFpr ? static_cast<Reg>(16 + r.m_reg) : static_cast<Reg>(r.m_reg);
-    };
-
     std::vector<uint8_t> bytes;
 
-    // Two-address coalescing: copy the source of a destructive operation into the destination.
+    // Two-address coalescing: materialize the copy implied by a destructive operation
+    // whose destination and first source register differ.
     if (enc->m_coalesceSrc != 0xFF && enc->m_coalesceSrc < resolved.size() && !resolved.empty())
     {
         const TableGen::ResolvedOperand &dst = resolved[0];
         const TableGen::ResolvedOperand &src = resolved[enc->m_coalesceSrc];
         if (dst.m_kind == TableGen::ResolvedOperand::Kind::Register &&
-            src.m_kind == TableGen::ResolvedOperand::Kind::Register)
+            src.m_kind == TableGen::ResolvedOperand::Kind::Register &&
+            (dst.m_reg != src.m_reg || dst.m_isFpr != src.m_isFpr))
         {
-            bool sameRegister = (dst.m_reg == src.m_reg && dst.m_isFpr == src.m_isFpr);
-            if (!sameRegister)
-            {
-                if (dst.m_isFpr || src.m_isFpr)
-                {
-                    if (dst.m_sizeBytes == 4)
-                    {
-                        InstructionEncoder::emitMovssRR(bytes, toOldReg(dst), toOldReg(src));
-                    }
-                    else
-                    {
-                        InstructionEncoder::emitMovsdRR(bytes, toOldReg(dst), toOldReg(src));
-                    }
-                }
-                else
-                {
-                    InstructionEncoder::emitMovRR(bytes, toOldReg(dst), toOldReg(src), dst.m_sizeBytes);
-                }
-            }
+            TableGen::InstructionEncoder::encodeRegisterMove(dst, src, bytes);
         }
     }
 
@@ -382,12 +302,12 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
 
     if (result.m_hasReloc)
     {
+        // Locate the MIR reference operand that produced the relocation field.
         MirReference *relocRef = nullptr;
         for (size_t i = 0; i < resolved.size() && !relocRef; ++i)
         {
             bool needsReloc = resolved[i].m_needsReloc ||
-                              (resolved[i].m_kind == TableGen::ResolvedOperand::Kind::Memory &&
-                               resolved[i].m_mem.m_needsReloc);
+                    (resolved[i].m_kind == TableGen::ResolvedOperand::Kind::Memory && resolved[i].m_mem.m_needsReloc);
             if (needsReloc && operands[i]->getType() == MirOperandType::Reference)
             {
                 relocRef = operands[i]->get<MirReference>();
@@ -399,10 +319,12 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
             uint64_t start = sec->getCurrentOffset();
             if (result.m_isBranch)
             {
+                // Branches carry their own PC-relative semantics.
                 m_ctx->addReloc(relocRef, TargetCodeRelocationType::BranchRel32);
             }
             else
             {
+                // Data references are fixed up at the exact relocation field offset.
                 m_ctx->addRelocAt(relocRef, TargetCodeRelocationType::PCRel32, start + result.m_relocOffset);
             }
         }
@@ -422,854 +344,8 @@ void X86_64CodeEmitter::emitInst(MirTargetInstructionDesc *desc, std::span<MirOp
         return;
     }
 
-    if (tryEmitTableDriven(desc, operands))
-    {
-        return;
-    }
-
-    CodeSection *sec = m_ctx->getCurrentSection();
-    if (!sec)
-    {
-        return;
-    }
-
-    std::string_view name = desc->getName();
-    std::vector<uint8_t> bytes;
-
-    auto commitBytes = [&]() {
-        if (!bytes.empty())
-        {
-            sec->emitBytes(bytes.data(), bytes.size());
-            bytes.clear();
-        }
-    };
-
-    // Helper lambdas for repetitive patterns
-    auto emitAluRRHelper = [&](AluOp op, uint8_t size) {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1)
-            {
-                InstructionEncoder::emitMovRR(bytes, dst, src1, size);
-            }
-            InstructionEncoder::emitAluRR(bytes, op, dst, src2, size);
-        }
-        else if (operands.size() == 2)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src = mapRegister(operands[1]->get<MirRegister>());
-            InstructionEncoder::emitAluRR(bytes, op, dst, src, size);
-        }
-        commitBytes();
-    };
-
-    auto emitAluRIHelper = [&](AluOp op, uint8_t size) {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            auto *imm = operands[2]->get<MirInteger>();
-            int32_t val = imm ? imm->getValue().getI32() : 0;
-            if (dst != src1)
-            {
-                InstructionEncoder::emitMovRR(bytes, dst, src1, size);
-            }
-            InstructionEncoder::emitAluRI(bytes, op, dst, val, size);
-        }
-        else if (operands.size() == 2)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            auto *imm = operands[1]->get<MirInteger>();
-            int32_t val = imm ? imm->getValue().getI32() : 0;
-            InstructionEncoder::emitAluRI(bytes, op, dst, val, size);
-        }
-        commitBytes();
-    };
-
-    auto emitAluRMHelper = [&](AluOp op, uint8_t size) {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            if (dst != src1)
-            {
-                InstructionEncoder::emitMovRR(bytes, dst, src1, size);
-            }
-            InstructionEncoder::emitAluRM(bytes, op, dst, mapOperandToMemory(operands[2]), size);
-        }
-        commitBytes();
-    };
-
-    auto emitShiftRIHelper = [&](void (*func)(std::vector<uint8_t> &, Reg, uint8_t, uint8_t), uint8_t size) {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src = mapRegister(operands[1]->get<MirRegister>());
-            auto *imm = operands[2]->get<MirInteger>();
-            uint8_t amt = imm ? static_cast<uint8_t>(imm->getValue().getU8()) : 0;
-            if (dst != src)
-            {
-                InstructionEncoder::emitMovRR(bytes, dst, src, size);
-            }
-            func(bytes, dst, amt, size);
-        }
-        commitBytes();
-    };
-
-    auto emitShiftRCLHelper = [&](void (*func)(std::vector<uint8_t> &, Reg, uint8_t), uint8_t size) {
-        if (operands.size() >= 2)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src = mapRegister(operands[1]->get<MirRegister>());
-            if (dst != src)
-            {
-                InstructionEncoder::emitMovRR(bytes, dst, src, size);
-            }
-            func(bytes, dst, size);
-        }
-        commitBytes();
-    };
-
-    auto emitUnaryHelper = [&](void (*func)(std::vector<uint8_t> &, Reg, uint8_t), uint8_t size) {
-        if (operands.size() >= 2)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src = mapRegister(operands[1]->get<MirRegister>());
-            if (dst != src)
-            {
-                InstructionEncoder::emitMovRR(bytes, dst, src, size);
-            }
-            func(bytes, dst, size);
-        }
-        commitBytes();
-    };
-
-    auto emitJccHelper = [&](ConditionCode cc) {
-        if (!operands.empty())
-        {
-            if (operands[0]->getType() == MirOperandType::Reference)
-            {
-                auto *ref = operands[0]->get<MirReference>();
-                InstructionEncoder::emitJccNear(bytes, cc, 0);
-                m_ctx->addReloc(ref, TargetCodeRelocationType::BranchRel32);
-            }
-            else if (operands[0]->getType() == MirOperandType::Integer)
-            {
-                int32_t disp = operands[0]->get<MirInteger>()->getValue().getI32();
-                InstructionEncoder::emitJccNear(bytes, cc, disp);
-            }
-        }
-        commitBytes();
-    };
-
-    auto emitSetccHelper = [&](ConditionCode cc) {
-        if (!operands.empty())
-        {
-            auto *dst = operands[0]->get<MirRegister>();
-            InstructionEncoder::emitSetcc(bytes, cc, mapRegister(dst));
-        }
-        commitBytes();
-    };
-
-    // =========================================================================
-    // INTEGER ARITHMETIC
-    // =========================================================================
-    if (name == "ADD32rr") { emitAluRRHelper(AluOp::ADD, 4); return; }
-    if (name == "ADD32ri") { emitAluRIHelper(AluOp::ADD, 4); return; }
-    if (name == "ADD32rm") { emitAluRMHelper(AluOp::ADD, 4); return; }
-    if (name == "ADD64rr") { emitAluRRHelper(AluOp::ADD, 8); return; }
-    if (name == "ADD64ri") { emitAluRIHelper(AluOp::ADD, 8); return; }
-    if (name == "ADD64rm") { emitAluRMHelper(AluOp::ADD, 8); return; }
-
-    if (name == "SUB32rr") { emitAluRRHelper(AluOp::SUB, 4); return; }
-    if (name == "SUB32ri") { emitAluRIHelper(AluOp::SUB, 4); return; }
-    if (name == "SUB32rm") { emitAluRMHelper(AluOp::SUB, 4); return; }
-    if (name == "SUB64rr") { emitAluRRHelper(AluOp::SUB, 8); return; }
-    if (name == "SUB64ri") { emitAluRIHelper(AluOp::SUB, 8); return; }
-    if (name == "SUB64rm") { emitAluRMHelper(AluOp::SUB, 8); return; }
-
-    if (name == "IMUL32rr")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovRR(bytes, dst, src1, 4);
-            InstructionEncoder::emitImulRR(bytes, dst, src2, 4);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "IMUL32ri")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            auto *imm = operands[2]->get<MirInteger>();
-            int32_t val = imm ? imm->getValue().getI32() : 0;
-            InstructionEncoder::emitImulRI(bytes, dst, src1, val, 4);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "IMUL64rr")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovRR(bytes, dst, src1, 8);
-            InstructionEncoder::emitImulRR(bytes, dst, src2, 8);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "IMUL64ri")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            auto *imm = operands[2]->get<MirInteger>();
-            int32_t val = imm ? imm->getValue().getI32() : 0;
-            InstructionEncoder::emitImulRI(bytes, dst, src1, val, 8);
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "IDIV32r")
-    {
-        if (!operands.empty()) InstructionEncoder::emitIdivR(bytes, mapRegister(operands[0]->get<MirRegister>()), 4);
-        commitBytes();
-        return;
-    }
-    if (name == "IDIV64r")
-    {
-        if (!operands.empty()) InstructionEncoder::emitIdivR(bytes, mapRegister(operands[0]->get<MirRegister>()), 8);
-        commitBytes();
-        return;
-    }
-    if (name == "DIV32r")
-    {
-        if (!operands.empty()) InstructionEncoder::emitDivR(bytes, mapRegister(operands[0]->get<MirRegister>()), 4);
-        commitBytes();
-        return;
-    }
-    if (name == "DIV64r")
-    {
-        if (!operands.empty()) InstructionEncoder::emitDivR(bytes, mapRegister(operands[0]->get<MirRegister>()), 8);
-        commitBytes();
-        return;
-    }
-
-    if (name == "NEG32r") { emitUnaryHelper(&InstructionEncoder::emitNegR, 4); return; }
-    if (name == "NEG64r") { emitUnaryHelper(&InstructionEncoder::emitNegR, 8); return; }
-    if (name == "NOT32r") { emitUnaryHelper(&InstructionEncoder::emitNotR, 4); return; }
-    if (name == "NOT64r") { emitUnaryHelper(&InstructionEncoder::emitNotR, 8); return; }
-
-    // =========================================================================
-    // BITWISE & SHIFTS
-    // =========================================================================
-    if (name == "AND32rr") { emitAluRRHelper(AluOp::AND, 4); return; }
-    if (name == "AND32ri") { emitAluRIHelper(AluOp::AND, 4); return; }
-    if (name == "AND64rr") { emitAluRRHelper(AluOp::AND, 8); return; }
-    if (name == "AND64ri") { emitAluRIHelper(AluOp::AND, 8); return; }
-
-    if (name == "OR32rr") { emitAluRRHelper(AluOp::OR, 4); return; }
-    if (name == "OR32ri") { emitAluRIHelper(AluOp::OR, 4); return; }
-    if (name == "OR64rr") { emitAluRRHelper(AluOp::OR, 8); return; }
-    if (name == "OR64ri") { emitAluRIHelper(AluOp::OR, 8); return; }
-
-    if (name == "XOR32rr") { emitAluRRHelper(AluOp::XOR, 4); return; }
-    if (name == "XOR32ri") { emitAluRIHelper(AluOp::XOR, 4); return; }
-    if (name == "XOR64rr") { emitAluRRHelper(AluOp::XOR, 8); return; }
-    if (name == "XOR64ri") { emitAluRIHelper(AluOp::XOR, 8); return; }
-
-    if (name == "SHL32ri") { emitShiftRIHelper(&InstructionEncoder::emitShlRI, 4); return; }
-    if (name == "SHL32rCL") { emitShiftRCLHelper(&InstructionEncoder::emitShlRCL, 4); return; }
-    if (name == "SHL64ri") { emitShiftRIHelper(&InstructionEncoder::emitShlRI, 8); return; }
-    if (name == "SHL64rCL") { emitShiftRCLHelper(&InstructionEncoder::emitShlRCL, 8); return; }
-
-    if (name == "SHR32ri") { emitShiftRIHelper(&InstructionEncoder::emitShrRI, 4); return; }
-    if (name == "SHR32rCL") { emitShiftRCLHelper(&InstructionEncoder::emitShrRCL, 4); return; }
-    if (name == "SHR64ri") { emitShiftRIHelper(&InstructionEncoder::emitShrRI, 8); return; }
-    if (name == "SHR64rCL") { emitShiftRCLHelper(&InstructionEncoder::emitShrRCL, 8); return; }
-
-    if (name == "SAR32ri") { emitShiftRIHelper(&InstructionEncoder::emitSarRI, 4); return; }
-    if (name == "SAR32rCL") { emitShiftRCLHelper(&InstructionEncoder::emitSarRCL, 4); return; }
-    if (name == "SAR64ri") { emitShiftRIHelper(&InstructionEncoder::emitSarRI, 8); return; }
-    if (name == "SAR64rCL") { emitShiftRCLHelper(&InstructionEncoder::emitSarRCL, 8); return; }
-
-    // =========================================================================
-    // COMPARISONS & SETcc
-    // =========================================================================
-    if (name == "CMP32rr")
-    {
-        if (operands.size() >= 2)
-        {
-            InstructionEncoder::emitAluRR(bytes, AluOp::CMP, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 4);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "CMP32ri")
-    {
-        if (operands.size() >= 2)
-        {
-            auto *imm = operands[1]->get<MirInteger>();
-            int32_t val = imm ? imm->getValue().getI32() : 0;
-            InstructionEncoder::emitAluRI(bytes, AluOp::CMP, mapRegister(operands[0]->get<MirRegister>()), val, 4);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "CMP64rr")
-    {
-        if (operands.size() >= 2)
-        {
-            InstructionEncoder::emitAluRR(bytes, AluOp::CMP, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 8);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "CMP64ri")
-    {
-        if (operands.size() >= 2)
-        {
-            auto *imm = operands[1]->get<MirInteger>();
-            int32_t val = imm ? imm->getValue().getI32() : 0;
-            InstructionEncoder::emitAluRI(bytes, AluOp::CMP, mapRegister(operands[0]->get<MirRegister>()), val, 8);
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "TEST32rr")
-    {
-        if (operands.size() >= 2)
-        {
-            InstructionEncoder::emitTestRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 4);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "TEST64rr")
-    {
-        if (operands.size() >= 2)
-        {
-            InstructionEncoder::emitTestRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 8);
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "SETE")  { emitSetccHelper(ConditionCode::E);  return; }
-    if (name == "SETNE") { emitSetccHelper(ConditionCode::NE); return; }
-    if (name == "SETL")  { emitSetccHelper(ConditionCode::L);  return; }
-    if (name == "SETLE") { emitSetccHelper(ConditionCode::LE); return; }
-    if (name == "SETG")  { emitSetccHelper(ConditionCode::G);  return; }
-    if (name == "SETGE") { emitSetccHelper(ConditionCode::GE); return; }
-    if (name == "SETB")  { emitSetccHelper(ConditionCode::B);  return; }
-    if (name == "SETBE") { emitSetccHelper(ConditionCode::BE); return; }
-    if (name == "SETA")  { emitSetccHelper(ConditionCode::A);  return; }
-    if (name == "SETAE") { emitSetccHelper(ConditionCode::AE); return; }
-
-    // =========================================================================
-    // DATA MOVEMENT & MEMORY
-    // =========================================================================
-    if (name == "MOV8rr")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 1);
-        commitBytes();
-        return;
-    }
-    if (name == "MOV8ri")
-    {
-        if (operands.size() >= 2)
-        {
-            auto *imm = operands[1]->get<MirInteger>();
-            int64_t val = imm ? imm->getValue().getI64() : 0;
-            InstructionEncoder::emitMovRI(bytes, mapRegister(operands[0]->get<MirRegister>()), val, 1);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "MOV16rr")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 2);
-        commitBytes();
-        return;
-    }
-    if (name == "MOV16ri")
-    {
-        if (operands.size() >= 2)
-        {
-            auto *imm = operands[1]->get<MirInteger>();
-            int64_t val = imm ? imm->getValue().getI64() : 0;
-            InstructionEncoder::emitMovRI(bytes, mapRegister(operands[0]->get<MirRegister>()), val, 2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "MOV32rr")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 4);
-        commitBytes();
-        return;
-    }
-    if (name == "MOV32ri")
-    {
-        if (operands.size() >= 2)
-        {
-            auto *imm = operands[1]->get<MirInteger>();
-            int64_t val = imm ? imm->getValue().getI64() : 0;
-            InstructionEncoder::emitMovRI(bytes, mapRegister(operands[0]->get<MirRegister>()), val, 4);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "MOV64rr")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 8);
-        commitBytes();
-        return;
-    }
-    if (name == "MOV64ri")
-    {
-        if (operands.size() >= 2)
-        {
-            auto *imm = operands[1]->get<MirInteger>();
-            int64_t val = imm ? imm->getValue().getI64() : 0;
-            InstructionEncoder::emitMovRI(bytes, mapRegister(operands[0]->get<MirRegister>()), val, 8);
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "LOAD8" || name == "LOAD16" || name == "LOAD32" || name == "LOAD64")
-    {
-        uint8_t size = (name == "LOAD8") ? 1 : (name == "LOAD16") ? 2 : (name == "LOAD32") ? 4 : 8;
-        if (operands.size() >= 2)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            MemoryOperand mem = mapOperandToMemory(operands[1]);
-            bool isXmm = (static_cast<uint8_t>(dst) >= 16 && static_cast<uint8_t>(dst) <= 31);
-            if (isXmm && size == 4)
-            {
-                bytes.push_back(0xF3);
-                RexPrefix rex;
-                rex.r = isExtendedReg(dst);
-                std::vector<uint8_t> modrmBytes;
-                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(dst), mem);
-                if (rex.isNeeded()) bytes.push_back(rex.encode());
-                bytes.push_back(0x0F);
-                bytes.push_back(0x10);
-                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
-            }
-            else if (isXmm && size == 8)
-            {
-                bytes.push_back(0xF2);
-                RexPrefix rex;
-                rex.r = isExtendedReg(dst);
-                std::vector<uint8_t> modrmBytes;
-                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(dst), mem);
-                if (rex.isNeeded()) bytes.push_back(rex.encode());
-                bytes.push_back(0x0F);
-                bytes.push_back(0x10);
-                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
-            }
-            else
-            {
-                InstructionEncoder::emitMovRM(bytes, dst, mem, size);
-            }
-
-            if (operands[1]->getType() == MirOperandType::Reference)
-            {
-                auto *ref = operands[1]->get<MirReference>();
-                if (ref && ref->isGlobalVar())
-                {
-                    uint64_t dispOffset = sec->getCurrentOffset() + bytes.size() - 4;
-                    m_ctx->addRelocAt(ref, TargetCodeRelocationType::PCRel32, dispOffset);
-                }
-            }
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "STORE8" || name == "STORE16" || name == "STORE32" || name == "STORE64")
-    {
-        uint8_t size = (name == "STORE8") ? 1 : (name == "STORE16") ? 2 : (name == "STORE32") ? 4 : 8;
-        if (operands.size() >= 2)
-        {
-            MemoryOperand mem = mapOperandToMemory(operands[0]);
-            Reg src = mapRegister(operands[1]->get<MirRegister>());
-            bool isXmm = (static_cast<uint8_t>(src) >= 16 && static_cast<uint8_t>(src) <= 31);
-            if (isXmm && size == 4)
-            {
-                bytes.push_back(0xF3);
-                RexPrefix rex;
-                rex.r = isExtendedReg(src);
-                std::vector<uint8_t> modrmBytes;
-                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(src), mem);
-                if (rex.isNeeded()) bytes.push_back(rex.encode());
-                bytes.push_back(0x0F);
-                bytes.push_back(0x11);
-                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
-            }
-            else if (isXmm && size == 8)
-            {
-                bytes.push_back(0xF2);
-                RexPrefix rex;
-                rex.r = isExtendedReg(src);
-                std::vector<uint8_t> modrmBytes;
-                InstructionEncoder::encodeModRMSIB(modrmBytes, rex, getLow3Bits(src), mem);
-                if (rex.isNeeded()) bytes.push_back(rex.encode());
-                bytes.push_back(0x0F);
-                bytes.push_back(0x11);
-                bytes.insert(bytes.end(), modrmBytes.begin(), modrmBytes.end());
-            }
-            else
-            {
-                InstructionEncoder::emitMovMR(bytes, mem, src, size);
-            }
-
-            if (operands[0]->getType() == MirOperandType::Reference)
-            {
-                auto *ref = operands[0]->get<MirReference>();
-                if (ref && ref->isGlobalVar())
-                {
-                    uint64_t dispOffset = sec->getCurrentOffset() + bytes.size() - 4;
-                    m_ctx->addRelocAt(ref, TargetCodeRelocationType::PCRel32, dispOffset);
-                }
-            }
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "MOVSX32_8")  { if (operands.size() >= 2) InstructionEncoder::emitMovsxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 1); commitBytes(); return; }
-    if (name == "MOVSX32_16") { if (operands.size() >= 2) InstructionEncoder::emitMovsxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 2); commitBytes(); return; }
-    if (name == "MOVSX64_8")  { if (operands.size() >= 2) InstructionEncoder::emitMovsxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 1); commitBytes(); return; }
-    if (name == "MOVSX64_16") { if (operands.size() >= 2) InstructionEncoder::emitMovsxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 2); commitBytes(); return; }
-    if (name == "MOVSX64_32") { if (operands.size() >= 2) InstructionEncoder::emitMovsxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 4); commitBytes(); return; }
-
-    if (name == "MOVZX32_8")  { if (operands.size() >= 2) InstructionEncoder::emitMovzxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 1); commitBytes(); return; }
-    if (name == "MOVZX32_16") { if (operands.size() >= 2) InstructionEncoder::emitMovzxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 2); commitBytes(); return; }
-    if (name == "MOVZX64_8")  { if (operands.size() >= 2) InstructionEncoder::emitMovzxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 1); commitBytes(); return; }
-    if (name == "MOVZX64_16") { if (operands.size() >= 2) InstructionEncoder::emitMovzxRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), 2); commitBytes(); return; }
-
-    if (name == "LEA64" || name == "LEA64r")
-    {
-        if (operands.size() >= 2)
-        {
-            auto *dst = operands[0]->get<MirRegister>();
-            InstructionEncoder::emitLea(bytes, mapRegister(dst), mapOperandToMemory(operands[1]), 8);
-            if (operands[1]->getType() == MirOperandType::Reference)
-            {
-                auto *ref = operands[1]->get<MirReference>();
-                if (ref && ref->isGlobalVar())
-                {
-                    uint64_t dispOffset = sec->getCurrentOffset() + bytes.size() - 4;
-                    m_ctx->addRelocAt(ref, TargetCodeRelocationType::PCRel32, dispOffset);
-                }
-            }
-        }
-        commitBytes();
-        return;
-    }
-
-    // =========================================================================
-    // CONTROL FLOW
-    // =========================================================================
-    if (name == "JMP")
-    {
-        if (!operands.empty())
-        {
-            if (operands[0]->getType() == MirOperandType::Reference)
-            {
-                auto *ref = operands[0]->get<MirReference>();
-                InstructionEncoder::emitJmpNear(bytes, 0);
-                m_ctx->addReloc(ref, TargetCodeRelocationType::BranchRel32);
-            }
-            else if (operands[0]->getType() == MirOperandType::Integer)
-            {
-                int32_t disp = operands[0]->get<MirInteger>()->getValue().getI32();
-                InstructionEncoder::emitJmpNear(bytes, disp);
-            }
-            else if (operands[0]->getType() == MirOperandType::Register)
-            {
-                auto *reg = operands[0]->get<MirRegister>();
-                InstructionEncoder::emitJmpR(bytes, mapRegister(reg));
-            }
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "JE")  { emitJccHelper(ConditionCode::E);  return; }
-    if (name == "JNE") { emitJccHelper(ConditionCode::NE); return; }
-    if (name == "JL")  { emitJccHelper(ConditionCode::L);  return; }
-    if (name == "JLE") { emitJccHelper(ConditionCode::LE); return; }
-    if (name == "JG")  { emitJccHelper(ConditionCode::G);  return; }
-    if (name == "JGE") { emitJccHelper(ConditionCode::GE); return; }
-    if (name == "JB")  { emitJccHelper(ConditionCode::B);  return; }
-    if (name == "JBE") { emitJccHelper(ConditionCode::BE); return; }
-    if (name == "JA")  { emitJccHelper(ConditionCode::A);  return; }
-    if (name == "JAE") { emitJccHelper(ConditionCode::AE); return; }
-
-    if (name == "CALL")
-    {
-        if (!operands.empty())
-        {
-            if (operands[0]->getType() == MirOperandType::Register)
-            {
-                auto *reg = operands[0]->get<MirRegister>();
-                InstructionEncoder::emitCallR(bytes, mapRegister(reg));
-            }
-            else if (operands[0]->getType() == MirOperandType::Reference)
-            {
-                auto *ref = operands[0]->get<MirReference>();
-                InstructionEncoder::emitCallNear(bytes, 0);
-                m_ctx->addReloc(ref, TargetCodeRelocationType::BranchRel32);
-            }
-            else if (operands[0]->getType() == MirOperandType::Integer)
-            {
-                int32_t disp = operands[0]->get<MirInteger>()->getValue().getI32();
-                InstructionEncoder::emitCallNear(bytes, disp);
-            }
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "RET")
-    {
-        InstructionEncoder::emitRet(bytes);
-        commitBytes();
-        return;
-    }
-
-    if (name == "PUSH64r")
-    {
-        if (!operands.empty())
-        {
-            auto *reg = operands[0]->get<MirRegister>();
-            InstructionEncoder::emitPushR(bytes, mapRegister(reg));
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "POP64r")
-    {
-        if (!operands.empty())
-        {
-            auto *reg = operands[0]->get<MirRegister>();
-            InstructionEncoder::emitPopR(bytes, mapRegister(reg));
-        }
-        commitBytes();
-        return;
-    }
-
-    // =========================================================================
-    // FLOATING POINT (SSE)
-    // =========================================================================
-    if (name == "ADDSS")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovssRR(bytes, dst, src1);
-            InstructionEncoder::emitAddss(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "ADDSD")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovsdRR(bytes, dst, src1);
-            InstructionEncoder::emitAddsd(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "SUBSS")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovssRR(bytes, dst, src1);
-            InstructionEncoder::emitSubss(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "SUBSD")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovsdRR(bytes, dst, src1);
-            InstructionEncoder::emitSubsd(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "MULSS")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovssRR(bytes, dst, src1);
-            InstructionEncoder::emitMulss(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "MULSD")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovsdRR(bytes, dst, src1);
-            InstructionEncoder::emitMulsd(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "DIVSS")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovssRR(bytes, dst, src1);
-            InstructionEncoder::emitDivss(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "DIVSD")
-    {
-        if (operands.size() >= 3)
-        {
-            Reg dst = mapRegister(operands[0]->get<MirRegister>());
-            Reg src1 = mapRegister(operands[1]->get<MirRegister>());
-            Reg src2 = mapRegister(operands[2]->get<MirRegister>());
-            if (dst != src1) InstructionEncoder::emitMovsdRR(bytes, dst, src1);
-            InstructionEncoder::emitDivsd(bytes, dst, src2);
-        }
-        commitBytes();
-        return;
-    }
-
-    if (name == "MOVSSrr")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovssRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()));
-        commitBytes();
-        return;
-    }
-    if (name == "MOVSDrr")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitMovsdRR(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()));
-        commitBytes();
-        return;
-    }
-
-    if (name == "UCOMISS")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitUcomiss(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()));
-        commitBytes();
-        return;
-    }
-    if (name == "UCOMISD")
-    {
-        if (operands.size() >= 2) InstructionEncoder::emitUcomisd(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()));
-        commitBytes();
-        return;
-    }
-
-    if (name == "CVTSI2SS")
-    {
-        if (operands.size() >= 2)
-        {
-            uint8_t srcSize = (operands[1]->getMirType() && operands[1]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
-            InstructionEncoder::emitCvtsi2ss(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), srcSize);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "CVTSI2SD")
-    {
-        if (operands.size() >= 2)
-        {
-            uint8_t srcSize = (operands[1]->getMirType() && operands[1]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
-            InstructionEncoder::emitCvtsi2sd(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), srcSize);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "CVTTSS2SI")
-    {
-        if (operands.size() >= 2)
-        {
-            uint8_t dstSize = (operands[0]->getMirType() && operands[0]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
-            InstructionEncoder::emitCvttss2si(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), dstSize);
-        }
-        commitBytes();
-        return;
-    }
-    if (name == "CVTTSD2SI")
-    {
-        if (operands.size() >= 2)
-        {
-            uint8_t dstSize = (operands[0]->getMirType() && operands[0]->getMirType()->getTotalSizeInBits() == 64) ? 8 : 4;
-            InstructionEncoder::emitCvttsd2si(bytes, mapRegister(operands[0]->get<MirRegister>()), mapRegister(operands[1]->get<MirRegister>()), dstSize);
-        }
-        commitBytes();
-        return;
-    }
-
-    // =========================================================================
-    // SYSTEM
-    // =========================================================================
-    if (name == "SYSCALL")
-    {
-        InstructionEncoder::emitSyscall(bytes);
-        commitBytes();
-        return;
-    }
-
-    if (name == "NOP")
-    {
-        InstructionEncoder::emitNop(bytes, 1);
-        commitBytes();
-        return;
-    }
+    // All x86-64 instructions are emitted through the generated encoding table.
+    tryEmitTableDriven(desc, operands);
 }
 
 } // namespace EzCodeEmitter::X86_64

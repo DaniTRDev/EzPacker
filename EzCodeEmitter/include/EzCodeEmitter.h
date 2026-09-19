@@ -8,9 +8,9 @@
 #include "GenericCodeEmitter.h"
 #include "Helpers.h"
 
-#include "X86_64/X86_64Registers.h"
-#include "X86_64/X86_64Encoding.h"
 #include "X86_64/X86_64CodeEmitter.h"
+#include "TableGen/EncodingDesc.h"
+#include "TableGen/InstructionEncoder.h"
 #include "BranchRelaxation/BranchRelaxer.h"
 #include "ObjectFormat/ObjectSymbol.h"
 #include "ObjectFormat/Elf64Writer.h"

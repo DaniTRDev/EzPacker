@@ -8,6 +8,32 @@ namespace EzCodeEmitter::TableGen
 {
 
 /**
+ * Standard machine condition codes used by conditional branches and conditional sets.
+ *
+ * The numeric values are architecture-defined digits folded into an opcode byte; the
+ * x86-64 values happen to be the canonical encoding shared by Jcc and SETcc.
+ */
+enum class ConditionCode : uint8_t
+{
+    O = 0x0,  ///< Overflow.
+    NO = 0x1, ///< Not overflow.
+    B = 0x2,  ///< Below / carry (unsigned less-than).
+    AE = 0x3, ///< Above or equal / not carry (unsigned greater-or-equal).
+    E = 0x4,  ///< Equal / zero.
+    NE = 0x5, ///< Not equal / not zero.
+    BE = 0x6, ///< Below or equal (unsigned less-or-equal).
+    A = 0x7,  ///< Above (unsigned greater-than).
+    S = 0x8,  ///< Sign (negative).
+    NS = 0x9, ///< Not sign (non-negative).
+    P = 0xA,  ///< Parity even.
+    NP = 0xB, ///< Parity odd.
+    L = 0xC,  ///< Less (signed less-than).
+    GE = 0xD, ///< Greater or equal (signed greater-or-equal).
+    LE = 0xE, ///< Less or equal (signed less-or-equal).
+    G = 0xF   ///< Greater (signed greater-than).
+};
+
+/**
  * Describes the role a given instruction operand plays inside an instruction encoding.
  *
  * The slot kind is intentionally target-agnostic: it names a structural position
@@ -70,9 +96,9 @@ enum class EncForm : uint8_t
  */
 enum class EncRegClass : uint8_t
 {
-    GPR = 0,
-    FPR = 1,
-    Any = 2,
+    GPR = 0, ///< General-purpose integer register.
+    FPR = 1, ///< Floating-point/vector register (XMM).
+    Any = 2, ///< Accept either register file.
 };
 
 /**
@@ -80,9 +106,9 @@ enum class EncRegClass : uint8_t
  */
 struct EncOperandBinding
 {
-    EncSlotKind m_slot{ EncSlotKind::None };
-    uint8_t m_operandIndex{ 0 };
-    EncRegClass m_regClass{ EncRegClass::GPR };
+    EncSlotKind m_slot{ EncSlotKind::None };    ///< Structural slot this binding occupies.
+    uint8_t m_operandIndex{ 0 };                ///< Index into the resolved operand list.
+    EncRegClass m_regClass{ EncRegClass::GPR }; ///< Register file expected in the slot.
 };
 
 /**
@@ -94,7 +120,7 @@ struct EncOperandBinding
  */
 struct EncodingDesc
 {
-    EncForm m_form{ EncForm::None };
+    EncForm m_form{ EncForm::None }; ///< Structural encoding algorithm to interpret this descriptor with.
 
     /// Legacy/mandatory prefix bitmask. See EncPrefix* constants below.
     uint8_t m_prefixes{ 0 };
@@ -107,7 +133,7 @@ struct EncodingDesc
     uint8_t m_opcodeLen{ 0 };
     /// Number of valid entries in m_operands.
     uint8_t m_operandCount{ 0 };
-    EncOperandBinding m_operands[4]{};
+    EncOperandBinding m_operands[4]{}; ///< Operand-to-slot bindings, in declaration order.
     /// Operand index used to determine the operation size; 0xFF for "first register".
     uint8_t m_sizeOperand{ 0xFF };
     /// Operand index copied into operand 0 before encoding (two-address coalescing); 0xFF disabled.
@@ -145,11 +171,11 @@ inline constexpr uint8_t EncPrefixF0 = 1u << 4;
  */
 struct EncMemory
 {
-    uint8_t m_base{ 0xFF };
-    uint8_t m_index{ 0xFF };
-    uint8_t m_scale{ 1 };
-    int64_t m_disp{ 0 };
-    bool m_ripRel{ false };
+    uint8_t m_base{ 0xFF };  ///< Hardware encoding of the base register, or 0xFF for none.
+    uint8_t m_index{ 0xFF }; ///< Hardware encoding of the index register, or 0xFF for none.
+    uint8_t m_scale{ 1 };    ///< Index scale factor (1, 2, 4 or 8).
+    int64_t m_disp{ 0 };     ///< Constant displacement added to the effective address.
+    bool m_ripRel{ false };  ///< True for RIP-relative addressing (disp32 relative to next IP).
     /// True when the displacement is a symbol reference that must be relocated.
     bool m_needsReloc{ false };
 };
@@ -164,20 +190,20 @@ struct ResolvedOperand
 {
     enum class Kind : uint8_t
     {
-        None = 0,
-        Register,
-        Immediate,
-        Memory,
+        None = 0,  ///< Unset/absent operand.
+        Register,  ///< Physical register operand.
+        Immediate, ///< Integer immediate operand.
+        Memory,    ///< Memory addressing operand.
     };
 
-    Kind m_kind{ Kind::None };
+    Kind m_kind{ Kind::None }; ///< Discriminant selecting which payload below is active.
     /// Hardware encoding of a register operand (0..31; >=16 identifies an FPR/XMM).
     uint8_t m_reg{ 0 };
-    bool m_isFpr{ false };
+    bool m_isFpr{ false }; ///< True when the register belongs to the floating-point/vector file.
     /// Size of the operand in bytes (used for prefix/REX.W selection).
     uint8_t m_sizeBytes{ 8 };
-    int64_t m_imm{ 0 };
-    EncMemory m_mem{};
+    int64_t m_imm{ 0 }; ///< Immediate value for Kind::Immediate.
+    EncMemory m_mem{};  ///< Addressing form for Kind::Memory.
     /// True when this operand references a symbol requiring a relocation.
     bool m_needsReloc{ false };
 };
@@ -187,7 +213,7 @@ struct ResolvedOperand
  */
 struct EncodeResult
 {
-    bool m_hasReloc{ false };
+    bool m_hasReloc{ false }; ///< True when the emitted instruction contains a relocation field.
     /// Byte offset (within the emitted instruction) of the relocation field.
     size_t m_relocOffset{ 0 };
     /// Width of the relocation field in bits (8 or 32).

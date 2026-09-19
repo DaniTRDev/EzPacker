@@ -3,6 +3,7 @@
 
 using namespace EzCodeEmitter;
 
+// A short forward JMP stays 2 bytes and resolves to a positive disp8.
 TEST_F(EzCodeEmitterTestSuite, TestShortForwardBranch)
 {
     BranchRelaxer relaxer;
@@ -27,6 +28,7 @@ TEST_F(EzCodeEmitterTestSuite, TestShortForwardBranch)
     EXPECT_EQ(resolvedLabels[1], 12u);
 }
 
+// A short backward JMP stays 2 bytes and resolves to a negative disp8.
 TEST_F(EzCodeEmitterTestSuite, TestShortBackwardBranch)
 {
     BranchRelaxer relaxer;
@@ -51,6 +53,7 @@ TEST_F(EzCodeEmitterTestSuite, TestShortBackwardBranch)
     EXPECT_EQ(outCode[21], static_cast<uint8_t>(-22));
 }
 
+// A forward JMP over more than 127 bytes is widened to a 5-byte near JMP with disp32.
 TEST_F(EzCodeEmitterTestSuite, TestJumpRelaxationToNear)
 {
     BranchRelaxer relaxer;
@@ -77,11 +80,12 @@ TEST_F(EzCodeEmitterTestSuite, TestJumpRelaxationToNear)
     EXPECT_EQ(resolvedLabels[1], 205u);
 }
 
+// A forward Jcc over more than 127 bytes is widened to a 6-byte near Jcc with disp32.
 TEST_F(EzCodeEmitterTestSuite, TestConditionalJumpRelaxation)
 {
     BranchRelaxer relaxer;
     // JE forward to label 42
-    relaxer.emitJcc(X86_64::ConditionCode::E, 42);
+    relaxer.emitJcc(TableGen::ConditionCode::E, 42);
     // 300 bytes of padding
     std::vector<uint8_t> padding(300, 0x90);
     relaxer.emitBytes(padding);
@@ -103,6 +107,7 @@ TEST_F(EzCodeEmitterTestSuite, TestConditionalJumpRelaxation)
     EXPECT_EQ(resolvedLabels[42], 306u);
 }
 
+// Widening one branch shifts later labels, forcing an earlier branch to expand as well.
 TEST_F(EzCodeEmitterTestSuite, TestCascadingBranchRelaxation)
 {
     BranchRelaxer relaxer;

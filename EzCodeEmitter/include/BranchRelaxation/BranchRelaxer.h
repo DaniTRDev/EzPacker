@@ -2,7 +2,7 @@
 #define EZPACKER_BRANCH_RELAXER_H
 
 #include "EzCodeEmitterCommon.h"
-#include "X86_64/X86_64Encoding.h"
+#include "TableGen/InstructionEncoder.h"
 #include <unordered_map>
 #include <vector>
 
@@ -14,9 +14,9 @@ namespace EzCodeEmitter
  */
 enum class StreamItemKind : uint8_t
 {
-    RawData,
-    LabelDef,
-    Branch
+    RawData,  ///< Opaque machine bytes emitted verbatim.
+    LabelDef, ///< Label marker anchoring the current stream offset.
+    Branch    ///< Relaxable branch that may be widened during resolution.
 };
 
 /**
@@ -24,11 +24,14 @@ enum class StreamItemKind : uint8_t
  */
 struct BranchItem
 {
-    MirId m_targetId{ MIRID_INVALID };
-    bool m_isConditional{ false };
-    X86_64::ConditionCode m_condition{ X86_64::ConditionCode::E };
+    MirId m_targetId{ MIRID_INVALID };                                 ///< Label this branch targets.
+    bool m_isConditional{ false };                                     ///< True for Jcc, false for JMP.
+    TableGen::ConditionCode m_condition{ TableGen::ConditionCode::E }; ///< Predicate used by conditional branches.
     bool m_isRelaxed{ false }; // false = Short (2 bytes), true = Near (5/6 bytes)
 
+    /**
+     * Returns the encoded length of the branch given its current relaxation state.
+     */
     size_t getSize() const
     {
         if (!m_isRelaxed)
@@ -44,11 +47,14 @@ struct BranchItem
  */
 struct StreamItem
 {
-    StreamItemKind m_kind{ StreamItemKind::RawData };
-    std::vector<uint8_t> m_rawData;
-    MirId m_labelId{ MIRID_INVALID };
-    BranchItem m_branch;
+    StreamItemKind m_kind{ StreamItemKind::RawData }; ///< Which payload below is active.
+    std::vector<uint8_t> m_rawData;                   ///< Bytes for RawData items.
+    MirId m_labelId{ MIRID_INVALID };                 ///< Label id for LabelDef items.
+    BranchItem m_branch;                              ///< Branch state for Branch items.
 
+    /**
+     * Builds a RawData item by copying the given byte range.
+     */
     static StreamItem Data(const uint8_t *data, size_t size)
     {
         StreamItem it;
@@ -57,6 +63,9 @@ struct StreamItem
         return it;
     }
 
+    /**
+     * Builds a LabelDef item that defines id at the current stream offset.
+     */
     static StreamItem Label(MirId id)
     {
         StreamItem it;
@@ -65,6 +74,9 @@ struct StreamItem
         return it;
     }
 
+    /**
+     * Builds an unconditional jump branch item targeting targetId.
+     */
     static StreamItem Jmp(MirId targetId)
     {
         StreamItem it;
@@ -75,7 +87,10 @@ struct StreamItem
         return it;
     }
 
-    static StreamItem Jcc(X86_64::ConditionCode cc, MirId targetId)
+    /**
+     * Builds a conditional jump branch item guarded by the given condition code.
+     */
+    static StreamItem Jcc(TableGen::ConditionCode cc, MirId targetId)
     {
         StreamItem it;
         it.m_kind = StreamItemKind::Branch;
@@ -120,15 +135,14 @@ class BranchRelaxer
     /**
      * Emits a conditional jump to the target label.
      */
-    void emitJcc(X86_64::ConditionCode cc, MirId targetLabelId);
+    void emitJcc(TableGen::ConditionCode cc, MirId targetLabelId);
 
     /**
      * Performs iterative branch relaxation until fixed point convergence.
      * Generates exact byte-level output into outCode and records final label offsets.
      * Returns the total count of relaxed branches.
      */
-    size_t relaxAndResolve(std::vector<uint8_t> &outCode,
-                           std::unordered_map<MirId, uint64_t> &resolvedLabels);
+    size_t relaxAndResolve(std::vector<uint8_t> &outCode, std::unordered_map<MirId, uint64_t> &resolvedLabels);
 
     /**
      * Returns all items currently in the stream.
@@ -141,7 +155,7 @@ class BranchRelaxer
     void clear();
 
   private:
-    std::vector<StreamItem> m_items;
+    std::vector<StreamItem> m_items; ///< Ordered stream of data, labels and branches to resolve.
 };
 
 } // namespace EzCodeEmitter

@@ -8,16 +8,20 @@ namespace EzCodeEmitter::TableGen
 namespace
 {
 
+// Sentinel meaning "no register" in base/index positions.
 constexpr uint8_t NoReg = 0xFF;
 
+// Accumulated REX prefix bits for a single instruction encoding.
 struct Rex
 {
-    bool w{ false };
-    bool r{ false };
-    bool x{ false };
-    bool b{ false };
+    bool w{ false }; ///< REX.W: 64-bit operand size.
+    bool r{ false }; ///< REX.R: extension of the ModR/M.reg field.
+    bool x{ false }; ///< REX.X: extension of the SIB.index field.
+    bool b{ false }; ///< REX.B: extension of the ModR/M.rm / SIB.base field.
 
+    // True when any REX bit is set, meaning a prefix byte must be emitted.
     bool isNeeded() const { return w || r || x || b; }
+    // Packs the REX bits into the 0x40-based prefix byte.
     uint8_t encode() const { return InstructionEncoder::rexByte(w, r, x, b); }
 };
 
@@ -25,6 +29,7 @@ uint8_t low3(uint8_t enc) { return static_cast<uint8_t>(enc & 0x07u); }
 uint8_t low4(uint8_t enc) { return static_cast<uint8_t>(enc & 0x0Fu); }
 bool extBit(uint8_t enc) { return ((enc >> 3) & 0x01u) != 0; }
 
+// Converts an index scale factor (1/2/4/8) into its 2-bit SIB encoding (0..3).
 uint8_t scaleToPower(uint8_t scale)
 {
     switch (scale)
@@ -42,6 +47,7 @@ uint8_t scaleToPower(uint8_t scale)
     }
 }
 
+// Appends the low `bytes` bytes of value in little-endian order.
 void emitImm(std::vector<uint8_t> &out, int64_t value, uint8_t bytes)
 {
     for (uint8_t i = 0; i < bytes; ++i)
@@ -50,14 +56,16 @@ void emitImm(std::vector<uint8_t> &out, int64_t value, uint8_t bytes)
     }
 }
 
+// ModR/M + SIB + displacement bytes for one operand, plus relocation metadata.
 struct ModRMPlan
 {
-    std::vector<uint8_t> bytes;
-    bool hasReloc{ false };
-    size_t relocOffsetWithin{ 0 };
-    uint8_t relocBits{ 32 };
+    std::vector<uint8_t> bytes;    ///< Encoded addressing bytes.
+    bool hasReloc{ false };        ///< True when a displacement field needs a relocation.
+    size_t relocOffsetWithin{ 0 }; ///< Offset of the relocatable field within bytes.
+    uint8_t relocBits{ 32 };       ///< Width in bits of that field.
 };
 
+// Builds ModR/M bytes for a register-direct r/m operand (mod = 3).
 ModRMPlan buildRegisterModRM(uint8_t regField, uint8_t rmEncoding, Rex &rex)
 {
     ModRMPlan plan;
@@ -66,12 +74,15 @@ ModRMPlan buildRegisterModRM(uint8_t regField, uint8_t rmEncoding, Rex &rex)
     return plan;
 }
 
+// Builds the full ModR/M + SIB + displacement sequence for a memory operand,
+// selecting the shortest legal displacement encoding for the addressing form.
 ModRMPlan buildMemoryModRM(uint8_t regField, const EncMemory &mem, Rex &rex)
 {
     ModRMPlan plan;
 
     if (mem.m_ripRel)
     {
+        // [rip + disp32]: mod=00, rm=101, optionally recording a rel32 fixup.
         plan.bytes.push_back(InstructionEncoder::encodeModRM(0, regField, 5));
         if (mem.m_needsReloc)
         {
@@ -85,6 +96,7 @@ ModRMPlan buildMemoryModRM(uint8_t regField, const EncMemory &mem, Rex &rex)
 
     if (mem.m_base == NoReg && mem.m_index == NoReg)
     {
+        // Absolute disp32 (mod=00, SIB with base=101 and no index).
         plan.bytes.push_back(InstructionEncoder::encodeModRM(0, regField, 4));
         plan.bytes.push_back(InstructionEncoder::encodeSIB(0, 4, 5));
         emitImm(plan.bytes, mem.m_disp, 4);
@@ -96,6 +108,7 @@ ModRMPlan buildMemoryModRM(uint8_t regField, const EncMemory &mem, Rex &rex)
         rex.x = extBit(mem.m_index);
         if (mem.m_base == NoReg)
         {
+            // Index-only addressing requires a disp32 base of 5.
             plan.bytes.push_back(InstructionEncoder::encodeModRM(0, regField, 4));
             plan.bytes.push_back(InstructionEncoder::encodeSIB(scaleToPower(mem.m_scale), low3(mem.m_index), 5));
             emitImm(plan.bytes, mem.m_disp, 4);
@@ -105,6 +118,7 @@ ModRMPlan buildMemoryModRM(uint8_t regField, const EncMemory &mem, Rex &rex)
         uint8_t baseLow = low3(mem.m_base);
         rex.b = extBit(mem.m_base);
 
+        // Choose mod/displacement form: no disp when possible, disp8 when it fits, else disp32.
         uint8_t mod = 0;
         bool emitDisp8 = false;
         bool emitDisp32 = false;
@@ -142,8 +156,9 @@ ModRMPlan buildMemoryModRM(uint8_t regField, const EncMemory &mem, Rex &rex)
 
     uint8_t baseLow = low3(mem.m_base);
     rex.b = extBit(mem.m_base);
-    bool needSib = (baseLow == 4);
+    bool needSib = (baseLow == 4); // rsp/r12 as base always needs a SIB byte.
 
+    // Choose mod/displacement form: no disp when possible, disp8 when it fits, else disp32.
     uint8_t mod = 0;
     bool emitDisp8 = false;
     bool emitDisp32 = false;
@@ -182,6 +197,7 @@ ModRMPlan buildMemoryModRM(uint8_t regField, const EncMemory &mem, Rex &rex)
     return plan;
 }
 
+// Returns the binding that assigns an operand to the given slot, or nullptr if unbound.
 const EncOperandBinding *findBinding(const EncodingDesc &desc, EncSlotKind slot)
 {
     for (uint8_t i = 0; i < desc.m_operandCount; ++i)
@@ -194,6 +210,7 @@ const EncOperandBinding *findBinding(const EncodingDesc &desc, EncSlotKind slot)
     return nullptr;
 }
 
+// Resolves the operand bound to the given slot, or nullptr when absent/out of range.
 const ResolvedOperand *resolve(const EncodingDesc &desc, std::span<const ResolvedOperand> operands, EncSlotKind slot)
 {
     const EncOperandBinding *binding = findBinding(desc, slot);
@@ -208,6 +225,8 @@ const ResolvedOperand *resolve(const EncodingDesc &desc, std::span<const Resolve
     return &operands[binding->m_operandIndex];
 }
 
+// Determines the operation size: the explicit size operand if any, otherwise the
+// first register operand, defaulting to 8 bytes.
 uint8_t resolveSize(const EncodingDesc &desc, std::span<const ResolvedOperand> operands)
 {
     if (desc.m_sizeOperand != 0xFF && desc.m_sizeOperand < operands.size())
@@ -228,6 +247,8 @@ uint8_t resolveSize(const EncodingDesc &desc, std::span<const ResolvedOperand> o
     return 8;
 }
 
+// Emits legacy/mandatory prefixes in the architecturally required order, adding the
+// 0x66 operand-size prefix when a 16-bit operation is requested.
 void emitLegacyPrefixes(std::vector<uint8_t> &out, uint8_t prefixes, bool size16)
 {
     if (prefixes & EncPrefixF0)
@@ -252,6 +273,7 @@ void emitLegacyPrefixes(std::vector<uint8_t> &out, uint8_t prefixes, bool size16
     }
 }
 
+// Copies the descriptor's fixed opcode bytes into the output.
 void emitRawOpcode(std::vector<uint8_t> &out, const uint8_t *opcode, uint8_t len)
 {
     for (uint8_t i = 0; i < len; ++i)
@@ -260,6 +282,7 @@ void emitRawOpcode(std::vector<uint8_t> &out, const uint8_t *opcode, uint8_t len
     }
 }
 
+// Applies the descriptor's REX.W policy: 0 = never, 1 = always, 2 = when the operand is 8 bytes.
 bool rexWanted(uint8_t rexWPolicy, uint8_t sizeBytes)
 {
     if (rexWPolicy == 1)
@@ -291,8 +314,10 @@ bool encodeModRMForm(const EncodingDesc &desc,
         return false;
     }
 
+    // rmIsMemory distinguishes the memory form from the register-direct form.
     const EncOperandBinding *rmBinding = findBinding(desc, EncSlotKind::RmMem);
     const bool rmIsMemory = rmBinding && rmBinding->m_operandIndex == static_cast<uint8_t>(rmOp - operands.data());
+    // Floating-point register with an SSE variant switches to the SSE opcode stream.
     const bool useSse = desc.m_hasSseVariant && regOp->m_isFpr;
 
     uint8_t sizeBytes = resolveSize(desc, operands);
@@ -310,6 +335,7 @@ bool encodeModRMForm(const EncodingDesc &desc,
         plan = buildRegisterModRM(low3(regOp->m_reg), rmOp->m_reg, rex);
     }
 
+    // Byte registers SPL/BPL/SIL/DIL (encoding low nibble >= 4) need a REX prefix to be addressable.
     bool forceRex =
             (sizeBytes == 1 && desc.m_byteRex && (low4(regOp->m_reg) >= 4 || (!rmIsMemory && low4(rmOp->m_reg) >= 4)));
 
@@ -321,6 +347,7 @@ bool encodeModRMForm(const EncodingDesc &desc,
 
     const uint8_t *opcode = useSse ? desc.m_sseOpcode : desc.m_opcode;
     uint8_t opcodeLen = useSse ? desc.m_sseOpcodeLen : desc.m_opcodeLen;
+    // Byte forms of ALU group opcodes are one less than their word/dword counterparts (e.g. 0x89 -> 0x88).
     bool byteMinusOne = !useSse && sizeBytes == 1;
     for (uint8_t i = 0; i < opcodeLen; ++i)
     {
@@ -332,6 +359,7 @@ bool encodeModRMForm(const EncodingDesc &desc,
         out.push_back(byte);
     }
 
+    // Append the addressing bytes, rebasing any relocation offset onto the full instruction.
     size_t planStart = out.size();
     out.insert(out.end(), plan.bytes.begin(), plan.bytes.end());
     if (plan.hasReloc)
@@ -359,7 +387,7 @@ bool encodeAluImmForm(const EncodingDesc &desc, std::span<const ResolvedOperand>
 
     uint8_t sizeBytes = resolveSize(desc, operands);
     int64_t imm = immOp->m_imm;
-    bool fitsImm8 = (imm >= -128 && imm <= 127);
+    bool fitsImm8 = (imm >= -128 && imm <= 127); // Sign-extended imm8 avoids a full-width immediate.
 
     Rex rex;
     rex.b = extBit(rmOp->m_reg);
@@ -479,6 +507,7 @@ bool encodeMovImmForm(const EncodingDesc &desc, std::span<const ResolvedOperand>
     {
         if (imm >= -2147483648LL && imm <= 2147483647LL)
         {
+            // Fits in a sign-extended imm32: use the shorter C7 /0 form.
             out.push_back(InstructionEncoder::rexByte(true, false, false, extended));
             out.push_back(0xC7);
             out.push_back(InstructionEncoder::encodeModRM(3, 0, rd));
@@ -486,6 +515,7 @@ bool encodeMovImmForm(const EncodingDesc &desc, std::span<const ResolvedOperand>
         }
         else
         {
+            // Full 64-bit immediate: MOVABS B8+rd with an imm64.
             out.push_back(InstructionEncoder::rexByte(true, false, false, extended));
             out.push_back(static_cast<uint8_t>(0xB8 + rd));
             emitImm(out, imm, 8);
@@ -615,6 +645,7 @@ bool encodeSetccForm(const EncodingDesc &desc, std::span<const ResolvedOperand> 
         return false;
     }
 
+    // SETcc targets byte registers, so SPL/BPL/SIL/DIL require a REX prefix.
     bool forceRex = (low4(regOp->m_reg) >= 4);
     if (forceRex)
     {
@@ -666,6 +697,7 @@ bool encodeBranchForm(const EncodingDesc &desc,
     emitRawOpcode(out, desc.m_opcode, desc.m_opcodeLen);
     if (isJcc && desc.m_opcodeLen > 0)
     {
+        // Fold the condition code into the low nibble of the final opcode byte.
         out.back() = static_cast<uint8_t>(out.back() | (desc.m_condCode & 0x0F));
     }
 
@@ -691,7 +723,7 @@ bool InstructionEncoder::encode(const EncodingDesc &desc,
                                 EncodeResult &result)
 {
     result = {};
-    std::vector<uint8_t> bytes;
+    std::vector<uint8_t> bytes; // Staged so `out` is left untouched on failure.
 
     bool ok = false;
     switch (desc.m_form)
@@ -749,6 +781,7 @@ bool InstructionEncoder::encode(const EncodingDesc &desc,
         case EncForm::Push:
         case EncForm::Pop:
         {
+            // Register push/pop: opcode base plus the low 3 bits of the register encoding.
             const ResolvedOperand *regOp = resolve(desc, operands, EncSlotKind::Reg);
             if (regOp && regOp->m_kind == ResolvedOperand::Kind::Register)
             {
@@ -784,6 +817,75 @@ bool InstructionEncoder::encode(const EncodingDesc &desc,
 
     out.insert(out.end(), bytes.begin(), bytes.end());
     return true;
+}
+
+void InstructionEncoder::encodeRegisterMove(const ResolvedOperand &dst,
+                                            const ResolvedOperand &src,
+                                            std::vector<uint8_t> &out)
+{
+    if (dst.m_isFpr || src.m_isFpr)
+    {
+        // Scalar SSE move: F3/F2 0F 10 /r with reg=dst and rm=src.
+        out.push_back(dst.m_sizeBytes == 4 ? 0xF3 : 0xF2);
+
+        Rex rex;
+        rex.r = extBit(dst.m_reg);
+        rex.b = extBit(src.m_reg);
+        if (rex.isNeeded())
+        {
+            out.push_back(rex.encode());
+        }
+
+        out.push_back(0x0F);
+        out.push_back(0x10);
+        out.push_back(InstructionEncoder::encodeModRM(3, low3(dst.m_reg), low3(src.m_reg)));
+        return;
+    }
+
+    // General-purpose move: 0x88/0x89 with reg=src and rm=dst.
+    Rex rex;
+    rex.w = (dst.m_sizeBytes == 8);
+    rex.r = extBit(src.m_reg);
+    rex.b = extBit(dst.m_reg);
+
+    bool forceRex = (dst.m_sizeBytes == 1 && (low4(dst.m_reg) >= 4 || low4(src.m_reg) >= 4));
+
+    if (dst.m_sizeBytes == 2)
+    {
+        out.push_back(0x66);
+    }
+    if (rex.isNeeded() || forceRex)
+    {
+        out.push_back(rex.encode());
+    }
+
+    out.push_back(dst.m_sizeBytes == 1 ? 0x88 : 0x89);
+    out.push_back(InstructionEncoder::encodeModRM(3, low3(src.m_reg), low3(dst.m_reg)));
+}
+
+void InstructionEncoder::emitJmpShort(std::vector<uint8_t> &out, int8_t disp)
+{
+    out.push_back(0xEB);
+    out.push_back(static_cast<uint8_t>(disp));
+}
+
+void InstructionEncoder::emitJmpNear(std::vector<uint8_t> &out, int32_t disp)
+{
+    out.push_back(0xE9);
+    emitImm(out, disp, 4);
+}
+
+void InstructionEncoder::emitJccShort(std::vector<uint8_t> &out, ConditionCode cc, int8_t disp)
+{
+    out.push_back(static_cast<uint8_t>(0x70 | (static_cast<uint8_t>(cc) & 0x0F)));
+    out.push_back(static_cast<uint8_t>(disp));
+}
+
+void InstructionEncoder::emitJccNear(std::vector<uint8_t> &out, ConditionCode cc, int32_t disp)
+{
+    out.push_back(0x0F);
+    out.push_back(static_cast<uint8_t>(0x80 | (static_cast<uint8_t>(cc) & 0x0F)));
+    emitImm(out, disp, 4);
 }
 
 } // namespace EzCodeEmitter::TableGen

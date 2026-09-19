@@ -11,13 +11,6 @@ EzCMK_ConfigureLib(NAME "EzCodeEmitterTestSuite"
 )
 
 EzPacker_AddTest(
-        "T_X86_64Encoding"
-        "EzCodeEmitterTestSuite"
-        ""
-        "tests/T_X86_64Encoding.cpp"
-)
-
-EzPacker_AddTest(
         "T_BranchRelaxation"
         "EzCodeEmitterTestSuite"
         ""

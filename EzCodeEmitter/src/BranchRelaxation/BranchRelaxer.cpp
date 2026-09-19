@@ -11,33 +11,21 @@ void BranchRelaxer::emitBytes(const uint8_t *data, size_t size)
     }
 }
 
-void BranchRelaxer::emitBytes(const std::vector<uint8_t> &bytes)
-{
-    emitBytes(bytes.data(), bytes.size());
-}
+void BranchRelaxer::emitBytes(const std::vector<uint8_t> &bytes) { emitBytes(bytes.data(), bytes.size()); }
 
-void BranchRelaxer::defineLabel(MirId labelId)
-{
-    m_items.push_back(StreamItem::Label(labelId));
-}
+void BranchRelaxer::defineLabel(MirId labelId) { m_items.push_back(StreamItem::Label(labelId)); }
 
-void BranchRelaxer::emitJmp(MirId targetLabelId)
-{
-    m_items.push_back(StreamItem::Jmp(targetLabelId));
-}
+void BranchRelaxer::emitJmp(MirId targetLabelId) { m_items.push_back(StreamItem::Jmp(targetLabelId)); }
 
-void BranchRelaxer::emitJcc(X86_64::ConditionCode cc, MirId targetLabelId)
+void BranchRelaxer::emitJcc(TableGen::ConditionCode cc, MirId targetLabelId)
 {
     m_items.push_back(StreamItem::Jcc(cc, targetLabelId));
 }
 
-void BranchRelaxer::clear()
-{
-    m_items.clear();
-}
+void BranchRelaxer::clear() { m_items.clear(); }
 
 size_t BranchRelaxer::relaxAndResolve(std::vector<uint8_t> &outCode,
-                                     std::unordered_map<MirId, uint64_t> &resolvedLabels)
+                                      std::unordered_map<MirId, uint64_t> &resolvedLabels)
 {
     size_t relaxedCount = 0;
     bool changed = true;
@@ -143,11 +131,13 @@ size_t BranchRelaxer::relaxAndResolve(std::vector<uint8_t> &outCode,
                     // Short branch (2 bytes)
                     if (item.m_branch.m_isConditional)
                     {
-                        X86_64::InstructionEncoder::emitJccShort(outCode, item.m_branch.m_condition, static_cast<int8_t>(disp));
+                        TableGen::InstructionEncoder::emitJccShort(outCode,
+                                                                   item.m_branch.m_condition,
+                                                                   static_cast<int8_t>(disp));
                     }
                     else
                     {
-                        X86_64::InstructionEncoder::emitJmpShort(outCode, static_cast<int8_t>(disp));
+                        TableGen::InstructionEncoder::emitJmpShort(outCode, static_cast<int8_t>(disp));
                     }
                 }
                 else
@@ -155,11 +145,13 @@ size_t BranchRelaxer::relaxAndResolve(std::vector<uint8_t> &outCode,
                     // Near branch (5 or 6 bytes)
                     if (item.m_branch.m_isConditional)
                     {
-                        X86_64::InstructionEncoder::emitJccNear(outCode, item.m_branch.m_condition, static_cast<int32_t>(disp));
+                        TableGen::InstructionEncoder::emitJccNear(outCode,
+                                                                  item.m_branch.m_condition,
+                                                                  static_cast<int32_t>(disp));
                     }
                     else
                     {
-                        X86_64::InstructionEncoder::emitJmpNear(outCode, static_cast<int32_t>(disp));
+                        TableGen::InstructionEncoder::emitJmpNear(outCode, static_cast<int32_t>(disp));
                     }
                 }
                 currentOffset += branchLen;

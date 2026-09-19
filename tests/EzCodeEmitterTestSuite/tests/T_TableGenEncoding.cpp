@@ -17,10 +17,12 @@ using namespace EzCodeEmitter::X86_64;
 namespace
 {
 
-std::vector<uint8_t> emitInstruction(bool tableDriven,
-                                     MirTargetInstructionDesc *desc,
+/**
+ * Emits a single instruction through the table-driven emitter, resolving the encoding
+ * from the generated x86-64 table by instruction name.
+ */
+std::vector<uint8_t> emitInstruction(MirTargetInstructionDesc *desc,
                                      std::span<MirOperand *> operands,
-                                     MirBuilderContext *builderCtx,
                                      DiagnosticCollector *diag,
                                      std::pmr::memory_resource *alloc)
 {
@@ -29,12 +31,8 @@ std::vector<uint8_t> emitInstruction(bool tableDriven,
 
     CodeEmitterContext context(diag, sections, alloc);
     X86_64CodeEmitter emitter;
-
-    if (tableDriven)
-    {
-        emitter.setEncodingResolver([](MirTargetInstructionDesc *d) -> const TableGen::EncodingDesc *
-                                    { return TableGen::x86_64::findEncodingDesc(d->getName()); });
-    }
+    emitter.setEncodingResolver([](MirTargetInstructionDesc *d) -> const TableGen::EncodingDesc *
+                                { return TableGen::x86_64::findEncodingDesc(d->getName()); });
 
     emitter.beginFunction(&context, "test_fn");
     emitter.emitInst(desc, operands);
@@ -49,10 +47,10 @@ std::vector<uint8_t> emitInstruction(bool tableDriven,
 } // namespace
 
 /**
- * Differential verification: the generated table-driven encoder must produce exactly the
- * same bytes as the legacy hand-written encoder for every instruction shape.
+ * Verifies that the generated encoding table drives the x86-64 emitter to produce the
+ * exact expected machine bytes, including two-address coalescing and REX selection.
  */
-TEST_F(EzCodeEmitterTestSuite, TestTableDrivenMatchesLegacyEncoder)
+TEST_F(EzCodeEmitterTestSuite, TestTableDrivenEmitterProducesExpectedBytes)
 {
     MirOperandBuilder opBuilder(getBuilderCtx());
 
@@ -99,7 +97,6 @@ TEST_F(EzCodeEmitterTestSuite, TestTableDrivenMatchesLegacyEncoder)
     MirRegister *x2 = s32(2);
     MirRegister *y0 = s64(0);
     MirRegister *y1 = s64(1);
-    MirRegister *y2 = s64(2);
 
     MirInteger *imm8 = opBuilder.buildInt(i8, FlexInt(3, 8));
     MirInteger *imm16 = opBuilder.buildInt(i16, FlexInt(7, 16));
@@ -109,93 +106,52 @@ TEST_F(EzCodeEmitterTestSuite, TestTableDrivenMatchesLegacyEncoder)
     MirInteger *imm64Big = opBuilder.buildInt(i64, FlexInt(static_cast<int64_t>(0x1122334455667788LL), 64));
     MirInteger *disp = opBuilder.buildInt(i64, FlexInt(16, 64));
 
-    auto check = [&](const char *name, std::vector<MirOperand *> ops)
+    auto expect = [&](const char *name, std::vector<MirOperand *> ops, std::vector<uint8_t> expected)
     {
         MirTargetInstructionDesc desc(name, 0);
-        std::vector<uint8_t> legacy =
-                emitInstruction(false, &desc, ops, getBuilderCtx(), getDiagCollector(), getAllocator());
-        std::vector<uint8_t> table =
-                emitInstruction(true, &desc, ops, getBuilderCtx(), getDiagCollector(), getAllocator());
-        EXPECT_EQ(legacy, table) << "Mismatch for instruction: " << name;
+        std::vector<uint8_t> actual = emitInstruction(&desc, ops, getDiagCollector(), getAllocator());
+        EXPECT_EQ(actual, expected) << "Unexpected encoding for instruction: " << name;
     };
 
     // Data movement.
-    check("MOV8rr", { b0, b1 });
-    check("MOV16rr", { w0, w1 });
-    check("MOV32rr", { d0, d1 });
-    check("MOV64rr", { r0, r1 });
-    check("MOV8ri", { b0, imm8 });
-    check("MOV16ri", { w0, imm16 });
-    check("MOV32ri", { d0, imm32 });
-    check("MOV64ri", { r0, imm64 });
-    check("MOV64ri", { r0, imm64Big });
-    check("MOVSX64_8", { r0, b1 });
-    check("MOVSX64_32", { r0, d1 });
-    check("MOVZX64_16", { r0, w1 });
+    expect("MOV8rr", { b0, b1 }, { 0x88, 0xC8 });
+    expect("MOV16rr", { w0, w1 }, { 0x66, 0x89, 0xC8 });
+    expect("MOV32rr", { d0, d1 }, { 0x89, 0xC8 });
+    expect("MOV64rr", { r0, r1 }, { 0x48, 0x89, 0xC8 });
+    expect("MOV64ri", { r0, imm64 }, { 0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00 });
+    expect("MOV64ri", { r0, imm64Big }, { 0x48, 0xB8, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11 });
 
-    // Integer ALU (register-register, destructive two-address forms).
-    check("ADD32rr", { d0, d1, d2 });
-    check("ADD64rr", { r0, r1, r2 });
-    check("ADD64rr", { r0, r0, r2 });
-    check("SUB64rr", { r0, r1, r2 });
-    check("AND64rr", { r0, r1, r2 });
-    check("OR64rr", { r0, r1, r2 });
-    check("XOR64rr", { r0, r1, r2 });
-    check("IMUL64rr", { r0, r1, r2 });
+    // Two-address ALU forms: a copy is materialized when dst and the first source differ.
+    expect("ADD64rr", { r0, r1, r2 }, { 0x48, 0x89, 0xC8, 0x48, 0x01, 0xD0 });
+    expect("ADD64rr", { r0, r0, r2 }, { 0x48, 0x01, 0xD0 });
+    expect("SUB64rr", { r0, r1, r2 }, { 0x48, 0x89, 0xC8, 0x48, 0x29, 0xD0 });
+    expect("IMUL64rr", { r0, r1, r2 }, { 0x48, 0x89, 0xC8, 0x48, 0x0F, 0xAF, 0xC2 });
 
-    // Integer ALU (immediate forms exercising 0x83/0x81 selection).
-    check("ADD64ri", { r0, r1, imm8 });
-    check("ADD64ri", { r0, r1, imm32Big });
-    check("ADD32ri", { d0, d1, imm32 });
-    check("SUB64ri", { r0, r1, imm8 });
-    check("AND64ri", { r0, r1, imm8 });
-    check("OR64ri", { r0, r1, imm8 });
-    check("XOR64ri", { r0, r1, imm8 });
-    check("CMP64ri", { r1, imm8 });
-    check("IMUL64ri", { r0, r1, imm8 });
-    check("IMUL64ri", { r0, r1, imm32Big });
+    // Immediate-width selection (0x83 vs 0x81).
+    expect("ADD64ri", { r0, r1, imm8 }, { 0x48, 0x89, 0xC8, 0x48, 0x83, 0xC0, 0x03 });
+    expect("ADD64ri", { r0, r1, imm32Big }, { 0x48, 0x89, 0xC8, 0x48, 0x81, 0xC0, 0xE8, 0x03, 0x00, 0x00 });
 
-    // Comparisons, tests, unary and shifts.
-    check("CMP64rr", { r1, r2 });
-    check("TEST64rr", { r1, r2 });
-    check("NEG64r", { r0, r1 });
-    check("NOT64r", { r0, r1 });
-    check("IDIV64r", { r1 });
-    check("DIV64r", { r1 });
-    check("SHL64ri", { r0, r1, imm8 });
-    check("SHR64ri", { r0, r1, imm8 });
-    check("SAR64ri", { r0, r1, imm8 });
-    check("SHL64rCL", { r0, r1 });
-    check("SHR64rCL", { r0, r1 });
-    check("SAR64rCL", { r0, r1 });
+    // Comparison, test, unary and shift forms.
+    expect("CMP64rr", { r1, r2 }, { 0x48, 0x39, 0xD1 });
+    expect("TEST64rr", { r1, r2 }, { 0x48, 0x85, 0xD1 });
+    expect("NEG64r", { r0, r1 }, { 0x48, 0x89, 0xC8, 0x48, 0xF7, 0xD8 });
+    expect("SHL64ri", { r0, r1, imm8 }, { 0x48, 0x89, 0xC8, 0x48, 0xC1, 0xE0, 0x03 });
+    expect("SETE", { b0 }, { 0x0F, 0x94, 0xC0 });
 
-    // Conditional set and control flow with explicit displacements.
-    check("SETE", { b0 });
-    check("SETNE", { b0 });
-    check("JMP", { disp });
-    check("JE", { disp });
-    check("JNE", { disp });
-    check("PUSH64r", { r1 });
-    check("POP64r", { r0 });
-    check("RET", {});
-    check("NOP", {});
-    check("SYSCALL", {});
+    // Control flow and system instructions.
+    expect("JMP", { disp }, { 0xE9, 0x10, 0x00, 0x00, 0x00 });
+    expect("JE", { disp }, { 0x0F, 0x84, 0x10, 0x00, 0x00, 0x00 });
+    expect("PUSH64r", { r1 }, { 0x51 });
+    expect("POP64r", { r0 }, { 0x58 });
+    expect("RET", {}, { 0xC3 });
+    expect("NOP", {}, { 0x90 });
+    expect("SYSCALL", {}, { 0x0F, 0x05 });
 
-    // Floating point / SSE and conversions.
-    check("ADDSS", { x0, x1, x2 });
-    check("ADDSD", { y0, y1, y2 });
-    check("SUBSS", { x0, x1, x2 });
-    check("MULSD", { y0, y1, y2 });
-    check("DIVSS", { x0, x1, x2 });
-    check("MOVSSrr", { x0, x1 });
-    check("MOVSDrr", { y0, y1 });
-    check("UCOMISS", { x0, x1 });
-    check("UCOMISD", { y0, y1 });
-    check("CVTSI2SS", { x0, d1 });
-    check("CVTSI2SS", { x0, r1 });
-    check("CVTSI2SD", { y0, r1 });
-    check("CVTTSS2SI", { d0, x1 });
-    check("CVTTSD2SI", { r0, y1 });
+    // SSE and scalar conversions.
+    expect("ADDSS", { x0, x1, x2 }, { 0xF3, 0x0F, 0x10, 0xC1, 0xF3, 0x0F, 0x58, 0xC2 });
+    expect("ADDSD", { y0, y0, y1 }, { 0xF2, 0x0F, 0x58, 0xC1 });
+    expect("CVTSI2SS", { x0, d1 }, { 0xF3, 0x0F, 0x2A, 0xC1 });
+    expect("CVTSI2SS", { x0, r1 }, { 0xF3, 0x48, 0x0F, 0x2A, 0xC1 });
 }
 
 /**

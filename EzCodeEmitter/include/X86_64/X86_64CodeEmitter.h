@@ -3,7 +3,6 @@
 
 #include "EzCodeEmitterCommon.h"
 #include "GenericCodeEmitter.h"
-#include "X86_64/X86_64Encoding.h"
 #include "TableGen/EncodingDesc.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Operand/MirOperands.h"
@@ -12,11 +11,6 @@
 
 namespace EzCodeEmitter::X86_64
 {
-
-/**
- * Physical register mapping function translating MirRegisterRef / physical ID into X86_64::Reg.
- */
-using RegMapper = std::function<Reg(size_t physId)>;
 
 /**
  * Resolves the declarative EncodingDesc for a target instruction descriptor.
@@ -28,48 +22,77 @@ using EncodingResolver = std::function<const TableGen::EncodingDesc *(MirTargetI
 
 /**
  * Concrete x86-64 Machine Code Emitter implementing GenericCodeEmitter.
- * Encodes target-lowered machine instructions directly into binary sections
- * using exact Intel 64 machine instruction encoding tables.
+ * Encodes target-lowered machine instructions into binary sections by interpreting the
+ * declarative TableGen::EncodingDesc supplied for each instruction descriptor.
  */
 class X86_64CodeEmitter : public GenericCodeEmitter
 {
   public:
-    explicit X86_64CodeEmitter(RegMapper regMapper = nullptr);
+    X86_64CodeEmitter() = default;
     ~X86_64CodeEmitter() override = default;
 
+    /**
+     * Starts a function, creating and binding an entry label of the given name in .text.
+     */
     void beginFunction(CodeEmitterContext *ctx, std::string_view name) override;
+
+    /**
+     * Starts a function described by a MIR function, remembering it for stack-frame
+     * resolution and deriving the entry label name from it.
+     */
     void beginFunction(CodeEmitterContext *ctx, MirFunction *func);
+
+    /**
+     * Materializes and binds the label identified by labelId at the current position.
+     */
     void bindLabel(MirId labelId) override;
+
+    /**
+     * Ends the current function, flushing its labels and relocations to the context.
+     */
     void endFunction(CodeEmitterContext *ctx) override;
+
+    /**
+     * Ends the current function and associates the flushed state with func.
+     */
     void endFunction(CodeEmitterContext *ctx, MirFunction *func);
+
+    /**
+     * Encodes and emits a single lowered target instruction via the table-driven encoder.
+     */
     void emitInst(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands) override;
 
     /**
-     * Sets a custom physical register ID mapper.
-     */
-    void setRegMapper(RegMapper mapper) { m_regMapper = std::move(mapper); }
-
-    /**
-     * Installs the table-driven encoding resolver. When unset (or when it returns a
-     * descriptor without an encoding), emission falls back to the built-in encoder.
+     * Installs the table-driven encoding resolver. Emission is skipped when no resolver
+     * is installed or when it cannot resolve the instruction's encoding.
      */
     void setEncodingResolver(EncodingResolver resolver) { m_encodingResolver = std::move(resolver); }
 
   private:
-    Reg mapRegister(MirRegister *reg) const;
-    MemoryOperand mapMemory(MirMemory *mem) const;
-    MemoryOperand mapOperandToMemory(MirOperand *op) const;
+    /**
+     * Maps a physical register operand to its hardware encoding. The returned value is in
+     * the x86-64 0..31 convention, where values >= 16 identify an FPR/XMM register.
+     */
+    uint8_t mapRegister(MirRegister *reg) const;
 
+    /**
+     * Resolves and emits an instruction via the table-driven encoder. Returns false when
+     * no encoding is available, allowing the caller to bail out.
+     */
     bool tryEmitTableDriven(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands);
+
+    /**
+     * Converts EzMir operands into the target-neutral representation consumed by the
+     * table-driven encoder, resolving stack slots and global references to memory.
+     */
     bool buildResolvedOperands(const TableGen::EncodingDesc &enc,
                                std::span<MirOperand *> operands,
                                std::vector<TableGen::ResolvedOperand> &resolved) const;
 
   private:
-    CodeEmitterContext *m_ctx{ nullptr };
-    MirFunction *m_currentFunc{ nullptr };
-    RegMapper m_regMapper;
-    EncodingResolver m_encodingResolver;
+    CodeEmitterContext *m_ctx{ nullptr };  ///< Active emission context (labels/relocations/sections).
+    MirFunction *m_currentFunc{ nullptr }; ///< Function currently being emitted, if any.
+    EncodingResolver m_encodingResolver;   ///< Resolves instruction descriptors to encoding descriptors.
 };
 
 } // namespace EzCodeEmitter::X86_64

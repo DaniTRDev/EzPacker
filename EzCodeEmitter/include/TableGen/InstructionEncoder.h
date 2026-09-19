@@ -59,6 +59,35 @@ class InstructionEncoder
     {
         return static_cast<uint8_t>(0x40u | (w ? 0x08u : 0u) | (r ? 0x04u : 0u) | (x ? 0x02u : 0u) | (b ? 0x01u : 0u));
     }
+
+    /**
+     * Emits a register-to-register move using the target's standard move encoding.
+     *
+     * Used by emitters to materialize the copy implied by a two-address instruction
+     * whose destination and first source differ, without resorting to a bespoke
+     * per-target move helper.
+     */
+    static void encodeRegisterMove(const ResolvedOperand &dst, const ResolvedOperand &src, std::vector<uint8_t> &out);
+
+    /**
+     * Emits a short unconditional branch (2-byte displacement field).
+     */
+    static void emitJmpShort(std::vector<uint8_t> &out, int8_t disp);
+
+    /**
+     * Emits a near unconditional branch (4-byte displacement field).
+     */
+    static void emitJmpNear(std::vector<uint8_t> &out, int32_t disp);
+
+    /**
+     * Emits a short conditional branch (2-byte displacement field).
+     */
+    static void emitJccShort(std::vector<uint8_t> &out, ConditionCode cc, int8_t disp);
+
+    /**
+     * Emits a near conditional branch (4-byte displacement field).
+     */
+    static void emitJccNear(std::vector<uint8_t> &out, ConditionCode cc, int32_t disp);
 };
 
 } // namespace EzCodeEmitter::TableGen
