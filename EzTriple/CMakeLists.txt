@@ -6,6 +6,7 @@ set(EZTRIPLE_FILES_LIST
         "include/FrameLowerer/MirFrameLowererPass.h"
         "include/Descriptors/TargetDesc.h"
         "include/Descriptors/TargetBinaryDesc.h"
+        "include/Descriptors/TargetRelocationResolver.h"
         "include/InstructionSelector/MirAddressingModeMatcher.h"
         "include/InstructionSelector/MirInstructionSelector.h"
         "include/InstructionSelector/MirInstructionSelectorPass.h"
@@ -27,6 +28,7 @@ set(EZTRIPLE_FILES_LIST
         "include/Targets/X86_64/X86_64InstructionSelector.h"
         "include/Targets/X86_64/X86_64ElfBinaryDesc.h"
         "include/Targets/X86_64/X86_64CoffBinaryDesc.h"
+        "include/Targets/X86_64/X86_64RelocationResolver.h"
 
         "src/AbiLowerer/MirAbiLowerer.cpp"
         "src/AbiLowerer/MirAbiLowererPass.cpp"
@@ -54,6 +56,7 @@ set(EZTRIPLE_FILES_LIST
         "src/Targets/X86_64/X86_64TargetDesc.cpp"
         "src/Targets/X86_64/X86_64ElfBinaryDesc.cpp"
         "src/Targets/X86_64/X86_64CoffBinaryDesc.cpp"
+        "src/Targets/X86_64/X86_64RelocationResolver.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzTriple"

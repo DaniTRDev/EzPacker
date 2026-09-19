@@ -7,6 +7,7 @@
 #include "Ast/TypeDefLangAst.h"
 #include "Ast/CallingConvDefLangAst.h"
 #include "Ast/RegisterDefLangAst.h"
+#include "Ast/TargetDescDefLangAst.h"
 
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
@@ -782,6 +783,85 @@ void InfoDumper::dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &f
         for (const auto &special : file.m_specialRegs)
         {
             os << std::format("  Special: {} = {}\n", special.m_name.m_node, special.m_id.m_node);
+        }
+        os << "======================================================================\n";
+    }
+}
+
+void InfoDumper::dumpTargetDescAst(const DSL::Ast::TargetDesc::TargetDescFile &file,
+                                   OutputFormat format,
+                                   std::ostream &os)
+{
+    if (format == OutputFormat::Json)
+    {
+        os << "{\n";
+        os << std::format("  \"target\": \"{}\",\n", escapeJson(file.m_name.m_node));
+        os << std::format("  \"pointer_size\": {},\n", file.m_pointerSize ? file.m_pointerSize->m_node : 0);
+        os << std::format("  \"stack_slot\": {},\n", file.m_stackSlot ? file.m_stackSlot->m_node : 0);
+        os << std::format("  \"instruction_pointer\": \"{}\",\n",
+                          file.mInstructionPointer ? escapeJson(file.mInstructionPointer->m_node) : "");
+        os << std::format("  \"default_calling_conv\": \"{}\",\n",
+                          file.mDefaultCallingConv ? escapeJson(file.mDefaultCallingConv->m_node) : "");
+        os << "  \"object_formats\": [";
+        for (size_t i = 0; i < file.mObjectFormats.size(); ++i)
+        {
+            os << std::format("\"{}\"", escapeJson(file.mObjectFormats[i].m_node));
+            if (i + 1 < file.mObjectFormats.size())
+                os << ", ";
+        }
+        os << "],\n";
+        os << "  \"components\": [";
+        for (size_t i = 0; i < file.mComponents.size(); ++i)
+        {
+            os << std::format("{{ \"slot\": \"{}\", \"type\": \"{}\" }}",
+                              escapeJson(file.mComponents[i].m_slot.m_node),
+                              escapeJson(file.mComponents[i].m_type.m_node));
+            if (i + 1 < file.mComponents.size())
+                os << ", ";
+        }
+        os << "],\n";
+        os << "  \"libcalls\": [";
+        for (size_t i = 0; i < file.mLibcalls.size(); ++i)
+        {
+            os << std::format("{{ \"id\": \"{}\", \"symbol\": \"{}\" }}",
+                              escapeJson(file.mLibcalls[i].m_name.m_node),
+                              escapeJson(file.mLibcalls[i].m_symbol.m_node));
+            if (i + 1 < file.mLibcalls.size())
+                os << ", ";
+        }
+        os << "]\n";
+        os << "}\n";
+    }
+    else
+    {
+        os << "======================================================================\n";
+        os << std::format("TargetDesc AST Dump (target: {})\n", file.m_name.m_node);
+        os << "======================================================================\n";
+        if (file.m_pointerSize)
+            os << std::format("  Pointer Size:       {}\n", file.m_pointerSize->m_node);
+        if (file.m_stackSlot)
+            os << std::format("  Stack Slot:         {}\n", file.m_stackSlot->m_node);
+        if (file.mInstructionPointer)
+            os << std::format("  Instruction Ptr:    {}\n", file.mInstructionPointer->m_node);
+        if (file.mDefaultCallingConv)
+            os << std::format("  Default CallingConv:{}\n", file.mDefaultCallingConv->m_node);
+        os << "  Object Formats:     ";
+        for (size_t i = 0; i < file.mObjectFormats.size(); ++i)
+        {
+            if (i > 0)
+                os << ", ";
+            os << file.mObjectFormats[i].m_node;
+        }
+        os << "\n";
+        os << std::format("  Components:         {}\n", file.mComponents.size());
+        for (const auto &component : file.mComponents)
+        {
+            os << std::format("    - {}: {}\n", component.m_slot.m_node, component.m_type.m_node);
+        }
+        os << std::format("  Libcalls:           {}\n", file.mLibcalls.size());
+        for (const auto &libcall : file.mLibcalls)
+        {
+            os << std::format("    - {}: {}\n", libcall.m_name.m_node, libcall.m_symbol.m_node);
         }
         os << "======================================================================\n";
     }

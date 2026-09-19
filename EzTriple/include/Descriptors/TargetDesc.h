@@ -4,6 +4,9 @@
 #include "EzTripleCommon.h"
 #include "Operand/MirRegisterReference.h"
 
+class GenericCodeEmitter;
+class TargetRelocationResolver;
+
 /**
  * Interface used to store target-dependent information (CPU-level).
  *
@@ -96,6 +99,28 @@ class TargetDesc
      * Returns a list with the available register banks for this target.
      */
     virtual std::pmr::vector<class MirRegisterBank *> getAvailableRegisterBanks() = 0;
+
+    /**
+     * Creates and registers a new register bank owned by this target.
+     *
+     * The default implementation returns nullptr so existing targets remain valid; generated
+     * target descriptors implement it so declarative bank setup does not need to reach into
+     * target internals. The returned bank is exposed through getAvailableRegisterBanks().
+     */
+    virtual class MirRegisterBank *createRegisterBank(const char * /*name*/) { return nullptr; }
+
+    /**
+     * Creates the target's machine code emitter.
+     *
+     * The caller takes ownership. Returns nullptr when the target does not provide an emitter.
+     */
+    virtual GenericCodeEmitter *createCodeEmitter() { return nullptr; }
+
+    /**
+     * Returns the target's relocation resolver, or nullptr if the target does not support
+     * in-place relocation patching.
+     */
+    virtual TargetRelocationResolver *getRelocationResolver() { return nullptr; }
 };
 
 #endif // EZTRIPLE_TARGET_DESC_H

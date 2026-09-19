@@ -13,6 +13,8 @@
 #include "x86_64TargetInstructionTable.h"
 #include "x86_64LegalizerActionTable.h"
 #include "Targets/X86_64/X86_64InstructionSelector.h"
+#include "Targets/X86_64/X86_64RelocationResolver.h"
+#include "X86_64/X86_64CodeEmitter.h"
 
 namespace EzTriple
 {
@@ -218,6 +220,34 @@ std::pmr::vector<CallingConvDesc *> X86_64TargetDesc::getAvailableCallingConvent
 std::pmr::vector<MirRegisterBank *> X86_64TargetDesc::getAvailableRegisterBanks()
 {
     return m_banks;
+}
+
+MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)
+{
+    if (!m_ctx || !name)
+    {
+        return nullptr;
+    }
+
+    auto *alloc = m_ctx->getGlobalAllocator();
+    std::pmr::polymorphic_allocator<MirRegisterBank> bankAlloc(alloc);
+    auto *bank = bankAlloc.new_object<MirRegisterBank>(name, alloc);
+    m_banks.push_back(bank);
+    return bank;
+}
+
+GenericCodeEmitter *X86_64TargetDesc::createCodeEmitter()
+{
+    return new EzCodeEmitter::X86_64::X86_64CodeEmitter();
+}
+
+TargetRelocationResolver *X86_64TargetDesc::getRelocationResolver()
+{
+    if (!m_relocResolver)
+    {
+        m_relocResolver = std::make_unique<X86_64RelocationResolver>();
+    }
+    return m_relocResolver.get();
 }
 
 } // namespace EzTriple

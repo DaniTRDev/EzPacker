@@ -9,6 +9,7 @@ set(EZDSL_LEXER_FILES_LIST
     "include/Ast/TargetInstDefLangAst.h"
     "include/Ast/InstructionSelectDefLangAst.h"
     "include/Ast/RegisterDefLangAst.h"
+    "include/Ast/TargetDescDefLangAst.h"
     "include/Parser/CommonParsers.h"
     "include/Parser/IrInstructionDefLang.h"
     "include/Parser/LegalizeActionDefLang.h"
@@ -19,6 +20,7 @@ set(EZDSL_LEXER_FILES_LIST
     "include/Parser/InstructionSelectDefLang.h"
     "include/Parser/CallingConvDefLang.h"
     "include/Parser/RegisterDefLang.h"
+    "include/Parser/TargetDescDefLang.h"
 
     "src/Parser/ParseContext.cpp"
 )

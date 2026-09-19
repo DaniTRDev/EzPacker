@@ -53,6 +53,10 @@ class X86_64TargetDesc : public TargetDesc
     std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() override;
     std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() override;
 
+    MirRegisterBank *createRegisterBank(const char *name) override;
+    GenericCodeEmitter *createCodeEmitter() override;
+    TargetRelocationResolver *getRelocationResolver() override;
+
     CallingConvDesc *getSysVCallingConv() const { return m_sysVConv.get(); }
     CallingConvDesc *getWin64CallingConv() const { return m_win64Conv.get(); }
     TargetBinaryDesc *getElfBinaryDesc() const { return m_elfBinary.get(); }
@@ -83,6 +87,8 @@ class X86_64TargetDesc : public TargetDesc
 
     std::unique_ptr<TargetBinaryDesc> m_elfBinary;
     std::unique_ptr<TargetBinaryDesc> m_coffBinary;
+
+    std::unique_ptr<TargetRelocationResolver> m_relocResolver;
 
     std::pmr::vector<MirRegisterBank *> m_banks;
     std::pmr::vector<CallingConvDesc *> m_convs;

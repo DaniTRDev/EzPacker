@@ -9,6 +9,7 @@
 #include "Symbols/InstructionSelectSymbols.h"
 #include "Symbols/CallingConvSymbols.h"
 #include "Symbols/RegisterSymbols.h"
+#include "Symbols/TargetDescSymbols.h"
 
 /**
  * Discriminator enum identifying the syntactic/semantic category of a Symbol.
@@ -47,6 +48,9 @@ enum class SymbolType : uint8_t
     Register,
     SpecialRegister,
 
+    // .tdesc Target Descriptor files.
+    TargetDesc,
+
     // Reusable symbol types.
     SsaVariable,
     ImmediateVariable
@@ -79,7 +83,8 @@ class Symbol
                                     Symbols::RegisterBankSymbol,
                                     Symbols::RegisterClassSymbol,
                                     Symbols::RegisterSymbol,
-                                    Symbols::SpecialRegisterSymbol>;
+                                    Symbols::SpecialRegisterSymbol,
+                                    Symbols::TargetDescSymbol>;
 
     /**
      * Constructs a symbol with source location span, flags, defining scope ID, unique symbol ID, type, and name.

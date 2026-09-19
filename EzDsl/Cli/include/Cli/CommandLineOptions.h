@@ -16,7 +16,8 @@ enum class GeneratorKind
     TargetInstructions, // CppTargetInstructionGenerator
     InstructionSelector, // CppInstructionSelectorGenerator
     CallingConv,  // CppCallingConvGenerator
-    RegisterInfo  // CppRegisterInfoGenerator
+    RegisterInfo, // CppRegisterInfoGenerator
+    TargetDesc    // CppTargetDescGenerator
 };
 
 enum class OutputFormat
@@ -35,7 +36,8 @@ enum class LanguageDialect
     TargetInstDef,     // .idf
     InstructionSelect, // .isf
     CallingConv,       // .ezcc, .ccd
-    RegisterDef        // .reg
+    RegisterDef,       // .reg
+    TargetDesc         // .tdesc
 };
 
 struct CliOptions
@@ -53,6 +55,7 @@ struct CliOptions
     bool emitInstructionSelector{ false }; // --emit-instruction-selector
     bool emitCallingConv{ false };    // --emit-calling-conv
     bool emitRegisterInfo{ false };   // --emit-registers
+    bool emitTargetDesc{ false };     // --emit-target-desc
 
     GeneratorKind generator{ GeneratorKind::Auto };
     LanguageDialect dialect{ LanguageDialect::Auto };

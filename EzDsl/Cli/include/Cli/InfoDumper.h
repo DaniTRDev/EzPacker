@@ -37,6 +37,11 @@ namespace DSL::Ast::RegisterDef
 struct RegisterFile;
 }
 
+namespace DSL::Ast::TargetDesc
+{
+struct TargetDescFile;
+}
+
 class SymbolTable;
 
 namespace Cli
@@ -88,6 +93,10 @@ class InfoDumper
     static void dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &file,
                                    OutputFormat format,
                                    std::ostream &os);
+
+    static void dumpTargetDescAst(const DSL::Ast::TargetDesc::TargetDescFile &file,
+                                  OutputFormat format,
+                                  std::ostream &os);
 
     static void dumpSymbols(const SymbolTable &symbolTable, OutputFormat format, std::ostream &os);
 

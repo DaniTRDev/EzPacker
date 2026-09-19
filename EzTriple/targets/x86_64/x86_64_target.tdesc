@@ -1,0 +1,35 @@
+// x86-64 target manifest. It names the sibling configuration files (registers,
+// instructions, calling conventions), target constants, object formats, libcall table and
+// the hand-written strategy components wired by the generated TargetDesc.
+
+target X86_64 {
+    registers:     "x86_64_registers.reg";
+    instructions:  "x86_64_instructions.idf";
+    calling_convs: ["x86_64_calling_conv.ezcc"];
+
+    pointer_size: 8;
+    stack_slot:   8;
+
+    instruction_pointer: rip;
+    mem_disp_type: i64;
+
+    object_formats: [ELF, COFF];
+    default_calling_conv: SysV_AMD64;
+
+    libcalls {
+        __returnNothing: "__returnNothing";
+        __divdi3:        "__divdi3";
+        __udivdi3:       "__udivdi3";
+        __moddi3:        "__moddi3";
+        __umoddi3:       "__umoddi3";
+        __muldi3:        "__muldi3"
+    }
+
+    components {
+        frame_lowerer:        X86_64FrameLowerer;
+        instruction_selector: X86_64TargetInstructionSelector;
+        addressing_mode:      X86AddressingModeMatcher;
+        register_allocator:   X86_64RegisterAllocator;
+        legalizer_info:       x86_64LegalizerInfo
+    }
+}

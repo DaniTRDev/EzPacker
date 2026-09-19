@@ -65,4 +65,11 @@ EzPacker_AddTest(
         "EzDslLexerTestSuite"
         ""
         "tests/T_RegisterDefLang.cpp"
+)
+
+EzPacker_AddTest(
+        "T_TargetDescDefLang"
+        "EzDslLexerTestSuite"
+        ""
+        "tests/T_TargetDescDefLang.cpp"
 )

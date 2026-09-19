@@ -11,6 +11,7 @@
 #include "CodeGenerators/CppInstructionSelectorGenerator.h"
 #include "CodeGenerators/CppCallingConvGenerator.h"
 #include "CodeGenerators/CppRegisterInfoGenerator.h"
+#include "CodeGenerators/CppTargetDescGenerator.h"
 
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
@@ -21,6 +22,7 @@
 #include "Ast/InstructionSelectDefLangAst.h"
 #include "Ast/CallingConvDefLangAst.h"
 #include "Ast/RegisterDefLangAst.h"
+#include "Ast/TargetDescDefLangAst.h"
 #include "Parser/IrInstructionDefLang.h"
 #include "Parser/LegalizeActionDefLang.h"
 #include "Parser/LegalizeRuleDefLang.h"
@@ -30,6 +32,7 @@
 #include "Parser/InstructionSelectDefLang.h"
 #include "Parser/CallingConvDefLang.h"
 #include "Parser/RegisterDefLang.h"
+#include "Parser/TargetDescDefLang.h"
 
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/IrSymbols.h"
@@ -38,6 +41,7 @@
 #include "Sema/Symbols/InstructionSelectSymbols.h"
 #include "Sema/Symbols/CallingConvSymbols.h"
 #include "Sema/Symbols/RegisterSymbols.h"
+#include "Sema/Symbols/TargetDescSymbols.h"
 #include "SemaPasses/IrInstructionPass.h"
 #include "SemaPasses/LegalizeActionPass.h"
 #include "SemaPasses/LegalizeRulePass.h"
@@ -46,6 +50,7 @@
 #include "SemaPasses/InstructionSelectPass.h"
 #include "SemaPasses/CallingConvPass.h"
 #include "SemaPasses/RegisterPass.h"
+#include "SemaPasses/TargetDescPass.h"
 
 #include "SourceManager/SourceManager.h"
 
@@ -341,6 +346,8 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return LanguageDialect::CallingConv;
     if (ext == ".reg")
         return LanguageDialect::RegisterDef;
+    if (ext == ".tdesc")
+        return LanguageDialect::TargetDesc;
 
     if (m_options.generator == GeneratorKind::TypeTable)
         return LanguageDialect::TypeDef;
@@ -358,6 +365,8 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return LanguageDialect::CallingConv;
     if (m_options.generator == GeneratorKind::RegisterInfo)
         return LanguageDialect::RegisterDef;
+    if (m_options.generator == GeneratorKind::TargetDesc)
+        return LanguageDialect::TargetDesc;
 
     return LanguageDialect::Auto;
 }
@@ -387,6 +396,8 @@ GeneratorKind Driver::resolveGeneratorKind(LanguageDialect dialect) const
             return GeneratorKind::CallingConv;
         case LanguageDialect::RegisterDef:
             return GeneratorKind::RegisterInfo;
+        case LanguageDialect::TargetDesc:
+            return GeneratorKind::TargetDesc;
         default:
             return GeneratorKind::Auto;
     }
@@ -620,6 +631,31 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
             outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
         }
     }
+    else if (genKind == GeneratorKind::TargetDesc)
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        target = sanitizeTargetIdentifier(target);
+        if (target.empty()) target = "Target";
+
+        std::string baseName = std::format("{}TargetDesc", target);
+        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
+
+        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
+        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
+
+        if (emitHeader)
+        {
+            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+        }
+        if (emitSource)
+        {
+            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
+        }
+    }
 
     return outputs;
 }
@@ -702,6 +738,7 @@ DriverResult Driver::run()
     std::optional<DSL::Ast::CallingConvDef::CallingConventionDefFile> ccAst;
     std::optional<DSL::Ast::InstructionSelectDef::InstructionSelectFile> isAst;
     std::optional<DSL::Ast::RegisterDef::RegisterFile> regAst;
+    std::optional<DSL::Ast::TargetDesc::TargetDescFile> tdAst;
 
     // Multi-dialect prelude & dependency ingestion
     if (dialect == LanguageDialect::LegalizeRule || dialect == LanguageDialect::LegalizeAction)
@@ -1043,6 +1080,34 @@ DriverResult Driver::run()
             break;
         }
 
+        case LanguageDialect::TargetDesc:
+        {
+            tdAst = parseCtx.parse<DSL::Parser::TargetDesc::TargetDescFileParser,
+                                   DSL::Ast::TargetDesc::TargetDescFile>();
+            if (!tdAst.has_value() || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Syntax parsing failed for Target Descriptor file.";
+                return result;
+            }
+
+            constructCount = 1;
+
+            if (m_options.dumpAst)
+            {
+                InfoDumper::dumpTargetDescAst(*tdAst, m_options.format, std::cout);
+            }
+
+            TargetDescPass pass;
+            if (!pass.run(&diagCollector, &symbolTable, &tdAst.value()) || errorTracker.hasErrors())
+            {
+                result.success = false;
+                result.errorMessage = "Semantic analysis failed for Target Descriptor file.";
+                return result;
+            }
+            break;
+        }
+
         default:
             break;
     }
@@ -1074,6 +1139,7 @@ DriverResult Driver::run()
             case LanguageDialect::InstructionSelect: gInfo.dialectName = "InstructionSelect (.isf)"; break;
             case LanguageDialect::CallingConv: gInfo.dialectName = "CallingConv (.ezcc, .ccd)"; break;
             case LanguageDialect::RegisterDef: gInfo.dialectName = "RegisterDef (.reg)"; break;
+            case LanguageDialect::TargetDesc: gInfo.dialectName = "TargetDesc (.tdesc)"; break;
             default: gInfo.dialectName = "Unknown"; break;
         }
         gInfo.constructCount = constructCount;
@@ -1088,6 +1154,7 @@ DriverResult Driver::run()
             case GeneratorKind::InstructionSelector: gInfo.generatorName = "CppInstructionSelectorGenerator"; break;
             case GeneratorKind::CallingConv: gInfo.generatorName = "CppCallingConvGenerator"; break;
             case GeneratorKind::RegisterInfo: gInfo.generatorName = "CppRegisterInfoGenerator"; break;
+            case GeneratorKind::TargetDesc: gInfo.generatorName = "CppTargetDescGenerator"; break;
             default: gInfo.generatorName = "None"; break;
         }
 
@@ -1270,6 +1337,24 @@ DriverResult Driver::run()
         {
             result.success = false;
             result.errorMessage = "Code generation failed during RegisterInfo synthesis.";
+            return result;
+        }
+    }
+    else if (genKind == GeneratorKind::TargetDesc)
+    {
+        using namespace CodeGenerators;
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty()) target = "Target";
+
+        CppTargetDescGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        if (!generator.run() || errorTracker.hasErrors())
+        {
+            result.success = false;
+            result.errorMessage = "Code generation failed during TargetDesc synthesis.";
             return result;
         }
     }

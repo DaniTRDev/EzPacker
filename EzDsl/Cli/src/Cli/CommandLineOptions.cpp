@@ -69,6 +69,11 @@ void CommandLineParser::setupArguments()
             .default_value(false)
             .implicit_value(true);
 
+    m_program->add_argument("--emit-target-desc")
+            .help("Synthesize TargetDesc (.h and .cpp) from .tdesc")
+            .default_value(false)
+            .implicit_value(true);
+
     m_program->add_argument("--rules")
             .help("Path to companion .lrd rewrite rules file")
             .metavar("<file>")
@@ -221,6 +226,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     opts.emitInstructionSelector = m_program->get<bool>("--emit-instruction-selector");
     opts.emitCallingConv = m_program->get<bool>("--emit-calling-conv");
     opts.emitRegisterInfo = m_program->get<bool>("--emit-registers");
+    opts.emitTargetDesc = m_program->get<bool>("--emit-target-desc");
 
     bool emitTypeTable = m_program->get<bool>("--emit-type-table");
     bool emitInstructions = m_program->get<bool>("--emit-instructions");
@@ -230,6 +236,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     bool emitInstructionSelector = opts.emitInstructionSelector;
     bool emitCallingConv = opts.emitCallingConv;
     bool emitRegisterInfo = opts.emitRegisterInfo;
+    bool emitTargetDesc = opts.emitTargetDesc;
     std::string explicitGen = m_program->get<std::string>("--generator");
     std::transform(explicitGen.begin(), explicitGen.end(), explicitGen.begin(),
                    [](unsigned char c) { return std::tolower(c); });
@@ -242,7 +249,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
 
     size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) + (emitRules ? 1 : 0)
                      + (emitTargetInstructions ? 1 : 0) + (emitInstructionSelector ? 1 : 0) + (emitCallingConv ? 1 : 0)
-                     + (emitRegisterInfo ? 1 : 0);
+                     + (emitRegisterInfo ? 1 : 0) + (emitTargetDesc ? 1 : 0);
     if (emitCount > 1)
     {
         errorMessage = "Cannot specify multiple generator emission flags simultaneously.";
@@ -281,6 +288,10 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     {
         opts.generator = GeneratorKind::RegisterInfo;
     }
+    else if (emitTargetDesc)
+    {
+        opts.generator = GeneratorKind::TargetDesc;
+    }
     else if (explicitGen == "type-table" || explicitGen == "typetable")
     {
         opts.generator = GeneratorKind::TypeTable;
@@ -312,6 +323,10 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     else if (explicitGen == "registers" || explicitGen == "register" || explicitGen == "register-info" || explicitGen == "reg")
     {
         opts.generator = GeneratorKind::RegisterInfo;
+    }
+    else if (explicitGen == "target-desc" || explicitGen == "target_desc" || explicitGen == "targetdesc" || explicitGen == "tdesc")
+    {
+        opts.generator = GeneratorKind::TargetDesc;
     }
     else
     {

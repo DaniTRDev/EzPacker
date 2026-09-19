@@ -15,6 +15,7 @@ set(EZCOMPILER_LIB_FILES_LIST
         "src/FrontendAdapter.cpp"
         "src/CompilationPipeline.cpp"
         "src/EmissionEngine.cpp"
+        "src/Targets/X86_64TargetRegistration.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzCompilerLib"

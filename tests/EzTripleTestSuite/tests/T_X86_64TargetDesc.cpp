@@ -2,6 +2,8 @@
 #include "Targets/X86_64/X86_64TargetDesc.h"
 #include "Targets/X86_64/X86_64ElfBinaryDesc.h"
 #include "Targets/X86_64/X86_64CoffBinaryDesc.h"
+#include "Descriptors/TargetRelocationResolver.h"
+#include "GenericCodeEmitter.h"
 #include "Operand/MirRegisterBank.h"
 #include "Operand/MirRegisterClass.h"
 #include "Instruction/MirTargetInstructionDesc.h"
@@ -164,4 +166,27 @@ TEST_F(EzTripleTestSuite, TestX86_64BinaryDescriptors)
     EXPECT_NE(coff->getSection(SectionType::Data), nullptr);
     EXPECT_NE(coff->getSection(SectionType::ReadOnly), nullptr);
     EXPECT_NE(coff->getSection(SectionType::NonInitialized), nullptr);
+}
+
+TEST_F(EzTripleTestSuite, TestX86_64EmitterBankFactoryAndResolverSurface)
+{
+    X86_64TargetDesc target(getBuilderCtx());
+    target.initialize();
+
+    // createCodeEmitter returns a fresh target emitter.
+    GenericCodeEmitter *emitter = target.createCodeEmitter();
+    ASSERT_NE(emitter, nullptr);
+    delete emitter;
+
+    // createRegisterBank registers a new bank accessible through the descriptor.
+    const size_t initialBankCount = target.getAvailableRegisterBanks().size();
+    MirRegisterBank *bank = target.createRegisterBank("TMP");
+    ASSERT_NE(bank, nullptr);
+    EXPECT_STREQ(bank->getName(), "TMP");
+    EXPECT_EQ(target.getAvailableRegisterBanks().size(), initialBankCount + 1);
+
+    // The relocation resolver is stable and non-null.
+    TargetRelocationResolver *resolver = target.getRelocationResolver();
+    ASSERT_NE(resolver, nullptr);
+    EXPECT_EQ(target.getRelocationResolver(), resolver);
 }
