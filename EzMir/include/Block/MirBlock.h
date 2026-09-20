@@ -3,6 +3,7 @@
 
 #include "EzMirCommon.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
+#include <utility>
 
 /**
  * Represents a basic block in the Machine Intermediate Representation (MIR) control-flow graph.
@@ -20,9 +21,14 @@ class MirBlock
     friend class MirInstruction;
 
     /**
-     * Constructs a basic block with a unique MIR ID, optional source reference, owning function, and name.
+     * Constructs a basic block with a unique MIR ID, optional source reference, owning function, arena
+     * allocator and name.
      */
-    MirBlock(MirId id, class SourceReference *sourceRef, class MirFunction *owner, const std::pmr::string &name = "");
+    MirBlock(MirId id,
+             class SourceReference *sourceRef,
+             class MirFunction *owner,
+             std::pmr::memory_resource *alloc,
+             const std::pmr::string &name = "");
 
     /**
      * Returns the mutable intrusive instruction list for this basic block.
@@ -99,6 +105,18 @@ class MirBlock
      */
     void setName(const std::pmr::string &name);
 
+    /**
+     * Returns the block's predecessors in ascending MirId order. This is the exact order in which
+     * NonSsaToSsaPass fills PHI incoming operands, so later stages can map operand slots to paths
+     * without rescanning instruction operands.
+     */
+    const std::pmr::vector<MirBlock *> &getPredecessors() const { return m_predecessors; }
+
+    /**
+     * Replaces the cached predecessor list. Owned and populated by CodeFlowAnalysisPass.
+     */
+    void setPredecessors(std::pmr::vector<MirBlock *> predecessors) { m_predecessors = std::move(predecessors); }
+
   private:
     /**
      * Sets the subsequent basic block in the intrusive list.
@@ -150,6 +168,11 @@ class MirBlock
      * Diagnostic/assembly label name of the block.
      */
     std::pmr::string m_name;
+
+    /**
+     * Predecessor blocks in ascending MirId order (analysis metadata; see getPredecessors).
+     */
+    std::pmr::vector<MirBlock *> m_predecessors;
 };
 
 #endif // EZMIR_MIR_BLOCK_H

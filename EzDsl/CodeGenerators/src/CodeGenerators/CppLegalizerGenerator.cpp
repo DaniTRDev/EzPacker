@@ -55,7 +55,7 @@ CppLegalizerGenerator::CppLegalizerGenerator(DiagnosticCollector *collector,
 // Resolves the header/source destinations, emits both artifacts, and reports combined success.
 bool CppLegalizerGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }
@@ -69,10 +69,7 @@ bool CppLegalizerGenerator::run()
     emitHeader(headerEmitter);
     emitSource(sourceEmitter);
 
-    bool headerOk = writeOutput(headerPath, headerEmitter.str());
-    bool sourceOk = writeOutput(sourcePath, sourceEmitter.str());
-
-    return headerOk && sourceOk;
+    return writeHeaderAndSource({ headerPath, sourcePath }, headerEmitter.view(), sourceEmitter.view());
 }
 
 // Emits the LegalizerInfo subclass declaration exposing query() and executeCustom().
@@ -514,18 +511,10 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitLine("{");
     emitter.indent();
 
-    emitter.emitLine("for (size_t op = 0; op < OPCODE_COUNT; ++op)");
-    emitter.emitLine("{");
-    emitter.indent();
-    emitter.emitLine("m_wildcardActions[op] = g_{}_WildcardActions[op];", m_targetName);
-    emitter.emitLine("for (size_t t = 0; t < MAX_COMPACT_TYPES; ++t)");
-    emitter.emitLine("{");
-    emitter.indent();
-    emitter.emitLine("m_primaryMatrix[op][t] = g_{}_PrimaryMatrix[op][t];", m_targetName);
-    emitter.dedent();
-    emitter.emitLine("}");
-    emitter.dedent();
-    emitter.emitLine("}");
+    // Tier 1/3 lookups read the static constexpr tables directly, so the base-class matrix is
+    // neither copied nor used; the heterogeneous matchers are dispatched by query()'s switch and
+    // must not be duplicated into the unused matcher map.
+    emitter.emitLine("// The static tier tables are consulted directly by query(); no base-class copy is made.");
     emitter.emitBlankLine();
 
     if (!libcalls.empty())
@@ -536,12 +525,10 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
         emitter.emitLine("registerLibcallSymbol(libcall);");
         emitter.dedent();
         emitter.emitLine("}");
-        emitter.emitBlankLine();
     }
-
-    for (const auto &op : heterogeneousOpcodes)
+    else
     {
-        emitter.emitLine("m_ruleMatchers[MirInstructionOpCode::{}].push_back(&match_{});", op, op);
+        emitter.emitLine("(void)0;");
     }
 
     emitter.dedent();

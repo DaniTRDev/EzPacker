@@ -13,6 +13,7 @@
 #include "CodeGenerators/CppCallingConvGenerator.h"
 #include "CodeGenerators/CppRegisterInfoGenerator.h"
 #include "CodeGenerators/CppTargetDescGenerator.h"
+#include "CodeGenerators/CodeGenerator.h"
 
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
@@ -347,6 +348,72 @@ std::filesystem::path findInstructionsIrdf()
     return {};
 }
 
+// One file extension mapped to the dialect its contents declare.
+struct ExtensionDialect
+{
+    std::string_view m_extension;  ///< Lower-case extension including the leading dot.
+    LanguageDialect m_dialect;     ///< Dialect selected for that extension.
+};
+
+// Authoritative extension -> dialect list (drives detectDialect).
+constexpr ExtensionDialect kExtensionDialects[] = {
+    { ".tyf", LanguageDialect::TypeDef },       { ".irdf", LanguageDialect::IrInstDef },
+    { ".lad", LanguageDialect::LegalizeAction }, { ".lrd", LanguageDialect::LegalizeRule },
+    { ".idf", LanguageDialect::TargetInstDef },  { ".isf", LanguageDialect::InstructionSelect },
+    { ".ezcc", LanguageDialect::CallingConv },   { ".ccd", LanguageDialect::CallingConv },
+    { ".reg", LanguageDialect::RegisterDef },    { ".tdesc", LanguageDialect::TargetDesc },
+};
+
+// Metadata describing one generator: everything the driver needs besides construction itself.
+struct GeneratorMeta
+{
+    GeneratorKind m_kind;              ///< Generator selector.
+    LanguageDialect m_dialect;         ///< Dialect this generator consumes.
+    std::string_view m_displayName;    ///< Class name reported by --dump-info.
+    bool m_targetQualified;            ///< True when output names are prefixed with the target.
+    std::string_view m_pairBaseName;   ///< Header/source base name (formatted with target when qualified).
+    std::string_view m_singleFileName; ///< Header-only file name (formatted with target when qualified).
+    bool m_headerAndSource;            ///< True for a .h/.cpp pair, false for a single header.
+    std::string_view m_fallbackTarget; ///< Target fallback used when none is supplied.
+};
+
+// Single source of truth for generator identity, dialect, display name and output naming.
+constexpr GeneratorMeta kGeneratorTable[] = {
+    { GeneratorKind::TypeTable, LanguageDialect::TypeDef, "CppMirTypeTableGenerator", false, "MirTypeTable", "", true,
+      "Target" },
+    { GeneratorKind::Instructions, LanguageDialect::IrInstDef, "CppMirInstructionGenerator", false, "",
+      "MirInstructionSetDefs.h", false, "Target" },
+    { GeneratorKind::Legalizer, LanguageDialect::LegalizeAction, "CppLegalizerGenerator", true,
+      "{}LegalizerActionTable", "", true, "Target" },
+    { GeneratorKind::Rules, LanguageDialect::LegalizeRule, "CppLegalizeRuleGenerator", true, "{}LegalizerRules", "",
+      true, "Target" },
+    { GeneratorKind::TargetInstructions, LanguageDialect::TargetInstDef, "CppTargetInstructionGenerator", true,
+      "{}TargetInstructionTable", "", true, "Target" },
+    { GeneratorKind::TargetEncodings, LanguageDialect::TargetInstDef, "CppEncodingTableGenerator", true, "",
+      "{}EncodingTable.h", false, "Target" },
+    { GeneratorKind::InstructionSelector, LanguageDialect::InstructionSelect, "CppInstructionSelectorGenerator", true,
+      "{}InstructionSelector", "", true, "Target" },
+    { GeneratorKind::CallingConv, LanguageDialect::CallingConv, "CppCallingConvGenerator", true,
+      "{}CallingConvDesc", "", true, "CallingConv" },
+    { GeneratorKind::RegisterInfo, LanguageDialect::RegisterDef, "CppRegisterInfoGenerator", true, "",
+      "{}RegisterInfo.h", false, "Target" },
+    { GeneratorKind::TargetDesc, LanguageDialect::TargetDesc, "CppTargetDescGenerator", true, "{}TargetDesc", "", true,
+      "Target" },
+};
+
+// Looks up the metadata for genKind; returns nullptr for Auto/unknown kinds.
+const GeneratorMeta *findGeneratorMeta(GeneratorKind genKind)
+{
+    for (const auto &meta : kGeneratorTable)
+    {
+        if (meta.m_kind == genKind)
+        {
+            return &meta;
+        }
+    }
+    return nullptr;
+}
+
 } // namespace
 
 // Stores the resolved CLI options; concrete work happens in run().
@@ -360,45 +427,20 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return m_options.dialect;
     }
 
-    std::string ext = NormalizeKey(filePath.extension().string());
+    const std::string ext = NormalizeKey(filePath.extension().string());
+    for (const auto &entry : kExtensionDialects)
+    {
+        if (entry.m_extension == ext)
+        {
+            return entry.m_dialect;
+        }
+    }
 
-    if (ext == ".tyf")
-        return LanguageDialect::TypeDef;
-    if (ext == ".irdf")
-        return LanguageDialect::IrInstDef;
-    if (ext == ".lad")
-        return LanguageDialect::LegalizeAction;
-    if (ext == ".lrd")
-        return LanguageDialect::LegalizeRule;
-    if (ext == ".idf")
-        return LanguageDialect::TargetInstDef;
-    if (ext == ".isf")
-        return LanguageDialect::InstructionSelect;
-    if (ext == ".ezcc" || ext == ".ccd")
-        return LanguageDialect::CallingConv;
-    if (ext == ".reg")
-        return LanguageDialect::RegisterDef;
-    if (ext == ".tdesc")
-        return LanguageDialect::TargetDesc;
-
-    if (m_options.generator == GeneratorKind::TypeTable)
-        return LanguageDialect::TypeDef;
-    if (m_options.generator == GeneratorKind::Instructions)
-        return LanguageDialect::IrInstDef;
-    if (m_options.generator == GeneratorKind::Legalizer)
-        return LanguageDialect::LegalizeAction;
-    if (m_options.generator == GeneratorKind::Rules)
-        return LanguageDialect::LegalizeRule;
-    if (m_options.generator == GeneratorKind::TargetInstructions)
-        return LanguageDialect::TargetInstDef;
-    if (m_options.generator == GeneratorKind::InstructionSelector)
-        return LanguageDialect::InstructionSelect;
-    if (m_options.generator == GeneratorKind::CallingConv)
-        return LanguageDialect::CallingConv;
-    if (m_options.generator == GeneratorKind::RegisterInfo)
-        return LanguageDialect::RegisterDef;
-    if (m_options.generator == GeneratorKind::TargetDesc)
-        return LanguageDialect::TargetDesc;
+    // No known extension: fall back to the dialect of an explicitly requested generator.
+    if (const GeneratorMeta *meta = findGeneratorMeta(m_options.generator))
+    {
+        return meta->m_dialect;
+    }
 
     return LanguageDialect::Auto;
 }
@@ -411,29 +453,30 @@ GeneratorKind Driver::resolveGeneratorKind(LanguageDialect dialect) const
         return m_options.generator;
     }
 
-    switch (dialect)
+    for (const auto &meta : kGeneratorTable)
     {
-        case LanguageDialect::TypeDef:
-            return GeneratorKind::TypeTable;
-        case LanguageDialect::IrInstDef:
-            return GeneratorKind::Instructions;
-        case LanguageDialect::LegalizeAction:
-            return GeneratorKind::Legalizer;
-        case LanguageDialect::LegalizeRule:
-            return GeneratorKind::Rules;
-        case LanguageDialect::TargetInstDef:
-            return GeneratorKind::TargetInstructions;
-        case LanguageDialect::InstructionSelect:
-            return GeneratorKind::InstructionSelector;
-        case LanguageDialect::CallingConv:
-            return GeneratorKind::CallingConv;
-        case LanguageDialect::RegisterDef:
-            return GeneratorKind::RegisterInfo;
-        case LanguageDialect::TargetDesc:
-            return GeneratorKind::TargetDesc;
-        default:
-            return GeneratorKind::Auto;
+        if (meta.m_dialect == dialect)
+        {
+            return meta.m_kind;
+        }
     }
+
+    return GeneratorKind::Auto;
+}
+
+// Resolves the target identifier (explicit, then input stem, then fallback) sanitized for C++.
+std::string Driver::resolveTargetName(std::string_view fallback) const
+{
+    std::string target = m_options.targetName;
+    if (target.empty() && !m_options.inputFilePath.empty())
+    {
+        target = std::filesystem::path(m_options.inputFilePath).stem().string();
+    }
+    if (target.empty())
+    {
+        target = std::string(fallback);
+    }
+    return SanitizeCppIdentifier(target, fallback);
 }
 
 // Predicts the artifacts a generator will write so the driver can report and dry-run them.
@@ -442,245 +485,84 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
 {
     std::vector<OutputFileInfo> outputs;
 
-    // Applies the same header/source naming rules as the generators for reporting purposes.
-    auto resolveHeaderAndSource =
-            [](std::filesystem::path outPath,
-               std::string_view defaultBaseName) -> std::pair<std::filesystem::path, std::filesystem::path>
+    const GeneratorMeta *meta = findGeneratorMeta(genKind);
+    if (!meta)
     {
-        if (outPath.empty())
-            outPath = ".";
+        return outputs;
+    }
 
-        std::string ext = NormalizeKey(outPath.extension().string());
+    const bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
+    const bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
 
-        if (ext == ".h" || ext == ".hpp")
-        {
-            auto sourcePath = outPath;
-            sourcePath.replace_extension(".cpp");
-            return { outPath, sourcePath };
-        }
-        if (ext == ".cpp" || ext == ".cxx" || ext == ".cc")
-        {
-            auto headerPath = outPath;
-            headerPath.replace_extension(".h");
-            return { headerPath, outPath };
-        }
-
-        return { outPath / std::format("{}.h", defaultBaseName), outPath / std::format("{}.cpp", defaultBaseName) };
-    };
-
-    // Resolves a header-only artifact, treating the path as a directory when it has no extension.
-    auto resolveSingleFile = [](std::filesystem::path outPath,
-                                std::string_view defaultFileName) -> std::filesystem::path
+    // Appends a header/source pair, formatting the base name with the resolved target when qualified.
+    auto appendPair = [&](std::string_view baseNameFormat)
     {
-        if (outPath.empty())
-            outPath = ".";
-
-        std::string ext = outPath.extension().string();
-        if (ext.empty() || std::filesystem::is_directory(outPath))
+        std::string baseName(baseNameFormat);
+        if (meta->m_targetQualified)
         {
-            return outPath / defaultFileName;
+            const std::string target = resolveTargetName(meta->m_fallbackTarget);
+            baseName = std::vformat(baseNameFormat, std::make_format_args(target));
         }
-        return outPath;
-    };
 
-    // Resolves the target identifier used for output names, sanitized into a valid C++ identifier.
-    auto resolveTarget = [&](std::string_view fallback) -> std::string
-    {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-        {
-            target = std::string(fallback);
-        }
-        return SanitizeCppIdentifier(target, fallback);
-    };
-
-    if (genKind == GeneratorKind::TypeTable)
-    {
-        auto [hPath, sPath] = resolveHeaderAndSource(outDir, "MirTypeTable");
-
-        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
-        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
-
+        auto paths = CodeGenerators::CodeGenerator::ResolveHeaderAndSourcePaths(outDir, baseName);
         if (emitHeader)
         {
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+            outputs.push_back(
+                    { .role = "header", .path = paths.m_headerPath, .exists = std::filesystem::exists(paths.m_headerPath) });
         }
         if (emitSource)
         {
-            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
+            outputs.push_back(
+                    { .role = "source", .path = paths.m_sourcePath, .exists = std::filesystem::exists(paths.m_sourcePath) });
         }
-    }
-    else if (genKind == GeneratorKind::Instructions)
+    };
+
+    // Appends a single header artifact, formatting the file name with the resolved target when qualified.
+    auto appendSingle = [&](std::string_view fileNameFormat)
     {
-        if (!m_options.sourceOnly || m_options.headerOnly)
+        if (!emitHeader)
         {
-            auto hPath = resolveSingleFile(outDir, "MirInstructionSetDefs.h");
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
+            return;
         }
-    }
-    else if (genKind == GeneratorKind::Legalizer)
+
+        std::string fileName(fileNameFormat);
+        if (meta->m_targetQualified)
+        {
+            const std::string target = resolveTargetName(meta->m_fallbackTarget);
+            fileName = std::vformat(fileNameFormat, std::make_format_args(target));
+        }
+
+        const auto filePath = CodeGenerators::CodeGenerator::ResolveSingleFilePath(outDir, fileName);
+        outputs.push_back({ .role = "header", .path = filePath, .exists = std::filesystem::exists(filePath) });
+    };
+
+    if (meta->m_headerAndSource)
     {
-        std::string target = resolveTarget("Target");
-
-        std::string baseName = std::format("{}LegalizerActionTable", target);
-        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
-
-        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
-        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
-
-        if (emitHeader)
-        {
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-        if (emitSource)
-        {
-            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
-        }
+        appendPair(meta->m_pairBaseName);
 
         // A .lad input may be accompanied by a .lrd file, which the legalizer run also emits.
-        bool hasRules = !m_options.rulesFilePath.empty();
-        if (!hasRules && !m_options.inputFilePath.empty())
+        if (meta->m_kind == GeneratorKind::Legalizer)
         {
-            auto adj = std::filesystem::path(m_options.inputFilePath);
-            adj.replace_extension(".lrd");
-            std::error_code ec;
-            if (std::filesystem::exists(adj, ec))
+            bool hasRules = !m_options.rulesFilePath.empty();
+            if (!hasRules && !m_options.inputFilePath.empty())
             {
-                hasRules = true;
+                auto adj = std::filesystem::path(m_options.inputFilePath);
+                adj.replace_extension(".lrd");
+                std::error_code ec;
+                if (std::filesystem::exists(adj, ec))
+                {
+                    hasRules = true;
+                }
             }
-        }
-        if (hasRules)
-        {
-            std::string rulesBaseName = std::format("{}LegalizerRules", target);
-            auto [rhPath, rsPath] = resolveHeaderAndSource(outDir, rulesBaseName);
-            if (emitHeader)
+            if (hasRules)
             {
-                outputs.push_back({ .role = "header", .path = rhPath, .exists = std::filesystem::exists(rhPath) });
-            }
-            if (emitSource)
-            {
-                outputs.push_back({ .role = "source", .path = rsPath, .exists = std::filesystem::exists(rsPath) });
+                appendPair("{}LegalizerRules");
             }
         }
     }
-    else if (genKind == GeneratorKind::Rules)
+    else
     {
-        std::string target = resolveTarget("Target");
-
-        std::string baseName = std::format("{}LegalizerRules", target);
-        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
-
-        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
-        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
-
-        if (emitHeader)
-        {
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-        if (emitSource)
-        {
-            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
-        }
-    }
-    else if (genKind == GeneratorKind::TargetInstructions)
-    {
-        std::string target = resolveTarget("Target");
-
-        std::string baseName = std::format("{}TargetInstructionTable", target);
-        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
-
-        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
-        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
-
-        if (emitHeader)
-        {
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-        if (emitSource)
-        {
-            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
-        }
-    }
-    else if (genKind == GeneratorKind::TargetEncodings)
-    {
-        std::string target = resolveTarget("Target");
-
-        if (!m_options.sourceOnly || m_options.headerOnly)
-        {
-            auto hPath = resolveSingleFile(outDir, std::format("{}EncodingTable.h", target));
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-    }
-    else if (genKind == GeneratorKind::InstructionSelector)
-    {
-        std::string target = resolveTarget("Target");
-
-        std::string baseName = std::format("{}InstructionSelector", target);
-        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
-
-        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
-        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
-
-        if (emitHeader)
-        {
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-        if (emitSource)
-        {
-            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
-        }
-    }
-    else if (genKind == GeneratorKind::CallingConv)
-    {
-        std::string target = resolveTarget("CallingConv");
-
-        std::string baseName = std::format("{}CallingConvDesc", target);
-        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
-
-        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
-        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
-
-        if (emitHeader)
-        {
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-        if (emitSource)
-        {
-            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
-        }
-    }
-    else if (genKind == GeneratorKind::RegisterInfo)
-    {
-        std::string target = resolveTarget("Target");
-
-        if (!m_options.sourceOnly || m_options.headerOnly)
-        {
-            auto hPath = resolveSingleFile(outDir, std::format("{}RegisterInfo.h", target));
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-    }
-    else if (genKind == GeneratorKind::TargetDesc)
-    {
-        std::string target = resolveTarget("Target");
-
-        std::string baseName = std::format("{}TargetDesc", target);
-        auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
-
-        bool emitHeader = !m_options.sourceOnly || m_options.headerOnly;
-        bool emitSource = !m_options.headerOnly || m_options.sourceOnly;
-
-        if (emitHeader)
-        {
-            outputs.push_back({ .role = "header", .path = hPath, .exists = std::filesystem::exists(hPath) });
-        }
-        if (emitSource)
-        {
-            outputs.push_back({ .role = "source", .path = sPath, .exists = std::filesystem::exists(sPath) });
-        }
+        appendSingle(meta->m_singleFileName);
     }
 
     return outputs;
@@ -744,7 +626,8 @@ DriverResult Driver::run()
     {
         result.success = false;
         result.errorMessage = std::format("Could not determine language dialect for file '{}'. "
-                                          "Please use a known extension (.tyf, .irdf, .lad, .lrd) "
+                                          "Please use a known extension (.tyf, .irdf, .lad, .lrd, .idf, .isf, .ezcc, "
+                                          ".ccd, .reg, .tdesc) "
                                           "or specify --generator / --emit-* option.",
                                           inputPath.string());
         return result;
@@ -753,14 +636,14 @@ DriverResult Driver::run()
     GeneratorKind genKind = resolveGeneratorKind(dialect);
     std::vector<OutputFileInfo> expectedOutputs = computeExpectedOutputs(genKind, m_options.outputPath);
 
-    // Track write timestamps of expected output files before generation
-    std::unordered_map<std::string, std::filesystem::file_time_type> preModTimes;
+    // Track write timestamps of expected output files before generation, keyed by path (OPT-07).
+    std::unordered_map<std::filesystem::path, std::filesystem::file_time_type> preModTimes;
     for (const auto &out : expectedOutputs)
     {
         std::error_code ec;
         if (std::filesystem::exists(out.path, ec))
         {
-            preModTimes[out.path.string()] = std::filesystem::last_write_time(out.path, ec);
+            preModTimes[out.path] = std::filesystem::last_write_time(out.path, ec);
         }
     }
 
@@ -1206,41 +1089,13 @@ DriverResult Driver::run()
         }
         gInfo.constructCount = constructCount;
 
-        switch (genKind)
+        if (const GeneratorMeta *meta = findGeneratorMeta(genKind))
         {
-            case GeneratorKind::TypeTable:
-                gInfo.generatorName = "CppMirTypeTableGenerator";
-                break;
-            case GeneratorKind::Instructions:
-                gInfo.generatorName = "CppMirInstructionGenerator";
-                break;
-            case GeneratorKind::Legalizer:
-                gInfo.generatorName = "CppLegalizerGenerator";
-                break;
-            case GeneratorKind::Rules:
-                gInfo.generatorName = "CppLegalizeRuleGenerator";
-                break;
-            case GeneratorKind::TargetInstructions:
-                gInfo.generatorName = "CppTargetInstructionGenerator";
-                break;
-            case GeneratorKind::TargetEncodings:
-                gInfo.generatorName = "CppEncodingTableGenerator";
-                break;
-            case GeneratorKind::InstructionSelector:
-                gInfo.generatorName = "CppInstructionSelectorGenerator";
-                break;
-            case GeneratorKind::CallingConv:
-                gInfo.generatorName = "CppCallingConvGenerator";
-                break;
-            case GeneratorKind::RegisterInfo:
-                gInfo.generatorName = "CppRegisterInfoGenerator";
-                break;
-            case GeneratorKind::TargetDesc:
-                gInfo.generatorName = "CppTargetDescGenerator";
-                break;
-            default:
-                gInfo.generatorName = "None";
-                break;
+            gInfo.generatorName = std::string(meta->m_displayName);
+        }
+        else
+        {
+            gInfo.generatorName = "None";
         }
 
         if (m_options.headerOnly && !m_options.sourceOnly)
@@ -1310,13 +1165,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::Legalizer)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        const std::string target = resolveTargetName("Target");
 
         CppLegalizerGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1340,13 +1189,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::Rules)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        const std::string target = resolveTargetName("Target");
 
         CppLegalizeRuleGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1359,13 +1202,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::TargetInstructions)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        const std::string target = resolveTargetName("Target");
 
         CppTargetInstructionGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1378,13 +1215,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::TargetEncodings)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        const std::string target = resolveTargetName("Target");
 
         CppEncodingTableGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1397,13 +1228,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::InstructionSelector)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        const std::string target = resolveTargetName("Target");
 
         CppInstructionSelectorGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1416,13 +1241,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::CallingConv)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "CallingConv";
+        const std::string target = resolveTargetName("CallingConv");
 
         CppCallingConvGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1435,13 +1254,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::RegisterInfo)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        const std::string target = resolveTargetName("Target");
 
         CppRegisterInfoGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1454,13 +1267,7 @@ DriverResult Driver::run()
     else if (genKind == GeneratorKind::TargetDesc)
     {
         using namespace CodeGenerators;
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        const std::string target = resolveTargetName("Target");
 
         CppTargetDescGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
@@ -1489,7 +1296,7 @@ DriverResult Driver::run()
         if (std::filesystem::exists(out.path, ec))
         {
             auto currentMod = std::filesystem::last_write_time(out.path, ec);
-            auto it = preModTimes.find(out.path.string());
+            auto it = preModTimes.find(out.path);
             if (it == preModTimes.end() || it->second != currentMod)
             {
                 result.generatedFiles.push_back(out);

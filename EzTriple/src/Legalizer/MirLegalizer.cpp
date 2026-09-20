@@ -63,6 +63,11 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
     const size_t maxSteps = worklist.size() * 32 + 256;
     size_t stepsTaken = 0;
 
+    // Reuse one stack query for the whole block; fillQuery clears only the slots that became
+    // unused, avoiding a full zero-fill of all operand arrays on every worklist item.
+    LegalityQuery query;
+    size_t prevOperandCount = 0;
+
     while (!worklist.empty())
     {
         if (++stepsTaken > maxSteps)
@@ -80,8 +85,8 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
         if (!inst || inst->isErased())
             continue;
 
-        // 3. Formulate Legality Query
-        LegalityQuery query = buildQuery(inst);
+        // 3. Formulate Legality Query (into the reused stack query)
+        fillQuery(inst, query, prevOperandCount);
 
         // 4. Query target legality
         LegalityResponse response;
@@ -125,22 +130,55 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
 }
 
 /**
- * Fills a LegalityQuery from an instruction's opcode, flags, operand types, compact ids and
- * operand kinds (register/immediate/memory/...), recording the first immediate encountered.
+ * Builds a freshly zero-initialized LegalityQuery for an instruction. Kept for callers that want
+ * an owned query; the legalization loop uses fillQuery to reuse a single stack query instead.
  */
 LegalityQuery MirLegalizer::buildQuery(MirInstruction *inst)
 {
     LegalityQuery q;
+    size_t prevOperandCount = 0;
+    fillQuery(inst, q, prevOperandCount);
+    return q;
+}
+
+/**
+ * Fills a caller-owned LegalityQuery from an instruction's opcode, flags, operand types, compact
+ * ids and operand kinds (register/immediate/memory/...), recording the first immediate
+ * encountered. Slots that were populated by the previous fill and are no longer needed are
+ * cleared, so a reused query never exposes stale values to the query implementations.
+ */
+void MirLegalizer::fillQuery(MirInstruction *inst, LegalityQuery &q, size_t &prevOperandCount)
+{
     if (!inst)
-        return q;
+    {
+        return;
+    }
+
+    const size_t limit = std::min(inst->getOperandCount(), q.m_types.size());
+
+    // Clear the tail that shrank relative to the previous fill; slots beyond it were already zero.
+    for (size_t i = limit; i < prevOperandCount; ++i)
+    {
+        q.m_types[i] = nullptr;
+        q.m_compactIds[i] = 0;
+        q.m_operandKinds[i] = ExpectedOperandType::None;
+    }
+    prevOperandCount = limit;
 
     q.m_opcode = inst->getOpCode();
     q.m_flags = static_cast<uint32_t>(inst->getFlags());
     q.m_operandCount = inst->getOperandCount();
+    q.m_immValue = 0;
+    q.m_hasImm = false;
 
-    size_t limit = std::min(inst->getOperandCount(), q.m_types.size());
     for (size_t i = 0; i < limit; ++i)
     {
+        // Reset each populated slot before writing it, in case the previous fill used a null
+        // operand at this position.
+        q.m_types[i] = nullptr;
+        q.m_compactIds[i] = 0;
+        q.m_operandKinds[i] = ExpectedOperandType::None;
+
         MirOperand *op = inst->getOperand(i);
         if (op)
         {
@@ -188,7 +226,6 @@ LegalityQuery MirLegalizer::buildQuery(MirInstruction *inst)
             }
         }
     }
-    return q;
 }
 
 /**

@@ -8,6 +8,11 @@
 /**
  * Orchestrator managing pass dependency resolution, dynamic topological pipeline construction,
  * on-demand analysis caching and invalidation, and iterative execution over MIR data structures.
+ *
+ * Error contract (pass-manager layer): a violation of an internal invariant (a requested pass was
+ * never registered, or the dependency graph contains a cycle) throws std::runtime_error. Ordinary
+ * pass execution failures are not exceptions: they are reported through the returned
+ * MirPassResult::m_succeeded flag and the DiagnosticCollector.
  */
 class MirPassManager
 {

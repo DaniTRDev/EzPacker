@@ -2,6 +2,8 @@
 #define EZMIR_MIR_INSTRUCTION_METADATA_H
 
 #include "EzMirCommon.h"
+#include <array>
+#include <string_view>
 
 /**
  * Bitmask enumeration defining expected operand types for MIR instructions and verification.
@@ -94,6 +96,38 @@ struct MirOperandMetadata
      * Dataflow direction (Read, Write, ReadWrite) for this argument position.
      */
     MirOperandFlag flags;
+};
+
+/**
+ * Maximum number of declared operand slots a single instruction metadata record can hold. Variadic
+ * operand slots expand at runtime and never add metadata entries.
+ */
+inline constexpr size_t MirMaxOperandSlots = 8;
+
+/**
+ * Fixed-capacity operand-slot list used by the generated instruction metadata table. It is a literal
+ * type, so the whole table is constant-initialized and static initialization never allocates.
+ * The variadic slot position, when present, is simply the index of the entry whose type includes
+ * ExpectedOperandType::VariadicArgs.
+ */
+struct MirOperandMetadataList
+{
+    std::array<MirOperandMetadata, MirMaxOperandSlots> m_slots{};
+    uint8_t m_count{ 0 };
+
+    constexpr MirOperandMetadataList() = default;
+
+    constexpr MirOperandMetadataList(std::initializer_list<MirOperandMetadata> slots) :
+        m_count(static_cast<uint8_t>(slots.size()))
+    {
+        size_t i = 0;
+        for (const MirOperandMetadata &slot : slots)
+        {
+            // at() fails constant evaluation (and throws at runtime) if a declaration ever exceeds
+            // the fixed capacity instead of silently truncating its operand signature.
+            m_slots.at(i++) = slot;
+        }
+    }
 };
 
 /**
@@ -199,20 +233,21 @@ struct MirInstructionMetadata
     std::string_view m_name;
 
     /**
-     * Formal operand signature specifying expected types and access directions.
+     * Formal operand signature specifying expected types and access directions. Fixed-capacity
+     * storage keeps the generated table constant-initialized with no per-opcode heap allocation.
      */
-    std::vector<MirOperandMetadata> m_operandMeta;
+    MirOperandMetadataList m_operandMeta;
 
     /**
      * Constructs a static metadata descriptor for an instruction opcode.
      */
-    MirInstructionMetadata(MirInstructionCategory category,
-                           MirInstructionOpCode opcode,
-                           MirInstructionTier tier,
-                           MirInstructionFlags flag,
-                           std::string_view name,
-                           std::initializer_list<MirOperandMetadata> operands) :
-        m_category(category), m_opcode(opcode), m_tier(tier), m_flags(flag), m_name(std::move(name)),
+    constexpr MirInstructionMetadata(MirInstructionCategory category,
+                                     MirInstructionOpCode opcode,
+                                     MirInstructionTier tier,
+                                     MirInstructionFlags flag,
+                                     std::string_view name,
+                                     MirOperandMetadataList operands) :
+        m_category(category), m_opcode(opcode), m_tier(tier), m_flags(flag), m_name(name),
         m_operandMeta(operands)
     {
     }

@@ -33,34 +33,8 @@ const DSL::Ast::TargetDesc::TargetDescDecl *findTargetDesc(const SymbolTable *ta
     return data ? data->m_astNode : nullptr;
 }
 
-// Escapes characters that would otherwise break the generated C++ string literal.
-std::string escapeString(std::string_view value)
-{
-    std::string result;
-    result.reserve(value.size() + 8);
-    for (char c : value)
-    {
-        switch (c)
-        {
-            case '\\':
-                result += "\\\\";
-                break;
-            case '"':
-                result += "\\\"";
-                break;
-            case '\n':
-                result += "\\n";
-                break;
-            case '\t':
-                result += "\\t";
-                break;
-            default:
-                result.push_back(c);
-                break;
-        }
-    }
-    return result;
-}
+// Escapes characters for the generated C++ string literals (delegates to the shared escaper).
+std::string escapeString(std::string_view value) { return EscapeString(value, EscapeMode::CppStringLiteral); }
 
 // Emits an inline constexpr array of escaped strings plus its element-count constant.
 template <typename Node>
@@ -106,9 +80,9 @@ CppTargetDescGenerator::CppTargetDescGenerator(DiagnosticCollector *collector,
 }
 
 // Emits the generated TargetDesc subclass declaration plus its static metadata tables.
-void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
+void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
+                                        const DSL::Ast::TargetDesc::TargetDescDecl *decl) const
 {
-    const auto *decl = findTargetDesc(getSymbolTable());
     const std::string ns = SanitizeCppIdentifier(m_targetName, "Target");
     const std::string className = std::format("{}TargetDesc", ns);
 
@@ -242,9 +216,9 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
 }
 
 // Emits the out-of-line TargetDesc method definitions and component wiring.
-void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter) const
+void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
+                                        const DSL::Ast::TargetDesc::TargetDescDecl *decl) const
 {
-    const auto *decl = findTargetDesc(getSymbolTable());
     const std::string ns = SanitizeCppIdentifier(m_targetName, "Target");
     const std::string className = std::format("{}TargetDesc", ns);
 
@@ -386,13 +360,14 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter) const
 // Requires a .tdesc manifest, then emits and writes the descriptor header/source pair.
 bool CppTargetDescGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }
 
     // Without a target descriptor symbol there is nothing meaningful to generate.
-    if (!findTargetDesc(getSymbolTable()))
+    const auto *decl = findTargetDesc(getSymbolTable());
+    if (!decl)
     {
         error("No target descriptor symbol found in symbol table.");
         return false;
@@ -404,14 +379,10 @@ bool CppTargetDescGenerator::run()
     CppSourceEmitter headerEmitter;
     CppSourceEmitter sourceEmitter;
 
-    emitHeader(headerEmitter);
-    emitSource(sourceEmitter);
+    emitHeader(headerEmitter, decl);
+    emitSource(sourceEmitter, decl);
 
-    if (!writeOutput(headerPath, headerEmitter.view()))
-    {
-        return false;
-    }
-    if (!writeOutput(sourcePath, sourceEmitter.view()))
+    if (!writeHeaderAndSource({ headerPath, sourcePath }, headerEmitter.view(), sourceEmitter.view()))
     {
         return false;
     }

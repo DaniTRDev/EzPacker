@@ -2,6 +2,7 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeActionPass.h"
+#include "SemaPasses/PassDriver.h"
 #include "Sema/Symbol.h"
 #include "SourceManager/GenericSourceManager.h"
 
@@ -103,7 +104,7 @@ bool LegalizeActionPass::run(DiagnosticCollector *collector,
                              SymbolTable *table,
                              DSL::Ast::LegalizeActionDef::LegalizeActionFile *file)
 {
-    if (!collector || !table || !file)
+    if (!Sema::preparePass(collector, table, file, PassName))
     {
         return false;
     }
@@ -481,8 +482,7 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
                     .m_customRules = std::nullopt
                 };
 
-                size_t dummyMax = 0;
-                if (!processClause(collector, table, clause, instIdentifier.m_node, clauseSym, dummyMax))
+                if (!processClause(collector, table, clause, instIdentifier.m_node, clauseSym))
                 {
                     success = false;
                     continue;
@@ -510,8 +510,7 @@ bool LegalizeActionPass::processInstructionDecl(DiagnosticCollector *collector,
                 }
             }
 
-            size_t dummyMax = 0;
-            if (!processClause(collector, table, clause, instIdentifier.m_node, clauseSym, dummyMax))
+            if (!processClause(collector, table, clause, instIdentifier.m_node, clauseSym))
             {
                 success = false;
                 continue;
@@ -538,8 +537,7 @@ bool LegalizeActionPass::processClause(DiagnosticCollector *collector,
                                        SymbolTable *table,
                                        const DSL::Ast::LegalizeActionDef::LegalizeActionClause &clause,
                                        std::string_view instName,
-                                       Symbols::LegalizeActionClauseSymbol &outClause,
-                                       size_t &maxOperandIndex)
+                                       Symbols::LegalizeActionClauseSymbol &outClause)
 {
     bool success = true;
 

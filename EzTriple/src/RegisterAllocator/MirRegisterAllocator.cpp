@@ -13,6 +13,7 @@
 #include "Operand/MirRegisterClass.h"
 #include "Printer/MirPrinter.h"
 #include "RegisterAllocator/MirRegisterAllocator.h"
+#include <bitset>
 
 /**
  * Builds the interference graph from backward liveness: live-out sets seed the nodes, each
@@ -68,13 +69,14 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
                     const auto &callerSaved = cc->getAllCallerSavedRegs();
                     for (const auto &csReg : callerSaved)
                     {
-                        addNode(csReg, ctx);
+                        // addNode returns the stable neighbor set, avoiding a re-hash per edge.
+                        auto &csNeighbors = addNode(csReg, ctx);
                         for (const MirRegisterRef &liveRegRef : live)
                         {
                             if (csReg != liveRegRef)
                             {
-                                ctx->m_iGraph[csReg].insert(liveRegRef);
-                                ctx->m_iGraph[liveRegRef].insert(csReg);
+                                csNeighbors.insert(liveRegRef);
+                                addNode(liveRegRef, ctx).insert(csReg);
                             }
                         }
                     }
@@ -84,15 +86,14 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             // Add nodes and interference edges for DEFs
             for (const MirRegisterRef &defRegRef : defs)
             {
-                addNode(defRegRef, ctx);
-                auto &neighbors = ctx->m_iGraph[defRegRef];
+                auto &neighbors = addNode(defRegRef, ctx);
 
                 for (const MirRegisterRef &liveRegRef : live)
                 {
                     if (defRegRef != liveRegRef)
                     {
                         neighbors.insert(liveRegRef);
-                        ctx->m_iGraph[liveRegRef].insert(defRegRef);
+                        addNode(liveRegRef, ctx).insert(defRegRef);
                     }
                 }
             }
@@ -285,8 +286,16 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
         MirRegisterRef node = ctx->m_selectStack.back();
         ctx->m_selectStack.pop_back();
 
-        // Fresh set for every individual node being colored
-        std::pmr::unordered_set<size_t> usedColorIds(ctx->m_allocator);
+        // Color ids are physical register indices within a class (16 on x86-64), so a per-node
+        // bitmask replaces a heap-backed set and its hashing.
+        std::bitset<64> usedColors;
+        const auto markUsed = [&usedColors](size_t colorId)
+        {
+            if (colorId < usedColors.size())
+                usedColors.set(colorId);
+        };
+        const auto isUsed = [&usedColors](size_t colorId)
+        { return colorId < usedColors.size() && usedColors.test(colorId); };
 
         const auto &availableColors = node.getClass()->getRegs();
 
@@ -296,7 +305,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             MirRegisterRef ref = MirRegisterRef::preg(regDesc);
             if (ctx->m_reservedRegs.contains(ref))
             {
-                usedColorIds.insert(ref.getId());
+                markUsed(ref.getId());
             }
         }
 
@@ -318,7 +327,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             {
                 if (isSameBank(neighbor.getClass(), node.getClass()))
                 {
-                    usedColorIds.insert(neighbor.getId());
+                    markUsed(neighbor.getId());
                 }
             }
             else
@@ -328,7 +337,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
                 {
                     if (isSameBank(it->second.getClass(), node.getClass()))
                     {
-                        usedColorIds.insert(it->second.getId());
+                        markUsed(it->second.getId());
                     }
                 }
             }
@@ -339,7 +348,7 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
         for (auto &[name, regDesc] : availableColors)
         {
             MirRegisterRef ref = MirRegisterRef::preg(regDesc);
-            if (!usedColorIds.contains(ref.getId()))
+            if (!isUsed(ref.getId()))
             {
                 assignedPhysReg = ref;
                 break;
@@ -485,11 +494,15 @@ double MirRegisterAllocator::calculateSpillCost(MirRegisterRef node, RegisterAll
 }
 
 /**
- * Ensures the interference graph has an (initially empty) node for v.
+ * Ensures the interference graph has an (initially empty) node for v and returns its neighbor
+ * set. The set is allocated from the allocator context (not the global arena) so the graph's
+ * nodes and edges share one resource, and try_emplace guarantees a single hash per lookup.
  */
-void MirRegisterAllocator::addNode(const MirRegisterRef &v, RegisterAllocatorCtx *ctx)
+std::pmr::set<MirRegisterRef> &MirRegisterAllocator::addNode(const MirRegisterRef &v, RegisterAllocatorCtx *ctx)
 {
-    ctx->m_iGraph.try_emplace(v, std::pmr::set<MirRegisterRef>(ctx->m_ctx->getGlobalAllocator()));
+    auto [it, inserted] = ctx->m_iGraph.try_emplace(v, std::pmr::set<MirRegisterRef>(ctx->m_allocator));
+    (void)inserted;
+    return it->second;
 }
 
 /**

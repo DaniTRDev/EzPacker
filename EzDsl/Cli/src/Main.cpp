@@ -1,9 +1,10 @@
 #include "Cli/CommandLineOptions.h"
 #include "Cli/Driver.h"
+#include "CliExitCode.h"
 
 #include <iostream>
 
-// Process entry point: parse arguments, run the driver, and map failures to exit codes.
+// Process entry point: parse arguments, run the driver, and map failures to shared exit codes.
 int main(int argc, char *argv[])
 {
     try
@@ -19,10 +20,10 @@ int main(int argc, char *argv[])
             {
                 std::cerr << "Error: " << errorMessage << "\n\n";
                 std::cerr << parser.getHelp() << "\n";
-                return 1;
+                return EzCli::kError;
             }
             // Help or version was requested and displayed
-            return 0;
+            return EzCli::kSuccess;
         }
 
         Cli::Driver driver(std::move(*options));
@@ -34,15 +35,15 @@ int main(int argc, char *argv[])
             {
                 std::cerr << "Error: " << result.errorMessage << "\n";
             }
-            return 1;
+            return EzCli::kError;
         }
 
-        return 0;
+        return EzCli::kSuccess;
     }
     catch (const std::exception &ex)
     {
         // Unexpected failures surface as a fatal error and a distinct exit code.
         std::cerr << "Fatal Exception: " << ex.what() << "\n";
-        return 2;
+        return EzCli::kFatalException;
     }
 }

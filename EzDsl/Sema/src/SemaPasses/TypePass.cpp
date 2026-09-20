@@ -1,20 +1,15 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
+#include "SemaPasses/PassDriver.h"
 #include "SemaPasses/TypePass.h"
 
 bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *table, DSL::Ast::TypeDef::TypeDefFile *file)
 {
-    constexpr auto passName = "TypePass";
+    constexpr auto passName = "Sema::TypePass";
 
-    if (!collector)
+    if (!Sema::preparePass(collector, table, file, passName))
     {
-        return false;
-    }
-
-    if (!table || !file)
-    {
-        collector->error(passName, "Invalid symbol table or AST file pointer.");
         return false;
     }
 

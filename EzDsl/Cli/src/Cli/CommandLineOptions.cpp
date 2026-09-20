@@ -3,6 +3,85 @@
 namespace Cli
 {
 
+namespace
+{
+
+// One --emit-* switch: its flag spelling, optional CliOptions mirror field, and generator it selects.
+struct EmitOption
+{
+    const char *m_flag;           ///< argparse option name.
+    bool CliOptions::*m_mirror;   ///< CliOptions field kept in sync, or nullptr when not mirrored.
+    GeneratorKind m_generator;    ///< Generator selected when the flag is present.
+};
+
+// Emission switches in precedence order; a new generator is added here once.
+constexpr EmitOption kEmitOptions[] = {
+    { "--emit-type-table", nullptr, GeneratorKind::TypeTable },
+    { "--emit-instructions", nullptr, GeneratorKind::Instructions },
+    { "--emit-legalizer", nullptr, GeneratorKind::Legalizer },
+    { "--emit-rules", &CliOptions::emitRules, GeneratorKind::Rules },
+    { "--emit-target-instructions", &CliOptions::emitTargetInstructions, GeneratorKind::TargetInstructions },
+    { "--emit-target-encodings", &CliOptions::emitTargetEncodings, GeneratorKind::TargetEncodings },
+    { "--emit-instruction-selector", &CliOptions::emitInstructionSelector, GeneratorKind::InstructionSelector },
+    { "--emit-calling-conv", &CliOptions::emitCallingConv, GeneratorKind::CallingConv },
+    { "--emit-registers", &CliOptions::emitRegisterInfo, GeneratorKind::RegisterInfo },
+    { "--emit-target-desc", &CliOptions::emitTargetDesc, GeneratorKind::TargetDesc },
+};
+
+// Accepted --generator spellings (case-insensitive) and the generator each selects.
+struct GeneratorAlias
+{
+    std::string_view m_alias;  ///< Lower-case alias spelling.
+    GeneratorKind m_generator; ///< Generator the alias selects.
+};
+
+constexpr GeneratorAlias kGeneratorAliases[] = {
+    { "type-table", GeneratorKind::TypeTable },
+    { "typetable", GeneratorKind::TypeTable },
+    { "instructions", GeneratorKind::Instructions },
+    { "instruction", GeneratorKind::Instructions },
+    { "legalizer", GeneratorKind::Legalizer },
+    { "legalize", GeneratorKind::Legalizer },
+    { "rules", GeneratorKind::Rules },
+    { "rule", GeneratorKind::Rules },
+    { "target-instructions", GeneratorKind::TargetInstructions },
+    { "target_instructions", GeneratorKind::TargetInstructions },
+    { "target-inst", GeneratorKind::TargetInstructions },
+    { "target-encodings", GeneratorKind::TargetEncodings },
+    { "target_encodings", GeneratorKind::TargetEncodings },
+    { "encodings", GeneratorKind::TargetEncodings },
+    { "instruction-selector", GeneratorKind::InstructionSelector },
+    { "instruction_selector", GeneratorKind::InstructionSelector },
+    { "isel", GeneratorKind::InstructionSelector },
+    { "calling-conv", GeneratorKind::CallingConv },
+    { "calling_conv", GeneratorKind::CallingConv },
+    { "callingconv", GeneratorKind::CallingConv },
+    { "cc", GeneratorKind::CallingConv },
+    { "registers", GeneratorKind::RegisterInfo },
+    { "register", GeneratorKind::RegisterInfo },
+    { "register-info", GeneratorKind::RegisterInfo },
+    { "reg", GeneratorKind::RegisterInfo },
+    { "target-desc", GeneratorKind::TargetDesc },
+    { "target_desc", GeneratorKind::TargetDesc },
+    { "targetdesc", GeneratorKind::TargetDesc },
+    { "tdesc", GeneratorKind::TargetDesc },
+};
+
+// Resolves an already lowercased --generator value; Auto when unrecognized.
+GeneratorKind generatorFromAlias(std::string_view alias)
+{
+    for (const auto &entry : kGeneratorAliases)
+    {
+        if (entry.m_alias == alias)
+        {
+            return entry.m_generator;
+        }
+    }
+    return GeneratorKind::Auto;
+}
+
+} // namespace
+
 // Installs all argument/option definitions used by parse().
 CommandLineParser::CommandLineParser() { setupArguments(); }
 
@@ -14,7 +93,8 @@ void CommandLineParser::setupArguments()
     m_program->add_description("EzDSL Compiler Backend Driver & Code Generator Tool");
 
     m_program->add_argument("-i", "--input")
-            .help("Path to the input EzDSL definition file (.tyf, .irdf, .lad, .lrd)")
+            .help("Path to the input EzDSL definition file (.tyf, .irdf, .lad, .lrd, .idf, .isf, .ezcc, .ccd, .reg, "
+                  ".tdesc)")
             .metavar("<file>")
             .default_value(std::string(""));
 
@@ -99,7 +179,9 @@ void CommandLineParser::setupArguments()
             .default_value(std::string(""));
 
     m_program->add_argument("--generator")
-            .help("Explicit generator to execute: 'type-table', 'instructions', 'legalizer', or 'auto'")
+            .help("Explicit generator to execute: 'type-table', 'instructions', 'legalizer', 'rules', "
+                  "'target-instructions', 'target-encodings', 'instruction-selector', 'calling-conv', 'registers', "
+                  "'target-desc', or 'auto'")
             .metavar("<gen>")
             .default_value(std::string("auto"));
 
@@ -215,146 +297,41 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
 
     // --format is case-insensitive; anything other than "json" falls back to text.
     std::string formatStr = StrToLower(m_program->get<std::string>("--format"));
-    if (formatStr == "json")
-    {
-        opts.format = OutputFormat::Json;
-    }
-    else
-    {
-        opts.format = OutputFormat::Text;
-    }
+    opts.format = formatStr == "json" ? OutputFormat::Json : OutputFormat::Text;
 
     opts.targetName = m_program->get<std::string>("--target");
 
     opts.rulesFilePath = m_program->get<std::string>("--rules");
     opts.typesFilePath = m_program->get<std::string>("--types");
     opts.instructionsFilePath = m_program->get<std::string>("--instructions");
-    opts.emitRules = m_program->get<bool>("--emit-rules");
-    opts.emitTargetInstructions = m_program->get<bool>("--emit-target-instructions");
-    opts.emitTargetEncodings = m_program->get<bool>("--emit-target-encodings");
-    opts.emitInstructionSelector = m_program->get<bool>("--emit-instruction-selector");
-    opts.emitCallingConv = m_program->get<bool>("--emit-calling-conv");
-    opts.emitRegisterInfo = m_program->get<bool>("--emit-registers");
-    opts.emitTargetDesc = m_program->get<bool>("--emit-target-desc");
 
-    // Emission flags and the explicit --generator value are reconciled below.
-    bool emitTypeTable = m_program->get<bool>("--emit-type-table");
-    bool emitInstructions = m_program->get<bool>("--emit-instructions");
-    bool emitLegalizer = m_program->get<bool>("--emit-legalizer");
-    bool emitRules = opts.emitRules;
-    bool emitTargetInstructions = opts.emitTargetInstructions;
-    bool emitTargetEncodings = opts.emitTargetEncodings;
-    bool emitInstructionSelector = opts.emitInstructionSelector;
-    bool emitCallingConv = opts.emitCallingConv;
-    bool emitRegisterInfo = opts.emitRegisterInfo;
-    bool emitTargetDesc = opts.emitTargetDesc;
-    std::string explicitGen = StrToLower(m_program->get<std::string>("--generator"));
-
-    if (emitTypeTable && emitInstructions)
+    // Emission flags: a new generator only needs an entry in kEmitOptions.
+    size_t emitCount = 0;
+    for (const auto &emit : kEmitOptions)
     {
-        errorMessage = "Cannot specify both --emit-type-table and --emit-instructions simultaneously.";
-        return std::nullopt;
+        const bool present = m_program->get<bool>(emit.m_flag);
+        if (emit.m_mirror)
+        {
+            opts.*(emit.m_mirror) = present;
+        }
+        if (present)
+        {
+            ++emitCount;
+            opts.generator = emit.m_generator;
+        }
     }
 
     // Reject ambiguous invocations that request more than one generator at once.
-    size_t emitCount = (emitTypeTable ? 1 : 0) + (emitInstructions ? 1 : 0) + (emitLegalizer ? 1 : 0) +
-            (emitRules ? 1 : 0) + (emitTargetInstructions ? 1 : 0) + (emitTargetEncodings ? 1 : 0) +
-            (emitInstructionSelector ? 1 : 0) + (emitCallingConv ? 1 : 0) + (emitRegisterInfo ? 1 : 0) +
-            (emitTargetDesc ? 1 : 0);
     if (emitCount > 1)
     {
         errorMessage = "Cannot specify multiple generator emission flags simultaneously.";
         return std::nullopt;
     }
 
-    // Emission flags take precedence over --generator; otherwise match the explicit name, else Auto.
-    if (emitTypeTable)
+    // Emission flags take precedence; else resolve the explicit --generator name, else Auto.
+    if (emitCount == 0)
     {
-        opts.generator = GeneratorKind::TypeTable;
-    }
-    else if (emitInstructions)
-    {
-        opts.generator = GeneratorKind::Instructions;
-    }
-    else if (emitLegalizer)
-    {
-        opts.generator = GeneratorKind::Legalizer;
-    }
-    else if (emitRules)
-    {
-        opts.generator = GeneratorKind::Rules;
-    }
-    else if (emitTargetInstructions)
-    {
-        opts.generator = GeneratorKind::TargetInstructions;
-    }
-    else if (emitTargetEncodings)
-    {
-        opts.generator = GeneratorKind::TargetEncodings;
-    }
-    else if (emitInstructionSelector)
-    {
-        opts.generator = GeneratorKind::InstructionSelector;
-    }
-    else if (emitCallingConv)
-    {
-        opts.generator = GeneratorKind::CallingConv;
-    }
-    else if (emitRegisterInfo)
-    {
-        opts.generator = GeneratorKind::RegisterInfo;
-    }
-    else if (emitTargetDesc)
-    {
-        opts.generator = GeneratorKind::TargetDesc;
-    }
-    else if (explicitGen == "type-table" || explicitGen == "typetable")
-    {
-        opts.generator = GeneratorKind::TypeTable;
-    }
-    else if (explicitGen == "instructions" || explicitGen == "instruction")
-    {
-        opts.generator = GeneratorKind::Instructions;
-    }
-    else if (explicitGen == "legalizer" || explicitGen == "legalize")
-    {
-        opts.generator = GeneratorKind::Legalizer;
-    }
-    else if (explicitGen == "rules" || explicitGen == "rule")
-    {
-        opts.generator = GeneratorKind::Rules;
-    }
-    else if (explicitGen == "target-instructions" || explicitGen == "target_instructions" ||
-             explicitGen == "target-inst")
-    {
-        opts.generator = GeneratorKind::TargetInstructions;
-    }
-    else if (explicitGen == "target-encodings" || explicitGen == "target_encodings" || explicitGen == "encodings")
-    {
-        opts.generator = GeneratorKind::TargetEncodings;
-    }
-    else if (explicitGen == "instruction-selector" || explicitGen == "instruction_selector" || explicitGen == "isel")
-    {
-        opts.generator = GeneratorKind::InstructionSelector;
-    }
-    else if (explicitGen == "calling-conv" || explicitGen == "calling_conv" || explicitGen == "callingconv" ||
-             explicitGen == "cc")
-    {
-        opts.generator = GeneratorKind::CallingConv;
-    }
-    else if (explicitGen == "registers" || explicitGen == "register" || explicitGen == "register-info" ||
-             explicitGen == "reg")
-    {
-        opts.generator = GeneratorKind::RegisterInfo;
-    }
-    else if (explicitGen == "target-desc" || explicitGen == "target_desc" || explicitGen == "targetdesc" ||
-             explicitGen == "tdesc")
-    {
-        opts.generator = GeneratorKind::TargetDesc;
-    }
-    else
-    {
-        opts.generator = GeneratorKind::Auto;
+        opts.generator = generatorFromAlias(StrToLower(m_program->get<std::string>("--generator")));
     }
 
     return opts;

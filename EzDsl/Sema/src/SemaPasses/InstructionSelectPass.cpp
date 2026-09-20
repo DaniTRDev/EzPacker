@@ -3,6 +3,7 @@
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/InstructionSelectSymbols.h"
+#include "SemaPasses/PassDriver.h"
 #include <unordered_set>
 
 namespace
@@ -48,7 +49,7 @@ bool InstructionSelectPass::run(DiagnosticCollector *collector,
                                 SymbolTable *table,
                                 DSL::Ast::InstructionSelectDef::InstructionSelectFile *file)
 {
-    if (!collector || !table || !file)
+    if (!Sema::preparePass(collector, table, file, PassName))
     {
         return false;
     }

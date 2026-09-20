@@ -73,7 +73,7 @@ std::vector<const Symbol *> CppTargetInstructionGenerator::collectInstructionSym
 // Resolves the header/source destinations, emits both artifacts, and reports combined success.
 bool CppTargetInstructionGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }
@@ -81,20 +81,20 @@ bool CppTargetInstructionGenerator::run()
     std::string defaultBaseName = std::format("{}TargetInstructionTable", m_targetName);
     auto [headerPath, sourcePath] = resolveHeaderAndSourcePaths(defaultBaseName);
 
+    auto instSymbols = collectInstructionSymbols();
+
     CppSourceEmitter headerEmitter;
     CppSourceEmitter sourceEmitter;
 
-    emitHeader(headerEmitter);
-    emitSource(sourceEmitter);
+    emitHeader(headerEmitter, instSymbols);
+    emitSource(sourceEmitter, instSymbols);
 
-    bool headerOk = writeOutput(headerPath, headerEmitter.str());
-    bool sourceOk = writeOutput(sourcePath, sourceEmitter.str());
-
-    return headerOk && sourceOk;
+    return writeHeaderAndSource({ headerPath, sourcePath }, headerEmitter.view(), sourceEmitter.view());
 }
 
 // Emits an include-guarded header declaring the compact opcode enum and lookup entry points.
-void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
+void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter,
+                                               const std::vector<const Symbol *> &instSymbols) const
 {
     std::string guard = std::format("EZTRIPLE_{}_TARGET_INSTRUCTION_TABLE_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
@@ -111,8 +111,6 @@ void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
     std::string ns = std::format("EzTriple::{}TargetInst", m_targetName);
     {
         auto nsScope = emitter.enterNamespace(ns);
-
-        auto instSymbols = collectInstructionSymbols();
 
         emitter.emitLine("enum OpCode : size_t");
         {
@@ -137,7 +135,8 @@ void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
 }
 
 // Emits the static descriptor table plus the opcode lookup and initialization routines.
-void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
+void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter,
+                                               const std::vector<const Symbol *> &instSymbols) const
 {
     emitter.emitBanner("CppTargetInstructionGenerator");
     emitter.emitBlankLine();
@@ -152,8 +151,6 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
     std::string ns = std::format("EzTriple::{}TargetInst", m_targetName);
     {
         auto nsScope = emitter.enterNamespace(ns);
-
-        auto instSymbols = collectInstructionSymbols();
 
         emitter.emitLine("static MirTargetInstructionDesc s_descs[] =");
         {

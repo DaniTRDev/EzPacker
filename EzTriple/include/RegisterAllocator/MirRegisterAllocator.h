@@ -147,9 +147,10 @@ class MirRegisterAllocator
                                                 class MirInstruction *defInst) = 0;
 
     /**
-     * Adds a node to the graph if it doesn't already exist.
+     * Adds a node to the graph if it doesn't already exist and returns its (stable) neighbor set,
+     * so callers can add interference edges without re-hashing the node.
      */
-    void addNode(const MirRegisterRef &v, class RegisterAllocatorCtx *ctx);
+    std::pmr::set<MirRegisterRef> &addNode(const MirRegisterRef &v, class RegisterAllocatorCtx *ctx);
 
     /**
      * Rewrites instructions so spilled registers are replaced by LOAD/STORE instructions.

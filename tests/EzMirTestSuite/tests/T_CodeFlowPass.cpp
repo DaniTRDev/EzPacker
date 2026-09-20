@@ -6,6 +6,7 @@
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
+#include <algorithm>
 
 /**
  * Test fixture for Control Flow Graph (CFG) analysis, reachability, and edge detection pass.
@@ -30,11 +31,7 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
 
     visited.insert(current);
 
-    auto it = res->m_successors.find(current);
-    if (it == res->m_successors.end())
-        return false;
-
-    for (const auto &successor : it->second)
+    for (MirId successor : res->getSuccessors(current))
     {
         if (DepthFirstSearch(res, successor, target, visited))
             return true;
@@ -44,20 +41,20 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
 }
 
 /**
- * Custom GoogleTest assertion verifying the total number of predecessor and successor map entries in the CFG result.
+ * Custom GoogleTest assertion verifying the total number of tracked block entries in the CFG result.
  */
 ::testing::AssertionResult HasGraphSize(CodeFlowResult *result, size_t predCount, size_t succCount)
 {
     if (!result)
         return ::testing::AssertionFailure() << "Result is nullptr";
 
-    if (result->m_predecessors.size() != predCount)
+    if (result->getBlockCount() != predCount)
         return ::testing::AssertionFailure()
-                << "Expected " << predCount << " predecessor entries, got " << result->m_predecessors.size();
+                << "Expected " << predCount << " predecessor entries, got " << result->getBlockCount();
 
-    if (result->m_successors.size() != succCount)
+    if (result->getBlockCount() != succCount)
         return ::testing::AssertionFailure()
-                << "Expected " << succCount << " successor entries, got " << result->m_successors.size();
+                << "Expected " << succCount << " successor entries, got " << result->getBlockCount();
 
     return ::testing::AssertionSuccess();
 }
@@ -73,14 +70,12 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
         return ::testing::AssertionFailure() << "ExitBlock is nullptr";
 
     size_t id = exitBlock->getId();
-    auto it = result->m_successors.find(id);
-
-    if (it == result->m_successors.end())
+    if (!result->contains(id))
         return ::testing::AssertionFailure() << "Block " << id << " not found in successors map";
 
-    if (!it->second.empty())
+    if (!result->getSuccessors(id).empty())
         return ::testing::AssertionFailure()
-                << "Block " << id << " is not an exit, it has " << it->second.size() << " successors";
+                << "Block " << id << " is not an exit, it has " << result->getSuccessors(id).size() << " successors";
 
     return ::testing::AssertionSuccess();
 }
@@ -96,25 +91,23 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
         return ::testing::AssertionFailure() << "Node is nullptr";
 
     size_t id = node->getId();
-    if (!result->m_predecessors.contains(id))
-        return ::testing::AssertionFailure() << "Missing predecessor entry for node " << id;
-    if (!result->m_successors.contains(id))
-        return ::testing::AssertionFailure() << "Missing successor entry for node " << id;
+    if (!result->contains(id))
+        return ::testing::AssertionFailure() << "Missing adjacency entry for node " << id;
 
-    if (result->m_predecessors[id].size() != expectedPreds)
+    if (result->getPredecessors(id).size() != expectedPreds)
         return ::testing::AssertionFailure() << "Node " << id << " expected " << expectedPreds << " predecessors, got "
-                                             << result->m_predecessors[id].size();
+                                             << result->getPredecessors(id).size();
 
-    if (result->m_successors[id].size() != expectedSuccs)
+    if (result->getSuccessors(id).size() != expectedSuccs)
         return ::testing::AssertionFailure() << "Node " << id << " expected " << expectedSuccs << " successors, got "
-                                             << result->m_successors[id].size();
+                                             << result->getSuccessors(id).size();
 
     return ::testing::AssertionSuccess();
 }
 
 /**
  * Custom GoogleTest assertion verifying the existence of a directed CFG edge from 'from' to 'to',
- * checking both successor and predecessor maps for bidirectional consistency.
+ * checking both successor and predecessor lists for bidirectional consistency.
  */
 ::testing::AssertionResult HasEdge(CodeFlowResult *result, MirBlock *from, MirBlock *to)
 {
@@ -126,14 +119,12 @@ bool DepthFirstSearch(CodeFlowResult *res, size_t current, size_t target, std::u
     size_t fromId = from->getId();
     size_t toId = to->getId();
 
-    // Check Successor link
-    auto succIt = result->m_successors.find(fromId);
-    if (succIt == result->m_successors.end() || !succIt->second.contains(toId))
+    const std::span<const MirId> successors = result->getSuccessors(fromId);
+    if (std::find(successors.begin(), successors.end(), toId) == successors.end())
         return ::testing::AssertionFailure() << "Node " << fromId << " does NOT list " << toId << " as a successor";
 
-    // Check Predecessor link
-    auto predIt = result->m_predecessors.find(toId);
-    if (predIt == result->m_predecessors.end() || !predIt->second.contains(fromId))
+    const std::span<const MirId> predecessors = result->getPredecessors(toId);
+    if (std::find(predecessors.begin(), predecessors.end(), fromId) == predecessors.end())
         return ::testing::AssertionFailure() << "Node " << toId << " does NOT list " << fromId << " as a predecessor";
 
     return ::testing::AssertionSuccess();
@@ -359,4 +350,34 @@ TEST_F(TestCodeFlowPass, TestDeadCodeBlock)
 
     EXPECT_TRUE(IsReachable(result, entryPoint, normalExit));
     EXPECT_TRUE(IsNotReachable(result, entryPoint, deadBlock));
+}
+
+/**
+ * WEI-08: verifies the explicit predecessor metadata published on each block matches the CFG
+ * result and captures implicit fallthrough predecessors (which an operand scan would miss).
+ */
+TEST_F(TestCodeFlowPass, TestPredecessorMetadataIncludesFallthrough)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirBlockBuilder blockBuilder(ctx, getTestFunc());
+
+    MirBlock *entryPoint = getTestFunc()->getEntryPoint();
+    MirBlock *fallthrough = blockBuilder.build(nullptr, "fallthrough");
+    MirBlock *join = blockBuilder.build(nullptr, "join");
+
+    // entry has no terminator and falls through to `fallthrough`, which jumps to `join`.
+    AddCfgEdge(ctx, fallthrough, join);
+
+    CodeFlowAnalysisPass *pass = runPass<CodeFlowAnalysisPass>(ctx);
+    CodeFlowResult *result = pass->getResult();
+
+    const std::span<const MirId> fallthroughPreds = result->getPredecessors(fallthrough->getId());
+    ASSERT_EQ(fallthroughPreds.size(), 1u);
+    EXPECT_TRUE(std::find(fallthroughPreds.begin(), fallthroughPreds.end(), entryPoint->getId()) != fallthroughPreds.end());
+
+    // The metadata must expose the same implicit fallthrough predecessor.
+    ASSERT_EQ(fallthrough->getPredecessors().size(), 1u);
+    EXPECT_EQ(fallthrough->getPredecessors()[0], entryPoint);
+    ASSERT_EQ(join->getPredecessors().size(), 1u);
+    EXPECT_EQ(join->getPredecessors()[0], fallthrough);
 }

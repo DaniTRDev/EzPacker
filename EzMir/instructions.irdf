@@ -16,7 +16,7 @@ ir_inst MOV_ADDR(Register:dst OUT, AddressSource:src IN) {
 
 // SSA Phi function: selects incoming register value based on predecessor basic block.
 // 1 destination (OUT), followed by variadic incoming operand pairs/values (IN).
-ir_inst PHI(Register:dst OUT, AnyValue:incoming IN) {
+ir_inst PHI(Register:dst OUT, VariadicArgs:incoming IN) {
     CATEGORY(DataMovement);
     TIER(HighLevel);
     FLAGS(VariadicArgs);
@@ -59,7 +59,7 @@ ir_inst POP_RET(Register:token IN, Register:dst OUT) {
 
 // Combines multiple smaller scalars into a single wider scalar or vector.
 // 1 destination (OUT), followed by variadic source values (IN).
-ir_inst MERGE_VALUES(Register:dst OUT, AnyValue:srcs IN) {
+ir_inst MERGE_VALUES(Register:dst OUT, VariadicArgs:srcs IN) {
     CATEGORY(DataMovement);
     TIER(HighLevel);
     FLAGS(VariadicArgs);
@@ -67,7 +67,7 @@ ir_inst MERGE_VALUES(Register:dst OUT, AnyValue:srcs IN) {
 
 // Splits a wide scalar or vector into multiple smaller scalar components.
 // Variadic destination registers (OUT), followed by 1 source value (IN).
-ir_inst UNMERGE_VALUES(Register:dsts OUT, Register:src IN) {
+ir_inst UNMERGE_VALUES(VariadicArgs:dsts OUT, Register:src IN) {
     CATEGORY(DataMovement);
     TIER(HighLevel);
     FLAGS(VariadicArgs);
@@ -417,7 +417,7 @@ ir_inst BR_COND(Register:cond IN, Reference:trueBlock IN, Reference:falseBlock I
 
 // Function Call: dst = call target(args...).
 // 1 destination (OUT), 1 call target (IN), followed by variadic arguments (IN).
-ir_inst CALL(Register:dst OUT, AnyValue:target IN, AnyValue:args IN) {
+ir_inst CALL(Register:dst OUT, AnyValue:target IN, VariadicArgs:args IN) {
     CATEGORY(ControlFlow);
     TIER(HighLevel);
     FLAGS(IsCall, HasSideEffect, VariadicArgs);

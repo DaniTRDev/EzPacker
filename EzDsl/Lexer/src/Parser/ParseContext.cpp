@@ -6,7 +6,7 @@ ParseContext::ParseContext(class DiagnosticCollector *diagCollector,
                            class GenericSourceManager *sourceManager,
                            size_t sourceId,
                            std::pmr::memory_resource *alloc) :
-    m_diagCollector(diagCollector), m_sourceManager(sourceManager), m_sourceId(sourceId), m_handler({ .ctx = *this }),
+    m_diagCollector(diagCollector), m_sourceManager(sourceManager), m_handler({ .ctx = *this }), m_sourceId(sourceId),
     m_alloc(alloc)
 {
 }

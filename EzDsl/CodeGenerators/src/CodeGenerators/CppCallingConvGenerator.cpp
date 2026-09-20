@@ -30,7 +30,7 @@ CppCallingConvGenerator::CppCallingConvGenerator(DiagnosticCollector *collector,
 // Requires at least one calling-convention symbol, then emits and writes the header/source pair.
 bool CppCallingConvGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }
@@ -49,17 +49,15 @@ bool CppCallingConvGenerator::run()
     CppSourceEmitter headerEmitter;
     CppSourceEmitter sourceEmitter;
 
-    emitHeader(headerEmitter);
-    emitSource(sourceEmitter);
+    emitHeader(headerEmitter, convs);
+    emitSource(sourceEmitter, convs);
 
-    bool headerOk = writeOutput(headerPath, headerEmitter.str());
-    bool sourceOk = writeOutput(sourcePath, sourceEmitter.str());
-
-    return headerOk && sourceOk;
+    return writeHeaderAndSource({ headerPath, sourcePath }, headerEmitter.view(), sourceEmitter.view());
 }
 
 // Emits one CallingConvDesc subclass declaration per parsed calling convention.
-void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter) const
+void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter,
+                                         const std::vector<const Symbol *> &convs) const
 {
     std::string guardName = std::format("EZMIR_{}_CALLING_CONV_DESC_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guardName);
@@ -79,7 +77,7 @@ void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter) const
     emitter.emitLine("class CallLoweringState;");
     emitter.emitBlankLine();
 
-    for (const Symbol *sym : getSymbolTable()->collect<Symbols::CallingConvSymbol>(SymbolType::CallingConv))
+    for (const Symbol *sym : convs)
     {
         const auto *ccData = sym->getIf<Symbols::CallingConvSymbol>();
         if (!ccData || !ccData->m_astNode)
@@ -143,7 +141,8 @@ void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter) const
 }
 
 // Emits the out-of-line definitions for every CallingConvDesc declared in the header.
-void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
+void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
+                                         const std::vector<const Symbol *> &convs) const
 {
     std::string defaultBaseName = std::format("{}CallingConvDesc", m_targetName);
     emitter.emitBanner("CppCallingConvGenerator");
@@ -158,7 +157,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitInclude("Operand/MirRegisterClass.h");
     emitter.emitBlankLine();
 
-    for (const Symbol *sym : getSymbolTable()->collect<Symbols::CallingConvSymbol>(SymbolType::CallingConv))
+    for (const Symbol *sym : convs)
     {
         const auto *ccData = sym->getIf<Symbols::CallingConvSymbol>();
         if (!ccData || !ccData->m_astNode)

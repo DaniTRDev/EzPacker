@@ -263,16 +263,13 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     {
         MirId blockId = blockList[i]->getId();
 
-        auto it = cfg->m_successors.find(blockId);
-        if (it != cfg->m_successors.end())
+        const std::span<const MirId> successors = cfg->getSuccessors(blockId);
+        denseSuccessors[i].reserve(successors.size());
+        for (MirId succId : successors)
         {
-            denseSuccessors[i].reserve(it->second.size());
-            for (MirId succId : it->second)
-            {
-                auto succIt = blockIdToDenseIdx.find(succId);
-                if (succIt != blockIdToDenseIdx.end())
-                    denseSuccessors[i].push_back(succIt->second);
-            }
+            auto succIt = blockIdToDenseIdx.find(succId);
+            if (succIt != blockIdToDenseIdx.end())
+                denseSuccessors[i].push_back(succIt->second);
         }
     }
 

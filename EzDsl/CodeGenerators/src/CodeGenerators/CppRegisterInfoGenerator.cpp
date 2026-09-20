@@ -161,10 +161,11 @@ CppRegisterInfoGenerator::CppRegisterInfoGenerator(DiagnosticCollector *collecto
 }
 
 // Emits the self-contained, header-only flat register tables and bank construction helper.
-void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
+static void emitRegisterInfoHeader(CppSourceEmitter &emitter,
+                                   std::string_view targetName,
+                                   const CollectedRegisterData &data)
 {
-    const auto data = collectData(getSymbolTable(), m_targetName);
-    const std::string ns = SanitizeCppIdentifier(m_targetName, "Target");
+    const std::string ns = SanitizeCppIdentifier(targetName, "Target");
     const std::string emissionNs = std::format("EzCodeEmitter::TableGen::{}", ns);
 
     emitter.emitBanner("CppRegisterInfoGenerator");
@@ -388,7 +389,7 @@ void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
 // Collects register data, emits the header, and writes it as a single file.
 bool CppRegisterInfoGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }
@@ -404,7 +405,7 @@ bool CppRegisterInfoGenerator::run()
     const auto targetFilePath = resolveSingleFilePath(baseName + ".h");
 
     CppSourceEmitter emitter;
-    emitHeader(emitter);
+    emitRegisterInfoHeader(emitter, m_targetName, data);
 
     if (!writeOutput(targetFilePath, emitter.view()))
     {

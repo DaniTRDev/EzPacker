@@ -45,7 +45,7 @@ void registerEncodingDialect(std::string_view name, EncodingDialect *dialect);
 /** Returns the dialect registered under (an alias of) name, or nullptr. */
 EncodingDialect *findEncodingDialect(std::string_view name);
 
-/** Returns the most recently registered dialect, used as a fallback selector. */
+/** Returns the explicit default dialect (x86_64), independent of registration order. */
 EncodingDialect *getDefaultEncodingDialect();
 
 } // namespace Sema::Encoding

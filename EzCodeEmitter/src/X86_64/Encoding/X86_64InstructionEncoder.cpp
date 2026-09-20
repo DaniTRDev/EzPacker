@@ -871,7 +871,7 @@ void InstructionEncoder::emitJmpShort(std::vector<uint8_t> &out, int8_t disp)
 
 void InstructionEncoder::emitJmpNear(std::vector<uint8_t> &out, int32_t disp)
 {
-    out.push_back(0xE9);
+    out.push_back(kNearJmpOpcode);
     emitImm(out, disp, 4);
 }
 
@@ -883,9 +883,50 @@ void InstructionEncoder::emitJccShort(std::vector<uint8_t> &out, ConditionCode c
 
 void InstructionEncoder::emitJccNear(std::vector<uint8_t> &out, ConditionCode cc, int32_t disp)
 {
-    out.push_back(0x0F);
-    out.push_back(static_cast<uint8_t>(0x80 | (static_cast<uint8_t>(cc) & 0x0F)));
+    out.push_back(kNearJccPrefix);
+    out.push_back(static_cast<uint8_t>(kNearJccBase | (static_cast<uint8_t>(cc) & 0x0F)));
     emitImm(out, disp, 4);
+}
+
+bool InstructionEncoder::classifyNearBranch(std::span<const uint8_t> bytes,
+                                            size_t offset,
+                                            size_t &dispOffset,
+                                            size_t &instrLength)
+{
+    if (offset >= bytes.size())
+    {
+        return false;
+    }
+
+    const uint8_t op0 = bytes[offset];
+    if (op0 == kNearJmpOpcode || op0 == kNearCallOpcode)
+    {
+        dispOffset = offset + 1;
+        instrLength = 5;
+        return true;
+    }
+    if (op0 == kNearJccPrefix && offset + 1 < bytes.size() && (bytes[offset + 1] & 0xF0) == kNearJccBase)
+    {
+        dispOffset = offset + 2;
+        instrLength = 6;
+        return true;
+    }
+    return false;
+}
+
+bool InstructionEncoder::writeDisp32(std::span<uint8_t> bytes, size_t offset, int32_t value)
+{
+    if (offset + 4 > bytes.size())
+    {
+        return false;
+    }
+
+    const uint32_t v = static_cast<uint32_t>(value);
+    bytes[offset + 0] = static_cast<uint8_t>(v & 0xFFu);
+    bytes[offset + 1] = static_cast<uint8_t>((v >> 8) & 0xFFu);
+    bytes[offset + 2] = static_cast<uint8_t>((v >> 16) & 0xFFu);
+    bytes[offset + 3] = static_cast<uint8_t>((v >> 24) & 0xFFu);
+    return true;
 }
 
 } // namespace EzCodeEmitter::X86_64

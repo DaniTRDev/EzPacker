@@ -56,11 +56,43 @@ class CodeGenerator
                                    std::string_view newContent,
                                    std::string *errorOut = nullptr);
 
+    /**
+     * Resolves a single file path from outPath, treating an empty/directory/extensionless path as a
+     * directory and appending defaultFileName. Shared by the CLI driver's dry-run reporting and the
+     * generators so both agree on where an artifact lands (DUP-08 / WEI-06).
+     */
+    static std::filesystem::path ResolveSingleFilePath(const std::filesystem::path &outPath,
+                                                       std::string_view defaultFileName);
+
+    /**
+     * Resolves header/source paths from outPath, treating an empty/directory/extensionless path as a
+     * directory. A `.h`/`.hpp` path is the header, anything else with an extension is the source.
+     * The extension comparison is case-insensitive. Shared with the CLI driver so dry-run output
+     * matches the files the generators actually write.
+     */
+    static HeaderAndSourcePaths ResolveHeaderAndSourcePaths(const std::filesystem::path &outPath,
+                                                            std::string_view defaultBaseName);
+
   protected:
     /**
      * Validates that the generator's collector and symbol table pointers are non-null and the output path is non-empty.
      */
     bool validate() const;
+
+    /**
+     * Shared generator preamble: runs validate() and, when a description is supplied, emits the
+     * uniform "Generating <description>" trace. Centralizes the boilerplate every run() used to
+     * open-code, so a generator body starts by calling this and returning on failure.
+     */
+    bool beginGeneration(std::string_view description = {}) const;
+
+    /**
+     * Writes a generated header/source pair, attempting neither specifically after the other fails.
+     * Returns true only when both artifacts are written successfully.
+     */
+    bool writeHeaderAndSource(const HeaderAndSourcePaths &paths,
+                              std::string_view headerContent,
+                              std::string_view sourceContent) const;
 
     /**
      * Resolves a single file path from m_outputPath.

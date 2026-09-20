@@ -150,7 +150,7 @@ rule SDivPow2 {
         isPositiveConst($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 )dsl";
@@ -182,7 +182,7 @@ rule SDivPow2 {
     // Verify Source: extern forward declarations
     EXPECT_NE(source.find("extern bool isPowTwo(int64_t arg0);"), std::string::npos);
     EXPECT_NE(source.find("extern bool isPositiveConst(int64_t arg0);"), std::string::npos);
-    EXPECT_NE(source.find("extern int64_t log2(int64_t arg0);"), std::string::npos);
+    EXPECT_NE(source.find("extern int64_t log2Pow2(int64_t arg0);"), std::string::npos);
 
     // Verify Source: rule matcher
     EXPECT_NE(source.find("LegalizationResult Rule_SDivPow2(LegalizeCtx &ctx)"), std::string::npos);
@@ -195,7 +195,7 @@ rule SDivPow2 {
     // Verify Source: when predicates & transforms
     EXPECT_NE(source.find("!isPowTwo("), std::string::npos);
     EXPECT_NE(source.find("!isPositiveConst("), std::string::npos);
-    EXPECT_NE(source.find("log2("), std::string::npos);
+    EXPECT_NE(source.find("log2Pow2("), std::string::npos);
 
     // Verify Source: emit sequence
     EXPECT_NE(source.find("MirInstructionOpCode::SAR"), std::string::npos);
@@ -219,7 +219,7 @@ rule SDivPow2 {
         isPowTwo($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 

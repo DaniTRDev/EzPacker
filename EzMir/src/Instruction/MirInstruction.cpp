@@ -137,8 +137,8 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
         return MirOperandFlag::Read;
     }
 
-    const auto &opMeta = getMetadata().m_operandMeta;
-    const size_t metaCount = opMeta.size();
+    const MirOperandMetadataList &opMeta = getMetadata().m_operandMeta;
+    const size_t metaCount = opMeta.m_count;
     const size_t totalOperands = m_operands.size();
 
     if (metaCount == 0 || index >= totalOperands)
@@ -146,11 +146,13 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
         return MirOperandFlag::None;
     }
 
-    // 1. Locate the variadic expansion slot if one exists
+    // 1. Locate the variadic expansion slot if one exists. The slot position is encoded directly
+    //    in the generated metadata by declaring that operand with ExpectedOperandType::VariadicArgs
+    //    (e.g. UNMERGE_VALUES repeats a leading OUT slot, PHI/MERGE_VALUES/CALL a trailing IN slot).
     size_t varSlot = size_t(-1);
     for (size_t i = 0; i < metaCount; ++i)
     {
-        if (opMeta[i].type & ExpectedOperandType::VariadicArgs)
+        if (opMeta.m_slots[i].type & ExpectedOperandType::VariadicArgs)
         {
             varSlot = i;
             break;
@@ -165,31 +167,31 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
         // Malformed operand count safety fallback
         if (totalOperands < metaCount - 1)
         {
-            return (index < metaCount) ? opMeta[index].flags : MirOperandFlag::None;
+            return (index < metaCount) ? opMeta.m_slots[index].flags : MirOperandFlag::None;
         }
 
         // Leading fixed operands before the variadic slice
         if (index < varSlot)
         {
-            return opMeta[index].flags;
+            return opMeta.m_slots[index].flags;
         }
         // Trailing fixed operands after the variadic slice
         else if (index >= totalOperands - trailingFixedCount)
         {
             size_t offsetFromEnd = totalOperands - index;
-            return opMeta[metaCount - offsetFromEnd].flags;
+            return opMeta.m_slots[metaCount - offsetFromEnd].flags;
         }
         // In the variadic expansion range (inherits Read/Write/ReadWrite from slot descriptor)
         else
         {
-            return opMeta[varSlot].flags;
+            return opMeta.m_slots[varSlot].flags;
         }
     }
 
     // 3. Standard fixed-length metadata descriptor
     if (index < metaCount)
     {
-        return opMeta[index].flags;
+        return opMeta.m_slots[index].flags;
     }
     else if (getFlags() & MirInstructionFlags::VariadicArgs)
     {

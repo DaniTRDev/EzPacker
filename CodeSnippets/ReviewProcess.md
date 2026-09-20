@@ -109,9 +109,8 @@ Branch `InstructionSelUpgrade`. Each project file marks implemented leads as `fi
 | Tier | Findings | Status |
 | --- | --- | --- |
 | P0 | All P0 across EzCore, EzMir, EzTriple, EzCompiler and XPR-08 | fixed |
-| P1 | EzCore DUP-01..05, OPT-01..02; EzMir DUP-01..06, LEG-01..09, WEI-04..08, OPT-01..06; EzTriple DUP-01/03..08, LEG-01..09, WEI-03..05, OPT-01..06; EzDsl DUP-01..02/04..06, LEG-01..02/05..07, WEI-01..05, OPT-01/03; EzCompiler DUP-02..05, LEG-01..08, WEI-02..07, OPT-01..03; XPR-01..03, XPR-09..10, XPR-13 | fixed |
-| P1 | EzTriple DUP-02 (ABI lowering merge) | deferred |
-| P2 | Shared helpers (XPR-06, DUP/LEG/WEI/OPT across all projects) | largely fixed; deferred items remain in each tracker |
+| P1 | All P1 leads across every project file | fixed |
+| P2 | All P2 leads across every project file | fixed except EzDsl LEG-04 (`wontfix`) |
 
 Notes:
 
@@ -128,9 +127,12 @@ Notes:
 - Windows build fix: `X86_64InstructionSelector.h` now includes the generated
   `x86_64InstructionSelector.h` with angle brackets, avoiding a case-insensitive filesystem
   collision with itself.
-- Known pre-existing issue (not introduced here): `std::hash<MirRegisterRef>` mixes in a
-  `MirRegisterClass*` for physical registers, so register-allocation order/object bytes can vary
-  with ASLR. Suggested follow-up: a pointer-independent hash.
-- Deferred P1/P2 findings and their rationale are recorded per project. The largest are the
-  `MirAbiLowerer` 4-way switch merge (EzTriple DUP-02), the shared generator/driver scaffolds
-  (EzDsl DUP-03/07/08), and the shared PCH/escaper/pass driver (XPR-04/05/07).
+- Reproducibility fix (EzMir WEI-14): `std::hash<MirRegisterRef>` no longer hashes the physical
+  register's class pointer; it hashes the class name instead, matching `operator<`. Object output
+  is now ASLR-independent, verified over 25 ELF and 20 COFF compilations.
+- The second pass closed the remaining leads: the `MirAbiLowerer` direction-parameterized merge,
+  generator/driver/path/enum/pass scaffolds, shared `EzCommonStd.h`/`EscapeString`/pass driver,
+  explicit PHI predecessor metadata, shared relocation constants, CFG vectors, static metadata
+  arrays, and view-based object symbol names. The only lead not changed is EzDsl LEG-04
+  (`wontfix`): the target-instruction payload is retained for consumers and emitting it would
+  change generated descriptor text, breaking byte-identity.

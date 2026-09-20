@@ -1,4 +1,4 @@
-#include "Legalizer/Actions/LegalizeActionCommon.h"
+#include "Targets/X86_64/X86_64Lowering.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
 #include <bit>
@@ -16,13 +16,13 @@ bool isPowTwo(int64_t val) { return val > 0 && (val & (val - 1)) == 0; }
 /// Predicate used by legalization rules: true when val is a strictly positive constant.
 bool isPositiveConst(int64_t val) { return val > 0; }
 
-/// Returns floor(log2(val)) for val > 0, or 0 for non-positive values (used to derive shift amounts).
-int64_t log2(int64_t val)
+/// Returns the shift amount for a positive power of two (floor(log2)), or 0 otherwise.
+int64_t log2Pow2(int64_t val)
 {
     if (val <= 0)
         return 0;
     return std::countr_zero(static_cast<uint64_t>(val));
 }
 
-/// Returns val - 1, used by rule predicates that match a power-of-two-plus-one pattern.
+/// Returns val - 1, used by rule transforms that match a power-of-two-minus-one pattern.
 int64_t sub1(int64_t val) { return val - 1; }

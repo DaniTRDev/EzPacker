@@ -2,6 +2,7 @@
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "SemaPasses/LegalizeRulePass.h"
+#include "SemaPasses/PassDriver.h"
 
 constexpr auto PassName = "Sema::LegalizeRulePass";
 
@@ -123,7 +124,7 @@ bool LegalizeRulePass::run(DiagnosticCollector *collector,
                            SymbolTable *table,
                            DSL::Ast::LegalizeRuleDef::LegalizeRuleFile *file)
 {
-    if (!collector || !table || !file)
+    if (!Sema::preparePass(collector, table, file, PassName))
     {
         return false;
     }

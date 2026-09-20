@@ -46,6 +46,15 @@ class MirLegalizer
     virtual LegalizationResult executeAction(const LegalityResponse &response, LegalizeCtx &ctx, MirInstruction *inst);
 
   protected:
+    /**
+     * Fills a caller-owned query for inst. Only slots that were populated by a previous fill and
+     * are no longer needed are cleared, so the legality loop can safely reuse one stack query
+     * without leaking stale operand data (generated matchers read operand 1 unconditionally).
+     *
+     * @param prevOperandCount In/out high-water mark of slots populated by the previous fill.
+     */
+    void fillQuery(MirInstruction *inst, LegalityQuery &q, size_t &prevOperandCount);
+
     MirBuilderContext *m_ctx; ///< Shared builder context used to create rewrites.
     TargetDesc *m_targetDesc; ///< Target providing legality info and legalization actions.
 };

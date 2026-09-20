@@ -6,10 +6,13 @@
 #include "GenericCodeEmitter.h"
 #include "Operand/MirRegisterBank.h"
 #include "Operand/MirRegisterClass.h"
+#include "Operand/MirOperandBuilder.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Function/CallingConvDesc.h"
 #include "CodeSection.h"
 #include "Legalizer/LegalityQuery.h"
+#include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "x86_64TargetInstructionTable.h"
 
 using namespace EzTriple;
@@ -193,4 +196,77 @@ TEST_F(EzTripleTestSuite, TestX86_64EmitterBankFactoryAndResolverSurface)
     TargetRelocationResolver *resolver = target.getRelocationResolver();
     ASSERT_NE(resolver, nullptr);
     EXPECT_EQ(target.getRelocationResolver(), resolver);
+}
+
+// WEI-08: selectPHI maps PHI incoming operands to predecessors using the CFG's explicit
+// predecessor metadata (ascending MirId order) and skips undefined incoming values based on SSA
+// def metadata rather than a register-name heuristic.
+TEST_F(EzTripleTestSuite, TestSelectPhiUsesPredecessorMetadata)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirTypeTable *tt = ctx->getTypeTable();
+    X86_64TargetDesc target(ctx);
+    target.initialize();
+
+    MirFunction *func = createTestFunction("phi_select", tt->i64());
+    MirBlock *entry = func->getEntryPoint();
+    MirBlock *left = createBlock(func, "left");
+    MirBlock *right = createBlock(func, "right");
+    MirBlock *join = createBlock(func, "join");
+    ASSERT_LT(left->getId(), right->getId());
+
+    MirInstructionBuilder entryIb(ctx, entry, InsertionType::Append);
+    MirInstructionBuilder leftIb(ctx, left, InsertionType::Append);
+    MirInstructionBuilder rightIb(ctx, right, InsertionType::Append);
+    MirInstructionBuilder joinIb(ctx, join, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *cond = ob.buildVReg(tt->i1(), "cond");
+    entryIb.BR_COND(cond, ob.buildRef(left), ob.buildRef(right));
+
+    MirRegister *lv = ob.buildVReg(tt->i64(), "lv");
+    MirRegister *rv = ob.buildVReg(tt->i64(), "rv");
+    // Define both incoming values so neither is treated as an undefined phantom.
+    leftIb.MOV(lv, ob.buildInt(tt->i64(), FlexInt(1)));
+    rightIb.MOV(rv, ob.buildInt(tt->i64(), FlexInt(2)));
+    leftIb.JMP(ob.buildRef(join));
+    rightIb.JMP(ob.buildRef(join));
+
+    MirRegister *dst = ob.buildVReg(tt->i64(), "phi");
+    MirInstruction *phi = joinIb.PHI(dst);
+    joinIb.addOperand(phi, lv);
+    joinIb.addOperand(phi, rv);
+    joinIb.RET(dst);
+
+    // Populate the explicit predecessor metadata exactly as the pipeline does.
+    MirPassManager passManager(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    passManager.addPass<CodeFlowAnalysisPass>(ctx);
+    ASSERT_NE(passManager.getAnalysis<CodeFlowAnalysisPass>(ctx), nullptr);
+
+    ASSERT_EQ(join->getPredecessors().size(), 2u);
+    EXPECT_EQ(join->getPredecessors()[0], left);
+    EXPECT_EQ(join->getPredecessors()[1], right);
+
+    MirInstructionSelector *isel = target.getInstructionSelector();
+    ASSERT_NE(isel, nullptr);
+    ASSERT_TRUE(isel->select(ctx, phi));
+
+    // The PHI is erased and a copy of the destination is emitted on each incoming edge.
+    EXPECT_TRUE(phi->isErased());
+
+    auto hasCopyOfDst = [&](MirBlock *block)
+    {
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            if (inst->getOpCode() == MirInstructionOpCode::MOV && inst->getOperandCount() >= 2 &&
+                inst->getOpAs<MirRegister>(0) == dst)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    EXPECT_TRUE(hasCopyOfDst(left));
+    EXPECT_TRUE(hasCopyOfDst(right));
+    ASSERT_NE(dst->getRegClass(), nullptr);
 }

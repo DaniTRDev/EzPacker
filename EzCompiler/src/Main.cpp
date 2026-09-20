@@ -4,6 +4,7 @@
 #include "FrontendAdapter.h"
 #include "CompilationPipeline.h"
 #include "EmissionEngine.h"
+#include "CliExitCode.h"
 
 #include <exception>
 #include <iostream>
@@ -27,9 +28,9 @@ int runCompiler(int argc, char **argv)
         if (!err.empty())
         {
             std::cerr << "error: " << err << "\n";
-            return 1;
+            return EzCli::kError;
         }
-        return 0;
+        return EzCli::kSuccess;
     }
 
     // Set up allocators, diagnostics and target descriptors for the chosen triple.
@@ -37,21 +38,21 @@ int runCompiler(int argc, char **argv)
     if (!ctx.initialize())
     {
         std::cerr << "error: failed to initialize compiler target for " << options.target.toString() << "\n";
-        return 1;
+        return EzCli::kError;
     }
 
     // Translate the input into generic MIR.
     EzCompiler::MirModuleLoader loader;
     if (!loader.compileSourceToMir(ctx, options.inputFilePath, *ctx.getBuilderContext()))
     {
-        return 1;
+        return EzCli::kError;
     }
 
     // Run the middle-end and backend pass pipeline.
     EzCompiler::CompilationPipeline pipeline(ctx);
     if (!pipeline.runPipeline())
     {
-        return 1;
+        return EzCli::kError;
     }
 
     // Inspection gates
@@ -60,23 +61,23 @@ int runCompiler(int argc, char **argv)
         options.emissionStage == EzCompiler::EmissionStage::LoweredMir)
     {
         std::cout << pipeline.dumpCurrentMir();
-        return 0;
+        return EzCli::kSuccess;
     }
 
     if (options.emissionStage == EzCompiler::EmissionStage::Assembly)
     {
         std::cout << pipeline.dumpAssembly();
-        return 0;
+        return EzCli::kSuccess;
     }
 
     // Default: emit object file
     EzCompiler::EmissionEngine emitter(ctx);
     if (!emitter.emitModule(*ctx.getBuilderContext(), options.outputFilePath))
     {
-        return 1;
+        return EzCli::kError;
     }
 
-    return 0;
+    return EzCli::kSuccess;
 }
 
 } // namespace
@@ -91,6 +92,6 @@ int main(int argc, char **argv)
     {
         // Contract-violating paths (e.g. an instruction the emitter cannot encode) surface here.
         std::cerr << "Fatal Exception: " << ex.what() << "\n";
-        return 2;
+        return EzCli::kFatalException;
     }
 }

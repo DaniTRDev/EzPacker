@@ -3,7 +3,7 @@
 #include "Sema/SymbolTable.h"
 
 SymbolTable::SymbolTable(std::pmr::memory_resource *alloc) :
-    m_currentScopeId(InvalidScopeId), m_scopes(alloc), m_symbols(alloc), m_alloc(alloc)
+    m_currentScopeId(InvalidScopeId), m_alloc(alloc), m_scopes(alloc), m_symbols(alloc)
 {
     // Enters the global scope at the moment of creating the table.
     enterScope("global");

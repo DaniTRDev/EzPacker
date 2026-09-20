@@ -26,11 +26,20 @@ inline const MirInstructionMetadata g_MirInstructionSet[] = {
 };
 
 /**
- * Mapping table from opcode name strings to their MirInstructionOpCode enum values. Keys are
- * string_views over the static opcode-name literals, so the table performs no dynamic key
- * allocations and lookups can reuse an existing view without copying.
+ * One opcode-name binding in the static string-to-opcode table. Replacing the previous
+ * std::unordered_map removes a static-init heap allocation while keeping lookup allocation-free.
  */
-inline std::unordered_map<std::string_view, MirInstructionOpCode> g_String2MirInstruction = {
+struct MirInstructionNameEntry
+{
+    std::string_view m_name;
+    MirInstructionOpCode m_opcode;
+};
+
+/**
+ * Static table mapping every opcode name literal to its MirInstructionOpCode enum value. Keys are
+ * string_views over the generated name literals, so the table is constant-initialized.
+ */
+inline constexpr MirInstructionNameEntry g_MirInstructionNames[] = {
 #define INSTRUCTION(name, tier, category, operands, flags) { #name, MirInstructionOpCode::name },
 #include "MirInstructionSetDefs.h"
 #undef INSTRUCTION
@@ -45,16 +54,28 @@ inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op)
 }
 
 /**
+ * Looks up an opcode name in the static table, returning opcode 0 when no exact match exists.
+ */
+inline MirInstructionOpCode findMirInstructionName(std::string_view key)
+{
+    for (const MirInstructionNameEntry &entry : g_MirInstructionNames)
+    {
+        if (entry.m_name == key)
+        {
+            return entry.m_opcode;
+        }
+    }
+    return static_cast<MirInstructionOpCode>(0);
+}
+
+/**
  * Parses a string representation of an opcode into its MirInstructionOpCode enum value (case-insensitive).
  * Returns opcode 0 if no match is found. Accepts a view so callers never materialize a temporary string.
  */
 inline MirInstructionOpCode getOpCodeFromStr(std::string_view str)
 {
     const auto findOpCode = [](std::string_view key) -> MirInstructionOpCode
-    {
-        auto it = g_String2MirInstruction.find(key);
-        return it != g_String2MirInstruction.end() ? it->second : static_cast<MirInstructionOpCode>(0);
-    };
+    { return findMirInstructionName(key); };
 
     if (MirInstructionOpCode op = findOpCode(str); op != static_cast<MirInstructionOpCode>(0))
     {

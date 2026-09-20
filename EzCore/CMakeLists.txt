@@ -1,5 +1,7 @@
 set(EZCORE_FILES_LIST
         "include/EzCoreCommon.h"
+        "include/EzCommonStd.h"
+        "include/CliExitCode.h"
         "include/StringUtils.h"
         "include/NameRegistry.h"
         "include/LibBFWrapper.h"

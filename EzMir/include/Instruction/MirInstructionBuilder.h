@@ -42,6 +42,10 @@ struct MirInstructionInsertionPoint
  * High-level and target instruction builder.
  * Constructs MirInstruction objects in the context memory arena, attaches operands,
  * validates constraints, and splices instructions into basic blocks at configured insertion points.
+ *
+ * Error contract (builder layer): invalid arguments that indicate a programming error - a null
+ * instruction/operand or an out-of-range operand index - throw std::runtime_error, consistently with
+ * operator<<. Validated user input is diagnosed by the parser layer, never by this builder.
  */
 class MirInstructionBuilder : public MirBuilder<class MirInstruction>
 {
@@ -149,17 +153,20 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
     MirInstructionBuilder &clearOperands(MirInstruction *instr);
 
     /**
-     * Clears the operand at the given position. This function does nothing if the operand does not exist.
+     * Clears the operand at the given position. Throws std::runtime_error when instr is null or pos
+     * is out of range.
      */
     MirInstructionBuilder &clearOperand(MirInstruction *instr, size_t pos);
 
     /**
-     * Erases an instruction from its owning list, block and function.
+     * Erases an instruction from its owning list, block and function. Throws std::runtime_error when
+     * instr is null.
      */
     MirInstructionBuilder &erase(MirInstruction *instr);
 
     /**
-     * Swap operand at the given index with the one provided. If there's no operand at given index, nothing is done.
+     * Swap operand at the given index with the one provided. Throws std::runtime_error when instr or
+     * newOperand is null, or when index is out of range.
      */
     MirInstructionBuilder &swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index);
 

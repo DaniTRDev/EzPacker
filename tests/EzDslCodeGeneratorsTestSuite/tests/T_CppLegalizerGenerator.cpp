@@ -172,6 +172,12 @@ action RET {
     // Verify Tier 1 dense matrix
     EXPECT_NE(sContent.find("g_AMD64_PrimaryMatrix"), std::string::npos);
 
+    // OPT-09: the generated constructor must not copy the static matrix into the base class, nor
+    // populate the unused matcher map (query() consults the static tables directly).
+    EXPECT_EQ(sContent.find("m_primaryMatrix"), std::string::npos);
+    EXPECT_EQ(sContent.find("m_wildcardActions"), std::string::npos);
+    EXPECT_EQ(sContent.find("m_ruleMatchers"), std::string::npos);
+
     // Verify executeCustom switch
     EXPECT_NE(sContent.find("case 0: return AMD64CallLowering(ctx);"), std::string::npos);
     EXPECT_NE(sContent.find("case 1: return AMD64ReturnLowering(ctx);"), std::string::npos);

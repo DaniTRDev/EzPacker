@@ -38,10 +38,10 @@ class CppTargetInstructionGenerator : public CodeGenerator
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the OpCode enum and descriptor lookup/initialization declarations into the header. */
-    void emitHeader(CppSourceEmitter &emitter) const;
+    void emitHeader(CppSourceEmitter &emitter, const std::vector<const Symbol *> &instSymbols) const;
 
     /** Emits the descriptor table and register-class resolution logic into the source. */
-    void emitSource(CppSourceEmitter &emitter) const;
+    void emitSource(CppSourceEmitter &emitter, const std::vector<const Symbol *> &instSymbols) const;
 
     /** Collects all SymbolType::TargetInstruction symbols from the symbol table in declaration order. */
     std::vector<const Symbol *> collectInstructionSymbols() const;

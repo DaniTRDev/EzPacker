@@ -11,7 +11,7 @@ rule SDivPow2_32 {
         isPositiveConst($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 
@@ -24,7 +24,7 @@ rule SDivPow2_64 {
         isPositiveConst($c);
     };
     emit {
-        SAR i64:$dst, i64:$lhs, log2($c);
+        SAR i64:$dst, i64:$lhs, log2Pow2($c);
     };
 };
 
@@ -36,7 +36,7 @@ rule UDivPow2_32 {
         isPowTwo($c);
     };
     emit {
-        SHR i32:$dst, i32:$lhs, log2($c);
+        SHR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 
@@ -48,7 +48,7 @@ rule UDivPow2_64 {
         isPowTwo($c);
     };
     emit {
-        SHR i64:$dst, i64:$lhs, log2($c);
+        SHR i64:$dst, i64:$lhs, log2Pow2($c);
     };
 };
 

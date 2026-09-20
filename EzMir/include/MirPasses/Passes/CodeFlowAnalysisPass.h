@@ -3,19 +3,78 @@
 
 #include "EzMirCommon.h"
 #include "MirPasses/IMirAnalysisPass.h"
+#include <span>
 
 /**
- * Control Flow Graph (CFG) representation storing predecessor and successor adjacency sets for each basic block.
+ * Control Flow Graph (CFG) representation for the basic blocks of the analysed functions.
+ *
+ * Adjacency is stored in dense per-block slot vectors instead of ordered MirId->set maps: every
+ * block is assigned a compact slot on first sight and its successor/predecessor lists are stored
+ * contiguously. Each adjacency list is kept sorted by MirId, so iteration order (and therefore PHI
+ * predecessor numbering) stays deterministic. The result accumulates across the functions the pass
+ * visits; the pass manager's single reset() clears it.
  */
 struct CodeFlowResult
 {
-    std::pmr::map<MirId, std::pmr::set<MirId>> m_successors;   // Block ID -> successor block IDs.
-    std::pmr::map<MirId, std::pmr::set<MirId>> m_predecessors; // Block ID -> predecessor block IDs.
+    /**
+     * Allocates the adjacency storage from the given arena.
+     */
+    explicit CodeFlowResult(std::pmr::memory_resource *arena);
 
     /**
-     * Allocates both adjacency maps from the given arena.
+     * Ensures a slot exists for blockId and returns its index.
      */
-    CodeFlowResult(std::pmr::memory_resource *arena) : m_successors(arena), m_predecessors(arena) {}
+    size_t ensureBlock(MirId blockId);
+
+    /**
+     * Records a directed edge from -> to in both the successor and predecessor lists, ignoring
+     * null-like duplicate edges and keeping every list sorted.
+     */
+    void addEdge(MirId from, MirId to);
+
+    /**
+     * Returns true when a slot was assigned to blockId.
+     */
+    [[nodiscard]] bool contains(MirId blockId) const;
+
+    /**
+     * Returns the number of blocks tracked in the graph.
+     */
+    [[nodiscard]] size_t getBlockCount() const;
+
+    /**
+     * Returns the sorted successor MirIds of blockId, or an empty span when the block is unknown.
+     */
+    [[nodiscard]] std::span<const MirId> getSuccessors(MirId blockId) const;
+
+    /**
+     * Returns the sorted predecessor MirIds of blockId, or an empty span when the block is unknown.
+     */
+    [[nodiscard]] std::span<const MirId> getPredecessors(MirId blockId) const;
+
+    /**
+     * Returns the block MirIds in slot order (used for deterministic reporting).
+     */
+    [[nodiscard]] const std::pmr::vector<MirId> &getBlockIds() const;
+
+    /**
+     * Clears every block slot and edge, ready for another run.
+     */
+    void reset();
+
+  private:
+    /**
+     * Returns the slot assigned to blockId or InvalidSlot when it was never assigned.
+     */
+    [[nodiscard]] size_t slotOf(MirId blockId) const;
+
+    static constexpr size_t InvalidSlot = static_cast<size_t>(-1);
+
+    std::pmr::memory_resource *m_arena;                       // Arena backing every adjacency vector.
+    std::pmr::vector<MirId> m_blockIds;                       // slot -> block MirId.
+    std::pmr::vector<std::pmr::vector<MirId>> m_successors;   // slot -> sorted successor MirIds.
+    std::pmr::vector<std::pmr::vector<MirId>> m_predecessors; // slot -> sorted predecessor MirIds.
+    std::pmr::unordered_map<MirId, size_t> m_slotById;        // block MirId -> slot.
 };
 
 /**
@@ -70,7 +129,7 @@ class CodeFlowAnalysisPass : public IMirAnalysisPass
     void addEdge(const class MirBlock *from, const class MirBlock *to);
 
   private:
-    CodeFlowResult m_result;            // Last computed CFG adjacency mappings.
+    CodeFlowResult m_result;            // Accumulated CFG adjacency mappings.
     class MirBuilderContext *m_ctx;     // Context whose functions are inspected.
     std::pmr::memory_resource *m_arena; // Arena backing the result containers.
 };

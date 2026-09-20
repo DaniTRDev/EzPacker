@@ -34,7 +34,7 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: `SymbolTable::collect<T>(SymbolType)` (or a templated free helper).
   - Status: fixed
 
-- [ ] **P1 · XPR-04 — PCH/common include lists overlap and drift**
+- [x] **P1 · XPR-04 — PCH/common include lists overlap and drift**
   - Where: `EzDsl/Lexer/include/EzDslLexerCommon.h:4-24` vs
     `EzDsl/CodeGenerators/include/EzDslCodeGeneratorsCommon.h:4-24` (identical block);
     `EzDsl/Sema/include/EzDslSemaCommon.h:4-8` is a subset; `EzCoreCommon.h`, `EzMirCommon.h`,
@@ -42,14 +42,14 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Why: Sema/CodeGenerators do not include `EzCoreCommon.h`/`StringUtils.h`, which is why helper
     duplication (XPR-02) happened.
   - Fix: shared base include header; trim the PCH (see EzDsl LEG-12).
-  - Status: deferred
+  - Status: fixed
 
-- [ ] **P2 · XPR-05 — `escapeString` vs `InfoDumper::escapeJson`**
+- [x] **P2 · XPR-05 — `escapeString` vs `InfoDumper::escapeJson`**
   - Where: `EzDsl/CodeGenerators/src/CodeGenerators/CppTargetDescGenerator.cpp:68-94` vs
     `EzDsl/Cli/src/Cli/InfoDumper.cpp:23-66`
   - Why: same structure and `reserve(size+8)` idiom, differing only in escape tables.
   - Fix: one `EscapeString(view, mode)`.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P2 · XPR-06 — Diagnostic `warn` convenience missing**
   - Where: `EzCore/include/Diagnostics/DiagnosticCollector.h` has `error`/`trace` but no `warn`,
@@ -58,11 +58,11 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: add `DiagnosticCollector::warn` and use it.
   - Status: fixed
 
-- [ ] **P2 · XPR-07 — Sema pass driver duplication**
+- [x] **P2 · XPR-07 — Sema pass driver duplication**
   - Where: nine passes under `EzDsl/Sema/src/SemaPasses/*` repeat trace/null-guard/`hasErrors`
     scaffolding with inconsistent sender names and messages (`TypePass` vs `Sema::Xxx`).
   - Fix: a shared pass driver/base; standardize the diagnostic sender.
-  - Status: deferred
+  - Status: fixed
 
 ## 2. Duplication that crosses project boundaries
 
@@ -91,12 +91,12 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: a single shared x86 vocabulary table. See `EzDslReview.md` DUP-06.
   - Status: fixed
 
-- [ ] **P2 · XPR-11 — CLI scaffold duplicated EzDsl/Cli vs EzCompiler**
+- [x] **P2 · XPR-11 — CLI scaffold duplicated EzDsl/Cli vs EzCompiler**
   - Where: `EzDsl/Cli/src/Cli/CommandLineOptions.cpp` vs
     `EzCompiler/src/CommandLineOptions.cpp`; entry-point error handling differs
     (`EzDsl/Cli/src/Main.cpp:9-47` has try/catch + exit 2; `EzCompiler/src/Main.cpp` has none).
   - Fix: share the argparse scaffold; align exit codes.
-  - Status: in-progress
+  - Status: fixed-progress
 
 - [x] **P2 · XPR-12 — Frontend stub (`EzFrontend`) is outside the build but referenced**
   - Where: `EzFrontend/EzLexer/include/EzLexerCommon.h:21` includes a removed `<EzCore.h>`;
@@ -116,17 +116,17 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: reconnect to the build or delete. See `EzTripleReview.md` LEG-02/03/04.
   - Status: fixed
 
-- [ ] **P2 · XPR-14 — Stale comments/docs after the emitter + encoding refactors**
+- [x] **P2 · XPR-14 — Stale comments/docs after the emitter + encoding refactors**
   - Where: e.g. `EzDsl/CodeGenerators/CppRegisterInfoGenerator.cpp:204` and
     `CppTargetDescGenerator.cpp:295` (`EzCodeEmitter::TableGen::`), `EzDsl/README.md`,
     `EzCompiler/EmissionEngine.h:37`.
   - Fix: sweep comments/docs against the current namespaces and APIs.
-  - Status: in-progress
+  - Status: fixed-progress
 
-- [ ] **P2 · XPR-15 — Dead locals / build warnings sweep**
+- [x] **P2 · XPR-15 — Dead locals / build warnings sweep**
   - Where: `EzMir`/`EzTriple`/`EzCore` dead `bool modified`-style flags (see project files
     OPT items). Run a warning-clean build (`-Wall -Wextra`) and delete.
-  - Status: in-progress
+  - Status: fixed-progress
 
 ## 4. Marker scan (baseline)
 
@@ -157,5 +157,5 @@ unless the change is explicitly intended to alter output.
 | XPR-09..10 | P1 | Duplication | fixed | — | shared `BasicBinaryDesc`/`IObjectWriter`, x86-64 vocabulary table |
 | XPR-13 | P1 | Legacy | fixed | — | orphaned target source-of-truth files deleted |
 | XPR-06, XPR-12 | P2 | mixed | fixed | — | `DiagnosticCollector::warn`; out-of-build `EzFrontend` stub deleted |
-| XPR-04..05, XPR-07 | P2 | mixed | deferred | — | shared PCH, string escaper, sema pass driver |
-| XPR-11, XPR-14..15 | P2 | mixed | in-progress | — | exit codes aligned + exception handling; doc/dead-local sweep ongoing |
+| XPR-04..05, XPR-07 | P2 | mixed | fixed | — | shared `EzCommonStd.h` PCH, `EscapeString`, Sema pass driver |
+| XPR-11, XPR-14..15 | P2 | mixed | fixed | — | shared CLI exit codes, doc sweep, dead-local/warning cleanup |

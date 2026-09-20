@@ -22,7 +22,7 @@ MirBlock *MirBlockBuilder::build(SourceReference *sourceRef, const std::string_v
 
     // Construct in-place without node wrapper allocations
     std::pmr::string pmrName(name, arena);
-    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, m_ownerFunc, std::move(pmrName));
+    MirBlock *block = alloc.new_object<MirBlock>(m_ctx->createId(), sourceRef, m_ownerFunc, arena, std::move(pmrName));
 
     m_ctx->getDiagCollector()->trace("MirBlockBuilder", "Built block with id: {}", block->getId()) << sourceRef;
 

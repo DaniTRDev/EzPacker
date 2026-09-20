@@ -134,7 +134,7 @@ void CppEncodingTableGenerator::emitHeader(CppSourceEmitter &emitter) const
 // Emits the encoding table for the current symbol table and writes the single output header.
 bool CppEncodingTableGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }

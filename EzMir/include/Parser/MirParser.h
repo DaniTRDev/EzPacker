@@ -53,6 +53,11 @@ class MirParser
     /**
      * Parses a complete MIR module from a source string buffer.
      * Populates ctx with functions, types, and global variables.
+     *
+     * Error contract (parser layer): every recoverable lexical/semantic error is reported through the
+     * DiagnosticCollector and the function returns false; exceptions raised by lower layers (for
+     * example an integer-literal overflow) are caught at this boundary, converted to a diagnostic and
+     * also reported as false. No exception ever escapes the parser.
      */
     bool parseModule(std::string_view source, std::string_view bufferName = "input.mir");
 

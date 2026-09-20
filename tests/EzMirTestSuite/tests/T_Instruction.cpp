@@ -6,6 +6,7 @@
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
+#include <stdexcept>
 
 /**
  * Test fixture for MIR instruction building, opcode assignments, and operand bindings.
@@ -82,4 +83,67 @@ TEST_F(InstrTest, SimpleBuild)
 
     EXPECT_TRUE(IsVirtualRegister(instr->getOperands()[0], getTypeTable()->i8()));
     EXPECT_TRUE(IsVirtualRegister(instr->getOperands()[1], getTypeTable()->i16()));
+}
+
+/**
+ * LEG-10: the variadic expansion slot encoded in the generated metadata must give every extra
+ * destination of UNMERGE_VALUES a Write flag, while every extra operand of MERGE_VALUES stays a Read.
+ */
+TEST_F(InstrTest, VariadicOperandFlags)
+{
+    MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
+    MirOperandBuilder oBuilder(getBuilderCtx());
+
+    MirType *i32 = getTypeTable()->i32();
+
+    // UNMERGE_VALUES: [dst0, dst1, src] -> Write, Write, Read.
+    MirInstruction *unmerge = iBuilder.build(MirInstructionOpCode::UNMERGE_VALUES,
+                                             nullptr,
+                                             { oBuilder.buildVReg(i32, "lo"),
+                                               oBuilder.buildVReg(i32, "hi"),
+                                               oBuilder.buildVReg(getTypeTable()->i64(), "wide") });
+    ASSERT_NE(unmerge, nullptr);
+    EXPECT_TRUE(unmerge->getOperandFlag(0) & MirOperandFlag::Write);
+    EXPECT_FALSE(unmerge->getOperandFlag(0) & MirOperandFlag::Read);
+    EXPECT_TRUE(unmerge->getOperandFlag(1) & MirOperandFlag::Write);
+    EXPECT_FALSE(unmerge->getOperandFlag(1) & MirOperandFlag::Read);
+    EXPECT_TRUE(unmerge->getOperandFlag(2) & MirOperandFlag::Read);
+    EXPECT_FALSE(unmerge->getOperandFlag(2) & MirOperandFlag::Write);
+
+    // MERGE_VALUES: [dst, src0, src1, src2] -> Write, Read, Read, Read.
+    MirInstruction *merge = iBuilder.build(MirInstructionOpCode::MERGE_VALUES,
+                                           nullptr,
+                                           { oBuilder.buildVReg(getTypeTable()->i64(), "wide_dst"),
+                                             oBuilder.buildVReg(i32, "a"),
+                                             oBuilder.buildVReg(i32, "b"),
+                                             oBuilder.buildVReg(i32, "c") });
+    ASSERT_NE(merge, nullptr);
+    EXPECT_TRUE(merge->getOperandFlag(0) & MirOperandFlag::Write);
+    for (size_t i = 1; i < 4; ++i)
+    {
+        EXPECT_TRUE(merge->getOperandFlag(i) & MirOperandFlag::Read);
+        EXPECT_FALSE(merge->getOperandFlag(i) & MirOperandFlag::Write);
+    }
+}
+
+/**
+ * WEI-12: the instruction builder reports programming errors through one channel. Null instructions
+ * or operands and out-of-range operand indices must throw std::runtime_error rather than no-op.
+ */
+TEST_F(InstrTest, BuilderRejectsInvalidOperands)
+{
+    MirInstructionBuilder iBuilder(getBuilderCtx(), getTestInsertionPoint());
+    MirOperandBuilder oBuilder(getBuilderCtx());
+
+    MirInstruction *instr = iBuilder.build(MirInstructionOpCode::ADD,
+                                           nullptr,
+                                           { oBuilder.buildVReg(getTypeTable()->i32(), "lhs"),
+                                             oBuilder.buildVReg(getTypeTable()->i32(), "rhs") });
+    ASSERT_NE(instr, nullptr);
+
+    EXPECT_THROW(iBuilder.addOperand(nullptr, nullptr), std::runtime_error);
+    EXPECT_THROW(iBuilder.clearOperand(nullptr, 0), std::runtime_error);
+    EXPECT_THROW(iBuilder.clearOperand(instr, 5), std::runtime_error);
+    EXPECT_THROW(iBuilder.swapOperand(instr, oBuilder.buildVReg(getTypeTable()->i32(), "fresh"), 5),
+                 std::runtime_error);
 }

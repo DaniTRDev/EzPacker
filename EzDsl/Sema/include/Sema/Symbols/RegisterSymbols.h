@@ -18,6 +18,8 @@ namespace Symbols
 
 /**
  * Semantic symbol for a `register_bank` declaration (.reg).
+ * The flattened name/target fields are retained for consumers and tests; code generation resolves
+ * banks through the RegisterFileSymbol's AST node.
  */
 struct RegisterBankSymbol
 {
@@ -28,6 +30,7 @@ struct RegisterBankSymbol
 
 /**
  * Semantic symbol for a register class declared inside a bank (.reg).
+ * The first three fields mirror the AST for consumers/tests; code generation reads m_astNode.
  */
 struct RegisterClassSymbol
 {
@@ -39,7 +42,8 @@ struct RegisterClassSymbol
 
 /**
  * Semantic symbol for a physical register declaration (.reg), including its explicit
- * hardware encoding.
+ * hardware encoding. The scalar fields mirror the AST for consumers/tests; the register-info
+ * generator resolves registers through the backing AST node.
  */
 struct RegisterSymbol
 {
@@ -51,6 +55,7 @@ struct RegisterSymbol
 
 /**
  * Semantic symbol for a non-allocatable pseudo register declared in `special { ... }`.
+ * The name/target/id fields mirror the AST for consumers/tests; code generation reads m_astNode.
  */
 struct SpecialRegisterSymbol
 {

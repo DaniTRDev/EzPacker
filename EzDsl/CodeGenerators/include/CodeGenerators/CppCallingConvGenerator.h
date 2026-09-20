@@ -38,10 +38,10 @@ class CppCallingConvGenerator : public CodeGenerator
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the CallingConvDesc class declarations and inline helpers into the header. */
-    void emitHeader(CppSourceEmitter &emitter) const;
+    void emitHeader(CppSourceEmitter &emitter, const std::vector<const Symbol *> &convs) const;
 
     /** Emits the CallingConvDesc out-of-line method definitions into the source. */
-    void emitSource(CppSourceEmitter &emitter) const;
+    void emitSource(CppSourceEmitter &emitter, const std::vector<const Symbol *> &convs) const;
 
   private:
     /** Target identifier substituted into generated class and include names. */

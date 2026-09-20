@@ -1,6 +1,7 @@
 #include "Ast/IrInstructionDefLangAst.h"
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
+#include "Sema/EnumNames.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 
@@ -13,45 +14,23 @@ namespace
 // Maps a parsed IR instruction category to the generated MirCat_* enum spelling.
 std::string CategoryToString(DSL::Ast::IrInstDef::IrInstCategory category)
 {
-    using namespace DSL::Ast::IrInstDef;
-    switch (category)
+    const std::string_view name = Sema::EnumNames::irCategoryName(category);
+    if (name == "Unknown")
     {
-        case IrInstCategory::DataMovement:
-            return "MirCat_DataMovement";
-        case IrInstCategory::Memory:
-            return "MirCat_Memory";
-        case IrInstCategory::Arithmetic:
-            return "MirCat_Arithmetic";
-        case IrInstCategory::Bitwise:
-            return "MirCat_Bitwise";
-        case IrInstCategory::Compare:
-            return "MirCat_Compare";
-        case IrInstCategory::ControlFlow:
-            return "MirCat_ControlFlow";
-        case IrInstCategory::Casting:
-            return "MirCat_Casting";
-        case IrInstCategory::System:
-            return "MirCat_System";
-        case IrInstCategory::Invalid:
-        default:
-            return "MirCat_Invalid";
+        return "MirCat_Invalid";
     }
+    return std::format("MirCat_{}", name);
 }
 
 // Maps a parsed IR tier to the generated T(...) macro argument spelling.
 std::string TierToString(DSL::Ast::IrInstDef::IrInstTier tier)
 {
-    using namespace DSL::Ast::IrInstDef;
-    switch (tier)
+    const std::string_view name = Sema::EnumNames::irTierName(tier);
+    if (name == "Unknown")
     {
-        case IrInstTier::HighLevel:
-            return "T(HighLevel)";
-        case IrInstTier::PassInternal:
-            return "T(PassInternal)";
-        case IrInstTier::TargetLow:
-            return "T(TargetLow)";
+        return "T(HighLevel)";
     }
-    return "T(HighLevel)";
+    return std::format("T({})", name);
 }
 
 // Maps a parsed operand type constraint to the generated ExpectedOperandType enumerator.
@@ -202,7 +181,9 @@ void CppMirInstructionGenerator::emitInstructionDefs(CppSourceEmitter &emitter,
     emitter.emitBlankLine();
 
     // Convenience macros keep the generated registration lines compact and readable.
-    emitter.emitLine("#define OPERAND_CONSTRAINTS(...) { __VA_ARGS__ }");
+    // OPERAND_CONSTRAINTS builds the fixed-capacity slot list consumed by MirInstructionMetadata;
+    // the position of a VariadicArgs entry encodes the instruction's variadic expansion slot.
+    emitter.emitLine("#define OPERAND_CONSTRAINTS(...) ::MirOperandMetadataList{ __VA_ARGS__ }");
     emitter.emitComment("Helper to keep the flags readable without polluting the global namespace");
     emitter.emitLine("#define F(x) MirInstructionFlags::x");
     emitter.emitLine("#define T(x) MirInstructionTier::x");
@@ -291,12 +272,10 @@ void CppMirInstructionGenerator::emitInstructionDefs(CppSourceEmitter &emitter,
 // Validates prerequisites, emits the definitions, and writes the single output header.
 bool CppMirInstructionGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration(std::format("IR instruction definitions in {}", m_outputPath.string())))
     {
         return false;
     }
-
-    trace("Generating IR instruction definitions in {}", m_outputPath.string());
 
     auto instSymbols = collectInstructionSymbols();
     auto targetFilePath = resolveSingleFilePath("MirInstructionSetDefs.h");

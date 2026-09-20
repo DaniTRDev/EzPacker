@@ -38,20 +38,13 @@ class LegalizerInfo
 
   public:
     /**
-     * Initializes the primary matrix and wildcard tables to Unsupported so unregistered
-     * combinations are rejected by default.
+     * Builds an empty legality table. The primary matrix and wildcard tables default to
+     * Unsupported through LegalityResponse's default member initializers, so unregistered
+     * combinations are rejected without an explicit per-element initialization pass. Generated
+     * targets override query() and read their static tables directly, so they do not pay for a
+     * base-class table copy either.
      */
-    LegalizerInfo()
-    {
-        for (size_t op = 0; op < OPCODE_COUNT; ++op)
-        {
-            m_wildcardActions[op] = LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            for (size_t t = 0; t < MAX_COMPACT_TYPES; ++t)
-            {
-                m_primaryMatrix[op][t] = LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-            }
-        }
-    }
+    LegalizerInfo() = default;
 
     virtual ~LegalizerInfo() = default;
 

@@ -4,6 +4,7 @@
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/TargetSymbols.h"
+#include "SemaPasses/PassDriver.h"
 #include <unordered_map>
 #include <unordered_set>
 
@@ -16,7 +17,7 @@ bool TargetInstPass::run(DiagnosticCollector *collector,
                          SymbolTable *table,
                          DSL::Ast::TargetInstDef::TargetInstFile *file)
 {
-    if (!collector || !table || !file)
+    if (!Sema::preparePass(collector, table, file, PassName))
     {
         return false;
     }

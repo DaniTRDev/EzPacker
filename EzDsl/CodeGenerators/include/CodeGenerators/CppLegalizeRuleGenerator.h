@@ -39,10 +39,10 @@ class CppLegalizeRuleGenerator : public CodeGenerator
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the rule matcher/rewriter declarations and predicate forward declarations into the header. */
-    void emitHeader(CppSourceEmitter &emitter) const;
+    void emitHeader(CppSourceEmitter &emitter, const std::vector<const Symbol *> &ruleSymbols) const;
 
     /** Emits the matcher and rewriter definitions plus instruction replacement sequences into the source. */
-    void emitSource(CppSourceEmitter &emitter) const;
+    void emitSource(CppSourceEmitter &emitter, const std::vector<const Symbol *> &ruleSymbols) const;
 
   private:
     /** Target identifier substituted into generated class and include names. */

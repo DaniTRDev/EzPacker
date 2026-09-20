@@ -1,6 +1,7 @@
 #include "ObjectFormat/Elf64Writer.h"
 #include <algorithm>
 #include <cstring>
+#include <format>
 #include <stdexcept>
 #include <string>
 
@@ -241,7 +242,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
     // 0. NULL symbol
     symTable.push_back(Elf64_Sym{ 0, 0, 0, 0, 0, 0 });
 
-    std::unordered_map<std::string, uint32_t> symIndexMap;
+    std::unordered_map<std::string_view, uint32_t> symIndexMap;
 
     for (const auto &sym : m_symbols)
     {
@@ -264,8 +265,8 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
             {
                 // A defined symbol in a section the writer does not emit would silently become
                 // SHN_UNDEF, producing a malformed object; fail loudly instead.
-                throw std::runtime_error("Elf64Writer: symbol '" + sym.m_name +
-                                         "' references a section that is not emitted");
+                throw std::runtime_error(std::format("Elf64Writer: symbol '{}' references a section that is not emitted",
+                                                     sym.m_name));
             }
             elfSym.st_shndx = itSec->second;
         }

@@ -126,7 +126,6 @@ void NonSsaToSsaPass::buildDominanceFrontier(CodeFlowResult *cfg, MirFunction *f
 {
     auto &domFrontier = m_result.m_domFrontier;
     auto &idom = m_result.m_immDomTree;
-    auto &predecessors = cfg->m_predecessors;
 
     for (MirBlock *b : func->getBlocks())
     {
@@ -137,12 +136,12 @@ void NonSsaToSsaPass::buildDominanceFrontier(CodeFlowResult *cfg, MirFunction *f
             continue;
 
         MirId bIdom = idomIt->second;
-        auto predIt = predecessors.find(bId);
+        const std::span<const MirId> predecessors = cfg->getPredecessors(bId);
 
-        if (predIt == predecessors.end() || predIt->second.size() < 2)
+        if (predecessors.size() < 2)
             continue;
 
-        for (MirId p : predIt->second)
+        for (MirId p : predecessors)
         {
             MirId runner = p;
 
@@ -224,22 +223,19 @@ void NonSsaToSsaPass::buildImmDomTree(CodeFlowResult *cfg, MirFunction *func, Mi
             MirId newIdom = 0;
             bool foundFirst = false;
 
-            auto predIt = cfg->m_predecessors.find(blockId);
-            if (predIt != cfg->m_predecessors.end())
+            const std::span<const MirId> predecessors = cfg->getPredecessors(blockId);
+            for (MirId pred : predecessors)
             {
-                for (MirId pred : predIt->second)
+                if (domTree.find(pred) != domTree.end())
                 {
-                    if (domTree.find(pred) != domTree.end())
+                    if (!foundFirst)
                     {
-                        if (!foundFirst)
-                        {
-                            newIdom = pred;
-                            foundFirst = true;
-                        }
-                        else
-                        {
-                            newIdom = intersect(pred, newIdom);
-                        }
+                        newIdom = pred;
+                        foundFirst = true;
+                    }
+                    else
+                    {
+                        newIdom = intersect(pred, newIdom);
                     }
                 }
             }
@@ -275,7 +271,7 @@ void NonSsaToSsaPass::buildPostOrderIndexList(CodeFlowResult *cfg, MirFunction *
     {
         visited.insert(currentBlock);
 
-        for (MirId succ : cfg->m_successors[currentBlock])
+        for (MirId succ : cfg->getSuccessors(currentBlock))
         {
             if (visited.find(succ) == visited.end())
             {
@@ -359,8 +355,8 @@ void NonSsaToSsaPass::insertPhiNodes(CodeFlowResult *cfg, MirFunction *func)
 
                     iBuilder.setInsertionPoint(targetBlock, InsertionType::InsertBefore, targetBlock->begin());
 
-                    auto numPredsIt = cfg->m_predecessors.find(dfBlockId);
-                    size_t numPreds = (numPredsIt != cfg->m_predecessors.end()) ? numPredsIt->second.size() : 0;
+                    auto numPredsIt = cfg->getPredecessors(dfBlockId);
+                    size_t numPreds = numPredsIt.size();
                     createPhiInstruction(&iBuilder, regId, numPreds);
 
                     auto diag = m_ctx->getDiagCollector()->trace("NonSsaToSsaPass",
@@ -558,14 +554,14 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
         }
 
         // --- C. Populate PHI arguments in CFG Successors ---
-        for (MirId succId : cfg->m_successors[blockId])
+        for (MirId succId : cfg->getSuccessors(blockId))
         {
             MirBlock *succBlock = func->getBlock(succId);
             if (!succBlock)
                 continue;
 
-            const auto &preds = cfg->m_predecessors.at(succId);
-            auto predIt = preds.find(blockId);
+            const std::span<const MirId> preds = cfg->getPredecessors(succId);
+            auto predIt = std::find(preds.begin(), preds.end(), blockId);
             if (predIt == preds.end())
                 continue;
 

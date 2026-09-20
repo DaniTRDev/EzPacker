@@ -1,12 +1,7 @@
 #ifndef EZDSLSEMA_COMMON_H
 #define EZDSLSEMA_COMMON_H
 
-#include "StringUtils.h" // NormalizeKey / StrToUpper
-
-#include <algorithm>
-#include <fstream>
-#include <optional>
-#include <sstream>
-#include <memory_resource>
+// Shared std/StringUtils base for the semantic analysis module.
+#include "EzCommonStd.h"
 
 #endif // EZDSLSEMA_COMMON_H

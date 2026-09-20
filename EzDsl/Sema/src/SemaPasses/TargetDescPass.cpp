@@ -3,6 +3,7 @@
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/TargetDescSymbols.h"
+#include "SemaPasses/PassDriver.h"
 
 #include <unordered_set>
 
@@ -20,14 +21,8 @@ bool TargetDescPass::run(class DiagnosticCollector *collector,
                          class SymbolTable *table,
                          DSL::Ast::TargetDesc::TargetDescFile *file)
 {
-    if (!collector)
+    if (!Sema::preparePass(collector, table, file, PassName))
     {
-        return false;
-    }
-
-    if (!table || !file)
-    {
-        collector->error(PassName, "Invalid symbol table or AST file pointer.");
         return false;
     }
 

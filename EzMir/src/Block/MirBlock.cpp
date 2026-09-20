@@ -5,8 +5,12 @@
 /**
  * Initializes a new basic block with its unique ID, source reference, owning function, and name.
  */
-MirBlock::MirBlock(MirId id, SourceReference *sourceRef, MirFunction *owner, const std::pmr::string &name) :
-    m_owner(owner), m_id(id), m_sourceRef(sourceRef), m_name(name)
+MirBlock::MirBlock(MirId id,
+                   SourceReference *sourceRef,
+                   MirFunction *owner,
+                   std::pmr::memory_resource *alloc,
+                   const std::pmr::string &name) :
+    m_owner(owner), m_id(id), m_sourceRef(sourceRef), m_name(name), m_predecessors(alloc)
 {
 }
 

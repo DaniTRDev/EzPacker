@@ -13,11 +13,10 @@ NameRegistry<EncodingDialect *> &registry()
     return s_registry;
 }
 
-EncodingDialect *&lastRegistered()
-{
-    static EncodingDialect *s_last = nullptr;
-    return s_last;
-}
+// Canonical name of the dialect used when an instruction's target name does not resolve to one.
+// Pinning the default to a named constant keeps behavior independent of static-registration order
+// (previously "last registered"), so adding a second ISA cannot silently change the fallback.
+constexpr std::string_view kDefaultDialectName = "x86_64";
 
 } // namespace
 
@@ -29,11 +28,10 @@ void registerEncodingDialect(std::string_view name, EncodingDialect *dialect)
     }
 
     registry().add(name, dialect);
-    lastRegistered() = dialect;
 }
 
 EncodingDialect *findEncodingDialect(std::string_view name) { return registry().find(name); }
 
-EncodingDialect *getDefaultEncodingDialect() { return lastRegistered(); }
+EncodingDialect *getDefaultEncodingDialect() { return registry().find(kDefaultDialectName); }
 
 } // namespace Sema::Encoding

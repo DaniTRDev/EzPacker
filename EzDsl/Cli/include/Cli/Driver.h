@@ -39,6 +39,9 @@ class Driver
     /** Maps a detected dialect to the code generator that consumes it. */
     GeneratorKind resolveGeneratorKind(LanguageDialect dialect) const;
 
+    /** Resolves the target identifier (explicit, input stem, or fallback) sanitized for C++ identifiers. */
+    std::string resolveTargetName(std::string_view fallback) const;
+
     /** Computes the output files a generator is expected to produce under outDir, for reporting and dry runs. */
     std::vector<OutputFileInfo> computeExpectedOutputs(GeneratorKind genKind,
                                                        const std::filesystem::path &outDir) const;

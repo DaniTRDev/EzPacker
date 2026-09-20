@@ -37,21 +37,10 @@ std::vector<const Symbol *> CppInstructionSelectorGenerator::collectPatternSymbo
     return m_table->collect<Symbols::SelectionPatternSymbol>(SymbolType::SelectionPattern);
 }
 
-// Collects the parsed addressing modes that selection patterns may fold into memory operands.
-std::vector<const Symbol *> CppInstructionSelectorGenerator::collectAddrModeSymbols() const
-{
-    if (!m_table)
-    {
-        return {};
-    }
-
-    return m_table->collect<Symbols::AddrModeSymbol>(SymbolType::AddressingMode);
-}
-
 // Resolves the header/source destinations, emits both artifacts, and reports combined success.
 bool CppInstructionSelectorGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }
@@ -62,17 +51,16 @@ bool CppInstructionSelectorGenerator::run()
     CppSourceEmitter headerEmitter;
     CppSourceEmitter sourceEmitter;
 
-    emitHeader(headerEmitter);
-    emitSource(sourceEmitter);
+    auto patternSymbols = collectPatternSymbols();
+    emitHeader(headerEmitter, patternSymbols);
+    emitSource(sourceEmitter, patternSymbols);
 
-    bool headerOk = writeOutput(headerPath, headerEmitter.str());
-    bool sourceOk = writeOutput(sourcePath, sourceEmitter.str());
-
-    return headerOk && sourceOk;
+    return writeHeaderAndSource({ headerPath, sourcePath }, headerEmitter.view(), sourceEmitter.view());
 }
 
 // Emits the selector class declaration with one private select<Opcode> entry point per opcode.
-void CppInstructionSelectorGenerator::emitHeader(CppSourceEmitter &emitter) const
+void CppInstructionSelectorGenerator::emitHeader(CppSourceEmitter &emitter,
+                                                 const std::vector<const Symbol *> &patternSymbols) const
 {
     std::string guard = std::format("EZTRIPLE_{}_INSTRUCTION_SELECTOR_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
@@ -83,8 +71,6 @@ void CppInstructionSelectorGenerator::emitHeader(CppSourceEmitter &emitter) cons
     emitter.emitInclude("InstructionSelector/MirInstructionSelector.h");
     emitter.emitInclude("Descriptors/TargetDesc.h");
     emitter.emitBlankLine();
-
-    auto patternSymbols = collectPatternSymbols();
 
     // Group unique generic root opcodes
     std::set<std::string> uniqueOpcodes;
@@ -127,7 +113,8 @@ void CppInstructionSelectorGenerator::emitHeader(CppSourceEmitter &emitter) cons
 }
 
 // Emits the selector dispatch, per-opcode matchers and the lowering bodies they perform.
-void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) const
+void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
+                                                 const std::vector<const Symbol *> &patternSymbols) const
 {
     emitter.emitBanner("CppInstructionSelectorGenerator");
     emitter.emitBlankLine();
@@ -173,8 +160,6 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
         emitter.dedent();
         emitter.emitLine("{}");
         emitter.emitBlankLine();
-
-        auto patternSymbols = collectPatternSymbols();
 
         // Group patterns by opcode, with higher-cost (more specific) patterns first
         std::map<std::string, std::vector<const DSL::Ast::InstructionSelectDef::SelectionPattern *>> opcodePatterns;

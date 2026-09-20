@@ -36,7 +36,7 @@ namespace
  */
 EzCodeEmitter::ObjectFormat::ObjectSymbol makeUndefinedFunctionSymbol(std::string_view name)
 {
-    return { .m_name = std::string(name),
+    return { .m_name = name,
              .m_section = SectionType::Undefined,
              .m_offset = 0,
              .m_size = 0,
@@ -184,7 +184,7 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             }
         }
 
-        symbols.push_back({ .m_name = std::string(gvar->getName()),
+        symbols.push_back({ .m_name = gvar->getName(),
                             .m_section = targetSecType,
                             .m_offset = gvOffset,
                             .m_size = gvSize,
@@ -240,7 +240,7 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         emitter->endFunction(&emitterCtx, func);
         uint64_t fnSize = textSection->getCurrentOffset() - fnOffset;
 
-        symbols.push_back({ .m_name = std::string(func->getName()),
+        symbols.push_back({ .m_name = func->getName(),
                             .m_section = SectionType::Text,
                             .m_offset = fnOffset,
                             .m_size = fnSize,
@@ -266,8 +266,9 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
     TargetRelocationResolver *relocResolver = targetDesc->getRelocationResolver();
     const auto &allRelocs = emitterCtx.getRelocations();
 
-    // O(1) lookup of already-defined symbol names while discovering undefined callees.
-    std::unordered_set<std::string> definedSymbolNames;
+    // O(1) lookup of already-defined symbol names while discovering undefined callees. Keys are
+    // views into MIR-context-owned names, which outlive this emission.
+    std::unordered_set<std::string_view> definedSymbolNames;
     definedSymbolNames.reserve(symbols.size() * 2);
     for (const auto &sym : symbols)
     {
@@ -298,11 +299,12 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             }
             else if (ref->isFunction())
             {
-                std::string calleeName;
+                // View into the resolved function's own (context-owned) name; empty when unresolved.
+                std::string_view calleeName;
                 auto itFunc = funcById.find(ref->getRefId());
                 if (itFunc != funcById.end() && itFunc->second)
                 {
-                    calleeName = std::string(itFunc->second->getName());
+                    calleeName = itFunc->second->getName();
                 }
 
                 if (!calleeName.empty())
@@ -331,11 +333,12 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             }
             else if (ref->isGlobalVar())
             {
-                std::string gvName;
+                // Same non-owning contract as the function case above.
+                std::string_view gvName;
                 auto itGv = gvarById.find(ref->getRefId());
                 if (itGv != gvarById.end() && itGv->second)
                 {
-                    gvName = std::string(itGv->second->getName());
+                    gvName = itGv->second->getName();
                 }
 
                 if (!gvName.empty())

@@ -22,13 +22,13 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: one parameterized `scalarActionFor(ActionKind, ...)`.
   - Status: fixed
 
-- [ ] **P1 · DUP-02 — AbiLowerer has four near-identical `ArgLocationType` switches**
+- [x] **P1 · DUP-02 — AbiLowerer has four near-identical `ArgLocationType` switches**
   - Where: `EzTriple/src/AbiLowerer/MirAbiLowerer.cpp:146-278` vs `:409-528` (and
     `processReturnBlock:24-140`, `processCallReturnBlock:284-403`)
   - Why: same Register/Split/Indirect/Stack bodies with only names/diagnostics differing;
     ~250 lines of near-duplication.
   - Fix: one "assign value to ABI location" routine parameterized by direction.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P1 · DUP-03 — "insert first, then switch insertion point" lambda repeated 4–5×**
   - Where: `LegalizeCallAction.cpp:37-45`, `LegalizeReturnAction.cpp:45-53`,
@@ -78,10 +78,10 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: delete with the module (LEG-01).
   - Status: fixed
 
-- [ ] **P2 · DUP-10 — `insertPrologue`/`insertEpilogue` setup boilerplate**
+- [x] **P2 · DUP-10 — `insertPrologue`/`insertEpilogue` setup boilerplate**
   - Where: `EzTriple/src/Targets/X86_64/X86_64FrameLowerer.cpp:24-97` vs `:103-185`
   - Fix: shared descriptor/register setup helper.
-  - Status: deferred
+  - Status: fixed
 
 ## 3. Legacy / un-removed code
 
@@ -150,12 +150,12 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: declare the real dependencies or fix the doc.
   - Status: fixed
 
-- [ ] **P2 · LEG-10 — `X86_64Lowering.cpp` is a thin shim with ad-hoc predicates**
+- [x] **P2 · LEG-10 — `X86_64Lowering.cpp` is a thin shim with ad-hoc predicates**
   - Where: `src/Targets/X86_64/X86_64Lowering.cpp:8,11,14-28`
   - Why: one-line wrappers plus `isPowTwo`/`log2` declared only by generated code/tests;
     `log2` returns trailing-zero count for non-powers and shadows `std::log2`.
   - Fix: declare the generator contract in a header, rename `log2`.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P2 · LEG-11 — `LoweredBlock` alias and `m_loweredBlocks` allocator**
   - Where: `include/AbiLowerer/MirAbiLowererPass.h:44,84`
@@ -208,11 +208,11 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: restrict to the current function.
   - Status: fixed
 
-- [ ] **P2 · WEI-08 — `selectPHI` predecessor mapping is heuristic and name-based**
+- [x] **P2 · WEI-08 — `selectPHI` predecessor mapping is heuristic and name-based**
   - Where: `src/Targets/X86_64/X86_64InstructionSelector.cpp:583-641` (`"undef"` name check at `:614`)
   - Why: relies on positional/`MirId` ordering and register naming.
   - Fix: use explicit predecessor/phi metadata.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P2 · WEI-09 — `std::format(...).c_str()` temporaries fed to `buildPhysReg`**
   - Where: `src/AbiLowerer/MirAbiLowerer.cpp:181,210,237,248,321,353,384,444,473,496`
@@ -220,12 +220,12 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: pass owned `pmr::string`/`std::string` (see OPT-07).
   - Status: fixed
 
-- [ ] **P2 · WEI-10 — Hand-rolled LE store / opcode sniffing in the relocation resolver**
+- [x] **P2 · WEI-10 — Hand-rolled LE store / opcode sniffing in the relocation resolver**
   - Where: `src/Targets/X86_64/X86_64RelocationResolver.cpp:10-16,36-66`
   - Why: duplicates frame-size/offset knowledge owned by the encoder/branch relaxer.
   - Fix: share the encoder's constants/helpers; unify with `EmissionEngine` (see
     `EzCompilerReview.md` DUP-01).
-  - Status: deferred
+  - Status: fixed
 
 ## 5. Easy optimization checks
 
@@ -281,16 +281,16 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: reserve.
   - Status: fixed
 
-- [ ] **P2 · OPT-09 — Generated legalizer copies a full static matrix**
+- [x] **P2 · OPT-09 — Generated legalizer copies a full static matrix**
   - Where: generated `x86_64LegalizerActionTable.cpp` constructor (build dir)
   - Why: ~2304 element copies and unused `m_ruleMatchers` population.
   - Fix: keep the static table and drop the member, or consult the map.
-  - Status: deferred
+  - Status: fixed
 
-- [ ] **P2 · OPT-10 — Interference graph repeated hashing / mixed allocators**
+- [x] **P2 · OPT-10 — Interference graph repeated hashing / mixed allocators**
   - Where: `src/RegisterAllocator/MirRegisterAllocator.cpp:73-74,91-92,283-295,490-493`
   - Fix: `try_emplace`/local refs; per-class bitmask for colors.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P2 · OPT-11 — Dead locals causing warnings**
   - Where: `src/RegisterAllocator/MirRegisterAllocator.cpp:419,436`,
@@ -298,10 +298,10 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: delete.
   - Status: fixed
 
-- [ ] **P2 · OPT-12 — Per-worklist-item `LegalityQuery` zero-fill**
+- [x] **P2 · OPT-12 — Per-worklist-item `LegalityQuery` zero-fill**
   - Where: `src/Legalizer/MirLegalizer.cpp:168-229`
   - Fix: lightweight pre-check / reuse a stack query.
-  - Status: deferred
+  - Status: fixed
 
 ## 6. Hot spots
 
@@ -322,9 +322,7 @@ on a large MIR module and re-run `T_X86_64TargetDesc`, `T_MirInstructionSelector
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| WEI-01..02 | P0 | Weird | fixed | — | AbiLowerer null deref, RegAlloc target deref |
-| DUP-01, DUP-03..09 | P1/P2 | Duplication | fixed | — | legalizer/ABI/descriptor/selector/runtime duplication |
-| LEG-01..09, LEG-11 | P1/P2 | Legacy | fixed | — | dead Predicates module, orphaned target files (XPR-13), dead fields |
-| WEI-03..07, WEI-09 | P1/P2 | Weird | fixed | — | null checks, flag/class dispatch, idempotent init, string-key cleanup |
-| OPT-01..08, OPT-11 | P1/P2 | Optimization | fixed | — | target lookups, spill cost, const descriptors, trace guards, dead locals |
-| DUP-02, DUP-10, LEG-10, WEI-08, WEI-10, OPT-09, OPT-10, OPT-12 | P2 | mixed | deferred | — | ABI merge, frame boilerplate, PHI metadata, reloc constants, generated polish |
+| DUP-01..10 | P1/P2 | Duplication | fixed | — | legalizer/ABI/frame/descriptor/selector/runtime consolidation |
+| LEG-01..11 | P1/P2 | Legacy | fixed | — | dead Predicates module, orphaned target files (XPR-13), dead fields, lowering contract |
+| WEI-01..10 | P0/P2 | Weird | fixed | — | ABI/RegAlloc guards, string dispatch, idempotent init, PHI predecessor metadata, shared reloc constants |
+| OPT-01..12 | P1/P2 | Optimization | fixed | — | lookups, spill cost, const descriptors, trace guards, color masks, reused query, dead locals |

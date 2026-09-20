@@ -60,8 +60,7 @@ class LegalizeActionPass
                               class SymbolTable *table,
                               const DSL::Ast::LegalizeActionDef::LegalizeActionClause &clause,
                               std::string_view instName,
-                              Symbols::LegalizeActionClauseSymbol &outClause,
-                              size_t &maxOperandIndex);
+                              Symbols::LegalizeActionClauseSymbol &outClause);
 
     /**
      * Resolves a type constraint (e.g. i32, i8:1) against declared type symbols.

@@ -39,11 +39,6 @@ class CppRegisterInfoGenerator : public CodeGenerator
     /** Overrides the target identifier used to name generated tables. */
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
-    /**
-     * Emits the complete register-info header into the given emitter.
-     */
-    void emitHeader(CppSourceEmitter &emitter) const;
-
   private:
     /** Target identifier substituted into generated table and include names. */
     std::string m_targetName;

@@ -3,6 +3,7 @@
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbol.h"
 #include "SemaPasses/IrInstructionPass.h"
+#include "SemaPasses/PassDriver.h"
 
 constexpr auto PassName = "Sema::IrInstructionPass"; // Pass identifier used in diagnostics.
 
@@ -10,7 +11,7 @@ bool IrInstructionPass::run(DiagnosticCollector *collector,
                             SymbolTable *table,
                             DSL::Ast::IrInstDef::IrInstDefFile *file)
 {
-    if (!collector || !table || !file)
+    if (!Sema::preparePass(collector, table, file, PassName))
     {
         return false;
     }

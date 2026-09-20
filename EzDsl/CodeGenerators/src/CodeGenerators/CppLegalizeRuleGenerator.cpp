@@ -33,7 +33,7 @@ CppLegalizeRuleGenerator::CppLegalizeRuleGenerator(DiagnosticCollector *collecto
 // Resolves the header/source destinations, emits both artifacts, and reports combined success.
 bool CppLegalizeRuleGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration())
     {
         return false;
     }
@@ -41,20 +41,21 @@ bool CppLegalizeRuleGenerator::run()
     std::string defaultBaseName = std::format("{}LegalizerRules", m_targetName);
     auto [headerPath, sourcePath] = resolveHeaderAndSourcePaths(defaultBaseName);
 
+    std::vector<const Symbol *> ruleSymbols =
+            m_table->collect<Symbols::LegalizeRuleSymbol>(SymbolType::LegalizeRule);
+
     CppSourceEmitter headerEmitter;
     CppSourceEmitter sourceEmitter;
 
-    emitHeader(headerEmitter);
-    emitSource(sourceEmitter);
+    emitHeader(headerEmitter, ruleSymbols);
+    emitSource(sourceEmitter, ruleSymbols);
 
-    bool headerOk = writeOutput(headerPath, headerEmitter.str());
-    bool sourceOk = writeOutput(sourcePath, sourceEmitter.str());
-
-    return headerOk && sourceOk;
+    return writeHeaderAndSource({ headerPath, sourcePath }, headerEmitter.view(), sourceEmitter.view());
 }
 
 // Emits the rule handler declarations and the two dispatcher entry points.
-void CppLegalizeRuleGenerator::emitHeader(CppSourceEmitter &emitter) const
+void CppLegalizeRuleGenerator::emitHeader(CppSourceEmitter &emitter,
+                                          const std::vector<const Symbol *> &ruleSymbols) const
 {
     std::string guard = std::format("EZTRIPLE_{}_LEGALIZER_RULES_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
@@ -72,7 +73,7 @@ void CppLegalizeRuleGenerator::emitHeader(CppSourceEmitter &emitter) const
 
         // Collect all parsed legalize rules in symbol-table order.
         std::vector<const Symbols::LegalizeRuleSymbol *> rules;
-        for (const Symbol *ruleSym : m_table->collect<Symbols::LegalizeRuleSymbol>(SymbolType::LegalizeRule))
+        for (const Symbol *ruleSym : ruleSymbols)
         {
             if (const auto *r = ruleSym->getIf<Symbols::LegalizeRuleSymbol>())
             {
@@ -112,7 +113,8 @@ void CppLegalizeRuleGenerator::emitHeader(CppSourceEmitter &emitter) const
 }
 
 // Emits each rule matcher/rewriter body plus the opcode- and id-based dispatchers.
-void CppLegalizeRuleGenerator::emitSource(CppSourceEmitter &emitter) const
+void CppLegalizeRuleGenerator::emitSource(CppSourceEmitter &emitter,
+                                          const std::vector<const Symbol *> &ruleSymbols) const
 {
     emitter.emitBanner("CppLegalizeRuleGenerator");
     emitter.emitBlankLine();
@@ -130,7 +132,7 @@ void CppLegalizeRuleGenerator::emitSource(CppSourceEmitter &emitter) const
 
     // Collect all parsed legalize rules in symbol-table order.
     std::vector<const Symbols::LegalizeRuleSymbol *> rules;
-    for (const Symbol *ruleSym : m_table->collect<Symbols::LegalizeRuleSymbol>(SymbolType::LegalizeRule))
+    for (const Symbol *ruleSym : ruleSymbols)
     {
         if (const auto *r = ruleSym->getIf<Symbols::LegalizeRuleSymbol>())
         {

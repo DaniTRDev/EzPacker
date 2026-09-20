@@ -39,16 +39,13 @@ class CppInstructionSelectorGenerator : public CodeGenerator
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the selector class declaration and pattern table into the header. */
-    void emitHeader(CppSourceEmitter &emitter) const;
+    void emitHeader(CppSourceEmitter &emitter, const std::vector<const Symbol *> &patternSymbols) const;
 
     /** Emits the selector matching and rewriting logic into the source. */
-    void emitSource(CppSourceEmitter &emitter) const;
+    void emitSource(CppSourceEmitter &emitter, const std::vector<const Symbol *> &patternSymbols) const;
 
     /** Collects the instruction-select pattern symbols produced by the Sema pass, in declaration order. */
     std::vector<const Symbol *> collectPatternSymbols() const;
-
-    /** Collects the addressing-mode symbols that patterns may fold into memory operands. */
-    std::vector<const Symbol *> collectAddrModeSymbols() const;
 
   private:
     /** Target identifier substituted into generated class and include names. */

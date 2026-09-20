@@ -203,11 +203,11 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: build managers/analyses once.
   - Status: fixed
 
-- [ ] **P2 · OPT-04 — Name copies in the emission path**
+- [x] **P2 · OPT-04 — Name copies in the emission path**
   - Where: `EmissionEngine.cpp:164,187,226,301,317,340`
   - Why: `ObjectSymbol::m_name`/`ObjectRelocEntry::m_symbolName` are `std::string`.
   - Fix: `string_view`/`pmr::string`.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P2 · OPT-05 — Unreserved containers**
   - Where: `EmissionEngine.cpp:60-62` (`funcById`, `gvarById`), `symbols`; writer string tables
@@ -254,5 +254,4 @@ byte-identical after routing through `X86_64RelocationResolver`; capture a `sha2
 | DUP-02..08 | P1/P2 | Duplication | fixed | — | writers/symbols/pipeline/dumps/options/ownership |
 | LEG-01..09 | P1/P2 | Legacy | fixed | — | dead API/options/frontend (`EzFrontend` removed); section types |
 | WEI-02..07, WEI-08..09 | P1/P2 | Weird | fixed | — | finalize dedup, emitter errors, reloc types, atomic writes, ownership |
-| OPT-01..03, OPT-05..08 | P1/P2 | Optimization | fixed | — | lookups, running offset, single manager, reserves, reads |
-| OPT-04 | P2 | Optimization | deferred | — | object-name ownership (`string_view`/`pmr`) left for a dedicated pass |
+| OPT-01..08 | P1/P2 | Optimization | fixed | — | lookups, running offset, single manager, reserves, reads, name views |

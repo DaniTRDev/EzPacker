@@ -38,38 +38,55 @@ bool CodeGenerator::validate() const
 // Treats the output path as a directory unless it already names a file with an extension.
 std::filesystem::path CodeGenerator::resolveSingleFilePath(std::string_view defaultFileName) const
 {
-    if (std::filesystem::is_directory(m_outputPath) || !m_outputPath.has_extension())
-    {
-        return m_outputPath / defaultFileName;
-    }
-    return m_outputPath;
+    return ResolveSingleFilePath(m_outputPath, defaultFileName);
 }
 
 // Derives the header/source pair, honoring an explicit .h/.hpp/.cpp/.cxx output path when given.
 CodeGenerator::HeaderAndSourcePaths CodeGenerator::resolveHeaderAndSourcePaths(std::string_view defaultBaseName) const
 {
+    return ResolveHeaderAndSourcePaths(m_outputPath, defaultBaseName);
+}
+
+// Shared static resolver used by both the generators and the CLI driver's output reporting.
+std::filesystem::path CodeGenerator::ResolveSingleFilePath(const std::filesystem::path &outPath,
+                                                           std::string_view defaultFileName)
+{
+    std::filesystem::path resolved = outPath.empty() ? std::filesystem::path(".") : outPath;
+    if (std::filesystem::is_directory(resolved) || !resolved.has_extension())
+    {
+        return resolved / defaultFileName;
+    }
+    return resolved;
+}
+
+// Shared static resolver; case-insensitive extension matching keeps driver and generator in agreement.
+CodeGenerator::HeaderAndSourcePaths CodeGenerator::ResolveHeaderAndSourcePaths(const std::filesystem::path &outPath,
+                                                                               std::string_view defaultBaseName)
+{
     HeaderAndSourcePaths result;
 
-    if (std::filesystem::is_directory(m_outputPath) || !m_outputPath.has_extension())
+    const std::filesystem::path resolved = outPath.empty() ? std::filesystem::path(".") : outPath;
+
+    if (std::filesystem::is_directory(resolved) || !resolved.has_extension())
     {
-        result.m_headerPath = m_outputPath / std::format("{}.h", defaultBaseName);
-        result.m_sourcePath = m_outputPath / std::format("{}.cpp", defaultBaseName);
+        result.m_headerPath = resolved / std::format("{}.h", defaultBaseName);
+        result.m_sourcePath = resolved / std::format("{}.cpp", defaultBaseName);
+        return result;
+    }
+
+    // Normalize the extension so ".H"/".CPP" resolve like their lowercase forms (WEI-06).
+    const std::string ext = NormalizeKey(resolved.extension().string());
+    if (ext == ".h" || ext == ".hpp")
+    {
+        result.m_headerPath = resolved;
+        result.m_sourcePath = resolved;
+        result.m_sourcePath.replace_extension(".cpp");
     }
     else
     {
-        std::string ext = m_outputPath.extension().string();
-        if (ext == ".h" || ext == ".hpp")
-        {
-            result.m_headerPath = m_outputPath;
-            result.m_sourcePath = m_outputPath;
-            result.m_sourcePath.replace_extension(".cpp");
-        }
-        else
-        {
-            result.m_sourcePath = m_outputPath;
-            result.m_headerPath = m_outputPath;
-            result.m_headerPath.replace_extension(".h");
-        }
+        result.m_sourcePath = resolved;
+        result.m_headerPath = resolved;
+        result.m_headerPath.replace_extension(".h");
     }
 
     return result;
@@ -184,6 +201,33 @@ bool CodeGenerator::writeOutput(const std::filesystem::path &filePath, std::stri
 
     trace("Generated file: {}", filePath.string());
     return true;
+}
+
+// Runs validation and the optional start trace shared by every generator's run().
+bool CodeGenerator::beginGeneration(std::string_view description) const
+{
+    if (!validate())
+    {
+        return false;
+    }
+
+    if (!description.empty())
+    {
+        trace("Generating {}", description);
+    }
+    return true;
+}
+
+// Writes the header and source artifacts, short-circuiting on the first failure.
+bool CodeGenerator::writeHeaderAndSource(const HeaderAndSourcePaths &paths,
+                                         std::string_view headerContent,
+                                         std::string_view sourceContent) const
+{
+    if (!writeOutput(paths.m_headerPath, headerContent))
+    {
+        return false;
+    }
+    return writeOutput(paths.m_sourcePath, sourceContent);
 }
 
 } // namespace CodeGenerators

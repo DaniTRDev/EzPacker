@@ -1,5 +1,6 @@
 #include "ObjectFormat/CoffWriter.h"
 #include <cstring>
+#include <format>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -188,7 +189,7 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
 
     std::vector<CoffSymbol> symbolRecords;
     symbolRecords.reserve(m_symbols.size());
-    std::unordered_map<std::string, uint32_t> symIndexMap;
+    std::unordered_map<std::string_view, uint32_t> symIndexMap;
 
     for (const auto &sym : m_symbols)
     {
@@ -216,8 +217,8 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
             {
                 // A defined symbol in a section the writer does not emit would silently become
                 // section 0, producing a malformed object; fail loudly instead.
-                throw std::runtime_error("CoffWriter: symbol '" + sym.m_name +
-                                         "' references a section that is not emitted");
+                throw std::runtime_error(std::format("CoffWriter: symbol '{}' references a section that is not emitted",
+                                                     sym.m_name));
             }
             rec.SectionNumber = itSec->second;
         }

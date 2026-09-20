@@ -54,7 +54,7 @@ class ParseContext
             using return_type = std::size_t; // Sink result type required by Lexy.
 
             template <typename Input, typename Reader, typename Tag>
-            void operator()(const lexy::error_context<Input> &context, const lexy::error<Reader, Tag> &error)
+            void operator()(const lexy::error_context<Input> & /*context*/, const lexy::error<Reader, Tag> &error)
             {
                 GenericSourceManager *sm = ctx.getSourceManager();
                 const size_t sourceId = ctx.getSourceId();

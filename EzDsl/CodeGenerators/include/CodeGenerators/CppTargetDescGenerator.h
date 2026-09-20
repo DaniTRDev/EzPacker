@@ -5,6 +5,11 @@
 #include "CodeGenerators/CppSourceEmitter.h"
 #include "EzDslCodeGeneratorsCommon.h"
 
+namespace DSL::Ast::TargetDesc
+{
+struct TargetDescDecl;
+}
+
 namespace CodeGenerators
 {
 
@@ -41,10 +46,10 @@ class CppTargetDescGenerator : public CodeGenerator
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the TargetDesc subclass declaration and component bindings into the header. */
-    void emitHeader(CppSourceEmitter &emitter) const;
+    void emitHeader(CppSourceEmitter &emitter, const DSL::Ast::TargetDesc::TargetDescDecl *decl) const;
 
     /** Emits the TargetDesc subclass constructor and register-bank/component wiring into the source. */
-    void emitSource(CppSourceEmitter &emitter) const;
+    void emitSource(CppSourceEmitter &emitter, const DSL::Ast::TargetDesc::TargetDescDecl *decl) const;
 
   private:
     /** Target identifier substituted into generated class and include names. */

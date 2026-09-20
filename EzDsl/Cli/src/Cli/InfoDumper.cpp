@@ -11,6 +11,7 @@
 
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
+#include "Sema/EnumNames.h"
 #include "Sema/Symbols/IrSymbols.h"
 #include "Sema/Symbols/LegalizeSymbols.h"
 #include "Sema/Symbols/TypeSymbols.h"
@@ -19,125 +20,92 @@
 namespace Cli
 {
 
-// Escapes a string for safe embedding in a JSON string literal.
-std::string InfoDumper::escapeJson(std::string_view str)
+namespace
 {
-    std::string res;
-    res.reserve(str.size() + 8);
-    for (char c : str)
-    {
-        switch (c)
-        {
-            case '\"':
-                res += "\\\"";
-                break;
-            case '\\':
-                res += "\\\\";
-                break;
-            case '\b':
-                res += "\\b";
-                break;
-            case '\f':
-                res += "\\f";
-                break;
-            case '\n':
-                res += "\\n";
-                break;
-            case '\r':
-                res += "\\r";
-                break;
-            case '\t':
-                res += "\\t";
-                break;
-            default:
-                if (static_cast<unsigned char>(c) < 0x20)
-                {
-                    res += std::format("\\u{:04x}", static_cast<unsigned int>(c));
-                }
-                else
-                {
-                    res += c;
-                }
-                break;
-        }
-    }
-    return res;
-}
+/**
+ * Text and JSON labels for one SymbolType. Both dump branches consult this single list so a
+ * newly added symbol type cannot silently fall through to a generic "Other"/"[Symbol]" label,
+ * and the text and JSON spellings stay together.
+ */
+struct SymbolTypeLabels
+{
+    std::string_view m_json; ///< Label used in the JSON "type" field.
+    std::string_view m_text; ///< Label used in the text "[...]" prefix.
+};
 
-// Renders a TypeKind enum value as its display string.
-std::string InfoDumper::typeKindToString(int kind)
+/** Maps every SymbolType to its shared display labels. */
+constexpr SymbolTypeLabels symbolTypeLabels(SymbolType type) noexcept
 {
-    switch (static_cast<DSL::Ast::TypeDef::TypeKind>(kind))
+    switch (type)
     {
-        case DSL::Ast::TypeDef::TypeKind::Integer:
-            return "Integer";
-        case DSL::Ast::TypeDef::TypeKind::FloatingPoint:
-            return "FloatingPoint";
-        case DSL::Ast::TypeDef::TypeKind::Void:
-            return "Void";
-        case DSL::Ast::TypeDef::TypeKind::BindingToken:
-            return "BindingToken";
-        case DSL::Ast::TypeDef::TypeKind::Pointer:
-            return "Pointer";
+        case SymbolType::Type:
+            return { "Type", "Type" };
+        case SymbolType::IrInstruction:
+            return { "IrInstruction", "Instruction" };
+        case SymbolType::IrInstructionOperand:
+            return { "IrInstructionOperand", "IrOperand" };
+        case SymbolType::LegalizeAction:
+            return { "LegalizeAction", "LegalizeAction" };
+        case SymbolType::TypeSet:
+            return { "TypeSet", "TypeSet" };
+        case SymbolType::LegalizeRule:
+            return { "LegalizeRule", "LegalizeRule" };
+        case SymbolType::TargetInstruction:
+            return { "TargetInstruction", "TargetInstruction" };
+        case SymbolType::TargetOperand:
+            return { "TargetOperand", "TargetOperand" };
+        case SymbolType::AddressingMode:
+            return { "AddressingMode", "AddressingMode" };
+        case SymbolType::SelectionPattern:
+            return { "SelectionPattern", "SelectionPattern" };
+        case SymbolType::CallingConv:
+            return { "CallingConv", "CallingConv" };
+        case SymbolType::RegisterFile:
+            return { "RegisterFile", "RegisterFile" };
+        case SymbolType::RegisterBank:
+            return { "RegisterBank", "RegisterBank" };
+        case SymbolType::RegisterClass:
+            return { "RegisterClass", "RegisterClass" };
+        case SymbolType::Register:
+            return { "Register", "Register" };
+        case SymbolType::SpecialRegister:
+            return { "SpecialRegister", "SpecialRegister" };
+        case SymbolType::TargetDesc:
+            return { "TargetDesc", "TargetDesc" };
+        case SymbolType::SsaVariable:
+            return { "SsaVariable", "SsaVariable" };
+        case SymbolType::ImmediateVariable:
+            return { "ImmediateVariable", "ImmediateVariable" };
     }
-    return "Unknown";
+    return { "Unknown", "Unknown" };
+}
+} // namespace
+
+// Escapes a string for safe embedding in a JSON string literal (shared EscapeString, Json mode).
+std::string InfoDumper::escapeJson(std::string_view str) { return EscapeString(str, EscapeMode::Json); }
+
+// Renders a TypeKind enum value as its display string (shared canonical spelling).
+std::string_view InfoDumper::typeKindToString(DSL::Ast::TypeDef::TypeKind kind)
+{
+    return Sema::EnumNames::typeKindName(kind);
 }
 
 // Renders an IR instruction category as its display string.
-std::string InfoDumper::irCategoryToString(int cat)
+std::string_view InfoDumper::irCategoryToString(DSL::Ast::IrInstDef::IrInstCategory cat)
 {
-    switch (static_cast<DSL::Ast::IrInstDef::IrInstCategory>(cat))
-    {
-        case DSL::Ast::IrInstDef::IrInstCategory::Invalid:
-            return "Invalid";
-        case DSL::Ast::IrInstDef::IrInstCategory::DataMovement:
-            return "DataMovement";
-        case DSL::Ast::IrInstDef::IrInstCategory::Memory:
-            return "Memory";
-        case DSL::Ast::IrInstDef::IrInstCategory::Arithmetic:
-            return "Arithmetic";
-        case DSL::Ast::IrInstDef::IrInstCategory::Bitwise:
-            return "Bitwise";
-        case DSL::Ast::IrInstDef::IrInstCategory::Compare:
-            return "Compare";
-        case DSL::Ast::IrInstDef::IrInstCategory::ControlFlow:
-            return "ControlFlow";
-        case DSL::Ast::IrInstDef::IrInstCategory::Casting:
-            return "Casting";
-        case DSL::Ast::IrInstDef::IrInstCategory::System:
-            return "System";
-    }
-    return "Unknown";
+    return Sema::EnumNames::irCategoryName(cat);
 }
 
 // Renders an IR instruction tier as its display string.
-std::string InfoDumper::irTierToString(int tier)
+std::string_view InfoDumper::irTierToString(DSL::Ast::IrInstDef::IrInstTier tier)
 {
-    switch (static_cast<DSL::Ast::IrInstDef::IrInstTier>(tier))
-    {
-        case DSL::Ast::IrInstDef::IrInstTier::HighLevel:
-            return "HighLevel";
-        case DSL::Ast::IrInstDef::IrInstTier::PassInternal:
-            return "PassInternal";
-        case DSL::Ast::IrInstDef::IrInstTier::TargetLow:
-            return "TargetLow";
-    }
-    return "Unknown";
+    return Sema::EnumNames::irTierName(tier);
 }
 
 // Renders an IR operand direction as IN/OUT/INOUT.
-std::string InfoDumper::irOperandDirToString(int dir)
+std::string_view InfoDumper::irOperandDirToString(DSL::Ast::IrInstDef::IrOperandDir dir)
 {
-    switch (static_cast<DSL::Ast::IrInstDef::IrOperandDir>(dir))
-    {
-        case DSL::Ast::IrInstDef::IrOperandDir::ArgIn:
-            return "IN";
-        case DSL::Ast::IrInstDef::IrOperandDir::ArgOut:
-            return "OUT";
-        case DSL::Ast::IrInstDef::IrOperandDir::ArgInOut:
-            return "INOUT";
-    }
-    return "IN";
+    return Sema::EnumNames::irOperandDirName(dir);
 }
 
 // Expands an operand-type bitmask into a `|`-joined list of type names, or "None" when empty.
@@ -289,7 +257,7 @@ void InfoDumper::dumpTypeDefAst(const DSL::Ast::TypeDef::TypeDefFile &file, Outp
             const auto &t = file.m_types[i];
             os << "    {\n";
             os << std::format("      \"name\": \"{}\",\n", escapeJson(t.m_name.m_node));
-            os << std::format("      \"kind\": \"{}\",\n", typeKindToString(static_cast<int>(t.m_kind)));
+            os << std::format("      \"kind\": \"{}\",\n", typeKindToString(t.m_kind));
             if (t.m_bitSize.has_value())
                 os << std::format("      \"bit_width\": {},\n", t.m_bitSize->m_node);
             else
@@ -314,7 +282,7 @@ void InfoDumper::dumpTypeDefAst(const DSL::Ast::TypeDef::TypeDefFile &file, Outp
             std::string al = t.m_alignment ? std::to_string(t.m_alignment->m_node) : "n/a";
             os << std::format("  Type: {:<12} Kind: {:<14} BitWidth: {:<6} Alignment: {}\n",
                               t.m_name.m_node,
-                              typeKindToString(static_cast<int>(t.m_kind)),
+                              typeKindToString(t.m_kind),
                               bw,
                               al);
         }
@@ -334,8 +302,8 @@ void InfoDumper::dumpIrInstDefAst(const DSL::Ast::IrInstDef::IrInstDefFile &file
             os << "    {\n";
             os << std::format("      \"name\": \"{}\",\n", escapeJson(inst.m_name.m_node));
             os << std::format("      \"category\": \"{}\",\n",
-                              irCategoryToString(static_cast<int>(inst.m_body.m_category)));
-            os << std::format("      \"tier\": \"{}\",\n", irTierToString(static_cast<int>(inst.m_body.m_tier)));
+                              irCategoryToString(inst.m_body.m_category));
+            os << std::format("      \"tier\": \"{}\",\n", irTierToString(inst.m_body.m_tier));
 
             // Flags
             // The AST stores flags individually; OR them into the bitmask the formatter expects.
@@ -362,7 +330,7 @@ void InfoDumper::dumpIrInstDefAst(const DSL::Ast::IrInstDef::IrInstDefFile &file
                 os << std::format("          \"type\": \"{}\",\n",
                                   irOperandTypeToString(static_cast<uint16_t>(op.m_type)));
                 os << std::format("          \"direction\": \"{}\"\n",
-                                  irOperandDirToString(static_cast<int>(op.m_dir)));
+                                  irOperandDirToString(op.m_dir));
                 os << (opIdx + 1 < inst.m_operands.size() ? "        },\n" : "        }\n");
             }
             os << "      ]\n";
@@ -379,8 +347,8 @@ void InfoDumper::dumpIrInstDefAst(const DSL::Ast::IrInstDef::IrInstDefFile &file
         {
             os << std::format("  Instruction: {} [Category: {}, Tier: {}]\n",
                               inst.m_name.m_node,
-                              irCategoryToString(static_cast<int>(inst.m_body.m_category)),
-                              irTierToString(static_cast<int>(inst.m_body.m_tier)));
+                              irCategoryToString(inst.m_body.m_category),
+                              irTierToString(inst.m_body.m_tier));
 
             uint32_t combinedFlags = 0;
             for (auto f : inst.m_body.m_flags)
@@ -406,7 +374,7 @@ void InfoDumper::dumpIrInstDefAst(const DSL::Ast::IrInstDef::IrInstDefFile &file
                     os << std::format("      - {:<16} {:<12} [{}]\n",
                                       op.m_name.m_node,
                                       irOperandTypeToString(static_cast<uint16_t>(op.m_type)),
-                                      irOperandDirToString(static_cast<int>(op.m_dir)));
+                                      irOperandDirToString(op.m_dir));
                 }
             }
         }
@@ -964,14 +932,15 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
             os << std::format("      \"name\": \"{}\",\n", escapeJson(sym->getName()));
             os << std::format("      \"scope_id\": {},\n", sym->getDefiningScopeId());
 
+            const auto labels = symbolTypeLabels(sym->getType());
             switch (sym->getType())
             {
                 case SymbolType::Type:
                 {
-                    os << "      \"type\": \"Type\",\n";
+                    os << std::format("      \"type\": \"{}\",\n", labels.m_json);
                     if (const auto *td = sym->getIf<Symbols::TypeSymbol>())
                     {
-                        os << std::format("      \"kind\": \"{}\",\n", typeKindToString(static_cast<int>(td->m_kind)));
+                        os << std::format("      \"kind\": \"{}\",\n", typeKindToString(td->m_kind));
                         os << std::format("      \"bit_width\": {},\n", td->m_bitWidth);
                         os << std::format("      \"alignment\": {},\n", td->m_alignment);
                         os << std::format("      \"compact_id\": {}\n", td->m_compactId);
@@ -984,12 +953,11 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                 }
                 case SymbolType::IrInstruction:
                 {
-                    os << "      \"type\": \"IrInstruction\",\n";
+                    os << std::format("      \"type\": \"{}\",\n", labels.m_json);
                     if (const auto *id = sym->getIf<Symbols::IrInstructionSymbol>())
                     {
-                        os << std::format("      \"category\": \"{}\",\n",
-                                          irCategoryToString(static_cast<int>(id->m_category)));
-                        os << std::format("      \"tier\": \"{}\",\n", irTierToString(static_cast<int>(id->m_tier)));
+                        os << std::format("      \"category\": \"{}\",\n", irCategoryToString(id->m_category));
+                        os << std::format("      \"tier\": \"{}\",\n", irTierToString(id->m_tier));
                         os << std::format("      \"operand_count\": {}\n", id->m_operands.size());
                     }
                     else
@@ -998,21 +966,9 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                     }
                     break;
                 }
-                case SymbolType::IrInstructionOperand:
-                {
-                    os << "      \"type\": \"IrInstructionOperand\",\n";
-                    os << "      \"details\": null\n";
-                    break;
-                }
-                case SymbolType::LegalizeAction:
-                {
-                    os << "      \"type\": \"LegalizeAction\",\n";
-                    os << "      \"details\": null\n";
-                    break;
-                }
                 case SymbolType::LegalizeRule:
                 {
-                    os << "      \"type\": \"LegalizeRule\",\n";
+                    os << std::format("      \"type\": \"{}\",\n", labels.m_json);
                     if (const auto *rd = sym->getIf<Symbols::LegalizeRuleSymbol>())
                     {
                         os << std::format("      \"match_count\": {},\n", rd->m_matchPatterns.size());
@@ -1024,15 +980,9 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                     }
                     break;
                 }
-                case SymbolType::CallingConv:
-                {
-                    os << "      \"type\": \"CallingConv\",\n";
-                    os << "      \"details\": null\n";
-                    break;
-                }
                 default:
                 {
-                    os << "      \"type\": \"Other\",\n";
+                    os << std::format("      \"type\": \"{}\",\n", labels.m_json);
                     os << "      \"details\": null\n";
                     break;
                 }
@@ -1052,18 +1002,20 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
             if (!sym)
                 continue;
 
+            const auto labels = symbolTypeLabels(sym->getType());
             switch (sym->getType())
             {
                 case SymbolType::Type:
                 {
                     if (const auto *td = sym->getIf<Symbols::TypeSymbol>())
                     {
-                        os << std::format("  [Type] ID: {:<3} Scope: {:<2} Name: {:<12} Kind: {:<12} Width: {:<4} "
+                        os << std::format("  [{}] ID: {:<3} Scope: {:<2} Name: {:<12} Kind: {:<12} Width: {:<4} "
                                           "Align: {:<4} CompactID: {}\n",
+                                          labels.m_text,
                                           sym->getId(),
                                           sym->getDefiningScopeId(),
                                           sym->getName(),
-                                          typeKindToString(static_cast<int>(td->m_kind)),
+                                          typeKindToString(td->m_kind),
                                           td->m_bitWidth,
                                           td->m_alignment,
                                           td->m_compactId);
@@ -1074,23 +1026,16 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                 {
                     if (const auto *id = sym->getIf<Symbols::IrInstructionSymbol>())
                     {
-                        os << std::format("  [Instruction] ID: {:<3} Scope: {:<2} Name: {:<16} Category: {:<14} Tier: "
+                        os << std::format("  [{}] ID: {:<3} Scope: {:<2} Name: {:<16} Category: {:<14} Tier: "
                                           "{:<12} Operands: {}\n",
+                                          labels.m_text,
                                           sym->getId(),
                                           sym->getDefiningScopeId(),
                                           sym->getName(),
-                                          irCategoryToString(static_cast<int>(id->m_category)),
-                                          irTierToString(static_cast<int>(id->m_tier)),
+                                          irCategoryToString(id->m_category),
+                                          irTierToString(id->m_tier),
                                           id->m_operands.size());
                     }
-                    break;
-                }
-                case SymbolType::LegalizeAction:
-                {
-                    os << std::format("  [LegalizeAction] ID: {:<3} Scope: {:<2} Name: {}\n",
-                                      sym->getId(),
-                                      sym->getDefiningScopeId(),
-                                      sym->getName());
                     break;
                 }
                 case SymbolType::LegalizeRule:
@@ -1102,8 +1047,9 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                         std::string emitOp = rd->m_expansionSequence.empty()
                                 ? "?"
                                 : std::string(rd->m_expansionSequence[0].m_opcode);
-                        os << std::format("  [LegalizeRule] ID: {:<3} Scope: {:<2} Name: {:<16} Matches: {:<2} Emits: "
+                        os << std::format("  [{}] ID: {:<3} Scope: {:<2} Name: {:<16} Matches: {:<2} Emits: "
                                           "{:<2} [{} -> {}]\n",
+                                          labels.m_text,
                                           sym->getId(),
                                           sym->getDefiningScopeId(),
                                           sym->getName(),
@@ -1114,24 +1060,18 @@ void InfoDumper::dumpSymbols(const SymbolTable &symbolTable, OutputFormat format
                     }
                     else
                     {
-                        os << std::format("  [LegalizeRule] ID: {:<3} Scope: {:<2} Name: {}\n",
+                        os << std::format("  [{}] ID: {:<3} Scope: {:<2} Name: {}\n",
+                                          labels.m_text,
                                           sym->getId(),
                                           sym->getDefiningScopeId(),
                                           sym->getName());
                     }
                     break;
                 }
-                case SymbolType::CallingConv:
-                {
-                    os << std::format("  [CallingConv] ID: {:<3} Scope: {:<2} Name: {}\n",
-                                      sym->getId(),
-                                      sym->getDefiningScopeId(),
-                                      sym->getName());
-                    break;
-                }
                 default:
                 {
-                    os << std::format("  [Symbol] ID: {:<3} Scope: {:<2} Name: {}\n",
+                    os << std::format("  [{}] ID: {:<3} Scope: {:<2} Name: {}\n",
+                                      labels.m_text,
                                       sym->getId(),
                                       sym->getDefiningScopeId(),
                                       sym->getName());

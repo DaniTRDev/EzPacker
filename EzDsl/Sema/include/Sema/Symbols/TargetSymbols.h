@@ -21,29 +21,21 @@ struct TargetOperandSymbol
 
 /**
  * Resolved semantic definition of a target machine instruction.
+ *
+ * The flattened fields mirror the parsed declaration so non-codegen consumers (tests, future
+ * passes) do not need to reach back into the AST. The current CppTargetInstructionGenerator emits
+ * the opcode name and operand directions but leaves the implicit def/use slots empty until target
+ * register references can be resolved; m_mnemonic is likewise retained for assembly consumers.
  */
 struct TargetInstructionSymbol
 {
     std::string_view m_name;                                    // Opcode name.
-    std::string_view m_mnemonic;                                // Assembly mnemonic.
+    std::string_view m_mnemonic;                                // Assembly mnemonic (retained; not yet emitted).
     std::pmr::vector<TargetOperandSymbol> m_operands;           // Operand signature.
     std::pmr::vector<std::string_view> m_flags;                 // Behavioral flags.
-    std::pmr::vector<std::string_view> m_implicitDefs;          // Implicitly defined registers.
-    std::pmr::vector<std::string_view> m_implicitUses;          // Implicitly used registers.
+    std::pmr::vector<std::string_view> m_implicitDefs;          // Implicitly defined registers (retained; not yet emitted).
+    std::pmr::vector<std::string_view> m_implicitUses;          // Implicitly used registers (retained; not yet emitted).
     std::optional<DSL::Ast::Encoding::EncodingDecl> m_encoding; // Optional generic machine encoding.
-
-    /**
-     * Checks whether the instruction carries the named behavioral flag.
-     */
-    bool hasFlag(std::string_view flag) const noexcept
-    {
-        for (const auto &f : m_flags)
-        {
-            if (f == flag)
-                return true;
-        }
-        return false;
-    }
 };
 
 } // namespace Symbols

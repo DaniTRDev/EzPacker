@@ -114,6 +114,11 @@ struct IndirectLoc
 
 /**
  * Discriminated union descriptor capturing the exact ABI-lowered location of a function argument or return value.
+ *
+ * Error contract (value-object layer): getType() never fails; the typed payload accessors
+ * (getReg/getStack/getSplit/getIndirect) throw std::runtime_error when the caller queries an inactive
+ * alternative. Callers are expected to branch on getType() first; this is the same fail-fast
+ * programmer-error channel used by the MIR builders.
  */
 class ArgumentLocationDesc
 {

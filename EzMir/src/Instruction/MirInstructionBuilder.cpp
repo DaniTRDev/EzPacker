@@ -149,10 +149,16 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
 }
 
 /**
- * Appends an operand to the instruction and records its def/use in the owning function's register info.
+ * Appends an operand to the instruction and records its def/use in the owning function's register
+ * info. Throws std::runtime_error on a null instruction or operand.
  */
 MirInstructionBuilder &MirInstructionBuilder::addOperand(MirInstruction *instr, MirOperand *operand)
 {
+    if (!instr || !operand)
+    {
+        throw std::runtime_error("Internal Compiler Error: addOperand requires a valid instruction and operand");
+    }
+
     auto &operands = instr->m_operands;
     operands.push_back(operand);
     registerOperand(instr, operand, operands.size() - 1);
@@ -162,9 +168,15 @@ MirInstructionBuilder &MirInstructionBuilder::addOperand(MirInstruction *instr, 
 
 /**
  * Prepends an operand, re-registering all following operands because their indices shift by one.
+ * Throws std::runtime_error on a null instruction or operand.
  */
 MirInstructionBuilder &MirInstructionBuilder::addOperandFront(MirInstruction *instr, MirOperand *operand)
 {
+    if (!instr || !operand)
+    {
+        throw std::runtime_error("Internal Compiler Error: addOperandFront requires a valid instruction and operand");
+    }
+
     for (size_t i = 0; i < instr->m_operands.size(); ++i)
     {
         unregisterOperand(instr, instr->m_operands[i], i);
@@ -182,10 +194,16 @@ MirInstructionBuilder &MirInstructionBuilder::addOperandFront(MirInstruction *in
 }
 
 /**
- * Removes every operand, unregistering their defs/uses from the function's register info.
+ * Removes every operand, unregistering their defs/uses from the function's register info. Throws
+ * std::runtime_error when instr is null.
  */
 MirInstructionBuilder &MirInstructionBuilder::clearOperands(MirInstruction *instr)
 {
+    if (!instr)
+    {
+        throw std::runtime_error("Internal Compiler Error: clearOperands requires a valid instruction");
+    }
+
     // Unregister all defs and uses
     for (size_t i = 0; i < instr->m_operands.size(); ++i)
     {
@@ -198,13 +216,19 @@ MirInstructionBuilder &MirInstructionBuilder::clearOperands(MirInstruction *inst
 
 /**
  * Erases the operand at pos and re-registers the shifted trailing operands with their new indices.
+ * Throws std::runtime_error when instr is null or pos is out of range.
  */
 MirInstructionBuilder &MirInstructionBuilder::clearOperand(MirInstruction *instr, size_t pos)
 {
+    if (!instr)
+    {
+        throw std::runtime_error("Internal Compiler Error: clearOperand requires a valid instruction");
+    }
+
     auto &operands = instr->m_operands;
     if (pos >= operands.size())
     {
-        return *this;
+        throw std::runtime_error("Internal Compiler Error: clearOperand operand index out of range");
     }
 
     for (size_t i = pos; i < operands.size(); ++i)
@@ -225,9 +249,15 @@ MirInstructionBuilder &MirInstructionBuilder::clearOperand(MirInstruction *instr
 
 /**
  * Unregisters all operands, then unlinks the instruction from its owning block and clears its owner.
+ * Throws std::runtime_error when instr is null.
  */
 MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
 {
+    if (!instr)
+    {
+        throw std::runtime_error("Internal Compiler Error: erase requires a valid instruction");
+    }
+
     for (size_t i = 0; i < instr->m_operands.size(); ++i)
     {
         unregisterOperand(instr, instr->m_operands[i], i);
@@ -244,15 +274,21 @@ MirInstructionBuilder &MirInstructionBuilder::erase(MirInstruction *instr)
 }
 
 /**
- * Replaces the operand at index, unregistering the old operand and registering the new one.
+ * Replaces the operand at index, unregistering the old operand and registering the new one. Throws
+ * std::runtime_error when instr or newOperand is null, or index is out of range.
  */
 MirInstructionBuilder &MirInstructionBuilder::swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index)
 {
+    if (!instr || !newOperand)
+    {
+        throw std::runtime_error("Internal Compiler Error: swapOperand requires a valid instruction and operand");
+    }
+
     auto &operands = instr->m_operands;
 
     if (index >= operands.size())
     {
-        return *this;
+        throw std::runtime_error("Internal Compiler Error: swapOperand operand index out of range");
     }
 
     unregisterOperand(instr, operands[index], index);

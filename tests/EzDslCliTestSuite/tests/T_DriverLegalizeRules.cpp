@@ -37,7 +37,7 @@ rule SDivPow2 {
         isPositiveConst($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 )dsl";
@@ -70,7 +70,7 @@ rule SDivPow2 {
         isPowTwo($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 )dsl";
@@ -137,7 +137,7 @@ rule SDivPow2 {
         isPowTwo($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 )dsl";
@@ -173,7 +173,7 @@ rule SDivPow2 {
         isPowTwo($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 )dsl";
@@ -229,7 +229,7 @@ rule SDivPow2 {
         isPowTwo($c);
     };
     emit {
-        SAR i32:$dst, i32:$lhs, log2($c);
+        SAR i32:$dst, i32:$lhs, log2Pow2($c);
     };
 };
 )dsl";

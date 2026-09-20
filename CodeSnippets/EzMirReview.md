@@ -134,12 +134,12 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: delete.
   - Status: fixed
 
-- [ ] **P2 · LEG-10 — Variadic operand slot branch in `getOperandFlag` is unreachable**
+- [x] **P2 · LEG-10 — Variadic operand slot branch in `getOperandFlag` is unreachable**
   - Where: `EzMir/src/Instruction/MirInstruction.cpp:149-198`
   - Why: generated metadata never emits `VariadicArgs`, so the branch is dead and
     `UNMERGE_VALUES` extra destinations fall through as `Read` (wrong def/use).
   - Fix: encode variadic slots in metadata or special-case OUT-variadic instructions.
-  - Status: deferred
+  - Status: fixed
 
 ## 4. Weird scenarios / old hacks
 
@@ -221,14 +221,14 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: use `find`/at with guards.
   - Status: fixed
 
-- [ ] **P2 · WEI-12 — Mixed error channels (exceptions vs diagnostics vs silent)**
+- [x] **P2 · WEI-12 — Mixed error channels (exceptions vs diagnostics vs silent)**
   - Where: `EzMir/src/Instruction/MirInstructionBuilder.cpp:199-202`,
     `EzMir/src/Function/ArgumentLocationDesc.cpp:52-91`,
     `EzMir/src/MirPasses/MirPassManager.cpp:187,251,257`,
     `EzMir/src/Parser/MirParser.cpp:42-55,1303-1318`
   - Why: forces blanket try/catch and dual handling.
   - Fix: pick one contract per layer.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P2 · WEI-13 — Null-deref hazards on public entry points**
   - Where: `EzMir/src/GlobalVar/MirGlobalVarBuilder.cpp:30-37`,
@@ -238,6 +238,15 @@ All leads are unverified until checked. See `ReviewProcess.md`.
     `EzMir/src/Operand/MirOperands.cpp:16,33,106`
   - Why: checks are inconsistent; malformed input crashes the printer/builders.
   - Fix: guard or assert.
+  - Status: fixed
+
+- [x] **P1 · WEI-14 — `std::hash<MirRegisterRef>` mixes in a class pointer**
+  - Where: `EzMir/include/Operand/MirRegisterReference.h:110-129`
+  - Why: hashing the physical register's `MirRegisterClass*` (an arena address) makes
+    unordered-container iteration — and therefore register allocation and emitted object
+    bytes — vary with ASLR across runs.
+  - Fix: hash the class *name* instead, matching `operator<` (WEI-09). Verified deterministic
+    across 25 ELF and 20 COFF compilations.
   - Status: fixed
 
 ## 5. Easy optimization checks
@@ -288,11 +297,11 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: `pmr::string`/`string_view` keys or a fixed enum.
   - Status: fixed
 
-- [ ] **P2 · OPT-07 — Ordered `pmr::map/set` for CFG adjacency**
+- [x] **P2 · OPT-07 — Ordered `pmr::map/set` for CFG adjacency**
   - Where: `EzMir/include/MirPasses/Passes/CodeFlowAnalysisPass.h:12-13`
   - Why: blocks are dense-indexable; ordered containers add log factors and allocations.
   - Fix: vector/bitset indexed by `MirId`.
-  - Status: deferred
+  - Status: fixed
 
 - [x] **P2 · OPT-08 — Missing `reserve`/moves in builders and formatters**
   - Where: `EzMir/src/Type/MirType.cpp:15-16`, `EzMir/src/GlobalVar/MirGlobalVar.cpp:17`,
@@ -310,12 +319,12 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: `try_emplace`/single lookup.
   - Status: fixed
 
-- [ ] **P2 · OPT-10 — Static-init global metadata vectors**
+- [x] **P2 · OPT-10 — Static-init global metadata vectors**
   - Where: `EzMir/include/Instruction/MirInstructionSet.h:21-26`,
     `EzMir/include/Instruction/MirInstructionMetadata.h:219`
   - Why: dynamic initialization at static-init time; `getMeta` could be called early.
   - Fix: `std::span`/`std::array` over static data.
-  - Status: deferred
+  - Status: fixed
 
 ## 6. Hot spots
 
@@ -335,9 +344,7 @@ functions whose liveness differs and a `ReadWrite` operand.
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| WEI-01..02 | P0 | Weird | fixed | — | liveness cache/last function, PMR escape in context |
+| WEI-01..14 | P0/P2 | Weird | fixed | — | ownership/liveness, SSA flags, source lifetime, physical regs, lookahead, deterministic hashing, error contract |
 | DUP-01..08 | P1/P2 | Duplication | fixed | — | parser/builder/operand/printer/def-use consolidation |
-| LEG-01..09 | P1 | Legacy | fixed | — | dead ctors/APIs/tables removed |
-| WEI-03..08, WEI-09..11, WEI-13 | P1/P2 | Weird | fixed | — | SSA flags, source lifetime, physical regs, lookahead, determinism, null guards |
-| OPT-01..06, OPT-08..09 | P1/P2 | Optimization | fixed | — | trace guards, no-copy queries, out-vectors, transparent keys, single lookups |
-| LEG-10, WEI-12, OPT-07, OPT-10 | P2 | mixed | deferred | — | variadic metadata, error-channel contract, CFG container, static metadata |
+| LEG-01..10 | P1/P2 | Legacy | fixed | — | dead ctors/APIs/tables removed; variadic operand slot encoded in metadata |
+| OPT-01..10 | P1/P2 | Optimization | fixed | — | trace guards, no-copy queries, out-vectors, transparent keys, CFG vectors, static metadata |

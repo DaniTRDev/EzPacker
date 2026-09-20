@@ -3,6 +3,7 @@
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/CallingConvSymbols.h"
+#include "SemaPasses/PassDriver.h"
 #include <unordered_set>
 
 namespace
@@ -91,7 +92,7 @@ bool CallingConvPass::run(DiagnosticCollector *collector,
                           SymbolTable *table,
                           DSL::Ast::CallingConvDef::CallingConventionDefFile *file)
 {
-    if (!collector || !table || !file)
+    if (!Sema::preparePass(collector, table, file, PassName))
     {
         return false;
     }

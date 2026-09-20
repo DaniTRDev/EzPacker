@@ -520,8 +520,9 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
 
     // Check if dst is actually used anywhere in the function. The SSA register tracker already
     // holds the use list, avoiding a full instruction scan per PHI.
+    MirFunctionRegisterInfo *regInfo = func->getRegisterInfo();
     bool isUsed = false;
-    if (MirFunctionRegisterInfo *regInfo = func->getRegisterInfo())
+    if (regInfo)
     {
         isUsed = regInfo->getUseCount(dst->getRegId()) > 0;
     }
@@ -565,64 +566,56 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
         dst->setClass(findClass(gprClass));
     }
 
-    // Collect predecessor blocks ordered by MirId (matching NonSsaToSsaPass convention)
-    std::map<MirId, MirBlock *> sortedPreds;
-    for (MirBlock *b : func->getBlocks())
-    {
-        if (!b || b == currBlock)
-            continue;
-        for (MirInstruction *i : b->getInstructions())
-        {
-            for (MirOperand *op : i->getOperands())
-            {
-                if (op && op->getType() == MirOperandType::Reference)
-                {
-                    auto *ref = op->get<MirReference>();
-                    if (ref && ref->isBlock() && ref->getRefId() == currBlock->getId())
-                    {
-                        sortedPreds[b->getId()] = b;
-                    }
-                }
-            }
-        }
-    }
+    // Use the CFG's explicit predecessor metadata. Operand 1 + i corresponds to the i-th
+    // predecessor in ascending MirId order, exactly as NonSsaToSsaPass filled the PHI slots.
+    const auto &predecessorBlocks = currBlock->getPredecessors();
 
     size_t predIdx = 0;
-    for (auto &[predId, predBlock] : sortedPreds)
+    for (MirBlock *predBlock : predecessorBlocks)
     {
         size_t opIdx = 1 + predIdx;
-        if (opIdx < inst->getOperandCount())
-        {
-            MirOperand *incoming = inst->getOperand(opIdx);
-            if (auto *inReg = incoming->get<MirRegister>())
-            {
-                if (inReg->getName().find("undef") == std::string_view::npos)
-                {
-                    if (!inReg->getRegClass())
-                    {
-                        inReg->setClass(findClass(gprClass));
-                    }
+        predIdx++;
 
-                    // Insert MOV %dst, %inReg before the first branch / jump instruction in predBlock
-                    auto it = predBlock->getInstructions().end();
-                    for (auto bit = predBlock->getInstructions().begin(); bit != predBlock->getInstructions().end();
-                         ++bit)
-                    {
-                        bool isBr = bool((*bit)->getFlags() & MirInstructionFlags::IsBranch) ||
-                                ((*bit)->getOpCode() == MirInstructionOpCode::JMP) ||
-                                ((*bit)->getOpCode() == MirInstructionOpCode::BR_COND);
-                        if (isBr)
-                        {
-                            it = bit;
-                            break;
-                        }
-                    }
-                    MirInstructionBuilder pib(ctx, predBlock, InsertionType::InsertBefore, it);
-                    pib.MOV(dst, inReg);
-                }
+        if (!predBlock || opIdx >= inst->getOperandCount())
+        {
+            continue;
+        }
+
+        MirOperand *incoming = inst->getOperand(opIdx);
+        auto *inReg = incoming ? incoming->get<MirRegister>() : nullptr;
+        if (!inReg)
+        {
+            continue;
+        }
+
+        // An undefined virtual register (an SSA "undef" phantom) has no reaching definition, so
+        // there is nothing to move; detect it from the SSA metadata rather than the register name.
+        const bool isUndefined = inReg->isVirtual() && regInfo && regInfo->getDef(inReg->getRegId()) == nullptr;
+        if (isUndefined)
+        {
+            continue;
+        }
+
+        if (!inReg->getRegClass())
+        {
+            inReg->setClass(findClass(gprClass));
+        }
+
+        // Insert MOV %dst, %inReg before the first branch / jump instruction in predBlock
+        auto it = predBlock->getInstructions().end();
+        for (auto bit = predBlock->getInstructions().begin(); bit != predBlock->getInstructions().end(); ++bit)
+        {
+            bool isBr = bool((*bit)->getFlags() & MirInstructionFlags::IsBranch) ||
+                    ((*bit)->getOpCode() == MirInstructionOpCode::JMP) ||
+                    ((*bit)->getOpCode() == MirInstructionOpCode::BR_COND);
+            if (isBr)
+            {
+                it = bit;
+                break;
             }
         }
-        predIdx++;
+        MirInstructionBuilder pib(ctx, predBlock, InsertionType::InsertBefore, it);
+        pib.MOV(dst, inReg);
     }
 
     inst->eraseFromOwner();

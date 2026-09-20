@@ -2,6 +2,8 @@
 #define EZMIR_MIR_REGISTER_REFERENCE_H
 
 #include "EzMirCommon.h"
+#include "Operand/MirRegisterClass.h"
+#include <string_view>
 
 /**
  * Encapsulates a reference to either a virtual register (SSA/pre-allocation) or a physical register
@@ -110,7 +112,10 @@ namespace std
 template <> struct hash<MirRegisterRef>
 {
     /**
-     * Computes a combined hash from the register ID, virtuality flag, and physical class pointer.
+     * Computes a combined hash from the register ID, virtuality flag, and — for physical registers —
+     * the register-class name. The class name (rather than its address) is hashed so unordered
+     * container iteration, and therefore register allocation, is reproducible across runs;
+     * `MirRegisterRef::operator<` orders by the same name for the same reason.
      */
     size_t operator()(const MirRegisterRef &reg) const noexcept
     {
@@ -118,10 +123,13 @@ template <> struct hash<MirRegisterRef>
         size_t seed = std::hash<size_t>{}(reg.getId());
         seed ^= std::hash<bool>{}(reg.isVirtual()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 
-        // Hash the class pointer for physical registers
+        // Hash the physical register's class name, never its heap address.
         if (reg.isPhysical())
         {
-            seed ^= std::hash<const MirRegisterClass *>{}(reg.getClass()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            const MirRegisterClass *regClass = reg.getClass();
+            const size_t classHash =
+                regClass != nullptr ? std::hash<std::string_view>{}(std::string_view(regClass->getName())) : 0;
+            seed ^= classHash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         }
 
         return seed;

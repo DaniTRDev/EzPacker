@@ -89,6 +89,31 @@ class InstructionEncoder
      * Emits a near conditional branch (4-byte displacement field).
      */
     static void emitJccNear(std::vector<uint8_t> &out, ConditionCode cc, int32_t disp);
+
+    /// Opcode of a near unconditional jump (JMP rel32).
+    static constexpr uint8_t kNearJmpOpcode = 0xE9;
+    /// Opcode of a near call (CALL rel32).
+    static constexpr uint8_t kNearCallOpcode = 0xE8;
+    /// Two-byte opcode prefix of a near conditional jump (Jcc rel32).
+    static constexpr uint8_t kNearJccPrefix = 0x0F;
+    /// Base opcode of a near conditional jump; the condition code occupies the low nibble.
+    static constexpr uint8_t kNearJccBase = 0x80;
+
+    /**
+     * Classifies the near branch/call opcode at `bytes[offset]`, reporting the displacement-field
+     * offset and the length of the whole instruction (both relative to `offset`). This is the
+     * single source of truth for the bytes-level branch layout used by the bit patcher, so it can
+     * never drift from emitJmpNear()/emitJccNear().
+     *
+     * Returns false for unrecognized opcodes or truncated input.
+     */
+    static bool classifyNearBranch(std::span<const uint8_t> bytes, size_t offset, size_t &dispOffset, size_t &instrLength);
+
+    /**
+     * Writes a 32-bit little-endian displacement at `bytes[offset]`. Returns false when the field
+     * would run past the end of the buffer.
+     */
+    static bool writeDisp32(std::span<uint8_t> bytes, size_t offset, int32_t value);
 };
 
 } // namespace EzCodeEmitter::X86_64

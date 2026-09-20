@@ -1,5 +1,6 @@
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
+#include "Sema/EnumNames.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 
@@ -9,23 +10,15 @@ namespace CodeGenerators
 namespace
 {
 
-// Maps a DSL type kind to the generated MirTypeKind enumerator.
+// Maps a DSL type kind to the generated MirTypeKind enumerator (shared canonical spelling + prefix).
 std::string KindToEnumString(DSL::Ast::TypeDef::TypeKind kind)
 {
-    switch (kind)
+    const std::string_view name = Sema::EnumNames::typeKindName(kind);
+    if (name == "Unknown")
     {
-        case DSL::Ast::TypeDef::TypeKind::Void:
-            return "MirTypeKind::Void";
-        case DSL::Ast::TypeDef::TypeKind::Integer:
-            return "MirTypeKind::Integer";
-        case DSL::Ast::TypeDef::TypeKind::FloatingPoint:
-            return "MirTypeKind::FloatingPoint";
-        case DSL::Ast::TypeDef::TypeKind::BindingToken:
-            return "MirTypeKind::BindingToken";
-        case DSL::Ast::TypeDef::TypeKind::Pointer:
-            return "MirTypeKind::Pointer";
+        return "MirTypeKind::Integer";
     }
-    return "MirTypeKind::Integer";
+    return std::format("MirTypeKind::{}", name);
 }
 
 } // namespace
@@ -559,12 +552,10 @@ void CppMirTypeTableGenerator::emitSource(CppSourceEmitter &emitter, const std::
 // Collects the type definitions and emits only the artifacts enabled by the working mode.
 bool CppMirTypeTableGenerator::run()
 {
-    if (!validate())
+    if (!beginGeneration(std::format("MirTypeTable in {}", m_outputPath.string())))
     {
         return false;
     }
-
-    trace("Generating MirTypeTable in {}", m_outputPath.string());
 
     auto collectedTypes = collectTypes();
     auto paths = resolveHeaderAndSourcePaths("MirTypeTable");

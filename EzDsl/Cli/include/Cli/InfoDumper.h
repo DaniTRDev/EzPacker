@@ -4,6 +4,9 @@
 #include "Cli/CommandLineOptions.h"
 #include "EzDslCliCommon.h"
 
+#include "Ast/IrInstructionDefLangAst.h"
+#include "Ast/TypeDefLangAst.h"
+
 // Forward declarations
 namespace DSL::Ast::TypeDef
 {
@@ -122,16 +125,16 @@ class InfoDumper
 
   private:
     /** Converts an AST type-kind enum value to its display string. */
-    static std::string typeKindToString(int kind);
+    static std::string_view typeKindToString(DSL::Ast::TypeDef::TypeKind kind);
 
     /** Converts an IR instruction category enum value to its display string. */
-    static std::string irCategoryToString(int cat);
+    static std::string_view irCategoryToString(DSL::Ast::IrInstDef::IrInstCategory cat);
 
     /** Converts an IR instruction tier enum value to its display string. */
-    static std::string irTierToString(int tier);
+    static std::string_view irTierToString(DSL::Ast::IrInstDef::IrInstTier tier);
 
     /** Converts an IR operand direction enum value to its display string. */
-    static std::string irOperandDirToString(int dir);
+    static std::string_view irOperandDirToString(DSL::Ast::IrInstDef::IrOperandDir dir);
 
     /** Converts an IR operand type bitmask into a list of individual type names. */
     static std::string irOperandTypeToString(uint16_t typeMask);
