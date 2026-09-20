@@ -9,11 +9,13 @@
 #include "Printer/MirPrinter.h"
 
 /**
- * Caches the builder context, target allocator and result storage for this pass.
+ * Caches the builder context, target allocator and result storage for this pass. Missing
+ * target/context pointers are tolerated here and reported by run(), so construction never
+ * dereferences them.
  */
 MirRegisterAllocatorPass::MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
-    m_ctx(ctx), m_regAllocator(targetDesc->getRegisterAllocator()), m_result(ctx->getGlobalAllocator()),
-    m_targetDesc(targetDesc)
+    m_ctx(ctx), m_regAllocator(targetDesc ? targetDesc->getRegisterAllocator() : nullptr),
+    m_result(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()), m_targetDesc(targetDesc)
 {
 }
 
@@ -34,6 +36,17 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
     MirFunction *func = *it;
     size_t iterationCount = 0;
     constexpr size_t maxIterations = 100;
+
+    if (!m_ctx || !m_targetDesc || !m_regAllocator || !func)
+    {
+        if (m_ctx)
+        {
+            m_ctx->getDiagCollector()->error(getName(),
+                                             "Register allocator pass is missing its context, target descriptor or "
+                                             "target allocator");
+        }
+        return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
+    }
 
     std::pmr::polymorphic_allocator<> alloc(m_ctx->getGlobalAllocator());
     RegisterAllocatorCtx *ctx =
