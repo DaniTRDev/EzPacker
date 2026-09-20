@@ -60,16 +60,6 @@ class FlexFloat
     FlexFloat &operator=(const FlexFloat &other);
 
     /**
-     * Returns true if this number fits in a container of the given bitsize.
-     */
-    bool fitsIn(size_t bitWidth) const;
-
-    /**
-     * Returns true if a allocation panic or memory out-of-bounds flag occurred within the underlying library state.
-     */
-    bool hasError() const;
-
-    /**
      * Returns true if this floating-point value is structurally negative and not a NaN.
      */
     bool isNeg() const;
@@ -187,16 +177,6 @@ class FlexFloat
      * is thrown.
      */
     void extend(size_t newBitSize);
-
-    /**
-     * Dumps the arbitrary floating point number into an IEEE-754 or custom layout byte array profile.
-     * Standard hardware lengths (32-bit/64-bit) match IEEE layouts perfectly, while larger styles serialize
-     * structural backing components down natively.
-     *
-     * If bigEndian is set to true, the number will be dumped in big endian format; if it is set to false, the number
-     * will be dumped in little endian.
-     */
-    std::pmr::vector<uint8_t> dump(bool bigEndian, std::pmr::memory_resource *alloc = std::pmr::get_default_resource());
 
     /**
      * Returns the string representation of the number with the given radix.

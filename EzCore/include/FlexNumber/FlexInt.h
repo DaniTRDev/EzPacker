@@ -64,30 +64,9 @@ class FlexInt
     ~FlexInt();
 
     /**
-     * Checks whether the current numerical value fits within the specified bit size and signedness bounds
-     * without overflow or truncation.
-     */
-    bool fitsIn(size_t bitSize, bool _signed);
-
-    /**
-     * Returns true if a LibTomMath error occurred during the most recent operation.
-     */
-    bool hasError() const;
-
-    /**
-     * Returns true if the integer value is even.
-     */
-    bool isEven() const;
-
-    /**
      * Returns true if the integer value is strictly negative (< 0).
      */
     bool isNeg() const;
-
-    /**
-     * Returns true if the integer value is odd.
-     */
-    bool isOdd() const;
 
     /**
      * Returns true if the integer value is strictly positive (> 0).
@@ -205,39 +184,9 @@ class FlexInt
     FlexInt &operator%=(const FlexInt &other);
 
     /**
-     * Truncates or converts the value to a native signed 8-bit integer (int8_t).
-     */
-    int8_t getI8() const;
-
-    /**
-     * Truncates or converts the value to a native signed 16-bit integer (int16_t).
-     */
-    int16_t getI16() const;
-
-    /**
-     * Truncates or converts the value to a native signed 32-bit integer (int32_t).
-     */
-    int32_t getI32() const;
-
-    /**
      * Truncates or converts the value to a native signed 64-bit integer (int64_t).
      */
     int64_t getI64() const;
-
-    /**
-     * Truncates or converts the value to a native unsigned 8-bit integer (uint8_t).
-     */
-    uint8_t getU8() const;
-
-    /**
-     * Truncates or converts the value to a native unsigned 16-bit integer (uint16_t).
-     */
-    uint16_t getU16() const;
-
-    /**
-     * Truncates or converts the value to a native unsigned 32-bit integer (uint32_t).
-     */
-    uint32_t getU32() const;
 
     /**
      * Truncates or converts the value to a native unsigned 64-bit integer (uint64_t).
@@ -253,12 +202,6 @@ class FlexInt
      * Extends or truncates the integer to a new bit size and signedness representation.
      */
     void extend(size_t newBitSize, bool isSigned);
-
-    /**
-     * Dumps the number into a binary byte vector using the specified endianness.
-     * Allocates via the supplied PMR memory resource.
-     */
-    std::pmr::vector<uint8_t> dump(bool bigEndian, std::pmr::memory_resource *alloc = std::pmr::get_default_resource());
 
     /**
      * Formats the integer into a string representation in the specified radix (base 2, 8, 10, or 16).

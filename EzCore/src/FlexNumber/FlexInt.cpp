@@ -182,59 +182,9 @@ FlexInt &FlexInt::operator=(const FlexInt &other)
 }
 
 /**
- * Reports whether the value is representable in bitSize bits with the requested signedness.
- * Zero always fits; signed fitting requires the sign bit and, for the exact minimum, only the
- * most-significant bit set; negative values never fit unsigned.
- */
-bool FlexInt::fitsIn(size_t bitSize, bool _signed)
-{
-    if (bitSize == 0)
-        return false;
-
-    if (mp_iszero(&m_number) == MP_YES)
-        return true;
-
-    int bits = mp_count_bits(&m_number);
-
-    if (_signed)
-    {
-        int maxBits = static_cast<int>(bitSize - 1);
-        if (mp_isneg(&m_number) == MP_YES)
-        {
-            if (bits < static_cast<int>(bitSize))
-                return true;
-            if (bits == static_cast<int>(bitSize))
-                return mp_cnt_lsb(&m_number) == maxBits;
-            return false;
-        }
-        return bits <= maxBits;
-    }
-
-    if (mp_isneg(&m_number) == MP_YES)
-        return false;
-
-    return bits <= static_cast<int>(bitSize);
-}
-
-/**
- * Returns true when the last libtommath operation did not succeed.
- */
-bool FlexInt::hasError() const { return m_lastErr != MP_OKAY; }
-
-/**
- * Returns true when the value has no least-significant set bit.
- */
-bool FlexInt::isEven() const { return mp_iseven(&m_number) == MP_YES; }
-
-/**
  * Returns true when the value is signed and structurally negative.
  */
 bool FlexInt::isNeg() const { return m_isSigned && mp_isneg(&m_number) == MP_YES; }
-
-/**
- * Returns true when the value is not even.
- */
-bool FlexInt::isOdd() const { return !isEven(); }
 
 /**
  * Returns true when the value is strictly greater than zero.
@@ -539,19 +489,6 @@ FlexInt &FlexInt::operator%=(const FlexInt &other)
 }
 
 /**
- * Returns the value truncated to a signed 8-bit integer.
- */
-int8_t FlexInt::getI8() const { return static_cast<int8_t>(getI64()); }
-/**
- * Returns the value truncated to a signed 16-bit integer.
- */
-int16_t FlexInt::getI16() const { return static_cast<int16_t>(getI64()); }
-/**
- * Returns the value truncated to a signed 32-bit integer.
- */
-int32_t FlexInt::getI32() const { return static_cast<int32_t>(getI64()); }
-
-/**
  * Returns the value as a signed 64-bit integer, using the signed or unsigned accessor depending
  * on the value's sign.
  */
@@ -561,19 +498,6 @@ int64_t FlexInt::getI64() const
         return mp_get_i64(&m_number);
     return static_cast<int64_t>(mp_get_u64(&m_number));
 }
-
-/**
- * Returns the value truncated to an unsigned 8-bit integer.
- */
-uint8_t FlexInt::getU8() const { return static_cast<uint8_t>(getU64()); }
-/**
- * Returns the value truncated to an unsigned 16-bit integer.
- */
-uint16_t FlexInt::getU16() const { return static_cast<uint16_t>(getU64()); }
-/**
- * Returns the value truncated to an unsigned 32-bit integer.
- */
-uint32_t FlexInt::getU32() const { return static_cast<uint32_t>(getU64()); }
 
 /**
  * Returns the value as an unsigned 64-bit integer, two's-complement-converting negative values.
@@ -635,72 +559,6 @@ void FlexInt::extend(size_t newBitSize, bool isSigned)
     {
         clampToTwosComplement();
     }
-}
-
-/**
- * Serializes the value as a two's-complement byte buffer of (bitWidth+7)/8 bytes, normalizing
- * negative values into range, writing big-endian bytes and optionally reversing for little-endian.
- */
-std::pmr::vector<uint8_t> FlexInt::dump(bool bigEndian, std::pmr::memory_resource *alloc)
-{
-    size_t byteSize = (m_bitWidth + 7) / 8;
-    std::pmr::vector<uint8_t> buffer(byteSize, 0, alloc);
-
-    if (byteSize == 0)
-        return buffer;
-
-    mp_int targetBits;
-    if (mp_init(&targetBits) != MP_OKAY)
-        throw std::bad_alloc();
-
-    if (mp_isneg(&m_number) == MP_YES)
-    {
-        mp_int fullRange;
-        if (mp_init(&fullRange) == MP_OKAY)
-        {
-            m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
-            m_lastErr = mp_mod(&m_number, &fullRange, &targetBits);
-            m_lastErr = mp_add(&targetBits, &fullRange, &targetBits);
-            mp_clear(&fullRange);
-        }
-    }
-    else
-    {
-        m_lastErr = mp_copy(&m_number, &targetBits);
-    }
-
-    size_t writtenBitsSize = mp_ubin_size(&targetBits);
-
-    if (writtenBitsSize > 0)
-    {
-        uint8_t stackBuf[128];
-        uint8_t *rawBeBytesPtr = stackBuf;
-        std::pmr::vector<uint8_t> dynamicTempBuf(alloc);
-
-        if (writtenBitsSize > sizeof(stackBuf))
-        {
-            dynamicTempBuf.resize(writtenBitsSize);
-            rawBeBytesPtr = dynamicTempBuf.data();
-        }
-
-        m_lastErr = mp_to_ubin(&targetBits, rawBeBytesPtr, writtenBitsSize, nullptr);
-
-        size_t offset = (byteSize >= writtenBitsSize) ? (byteSize - writtenBitsSize) : 0;
-        size_t copyBytes = std::min(byteSize, writtenBitsSize);
-
-        std::copy(rawBeBytesPtr + (writtenBitsSize - copyBytes),
-                  rawBeBytesPtr + writtenBitsSize,
-                  buffer.begin() + offset);
-    }
-
-    mp_clear(&targetBits);
-
-    if (!bigEndian)
-    {
-        std::reverse(buffer.begin(), buffer.end());
-    }
-
-    return buffer;
 }
 
 /**
