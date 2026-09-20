@@ -1,12 +1,12 @@
-#ifndef EZCODEEMITTER_X86_64_BRANCH_RELAXER_H
-#define EZCODEEMITTER_X86_64_BRANCH_RELAXER_H
+#ifndef EZTARGETS_X86_64_BRANCH_RELAXER_H
+#define EZTARGETS_X86_64_BRANCH_RELAXER_H
 
-#include "EzCodeEmitterCommon.h"
-#include "X86_64/Encoding/X86_64InstructionEncoder.h"
+#include "EzTargetsX86_64Common.h"
+#include "Encoding/X86_64InstructionEncoder.h"
 #include <unordered_map>
 #include <vector>
 
-namespace EzCodeEmitter::X86_64
+namespace EzTargets::X86_64
 {
 
 /**
@@ -158,6 +158,6 @@ class BranchRelaxer
     std::vector<StreamItem> m_items; ///< Ordered stream of data, labels and branches to resolve.
 };
 
-} // namespace EzCodeEmitter::X86_64
+} // namespace EzTargets::X86_64
 
-#endif // EZCODEEMITTER_X86_64_BRANCH_RELAXER_H
+#endif // EZTARGETS_X86_64_BRANCH_RELAXER_H

@@ -24,9 +24,10 @@ namespace
 CppLegalizeRuleGenerator::CppLegalizeRuleGenerator(DiagnosticCollector *collector,
                                                    SymbolTable *table,
                                                    std::filesystem::path outPath,
-                                                   std::string targetName) :
+                                                   std::string targetName,
+                                                   std::string namespaceRoot) :
     CodeGenerator("CodeGenerators::LegalizeRule", collector, table, std::move(outPath)),
-    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target")), m_namespaceRoot(std::move(namespaceRoot))
 {
 }
 
@@ -57,7 +58,7 @@ bool CppLegalizeRuleGenerator::run()
 void CppLegalizeRuleGenerator::emitHeader(CppSourceEmitter &emitter,
                                           const std::vector<const Symbol *> &ruleSymbols) const
 {
-    std::string guard = std::format("EZTRIPLE_{}_LEGALIZER_RULES_H", StrToUpper(m_targetName));
+    std::string guard = std::format("EZTARGETS_{}_LEGALIZER_RULES_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
 
     emitter.emitBanner("CppLegalizeRuleGenerator");
@@ -69,7 +70,7 @@ void CppLegalizeRuleGenerator::emitHeader(CppSourceEmitter &emitter,
     emitter.emitBlankLine();
 
     {
-        auto nsScope = emitter.enterNamespace(std::format("EzTriple::{}Rules", m_targetName));
+        auto nsScope = emitter.enterNamespace(std::format("{}::{}Rules", m_namespaceRoot, m_targetName));
 
         // Collect all parsed legalize rules in symbol-table order.
         std::vector<const Symbols::LegalizeRuleSymbol *> rules;
@@ -192,7 +193,7 @@ void CppLegalizeRuleGenerator::emitSource(CppSourceEmitter &emitter,
         emitter.emitBlankLine();
     }
 
-    auto nsScope = emitter.enterNamespace(std::format("EzTriple::{}Rules", m_targetName));
+    auto nsScope = emitter.enterNamespace(std::format("{}::{}Rules", m_namespaceRoot, m_targetName));
 
     // Emit individual rules
     for (const auto *r : rules)

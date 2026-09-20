@@ -1,13 +1,13 @@
 #include <gtest/gtest.h>
 
 #include "CodeEmitterContext.h"
-#include "Targets/X86_64/X86_64RelocationResolver.h"
+#include "X86_64RelocationResolver.h"
 
 #include <array>
 #include <cstdint>
 #include <span>
 
-using namespace EzTriple;
+using namespace EzTargets::X86_64;
 
 namespace
 {

@@ -1,7 +1,7 @@
-#include "Targets/X86_64/X86_64RelocationResolver.h"
-#include "X86_64/Encoding/X86_64InstructionEncoder.h"
+#include "X86_64RelocationResolver.h"
+#include "Encoding/X86_64InstructionEncoder.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 namespace
@@ -15,7 +15,7 @@ bool resolveBranchField(std::span<const uint8_t> text, uint64_t relocOffset, uin
 {
     size_t fieldOffset = 0;
     size_t instrLength = 0;
-    if (!EzCodeEmitter::X86_64::InstructionEncoder::classifyNearBranch(
+    if (!EzTargets::X86_64::InstructionEncoder::classifyNearBranch(
                 text, static_cast<size_t>(relocOffset), fieldOffset, instrLength))
     {
         return false;
@@ -55,7 +55,7 @@ bool X86_64RelocationResolver::patch(std::span<uint8_t> text,
 
         // x86 relative branches are encoded as target - address_of_next_instruction.
         const int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) - static_cast<int64_t>(nextRip));
-        return EzCodeEmitter::X86_64::InstructionEncoder::writeDisp32(text, dispOffset, disp);
+        return EzTargets::X86_64::InstructionEncoder::writeDisp32(text, dispOffset, disp);
     }
 
     if (type == TargetCodeRelocationType::PCRel32)
@@ -65,7 +65,7 @@ bool X86_64RelocationResolver::patch(std::span<uint8_t> text,
         // A RIP-relative field is measured from the end of the 4-byte field itself.
         const int32_t disp =
                 static_cast<int32_t>(static_cast<int64_t>(targetOffset) - static_cast<int64_t>(fieldOffset + 4));
-        return EzCodeEmitter::X86_64::InstructionEncoder::writeDisp32(text, fieldOffset, disp);
+        return EzTargets::X86_64::InstructionEncoder::writeDisp32(text, fieldOffset, disp);
     }
 
     return false;
@@ -91,4 +91,4 @@ uint64_t X86_64RelocationResolver::getRelocationFieldOffset(std::span<const uint
     return reloc.m_address;
 }
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64

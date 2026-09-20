@@ -1,10 +1,10 @@
-#ifndef EZTRIPLE_X86_64_FRAME_LOWERER_H
-#define EZTRIPLE_X86_64_FRAME_LOWERER_H
+#ifndef EZTARGETS_X86_64_FRAME_LOWERER_H
+#define EZTARGETS_X86_64_FRAME_LOWERER_H
 
-#include "EzTripleCommon.h"
+#include "EzTargetsX86_64Common.h"
 #include "FrameLowerer/MirFrameLowerer.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -31,6 +31,6 @@ class X86_64FrameLowerer : public MirFrameLowerer
     bool lowerDAlloc(FrameLowererCtx &ctx) override;
 };
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64
 
-#endif // EZTRIPLE_X86_64_FRAME_LOWERER_H
+#endif // EZTARGETS_X86_64_FRAME_LOWERER_H

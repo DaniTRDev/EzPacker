@@ -6,7 +6,7 @@ set(EZTRIPLETESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzTripleTestSuite"
         FILE_LIST ${EZTRIPLETESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER ""
-        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;gtest;GTest::gtest_main"
+        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;EzTargetsX86_64;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include"
 )
 

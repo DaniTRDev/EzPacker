@@ -1,15 +1,15 @@
 #ifndef EZPACKER_X86_64_CODE_EMITTER_H
 #define EZPACKER_X86_64_CODE_EMITTER_H
 
-#include "EzCodeEmitterCommon.h"
+#include "EzTargetsX86_64Common.h"
 #include "GenericCodeEmitter.h"
-#include "X86_64/Encoding/X86_64EncodingDesc.h"
+#include "Encoding/X86_64EncodingDesc.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Operand/MirOperands.h"
 #include <functional>
 #include <vector>
 
-namespace EzCodeEmitter::X86_64
+namespace EzTargets::X86_64
 {
 
 /**
@@ -96,6 +96,6 @@ class X86_64CodeEmitter : public GenericCodeEmitter
     EncodingResolver m_encodingResolver;   ///< Resolves instruction descriptors to encoding descriptors.
 };
 
-} // namespace EzCodeEmitter::X86_64
+} // namespace EzTargets::X86_64
 
 #endif // EZPACKER_X86_64_CODE_EMITTER_H

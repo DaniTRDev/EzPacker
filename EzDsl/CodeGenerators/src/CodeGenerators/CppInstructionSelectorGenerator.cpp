@@ -20,9 +20,10 @@ namespace
 CppInstructionSelectorGenerator::CppInstructionSelectorGenerator(DiagnosticCollector *collector,
                                                                  SymbolTable *table,
                                                                  std::filesystem::path outPath,
-                                                                 std::string targetName) :
+                                                                 std::string targetName,
+                                                                 std::string namespaceRoot) :
     CodeGenerator("CodeGenerators::InstructionSelector", collector, table, std::move(outPath)),
-    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target")), m_namespaceRoot(std::move(namespaceRoot))
 {
 }
 
@@ -62,7 +63,7 @@ bool CppInstructionSelectorGenerator::run()
 void CppInstructionSelectorGenerator::emitHeader(CppSourceEmitter &emitter,
                                                  const std::vector<const Symbol *> &patternSymbols) const
 {
-    std::string guard = std::format("EZTRIPLE_{}_INSTRUCTION_SELECTOR_H", StrToUpper(m_targetName));
+    std::string guard = std::format("EZTARGETS_{}_INSTRUCTION_SELECTOR_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
     emitter.emitBlankLine();
     emitter.emitBanner("CppInstructionSelectorGenerator");
@@ -84,7 +85,7 @@ void CppInstructionSelectorGenerator::emitHeader(CppSourceEmitter &emitter,
     }
 
     {
-        auto nsScope = emitter.enterNamespace("EzTriple");
+        auto nsScope = emitter.enterNamespace(m_namespaceRoot);
 
         std::string className = std::format("{}InstructionSelector", m_targetName);
         {
@@ -137,7 +138,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitBlankLine();
 
     {
-        auto nsScope = emitter.enterNamespace("EzTriple");
+        auto nsScope = emitter.enterNamespace(m_namespaceRoot);
 
         // Static helper predicates
         emitter.emitLine("namespace");

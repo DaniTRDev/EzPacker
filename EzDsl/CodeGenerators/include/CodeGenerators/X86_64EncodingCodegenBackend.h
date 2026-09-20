@@ -11,13 +11,13 @@ namespace CodeGenerators
  * x86-64 code generation backend for the generic encoding table.
  *
  * Decodes the generic ENCODING directives with x86-64 semantics and emits
- * `EzCodeEmitter::X86_64::EncodingDesc` rows.
+ * `EzTargets::X86_64::EncodingDesc` rows.
  */
 class X86_64EncodingCodegenBackend : public EncodingCodegenBackend
 {
   public:
-    std::string_view includeHeader() const override { return "X86_64/Encoding/X86_64EncodingDesc.h"; }
-    std::string_view namespaceName() const override { return "EzCodeEmitter::X86_64"; }
+    std::string_view includeHeader() const override { return "Encoding/X86_64EncodingDesc.h"; }
+    std::string_view namespaceName() const override { return "EzTargets::X86_64"; }
     std::string_view arrayType() const override { return "EncodingDesc"; }
 
     /** Serializes one instruction's encoding into an EncodingDesc brace initializer. */

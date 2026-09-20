@@ -154,19 +154,21 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
 CppRegisterInfoGenerator::CppRegisterInfoGenerator(DiagnosticCollector *collector,
                                                    SymbolTable *table,
                                                    std::filesystem::path outPath,
-                                                   std::string targetName) :
+                                                   std::string targetName,
+                                                   std::string namespaceRoot) :
     CodeGenerator("CodeGenerators::RegisterInfo", collector, table, std::move(outPath)),
-    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target")), m_namespaceRoot(std::move(namespaceRoot))
 {
 }
 
 // Emits the self-contained, header-only flat register tables and bank construction helper.
 static void emitRegisterInfoHeader(CppSourceEmitter &emitter,
                                    std::string_view targetName,
+                                   std::string_view namespaceRoot,
                                    const CollectedRegisterData &data)
 {
     const std::string ns = SanitizeCppIdentifier(targetName, "Target");
-    const std::string emissionNs = std::format("EzCodeEmitter::TableGen::{}", ns);
+    const std::string emissionNs = std::format("{}::TableGen::{}", namespaceRoot, ns);
 
     emitter.emitBanner("CppRegisterInfoGenerator");
     emitter.emitBlankLine();
@@ -405,7 +407,7 @@ bool CppRegisterInfoGenerator::run()
     const auto targetFilePath = resolveSingleFilePath(baseName + ".h");
 
     CppSourceEmitter emitter;
-    emitRegisterInfoHeader(emitter, m_targetName, data);
+    emitRegisterInfoHeader(emitter, m_targetName, m_namespaceRoot, data);
 
     if (!writeOutput(targetFilePath, emitter.view()))
     {
@@ -425,9 +427,11 @@ bool CppRegisterInfoGenerator::run()
 bool GenerateRegisterInfo(DiagnosticCollector *collector,
                           SymbolTable *table,
                           std::filesystem::path outPath,
-                          std::string targetName)
+                          std::string targetName,
+                          std::string namespaceRoot)
 {
-    CppRegisterInfoGenerator generator(collector, table, std::move(outPath), std::move(targetName));
+    CppRegisterInfoGenerator generator(
+            collector, table, std::move(outPath), std::move(targetName), std::move(namespaceRoot));
     return generator.run();
 }
 

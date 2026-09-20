@@ -15,10 +15,11 @@ Usage:
       [RULES <path_to_lrd_file>]
       TARGET_NAME <target_architecture_name>
       [OUTPUT_DIR <output_directory>]
+      [NAMESPACE_ROOT <namespace_root>]
   )
 #]=======================================================================]
 function(EzDslGenLegalizerActionTable)
-    cmake_parse_arguments(PARSE_ARGV 0 EZDSL "" "TARGET;INPUT;RULES;TARGET_NAME;OUTPUT_DIR" "")
+    cmake_parse_arguments(PARSE_ARGV 0 EZDSL "" "TARGET;INPUT;RULES;TARGET_NAME;OUTPUT_DIR;NAMESPACE_ROOT" "")
 
     if(NOT EZDSL_TARGET)
         message(FATAL_ERROR "EzDslGenLegalizerActionTable: TARGET argument is required.")
@@ -30,6 +31,10 @@ function(EzDslGenLegalizerActionTable)
 
     if(NOT EZDSL_TARGET_NAME)
         set(EZDSL_TARGET_NAME "Target")
+    endif()
+
+    if(NOT EZDSL_NAMESPACE_ROOT)
+        set(EZDSL_NAMESPACE_ROOT "EzTargets")
     endif()
 
     if(NOT EZDSL_OUTPUT_DIR)
@@ -66,6 +71,7 @@ function(EzDslGenLegalizerActionTable)
                 -o "${EZDSL_OUTPUT_DIR}"
                 --emit-legalizer
                 --target "${EZDSL_TARGET_NAME}"
+                --namespace-root "${EZDSL_NAMESPACE_ROOT}"
         DEPENDS ${GEN_DEPENDS}
         COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}LegalizerActionTable from ${EZDSL_INPUT}"
         VERBATIM

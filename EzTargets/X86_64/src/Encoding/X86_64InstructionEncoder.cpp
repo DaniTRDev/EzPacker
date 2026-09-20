@@ -1,8 +1,8 @@
-#include "X86_64/Encoding/X86_64InstructionEncoder.h"
+#include "Encoding/X86_64InstructionEncoder.h"
 
 #include <cstdint>
 
-namespace EzCodeEmitter::X86_64
+namespace EzTargets::X86_64
 {
 
 namespace
@@ -300,7 +300,7 @@ bool rexWanted(uint8_t rexWPolicy, uint8_t sizeBytes)
 bool encodeModRMForm(const EncodingDesc &desc,
                      std::span<const ResolvedOperand> operands,
                      std::vector<uint8_t> &out,
-                     EncodeResult &result)
+                     EzCodeEmitter::EncodeResult &result)
 {
     const ResolvedOperand *regOp = resolve(desc, operands, EncSlotKind::Reg);
     const ResolvedOperand *rmOp = resolve(desc, operands, EncSlotKind::RmReg);
@@ -662,7 +662,7 @@ bool encodeSetccForm(const EncodingDesc &desc, std::span<const ResolvedOperand> 
 bool encodeBranchForm(const EncodingDesc &desc,
                       std::span<const ResolvedOperand> operands,
                       std::vector<uint8_t> &out,
-                      EncodeResult &result,
+                      EzCodeEmitter::EncodeResult &result,
                       bool isJcc,
                       bool allowRegister)
 {
@@ -720,7 +720,7 @@ bool encodeBranchForm(const EncodingDesc &desc,
 bool InstructionEncoder::encode(const EncodingDesc &desc,
                                 std::span<const ResolvedOperand> operands,
                                 std::vector<uint8_t> &out,
-                                EncodeResult &result)
+                                EzCodeEmitter::EncodeResult &result)
 {
     result = {};
     std::vector<uint8_t> bytes; // Staged so `out` is left untouched on failure.
@@ -929,4 +929,4 @@ bool InstructionEncoder::writeDisp32(std::span<uint8_t> bytes, size_t offset, in
     return true;
 }
 
-} // namespace EzCodeEmitter::X86_64
+} // namespace EzTargets::X86_64

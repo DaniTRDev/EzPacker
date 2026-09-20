@@ -1,10 +1,10 @@
-#ifndef EZCODEEMITTER_X86_64_ENCODING_DESC_H
-#define EZCODEEMITTER_X86_64_ENCODING_DESC_H
+#ifndef EZTARGETS_X86_64_ENCODING_DESC_H
+#define EZTARGETS_X86_64_ENCODING_DESC_H
 
 #include <cstddef>
 #include <cstdint>
 
-namespace EzCodeEmitter::X86_64
+namespace EzTargets::X86_64
 {
 
 /**
@@ -208,6 +208,6 @@ struct ResolvedOperand
     bool m_needsReloc{ false };
 };
 
-} // namespace EzCodeEmitter::X86_64
+} // namespace EzTargets::X86_64
 
-#endif // EZCODEEMITTER_X86_64_ENCODING_DESC_H
+#endif // EZTARGETS_X86_64_ENCODING_DESC_H

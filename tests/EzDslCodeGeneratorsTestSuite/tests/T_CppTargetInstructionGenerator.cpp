@@ -65,8 +65,8 @@ TEST_F(CppTargetInstructionGeneratorTest, TestTargetInstructionTableGeneration)
     std::string sourceContent = readFileContent(sourcePath);
 
     // Verify Header
-    EXPECT_NE(headerContent.find("EZTRIPLE_AMD64_TARGET_INSTRUCTION_TABLE_H"), std::string::npos);
-    EXPECT_NE(headerContent.find("namespace EzTriple::AMD64TargetInst"), std::string::npos);
+    EXPECT_NE(headerContent.find("EZTARGETS_AMD64_TARGET_INSTRUCTION_TABLE_H"), std::string::npos);
+    EXPECT_NE(headerContent.find("namespace EzTargets::AMD64TargetInst"), std::string::npos);
     EXPECT_NE(headerContent.find("enum OpCode : size_t"), std::string::npos);
     EXPECT_NE(headerContent.find("ADD32rr = 1"), std::string::npos);
     EXPECT_NE(headerContent.find("ADD32rm = 2"), std::string::npos);
@@ -75,7 +75,7 @@ TEST_F(CppTargetInstructionGeneratorTest, TestTargetInstructionTableGeneration)
     EXPECT_NE(headerContent.find("void initializeTargetInstructionTable(::TargetDesc *target);"), std::string::npos);
 
     // Verify Source
-    EXPECT_NE(sourceContent.find("namespace EzTriple::AMD64TargetInst"), std::string::npos);
+    EXPECT_NE(sourceContent.find("namespace EzTargets::AMD64TargetInst"), std::string::npos);
     EXPECT_NE(sourceContent.find("static MirTargetInstructionDesc s_descs[] ="), std::string::npos);
     EXPECT_NE(sourceContent.find("\"ADD32rr\""), std::string::npos);
     EXPECT_NE(sourceContent.find("MirInstructionFlags::IsCommutative"), std::string::npos);
@@ -108,7 +108,7 @@ TEST_F(CppTargetInstructionGeneratorTest, TestDashedTargetNameIsSanitized)
     ASSERT_TRUE(std::filesystem::exists(sourcePath));
 
     std::string headerContent = readFileContent(headerPath);
-    EXPECT_NE(headerContent.find("EZTRIPLE_X86_64_TARGET_INSTRUCTION_TABLE_H"), std::string::npos);
-    EXPECT_NE(headerContent.find("namespace EzTriple::x86_64TargetInst"), std::string::npos);
+    EXPECT_NE(headerContent.find("EZTARGETS_X86_64_TARGET_INSTRUCTION_TABLE_H"), std::string::npos);
+    EXPECT_NE(headerContent.find("namespace EzTargets::x86_64TargetInst"), std::string::npos);
     EXPECT_EQ(headerContent.find("x86-64"), std::string::npos);
 }

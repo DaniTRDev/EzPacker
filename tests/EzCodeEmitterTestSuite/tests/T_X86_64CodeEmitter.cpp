@@ -1,7 +1,7 @@
 #include "EzCodeEmitterTestSuite.h"
 #include "Helpers.h"
-#include "X86_64/X86_64CodeEmitter.h"
-#include "X86_64/Encoding/X86_64EncodingDesc.h"
+#include "X86_64CodeEmitter.h"
+#include "Encoding/X86_64EncodingDesc.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "x86_64EncodingTable.h"
@@ -9,7 +9,7 @@
 #include <stdexcept>
 
 using namespace EzCodeEmitter;
-using namespace EzCodeEmitter::X86_64;
+using namespace EzTargets::X86_64;
 
 // Emits MOV/ADD/RET through the x86-64 emitter and verifies the exact sequence of machine bytes.
 TEST_F(EzCodeEmitterTestSuite, TestFullEmitterIntegration)

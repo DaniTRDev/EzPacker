@@ -1,7 +1,7 @@
-#ifndef EZTRIPLE_X86_64_REGISTER_ALLOCATOR_H
-#define EZTRIPLE_X86_64_REGISTER_ALLOCATOR_H
+#ifndef EZTARGETS_X86_64_REGISTER_ALLOCATOR_H
+#define EZTARGETS_X86_64_REGISTER_ALLOCATOR_H
 
-#include "EzTripleCommon.h"
+#include "EzTargetsX86_64Common.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
 #include "RegisterAllocator/MirRegisterAllocator.h"
 
@@ -12,7 +12,7 @@ class SourceReference;
 class StackFrameObject;
 struct RegisterAllocatorCtx;
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -57,6 +57,6 @@ class X86_64RegisterAllocator : public MirRegisterAllocator
                                   MirInstruction *defInst) override;
 };
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64
 
-#endif // EZTRIPLE_X86_64_REGISTER_ALLOCATOR_H
+#endif // EZTARGETS_X86_64_REGISTER_ALLOCATOR_H

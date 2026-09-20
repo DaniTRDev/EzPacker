@@ -1,8 +1,8 @@
 #include "EzCodeEmitterTestSuite.h"
-#include "X86_64/BranchRelaxation/BranchRelaxer.h"
+#include "BranchRelaxation/BranchRelaxer.h"
 
 using namespace EzCodeEmitter;
-using namespace EzCodeEmitter::X86_64;
+using namespace EzTargets::X86_64;
 
 // A short forward JMP stays 2 bytes and resolves to a positive disp8.
 TEST_F(EzCodeEmitterTestSuite, TestShortForwardBranch)

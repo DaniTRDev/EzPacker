@@ -1,4 +1,4 @@
-#include "Targets/X86_64/X86_64InstructionSelector.h"
+#include "X86_64TargetInstructionSelector.h"
 #include "x86_64TargetInstructionTable.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
@@ -14,7 +14,7 @@
 #include "Function/MirFunctionRegisterInfo.h"
 #include <map>
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -847,4 +847,4 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
     return false;
 }
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64

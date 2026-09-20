@@ -114,7 +114,7 @@ TEST_F(CppInstructionSelectorGeneratorTest, TestInstructionSelectorGeneration)
     std::string sourceContent = readFileContent(sourcePath);
 
     // Verify Header
-    EXPECT_NE(headerContent.find("EZTRIPLE_AMD64_INSTRUCTION_SELECTOR_H"), std::string::npos);
+    EXPECT_NE(headerContent.find("EZTARGETS_AMD64_INSTRUCTION_SELECTOR_H"), std::string::npos);
     EXPECT_NE(headerContent.find("class AMD64InstructionSelector : public MirInstructionSelector"), std::string::npos);
     EXPECT_NE(headerContent.find("bool select(MirBuilderContext *ctx, MirInstruction *inst) override;"),
               std::string::npos);

@@ -1,7 +1,7 @@
-#ifndef EZTRIPLE_X86_64_LOWERING_H
-#define EZTRIPLE_X86_64_LOWERING_H
+#ifndef EZTARGETS_X86_64_LOWERING_H
+#define EZTARGETS_X86_64_LOWERING_H
 
-#include "EzTripleCommon.h"
+#include "EzTargetsX86_64Common.h"
 #include "Legalizer/Actions/LegalizeActionCommon.h"
 
 /**
@@ -33,4 +33,4 @@ int64_t log2Pow2(int64_t val);
 /// Returns val - 1, used by power-of-two-minus-one rule transforms.
 int64_t sub1(int64_t val);
 
-#endif // EZTRIPLE_X86_64_LOWERING_H
+#endif // EZTARGETS_X86_64_LOWERING_H

@@ -1,5 +1,5 @@
-#ifndef EZTRIPLE_X86_64_TARGET_INSTRUCTION_SELECTOR_H
-#define EZTRIPLE_X86_64_TARGET_INSTRUCTION_SELECTOR_H
+#ifndef EZTARGETS_X86_64_TARGET_INSTRUCTION_SELECTOR_H
+#define EZTARGETS_X86_64_TARGET_INSTRUCTION_SELECTOR_H
 
 // Angle brackets keep the search out of this header's own directory: on case-insensitive
 // filesystems a quoted include would resolve "x86_64InstructionSelector.h" back to this file.
@@ -8,7 +8,7 @@
 
 class MirRegisterClass;
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -63,6 +63,6 @@ class X86_64TargetInstructionSelector : public x86_64InstructionSelector
 
     TargetDesc *m_targetDesc{ nullptr }; ///< Target descriptor owning the register classes used above.
 };
-} // namespace EzTriple
+} // namespace EzTargets::X86_64
 
-#endif // EZTRIPLE_X86_64_TARGET_INSTRUCTION_SELECTOR_H
+#endif // EZTARGETS_X86_64_TARGET_INSTRUCTION_SELECTOR_H

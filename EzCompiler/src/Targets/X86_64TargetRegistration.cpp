@@ -2,7 +2,7 @@
 #include "Builder/MirBuilderContext.h"
 #include "Descriptors/TargetBinaryDesc.h"
 #include "Function/CallingConvDesc.h"
-#include "Targets/X86_64/X86_64TargetDesc.h"
+#include "X86_64TargetDesc.h"
 
 #include <memory>
 
@@ -25,7 +25,7 @@ struct X86_64TargetRegistration
                 {
                     EzCompiler::ResolvedTarget result;
 
-                    auto target = std::make_unique<EzTriple::X86_64TargetDesc>(mirCtx);
+                    auto target = std::make_unique<EzTargets::X86_64::X86_64TargetDesc>(mirCtx);
                     target->setPositionIndependent(isPositionIndependent);
                     target->initialize();
 

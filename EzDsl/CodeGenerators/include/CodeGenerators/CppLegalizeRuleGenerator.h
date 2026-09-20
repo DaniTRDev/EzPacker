@@ -23,11 +23,13 @@ class CppLegalizeRuleGenerator : public CodeGenerator
      * @param table Symbol table holding the parsed .lrd rule definitions.
      * @param outPath Destination file or directory for the generated artifacts.
      * @param targetName Target identifier substituted into generated class names.
+     * @param namespaceRoot Namespace root the generated rules are emitted into.
      */
     CppLegalizeRuleGenerator(DiagnosticCollector *collector,
                              SymbolTable *table,
                              std::filesystem::path outPath,
-                             std::string targetName = "Target");
+                             std::string targetName = "Target",
+                             std::string namespaceRoot = "EzTargets");
 
     /** Generates the rule header/source pair; returns false if validation or emission fails. */
     bool run() override;
@@ -38,6 +40,9 @@ class CppLegalizeRuleGenerator : public CodeGenerator
     /** Overrides the target identifier used to name generated classes. */
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
+    /** Overrides the namespace root the generated rules are emitted into. */
+    void setNamespaceRoot(std::string namespaceRoot) { m_namespaceRoot = std::move(namespaceRoot); }
+
     /** Emits the rule matcher/rewriter declarations and predicate forward declarations into the header. */
     void emitHeader(CppSourceEmitter &emitter, const std::vector<const Symbol *> &ruleSymbols) const;
 
@@ -47,6 +52,9 @@ class CppLegalizeRuleGenerator : public CodeGenerator
   private:
     /** Target identifier substituted into generated class and include names. */
     std::string m_targetName;
+
+    /** Namespace root the generated rules are emitted into. */
+    std::string m_namespaceRoot;
 };
 
 } // namespace CodeGenerators

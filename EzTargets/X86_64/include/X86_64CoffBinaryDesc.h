@@ -1,16 +1,16 @@
-#ifndef EZTRIPLE_X86_64_COFF_BINARY_DESC_H
-#define EZTRIPLE_X86_64_COFF_BINARY_DESC_H
+#ifndef EZTARGETS_X86_64_COFF_BINARY_DESC_H
+#define EZTARGETS_X86_64_COFF_BINARY_DESC_H
 
-#include "EzTripleCommon.h"
+#include "EzTargetsX86_64Common.h"
 #include "Descriptors/BasicBinaryDesc.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
  * Windows x64 (COFF) binary descriptor. Code is non-PIC and uses the small code model.
  */
-class X86_64CoffBinaryDesc : public BasicBinaryDesc
+class X86_64CoffBinaryDesc : public EzTriple::BasicBinaryDesc
 {
   public:
     /**
@@ -29,6 +29,6 @@ class X86_64CoffBinaryDesc : public BasicBinaryDesc
     void initialize() override;
 };
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64
 
-#endif // EZTRIPLE_X86_64_COFF_BINARY_DESC_H
+#endif // EZTARGETS_X86_64_COFF_BINARY_DESC_H

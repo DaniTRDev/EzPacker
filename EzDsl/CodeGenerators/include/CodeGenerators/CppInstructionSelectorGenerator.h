@@ -23,11 +23,13 @@ class CppInstructionSelectorGenerator : public CodeGenerator
      * @param table Symbol table holding the parsed .isf pattern definitions.
      * @param outPath Destination file or directory for the generated artifacts.
      * @param targetName Target identifier substituted into generated class names.
+     * @param namespaceRoot Namespace root the generated selector is emitted into.
      */
     CppInstructionSelectorGenerator(DiagnosticCollector *collector,
                                     SymbolTable *table,
                                     std::filesystem::path outPath,
-                                    std::string targetName = "Target");
+                                    std::string targetName = "Target",
+                                    std::string namespaceRoot = "EzTargets");
 
     /** Generates the selector header/source pair; returns false if validation or emission fails. */
     bool run() override;
@@ -37,6 +39,9 @@ class CppInstructionSelectorGenerator : public CodeGenerator
 
     /** Overrides the target identifier used to name generated classes. */
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
+
+    /** Overrides the namespace root the generated selector is emitted into. */
+    void setNamespaceRoot(std::string namespaceRoot) { m_namespaceRoot = std::move(namespaceRoot); }
 
     /** Emits the selector class declaration and pattern table into the header. */
     void emitHeader(CppSourceEmitter &emitter, const std::vector<const Symbol *> &patternSymbols) const;
@@ -50,6 +55,9 @@ class CppInstructionSelectorGenerator : public CodeGenerator
   private:
     /** Target identifier substituted into generated class and include names. */
     std::string m_targetName;
+
+    /** Namespace root the generated selector is emitted into. */
+    std::string m_namespaceRoot;
 };
 
 } // namespace CodeGenerators

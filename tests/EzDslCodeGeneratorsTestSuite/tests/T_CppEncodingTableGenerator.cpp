@@ -118,8 +118,8 @@ TEST_F(CppTargetEncodingGeneratorTest, TestEncodingTableGeneration)
 
     std::string header = readFileContent(headerPath);
 
-    EXPECT_NE(header.find("#include \"X86_64/Encoding/X86_64EncodingDesc.h\""), std::string::npos);
-    EXPECT_NE(header.find("namespace EzCodeEmitter::X86_64"), std::string::npos);
+    EXPECT_NE(header.find("#include \"Encoding/X86_64EncodingDesc.h\""), std::string::npos);
+    EXPECT_NE(header.find("namespace EzTargets::X86_64"), std::string::npos);
     EXPECT_NE(header.find("inline constexpr EncodingDesc s_encodings[]"), std::string::npos);
     EXPECT_NE(header.find("inline constexpr std::size_t s_encodingCount = 4;"), std::string::npos);
 

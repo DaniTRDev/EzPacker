@@ -1,7 +1,7 @@
 #include "EzTripleTestSuite.h"
-#include "Targets/X86_64/X86_64TargetDesc.h"
-#include "Targets/X86_64/X86_64ElfBinaryDesc.h"
-#include "Targets/X86_64/X86_64CoffBinaryDesc.h"
+#include "X86_64TargetDesc.h"
+#include "X86_64ElfBinaryDesc.h"
+#include "X86_64CoffBinaryDesc.h"
 #include "Descriptors/TargetRelocationResolver.h"
 #include "GenericCodeEmitter.h"
 #include "Operand/MirRegisterBank.h"
@@ -15,7 +15,7 @@
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "x86_64TargetInstructionTable.h"
 
-using namespace EzTriple;
+using namespace EzTargets::X86_64;
 
 // Verifies basic descriptor metadata, displacement type, RIP register id, and GPR class.
 TEST_F(EzTripleTestSuite, TestX86_64TargetDescInitialization)

@@ -61,6 +61,7 @@ struct CliOptions
     std::string inputFilePath;            ///< Primary input file to process.
     std::string outputPath{ "." };        ///< Destination file or directory for generated artifacts.
     std::string targetName;               ///< Target identifier substituted into generated code.
+    std::string namespaceRoot{ "EzTargets" }; ///< Namespace root the generated code is emitted into.
     std::vector<std::string> includeDirs; ///< Additional search paths for imported DSL files.
 
     std::string rulesFilePath;             // --rules <file.lrd>

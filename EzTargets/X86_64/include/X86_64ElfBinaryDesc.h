@@ -1,16 +1,16 @@
-#ifndef EZTRIPLE_X86_64_ELF_BINARY_DESC_H
-#define EZTRIPLE_X86_64_ELF_BINARY_DESC_H
+#ifndef EZTARGETS_X86_64_ELF_BINARY_DESC_H
+#define EZTARGETS_X86_64_ELF_BINARY_DESC_H
 
-#include "EzTripleCommon.h"
+#include "EzTargetsX86_64Common.h"
 #include "Descriptors/BasicBinaryDesc.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
  * System V x86-64 (ELF) binary descriptor. Optionally configured for position-independent code.
  */
-class X86_64ElfBinaryDesc : public BasicBinaryDesc
+class X86_64ElfBinaryDesc : public EzTriple::BasicBinaryDesc
 {
   public:
     /**
@@ -31,6 +31,6 @@ class X86_64ElfBinaryDesc : public BasicBinaryDesc
     void initialize() override;
 };
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64
 
-#endif // EZTRIPLE_X86_64_ELF_BINARY_DESC_H
+#endif // EZTARGETS_X86_64_ELF_BINARY_DESC_H

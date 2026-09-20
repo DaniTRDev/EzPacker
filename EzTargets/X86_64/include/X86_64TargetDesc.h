@@ -1,7 +1,7 @@
-#ifndef EZTRIPLE_X86_64_TARGET_DESC_H
-#define EZTRIPLE_X86_64_TARGET_DESC_H
+#ifndef EZTARGETS_X86_64_TARGET_DESC_H
+#define EZTARGETS_X86_64_TARGET_DESC_H
 
-#include "EzTripleCommon.h"
+#include "EzTargetsX86_64Common.h"
 #include "Descriptors/TargetDesc.h"
 #include "Operand/MirRegisterReference.h"
 #include <memory>
@@ -19,7 +19,7 @@ class MirType;
 class CallingConvDesc;
 class TargetBinaryDesc;
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -144,6 +144,6 @@ class X86_64TargetDesc : public TargetDesc
     std::pmr::vector<TargetBinaryDesc *> m_binaries; ///< Registered binary descriptors.
 };
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64
 
-#endif // EZTRIPLE_X86_64_TARGET_DESC_H
+#endif // EZTARGETS_X86_64_TARGET_DESC_H

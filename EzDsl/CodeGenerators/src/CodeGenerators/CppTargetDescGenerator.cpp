@@ -73,9 +73,10 @@ void emitStringArray(CppSourceEmitter &emitter,
 CppTargetDescGenerator::CppTargetDescGenerator(DiagnosticCollector *collector,
                                                SymbolTable *table,
                                                std::filesystem::path outPath,
-                                               std::string targetName) :
+                                               std::string targetName,
+                                               std::string namespaceRoot) :
     CodeGenerator("CodeGenerators::TargetDesc", collector, table, std::move(outPath)),
-    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target")), m_namespaceRoot(std::move(namespaceRoot))
 {
 }
 
@@ -106,7 +107,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
     emitter.emitBlankLine();
 
     {
-        auto nsScope = emitter.enterNamespace(std::format("EzTriple::TableGen::{}", ns));
+        auto nsScope = emitter.enterNamespace(std::format("{}::TableGen::{}", m_namespaceRoot, ns));
         emitter.emitBlankLine();
 
         emitter.emitComment("Declarative metadata extracted from the .tdesc manifest.");
@@ -231,10 +232,10 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitInclude(std::format("{}RegisterInfo.h", ns));
     emitter.emitBlankLine();
 
-    const std::string registerNs = std::format("EzCodeEmitter::TableGen::{}", ns);
+    const std::string registerNs = std::format("{}::TableGen::{}", m_namespaceRoot, ns);
 
     {
-        auto nsScope = emitter.enterNamespace(std::format("EzTriple::TableGen::{}", ns));
+        auto nsScope = emitter.enterNamespace(std::format("{}::TableGen::{}", m_namespaceRoot, ns));
         emitter.emitBlankLine();
 
         emitter.emitLine("{}::{} (MirBuilderContext *ctx) :", className, className);
@@ -395,9 +396,11 @@ bool CppTargetDescGenerator::run()
 bool GenerateTargetDescriptor(DiagnosticCollector *collector,
                               SymbolTable *table,
                               std::filesystem::path outPath,
-                              std::string targetName)
+                              std::string targetName,
+                              std::string namespaceRoot)
 {
-    CppTargetDescGenerator generator(collector, table, std::move(outPath), std::move(targetName));
+    CppTargetDescGenerator generator(
+            collector, table, std::move(outPath), std::move(targetName), std::move(namespaceRoot));
     return generator.run();
 }
 

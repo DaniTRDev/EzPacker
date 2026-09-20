@@ -22,11 +22,13 @@ class CppTargetInstructionGenerator : public CodeGenerator
      * @param table Symbol table holding the parsed .idf instruction definitions.
      * @param outPath Destination file or directory for the generated artifacts.
      * @param targetName Target identifier substituted into generated class names.
+     * @param namespaceRoot Namespace the generated table is emitted into (e.g. "EzTargets::X86_64").
      */
     CppTargetInstructionGenerator(DiagnosticCollector *collector,
                                   SymbolTable *table,
                                   std::filesystem::path outPath,
-                                  std::string targetName = "Target");
+                                  std::string targetName = "Target",
+                                  std::string namespaceRoot = "EzTargets");
 
     /** Generates the target instruction table header/source pair; returns false if validation or emission fails. */
     bool run() override;
@@ -36,6 +38,9 @@ class CppTargetInstructionGenerator : public CodeGenerator
 
     /** Overrides the target identifier used to name generated classes. */
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
+
+    /** Overrides the namespace root the generated table is emitted into. */
+    void setNamespaceRoot(std::string namespaceRoot) { m_namespaceRoot = std::move(namespaceRoot); }
 
     /** Emits the OpCode enum and descriptor lookup/initialization declarations into the header. */
     void emitHeader(CppSourceEmitter &emitter, const std::vector<const Symbol *> &instSymbols) const;
@@ -49,6 +54,9 @@ class CppTargetInstructionGenerator : public CodeGenerator
   private:
     /** Target identifier substituted into generated class and include names. */
     std::string m_targetName;
+
+    /** Namespace root the generated table is emitted into. */
+    std::string m_namespaceRoot;
 };
 
 } // namespace CodeGenerators

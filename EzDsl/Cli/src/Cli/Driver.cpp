@@ -1167,7 +1167,8 @@ DriverResult Driver::run()
         using namespace CodeGenerators;
         const std::string target = resolveTargetName("Target");
 
-        CppLegalizerGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        CppLegalizerGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target,
+                                        m_options.namespaceRoot);
         if (!generator.run() || errorTracker.hasErrors())
         {
             result.success = false;
@@ -1177,7 +1178,8 @@ DriverResult Driver::run()
 
         if (hasLoadedRules)
         {
-            CppLegalizeRuleGenerator ruleGen(&diagCollector, &symbolTable, m_options.outputPath, target);
+            CppLegalizeRuleGenerator ruleGen(&diagCollector, &symbolTable, m_options.outputPath, target,
+                                             m_options.namespaceRoot);
             if (!ruleGen.run() || errorTracker.hasErrors())
             {
                 result.success = false;
@@ -1191,7 +1193,8 @@ DriverResult Driver::run()
         using namespace CodeGenerators;
         const std::string target = resolveTargetName("Target");
 
-        CppLegalizeRuleGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        CppLegalizeRuleGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target,
+                                           m_options.namespaceRoot);
         if (!generator.run() || errorTracker.hasErrors())
         {
             result.success = false;
@@ -1204,7 +1207,8 @@ DriverResult Driver::run()
         using namespace CodeGenerators;
         const std::string target = resolveTargetName("Target");
 
-        CppTargetInstructionGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        CppTargetInstructionGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target,
+                                                m_options.namespaceRoot);
         if (!generator.run() || errorTracker.hasErrors())
         {
             result.success = false;
@@ -1230,7 +1234,8 @@ DriverResult Driver::run()
         using namespace CodeGenerators;
         const std::string target = resolveTargetName("Target");
 
-        CppInstructionSelectorGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        CppInstructionSelectorGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target,
+                                                  m_options.namespaceRoot);
         if (!generator.run() || errorTracker.hasErrors())
         {
             result.success = false;
@@ -1256,7 +1261,8 @@ DriverResult Driver::run()
         using namespace CodeGenerators;
         const std::string target = resolveTargetName("Target");
 
-        CppRegisterInfoGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        CppRegisterInfoGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target,
+                                           m_options.namespaceRoot);
         if (!generator.run() || errorTracker.hasErrors())
         {
             result.success = false;
@@ -1269,7 +1275,8 @@ DriverResult Driver::run()
         using namespace CodeGenerators;
         const std::string target = resolveTargetName("Target");
 
-        CppTargetDescGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        CppTargetDescGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target,
+                                         m_options.namespaceRoot);
         if (!generator.run() || errorTracker.hasErrors())
         {
             result.success = false;

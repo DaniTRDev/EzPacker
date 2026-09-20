@@ -1,21 +1,21 @@
 #include "EzCodeEmitterTestSuite.h"
 #include "Helpers.h"
-#include "X86_64/Encoding/X86_64EncodingDesc.h"
-#include "X86_64/Encoding/X86_64InstructionEncoder.h"
-#include "X86_64/BranchRelaxation/BranchRelaxer.h"
+#include "Encoding/X86_64EncodingDesc.h"
+#include "Encoding/X86_64InstructionEncoder.h"
+#include "BranchRelaxation/BranchRelaxer.h"
 #include <chrono>
 
 using namespace EzCodeEmitter;
-using namespace EzCodeEmitter::X86_64;
+using namespace EzTargets::X86_64;
 
 namespace
 {
 
-using EncForm = EzCodeEmitter::X86_64::EncForm;
-using EncodingDesc = EzCodeEmitter::X86_64::EncodingDesc;
-using EncOperandBinding = EzCodeEmitter::X86_64::EncOperandBinding;
-using EncRegClass = EzCodeEmitter::X86_64::EncRegClass;
-using EncSlotKind = EzCodeEmitter::X86_64::EncSlotKind;
+using EncForm = EzTargets::X86_64::EncForm;
+using EncodingDesc = EzTargets::X86_64::EncodingDesc;
+using EncOperandBinding = EzTargets::X86_64::EncOperandBinding;
+using EncRegClass = EzTargets::X86_64::EncRegClass;
+using EncSlotKind = EzTargets::X86_64::EncSlotKind;
 
 /**
  * Builds a two-operand, two-address register instruction descriptor with the given

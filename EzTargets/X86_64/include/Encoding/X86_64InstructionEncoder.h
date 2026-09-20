@@ -1,14 +1,14 @@
-#ifndef EZCODEEMITTER_X86_64_INSTRUCTION_ENCODER_H
-#define EZCODEEMITTER_X86_64_INSTRUCTION_ENCODER_H
+#ifndef EZTARGETS_X86_64_INSTRUCTION_ENCODER_H
+#define EZTARGETS_X86_64_INSTRUCTION_ENCODER_H
 
-#include "X86_64/Encoding/X86_64EncodingDesc.h"
+#include "Encoding/X86_64EncodingDesc.h"
 #include "Encoding/EncodeResult.h"
 
 #include <cstdint>
 #include <span>
 #include <vector>
 
-namespace EzCodeEmitter::X86_64
+namespace EzTargets::X86_64
 {
 
 /**
@@ -35,7 +35,7 @@ class InstructionEncoder
     static bool encode(const EncodingDesc &desc,
                        std::span<const ResolvedOperand> operands,
                        std::vector<uint8_t> &out,
-                       EncodeResult &result);
+                       EzCodeEmitter::EncodeResult &result);
 
     /**
      * Encodes the ModR/M byte: (mod << 6) | ((reg & 7) << 3) | (rm & 7).
@@ -116,6 +116,6 @@ class InstructionEncoder
     static bool writeDisp32(std::span<uint8_t> bytes, size_t offset, int32_t value);
 };
 
-} // namespace EzCodeEmitter::X86_64
+} // namespace EzTargets::X86_64
 
-#endif // EZCODEEMITTER_X86_64_INSTRUCTION_ENCODER_H
+#endif // EZTARGETS_X86_64_INSTRUCTION_ENCODER_H

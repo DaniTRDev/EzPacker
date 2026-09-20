@@ -1,10 +1,10 @@
-#ifndef EZTRIPLE_X86_64_RELOCATION_RESOLVER_H
-#define EZTRIPLE_X86_64_RELOCATION_RESOLVER_H
+#ifndef EZTARGETS_X86_64_RELOCATION_RESOLVER_H
+#define EZTARGETS_X86_64_RELOCATION_RESOLVER_H
 
 #include "Descriptors/TargetRelocationResolver.h"
-#include "EzTripleCommon.h"
+#include "EzTargetsX86_64Common.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -32,6 +32,6 @@ class X86_64RelocationResolver : public TargetRelocationResolver
                                       TargetCodeRelocationType type) const override;
 };
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64
 
-#endif // EZTRIPLE_X86_64_RELOCATION_RESOLVER_H
+#endif // EZTARGETS_X86_64_RELOCATION_RESOLVER_H

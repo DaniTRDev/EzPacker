@@ -1,7 +1,7 @@
-#include "Targets/X86_64/X86_64ElfBinaryDesc.h"
+#include "X86_64ElfBinaryDesc.h"
 #include "Helpers.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -21,4 +21,4 @@ void X86_64ElfBinaryDesc::initialize()
     Helpers::ObjectFormat::CreateElfSections(m_sections, m_alloc);
 }
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64

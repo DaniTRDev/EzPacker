@@ -13,10 +13,11 @@ Usage:
       INPUT  <path_to_isf_file>
       TARGET_NAME <target_architecture_name>
       [OUTPUT_DIR <output_directory>]
+      [NAMESPACE_ROOT <namespace_root>]
   )
 #]=======================================================================]
 function(EzDslGenInstructionSelector)
-    cmake_parse_arguments(PARSE_ARGV 0 EZDSL "" "TARGET;INPUT;TARGET_NAME;OUTPUT_DIR" "")
+    cmake_parse_arguments(PARSE_ARGV 0 EZDSL "" "TARGET;INPUT;TARGET_NAME;OUTPUT_DIR;NAMESPACE_ROOT" "")
 
     if(NOT EZDSL_TARGET)
         message(FATAL_ERROR "EzDslGenInstructionSelector: TARGET argument is required.")
@@ -28,6 +29,10 @@ function(EzDslGenInstructionSelector)
 
     if(NOT EZDSL_TARGET_NAME)
         set(EZDSL_TARGET_NAME "Target")
+    endif()
+
+    if(NOT EZDSL_NAMESPACE_ROOT)
+        set(EZDSL_NAMESPACE_ROOT "EzTargets")
     endif()
 
     if(NOT EZDSL_OUTPUT_DIR)
@@ -52,6 +57,7 @@ function(EzDslGenInstructionSelector)
                 -o "${EZDSL_OUTPUT_DIR}"
                 --emit-instruction-selector
                 --target "${EZDSL_TARGET_NAME}"
+                --namespace-root "${EZDSL_NAMESPACE_ROOT}"
         DEPENDS EzDslCli "${EZDSL_INPUT}"
         COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}InstructionSelector from ${EZDSL_INPUT}"
         VERBATIM

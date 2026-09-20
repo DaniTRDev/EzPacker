@@ -21,8 +21,8 @@ set(EZCOMPILER_LIB_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzCompilerLib"
         FILE_LIST ${EZCOMPILER_LIB_FILES_LIST}
         PRECOMPILED_HEADER "include/EzCompilerCommon.h"
-        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;argparse"
-        INCLUDED_DIRS "include;../EzCodeEmitter/include;../EzTriple/include;../EzMir/include;../EzCore/include"
+        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;argparse;EzTargetsX86_64"
+        INCLUDED_DIRS "include;../EzCodeEmitter/include;../EzTriple/include;../EzMir/include;../EzCore/include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/include"
 )
 
 EzCMK_AddExecutable(NAME "ezc"

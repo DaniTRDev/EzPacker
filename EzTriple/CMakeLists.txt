@@ -22,14 +22,6 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/Actions/LegalizeBitcastAction.h"
         "include/Legalizer/Actions/LegalizeLibcallAction.h"
         "include/RegisterAllocator/MirRegisterAllocator.h"
-        "include/Targets/X86_64/X86_64FrameLowerer.h"
-        "include/Targets/X86_64/X86_64Lowering.h"
-        "include/Targets/X86_64/X86_64RegisterAllocator.h"
-        "include/Targets/X86_64/X86_64TargetDesc.h"
-        "include/Targets/X86_64/X86_64InstructionSelector.h"
-        "include/Targets/X86_64/X86_64ElfBinaryDesc.h"
-        "include/Targets/X86_64/X86_64CoffBinaryDesc.h"
-        "include/Targets/X86_64/X86_64RelocationResolver.h"
 
         "src/AbiLowerer/MirAbiLowerer.cpp"
         "src/AbiLowerer/MirAbiLowererPass.cpp"
@@ -51,52 +43,12 @@ set(EZTRIPLE_FILES_LIST
         "src/Legalizer/Actions/LegalizeLibcallAction.cpp"
         "src/RegisterAllocator/MirRegisterAllocator.cpp"
         "src/RegisterAllocator/MirRegisterAllocatorPass.cpp"
-        "src/Targets/X86_64/X86_64Lowering.cpp"
-        "src/Targets/X86_64/X86_64InstructionSelector.cpp"
-        "src/Targets/X86_64/X86_64FrameLowerer.cpp"
-        "src/Targets/X86_64/X86_64RegisterAllocator.cpp"
-        "src/Targets/X86_64/X86_64TargetDesc.cpp"
-        "src/Targets/X86_64/X86_64ElfBinaryDesc.cpp"
-        "src/Targets/X86_64/X86_64CoffBinaryDesc.cpp"
-        "src/Targets/X86_64/X86_64RelocationResolver.cpp"
 )
 
+# EzTriple is the target-agnostic MIR lowering/selection framework. Concrete targets (x86-64
+# and future ISAs) live in EzTargets; EzTriple intentionally contains no ISA-specific code.
 EzCMK_ConfigureLib(NAME "EzTriple"
         FILE_LIST ${EZTRIPLE_FILES_LIST}
         PRECOMPILED_HEADER "include/EzTripleCommon.h"
         LINKED_LIBRARIES "EzMir;EzCodeEmitter"
         INCLUDED_DIRS "include;../EzCodeEmitter/include")
-
-include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenCallingConv.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenLegalizerActionTable.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenTargetInstructions.cmake")
-include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenInstructionSelector.cmake")
-
-EzDslGenCallingConv(
-    TARGET EzTriple
-    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64_calling_conv.ezcc"
-    TARGET_NAME "x86_64"
-    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
-)
-
-EzDslGenLegalizerActionTable(
-    TARGET EzTriple
-    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64_legalize.lad"
-    RULES  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64_rules.lrd"
-    TARGET_NAME "x86_64"
-    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
-)
-
-EzDslGenTargetInstructions(
-    TARGET EzTriple
-    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64_instructions.idf"
-    TARGET_NAME "x86_64"
-    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
-)
-
-EzDslGenInstructionSelector(
-    TARGET EzTriple
-    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64_patterns.isf"
-    TARGET_NAME "x86_64"
-    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
-)

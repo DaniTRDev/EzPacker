@@ -1,4 +1,4 @@
-#include "Targets/X86_64/X86_64FrameLowerer.h"
+#include "X86_64FrameLowerer.h"
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Function/CallingConvDesc.h"
@@ -14,7 +14,7 @@
 #include "FlexNumber/FlexInt.h"
 #include "x86_64TargetInstructionTable.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 namespace
@@ -72,11 +72,11 @@ bool resolveFrameLoweringSetup(FrameLowererCtx &ctx, MirOperandBuilder &opBuilde
     setup.m_fpReg = opBuilder.buildPhysReg(setup.m_ptrType, setup.m_fpRef.getId(), "rbp", setup.m_fpRef.getClass());
     setup.m_spReg = opBuilder.buildPhysReg(setup.m_ptrType, setup.m_spRef.getId(), "rsp", setup.m_spRef.getClass());
 
-    setup.m_descPush = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::PUSH64r);
-    setup.m_descPop = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::POP64r);
-    setup.m_descMov = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr);
-    setup.m_descSub = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::SUB64ri);
-    setup.m_descAdd = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::ADD64ri);
+    setup.m_descPush = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::PUSH64r);
+    setup.m_descPop = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::POP64r);
+    setup.m_descMov = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::MOV64rr);
+    setup.m_descSub = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::SUB64ri);
+    setup.m_descAdd = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::ADD64ri);
     return true;
 }
 
@@ -239,7 +239,7 @@ bool X86_64FrameLowerer::lowerAlloc(FrameLowererCtx &ctx)
     MirOperandBuilder opBuilder(ctx.m_ctx);
     MirReference *slotRef = opBuilder.buildRef(stackObj, allocInst->getSourceRef());
 
-    const auto *descLEA64r = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::LEA64r);
+    const auto *descLEA64r = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::LEA64r);
 
     allocInst->setOpcode(MirInstructionOpCode::TARGET_INST);
     allocInst->setTargetDesc(descLEA64r);
@@ -282,8 +282,8 @@ bool X86_64FrameLowerer::lowerDAlloc(FrameLowererCtx &ctx)
     MirRegisterRef spRef = cc->getStackPointerReg();
     MirRegister *spReg = opBuilder.buildPhysReg(ptrType, spRef.getId(), "rsp", spRef.getClass());
 
-    const auto *descSUB64rr = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::SUB64rr);
-    const auto *descMOV64rr = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr);
+    const auto *descSUB64rr = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::SUB64rr);
+    const auto *descMOV64rr = EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::MOV64rr);
 
     MirInstructionBuilder ib(ctx.m_ctx, dallocInst, InsertionType::InsertBefore);
     // 1. subq %src, %rsp
@@ -299,4 +299,4 @@ bool X86_64FrameLowerer::lowerDAlloc(FrameLowererCtx &ctx)
     return true;
 }
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64

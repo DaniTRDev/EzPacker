@@ -53,9 +53,10 @@ std::string FlagsToCpp(const std::pmr::vector<std::string_view> &flags)
 CppTargetInstructionGenerator::CppTargetInstructionGenerator(DiagnosticCollector *collector,
                                                              SymbolTable *table,
                                                              std::filesystem::path outPath,
-                                                             std::string targetName) :
+                                                             std::string targetName,
+                                                             std::string namespaceRoot) :
     CodeGenerator("CodeGenerators::TargetInstructions", collector, table, std::move(outPath)),
-    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target")), m_namespaceRoot(std::move(namespaceRoot))
 {
 }
 
@@ -96,7 +97,7 @@ bool CppTargetInstructionGenerator::run()
 void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter,
                                                const std::vector<const Symbol *> &instSymbols) const
 {
-    std::string guard = std::format("EZTRIPLE_{}_TARGET_INSTRUCTION_TABLE_H", StrToUpper(m_targetName));
+    std::string guard = std::format("EZTARGETS_{}_TARGET_INSTRUCTION_TABLE_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
     emitter.emitBlankLine();
     emitter.emitBanner("CppTargetInstructionGenerator");
@@ -108,7 +109,7 @@ void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter,
     emitter.emitLine("#include <cstddef>");
     emitter.emitBlankLine();
 
-    std::string ns = std::format("EzTriple::{}TargetInst", m_targetName);
+    std::string ns = std::format("{}::{}TargetInst", m_namespaceRoot, m_targetName);
     {
         auto nsScope = emitter.enterNamespace(ns);
 
@@ -148,7 +149,7 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitLine("#include <string_view>");
     emitter.emitBlankLine();
 
-    std::string ns = std::format("EzTriple::{}TargetInst", m_targetName);
+    std::string ns = std::format("{}::{}TargetInst", m_namespaceRoot, m_targetName);
     {
         auto nsScope = emitter.enterNamespace(ns);
 

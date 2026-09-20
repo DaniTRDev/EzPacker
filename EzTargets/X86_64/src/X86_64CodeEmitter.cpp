@@ -1,4 +1,4 @@
-#include "X86_64/X86_64CodeEmitter.h"
+#include "X86_64CodeEmitter.h"
 #include "CodeSection.h"
 #include "CodeEmitterContext.h"
 #include "Operand/MirOperands.h"
@@ -6,12 +6,12 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Type/MirType.h"
-#include "X86_64/Encoding/X86_64InstructionEncoder.h"
+#include "Encoding/X86_64InstructionEncoder.h"
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
-namespace EzCodeEmitter::X86_64
+namespace EzTargets::X86_64
 {
 
 namespace
@@ -295,7 +295,7 @@ bool X86_64CodeEmitter::tryEmitTableDriven(const MirTargetInstructionDesc *desc,
         }
     }
 
-    EncodeResult result;
+    EzCodeEmitter::EncodeResult result;
     if (!InstructionEncoder::encode(*enc, resolved, bytes, result))
     {
         return false;
@@ -354,4 +354,4 @@ void X86_64CodeEmitter::emitInst(const MirTargetInstructionDesc *desc, std::span
     }
 }
 
-} // namespace EzCodeEmitter::X86_64
+} // namespace EzTargets::X86_64

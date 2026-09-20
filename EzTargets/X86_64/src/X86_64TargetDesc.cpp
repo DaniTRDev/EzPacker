@@ -1,8 +1,8 @@
-#include "Targets/X86_64/X86_64TargetDesc.h"
-#include "Targets/X86_64/X86_64FrameLowerer.h"
-#include "Targets/X86_64/X86_64RegisterAllocator.h"
-#include "Targets/X86_64/X86_64ElfBinaryDesc.h"
-#include "Targets/X86_64/X86_64CoffBinaryDesc.h"
+#include "X86_64TargetDesc.h"
+#include "X86_64FrameLowerer.h"
+#include "X86_64RegisterAllocator.h"
+#include "X86_64ElfBinaryDesc.h"
+#include "X86_64CoffBinaryDesc.h"
 #include "Builder/MirBuilderContext.h"
 #include "Type/MirTypeTable.h"
 #include "Operand/MirRegisterBank.h"
@@ -12,12 +12,12 @@
 #include "x86_64TargetInstructionTable.h"
 #include "x86_64EncodingTable.h"
 #include "x86_64LegalizerActionTable.h"
-#include "Targets/X86_64/X86_64InstructionSelector.h"
-#include "Targets/X86_64/X86_64RelocationResolver.h"
-#include "X86_64/X86_64CodeEmitter.h"
+#include "X86_64TargetInstructionSelector.h"
+#include "X86_64RelocationResolver.h"
+#include "X86_64CodeEmitter.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /**
@@ -137,7 +137,7 @@ void X86_64TargetDesc::initialize()
     m_convs.push_back(m_win64Conv.get());
 
     // 6. Target Instruction Descriptors Table
-    EzTriple::x86_64TargetInst::initializeTargetInstructionTable(this);
+    EzTargets::X86_64::x86_64TargetInst::initializeTargetInstructionTable(this);
 
     // 7. Legalizer Info & Legalizer
     m_legalizerInfo = std::make_unique<x86_64LegalizerInfo>();
@@ -234,19 +234,19 @@ MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)
  */
 std::unique_ptr<GenericCodeEmitter> X86_64TargetDesc::createCodeEmitter()
 {
-    auto emitter = std::make_unique<EzCodeEmitter::X86_64::X86_64CodeEmitter>();
+    auto emitter = std::make_unique<EzTargets::X86_64::X86_64CodeEmitter>();
     emitter->setEncodingResolver(
-            [](const MirTargetInstructionDesc *desc) -> const EzCodeEmitter::X86_64::EncodingDesc *
+            [](const MirTargetInstructionDesc *desc) -> const EzTargets::X86_64::EncodingDesc *
             {
                 if (!desc)
                 {
                     return nullptr;
                 }
-                if (const auto *enc = EzCodeEmitter::X86_64::getEncodingDesc(desc->getEncodingId()))
+                if (const auto *enc = EzTargets::X86_64::getEncodingDesc(desc->getEncodingId()))
                 {
                     return enc;
                 }
-                return EzCodeEmitter::X86_64::findEncodingDesc(desc->getName());
+                return EzTargets::X86_64::findEncodingDesc(desc->getName());
             });
     return emitter;
 }
@@ -261,4 +261,4 @@ TargetRelocationResolver *X86_64TargetDesc::getRelocationResolver()
     return m_relocResolver.get();
 }
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64

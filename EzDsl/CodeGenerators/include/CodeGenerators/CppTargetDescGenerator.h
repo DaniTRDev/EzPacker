@@ -30,11 +30,13 @@ class CppTargetDescGenerator : public CodeGenerator
      * @param table Symbol table holding the parsed .tdesc manifest and referenced symbols.
      * @param outPath Destination file or directory for the generated artifacts.
      * @param targetName Target identifier substituted into generated class names.
+     * @param namespaceRoot Namespace root the generated descriptor tables are emitted into.
      */
     CppTargetDescGenerator(DiagnosticCollector *collector,
                            SymbolTable *table,
                            std::filesystem::path outPath,
-                           std::string targetName = "Target");
+                           std::string targetName = "Target",
+                           std::string namespaceRoot = "EzTargets");
 
     /** Generates the target descriptor header/source pair; returns false if validation or emission fails. */
     bool run() override;
@@ -45,6 +47,9 @@ class CppTargetDescGenerator : public CodeGenerator
     /** Overrides the target identifier used to name generated classes. */
     void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
+    /** Overrides the namespace root the generated descriptor tables are emitted into. */
+    void setNamespaceRoot(std::string namespaceRoot) { m_namespaceRoot = std::move(namespaceRoot); }
+
     /** Emits the TargetDesc subclass declaration and component bindings into the header. */
     void emitHeader(CppSourceEmitter &emitter, const DSL::Ast::TargetDesc::TargetDescDecl *decl) const;
 
@@ -54,6 +59,9 @@ class CppTargetDescGenerator : public CodeGenerator
   private:
     /** Target identifier substituted into generated class and include names. */
     std::string m_targetName;
+
+    /** Namespace root the generated descriptor tables are emitted into. */
+    std::string m_namespaceRoot;
 };
 
 /**
@@ -62,7 +70,8 @@ class CppTargetDescGenerator : public CodeGenerator
 extern bool GenerateTargetDescriptor(DiagnosticCollector *collector,
                                      SymbolTable *table,
                                      std::filesystem::path outPath,
-                                     std::string targetName = "Target");
+                                     std::string targetName = "Target",
+                                     std::string namespaceRoot = "EzTargets");
 
 } // namespace CodeGenerators
 

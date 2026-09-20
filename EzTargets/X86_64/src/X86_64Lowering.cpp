@@ -1,4 +1,4 @@
-#include "Targets/X86_64/X86_64Lowering.h"
+#include "X86_64Lowering.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
 #include <bit>

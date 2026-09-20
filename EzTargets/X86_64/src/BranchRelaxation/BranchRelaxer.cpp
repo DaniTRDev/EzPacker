@@ -1,6 +1,6 @@
-#include "X86_64/BranchRelaxation/BranchRelaxer.h"
+#include "BranchRelaxation/BranchRelaxer.h"
 
-namespace EzCodeEmitter::X86_64
+namespace EzTargets::X86_64
 {
 
 void BranchRelaxer::emitBytes(const uint8_t *data, size_t size)
@@ -159,4 +159,4 @@ size_t BranchRelaxer::relaxAndResolve(std::vector<uint8_t> &outCode,
     return relaxedCount;
 }
 
-} // namespace EzCodeEmitter::X86_64
+} // namespace EzTargets::X86_64

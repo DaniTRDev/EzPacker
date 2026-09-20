@@ -46,9 +46,10 @@ std::string ActionKindToCpp(DSL::Ast::LegalizeActionDef::LegalizeActionKind kind
 CppLegalizerGenerator::CppLegalizerGenerator(DiagnosticCollector *collector,
                                              SymbolTable *table,
                                              std::filesystem::path outPath,
-                                             std::string targetName) :
+                                             std::string targetName,
+                                             std::string namespaceRoot) :
     CodeGenerator("CodeGenerators::Legalizer", collector, table, std::move(outPath)),
-    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target")), m_namespaceRoot(std::move(namespaceRoot))
 {
 }
 
@@ -75,7 +76,7 @@ bool CppLegalizerGenerator::run()
 // Emits the LegalizerInfo subclass declaration exposing query() and executeCustom().
 void CppLegalizerGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
-    std::string guardName = std::format("EZTRIPLE_{}_LEGALIZER_ACTION_TABLE_H", StrToUpper(m_targetName));
+    std::string guardName = std::format("EZTARGETS_{}_LEGALIZER_ACTION_TABLE_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guardName);
     emitter.emitBlankLine();
     emitter.emitBanner("CppLegalizerGenerator");
@@ -627,11 +628,11 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
         if (!handlers.empty())
         {
             emitter.emitLine("uint16_t ruleIndex = handlerId - {};", handlers.size());
-            emitter.emitLine("return EzTriple::{}Rules::applyRuleById(ctx, ruleIndex);", m_targetName);
+            emitter.emitLine("return {}::{}Rules::applyRuleById(ctx, ruleIndex);", m_namespaceRoot, m_targetName);
         }
         else
         {
-            emitter.emitLine("return EzTriple::{}Rules::applyRuleById(ctx, handlerId);", m_targetName);
+            emitter.emitLine("return {}::{}Rules::applyRuleById(ctx, handlerId);", m_namespaceRoot, m_targetName);
         }
     }
     else

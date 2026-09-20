@@ -1,4 +1,4 @@
-#include "Targets/X86_64/X86_64RegisterAllocator.h"
+#include "X86_64RegisterAllocator.h"
 #include "Builder/MirBuilderContext.h"
 #include "Block/MirBlock.h"
 #include "Instruction/MirInstruction.h"
@@ -6,7 +6,7 @@
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 
-namespace EzTriple
+namespace EzTargets::X86_64
 {
 
 /// True when instr is a dynamic allocation, which forces the function to use a frame pointer.
@@ -83,4 +83,4 @@ MirInstruction *X86_64RegisterAllocator::reMaterialize(RegisterAllocatorCtx *ctx
     return iBuilder.build(defInst->getOpCode(), srcRef, ops);
 }
 
-} // namespace EzTriple
+} // namespace EzTargets::X86_64

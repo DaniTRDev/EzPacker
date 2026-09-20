@@ -178,6 +178,11 @@ void CommandLineParser::setupArguments()
             .metavar("<target>")
             .default_value(std::string(""));
 
+    m_program->add_argument("--namespace-root")
+            .help("Namespace root the generated code is emitted into (e.g. EzTargets::X86_64)")
+            .metavar("<ns>")
+            .default_value(std::string("EzTargets"));
+
     m_program->add_argument("--generator")
             .help("Explicit generator to execute: 'type-table', 'instructions', 'legalizer', 'rules', "
                   "'target-instructions', 'target-encodings', 'instruction-selector', 'calling-conv', 'registers', "
@@ -300,6 +305,11 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     opts.format = formatStr == "json" ? OutputFormat::Json : OutputFormat::Text;
 
     opts.targetName = m_program->get<std::string>("--target");
+    opts.namespaceRoot = m_program->get<std::string>("--namespace-root");
+    if (opts.namespaceRoot.empty())
+    {
+        opts.namespaceRoot = "EzTargets";
+    }
 
     opts.rulesFilePath = m_program->get<std::string>("--rules");
     opts.typesFilePath = m_program->get<std::string>("--types");

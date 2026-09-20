@@ -128,8 +128,8 @@ TEST_F(CppLegalizeRuleGeneratorTest, TestEmptyRulesGeneration)
     std::string header = readFile(headerPath);
     std::string source = readFile(sourcePath);
 
-    EXPECT_NE(header.find("#ifndef EZTRIPLE_AMD64_LEGALIZER_RULES_H"), std::string::npos);
-    EXPECT_NE(header.find("namespace EzTriple::AMD64Rules"), std::string::npos);
+    EXPECT_NE(header.find("#ifndef EZTARGETS_AMD64_LEGALIZER_RULES_H"), std::string::npos);
+    EXPECT_NE(header.find("namespace EzTargets::AMD64Rules"), std::string::npos);
     EXPECT_NE(header.find("LegalizationResult applyRules("), std::string::npos);
     EXPECT_NE(header.find("LegalizationResult applyRuleById("), std::string::npos);
 
