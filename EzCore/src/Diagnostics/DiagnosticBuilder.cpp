@@ -32,9 +32,21 @@ DiagnosticBuilder::DiagnosticBuilder(DiagnosticBuilder &&other) :
 }
 
 /**
- * Flushes any pending message to the collector on scope exit.
+ * Flushes any pending message to the collector on scope exit. The collector may reject the
+ * message (for example when no scope is active), but a destructor must never throw, so any
+ * failure is swallowed here to avoid std::terminate while unwinding.
  */
-DiagnosticBuilder::~DiagnosticBuilder() { flush(); }
+DiagnosticBuilder::~DiagnosticBuilder()
+{
+    try
+    {
+        flush();
+    }
+    catch (...)
+    {
+        // Intentionally ignored: emitting a diagnostic must not terminate the process.
+    }
+}
 
 /**
  * Appends a note associated with a source reference by delegating to the raw append path.
@@ -97,7 +109,8 @@ void DiagnosticBuilder::flush()
  */
 bool DiagnosticBuilder::isDiagEnabledForType(DiagnosticMessageType type) const
 {
-    return m_collector->isDiagEnabledForType(type);
+    // After flush() or a move the builder is detached; report disabled instead of dereferencing null.
+    return m_collector != nullptr && m_collector->isDiagEnabledForType(type);
 }
 
 /**
@@ -105,6 +118,12 @@ bool DiagnosticBuilder::isDiagEnabledForType(DiagnosticMessageType type) const
  */
 DiagnosticBuilder &DiagnosticBuilder::appendNoteRaw(std::string_view str, class SourceReference *ref)
 {
+    // Detached builder (flushed or moved-from): the note has no collector to receive it.
+    if (!m_collector)
+    {
+        return *this;
+    }
+
     std::pmr::string copyMsg(m_collector->getAllocator());
     copyMsg += str;
     m_message.addNote({ ref, copyMsg });
