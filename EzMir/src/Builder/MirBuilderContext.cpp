@@ -17,8 +17,9 @@ MirBuilderContext::MirBuilderContext(CallingConvDesc *defaultCallingConv,
                                      MirTypeTable *typeTable,
                                      std::pmr::monotonic_buffer_resource *globalArena) :
     m_defaultCallingConv(defaultCallingConv), m_diagCollector(diagCollector), m_currentId(1), m_typeTable(typeTable),
-    m_globalResource(globalArena), m_blockIdToBlock(m_globalResource), m_functionIdToFunc(m_globalResource),
-    m_globalVarIdToGVar(m_globalResource)
+    m_globalResource(globalArena), m_globalVars(m_globalResource), m_blockIdToBlock(m_globalResource),
+    m_typeIdToClass(m_globalResource), m_functionIdToFunc(m_globalResource), m_globalVarIdToGVar(m_globalResource),
+    m_registerIdToRegister(m_globalResource)
 
 {
 }
