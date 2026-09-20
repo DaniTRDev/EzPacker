@@ -15,7 +15,8 @@ class FlexFloat
   public:
     /**
      * Initializes the LibBF calculation context and clamps it to a target precision bit-width (e.g., 32, 64, 128,
-     * etc.). If internal contexts or backing structures could not be initialized, it throws std::bad_alloc.
+     * etc.). Widths below 32 bits are unsupported and throw std::invalid_argument. If internal contexts or backing
+     * structures could not be initialized, it throws std::bad_alloc.
      */
     explicit FlexFloat(size_t bitWidth);
 

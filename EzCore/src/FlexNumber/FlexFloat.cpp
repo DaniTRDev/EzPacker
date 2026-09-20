@@ -17,6 +17,13 @@ static void *bf_realloc_wrapper(void *opaque, void *ptr, size_t size) { return s
  */
 FlexFloat::FlexFloat(size_t bitWidth) : m_bitWidth(bitWidth), m_lastErr(0)
 {
+    // Sub-32-bit layouts need dedicated exponent/mantissa handling that is not implemented, so
+    // reject them instead of silently keeping binary32 precision/range.
+    if (bitWidth != 0 && bitWidth < 32)
+    {
+        throw std::invalid_argument("FlexFloat does not support widths below 32 bits.");
+    }
+
     libbf::bf_context_init(&m_bfCtx, bf_realloc_wrapper, nullptr);
     libbf::bf_init(&m_bfCtx, &m_number);
     libbf::bf_set_zero(&m_number, 0);
@@ -437,6 +444,9 @@ void FlexFloat::extend(size_t newBitSize)
 {
     if (newBitSize < m_bitWidth)
         throw std::invalid_argument("FlexFloat::extend cannot be used to down-cast precision widths.");
+
+    if (newBitSize != 0 && newBitSize < 32)
+        throw std::invalid_argument("FlexFloat does not support widths below 32 bits.");
 
     if (newBitSize == m_bitWidth)
         return;
