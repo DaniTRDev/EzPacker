@@ -43,34 +43,6 @@ struct SpecialRow
     uint32_t m_id{ 0 }; ///< Numeric id assigned by the definition.
 };
 
-// Rewrites raw into a valid C++ identifier, substituting illegal characters and prefixing leading digits.
-std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
-{
-    std::string result;
-    result.reserve(raw.size());
-    for (char c : raw)
-    {
-        unsigned char uc = static_cast<unsigned char>(c);
-        if (std::isalnum(uc) || c == '_')
-        {
-            result.push_back(c);
-        }
-        else
-        {
-            result.push_back('_');
-        }
-    }
-    if (result.empty())
-    {
-        result = std::string(fallback);
-    }
-    if (std::isdigit(static_cast<unsigned char>(result.front())))
-    {
-        result.insert(result.begin(), '_');
-    }
-    return result;
-}
-
 // Aggregated register metadata extracted from the symbol table for one generation run.
 struct CollectedRegisterData
 {
@@ -93,16 +65,12 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
 
     // Exactly one register file is expected; the first one found wins.
     const DSL::Ast::RegisterDef::RegisterFile *file = nullptr;
-    for (const Symbol *sym : table->getSymbols())
+    const auto files = table->collect<Symbols::RegisterFileSymbol>(SymbolType::RegisterFile);
+    if (!files.empty())
     {
-        if (!sym || sym->getType() != SymbolType::RegisterFile)
-        {
-            continue;
-        }
-        if (const auto *fileSym = sym->getIf<Symbols::RegisterFileSymbol>())
+        if (const auto *fileSym = files.front()->getIf<Symbols::RegisterFileSymbol>())
         {
             file = fileSym->m_astNode;
-            break;
         }
     }
 
@@ -188,19 +156,15 @@ CppRegisterInfoGenerator::CppRegisterInfoGenerator(DiagnosticCollector *collecto
                                                    std::filesystem::path outPath,
                                                    std::string targetName) :
     CodeGenerator("CodeGenerators::RegisterInfo", collector, table, std::move(outPath)),
-    m_targetName(std::move(targetName))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
 {
-    if (m_targetName.empty())
-    {
-        m_targetName = "Target";
-    }
 }
 
 // Emits the self-contained, header-only flat register tables and bank construction helper.
 void CppRegisterInfoGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
     const auto data = collectData(getSymbolTable(), m_targetName);
-    const std::string ns = sanitizeIdentifier(m_targetName, "Target");
+    const std::string ns = SanitizeCppIdentifier(m_targetName, "Target");
     const std::string emissionNs = std::format("EzCodeEmitter::TableGen::{}", ns);
 
     emitter.emitBanner("CppRegisterInfoGenerator");
@@ -436,7 +400,7 @@ bool CppRegisterInfoGenerator::run()
     }
 
     // Pick a target-qualified file name and derive the destination path.
-    const std::string baseName = std::format("{}RegisterInfo", sanitizeIdentifier(m_targetName, "Target"));
+    const std::string baseName = std::format("{}RegisterInfo", SanitizeCppIdentifier(m_targetName, "Target"));
     const auto targetFilePath = resolveSingleFilePath(baseName + ".h");
 
     CppSourceEmitter emitter;

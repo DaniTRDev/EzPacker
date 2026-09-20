@@ -36,45 +36,45 @@ class TargetTriple
      */
     std::string toString() const;
 
-    const std::string &getArch() const { return m_arch; }     ///< Architecture component (e.g. x86_64).
-    const std::string &getVendor() const { return m_vendor; } ///< Vendor component (e.g. pc).
-    const std::string &getSys() const { return m_sys; }       ///< Operating system component (e.g. linux).
-    const std::string &getAbi() const { return m_abi; }       ///< ABI/object-format component (e.g. gnu).
+    const std::string &getArch() const noexcept { return m_arch; }     ///< Architecture component (e.g. x86_64).
+    const std::string &getVendor() const noexcept { return m_vendor; } ///< Vendor component (e.g. pc).
+    const std::string &getSys() const noexcept { return m_sys; }       ///< Operating system component (e.g. linux).
+    const std::string &getAbi() const noexcept { return m_abi; }       ///< ABI/object-format component (e.g. gnu).
 
     /**
      * True when the architecture names an x86-64 target (x86_64 / amd64 / x64).
      */
-    bool isX86_64() const;
+    bool isX86_64() const noexcept;
 
     /**
      * True when the triple targets Windows (sys/abi indicate win32/msvc/coff).
      */
-    bool isWindows() const;
+    bool isWindows() const noexcept;
 
     /**
      * True when the triple targets Linux.
      */
-    bool isLinux() const;
+    bool isLinux() const noexcept;
 
     /**
      * True when the triple should produce an ELF object file.
      */
-    bool isElf() const;
+    bool isElf() const noexcept;
 
     /**
      * True when the triple should produce a COFF object file.
      */
-    bool isCoff() const;
+    bool isCoff() const noexcept;
 
     /**
      * Component-wise equality.
      */
-    bool operator==(const TargetTriple &other) const;
+    bool operator==(const TargetTriple &other) const noexcept;
 
     /**
      * Component-wise inequality.
      */
-    bool operator!=(const TargetTriple &other) const;
+    bool operator!=(const TargetTriple &other) const noexcept;
 
   private:
     std::string m_arch{ "x86_64" };    ///< Architecture component.

@@ -4,8 +4,6 @@
 namespace EzCompiler
 {
 
-CommandLineParser::CommandLineParser() { setupArguments(); }
-
 void CommandLineParser::setupArguments()
 {
     m_program = std::make_unique<argparse::ArgumentParser>("ezc", "1.0.0", argparse::default_arguments::help);
@@ -20,11 +18,6 @@ void CommandLineParser::setupArguments()
             .help("Output file path (default: a.out or a.obj depending on target)")
             .metavar("<path>")
             .default_value(std::string(""));
-
-    m_program->add_argument("-c")
-            .help("Compile and assemble, but do not link")
-            .default_value(false)
-            .implicit_value(true);
 
     m_program->add_argument("-S")
             .help("Stop after compilation; emit assembly text")
@@ -48,11 +41,6 @@ void CommandLineParser::setupArguments()
 
     m_program->add_argument("--emit-lowered-mir")
             .help("Dump target-lowered MIR post register allocation and frame lowering")
-            .default_value(false)
-            .implicit_value(true);
-
-    m_program->add_argument("--emit-obj")
-            .help("Emit native object format (ELF64 or PE-COFF)")
             .default_value(false)
             .implicit_value(true);
 
@@ -88,7 +76,7 @@ void CommandLineParser::setupArguments()
             .implicit_value(true);
 
     m_program->add_argument("--diag-level")
-            .help("Minimum diagnostic severity threshold (error, warning, info, trace, debug)")
+            .help("Minimum diagnostic severity threshold (error, warning, trace, debug)")
             .metavar("<level>")
             .default_value(std::string("warning"));
 
@@ -161,20 +149,34 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
         }
     }
 
-    // Emission stage
-    if (m_program->get<bool>("--emit-mir"))
+    // Emission stage. Multiple stage flags are ambiguous, so reject them rather than silently
+    // letting one win; the default remains object emission.
+    const bool emitMir = m_program->get<bool>("--emit-mir");
+    const bool emitLegalized = m_program->get<bool>("--emit-legalized-mir");
+    const bool emitLowered = m_program->get<bool>("--emit-lowered-mir");
+    const bool emitAsm = m_program->get<bool>("-S");
+    const int stageFlagCount = static_cast<int>(emitMir) + static_cast<int>(emitLegalized) +
+            static_cast<int>(emitLowered) + static_cast<int>(emitAsm);
+    if (stageFlagCount > 1)
+    {
+        outError = "conflicting emission stage flags: choose at most one of --emit-mir, "
+                   "--emit-legalized-mir, --emit-lowered-mir, -S";
+        return false;
+    }
+
+    if (emitMir)
     {
         outOptions.emissionStage = EmissionStage::GenericMir;
     }
-    else if (m_program->get<bool>("--emit-legalized-mir"))
+    else if (emitLegalized)
     {
         outOptions.emissionStage = EmissionStage::LegalizedMir;
     }
-    else if (m_program->get<bool>("--emit-lowered-mir"))
+    else if (emitLowered)
     {
         outOptions.emissionStage = EmissionStage::LoweredMir;
     }
-    else if (m_program->get<bool>("-S"))
+    else if (emitAsm)
     {
         outOptions.emissionStage = EmissionStage::Assembly;
     }
@@ -183,21 +185,34 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
         outOptions.emissionStage = EmissionStage::Object;
     }
 
-    // Optimizations
-    if (m_program->get<bool>("-O2"))
+    // Optimizations. Reject contradictory level flags instead of silently picking one.
+    const bool opt0 = m_program->get<bool>("-O0");
+    const bool opt1 = m_program->get<bool>("-O1");
+    const bool opt2 = m_program->get<bool>("-O2");
+    const bool optS = m_program->get<bool>("-Os");
+    const int optFlagCount = static_cast<int>(opt0) + static_cast<int>(opt1) + static_cast<int>(opt2) +
+            static_cast<int>(optS);
+    if (optFlagCount > 1)
+    {
+        outError = "conflicting optimization flags: choose at most one of -O0, -O1, -O2, -Os";
+        return false;
+    }
+
+    if (opt2)
     {
         outOptions.optLevel = OptimizationLevel::O2;
     }
-    else if (m_program->get<bool>("-O1"))
+    else if (opt1)
     {
         outOptions.optLevel = OptimizationLevel::O1;
     }
-    else if (m_program->get<bool>("-Os"))
+    else if (optS)
     {
         outOptions.optLevel = OptimizationLevel::Os;
     }
     else
     {
+        // Covers both an explicit -O0 and the absence of any optimization flag.
         outOptions.optLevel = OptimizationLevel::O0;
     }
 
@@ -205,9 +220,9 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
     outOptions.printPasses = m_program->get<bool>("--print-passes");
     outOptions.timePasses = m_program->get<bool>("--time-passes");
     outOptions.isPositionIndependent = m_program->get<bool>("-fPIC");
-    outOptions.compileOnly = m_program->get<bool>("-c");
 
-    // Diag level: unrecognized values (including "info") keep the default threshold.
+    // Diag level: every documented value is accepted, anything else is a hard error so a typo
+    // cannot silently leave the default threshold in place.
     std::string diagLvl = m_program->get<std::string>("--diag-level");
     if (diagLvl == "error")
     {
@@ -225,11 +240,14 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
     {
         outOptions.diagThreshold = DiagnosticMessageType::Diag_Debug;
     }
+    else
+    {
+        outError = "unknown diagnostic level '" + diagLvl + "': expected error, warning, trace or debug";
+        return false;
+    }
 
     return true;
 }
-
-void CommandLineParser::printHelp() const { std::cout << m_program->help().str() << "\n"; }
 
 void CommandLineParser::printVersion() const
 {

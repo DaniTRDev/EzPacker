@@ -1,8 +1,8 @@
 set(EZDSL_SEMA_FILES_LIST
     "include/Sema/Encoding/EncodingDialect.h"
     "include/Sema/Encoding/X86_64EncodingDialect.h"
+    "include/Sema/Encoding/X86_64EncodingVocabulary.h"
     "include/Sema/Scope.h"
-    "include/Sema/SemaContext.h"
     "include/Sema/Symbol.h"
     "include/Sema/SymbolTable.h"
     "include/Sema/Symbols/IrSymbols.h"
@@ -26,7 +26,6 @@ set(EZDSL_SEMA_FILES_LIST
     "src/Sema/Encoding/EncodingDialect.cpp"
     "src/Sema/Encoding/X86_64EncodingDialect.cpp"
     "src/Sema/Scope.cpp"
-    "src/Sema/SemaContext.cpp"
     "src/Sema/Symbol.cpp"
     "src/Sema/SymbolTable.cpp"
     "src/SemaPasses/IrInstructionPass.cpp"

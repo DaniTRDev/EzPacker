@@ -140,30 +140,6 @@ struct IntegerLiteral
 };
 
 /**
- * Parses a floating-point literal (with mandatory fractional part) and produces a located
- * Common::RealLiteral parsed via std::from_chars.
- */
-struct RealLiteral
-{
-    static constexpr auto FloatRule =
-            dsl::token(dsl::digits<> >> (dsl::period + dsl::digits<>) | dsl::period >> dsl::digits<>);
-
-    static constexpr auto rule = dsl::position + dsl::capture(FloatRule) + dsl::position;
-
-    static constexpr auto value =
-            lexy::bind(lexy::callback<Ast::Common::RealLiteral>(
-                               [](ParseContext &ctx, const char *startIter, auto textLexeme, const char *endIter)
-                               {
-                                   std::string_view text(textLexeme.data(), textLexeme.size());
-                                   double parsedValue = 0.0;
-                                   std::from_chars(text.data(), text.data() + text.size(), parsedValue);
-                                   return Ast::Common::RealLiteral{ parsedValue, ctx.createRef(startIter, endIter) };
-                               }),
-                       lexy::parse_state,
-                       lexy::values);
-};
-
-/**
  * Parses a double-quoted string literal and produces a located Common::StringLiteral holding a
  * view of its contents.
  */

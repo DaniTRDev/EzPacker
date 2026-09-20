@@ -5,6 +5,7 @@
 #include "MirInstructionSet.h"
 #include "Builder/MirBuilder.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
+#include <span>
 
 /**
  * Mode specifying how newly constructed instructions are inserted into a basic block.
@@ -89,21 +90,21 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
     /**
      * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
      */
-    MirInstruction *buildTarget(class MirTargetInstructionDesc *targetDesc,
+    MirInstruction *buildTarget(const class MirTargetInstructionDesc *targetDesc,
                                 class SourceReference *srcRef,
                                 std::initializer_list<class MirOperand *> operands);
 
     /**
      * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
      */
-    MirInstruction *buildTarget(class MirTargetInstructionDesc *targetDesc,
+    MirInstruction *buildTarget(const class MirTargetInstructionDesc *targetDesc,
                                 class SourceReference *srcRef,
                                 const std::vector<class MirOperand *> &operands);
 
     /**
      * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
      */
-    MirInstruction *buildTarget(class MirTargetInstructionDesc *targetDesc,
+    MirInstruction *buildTarget(const class MirTargetInstructionDesc *targetDesc,
                                 class SourceReference *srcRef,
                                 const std::pmr::vector<class MirOperand *> &operands);
 
@@ -180,6 +181,15 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
                            IntrusiveLinkedList<class MirInstruction>::iterator it = {});
 
   private:
+    /**
+     * Shared body of every build()/buildTarget() overload: allocates the instruction, optionally
+     * attaches a target descriptor, appends each operand and finalizes the insertion.
+     */
+    MirInstruction *buildImpl(MirInstructionOpCode opcode,
+                              class SourceReference *ref,
+                              std::span<class MirOperand *const> operands,
+                              const class MirTargetInstructionDesc *targetDesc);
+
     /**
      * Returns the register info of the instruction either by getting the instr owners or using the owner of the linked
      * block.

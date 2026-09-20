@@ -25,9 +25,17 @@ bool MirModuleLoader::compileSourceToMir(DriverContext &ctx, std::string_view so
     }
 
     std::filesystem::path p(sourcePath);
-    if (!std::filesystem::exists(p))
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec))
     {
-        ctx.getDiagCollector()->error("EzCompiler", "Input file not found: {}", sourcePath);
+        if (ec)
+        {
+            ctx.getDiagCollector()->error("EzCompiler", "Cannot access input file {}: {}", sourcePath, ec.message());
+        }
+        else
+        {
+            ctx.getDiagCollector()->error("EzCompiler", "Input file not found: {}", sourcePath);
+        }
         return false;
     }
 
@@ -36,36 +44,61 @@ bool MirModuleLoader::compileSourceToMir(DriverContext &ctx, std::string_view so
         return loadMirFile(ctx, sourcePath, outMirCtx);
     }
 
-    // When the future EzFrontend 2.0 is connected, it will be invoked here.
-    // For now, generate the main entrypoint function representing the module.
-    createReturnConstFunction(ctx, "main", 42);
-    return true;
+    // The real language frontend is not wired in yet: reject unsupported inputs rather than
+    // silently synthesizing a main() that hides the missing translation.
+    ctx.getDiagCollector()->error("EzCompiler",
+                                  "Unsupported input format '{}': only .mir input is supported",
+                                  p.extension().string());
+    return false;
 }
 
 bool MirModuleLoader::loadMirFile(DriverContext &ctx, std::string_view mirPath, MirBuilderContext &outMirCtx)
 {
     std::filesystem::path p(mirPath);
-    if (!std::filesystem::exists(p))
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec))
     {
-        ctx.getDiagCollector()->error("EzCompiler", "Input file not found: {}", mirPath);
+        if (ec)
+        {
+            ctx.getDiagCollector()->error("EzCompiler", "Cannot access MIR file {}: {}", mirPath, ec.message());
+        }
+        else
+        {
+            ctx.getDiagCollector()->error("EzCompiler", "Input file not found: {}", mirPath);
+        }
         return false;
     }
 
-    std::ifstream file(p, std::ios::in | std::ios::binary);
+    std::ifstream file(p, std::ios::in | std::ios::binary | std::ios::ate);
     if (!file.is_open())
     {
         ctx.getDiagCollector()->error("EzCompiler", "Failed to open input MIR file: {}", mirPath);
         return false;
     }
 
-    // Slurp the whole MIR file into memory for the parser.
-    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    // Size the buffer up front and read it in one shot instead of growing a string byte by byte.
+    const std::streamsize fileSize = file.tellg();
+    if (fileSize < 0)
+    {
+        ctx.getDiagCollector()->error("EzCompiler", "Failed to determine size of input MIR file: {}", mirPath);
+        return false;
+    }
+    file.seekg(0, std::ios::beg);
+
+    std::string content(static_cast<size_t>(fileSize), '\0');
+    if (fileSize > 0 && !file.read(content.data(), fileSize))
+    {
+        ctx.getDiagCollector()->error("EzCompiler", "Failed to read input MIR file: {}", mirPath);
+        return false;
+    }
 
     EzMir::MirParserOptions parserOptions;
     // Enforce SSA well-formedness only when optimizing, where the invariant matters.
     parserOptions.verifySsa = (ctx.getOptions().optLevel != OptimizationLevel::O0);
 
-    EzMir::MirParser parser(&outMirCtx, ctx.getDiagCollector(), parserOptions);
+    // Share the session SourceManager so source spans retained by parsed MIR stay resolvable after
+    // parsing finishes.
+    EzMir::MirParser parser(&outMirCtx, ctx.getDiagCollector(), parserOptions, ctx.getSourceManager());
     if (!parser.parseModule(content, mirPath))
     {
         ctx.getDiagCollector()->error("EzCompiler", "Failed to parse MIR file: {}", mirPath);

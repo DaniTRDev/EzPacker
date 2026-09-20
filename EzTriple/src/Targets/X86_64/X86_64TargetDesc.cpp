@@ -3,7 +3,6 @@
 #include "Targets/X86_64/X86_64RegisterAllocator.h"
 #include "Targets/X86_64/X86_64ElfBinaryDesc.h"
 #include "Targets/X86_64/X86_64CoffBinaryDesc.h"
-#include "InstructionSelector/MirAddressingModeMatcher.h"
 #include "Builder/MirBuilderContext.h"
 #include "Type/MirTypeTable.h"
 #include "Operand/MirRegisterBank.h"
@@ -32,16 +31,23 @@ X86_64TargetDesc::X86_64TargetDesc(MirBuilderContext *ctx) :
 }
 
 /**
+ * Out-of-line destructor so translation units that only forward-declare the target's component
+ * types (e.g. the resolver registration TU) do not need their complete definitions.
+ */
+X86_64TargetDesc::~X86_64TargetDesc() = default;
+
+/**
  * Builds all x86-64 sub-components in dependency order: register banks/classes, calling
  * conventions, target instruction table, legalizer, selector, allocator, frame lowerer and
  * ELF/COFF binary descriptors.
  */
 void X86_64TargetDesc::initialize()
 {
-    if (!m_ctx)
+    if (!m_ctx || m_initialized)
     {
         return;
     }
+    m_initialized = true;
 
     auto *alloc = m_ctx->getGlobalAllocator();
 
@@ -137,16 +143,15 @@ void X86_64TargetDesc::initialize()
     m_legalizerInfo = std::make_unique<x86_64LegalizerInfo>();
     m_legalizer = std::make_unique<MirLegalizer>(m_ctx, this);
 
-    // 8. Instruction Selector & Addressing Mode Matcher
+    // 8. Instruction Selector
     m_isel = std::make_unique<X86_64TargetInstructionSelector>(this);
-    m_modeMatcher = std::make_unique<X86AddressingModeMatcher>();
 
     // 9. Register Allocator & Frame Lowerer
     m_regAlloc = std::make_unique<X86_64RegisterAllocator>();
     m_frameLowerer = std::make_unique<X86_64FrameLowerer>();
 
     // 10. Binary Descriptors
-    m_elfBinary = std::make_unique<X86_64ElfBinaryDesc>(alloc);
+    m_elfBinary = std::make_unique<X86_64ElfBinaryDesc>(alloc, m_isPic);
     m_elfBinary->initialize();
 
     m_coffBinary = std::make_unique<X86_64CoffBinaryDesc>(alloc);
@@ -162,9 +167,6 @@ MirFrameLowerer *X86_64TargetDesc::getFrameLowerer() { return m_frameLowerer.get
 
 /// Returns the x86-64 instruction selector created by initialize().
 MirInstructionSelector *X86_64TargetDesc::getInstructionSelector() { return m_isel.get(); }
-
-/// Returns the x86-64 addressing mode matcher created by initialize().
-MirAddressingModeMatcher *X86_64TargetDesc::getAddressingModeMatcher() { return m_modeMatcher.get(); }
 
 /// Returns the 64-bit GPR class as the target's default integer register class.
 MirRegisterClass *X86_64TargetDesc::getGprClass() { return m_gpr64; }
@@ -190,33 +192,22 @@ MirRegisterRef X86_64TargetDesc::getInstructionPtrReg() const
 /// Maps a legality-table libcall symbol id to the runtime symbol name it should call.
 std::string_view X86_64TargetDesc::getLibcallStr(uint8_t symId)
 {
-    switch (symId)
+    // Delegate to the generated legality table so the id-space is the single source of truth.
+    if (m_legalizerInfo)
     {
-        case 0:
-            return "__returnNothing";
-        case 1:
-            return "__divdi3";
-        case 2:
-            return "__udivdi3";
-        case 3:
-            return "__moddi3";
-        case 4:
-            return "__umoddi3";
-        case 5:
-            return "__muldi3";
-        default:
-            return {};
+        return m_legalizerInfo->getLibcallSymbol(symId);
     }
+    return {};
 }
 
 /// Returns the ELF and COFF binary descriptors registered for x86-64.
-std::pmr::vector<TargetBinaryDesc *> X86_64TargetDesc::getAvailableBinaryDescriptors() { return m_binaries; }
+const std::pmr::vector<TargetBinaryDesc *> &X86_64TargetDesc::getAvailableBinaryDescriptors() { return m_binaries; }
 
 /// Returns the System V and Win64 calling conventions registered for x86-64.
-std::pmr::vector<CallingConvDesc *> X86_64TargetDesc::getAvailableCallingConventions() { return m_convs; }
+const std::pmr::vector<CallingConvDesc *> &X86_64TargetDesc::getAvailableCallingConventions() { return m_convs; }
 
 /// Returns the GPR and FPR register banks registered for x86-64.
-std::pmr::vector<MirRegisterBank *> X86_64TargetDesc::getAvailableRegisterBanks() { return m_banks; }
+const std::pmr::vector<MirRegisterBank *> &X86_64TargetDesc::getAvailableRegisterBanks() { return m_banks; }
 
 /**
  * Allocates a new register bank from the global allocator and registers it for later lookup.
@@ -240,13 +231,12 @@ MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)
  * (falling back to its name) to the generated x86-64 encoding description.
  *
  * The target owns this binding so the shared emitter seam stays free of x86 encoding types.
- * Caller takes ownership of the returned emitter.
  */
-GenericCodeEmitter *X86_64TargetDesc::createCodeEmitter()
+std::unique_ptr<GenericCodeEmitter> X86_64TargetDesc::createCodeEmitter()
 {
-    auto *emitter = new EzCodeEmitter::X86_64::X86_64CodeEmitter();
+    auto emitter = std::make_unique<EzCodeEmitter::X86_64::X86_64CodeEmitter>();
     emitter->setEncodingResolver(
-            [](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::X86_64::EncodingDesc *
+            [](const MirTargetInstructionDesc *desc) -> const EzCodeEmitter::X86_64::EncodingDesc *
             {
                 if (!desc)
                 {

@@ -5,9 +5,6 @@
 #include "Block/MirBlockBuilder.h"
 
 /**
- * TODO: Remove this ugly list constructor and add a MirModule.
- */
-/**
  * Fluent builder for constructing MirFunction instances.
  * Manages formal parameter accumulation, calling convention configuration,
  * entry block creation, and automatic registration into the owning module list.
@@ -19,11 +16,6 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
      * Constructs a function builder bound to a MirBuilderContext.
      */
     MirFunctionBuilder(class MirBuilderContext *ctx);
-
-    /**
-     * Constructs a function builder bound to a context and an owning function list.
-     */
-    MirFunctionBuilder(class MirBuilderContext *ctx, std::pmr::vector<class MirFunction *> *owner);
 
     /**
      * Creates and returns a MirBlockBuilder configured to append blocks to the LAST function built, if no function was
@@ -57,8 +49,7 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
                        class SourceReference *sourceRef = nullptr);
 
   private:
-    class MirBuilderContext *m_ctx;                 // Context providing the arena, diagnostics and registration.
-    std::pmr::vector<class MirFunction *> *m_owner; // Optional external container the built function is appended to.
+    class MirBuilderContext *m_ctx; // Context providing the arena, diagnostics and registration.
 };
 
 #endif // EZMIR_MIR_FUNCTION_BUILDER_H

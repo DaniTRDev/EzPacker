@@ -17,13 +17,11 @@ struct FrameLowererCtx
 
     // Iterator pointing to an ALLOC/DALLOC instruction. Used by lowerAlloc/lowerDAlloc.
     IntrusiveLinkedList<class MirInstruction>::iterator m_allocIt;
-    std::pmr::memory_resource *m_allocator; ///< Memory allocator for temporary layout data structures.
 
     FrameLowererCtx(class MirBuilderContext *ctx,
                     class MirFunction *func,
-                    class TargetDesc *targetDesc,
-                    std::pmr::memory_resource *alloc) :
-        m_ctx(ctx), m_targetFunc(func), m_targetDesc(targetDesc), m_allocator(alloc)
+                    class TargetDesc *targetDesc) :
+        m_ctx(ctx), m_targetFunc(func), m_targetDesc(targetDesc)
     {
     }
 };

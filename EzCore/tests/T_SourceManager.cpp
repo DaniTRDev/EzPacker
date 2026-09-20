@@ -14,7 +14,7 @@ TEST(SourceManagerTest, TrailingNewlineDoesNotCreatePhantomLine)
     // Real second line is still resolvable.
     SourceReference *lastLineRef = sm.createReference(2, 0, id);
     ASSERT_NE(lastLineRef, nullptr);
-    SourceLineRange *lastLine = sm.getReferenceLine(lastLineRef);
+    const SourceLineRange *lastLine = sm.getReferenceLine(lastLineRef);
     ASSERT_NE(lastLine, nullptr);
     EXPECT_EQ(lastLine->m_lineNumber, 2u);
 
@@ -35,7 +35,7 @@ TEST(SourceManagerTest, FinalLineWithoutTrailingNewline)
 
     SourceReference *ref = sm.createReference(2, 0, id);
     ASSERT_NE(ref, nullptr);
-    SourceLineRange *line = sm.getReferenceLine(ref);
+    const SourceLineRange *line = sm.getReferenceLine(ref);
     ASSERT_NE(line, nullptr);
     EXPECT_EQ(line->m_lineNumber, 2u);
     EXPECT_EQ(sm.getRawLineContent(ref), "b");

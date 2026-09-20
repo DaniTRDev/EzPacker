@@ -254,125 +254,7 @@ std::string MirPrinter::printInstruction(MirInstruction *instr, MirPrinterMode m
  */
 std::string MirPrinter::printOperand(MirOperand *operand, MirPrinterMode mode)
 {
-    if (!operand)
-        return "<null>";
-
-    if (mode == MirPrinterMode::Diagnostic)
-    {
-        return printToString(operand);
-    }
-
-    switch (operand->getType())
-    {
-        case MirOperandType::Register:
-        {
-            auto *reg = static_cast<MirRegister *>(operand);
-            std::string typeStr = reg->getMirType() ? std::string(reg->getMirType()->getName()) : "i64";
-            if (reg->isVirtual())
-            {
-                std::string name =
-                        !reg->getName().empty() ? std::string(reg->getName()) : std::format("%v{}", reg->getRegId());
-                if (!name.starts_with("%"))
-                    name = "%" + name;
-                return std::format("{} {}", typeStr, name);
-            }
-            else
-            {
-                const char *className = reg->getRegClass() ? reg->getRegClass()->getName() : "unassigned";
-                return std::format("{} %p{}({})", typeStr, reg->getRegId(), className);
-            }
-        }
-        case MirOperandType::Integer:
-        {
-            auto *imm = static_cast<MirInteger *>(operand);
-            std::string typeStr = imm->getMirType() ? std::string(imm->getMirType()->getName()) : "i64";
-            return std::format("{} {}", typeStr, imm->getValue().getI64());
-        }
-        case MirOperandType::FloatingPoint:
-        {
-            auto *fImm = static_cast<MirFloat *>(operand);
-            std::string typeStr = fImm->getMirType() ? std::string(fImm->getMirType()->getName()) : "f64";
-            return std::format("{} {}", typeStr, fImm->getValue().toString(10));
-        }
-        case MirOperandType::Reference:
-        {
-            auto *ref = static_cast<MirReference *>(operand);
-            if (ref->isBlock())
-            {
-                return std::format("label %block_{}", ref->getRefId());
-            }
-            else if (ref->isGlobalVar())
-            {
-                std::string typeStr = ref->getMirType() ? std::string(ref->getMirType()->getName()) : "ptr";
-                if (ref->getOffset() > 0)
-                {
-                    return std::format("{} @global_{}+0x{:X}", typeStr, ref->getRefId(), ref->getOffset());
-                }
-                return std::format("{} @global_{}", typeStr, ref->getRefId());
-            }
-            else if (ref->isFunction())
-            {
-                return std::format("@func_{}", ref->getRefId());
-            }
-            else if (ref->isStackFrameObject())
-            {
-                return std::format("%stack[{}]", ref->getRefId());
-            }
-            return "<invalid_ref>";
-        }
-        case MirOperandType::RuntimeSymbol:
-        {
-            auto *rt = static_cast<MirRuntimeSymbol *>(operand);
-            if (rt->getSymbolName().starts_with("@"))
-            {
-                return std::string(rt->getSymbolName());
-            }
-            return std::format("@{}", rt->getSymbolName());
-        }
-        case MirOperandType::Memory:
-        {
-            auto *mem = static_cast<MirMemory *>(operand);
-            std::string baseStr = mem->getBase()
-                    ? (!mem->getBase()->getName().empty() ? std::string(mem->getBase()->getName())
-                                                          : std::format("%v{}", mem->getBase()->getRegId()))
-                    : "%0";
-            if (!baseStr.starts_with("%"))
-                baseStr = "%" + baseStr;
-
-            std::string addrStr = std::format("ptr {}", baseStr);
-            if (mem->getIndex())
-            {
-                std::string idxStr = !mem->getIndex()->getName().empty()
-                        ? std::string(mem->getIndex()->getName())
-                        : std::format("%v{}", mem->getIndex()->getRegId());
-                if (!idxStr.starts_with("%"))
-                    idxStr = "%" + idxStr;
-                if (mem->getScale() > 1)
-                {
-                    addrStr += std::format(" + {} * {}", idxStr, mem->getScale());
-                }
-                else
-                {
-                    addrStr += std::format(" + {}", idxStr);
-                }
-            }
-            if (mem->getDisplacement() && !mem->getDisplacement()->getValue().isZero())
-            {
-                int64_t disp = mem->getDisplacement()->getValue().getI64();
-                if (disp >= 0)
-                {
-                    addrStr += std::format(" + {}", disp);
-                }
-                else
-                {
-                    addrStr += std::format(" - {}", -disp);
-                }
-            }
-            return std::format("[{}]", addrStr);
-        }
-        default:
-            return operand->toString();
-    }
+    return formatOperand(operand, mode != MirPrinterMode::Diagnostic);
 }
 
 /**
@@ -422,10 +304,8 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
 
     // Signature header
     std::pmr::string fnName = !function->getName().empty() ? function->getName() : "<anonymous>";
-    result += std::format("fn {}() -> {} [params: {}]\n",
-                          fnName,
-                          function->getReturnType()->getName(),
-                          function->getParameters().size());
+    std::string_view retTypeName = function->getReturnType() ? function->getReturnType()->getName() : "void";
+    result += std::format("fn {}() -> {} [params: {}]\n", fnName, retTypeName, function->getParameters().size());
 
     // Parameters
     result += "  Params:\n";
@@ -500,10 +380,11 @@ std::string MirPrinter::printToString(MirGlobalVar *globalVar, MirPrinterDetail 
             break;
     }
 
+    std::string_view varTypeName = globalVar->getType() ? globalVar->getType()->getName() : "void";
     std::string result = std::format("@{} [id: {}, type: {}, linkage: {}, const: {}]\n",
                                      globalVar->getName(),
                                      globalVar->getId(),
-                                     globalVar->getType()->getName(),
+                                     varTypeName,
                                      linkageStr,
                                      globalVar->isConstant() ? "true" : "false");
 

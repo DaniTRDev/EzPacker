@@ -15,7 +15,7 @@ DiagnosticBuilder::DiagnosticBuilder(class DiagnosticCollector *collector) :
  */
 DiagnosticBuilder::DiagnosticBuilder(class DiagnosticCollector *collector,
                                      DiagnosticMessageType type,
-                                     const std::string_view &sender) : DiagnosticBuilder(collector)
+                                     std::string_view sender) : DiagnosticBuilder(collector)
 {
     build(type, sender);
 }
@@ -65,7 +65,7 @@ DiagnosticBuilder &DiagnosticBuilder::appendNote(std::string_view message) { ret
  * Records the severity and emitting component for the pending message and returns this builder
  * to support fluent chaining.
  */
-DiagnosticBuilder &DiagnosticBuilder::build(DiagnosticMessageType type, const std::string_view &sender)
+DiagnosticBuilder &DiagnosticBuilder::build(DiagnosticMessageType type, std::string_view sender)
 {
     m_message.setType(type);
     m_message.setSender(sender);
@@ -76,7 +76,7 @@ DiagnosticBuilder &DiagnosticBuilder::build(DiagnosticMessageType type, const st
 /**
  * Streams a string into the main message body.
  */
-DiagnosticBuilder &DiagnosticBuilder::operator<<(const std::string_view &str)
+DiagnosticBuilder &DiagnosticBuilder::operator<<(std::string_view str)
 {
     m_message.addMainMsg(str);
     return *this;
@@ -124,9 +124,8 @@ DiagnosticBuilder &DiagnosticBuilder::appendNoteRaw(std::string_view str, class 
         return *this;
     }
 
-    std::pmr::string copyMsg(m_collector->getAllocator());
-    copyMsg += str;
-    m_message.addNote({ ref, copyMsg });
+    std::pmr::string copyMsg(str, m_collector->getAllocator());
+    m_message.addNote(DiagnosticNote{ ref, std::move(copyMsg) });
 
     return *this;
 }

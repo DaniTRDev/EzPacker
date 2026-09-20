@@ -26,6 +26,9 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
     const auto analysisData = func->getAnalysisData();
     const auto &blockList = func->getBlocks();
 
+    // Instruction stream drives spill costs, so invalidate any cost cache built for a previous state.
+    ctx->m_spillCostsValid = false;
+
     for (MirBlock *block : blockList)
     {
         size_t blockId = block->getId();
@@ -42,11 +45,13 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
         }
 
         const auto &instructions = block->getInstructions();
+        std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
+        std::pmr::vector<MirRegisterRef> uses(ctx->m_allocator);
         for (auto it = instructions.rbegin(); it != instructions.rend(); ++it)
         {
             MirInstruction *inst = *it;
-            const auto &defs = inst->getDefinedRegisters();
-            const auto &uses = inst->getUsedRegisters();
+            inst->getDefinedRegisters(defs);
+            inst->getUsedRegisters(uses);
 
             if (isInstructionDAlloc(inst))
             {
@@ -54,9 +59,7 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             }
 
             bool isCall = (inst->getOpCode() == MirInstructionOpCode::CALL) ||
-                    (inst->getTargetDesc() &&
-                     ((inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsCall) ||
-                      std::string_view(inst->getTargetDesc()->getName()) == "CALL"));
+                    (inst->getTargetDesc() && (inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsCall));
             if (isCall)
             {
                 analysisData->m_hasCalls = true;
@@ -109,18 +112,21 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
         }
     }
 
-    // Reserve physical Frame Pointer register if required
-    if (cc->hasFramePointer(func))
+    // Reserve the frame and stack pointer registers, when the calling convention defines them.
+    if (cc)
     {
-        MirRegisterRef fpReg = cc->getFramePointerReg();
-        ctx->m_reservedRegs.insert(fpReg);
-    }
+        if (cc->hasFramePointer(func))
+        {
+            MirRegisterRef fpReg = cc->getFramePointerReg();
+            ctx->m_reservedRegs.insert(fpReg);
+        }
 
-    // Reserve physical Stack Pointer register if physical
-    MirRegisterRef spReg = cc->getStackPointerReg();
-    if (spReg.isPhysical())
-    {
-        ctx->m_reservedRegs.insert(spReg);
+        // Reserve physical Stack Pointer register if physical
+        MirRegisterRef spReg = cc->getStackPointerReg();
+        if (spReg.isPhysical())
+        {
+            ctx->m_reservedRegs.insert(spReg);
+        }
     }
 
     return true;
@@ -294,17 +300,13 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             }
         }
 
-        // 2. Lock colors taken by interfering neighbors in the same register bank/family
-        // GPR and FPR families only compete within their own family (names starting with "FPR").
+        // 2. Lock colors taken by interfering neighbors in the same register bank.
+        // GPR and FPR families only compete within their own bank.
         auto isSameBank = [](MirRegisterClass *c1, MirRegisterClass *c2)
         {
             if (!c1 || !c2)
                 return true;
-            std::string_view n1(c1->getName());
-            std::string_view n2(c2->getName());
-            bool f1 = (n1.rfind("FPR", 0) == 0);
-            bool f2 = (n2.rfind("FPR", 0) == 0);
-            return f1 == f2;
+            return c1->getBank() == c2->getBank();
         };
 
         for (const MirRegisterRef &neighbor : ctx->m_iGraph[node])
@@ -346,15 +348,18 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
 
         if (assignedPhysReg.has_value())
         {
-            const auto &calleeSaved = ctx->m_targetFunction->getCallingConv()->getCalleeSavedRegs(node.getClass());
             const auto &physRef = assignedPhysReg.value();
 
-            for (auto &reg : calleeSaved)
+            if (CallingConvDesc *cc = ctx->m_targetFunction ? ctx->m_targetFunction->getCallingConv() : nullptr)
             {
-                if (reg == physRef)
+                const auto &calleeSaved = cc->getCalleeSavedRegs(node.getClass());
+                for (auto &reg : calleeSaved)
                 {
-                    fBuilder.addPhysRegUse(ctx->m_targetFunction, reg);
-                    break;
+                    if (reg == physRef)
+                    {
+                        fBuilder.addPhysRegUse(ctx->m_targetFunction, reg);
+                        break;
+                    }
                 }
             }
 
@@ -416,7 +421,6 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
     {
         for (MirInstruction *inst : block->getInstructions())
         {
-            bool modified = false;
             auto &operands = inst->getOperands();
 
             for (size_t i = 0; i < operands.size(); ++i)
@@ -433,7 +437,6 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
                     if (it != ctx->m_allocatedRegs.end())
                     {
                         regOp->setRef(it->second);
-                        modified = true;
                     }
                 }
             }
@@ -442,46 +445,43 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
 }
 
 /**
- * Estimates how expensive it is to spill node by summing its definitions and uses; loop depths
- * are intended to weight uses more heavily (currently all weights are 1).
+ * Estimates how expensive it is to spill node by summing its definitions and uses.
+ *
+ * The per-register cost table is computed once per interference-graph build and reused across
+ * simplification steps, so repeated candidate evaluations are O(1). Weights are flat (1) until
+ * loop-depth analysis is available.
  */
 double MirRegisterAllocator::calculateSpillCost(MirRegisterRef node, RegisterAllocatorCtx *ctx)
 {
-    double totalCost = 0.0;
-
-    for (MirBlock *block : ctx->m_targetFunction->getBlocks())
+    if (!ctx->m_spillCostsValid)
     {
-        size_t loopDepth = 0;
-        double weight = std::pow(10.0, static_cast<double>(loopDepth));
+        ctx->m_spillCostsValid = true;
+        ctx->m_spillCosts.clear();
 
-        for (MirInstruction *inst : block->getInstructions())
+        std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
+        std::pmr::vector<MirRegisterRef> uses(ctx->m_allocator);
+
+        for (MirBlock *block : ctx->m_targetFunction->getBlocks())
         {
-            for (const auto &use : inst->getUsedRegisters())
+            for (MirInstruction *inst : block->getInstructions())
             {
-                if (use == node)
-                    totalCost += 1.0 * weight;
-            }
-            for (const auto &def : inst->getDefinedRegisters())
-            {
-                if (def == node)
-                    totalCost += 1.0 * weight;
+                inst->getUsedRegisters(uses);
+                for (const auto &use : uses)
+                {
+                    ctx->m_spillCosts[use] += 1.0;
+                }
+
+                inst->getDefinedRegisters(defs);
+                for (const auto &def : defs)
+                {
+                    ctx->m_spillCosts[def] += 1.0;
+                }
             }
         }
     }
 
-    return totalCost;
-}
-
-/**
- * Inserts an undirected interference edge between u and v, ignoring self-edges.
- */
-void MirRegisterAllocator::addEdge(const MirRegisterRef &u, const MirRegisterRef &v, RegisterAllocatorCtx *ctx)
-{
-    if (u == v)
-        return;
-
-    ctx->m_iGraph[u].insert(v);
-    ctx->m_iGraph[v].insert(u);
+    auto it = ctx->m_spillCosts.find(node);
+    return it != ctx->m_spillCosts.end() ? it->second : 0.0;
 }
 
 /**
@@ -506,11 +506,13 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
 
     // 1. Map defining instructions for rematerialization checks
     std::pmr::unordered_map<MirRegisterRef, MirInstruction *> definingInstMap(ctx->m_allocator);
+    std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
     for (MirBlock *block : func->getBlocks())
     {
         for (MirInstruction *inst : block->getInstructions())
         {
-            for (const auto &def : inst->getDefinedRegisters())
+            inst->getDefinedRegisters(defs);
+            for (const auto &def : defs)
             {
                 if (def.isVirtual())
                     definingInstMap[def] = inst;

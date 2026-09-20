@@ -1,29 +1,15 @@
 #include "Sema/Encoding/EncodingDialect.h"
-
-#include <cctype>
-#include <string>
-#include <unordered_map>
+#include "NameRegistry.h"
 
 namespace Sema::Encoding
 {
 namespace
 {
 
-// Normalizes a dialect name to a case-insensitive lookup key.
-std::string normalize(std::string_view name)
+// Function-local static registry: constructed on first use to avoid static-initialization order issues.
+NameRegistry<EncodingDialect *> &registry()
 {
-    std::string result;
-    result.reserve(name.size());
-    for (char c : name)
-    {
-        result.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-    }
-    return result;
-}
-
-std::unordered_map<std::string, EncodingDialect *> &registry()
-{
-    static std::unordered_map<std::string, EncodingDialect *> s_registry;
+    static NameRegistry<EncodingDialect *> s_registry;
     return s_registry;
 }
 
@@ -41,20 +27,12 @@ void registerEncodingDialect(std::string_view name, EncodingDialect *dialect)
     {
         return;
     }
-    registry()[normalize(name)] = dialect;
+
+    registry().add(name, dialect);
     lastRegistered() = dialect;
 }
 
-EncodingDialect *findEncodingDialect(std::string_view name)
-{
-    if (name.empty())
-    {
-        return nullptr;
-    }
-    auto &reg = registry();
-    auto it = reg.find(normalize(name));
-    return it == reg.end() ? nullptr : it->second;
-}
+EncodingDialect *findEncodingDialect(std::string_view name) { return registry().find(name); }
 
 EncodingDialect *getDefaultEncodingDialect() { return lastRegistered(); }
 

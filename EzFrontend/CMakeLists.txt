@@ -1,4 +1,0 @@
-add_subdirectory(EzLexer)
-add_subdirectory(EzSemantics)
-add_subdirectory(EzAstLowerer)
-add_subdirectory(EzFrontendCompiler)

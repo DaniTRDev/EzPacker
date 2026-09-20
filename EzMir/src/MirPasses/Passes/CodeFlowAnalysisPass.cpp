@@ -53,11 +53,10 @@ MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_
     {
         const MirBlock *currentBlock = *blockIt;
 
-        // Ensure our maps are initialized for every block, even terminal ones with zero edges
-        if (!successors.contains(currentBlock->getId()))
-            successors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
-        if (!predecessors.contains(currentBlock->getId()))
-            predecessors[currentBlock->getId()] = std::pmr::set<size_t>(m_arena);
+        // Ensure our maps are initialized for every block, even terminal ones with zero edges.
+        // insert() de-duplicates, so a single lookup suffices and the set keeps the arena.
+        successors.insert({ currentBlock->getId(), std::pmr::set<MirId>(m_arena) });
+        predecessors.insert({ currentBlock->getId(), std::pmr::set<MirId>(m_arena) });
 
         // Identify fallback path coordinates (the next sequential block in code layout)
         auto nextIt = blockIt;
@@ -211,16 +210,7 @@ void CodeFlowAnalysisPass::addEdge(const MirBlock *from, const MirBlock *to)
     if (!from || !to)
         return;
 
-    // Defensive check: Guard against duplicate edge tracking records inside our vectors
-    auto &successors = m_result.m_successors[from->getId()];
-    if (successors.find(to->getId()) == successors.end())
-    {
-        successors.insert(to->getId());
-    }
-
-    auto &predecessors = m_result.m_predecessors[to->getId()];
-    if (predecessors.find(from->getId()) == predecessors.end())
-    {
-        predecessors.insert(from->getId());
-    }
+    // set::insert ignores duplicates, so a single insertion both adds the edge and de-duplicates it.
+    m_result.m_successors[from->getId()].insert(to->getId());
+    m_result.m_predecessors[to->getId()].insert(from->getId());
 }

@@ -178,7 +178,7 @@ bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
                 const RegLoc &reg = argLoc.getReg();
                 MirRegister *physReg = oBuilder.buildPhysReg(argType,
                                                              reg.m_ref.getId(),
-                                                             std::format("arg{}", argIdx).c_str(),
+                                                             std::format("arg{}", argIdx),
                                                              reg.m_ref.getClass(),
                                                              pushArgInstr->getSourceRef());
 
@@ -207,7 +207,7 @@ bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
                     MirType *ptr = t->getPtr(piece.m_type);
                     MirRegister *physReg = oBuilder.buildPhysReg(ptr,
                                                                  piece.m_reg.getId(),
-                                                                 std::format("splitArg{}", argIdx).c_str(),
+                                                                 std::format("splitArg{}", argIdx),
                                                                  piece.m_reg.getClass(),
                                                                  pushArgInstr->getSourceRef());
                     MirMemory *mem = oBuilder.buildMem(ptr,
@@ -234,7 +234,7 @@ bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
                     // Pass pointer to the stack copy in the target physical register
                     MirRegister *physReg = oBuilder.buildPhysReg(byValAddr->getMirType(),
                                                                  indirect.m_pointerStorage.getId(),
-                                                                 std::format("byValArgPtr{}", argIdx).c_str(),
+                                                                 std::format("byValArgPtr{}", argIdx),
                                                                  indirect.m_pointerStorage.getClass(),
                                                                  pushArgInstr->getSourceRef());
                     iBuilder.MOV(physReg, byValAddr);
@@ -245,7 +245,7 @@ bool MirAbiLowerer::processCallBlock(CallingConvDesc *cc,
                     // case.
                     MirRegister *physReg = oBuilder.buildPhysReg(argType,
                                                                  indirect.m_pointerStorage.getId(),
-                                                                 std::format("indirectArgPtr{}", argIdx).c_str(),
+                                                                 std::format("indirectArgPtr{}", argIdx),
                                                                  indirect.m_pointerStorage.getClass(),
                                                                  pushArgInstr->getSourceRef());
                     iBuilder.MOV(physReg, argVal);
@@ -318,7 +318,7 @@ bool MirAbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
                 const RegLoc &reg = retLoc.getReg();
                 MirRegister *physReg = oBuilder.buildPhysReg(retType,
                                                              reg.m_ref.getId(),
-                                                             std::format("call_ret{}", retIdx).c_str(),
+                                                             std::format("call_ret{}", retIdx),
                                                              reg.m_ref.getClass(),
                                                              popRetInstr->getSourceRef());
 
@@ -350,7 +350,7 @@ bool MirAbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
 
                         MirRegister *physReg = oBuilder.buildPhysReg(pieceType,
                                                                      piece.m_reg.getId(),
-                                                                     std::format("call_splitRet{}", retIdx).c_str(),
+                                                                     std::format("call_splitRet{}", retIdx),
                                                                      piece.m_reg.getClass(),
                                                                      popRetInstr->getSourceRef());
 
@@ -381,7 +381,7 @@ bool MirAbiLowerer::processCallReturnBlock(CallingConvDesc *cc,
                 // Physical register containing the pointer to the indirect return storage (or return pointer register)
                 MirRegister *physReg = oBuilder.buildPhysReg(m_ctx->getTypeTable()->getPtr(retType),
                                                              indirect.m_pointerStorage.getId(),
-                                                             std::format("call_indirectRetPtr{}", retIdx).c_str(),
+                                                             std::format("call_indirectRetPtr{}", retIdx),
                                                              indirect.m_pointerStorage.getClass(),
                                                              popRetInstr->getSourceRef());
 
@@ -441,7 +441,7 @@ bool MirAbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                 const RegLoc &reg = argLoc.getReg();
                 MirRegister *physReg = oBuilder.buildPhysReg(argType,
                                                              reg.m_ref.getId(),
-                                                             std::format("in_arg{}", argIdx).c_str(),
+                                                             std::format("in_arg{}", argIdx),
                                                              reg.m_ref.getClass(),
                                                              popArgInstr->getSourceRef());
 
@@ -470,7 +470,7 @@ bool MirAbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                     MirType *pieceType = piece.m_type;
                     MirRegister *physReg = oBuilder.buildPhysReg(pieceType,
                                                                  piece.m_reg.getId(),
-                                                                 std::format("in_splitArg{}", argIdx).c_str(),
+                                                                 std::format("in_splitArg{}", argIdx),
                                                                  piece.m_reg.getClass(),
                                                                  popArgInstr->getSourceRef());
 
@@ -493,7 +493,7 @@ bool MirAbiLowerer::processFunctionArguments(CallingConvDesc *cc,
                 // Physical register containing the pointer to the indirect argument
                 MirRegister *physReg = oBuilder.buildPhysReg(m_ctx->getTypeTable()->getPtr(argType),
                                                              indirect.m_pointerStorage.getId(),
-                                                             std::format("in_indirectPtr{}", argIdx).c_str(),
+                                                             std::format("in_indirectPtr{}", argIdx),
                                                              indirect.m_pointerStorage.getClass(),
                                                              popArgInstr->getSourceRef());
 

@@ -16,12 +16,12 @@ namespace CodeGenerators
 class X86_64EncodingCodegenBackend : public EncodingCodegenBackend
 {
   public:
-    std::string includeHeader() const override { return "X86_64/Encoding/X86_64EncodingDesc.h"; }
-    std::string namespaceName() const override { return "EzCodeEmitter::X86_64"; }
-    std::string arrayType() const override { return "EncodingDesc"; }
+    std::string_view includeHeader() const override { return "X86_64/Encoding/X86_64EncodingDesc.h"; }
+    std::string_view namespaceName() const override { return "EzCodeEmitter::X86_64"; }
+    std::string_view arrayType() const override { return "EncodingDesc"; }
 
     /** Serializes one instruction's encoding into an EncodingDesc brace initializer. */
-    std::string row(const Symbols::TargetInstructionSymbol &sym) const override;
+    std::string row(const Symbols::TargetInstructionSymbol &sym, DiagnosticCollector *diag = nullptr) const override;
 };
 
 } // namespace CodeGenerators

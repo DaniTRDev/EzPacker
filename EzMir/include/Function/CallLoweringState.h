@@ -3,6 +3,26 @@
 
 #include "EzMirCommon.h"
 #include "Operand/MirRegisterReference.h"
+#include <string_view>
+
+/**
+ * Transparent hash/equality for bank-name keys, letting cursors be queried with a string_view
+ * without building a temporary std::string.
+ */
+struct BankCursorHash
+{
+    using is_transparent = void;
+
+    size_t operator()(std::string_view value) const noexcept { return std::hash<std::string_view>{}(value); }
+    size_t operator()(const std::string &value) const noexcept { return operator()(std::string_view(value)); }
+};
+
+struct BankCursorEqual
+{
+    using is_transparent = void;
+
+    bool operator()(std::string_view lhs, std::string_view rhs) const noexcept { return lhs == rhs; }
+};
 
 /**
  * State machine tracking register and stack allocations during ABI call/argument lowering.
@@ -23,16 +43,6 @@ class CallLoweringState
      * Returns true on success and writes the register reference to outReg; returns false if exhausted.
      */
     bool allocate(class MirRegisterClass *_class, MirRegisterRef &reg);
-
-    /**
-     * Returns the number of unallocated usable registers remaining in the specified register class.
-     */
-    size_t getUsableRegCount(class MirRegisterClass *_class) const;
-
-    /**
-     * Returns the number of registers already allocated in the specified register class during this lowering.
-     */
-    size_t getUsedRegCount(class MirRegisterClass *_class) const;
 
     /**
      * Allocates a parameter slot in the target function's stack frame.
@@ -63,10 +73,6 @@ class CallLoweringState
      */
     void advanceSlot() { ++m_slotIndex; }
 
-    /**
-     * Current logical argument index.
-     */
-    size_t getArgIndex() const { return m_argIndex; }
     /**
      * Moves to the next logical argument index.
      */
@@ -111,7 +117,7 @@ class CallLoweringState
     /**
      * Cursors for named register banks (e.g. "integer", "float").
      */
-    std::pmr::unordered_map<std::string, size_t> m_bankCursors;
+    std::pmr::unordered_map<std::string, size_t, BankCursorHash, BankCursorEqual> m_bankCursors;
 
     /**
      * Registers allocated so far, partitioned by register class.

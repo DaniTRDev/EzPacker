@@ -3,6 +3,8 @@
 
 #include <argparse/argparse.hpp>
 
+#include "StringUtils.h" // SanitizeCppIdentifier / NormalizeKey
+
 #include <algorithm>
 #include <charconv>
 #include <filesystem>

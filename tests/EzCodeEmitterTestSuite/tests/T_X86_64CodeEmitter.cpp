@@ -6,6 +6,8 @@
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "x86_64EncodingTable.h"
 
+#include <stdexcept>
+
 using namespace EzCodeEmitter;
 using namespace EzCodeEmitter::X86_64;
 
@@ -18,7 +20,7 @@ TEST_F(EzCodeEmitterTestSuite, TestFullEmitterIntegration)
     CodeEmitterContext context(getDiagCollector(), sections, getAllocator());
 
     X86_64CodeEmitter emitter;
-    emitter.setEncodingResolver([](MirTargetInstructionDesc *desc) -> const EncodingDesc *
+    emitter.setEncodingResolver([](const MirTargetInstructionDesc *desc) -> const EncodingDesc *
                                 { return findEncodingDesc(desc->getName()); });
     emitter.beginFunction(&context, "main");
 
@@ -72,4 +74,21 @@ TEST_F(EzCodeEmitterTestSuite, TestFullEmitterIntegration)
 
     // Check RET
     EXPECT_EQ(code[11], 0xC3);
+}
+
+// WEI-03: an instruction the encoding table cannot resolve must throw instead of vanishing.
+TEST_F(EzCodeEmitterTestSuite, TestEmitterRejectsUnknownEncoding)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateElfSections(sections, getAllocator());
+
+    CodeEmitterContext context(getDiagCollector(), sections, getAllocator());
+
+    X86_64CodeEmitter emitter;
+    emitter.setEncodingResolver([](const MirTargetInstructionDesc *desc) -> const EncodingDesc *
+                                { return findEncodingDesc(desc->getName()); });
+    emitter.beginFunction(&context, "bad");
+
+    MirTargetInstructionDesc unknown("NOT_A_REAL_INSTRUCTION", 999);
+    EXPECT_THROW(emitter.emitInst(&unknown, {}), std::runtime_error);
 }

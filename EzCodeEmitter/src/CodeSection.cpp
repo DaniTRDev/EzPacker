@@ -40,9 +40,24 @@ void CodeSection::alignTo(size_t alignment)
     auto *alignNode = insertNodeAfter(m_cursor, SectionNodeKind::Align);
     alignNode->m_alignment = alignment;
     alignNode->m_padByte = m_padByte;
+
+    // The new cursor sits at the aligned offset; account for the padding immediately so the
+    // running offset matches what finalize() would produce.
+    if (alignment > 1)
+    {
+        uint64_t rem = m_cursorOffset % alignment;
+        if (rem != 0)
+        {
+            m_cursorOffset += alignment - rem;
+        }
+    }
 }
 
-void CodeSection::emit8(uint8_t val) { getActiveDataBuffer().push_back(val); }
+void CodeSection::emit8(uint8_t val)
+{
+    getActiveDataBuffer().push_back(val);
+    ++m_cursorOffset;
+}
 
 void CodeSection::emit16(uint16_t val)
 {
@@ -57,6 +72,7 @@ void CodeSection::emit16(uint16_t val)
         buf.push_back(static_cast<uint8_t>(val >> 8));
         buf.push_back(static_cast<uint8_t>(val));
     }
+    m_cursorOffset += 2;
 }
 
 void CodeSection::emit32(uint32_t val)
@@ -76,6 +92,7 @@ void CodeSection::emit32(uint32_t val)
         buf.push_back(static_cast<uint8_t>(val >> 8));
         buf.push_back(static_cast<uint8_t>(val));
     }
+    m_cursorOffset += 4;
 }
 
 void CodeSection::emit64(uint64_t val)
@@ -95,6 +112,7 @@ void CodeSection::emit64(uint64_t val)
             buf.push_back(static_cast<uint8_t>(val >> (i * 8)));
         }
     }
+    m_cursorOffset += 8;
 }
 
 void CodeSection::emitBytes(const uint8_t *data, size_t size)
@@ -105,6 +123,7 @@ void CodeSection::emitBytes(const uint8_t *data, size_t size)
     }
     auto &buf = getActiveDataBuffer();
     buf.insert(buf.end(), data, data + size);
+    m_cursorOffset += size;
 }
 
 void CodeSection::emitBytesWithEndian(const uint8_t *data, size_t size, TargetEndianness inputEndianness)
@@ -129,6 +148,7 @@ void CodeSection::emitBytesWithEndian(const uint8_t *data, size_t size, TargetEn
             buf.push_back(data[i - 1]);
         }
     }
+    m_cursorOffset += size;
 }
 
 void CodeSection::finalize()
@@ -173,11 +193,20 @@ void CodeSection::finalize()
     }
 
     m_isFinalized = true;
+    m_cursorOffset = currentOffset;
 }
 
-void CodeSection::resetCursorToEnd() { m_cursor = m_tail; }
+void CodeSection::resetCursorToEnd()
+{
+    m_cursor = m_tail;
+    m_cursorOffset = computeOffsetTo(m_tail);
+}
 
-void CodeSection::setCursor(SectionNode *node) { m_cursor = node ? node : m_tail; }
+void CodeSection::setCursor(SectionNode *node)
+{
+    m_cursor = node ? node : m_tail;
+    m_cursorOffset = computeOffsetTo(m_cursor);
+}
 
 bool CodeSection::patch32(uint64_t offset, uint32_t val)
 {
@@ -266,10 +295,19 @@ uint64_t CodeSection::getCurrentOffset() const
         return m_buffer.size();
     }
 
-    // Pre-finalize the offset is the effect of every node up to and including the cursor,
-    // applying alignment padding the same way finalize() does so pending Align nodes are counted.
+    // The running offset is maintained incrementally by the emit/align operations; only explicit
+    // cursor repositioning requires a replay, handled in setCursor()/resetCursorToEnd().
+    return m_cursorOffset;
+}
+
+/**
+ * Replays the node stream from the head up to and including node, applying alignment padding the
+ * same way finalize() does. Used only when the cursor is repositioned to an arbitrary node.
+ */
+uint64_t CodeSection::computeOffsetTo(const SectionNode *node) const
+{
     uint64_t sz = 0;
-    for (SectionNode *n = m_head; n != nullptr; n = n->m_next)
+    for (const SectionNode *n = m_head; n != nullptr; n = n->m_next)
     {
         if (n->m_kind == SectionNodeKind::Align)
         {
@@ -287,7 +325,7 @@ uint64_t CodeSection::getCurrentOffset() const
             sz += n->m_data.size();
         }
 
-        if (n == m_cursor)
+        if (n == node)
         {
             break;
         }

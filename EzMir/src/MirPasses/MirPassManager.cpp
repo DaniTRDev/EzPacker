@@ -4,6 +4,7 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Instruction/MirInstruction.h"
 #include "Function/MirFunction.h"
+#include <algorithm>
 
 /**
  * Initializes the manager in non-test mode with all internal containers backed by globalArena.
@@ -124,7 +125,6 @@ MirPassResult MirPassManager::runPass(MirPass *pass, MirBuilderContext *ctx)
         invalidateAnalysis();
     }
 
-    pass->setResult(&combinedResult);
     m_savedResults[std::type_index(typeid(*pass))] = combinedResult;
 
     auto builder = m_diagCollector->trace("MirPassManager", "Pass result");
@@ -197,7 +197,6 @@ MirPass *MirPassManager::runAnalysisById(std::type_index passId, MirBuilderConte
 
     // Run the analysis and safely persist the result inside our map storage
     m_savedResults[passId] = runPass(analysisPass, ctx);
-    analysisPass->setResult(&m_savedResults[passId]);
 
     // Validate cache entry tracking
     m_validAnalyses[passId] = analysisPass;
@@ -217,13 +216,25 @@ void MirPassManager::generatePipeline()
     std::unordered_set<std::type_index> resolved;
     std::unordered_set<std::type_index> seenInCurrentPath;
 
+    // Resolve transforms in a deterministic order (by pass name) so the resulting pipeline does
+    // not depend on unordered_map bucket iteration order.
+    std::vector<MirPass *> orderedPasses;
+    orderedPasses.reserve(m_passesBlueprint.size());
     for (const auto &[passId, passPtr] : m_passesBlueprint)
     {
-        // Analysis passes are excluded from the static array loop; they invoke on-demand
         if (passPtr->getPassType() == MirPassType::Transform)
         {
-            resolveDependencies(passId, resolved, seenInCurrentPath);
+            orderedPasses.push_back(passPtr.get());
         }
+    }
+    std::sort(orderedPasses.begin(),
+              orderedPasses.end(),
+              [](const MirPass *lhs, const MirPass *rhs)
+              { return std::string_view(lhs->getName()) < std::string_view(rhs->getName()); });
+
+    for (MirPass *passPtr : orderedPasses)
+    {
+        resolveDependencies(std::type_index(typeid(*passPtr)), resolved, seenInCurrentPath);
     }
 
     auto builder = m_diagCollector->trace("MirPassManager", "Calculated pass dependency pipeline:");

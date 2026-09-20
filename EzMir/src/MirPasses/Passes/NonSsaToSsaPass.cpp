@@ -9,6 +9,7 @@
 #include "MirPasses/Passes/NonSsaToSsaPass.h"
 #include "Operand/MirOperands.h"
 #include "Operand/MirOperandBuilder.h"
+#include <algorithm>
 
 /**
  * Initializes the SSA construction pass and its intermediate data using the context's global arena.
@@ -95,9 +96,11 @@ void NonSsaToSsaPass::buildVirtualRegDefPlaces(MirFunction *func)
     {
         MirId bId = block->getId();
 
+        std::pmr::vector<MirRegisterRef> defs(m_resc);
         for (const MirInstruction *inst : block->getInstructions())
         {
-            for (const auto &def : inst->getDefinedRegisters())
+            inst->getDefinedRegisters(defs);
+            for (const auto &def : defs)
             {
                 if (def.isVirtual())
                 {
@@ -188,14 +191,19 @@ void NonSsaToSsaPass::buildImmDomTree(CodeFlowResult *cfg, MirFunction *func, Mi
 
         while (finger1 != finger2)
         {
-            while (postOrderIndexes[finger1] < postOrderIndexes[finger2])
-            {
-                finger1 = domTree[finger1];
-            }
-            while (postOrderIndexes[finger2] < postOrderIndexes[finger1])
-            {
-                finger2 = domTree[finger2];
-            }
+            // Use find() rather than operator[] so a missing index never silently inserts a zero
+            // entry, which could spin the loop forever on a 0 <-> 0 comparison.
+            auto idx1It = postOrderIndexes.find(finger1);
+            auto idx2It = postOrderIndexes.find(finger2);
+            if (idx1It == postOrderIndexes.end() || idx2It == postOrderIndexes.end())
+                break;
+
+            MirId &finger = (idx1It->second < idx2It->second) ? finger1 : finger2;
+            auto next = domTree.find(finger);
+            if (next == domTree.end() || next->second == finger)
+                break;
+
+            finger = next->second;
         }
         return finger1;
     };
@@ -216,18 +224,22 @@ void NonSsaToSsaPass::buildImmDomTree(CodeFlowResult *cfg, MirFunction *func, Mi
             MirId newIdom = 0;
             bool foundFirst = false;
 
-            for (MirId pred : cfg->m_predecessors[blockId])
+            auto predIt = cfg->m_predecessors.find(blockId);
+            if (predIt != cfg->m_predecessors.end())
             {
-                if (domTree.find(pred) != domTree.end())
+                for (MirId pred : predIt->second)
                 {
-                    if (!foundFirst)
+                    if (domTree.find(pred) != domTree.end())
                     {
-                        newIdom = pred;
-                        foundFirst = true;
-                    }
-                    else
-                    {
-                        newIdom = intersect(pred, newIdom);
+                        if (!foundFirst)
+                        {
+                            newIdom = pred;
+                            foundFirst = true;
+                        }
+                        else
+                        {
+                            newIdom = intersect(pred, newIdom);
+                        }
                     }
                 }
             }
@@ -293,15 +305,30 @@ void NonSsaToSsaPass::insertPhiNodes(CodeFlowResult *cfg, MirFunction *func)
     auto &defSites = m_result.m_defSites;
     MirInstructionBuilder iBuilder(m_ctx, nullptr, InsertionType::InsertBefore, {});
 
+    // Visit registers (and their def/dominance-frontier sets) in sorted order so phi placement is
+    // independent of unordered container iteration order.
+    std::pmr::vector<MirId> regIds(m_resc);
+    regIds.reserve(defSites.size());
     for (const auto &[regId, definingBlocks] : defSites)
     {
+        regIds.push_back(regId);
+    }
+    std::sort(regIds.begin(), regIds.end());
+
+    for (MirId regId : regIds)
+    {
+        const auto &definingBlocks = defSites.at(regId);
+
         std::pmr::vector<MirId> worklist(m_resc);
         worklist.reserve(definingBlocks.size());
 
         std::pmr::unordered_set<MirId> inWorklist(m_resc);
         std::pmr::unordered_set<MirId> hasPhi(m_resc);
 
-        for (MirId bId : definingBlocks)
+        std::pmr::vector<MirId> sortedDefBlocks(definingBlocks.begin(), definingBlocks.end(), m_resc);
+        std::sort(sortedDefBlocks.begin(), sortedDefBlocks.end());
+
+        for (MirId bId : sortedDefBlocks)
         {
             worklist.push_back(bId);
             inWorklist.insert(bId);
@@ -317,16 +344,23 @@ void NonSsaToSsaPass::insertPhiNodes(CodeFlowResult *cfg, MirFunction *func)
             if (dfIt == domFrontier.end())
                 continue;
 
-            for (MirId dfBlockId : dfIt->second)
+            std::pmr::vector<MirId> dfBlocks(dfIt->second.begin(), dfIt->second.end(), m_resc);
+            std::sort(dfBlocks.begin(), dfBlocks.end());
+
+            for (MirId dfBlockId : dfBlocks)
             {
                 if (hasPhi.find(dfBlockId) == hasPhi.end())
                 {
                     hasPhi.insert(dfBlockId);
 
                     MirBlock *targetBlock = func->getBlock(dfBlockId);
+                    if (!targetBlock)
+                        continue;
+
                     iBuilder.setInsertionPoint(targetBlock, InsertionType::InsertBefore, targetBlock->begin());
 
-                    size_t numPreds = cfg->m_predecessors[dfBlockId].size();
+                    auto numPredsIt = cfg->m_predecessors.find(dfBlockId);
+                    size_t numPreds = (numPredsIt != cfg->m_predecessors.end()) ? numPredsIt->second.size() : 0;
                     createPhiInstruction(&iBuilder, regId, numPreds);
 
                     auto diag = m_ctx->getDiagCollector()->trace("NonSsaToSsaPass",

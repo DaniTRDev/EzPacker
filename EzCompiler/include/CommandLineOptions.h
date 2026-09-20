@@ -47,8 +47,6 @@ struct CommandLineOptions
     bool printPasses{ false };           ///< Prints pass names as they run.
     bool timePasses{ false };            ///< Reports per-pass execution times.
     bool isPositionIndependent{ false }; ///< Generates position-independent code.
-    bool compileOnly{ true };            ///< Compile/assemble without linking.
-    bool color{ true };                  ///< Enables colored diagnostic output.
     DiagnosticMessageType diagThreshold{ DiagnosticMessageType::Diag_Warning }; ///< Minimum reported severity.
 };
 
@@ -59,9 +57,10 @@ class CommandLineParser
 {
   public:
     /**
-     * Constructs the parser and registers all supported command-line arguments.
+     * Constructs a parser whose argument program is built lazily by parse(). A default-constructed
+     * instance holds no argument definitions until parse() is invoked.
      */
-    CommandLineParser();
+    CommandLineParser() = default;
 
     /**
      * Parses argv and populates outOptions. On failure, outError receives the reason.
@@ -73,11 +72,6 @@ class CommandLineParser
      * Parses a pre-tokenized argument list and populates outOptions (see the argv overload).
      */
     bool parse(const std::vector<std::string> &args, CommandLineOptions &outOptions, std::string &outError);
-
-    /**
-     * Prints the argparse-generated usage/help text.
-     */
-    void printHelp() const;
 
     /**
      * Prints the compiler version banner.

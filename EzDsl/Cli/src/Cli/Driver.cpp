@@ -61,34 +61,6 @@ namespace Cli
 namespace
 {
 
-// Rewrites the target name into a valid C++ identifier, defaulting to "Target" when empty.
-std::string sanitizeTargetIdentifier(std::string_view raw)
-{
-    std::string result;
-    result.reserve(raw.size());
-    for (char c : raw)
-    {
-        unsigned char uc = static_cast<unsigned char>(c);
-        if (std::isalnum(uc) || c == '_')
-        {
-            result.push_back(c);
-        }
-        else
-        {
-            result.push_back('_');
-        }
-    }
-    if (result.empty())
-    {
-        result = "Target";
-    }
-    if (std::isdigit(static_cast<unsigned char>(result.front())))
-    {
-        result.insert(result.begin(), '_');
-    }
-    return result;
-}
-
 // Diagnostic listener that counts errors and warnings emitted during a run.
 class ErrorTrackingListener : public DiagnosticListener
 {
@@ -388,8 +360,7 @@ LanguageDialect Driver::detectDialect(const std::filesystem::path &filePath) con
         return m_options.dialect;
     }
 
-    std::string ext = filePath.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::string ext = NormalizeKey(filePath.extension().string());
 
     if (ext == ".tyf")
         return LanguageDialect::TypeDef;
@@ -479,8 +450,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         if (outPath.empty())
             outPath = ".";
 
-        std::string ext = outPath.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+        std::string ext = NormalizeKey(outPath.extension().string());
 
         if (ext == ".h" || ext == ".hpp")
         {
@@ -513,6 +483,21 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
         return outPath;
     };
 
+    // Resolves the target identifier used for output names, sanitized into a valid C++ identifier.
+    auto resolveTarget = [&](std::string_view fallback) -> std::string
+    {
+        std::string target = m_options.targetName;
+        if (target.empty() && !m_options.inputFilePath.empty())
+        {
+            target = std::filesystem::path(m_options.inputFilePath).stem().string();
+        }
+        if (target.empty())
+        {
+            target = std::string(fallback);
+        }
+        return SanitizeCppIdentifier(target, fallback);
+    };
+
     if (genKind == GeneratorKind::TypeTable)
     {
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, "MirTypeTable");
@@ -539,13 +524,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::Legalizer)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        std::string target = resolveTarget("Target");
 
         std::string baseName = std::format("{}LegalizerActionTable", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -590,13 +569,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::Rules)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        std::string target = resolveTarget("Target");
 
         std::string baseName = std::format("{}LegalizerRules", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -615,13 +588,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::TargetInstructions)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        std::string target = resolveTarget("Target");
 
         std::string baseName = std::format("{}TargetInstructionTable", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -640,14 +607,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::TargetEncodings)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        target = sanitizeTargetIdentifier(target);
-        if (target.empty())
-            target = "Target";
+        std::string target = resolveTarget("Target");
 
         if (!m_options.sourceOnly || m_options.headerOnly)
         {
@@ -657,13 +617,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::InstructionSelector)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "Target";
+        std::string target = resolveTarget("Target");
 
         std::string baseName = std::format("{}InstructionSelector", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -682,13 +636,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::CallingConv)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        if (target.empty())
-            target = "CallingConv";
+        std::string target = resolveTarget("CallingConv");
 
         std::string baseName = std::format("{}CallingConvDesc", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);
@@ -707,14 +655,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::RegisterInfo)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        target = sanitizeTargetIdentifier(target);
-        if (target.empty())
-            target = "Target";
+        std::string target = resolveTarget("Target");
 
         if (!m_options.sourceOnly || m_options.headerOnly)
         {
@@ -724,14 +665,7 @@ std::vector<OutputFileInfo> Driver::computeExpectedOutputs(GeneratorKind genKind
     }
     else if (genKind == GeneratorKind::TargetDesc)
     {
-        std::string target = m_options.targetName;
-        if (target.empty() && !m_options.inputFilePath.empty())
-        {
-            target = std::filesystem::path(m_options.inputFilePath).stem().string();
-        }
-        target = sanitizeTargetIdentifier(target);
-        if (target.empty())
-            target = "Target";
+        std::string target = resolveTarget("Target");
 
         std::string baseName = std::format("{}TargetDesc", target);
         auto [hPath, sPath] = resolveHeaderAndSource(outDir, baseName);

@@ -25,9 +25,14 @@ class SourceReference *DiagnosticMessage::getPrimarySourceRef() const { return m
 void DiagnosticMessage::addNote(const DiagnosticNote &note) { m_notes.push_back(note); }
 
 /**
+ * Appends a contextual note to this message by moving it into the note list.
+ */
+void DiagnosticMessage::addNote(DiagnosticNote &&note) { m_notes.push_back(std::move(note)); }
+
+/**
  * Appends text to the main message body.
  */
-void DiagnosticMessage::addMainMsg(const std::string_view &str) { m_mainMessage += str; }
+void DiagnosticMessage::addMainMsg(std::string_view str) { m_mainMessage += str; }
 
 /**
  * Sets the primary source span used when rendering this message.
@@ -37,7 +42,7 @@ void DiagnosticMessage::setPrimarySourceRef(class SourceReference *sourceRef) { 
 /**
  * Replaces the sender identifier, clearing any previously stored value first.
  */
-void DiagnosticMessage::setSender(const std::string_view &sender)
+void DiagnosticMessage::setSender(std::string_view sender)
 {
     m_sender.clear();
     m_sender += sender;

@@ -81,9 +81,10 @@ class MirFunctionRegisterInfo
     void reset();
 
     /**
-     * Returns the list of uses for a given register ID.
+     * Returns a pointer to the use list for a given register ID, or nullptr when the register is
+     * unknown. The pointer is invalidated only by mutation of this tracker.
      */
-    std::optional<const std::pmr::vector<MirVRegUse>> getUses(MirId regId) const;
+    const std::pmr::vector<MirVRegUse> *getUses(MirId regId) const;
 
   private:
     std::pmr::unordered_map<MirId, MirVRegData> m_vregs; // Register ID -> SSA def/use information.

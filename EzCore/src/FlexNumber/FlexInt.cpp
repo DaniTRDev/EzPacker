@@ -1,6 +1,7 @@
 #include "FlexNumber/FlexInt.h"
 #include <algorithm>
 #include <stdexcept>
+#include <type_traits>
 
 /**
  * Deep-copies other's mp_int value along with its signedness and width; throws std::bad_alloc
@@ -33,60 +34,40 @@ FlexInt::FlexInt(FlexInt &&other) noexcept
 /**
  * Creates an unsigned integer from a 32-bit value, then clamps it to the requested width.
  */
-FlexInt::FlexInt(uint32_t value, size_t bitWidth)
-{
-    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
-        throw std::bad_alloc();
-
-    m_isSigned = false;
-    m_bitWidth = bitWidth;
-
-    mp_set_ul(&m_number, value);
-    clampToTwosComplement();
-}
+FlexInt::FlexInt(uint32_t value, size_t bitWidth) { initFromInteger(value, bitWidth, false); }
 
 /**
  * Creates an unsigned integer from a 64-bit value, then clamps it to the requested width.
  */
-FlexInt::FlexInt(uint64_t value, size_t bitWidth)
-{
-    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
-        throw std::bad_alloc();
-
-    m_isSigned = false;
-    m_bitWidth = bitWidth;
-
-    mp_set_u64(&m_number, value);
-    clampToTwosComplement();
-}
+FlexInt::FlexInt(uint64_t value, size_t bitWidth) { initFromInteger(value, bitWidth, false); }
 
 /**
  * Creates a signed integer from a 32-bit value, then clamps it to the requested width.
  */
-FlexInt::FlexInt(int32_t value, size_t bitWidth)
-{
-    if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
-        throw std::bad_alloc();
-
-    m_isSigned = true;
-    m_bitWidth = bitWidth;
-
-    mp_set_l(&m_number, value);
-    clampToTwosComplement();
-}
+FlexInt::FlexInt(int32_t value, size_t bitWidth) { initFromInteger(value, bitWidth, true); }
 
 /**
  * Creates a signed integer from a 64-bit value, then clamps it to the requested width.
  */
-FlexInt::FlexInt(int64_t value, size_t bitWidth)
+FlexInt::FlexInt(int64_t value, size_t bitWidth) { initFromInteger(value, bitWidth, true); }
+
+/**
+ * Shared initialization for the four integral constructors: allocates the mp_int, records the
+ * signedness/width metadata and applies two's-complement clamping.
+ */
+template <typename T> void FlexInt::initFromInteger(T value, size_t bitWidth, bool isSigned)
 {
     if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
         throw std::bad_alloc();
 
-    m_isSigned = true;
+    m_isSigned = isSigned;
     m_bitWidth = bitWidth;
 
-    mp_set_i64(&m_number, value);
+    if constexpr (std::is_signed_v<T>)
+        mp_set_i64(&m_number, static_cast<int64_t>(value));
+    else
+        mp_set_u64(&m_number, static_cast<uint64_t>(value));
+
     clampToTwosComplement();
 }
 
@@ -184,30 +165,38 @@ FlexInt &FlexInt::operator=(const FlexInt &other)
 /**
  * Returns true when the value is signed and structurally negative.
  */
-bool FlexInt::isNeg() const { return m_isSigned && mp_isneg(&m_number) == MP_YES; }
+bool FlexInt::isNeg() const noexcept { return m_isSigned && mp_isneg(&m_number) == MP_YES; }
 
 /**
  * Returns true when the value is strictly greater than zero.
  */
-bool FlexInt::isPositive() const { return !isNeg() && !isZero(); }
+bool FlexInt::isPositive() const noexcept { return !isNeg() && !isZero(); }
 
 /**
  * Returns true when this instance was constructed with signed semantics.
  */
-bool FlexInt::isSigned() const { return m_isSigned; }
+bool FlexInt::isSigned() const noexcept { return m_isSigned; }
 
 /**
  * Returns true when the value is exactly zero.
  */
-bool FlexInt::isZero() const { return mp_iszero(&m_number) == MP_YES; }
+bool FlexInt::isZero() const noexcept { return mp_iszero(&m_number) == MP_YES; }
+
+/**
+ * Throws std::invalid_argument when other's bit width or signedness does not match this instance.
+ */
+void FlexInt::checkCompatible(const FlexInt &other) const
+{
+    if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
+        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
+}
 
 /**
  * Compares values, requiring identical width and signedness; throws std::invalid_argument otherwise.
  */
 bool FlexInt::operator>(const FlexInt &other) const
 {
-    if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
+    checkCompatible(other);
     return mp_cmp(&m_number, &other.m_number) == MP_GT;
 }
 
@@ -216,8 +205,7 @@ bool FlexInt::operator>(const FlexInt &other) const
  */
 bool FlexInt::operator>=(const FlexInt &other) const
 {
-    if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
+    checkCompatible(other);
     auto res = mp_cmp(&m_number, &other.m_number);
     return res == MP_GT || res == MP_EQ;
 }
@@ -227,8 +215,7 @@ bool FlexInt::operator>=(const FlexInt &other) const
  */
 bool FlexInt::operator<(const FlexInt &other) const
 {
-    if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
+    checkCompatible(other);
     return mp_cmp(&m_number, &other.m_number) == MP_LT;
 }
 
@@ -237,39 +224,26 @@ bool FlexInt::operator<(const FlexInt &other) const
  */
 bool FlexInt::operator<=(const FlexInt &other) const
 {
-    if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
+    checkCompatible(other);
     auto res = mp_cmp(&m_number, &other.m_number);
     return res == MP_LT || res == MP_EQ;
 }
 
 /**
- * Equality that tolerates differing widths/signedness: equal metadata compares directly,
- * differing signs are unequal, non-negative values compare directly, and negative values are
- * sign-extended to the common width before comparing.
+ * Equality that tolerates differing widths/signedness: equal metadata compares directly, and
+ * otherwise differing signs are unequal while same-signed values compare by value. Libtommath
+ * stores sign+magnitude, so equal signed values are equal regardless of storage width; no
+ * sign-extension copy is required.
  */
 bool FlexInt::operator==(const FlexInt &other) const
 {
     if (m_bitWidth == other.m_bitWidth && m_isSigned == other.m_isSigned)
         return mp_cmp(&m_number, &other.m_number) == MP_EQ;
 
-    bool thisNeg = this->isNeg();
-    bool otherNeg = other.isNeg();
-
-    if (thisNeg != otherNeg)
+    if (this->isNeg() != other.isNeg())
         return false;
 
-    if (!thisNeg && !otherNeg)
-        return mp_cmp(&m_number, &other.m_number) == MP_EQ;
-
-    FlexInt cloneThis(*this);
-    FlexInt cloneOther(other);
-
-    size_t targetWidth = std::max(m_bitWidth, other.m_bitWidth);
-    cloneThis.extend(targetWidth, true);
-    cloneOther.extend(targetWidth, true);
-
-    return mp_cmp(&cloneThis.m_number, &cloneOther.m_number) == MP_EQ;
+    return mp_cmp(&m_number, &other.m_number) == MP_EQ;
 }
 
 /**
@@ -282,32 +256,17 @@ bool FlexInt::operator!=(const FlexInt &other) const { return !(*this == other);
  * result as signed when this instance is signed. Negative values are first normalized into the
  * unsigned range. Throws if the width is odd.
  */
-FlexInt FlexInt::getHighHalf()
+FlexInt FlexInt::getHighHalf() const
 {
-    if (m_bitWidth % 2 != 0)
-        throw std::invalid_argument("Cannot execute scalar split on an odd bit-width.");
+    ensureSplittableWidth();
 
     size_t splitWidth = m_bitWidth / 2;
     FlexInt highPart(uint64_t(0), splitWidth);
     highPart.m_isSigned = m_isSigned;
 
-    if (mp_isneg(&m_number) == MP_YES)
-    {
-        mp_int fullRange, tempNum;
-        if (mp_init_multi(&fullRange, &tempNum, nullptr) == MP_OKAY)
-        {
-            m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
-            m_lastErr = mp_mod(&m_number, &fullRange, &tempNum);
-            m_lastErr = mp_add(&tempNum, &fullRange, &tempNum);
-
-            m_lastErr = mp_div_2d(&tempNum, static_cast<int>(splitWidth), &highPart.m_number, nullptr);
-            mp_clear_multi(&fullRange, &tempNum, nullptr);
-        }
-    }
-    else
-    {
-        m_lastErr = mp_div_2d(&m_number, static_cast<int>(splitWidth), &highPart.m_number, nullptr);
-    }
+    mp_int normalized = normalizedUnsigned();
+    m_lastErr = mp_div_2d(&normalized, static_cast<int>(splitWidth), &highPart.m_number, nullptr);
+    mp_clear(&normalized);
 
     if (highPart.m_isSigned)
     {
@@ -331,10 +290,9 @@ FlexInt FlexInt::getHighHalf()
  * Returns the lower half of a scalar expansion split (value & ((1<<(width/2))-1)) as an unsigned
  * value; negative inputs are normalized into the unsigned range first. Throws if the width is odd.
  */
-FlexInt FlexInt::getLowHalf()
+FlexInt FlexInt::getLowHalf() const
 {
-    if (m_bitWidth % 2 != 0)
-        throw std::invalid_argument("Cannot execute scalar expansion split on an odd bit-width.");
+    ensureSplittableWidth();
 
     size_t splitWidth = m_bitWidth / 2;
     FlexInt lowPart(uint64_t(0), splitWidth);
@@ -347,36 +305,59 @@ FlexInt FlexInt::getLowHalf()
     m_lastErr = mp_2expt(&mask, static_cast<int>(splitWidth));
     m_lastErr = mp_decr(&mask);
 
+    mp_int normalized = normalizedUnsigned();
+    m_lastErr = mp_and(&normalized, &mask, &lowPart.m_number);
+    mp_clear(&normalized);
+    mp_clear(&mask);
+
+    return lowPart;
+}
+
+/**
+ * Throws std::invalid_argument when this value's width cannot be split into two equal halves.
+ */
+void FlexInt::ensureSplittableWidth() const
+{
+    if (m_bitWidth % 2 != 0)
+        throw std::invalid_argument("Cannot execute scalar expansion split on an odd bit-width.");
+}
+
+/**
+ * Returns this value mapped into the unsigned range [0, 2^m_bitWidth): for negative values
+ * 2^m_bitWidth is added to the remainder. The caller owns the returned mp_int and must clear it.
+ */
+mp_int FlexInt::normalizedUnsigned() const
+{
+    mp_int result;
+    if (mp_init(&result) != MP_OKAY)
+        throw std::bad_alloc();
+
     if (mp_isneg(&m_number) == MP_YES)
     {
-        mp_int fullRange, tempNum;
-        if (mp_init_multi(&fullRange, &tempNum, nullptr) == MP_OKAY)
+        mp_int fullRange;
+        if (mp_init(&fullRange) != MP_OKAY)
         {
-            m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
-            m_lastErr = mp_mod(&m_number, &fullRange, &tempNum);
-            m_lastErr = mp_add(&tempNum, &fullRange, &tempNum);
-            m_lastErr = mp_and(&tempNum, &mask, &lowPart.m_number);
-            mp_clear_multi(&fullRange, &tempNum, nullptr);
+            mp_clear(&result);
+            throw std::bad_alloc();
         }
+
+        m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
+        m_lastErr = mp_mod(&m_number, &fullRange, &result);
+        m_lastErr = mp_add(&result, &fullRange, &result);
+        mp_clear(&fullRange);
     }
     else
     {
-        m_lastErr = mp_and(&m_number, &mask, &lowPart.m_number);
+        m_lastErr = mp_copy(&m_number, &result);
     }
 
-    mp_clear(&mask);
-    return lowPart;
+    return result;
 }
 
 /**
  * Returns the sum as a new value, leaving both operands unchanged.
  */
-FlexInt FlexInt::operator+(const FlexInt &other)
-{
-    FlexInt res(*this);
-    res += other;
-    return res;
-}
+FlexInt FlexInt::operator+(const FlexInt &other) const { return applyBinary(other, &FlexInt::operator+=); }
 
 /**
  * Pre-increments the value and re-clamps it to the configured width.
@@ -401,12 +382,7 @@ FlexInt &FlexInt::operator+=(const FlexInt &other)
 /**
  * Returns the difference as a new value, leaving both operands unchanged.
  */
-FlexInt FlexInt::operator-(const FlexInt &other)
-{
-    FlexInt res(*this);
-    res -= other;
-    return res;
-}
+FlexInt FlexInt::operator-(const FlexInt &other) const { return applyBinary(other, &FlexInt::operator-=); }
 
 /**
  * Pre-decrements the value and re-clamps it to the configured width.
@@ -431,12 +407,7 @@ FlexInt &FlexInt::operator-=(const FlexInt &other)
 /**
  * Returns the product as a new value, leaving both operands unchanged.
  */
-FlexInt FlexInt::operator*(const FlexInt &other)
-{
-    FlexInt res(*this);
-    res *= other;
-    return res;
-}
+FlexInt FlexInt::operator*(const FlexInt &other) const { return applyBinary(other, &FlexInt::operator*=); }
 
 /**
  * Multiplies in place and re-clamps the result to the configured width.
@@ -451,12 +422,7 @@ FlexInt &FlexInt::operator*=(const FlexInt &other)
 /**
  * Returns the quotient as a new value, leaving both operands unchanged.
  */
-FlexInt FlexInt::operator/(const FlexInt &other)
-{
-    FlexInt res(*this);
-    res /= other;
-    return res;
-}
+FlexInt FlexInt::operator/(const FlexInt &other) const { return applyBinary(other, &FlexInt::operator/=); }
 
 /**
  * Divides in place (truncating quotient) and re-clamps the result to the configured width.
@@ -471,12 +437,7 @@ FlexInt &FlexInt::operator/=(const FlexInt &other)
 /**
  * Returns the remainder as a new value, leaving both operands unchanged.
  */
-FlexInt FlexInt::operator%(const FlexInt &other)
-{
-    FlexInt res(*this);
-    res %= other;
-    return res;
-}
+FlexInt FlexInt::operator%(const FlexInt &other) const { return applyBinary(other, &FlexInt::operator%=); }
 
 /**
  * Takes the remainder in place and re-clamps the result to the configured width.
@@ -512,7 +473,7 @@ uint64_t FlexInt::getU64() const
 /**
  * Returns the configured storage width in bits.
  */
-size_t FlexInt::getBitSize() const { return m_bitWidth; }
+size_t FlexInt::getBitSize() const noexcept { return m_bitWidth; }
 
 /**
  * Widens the storage to newBitSize, adopting the requested signedness. Narrowing is rejected with

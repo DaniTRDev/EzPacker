@@ -43,8 +43,8 @@ struct TypeDescriptor
 struct TypeDefFile
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule =
-            dsl::list(dsl::peek(dsl::ascii::alpha_underscore) >> (dsl::p<TypeDescriptor> + dsl::lit_c<';'>));
+    static constexpr auto rule = dsl::terminator(dsl::eof).list(
+            dsl::peek(dsl::ascii::alpha_underscore) >> (dsl::p<TypeDescriptor> + dsl::lit_c<';'>));
     static constexpr auto value =
             Common::PmrAsList<Ast::TypeDef::TypeDescriptor> >> lexy::construct<Ast::TypeDef::TypeDefFile>;
 };

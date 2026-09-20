@@ -22,7 +22,7 @@ class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
      */
     MirGlobalVar *build(MirGlobalVarLinkage linkage,
                         class MirType *type,
-                        const std::pmr::string &name,
+                        std::pmr::string name,
                         class SourceReference *sourceRef = nullptr);
 
     /**

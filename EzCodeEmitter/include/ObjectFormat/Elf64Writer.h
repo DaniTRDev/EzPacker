@@ -3,6 +3,7 @@
 
 #include "EzCodeEmitterCommon.h"
 #include "CodeSection.h"
+#include "ObjectFormat/IObjectWriter.h"
 #include "ObjectFormat/ObjectSymbol.h"
 #include <vector>
 
@@ -15,30 +16,31 @@ namespace EzCodeEmitter::ObjectFormat
  * System V AMD64 ABI specification, containing valid ELF headers, section table,
  * string tables, symbol table, and relocation tables.
  */
-class Elf64Writer
+class Elf64Writer : public IObjectWriter
 {
   public:
     Elf64Writer() = default;
+    ~Elf64Writer() override = default;
 
     /**
      * Adds an exported or internal symbol.
      */
-    void addSymbol(const ObjectSymbol &sym);
+    void addSymbol(const ObjectSymbol &sym) override;
 
     /**
      * Adds a relocation entry.
      */
-    void addRelocation(const ObjectRelocEntry &reloc);
+    void addRelocation(const ObjectRelocEntry &reloc) override;
 
     /**
      * Generates a relocatable ELF64 object file byte stream from the provided code sections.
      */
-    std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections);
+    std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections) override;
 
     /**
      * Clears all registered symbols and relocations.
      */
-    void clear();
+    void clear() override;
 
   private:
     std::vector<ObjectSymbol> m_symbols;    ///< Symbols to materialize in .symtab.

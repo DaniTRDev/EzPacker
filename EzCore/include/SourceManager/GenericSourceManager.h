@@ -81,9 +81,9 @@ class GenericSourceManager
 
     /**
      * Performs binary search over precomputed line ranges to locate the line containing the given reference.
-     * Returns a pointer to the matching SourceLineRange, or nullptr if not found.
+     * Returns a read-only pointer to the matching SourceLineRange, or nullptr if not found.
      */
-    virtual SourceLineRange *getReferenceLine(SourceReference *ref) const = 0;
+    virtual const SourceLineRange *getReferenceLine(SourceReference *ref) const = 0;
 
     /**
      * Adds an include directory path to search during file resolution.

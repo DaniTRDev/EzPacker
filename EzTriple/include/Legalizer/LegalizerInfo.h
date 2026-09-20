@@ -100,19 +100,6 @@ class LegalizerInfo
     }
 
     /**
-     * Fast Tier 1 direct query for homogeneous primary type.
-     */
-    inline LegalityResponse queryFast(MirInstructionOpCode op, uint8_t typeId) const
-    {
-        size_t opIdx = static_cast<size_t>(op);
-        if (opIdx < OPCODE_COUNT && typeId < MAX_COMPACT_TYPES)
-        {
-            return m_primaryMatrix[opIdx][typeId];
-        }
-        return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-    }
-
-    /**
      * Executes custom or lower action callback registered with given handler ID.
      */
     virtual LegalizationResult executeCustom(LegalizeCtx &ctx, uint16_t handlerId)
@@ -288,51 +275,7 @@ class ActionDefinitionBuilder
      */
     ActionDefinitionBuilder &widenScalarTo(size_t slot, std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
-        uint8_t toId = toType ? toType->getCompactId() : 0;
-        for (auto op : m_opcodes)
-        {
-            if (slot == 0)
-            {
-                for (auto *t : fromTypes)
-                {
-                    if (t && t->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
-                    {
-                        m_info->setPrimaryMatrix(op,
-                                                 t->getCompactId(),
-                                                 LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
-                                                                   .m_slot = 0,
-                                                                   .m_targetCompactId = toId });
-                    }
-                }
-            }
-            else
-            {
-                std::vector<uint8_t> fromIds;
-                for (auto *t : fromTypes)
-                {
-                    if (t)
-                        fromIds.push_back(t->getCompactId());
-                }
-                m_info->addRuleMatcher(
-                        op,
-                        [slot, fromIds, toId](const LegalityQuery &q) -> LegalityResponse
-                        {
-                            if (q.m_operandCount > slot)
-                            {
-                                for (uint8_t fid : fromIds)
-                                {
-                                    if (q.m_compactIds[slot] == fid)
-                                    {
-                                        return LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
-                                                                 .m_slot = static_cast<uint8_t>(slot),
-                                                                 .m_targetCompactId = toId };
-                                    }
-                                }
-                            }
-                            return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-                        });
-            }
-        }
+        installScalarAction(slot, slot, fromTypes, toType, LegalizeActionKind::WidenScalar);
         return *this;
     }
 
@@ -342,51 +285,7 @@ class ActionDefinitionBuilder
      */
     ActionDefinitionBuilder &narrowScalarTo(size_t slot, std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
-        uint8_t toId = toType ? toType->getCompactId() : 0;
-        for (auto op : m_opcodes)
-        {
-            if (slot == 0)
-            {
-                for (auto *t : fromTypes)
-                {
-                    if (t && t->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
-                    {
-                        m_info->setPrimaryMatrix(op,
-                                                 t->getCompactId(),
-                                                 LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
-                                                                   .m_slot = 0,
-                                                                   .m_targetCompactId = toId });
-                    }
-                }
-            }
-            else
-            {
-                std::vector<uint8_t> fromIds;
-                for (auto *t : fromTypes)
-                {
-                    if (t)
-                        fromIds.push_back(t->getCompactId());
-                }
-                m_info->addRuleMatcher(
-                        op,
-                        [slot, fromIds, toId](const LegalityQuery &q) -> LegalityResponse
-                        {
-                            if (q.m_operandCount > slot)
-                            {
-                                for (uint8_t fid : fromIds)
-                                {
-                                    if (q.m_compactIds[slot] == fid)
-                                    {
-                                        return LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
-                                                                 .m_slot = static_cast<uint8_t>(slot),
-                                                                 .m_targetCompactId = toId };
-                                    }
-                                }
-                            }
-                            return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-                        });
-            }
-        }
+        installScalarAction(slot, slot, fromTypes, toType, LegalizeActionKind::NarrowScalar);
         return *this;
     }
 
@@ -481,33 +380,7 @@ class ActionDefinitionBuilder
      */
     ActionDefinitionBuilder &widenScalarSourceTo(std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
-        uint8_t toId = toType ? toType->getCompactId() : 0;
-        std::vector<uint8_t> fromIds;
-        for (auto *t : fromTypes)
-        {
-            if (t)
-                fromIds.push_back(t->getCompactId());
-        }
-        for (auto op : m_opcodes)
-        {
-            m_info->addRuleMatcher(op,
-                                   [fromIds, toId](const LegalityQuery &q) -> LegalityResponse
-                                   {
-                                       if (q.m_operandCount > 1)
-                                       {
-                                           for (uint8_t fid : fromIds)
-                                           {
-                                               if (q.m_compactIds[1] == fid)
-                                               {
-                                                   return LegalityResponse{ .m_action = LegalizeActionKind::WidenScalar,
-                                                                            .m_slot = 0,
-                                                                            .m_targetCompactId = toId };
-                                               }
-                                           }
-                                       }
-                                       return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-                                   });
-        }
+        installScalarAction(1, 0, fromTypes, toType, LegalizeActionKind::WidenScalar);
         return *this;
     }
 
@@ -516,34 +389,7 @@ class ActionDefinitionBuilder
      */
     ActionDefinitionBuilder &narrowScalarSourceTo(std::initializer_list<MirType *> fromTypes, MirType *toType)
     {
-        uint8_t toId = toType ? toType->getCompactId() : 0;
-        std::vector<uint8_t> fromIds;
-        for (auto *t : fromTypes)
-        {
-            if (t)
-                fromIds.push_back(t->getCompactId());
-        }
-        for (auto op : m_opcodes)
-        {
-            m_info->addRuleMatcher(
-                    op,
-                    [fromIds, toId](const LegalityQuery &q) -> LegalityResponse
-                    {
-                        if (q.m_operandCount > 1)
-                        {
-                            for (uint8_t fid : fromIds)
-                            {
-                                if (q.m_compactIds[1] == fid)
-                                {
-                                    return LegalityResponse{ .m_action = LegalizeActionKind::NarrowScalar,
-                                                             .m_slot = 0,
-                                                             .m_targetCompactId = toId };
-                                }
-                            }
-                        }
-                        return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
-                    });
-        }
+        installScalarAction(1, 0, fromTypes, toType, LegalizeActionKind::NarrowScalar);
         return *this;
     }
 
@@ -619,6 +465,67 @@ class ActionDefinitionBuilder
     }
 
   private:
+    /**
+     * Installs one Widen/Narrow scalar action for every opcode in the builder.
+     *
+     * @param matchSlot  Operand slot consulted when matching (0 uses the dense primary matrix).
+     * @param actionSlot Operand slot the action rewrites (may differ from matchSlot for source rules).
+     * @param fromTypes  Types that trigger the action.
+     * @param toType     Type the matched value is widened/narrowed to.
+     * @param action     WidenScalar or NarrowScalar.
+     */
+    void installScalarAction(size_t matchSlot,
+                             size_t actionSlot,
+                             std::initializer_list<MirType *> fromTypes,
+                             MirType *toType,
+                             LegalizeActionKind action)
+    {
+        uint8_t toId = toType ? toType->getCompactId() : 0;
+        for (auto op : m_opcodes)
+        {
+            if (matchSlot == 0 && actionSlot == 0)
+            {
+                for (auto *t : fromTypes)
+                {
+                    if (t && t->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
+                    {
+                        m_info->setPrimaryMatrix(op,
+                                                 t->getCompactId(),
+                                                 LegalityResponse{ .m_action = action,
+                                                                   .m_slot = 0,
+                                                                   .m_targetCompactId = toId });
+                    }
+                }
+                continue;
+            }
+
+            std::vector<uint8_t> fromIds;
+            for (auto *t : fromTypes)
+            {
+                if (t)
+                    fromIds.push_back(t->getCompactId());
+            }
+            m_info->addRuleMatcher(
+                    op,
+                    [matchSlot, actionSlot, fromIds, toId, action](const LegalityQuery &q) -> LegalityResponse
+                    {
+                        if (q.m_operandCount > matchSlot)
+                        {
+                            for (uint8_t fid : fromIds)
+                            {
+                                if (q.m_compactIds[matchSlot] == fid)
+                                {
+                                    return LegalityResponse{ .m_action = action,
+                                                             .m_slot = static_cast<uint8_t>(actionSlot),
+                                                             .m_targetCompactId = toId };
+                                }
+                            }
+                        }
+                        return LegalityResponse{ .m_action = LegalizeActionKind::Unsupported };
+                    });
+        }
+    }
+
     LegalizerInfo *m_info;                       ///< LegalizerInfo receiving the rules being defined.
     std::vector<MirInstructionOpCode> m_opcodes; ///< Opcodes the builder applies each rule to.
 };

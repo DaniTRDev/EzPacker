@@ -12,17 +12,6 @@ namespace CodeGenerators
 namespace
 {
 
-// Uppercases an ASCII string, used to build include-guard names from the target name.
-std::string ToUpper(std::string_view s)
-{
-    std::string res(s);
-    for (char &c : res)
-    {
-        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    }
-    return res;
-}
-
 // Maps a target-operand direction to the MirOperandFlag read/write flag it implies.
 std::string DirectionToFlag(DSL::Ast::TargetInstDef::OperandDirection dir)
 {
@@ -66,32 +55,19 @@ CppTargetInstructionGenerator::CppTargetInstructionGenerator(DiagnosticCollector
                                                              std::filesystem::path outPath,
                                                              std::string targetName) :
     CodeGenerator("CodeGenerators::TargetInstructions", collector, table, std::move(outPath)),
-    m_targetName(std::move(targetName))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
 {
-    if (m_targetName.empty())
-    {
-        m_targetName = "Target";
-    }
 }
 
 // Collects the parsed target instruction symbols that are attached to the symbol table.
 std::vector<const Symbol *> CppTargetInstructionGenerator::collectInstructionSymbols() const
 {
-    std::vector<const Symbol *> results;
     if (!m_table)
     {
-        return results;
+        return {};
     }
 
-    for (const Symbol *sym : m_table->getSymbols())
-    {
-        if (sym && sym->getType() == SymbolType::TargetInstruction && sym->hasData<Symbols::TargetInstructionSymbol>())
-        {
-            results.push_back(sym);
-        }
-    }
-
-    return results;
+    return m_table->collect<Symbols::TargetInstructionSymbol>(SymbolType::TargetInstruction);
 }
 
 // Resolves the header/source destinations, emits both artifacts, and reports combined success.
@@ -120,7 +96,7 @@ bool CppTargetInstructionGenerator::run()
 // Emits an include-guarded header declaring the compact opcode enum and lookup entry points.
 void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
-    std::string guard = std::format("EZTRIPLE_{}_TARGET_INSTRUCTION_TABLE_H", ToUpper(m_targetName));
+    std::string guard = std::format("EZTRIPLE_{}_TARGET_INSTRUCTION_TABLE_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
     emitter.emitBlankLine();
     emitter.emitBanner("CppTargetInstructionGenerator");
@@ -220,7 +196,7 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
                 emitter.emitLine("{},", "{ /* implicit uses */ }");
                 emitter.emitLine("{}", targetFlagsStr);
                 emitter.dedent();
-                emitter.emitLine("){},", (i + 1 == instSymbols.size()) ? "" : "");
+                emitter.emitLine("),");
             }
         }
         emitter.emitLine(";");
@@ -285,16 +261,6 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter) const
             }
         }
     }
-}
-
-// Convenience wrapper retained for callers that do not need to configure a generator object.
-bool GenerateTargetInstructionTable(DiagnosticCollector *collector,
-                                    SymbolTable *table,
-                                    std::filesystem::path outPath,
-                                    std::string targetName)
-{
-    CppTargetInstructionGenerator generator(collector, table, std::move(outPath), std::move(targetName));
-    return generator.run();
 }
 
 } // namespace CodeGenerators

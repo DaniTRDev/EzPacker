@@ -16,10 +16,103 @@
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 #include "FrameLowerer/MirFrameLowererPass.h"
 #include "MirPasses/MirPassManager.h"
-#include <sstream>
+#include <chrono>
 
 namespace EzCompiler
 {
+
+namespace
+{
+
+/**
+ * Walks every function/block/instruction once, delegating the textual representation to a
+ * formatter. Shared by dumpCurrentMir() and dumpAssembly(), which previously duplicated the walk.
+ */
+template <typename Formatter>
+std::string dumpFunctions(MirBuilderContext *bCtx, Formatter &formatter)
+{
+    std::string out;
+    if (!bCtx)
+    {
+        return out;
+    }
+
+    for (MirFunction *func : bCtx->getFunctions())
+    {
+        if (!func)
+        {
+            continue;
+        }
+        formatter.beginFunction(out, func);
+        for (MirBlock *block : func->getBlocks())
+        {
+            if (!block)
+            {
+                continue;
+            }
+            formatter.beginBlock(out, func, block);
+            for (MirInstruction *inst : block->getInstructions())
+            {
+                if (!inst)
+                {
+                    continue;
+                }
+                formatter.instruction(out, inst);
+            }
+        }
+        formatter.endFunction(out, func);
+    }
+    return out;
+}
+
+/// Formats the generic MIR dump (function/block/instruction with indentation).
+struct MirDumpFormatter
+{
+    void beginFunction(std::string &out, const MirFunction *func) const
+    {
+        out += std::format("function @{}() {{\n", func->getName());
+    }
+
+    void beginBlock(std::string &out, const MirFunction *, const MirBlock *block) const
+    {
+        out += std::format("{}:\n", block->getName());
+    }
+
+    void instruction(std::string &out, const MirInstruction *inst) const { out += std::format("    {}\n", inst->toString()); }
+
+    void endFunction(std::string &out, const MirFunction *) const { out += "}\n\n"; }
+};
+
+/// Formats the assembly-like listing (global labels, per-block labels, mnemonics).
+struct AssemblyDumpFormatter
+{
+    void beginFunction(std::string &out, const MirFunction *func) const
+    {
+        out += std::format(".globl {}\n", func->getName());
+        out += std::format("{}:\n", func->getName());
+    }
+
+    void beginBlock(std::string &out, const MirFunction *func, const MirBlock *block) const
+    {
+        out += std::format(".{}_{}:\n", func->getName(), block->getName());
+    }
+
+    void instruction(std::string &out, const MirInstruction *inst) const
+    {
+        if (inst->getTargetDesc())
+        {
+            out += std::format("    {}\n", inst->getTargetDesc()->getName());
+        }
+        else
+        {
+            out += std::format("    {}\n", inst->getOpCodeName());
+        }
+    }
+
+    void endFunction(std::string &, const MirFunction *) const {}
+};
+
+} // namespace
 
 CompilationPipeline::CompilationPipeline(DriverContext &ctx) : m_ctx(ctx) {}
 
@@ -31,6 +124,21 @@ bool CompilationPipeline::runPipeline()
         return false;
     }
 
+    // Build one pass manager per stage (and register its analyses) once, instead of reconstructing
+    // them for every function. invalidateAnalysis() is called per function to give each function the
+    // same fresh-analysis state a newly constructed manager would have.
+    MirPassManager middleEndManager(m_ctx.getDiagCollector(), m_ctx.getSessionAllocator());
+    middleEndManager.setTestMode();
+    middleEndManager.addPass<CodeFlowAnalysisPass>(bCtx);
+
+    MirPassManager legalizationManager(m_ctx.getDiagCollector(), m_ctx.getSessionAllocator());
+    legalizationManager.setTestMode();
+
+    MirPassManager targetLoweringManager(m_ctx.getDiagCollector(), m_ctx.getSessionAllocator());
+    targetLoweringManager.setTestMode();
+    targetLoweringManager.addPass<CodeFlowAnalysisPass>(bCtx);
+    targetLoweringManager.addPass<LivenessAnalysisPass>(bCtx);
+
     for (MirFunction *func : bCtx->getFunctions())
     {
         if (!func)
@@ -39,7 +147,7 @@ bool CompilationPipeline::runPipeline()
         }
 
         // 1. Middle-End Passes (CFG, SSA, Liveness)
-        if (!runMiddleEndPasses(func))
+        if (!runMiddleEndPasses(func, middleEndManager))
         {
             return false;
         }
@@ -50,7 +158,7 @@ bool CompilationPipeline::runPipeline()
         }
 
         // 2. Legalization Passes (Signatures, Ops, Types)
-        if (!runLegalizationPasses(func))
+        if (!runLegalizationPasses(func, legalizationManager))
         {
             return false;
         }
@@ -61,7 +169,7 @@ bool CompilationPipeline::runPipeline()
         }
 
         // 3. Backend Target Lowering (ABI, ISel, RegAlloc, Frame)
-        if (!runTargetLoweringPasses(func))
+        if (!runTargetLoweringPasses(func, targetLoweringManager))
         {
             return false;
         }
@@ -70,130 +178,124 @@ bool CompilationPipeline::runPipeline()
     return true;
 }
 
-bool CompilationPipeline::runMiddleEndPasses(MirFunction *func)
+void CompilationPipeline::printPassRunning(std::string_view passName, const MirFunction *func) const
 {
-    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
-    auto it = bCtx->getFunctions().to_iterator(func);
-    MirPassManager passManager(m_ctx.getDiagCollector(), m_ctx.getSessionAllocator());
-    // Test mode lets passes be invoked explicitly instead of through the manager's schedule.
-    passManager.setTestMode();
-    passManager.addPass<CodeFlowAnalysisPass>(bCtx);
-
     if (m_ctx.getOptions().printPasses)
     {
-        std::cout << "[Pass] Running CodeFlowAnalysisPass on " << func->getName() << "\n";
+        std::cout << "[Pass] Running " << passName << " on " << (func ? func->getName() : "") << "\n";
     }
+}
+
+bool CompilationPipeline::reportPassFailure(const char *message)
+{
+    m_ctx.getDiagCollector()->error("EzCompiler", "{}", message);
+    return false;
+}
+
+template <typename PassT, typename... Args>
+bool CompilationPipeline::runCheckedPass(std::string_view passName,
+                                         MirFunction *func,
+                                         MirPassManager *passManager,
+                                         const char *failureMessage,
+                                         Args &&...args)
+{
+    printPassRunning(passName, func);
+
+    const auto start = std::chrono::steady_clock::now();
+    PassT pass(std::forward<Args>(args)...);
+    MirPassResult result = pass.run(m_ctx.getBuilderContext()->getFunctions().to_iterator(func), passManager);
+    if (m_ctx.getOptions().timePasses)
+    {
+        const double elapsedMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        std::cout << "[Time] " << passName << ": " << elapsedMs << " ms\n";
+    }
+
+    if (!result.m_succeeded)
+    {
+        return reportPassFailure(failureMessage);
+    }
+    return true;
+}
+
+bool CompilationPipeline::runMiddleEndPasses(MirFunction *func, MirPassManager &passManager)
+{
+    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
+    passManager.invalidateAnalysis();
+
     // Materialize the CFG analysis so subsequent passes can retrieve it from the manager.
+    printPassRunning("CodeFlowAnalysisPass", func);
     CodeFlowAnalysisPass *cfPass = passManager.getAnalysis<CodeFlowAnalysisPass>(bCtx);
     (void)cfPass;
 
-    if (m_ctx.getOptions().printPasses)
+    if (!runCheckedPass<NonSsaToSsaPass>(
+                "NonSsaToSsaPass", func, &passManager, "SSA construction failed", bCtx))
     {
-        std::cout << "[Pass] Running NonSsaToSsaPass on " << func->getName() << "\n";
-    }
-    NonSsaToSsaPass ssaPass(bCtx);
-    ssaPass.run(it, &passManager);
-
-    if (m_ctx.getOptions().printPasses)
-    {
-        std::cout << "[Pass] Running LivenessAnalysisPass on " << func->getName() << "\n";
-    }
-    LivenessAnalysisPass livePass(bCtx);
-    livePass.run(it, &passManager);
-
-    return true;
-}
-
-bool CompilationPipeline::runLegalizationPasses(MirFunction *func)
-{
-    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
-    TargetDesc *targetDesc = m_ctx.getTargetDesc();
-    auto it = bCtx->getFunctions().to_iterator(func);
-    MirPassManager passManager(m_ctx.getDiagCollector(), m_ctx.getSessionAllocator());
-    passManager.setTestMode();
-
-    if (m_ctx.getOptions().printPasses)
-    {
-        std::cout << "[Pass] Running MirFunctionSignatureLegalizerPass on " << func->getName() << "\n";
-    }
-    MirFunctionSignatureLegalizerPass sigPass(bCtx, targetDesc);
-    auto sigRes = sigPass.run(it, &passManager);
-    if (!sigRes.m_succeeded)
-    {
-        m_ctx.getDiagCollector()->error("EzCompiler", "Function signature legalization failed");
         return false;
     }
 
-    if (m_ctx.getOptions().printPasses)
+    if (!runCheckedPass<LivenessAnalysisPass>(
+                "LivenessAnalysisPass", func, &passManager, "Liveness analysis failed", bCtx))
     {
-        std::cout << "[Pass] Running MirLegalizerPass on " << func->getName() << "\n";
-    }
-    MirLegalizerPass legPass(bCtx, targetDesc);
-    auto legRes = legPass.run(it, &passManager);
-    if (!legRes.m_succeeded)
-    {
-        m_ctx.getDiagCollector()->error("EzCompiler", "Operation legalization failed");
         return false;
     }
 
     return true;
 }
 
-bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func)
+bool CompilationPipeline::runLegalizationPasses(MirFunction *func, MirPassManager &passManager)
 {
     MirBuilderContext *bCtx = m_ctx.getBuilderContext();
     TargetDesc *targetDesc = m_ctx.getTargetDesc();
-    auto it = bCtx->getFunctions().to_iterator(func);
-    MirPassManager passManager(m_ctx.getDiagCollector(), m_ctx.getSessionAllocator());
-    passManager.setTestMode();
-    passManager.addPass<CodeFlowAnalysisPass>(bCtx);
-    passManager.addPass<LivenessAnalysisPass>(bCtx);
+    passManager.invalidateAnalysis();
 
-    if (m_ctx.getOptions().printPasses)
+    if (!runCheckedPass<MirFunctionSignatureLegalizerPass>(
+                "MirFunctionSignatureLegalizerPass",
+                func,
+                &passManager,
+                "Function signature legalization failed",
+                bCtx,
+                targetDesc))
     {
-        std::cout << "[Pass] Running MirAbiLowererPass on " << func->getName() << "\n";
-    }
-    MirAbiLowererPass abiPass(bCtx);
-    auto abiRes = abiPass.run(it, &passManager);
-    if (!abiRes.m_succeeded)
-    {
-        m_ctx.getDiagCollector()->error("EzCompiler", "ABI lowering failed");
         return false;
     }
 
-    if (m_ctx.getOptions().printPasses)
+    if (!runCheckedPass<MirLegalizerPass>(
+                "MirLegalizerPass", func, &passManager, "Operation legalization failed", bCtx, targetDesc))
     {
-        std::cout << "[Pass] Running MirInstructionSelectorPass on " << func->getName() << "\n";
-    }
-    MirInstructionSelectorPass iselPass(bCtx, targetDesc);
-    auto iselRes = iselPass.run(it, &passManager);
-    if (!iselRes.m_succeeded)
-    {
-        m_ctx.getDiagCollector()->error("EzCompiler", "Instruction selection failed");
         return false;
     }
 
-    if (m_ctx.getOptions().printPasses)
+    return true;
+}
+
+bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func, MirPassManager &passManager)
+{
+    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
+    TargetDesc *targetDesc = m_ctx.getTargetDesc();
+    passManager.invalidateAnalysis();
+
+    if (!runCheckedPass<MirAbiLowererPass>(
+                "MirAbiLowererPass", func, &passManager, "ABI lowering failed", bCtx))
     {
-        std::cout << "[Pass] Running MirRegisterAllocatorPass on " << func->getName() << "\n";
-    }
-    MirRegisterAllocatorPass regAllocPass(bCtx, targetDesc);
-    auto regRes = regAllocPass.run(it, &passManager);
-    if (!regRes.m_succeeded)
-    {
-        m_ctx.getDiagCollector()->error("EzCompiler", "Register allocation failed");
         return false;
     }
 
-    if (m_ctx.getOptions().printPasses)
+    if (!runCheckedPass<MirInstructionSelectorPass>(
+                "MirInstructionSelectorPass", func, &passManager, "Instruction selection failed", bCtx, targetDesc))
     {
-        std::cout << "[Pass] Running MirFrameLowererPass on " << func->getName() << "\n";
+        return false;
     }
-    MirFrameLowererPass framePass(bCtx, targetDesc);
-    auto frameRes = framePass.run(it, &passManager);
-    if (!frameRes.m_succeeded)
+
+    if (!runCheckedPass<MirRegisterAllocatorPass>(
+                "MirRegisterAllocatorPass", func, &passManager, "Register allocation failed", bCtx, targetDesc))
     {
-        m_ctx.getDiagCollector()->error("EzCompiler", "Frame lowering failed");
+        return false;
+    }
+
+    if (!runCheckedPass<MirFrameLowererPass>(
+                "MirFrameLowererPass", func, &passManager, "Frame lowering failed", bCtx, targetDesc))
+    {
         return false;
     }
 
@@ -202,68 +304,14 @@ bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func)
 
 std::string CompilationPipeline::dumpCurrentMir() const
 {
-    std::ostringstream oss;
-    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
-    if (!bCtx)
-        return {};
-
-    for (MirFunction *func : bCtx->getFunctions())
-    {
-        if (!func)
-            continue;
-        oss << "function @" << func->getName() << "() {\n";
-        for (MirBlock *block : func->getBlocks())
-        {
-            if (!block)
-                continue;
-            oss << block->getName() << ":\n";
-            for (MirInstruction *inst : block->getInstructions())
-            {
-                if (!inst)
-                    continue;
-                oss << "    " << inst->toString() << "\n";
-            }
-        }
-        oss << "}\n\n";
-    }
-    return oss.str();
+    MirDumpFormatter formatter;
+    return dumpFunctions(m_ctx.getBuilderContext(), formatter);
 }
 
 std::string CompilationPipeline::dumpAssembly() const
 {
-    std::ostringstream oss;
-    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
-    if (!bCtx)
-        return {};
-
-    for (MirFunction *func : bCtx->getFunctions())
-    {
-        if (!func)
-            continue;
-        oss << ".globl " << func->getName() << "\n";
-        oss << func->getName() << ":\n";
-        for (MirBlock *block : func->getBlocks())
-        {
-            if (!block)
-                continue;
-            oss << "." << func->getName() << "_" << block->getName() << ":\n";
-            for (MirInstruction *inst : block->getInstructions())
-            {
-                if (!inst)
-                    continue;
-                if (inst->getTargetDesc())
-                {
-                    oss << "    " << inst->getTargetDesc()->getName();
-                }
-                else
-                {
-                    oss << "    " << inst->getOpCodeName();
-                }
-                oss << "\n";
-            }
-        }
-    }
-    return oss.str();
+    AssemblyDumpFormatter formatter;
+    return dumpFunctions(m_ctx.getBuilderContext(), formatter);
 }
 
 } // namespace EzCompiler

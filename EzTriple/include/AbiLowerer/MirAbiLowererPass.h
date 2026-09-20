@@ -40,9 +40,6 @@ struct UnloweredBlock
     }
 };
 
-// Same fields internally, just made this alias not to confuse.
-using LoweredBlock = UnloweredBlock;
-
 /**
  * This pass lowers iterates over the blocks of a function, searches for RET blocks (PUSH_RET/RET + PUSH_ARG/CALL with
  * the same binding token) and aggrupates them. Then it will lower each block into a physical destination provided by
@@ -80,8 +77,8 @@ class MirAbiLowererPass : public IMirTransformPass
     void printResult() override;
 
   private:
-    class MirBuilderContext *m_ctx;               ///< Shared builder context used to rewrite instructions.
-    std::pmr::list<LoweredBlock> m_loweredBlocks; // List of blocks in which at least a CALL or RET was lowered.
+    class MirBuilderContext *m_ctx;                ///< Shared builder context used to rewrite instructions.
+    std::pmr::list<UnloweredBlock> m_loweredBlocks; // List of blocks in which at least a CALL or RET was lowered.
 };
 
 #endif // EZTRIPLE_FUCTION_ABI_LOWERER_PASS_H

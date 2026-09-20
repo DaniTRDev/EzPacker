@@ -44,7 +44,11 @@ class CppEncodingTableGenerator : public CodeGenerator
     const std::string &getTargetName() const noexcept { return m_targetName; }
 
     /** Overrides the target identifier used to select the backend and name generated tables. */
-    void setTargetName(std::string targetName) { m_targetName = std::move(targetName); }
+    void setTargetName(std::string targetName)
+    {
+        m_targetName = SanitizeCppIdentifier(targetName, "Target");
+        m_backend = findEncodingBackend(m_targetName);
+    }
 
   private:
     /** Target identifier substituted into generated table and include names. */
@@ -52,14 +56,6 @@ class CppEncodingTableGenerator : public CodeGenerator
     /** Backend selected by target name, or nullptr when none is registered. */
     EncodingCodegenBackend *m_backend{ nullptr };
 };
-
-/**
- * Convenience entry point for generating the target encoding table.
- */
-extern bool GenerateEncodingTable(DiagnosticCollector *collector,
-                                  SymbolTable *table,
-                                  std::filesystem::path outPath,
-                                  std::string targetName = "Target");
 
 } // namespace CodeGenerators
 

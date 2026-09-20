@@ -291,12 +291,15 @@ EzDSL features a dedicated semantic validation pipeline (`EzDsl/include/Sema/`, 
 
 ## 5. C++ Code Generators
 
-EzDSL translates verified AST and symbol table models into production C++ source and header files (`EzDsl/include/CodeGenerators/`):
+EzDSL translates verified AST and symbol table models into production C++ source and header files (`EzDsl/CodeGenerators/`):
 
-- **`GenerateMirTypeTable`**: Synthesizes `MirTypeTable.h` and `MirTypeTable.cpp`. Generates direct accessor methods (`i32()`, `f64()`, `getPtr()`, `getArray()`, `getClass()`), memory-interning structures, and layout initialization logic via `IMirTargetTypeLayout`.
-- **`GenerateMirIrInstructionDefs`**: Synthesizes `MirInstructionSetDefs.h`. Emits `INSTRUCTION(name, tier, category, operands, flags)` macro tables defining opcodes, instruction categories, and operand validation metadata.
+- **`CppMirTypeTableGenerator`**: Synthesizes `MirTypeTable.h` and `MirTypeTable.cpp`. Generates direct accessor methods (`i32()`, `f64()`, `getPtr()`, `getArray()`, `getClass()`), memory-interning structures, and layout initialization logic via `IMirTargetTypeLayout`.
+- **`CppMirInstructionGenerator`**: Synthesizes `MirInstructionSetDefs.h`. Emits `INSTRUCTION(name, tier, category, operands, flags)` macro tables defining opcodes, instruction categories, and operand validation metadata.
+- **`CppLegalizerGenerator`** / **`CppLegalizeRuleGenerator`**: Synthesize the target legalizer action matrix and the IR-to-IR rewrite rule tables.
 - **`CppTargetInstructionGenerator`**: Synthesizes `<Target>TargetInstructionTable.h` and `<Target>TargetInstructionTable.cpp`. Generates the target opcode enumeration, static instruction descriptor table (`MirTargetInstructionDesc[]`) with operand classes, directionality, latency, execution flags, and implicit registers, and exposes `create<Target>TargetInstructionTable(std::pmr::memory_resource*)`.
+- **`CppEncodingTableGenerator`**: Synthesizes `<Target>EncodingTable.h`. Emits the declarative machine-encoding table consumed by the code emitter.
 - **`CppInstructionSelectorGenerator`**: Synthesizes `<Target>InstructionSelector.h` and `<Target>InstructionSelector.cpp`. Generates a target-specialized `MirInstructionSelector` subclass that embodies Maximal Munch pattern matching tables, tree pattern predicates, addressing mode matching routines, and target instruction emission lowering.
+- **`CppCallingConvGenerator`** / **`CppRegisterInfoGenerator`** / **`CppTargetDescGenerator`**: Synthesize the calling-convention descriptors, register bank/class metadata and the target descriptor that ties the generated components together.
 
 ---
 

@@ -135,8 +135,13 @@ void MirRegisterAllocatorPass::reset()
  */
 void MirRegisterAllocatorPass::printResult()
 {
+    if (!m_ctx->getDiagCollector()->isDiagEnabledForType(Diag_Debug))
+    {
+        return;
+    }
+
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirRegisterAllocatorPass");
-    log << std::format("Printing function register allocation result").c_str();
+    log << "Printing function register allocation result";
 
     for (auto &func : m_result.m_resolvedFunctions)
     {
@@ -145,9 +150,8 @@ void MirRegisterAllocatorPass::printResult()
     }
 }
 
-/// Declares the analysis passes required before allocation (currently none).
+/// Declares the liveness analysis required before interference-graph construction.
 std::vector<std::type_index> MirRegisterAllocatorPass::getDependencies() const
 {
-    // TODO: FIll with instruction selector pass.
-    return {};
+    return { std::type_index(typeid(LivenessAnalysisPass)) };
 }

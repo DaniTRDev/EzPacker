@@ -71,20 +71,33 @@ size_t SourceManager::addSourceContent(const std::string &name, const std::strin
         return 0;
     }
 
-    size_t newId = m_sourceFiles.size();
+    SourceFileEntry *entry = createEntry(std::pmr::string(content, m_alloc), std::pmr::string(name, m_alloc));
+    return registerEntry(entry);
+}
 
-    // Allocate SourceFileEntry using the PMR memory resource
+/**
+ * Allocates an arena-backed SourceFileEntry from the given content/name, precomputes its line
+ * table, and returns the entry without registering it.
+ */
+SourceFileEntry *SourceManager::createEntry(std::pmr::string content, std::pmr::string name)
+{
     void *entryMem = m_alloc->allocate(sizeof(SourceFileEntry), alignof(SourceFileEntry));
-    SourceFileEntry *entry = new (entryMem) SourceFileEntry{ std::pmr::string(content, m_alloc),
-                                                             std::pmr::string(name, m_alloc),
-                                                             std::pmr::vector<SourceLineRange>(m_alloc) };
+    SourceFileEntry *entry = new (entryMem)
+            SourceFileEntry{ std::move(content), std::move(name), std::pmr::vector<SourceLineRange>(m_alloc) };
 
     populateLineRanges(entry);
+    return entry;
+}
 
-    // Use the arena-backed string to ensure it outlives the map entry
+/**
+ * Assigns entry the next 1-based ID, registers it in the path map and source list, and returns
+ * that ID. The map key points at the entry's arena-backed name so it outlives the map.
+ */
+size_t SourceManager::registerEntry(SourceFileEntry *entry)
+{
+    size_t newId = m_sourceFiles.size();
     m_pathToIdMap.emplace(entry->m_name, newId);
     m_sourceFiles.push_back(entry);
-
     return newId;
 }
 
@@ -134,8 +147,9 @@ SourceReference *SourceManager::createReference(size_t startOffset, size_t lengt
 /**
  * Locates the precomputed line containing the reference's begin offset via upper_bound, then
  * verifies the offset lies within the preceding range. Returns nullptr when no range matches.
+ * The returned pointer references the entry's line table and is read-only.
  */
-SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
+const SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
 {
     if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
     {
@@ -268,31 +282,19 @@ std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &fileP
     size_t fileSize = static_cast<size_t>(endPos);
     file.seekg(0, std::ios::beg);
 
-    size_t newId = m_sourceFiles.size();
-
-    // Direct allocation of SourceFileEntry and its PMR string buffer without heap intermediates
-    void *entryMem = m_alloc->allocate(sizeof(SourceFileEntry), alignof(SourceFileEntry));
-    SourceFileEntry *entry = new (entryMem) SourceFileEntry{ std::pmr::string(fileSize, '\0', m_alloc),
-                                                             std::pmr::string(canonicalName, m_alloc),
-                                                             std::pmr::vector<SourceLineRange>(m_alloc) };
-
+    // Read into an arena string first so a short read can bail out before any entry is registered.
+    std::pmr::string content(fileSize, '\0', m_alloc);
     if (fileSize > 0)
     {
-        file.read(entry->m_content.data(), static_cast<std::streamsize>(fileSize));
+        file.read(content.data(), static_cast<std::streamsize>(fileSize));
         if (!file)
         {
-            entry->~SourceFileEntry();
-            m_alloc->deallocate(entryMem, sizeof(SourceFileEntry), alignof(SourceFileEntry));
             return std::nullopt;
         }
     }
 
-    populateLineRanges(entry);
-
-    m_pathToIdMap.emplace(entry->m_name, newId);
-    m_sourceFiles.push_back(entry);
-
-    return newId;
+    SourceFileEntry *entry = createEntry(std::move(content), std::pmr::string(canonicalName, m_alloc));
+    return registerEntry(entry);
 }
 
 /**
@@ -301,7 +303,7 @@ std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &fileP
  */
 std::string_view SourceManager::getRawLineContent(SourceReference *ref) const
 {
-    SourceLineRange *lineRange = getReferenceLine(ref);
+    const SourceLineRange *lineRange = getReferenceLine(ref);
     if (!lineRange)
     {
         return {};

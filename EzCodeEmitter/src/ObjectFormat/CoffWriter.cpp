@@ -1,5 +1,7 @@
 #include "ObjectFormat/CoffWriter.h"
 #include <cstring>
+#include <stdexcept>
+#include <string>
 #include <unordered_map>
 
 namespace EzCodeEmitter::ObjectFormat
@@ -134,6 +136,7 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     };
 
     std::vector<SectionInfo> secInfos;
+    secInfos.reserve(4);
     std::unordered_map<SectionType, int16_t> sectionIndexMap; // 1-based for COFF
 
     // Copies a code section (if present) into the staging list and records its 1-based index.
@@ -173,6 +176,7 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     std::vector<uint8_t> stringTable;
     // Initial 4 bytes are size of string table
     stringTable.resize(4, 0);
+    stringTable.reserve(m_symbols.size() * 16 + 4);
 
     auto addCoffString = [&](std::string_view str) -> uint32_t
     {
@@ -183,6 +187,7 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     };
 
     std::vector<CoffSymbol> symbolRecords;
+    symbolRecords.reserve(m_symbols.size());
     std::unordered_map<std::string, uint32_t> symIndexMap;
 
     for (const auto &sym : m_symbols)
@@ -199,8 +204,23 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
         }
 
         rec.Value = static_cast<uint32_t>(sym.m_offset);
-        auto itSec = sectionIndexMap.find(sym.m_section);
-        rec.SectionNumber = (itSec != sectionIndexMap.end()) ? itSec->second : 0;
+        if (sym.m_section == SectionType::Undefined)
+        {
+            // Undefined symbols have no section (COFF section number 0).
+            rec.SectionNumber = 0;
+        }
+        else
+        {
+            auto itSec = sectionIndexMap.find(sym.m_section);
+            if (itSec == sectionIndexMap.end())
+            {
+                // A defined symbol in a section the writer does not emit would silently become
+                // section 0, producing a malformed object; fail loudly instead.
+                throw std::runtime_error("CoffWriter: symbol '" + sym.m_name +
+                                         "' references a section that is not emitted");
+            }
+            rec.SectionNumber = itSec->second;
+        }
         rec.Type = sym.m_isFunction ? 0x0020 : 0x0000;
         rec.StorageClass = sym.m_isGlobal ? COFF_SYM_CLASS_EXTERNAL : COFF_SYM_CLASS_STATIC;
         rec.NumberOfAuxSymbols = 0;
@@ -218,16 +238,18 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
     for (const auto &reloc : m_relocs)
     {
         auto itSec = sectionIndexMap.find(reloc.m_section);
-        if (itSec != sectionIndexMap.end())
+        if (itSec == sectionIndexMap.end())
         {
-            size_t secIdx = static_cast<size_t>(itSec->second - 1);
-            CoffRelocation r{};
-            r.VirtualAddress = static_cast<uint32_t>(reloc.m_offset);
-            auto itSym = symIndexMap.find(reloc.m_symbolName);
-            r.SymbolTableIndex = (itSym != symIndexMap.end()) ? itSym->second : 0;
-            r.Type = mapCoffRelocType(reloc.m_type);
-            secInfos[secIdx].relocs.push_back(r);
+            // Dropping the relocation silently would leave an unresolved field in the object.
+            throw std::runtime_error("CoffWriter: relocation references a section that is not emitted");
         }
+        size_t secIdx = static_cast<size_t>(itSec->second - 1);
+        CoffRelocation r{};
+        r.VirtualAddress = static_cast<uint32_t>(reloc.m_offset);
+        auto itSym = symIndexMap.find(reloc.m_symbolName);
+        r.SymbolTableIndex = (itSym != symIndexMap.end()) ? itSym->second : 0;
+        r.Type = mapCoffRelocType(reloc.m_type);
+        secInfos[secIdx].relocs.push_back(r);
     }
 
     // Compute File Layout

@@ -54,9 +54,11 @@ class SourceManager : public GenericSourceManager
 
     /**
      * Finds the precomputed 1-based line interval enclosing the given SourceReference via binary search.
-     * Returns nullptr if reference or source entry is invalid.
+     * Returns a read-only pointer into the entry's line table, or nullptr if reference or source entry is
+     * invalid. The pointer stays valid as long as the owning SourceManager is alive and no further sources
+     * are registered (registration never reallocates an existing entry's line table).
      */
-    SourceLineRange *getReferenceLine(SourceReference *ref) const override;
+    const SourceLineRange *getReferenceLine(SourceReference *ref) const override;
 
     /**
      * Adds an include directory to the search list, converting existing paths to weakly canonical forms.
@@ -99,6 +101,18 @@ class SourceManager : public GenericSourceManager
     std::string_view getSourceName(size_t id) const override;
 
   private:
+    /**
+     * Allocates an arena-backed SourceFileEntry for the given content/name, precomputes its line
+     * table, and returns the still-unregistered entry.
+     */
+    SourceFileEntry *createEntry(std::pmr::string content, std::pmr::string name);
+
+    /**
+     * Assigns entry the next 1-based ID, registers it in the name map and source list, and returns
+     * that ID.
+     */
+    size_t registerEntry(SourceFileEntry *entry);
+
     std::filesystem::path m_workingPath; // Base directory used to resolve relative source paths.
     std::pmr::memory_resource *m_alloc;  // Arena that owns file entries and their buffer/line storage.
     std::pmr::vector<std::filesystem::path> m_includePaths;          // Search directories for include resolution.

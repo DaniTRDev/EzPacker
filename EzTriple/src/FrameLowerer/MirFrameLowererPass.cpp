@@ -36,8 +36,8 @@ MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_i
         return { .m_modifiedMir = false, .m_executed = false, .m_succeeded = false };
     }
 
-    // Prepare frame lowerer context using temporary pass memory resource
-    FrameLowererCtx ctx(m_ctx, func, m_targetDesc, m_ctx->getGlobalAllocator());
+    // Prepare frame lowerer context.
+    FrameLowererCtx ctx(m_ctx, func, m_targetDesc);
     MirFrameLowerer *lowerer = m_targetDesc->getFrameLowerer();
 
     // Scan for ALLOC/DEALLOC instructions and lower them.
@@ -81,8 +81,13 @@ MirPassResult MirFrameLowererPass::run(IntrusiveLinkedList<MirFunction>::const_i
  */
 void MirFrameLowererPass::printResult()
 {
+    if (!m_ctx->getDiagCollector()->isDiagEnabledForType(Diag_Debug))
+    {
+        return;
+    }
+
     auto log = m_ctx->getDiagCollector()->builder(Diag_Debug, "MirFrameLowererPass");
-    log << std::format("Printing frame lowerer result").c_str();
+    log << "Printing frame lowerer result";
 
     for (auto &func : m_loweredFunctions)
     {

@@ -22,7 +22,7 @@ class DiagnosticBuilder
     /**
      * Creates the builder, builds a simple diagnostic message and attaches it to a collector.
      */
-    DiagnosticBuilder(class DiagnosticCollector *collector, DiagnosticMessageType type, const std::string_view &sender);
+    DiagnosticBuilder(class DiagnosticCollector *collector, DiagnosticMessageType type, std::string_view sender);
 
     /**
      * Defines the move constructor. It will unlink other's from emitting the message.
@@ -78,12 +78,12 @@ class DiagnosticBuilder
     /**
      * Sets the type and sender of the current message.
      */
-    DiagnosticBuilder &build(DiagnosticMessageType type, const std::string_view &sender);
+    DiagnosticBuilder &build(DiagnosticMessageType type, std::string_view sender);
 
     /**
      * Operator used to append a string into the main message.
      */
-    DiagnosticBuilder &operator<<(const std::string_view &str);
+    DiagnosticBuilder &operator<<(std::string_view str);
 
     /**
      * Operator used to append a source reference to the main message.

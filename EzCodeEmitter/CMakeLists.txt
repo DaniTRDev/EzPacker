@@ -11,6 +11,7 @@ set(EZCODEEMITTER_FILES_LIST
         "include/X86_64/Encoding/X86_64InstructionEncoder.h"
         "include/X86_64/BranchRelaxation/BranchRelaxer.h"
         "include/ObjectFormat/ObjectSymbol.h"
+        "include/ObjectFormat/IObjectWriter.h"
         "include/ObjectFormat/Elf64Writer.h"
         "include/ObjectFormat/CoffWriter.h"
 

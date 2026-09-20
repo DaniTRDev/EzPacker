@@ -9,8 +9,6 @@ SymbolTable::SymbolTable(std::pmr::memory_resource *alloc) :
     enterScope("global");
 }
 
-ScopeId SymbolTable::getCurrentScopeId() const { return m_currentScopeId; }
-
 ScopeId SymbolTable::createScope(ScopeId parentId, const std::string_view &debugName)
 {
     // Allocate the scope in the arena; its id is its index in the scope list.
@@ -19,14 +17,6 @@ ScopeId SymbolTable::createScope(ScopeId parentId, const std::string_view &debug
 
     m_scopes.push_back(scope);
     return scope->getId();
-}
-
-Scope *SymbolTable::getScopeById(ScopeId id) const
-{
-    if (id >= m_scopes.size())
-        return nullptr;
-
-    return m_scopes[id];
 }
 
 Symbol *SymbolTable::getSymById(SymbolId id) const
@@ -39,25 +29,18 @@ Symbol *SymbolTable::getSymById(SymbolId id) const
 
 Symbol *SymbolTable::getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope)
 {
-    // Walk the parent scope chain from the starting (or current) scope up to the root.
-    ScopeId cursor = startingScope.value_or(m_currentScopeId);
-
-    while (cursor != InvalidScopeId)
-    {
-        Scope *scope = m_scopes[cursor];
-
-        if (Symbol *sym = getSymInScope(cursor, name, std::nullopt); sym)
-            return sym;
-
-        cursor = scope->getParentId();
-    }
-
-    return nullptr;
+    return getSymByNameImpl(name, std::nullopt, startingScope);
 }
 
 Symbol *SymbolTable::getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope)
 {
-    // Same bottom-up lookup as the untyped overload, but only matching the requested symbol type.
+    return getSymByNameImpl(name, type, startingScope);
+}
+
+Symbol *
+SymbolTable::getSymByNameImpl(const std::string_view &name, std::optional<SymbolType> type, std::optional<ScopeId> startingScope)
+{
+    // Same bottom-up lookup for both overloads, optionally matching only the requested symbol type.
     ScopeId cursor = startingScope.value_or(m_currentScopeId);
 
     while (cursor != InvalidScopeId)

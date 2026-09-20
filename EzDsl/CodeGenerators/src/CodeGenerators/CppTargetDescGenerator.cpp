@@ -23,45 +23,14 @@ const DSL::Ast::TargetDesc::TargetDescDecl *findTargetDesc(const SymbolTable *ta
         return nullptr;
     }
 
-    for (const Symbol *sym : table->getSymbols())
+    const auto descs = table->collect<Symbols::TargetDescSymbol>(SymbolType::TargetDesc);
+    if (descs.empty())
     {
-        if (sym && sym->getType() == SymbolType::TargetDesc)
-        {
-            if (const auto *data = sym->getIf<Symbols::TargetDescSymbol>())
-            {
-                return data->m_astNode;
-            }
-        }
+        return nullptr;
     }
-    return nullptr;
-}
 
-// Rewrites raw into a valid C++ identifier, substituting illegal characters and prefixing leading digits.
-std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
-{
-    std::string result;
-    result.reserve(raw.size());
-    for (char c : raw)
-    {
-        unsigned char uc = static_cast<unsigned char>(c);
-        if (std::isalnum(uc) || c == '_')
-        {
-            result.push_back(c);
-        }
-        else
-        {
-            result.push_back('_');
-        }
-    }
-    if (result.empty())
-    {
-        result = std::string(fallback);
-    }
-    if (std::isdigit(static_cast<unsigned char>(result.front())))
-    {
-        result.insert(result.begin(), '_');
-    }
-    return result;
+    const auto *data = descs.front()->getIf<Symbols::TargetDescSymbol>();
+    return data ? data->m_astNode : nullptr;
 }
 
 // Escapes characters that would otherwise break the generated C++ string literal.
@@ -132,19 +101,15 @@ CppTargetDescGenerator::CppTargetDescGenerator(DiagnosticCollector *collector,
                                                std::filesystem::path outPath,
                                                std::string targetName) :
     CodeGenerator("CodeGenerators::TargetDesc", collector, table, std::move(outPath)),
-    m_targetName(std::move(targetName))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
 {
-    if (m_targetName.empty())
-    {
-        m_targetName = "Target";
-    }
 }
 
 // Emits the generated TargetDesc subclass declaration plus its static metadata tables.
 void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
     const auto *decl = findTargetDesc(getSymbolTable());
-    const std::string ns = sanitizeIdentifier(m_targetName, "Target");
+    const std::string ns = SanitizeCppIdentifier(m_targetName, "Target");
     const std::string className = std::format("{}TargetDesc", ns);
 
     emitter.emitBanner("CppTargetDescGenerator");
@@ -280,7 +245,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter) const
 void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter) const
 {
     const auto *decl = findTargetDesc(getSymbolTable());
-    const std::string ns = sanitizeIdentifier(m_targetName, "Target");
+    const std::string ns = SanitizeCppIdentifier(m_targetName, "Target");
     const std::string className = std::format("{}TargetDesc", ns);
 
     emitter.emitBanner("CppTargetDescGenerator");
@@ -433,7 +398,7 @@ bool CppTargetDescGenerator::run()
         return false;
     }
 
-    const std::string ns = sanitizeIdentifier(m_targetName, "Target");
+    const std::string ns = SanitizeCppIdentifier(m_targetName, "Target");
     auto [headerPath, sourcePath] = resolveHeaderAndSourcePaths(std::format("{}TargetDesc", ns));
 
     CppSourceEmitter headerEmitter;

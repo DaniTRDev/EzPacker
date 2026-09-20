@@ -106,31 +106,46 @@ void MirLexer::skipWhitespaceAndComments()
 }
 
 /**
- * Returns the next token, lexing and caching it on first call.
+ * Returns the token ahead-th ahead of the cursor without consuming it, lexing and buffering as many
+ * tokens as needed. References remain valid until the token is consumed because the underlying
+ * deque never invalidates references to existing elements on push/pop.
  */
-const MirToken &MirLexer::peekToken()
+const MirToken &MirLexer::peekToken(size_t ahead)
 {
-    if (!m_peeked.has_value())
+    while (m_lookahead.size() <= ahead)
     {
-        m_peeked = nextToken();
+        m_lookahead.push_back(lexToken());
     }
-    return *m_peeked;
+    return m_lookahead[ahead];
 }
 
 /**
- * Returns the next token, consuming and clearing any cached lookahead first. Dispatches to the
- * number/string/identifier scanners and otherwise classifies punctuation, including a leading '-'
- * on a digit as a negative number.
+ * Returns the next token, consuming any buffered lookahead first and otherwise lexing from source.
  */
 MirToken MirLexer::nextToken()
 {
-    if (m_peeked.has_value())
+    if (!m_lookahead.empty())
     {
-        MirToken tok = std::move(*m_peeked);
-        m_peeked.reset();
+        MirToken tok = std::move(m_lookahead.front());
+        m_lookahead.pop_front();
         return tok;
     }
 
+    return lexToken();
+}
+
+/**
+ * Pushes a previously consumed token back as the next token to be returned.
+ */
+void MirLexer::pushBack(MirToken tok) { m_lookahead.push_front(std::move(tok)); }
+
+/**
+ * Lexes the next raw token directly from source. Dispatches to the number/string/identifier
+ * scanners and otherwise classifies punctuation, including a leading '-' on a digit as a negative
+ * number.
+ */
+MirToken MirLexer::lexToken()
+{
     skipWhitespaceAndComments();
 
     MirToken tok(m_ctx.getArena());

@@ -92,7 +92,7 @@ MirInstructionFlags MirInstruction::getFlags() const { return getMetadata().m_fl
 /**
  * Returns the target instruction descriptor if lowered.
  */
-MirTargetInstructionDesc *MirInstruction::getTargetDesc() const { return m_targetDesc; }
+const MirTargetInstructionDesc *MirInstruction::getTargetDesc() const { return m_targetDesc; }
 
 /**
  * Retrieves the operand pointer at the specified index, or nullptr if out of bounds.
@@ -216,84 +216,63 @@ SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { return m_operands; }
 
 /**
- * Identifies all register definitions (DEFs) written by this instruction, including explicit write operands and target
- * implicit defs.
+ * Collects all register definitions (DEFs) written by this instruction, including explicit write
+ * operands and target implicit defs. out is cleared first.
  */
-std::vector<MirRegisterRef> MirInstruction::getDefinedRegisters() const
+void MirInstruction::getDefinedRegisters(std::pmr::vector<MirRegisterRef> &out) const
 {
-    std::vector<MirRegisterRef> defs;
-    defs.reserve(2);
+    out.clear();
 
     for (size_t i = 0; i < m_operands.size(); ++i)
     {
-        MirOperand *operand = m_operands[i];
-        if (!operand)
-            continue;
-
-        if (auto *reg = operand->get<MirRegister>())
-        {
-            if (getOperandFlag(i) & MirOperandFlag::Write)
-            {
-                defs.push_back(reg->getRef());
-            }
-        }
+        visitOperandRegisters(m_operands[i],
+                              getOperandFlag(i),
+                              [&out](MirRegister *reg, MirOperandFlag flag)
+                              {
+                                  if (flag & MirOperandFlag::Write)
+                                  {
+                                      out.push_back(reg->getRef());
+                                  }
+                              });
     }
 
     if (m_targetDesc)
     {
         for (const auto &impDef : m_targetDesc->getImplicitDefs())
         {
-            defs.push_back(impDef);
+            out.push_back(impDef);
         }
     }
-
-    return defs;
 }
 
 /**
- * Identifies all register uses (USEs) read by this instruction, including explicit read operands, memory bases, and
- * target implicit uses.
+ * Collects all register uses (USEs) read by this instruction, including explicit read operands,
+ * memory bases and target implicit uses. out is cleared first.
  */
-std::vector<MirRegisterRef> MirInstruction::getUsedRegisters() const
+void MirInstruction::getUsedRegisters(std::pmr::vector<MirRegisterRef> &out) const
 {
-    std::vector<MirRegisterRef> uses;
-    uses.reserve(4);
+    out.clear();
 
     for (size_t i = 0; i < m_operands.size(); ++i)
     {
-        MirOperand *operand = m_operands[i];
-        if (!operand)
-            continue;
-
-        if (auto *reg = operand->get<MirRegister>())
-        {
-            if (getOperandFlag(i) & MirOperandFlag::Read)
-            {
-                uses.push_back(reg->getRef());
-            }
-        }
-        else if (auto *mem = operand->get<MirMemory>())
-        {
-            if (mem->getBase())
-            {
-                uses.push_back(mem->getBase()->getRef());
-            }
-            if (mem->getIndex())
-            {
-                uses.push_back(mem->getIndex()->getRef());
-            }
-        }
+        visitOperandRegisters(m_operands[i],
+                              getOperandFlag(i),
+                              [&out](MirRegister *reg, MirOperandFlag flag)
+                              {
+                                  if (flag & MirOperandFlag::Read)
+                                  {
+                                      out.push_back(reg->getRef());
+                                  }
+                              });
     }
 
     if (m_targetDesc)
     {
         for (const auto &impUse : m_targetDesc->getImplicitUses())
         {
-            uses.push_back(impUse);
+            out.push_back(impUse);
         }
     }
-
-    return uses;
 }
 
 /**
@@ -310,28 +289,23 @@ void MirInstruction::eraseFromOwner()
     {
         for (size_t i = 0; i < m_operands.size(); ++i)
         {
-            MirOperand *op = m_operands[i];
-            if (!op)
-                continue;
-
-            MirOperandFlag flag = getOperandFlag(i);
-            if (auto *reg = op->get<MirRegister>())
-            {
-                if (reg->isVirtual())
-                {
-                    if (flag & MirOperandFlag::Write)
-                        regInfo->clearDef(reg->getRegId());
-                    if (flag & MirOperandFlag::Read)
-                        regInfo->removeUse(reg->getRegId(), this);
-                }
-            }
-            else if (auto *mem = op->get<MirMemory>())
-            {
-                if (mem->getBase() && mem->getBase()->isVirtual())
-                    regInfo->removeUse(mem->getBase()->getRegId(), this);
-                if (mem->getIndex() && mem->getIndex()->isVirtual())
-                    regInfo->removeUse(mem->getIndex()->getRegId(), this);
-            }
+            visitOperandRegisters(m_operands[i],
+                                  getOperandFlag(i),
+                                  [&](MirRegister *reg, MirOperandFlag flag)
+                                  {
+                                      if (!reg->isVirtual())
+                                      {
+                                          return;
+                                      }
+                                      if (flag & MirOperandFlag::Write)
+                                      {
+                                          regInfo->clearDef(reg->getRegId());
+                                      }
+                                      if (flag & MirOperandFlag::Read)
+                                      {
+                                          regInfo->removeUse(reg->getRegId(), this);
+                                      }
+                                  });
         }
     }
 
@@ -345,6 +319,7 @@ void MirInstruction::eraseFromOwner()
 std::string MirInstruction::toString() const
 {
     std::string res;
+    res.reserve(getMetadata().m_name.size() + m_operands.size() * 16 + 1);
     res += getMetadata().m_name;
 
     for (auto *operand : m_operands)
@@ -362,7 +337,7 @@ void MirInstruction::setOpcode(MirInstructionOpCode opcode) { m_opcode = opcode;
 /**
  * Attaches a target machine instruction descriptor.
  */
-void MirInstruction::setTargetDesc(MirTargetInstructionDesc *desc) { m_targetDesc = desc; }
+void MirInstruction::setTargetDesc(const MirTargetInstructionDesc *desc) { m_targetDesc = desc; }
 
 /**
  * Sets the previous instruction in the intrusive list.

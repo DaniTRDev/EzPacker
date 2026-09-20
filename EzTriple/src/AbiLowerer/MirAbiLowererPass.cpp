@@ -28,7 +28,11 @@ static MirId getTokenId(const MirInstruction *instr)
 }
 
 /// Stores the builder context used to inspect and rewrite instructions.
-MirAbiLowererPass::MirAbiLowererPass(MirBuilderContext *ctx) : m_ctx(ctx) {}
+MirAbiLowererPass::MirAbiLowererPass(MirBuilderContext *ctx) :
+    m_ctx(ctx),
+    m_loweredBlocks(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource())
+{
+}
 
 /// Returns the diagnostic name of this pass.
 const char *MirAbiLowererPass::getName() const { return "MirAbiLowererPass"; }

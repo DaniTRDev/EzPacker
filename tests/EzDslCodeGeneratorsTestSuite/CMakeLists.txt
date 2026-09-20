@@ -61,10 +61,10 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
-        "T_CppTargetEncodingGenerator"
+        "T_CppEncodingTableGenerator"
         "EzDslCodeGeneratorsTestSuite"
         "EzDslCodeGenerators"
-        "tests/T_CppTargetEncodingGenerator.cpp"
+        "tests/T_CppEncodingTableGenerator.cpp"
 )
 
 EzPacker_AddTest(

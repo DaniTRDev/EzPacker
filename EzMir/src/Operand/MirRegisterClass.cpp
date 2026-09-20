@@ -19,22 +19,18 @@ bool MirRegisterClass::addRegister(const std::string_view &name,
                                    std::initializer_list<MirRegisterDescriptor *> subParts,
                                    uint32_t hwEncoding)
 {
-    auto it = m_registers.find(name);
-    if (it != m_registers.end())
+    const size_t regId = m_registers.size();
+
+    auto [it, inserted] = m_registers.try_emplace(name, nullptr);
+    if (!inserted)
         return false;
 
     std::pmr::polymorphic_allocator<MirRegisterDescriptor> alloc(m_alloc);
 
-    auto desc = alloc.new_object<MirRegisterDescriptor>(name,
-                                                        this,
-                                                        bitSize,
-                                                        m_registers.size(),
-                                                        partOffsetInBits,
-                                                        m_alloc,
-                                                        hwEncoding);
+    auto desc = alloc.new_object<MirRegisterDescriptor>(name, this, bitSize, regId, partOffsetInBits, m_alloc, hwEncoding);
     desc->m_subParts.insert(desc->m_subParts.begin(), subParts.begin(), subParts.end());
 
-    m_registers[name] = desc;
+    it->second = desc;
     return true;
 }
 
@@ -42,6 +38,11 @@ bool MirRegisterClass::addRegister(const std::string_view &name,
  * Retrieves the name of this register class.
  */
 const char *MirRegisterClass::getName() const { return m_name; }
+
+/**
+ * Retrieves the register bank this class belongs to.
+ */
+MirRegisterBank *MirRegisterClass::getBank() const { return m_owner; }
 
 /**
  * Looks up a register descriptor by its mnemonic/name.

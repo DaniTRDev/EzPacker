@@ -63,47 +63,47 @@ class FlexFloat
     /**
      * Returns true if this floating-point value is structurally negative and not a NaN.
      */
-    bool isNeg() const;
+    bool isNeg() const noexcept;
 
     /**
      * Returns true if this floating-point value is positive, non-zero, and valid.
      */
-    bool isPositive() const;
+    bool isPositive() const noexcept;
 
     /**
      * Returns true if this number evaluates precisely to 0.0 or -0.0.
      */
-    bool isZero() const;
+    bool isZero() const noexcept;
 
     /**
      * Compares this against other and returns true if this is greater.
      */
-    bool operator>(const FlexFloat &other) const;
+    bool operator>(const FlexFloat &other) const noexcept;
 
     /**
      * Compares this against other and returns true if this is greater or equal.
      */
-    bool operator>=(const FlexFloat &other) const;
+    bool operator>=(const FlexFloat &other) const noexcept;
 
     /**
      * Compares this against other and returns true if this is smaller.
      */
-    bool operator<(const FlexFloat &other) const;
+    bool operator<(const FlexFloat &other) const noexcept;
 
     /**
      * Compares this against other and returns true if this is smaller or equal.
      */
-    bool operator<=(const FlexFloat &other) const;
+    bool operator<=(const FlexFloat &other) const noexcept;
 
     /**
      * Compares this against other and returns true if this is equal to other.
      */
-    bool operator==(const FlexFloat &other) const;
+    bool operator==(const FlexFloat &other) const noexcept;
 
     /**
      * Compares this against other and returns true if this is not equal to other.
      */
-    bool operator!=(const FlexFloat &other) const;
+    bool operator!=(const FlexFloat &other) const noexcept;
 
     /**
      * Extracts the upper half components (sign and exponent fields) for floating-point scalar expansion.
@@ -118,7 +118,7 @@ class FlexFloat
     /**
      * Creates a new resulting FlexFloat that's a copy of this and adds other into it.
      */
-    FlexFloat operator+(const FlexFloat &other);
+    FlexFloat operator+(const FlexFloat &other) const;
 
     /**
      * Increments this value by other and returns a reference to this instance.
@@ -128,7 +128,7 @@ class FlexFloat
     /**
      * Creates a new resulting FlexFloat that's a copy of this and subtracts other from it.
      */
-    FlexFloat operator-(const FlexFloat &other);
+    FlexFloat operator-(const FlexFloat &other) const;
 
     /**
      * Decrements this value by other and returns a reference to this instance.
@@ -138,7 +138,7 @@ class FlexFloat
     /**
      * Creates a new resulting FlexFloat that's a copy of this and multiplies it by other.
      */
-    FlexFloat operator*(const FlexFloat &other);
+    FlexFloat operator*(const FlexFloat &other) const;
 
     /**
      * Multiplies this value by other and returns a reference to this instance.
@@ -148,7 +148,7 @@ class FlexFloat
     /**
      * Creates a new resulting FlexFloat that's a copy of this and divides it by other.
      */
-    FlexFloat operator/(const FlexFloat &other);
+    FlexFloat operator/(const FlexFloat &other) const;
 
     /**
      * Divides this value by other and returns a reference to this instance. Throws std::domain_error if other
@@ -171,7 +171,7 @@ class FlexFloat
     /**
      * Returns the configured tracking bit size of this float container representation (e.g., 32, 64, 128, 256).
      */
-    size_t getBitSize() const;
+    size_t getBitSize() const noexcept;
 
     /**
      * Extends the float value to the new bit size. If it is smaller than the previous, a
@@ -197,6 +197,27 @@ class FlexFloat
      * matching the configured structural layout configurations.
      */
     libbf::limb_t getPrecBits() const;
+
+    /**
+     * Returns true when either this value or other is NaN; ordered comparisons are false in that case.
+     */
+    bool hasNaNWith(const FlexFloat &other) const noexcept;
+
+    /**
+     * Throws std::invalid_argument when the configured width cannot be split into two equal halves.
+     */
+    void ensureSplittableWidth() const;
+
+    /**
+     * Shared implementation of the value-returning arithmetic operators: copies this instance and
+     * applies op (a pointer to a compound-assignment member) to the copy.
+     */
+    template <typename Op> FlexFloat applyBinary(const FlexFloat &other, Op op) const
+    {
+        FlexFloat result(*this);
+        (result.*op)(other);
+        return result;
+    }
 
   private:
     libbf::bf_context_t m_bfCtx; // Per-instance libbf allocator/context owning this number's memory.

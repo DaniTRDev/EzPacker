@@ -11,13 +11,8 @@ MirRegisterBank::MirRegisterBank(const char *name, std::pmr::memory_resource *al
  */
 bool MirRegisterBank::addClass(const std::string_view &name, MirRegisterClass *_class)
 {
-    auto it = m_classes.find(name);
-
-    if (it != m_classes.end())
-        return false;
-
-    m_classes[name] = _class;
-    return true;
+    auto [it, inserted] = m_classes.try_emplace(name, _class);
+    return inserted;
 }
 
 /**

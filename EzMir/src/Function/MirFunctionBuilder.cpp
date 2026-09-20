@@ -12,18 +12,9 @@
 #include "Type/MirTypeTable.h"
 
 /**
- * Creates a builder bound to a context with no optional owner function vector.
+ * Creates a builder bound to a context.
  */
-MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx), m_owner(nullptr) {}
-
-/**
- * Creates a builder that additionally appends the built function to the given vector, when non-null.
- */
-MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx, std::pmr::vector<MirFunction *> *owner) :
-    MirFunctionBuilder(ctx)
-{
-    m_owner = owner;
-}
+MirFunctionBuilder::MirFunctionBuilder(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
 /**
  * Produces a block builder for the function built so far. Returns an invalid builder and emits an
@@ -35,7 +26,9 @@ MirBlockBuilder MirFunctionBuilder::blockBuilder()
     if (!obj)
     {
         m_ctx->getDiagCollector()->error("MirFunctionBuilder", "Can't create block builder from non-built function");
-        return MirBlockBuilder(nullptr, static_cast<MirFunction *>(nullptr));
+        // Keep the context so the returned builder is inert rather than crash-prone; callers can
+        // detect the failure via MirBlockBuilder::isBuilt().
+        return MirBlockBuilder(m_ctx, nullptr);
     }
 
     return MirBlockBuilder(m_ctx, obj);
@@ -113,20 +106,18 @@ MirFunction *MirFunctionBuilder::build(class MirType *returnType,
     // Seed the function's parameter list with the requested parameters.
     func->m_parameters.insert(func->m_parameters.begin(), parameters.begin(), parameters.end());
 
-    auto diagBuilder = m_ctx->getDiagCollector()->trace("MirFunctionBuilder", "Built func with id: {}", func->getId());
-    diagBuilder.appendNote(sourceRef, MirPrinter::printToString(func, MirPrinterDetail::Detailed));
-    diagBuilder.appendNote("Using calling convention: {}", cc->getName());
+    // Only format the full function dump when the trace diagnostic is actually enabled.
+    if (m_ctx->getDiagCollector()->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+    {
+        auto diagBuilder = m_ctx->getDiagCollector()->trace("MirFunctionBuilder", "Built func with id: {}", func->getId());
+        diagBuilder.appendNote(sourceRef, MirPrinter::printToString(func, MirPrinterDetail::Detailed));
+        diagBuilder.appendNote("Using calling convention: {}", cc->getName());
+    }
 
     // Registration enforces global ID uniqueness; abort if it fails.
     if (!m_ctx->appendFunction(func))
     {
         return nullptr;
-    }
-
-    // Optionally publish the function to the caller-provided container.
-    if (m_owner)
-    {
-        m_owner->push_back(func);
     }
 
     setBuildResult(func);

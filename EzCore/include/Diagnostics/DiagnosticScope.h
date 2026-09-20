@@ -30,10 +30,15 @@ class DiagnosticScope
     void appendMessage(const DiagnosticMessage &message);
 
     /**
-     * Inserts the given range of a vector into the current scope.
+     * Appends a message to the current scope by moving it into the arena-managed vector.
      */
-    void insert(std::pmr::vector<DiagnosticMessage>::const_iterator begin,
-                std::pmr::vector<DiagnosticMessage>::const_iterator end);
+    void appendMessage(DiagnosticMessage &&message);
+
+    /**
+     * Moves all messages of this scope to the end of the target scope's message list, leaving this
+     * scope empty. Used when a Propagate scope bubbles its diagnostics up to its parent.
+     */
+    void moveMessagesTo(DiagnosticScope &target);
 
     /**
      * Sets the action to be performed on the messages on scope's end.

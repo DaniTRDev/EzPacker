@@ -6,7 +6,7 @@ All leads are unverified until checked. See `ReviewProcess.md`.
 
 ## 1. Shared helpers to centralize
 
-- [ ] **P1 · XPR-01 — One generic name registry instead of three**
+- [x] **P1 · XPR-01 — One generic name registry instead of three**
   - Where: `EzDsl/Sema/src/Sema/Encoding/EncodingDialect.cpp:24-59`,
     `EzDsl/CodeGenerators/src/CodeGenerators/CppEncodingTableGenerator.cpp:31-85`,
     `EzCompiler/src/TargetResolver.cpp:30-54`
@@ -15,9 +15,9 @@ All leads are unverified until checked. See `ReviewProcess.md`.
     (`X86_64EncodingDialect.cpp:365-377`, `X86_64EncodingCodegenBackend.cpp:224-235`).
   - Fix: a `template <class T> NameRegistry` (case-insensitive, alias-aware) in `EzCore`;
     register aliases once. Beware static-init order (see EzDsl WEI-10).
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · XPR-02 — Safe string helpers in `EzCore/StringUtils.h`; adopt them**
+- [x] **P1 · XPR-02 — Safe string helpers in `EzCore/StringUtils.h`; adopt them**
   - Where: `EzCore/include/StringUtils.h:10-30` (`StrToLower`/`StrToUpper` lack an
     `unsigned char` cast — UB for non-ASCII), plus four `sanitizeIdentifier` copies in EzDsl
     (`CppTargetDescGenerator.cpp:40-65`, `CppRegisterInfoGenerator.cpp:47-72`,
@@ -26,13 +26,13 @@ All leads are unverified until checked. See `ReviewProcess.md`.
     `Cli/Driver.cpp:392,483`, `EzCompiler/src/TargetResolver.cpp:14-27`.
   - Fix: fix the core helpers, add `SanitizeCppIdentifier(view, fallback)` and
     `NormalizeKey(view)` (optional `-`→`_`); delete the copies.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · XPR-03 — Symbol-table collection helper**
+- [x] **P1 · XPR-03 — Symbol-table collection helper**
   - Where: the `getSymbols()` → `getType()` → `getIf<T>()` idiom appears ~13× in EzDsl generators
     (see `EzDslReview.md` DUP-04).
   - Fix: `SymbolTable::collect<T>(SymbolType)` (or a templated free helper).
-  - Status: new
+  - Status: fixed
 
 - [ ] **P1 · XPR-04 — PCH/common include lists overlap and drift**
   - Where: `EzDsl/Lexer/include/EzDslLexerCommon.h:4-24` vs
@@ -42,27 +42,27 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Why: Sema/CodeGenerators do not include `EzCoreCommon.h`/`StringUtils.h`, which is why helper
     duplication (XPR-02) happened.
   - Fix: shared base include header; trim the PCH (see EzDsl LEG-12).
-  - Status: new
+  - Status: deferred
 
 - [ ] **P2 · XPR-05 — `escapeString` vs `InfoDumper::escapeJson`**
   - Where: `EzDsl/CodeGenerators/src/CodeGenerators/CppTargetDescGenerator.cpp:68-94` vs
     `EzDsl/Cli/src/Cli/InfoDumper.cpp:23-66`
   - Why: same structure and `reserve(size+8)` idiom, differing only in escape tables.
   - Fix: one `EscapeString(view, mode)`.
-  - Status: new
+  - Status: deferred
 
-- [ ] **P2 · XPR-06 — Diagnostic `warn` convenience missing**
+- [x] **P2 · XPR-06 — Diagnostic `warn` convenience missing**
   - Where: `EzCore/include/Diagnostics/DiagnosticCollector.h` has `error`/`trace` but no `warn`,
     forcing the hand-rolled `CodeGenerator::warn`
     (`EzDsl/CodeGenerators/include/CodeGenerators/CodeGenerator.h:105-115`).
   - Fix: add `DiagnosticCollector::warn` and use it.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P2 · XPR-07 — Sema pass driver duplication**
   - Where: nine passes under `EzDsl/Sema/src/SemaPasses/*` repeat trace/null-guard/`hasErrors`
     scaffolding with inconsistent sender names and messages (`TypePass` vs `Sema::Xxx`).
   - Fix: a shared pass driver/base; standardize the diagnostic sender.
-  - Status: new
+  - Status: deferred
 
 ## 2. Duplication that crosses project boundaries
 
@@ -75,58 +75,58 @@ All leads are unverified until checked. See `ReviewProcess.md`.
   - Fix: emit through `TargetDesc::getRelocationResolver()`.
   - Status: fixed
 
-- [ ] **P1 · XPR-09 — ELF/COFF section + writer logic spread across three projects**
+- [x] **P1 · XPR-09 — ELF/COFF section + writer logic spread across three projects**
   - Where: section creation in `EzCodeEmitter/src/Helpers.cpp:25,94,154-166`; descriptor wrappers
     in `EzTriple/src/Targets/X86_64/X86_64ElfBinaryDesc.cpp` / `X86_64CoffBinaryDesc.cpp`;
     writer feed loops in `EzCompiler/src/EmissionEngine.cpp:357-388`; duplicate `alignTo` in
     `Elf64Writer.cpp:118-123` and `CoffWriter.cpp:101-106`.
   - Why: near-identical COFF/ELF mapping and writer wiring in three places.
   - Fix: shared base descriptor + `IObjectWriter`.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · XPR-10 — x86 encoding vocabulary duplicated across Sema and CodeGenerators**
+- [x] **P1 · XPR-10 — x86 encoding vocabulary duplicated across Sema and CodeGenerators**
   - Where: `EzDsl/Sema/src/Sema/Encoding/X86_64EncodingDialect.cpp:37-67` vs
     `EzDsl/CodeGenerators/src/CodeGenerators/X86_64EncodingCodegenBackend.cpp:14-95`
   - Why: forms/fields must be kept in sync; a mismatch emits `EncForm::None` silently.
   - Fix: a single shared x86 vocabulary table. See `EzDslReview.md` DUP-06.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P2 · XPR-11 — CLI scaffold duplicated EzDsl/Cli vs EzCompiler**
   - Where: `EzDsl/Cli/src/Cli/CommandLineOptions.cpp` vs
     `EzCompiler/src/CommandLineOptions.cpp`; entry-point error handling differs
     (`EzDsl/Cli/src/Main.cpp:9-47` has try/catch + exit 2; `EzCompiler/src/Main.cpp` has none).
   - Fix: share the argparse scaffold; align exit codes.
-  - Status: new
+  - Status: in-progress
 
-- [ ] **P2 · XPR-12 — Frontend stub (`EzFrontend`) is outside the build but referenced**
+- [x] **P2 · XPR-12 — Frontend stub (`EzFrontend`) is outside the build but referenced**
   - Where: `EzFrontend/EzLexer/include/EzLexerCommon.h:21` includes a removed `<EzCore.h>`;
     `EzFrontend/EzLexer/src/Tokenizer/BasicTokenizer.cpp:74,344,420` calls a 4-arg
     `createReference` the current manager no longer exposes; `CMakeLists.txt:44-50` does not add
     `EzFrontend`.
   - Fix: decide to delete `EzFrontend` or bring it back in with a fixed API. See
     `EzCoreReview.md` LEG-07 / `EzCompilerReview.md` LEG-08.
-  - Status: new
+  - Status: fixed
 
 ## 3. Repo-wide hygiene checks
 
-- [ ] **P1 · XPR-13 — Orphaned target source-of-truth files**
+- [x] **P1 · XPR-13 — Orphaned target source-of-truth files**
   - Where: `EzTriple/targets/x86_64/x86_64_registers.reg`, `x86_64_target.tdesc`,
     `x86_64_types.tyf`, and `EzTriple/data/{SysV_AMD64,Win64,AAPCS64}.ezcc`
   - Why: none referenced by any CMake target; some point at the removed `TableGen` namespace.
   - Fix: reconnect to the build or delete. See `EzTripleReview.md` LEG-02/03/04.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P2 · XPR-14 — Stale comments/docs after the emitter + encoding refactors**
   - Where: e.g. `EzDsl/CodeGenerators/CppRegisterInfoGenerator.cpp:204` and
     `CppTargetDescGenerator.cpp:295` (`EzCodeEmitter::TableGen::`), `EzDsl/README.md`,
     `EzCompiler/EmissionEngine.h:37`.
   - Fix: sweep comments/docs against the current namespaces and APIs.
-  - Status: new
+  - Status: in-progress
 
 - [ ] **P2 · XPR-15 — Dead locals / build warnings sweep**
   - Where: `EzMir`/`EzTriple`/`EzCore` dead `bool modified`-style flags (see project files
     OPT items). Run a warning-clean build (`-Wall -Wextra`) and delete.
-  - Status: new
+  - Status: in-progress
 
 ## 4. Marker scan (baseline)
 
@@ -153,7 +153,9 @@ unless the change is explicitly intended to alter output.
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
 | XPR-08 | P0 | Duplication | fixed | — | branch patching duplicated |
-| XPR-01..04 | P1 | Duplication | new | — | registry/string/collect/PCH |
-| XPR-09..10 | P1 | Duplication | new | — | object format/vocabulary |
-| XPR-13 | P1 | Legacy | new | — | orphaned target files |
-| XPR-05..07, XPR-11..12, XPR-14..15 | P2 | mixed | new | — | polish/hygiene |
+| XPR-01..03 | P1 | Duplication | fixed | — | `NameRegistry`, `StringUtils`, `SymbolTable::collect` |
+| XPR-09..10 | P1 | Duplication | fixed | — | shared `BasicBinaryDesc`/`IObjectWriter`, x86-64 vocabulary table |
+| XPR-13 | P1 | Legacy | fixed | — | orphaned target source-of-truth files deleted |
+| XPR-06, XPR-12 | P2 | mixed | fixed | — | `DiagnosticCollector::warn`; out-of-build `EzFrontend` stub deleted |
+| XPR-04..05, XPR-07 | P2 | mixed | deferred | — | shared PCH, string escaper, sema pass driver |
+| XPR-11, XPR-14..15 | P2 | mixed | in-progress | — | exit codes aligned + exception handling; doc/dead-local sweep ongoing |

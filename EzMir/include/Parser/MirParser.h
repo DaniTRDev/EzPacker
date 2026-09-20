@@ -10,6 +10,7 @@
 
 class MirBuilderContext;
 class DiagnosticCollector;
+class GenericSourceManager;
 class MirFunction;
 class MirBlock;
 class MirInstruction;
@@ -36,25 +37,24 @@ struct MirParserOptions
 class MirParser
 {
   public:
+    /**
+     * Creates a parser attached to a builder context.
+     *
+     * When sourceManager is supplied it must outlive the produced MIR (for example the driver's
+     * session SourceManager), so that source references retained by instructions can still be
+     * resolved during later diagnostics. When it is null the parser owns a private manager that
+     * only lasts as long as the parser itself.
+     */
     explicit MirParser(MirBuilderContext *ctx,
                        DiagnosticCollector *diagCollector = nullptr,
-                       MirParserOptions options = {});
+                       MirParserOptions options = {},
+                       GenericSourceManager *sourceManager = nullptr);
 
     /**
      * Parses a complete MIR module from a source string buffer.
      * Populates ctx with functions, types, and global variables.
      */
     bool parseModule(std::string_view source, std::string_view bufferName = "input.mir");
-
-    /**
-     * Parses a single MIR function from a string buffer and attaches it to ctx.
-     */
-    MirFunction *parseFunction(std::string_view source);
-
-    /**
-     * Parses a single MIR instruction and inserts it at the current builder point in targetBlock.
-     */
-    MirInstruction *parseInstruction(std::string_view source, MirBlock *targetBlock);
 
   private:
     /**
@@ -116,9 +116,10 @@ class MirParser
     bool matchToken(Parser::MirLexer &lexer, Parser::MirTokenKind kind, std::string_view errorMsg);
 
   private:
-    MirBuilderContext *m_ctx{ nullptr };    // Context receiving constructed MIR entities.
-    DiagnosticCollector *m_diag{ nullptr }; // Collector for parser error diagnostics.
-    MirParserOptions m_options;             // Parser strictness/feature toggles.
+    MirBuilderContext *m_ctx{ nullptr };            // Context receiving constructed MIR entities.
+    DiagnosticCollector *m_diag{ nullptr };         // Collector for parser error diagnostics.
+    MirParserOptions m_options;                     // Parser strictness/feature toggles.
+    GenericSourceManager *m_sourceMgr{ nullptr };   // Caller-owned source manager, or nullptr.
 };
 
 } // namespace EzMir

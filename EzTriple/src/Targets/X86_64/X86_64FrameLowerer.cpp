@@ -52,12 +52,9 @@ void X86_64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
     MirRegister *fpReg = opBuilder.buildPhysReg(ptrType, fpRef.getId(), "rbp", fpRef.getClass());
     MirRegister *spReg = opBuilder.buildPhysReg(ptrType, spRef.getId(), "rsp", spRef.getClass());
 
-    auto *descPUSH64r = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::PUSH64r));
-    auto *descMOV64rr = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr));
-    auto *descSUB64ri = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::SUB64ri));
+    const auto *descPUSH64r = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::PUSH64r);
+    const auto *descMOV64rr = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr);
+    const auto *descSUB64ri = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::SUB64ri);
 
     auto &instrList = entryBlock->getInstructions();
     auto it = instrList.begin();
@@ -124,12 +121,9 @@ void X86_64FrameLowerer::insertEpilogue(FrameLowererCtx &ctx)
     MirRegister *fpReg = opBuilder.buildPhysReg(ptrType, fpRef.getId(), "rbp", fpRef.getClass());
     MirRegister *spReg = opBuilder.buildPhysReg(ptrType, spRef.getId(), "rsp", spRef.getClass());
 
-    auto *descPOP64r = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::POP64r));
-    auto *descMOV64rr = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr));
-    auto *descADD64ri = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::ADD64ri));
+    const auto *descPOP64r = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::POP64r);
+    const auto *descMOV64rr = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr);
+    const auto *descADD64ri = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::ADD64ri);
 
     const auto &usedCallees = func->getUsedCalleeSavedRegs();
 
@@ -216,8 +210,7 @@ bool X86_64FrameLowerer::lowerAlloc(FrameLowererCtx &ctx)
     MirOperandBuilder opBuilder(ctx.m_ctx);
     MirReference *slotRef = opBuilder.buildRef(stackObj, allocInst->getSourceRef());
 
-    auto *descLEA64r = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::LEA64r));
+    const auto *descLEA64r = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::LEA64r);
 
     allocInst->setOpcode(MirInstructionOpCode::TARGET_INST);
     allocInst->setTargetDesc(descLEA64r);
@@ -260,10 +253,8 @@ bool X86_64FrameLowerer::lowerDAlloc(FrameLowererCtx &ctx)
     MirRegisterRef spRef = cc->getStackPointerReg();
     MirRegister *spReg = opBuilder.buildPhysReg(ptrType, spRef.getId(), "rsp", spRef.getClass());
 
-    auto *descSUB64rr = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::SUB64rr));
-    auto *descMOV64rr = const_cast<MirTargetInstructionDesc *>(
-            EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr));
+    const auto *descSUB64rr = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::SUB64rr);
+    const auto *descMOV64rr = EzTriple::x86_64TargetInst::getTargetDesc(EzTriple::x86_64TargetInst::MOV64rr);
 
     MirInstructionBuilder ib(ctx.m_ctx, dallocInst, InsertionType::InsertBefore);
     // 1. subq %src, %rsp

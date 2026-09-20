@@ -23,45 +23,16 @@ MirOperandBuilder::MirOperandBuilder(MirBuilderContext *ctx) :
  */
 MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, SourceReference *ref)
 {
-    FlexFloat val = value;
-    MirType *destType = type;
-    size_t mirSize = type->getTotalSizeInBits(), valueSize = value.getBitSize();
-
-    if (type->getKind() != MirTypeKind::FloatingPoint)
-    {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                << ref << "Given float's MirType is not a floating point value: " << type->getName();
-        return nullptr;
-    }
-
-    if (mirSize > valueSize)
-    {
-        // Emit a warning and extend.
-        m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
-                << ref << "Extending float value to type: " << type->getName();
-        val.extend(mirSize);
-    }
-    else if (mirSize < valueSize)
-    {
-        destType = m_ctx->getTypeTable()->getFloatingTypeBySize(valueSize);
-        if (destType)
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
-                    << ref << "Promoting float type to type: " << destType->getName();
-        }
-        else
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref
-                    << "Given value's bit-width is BIGGER than internal type and there's no available type to be "
-                       "promoted "
-                       "to: "
-                    << type->getName();
-            return nullptr;
-        }
-    }
-
-    return build<MirFloat>(destType, std::move(val), ref);
+    return buildConstant<FlexFloat, MirFloat>(
+            type,
+            value,
+            ref,
+            MirTypeKind::FloatingPoint,
+            "Given float's MirType is not a floating point value: ",
+            "Extending float value to type: ",
+            "Promoting float type to type: ",
+            false,
+            [this](size_t valueSize) { return m_ctx->getTypeTable()->getFloatingTypeBySize(valueSize); });
 }
 
 /**
@@ -69,45 +40,53 @@ MirFloat *MirOperandBuilder::buildFloat(MirType *type, const FlexFloat &value, S
  */
 MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, SourceReference *ref)
 {
-    FlexInt val = value;
-    MirType *destType = type;
-    size_t mirSize = type->getTotalSizeInBits(), valueSize = value.getBitSize();
+    return buildConstant<FlexInt, MirInteger>(
+            type,
+            value,
+            ref,
+            MirTypeKind::Integer,
+            "Given int's MirType is not an integer: ",
+            "Z-Extending integer value to type: ",
+            "Promoting integer type to type: ",
+            false,
+            [this](size_t valueSize) { return m_ctx->getTypeTable()->getIntegerTypeBySize(valueSize); });
+}
 
-    if (type->getKind() != MirTypeKind::Integer)
+/**
+ * Validates the base and index registers of a memory operand, emitting an error and returning false
+ * when either has an illegal type for its role.
+ */
+bool MirOperandBuilder::validateMemoryRegisters(MirType *resultType,
+                                                MirRegister *base,
+                                                MirRegister *index,
+                                                SourceReference *ref)
+{
+    if (base)
     {
-        m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                << ref << "Given int's MirType is not an integer: " << type->getName();
-        return nullptr;
-    }
-
-    if (mirSize > valueSize)
-    {
-        // Emit a warning and extend.
-        m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
-                << ref << "Z-Extending integer value to type: " << type->getName();
-        val.extend(mirSize, false);
-    }
-    else if (mirSize < valueSize)
-    {
-        destType = m_ctx->getTypeTable()->getIntegerTypeBySize(valueSize);
-        if (destType)
+        MirType *baseType = base->getMirType();
+        if (!baseType || baseType->getKind() != MirTypeKind::Pointer)
         {
-            m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
-                    << ref << "Promoting integer type to type: " << destType->getName();
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
+                    << resultType->getName();
+            return false;
         }
-        else
+    }
+
+    if (index)
+    {
+        MirType *indexType = index->getMirType();
+        if (!indexType || (indexType->getKind() != MirTypeKind::Integer && indexType->getKind() != MirTypeKind::Pointer))
         {
             m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
                     << ref
-                    << "Given value's bit-width is BIGGER than internal type and there's no available type to be "
-                       "promoted "
-                       "to: "
-                    << type->getName();
-            return nullptr;
+                    << "Can't create a memory operand if the index register doesn't have integer or pointer type "
+                    << resultType->getName();
+            return false;
         }
     }
 
-    return build<MirInteger>(destType, std::move(val), ref);
+    return true;
 }
 
 /**
@@ -115,16 +94,9 @@ MirInteger *MirOperandBuilder::buildInt(MirType *type, const FlexInt &value, Sou
  */
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInteger *displ, SourceReference *ref)
 {
-    if (base)
+    if (!validateMemoryRegisters(type, base, nullptr, ref))
     {
-        MirType *baseType = base->getMirType();
-        if (baseType->getKind() != MirTypeKind::Pointer)
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
-                    << type->getName();
-            return nullptr;
-        }
+        return nullptr;
     }
 
     return build<MirMemory>(type, base, displ, nullptr, 1, ref);
@@ -136,16 +108,9 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, MirInte
  */
 MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const FlexInt &displ, SourceReference *ref)
 {
-    if (base)
+    if (!validateMemoryRegisters(type, base, nullptr, ref))
     {
-        MirType *baseType = base->getMirType();
-        if (baseType->getKind() != MirTypeKind::Pointer)
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
-                    << type->getName();
-            return nullptr;
-        }
+        return nullptr;
     }
 
     MirTypeTable *t = m_ctx->getTypeTable();
@@ -158,28 +123,9 @@ MirMemory *MirOperandBuilder::buildMem(MirType *type, MirRegister *base, const F
 MirMemory *MirOperandBuilder::buildMem(
         MirType *type, MirRegister *base, MirInteger *displ, MirRegister *index, uint8_t scale, SourceReference *ref)
 {
-    if (base)
+    if (!validateMemoryRegisters(type, base, index, ref))
     {
-        MirType *baseType = base->getMirType();
-        if (baseType->getKind() != MirTypeKind::Pointer)
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
-                    << type->getName();
-            return nullptr;
-        }
-    }
-    if (index)
-    {
-        MirType *indexType = index->getMirType();
-        if (indexType->getKind() != MirTypeKind::Integer && indexType->getKind() != MirTypeKind::Pointer)
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref
-                    << "Can't create a memory operand if the index register doesn't have integer or pointer type "
-                    << type->getName();
-            return nullptr;
-        }
+        return nullptr;
     }
 
     return build<MirMemory>(type, base, displ, index, scale, ref);
@@ -192,28 +138,9 @@ MirMemory *MirOperandBuilder::buildMem(
 MirMemory *MirOperandBuilder::buildMem(
         MirType *type, MirRegister *base, const FlexInt &displ, MirRegister *index, uint8_t scale, SourceReference *ref)
 {
-    if (base)
+    if (!validateMemoryRegisters(type, base, index, ref))
     {
-        MirType *baseType = base->getMirType();
-        if (baseType->getKind() != MirTypeKind::Pointer)
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref << "Can't create a memory operand if the base register doesn't have pointer type "
-                    << type->getName();
-            return nullptr;
-        }
-    }
-    if (index)
-    {
-        MirType *indexType = index->getMirType();
-        if (indexType->getKind() != MirTypeKind::Integer && indexType->getKind() != MirTypeKind::Pointer)
-        {
-            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
-                    << ref
-                    << "Can't create a memory operand if the index register doesn't have integer or pointer type "
-                    << type->getName();
-            return nullptr;
-        }
+        return nullptr;
     }
 
     MirTypeTable *t = m_ctx->getTypeTable();

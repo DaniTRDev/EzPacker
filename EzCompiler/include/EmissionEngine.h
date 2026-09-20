@@ -4,9 +4,6 @@
 #include "EzCompilerCommon.h"
 
 class MirBuilderContext;
-class MirFunction;
-class CodeEmitterContext;
-class GenericCodeEmitter;
 
 namespace EzCompiler
 {
@@ -29,12 +26,6 @@ class EmissionEngine
      * Serializes all lowered functions in mirCtx and writes the final binary object file to outputPath.
      */
     bool emitModule(MirBuilderContext &mirCtx, std::string_view outputPath);
-
-  private:
-    /**
-     * Emits one function's blocks and instructions through the given emitter, binding labels per block.
-     */
-    bool emitFunction(MirFunction *func, GenericCodeEmitter &emitter, ::CodeEmitterContext &emitterCtx);
 
   private:
     DriverContext &m_ctx; ///< Driver context supplying diagnostics, target descriptors and allocators.

@@ -56,9 +56,8 @@ Target specifications are decoupled into CPU-level architecture and OS-level bin
   - Provides lists of available register banks (`MirRegisterBank`) and calling conventions (`CallingConvDesc`).
 - **`TargetBinaryDesc`**: OS/ABI-level binary container descriptor.
   - Encapsulates target object file format: `TargetObjectFormat` (`ELF`, `COFF`, `MachO`).
-  - Code model configuration: `TargetCodeModel` (`Small`, `Large`).
   - Position-independence settings (`PIC`/`PIE`) and endianness (`isLittleEndian()`).
-  - Alignment rules for functions (`getFunctionAlignment()`) and loops (`getLoopAlignment()`).
+  - Alignment rule for functions (`getFunctionAlignment()`, honored during `.text` emission).
   - Pre-allocated section map (`getSections()`) mapping `SectionType` to concrete `CodeSection` instances.
 
 ---
@@ -134,7 +133,7 @@ The ABI Lowering subsystem transforms abstract parameter/return operations into 
 
 The Frame Lowering subsystem performs Prologue/Epilogue Insertion (PEI) and resolves abstract stack layout offsets:
 
-- **`FrameLowererCtx`**: Encapsulates function, builder context, target descriptor, and PMR allocator.
+- **`FrameLowererCtx`**: Encapsulates the function, builder context, and target descriptor.
 - **`MirFrameLowerer`**:
   - `calculateFrameLayout()`: Computes total stack frame size, aligning to ABI stack boundaries (e.g. 16-byte alignment), reserving callee-saved register save areas and ABI shadow spaces (e.g. 32-byte Windows x64 shadow store).
   - `insertPrologue()`: Emits target instructions setting up stack and frame pointers (e.g. `push rbp`, `mov rbp, rsp`, `sub rsp, frameSize`) and saving callee-saved registers.

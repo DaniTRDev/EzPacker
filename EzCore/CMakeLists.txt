@@ -1,6 +1,8 @@
 set(EZCORE_FILES_LIST
         "include/EzCoreCommon.h"
         "include/StringUtils.h"
+        "include/NameRegistry.h"
+        "include/LibBFWrapper.h"
         "include/Diagnostics/DiagnosticBuilder.h"
         "include/Diagnostics/DiagnosticCollector.h"
         "include/Diagnostics/DiagnosticListener.h"
@@ -61,5 +63,12 @@ if (EZPACKER_BUILD_TESTS)
             "EzCore"
             "gtest;GTest::gtest_main"
             "tests/T_SourceManager.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_FlexNumber"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_FlexNumber.cpp"
     )
 endif ()

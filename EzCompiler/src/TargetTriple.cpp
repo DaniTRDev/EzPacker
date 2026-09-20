@@ -97,28 +97,28 @@ TargetTriple TargetTriple::getHostTriple()
 
 std::string TargetTriple::toString() const { return std::format("{}-{}-{}-{}", m_arch, m_vendor, m_sys, m_abi); }
 
-bool TargetTriple::isX86_64() const { return m_arch == "x86_64" || m_arch == "amd64" || m_arch == "x64"; }
+bool TargetTriple::isX86_64() const noexcept { return m_arch == "x86_64" || m_arch == "amd64" || m_arch == "x64"; }
 
-bool TargetTriple::isWindows() const
+bool TargetTriple::isWindows() const noexcept
 {
     return m_sys == "windows" || m_sys == "win32" || m_abi == "msvc" || m_abi == "coff";
 }
 
-bool TargetTriple::isLinux() const { return m_sys == "linux"; }
+bool TargetTriple::isLinux() const noexcept { return m_sys == "linux"; }
 
-bool TargetTriple::isElf() const
+bool TargetTriple::isElf() const noexcept
 {
     // Fall back to ELF for any target that is neither Windows nor explicitly Mach-O.
     return m_abi == "elf" || m_abi == "gnu" || m_sys == "linux" || (!isWindows() && m_abi != "macho");
 }
 
-bool TargetTriple::isCoff() const { return isWindows(); }
+bool TargetTriple::isCoff() const noexcept { return isWindows(); }
 
-bool TargetTriple::operator==(const TargetTriple &other) const
+bool TargetTriple::operator==(const TargetTriple &other) const noexcept
 {
     return m_arch == other.m_arch && m_vendor == other.m_vendor && m_sys == other.m_sys && m_abi == other.m_abi;
 }
 
-bool TargetTriple::operator!=(const TargetTriple &other) const { return !(*this == other); }
+bool TargetTriple::operator!=(const TargetTriple &other) const noexcept { return !(*this == other); }
 
 } // namespace EzCompiler

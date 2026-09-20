@@ -11,41 +11,18 @@
 #include "FlexNumber/FlexInt.h"
 #include "Block/MirBlock.h"
 #include "Function/MirFunction.h"
+#include "Function/MirFunctionRegisterInfo.h"
 #include <map>
 
 namespace EzTriple
 {
 
 /**
- * Forwards the target descriptor to the generated base selector and caches it for findClass().
+ * Forwards the target descriptor to the generated base selector and caches it for class lookups.
  */
 X86_64TargetInstructionSelector::X86_64TargetInstructionSelector(TargetDesc *targetDesc) :
     x86_64InstructionSelector(targetDesc), m_targetDesc(targetDesc)
 {
-}
-
-/**
- * Searches every register bank of the target for a class with the given declarative name.
- * @return The matching class, or nullptr when the target has no such class.
- */
-MirRegisterClass *X86_64TargetInstructionSelector::findClass(std::string_view name)
-{
-    if (!m_targetDesc)
-    {
-        return nullptr;
-    }
-    for (auto *bank : m_targetDesc->getAvailableRegisterBanks())
-    {
-        if (!bank)
-        {
-            continue;
-        }
-        if (auto *rc = bank->getClass(name))
-        {
-            return rc;
-        }
-    }
-    return nullptr;
 }
 
 /**
@@ -119,7 +96,7 @@ bool X86_64TargetInstructionSelector::selectJMP(MirBuilderContext *ctx, MirInstr
     }
 
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JMP)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JMP),
                    inst->getSourceRef(),
                    { inst->getOperand(0) });
     inst->eraseFromOwner();
@@ -155,18 +132,18 @@ bool X86_64TargetInstructionSelector::selectBR_COND(MirBuilderContext *ctx, MirI
     auto *zeroImm = ob.buildInt(ctx->getTypeTable()->i32(), FlexInt(static_cast<int32_t>(0)));
 
     // Emit: CMP32ri %cond, 0
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::CMP32ri)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::CMP32ri),
                    inst->getSourceRef(),
                    { cond, zeroImm });
     ib.changeInsertionType(InsertionType::InsertAfter);
 
     // Emit: JNE %trueBlock
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JNE)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JNE),
                    inst->getSourceRef(),
                    { trueBlock });
 
     // Emit: JMP %falseBlock
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JMP)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JMP),
                    inst->getSourceRef(),
                    { falseBlock });
 
@@ -209,7 +186,7 @@ bool X86_64TargetInstructionSelector::selectCALL(MirBuilderContext *ctx, MirInst
         }
     }
 
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::CALL)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::CALL),
                    inst->getSourceRef(),
                    { callee });
     inst->eraseFromOwner();
@@ -254,7 +231,7 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
         }
     }
     auto *zeroImm = ob.buildInt(ctx->getTypeTable()->i32(), FlexInt(static_cast<int32_t>(0)));
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV32ri)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV32ri),
                    inst->getSourceRef(),
                    { dst, zeroImm });
     ib.changeInsertionType(InsertionType::InsertAfter);
@@ -263,7 +240,7 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
     if (rhs->getType() == MirOperandType::Integer)
     {
         auto cmpOp = is64 ? x86_64TargetInst::CMP64ri : x86_64TargetInst::CMP32ri;
-        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(cmpOp)),
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(cmpOp),
                        inst->getSourceRef(),
                        { lhs, rhs });
     }
@@ -277,7 +254,7 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
             }
         }
         auto cmpOp = is64 ? x86_64TargetInst::CMP64rr : x86_64TargetInst::CMP32rr;
-        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(cmpOp)),
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(cmpOp),
                        inst->getSourceRef(),
                        { lhs, rhs });
     }
@@ -324,7 +301,7 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
             return false;
     }
 
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(setccOp)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(setccOp),
                    inst->getSourceRef(),
                    { dst });
 
@@ -416,7 +393,7 @@ bool X86_64TargetInstructionSelector::selectLOAD(MirBuilderContext *ctx, MirInst
         }
     }
 
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(loadOp)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(loadOp),
                    inst->getSourceRef(),
                    { dst, memOp });
     inst->eraseFromOwner();
@@ -507,7 +484,7 @@ bool X86_64TargetInstructionSelector::selectSTORE(MirBuilderContext *ctx, MirIns
         }
     }
 
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(storeOp)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(storeOp),
                    inst->getSourceRef(),
                    { memOp, val });
     inst->eraseFromOwner();
@@ -541,29 +518,37 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
         return true;
     }
 
-    // Check if dst is actually used anywhere in the function
+    // Check if dst is actually used anywhere in the function. The SSA register tracker already
+    // holds the use list, avoiding a full instruction scan per PHI.
     bool isUsed = false;
-    for (MirBlock *b : func->getBlocks())
+    if (MirFunctionRegisterInfo *regInfo = func->getRegisterInfo())
     {
-        if (!b)
-            continue;
-        for (MirInstruction *i : b->getInstructions())
+        isUsed = regInfo->getUseCount(dst->getRegId()) > 0;
+    }
+    else
+    {
+        for (MirBlock *b : func->getBlocks())
         {
-            if (i == inst)
+            if (!b)
                 continue;
-            for (MirOperand *op : i->getOperands())
+            for (MirInstruction *i : b->getInstructions())
             {
-                if (op && op->isOfType<MirRegister>() && op->get<MirRegister>()->getRegId() == dst->getRegId())
+                if (i == inst)
+                    continue;
+                for (MirOperand *op : i->getOperands())
                 {
-                    isUsed = true;
-                    break;
+                    if (op && op->isOfType<MirRegister>() && op->get<MirRegister>()->getRegId() == dst->getRegId())
+                    {
+                        isUsed = true;
+                        break;
+                    }
                 }
+                if (isUsed)
+                    break;
             }
             if (isUsed)
                 break;
         }
-        if (isUsed)
-            break;
     }
 
     if (!isUsed)
@@ -698,7 +683,7 @@ bool X86_64TargetInstructionSelector::selectFloatALU(MirBuilderContext *ctx, Mir
     }
 
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
-    ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
                    inst->getSourceRef(),
                    { dst, lhs, rhs });
     inst->eraseFromOwner();
@@ -738,7 +723,7 @@ bool X86_64TargetInstructionSelector::selectFloatCvt(MirBuilderContext *ctx, Mir
         }
 
         auto op = isDstDouble ? x86_64TargetInst::CVTSI2SD : x86_64TargetInst::CVTSI2SS;
-        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
                        inst->getSourceRef(),
                        { dst, src });
     }
@@ -759,7 +744,7 @@ bool X86_64TargetInstructionSelector::selectFloatCvt(MirBuilderContext *ctx, Mir
         }
 
         auto op = isSrcDouble ? x86_64TargetInst::CVTTSD2SI : x86_64TargetInst::CVTTSS2SI;
-        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
                        inst->getSourceRef(),
                        { dst, src });
     }
@@ -800,7 +785,7 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
                     r->setClass(findClass("GPR64"));
             }
             ib.buildTarget(
-                    const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(x86_64TargetInst::LEA64r)),
+                    x86_64TargetInst::getTargetDesc(x86_64TargetInst::LEA64r),
                     inst->getSourceRef(),
                     { dst, src });
             inst->eraseFromOwner();
@@ -826,7 +811,7 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
         }
 
         auto op = isDouble ? x86_64TargetInst::MOVSDrr : x86_64TargetInst::MOVSSrr;
-        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
                        inst->getSourceRef(),
                        { dst, src });
         inst->eraseFromOwner();
@@ -850,7 +835,7 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
                 r->setClass(findClass(gprClass));
         }
         auto op = (sizeInBits == 64) ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
-        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
                        inst->getSourceRef(),
                        { dst, src });
         inst->eraseFromOwner();
@@ -859,7 +844,7 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
     else if (src->getType() == MirOperandType::Integer)
     {
         auto op = (sizeInBits == 64) ? x86_64TargetInst::MOV64ri : x86_64TargetInst::MOV32ri;
-        ib.buildTarget(const_cast<MirTargetInstructionDesc *>(x86_64TargetInst::getTargetDesc(op)),
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
                        inst->getSourceRef(),
                        { dst, src });
         inst->eraseFromOwner();

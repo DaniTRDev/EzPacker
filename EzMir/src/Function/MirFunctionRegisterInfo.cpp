@@ -93,13 +93,13 @@ void MirFunctionRegisterInfo::removeUse(MirId regId, const class MirInstruction 
 void MirFunctionRegisterInfo::reset() { m_vregs.clear(); }
 
 /**
- * Returns a copy of the register's use list, or nullopt when the register is unknown.
+ * Returns a pointer to the register's use list, or nullptr when the register is unknown.
  */
-std::optional<const std::pmr::vector<MirVRegUse>> MirFunctionRegisterInfo::getUses(MirId regId) const
+const std::pmr::vector<MirVRegUse> *MirFunctionRegisterInfo::getUses(MirId regId) const
 {
     auto it = m_vregs.find(regId);
     if (it == m_vregs.end())
-        return std::nullopt;
+        return nullptr;
 
-    return it->second.m_uses;
+    return &it->second.m_uses;
 }

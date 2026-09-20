@@ -30,8 +30,6 @@ class MirType
   public:
     /**
      * Constructs a MIR type descriptor.
-     * Trivial types can be trivially copied or moved without special destructor actions,
-     * whereas non-trivial types require structured destruction sequences.
      */
     MirType(MirTypeKind kind,
             class MirTypeTable *owner,
@@ -40,13 +38,7 @@ class MirType
             size_t totalSizeInBits,
             std::pmr::string name,
             std::pmr::vector<MirType *> subTypes,
-            uint8_t compactId,
-            bool isTrivial = true);
-
-    /**
-     * Returns true if this is a trivial type.
-     */
-    bool isTrivial() const;
+            uint8_t compactId);
 
     /**
      * Returns true if the type has zero required byte alignment.
@@ -74,11 +66,6 @@ class MirType
     class MirTypeTable *getOwner() const;
 
     /**
-     * Calculates the number of elements in an array type based on total size and element size, or 0 if not an array.
-     */
-    size_t getArrayElementCount() const;
-
-    /**
      * Returns the unique MIR identifier of this type descriptor.
      */
     size_t getId() const;
@@ -104,11 +91,6 @@ class MirType
     uint8_t getCompactId() const;
 
     /**
-     * Marks this type as non-trivial, indicating custom destruction semantics are required.
-     */
-    void setNonTrivial();
-
-    /**
      * Returns the human-readable diagnostic name associated with this type.
      * Identity is determined by getId() rather than name.
      */
@@ -120,11 +102,6 @@ class MirType
     const std::pmr::vector<MirType *> &getSubTypes() const;
 
   private:
-    /**
-     * Indicates whether the type requires special cleanup/destruction logic.
-     */
-    bool m_isTrivial;
-
     /**
      * High-level classification of the type.
      */

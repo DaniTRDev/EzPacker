@@ -151,11 +151,6 @@ class MirFunction
     bool appendBlock(MirBlock *block);
 
     /**
-     * Records a callee-saved register consumed by this function requiring prologue preservation.
-     */
-    void addCalleeSavedRegUse(const class MirRegisterRef &reg);
-
-    /**
      * Updates the entry basic block pointer without inserting it into the block list.
      */
     void setEntryPoint(MirBlock *entryPoint);

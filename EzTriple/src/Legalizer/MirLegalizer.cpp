@@ -125,43 +125,6 @@ bool MirLegalizer::legalizeBlock(MirBlock *block)
 }
 
 /**
- * Legalizes exactly one instruction at the given iterator without a worklist.
- * Returns NotModified when it is already legal, and Failed when unsupported.
- */
-LegalizationResult MirLegalizer::legalizeInstruction(IntrusiveLinkedList<MirInstruction>::iterator it, MirBlock *block)
-{
-    if (!m_ctx)
-        return LegalizationResult::Failed;
-
-    MirInstruction *inst = *it;
-    if (!inst || inst->isErased())
-        return LegalizationResult::NotModified;
-
-    LegalityQuery query = buildQuery(inst);
-
-    LegalityResponse response;
-    if (m_targetDesc && m_targetDesc->getLegalizerInfo())
-    {
-        response = m_targetDesc->getLegalizerInfo()->query(query);
-    }
-
-    if (response.isLegal())
-    {
-        return LegalizationResult::NotModified;
-    }
-
-    if (response.isUnsupported())
-    {
-        m_ctx->getDiagCollector()->error("MirLegalizer", "Unsupported instruction '{}'", inst->getOpCodeName())
-                << inst->getSourceRef();
-        return LegalizationResult::Failed;
-    }
-
-    LegalizeCtx ctx(m_ctx, m_targetDesc, it);
-    return executeAction(response, ctx, inst);
-}
-
-/**
  * Fills a LegalityQuery from an instruction's opcode, flags, operand types, compact ids and
  * operand kinds (register/immediate/memory/...), recording the first immediate encountered.
  */

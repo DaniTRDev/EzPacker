@@ -3,6 +3,7 @@
 
 #include "EzCodeEmitterCommon.h"
 #include "CodeSection.h"
+#include "ObjectFormat/IObjectWriter.h"
 #include "ObjectFormat/ObjectSymbol.h"
 #include <vector>
 
@@ -16,30 +17,31 @@ namespace EzCodeEmitter::ObjectFormat
  * containing valid IMAGE_FILE_HEADER, IMAGE_SECTION_HEADERs, relocation tables,
  * COFF symbol table, and string table.
  */
-class CoffWriter
+class CoffWriter : public IObjectWriter
 {
   public:
     CoffWriter() = default;
+    ~CoffWriter() override = default;
 
     /**
      * Adds an exported or internal symbol.
      */
-    void addSymbol(const ObjectSymbol &sym);
+    void addSymbol(const ObjectSymbol &sym) override;
 
     /**
      * Adds a relocation entry.
      */
-    void addRelocation(const ObjectRelocEntry &reloc);
+    void addRelocation(const ObjectRelocEntry &reloc) override;
 
     /**
      * Generates a relocatable PE/COFF object file byte stream from the provided code sections.
      */
-    std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections);
+    std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections) override;
 
     /**
      * Clears all registered symbols and relocations.
      */
-    void clear();
+    void clear() override;
 
   private:
     std::vector<ObjectSymbol> m_symbols;    ///< Symbols to materialize in the COFF symbol table.

@@ -49,9 +49,14 @@ class DiagnosticMessage
     void addNote(const DiagnosticNote &note);
 
     /**
+     * Appends an additional DiagnosticNote to this message by moving it into the note list.
+     */
+    void addNote(DiagnosticNote &&note);
+
+    /**
      * Appends string text to the primary diagnostic description buffer.
      */
-    void addMainMsg(const std::string_view &str);
+    void addMainMsg(std::string_view str);
 
     /**
      * Sets the primary source span reference for this diagnostic.
@@ -61,7 +66,7 @@ class DiagnosticMessage
     /**
      * Sets the identifier name of the compiler component emitting this message.
      */
-    void setSender(const std::string_view &sender);
+    void setSender(std::string_view sender);
 
     /**
      * Sets the diagnostic severity type.

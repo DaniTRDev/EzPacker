@@ -84,3 +84,31 @@ TEST_F(CppTargetInstructionGeneratorTest, TestTargetInstructionTableGeneration)
     EXPECT_NE(sourceContent.find("void initializeTargetInstructionTable(::TargetDesc *target)"), std::string::npos);
     EXPECT_NE(sourceContent.find("setOperandClass"), std::string::npos);
 }
+
+// WEI-02: an alias target name containing a separator must still yield compilable identifiers.
+TEST_F(CppTargetInstructionGeneratorTest, TestDashedTargetNameIsSanitized)
+{
+    std::string idfSource = R"(
+        target AMD64;
+
+        target_inst ADD32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+            MNEMONIC("addl");
+        };
+    )";
+
+    ASSERT_TRUE(parseAndRunPass(idfSource));
+
+    CppTargetInstructionGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "x86-64");
+    ASSERT_TRUE(generator.run());
+
+    // 'x86-64' must be rewritten to 'x86_64' in the file names and emitted identifiers.
+    auto headerPath = m_testTempDir / "x86_64TargetInstructionTable.h";
+    auto sourcePath = m_testTempDir / "x86_64TargetInstructionTable.cpp";
+    ASSERT_TRUE(std::filesystem::exists(headerPath));
+    ASSERT_TRUE(std::filesystem::exists(sourcePath));
+
+    std::string headerContent = readFileContent(headerPath);
+    EXPECT_NE(headerContent.find("EZTRIPLE_X86_64_TARGET_INSTRUCTION_TABLE_H"), std::string::npos);
+    EXPECT_NE(headerContent.find("namespace EzTriple::x86_64TargetInst"), std::string::npos);
+    EXPECT_EQ(headerContent.find("x86-64"), std::string::npos);
+}

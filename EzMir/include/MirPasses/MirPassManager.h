@@ -30,9 +30,10 @@ class MirPassManager
     PassType *addPass(Args &&...args)
     {
         auto passId = std::type_index(typeid(PassType));
-        m_passesBlueprint[passId] = std::make_unique<PassType>(std::forward<Args>(args)...);
+        auto &slot = m_passesBlueprint[passId];
+        slot = std::make_unique<PassType>(std::forward<Args>(args)...);
 
-        return static_cast<PassType *>(m_passesBlueprint[passId].get());
+        return static_cast<PassType *>(slot.get());
     }
 
     /**
@@ -49,9 +50,9 @@ class MirPassManager
     {
         std::type_index passId = std::type_index(typeid(AnalysisPass));
 
-        if (m_validAnalyses.contains(passId))
+        if (auto it = m_validAnalyses.find(passId); it != m_validAnalyses.end())
         {
-            return static_cast<AnalysisPass *>(m_validAnalyses[passId]);
+            return static_cast<AnalysisPass *>(it->second);
         }
 
         MirPass *executedPass = runAnalysisById(passId, ctx);

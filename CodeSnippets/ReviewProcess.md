@@ -108,18 +108,29 @@ Branch `InstructionSelUpgrade`. Each project file marks implemented leads as `fi
 
 | Tier | Findings | Status |
 | --- | --- | --- |
-| P0 | EzCore WEI-01/02/03; EzMir WEI-01/02; EzTriple WEI-01/02; EzCompiler DUP-01, WEI-01; XPR-08 | fixed |
-| P1 | EzCore LEG-01..06, WEI-04..08, DUP-06 | fixed |
-| P1 | EzCore OPT-01, OPT-04 | in-progress |
-| P1 | EzMir WEI-03 | fixed |
+| P0 | All P0 across EzCore, EzMir, EzTriple, EzCompiler and XPR-08 | fixed |
+| P1 | EzCore DUP-01..05, OPT-01..02; EzMir DUP-01..06, LEG-01..09, WEI-04..08, OPT-01..06; EzTriple DUP-01/03..08, LEG-01..09, WEI-03..05, OPT-01..06; EzDsl DUP-01..02/04..06, LEG-01..02/05..07, WEI-01..05, OPT-01/03; EzCompiler DUP-02..05, LEG-01..08, WEI-02..07, OPT-01..03; XPR-01..03, XPR-09..10, XPR-13 | fixed |
+| P1 | EzTriple DUP-02 (ABI lowering merge) | deferred |
+| P2 | Shared helpers (XPR-06, DUP/LEG/WEI/OPT across all projects) | largely fixed; deferred items remain in each tracker |
 
 Notes:
 
-- New regression tests: `T_DenseBitSet` (WEI-02), `T_SourceManager` (WEI-05/07), a two-function
-  liveness case (EzMir WEI-01), and an object-writer alignment case (EzCompiler WEI-01).
-- The branch-patching refactor (DUP-01/XPR-08) was verified to keep the sample object output
-  byte-identical before and after.
-- Verified with `cmake --build` and `ctest` on 63 tests. Note: the EzDsl code-generation suites
-  share output paths and can race under `ctest -j`; run them serially (`-j1`) for a clean result.
-- Remaining P1/P2 findings across EzMir, EzTriple, EzDsl, EzCompiler and CrossProject are tracked
-  in their respective project files.
+- Baseline before this batch: 63 tests; after: **64 tests**, all green (`ctest -j1`). New suites:
+  `T_FlexNumber` (EzCore), the dashed-target sanitization case (EzDsl), plus extra cases for the
+  command-line parser, relocation resolver, object writers, code emitter and end-to-end frontend.
+- New shared infrastructure to keep the surface extensible: `EzCore/StringUtils.h`
+  (`SanitizeCppIdentifier`, `NormalizeKey`, `IsCppIdentifierChar`), `EzCore/NameRegistry.h`
+  (case-insensitive alias registry) and `EzDsl`'s `SymbolTable::collect<T>`. Four
+  `sanitizeIdentifier` copies and five `ToUpper` copies were deleted.
+- Emitter paths were re-verified byte-identical: the generated x86-64 encoding table hashes the
+  same before/after, and ELF/COFF objects for the sample MIR are unchanged (except intentional
+  `.text` alignment via `getFunctionAlignment()`).
+- Windows build fix: `X86_64InstructionSelector.h` now includes the generated
+  `x86_64InstructionSelector.h` with angle brackets, avoiding a case-insensitive filesystem
+  collision with itself.
+- Known pre-existing issue (not introduced here): `std::hash<MirRegisterRef>` mixes in a
+  `MirRegisterClass*` for physical registers, so register-allocation order/object bytes can vary
+  with ASLR. Suggested follow-up: a pointer-independent hash.
+- Deferred P1/P2 findings and their rationale are recorded per project. The largest are the
+  `MirAbiLowerer` 4-way switch merge (EzTriple DUP-02), the shared generator/driver scaffolds
+  (EzDsl DUP-03/07/08), and the shared PCH/escaper/pass driver (XPR-04/05/07).

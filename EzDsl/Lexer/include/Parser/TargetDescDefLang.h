@@ -279,7 +279,8 @@ struct BodyList
 struct TargetDescFileParser
 {
     static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = Common::Keyword<"target">::rule >> (dsl::p<Common::Identifier> + dsl::p<BodyList>);
+    static constexpr auto rule =
+            dsl::terminator(dsl::eof)(Common::Keyword<"target">::rule >> (dsl::p<Common::Identifier> + dsl::p<BodyList>));
     static constexpr auto value = lexy::callback<TargetDescFile>(
             [](Ast::Common::Identifier name, std::pmr::vector<TargetDescItem> items)
             {

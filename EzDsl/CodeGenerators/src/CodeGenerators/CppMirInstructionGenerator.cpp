@@ -174,20 +174,12 @@ CppMirInstructionGenerator::CppMirInstructionGenerator(DiagnosticCollector *coll
 // Collects every IR instruction symbol recorded by Sema, preserving symbol-table order.
 std::vector<const Symbol *> CppMirInstructionGenerator::collectInstructionSymbols() const
 {
-    std::vector<const Symbol *> instSymbols;
     if (!m_table)
     {
-        return instSymbols;
+        return {};
     }
 
-    for (const Symbol *sym : m_table->getSymbols())
-    {
-        if (sym && sym->getType() == SymbolType::IrInstruction)
-        {
-            instSymbols.push_back(sym);
-        }
-    }
-    return instSymbols;
+    return m_table->collect<Symbols::IrInstructionSymbol>(SymbolType::IrInstruction);
 }
 
 // Serializes the parsed IR instructions into the X-macro form consumed by EzMir.

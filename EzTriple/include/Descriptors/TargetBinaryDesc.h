@@ -7,15 +7,6 @@
 enum class SectionType : uint8_t;
 
 /**
- * Code model controlling symbol address reachability and encoding size.
- */
-enum class TargetCodeModel : uint8_t
-{
-    Small = 0, // Global addresses can be encoded in instruction pointer + small integer immediate.
-    Large      // The entire address must be encoded in the instruction.
-};
-
-/**
  * Binary object container format targeting the host operating system.
  */
 enum class TargetObjectFormat : uint8_t
@@ -60,11 +51,6 @@ class TargetBinaryDesc
     virtual class CodeSection *getSection(SectionType type) = 0;
 
     /**
-     * Returns the code model for this binary description.
-     */
-    virtual TargetCodeModel getCodeModel() const = 0;
-
-    /**
      * Returns the object format this ABI expects.
      */
     virtual TargetObjectFormat getObjectFormat() const = 0;
@@ -77,11 +63,6 @@ class TargetBinaryDesc
      * PADDING (NOPS, INT3, ...).
      */
     virtual size_t getFunctionAlignment() const = 0;
-
-    /**
-     * Same as getFunctionAlignment but for loops.
-     */
-    virtual size_t getLoopAlignment() const = 0;
 
     /**
      * Initializes the binary descriptor and creates the needed structures.

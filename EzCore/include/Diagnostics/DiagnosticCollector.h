@@ -28,14 +28,14 @@ class DiagnosticCollector
     /**
      * Returns a diagnostic builder with the main diagnostic information.
      */
-    DiagnosticBuilder builder(DiagnosticMessageType type, const std::string_view &sender);
+    DiagnosticBuilder builder(DiagnosticMessageType type, std::string_view sender);
 
     /**
      * Creates an error diagnostic builder with a predefined format message and sender. If error diag is not enabled,
      * this function will return an empty builder.
      */
     template <typename... Args>
-    DiagnosticBuilder error(const std::string_view &sender, std::format_string<Args...> fmt, Args &&...args)
+    DiagnosticBuilder error(std::string_view sender, std::format_string<Args...> fmt, Args &&...args)
     {
         return buildAndAppend(Diag_Error, sender, fmt, std::forward<Args>(args)...);
     }
@@ -44,13 +44,13 @@ class DiagnosticCollector
      * Creates an error diagnostic builder with a predefined message and sender. If error diag is not enabled, this
      * function returns an empty builder.
      */
-    DiagnosticBuilder error(const std::string_view &sender, const std::string_view &message);
+    DiagnosticBuilder error(std::string_view sender, std::string_view message);
     /**
      * Creates an error diagnostic builder with a predefined format message and sender. If trace diag is not enabled,
      * this function will return an empty builder.
      */
     template <typename... Args>
-    DiagnosticBuilder trace(const std::string_view &sender, std::format_string<Args...> fmt, Args &&...args)
+    DiagnosticBuilder trace(std::string_view sender, std::format_string<Args...> fmt, Args &&...args)
     {
         return buildAndAppend(Diag_Trace, sender, fmt, std::forward<Args>(args)...);
     }
@@ -59,12 +59,34 @@ class DiagnosticCollector
      * Creates a trace diagnostic builder with a predefined message and sender. If trace diag is not enabled, this
      * function returns an empty builder.
      */
-    DiagnosticBuilder trace(const std::string_view &sender, const std::string_view &message);
+    DiagnosticBuilder trace(std::string_view sender, std::string_view message);
 
     /**
-     * Adds a listener for diagnostic messages.
+     * Creates a warning diagnostic builder with a predefined format message and sender. If warning diag is not
+     * enabled, this function returns an empty builder.
+     */
+    template <typename... Args>
+    DiagnosticBuilder warn(std::string_view sender, std::format_string<Args...> fmt, Args &&...args)
+    {
+        return buildAndAppend(Diag_Warning, sender, fmt, std::forward<Args>(args)...);
+    }
+
+    /**
+     * Creates a warning diagnostic builder with a predefined message and sender. If warning diag is not enabled,
+     * this function returns an empty builder.
+     */
+    DiagnosticBuilder warn(std::string_view sender, std::string_view message);
+
+    /**
+     * Adds a listener for diagnostic messages. A null listener is ignored, so callers may pass an
+     * optional listener without checking it first.
      */
     void addListener(DiagnosticListener *listener);
+
+    /**
+     * Unregisters a previously added listener. Unknown or null listeners are ignored.
+     */
+    void removeListener(DiagnosticListener *listener);
 
     /**
      * Begins a new scope with a default action.
@@ -75,6 +97,12 @@ class DiagnosticCollector
      * Enables the diagnostic for the given message type.
      */
     void enableDiag(DiagnosticMessageType type);
+
+    /**
+     * Replaces the set of enabled diagnostic types with the given bitmask. Used to apply a
+     * severity threshold (e.g. error-only, or error+warning+trace) after construction.
+     */
+    void setEnabledDiags(DiagnosticMessageType types);
 
     /**
      * Ends the current scope. If it is the top most scope, an exception is thrown.
@@ -99,10 +127,8 @@ class DiagnosticCollector
      * diagnostics never pay for formatting.
      */
     template <typename... Args>
-    DiagnosticBuilder buildAndAppend(DiagnosticMessageType type,
-                                     const std::string_view &sender,
-                                     std::format_string<Args...> fmt,
-                                     Args &&...args)
+    DiagnosticBuilder
+    buildAndAppend(DiagnosticMessageType type, std::string_view sender, std::format_string<Args...> fmt, Args &&...args)
     {
         auto b = builder(type, sender);
 
@@ -115,13 +141,11 @@ class DiagnosticCollector
         return b;
     }
 
-    std::atomic<uint8_t> m_enabledDiags;                  // Enabled diagnostic types; atomic to match the documented thread-safety.
+    std::atomic<uint8_t> m_enabledDiags; // Enabled diagnostic types; atomic to match the documented thread-safety.
     std::list<DiagnosticListener *> m_listeners;          // Registered observers notified when messages are committed.
     std::pmr::synchronized_pool_resource m_diagScopePool; // Thread-safe arena backing all messages and scopes.
-    std::pmr::vector<DiagnosticMessage> m_messages; // A set of notified messages. Will be filled with elements that
-                                                    // were actually notified to the listener.
-    std::pmr::vector<DiagnosticScope> m_scopes;     // Stack of active scopes; index 0 is the always-present root scope.
-    std::recursive_mutex m_mutex;                   // Guards listeners, scopes and messages from concurrent access.
+    std::pmr::vector<DiagnosticScope> m_scopes; // Stack of active scopes; index 0 is the always-present root scope.
+    std::recursive_mutex m_mutex;               // Guards listeners, scopes and messages from concurrent access.
 };
 
 #endif // EZCORE_DIAGNOSTIC_COLLECTOR_H

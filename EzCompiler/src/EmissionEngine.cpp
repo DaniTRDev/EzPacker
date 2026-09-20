@@ -10,18 +10,41 @@
 #include "GenericCodeEmitter.h"
 #include "Descriptors/TargetDesc.h"
 #include "Descriptors/TargetRelocationResolver.h"
+#include "ObjectFormat/IObjectWriter.h"
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
 #include "Operand/MirOperands.h"
 #include "GlobalVar/MirGlobalVar.h"
 #include "Type/MirType.h"
 #include "FlexNumber/FlexFloat.h"
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace EzCompiler
 {
+
+namespace
+{
+
+/**
+ * Builds the undefined-symbol record used for external function declarations and for callees that
+ * are referenced but never defined in this module. Undefined symbols carry SectionType::Undefined,
+ * which both object writers map to the "no section" index (SHN_UNDEF / COFF section 0).
+ */
+EzCodeEmitter::ObjectFormat::ObjectSymbol makeUndefinedFunctionSymbol(std::string_view name)
+{
+    return { .m_name = std::string(name),
+             .m_section = SectionType::Undefined,
+             .m_offset = 0,
+             .m_size = 0,
+             .m_isGlobal = true,
+             .m_isFunction = true };
+}
+
+} // namespace
 
 EmissionEngine::EmissionEngine(DriverContext &ctx) : m_ctx(ctx) {}
 
@@ -42,16 +65,13 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         return false;
     }
 
+    // initialize() resolves the target descriptor and its binary view together, so a non-null
+    // binary descriptor guarantees a target descriptor; no redundant re-validation here.
     TargetDesc *targetDesc = m_ctx.getTargetDesc();
-    if (!targetDesc)
-    {
-        m_ctx.getDiagCollector()->error("EzCompiler", "No target descriptor configured for emission");
-        return false;
-    }
 
     ::CodeEmitterContext emitterCtx(m_ctx.getDiagCollector(), sections, m_ctx.getSessionAllocator());
     // The target installs its own encoding resolution; this layer stays target-agnostic.
-    std::unique_ptr<GenericCodeEmitter> emitter(targetDesc->createCodeEmitter());
+    std::unique_ptr<GenericCodeEmitter> emitter = targetDesc->createCodeEmitter();
     if (!emitter)
     {
         m_ctx.getDiagCollector()->error("EzCompiler", "Target did not provide a code emitter");
@@ -61,6 +81,8 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
     std::vector<EzCodeEmitter::ObjectFormat::ObjectSymbol> symbols;
     std::unordered_map<size_t, MirFunction *> funcById;
     std::unordered_map<size_t, MirGlobalVar *> gvarById;
+    funcById.reserve(mirCtx.getFunctions().size());
+    gvarById.reserve(mirCtx.getGlobalVars().size());
 
     // 1. Emit Global Variables (.rodata, .data, .bss)
     for (MirGlobalVar *gvar : mirCtx.getGlobalVars())
@@ -162,14 +184,12 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             }
         }
 
-        EzCodeEmitter::ObjectFormat::ObjectSymbol sym{ .m_name = std::string(gvar->getName()),
-                                                       .m_section = targetSecType,
-                                                       .m_offset = gvOffset,
-                                                       .m_size = gvSize,
-                                                       .m_isGlobal =
-                                                               (gvar->getLinkage() != MirGlobalVarLinkage::Internal),
-                                                       .m_isFunction = false };
-        symbols.push_back(sym);
+        symbols.push_back({ .m_name = std::string(gvar->getName()),
+                            .m_section = targetSecType,
+                            .m_offset = gvOffset,
+                            .m_size = gvSize,
+                            .m_isGlobal = (gvar->getLinkage() != MirGlobalVarLinkage::Internal),
+                            .m_isFunction = false });
     }
 
     // 2. Emit Functions (.text)
@@ -185,16 +205,12 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         if (func->getBlockCount() == 0)
         {
             // External declaration
-            EzCodeEmitter::ObjectFormat::ObjectSymbol sym{ .m_name = std::string(func->getName()),
-                                                           .m_section = SectionType::Custom,
-                                                           .m_offset = 0,
-                                                           .m_size = 0,
-                                                           .m_isGlobal = true,
-                                                           .m_isFunction = true };
-            symbols.push_back(sym);
+            symbols.push_back(makeUndefinedFunctionSymbol(func->getName()));
             continue;
         }
 
+        // Honor the target's function alignment so consecutive functions do not share padding.
+        textSection->alignTo(binDesc->getFunctionAlignment());
         uint64_t fnOffset = textSection->getCurrentOffset();
         emitter->beginFunction(&emitterCtx, func);
 
@@ -214,9 +230,9 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                 }
                 if (inst->getTargetDesc())
                 {
+                    // getOperands() exposes const pointers; emitInst accepts that const span directly.
                     const auto &ops = inst->getOperands();
-                    emitter->emitInst(inst->getTargetDesc(),
-                                      std::span(const_cast<MirOperand **>(ops.data()), ops.size()));
+                    emitter->emitInst(inst->getTargetDesc(), std::span<MirOperand *const>(ops.data(), ops.size()));
                 }
             }
         }
@@ -224,19 +240,20 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         emitter->endFunction(&emitterCtx, func);
         uint64_t fnSize = textSection->getCurrentOffset() - fnOffset;
 
-        EzCodeEmitter::ObjectFormat::ObjectSymbol sym{ .m_name = std::string(func->getName()),
-                                                       .m_section = SectionType::Text,
-                                                       .m_offset = fnOffset,
-                                                       .m_size = fnSize,
-                                                       .m_isGlobal = true,
-                                                       .m_isFunction = true };
-        symbols.push_back(sym);
+        symbols.push_back({ .m_name = std::string(func->getName()),
+                            .m_section = SectionType::Text,
+                            .m_offset = fnOffset,
+                            .m_size = fnSize,
+                            .m_isGlobal = true,
+                            .m_isFunction = true });
     }
 
-    // Flatten every section so label offsets are final before branch patching.
+    // Flatten every section so label offsets are final before branch patching. Several section
+    // keys may alias one CodeSection (e.g. .rodata), so finalize each unique section once.
+    std::unordered_set<CodeSection *> finalizedSections;
     for (auto &[type, sec] : sections)
     {
-        if (sec)
+        if (sec && finalizedSections.insert(sec).second)
         {
             sec->finalize();
         }
@@ -248,6 +265,15 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
     // Target-owned hook that owns the opcode/displacement knowledge for in-place branch patching.
     TargetRelocationResolver *relocResolver = targetDesc->getRelocationResolver();
     const auto &allRelocs = emitterCtx.getRelocations();
+
+    // O(1) lookup of already-defined symbol names while discovering undefined callees.
+    std::unordered_set<std::string> definedSymbolNames;
+    definedSymbolNames.reserve(symbols.size() * 2);
+    for (const auto &sym : symbols)
+    {
+        definedSymbolNames.insert(sym.m_name);
+    }
+
     auto itTextRelocs = allRelocs.find(textSection);
     if (itTextRelocs != allRelocs.end())
     {
@@ -259,15 +285,15 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             }
 
             MirReference *ref = reloc->m_srcRef;
-            uint64_t instOffset = reloc->m_address;
+            const TargetCodeRelocationType relocType = reloc->m_relocType;
 
             if (ref->isBlock())
             {
                 CodeLabel *targetLabel = emitterCtx.findLabel(ref->getRefId());
-                if (targetLabel && relocResolver && instOffset < textBytes.size())
+                if (targetLabel && relocResolver)
                 {
                     // Delegate the opcode sniff and displacement computation to the target.
-                    relocResolver->patch(textBytes, *reloc, targetLabel->getAddress(), reloc->m_relocType);
+                    relocResolver->patch(textBytes, *reloc, targetLabel->getAddress(), relocType);
                 }
             }
             else if (ref->isFunction())
@@ -281,31 +307,25 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
                 if (!calleeName.empty())
                 {
-                    bool symExists = false;
-                    for (const auto &s : symbols)
+                    if (definedSymbolNames.insert(calleeName).second)
                     {
-                        if (s.m_name == calleeName)
-                        {
-                            symExists = true;
-                            break;
-                        }
+                        symbols.push_back(makeUndefinedFunctionSymbol(calleeName));
                     }
-                    if (!symExists)
-                    {
-                        symbols.push_back({ .m_name = calleeName,
-                                            .m_section = SectionType::Custom,
-                                            .m_offset = 0,
-                                            .m_size = 0,
-                                            .m_isGlobal = true,
-                                            .m_isFunction = true });
-                    }
+
+                    // Ask the resolver for the exact displacement-field offset (opcode dependent
+                    // for near branches). Falls back to the relocation address for unknown targets.
+                    uint64_t fieldOffset = relocResolver
+                            ? relocResolver->getRelocationFieldOffset(textBytes, *reloc, relocType)
+                            : reloc->m_address;
 
                     // ELF PC-relative fixups subtract the 4-byte displacement field length.
                     int64_t addend = (binDesc->getObjectFormat() == TargetObjectFormat::ELF) ? -4 : 0;
-                    objectRelocs.push_back({ .m_section = SectionType::Text,
-                                             .m_offset = instOffset + 1,
+                    objectRelocs.push_back({ .m_section = reloc->m_definingSection
+                                                             ? reloc->m_definingSection->getType()
+                                                             : SectionType::Text,
+                                             .m_offset = fieldOffset,
                                              .m_symbolName = calleeName,
-                                             .m_type = TargetCodeRelocationType::BranchRel32,
+                                             .m_type = relocType,
                                              .m_addend = addend });
                 }
             }
@@ -320,60 +340,86 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
                 if (!gvName.empty())
                 {
+                    uint64_t fieldOffset = relocResolver
+                            ? relocResolver->getRelocationFieldOffset(textBytes, *reloc, relocType)
+                            : reloc->m_address;
+
                     // Same -4 addend adjustment for ELF PC-relative global references.
                     int64_t addend = (binDesc->getObjectFormat() == TargetObjectFormat::ELF) ? -4 : 0;
-                    objectRelocs.push_back({ .m_section = SectionType::Text,
-                                             .m_offset = reloc->m_address,
+                    objectRelocs.push_back({ .m_section = reloc->m_definingSection
+                                                             ? reloc->m_definingSection->getType()
+                                                             : SectionType::Text,
+                                             .m_offset = fieldOffset,
                                              .m_symbolName = gvName,
-                                             .m_type = TargetCodeRelocationType::PCRel32,
+                                             .m_type = relocType,
                                              .m_addend = addend });
                 }
             }
         }
     }
 
-    std::vector<uint8_t> outputBytes;
-    if (binDesc->getObjectFormat() == TargetObjectFormat::ELF)
+    // Feed the selected object writer once; the format-specific setup lives behind IObjectWriter.
+    std::unique_ptr<EzCodeEmitter::ObjectFormat::IObjectWriter> writer;
+    switch (binDesc->getObjectFormat())
     {
-        EzCodeEmitter::ObjectFormat::Elf64Writer elfWriter;
-        for (const auto &sym : symbols)
-        {
-            elfWriter.addSymbol(sym);
-        }
-        for (const auto &reloc : objectRelocs)
-        {
-            elfWriter.addRelocation(reloc);
-        }
-        outputBytes = elfWriter.write(sections);
-    }
-    else if (binDesc->getObjectFormat() == TargetObjectFormat::COFF)
-    {
-        EzCodeEmitter::ObjectFormat::CoffWriter coffWriter;
-        for (const auto &sym : symbols)
-        {
-            coffWriter.addSymbol(sym);
-        }
-        for (const auto &reloc : objectRelocs)
-        {
-            coffWriter.addRelocation(reloc);
-        }
-        outputBytes = coffWriter.write(sections);
-    }
-    else
-    {
-        m_ctx.getDiagCollector()->error("EzCompiler", "Unsupported object format for emission");
-        return false;
+        case TargetObjectFormat::ELF:
+            writer = std::make_unique<EzCodeEmitter::ObjectFormat::Elf64Writer>();
+            break;
+        case TargetObjectFormat::COFF:
+            writer = std::make_unique<EzCodeEmitter::ObjectFormat::CoffWriter>();
+            break;
+        default:
+            m_ctx.getDiagCollector()->error("EzCompiler", "Unsupported object format for emission");
+            return false;
     }
 
-    std::ofstream outFile(std::string(outputPath), std::ios::binary);
-    if (!outFile.is_open())
+    for (const auto &sym : symbols)
     {
-        m_ctx.getDiagCollector()->error("EzCompiler", "Failed to open output file for writing: {}", outputPath);
-        return false;
+        writer->addSymbol(sym);
+    }
+    for (const auto &reloc : objectRelocs)
+    {
+        writer->addRelocation(reloc);
+    }
+    std::vector<uint8_t> outputBytes = writer->write(sections);
+
+    // Write to a sibling temporary file, then atomically rename it over the destination so a
+    // failed or partially written object never replaces a good previous artifact.
+    std::filesystem::path finalPath{ std::string(outputPath) };
+    std::filesystem::path tempPath = finalPath;
+    tempPath += ".tmp";
+
+    {
+        std::ofstream outFile(tempPath, std::ios::binary | std::ios::trunc);
+        if (!outFile.is_open())
+        {
+            m_ctx.getDiagCollector()->error("EzCompiler", "Failed to open output file for writing: {}", outputPath);
+            return false;
+        }
+
+        outFile.write(reinterpret_cast<const char *>(outputBytes.data()),
+                      static_cast<std::streamsize>(outputBytes.size()));
+        outFile.close();
+        if (!outFile)
+        {
+            m_ctx.getDiagCollector()->error("EzCompiler", "Failed writing object file: {}", outputPath);
+            std::error_code removeEc;
+            std::filesystem::remove(tempPath, removeEc);
+            return false;
+        }
     }
 
-    outFile.write(reinterpret_cast<const char *>(outputBytes.data()), static_cast<std::streamsize>(outputBytes.size()));
-    outFile.close();
+    std::error_code ec;
+    std::filesystem::remove(finalPath, ec);
+    ec.clear();
+    std::filesystem::rename(tempPath, finalPath, ec);
+    if (ec)
+    {
+        m_ctx.getDiagCollector()->error("EzCompiler", "Failed to publish object file {}: {}", outputPath, ec.message());
+        std::error_code removeEc;
+        std::filesystem::remove(tempPath, removeEc);
+        return false;
+    }
 
     if (m_ctx.getOptions().verbose)
     {

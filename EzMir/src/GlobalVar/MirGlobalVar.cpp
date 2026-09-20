@@ -12,9 +12,9 @@ MirGlobalVar::MirGlobalVar(bool constant,
                            MirType *type,
                            MirOperand *initializer,
                            SourceReference *sourceRef,
-                           const std::pmr::string &name) :
+                           std::pmr::string name) :
     m_constant(constant), m_id(id), m_linkage(linkage), m_type(type), m_initializer(initializer),
-    m_sourceRef(sourceRef), m_name(name)
+    m_sourceRef(sourceRef), m_name(std::move(name))
 {
 }
 

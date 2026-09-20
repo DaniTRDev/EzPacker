@@ -29,7 +29,6 @@ struct X86OperandBindingSpec
  */
 struct X86EncodingSpec
 {
-    bool m_valid{ false }; ///< True when decoding completed without errors.
     bool m_hasForm{ false };
     std::string_view m_form; ///< "rr", "ri", "jcc", ...
     std::vector<uint8_t> m_opcode;
@@ -52,7 +51,7 @@ struct X86EncodingSpec
  * Decodes a generic ENCODING block using x86-64 field semantics.
  *
  * When `diag` is non-null, decoding errors are reported with source locations.
- * Returns the value of `out.m_valid`.
+ * Returns true when decoding completed without errors.
  */
 bool decodeX86_64Encoding(const DSL::Ast::Encoding::EncodingDecl &encoding,
                           X86EncodingSpec &out,

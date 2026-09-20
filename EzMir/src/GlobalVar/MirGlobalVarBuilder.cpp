@@ -29,6 +29,12 @@ MirGlobalVarBuilder &MirGlobalVarBuilder::setConstant(bool constant)
  */
 MirGlobalVarBuilder &MirGlobalVarBuilder::setInitializer(MirOperand *initializer)
 {
+    if (!initializer)
+    {
+        m_ctx->getDiagCollector()->error("MirGlobalVarBuilder", "Can't set a null initializer to a global variable");
+        return *this;
+    }
+
     if (!initializer->isOfType<MirInteger>() && !initializer->isOfType<MirFloat>())
     {
         m_ctx->getDiagCollector()->error("MirGlobalVarBuilder",
@@ -45,7 +51,7 @@ MirGlobalVarBuilder &MirGlobalVarBuilder::setInitializer(MirOperand *initializer
  */
 MirGlobalVar *MirGlobalVarBuilder::build(MirGlobalVarLinkage linkage,
                                          MirType *type,
-                                         const std::pmr::string &name,
+                                         std::pmr::string name,
                                          SourceReference *sourceRef)
 {
     std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
@@ -57,12 +63,16 @@ MirGlobalVar *MirGlobalVarBuilder::build(MirGlobalVarLinkage linkage,
                                                        type,
                                                        m_initializer,
                                                        sourceRef,
-                                                       name);
+                                                       std::move(name));
 
-    auto diag =
-            m_ctx->getDiagCollector()->trace("MirMirGlobalVarBuilder", "Built global var with id: {}", var->getId());
-    diag << sourceRef;
-    diag.appendNote(MirPrinter::printToString(var, MirPrinterDetail::Detailed));
+    // Only format the full variable dump when the trace diagnostic is actually enabled.
+    if (m_ctx->getDiagCollector()->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+    {
+        auto diag =
+                m_ctx->getDiagCollector()->trace("MirMirGlobalVarBuilder", "Built global var with id: {}", var->getId());
+        diag << sourceRef;
+        diag.appendNote(MirPrinter::printToString(var, MirPrinterDetail::Detailed));
+    }
 
     return var;
 }

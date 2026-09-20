@@ -36,7 +36,7 @@ class CppInstructionSelectorGenerator : public CodeGenerator
     const std::string &getTargetName() const noexcept { return m_targetName; }
 
     /** Overrides the target identifier used to name generated classes. */
-    void setTargetName(std::string targetName) { m_targetName = std::move(targetName); }
+    void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the selector class declaration and pattern table into the header. */
     void emitHeader(CppSourceEmitter &emitter) const;
@@ -54,11 +54,6 @@ class CppInstructionSelectorGenerator : public CodeGenerator
     /** Target identifier substituted into generated class and include names. */
     std::string m_targetName;
 };
-
-extern bool GenerateInstructionSelector(DiagnosticCollector *collector,
-                                        SymbolTable *table,
-                                        std::filesystem::path outPath,
-                                        std::string targetName = "Target");
 
 } // namespace CodeGenerators
 

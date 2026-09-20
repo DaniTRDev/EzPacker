@@ -4,6 +4,8 @@
 #include "EzTripleCommon.h"
 #include "Operand/MirRegisterReference.h"
 
+#include <memory>
+
 class GenericCodeEmitter;
 class TargetRelocationResolver;
 
@@ -88,17 +90,17 @@ class TargetDesc
     /**
      * Returns a list with the available binary descriptors.
      */
-    virtual std::pmr::vector<class TargetBinaryDesc *> getAvailableBinaryDescriptors() = 0;
+    virtual const std::pmr::vector<class TargetBinaryDesc *> &getAvailableBinaryDescriptors() = 0;
 
     /**
      * Returns a list with the available calling conventions defined for this target.
      */
-    virtual std::pmr::vector<class CallingConvDesc *> getAvailableCallingConventions() = 0;
+    virtual const std::pmr::vector<class CallingConvDesc *> &getAvailableCallingConventions() = 0;
 
     /**
      * Returns a list with the available register banks for this target.
      */
-    virtual std::pmr::vector<class MirRegisterBank *> getAvailableRegisterBanks() = 0;
+    virtual const std::pmr::vector<class MirRegisterBank *> &getAvailableRegisterBanks() = 0;
 
     /**
      * Creates and registers a new register bank owned by this target.
@@ -112,9 +114,9 @@ class TargetDesc
     /**
      * Creates the target's machine code emitter.
      *
-     * The caller takes ownership. Returns nullptr when the target does not provide an emitter.
+     * Returns nullptr when the target does not provide an emitter.
      */
-    virtual GenericCodeEmitter *createCodeEmitter() { return nullptr; }
+    virtual std::unique_ptr<GenericCodeEmitter> createCodeEmitter();
 
     /**
      * Returns the target's relocation resolver, or nullptr if the target does not support

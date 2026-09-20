@@ -188,7 +188,6 @@ bool InstructionSelectPass::validatePattern(DiagnosticCollector *collector,
     }
 
     Symbols::SelectionPatternSymbol symData{ .m_name = pattern.m_name.m_node,
-                                             .m_cost = pattern.m_cost,
                                              .m_astNode = &pattern };
 
     SymbolId id = table->declareSym(ref, SymbolType::SelectionPattern, std::move(symData), pattern.m_name.m_node);

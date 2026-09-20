@@ -9,7 +9,37 @@
 #include "InstructionSelector/MirAddressingModeMatcher.h"
 #include "InstructionSelector/MirInstructionSelector.h"
 #include "Operand/MirOperands.h"
+#include "Operand/MirRegisterBank.h"
 #include "Operand/MirRegisterClass.h"
+
+/**
+ * Looks up a target register class by name, building a bank/class cache on first use.
+ */
+MirRegisterClass *MirInstructionSelector::findClass(std::string_view name)
+{
+    if (!m_classLookupBuilt)
+    {
+        m_classLookupBuilt = true;
+        m_classLookup.clear();
+        if (m_targetDesc)
+        {
+            for (MirRegisterBank *bank : m_targetDesc->getAvailableRegisterBanks())
+            {
+                if (!bank)
+                {
+                    continue;
+                }
+                for (const auto &[className, regClass] : bank->getClasses())
+                {
+                    m_classLookup.try_emplace(className, regClass);
+                }
+            }
+        }
+    }
+
+    auto it = m_classLookup.find(name);
+    return it != m_classLookup.end() ? it->second : nullptr;
+}
 
 /**
  * Selects every block of func, returning false if any instruction could not be selected.

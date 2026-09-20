@@ -3,6 +3,8 @@
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
 
+#include <stdexcept>
+
 using namespace EzCodeEmitter;
 using namespace EzCodeEmitter::ObjectFormat;
 
@@ -185,4 +187,33 @@ TEST_F(EzCodeEmitterTestSuite, TestCurrentOffsetAccountsForAlignment)
     ASSERT_EQ(dataSec->getData().size(), 9u);
     EXPECT_EQ(dataSec->getData()[0], 0xAA);
     EXPECT_EQ(dataSec->getData()[8], 0xBB);
+}
+
+// LEG-09: a defined symbol in a section the writer does not serialize must fail loudly instead of
+// silently becoming an undefined (section 0) symbol.
+TEST_F(EzCodeEmitterTestSuite, TestWritersRejectUnsupportedSections)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateElfSections(sections, getAllocator());
+    sections[SectionType::Text]->finalize();
+
+    ObjectSymbol customSym{ .m_name = "custom_data",
+                            .m_section = SectionType::Custom,
+                            .m_offset = 0,
+                            .m_size = 4,
+                            .m_isGlobal = true,
+                            .m_isFunction = false };
+
+    Elf64Writer elfWriter;
+    elfWriter.addSymbol(customSym);
+    EXPECT_THROW(elfWriter.write(sections), std::runtime_error);
+
+    // The same policy applies to COFF.
+    std::pmr::unordered_map<SectionType, CodeSection *> coffSections(getAllocator());
+    Helpers::ObjectFormat::CreateCoffSections(coffSections, getAllocator());
+    coffSections[SectionType::Text]->finalize();
+
+    CoffWriter coffWriter;
+    coffWriter.addSymbol(customSym);
+    EXPECT_THROW(coffWriter.write(coffSections), std::runtime_error);
 }

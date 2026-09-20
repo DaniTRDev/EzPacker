@@ -18,7 +18,8 @@ enum class SectionType : uint8_t
     Data,             ///< Mutable initialized data (".data").
     DataWithRel,      ///< Mutable data that requires relocations.
     NonInitialized,   ///< Zero-initialized storage with no file bytes (".bss").
-    Custom            ///< Target-specific metadata/exception tables.
+    Custom,           ///< Target-specific metadata/exception tables.
+    Undefined         ///< Symbol is not defined in this module (SHN_UNDEF / COFF section 0).
 };
 
 /**
@@ -229,6 +230,13 @@ class CodeSection
      */
     std::pmr::vector<uint8_t> &getActiveDataBuffer();
 
+    /**
+     * Recomputes m_cursorOffset by replaying the node stream from the head up to and including
+     * node. Only needed when the cursor is moved to an arbitrary node; normal emission updates
+     * the running offset incrementally.
+     */
+    uint64_t computeOffsetTo(const SectionNode *node) const;
+
   private:
     bool m_isFinalized;   ///< True once finalize() has flattened the node stream.
     SectionFlags m_flags; ///< Runtime access permissions of the section.
@@ -237,6 +245,8 @@ class CodeSection
     SectionNode *m_head;   ///< First node of the stream.
     SectionNode *m_tail;   ///< Last node of the stream.
     SectionNode *m_cursor; ///< Node where subsequent emits/insertions take place.
+
+    uint64_t m_cursorOffset{ 0 }; ///< Running byte offset of m_cursor, kept in sync with finalize().
 
     SectionType m_type;            ///< Output section classification.
     size_t m_alignment;            ///< Alignment applied when the section is laid out.

@@ -133,7 +133,7 @@ class ArgumentLocationDesc
     /**
      * Factory constructing a split multi-register location descriptor.
      */
-    static ArgumentLocationDesc Split(const std::vector<SplitPiece> &pieces);
+    static ArgumentLocationDesc Split(std::vector<SplitPiece> pieces);
 
     /**
      * Factory constructing a stack frame slot location descriptor.
@@ -167,18 +167,15 @@ class ArgumentLocationDesc
 
   private:
     /**
-     * Private constructor initializing active type tag and variant storage payload.
+     * Private constructor initializing the variant storage payload; the active location kind is
+     * derived from the variant's active alternative.
      */
-    ArgumentLocationDesc(ArgLocationType type, StorageT storage);
+    explicit ArgumentLocationDesc(StorageT storage);
 
   private:
     /**
-     * Active discriminator tag.
-     */
-    ArgLocationType m_type;
-
-    /**
-     * Variant storage container.
+     * Variant storage container; its active alternative is the single source of truth for the
+     * location kind returned by getType().
      */
     StorageT m_storage;
 };

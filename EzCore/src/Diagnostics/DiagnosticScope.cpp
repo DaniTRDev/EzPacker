@@ -1,4 +1,5 @@
 #include "Diagnostics/DiagnosticScope.h"
+#include <iterator>
 
 /**
  * Creates a scope backed by the given arena, defaulting to Propagate.
@@ -19,12 +20,19 @@ DiagnosticScopeAction DiagnosticScope::getAction() const { return m_action; }
 void DiagnosticScope::appendMessage(const DiagnosticMessage &message) { m_messages.push_back(message); }
 
 /**
- * Moves the half-open range [begin, end) of messages to the end of this scope's message list.
+ * Moves the message into the arena-managed vector of this scope.
  */
-void DiagnosticScope::insert(std::pmr::vector<DiagnosticMessage>::const_iterator begin,
-                             std::pmr::vector<DiagnosticMessage>::const_iterator end)
+void DiagnosticScope::appendMessage(DiagnosticMessage &&message) { m_messages.push_back(std::move(message)); }
+
+/**
+ * Move-inserts every message of this scope into target, then clears this scope's list.
+ */
+void DiagnosticScope::moveMessagesTo(DiagnosticScope &target)
 {
-    m_messages.insert(m_messages.end(), begin, end);
+    target.m_messages.insert(target.m_messages.end(),
+                             std::make_move_iterator(m_messages.begin()),
+                             std::make_move_iterator(m_messages.end()));
+    m_messages.clear();
 }
 
 /**

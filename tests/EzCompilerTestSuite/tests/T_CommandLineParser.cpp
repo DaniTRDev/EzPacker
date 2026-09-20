@@ -107,3 +107,44 @@ TEST_F(EzCompilerTestSuite, TestInvalidFlagHandling)
     EXPECT_FALSE(ok);
     EXPECT_FALSE(err.empty());
 }
+
+// WEI-09: contradictory stage flags must be diagnosed instead of silently picking one.
+TEST_F(EzCompilerTestSuite, TestConflictingEmissionFlagsRejected)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
+
+    std::vector<std::string> args = { "ezc", "test.ez", "--emit-mir", "-S" };
+    EXPECT_FALSE(parser.parse(args, options, err));
+    EXPECT_FALSE(err.empty());
+}
+
+// WEI-09: contradictory optimization flags must be diagnosed.
+TEST_F(EzCompilerTestSuite, TestConflictingOptimizationFlagsRejected)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
+
+    std::vector<std::string> args = { "ezc", "test.ez", "-O2", "-Os" };
+    EXPECT_FALSE(parser.parse(args, options, err));
+    EXPECT_FALSE(err.empty());
+}
+
+// WEI-09: an unknown --diag-level value is a hard error rather than a silent default.
+TEST_F(EzCompilerTestSuite, TestUnknownDiagLevelRejected)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
+
+    std::vector<std::string> args = { "ezc", "test.ez", "--diag-level", "bogus" };
+    EXPECT_FALSE(parser.parse(args, options, err));
+    EXPECT_FALSE(err.empty());
+
+    // A documented level still parses.
+    std::vector<std::string> valid = { "ezc", "test.ez", "--diag-level", "trace" };
+    EXPECT_TRUE(parser.parse(valid, options, err));
+    EXPECT_EQ(options.diagThreshold, DiagnosticMessageType::Diag_Trace);
+}

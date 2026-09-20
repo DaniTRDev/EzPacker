@@ -80,15 +80,23 @@ bool MirRegisterRef::operator!=(const MirRegisterRef &other) const { return !(*t
 
 /**
  * Strict weak ordering comparison operator for sorting and associative container keys.
+ *
+ * Physical registers are ordered by register class name before numeric ID so the ordering is
+ * stable across runs; comparing raw class pointers would make it depend on heap addresses.
  */
 bool MirRegisterRef::operator<(const MirRegisterRef &other) const
 {
     if (m_virtual != other.m_virtual)
         return m_virtual < other.m_virtual;
 
-    if (m_id != other.m_id)
-        return m_id < other.m_id;
+    if (!m_virtual)
+    {
+        const char *lhsName = m_class ? m_class->getName() : "";
+        const char *rhsName = other.m_class ? other.m_class->getName() : "";
+        int classCmp = std::strcmp(lhsName, rhsName);
+        if (classCmp != 0)
+            return classCmp < 0;
+    }
 
-    // Compare class pointers for physical registers
-    return !m_virtual && (m_class < other.m_class);
+    return m_id < other.m_id;
 }

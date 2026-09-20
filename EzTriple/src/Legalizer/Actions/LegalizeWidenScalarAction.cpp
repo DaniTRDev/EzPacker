@@ -16,6 +16,20 @@
 namespace LegalizeActions
 {
 
+namespace
+{
+/**
+ * Picks the opcode that widens a value into targetType: FPEXT for floating point, otherwise the
+ * signed or zero extension matching the instruction's signedness.
+ */
+MirInstructionOpCode extensionOpcode(const MirInstruction *instr, const MirType *targetType)
+{
+    if (targetType->getKind() == MirTypeKind::FloatingPoint)
+        return MirInstructionOpCode::FPEXT;
+    return instr->isSigned() ? MirInstructionOpCode::SEXT : MirInstructionOpCode::ZEXT;
+}
+} // namespace
+
 /**
  * Promotes the operands of an instruction to targetType. Comparisons only need their read
  * operands extended, while other instructions also widen the definition and truncate the result.
@@ -32,13 +46,7 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
                       instr->getMetadata().m_category == MirInstructionCategory::MirCat_Compare);
     if (isCompare)
     {
-        MirInstructionOpCode extOp;
-        if (targetType->getKind() == MirTypeKind::FloatingPoint)
-            extOp = MirInstructionOpCode::FPEXT;
-        else if (instr->isSigned())
-            extOp = MirInstructionOpCode::SEXT;
-        else
-            extOp = MirInstructionOpCode::ZEXT;
+        MirInstructionOpCode extOp = extensionOpcode(instr, targetType);
 
         for (size_t i = 1; i < instr->getOperandCount(); ++i)
         {
@@ -59,13 +67,7 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
 
     if (flag & MirOperandFlag::Write)
     {
-        MirInstructionOpCode extOp;
-        if (targetType->getKind() == MirTypeKind::FloatingPoint)
-            extOp = MirInstructionOpCode::FPEXT;
-        else if (instr->isSigned())
-            extOp = MirInstructionOpCode::SEXT;
-        else
-            extOp = MirInstructionOpCode::ZEXT;
+        MirInstructionOpCode extOp = extensionOpcode(instr, targetType);
 
         // Widen any read operands smaller than targetType before the instruction
         for (size_t i = 0; i < instr->getOperandCount(); ++i)
@@ -100,13 +102,7 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
 
     // 2. Use widening: extend input to targetType before the instruction
     MirRegister *wideUse = ob.buildVReg(targetType);
-    MirInstructionOpCode extOp;
-    if (targetType->getKind() == MirTypeKind::FloatingPoint)
-        extOp = MirInstructionOpCode::FPEXT;
-    else if (instr->isSigned())
-        extOp = MirInstructionOpCode::SEXT;
-    else
-        extOp = MirInstructionOpCode::ZEXT;
+    MirInstructionOpCode extOp = extensionOpcode(instr, targetType);
 
     ib.setInsertionPoint(instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);
     ib.build(extOp, instr->getSourceRef(), { wideUse, op });

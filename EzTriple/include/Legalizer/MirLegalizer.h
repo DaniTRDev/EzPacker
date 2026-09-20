@@ -36,11 +36,6 @@ class MirLegalizer
     virtual bool legalizeBlock(MirBlock *block);
 
     /**
-     * Legalizes a single instruction at the given iterator position.
-     */
-    virtual LegalizationResult legalizeInstruction(IntrusiveLinkedList<MirInstruction>::iterator it, MirBlock *block);
-
-    /**
      * Builds a LegalityQuery capturing all operands, types, and flags for an instruction.
      */
     virtual LegalityQuery buildQuery(MirInstruction *inst);

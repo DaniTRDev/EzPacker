@@ -19,16 +19,6 @@ enum class MirOperandType : uint8_t
 };
 
 /**
- * Mapping table from MirOperandType to human-readable string representations.
- */
-inline std::unordered_map<MirOperandType, std::string> g_MirOperandType2Str = {
-    { MirOperandType::Invalid, "Invalid" },   { MirOperandType::FloatingPoint, "FloatingPoint" },
-    { MirOperandType::Integer, "Integer" },   { MirOperandType::Reference, "Reference" },
-    { MirOperandType::Register, "Register" }, { MirOperandType::RuntimeSymbol, "RuntimeSymbol" },
-    { MirOperandType::Memory, "Memory" },     { MirOperandType::MaxOperandType, "MaxOperandType" }
-};
-
-/**
  * Abstract base class for all operands attached to MIR instructions.
  * Encapsulates the associated MirType and optional source location reference.
  */

@@ -5,7 +5,17 @@
 #include "CompilationPipeline.h"
 #include "EmissionEngine.h"
 
-int main(int argc, char **argv)
+#include <exception>
+#include <iostream>
+
+namespace
+{
+
+/**
+ * Runs the compiler driver. Returns 0 on success, 1 for user/compilation errors and 2 for an
+ * unexpected fatal exception (aligned with the EzDSL CLI entry point).
+ */
+int runCompiler(int argc, char **argv)
 {
     EzCompiler::CommandLineParser parser;
     EzCompiler::CommandLineOptions options;
@@ -67,4 +77,20 @@ int main(int argc, char **argv)
     }
 
     return 0;
+}
+
+} // namespace
+
+int main(int argc, char **argv)
+{
+    try
+    {
+        return runCompiler(argc, argv);
+    }
+    catch (const std::exception &ex)
+    {
+        // Contract-violating paths (e.g. an instruction the emitter cannot encode) surface here.
+        std::cerr << "Fatal Exception: " << ex.what() << "\n";
+        return 2;
+    }
 }

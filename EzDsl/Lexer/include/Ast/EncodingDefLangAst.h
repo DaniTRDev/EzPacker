@@ -20,23 +20,18 @@ struct OperandBinding
     Common::Identifier m_field;   // Target-defined field/slot name.
 };
 
-struct Directive;
-
 /**
  * Arch-neutral value of an ENCODING directive.
  *
  * Each architecture owns the interpretation of the keys and values; the shared
- * AST only understands their shapes. The nested-directive alternative exists so
- * fixed-width (bitfield) ISAs can express nested blocks without an AST change.
+ * AST only understands their shapes.
  */
 using Value = std::variant<std::monostate,
                            bool,
                            int64_t,
                            Common::Identifier,
-                           std::pmr::vector<uint8_t>,            // [0x0F, 0x58]
-                           std::pmr::vector<Common::Identifier>, // prefix / identifier lists
-                           std::pmr::vector<OperandBinding>,     // operands { op => field; ... }
-                           std::pmr::vector<Directive>>;         // nested block (bitfields later)
+                           std::pmr::vector<uint8_t>,        // [0x0F, 0x58]
+                           std::pmr::vector<OperandBinding>>; // operands { op => field; ... }
 
 /**
  * One `key : value` directive inside a generic ENCODING block.

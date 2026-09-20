@@ -1,6 +1,8 @@
 #ifndef EZDSLSEMA_COMMON_H
 #define EZDSLSEMA_COMMON_H
 
+#include "StringUtils.h" // NormalizeKey / StrToUpper
+
 #include <algorithm>
 #include <fstream>
 #include <optional>

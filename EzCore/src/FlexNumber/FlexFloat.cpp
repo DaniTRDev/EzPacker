@@ -1,11 +1,11 @@
 #include "FlexNumber/FlexFloat.h"
 #include <algorithm>
 #include <cmath>
-#include <cstring>
+#include <cstdlib>
 #include <limits>
 #include <stdexcept>
 
-#include <libbf.h>
+#include "LibBFWrapper.h"
 
 /**
  * Allocation shim handed to libbf so its limb buffers are managed by the C allocator.
@@ -186,24 +186,32 @@ FlexFloat &FlexFloat::operator=(const FlexFloat &other)
 /**
  * Returns true when the value carries a negative sign; NaN is treated as non-negative.
  */
-bool FlexFloat::isNeg() const { return m_number.sign != 0 && !libbf::bf_is_nan(&m_number); }
+bool FlexFloat::isNeg() const noexcept { return m_number.sign != 0 && !libbf::bf_is_nan(&m_number); }
 
 /**
  * Returns true when the value is exactly zero.
  */
-bool FlexFloat::isZero() const { return libbf::bf_is_zero(&m_number); }
+bool FlexFloat::isZero() const noexcept { return libbf::bf_is_zero(&m_number); }
 
 /**
  * Returns true when the value is finite, non-zero and not negative.
  */
-bool FlexFloat::isPositive() const { return !isNeg() && !isZero() && !libbf::bf_is_nan(&m_number); }
+bool FlexFloat::isPositive() const noexcept { return !isNeg() && !isZero() && !libbf::bf_is_nan(&m_number); }
+
+/**
+ * Returns true when either this value or other is NaN, in which case ordered comparisons are false.
+ */
+bool FlexFloat::hasNaNWith(const FlexFloat &other) const noexcept
+{
+    return libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number);
+}
 
 /**
  * Ordering comparison; any NaN operand yields false.
  */
-bool FlexFloat::operator>(const FlexFloat &other) const
+bool FlexFloat::operator>(const FlexFloat &other) const noexcept
 {
-    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
+    if (hasNaNWith(other))
         return false;
     return libbf::bf_cmp(&m_number, &other.m_number) > 0;
 }
@@ -211,9 +219,9 @@ bool FlexFloat::operator>(const FlexFloat &other) const
 /**
  * Ordering comparison; any NaN operand yields false.
  */
-bool FlexFloat::operator>=(const FlexFloat &other) const
+bool FlexFloat::operator>=(const FlexFloat &other) const noexcept
 {
-    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
+    if (hasNaNWith(other))
         return false;
     return libbf::bf_cmp(&m_number, &other.m_number) >= 0;
 }
@@ -221,9 +229,9 @@ bool FlexFloat::operator>=(const FlexFloat &other) const
 /**
  * Ordering comparison; any NaN operand yields false.
  */
-bool FlexFloat::operator<(const FlexFloat &other) const
+bool FlexFloat::operator<(const FlexFloat &other) const noexcept
 {
-    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
+    if (hasNaNWith(other))
         return false;
     return libbf::bf_cmp(&m_number, &other.m_number) < 0;
 }
@@ -231,9 +239,9 @@ bool FlexFloat::operator<(const FlexFloat &other) const
 /**
  * Ordering comparison; any NaN operand yields false.
  */
-bool FlexFloat::operator<=(const FlexFloat &other) const
+bool FlexFloat::operator<=(const FlexFloat &other) const noexcept
 {
-    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
+    if (hasNaNWith(other))
         return false;
     return libbf::bf_cmp(&m_number, &other.m_number) <= 0;
 }
@@ -241,9 +249,9 @@ bool FlexFloat::operator<=(const FlexFloat &other) const
 /**
  * Equality comparison; any NaN operand yields false (IEEE-754 semantics).
  */
-bool FlexFloat::operator==(const FlexFloat &other) const
+bool FlexFloat::operator==(const FlexFloat &other) const noexcept
 {
-    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
+    if (hasNaNWith(other))
         return false;
     return libbf::bf_cmp(&m_number, &other.m_number) == 0;
 }
@@ -251,9 +259,9 @@ bool FlexFloat::operator==(const FlexFloat &other) const
 /**
  * Inequality comparison; any NaN operand yields true (IEEE-754 semantics).
  */
-bool FlexFloat::operator!=(const FlexFloat &other) const
+bool FlexFloat::operator!=(const FlexFloat &other) const noexcept
 {
-    if (libbf::bf_is_nan(&m_number) || libbf::bf_is_nan(&other.m_number))
+    if (hasNaNWith(other))
         return true;
     return libbf::bf_cmp(&m_number, &other.m_number) != 0;
 }
@@ -261,12 +269,7 @@ bool FlexFloat::operator!=(const FlexFloat &other) const
 /**
  * Returns the sum as a new value, leaving both operands unchanged.
  */
-FlexFloat FlexFloat::operator+(const FlexFloat &other)
-{
-    FlexFloat res(*this);
-    res += other;
-    return res;
-}
+FlexFloat FlexFloat::operator+(const FlexFloat &other) const { return applyBinary(other, &FlexFloat::operator+=); }
 
 /**
  * Adds other in place using the current precision and rounds the result to this width.
@@ -281,12 +284,7 @@ FlexFloat &FlexFloat::operator+=(const FlexFloat &other)
 /**
  * Returns the difference as a new value, leaving both operands unchanged.
  */
-FlexFloat FlexFloat::operator-(const FlexFloat &other)
-{
-    FlexFloat res(*this);
-    res -= other;
-    return res;
-}
+FlexFloat FlexFloat::operator-(const FlexFloat &other) const { return applyBinary(other, &FlexFloat::operator-=); }
 
 /**
  * Subtracts other in place using the current precision and rounds the result to this width.
@@ -301,12 +299,7 @@ FlexFloat &FlexFloat::operator-=(const FlexFloat &other)
 /**
  * Returns the product as a new value, leaving both operands unchanged.
  */
-FlexFloat FlexFloat::operator*(const FlexFloat &other)
-{
-    FlexFloat res(*this);
-    res *= other;
-    return res;
-}
+FlexFloat FlexFloat::operator*(const FlexFloat &other) const { return applyBinary(other, &FlexFloat::operator*=); }
 
 /**
  * Multiplies in place using the current precision and rounds the result to this width.
@@ -321,12 +314,7 @@ FlexFloat &FlexFloat::operator*=(const FlexFloat &other)
 /**
  * Returns the quotient as a new value, leaving both operands unchanged.
  */
-FlexFloat FlexFloat::operator/(const FlexFloat &other)
-{
-    FlexFloat res(*this);
-    res /= other;
-    return res;
-}
+FlexFloat FlexFloat::operator/(const FlexFloat &other) const { return applyBinary(other, &FlexFloat::operator/=); }
 
 /**
  * Divides in place, throwing std::domain_error when the divisor is zero and rounding the
@@ -366,7 +354,7 @@ float FlexFloat::getFloat() const
 /**
  * Returns the configured storage width in bits.
  */
-size_t FlexFloat::getBitSize() const { return m_bitWidth; }
+size_t FlexFloat::getBitSize() const noexcept { return m_bitWidth; }
 
 /**
  * Returns the significand precision in bits for the configured width: 24 for binary32, 53 for
@@ -391,13 +379,21 @@ libbf::limb_t FlexFloat::getPrecBits() const
 }
 
 /**
+ * Throws std::invalid_argument when the configured width cannot be split into two equal halves.
+ */
+void FlexFloat::ensureSplittableWidth() const
+{
+    if (m_bitWidth % 2 != 0)
+        throw std::invalid_argument("Cannot execute floating-point scalar expansion split on an odd bit-width.");
+}
+
+/**
  * Returns the "high" piece of a scalar expansion split: the base-2 exponent of the value as
  * returned by std::frexp. Throws if the width is odd (not evenly splittable).
  */
 FlexFloat FlexFloat::getHighHalf() const
 {
-    if (m_bitWidth % 2 != 0)
-        throw std::invalid_argument("Cannot execute floating-point scalar expansion split on an odd bit-width.");
+    ensureSplittableWidth();
 
     size_t splitWidth = m_bitWidth / 2;
     FlexFloat highPart(splitWidth);
@@ -419,8 +415,7 @@ FlexFloat FlexFloat::getHighHalf() const
  */
 FlexFloat FlexFloat::getLowHalf() const
 {
-    if (m_bitWidth % 2 != 0)
-        throw std::invalid_argument("Cannot execute floating-point scalar expansion split on an odd bit-width.");
+    ensureSplittableWidth();
 
     size_t splitWidth = m_bitWidth / 2;
     FlexFloat lowPart(splitWidth);

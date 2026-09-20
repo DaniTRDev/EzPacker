@@ -155,21 +155,6 @@ enum MirInstructionCategory : uint8_t
 };
 
 /**
- * Mapping table from MirInstructionCategory enum to diagnostic strings.
- */
-inline std::map<MirInstructionCategory, std::string> g_MirInstructionCategory2Str = {
-    { MirCat_Invalid, "MirCat_Invalid" },
-    { MirCat_DataMovement, "MirCat_DataMovement" },
-    { MirCat_Memory, "MirCat_Memory" },
-    { MirCat_Arithmetic, "MirCat_Arithmetic" },
-    { MirCat_Bitwise, "MirCat_Bitwise" },
-    { MirCat_Compare, "MirCat_Compare" },
-    { MirCat_ControlFlow, "MirCat_ControlFlow" },
-    { MirCat_Casting, "MirCat_Casting" },
-    { MirCat_System, "MirCat_System" }
-};
-
-/**
  * Compilation tier indicating the abstraction level of an instruction.
  */
 enum class MirInstructionTier : uint8_t

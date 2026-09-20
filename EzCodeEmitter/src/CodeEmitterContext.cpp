@@ -39,7 +39,7 @@ CodeEmitterContext::~CodeEmitterContext()
     m_relocations.clear();
 }
 
-CodeLabel *CodeEmitterContext::getOrCreateLabel(CodeSection *definingSection, MirId id, const std::string_view &name)
+CodeLabel *CodeEmitterContext::getOrCreateLabel(CodeSection *definingSection, MirId id, std::string_view name)
 {
     auto it = m_currentFuncLabels.find(id);
     if (it != m_currentFuncLabels.end())

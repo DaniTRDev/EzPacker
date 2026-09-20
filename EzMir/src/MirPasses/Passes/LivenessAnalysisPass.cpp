@@ -138,17 +138,22 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
         auto &defSet = m_result.m_def[blockId];
         auto &useSet = m_result.m_use[blockId];
 
+        std::pmr::vector<MirRegisterRef> readRegs(m_arena);
+        std::pmr::vector<MirRegisterRef> writtenRegs(m_arena);
+
         for (const MirInstruction *instr : block->getInstructions())
         {
             // Upward-exposed use: register read before defined in this block
-            for (const auto &reg : instr->getUsedRegisters())
+            instr->getUsedRegisters(readRegs);
+            for (const auto &reg : readRegs)
             {
                 if (!defSet.contains(reg))
                     useSet.insert(reg);
             }
 
             // Defs kill upward uses for subsequent instructions
-            for (const auto &reg : instr->getDefinedRegisters())
+            instr->getDefinedRegisters(writtenRegs);
+            for (const auto &reg : writtenRegs)
             {
                 defSet.insert(reg);
             }

@@ -13,6 +13,15 @@ class SourceReference;
 class MirRegisterClass;
 
 /**
+ * Formats an operand for MIR text.
+ *
+ * In parseable mode this produces strict, round-trippable .mir syntax (a single shared
+ * implementation consumed by the printer). In non-parseable mode it returns the operand's own
+ * detailed diagnostic rendering.
+ */
+std::string formatOperand(MirOperand *operand, bool parseable);
+
+/**
  * Classification of symbolic targets referenced by MirReference operands.
  */
 enum class MirReferenceType : uint8_t

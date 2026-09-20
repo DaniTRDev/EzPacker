@@ -149,7 +149,7 @@ size_t fileId = sm.addSourceContent("main.ez", "func main(): i32 {\n    return 4
 SourceReference *ref = sm.createReference(23, 9, fileId);
 
 // Query line and slice content
-SourceLineRange *line = sm.getReferenceLine(ref);
+const SourceLineRange *line = sm.getReferenceLine(ref);
 std::string_view rawLine = sm.getRawLineContent(ref);
 std::string_view refText = sm.getReferenceContent(ref);
 ```

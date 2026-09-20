@@ -1,12 +1,7 @@
 #ifndef EZDSL_EZ_DSL_COMMON_H
 #define EZDSL_EZ_DSL_COMMON_H
 
-#include <lexy/action/parse.hpp>  // lexy::parse
-#include <lexy/callback/bind.hpp> // parse_state
-#include <lexy/callback.hpp>      // value callbacks
-#include <lexy/dsl.hpp>           // lexy::dsl::*
-#include <lexy/input/string_input.hpp>
-#include <lexy_ext/report_error.hpp> // lexy_ext::report_error
+#include "StringUtils.h" // SanitizeCppIdentifier / NormalizeKey / StrToUpper
 
 #include <charconv>
 #include <filesystem>

@@ -35,7 +35,7 @@ class CppTargetInstructionGenerator : public CodeGenerator
     const std::string &getTargetName() const noexcept { return m_targetName; }
 
     /** Overrides the target identifier used to name generated classes. */
-    void setTargetName(std::string targetName) { m_targetName = std::move(targetName); }
+    void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the OpCode enum and descriptor lookup/initialization declarations into the header. */
     void emitHeader(CppSourceEmitter &emitter) const;
@@ -50,14 +50,6 @@ class CppTargetInstructionGenerator : public CodeGenerator
     /** Target identifier substituted into generated class and include names. */
     std::string m_targetName;
 };
-
-/**
- * Convenience entry point for generating the target instruction table.
- */
-extern bool GenerateTargetInstructionTable(DiagnosticCollector *collector,
-                                           SymbolTable *table,
-                                           std::filesystem::path outPath,
-                                           std::string targetName = "Target");
 
 } // namespace CodeGenerators
 

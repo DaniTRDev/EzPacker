@@ -23,7 +23,6 @@ struct AddrModeSymbol
 struct SelectionPatternSymbol
 {
     std::string_view m_name;                                                      // Pattern name.
-    uint32_t m_cost{ 1 };                                                         // Relative selection cost.
     const DSL::Ast::InstructionSelectDef::SelectionPattern *m_astNode{ nullptr }; // Backing AST declaration.
 };
 

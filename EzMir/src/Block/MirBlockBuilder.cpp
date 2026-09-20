@@ -54,7 +54,9 @@ MirInstructionBuilder MirBlockBuilder::instrBuilder()
     {
         m_ctx->getDiagCollector()->error("MirBlockBuilder",
                                          "Can't create an instruction builder for a block if block was not built");
-        return MirInstructionBuilder(nullptr, {});
+        // Keep the context so the returned builder emits unlinked instructions instead of
+        // dereferencing a null context.
+        return MirInstructionBuilder(m_ctx, static_cast<MirBlock *>(nullptr), InsertionType::Append);
     }
 
     return MirInstructionBuilder(m_ctx, m_insertPoint);
@@ -65,6 +67,13 @@ MirInstructionBuilder MirBlockBuilder::instrBuilder()
  */
 void MirBlockBuilder::erase(MirBlock *block)
 {
-    auto owner = block->getOwner();
-    owner->m_blocks.remove(block);
+    if (!block)
+    {
+        return;
+    }
+
+    if (auto *owner = block->getOwner())
+    {
+        owner->m_blocks.remove(block);
+    }
 }

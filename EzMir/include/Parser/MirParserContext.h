@@ -24,6 +24,33 @@ namespace EzMir
 {
 
 /**
+ * Transparent hash over pmr::string keys so symbol tables can be probed with a string_view
+ * without materializing a temporary pmr::string key before every lookup.
+ */
+struct PmrStringHash
+{
+    using is_transparent = void;
+
+    size_t operator()(std::string_view value) const noexcept { return std::hash<std::string_view>{}(value); }
+    size_t operator()(const std::pmr::string &value) const noexcept { return operator()(std::string_view(value)); }
+};
+
+/**
+ * Transparent equality matching PmrStringHash, comparing the underlying character sequences.
+ */
+struct PmrStringEqual
+{
+    using is_transparent = void;
+
+    bool operator()(std::string_view lhs, std::string_view rhs) const noexcept { return lhs == rhs; }
+};
+
+/**
+ * Arena-backed string map with transparent string_view lookups.
+ */
+template <typename TValue> using PmrStringMap = std::pmr::unordered_map<std::pmr::string, TValue, PmrStringHash, PmrStringEqual>;
+
+/**
  * Namespaces in which a textual symbol name can be resolved.
  */
 enum class SymbolKind
@@ -201,6 +228,16 @@ class MirParserContext
     size_t getSourceId() const { return m_sourceId; }
 
   private:
+    /**
+     * Materializes a register from its textual name: names of the form "p<digits>" or "%p<digits>"
+     * become physical registers bound to that hardware ID, every other name becomes a virtual
+     * register. The type defaults to i64 when null.
+     */
+    MirRegister *materializeRegister(std::string_view name,
+                                     MirType *type,
+                                     SourceReference *ref,
+                                     MirRegisterClass *regClass);
+
     MirBuilderContext *m_bCtx{ nullptr };          // Builder context receiving constructed MIR entities.
     DiagnosticCollector *m_diag{ nullptr };        // Collector for parser error diagnostics.
     std::pmr::memory_resource *m_arena{ nullptr }; // Arena owning parser-created strings/containers.
@@ -209,12 +246,12 @@ class MirParserContext
     MirFunction *m_currentFunction{ nullptr };     // Function scope currently being populated.
 
     // Function-scoped symbol tables
-    std::pmr::unordered_map<std::pmr::string, MirRegister *> m_registers; // Name -> declared register.
-    std::pmr::unordered_map<std::pmr::string, MirBlock *> m_blocks;       // Label -> declared block.
+    PmrStringMap<MirRegister *> m_registers; // Name -> declared register.
+    PmrStringMap<MirBlock *> m_blocks;       // Label -> declared block.
 
     // Module-scoped symbol tables
-    std::pmr::unordered_map<std::pmr::string, MirGlobalVar *> m_globals;  // Name -> global variable.
-    std::pmr::unordered_map<std::pmr::string, MirFunction *> m_functions; // Name -> function.
+    PmrStringMap<MirGlobalVar *> m_globals;  // Name -> global variable.
+    PmrStringMap<MirFunction *> m_functions; // Name -> function.
 
     // Worklist of forward references to patch
     std::pmr::vector<UnresolvedReference> m_pendingFixups; // Queued unresolved operand references.

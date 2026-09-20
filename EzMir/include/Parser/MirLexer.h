@@ -2,6 +2,7 @@
 #define EZMIR_MIR_LEXER_H
 
 #include "EzMirCommon.h"
+#include <deque>
 #include <memory_resource>
 #include <optional>
 #include <string_view>
@@ -115,10 +116,20 @@ class MirLexer
      * Consumes and returns the next token, advancing the cursor past it.
      */
     MirToken nextToken();
+
     /**
-     * Returns the next token without consuming it, buffering the lookahead.
+     * Returns the token ahead-th token without consuming it, buffering the lookahead.
+     * ahead = 0 (default) is the next token; ahead = 1 enables two-token lookahead,
+     * used to disambiguate a block label from an instruction without consuming input.
      */
-    const MirToken &peekToken();
+    const MirToken &peekToken(size_t ahead = 0);
+
+    /**
+     * Pushes a previously consumed token back onto the input so it becomes the next token
+     * returned by nextToken()/peekToken(). Used to re-examine a token that was speculatively
+     * consumed while disambiguating the surrounding syntax.
+     */
+    void pushBack(MirToken tok);
 
     /**
      * Returns true once the cursor has consumed the entire source.
@@ -126,6 +137,11 @@ class MirLexer
     bool isAtEnd() const;
 
   private:
+    /**
+     * Lexes the next raw token directly from the source, bypassing the lookahead buffer.
+     */
+    MirToken lexToken();
+
     /**
      * Advances past whitespace, line comments and block comments.
      */
@@ -157,10 +173,10 @@ class MirLexer
     char peekNextChar() const;
 
   private:
-    std::string_view m_source;        // Source buffer being tokenized.
-    size_t m_cursor{ 0 };             // Byte index of the next unconsumed character.
-    MirParserContext &m_ctx;          // Context used for allocations and source references.
-    std::optional<MirToken> m_peeked; // Cached lookahead token from peekToken().
+    std::string_view m_source;          // Source buffer being tokenized.
+    size_t m_cursor{ 0 };               // Byte index of the next unconsumed character.
+    MirParserContext &m_ctx;            // Context used for allocations and source references.
+    std::deque<MirToken> m_lookahead;   // Buffered lookahead tokens; front is the next token to consume.
 };
 
 } // namespace EzMir::Parser

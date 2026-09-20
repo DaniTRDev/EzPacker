@@ -3,12 +3,15 @@
 
 #include "InstructionSelector/MirAddressingModeMatcher.h"
 #include <list>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 class MirBlock;
 class MirBuilderContext;
 class MirFunction;
 class MirInstruction;
+class MirRegisterClass;
 class TargetDesc;
 class MirOperand;
 
@@ -27,19 +30,11 @@ class MirInstructionSelector
     TargetDesc *getTargetDesc() const noexcept { return m_targetDesc; }
 
     /// Rebinds the selector to a different target descriptor.
-    void setTargetDesc(TargetDesc *targetDesc) noexcept { m_targetDesc = targetDesc; }
-
-    /// Records the function whose blocks are currently being processed.
-    void setCurrentFunction(MirFunction *func) noexcept { m_currentFunction = func; }
-
-    /// Records the block whose instructions are currently being processed.
-    void setCurrentBlock(MirBlock *block) noexcept { m_currentBlock = block; }
-
-    /// Returns the function being processed, used to resolve register uses and definitions.
-    MirFunction *getCurrentFunction() const noexcept { return m_currentFunction; }
-
-    /// Returns the block being processed, used to locate insertion points.
-    MirBlock *getCurrentBlock() const noexcept { return m_currentBlock; }
+    void setTargetDesc(TargetDesc *targetDesc) noexcept
+    {
+        m_targetDesc = targetDesc;
+        m_classLookupBuilt = false;
+    }
 
     /**
      * Selects and replaces a generic instruction with target hardware instructions.
@@ -100,9 +95,19 @@ class MirInstructionSelector
     MirInstruction *getDefiningInstruction(MirBuilderContext *ctx, class MirRegister *reg) const;
 
   protected:
+    /**
+     * Looks up a target register class by name, building a bank/class cache on first use.
+     * @return The matching class, or nullptr when the target has no such class.
+     */
+    MirRegisterClass *findClass(std::string_view name);
+
     TargetDesc *m_targetDesc{ nullptr };       ///< Target the selector is generating code for.
     MirBlock *m_currentBlock{ nullptr };       ///< Block currently being visited.
     MirFunction *m_currentFunction{ nullptr }; ///< Function currently being visited.
+
+  private:
+    std::unordered_map<std::string_view, MirRegisterClass *> m_classLookup; ///< Cached class-name lookup.
+    bool m_classLookupBuilt{ false };                                       ///< Whether the cache was built.
 };
 
 #endif // EZTRIPLE_MIR_INSTRUCTION_SELECTOR_H

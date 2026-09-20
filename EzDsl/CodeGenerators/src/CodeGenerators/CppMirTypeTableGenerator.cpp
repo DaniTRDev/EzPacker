@@ -48,13 +48,8 @@ std::vector<CppMirTypeTableGenerator::TypeEntry> CppMirTypeTableGenerator::colle
         return collectedTypes;
     }
 
-    for (const Symbol *sym : m_table->getSymbols())
+    for (const Symbol *sym : m_table->collect<Symbols::TypeSymbol>(SymbolType::Type))
     {
-        if (!sym || sym->getType() != SymbolType::Type)
-        {
-            continue;
-        }
-
         const auto *data = sym->getIf<Symbols::TypeSymbol>();
         if (!data)
         {

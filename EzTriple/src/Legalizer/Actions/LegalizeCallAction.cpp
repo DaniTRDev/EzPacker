@@ -33,16 +33,7 @@ LegalizationResult LegalizeCall(LegalizeCtx &ctx)
     MirInstructionBuilder beforeBuilder(builderCtx, instr->getOwner(), InsertionType::InsertBefore, it);
     MirOperandBuilder opBuilder(builderCtx);
 
-    bool firstBeforeInserted = false;
-    auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
-    {
-        beforeBuilder.build(opc, instr->getSourceRef(), ops);
-        if (!firstBeforeInserted)
-        {
-            beforeBuilder.changeInsertionType(InsertionType::InsertAfter);
-            firstBeforeInserted = true;
-        }
-    };
+    EmitOrdered emitBefore(beforeBuilder, instr);
 
     MirOperand *returnDest = nullptr;
     MirOperand *callee = nullptr;

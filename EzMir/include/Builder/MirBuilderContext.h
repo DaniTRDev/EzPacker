@@ -117,7 +117,6 @@ class MirBuilderContext
     std::pmr::list<class MirGlobalVar *> m_globalVars;  // Used to quickly iterate over defined global variables.
 
     std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
-    std::pmr::map<MirId, class MirClass *> m_typeIdToClass;           // Used to search for classes using their type.
     std::pmr::map<MirId, class MirFunction *> m_functionIdToFunc;     // Used to search for functions.
     std::pmr::map<MirId, class MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
     std::pmr::map<MirId, class MirRegister *> m_registerIdToRegister; // Used to search for registers.

@@ -14,17 +14,6 @@ namespace CodeGenerators
 namespace
 {
 
-// Uppercases an ASCII string, used to build include-guard names from the target name.
-std::string ToUpper(std::string_view s)
-{
-    std::string res(s);
-    for (char &c : res)
-    {
-        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    }
-    return res;
-}
-
 } // namespace
 
 // Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
@@ -33,52 +22,30 @@ CppInstructionSelectorGenerator::CppInstructionSelectorGenerator(DiagnosticColle
                                                                  std::filesystem::path outPath,
                                                                  std::string targetName) :
     CodeGenerator("CodeGenerators::InstructionSelector", collector, table, std::move(outPath)),
-    m_targetName(std::move(targetName))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
 {
-    if (m_targetName.empty())
-    {
-        m_targetName = "Target";
-    }
 }
 
 // Collects the parsed selection patterns produced by Sema, preserving declaration order.
 std::vector<const Symbol *> CppInstructionSelectorGenerator::collectPatternSymbols() const
 {
-    std::vector<const Symbol *> results;
     if (!m_table)
     {
-        return results;
+        return {};
     }
 
-    for (const Symbol *sym : m_table->getSymbols())
-    {
-        if (sym && sym->getType() == SymbolType::SelectionPattern && sym->hasData<Symbols::SelectionPatternSymbol>())
-        {
-            results.push_back(sym);
-        }
-    }
-
-    return results;
+    return m_table->collect<Symbols::SelectionPatternSymbol>(SymbolType::SelectionPattern);
 }
 
 // Collects the parsed addressing modes that selection patterns may fold into memory operands.
 std::vector<const Symbol *> CppInstructionSelectorGenerator::collectAddrModeSymbols() const
 {
-    std::vector<const Symbol *> results;
     if (!m_table)
     {
-        return results;
+        return {};
     }
 
-    for (const Symbol *sym : m_table->getSymbols())
-    {
-        if (sym && sym->getType() == SymbolType::AddressingMode && sym->hasData<Symbols::AddrModeSymbol>())
-        {
-            results.push_back(sym);
-        }
-    }
-
-    return results;
+    return m_table->collect<Symbols::AddrModeSymbol>(SymbolType::AddressingMode);
 }
 
 // Resolves the header/source destinations, emits both artifacts, and reports combined success.
@@ -107,7 +74,7 @@ bool CppInstructionSelectorGenerator::run()
 // Emits the selector class declaration with one private select<Opcode> entry point per opcode.
 void CppInstructionSelectorGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
-    std::string guard = std::format("EZTRIPLE_{}_INSTRUCTION_SELECTOR_H", ToUpper(m_targetName));
+    std::string guard = std::format("EZTRIPLE_{}_INSTRUCTION_SELECTOR_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guard);
     emitter.emitBlankLine();
     emitter.emitBanner("CppInstructionSelectorGenerator");
@@ -273,20 +240,6 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
             emitter.emitLine("bool {}::select{}(MirBuilderContext *ctx, MirInstruction *inst)", className, opc);
             {
                 auto fnScope = emitter.enterBlock();
-                emitter.emitLine("auto findClass = [&](std::string_view name) -> MirRegisterClass * {");
-                emitter.indent();
-                emitter.emitLine("if (!m_targetDesc) return nullptr;");
-                emitter.emitLine("for (auto *bank : m_targetDesc->getAvailableRegisterBanks())");
-                emitter.emitLine("{");
-                emitter.indent();
-                emitter.emitLine("if (!bank) continue;");
-                emitter.emitLine("if (auto *rc = bank->getClass(name)) return rc;");
-                emitter.dedent();
-                emitter.emitLine("}");
-                emitter.emitLine("return nullptr;");
-                emitter.dedent();
-                emitter.emitLine("};");
-                emitter.emitBlankLine();
 
                 for (const auto *pat : patterns)
                 {
@@ -408,8 +361,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                                                 m_targetName,
                                                                 m_targetName,
                                                                 selInst.m_targetOpcode.m_node);
-                                            emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc "
-                                                             "*>({}), inst->getSourceRef(), emittedOps);",
+                                            emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);",
                                                              targetDescCall);
                                         }
 
@@ -484,8 +436,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                                                 m_targetName,
                                                                 m_targetName,
                                                                 selInst.m_targetOpcode.m_node);
-                                            emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc "
-                                                             "*>({}), inst->getSourceRef(), emittedOps);",
+                                            emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);",
                                                              targetDescCall);
                                         }
                                         emitter.emitLine("inst->eraseFromOwner();");
@@ -540,8 +491,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
                                                                 m_targetName,
                                                                 m_targetName,
                                                                 selInst.m_targetOpcode.m_node);
-                                            emitter.emitLine("ib.buildTarget(const_cast<MirTargetInstructionDesc "
-                                                             "*>({}), inst->getSourceRef(), emittedOps);",
+                                            emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);",
                                                              targetDescCall);
                                         }
                                         emitter.emitLine("inst->eraseFromOwner();");
@@ -572,16 +522,6 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter) cons
             emitter.emitBlankLine();
         }
     }
-}
-
-// Convenience wrapper retained for callers that do not need to configure a generator object.
-bool GenerateInstructionSelector(DiagnosticCollector *collector,
-                                 SymbolTable *table,
-                                 std::filesystem::path outPath,
-                                 std::string targetName)
-{
-    CppInstructionSelectorGenerator generator(collector, table, std::move(outPath), std::move(targetName));
-    return generator.run();
 }
 
 } // namespace CodeGenerators

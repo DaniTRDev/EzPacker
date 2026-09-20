@@ -49,7 +49,7 @@ TEST_F(MirFrameLowererTest, TestBasicFrameLayoutCalculation)
     ASSERT_NE(obj2, nullptr);
     ASSERT_NE(obj3, nullptr);
 
-    FrameLowererCtx flCtx(ctx, func, getTargetDesc(), ctx->getGlobalAllocator());
+    FrameLowererCtx flCtx(ctx, func, getTargetDesc());
     auto *lowerer = getTargetDesc()->getFrameLowerer();
 
     lowerer->calculateFrameLayout(flCtx);
@@ -91,7 +91,7 @@ TEST_F(MirFrameLowererTest, TestFrameLayoutWithCalleeSavedRegisters)
 
     auto *obj = func->getStackFrame()->createStaticStackObj(typeTable->i64());
 
-    FrameLowererCtx flCtx(ctx, func, getTargetDesc(), ctx->getGlobalAllocator());
+    FrameLowererCtx flCtx(ctx, func, getTargetDesc());
     auto *lowerer = getTargetDesc()->getFrameLowerer();
 
     lowerer->calculateFrameLayout(flCtx);
@@ -132,7 +132,7 @@ TEST_F(MirFrameLowererTest, TestLowerStackObjectReferences)
     MirInstruction *inst = *block->getInstructions().begin();
     EXPECT_TRUE(inst->getOperand(1)->isOfType<MirReference>());
 
-    FrameLowererCtx flCtx(ctx, func, getTargetDesc(), ctx->getGlobalAllocator());
+    FrameLowererCtx flCtx(ctx, func, getTargetDesc());
     auto *lowerer = getTargetDesc()->getFrameLowerer();
 
     // Step 1: Compute layout to calculate concrete offsets

@@ -18,20 +18,6 @@ MirTargetInstructionDesc::MirTargetInstructionDesc(const char *name,
 }
 
 /**
- * Backward-compatible constructor without operand classes.
- */
-MirTargetInstructionDesc::MirTargetInstructionDesc(const char *name,
-                                                   size_t id,
-                                                   std::initializer_list<MirOperandFlag> operandFlags,
-                                                   std::initializer_list<MirRegisterRef> implicitDefs,
-                                                   std::initializer_list<MirRegisterRef> implicitUses,
-                                                   MirInstructionFlags targetFlags) :
-    m_name(name), m_id(id), m_implicitDefs(implicitDefs), m_implicitUses(implicitUses), m_targetFlags(targetFlags)
-{
-    m_operandsFlags.insert(m_operandsFlags.begin(), operandFlags.begin(), operandFlags.end());
-}
-
-/**
  * Returns the target assembly mnemonic name.
  */
 const char *MirTargetInstructionDesc::getName() const { return m_name; }
@@ -45,11 +31,6 @@ size_t MirTargetInstructionDesc::getId() const { return m_id; }
  * Returns the vector of operand dataflow access flags.
  */
 const std::vector<MirOperandFlag> &MirTargetInstructionDesc::getOperandsFlags() const { return m_operandsFlags; }
-
-/**
- * Returns the vector of operand register class constraints.
- */
-const std::vector<MirRegisterClass *> &MirTargetInstructionDesc::getOperandClasses() const { return m_operandClasses; }
 
 /**
  * Returns the register class constraint for the operand at index, or nullptr.
@@ -73,14 +54,6 @@ void MirTargetInstructionDesc::setOperandClass(size_t index, MirRegisterClass *r
         m_operandClasses.resize(index + 1, nullptr);
     }
     m_operandClasses[index] = regClass;
-}
-
-/**
- * Replaces the full operand register class constraint vector.
- */
-void MirTargetInstructionDesc::setOperandClasses(std::vector<MirRegisterClass *> classes)
-{
-    m_operandClasses = std::move(classes);
 }
 
 /**

@@ -196,3 +196,24 @@ entry:
     std::filesystem::remove(mirPath);
     std::filesystem::remove(outPath);
 }
+
+// LEG-08: only .mir inputs are supported; other extensions must be rejected explicitly.
+TEST_F(EzCompilerTestSuite, TestUnsupportedSourceFormatRejected)
+{
+    const std::string srcPath = "test_unsupported_source.ez";
+    {
+        std::ofstream out(srcPath);
+        out << "int main() { return 0; }\n";
+    }
+
+    CommandLineOptions options;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    EzCompiler::MirModuleLoader loader;
+    EXPECT_FALSE(loader.compileSourceToMir(ctx, srcPath, *ctx.getBuilderContext()));
+
+    std::filesystem::remove(srcPath);
+}

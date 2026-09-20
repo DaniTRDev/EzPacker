@@ -88,7 +88,7 @@ class CodeEmitterContext
      * If the label does not exist, allocates a new CodeLabel via the context allocator,
      * registers it into the current function's label map, and returns a pointer to it.
      */
-    CodeLabel *getOrCreateLabel(CodeSection *definingSection, MirId id, const std::string_view &name);
+    CodeLabel *getOrCreateLabel(CodeSection *definingSection, MirId id, std::string_view name);
 
     /**
      * Returns the current code label bound to the context.

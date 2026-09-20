@@ -5,7 +5,6 @@
 #include "MirPasses/IMirTransformPass.h"
 
 class MirBuilderContext;
-class MirLegalizer;
 class TargetDesc;
 
 /**
@@ -26,8 +25,7 @@ class MirFunctionSignatureLegalizerPass : public IMirTransformPass
                       class MirPassManager *passManager) override;
 
   private:
-    MirBuilderContext *m_ctx;  ///< Shared builder context used to synthesize the prologue.
-    MirLegalizer *m_legalizer; ///< Target legalizer used for ABI return classification.
+    MirBuilderContext *m_ctx; ///< Shared builder context used to synthesize the prologue.
 };
 
 #endif // EZTRIPLE_MIR_FUNCTION_SIGNATURE_LEGALIZER_PASS_H

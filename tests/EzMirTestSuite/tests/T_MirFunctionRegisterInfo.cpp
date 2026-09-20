@@ -46,7 +46,7 @@ TEST_F(TestMirFunctionRegisterInfo, TrackOnBuild)
     EXPECT_TRUE(regInfo->hasOneUse(vregSrc->getRegId()));
 
     auto usesOpt = regInfo->getUses(vregSrc->getRegId());
-    ASSERT_TRUE(usesOpt.has_value());
+    ASSERT_NE(usesOpt, nullptr);
     const auto &uses = *usesOpt;
     ASSERT_EQ(uses.size(), 1u);
     EXPECT_EQ(uses[0].m_userInst, addInst);
@@ -74,7 +74,7 @@ TEST_F(TestMirFunctionRegisterInfo, TrackMultipleUses)
     EXPECT_EQ(regInfo->getUseCount(src->getRegId()), 2u);
 
     auto usesOpt = regInfo->getUses(src->getRegId());
-    ASSERT_TRUE(usesOpt.has_value());
+    ASSERT_NE(usesOpt, nullptr);
     const auto &uses = *usesOpt;
     ASSERT_EQ(uses.size(), 2u);
     EXPECT_EQ(uses[0].m_userInst, inst1);
@@ -107,7 +107,7 @@ TEST_F(TestMirFunctionRegisterInfo, TrackOperandSwap)
     EXPECT_TRUE(regInfo->hasOneUse(srcNew->getRegId()));
 
     auto usesOpt = regInfo->getUses(srcNew->getRegId());
-    ASSERT_TRUE(usesOpt.has_value());
+    ASSERT_NE(usesOpt, nullptr);
     const auto &uses = *usesOpt;
     ASSERT_EQ(uses.size(), 1u);
     EXPECT_EQ(uses[0].m_userInst, inst);
@@ -162,7 +162,7 @@ TEST_F(TestMirFunctionRegisterInfo, TrackMemoryOperandBaseVReg)
     EXPECT_TRUE(regInfo->hasOneUse(baseReg->getRegId()));
 
     auto usesOpt = regInfo->getUses(baseReg->getRegId());
-    ASSERT_TRUE(usesOpt.has_value());
+    ASSERT_NE(usesOpt, nullptr);
     const auto &uses = *usesOpt;
     ASSERT_EQ(uses.size(), 1u);
     EXPECT_EQ(uses[0].m_userInst, storeInst);

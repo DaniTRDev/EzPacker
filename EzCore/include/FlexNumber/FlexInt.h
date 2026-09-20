@@ -66,22 +66,22 @@ class FlexInt
     /**
      * Returns true if the integer value is strictly negative (< 0).
      */
-    bool isNeg() const;
+    bool isNeg() const noexcept;
 
     /**
      * Returns true if the integer value is strictly positive (> 0).
      */
-    bool isPositive() const;
+    bool isPositive() const noexcept;
 
     /**
      * Returns true if this instance was constructed with signed semantics.
      */
-    bool isSigned() const;
+    bool isSigned() const noexcept;
 
     /**
      * Returns true if the integer value is equal to zero.
      */
-    bool isZero() const;
+    bool isZero() const noexcept;
 
     /**
      * Returns true if this value is strictly greater than other.
@@ -116,17 +116,17 @@ class FlexInt
     /**
      * Splits this integer and extracts the most significant half (bitWidth / 2 bits).
      */
-    FlexInt getHighHalf();
+    FlexInt getHighHalf() const;
 
     /**
      * Splits this integer and extracts the least significant half (bitWidth / 2 bits).
      */
-    FlexInt getLowHalf();
+    FlexInt getLowHalf() const;
 
     /**
      * Returns the sum of this integer and other, clamped to the target bitwidth.
      */
-    FlexInt operator+(const FlexInt &other);
+    FlexInt operator+(const FlexInt &other) const;
 
     /**
      * Increments this value in-place by 1.
@@ -141,7 +141,7 @@ class FlexInt
     /**
      * Returns the difference of this integer minus other, clamped to the target bitwidth.
      */
-    FlexInt operator-(const FlexInt &other);
+    FlexInt operator-(const FlexInt &other) const;
 
     /**
      * Decrements this value in-place by 1.
@@ -156,7 +156,7 @@ class FlexInt
     /**
      * Returns the product of this integer multiplied by other.
      */
-    FlexInt operator*(const FlexInt &other);
+    FlexInt operator*(const FlexInt &other) const;
 
     /**
      * Multiplies this value by other in-place.
@@ -166,7 +166,7 @@ class FlexInt
     /**
      * Returns the quotient of this integer divided by other.
      */
-    FlexInt operator/(const FlexInt &other);
+    FlexInt operator/(const FlexInt &other) const;
 
     /**
      * Divides this value by other in-place.
@@ -176,7 +176,7 @@ class FlexInt
     /**
      * Returns the remainder (modulus) of this integer divided by other.
      */
-    FlexInt operator%(const FlexInt &other);
+    FlexInt operator%(const FlexInt &other) const;
 
     /**
      * Computes the modulus of this value by other in-place.
@@ -196,7 +196,7 @@ class FlexInt
     /**
      * Returns the configured bit size of this integer.
      */
-    size_t getBitSize() const;
+    size_t getBitSize() const noexcept;
 
     /**
      * Extends or truncates the integer to a new bit size and signedness representation.
@@ -214,11 +214,45 @@ class FlexInt
      */
     void clampToTwosComplement();
 
+    /**
+     * Throws std::invalid_argument when other's bit width or signedness does not match this instance.
+     */
+    void checkCompatible(const FlexInt &other) const;
+
+    /**
+     * Shared initialization for the four integral constructors: initializes the mp_int, stamps the
+     * signedness/width metadata and clamps the value to the requested width.
+     */
+    template <typename T> void initFromInteger(T value, size_t bitWidth, bool isSigned);
+
+    /**
+     * Shared implementation of the value-returning arithmetic operators: copies this instance and
+     * applies op (a pointer to a compound-assignment member) to the copy.
+     */
+    template <typename Op> FlexInt applyBinary(const FlexInt &other, Op op) const
+    {
+        FlexInt result(*this);
+        (result.*op)(other);
+        return result;
+    }
+
+    /**
+     * Throws std::invalid_argument when this value's width cannot be split into two equal halves.
+     */
+    void ensureSplittableWidth() const;
+
+    /**
+     * Returns this value mapped into the unsigned range [0, 2^m_bitWidth): negative values are
+     * normalized by adding 2^m_bitWidth. The caller owns the returned mp_int and must mp_clear it.
+     */
+    mp_int normalizedUnsigned() const;
+
   private:
-    bool m_isSigned;   // Whether the value is interpreted with two's-complement signed semantics.
-    mp_err m_lastErr;  // Status code from the most recent libtommath operation (MP_OKAY on success).
-    mp_int m_number;   // Underlying libtommath multi-precision integer holding the magnitude/sign.
-    size_t m_bitWidth; // Configured storage width in bits used for clamping and serialization.
+    bool m_isSigned;          // Whether the value is interpreted with two's-complement signed semantics.
+    mutable mp_err m_lastErr; // Status of the most recent libtommath operation (MP_OKAY on success).
+                              // Mutable so const query helpers can record status without observable state.
+    mp_int m_number;          // Underlying libtommath multi-precision integer holding the magnitude/sign.
+    size_t m_bitWidth;        // Configured storage width in bits used for clamping and serialization.
 };
 
 #endif // EZCORE_FLEX_INT_H

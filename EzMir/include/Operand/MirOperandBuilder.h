@@ -3,9 +3,14 @@
 
 #include "EzMirCommon.h"
 #include "Builder/MirBuilder.h"
+#include "Builder/MirBuilderContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
 #include "FlexNumber/FlexFloat.h"
 #include "FlexNumber/FlexInt.h"
 #include "Operand/MirOperand.h"
+#include "Type/MirType.h"
+#include <string_view>
+#include <type_traits>
 
 /**
  * Factory builder for constructing and allocating all variants of MirOperand objects
@@ -127,6 +132,84 @@ class MirOperandBuilder : public MirBuilder<MirOperand>
         OperandType *op = m_allocator.template new_object<OperandType>(std::forward<Args>(args)...);
         setBuildResult(static_cast<MirOperand *>(op));
         return op;
+    }
+
+    /**
+     * Validates the registers of a memory operand: when a base register is present it must have
+     * pointer type, and when an index register is present it must be integer or pointer. Emits an
+     * error diagnostic and returns false on the first violation.
+     */
+    bool validateMemoryRegisters(MirType *resultType, MirRegister *base, MirRegister *index, SourceReference *ref);
+
+    /**
+     * Shared implementation of buildInt/buildFloat: validates the declared type kind, extends the
+     * value when it is narrower than the destination type, or promotes the destination type when
+     * the value is wider. PromoteFn maps a bit width to the closest matching MirType (or nullptr).
+     */
+    template <typename ValueType, typename OperandType, typename PromoteFn>
+    OperandType *buildConstant(MirType *type,
+                               const ValueType &value,
+                               SourceReference *ref,
+                               MirTypeKind expectedKind,
+                               std::string_view kindErrorMsg,
+                               std::string_view extendMsg,
+                               std::string_view promoteMsg,
+                               bool zeroExtend,
+                               PromoteFn promote)
+    {
+        if (!type)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << "Can't build a constant operand without a type";
+            return nullptr;
+        }
+
+        ValueType val = value;
+        MirType *destType = type;
+        size_t mirSize = type->getTotalSizeInBits(), valueSize = value.getBitSize();
+
+        if (type->getKind() != expectedKind)
+        {
+            m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                    << ref << kindErrorMsg << type->getName();
+            return nullptr;
+        }
+
+        if (mirSize > valueSize)
+        {
+            // Emit a warning and extend.
+            m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
+                    << ref << extendMsg << type->getName();
+            if constexpr (std::is_same_v<ValueType, FlexInt>)
+            {
+                val.extend(mirSize, zeroExtend);
+            }
+            else
+            {
+                val.extend(mirSize);
+            }
+        }
+        else if (mirSize < valueSize)
+        {
+            destType = promote(valueSize);
+            if (destType)
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Warning, "MirOperandBuilder")
+                        << ref << promoteMsg << destType->getName();
+            }
+            else
+            {
+                m_ctx->getDiagCollector()->builder(Diag_Error, "MirOperandBuilder")
+                        << ref
+                        << "Given value's bit-width is BIGGER than internal type and there's no available type to be "
+                           "promoted "
+                           "to: "
+                        << type->getName();
+                return nullptr;
+            }
+        }
+
+        return build<OperandType>(destType, std::move(val), ref);
     }
 
   private:

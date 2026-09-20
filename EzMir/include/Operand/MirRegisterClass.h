@@ -106,6 +106,11 @@ class MirRegisterClass
     const char *getName() const;
 
     /**
+     * Returns the register bank this class belongs to.
+     */
+    class MirRegisterBank *getBank() const;
+
+    /**
      * Inserts a register descriptor into this class if not already registered.
      * Returns true upon successful insertion, false if a register with the same name exists.
      *

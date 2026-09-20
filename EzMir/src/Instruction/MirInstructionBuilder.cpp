@@ -10,42 +10,6 @@
 #include "Printer/MirPrinter.h"
 
 /**
- * Resolves the register information of the function owning the instruction, or nullptr when the
- * instruction is detached from any function.
- */
-MirFunctionRegisterInfo *getRegInfo(MirInstruction *instr)
-{
-    MirBlock *block = instr->getOwner();
-    if (block && block->getOwner())
-    {
-        return block->getOwner()->getRegisterInfo();
-    }
-    return nullptr;
-}
-
-/**
- * Invokes callback with the register ID of every virtual register referenced by an operand,
- * including the base and index registers of a memory operand. Null operands are ignored.
- */
-static void forEachVReg(MirOperand *op, auto &&callback)
-{
-    if (!op)
-        return;
-    if (auto *reg = op->get<MirRegister>())
-    {
-        if (reg->isVirtual())
-            callback(reg->getRegId());
-    }
-    else if (auto *mem = op->get<MirMemory>())
-    {
-        if (mem->getBase() && mem->getBase()->isVirtual())
-            callback(mem->getBase()->getRegId());
-        if (mem->getIndex() && mem->getIndex()->isVirtual())
-            callback(mem->getIndex()->getRegId());
-    }
-}
-
-/**
  * Initializes the instruction builder with parent context and insertion cursor.
  */
 MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint) :
@@ -80,13 +44,19 @@ MirInstructionBuilder::MirInstructionBuilder(MirBuilderContext *ctx, MirInstruct
 }
 
 /**
- * Builds an instruction from opcode, source reference, and initializer_list of operands.
+ * Shared body of every build()/buildTarget() overload: allocates the instruction, optionally
+ * attaches a target descriptor, appends each operand and finalizes the insertion.
  */
-MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
-                                             SourceReference *ref,
-                                             const std::initializer_list<MirOperand *> &operands)
+MirInstruction *MirInstructionBuilder::buildImpl(MirInstructionOpCode opcode,
+                                                 SourceReference *ref,
+                                                 std::span<MirOperand *const> operands,
+                                                 const MirTargetInstructionDesc *targetDesc)
 {
     MirInstruction *instr = createInstruction(opcode, ref);
+    if (instr && targetDesc)
+    {
+        instr->setTargetDesc(targetDesc);
+    }
     for (MirOperand *op : operands)
     {
         addOperand(instr, op);
@@ -94,6 +64,16 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
 
     finalizeInstruction(instr, ref);
     return instr;
+}
+
+/**
+ * Builds an instruction from opcode, source reference, and initializer_list of operands.
+ */
+MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
+                                             SourceReference *ref,
+                                             const std::initializer_list<MirOperand *> &operands)
+{
+    return buildImpl(opcode, ref, operands, nullptr);
 }
 
 /**
@@ -103,14 +83,7 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::vector<MirOperand *> &operands)
 {
-    MirInstruction *instr = createInstruction(opcode, ref);
-    for (MirOperand *op : operands)
-    {
-        addOperand(instr, op);
-    }
-
-    finalizeInstruction(instr, ref);
-    return instr;
+    return buildImpl(opcode, ref, operands, nullptr);
 }
 
 /**
@@ -120,75 +93,37 @@ MirInstruction *MirInstructionBuilder::build(MirInstructionOpCode opcode,
                                              SourceReference *ref,
                                              const std::pmr::vector<MirOperand *> &operands)
 {
-    MirInstruction *instr = createInstruction(opcode, ref);
-
-    for (MirOperand *op : operands)
-    {
-        addOperand(instr, op);
-    }
-
-    finalizeInstruction(instr, ref);
-    return instr;
+    return buildImpl(opcode, ref, operands, nullptr);
 }
 
 /**
  * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
  */
-MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
+MirInstruction *MirInstructionBuilder::buildTarget(const MirTargetInstructionDesc *targetDesc,
                                                    SourceReference *srcRef,
                                                    std::initializer_list<MirOperand *> operands)
 {
-    MirInstruction *instr = createInstruction(MirInstructionOpCode::TARGET_INST, srcRef);
-    if (instr)
-    {
-        instr->setTargetDesc(targetDesc);
-    }
-    for (MirOperand *op : operands)
-    {
-        addOperand(instr, op);
-    }
-    finalizeInstruction(instr, srcRef);
-    return instr;
+    return buildImpl(MirInstructionOpCode::TARGET_INST, srcRef, operands, targetDesc);
 }
 
 /**
  * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
  */
-MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
+MirInstruction *MirInstructionBuilder::buildTarget(const MirTargetInstructionDesc *targetDesc,
                                                    SourceReference *srcRef,
                                                    const std::vector<MirOperand *> &operands)
 {
-    MirInstruction *instr = createInstruction(MirInstructionOpCode::TARGET_INST, srcRef);
-    if (instr)
-    {
-        instr->setTargetDesc(targetDesc);
-    }
-    for (MirOperand *op : operands)
-    {
-        addOperand(instr, op);
-    }
-    finalizeInstruction(instr, srcRef);
-    return instr;
+    return buildImpl(MirInstructionOpCode::TARGET_INST, srcRef, operands, targetDesc);
 }
 
 /**
  * Builds a target machine instruction with opcode TARGET_INST and attaches the target descriptor.
  */
-MirInstruction *MirInstructionBuilder::buildTarget(MirTargetInstructionDesc *targetDesc,
+MirInstruction *MirInstructionBuilder::buildTarget(const MirTargetInstructionDesc *targetDesc,
                                                    SourceReference *srcRef,
                                                    const std::pmr::vector<MirOperand *> &operands)
 {
-    MirInstruction *instr = createInstruction(MirInstructionOpCode::TARGET_INST, srcRef);
-    if (instr)
-    {
-        instr->setTargetDesc(targetDesc);
-    }
-    for (MirOperand *op : operands)
-    {
-        addOperand(instr, op);
-    }
-    finalizeInstruction(instr, srcRef);
-    return instr;
+    return buildImpl(MirInstructionOpCode::TARGET_INST, srcRef, operands, targetDesc);
 }
 
 /**
@@ -201,10 +136,13 @@ MirInstructionBuilder &MirInstructionBuilder::operator<<(MirOperand *operand)
         throw std::runtime_error("Internal Compiler Error: The instruction is not built or the operand is not valid");
     }
 
-    m_ctx->getDiagCollector()->trace("MirInstructionBuilder",
-                                     "Appended operand to inst: {}",
-                                     MirPrinter::printToString(operand))
-            << operand->getSourceRef();
+    // Only format the operand when the trace diagnostic is actually enabled.
+    if (m_ctx->getDiagCollector()->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+    {
+        m_ctx->getDiagCollector()
+                        ->trace("MirInstructionBuilder", "Appended operand to inst: {}", MirPrinter::printToString(operand))
+                << operand->getSourceRef();
+    }
 
     addOperand(getBuiltObj(), operand);
     return *this;
@@ -383,10 +321,15 @@ void MirInstructionBuilder::finalizeInstruction(MirInstruction *instr, SourceRef
     if (!instr)
         return;
 
-    m_ctx->getDiagCollector()->trace("MirInstructionBuilder",
-                                     "Built instruction: {}",
-                                     MirPrinter::printToString(instr, MirPrinterDetail::Detailed))
-            << ref;
+    // Only format the whole instruction when the trace diagnostic is actually enabled.
+    if (m_ctx->getDiagCollector()->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+    {
+        m_ctx->getDiagCollector()
+                        ->trace("MirInstructionBuilder",
+                                "Built instruction: {}",
+                                MirPrinter::printToString(instr, MirPrinterDetail::Detailed))
+                << ref;
+    }
 
     if (m_insertionPoint.m_block)
     {
@@ -436,15 +379,19 @@ void MirInstructionBuilder::registerOperand(MirInstruction *instr, MirOperand *o
         return;
 
     MirOperandFlag flag = instr->getOperandFlag(index);
-    forEachVReg(op,
-                [&](MirId vregId)
-                {
-                    if (flag & MirOperandFlag::Write)
-                        regInfo->recordDef(vregId, instr);
+    MirInstruction::visitOperandRegisters(op,
+                                          flag,
+                                          [&](MirRegister *reg, MirOperandFlag effectiveFlag)
+                                          {
+                                              if (!reg->isVirtual())
+                                                  return;
 
-                    if (flag & MirOperandFlag::Read)
-                        regInfo->recordUse(vregId, instr, index);
-                });
+                                              if (effectiveFlag & MirOperandFlag::Write)
+                                                  regInfo->recordDef(reg->getRegId(), instr);
+
+                                              if (effectiveFlag & MirOperandFlag::Read)
+                                                  regInfo->recordUse(reg->getRegId(), instr, index);
+                                          });
 }
 
 /**
@@ -457,13 +404,17 @@ void MirInstructionBuilder::unregisterOperand(MirInstruction *instr, MirOperand 
         return;
 
     MirOperandFlag flag = instr->getOperandFlag(index);
-    forEachVReg(op,
-                [&](MirId vregId)
-                {
-                    if (flag & MirOperandFlag::Write)
-                        regInfo->clearDef(vregId);
+    MirInstruction::visitOperandRegisters(op,
+                                          flag,
+                                          [&](MirRegister *reg, MirOperandFlag effectiveFlag)
+                                          {
+                                              if (!reg->isVirtual())
+                                                  return;
 
-                    if (flag & MirOperandFlag::Read)
-                        regInfo->removeUse(vregId, instr);
-                });
+                                              if (effectiveFlag & MirOperandFlag::Write)
+                                                  regInfo->clearDef(reg->getRegId());
+
+                                              if (effectiveFlag & MirOperandFlag::Read)
+                                                  regInfo->removeUse(reg->getRegId(), instr);
+                                          });
 }

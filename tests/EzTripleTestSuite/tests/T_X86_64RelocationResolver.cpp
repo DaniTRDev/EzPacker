@@ -125,3 +125,45 @@ TEST_F(X86_64RelocationResolverTest, RejectsOutOfBoundsOffsets)
     X86_64RelocationResolver resolver;
     EXPECT_FALSE(resolver.patch(std::span<uint8_t>(bytes.data(), bytes.size()), reloc, 0x10, reloc.m_relocType));
 }
+
+// WEI-04: object-file relocations need the opcode-dependent field offset, not the instruction start.
+TEST_F(X86_64RelocationResolverTest, ReportsBranchAndPcRelativeFieldOffsets)
+{
+    std::array<uint8_t, 16> bytes{};
+    CodeRelocation reloc{};
+    reloc.m_address = 0;
+    reloc.m_relocType = TargetCodeRelocationType::BranchRel32;
+
+    X86_64RelocationResolver resolver;
+
+    // JMP rel32: the displacement field starts one byte after the opcode.
+    bytes[0] = 0xE9;
+    EXPECT_EQ(resolver.getRelocationFieldOffset(std::span<const uint8_t>(bytes.data(), bytes.size()),
+                                                reloc,
+                                                reloc.m_relocType),
+              1u);
+
+    // Jcc rel32: two opcode bytes precede the displacement.
+    bytes[0] = 0x0F;
+    bytes[1] = 0x84;
+    EXPECT_EQ(resolver.getRelocationFieldOffset(std::span<const uint8_t>(bytes.data(), bytes.size()),
+                                                reloc,
+                                                reloc.m_relocType),
+              2u);
+
+    // Unrecognized opcode falls back to the relocation address.
+    bytes[0] = 0x90;
+    EXPECT_EQ(resolver.getRelocationFieldOffset(std::span<const uint8_t>(bytes.data(), bytes.size()),
+                                                reloc,
+                                                reloc.m_relocType),
+              0u);
+
+    // A direct RIP-relative field is already located by the relocation address.
+    CodeRelocation pcReloc{};
+    pcReloc.m_address = 4;
+    pcReloc.m_relocType = TargetCodeRelocationType::PCRel32;
+    EXPECT_EQ(resolver.getRelocationFieldOffset(std::span<const uint8_t>(bytes.data(), bytes.size()),
+                                                pcReloc,
+                                                pcReloc.m_relocType),
+              4u);
+}

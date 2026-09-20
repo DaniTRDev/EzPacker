@@ -80,18 +80,24 @@ bool CodeGenerator::WriteFileIfChanged(const std::filesystem::path &filePath,
                                        std::string_view newContent,
                                        std::string *errorOut)
 {
-    // Check if the file already exists and has identical content
-    if (std::filesystem::exists(filePath))
+    // Compare sizes first, then read the existing file once; identical content leaves the mtime untouched.
+    std::error_code existsEc;
+    if (std::filesystem::exists(filePath, existsEc) && !existsEc)
     {
-        std::ifstream currentFile(filePath, std::ios::in | std::ios::binary);
+        std::ifstream currentFile(filePath, std::ios::in | std::ios::binary | std::ios::ate);
         if (currentFile.is_open())
         {
-            std::ostringstream ss;
-            ss << currentFile.rdbuf();
-            if (ss.str() == newContent)
+            const std::streamoff size = currentFile.tellg();
+            if (size >= 0 && static_cast<size_t>(size) == newContent.size())
             {
-                // Identical content: leave file unmodified to preserve mtime
-                return true;
+                std::string current(static_cast<size_t>(size), '\0');
+                currentFile.seekg(0, std::ios::beg);
+                currentFile.read(current.data(), static_cast<std::streamsize>(current.size()));
+                if (current == newContent)
+                {
+                    // Identical content: leave file unmodified to preserve mtime
+                    return true;
+                }
             }
         }
     }
@@ -113,25 +119,54 @@ bool CodeGenerator::WriteFileIfChanged(const std::filesystem::path &filePath,
         }
     }
 
-    // Write new content
-    std::ofstream outFile(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
-    if (!outFile.is_open())
+    // Stage the new content in a sibling file, then rename it over the destination. A crash mid-write
+    // can therefore only leave the destination intact or the stale temporary, never a truncated output.
+    std::filesystem::path tempPath = filePath;
+    tempPath += ".tmp";
+
     {
-        if (errorOut)
+        std::ofstream outFile(tempPath, std::ios::out | std::ios::trunc | std::ios::binary);
+        if (!outFile.is_open())
         {
-            *errorOut = std::format("Failed to open file '{}' for writing.", filePath.string());
+            if (errorOut)
+            {
+                *errorOut = std::format("Failed to open file '{}' for writing.", tempPath.string());
+            }
+            return false;
         }
-        return false;
+
+        outFile.write(newContent.data(), static_cast<std::streamsize>(newContent.size()));
+        outFile.flush();
+        if (!outFile.good())
+        {
+            if (errorOut)
+            {
+                *errorOut = std::format("Failed during writing to file '{}'.", tempPath.string());
+            }
+            outFile.close();
+            std::error_code removeEc;
+            std::filesystem::remove(tempPath, removeEc);
+            return false;
+        }
     }
 
-    outFile.write(newContent.data(), static_cast<std::streamsize>(newContent.size()));
-    if (!outFile.good())
+    std::error_code renameEc;
+    std::filesystem::rename(tempPath, filePath, renameEc);
+    if (renameEc)
     {
-        if (errorOut)
+        // Some platforms refuse to overwrite via rename; fall back to remove + rename.
+        std::error_code removeEc;
+        std::filesystem::remove(filePath, removeEc);
+        std::filesystem::rename(tempPath, filePath, renameEc);
+        if (renameEc)
         {
-            *errorOut = std::format("Failed during writing to file '{}'.", filePath.string());
+            if (errorOut)
+            {
+                *errorOut = std::format("Failed to replace file '{}': {}", filePath.string(), renameEc.message());
+            }
+            std::filesystem::remove(tempPath, removeEc);
+            return false;
         }
-        return false;
     }
 
     return true;

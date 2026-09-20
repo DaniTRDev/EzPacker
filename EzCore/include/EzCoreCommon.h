@@ -6,26 +6,13 @@
 #include <string>
 #include <cstdint>
 #include <unordered_map>
-#include <stack>
-#include <functional>
-#include <memory>
 #include <list>
 #include <memory_resource>
 #include <cmath>
 
 #include <tommath.h>
 
-extern "C"
-{
-    /**
-     * LibBF arbitrary-precision floating-point library C bindings.
-     * Isolated within the libbf namespace to prevent symbol collisions with standard math symbols.
-     */
-    namespace libbf
-    {
-#include <libbf.h>
-    };
-};
+#include "LibBFWrapper.h"
 
 #include <EzLogger.h>
 

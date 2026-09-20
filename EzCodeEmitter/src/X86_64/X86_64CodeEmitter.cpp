@@ -7,6 +7,8 @@
 #include "Function/MirFunctionStackFrame.h"
 #include "Type/MirType.h"
 #include "X86_64/Encoding/X86_64InstructionEncoder.h"
+#include <stdexcept>
+#include <string>
 #include <string_view>
 
 namespace EzCodeEmitter::X86_64
@@ -116,7 +118,7 @@ uint8_t X86_64CodeEmitter::mapRegister(MirRegister *reg) const
 }
 
 bool X86_64CodeEmitter::buildResolvedOperands(const EncodingDesc &enc,
-                                              std::span<MirOperand *> operands,
+                                              std::span<MirOperand *const> operands,
                                               std::vector<ResolvedOperand> &resolved) const
 {
     resolved.assign(operands.size(), ResolvedOperand{});
@@ -253,7 +255,7 @@ bool X86_64CodeEmitter::buildResolvedOperands(const EncodingDesc &enc,
     return true;
 }
 
-bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands)
+bool X86_64CodeEmitter::tryEmitTableDriven(const MirTargetInstructionDesc *desc, std::span<MirOperand *const> operands)
 {
     if (!m_encodingResolver)
     {
@@ -336,15 +338,20 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
     return true;
 }
 
-void X86_64CodeEmitter::emitInst(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands)
+void X86_64CodeEmitter::emitInst(const MirTargetInstructionDesc *desc, std::span<MirOperand *const> operands)
 {
     if (!desc || !m_ctx)
     {
         return;
     }
 
-    // All x86-64 instructions are emitted through the generated encoding table.
-    tryEmitTableDriven(desc, operands);
+    // All x86-64 instructions are emitted through the generated encoding table. A rejected
+    // instruction previously vanished silently, producing a malformed object; surface it instead.
+    if (!tryEmitTableDriven(desc, operands))
+    {
+        throw std::runtime_error(std::string("x86-64 emitter: no encoding available for instruction '") +
+                                 std::string(desc->getName()) + "'");
+    }
 }
 
 } // namespace EzCodeEmitter::X86_64

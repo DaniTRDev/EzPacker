@@ -140,16 +140,7 @@ LegalizationResult LegalizeNarrowScalar(LegalizeCtx &ctx, size_t operandSlot, Mi
     MirInstructionBuilder ib(ctx.m_ctx, instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);
     MirOperandBuilder ob(ctx.m_ctx);
 
-    bool firstInserted = false;
-    auto emitInst = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
-    {
-        ib.build(opc, instr->getSourceRef(), ops);
-        if (!firstInserted)
-        {
-            ib.changeInsertionType(InsertionType::InsertAfter);
-            firstInserted = true;
-        }
-    };
+    EmitOrdered emitInst(ib, instr);
 
     MirOperand *dstOp = operands[0];
     bool isCompare = (instr->getMetadata().m_category == MirInstructionCategory::MirCat_Compare);

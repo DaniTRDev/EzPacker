@@ -26,13 +26,6 @@ struct IntegerLiteral : SourcedAstNode<int64_t>
 };
 
 /**
- * A floating-point literal token parsed via std::from_chars.
- */
-struct RealLiteral : SourcedAstNode<double>
-{
-};
-
-/**
  * A bare identifier token, stored as a view into the source buffer.
  */
 struct Identifier : SourcedAstNode<std::string_view>

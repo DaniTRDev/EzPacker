@@ -31,7 +31,7 @@ class MirGlobalVar
                  class MirType *type,
                  class MirOperand *initializer,
                  class SourceReference *sourceRef,
-                 const std::pmr::string &name);
+                 std::pmr::string name);
 
     /**
      * Checks if this global variable is read-only (constant).

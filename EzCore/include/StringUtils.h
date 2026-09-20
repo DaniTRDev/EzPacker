@@ -6,6 +6,64 @@
 #include <cctype>
 
 /**
+ * Returns true when the given character is legal inside a C++ identifier (ASCII letter, digit or '_').
+ */
+inline bool IsCppIdentifierChar(char c) noexcept
+{
+    return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+}
+
+/**
+ * Rewrites raw into a valid C++ identifier and returns it.
+ *
+ * Every character that cannot appear in a C++ identifier becomes '_', a leading digit is prefixed
+ * with '_', and an empty result falls back to the given string. Shared by the EzDSL generators and
+ * the CLI so target names such as "x86-64" always produce compilable code.
+ */
+inline std::string SanitizeCppIdentifier(std::string_view raw, std::string_view fallback)
+{
+    std::string result;
+    result.reserve(raw.size());
+
+    for (char c : raw)
+    {
+        result.push_back(IsCppIdentifierChar(c) ? c : '_');
+    }
+
+    if (result.empty())
+    {
+        result.assign(fallback);
+    }
+
+    if (std::isdigit(static_cast<unsigned char>(result.front())) != 0)
+    {
+        result.insert(result.begin(), '_');
+    }
+
+    return result;
+}
+
+/**
+ * Builds a canonical registry key from the given name.
+ *
+ * Lowercases ASCII and maps '-' to '_' so case- and separator-variant spellings ("x86-64",
+ * "X86_64", "AMD64") resolve to the same entry. Used by the target/dialect registries.
+ */
+inline std::string NormalizeKey(std::string_view key)
+{
+    std::string result;
+    result.reserve(key.size());
+
+    for (char c : key)
+    {
+        char lower = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        result.push_back(lower == '-' ? '_' : lower);
+    }
+
+    return result;
+}
+
+/**
  * Converts all characters in a given string view to lowercase using ASCII transformations.
  * Allocates and returns a new std::string of the same length with lowercase characters.
  */

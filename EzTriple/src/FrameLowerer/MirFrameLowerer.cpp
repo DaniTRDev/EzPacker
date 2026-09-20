@@ -56,9 +56,12 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
             currentOffset += objSize;
         }
 
-        auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
-        log << "Lowered stack frame object" << func->getSourceRef();
-        log.appendNote(func->getSourceRef(), "{}", MirPrinter::printToString(obj));
+        if (ctx.m_ctx->getDiagCollector()->isDiagEnabledForType(Diag_Trace))
+        {
+            auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
+            log << "Lowered stack frame object" << func->getSourceRef();
+            log.appendNote(func->getSourceRef(), "{}", MirPrinter::printToString(obj));
+        }
     }
 
     // Include ABI shadow space (e.g., 32 bytes on Win64 ABI)
@@ -98,7 +101,6 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
 
         for (MirInstruction *inst : instructionList)
         {
-            bool instructionModified = false;
             auto &operands = inst->getOperands();
 
             for (size_t i = 0; i < operands.size(); ++i)
@@ -120,9 +122,12 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
                     StackFrameObject *stackObj = func->getStackFrame()->getObjectFromId(objId);
                     if (!stackObj)
                     {
-                        auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Error, "MirFrameLowerer");
-                        log << "Could not retrieve stack frame object out of given reference" << ref->getSourceRef();
-                        log.appendNote(ref->getSourceRef(), "{}", MirPrinter::printToString(ref));
+                        if (ctx.m_ctx->getDiagCollector()->isDiagEnabledForType(Diag_Error))
+                        {
+                            auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Error, "MirFrameLowerer");
+                            log << "Could not retrieve stack frame object out of given reference" << ref->getSourceRef();
+                            log.appendNote(ref->getSourceRef(), "{}", MirPrinter::printToString(ref));
+                        }
                         continue;
                     }
 
@@ -133,7 +138,6 @@ void MirFrameLowerer::lowerStackObjectReferences(FrameLowererCtx &ctx)
 
                     // Replace abstract stack reference with concrete memory operand
                     builder.swapOperand(inst, memOp, i);
-                    instructionModified = true;
                 }
             }
         }

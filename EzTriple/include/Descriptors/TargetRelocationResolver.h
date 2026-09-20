@@ -30,6 +30,27 @@ class TargetRelocationResolver
                        const CodeRelocation &reloc,
                        uint64_t targetOffset,
                        TargetCodeRelocationType type) = 0;
+
+    /**
+     * Returns the byte offset (within the section) of the relocation's fixup field.
+     *
+     * For types whose field location depends on the encoded opcode (e.g. near branches) the target
+     * inspects the section bytes; other types fall back to reloc.m_address. This lets the compiler
+     * describe object-file relocations without re-implementing opcode knowledge.
+     *
+     * @param text  Finalized section bytes that own the relocation.
+     * @param reloc Relocation record describing the instruction/field location.
+     * @param type  Relocation kind requested by the emitter.
+     * @return Absolute offset of the field to patch.
+     */
+    virtual uint64_t getRelocationFieldOffset(std::span<const uint8_t> text,
+                                              const CodeRelocation &reloc,
+                                              TargetCodeRelocationType type) const
+    {
+        (void)text;
+        (void)type;
+        return reloc.m_address;
+    }
 };
 
 #endif // EZTRIPLE_TARGET_RELOCATION_RESOLVER_H

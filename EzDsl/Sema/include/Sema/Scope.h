@@ -31,24 +31,14 @@ class Scope
     ScopeId getParentId() const;
 
     /**
-     * Finds a locally declared symbol ID by name. Returns InvalidScopeId if not found in this scope.
-     */
-    ScopeId findSymbol(std::string_view name) const;
-
-    /**
      * Finds all locally declared symbol IDs by name.
      */
     auto findSymbols(std::string_view name) const { return m_symbolMap.equal_range(name); }
 
     /**
-     * Registers a symbol name and its SymbolId into this scope's lookup table and ordered list.
+     * Registers a symbol name and its SymbolId into this scope's lookup table.
      */
     void addSymbol(std::string_view name, ScopeId symbolId);
-
-    /**
-     * Returns the ordered list of symbol IDs declared directly in this scope.
-     */
-    const std::pmr::vector<ScopeId> &getSymbols() const;
 
     /**
      * Returns the human-readable debug name of this scope.
@@ -58,7 +48,6 @@ class Scope
   private:
     ScopeId m_id;                        // Unique ID of this scope.
     ScopeId m_parentId;                  // Enclosing scope ID, or InvalidScopeId at the root.
-    std::pmr::vector<ScopeId> m_symbols; // Symbols declared here, in declaration order.
     std::pmr::unordered_multimap<std::string_view, ScopeId> m_symbolMap; // Name-to-symbol lookup within this scope.
     std::string_view m_debugName;                                        // Human-readable label for diagnostics.
 };

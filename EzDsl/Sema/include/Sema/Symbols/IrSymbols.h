@@ -35,14 +35,6 @@ struct IrInstructionSymbol
     DSL::Ast::IrInstDef::IrInstTier m_tier;         // Compilation tier.
     DSL::Ast::IrInstDef::IrInstFlag m_flags;        // Combined behavioral flags.
     std::pmr::vector<IrOperandSymbol> m_operands;   // Operand signature.
-
-    /**
-     * Checks if the IR instruction has the specified flag set.
-     */
-    bool hasFlag(DSL::Ast::IrInstDef::IrInstFlag flagMask) const noexcept
-    {
-        return (static_cast<uint32_t>(m_flags) & static_cast<uint32_t>(flagMask)) != 0;
-    }
 };
 
 }; // namespace Symbols

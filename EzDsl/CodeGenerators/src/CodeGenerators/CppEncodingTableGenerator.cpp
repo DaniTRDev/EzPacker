@@ -1,13 +1,12 @@
 #include "CodeGenerators/CppEncodingTableGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
+#include "NameRegistry.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/TargetSymbols.h"
 
-#include <cctype>
 #include <format>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace CodeGenerators
@@ -16,50 +15,11 @@ namespace CodeGenerators
 namespace
 {
 
-// Normalizes a backend name to a case-insensitive lookup key.
-std::string normalizeBackendName(std::string_view name)
+// Function-local static registry: constructed on first use to avoid static-initialization order issues.
+NameRegistry<EncodingCodegenBackend *> &backendRegistry()
 {
-    std::string result;
-    result.reserve(name.size());
-    for (char c : name)
-    {
-        result.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-    }
-    return result;
-}
-
-std::unordered_map<std::string, EncodingCodegenBackend *> &backendRegistry()
-{
-    static std::unordered_map<std::string, EncodingCodegenBackend *> s_registry;
+    static NameRegistry<EncodingCodegenBackend *> s_registry;
     return s_registry;
-}
-
-// Rewrites raw into a valid C++ identifier, substituting illegal characters and prefixing leading digits.
-std::string sanitizeIdentifier(std::string_view raw, std::string_view fallback)
-{
-    std::string result;
-    result.reserve(raw.size());
-    for (char c : raw)
-    {
-        unsigned char uc = static_cast<unsigned char>(c);
-        if (std::isalnum(uc) || c == '_')
-        {
-            result.push_back(c);
-        }
-        else
-        {
-            result.push_back('_');
-        }
-    }
-    if (result.empty())
-    {
-        result = std::string(fallback);
-    }
-    if (std::isdigit(static_cast<unsigned char>(result.front())))
-    {
-        result.insert(result.begin(), '_');
-    }
-    return result;
 }
 
 } // namespace
@@ -70,19 +30,11 @@ void registerEncodingBackend(std::string_view name, EncodingCodegenBackend *back
     {
         return;
     }
-    backendRegistry()[normalizeBackendName(name)] = backend;
+
+    backendRegistry().add(name, backend);
 }
 
-EncodingCodegenBackend *findEncodingBackend(std::string_view name)
-{
-    if (name.empty())
-    {
-        return nullptr;
-    }
-    auto &registry = backendRegistry();
-    auto it = registry.find(normalizeBackendName(name));
-    return it == registry.end() ? nullptr : it->second;
-}
+EncodingCodegenBackend *findEncodingBackend(std::string_view name) { return backendRegistry().find(name); }
 
 // Binds the generator to its diagnostics/symbols and selects the backend by target name.
 CppEncodingTableGenerator::CppEncodingTableGenerator(DiagnosticCollector *collector,
@@ -90,12 +42,8 @@ CppEncodingTableGenerator::CppEncodingTableGenerator(DiagnosticCollector *collec
                                                      std::filesystem::path outPath,
                                                      std::string targetName) :
     CodeGenerator("CodeGenerators::EncodingTable", collector, table, std::move(outPath)),
-    m_targetName(std::move(targetName))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
 {
-    if (m_targetName.empty())
-    {
-        m_targetName = "Target";
-    }
     m_backend = findEncodingBackend(m_targetName);
 }
 
@@ -122,18 +70,9 @@ void CppEncodingTableGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitBlankLine();
 
         // Collect target instructions in symbol-table order; encodings stay index-aligned with them.
-        std::vector<const Symbol *> instSymbols;
-        if (m_table)
-        {
-            for (const Symbol *sym : m_table->getSymbols())
-            {
-                if (sym && sym->getType() == SymbolType::TargetInstruction &&
-                    sym->hasData<Symbols::TargetInstructionSymbol>())
-                {
-                    instSymbols.push_back(sym);
-                }
-            }
-        }
+        const auto instSymbols = m_table
+                ? m_table->collect<Symbols::TargetInstructionSymbol>(SymbolType::TargetInstruction)
+                : std::vector<const Symbol *>{};
 
         emitter.emitLine("inline constexpr {} s_encodings[] =", m_backend->arrayType());
         {
@@ -141,7 +80,7 @@ void CppEncodingTableGenerator::emitHeader(CppSourceEmitter &emitter) const
             for (const Symbol *sym : instSymbols)
             {
                 const auto *data = sym->getIf<Symbols::TargetInstructionSymbol>();
-                emitter.emitLine("{},", m_backend->row(*data));
+                emitter.emitLine("{},", m_backend->row(*data, getCollector()));
             }
             if (instSymbols.empty())
             {
@@ -206,7 +145,7 @@ bool CppEncodingTableGenerator::run()
         return false;
     }
 
-    const std::string baseName = std::format("{}EncodingTable", sanitizeIdentifier(m_targetName, "Target"));
+    const std::string baseName = std::format("{}EncodingTable", SanitizeCppIdentifier(m_targetName, "Target"));
     const auto targetFilePath = resolveSingleFilePath(baseName + ".h");
 
     CppSourceEmitter emitter;
@@ -219,16 +158,6 @@ bool CppEncodingTableGenerator::run()
 
     trace("Synthesized target encoding table into {}", targetFilePath.filename().string());
     return true;
-}
-
-// Convenience wrapper retained for callers that do not need to configure a generator object.
-bool GenerateEncodingTable(DiagnosticCollector *collector,
-                           SymbolTable *table,
-                           std::filesystem::path outPath,
-                           std::string targetName)
-{
-    CppEncodingTableGenerator generator(collector, table, std::move(outPath), std::move(targetName));
-    return generator.run();
 }
 
 } // namespace CodeGenerators

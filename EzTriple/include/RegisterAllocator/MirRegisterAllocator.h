@@ -49,13 +49,17 @@ struct RegisterAllocatorCtx
     // Set of registers that can't be optimistically spilled.
     std::pmr::unordered_set<MirRegisterRef> m_unspillableRegs;
 
+    // Cached per-register spill costs, rebuilt once per interference-graph construction.
+    std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
+    bool m_spillCostsValid{ false };
+
     explicit RegisterAllocatorCtx(class MirBuilderContext *ctx,
                                   class MirFunction *targetFunction,
                                   class TargetDesc *targetDesc,
                                   std::pmr::memory_resource *alloc) :
         m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc), m_allocator(alloc),
         m_selectStack(alloc), m_removedNodes(alloc), m_reservedRegs(alloc), m_allocatedRegs(alloc), m_degree(alloc),
-        m_spilledRegs(alloc), m_iGraph(alloc), m_unspillableRegs(alloc)
+        m_spilledRegs(alloc), m_iGraph(alloc), m_unspillableRegs(alloc), m_spillCosts(alloc)
     {
     }
 };
@@ -141,11 +145,6 @@ class MirRegisterAllocator
                                                 class SourceReference *srcRef,
                                                 class MirRegister *dstReg,
                                                 class MirInstruction *defInst) = 0;
-
-    /**
-     * Adds an undirected edge between U and V.
-     */
-    void addEdge(const MirRegisterRef &u, const MirRegisterRef &v, class RegisterAllocatorCtx *ctx);
 
     /**
      * Adds a node to the graph if it doesn't already exist.

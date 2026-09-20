@@ -2,16 +2,16 @@
 #include "Function/MirFunctionStackFrame.h"
 
 /**
- * Stores the location kind and its variant payload; callers should use the typed factory helpers instead.
+ * Stores the variant payload; callers should use the typed factory helpers instead.
  */
-ArgumentLocationDesc::ArgumentLocationDesc(ArgLocationType type, StorageT storage) : m_type(type), m_storage(storage) {}
+ArgumentLocationDesc::ArgumentLocationDesc(StorageT storage) : m_storage(std::move(storage)) {}
 
 /**
  * Builds a register location describing which register holds the value and its byte size.
  */
 ArgumentLocationDesc ArgumentLocationDesc::Reg(MirRegisterRef regId, size_t sizeInBytes)
 {
-    return ArgumentLocationDesc(ArgLocationType::Register, RegLoc{ .m_ref = regId, .m_sizeBytes = sizeInBytes });
+    return ArgumentLocationDesc(RegLoc{ .m_ref = regId, .m_sizeBytes = sizeInBytes });
 }
 /**
  * Builds an indirect location, recording whether the pointee is passed by value, whether a copy
@@ -19,18 +19,15 @@ ArgumentLocationDesc ArgumentLocationDesc::Reg(MirRegisterRef regId, size_t size
  */
 ArgumentLocationDesc ArgumentLocationDesc::Indirect(bool byVal, bool copyOnReg, size_t size, MirRegisterRef ptrStorage)
 {
-    return ArgumentLocationDesc(ArgLocationType::Indirect,
-                                IndirectLoc{ .m_isByVal = byVal,
-                                             .m_copyOnReg = copyOnReg,
-                                             .m_size = size,
-                                             .m_pointerStorage = ptrStorage });
+    return ArgumentLocationDesc(
+            IndirectLoc{ .m_isByVal = byVal, .m_copyOnReg = copyOnReg, .m_size = size, .m_pointerStorage = ptrStorage });
 }
 /**
  * Builds a split location from the provided pieces, each describing how part of the argument is passed.
  */
-ArgumentLocationDesc ArgumentLocationDesc::Split(const std::vector<SplitPiece> &pieces)
+ArgumentLocationDesc ArgumentLocationDesc::Split(std::vector<SplitPiece> pieces)
 {
-    return ArgumentLocationDesc(ArgLocationType::Split, SplitLoc{ .m_parts = std::move(pieces) });
+    return ArgumentLocationDesc(SplitLoc{ .m_parts = std::move(pieces) });
 }
 
 /**
@@ -38,20 +35,35 @@ ArgumentLocationDesc ArgumentLocationDesc::Split(const std::vector<SplitPiece> &
  */
 ArgumentLocationDesc ArgumentLocationDesc::Stack(size_t sizeInBytes, StackFrameObject *object)
 {
-    return ArgumentLocationDesc(ArgLocationType::Stack, StackLoc{ .m_sizeBytes = sizeInBytes, .m_object = object });
+    return ArgumentLocationDesc(StackLoc{ .m_sizeBytes = sizeInBytes, .m_object = object });
 }
 
 /**
- * Returns the active location kind, indicating which getter is valid.
+ * Returns the active location kind derived from the variant's active alternative.
  */
-ArgLocationType ArgumentLocationDesc::getType() const { return m_type; }
+ArgLocationType ArgumentLocationDesc::getType() const
+{
+    switch (m_storage.index())
+    {
+        case 0:
+            return ArgLocationType::Register;
+        case 1:
+            return ArgLocationType::Stack;
+        case 2:
+            return ArgLocationType::Split;
+        case 3:
+            return ArgLocationType::Indirect;
+        default:
+            return ArgLocationType::Invalid;
+    }
+}
 
 /**
  * Returns the indirect payload, throwing a runtime_error if the active kind is not Indirect.
  */
 const IndirectLoc &ArgumentLocationDesc::getIndirect() const
 {
-    if (m_type != ArgLocationType::Indirect)
+    if (!std::holds_alternative<IndirectLoc>(m_storage))
         throw std::runtime_error("ArgumentLocationDesc: Attempted to get Indirect from invalid variant state.");
 
     return std::get<IndirectLoc>(m_storage);
@@ -62,7 +74,7 @@ const IndirectLoc &ArgumentLocationDesc::getIndirect() const
  */
 const RegLoc &ArgumentLocationDesc::getReg() const
 {
-    if (m_type != ArgLocationType::Register)
+    if (!std::holds_alternative<RegLoc>(m_storage))
         throw std::runtime_error("ArgumentLocationDesc: Attempted to get Reg from invalid variant state.");
 
     return std::get<RegLoc>(m_storage);
@@ -73,7 +85,7 @@ const RegLoc &ArgumentLocationDesc::getReg() const
  */
 const SplitLoc &ArgumentLocationDesc::getSplit() const
 {
-    if (m_type != ArgLocationType::Split)
+    if (!std::holds_alternative<SplitLoc>(m_storage))
         throw std::runtime_error("ArgumentLocationDesc: Attempted to get Split from invalid variant state.");
 
     return std::get<SplitLoc>(m_storage);
@@ -84,7 +96,7 @@ const SplitLoc &ArgumentLocationDesc::getSplit() const
  */
 const StackLoc &ArgumentLocationDesc::getStack() const
 {
-    if (m_type != ArgLocationType::Stack)
+    if (!std::holds_alternative<StackLoc>(m_storage))
         throw std::runtime_error("ArgumentLocationDesc: Attempted to get Stack from invalid variant state.");
 
     return std::get<StackLoc>(m_storage);

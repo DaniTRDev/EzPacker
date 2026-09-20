@@ -6,6 +6,8 @@
 #include <string>
 #include <string_view>
 
+class DiagnosticCollector;
+
 namespace CodeGenerators
 {
 
@@ -24,16 +26,20 @@ class EncodingCodegenBackend
     virtual ~EncodingCodegenBackend() = default;
 
     /** Runtime header that defines the array element type, e.g. "X86_64/Encoding/X86_64EncodingDesc.h". */
-    virtual std::string includeHeader() const = 0;
+    virtual std::string_view includeHeader() const = 0;
 
     /** C++ namespace the generated table lives in. */
-    virtual std::string namespaceName() const = 0;
+    virtual std::string_view namespaceName() const = 0;
 
     /** Array element type name, e.g. "EncodingDesc". */
-    virtual std::string arrayType() const = 0;
+    virtual std::string_view arrayType() const = 0;
 
-    /** Initializer for one table row (including the type and braces). */
-    virtual std::string row(const Symbols::TargetInstructionSymbol &sym) const = 0;
+    /**
+     * Initializer for one table row (including the type and braces).
+     * When diag is non-null, a decoding failure is reported against it instead of failing silently.
+     */
+    virtual std::string
+    row(const Symbols::TargetInstructionSymbol &sym, DiagnosticCollector *diag = nullptr) const = 0;
 };
 
 /** Registers a backend under a name (matched case-insensitively); used for aliases too. */

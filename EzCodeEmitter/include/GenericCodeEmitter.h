@@ -58,8 +58,11 @@ class GenericCodeEmitter
 
     /**
      * Emits the instruction with the given operands and target desc.
+     *
+     * Operands are exposed as const pointers because emission must not rewrite the MIR operand
+     * graph; implementations throw when the instruction cannot be encoded.
      */
-    virtual void emitInst(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands) = 0;
+    virtual void emitInst(const MirTargetInstructionDesc *desc, std::span<MirOperand *const> operands) = 0;
 };
 
 #endif // EZPACKER_GENERICCODEEMITTER_H

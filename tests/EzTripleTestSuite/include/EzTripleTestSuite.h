@@ -402,11 +402,11 @@ class MockTargetDesc : public TargetDesc
         }
     }
     // No binary descriptors are exposed by the mock.
-    std::pmr::vector<TargetBinaryDesc *> getAvailableBinaryDescriptors() override { return {}; }
+    const std::pmr::vector<TargetBinaryDesc *> &getAvailableBinaryDescriptors() override { return m_binaries; }
     // Returns the single mock calling convention.
-    std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() override { return m_convs; }
+    const std::pmr::vector<CallingConvDesc *> &getAvailableCallingConventions() override { return m_convs; }
     // Returns the single mock register bank.
-    std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() override { return m_banks; }
+    const std::pmr::vector<MirRegisterBank *> &getAvailableRegisterBanks() override { return m_banks; }
 
     // Accessors exposing the mock sub-components to tests.
     MockCallingConvDesc *getMockCallingConv() { return m_mockCc.get(); }
@@ -441,6 +441,7 @@ class MockTargetDesc : public TargetDesc
     MirRegisterBank *m_gprBank{ nullptr };
     std::pmr::vector<MirRegisterBank *> m_banks;
     std::pmr::vector<CallingConvDesc *> m_convs;
+    std::pmr::vector<TargetBinaryDesc *> m_binaries;
 
     std::unique_ptr<MirTargetInstructionDesc> m_descADD64rr;
     std::unique_ptr<MirTargetInstructionDesc> m_descADD64ri;

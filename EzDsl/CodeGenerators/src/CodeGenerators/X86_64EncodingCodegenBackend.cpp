@@ -1,5 +1,7 @@
 #include "CodeGenerators/X86_64EncodingCodegenBackend.h"
+#include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Encoding/X86_64EncodingDialect.h"
+#include "Sema/Encoding/X86_64EncodingVocabulary.h"
 
 #include <format>
 #include <string>
@@ -9,90 +11,6 @@ namespace CodeGenerators
 {
 namespace
 {
-
-// Maps a decoded x86 form name to the generated EncForm enumerator.
-std::string_view formToString(std::string_view form)
-{
-    if (form == "rr")
-        return "EncForm::Rr";
-    if (form == "rm")
-        return "EncForm::Rm";
-    if (form == "mr")
-        return "EncForm::Mr";
-    if (form == "ri")
-        return "EncForm::Ri";
-    if (form == "movri")
-        return "EncForm::MovRI";
-    if (form == "movzx")
-        return "EncForm::Movzx";
-    if (form == "movsx")
-        return "EncForm::Movsx";
-    if (form == "lea")
-        return "EncForm::Lea";
-    if (form == "unary")
-        return "EncForm::Unary";
-    if (form == "test")
-        return "EncForm::Test";
-    if (form == "shift")
-        return "EncForm::Shift";
-    if (form == "imul_rr")
-        return "EncForm::ImulRR";
-    if (form == "imul_ri")
-        return "EncForm::ImulRI";
-    if (form == "div")
-        return "EncForm::Div";
-    if (form == "jcc")
-        return "EncForm::Jcc";
-    if (form == "jmp")
-        return "EncForm::Jmp";
-    if (form == "call")
-        return "EncForm::Call";
-    if (form == "ret")
-        return "EncForm::Ret";
-    if (form == "push")
-        return "EncForm::Push";
-    if (form == "pop")
-        return "EncForm::Pop";
-    if (form == "nop")
-        return "EncForm::Nop";
-    if (form == "syscall")
-        return "EncForm::Syscall";
-    if (form == "setcc")
-        return "EncForm::Setcc";
-    if (form == "sse")
-        return "EncForm::Sse";
-    if (form == "cvt")
-        return "EncForm::Cvt";
-    return "EncForm::None";
-}
-
-// Maps a decoded x86 field name to the generated EncSlotKind enumerator.
-std::string_view slotToString(std::string_view field)
-{
-    if (field == "reg")
-        return "EncSlotKind::Reg";
-    if (field == "rm_reg")
-        return "EncSlotKind::RmReg";
-    if (field == "rm_mem")
-        return "EncSlotKind::RmMem";
-    if (field == "imm8")
-        return "EncSlotKind::Imm8";
-    if (field == "imm16")
-        return "EncSlotKind::Imm16";
-    if (field == "imm32")
-        return "EncSlotKind::Imm32";
-    if (field == "imm64")
-        return "EncSlotKind::Imm64";
-    if (field == "imm8_signed")
-        return "EncSlotKind::Imm8Signed";
-    if (field == "rel8")
-        return "EncSlotKind::Rel8";
-    if (field == "rel32")
-        return "EncSlotKind::Rel32";
-    if (field == "cc")
-        return "EncSlotKind::CondCode";
-    return "EncSlotKind::None";
-}
 
 // Classifies a DSL operand type/class name into the generated encoder register class.
 const char *regClassToString(std::string_view type)
@@ -156,7 +74,7 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
             operands += ", ";
         }
         operands += std::format("EncOperandBinding{{ {}, {}, {} }}",
-                                slotToString(binding.m_field),
+                                Sema::Encoding::X86Vocab::slotEnum(binding.m_field),
                                 index,
                                 regClassToString(type));
     }
@@ -199,7 +117,7 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
                        ".m_sizeOperand = {}, .m_coalesceSrc = {}, .m_relocOperand = {}, "
                        ".m_shiftByCL = {}, .m_movabs = {}, .m_byteRex = {}, .m_condCode = {}, "
                        ".m_hasSseVariant = {}, .m_ssePrefixes = {}, .m_sseOpcode = {}, .m_sseOpcodeLen = {} }}",
-                       formToString(enc.m_form),
+                       Sema::Encoding::X86Vocab::formEnum(enc.m_form),
                        static_cast<unsigned>(enc.m_prefixes),
                        rexPolicy,
                        enc.m_opcodeDigit.has_value() ? static_cast<unsigned>(enc.m_opcodeDigit.value()) : 0xFFu,
@@ -236,7 +154,8 @@ const X86_64BackendRegistrar s_registrar;
 
 } // namespace
 
-std::string X86_64EncodingCodegenBackend::row(const Symbols::TargetInstructionSymbol &sym) const
+std::string X86_64EncodingCodegenBackend::row(const Symbols::TargetInstructionSymbol &sym,
+                                              DiagnosticCollector *diag) const
 {
     if (!sym.m_encoding.has_value())
     {
@@ -244,7 +163,7 @@ std::string X86_64EncodingCodegenBackend::row(const Symbols::TargetInstructionSy
     }
 
     Sema::Encoding::X86EncodingSpec spec;
-    if (!Sema::Encoding::decodeX86_64Encoding(sym.m_encoding.value(), spec, nullptr))
+    if (!Sema::Encoding::decodeX86_64Encoding(sym.m_encoding.value(), spec, diag))
     {
         return "EncodingDesc{}";
     }

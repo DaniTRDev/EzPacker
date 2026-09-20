@@ -1,6 +1,8 @@
 #include "ObjectFormat/Elf64Writer.h"
 #include <algorithm>
 #include <cstring>
+#include <stdexcept>
+#include <string>
 
 namespace EzCodeEmitter::ObjectFormat
 {
@@ -165,6 +167,8 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
     std::vector<uint8_t> fileBuf;
     std::vector<uint8_t> shstrtab;
     std::vector<uint8_t> strtab;
+    strtab.reserve(m_symbols.size() * 16 + 1);
+    shstrtab.reserve(64);
 
     addString(shstrtab, "");
     addString(strtab, "");
@@ -186,6 +190,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
     };
 
     std::vector<SectionDesc> sectionDescs;
+    sectionDescs.reserve(8);
 
     // 0. NULL section
     sectionDescs.push_back(SectionDesc{ "", SHT_NULL, 0, 0, 0, 0, 0, {}, false, 0 });
@@ -232,6 +237,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
 
     // Build Symbols
     std::vector<Elf64_Sym> symTable;
+    symTable.reserve(m_symbols.size() + 1);
     // 0. NULL symbol
     symTable.push_back(Elf64_Sym{ 0, 0, 0, 0, 0, 0 });
 
@@ -246,8 +252,23 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
         // st_info packs binding in the high nibble and symbol type in the low nibble.
         elfSym.st_info = (bind << 4) | (symType & 0x0F);
         elfSym.st_other = 0;
-        auto itSec = sectionIndexMap.find(sym.m_section);
-        elfSym.st_shndx = (itSec != sectionIndexMap.end()) ? itSec->second : 0;
+        if (sym.m_section == SectionType::Undefined)
+        {
+            // Undefined symbols have no section (SHN_UNDEF).
+            elfSym.st_shndx = 0;
+        }
+        else
+        {
+            auto itSec = sectionIndexMap.find(sym.m_section);
+            if (itSec == sectionIndexMap.end())
+            {
+                // A defined symbol in a section the writer does not emit would silently become
+                // SHN_UNDEF, producing a malformed object; fail loudly instead.
+                throw std::runtime_error("Elf64Writer: symbol '" + sym.m_name +
+                                         "' references a section that is not emitted");
+            }
+            elfSym.st_shndx = itSec->second;
+        }
         elfSym.st_value = sym.m_offset;
         elfSym.st_size = sym.m_size;
 

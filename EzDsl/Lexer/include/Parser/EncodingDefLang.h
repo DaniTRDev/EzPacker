@@ -42,8 +42,7 @@ struct OperandBindingParser
  *
  * Shapes: `[bytes]`, `operands { op => field; ... }`, a boolean, an integer, or an
  * identifier. The parser has no architecture knowledge; keys and fields are accepted
- * as-is. Nested directive blocks (for fixed-width bitfield ISAs) are represented in
- * the AST but are intentionally not surfaced by the parser yet.
+ * as-is.
  */
 struct ValueParser
 {

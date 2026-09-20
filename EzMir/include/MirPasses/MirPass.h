@@ -84,11 +84,6 @@ class MirPass
     virtual MirPassIterationPlace getIterationPlace() const = 0;
 
     /**
-     * Returns a pointer to the last execution result of this pass.
-     */
-    MirPassResult *getResult();
-
-    /**
      * Returns the MirPassType discriminator (Analysis vs Transform).
      */
     virtual MirPassType getPassType() const = 0;
@@ -104,17 +99,9 @@ class MirPass
     virtual void reset() {};
 
     /**
-     * Stores a copy of the given execution result.
-     */
-    void setResult(MirPassResult *result);
-
-    /**
      * Returns the collection of pass type indices that must precede this pass in the pipeline.
      */
     virtual std::vector<std::type_index> getDependencies() const { return {}; }
-
-  private:
-    MirPassResult m_result; // Cached outcome of the most recent run, returned by getResult().
 };
 
 #endif // EZPACKER_MIRPASS_H

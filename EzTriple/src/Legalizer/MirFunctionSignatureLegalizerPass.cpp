@@ -15,8 +15,8 @@
 /**
  * Stores the builder context and caches the target legalizer used for ABI classification.
  */
-MirFunctionSignatureLegalizerPass::MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
-    m_ctx(ctx), m_legalizer(targetDesc ? targetDesc->getLegalizer() : nullptr)
+MirFunctionSignatureLegalizerPass::MirFunctionSignatureLegalizerPass(MirBuilderContext *ctx, TargetDesc * /*targetDesc*/) :
+    m_ctx(ctx)
 {
 }
 
@@ -37,7 +37,6 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
                                                      MirPassManager *passManager)
 {
     bool modified = false;
-    bool succeeded = true;
     MirFunction *func = *it;
     if (!func)
     {
@@ -105,5 +104,5 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
     builder.build(MirInstructionOpCode::END_ARG, func->getSourceRef(), { token });
     modified = true;
 
-    return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = succeeded };
+    return { .m_modifiedMir = modified, .m_executed = true, .m_succeeded = true };
 }

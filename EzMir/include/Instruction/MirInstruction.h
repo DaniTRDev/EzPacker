@@ -4,6 +4,7 @@
 #include "EzMirCommon.h"
 #include "MirInstructionMetadata.h"
 #include "Operand/MirOperand.h"
+#include "Operand/MirOperands.h"
 #include "Operand/MirRegisterReference.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
 
@@ -105,7 +106,7 @@ class MirInstruction
     /**
      * Returns the target machine instruction descriptor, if selected.
      */
-    class MirTargetInstructionDesc *getTargetDesc() const;
+    const class MirTargetInstructionDesc *getTargetDesc() const;
 
     /**
      * Retrieves the operand at the specified index, or nullptr if out of bounds.
@@ -161,15 +162,44 @@ class MirInstruction
     const std::pmr::vector<class MirOperand *> &getOperands() const;
 
     /**
-     * Computes the set of registers defined (written) by this instruction, including explicit and target implicit defs.
+     * Visits every register referenced by operand. A direct register operand is visited with the
+     * supplied access flag; a memory operand's base and index registers are always visited as
+     * reads, since computing an address consumes those registers. Null operands are ignored.
      */
-    std::vector<MirRegisterRef> getDefinedRegisters() const;
+    template <typename Fn> static void visitOperandRegisters(MirOperand *operand, MirOperandFlag flag, Fn &&fn)
+    {
+        if (!operand)
+        {
+            return;
+        }
+        if (auto *reg = operand->get<MirRegister>())
+        {
+            fn(reg, flag);
+        }
+        else if (auto *mem = operand->get<MirMemory>())
+        {
+            if (mem->getBase())
+            {
+                fn(mem->getBase(), MirOperandFlag::Read);
+            }
+            if (mem->getIndex())
+            {
+                fn(mem->getIndex(), MirOperandFlag::Read);
+            }
+        }
+    }
 
     /**
-     * Computes the set of registers used (read) by this instruction, including explicit, memory base, and implicit
-     * uses.
+     * Collects the registers defined (written) by this instruction, including explicit and target
+     * implicit defs. out is cleared first and must use an arena chosen by the caller.
      */
-    std::vector<MirRegisterRef> getUsedRegisters() const;
+    void getDefinedRegisters(std::pmr::vector<MirRegisterRef> &out) const;
+
+    /**
+     * Collects the registers used (read) by this instruction, including explicit, memory base and
+     * implicit uses. out is cleared first and must use an arena chosen by the caller.
+     */
+    void getUsedRegisters(std::pmr::vector<MirRegisterRef> &out) const;
 
     /**
      * Formats the instruction into assembly text format.
@@ -184,7 +214,7 @@ class MirInstruction
     /**
      * Associates a target machine instruction descriptor for lowered instructions.
      */
-    void setTargetDesc(MirTargetInstructionDesc *desc);
+    void setTargetDesc(const MirTargetInstructionDesc *desc);
 
     /**
      * Unlinks and erases this instruction from its owning basic block, updating register def/use tracking.
@@ -226,7 +256,7 @@ class MirInstruction
     /**
      * Low-level target machine instruction descriptor (null for generic IR).
      */
-    class MirTargetInstructionDesc *m_targetDesc;
+    const class MirTargetInstructionDesc *m_targetDesc;
 
     /**
      * Source code reference for diagnostics.

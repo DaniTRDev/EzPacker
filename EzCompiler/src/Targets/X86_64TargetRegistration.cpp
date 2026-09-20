@@ -1,14 +1,7 @@
 #include "TargetResolver.h"
 #include "Builder/MirBuilderContext.h"
 #include "Descriptors/TargetBinaryDesc.h"
-#include "Descriptors/TargetRelocationResolver.h"
-#include "FrameLowerer/MirFrameLowerer.h"
 #include "Function/CallingConvDesc.h"
-#include "InstructionSelector/MirAddressingModeMatcher.h"
-#include "InstructionSelector/MirInstructionSelector.h"
-#include "Legalizer/LegalizerInfo.h"
-#include "Legalizer/MirLegalizer.h"
-#include "RegisterAllocator/MirRegisterAllocator.h"
 #include "Targets/X86_64/X86_64TargetDesc.h"
 
 #include <memory>
@@ -26,23 +19,31 @@ struct X86_64TargetRegistration
     {
         EzCompiler::TargetResolver::registerTarget(
                 "x86_64",
-                [](const EzCompiler::TargetTriple &triple, MirBuilderContext *mirCtx) -> EzCompiler::ResolvedTarget
+                [](const EzCompiler::TargetTriple &triple,
+                   MirBuilderContext *mirCtx,
+                   bool isPositionIndependent) -> EzCompiler::ResolvedTarget
                 {
                     EzCompiler::ResolvedTarget result;
 
                     auto target = std::make_unique<EzTriple::X86_64TargetDesc>(mirCtx);
+                    target->setPositionIndependent(isPositionIndependent);
                     target->initialize();
 
-                    // Windows uses the Win64 ABI with COFF; every other triple uses SysV + ELF.
-                    if (triple.isWindows())
+                    // Select the object format from the triple's own predicates: Windows maps to
+                    // COFF, ELF is the non-Mach-O default, and anything else is unsupported.
+                    if (triple.isCoff())
                     {
                         result.m_callingConv = target->getWin64CallingConv();
                         result.m_binaryDesc = target->getCoffBinaryDesc();
                     }
-                    else
+                    else if (triple.isElf())
                     {
                         result.m_callingConv = target->getSysVCallingConv();
                         result.m_binaryDesc = target->getElfBinaryDesc();
+                    }
+                    else
+                    {
+                        return {};
                     }
 
                     result.m_targetDesc = std::move(target);

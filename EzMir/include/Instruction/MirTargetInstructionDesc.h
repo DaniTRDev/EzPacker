@@ -28,16 +28,6 @@ class MirTargetInstructionDesc
                              MirInstructionFlags targetFlags = MirInstructionFlags::None);
 
     /**
-     * Backward-compatible constructor without operand classes.
-     */
-    MirTargetInstructionDesc(const char *name,
-                             size_t id,
-                             std::initializer_list<MirOperandFlag> operandFlags,
-                             std::initializer_list<MirRegisterRef> implicitDefs,
-                             std::initializer_list<MirRegisterRef> implicitUses,
-                             MirInstructionFlags targetFlags = MirInstructionFlags::None);
-
-    /**
      * Returns the target machine assembly mnemonic name.
      */
     const char *getName() const;
@@ -53,11 +43,6 @@ class MirTargetInstructionDesc
     const std::vector<MirOperandFlag> &getOperandsFlags() const;
 
     /**
-     * Returns the list of register class constraints for explicit instruction arguments.
-     */
-    const std::vector<MirRegisterClass *> &getOperandClasses() const;
-
-    /**
      * Returns the register class constraint for the operand at index, or nullptr.
      */
     MirRegisterClass *getOperandClass(size_t index) const;
@@ -66,11 +51,6 @@ class MirTargetInstructionDesc
      * Sets the register class constraint for the operand at index.
      */
     void setOperandClass(size_t index, MirRegisterClass *regClass);
-
-    /**
-     * Sets the full vector of register class constraints.
-     */
-    void setOperandClasses(std::vector<MirRegisterClass *> classes);
 
     /**
      * Returns the list of implicit hardware register definitions (DEF) modified by this instruction.

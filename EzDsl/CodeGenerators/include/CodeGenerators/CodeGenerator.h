@@ -101,16 +101,12 @@ class CodeGenerator
         }
     }
 
-    /** Emits a warning diagnostic, skipping formatting entirely when warnings are disabled for the collector. */
+    /** Forwards a warning-level diagnostic to the collector, prefixed with the generator name. */
     template <typename... Args> void warn(std::format_string<Args...> fmt, Args &&...args) const
     {
         if (m_collector)
         {
-            auto b = m_collector->builder(Diag_Warning, m_generatorName);
-            if (m_collector->isDiagEnabledForType(Diag_Warning))
-            {
-                b << std::format(fmt, std::forward<Args>(args)...);
-            }
+            m_collector->warn(m_generatorName, fmt, std::forward<Args>(args)...);
         }
     }
 

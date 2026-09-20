@@ -98,7 +98,7 @@ void DiagnosticLogger::logSourceRef(LogMessage &msg, class SourceReference *sour
         return;
     }
 
-    SourceLineRange *lineRange = m_sourceManager->getReferenceLine(sourceRef);
+    const SourceLineRange *lineRange = m_sourceManager->getReferenceLine(sourceRef);
     if (!lineRange)
     {
         return;
@@ -125,12 +125,8 @@ void DiagnosticLogger::logSourceRef(LogMessage &msg, class SourceReference *sour
     msg.add("    | {}\n", rawLine);
 
     // Build whitespace padding, preserving tabs so alignment remains 1:1 with source
-    std::string padding;
-    padding.reserve(colOffset);
-    for (size_t i = 0; i < colOffset && i < rawLine.size(); ++i)
-    {
-        padding += (rawLine[i] == '\t') ? '\t' : ' ';
-    }
+    std::string padding(rawLine.substr(0, std::min(colOffset, rawLine.size())));
+    std::replace_if(padding.begin(), padding.end(), [](char c) { return c != '\t'; }, ' ');
 
     // Build squiggle string: '^' for the start token followed by '~' across the length
     size_t refLen = sourceRef->length();

@@ -13,6 +13,7 @@
 #include "SourceManager/GenericSourceManager.h"
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
+#include <charconv>
 
 namespace EzMir
 {
@@ -189,17 +190,56 @@ MirType *MirParserContext::resolveType(const Ast::MirAstType *astType)
 }
 
 /**
- * Declares a named register in the current function scope, defaulting to i64 when no type is
- * given. Names beginning with "p"/"%p" create physical registers; all others create virtual ones.
- * Re-declaration is an error and returns the existing register.
+ * Materializes a register from its textual name. A name is a physical register only when it is
+ * exactly "p<digits>" or "%p<digits>": the prefix is stripped, the remainder must be a non-empty
+ * run of decimal digits that parses without overflow. Any other name (including identifiers that
+ * merely start with 'p', such as "param") becomes a virtual register. The type defaults to i64.
+ */
+MirRegister *MirParserContext::materializeRegister(std::string_view name,
+                                                   MirType *type,
+                                                   SourceReference *ref,
+                                                   MirRegisterClass *regClass)
+{
+    if (!type && m_bCtx)
+    {
+        type = m_bCtx->getTypeTable()->i64();
+    }
+
+    MirOperandBuilder opBuilder(m_bCtx);
+
+    std::string_view numPart;
+    if (name.starts_with("%p"))
+    {
+        numPart = name.substr(2);
+    }
+    else if (name.starts_with("p"))
+    {
+        numPart = name.substr(1);
+    }
+
+    if (!numPart.empty())
+    {
+        size_t physId = 0;
+        auto [end, ec] = std::from_chars(numPart.data(), numPart.data() + numPart.size(), physId);
+        if (ec == std::errc() && end == numPart.data() + numPart.size())
+        {
+            return opBuilder.buildPhysReg(type, physId, name, regClass, ref);
+        }
+    }
+
+    return opBuilder.buildVReg(type, name, ref, regClass);
+}
+
+/**
+ * Declares a named register in the current function scope. Re-declaration is an error and returns
+ * the existing register.
  */
 MirRegister *MirParserContext::declareRegister(std::string_view name,
                                                MirType *type,
                                                SourceReference *ref,
                                                MirRegisterClass *regClass)
 {
-    std::pmr::string key(name, m_arena);
-    auto it = m_registers.find(key);
+    auto it = m_registers.find(name);
     if (it != m_registers.end())
     {
         if (m_diag)
@@ -210,28 +250,8 @@ MirRegister *MirParserContext::declareRegister(std::string_view name,
         return it->second;
     }
 
-    if (!type && m_bCtx)
-    {
-        type = m_bCtx->getTypeTable()->i64();
-    }
-
-    MirOperandBuilder opBuilder(m_bCtx);
-    MirRegister *reg = nullptr;
-
-    // Check if physical register: %p...
-    if (name.starts_with("%p") || name.starts_with("p"))
-    {
-        std::string_view numPart = name.starts_with("%p") ? name.substr(2) : name.substr(1);
-        size_t physId = 0;
-        std::from_chars(numPart.data(), numPart.data() + numPart.size(), physId);
-        reg = opBuilder.buildPhysReg(type, physId, name, regClass, ref);
-    }
-    else
-    {
-        reg = opBuilder.buildVReg(type, name, ref, regClass);
-    }
-
-    m_registers[key] = reg;
+    MirRegister *reg = materializeRegister(name, type, ref, regClass);
+    m_registers.insert_or_assign(std::pmr::string(name, m_arena), reg);
     return reg;
 }
 
@@ -240,8 +260,7 @@ MirRegister *MirParserContext::declareRegister(std::string_view name,
  */
 MirRegister *MirParserContext::resolveRegister(std::string_view name, SourceReference * /*ref*/)
 {
-    std::pmr::string key(name, m_arena);
-    auto it = m_registers.find(key);
+    auto it = m_registers.find(name);
     if (it != m_registers.end())
     {
         return it->second;
@@ -250,42 +269,22 @@ MirRegister *MirParserContext::resolveRegister(std::string_view name, SourceRefe
 }
 
 /**
- * Returns the named register, creating it on first use (physical for "p"/"%p" names, virtual
- * otherwise) so references to not-yet-declared registers can be resolved later.
+ * Returns the named register, creating it on first use so references to not-yet-declared registers
+ * can be resolved later.
  */
 MirRegister *MirParserContext::getOrCreateRegister(std::string_view name,
                                                    MirType *type,
                                                    SourceReference *ref,
                                                    MirRegisterClass *regClass)
 {
-    std::pmr::string key(name, m_arena);
-    auto it = m_registers.find(key);
+    auto it = m_registers.find(name);
     if (it != m_registers.end())
     {
         return it->second;
     }
 
-    if (!type && m_bCtx)
-    {
-        type = m_bCtx->getTypeTable()->i64();
-    }
-
-    MirOperandBuilder opBuilder(m_bCtx);
-    MirRegister *reg = nullptr;
-
-    if (name.starts_with("%p") || name.starts_with("p"))
-    {
-        std::string_view numPart = name.starts_with("%p") ? name.substr(2) : name.substr(1);
-        size_t physId = 0;
-        std::from_chars(numPart.data(), numPart.data() + numPart.size(), physId);
-        reg = opBuilder.buildPhysReg(type, physId, name, regClass, ref);
-    }
-    else
-    {
-        reg = opBuilder.buildVReg(type, name, ref, regClass);
-    }
-
-    m_registers[key] = reg;
+    MirRegister *reg = materializeRegister(name, type, ref, regClass);
+    m_registers.insert_or_assign(std::pmr::string(name, m_arena), reg);
     return reg;
 }
 
@@ -305,8 +304,7 @@ MirBlock *MirParserContext::declareBlock(std::string_view name, SourceReference 
         return nullptr;
     }
 
-    std::pmr::string key(name, m_arena);
-    auto it = m_blocks.find(key);
+    auto it = m_blocks.find(name);
     if (it != m_blocks.end())
     {
         // Check if this was already declared and populated
@@ -316,17 +314,18 @@ MirBlock *MirParserContext::declareBlock(std::string_view name, SourceReference 
     // If function has an empty skeleton entry point block, reuse it for the first declared block
     MirBlock *entry = m_currentFunction->getEntryPoint();
     if (entry && entry->getInstructions().empty() &&
-        (m_blocks.empty() || (m_blocks.size() == 1 && m_blocks.find("entryPoint") != m_blocks.end())))
+        (m_blocks.empty() ||
+         (m_blocks.size() == 1 && m_blocks.find(std::string_view("entryPoint")) != m_blocks.end())))
     {
         m_blocks.erase("entryPoint");
-        entry->setName(key);
-        m_blocks[key] = entry;
+        entry->setName(std::pmr::string(name, m_arena));
+        m_blocks.insert_or_assign(std::pmr::string(name, m_arena), entry);
         return entry;
     }
 
     MirBlockBuilder blockBuilder(m_bCtx, m_currentFunction);
     MirBlock *blk = blockBuilder.build(ref, name);
-    m_blocks[key] = blk;
+    m_blocks.insert_or_assign(std::pmr::string(name, m_arena), blk);
     return blk;
 }
 
@@ -341,8 +340,7 @@ MirBlock *MirParserContext::getOrCreateBlock(std::string_view name, SourceRefere
         return nullptr;
     }
 
-    std::pmr::string key(name, m_arena);
-    auto it = m_blocks.find(key);
+    auto it = m_blocks.find(name);
     if (it != m_blocks.end())
     {
         return it->second;
@@ -350,7 +348,7 @@ MirBlock *MirParserContext::getOrCreateBlock(std::string_view name, SourceRefere
 
     MirBlockBuilder blockBuilder(m_bCtx, m_currentFunction);
     MirBlock *blk = blockBuilder.build(ref, name);
-    m_blocks[key] = blk;
+    m_blocks.insert_or_assign(std::pmr::string(name, m_arena), blk);
     return blk;
 }
 
@@ -359,8 +357,7 @@ MirBlock *MirParserContext::getOrCreateBlock(std::string_view name, SourceRefere
  */
 MirBlock *MirParserContext::resolveBlock(std::string_view name, SourceReference * /*ref*/)
 {
-    std::pmr::string key(name, m_arena);
-    auto it = m_blocks.find(key);
+    auto it = m_blocks.find(name);
     if (it != m_blocks.end())
     {
         return it->second;
@@ -373,8 +370,7 @@ MirBlock *MirParserContext::resolveBlock(std::string_view name, SourceReference 
  */
 MirGlobalVar *MirParserContext::declareGlobal(std::string_view name, MirGlobalVar *var)
 {
-    std::pmr::string key(name, m_arena);
-    m_globals[key] = var;
+    m_globals.insert_or_assign(std::pmr::string(name, m_arena), var);
     return var;
 }
 
@@ -383,8 +379,7 @@ MirGlobalVar *MirParserContext::declareGlobal(std::string_view name, MirGlobalVa
  */
 MirGlobalVar *MirParserContext::resolveGlobal(std::string_view name, SourceReference * /*ref*/)
 {
-    std::pmr::string key(name, m_arena);
-    auto it = m_globals.find(key);
+    auto it = m_globals.find(name);
     if (it != m_globals.end())
     {
         return it->second;
@@ -397,8 +392,7 @@ MirGlobalVar *MirParserContext::resolveGlobal(std::string_view name, SourceRefer
  */
 MirFunction *MirParserContext::declareFunction(std::string_view name, MirFunction *func)
 {
-    std::pmr::string key(name, m_arena);
-    m_functions[key] = func;
+    m_functions.insert_or_assign(std::pmr::string(name, m_arena), func);
     return func;
 }
 
@@ -407,8 +401,7 @@ MirFunction *MirParserContext::declareFunction(std::string_view name, MirFunctio
  */
 MirFunction *MirParserContext::resolveFunction(std::string_view name, SourceReference * /*ref*/)
 {
-    std::pmr::string key(name, m_arena);
-    auto it = m_functions.find(key);
+    auto it = m_functions.find(name);
     if (it != m_functions.end())
     {
         return it->second;

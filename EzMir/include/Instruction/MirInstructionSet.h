@@ -26,9 +26,11 @@ inline const MirInstructionMetadata g_MirInstructionSet[] = {
 };
 
 /**
- * Mapping table from opcode name strings to their MirInstructionOpCode enum values.
+ * Mapping table from opcode name strings to their MirInstructionOpCode enum values. Keys are
+ * string_views over the static opcode-name literals, so the table performs no dynamic key
+ * allocations and lookups can reuse an existing view without copying.
  */
-inline std::unordered_map<std::string, MirInstructionOpCode> g_String2MirInstruction = {
+inline std::unordered_map<std::string_view, MirInstructionOpCode> g_String2MirInstruction = {
 #define INSTRUCTION(name, tier, category, operands, flags) { #name, MirInstructionOpCode::name },
 #include "MirInstructionSetDefs.h"
 #undef INSTRUCTION
@@ -44,25 +46,30 @@ inline const MirInstructionMetadata &getMeta(MirInstructionOpCode op)
 
 /**
  * Parses a string representation of an opcode into its MirInstructionOpCode enum value (case-insensitive).
- * Returns opcode 0 if no match is found.
+ * Returns opcode 0 if no match is found. Accepts a view so callers never materialize a temporary string.
  */
-inline MirInstructionOpCode getOpCodeFromStr(const std::string &str)
+inline MirInstructionOpCode getOpCodeFromStr(std::string_view str)
 {
-    auto it = g_String2MirInstruction.find(str);
-    if (it != g_String2MirInstruction.end())
+    const auto findOpCode = [](std::string_view key) -> MirInstructionOpCode
     {
-        return it->second;
+        auto it = g_String2MirInstruction.find(key);
+        return it != g_String2MirInstruction.end() ? it->second : static_cast<MirInstructionOpCode>(0);
+    };
+
+    if (MirInstructionOpCode op = findOpCode(str); op != static_cast<MirInstructionOpCode>(0))
+    {
+        return op;
     }
-    std::string upper = StrToUpper(str);
-    it = g_String2MirInstruction.find(upper);
-    if (it != g_String2MirInstruction.end())
+
+    // Normalize the case once; the table only holds upper-case spellings.
+    const std::string upper = StrToUpper(str);
+    if (MirInstructionOpCode op = findOpCode(upper); op != static_cast<MirInstructionOpCode>(0))
     {
-        return it->second;
+        return op;
     }
-    it = g_String2MirInstruction.find(StrToLower(str));
-    if (it != g_String2MirInstruction.end())
+    if (MirInstructionOpCode op = findOpCode(StrToLower(str)); op != static_cast<MirInstructionOpCode>(0))
     {
-        return it->second;
+        return op;
     }
     // Alias 'BR' to 'JMP' (standard unconditional branch)
     if (upper == "BR")
@@ -73,10 +80,9 @@ inline MirInstructionOpCode getOpCodeFromStr(const std::string &str)
     if (upper.rfind("ICMP_", 0) == 0)
     {
         std::string cmpStr = "CMP_" + upper.substr(5);
-        it = g_String2MirInstruction.find(cmpStr);
-        if (it != g_String2MirInstruction.end())
+        if (MirInstructionOpCode op = findOpCode(cmpStr); op != static_cast<MirInstructionOpCode>(0))
         {
-            return it->second;
+            return op;
         }
     }
     return static_cast<MirInstructionOpCode>(0);

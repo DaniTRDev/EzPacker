@@ -18,7 +18,7 @@ namespace EzCodeEmitter::X86_64
  * Supplied by the target descriptor (which owns the generated encoding table), so the
  * emitter stays independent from generated code and from EzTriple.
  */
-using EncodingResolver = std::function<const EncodingDesc *(MirTargetInstructionDesc *)>;
+using EncodingResolver = std::function<const EncodingDesc *(const MirTargetInstructionDesc *)>;
 
 /**
  * Concrete x86-64 Machine Code Emitter implementing GenericCodeEmitter.
@@ -59,8 +59,9 @@ class X86_64CodeEmitter : public GenericCodeEmitter
 
     /**
      * Encodes and emits a single lowered target instruction via the table-driven encoder.
+     * Throws std::runtime_error when the instruction has no resolvable encoding.
      */
-    void emitInst(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands) override;
+    void emitInst(const MirTargetInstructionDesc *desc, std::span<MirOperand *const> operands) override;
 
     /**
      * Installs the table-driven encoding resolver. Emission is skipped when no resolver
@@ -79,14 +80,14 @@ class X86_64CodeEmitter : public GenericCodeEmitter
      * Resolves and emits an instruction via the table-driven encoder. Returns false when
      * no encoding is available, allowing the caller to bail out.
      */
-    bool tryEmitTableDriven(MirTargetInstructionDesc *desc, std::span<MirOperand *> operands);
+    bool tryEmitTableDriven(const MirTargetInstructionDesc *desc, std::span<MirOperand *const> operands);
 
     /**
      * Converts EzMir operands into the target-neutral representation consumed by the
      * table-driven encoder, resolving stack slots and global references to memory.
      */
     bool buildResolvedOperands(const EncodingDesc &enc,
-                               std::span<MirOperand *> operands,
+                               std::span<MirOperand *const> operands,
                                std::vector<ResolvedOperand> &resolved) const;
 
   private:

@@ -1,7 +1,0 @@
-#ifndef EZPACKER_EZASTLOWERERCOMMON_H
-#define EZPACKER_EZASTLOWERERCOMMON_H
-
-#include <EzMir.h>
-#include <EzSemantics.h>
-
-#endif // EZPACKER_EZASTLOWERERCOMMON_H

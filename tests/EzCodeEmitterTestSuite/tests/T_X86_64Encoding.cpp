@@ -31,7 +31,7 @@ std::vector<uint8_t> emitInstruction(MirTargetInstructionDesc *desc,
 
     CodeEmitterContext context(diag, sections, alloc);
     X86_64CodeEmitter emitter;
-    emitter.setEncodingResolver([](MirTargetInstructionDesc *d) -> const EncodingDesc *
+    emitter.setEncodingResolver([](const MirTargetInstructionDesc *d) -> const EncodingDesc *
                                 { return findEncodingDesc(d->getName()); });
 
     emitter.beginFunction(&context, "test_fn");

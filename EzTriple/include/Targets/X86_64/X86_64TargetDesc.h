@@ -10,7 +10,6 @@
 class MirBuilderContext;
 class MirFrameLowerer;
 class MirInstructionSelector;
-class MirAddressingModeMatcher;
 class MirRegisterClass;
 class MirRegisterBank;
 class MirLegalizer;
@@ -36,7 +35,7 @@ class X86_64TargetDesc : public TargetDesc
      * Creates the descriptor bound to the shared builder context used by its sub-components.
      */
     explicit X86_64TargetDesc(MirBuilderContext *ctx);
-    ~X86_64TargetDesc() override = default;
+    ~X86_64TargetDesc() override;
 
     /// Identifier used for diagnostics and target lookup.
     const char *getName() const override { return "x86_64"; }
@@ -46,9 +45,6 @@ class X86_64TargetDesc : public TargetDesc
 
     /// Returns the x86-64 instruction selector, creating it on first access.
     MirInstructionSelector *getInstructionSelector() override;
-
-    /// Returns the x86-64 addressing mode matcher, creating it on first access.
-    MirAddressingModeMatcher *getAddressingModeMatcher() override;
 
     /// Returns the 64-bit general-purpose register class used as the default integer class.
     MirRegisterClass *getGprClass() override;
@@ -78,22 +74,28 @@ class X86_64TargetDesc : public TargetDesc
     std::string_view getLibcallStr(uint8_t symId) override;
 
     /// Returns the ELF and COFF binary descriptors available for x86-64.
-    std::pmr::vector<TargetBinaryDesc *> getAvailableBinaryDescriptors() override;
+    const std::pmr::vector<TargetBinaryDesc *> &getAvailableBinaryDescriptors() override;
 
     /// Returns the System V and Win64 calling conventions defined for this target.
-    std::pmr::vector<CallingConvDesc *> getAvailableCallingConventions() override;
+    const std::pmr::vector<CallingConvDesc *> &getAvailableCallingConventions() override;
 
     /// Returns the GPR and FPR register banks exposed by this target.
-    std::pmr::vector<MirRegisterBank *> getAvailableRegisterBanks() override;
+    const std::pmr::vector<MirRegisterBank *> &getAvailableRegisterBanks() override;
 
     /// Creates and registers a new register bank owned by this target's allocator.
     MirRegisterBank *createRegisterBank(const char *name) override;
 
     /// Creates the x86-64 machine code emitter.
-    GenericCodeEmitter *createCodeEmitter() override;
+    std::unique_ptr<GenericCodeEmitter> createCodeEmitter() override;
 
     /// Returns the x86-64 relocation resolver used to patch encoded branch fields.
     TargetRelocationResolver *getRelocationResolver() override;
+
+    /**
+     * Records whether position-independent code was requested. Must be called before initialize()
+     * so the ELF binary descriptor is constructed with the right PIC mode.
+     */
+    void setPositionIndependent(bool isPositionIndependent) { m_isPic = isPositionIndependent; }
 
     /// Returns the System V AMD64 calling convention instance.
     CallingConvDesc *getSysVCallingConv() const { return m_sysVConv.get(); }
@@ -109,6 +111,7 @@ class X86_64TargetDesc : public TargetDesc
 
   private:
     MirBuilderContext *m_ctx{ nullptr }; ///< Shared builder context passed to generated components.
+    bool m_initialized{ false };         ///< Guards initialize() so it only builds components once.
 
     MirRegisterBank *m_gprBank{ nullptr }; ///< General-purpose integer register bank.
     MirRegisterBank *m_fprBank{ nullptr }; ///< Floating-point/vector register bank.
@@ -120,10 +123,9 @@ class X86_64TargetDesc : public TargetDesc
     MirRegisterClass *m_fpr64{ nullptr }; ///< 64-bit floating-point register class.
     MirRegisterClass *m_fpr32{ nullptr }; ///< 32-bit floating-point register class.
 
-    std::unique_ptr<MirFrameLowerer> m_frameLowerer;         ///< Lazily created frame lowerer.
-    std::unique_ptr<MirInstructionSelector> m_isel;          ///< Lazily created instruction selector.
-    std::unique_ptr<MirAddressingModeMatcher> m_modeMatcher; ///< Lazily created addressing mode matcher.
-    std::unique_ptr<MirLegalizer> m_legalizer;               ///< Lazily created legalizer.
+    std::unique_ptr<MirFrameLowerer> m_frameLowerer;  ///< Lazily created frame lowerer.
+    std::unique_ptr<MirInstructionSelector> m_isel;   ///< Lazily created instruction selector.
+    std::unique_ptr<MirLegalizer> m_legalizer;        ///< Lazily created legalizer.
     std::unique_ptr<LegalizerInfo> m_legalizerInfo;          ///< Table-driven legality definitions.
     std::unique_ptr<MirRegisterAllocator> m_regAlloc;        ///< Graph-coloring register allocator.
 
@@ -134,6 +136,8 @@ class X86_64TargetDesc : public TargetDesc
     std::unique_ptr<TargetBinaryDesc> m_coffBinary; ///< COFF binary descriptor.
 
     std::unique_ptr<TargetRelocationResolver> m_relocResolver; ///< Branch/field relocation patcher.
+
+    bool m_isPic{ false }; ///< Whether -fPIC was requested before initialize().
 
     std::pmr::vector<MirRegisterBank *> m_banks;     ///< Registered register banks.
     std::pmr::vector<CallingConvDesc *> m_convs;     ///< Registered calling conventions.

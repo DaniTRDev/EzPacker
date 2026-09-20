@@ -60,7 +60,7 @@ class MirRegisterAllocatorPass : public IMirTransformPass
     void reset() override;
 
     /**
-     * This pass depends on instruction selection and LivenessAnalysisPass.
+     * This pass requires the LivenessAnalysisPass analysis to build the interference graph.
      */
     std::vector<std::type_index> getDependencies() const override;
 

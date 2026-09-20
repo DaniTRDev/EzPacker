@@ -40,17 +40,6 @@ std::string ActionKindToCpp(DSL::Ast::LegalizeActionDef::LegalizeActionKind kind
     return "LegalizeActionKind::Unsupported";
 }
 
-// Uppercases an ASCII string, used to build include-guard names from the target name.
-std::string ToUpper(std::string_view s)
-{
-    std::string res(s);
-    for (char &c : res)
-    {
-        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    }
-    return res;
-}
-
 } // namespace
 
 // Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
@@ -59,12 +48,8 @@ CppLegalizerGenerator::CppLegalizerGenerator(DiagnosticCollector *collector,
                                              std::filesystem::path outPath,
                                              std::string targetName) :
     CodeGenerator("CodeGenerators::Legalizer", collector, table, std::move(outPath)),
-    m_targetName(std::move(targetName))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
 {
-    if (m_targetName.empty())
-    {
-        m_targetName = "Target";
-    }
 }
 
 // Resolves the header/source destinations, emits both artifacts, and reports combined success.
@@ -93,7 +78,7 @@ bool CppLegalizerGenerator::run()
 // Emits the LegalizerInfo subclass declaration exposing query() and executeCustom().
 void CppLegalizerGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
-    std::string guardName = std::format("EZTRIPLE_{}_LEGALIZER_ACTION_TABLE_H", ToUpper(m_targetName));
+    std::string guardName = std::format("EZTRIPLE_{}_LEGALIZER_ACTION_TABLE_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guardName);
     emitter.emitBlankLine();
     emitter.emitBanner("CppLegalizerGenerator");
@@ -114,7 +99,6 @@ void CppLegalizerGenerator::emitHeader(CppSourceEmitter &emitter) const
         emitter.emitLine("LegalizationResult executeCustom(LegalizeCtx &ctx, uint16_t handlerId) override;");
         emitter.dedent();
     }
-    emitter.emitLine(";");
     emitter.emitBlankLine();
     emitter.emitIncludeGuardEnd(guardName);
 }
@@ -136,17 +120,13 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitInclude("cstdint", true);
 
     std::vector<const Symbols::LegalizeRuleSymbol *> rules;
-    for (const Symbol *sym : m_table->getSymbols())
+    for (const Symbol *ruleSym : m_table->collect<Symbols::LegalizeRuleSymbol>(SymbolType::LegalizeRule))
     {
-        if (sym && sym->getType() == SymbolType::LegalizeRule)
+        if (const auto *r = ruleSym->getIf<Symbols::LegalizeRuleSymbol>())
         {
-            if (const auto *r = sym->getIf<Symbols::LegalizeRuleSymbol>())
-            {
-                rules.push_back(r);
-            }
+            rules.push_back(r);
         }
     }
-
     if (!rules.empty())
     {
         emitter.emitInclude(std::format("{}LegalizerRules.h", m_targetName));
@@ -185,29 +165,39 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
 
     // 2. Collect Actions, Libcalls, and Handlers
     std::vector<std::string> libcalls;
+    std::unordered_map<std::string, uint16_t> libcallIndex;
     // Interns a libcall symbol name and returns its dense pool index, reusing existing entries.
     auto getOrAddLibcall = [&](std::string_view sym) -> uint16_t
     {
-        for (size_t i = 0; i < libcalls.size(); ++i)
+        std::string key(sym);
+        auto it = libcallIndex.find(key);
+        if (it != libcallIndex.end())
         {
-            if (libcalls[i] == sym)
-                return static_cast<uint16_t>(i);
+            return it->second;
         }
-        libcalls.emplace_back(sym);
-        return static_cast<uint16_t>(libcalls.size() - 1);
+
+        const auto index = static_cast<uint16_t>(libcalls.size());
+        libcalls.push_back(std::move(key));
+        libcallIndex.emplace(libcalls.back(), index);
+        return index;
     };
 
     std::vector<std::string> handlers;
+    std::unordered_map<std::string, uint16_t> handlerIndex;
     // Interns a custom lowering handler name and returns its dense handler index.
     auto getOrAddHandler = [&](std::string_view h) -> uint16_t
     {
-        for (size_t i = 0; i < handlers.size(); ++i)
+        std::string key(h);
+        auto it = handlerIndex.find(key);
+        if (it != handlerIndex.end())
         {
-            if (handlers[i] == h)
-                return static_cast<uint16_t>(i);
+            return it->second;
         }
-        handlers.emplace_back(h);
-        return static_cast<uint16_t>(handlers.size() - 1);
+
+        const auto index = static_cast<uint16_t>(handlers.size());
+        handlers.push_back(std::move(key));
+        handlerIndex.emplace(handlers.back(), index);
+        return index;
     };
 
     // Flattened per-opcode action metadata used to choose which table a clause belongs to.
@@ -221,68 +211,68 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     std::vector<OpcodeActionInfo> actionInfos;
 
     // Classify each declared action and pre-intern its libcall/handler references.
-    for (const Symbol *sym : m_table->getSymbols())
+    for (const Symbol *actionSym : m_table->collect<Symbols::LegalizeActionSymbol>(SymbolType::LegalizeAction))
     {
-        if (sym && sym->getType() == SymbolType::LegalizeAction)
-        {
-            const auto *data = sym->getIf<Symbols::LegalizeActionSymbol>();
-            if (!data)
-                continue;
+        const auto *data = actionSym->getIf<Symbols::LegalizeActionSymbol>();
+        if (!data)
+            continue;
 
-            bool isHet = false;
-            bool hasNonEmpty = false;
-            for (const auto &clause : data->m_clauses)
+        bool isHet = false;
+        bool hasNonEmpty = false;
+        for (const auto &clause : data->m_clauses)
+        {
+            if (!clause.m_types.empty())
             {
-                if (!clause.m_types.empty())
-                {
-                    hasNonEmpty = true;
-                }
-                std::set<uint8_t> slotsInClause;
-                for (const auto &tc : clause.m_types)
-                {
-                    uint8_t slot = tc.m_operandIndex.value_or(0);
-                    slotsInClause.insert(slot);
-                    if (slot > 0)
-                    {
-                        isHet = true;
-                    }
-                }
-                if (slotsInClause.size() > 1)
+                hasNonEmpty = true;
+            }
+            std::set<uint8_t> slotsInClause;
+            for (const auto &tc : clause.m_types)
+            {
+                uint8_t slot = tc.m_operandIndex.value_or(0);
+                slotsInClause.insert(slot);
+                if (slot > 0)
                 {
                     isHet = true;
                 }
-                if (clause.m_libcallSymbol.has_value())
-                {
-                    getOrAddLibcall(*clause.m_libcallSymbol);
-                }
-                if (clause.m_lowerHandler.has_value())
-                {
-                    getOrAddHandler(*clause.m_lowerHandler);
-                }
             }
-
-            bool isWild = !data->m_clauses.empty() && !hasNonEmpty;
-            actionInfos.push_back({ std::string(sym->getName()), data, isHet, isWild });
+            if (slotsInClause.size() > 1)
+            {
+                isHet = true;
+            }
+            if (clause.m_libcallSymbol.has_value())
+            {
+                getOrAddLibcall(*clause.m_libcallSymbol);
+            }
+            if (clause.m_lowerHandler.has_value())
+            {
+                getOrAddHandler(*clause.m_lowerHandler);
+            }
         }
+
+        bool isWild = !data->m_clauses.empty() && !hasNonEmpty;
+        actionInfos.push_back({ std::string(actionSym->getName()), data, isHet, isWild });
     }
 
     // Rule-backed handlers are numbered after all directly-declared lowering handlers.
     uint16_t ruleBaseId = static_cast<uint16_t>(handlers.size());
-    // Maps a rule symbol id to its index within the collected rules list.
-    auto getRuleIndex = [&](SymbolId ruleSymId) -> uint16_t
+    // Maps each collected rule name to its dense index for O(1) lookup by symbol id.
+    std::unordered_map<std::string_view, uint16_t> ruleIndexByName;
+    for (size_t r = 0; r < rules.size(); ++r)
+    {
+        ruleIndexByName.emplace(rules[r]->m_ruleName, static_cast<uint16_t>(r));
+    }
+
+    // Resolves a rule symbol id to its index within the collected rules list.
+    auto getRuleIndex = [&](SymbolId ruleSymId) -> std::optional<uint16_t>
     {
         const Symbol *ruleSym = m_table->getSymById(ruleSymId);
-        if (ruleSym)
+        if (!ruleSym)
         {
-            for (size_t r = 0; r < rules.size(); ++r)
-            {
-                if (rules[r]->m_ruleName == ruleSym->getName())
-                {
-                    return static_cast<uint16_t>(r);
-                }
-            }
+            return std::nullopt;
         }
-        return 0;
+
+        auto it = ruleIndexByName.find(ruleSym->getName());
+        return it == ruleIndexByName.end() ? std::nullopt : std::optional<uint16_t>(it->second);
     };
 
     // 3. Emit Forward Declarations for Custom Lowering Handlers
@@ -346,7 +336,10 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                 }
                 else if (clause.m_customRules.has_value() && !clause.m_customRules->empty())
                 {
-                    handlerOrStrId = ruleBaseId + getRuleIndex(clause.m_customRules->front());
+                    if (auto ruleIndex = getRuleIndex(clause.m_customRules->front()))
+                    {
+                        handlerOrStrId = ruleBaseId + *ruleIndex;
+                    }
                 }
             }
 
@@ -431,7 +424,10 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
             }
             else if (clause.m_customRules.has_value() && !clause.m_customRules->empty())
             {
-                handlerId = ruleBaseId + getRuleIndex(clause.m_customRules->front());
+                if (auto ruleIndex = getRuleIndex(clause.m_customRules->front()))
+                {
+                    handlerId = ruleBaseId + *ruleIndex;
+                }
             }
             emitter.emitLine(
                     "wildcards[static_cast<size_t>(MirInstructionOpCode::{})] = LegalityResponse{{ {}, 0, 0, {} }};",
@@ -479,7 +475,10 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
                 }
                 else if (clause.m_customRules.has_value() && !clause.m_customRules->empty())
                 {
-                    handlerOrStrId = ruleBaseId + getRuleIndex(clause.m_customRules->front());
+                    if (auto ruleIndex = getRuleIndex(clause.m_customRules->front()))
+                    {
+                        handlerOrStrId = ruleBaseId + *ruleIndex;
+                    }
                 }
             }
 
@@ -659,16 +658,6 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     }
     emitter.dedent();
     emitter.emitLine("}");
-}
-
-// Convenience wrapper retained for callers that do not need to configure a generator object.
-bool GenerateLegalizerActionTable(DiagnosticCollector *collector,
-                                  SymbolTable *table,
-                                  std::filesystem::path outPath,
-                                  std::string targetName)
-{
-    CppLegalizerGenerator generator(collector, table, std::move(outPath), std::move(targetName));
-    return generator.run();
 }
 
 } // namespace CodeGenerators

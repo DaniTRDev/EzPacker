@@ -41,16 +41,7 @@ LegalizationResult LegalizeReturn(LegalizeCtx &ctx)
     MirOperandBuilder opBuilder(builderCtx);
 
     // Inserts the first emitted instruction before RET and subsequent ones after it, preserving order.
-    bool firstInserted = false;
-    auto emitBefore = [&](MirInstructionOpCode opc, const std::vector<MirOperand *> &ops)
-    {
-        insertBeforeBuilder.build(opc, instr->getSourceRef(), ops);
-        if (!firstInserted)
-        {
-            insertBeforeBuilder.changeInsertionType(InsertionType::InsertAfter);
-            firstInserted = true;
-        }
-    };
+    EmitOrdered emitBefore(insertBeforeBuilder, instr);
 
     // Create a unique return tracking token (virtual register)
     MirRegister *retToken = opBuilder.buildVReg(builderCtx->getTypeTable()->__bindToken());

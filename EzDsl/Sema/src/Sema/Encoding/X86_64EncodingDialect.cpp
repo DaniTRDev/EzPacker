@@ -1,7 +1,7 @@
 #include "Sema/Encoding/X86_64EncodingDialect.h"
 #include "Diagnostics/DiagnosticCollector.h"
+#include "Sema/Encoding/X86_64EncodingVocabulary.h"
 
-#include <array>
 #include <unordered_set>
 
 namespace Sema::Encoding
@@ -12,19 +12,6 @@ constexpr auto PassName = "Sema::Encoding::X86_64";
 
 namespace AstEnc = DSL::Ast::Encoding;
 
-// Finds the first directive with the given key, or nullptr.
-const AstEnc::Directive *findDirective(const AstEnc::EncodingDecl &encoding, std::string_view key)
-{
-    for (const auto &directive : encoding.m_directives)
-    {
-        if (directive.m_key.m_node == key)
-        {
-            return &directive;
-        }
-    }
-    return nullptr;
-}
-
 // Reports a decode error against a directive's key span when diagnostics are enabled.
 void reportDecodeError(DiagnosticCollector *diag, std::string_view message, const DSL::Ast::Common::Identifier &key)
 {
@@ -32,38 +19,6 @@ void reportDecodeError(DiagnosticCollector *diag, std::string_view message, cons
     {
         diag->error(PassName, "{}: {}", message, key.m_node) << key.m_sourceRef;
     }
-}
-
-bool isKnownForm(std::string_view form)
-{
-    static constexpr std::array<std::string_view, 25> s_forms = { "rr",    "rm",      "mr",      "ri",    "movri",
-                                                                  "movzx", "movsx",   "lea",     "unary", "test",
-                                                                  "shift", "imul_rr", "imul_ri", "div",   "jcc",
-                                                                  "jmp",   "call",    "ret",     "push",  "pop",
-                                                                  "nop",   "syscall", "setcc",   "sse",   "cvt" };
-    for (auto known : s_forms)
-    {
-        if (known == form)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool isKnownField(std::string_view field)
-{
-    static constexpr std::array<std::string_view, 11> s_fields = { "reg",   "rm_reg", "rm_mem", "imm8",
-                                                                   "imm16", "imm32",  "imm64",  "imm8_signed",
-                                                                   "rel8",  "rel32",  "cc" };
-    for (auto known : s_fields)
-    {
-        if (known == field)
-        {
-            return true;
-        }
-    }
-    return false;
 }
 
 } // namespace
@@ -229,7 +184,6 @@ bool decodeX86_64Encoding(const AstEnc::EncodingDecl &encoding, X86EncodingSpec 
         }
     }
 
-    out.m_valid = ok;
     return ok;
 }
 
@@ -261,7 +215,7 @@ bool X86_64EncodingDialect::validate(const AstEnc::EncodingDecl &encoding,
         return false;
     }
 
-    if (!isKnownForm(spec.m_form))
+    if (!X86Vocab::isKnownForm(spec.m_form))
     {
         instError("ENCODING has an unknown x86-64 form '" + std::string(spec.m_form) + "'");
         return false;
@@ -305,7 +259,7 @@ bool X86_64EncodingDialect::validate(const AstEnc::EncodingDecl &encoding,
             return false;
         }
 
-        if (!isKnownField(binding.m_field))
+        if (!X86Vocab::isKnownField(binding.m_field))
         {
             if (diag)
             {

@@ -124,7 +124,8 @@ TEST_F(EzTripleTestSuite, TestX86_64Subsystems)
     EXPECT_NE(target.getLegalizer(), nullptr);
     EXPECT_NE(target.getLegalizerInfo(), nullptr);
     EXPECT_NE(target.getInstructionSelector(), nullptr);
-    EXPECT_NE(target.getAddressingModeMatcher(), nullptr);
+    // Addressing-mode folding is not wired into production selection, so the target exposes none.
+    EXPECT_EQ(target.getAddressingModeMatcher(), nullptr);
     EXPECT_NE(target.getRegisterAllocator(), nullptr);
     EXPECT_NE(target.getFrameLowerer(), nullptr);
 
@@ -137,12 +138,10 @@ TEST_F(EzTripleTestSuite, TestX86_64Subsystems)
     ASSERT_NE(descMOV64rr, nullptr);
     EXPECT_STREQ(descMOV64rr->getName(), "MOV64rr");
 
-    // Libcall resolution
-    EXPECT_EQ(target.getLibcallStr(1), "__divdi3");
-    EXPECT_EQ(target.getLibcallStr(2), "__udivdi3");
-    EXPECT_EQ(target.getLibcallStr(3), "__moddi3");
-    EXPECT_EQ(target.getLibcallStr(4), "__umoddi3");
-    EXPECT_EQ(target.getLibcallStr(5), "__muldi3");
+    // Libcall resolution mirrors the generated legality table's symbol pool (i128 divide).
+    EXPECT_EQ(target.getLibcallStr(0), "__divti3");
+    EXPECT_EQ(target.getLibcallStr(1), "__udivti3");
+    EXPECT_TRUE(target.getLibcallStr(2).empty());
 }
 
 // Verifies the ELF and COFF binary descriptors and their standard sections.
@@ -179,10 +178,9 @@ TEST_F(EzTripleTestSuite, TestX86_64EmitterBankFactoryAndResolverSurface)
     X86_64TargetDesc target(getBuilderCtx());
     target.initialize();
 
-    // createCodeEmitter returns a fresh target emitter.
-    GenericCodeEmitter *emitter = target.createCodeEmitter();
+    // createCodeEmitter returns a fresh target emitter owned by the caller.
+    std::unique_ptr<GenericCodeEmitter> emitter = target.createCodeEmitter();
     ASSERT_NE(emitter, nullptr);
-    delete emitter;
 
     // createRegisterBank registers a new bank accessible through the descriptor.
     const size_t initialBankCount = target.getAvailableRegisterBanks().size();

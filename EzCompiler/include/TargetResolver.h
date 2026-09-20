@@ -27,7 +27,7 @@ struct ResolvedTarget
  * The factory fully encapsulates architecture-specific target, calling convention and
  * binary descriptor selection so TargetResolver stays target-agnostic.
  */
-using TargetFactory = std::function<ResolvedTarget(const TargetTriple &, MirBuilderContext *)>;
+using TargetFactory = std::function<ResolvedTarget(const TargetTriple &, MirBuilderContext *, bool isPositionIndependent)>;
 
 /**
  * Resolves a TargetTriple to a concrete TargetDesc, CallingConvDesc, and TargetBinaryDesc
@@ -44,8 +44,12 @@ class TargetResolver
     /**
      * Resolves a target triple to a concrete target, calling convention, and binary descriptor.
      * Returns an empty ResolvedTarget when the architecture is not registered.
+     *
+     * @param triple                Requested architecture/OS/ABI triple.
+     * @param mirCtx                Shared builder context passed to the target.
+     * @param isPositionIndependent Forwards the driver's -fPIC request to the target factory.
      */
-    static ResolvedTarget resolve(const TargetTriple &triple, MirBuilderContext *mirCtx);
+    static ResolvedTarget resolve(const TargetTriple &triple, MirBuilderContext *mirCtx, bool isPositionIndependent);
 };
 
 } // namespace EzCompiler

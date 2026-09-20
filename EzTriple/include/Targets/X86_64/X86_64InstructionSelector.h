@@ -1,7 +1,9 @@
 #ifndef EZTRIPLE_X86_64_TARGET_INSTRUCTION_SELECTOR_H
 #define EZTRIPLE_X86_64_TARGET_INSTRUCTION_SELECTOR_H
 
-#include "x86_64InstructionSelector.h"
+// Angle brackets keep the search out of this header's own directory: on case-insensitive
+// filesystems a quoted include would resolve "x86_64InstructionSelector.h" back to this file.
+#include <x86_64InstructionSelector.h>
 #include <string_view>
 
 class MirRegisterClass;
@@ -29,9 +31,6 @@ class X86_64TargetInstructionSelector : public x86_64InstructionSelector
     bool select(MirBuilderContext *ctx, MirInstruction *inst) override;
 
   private:
-    /// Looks up a register class by its declarative name, or nullptr when unknown.
-    MirRegisterClass *findClass(std::string_view name);
-
     /// Lowers an unconditional JMP into a target jump, folding the destination if possible.
     bool selectJMP(MirBuilderContext *ctx, MirInstruction *inst);
 

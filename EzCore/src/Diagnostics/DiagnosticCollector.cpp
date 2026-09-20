@@ -7,7 +7,6 @@
 DiagnosticCollector::DiagnosticCollector()
 {
     m_enabledDiags = Diag_Error | Diag_Warning;
-    m_messages = std::pmr::vector<DiagnosticMessage>(&m_diagScopePool);
     m_scopes = std::pmr::vector<DiagnosticScope>(&m_diagScopePool);
     m_scopes.emplace_back(&m_diagScopePool); // Ensure there's at least 1 scope available.
 }
@@ -23,7 +22,7 @@ bool DiagnosticCollector::isDiagEnabledForType(DiagnosticMessageType type) const
 /**
  * Creates a builder attached to this collector with the given type and sender.
  */
-DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const std::string_view &sender)
+DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, std::string_view sender)
 {
     return DiagnosticBuilder(this, type, sender);
 }
@@ -32,7 +31,7 @@ DiagnosticBuilder DiagnosticCollector::builder(DiagnosticMessageType type, const
  * Creates an error builder and appends the message only when error diagnostics are enabled;
  * otherwise the returned inactive builder silently absorbs further chained operations.
  */
-DiagnosticBuilder DiagnosticCollector::error(const std::string_view &sender, const std::string_view &message)
+DiagnosticBuilder DiagnosticCollector::error(std::string_view sender, std::string_view message)
 {
     return buildAndAppend(Diag_Error, sender, "{}", message);
 }
@@ -40,18 +39,42 @@ DiagnosticBuilder DiagnosticCollector::error(const std::string_view &sender, con
 /**
  * Creates a trace builder and appends the message only when trace diagnostics are enabled.
  */
-DiagnosticBuilder DiagnosticCollector::trace(const std::string_view &sender, const std::string_view &message)
+DiagnosticBuilder DiagnosticCollector::trace(std::string_view sender, std::string_view message)
 {
     return buildAndAppend(Diag_Trace, sender, "{}", message);
 }
 
 /**
- * Registers a listener under the collector mutex so it receives committed diagnostics.
+ * Creates a warning builder and appends the message only when warning diagnostics are enabled.
+ */
+DiagnosticBuilder DiagnosticCollector::warn(std::string_view sender, std::string_view message)
+{
+    return buildAndAppend(Diag_Warning, sender, "{}", message);
+}
+
+/**
+ * Registers a listener under the collector mutex so it receives committed diagnostics. Null
+ * listeners are ignored at registration so notification sites never need to special-case them.
  */
 void DiagnosticCollector::addListener(DiagnosticListener *listener)
 {
+    if (!listener)
+        return;
+
     std::lock_guard lock(m_mutex);
     m_listeners.push_back(listener);
+}
+
+/**
+ * Removes every registration of the given listener under the collector mutex.
+ */
+void DiagnosticCollector::removeListener(DiagnosticListener *listener)
+{
+    if (!listener)
+        return;
+
+    std::lock_guard lock(m_mutex);
+    m_listeners.remove(listener);
 }
 
 /**
@@ -70,6 +93,14 @@ void DiagnosticCollector::beginScope(DiagnosticScopeAction action)
  * Adds the given diagnostic type to the enabled bitmask.
  */
 void DiagnosticCollector::enableDiag(DiagnosticMessageType type) { m_enabledDiags.fetch_or(type); }
+
+/**
+ * Replaces the enabled diagnostic type bitmask.
+ */
+void DiagnosticCollector::setEnabledDiags(DiagnosticMessageType types)
+{
+    m_enabledDiags.store(static_cast<uint8_t>(types));
+}
 
 /**
  * Pops the innermost scope and applies its action: Commit forwards messages to listeners and the
@@ -92,16 +123,16 @@ void DiagnosticCollector::endScope()
     {
         case DiagnosticScopeAction::Commit:
         {
-            for (auto &msg : closingScope.getMessages())
+            // Notify listeners directly from the closing scope. The scope (and its messages) stays
+            // alive until this function returns, so no collector-side retained copy is required and
+            // committed diagnostics do not accumulate for the collector's lifetime.
+            for (const auto &msg : closingScope.getMessages())
             {
-                // Record the message and notify every listener.
-
-                m_messages.push_back(msg);
                 for (auto *listener : m_listeners)
                 {
                     if (listener)
                     {
-                        listener->onDiag(m_messages.back());
+                        listener->onDiag(msg);
                     }
                 }
             }
@@ -109,9 +140,8 @@ void DiagnosticCollector::endScope()
         }
         case DiagnosticScopeAction::Propagate:
         {
-            // Pass messages cleanly to the parent scope vector
-            auto &parentScope = m_scopes.back();
-            parentScope.insert(closingScope.getMessages().begin(), closingScope.getMessages().end());
+            // Move messages into the parent scope instead of copying them.
+            closingScope.moveMessagesTo(m_scopes.back());
             break;
         }
         case DiagnosticScopeAction::Discard:
@@ -123,9 +153,8 @@ void DiagnosticCollector::endScope()
 }
 
 /**
- * Receives a message from a builder. At the root scope it notifies listeners immediately and
- * records the message; inside nested scopes it buffers the message. Error messages additionally
- * mark the current scope as having fatal errors.
+ * Receives a message from a builder. At the root scope it notifies listeners immediately; inside
+ * nested scopes it buffers the message for the enclosing scope to commit, propagate or discard.
  */
 void DiagnosticCollector::onDiag(DiagnosticMessage message)
 {
@@ -142,17 +171,19 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
     DiagnosticScope &scope = m_scopes.back();
     if (m_scopes.size() == 1)
     {
-        for (auto &listener : m_listeners)
+        // The by-value message is alive for the whole notification, so it can be passed directly
+        // without retaining a collector-lifetime copy.
+        for (auto *listener : m_listeners)
         {
-            listener->onDiag(message);
+            if (listener)
+            {
+                listener->onDiag(message);
+            }
         }
-
-        // Move the message into the permanent record of messages.
-        m_messages.push_back(message);
     }
     else
     {
-        scope.appendMessage(message);
+        scope.appendMessage(std::move(message));
     }
 }
 

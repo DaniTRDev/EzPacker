@@ -6,6 +6,7 @@
 
 class MirBuilderContext;
 class MirFunction;
+class MirPassManager;
 
 namespace EzCompiler
 {
@@ -45,19 +46,40 @@ class CompilationPipeline
      * Runs CFG analysis, SSA construction and liveness analysis on a function.
      * Returns false if a pass reports failure.
      */
-    bool runMiddleEndPasses(MirFunction *func);
+    bool runMiddleEndPasses(MirFunction *func, MirPassManager &passManager);
 
     /**
      * Runs function-signature and operation legalization passes on a function.
      * Returns false if a pass reports failure.
      */
-    bool runLegalizationPasses(MirFunction *func);
+    bool runLegalizationPasses(MirFunction *func, MirPassManager &passManager);
 
     /**
      * Runs ABI lowering, instruction selection, register allocation and frame lowering.
      * Returns false if a pass reports failure.
      */
-    bool runTargetLoweringPasses(MirFunction *func);
+    bool runTargetLoweringPasses(MirFunction *func, MirPassManager &passManager);
+
+    /**
+     * Prints the "Running <pass>" banner for a function when --print-passes is enabled.
+     */
+    void printPassRunning(std::string_view passName, const MirFunction *func) const;
+
+    /**
+     * Reports a failed pass through the diagnostic collector and returns false.
+     */
+    bool reportPassFailure(const char *message);
+
+    /**
+     * Constructs, times and runs one pass on a single function, centralizing the print/timing/error
+     * scaffolding shared by every stage. Returns false when the pass reports failure.
+     */
+    template <typename PassT, typename... Args>
+    bool runCheckedPass(std::string_view passName,
+                        MirFunction *func,
+                        MirPassManager *passManager,
+                        const char *failureMessage,
+                        Args &&...args);
 
   private:
     DriverContext &m_ctx; ///< Driver context supplying diagnostics, allocators and target descriptors.

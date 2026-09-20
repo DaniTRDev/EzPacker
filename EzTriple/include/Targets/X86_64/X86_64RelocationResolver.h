@@ -22,6 +22,14 @@ class X86_64RelocationResolver : public TargetRelocationResolver
                const CodeRelocation &reloc,
                uint64_t targetOffset,
                TargetCodeRelocationType type) override;
+
+    /**
+     * Returns the offset of the fixup field for a near branch/call (opcode dependent) or the
+     * relocation address itself for direct RIP-relative fields.
+     */
+    uint64_t getRelocationFieldOffset(std::span<const uint8_t> text,
+                                      const CodeRelocation &reloc,
+                                      TargetCodeRelocationType type) const override;
 };
 
 } // namespace EzTriple

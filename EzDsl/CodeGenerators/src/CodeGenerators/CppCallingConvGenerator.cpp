@@ -15,17 +15,6 @@ namespace CodeGenerators
 namespace
 {
 
-// Uppercases an ASCII string, used to build include-guard names from the target name.
-std::string ToUpper(std::string_view s)
-{
-    std::string res(s);
-    for (char &c : res)
-    {
-        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    }
-    return res;
-}
-
 } // namespace
 
 // Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
@@ -34,12 +23,8 @@ CppCallingConvGenerator::CppCallingConvGenerator(DiagnosticCollector *collector,
                                                  std::filesystem::path outPath,
                                                  std::string targetName) :
     CodeGenerator("CodeGenerators::CallingConv", collector, table, std::move(outPath)),
-    m_targetName(std::move(targetName))
+    m_targetName(SanitizeCppIdentifier(targetName, "Target"))
 {
-    if (m_targetName.empty())
-    {
-        m_targetName = "Target";
-    }
 }
 
 // Requires at least one calling-convention symbol, then emits and writes the header/source pair.
@@ -51,17 +36,8 @@ bool CppCallingConvGenerator::run()
     }
 
     // Bail out early when the input declared no calling conventions at all.
-    bool foundAny = false;
-    for (Symbol *sym : getSymbolTable()->getSymbols())
-    {
-        if (sym && sym->getType() == SymbolType::CallingConv)
-        {
-            foundAny = true;
-            break;
-        }
-    }
-
-    if (!foundAny)
+    const auto convs = getSymbolTable()->collect<Symbols::CallingConvSymbol>(SymbolType::CallingConv);
+    if (convs.empty())
     {
         error("No calling convention symbols found in symbol table.");
         return false;
@@ -85,7 +61,7 @@ bool CppCallingConvGenerator::run()
 // Emits one CallingConvDesc subclass declaration per parsed calling convention.
 void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter) const
 {
-    std::string guardName = std::format("EZMIR_{}_CALLING_CONV_DESC_H", ToUpper(m_targetName));
+    std::string guardName = std::format("EZMIR_{}_CALLING_CONV_DESC_H", StrToUpper(m_targetName));
     emitter.emitIncludeGuardStart(guardName);
     emitter.emitBlankLine();
     emitter.emitBanner("CppCallingConvGenerator");
@@ -103,12 +79,9 @@ void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter) const
     emitter.emitLine("class CallLoweringState;");
     emitter.emitBlankLine();
 
-    for (Symbol *sym : getSymbolTable()->getSymbols())
+    for (const Symbol *sym : getSymbolTable()->collect<Symbols::CallingConvSymbol>(SymbolType::CallingConv))
     {
-        if (!sym || sym->getType() != SymbolType::CallingConv)
-            continue;
-
-        auto *ccData = sym->getIf<Symbols::CallingConvSymbol>();
+        const auto *ccData = sym->getIf<Symbols::CallingConvSymbol>();
         if (!ccData || !ccData->m_astNode)
             continue;
 
@@ -163,7 +136,6 @@ void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter) const
             emitter.emitLine("size_t resolveRegId(std::string_view name, size_t fallback) const;");
             emitter.dedent();
         }
-        emitter.emitLine(";");
         emitter.emitBlankLine();
     }
 
@@ -186,20 +158,17 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
     emitter.emitInclude("Operand/MirRegisterClass.h");
     emitter.emitBlankLine();
 
-    for (Symbol *sym : getSymbolTable()->getSymbols())
+    for (const Symbol *sym : getSymbolTable()->collect<Symbols::CallingConvSymbol>(SymbolType::CallingConv))
     {
-        if (!sym || sym->getType() != SymbolType::CallingConv)
-            continue;
-
-        auto *ccData = sym->getIf<Symbols::CallingConvSymbol>();
+        const auto *ccData = sym->getIf<Symbols::CallingConvSymbol>();
         if (!ccData || !ccData->m_astNode)
             continue;
 
         const auto &file = *ccData->m_astNode;
         std::string className = std::format("{}CallingConvDesc", file.m_name.m_node);
 
-        // Assigns a dense id to each saved register: callee-saved first, then caller-saved.
-        auto findRegId = [&](std::string_view name) -> size_t
+        // Assigns a dense id to each saved register: caller-saved first, then callee-saved.
+        auto findRegId = [&](std::string_view name) -> std::optional<size_t>
         {
             for (size_t i = 0; i < file.m_callerSaved.size(); ++i)
             {
@@ -211,7 +180,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
                 if (file.m_calleeSaved[i].m_node == name)
                     return i + file.m_callerSaved.size();
             }
-            return 0;
+            return std::nullopt;
         };
         emitter.emitBlankLine();
 
@@ -285,7 +254,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
 
         if (file.m_stack.m_linkRegister.has_value())
         {
-            size_t lrId = findRegId(file.m_stack.m_linkRegister->m_node);
+            size_t lrId = findRegId(file.m_stack.m_linkRegister->m_node).value_or(0);
             emitter.emitLine("std::optional<MirRegisterRef> {}::getLinkRegister() const {{ return "
                              "MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {})); }}",
                              className,
@@ -298,8 +267,8 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
                              className);
         }
 
-        size_t fpId = findRegId(file.m_stack.m_framePointer.m_node);
-        size_t spId = findRegId(file.m_stack.m_stackPointer.m_node);
+        size_t fpId = findRegId(file.m_stack.m_framePointer.m_node).value_or(0);
+        size_t spId = findRegId(file.m_stack.m_stackPointer.m_node).value_or(0);
         emitter.emitLine("MirRegisterRef {}::getFramePointerReg() const {{ return MirRegisterRef(m_defaultClass, "
                          "resolveRegId(\"{}\", {})); }}",
                          className,
@@ -393,32 +362,32 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
                                                  "ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
                                                  "resolveRegId(\"{}\", {})), sizeInBytes);",
                                                  floatBinding->m_register.m_node,
-                                                 findRegId(floatBinding->m_register.m_node));
+                                                 findRegId(floatBinding->m_register.m_node).value_or(0));
                                 emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
                                                  "resolveRegId(\"{}\", {})), sizeInBytes);",
                                                  intBinding->m_register.m_node,
-                                                 findRegId(intBinding->m_register.m_node));
+                                                 findRegId(intBinding->m_register.m_node).value_or(0));
                             }
                             else if (floatBinding)
                             {
                                 emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
                                                  "resolveRegId(\"{}\", {})), sizeInBytes);",
                                                  floatBinding->m_register.m_node,
-                                                 findRegId(floatBinding->m_register.m_node));
+                                                 findRegId(floatBinding->m_register.m_node).value_or(0));
                             }
                             else if (intBinding)
                             {
                                 emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
                                                  "resolveRegId(\"{}\", {})), sizeInBytes);",
                                                  intBinding->m_register.m_node,
-                                                 findRegId(intBinding->m_register.m_node));
+                                                 findRegId(intBinding->m_register.m_node).value_or(0));
                             }
                             else if (!slot.m_bindings.empty())
                             {
                                 emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
                                                  "resolveRegId(\"{}\", {})), sizeInBytes);",
                                                  slot.m_bindings[0].m_register.m_node,
-                                                 findRegId(slot.m_bindings[0].m_register.m_node));
+                                                 findRegId(slot.m_bindings[0].m_register.m_node).value_or(0));
                             }
                             else
                             {
@@ -461,7 +430,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
                                     sseRegsStr += ", ";
                                 sseRegsStr += std::format("MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {}))",
                                                           seq.m_registers[r].m_node,
-                                                          findRegId(seq.m_registers[r].m_node));
+                                                          findRegId(seq.m_registers[r].m_node).value_or(0));
                             }
                             emitter.emitLine("const MirRegisterRef s_sseRegs[] = {{ {} }};", sseRegsStr);
                             emitter.emitLine("if (cursor < sizeof(s_sseRegs)/sizeof(s_sseRegs[0]))");
@@ -492,7 +461,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
                                     intRegsStr += ", ";
                                 intRegsStr += std::format("MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {}))",
                                                           seq.m_registers[r].m_node,
-                                                          findRegId(seq.m_registers[r].m_node));
+                                                          findRegId(seq.m_registers[r].m_node).value_or(0));
                             }
                             emitter.emitLine("const MirRegisterRef s_intRegs[] = {{ {} }};", intRegsStr);
                             emitter.emitLine("if (cursor < sizeof(s_intRegs)/sizeof(s_intRegs[0]))");
@@ -543,7 +512,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
             if (file.m_returns.m_sret.has_value())
             {
                 sretRegName = file.m_returns.m_sret->m_pointerRegister.m_node;
-                sretRegId = findRegId(sretRegName);
+                sretRegId = findRegId(sretRegName).value_or(0);
             }
             // Returns that cannot fit in registers use an indirect sret pointer.
             emitter.emitLine("if (!canReturnInRegs(type))");
@@ -569,12 +538,12 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
                         if (rule.m_abiClass.m_node == "sse" || rule.m_abiClass.m_node == "float")
                         {
                             floatRetName = seq.m_registers.front().m_node;
-                            floatRetRegId = findRegId(floatRetName);
+                            floatRetRegId = findRegId(floatRetName).value_or(0);
                         }
                         else if (rule.m_abiClass.m_node == "integer")
                         {
                             intRetName = seq.m_registers.front().m_node;
-                            intRetRegId = findRegId(intRetName);
+                            intRetRegId = findRegId(intRetName).value_or(0);
                         }
                     }
                 }
@@ -611,16 +580,6 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter) const
                          className);
         emitter.emitBlankLine();
     }
-}
-
-// Convenience wrapper retained for callers that do not need to configure a generator object.
-bool GenerateCallingConvDesc(DiagnosticCollector *collector,
-                             SymbolTable *table,
-                             std::filesystem::path outPath,
-                             std::string targetName)
-{
-    CppCallingConvGenerator gen(collector, table, std::move(outPath), std::move(targetName));
-    return gen.run();
 }
 
 } // namespace CodeGenerators

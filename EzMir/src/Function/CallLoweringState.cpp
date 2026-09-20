@@ -56,32 +56,6 @@ bool CallLoweringState::allocate(MirRegisterClass *_class, MirRegisterRef &outRe
 }
 
 /**
- * Returns pool size minus allocated count for the class, clamped at zero; 0 for unknown classes.
- */
-size_t CallLoweringState::getUsableRegCount(MirRegisterClass *_class) const
-{
-    auto itUsable = m_usableRegs.find(_class);
-    if (itUsable == m_usableRegs.end())
-    {
-        return 0;
-    }
-
-    size_t total = itUsable->second.size();
-    size_t used = getUsedRegCount(_class);
-
-    return (total > used) ? (total - used) : 0;
-}
-
-/**
- * Returns how many registers of the class have been allocated so far.
- */
-size_t CallLoweringState::getUsedRegCount(MirRegisterClass *_class) const
-{
-    auto it = m_allocatedRegs.find(_class);
-    return (it != m_allocatedRegs.end()) ? it->second.size() : 0;
-}
-
-/**
  * Creates a stack-passed parameter slot of the given type in the target function's frame.
  */
 StackFrameObject *CallLoweringState::allocateStack(MirType *type) const
@@ -94,7 +68,7 @@ StackFrameObject *CallLoweringState::allocateStack(MirType *type) const
  */
 size_t CallLoweringState::getBankCursor(std::string_view bank) const
 {
-    auto it = m_bankCursors.find(std::string(bank));
+    auto it = m_bankCursors.find(bank);
     return (it != m_bankCursors.end()) ? it->second : 0;
 }
 

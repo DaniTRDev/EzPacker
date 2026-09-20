@@ -147,11 +147,6 @@ bool MirFunction::appendBlock(MirBlock *block)
 }
 
 /**
- * Records that the given callee-saved register is used by this function.
- */
-void MirFunction::addCalleeSavedRegUse(const MirRegisterRef &reg) { m_usedCalleeSavedRegs.push_back(reg); }
-
-/**
  * Sets the block that control enters first when the function is called.
  */
 void MirFunction::setEntryPoint(MirBlock *entryPoint) { m_entryPoint = entryPoint; }

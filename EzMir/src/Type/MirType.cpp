@@ -10,17 +10,11 @@ MirType::MirType(MirTypeKind kind,
                  size_t totalSize,
                  std::pmr::string name,
                  std::pmr::vector<MirType *> subTypes,
-                 uint8_t compactId,
-                 bool isTrivial) :
+                 uint8_t compactId) :
     m_kind(kind), m_owner(owner), m_id(id), m_maxAlignmentInBits(maxAlignmentInBytes), m_totalSizeInBits(totalSize),
-    m_subTypes(subTypes), m_name(name), m_compactId(compactId), m_isTrivial(isTrivial)
+    m_compactId(compactId), m_name(std::move(name)), m_subTypes(std::move(subTypes))
 {
 }
-
-/**
- * Checks whether this type is trivial (can be copied/moved without custom destructor logic).
- */
-bool MirType::isTrivial() const { return m_isTrivial; }
 
 /**
  * Checks whether this type has no alignment requirements (alignment = 0).
@@ -62,19 +56,6 @@ MirTypeKind MirType::getKind() const { return m_kind; }
 class MirTypeTable *MirType::getOwner() const { return m_owner; }
 
 /**
- * Calculates the number of elements contained in the array by dividing total byte size by element byte size.
- */
-size_t MirType::getArrayElementCount() const
-{
-    MirType *elemType = getArrayElementType();
-    if (elemType)
-    {
-        return getTotalSizeInBytes() / elemType->getTotalSizeInBytes();
-    }
-    return 0;
-}
-
-/**
  * Retrieves the unique identifier of this type descriptor.
  */
 size_t MirType::getId() const { return m_id; }
@@ -98,11 +79,6 @@ size_t MirType::getTotalSizeInBytes() const { return getTotalSizeInBits() / 8; }
  * Retrieves the compact 8-bit type index used for fast lookups.
  */
 uint8_t MirType::getCompactId() const { return m_compactId; }
-
-/**
- * Sets the triviality flag to false, indicating custom destructor logic is required.
- */
-void MirType::setNonTrivial() { m_isTrivial = false; }
 
 /**
  * Retrieves the diagnostic/human-readable name string for this type.

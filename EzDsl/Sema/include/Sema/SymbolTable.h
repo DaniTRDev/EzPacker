@@ -4,6 +4,7 @@
 #include "EzDslSemaCommon.h"
 #include "Scope.h"
 #include "Symbol.h"
+#include <vector>
 
 /**
  * Central repository managing hierarchical lexical/semantic scopes and Symbol instances.
@@ -18,19 +19,9 @@ class SymbolTable
     SymbolTable(std::pmr::memory_resource *alloc);
 
     /**
-     * Returns the numeric ID of the active scope.
-     */
-    ScopeId getCurrentScopeId() const;
-
-    /**
      * Creates a new scope as a child of parentId with the specified debug name.
      */
     ScopeId createScope(ScopeId parentId, const std::string_view &debugName);
-
-    /**
-     * Returns a pointer to the Scope with the specified ID, or nullptr if out of bounds.
-     */
-    Scope *getScopeById(ScopeId id) const;
 
     /**
      * Returns a pointer to the Symbol with the specified SymbolId, or nullptr if out of bounds.
@@ -72,12 +63,40 @@ class SymbolTable
      */
     const std::pmr::vector<Symbol *> &getSymbols() const;
 
+    /**
+     * Collects every symbol of the given type whose payload is a T, in symbol-table order.
+     *
+     * Equivalent to scanning getSymbols(), filtering on getType() == type and then checking
+     * getIf<T>(); the scanned Symbol pointers are returned so callers keep access to the
+     * authoritative symbol name/id as well as the typed payload.
+     */
+    template <typename T> std::vector<const Symbol *> collect(SymbolType type) const
+    {
+        std::vector<const Symbol *> result;
+
+        for (const Symbol *sym : m_symbols)
+        {
+            if (sym && sym->getType() == type && sym->hasData<T>())
+            {
+                result.push_back(sym);
+            }
+        }
+
+        return result;
+    }
+
   private:
     /**
      * Looks up a symbol name within a single specific scope without ascending to parents.
      */
     Symbol *
     getSymInScope(ScopeId id, const std::string_view &name, std::optional<SymbolType> type = std::nullopt) const;
+
+    /**
+     * Shared bottom-up lookup used by both getSymByName overloads; type is optional.
+     */
+    Symbol *
+    getSymByNameImpl(const std::string_view &name, std::optional<SymbolType> type, std::optional<ScopeId> startingScope);
 
   private:
     ScopeId m_currentScopeId;             // Scope receiving newly declared symbols.

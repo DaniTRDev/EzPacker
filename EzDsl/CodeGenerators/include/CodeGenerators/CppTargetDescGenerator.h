@@ -38,7 +38,7 @@ class CppTargetDescGenerator : public CodeGenerator
     const std::string &getTargetName() const noexcept { return m_targetName; }
 
     /** Overrides the target identifier used to name generated classes. */
-    void setTargetName(std::string targetName) { m_targetName = std::move(targetName); }
+    void setTargetName(std::string targetName) { m_targetName = SanitizeCppIdentifier(targetName, "Target"); }
 
     /** Emits the TargetDesc subclass declaration and component bindings into the header. */
     void emitHeader(CppSourceEmitter &emitter) const;

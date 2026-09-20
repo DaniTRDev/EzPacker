@@ -14,35 +14,35 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
 
 ## 2. Duplicated code
 
-- [ ] **P1 · DUP-01 — `FlexInt` integer constructors are four copies**
+- [x] **P1 · DUP-01 — `FlexInt` integer constructors are four copies**
   - Where: `EzCore/src/FlexNumber/FlexInt.cpp:36-91`
   - Why: `(uint32_t)/(uint64_t)/(int32_t)/(int64_t)` differ only in `m_isSigned` and the `mp_set_*` call.
   - Fix: one private templated/delegating helper.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · DUP-02 — `FlexInt` comparison guard repeated four times**
+- [x] **P1 · DUP-02 — `FlexInt` comparison guard repeated four times**
   - Where: `EzCore/src/FlexNumber/FlexInt.cpp:257-294`
   - Why: identical bit-width/signedness-mismatch throw block in each comparison operator.
   - Fix: `checkCompatible(const FlexInt&) const` helper.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · DUP-03 — `FlexInt` arithmetic operators are the same shape five times**
+- [x] **P1 · DUP-03 — `FlexInt` arithmetic operators are the same shape five times**
   - Where: `EzCore/src/FlexNumber/FlexInt.cpp:424-539`
   - Why: `+ - * / %` all do "copy this, in-place op, return".
   - Fix: shared binary-op template / free function.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · DUP-04 — `getHighHalf`/`getLowHalf` duplicate normalization**
+- [x] **P1 · DUP-04 — `getHighHalf`/`getLowHalf` duplicate normalization**
   - Where: `EzCore/src/FlexNumber/FlexInt.cpp:335-419`, `EzCore/src/FlexNumber/FlexFloat.cpp:429-469`
   - Why: same odd-width guard and negative normalization re-derived in four functions.
   - Fix: shared `normalizeNegative()` / width helper.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · DUP-05 — `FlexFloat` NaN guard repeated six times**
+- [x] **P1 · DUP-05 — `FlexFloat` NaN guard repeated six times**
   - Where: `EzCore/src/FlexNumber/FlexFloat.cpp:236-291`
   - Why: each comparison re-checks NaN explicitly.
   - Fix: shared comparison helper.
-  - Status: new
+  - Status: fixed
 
 - [x] **P1 · DUP-06 — `DiagnosticCollector` error/trace overloads are four copies**
   - Where: `EzCore/include/Diagnostics/DiagnosticCollector.h:36-49,55,60-71,77` and
@@ -51,17 +51,17 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
   - Fix: one private `makeBuilderAndAppend(type, sender, message)`.
   - Status: fixed
 
-- [ ] **P2 · DUP-07 — `SourceManager` entry creation duplicated**
+- [x] **P2 · DUP-07 — `SourceManager` entry creation duplicated**
   - Where: `EzCore/src/SourceManager/SourceManager.cpp:73-87` vs `:264-288`
   - Why: `addSourceContent` and `loadFile` repeat allocate/placement-new/populate/map/push.
   - Fix: shared private `createEntry(...)`.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P2 · DUP-08 — `DiagnosticLogger` padding built char-by-char**
+- [x] **P2 · DUP-08 — `DiagnosticLogger` padding built char-by-char**
   - Where: `EzCore/src/Diagnostics/DiagnosticLogger.cpp:128-133`
   - Why: manual loop duplicates what `std::string(count, ' ')` does, with a tab-fixup pass.
   - Fix: construct once, then adjust for tabs.
-  - Status: new
+  - Status: fixed
 
 ## 3. Legacy / un-removed code
 
@@ -106,13 +106,13 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
   - Fix: add it (or drop the explicit header list).
   - Status: fixed
 
-- [ ] **P2 · LEG-07 — Stale `<EzCore.h>` reference outside the build**
+- [x] **P2 · LEG-07 — Stale `<EzCore.h>` reference outside the build**
   - Where: `EzFrontend/EzLexer/include/EzLexerCommon.h:21`
   - Why: no `EzCore.h` exists in the repo and `EzFrontend` is not in the top-level
     `add_subdirectory` list; also calls a 4-arg `createReference` no longer exposed.
   - Fix: decide to delete `EzFrontend` or bring it back into the build with a fixed API.
     Tracked in `CrossProjectReview.md` (XPR-01).
-  - Status: new
+  - Status: fixed
 
 ## 4. Weird scenarios / old hacks
 
@@ -176,48 +176,48 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
   - Fix: define a single error policy and align docs.
   - Status: fixed
 
-- [ ] **P2 · WEI-09 — Inconsistent null-listener checks**
+- [x] **P2 · WEI-09 — Inconsistent null-listener checks**
   - Where: `EzCore/src/Diagnostics/DiagnosticCollector.cpp:113` vs `:170-173`
   - Why: nested-scope path guards `if (listener)`, root path dereferences directly;
     `addListener` accepts null.
   - Fix: reject null at registration and guard uniformly.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P2 · WEI-10 — `DiagnosticCollector` messages grow without bound**
+- [x] **P2 · WEI-10 — `DiagnosticCollector` messages grow without bound**
   - Where: `EzCore/include/Diagnostics/DiagnosticCollector.h:119`,
     `EzCore/src/Diagnostics/DiagnosticCollector.cpp:112,176`
   - Why: committed messages are appended forever; no `removeListener` either.
   - Fix: clear after scope, or document a bounded lifetime.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P2 · WEI-11 — `getReferenceLine` returns a mutable interior pointer from `const`**
+- [x] **P2 · WEI-11 — `getReferenceLine` returns a mutable interior pointer from `const`**
   - Where: `EzCore/src/SourceManager/SourceManager.cpp:137-167`,
     `EzCore/include/SourceManager/SourceManager.h:54`
   - Why: `const` method returns `SourceLineRange*`; growing `m_lines` can invalidate it.
   - Fix: return by value/index or document lifetime.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P2 · WEI-12 — LibBF header wrapped in a namespace under a fragile guard**
+- [x] **P2 · WEI-12 — LibBF header wrapped in a namespace under a fragile guard**
   - Where: `EzCore/include/EzCoreCommon.h:18-28`, `EzCore/src/FlexNumber/FlexFloat.cpp:8`
   - Why: correctness depends on which include path sets libbf's guard first.
   - Fix: dedicated wrapper header / build-level namespace option.
-  - Status: new
+  - Status: fixed
 
 ## 5. Easy optimization checks
 
-- [ ] **P1 · OPT-01 — `string_view` passed by `const&`**
+- [x] **P1 · OPT-01 — `string_view` passed by `const&`**
   - Where: `EzCore/include/Diagnostics/DiagnosticBuilder.h:25,71,76,81,86`,
     `DiagnosticMessage.h:54,64`, `DiagnosticCollector.h:30,37,55,61,77`, `StringUtils.h:10,23`
   - Why: `string_view` is trivially copyable.
   - Fix: pass by value.
-  - Status: in-progress
+  - Status: fixed-progress
 
-- [ ] **P1 · OPT-02 — Excessive message copies in the diagnostics path**
+- [x] **P1 · OPT-02 — Excessive message copies in the diagnostics path**
   - Where: `EzCore/src/Diagnostics/DiagnosticCollector.cpp:112,127,176,180`
   - Why: `push_back` copies messages/lists that are about to be destroyed; missing
     `DiagnosticScope` rvalue overload.
   - Fix: add `DiagnosticMessage&&` overloads and use move iterators.
-  - Status: new
+  - Status: fixed
 
 - [x] **P1 · OPT-03 — `StringUtils` `tolower`/`toupper` UB on signed `char`**
   - Where: `EzCore/include/StringUtils.h:15,28`
@@ -226,30 +226,30 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
     (see `CrossProjectReview.md` XPR-02).
   - Status: fixed
 
-- [ ] **P2 · OPT-04 — Redundant / missing includes**
+- [x] **P2 · OPT-04 — Redundant / missing includes**
   - Where: `EzCore/include/EzCoreCommon.h:4,12` (`<memory>` twice, unused `<stack>`/`<functional>`);
     `StringUtils.h` (`<algorithm>`, `<cctype>`); `FlexFloat.cpp` uses `std::realloc/free` but
     includes `<cstring>` instead of `<cstdlib>`.
   - Fix: trim/add.
-  - Status: in-progress
+  - Status: fixed-progress
 
-- [ ] **P2 · OPT-05 — Unnecessary deep copies in FlexNumber**
+- [x] **P2 · OPT-05 — Unnecessary deep copies in FlexNumber**
   - Where: `EzCore/src/FlexNumber/FlexFloat.cpp:206` (copies whole `bf_t`),
     `FlexInt.cpp:315-320` (cross-width `==` heap-copies both operands).
   - Fix: use local temporaries / compare without materializing.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P2 · OPT-06 — `IntrusiveLinkedList::splice` range overload recounts**
+- [x] **P2 · OPT-06 — `IntrusiveLinkedList::splice` range overload recounts**
   - Where: `EzCore/include/HelperClasses/IntrusiveLinkedList.h:514-524`
   - Why: walks the range although the count-aware overload exists (`:441`).
   - Fix: use the cached `m_size`/count overload.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P2 · OPT-07 — Missing `const`/`noexcept` wins**
+- [x] **P2 · OPT-07 — Missing `const`/`noexcept` wins**
   - Where: `FlexInt` binary operators (`FlexInt.cpp:424-539`) are non-`const`;
     `fitsIn` (`:189`) is non-`const`; comparisons can be `noexcept`.
   - Fix: add qualifiers.
-  - Status: new
+  - Status: fixed
 
 ## 6. Hot spots
 
@@ -271,15 +271,15 @@ Use the standard gate in `ReviewProcess.md`. Add smoke coverage for FlexNumber c
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| WEI-01 | P0 | Weird | fixed | — | `SourceManager` copy ownership |
-| WEI-02 | P0 | Weird | fixed | — | `DenseBitSet::computeLiveIn` bounds |
-| WEI-03 | P0 | Weird | fixed | — | `~DiagnosticBuilder` / null after flush |
-| WEI-04 | P1 | Weird | fixed | — | sub-32-bit `FlexFloat` |
-| WEI-05 | P1 | Weird | fixed | — | phantom trailing line |
-| WEI-06 | P1 | Weird | fixed | — | unlocked `m_enabledDiags` |
-| WEI-07 | P1 | Weird | fixed | — | unchecked `tellg()` |
-| WEI-08 | P1 | Weird | fixed | — | exception-type mismatches |
-| DUP-01..06 | P1 | Duplication | in-progress | — | DUP-06 fixed; DUP-01..05 open |
-| LEG-01..05 | P1 | Legacy | fixed | — | dead fields/APIs/methods |
-| OPT-01..03 | P1 | Optimization | in-progress | — | OPT-03 fixed; OPT-01 in-progress; OPT-02 open |
-| DUP-07..08, LEG-06..07, WEI-09..12, OPT-04..07 | P2 | mixed | in-progress | — | LEG-06 fixed; OPT-04 in-progress; rest open |
+| WEI-01..03 | P0 | Weird | fixed | — | `SourceManager` ownership, `DenseBitSet` bounds, builder lifetime |
+| WEI-04..08 | P1 | Weird | fixed | — | FlexFloat widths, phantom line, atomic diags, `tellg()`, exception policy |
+| WEI-09..12 | P2 | Weird | fixed | — | null listeners, bounded message lifetime, const line pointer, libbf wrapper |
+| DUP-01..06 | P1 | Duplication | fixed | — | FlexInt/FlexFloat consolidation and diagnostic funnel |
+| DUP-07..08 | P2 | Duplication | fixed | — | `SourceManager` entry creation, logger padding |
+| LEG-01..07 | P1/P2 | Legacy | fixed | — | dead fields/APIs; stale `EzFrontend` removed via XPR-12 |
+| OPT-01..03 | P1 | Optimization | fixed | — | `string_view` by value, move overloads, safe case conversion |
+| OPT-04..07 | P2 | Optimization | fixed | — | includes, deep copies, splice recount, const/noexcept |
+
+Notes: OPT-05/OPT-07 are partially refuted — the stale whole-`bf_t` copy no longer exists, and `FlexInt`
+comparisons intentionally keep throwing on width/signedness mismatch (so they are not `noexcept`).
+New `T_FlexNumber` regression suite added for the changed numerics.

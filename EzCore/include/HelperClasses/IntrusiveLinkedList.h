@@ -510,11 +510,19 @@ template <typename T> class IntrusiveLinkedList
 
     /**
      * Slices and transfers range [first, last) from other list into this list before position pos.
+     * The whole-list case reuses other's cached size instead of walking the range.
      */
     void splice(iterator pos, IntrusiveLinkedList &other, iterator first, iterator last)
     {
         if (first == last || !first.m_node)
             return;
+
+        // Whole-list transfer: reuse the cached size instead of recounting element by element.
+        if (first.m_node == other.m_head && last.m_node == nullptr)
+        {
+            splice(pos, other);
+            return;
+        }
 
         size_t count = 0;
         for (auto it = first; it != last; ++it)

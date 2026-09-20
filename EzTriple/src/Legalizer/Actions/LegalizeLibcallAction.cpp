@@ -42,6 +42,7 @@ LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSym
     MirRuntimeSymbol *calleeRef = ob.buildRtSymbol(symStr);
 
     std::vector<MirOperand *> callOps;
+    callOps.reserve(instr->getOperandCount() + 1);
     // A write-only operand 0 is the original destination; the libcall result must be returned into it.
     bool hasDst = (instr->hasOperands() && (instr->getOperandFlag(0) & MirOperandFlag::Write));
 

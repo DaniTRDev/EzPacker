@@ -214,11 +214,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     opts.quiet = m_program->get<bool>("-q");
 
     // --format is case-insensitive; anything other than "json" falls back to text.
-    std::string formatStr = m_program->get<std::string>("--format");
-    std::transform(formatStr.begin(),
-                   formatStr.end(),
-                   formatStr.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::string formatStr = StrToLower(m_program->get<std::string>("--format"));
     if (formatStr == "json")
     {
         opts.format = OutputFormat::Json;
@@ -252,11 +248,7 @@ std::optional<CliOptions> CommandLineParser::parse(int argc, char *argv[], std::
     bool emitCallingConv = opts.emitCallingConv;
     bool emitRegisterInfo = opts.emitRegisterInfo;
     bool emitTargetDesc = opts.emitTargetDesc;
-    std::string explicitGen = m_program->get<std::string>("--generator");
-    std::transform(explicitGen.begin(),
-                   explicitGen.end(),
-                   explicitGen.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::string explicitGen = StrToLower(m_program->get<std::string>("--generator"));
 
     if (emitTypeTable && emitInstructions)
     {
