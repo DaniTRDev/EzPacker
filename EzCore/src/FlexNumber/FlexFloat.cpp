@@ -85,14 +85,14 @@ FlexFloat::FlexFloat(double value) : FlexFloat(size_t(64))
 }
 
 /**
- * Parses a number from text in the given radix (2..36), throwing std::runtime_error on invalid
+ * Parses a number from text in the given radix (2..36), throwing std::invalid_argument on invalid
  * input and std::bad_alloc on allocation failure, then clamps to the target width.
  */
 FlexFloat::FlexFloat(std::string_view numberStr, size_t bitWidth, size_t radix) : FlexFloat(bitWidth)
 {
     if (numberStr.empty() || radix < 2 || radix > 36)
     {
-        throw std::runtime_error("Could not decode float because string is invalid or radix is not supported");
+        throw std::invalid_argument("Could not decode float because string is invalid or radix is not supported");
     }
 
     const char *next_ptr = nullptr;
@@ -106,7 +106,7 @@ FlexFloat::FlexFloat(std::string_view numberStr, size_t bitWidth, size_t radix) 
     }
     if (next_ptr == str.c_str())
     {
-        throw std::runtime_error("Error while decoding floating-point value from string");
+        throw std::invalid_argument("Error while decoding floating-point value from string");
     }
     clampToFloatBounds();
 }
@@ -322,14 +322,14 @@ FlexFloat FlexFloat::operator/(const FlexFloat &other)
 }
 
 /**
- * Divides in place, throwing std::runtime_error when the divisor is zero and rounding the
+ * Divides in place, throwing std::domain_error when the divisor is zero and rounding the
  * result to this width.
  */
 FlexFloat &FlexFloat::operator/=(const FlexFloat &other)
 {
     if (other.isZero())
     {
-        throw std::runtime_error("Floating-point division by zero.");
+        throw std::domain_error("Floating-point division by zero.");
     }
     m_lastErr = libbf::bf_div(&m_number, &m_number, &other.m_number, getPrecBits(), libbf::BF_RNDN);
     clampToFloatBounds();
@@ -390,7 +390,7 @@ libbf::limb_t FlexFloat::getPrecBits() const
 FlexFloat FlexFloat::getHighHalf() const
 {
     if (m_bitWidth % 2 != 0)
-        throw std::runtime_error("Cannot execute floating-point scalar expansion split on an odd bit-width.");
+        throw std::invalid_argument("Cannot execute floating-point scalar expansion split on an odd bit-width.");
 
     size_t splitWidth = m_bitWidth / 2;
     FlexFloat highPart(splitWidth);
@@ -413,7 +413,7 @@ FlexFloat FlexFloat::getHighHalf() const
 FlexFloat FlexFloat::getLowHalf() const
 {
     if (m_bitWidth % 2 != 0)
-        throw std::runtime_error("Cannot execute floating-point scalar expansion split on an odd bit-width.");
+        throw std::invalid_argument("Cannot execute floating-point scalar expansion split on an odd bit-width.");
 
     size_t splitWidth = m_bitWidth / 2;
     FlexFloat lowPart(splitWidth);
@@ -431,12 +431,12 @@ FlexFloat FlexFloat::getLowHalf() const
 
 /**
  * Widens the storage precision to newBitSize (a no-op at equal width) and re-clamps; narrowing
- * is rejected with std::runtime_error.
+ * is rejected with std::invalid_argument.
  */
 void FlexFloat::extend(size_t newBitSize)
 {
     if (newBitSize < m_bitWidth)
-        throw std::runtime_error("FlexFloat::extend cannot be used to down-cast precision widths.");
+        throw std::invalid_argument("FlexFloat::extend cannot be used to down-cast precision widths.");
 
     if (newBitSize == m_bitWidth)
         return;
@@ -452,7 +452,7 @@ void FlexFloat::extend(size_t newBitSize)
 std::string FlexFloat::toString(size_t radix) const
 {
     if (radix < 2 || radix > 36)
-        throw std::runtime_error("Unsupported radix for string conversion.");
+        throw std::invalid_argument("Unsupported radix for string conversion.");
 
     size_t length = 0;
     libbf::bf_flags_t flags = BF_FTOA_FORMAT_FREE | libbf::BF_RNDN;

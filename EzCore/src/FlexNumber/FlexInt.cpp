@@ -92,7 +92,7 @@ FlexInt::FlexInt(int64_t value, size_t bitWidth)
 
 /**
  * Parses a value from text in the given radix (2..64), skipping leading whitespace and an
- * optional 0x/0X prefix for radix 16, then clamps to the target width. Throws std::runtime_error
+ * optional 0x/0X prefix for radix 16, then clamps to the target width. Throws std::invalid_argument
  * on malformed input, std::bad_alloc on allocation failure.
  */
 FlexInt::FlexInt(std::string_view numberStr, size_t bitWidth, bool _signed, size_t radix)
@@ -102,13 +102,13 @@ FlexInt::FlexInt(std::string_view numberStr, size_t bitWidth, bool _signed, size
 
     if (numberStr.empty() || radix < 2 || radix > 64)
     {
-        throw std::runtime_error("Could not decode number because it is invalid or radix is out of bounds");
+        throw std::invalid_argument("Could not decode number because it is invalid or radix is out of bounds");
     }
 
     size_t scanIdx = numberStr.find_first_not_of(" \t");
     if (scanIdx == std::string_view::npos)
     {
-        throw std::runtime_error("Empty or whitespace-only string passed to FlexInt");
+        throw std::invalid_argument("Empty or whitespace-only string passed to FlexInt");
     }
 
     m_bitWidth = bitWidth;
@@ -123,7 +123,7 @@ FlexInt::FlexInt(std::string_view numberStr, size_t bitWidth, bool _signed, size
 
     if (m_lastErr = mp_read_radix(&m_number, safeStr.c_str(), int(radix)); m_lastErr != MP_OKAY)
     {
-        throw std::runtime_error("Error while decoding number from string: LibTomMath error " +
+        throw std::invalid_argument("Error while decoding number from string: LibTomMath error " +
                                  std::to_string(m_lastErr));
     }
 
@@ -202,43 +202,43 @@ bool FlexInt::isSigned() const { return m_isSigned; }
 bool FlexInt::isZero() const { return mp_iszero(&m_number) == MP_YES; }
 
 /**
- * Compares values, requiring identical width and signedness; throws std::runtime_error otherwise.
+ * Compares values, requiring identical width and signedness; throws std::invalid_argument otherwise.
  */
 bool FlexInt::operator>(const FlexInt &other) const
 {
     if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::runtime_error("Mismatched target types in FlexInt comparison");
+        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
     return mp_cmp(&m_number, &other.m_number) == MP_GT;
 }
 
 /**
- * Compares values, requiring identical width and signedness; throws std::runtime_error otherwise.
+ * Compares values, requiring identical width and signedness; throws std::invalid_argument otherwise.
  */
 bool FlexInt::operator>=(const FlexInt &other) const
 {
     if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::runtime_error("Mismatched target types in FlexInt comparison");
+        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
     auto res = mp_cmp(&m_number, &other.m_number);
     return res == MP_GT || res == MP_EQ;
 }
 
 /**
- * Compares values, requiring identical width and signedness; throws std::runtime_error otherwise.
+ * Compares values, requiring identical width and signedness; throws std::invalid_argument otherwise.
  */
 bool FlexInt::operator<(const FlexInt &other) const
 {
     if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::runtime_error("Mismatched target types in FlexInt comparison");
+        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
     return mp_cmp(&m_number, &other.m_number) == MP_LT;
 }
 
 /**
- * Compares values, requiring identical width and signedness; throws std::runtime_error otherwise.
+ * Compares values, requiring identical width and signedness; throws std::invalid_argument otherwise.
  */
 bool FlexInt::operator<=(const FlexInt &other) const
 {
     if (m_bitWidth != other.m_bitWidth || m_isSigned != other.m_isSigned)
-        throw std::runtime_error("Mismatched target types in FlexInt comparison");
+        throw std::invalid_argument("Mismatched target types in FlexInt comparison");
     auto res = mp_cmp(&m_number, &other.m_number);
     return res == MP_LT || res == MP_EQ;
 }
@@ -285,7 +285,7 @@ bool FlexInt::operator!=(const FlexInt &other) const { return !(*this == other);
 FlexInt FlexInt::getHighHalf()
 {
     if (m_bitWidth % 2 != 0)
-        throw std::runtime_error("Cannot execute scalar split on an odd bit-width.");
+        throw std::invalid_argument("Cannot execute scalar split on an odd bit-width.");
 
     size_t splitWidth = m_bitWidth / 2;
     FlexInt highPart(uint64_t(0), splitWidth);
@@ -334,7 +334,7 @@ FlexInt FlexInt::getHighHalf()
 FlexInt FlexInt::getLowHalf()
 {
     if (m_bitWidth % 2 != 0)
-        throw std::runtime_error("Cannot execute scalar expansion split on an odd bit-width.");
+        throw std::invalid_argument("Cannot execute scalar expansion split on an odd bit-width.");
 
     size_t splitWidth = m_bitWidth / 2;
     FlexInt lowPart(uint64_t(0), splitWidth);
@@ -515,14 +515,14 @@ uint64_t FlexInt::getU64() const
 size_t FlexInt::getBitSize() const { return m_bitWidth; }
 
 /**
- * Widens the storage to newBitSize, adopting the requested signedness. Widening is rejected with
- * std::bad_alloc; when the old value was negative and the target is now unsigned, the value is
- * converted into the unsigned range before clamping.
+ * Widens the storage to newBitSize, adopting the requested signedness. Narrowing is rejected with
+ * std::invalid_argument; when the old value was negative and the target is now unsigned, the value
+ * is converted into the unsigned range before clamping.
  */
 void FlexInt::extend(size_t newBitSize, bool isSigned)
 {
     if (newBitSize < m_bitWidth)
-        throw std::bad_alloc();
+        throw std::invalid_argument("FlexInt::extend cannot be used to down-cast bit widths.");
 
     if (newBitSize == m_bitWidth)
     {

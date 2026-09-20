@@ -150,7 +150,7 @@ class FlexFloat
     FlexFloat operator/(const FlexFloat &other);
 
     /**
-     * Divides this value by other and returns a reference to this instance. Throws std::runtime_error if other
+     * Divides this value by other and returns a reference to this instance. Throws std::domain_error if other
      * evaluates exactly to zero.
      */
     FlexFloat &operator/=(const FlexFloat &other);
@@ -173,8 +173,8 @@ class FlexFloat
     size_t getBitSize() const;
 
     /**
-     * Extends the float value to the new bit size. If it is smaller than the previous, a std::bad_alloc exception
-     * is thrown.
+     * Extends the float value to the new bit size. If it is smaller than the previous, a
+     * std::invalid_argument exception is thrown.
      */
     void extend(size_t newBitSize);
 
