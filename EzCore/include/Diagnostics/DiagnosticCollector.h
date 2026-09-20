@@ -6,6 +6,7 @@
 #include "DiagnosticMessage.h"
 #include "DiagnosticListener.h"
 #include "DiagnosticScope.h"
+#include <atomic>
 
 /**
  * This class is the responsible of creating diagnostic builders to emit messages into scopes and later handle the
@@ -108,7 +109,7 @@ class DiagnosticCollector
     std::pmr::memory_resource *getAllocator();
 
   private:
-    uint8_t m_enabledDiags;                               // Used to know which diagnostic types are enabled.
+    std::atomic<uint8_t> m_enabledDiags;                  // Enabled diagnostic types; atomic to match the documented thread-safety.
     std::list<DiagnosticListener *> m_listeners;          // Registered observers notified when messages are committed.
     std::pmr::synchronized_pool_resource m_diagScopePool; // Thread-safe arena backing all messages and scopes.
     std::pmr::vector<DiagnosticMessage> m_messages; // A set of notified messages. Will be filled with elements that

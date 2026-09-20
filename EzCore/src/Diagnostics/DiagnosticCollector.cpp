@@ -15,7 +15,10 @@ DiagnosticCollector::DiagnosticCollector()
 /**
  * Returns true when the given type's bit is set among the enabled diagnostics.
  */
-bool DiagnosticCollector::isDiagEnabledForType(DiagnosticMessageType type) const { return m_enabledDiags & type; }
+bool DiagnosticCollector::isDiagEnabledForType(DiagnosticMessageType type) const
+{
+    return (m_enabledDiags.load() & type) != 0;
+}
 
 /**
  * Creates a builder attached to this collector with the given type and sender.
@@ -82,7 +85,7 @@ void DiagnosticCollector::beginScope(DiagnosticScopeAction action)
 /**
  * Adds the given diagnostic type to the enabled bitmask.
  */
-void DiagnosticCollector::enableDiag(DiagnosticMessageType type) { m_enabledDiags |= type; }
+void DiagnosticCollector::enableDiag(DiagnosticMessageType type) { m_enabledDiags.fetch_or(type); }
 
 /**
  * Pops the innermost scope and applies its action: Commit forwards messages to listeners and the
