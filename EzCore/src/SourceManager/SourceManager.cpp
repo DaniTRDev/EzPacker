@@ -17,8 +17,9 @@ static void populateLineRanges(SourceFileEntry *entry)
             lineStart = i + 1;
         }
     }
-    // Record final line if buffer does not end with a newline
-    if (lineStart <= content.size())
+    // Record the final line only when the buffer does not already end with a newline, so a
+    // trailing '\n' does not create a phantom empty line at EOF.
+    if (content.empty() || content.back() != '\n')
     {
         entry->m_lines.push_back({ lineStart, content.size(), lineNumber });
     }
@@ -257,8 +258,14 @@ std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &fileP
         return std::nullopt;
     }
 
+    // A failed end-seek leaves tellg() at -1; casting that to size_t would request a huge allocation.
     file.seekg(0, std::ios::end);
-    size_t fileSize = static_cast<size_t>(file.tellg());
+    std::streampos endPos = file.tellg();
+    if (endPos == std::streampos(-1))
+    {
+        return std::nullopt;
+    }
+    size_t fileSize = static_cast<size_t>(endPos);
     file.seekg(0, std::ios::beg);
 
     size_t newId = m_sourceFiles.size();

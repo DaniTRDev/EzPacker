@@ -55,4 +55,11 @@ if (EZPACKER_BUILD_TESTS)
             "gtest;GTest::gtest_main"
             "tests/T_DenseBitSet.cpp"
     )
+
+    EzPacker_AddTest(
+            "T_SourceManager"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_SourceManager.cpp"
+    )
 endif ()
