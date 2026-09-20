@@ -289,23 +289,6 @@ std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &fileP
 }
 
 /**
- * Returns the arena-backed content buffer for the source ID, or nullptr when the ID is invalid.
- */
-const std::pmr::string *SourceManager::getSourceBuffer(size_t id) const
-{
-    if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
-    {
-        return nullptr;
-    }
-    return &m_sourceFiles[id]->m_content;
-}
-
-/**
- * Returns the registered include search paths.
- */
-const std::pmr::vector<std::filesystem::path> &SourceManager::getIncludePaths() const { return m_includePaths; }
-
-/**
  * Returns a view of the full line containing the reference (terminators excluded), or an empty
  * view when the reference line cannot be resolved.
  */

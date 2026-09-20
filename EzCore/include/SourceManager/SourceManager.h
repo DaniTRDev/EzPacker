@@ -79,17 +79,6 @@ class SourceManager : public GenericSourceManager
                                    const std::optional<std::filesystem::path> &relativeTo = std::nullopt) override;
 
     /**
-     * Returns a direct pointer to the arena-backed string buffer for the specified source file ID, or nullptr if
-     * invalid.
-     */
-    const std::pmr::string *getSourceBuffer(size_t id) const;
-
-    /**
-     * Returns a const reference to the registered include search paths vector.
-     */
-    const std::pmr::vector<std::filesystem::path> &getIncludePaths() const;
-
-    /**
      * Returns a zero-copy string view of the full line containing the given SourceReference.
      */
     std::string_view getRawLineContent(SourceReference *ref) const override;
