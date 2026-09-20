@@ -67,10 +67,10 @@ EzCMK_ConfigureLib(NAME "EzTriple"
         LINKED_LIBRARIES "EzMir;EzCodeEmitter"
         INCLUDED_DIRS "include;../EzCodeEmitter/include")
 
-include(CMake/EzDslGenCallingConv.cmake)
-include(CMake/EzDslGenLegalizerActionTable.cmake)
-include(CMake/EzDslGenTargetInstructions.cmake)
-include(CMake/EzDslGenInstructionSelector.cmake)
+include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenCallingConv.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenLegalizerActionTable.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenTargetInstructions.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../EzTargets/CMake/EzDslGenInstructionSelector.cmake")
 
 EzDslGenCallingConv(
     TARGET EzTriple

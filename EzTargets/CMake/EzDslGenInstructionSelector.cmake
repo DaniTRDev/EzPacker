@@ -1,29 +1,29 @@
-# EzTriple/CMake/EzDslGenCallingConv.cmake
+# EzTargets/CMake/EzDslGenInstructionSelector.cmake
 
 #[=======================================================================[.rst:
-EzDslGenCallingConv
--------------------
+EzDslGenInstructionSelector
+---------------------------
 
-Binds an .ezcc / .ccd calling convention specification file to a target library
-by executing EzDslCli and generating <Target>CallingConvDesc.h and .cpp.
+Binds an .isf instruction selection pattern file to a target library
+by executing EzDslCli and generating <Target>InstructionSelector.h and .cpp.
 
 Usage:
-  EzDslGenCallingConv(
+  EzDslGenInstructionSelector(
       TARGET <target_name>
-      INPUT  <path_to_ezcc_file>
+      INPUT  <path_to_isf_file>
       TARGET_NAME <target_architecture_name>
       [OUTPUT_DIR <output_directory>]
   )
 #]=======================================================================]
-function(EzDslGenCallingConv)
+function(EzDslGenInstructionSelector)
     cmake_parse_arguments(PARSE_ARGV 0 EZDSL "" "TARGET;INPUT;TARGET_NAME;OUTPUT_DIR" "")
 
     if(NOT EZDSL_TARGET)
-        message(FATAL_ERROR "EzDslGenCallingConv: TARGET argument is required.")
+        message(FATAL_ERROR "EzDslGenInstructionSelector: TARGET argument is required.")
     endif()
 
     if(NOT EZDSL_INPUT)
-        message(FATAL_ERROR "EzDslGenCallingConv: INPUT argument is required.")
+        message(FATAL_ERROR "EzDslGenInstructionSelector: INPUT argument is required.")
     endif()
 
     if(NOT EZDSL_TARGET_NAME)
@@ -34,8 +34,8 @@ function(EzDslGenCallingConv)
         set(EZDSL_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/${EZDSL_TARGET_NAME}")
     endif()
 
-    set(GEN_HEADER "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}CallingConvDesc.h")
-    set(GEN_SOURCE "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}CallingConvDesc.cpp")
+    set(GEN_HEADER "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}InstructionSelector.h")
+    set(GEN_SOURCE "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}InstructionSelector.cpp")
 
     file(MAKE_DIRECTORY "${EZDSL_OUTPUT_DIR}")
 
@@ -50,10 +50,10 @@ function(EzDslGenCallingConv)
         COMMAND ${ENV_WRAPPER} $<TARGET_FILE:EzDslCli>
                 -i "${EZDSL_INPUT}"
                 -o "${EZDSL_OUTPUT_DIR}"
-                --emit-calling-conv
+                --emit-instruction-selector
                 --target "${EZDSL_TARGET_NAME}"
         DEPENDS EzDslCli "${EZDSL_INPUT}"
-        COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}CallingConvDesc from ${EZDSL_INPUT}"
+        COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}InstructionSelector from ${EZDSL_INPUT}"
         VERBATIM
     )
 

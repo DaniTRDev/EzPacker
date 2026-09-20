@@ -1,4 +1,4 @@
-# EzTriple/CMake/EzDslGenLegalizerActionTable.cmake
+# EzTargets/CMake/EzDslGenLegalizerActionTable.cmake
 
 #[=======================================================================[.rst:
 EzDslGenLegalizerActionTable

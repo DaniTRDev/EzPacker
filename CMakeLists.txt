@@ -48,6 +48,7 @@ add_subdirectory(EzDsl)
 add_subdirectory(EzCodeEmitter)
 add_subdirectory(EzTriple)
 add_subdirectory(EzCompiler)
+add_subdirectory(EzTargets)
 
 if (EZPACKER_BUILD_TESTS)
     add_subdirectory(tests/EzMirTestSuite)

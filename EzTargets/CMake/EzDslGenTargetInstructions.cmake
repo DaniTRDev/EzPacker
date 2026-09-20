@@ -1,29 +1,29 @@
-# EzTriple/CMake/EzDslGenInstructionSelector.cmake
+# EzTargets/CMake/EzDslGenTargetInstructions.cmake
 
 #[=======================================================================[.rst:
-EzDslGenInstructionSelector
----------------------------
+EzDslGenTargetInstructions
+--------------------------
 
-Binds an .isf instruction selection pattern file to a target library
-by executing EzDslCli and generating <Target>InstructionSelector.h and .cpp.
+Binds an .idf target instruction specification file to a target library
+by executing EzDslCli and generating <Target>TargetInstructionTable.h and .cpp.
 
 Usage:
-  EzDslGenInstructionSelector(
+  EzDslGenTargetInstructions(
       TARGET <target_name>
-      INPUT  <path_to_isf_file>
+      INPUT  <path_to_idf_file>
       TARGET_NAME <target_architecture_name>
       [OUTPUT_DIR <output_directory>]
   )
 #]=======================================================================]
-function(EzDslGenInstructionSelector)
+function(EzDslGenTargetInstructions)
     cmake_parse_arguments(PARSE_ARGV 0 EZDSL "" "TARGET;INPUT;TARGET_NAME;OUTPUT_DIR" "")
 
     if(NOT EZDSL_TARGET)
-        message(FATAL_ERROR "EzDslGenInstructionSelector: TARGET argument is required.")
+        message(FATAL_ERROR "EzDslGenTargetInstructions: TARGET argument is required.")
     endif()
 
     if(NOT EZDSL_INPUT)
-        message(FATAL_ERROR "EzDslGenInstructionSelector: INPUT argument is required.")
+        message(FATAL_ERROR "EzDslGenTargetInstructions: INPUT argument is required.")
     endif()
 
     if(NOT EZDSL_TARGET_NAME)
@@ -34,8 +34,9 @@ function(EzDslGenInstructionSelector)
         set(EZDSL_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/${EZDSL_TARGET_NAME}")
     endif()
 
-    set(GEN_HEADER "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}InstructionSelector.h")
-    set(GEN_SOURCE "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}InstructionSelector.cpp")
+    set(GEN_HEADER "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}TargetInstructionTable.h")
+    set(GEN_SOURCE "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}TargetInstructionTable.cpp")
+    set(GEN_ENCODING_HEADER "${EZDSL_OUTPUT_DIR}/${EZDSL_TARGET_NAME}EncodingTable.h")
 
     file(MAKE_DIRECTORY "${EZDSL_OUTPUT_DIR}")
 
@@ -50,16 +51,29 @@ function(EzDslGenInstructionSelector)
         COMMAND ${ENV_WRAPPER} $<TARGET_FILE:EzDslCli>
                 -i "${EZDSL_INPUT}"
                 -o "${EZDSL_OUTPUT_DIR}"
-                --emit-instruction-selector
+                --emit-target-instructions
                 --target "${EZDSL_TARGET_NAME}"
         DEPENDS EzDslCli "${EZDSL_INPUT}"
-        COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}InstructionSelector from ${EZDSL_INPUT}"
+        COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}TargetInstructionTable from ${EZDSL_INPUT}"
+        VERBATIM
+    )
+
+    add_custom_command(
+        OUTPUT "${GEN_ENCODING_HEADER}"
+        COMMAND ${ENV_WRAPPER} $<TARGET_FILE:EzDslCli>
+                -i "${EZDSL_INPUT}"
+                -o "${EZDSL_OUTPUT_DIR}"
+                --emit-target-encodings
+                --target "${EZDSL_TARGET_NAME}"
+        DEPENDS EzDslCli "${EZDSL_INPUT}"
+        COMMENT "[EzDSL] Synthesizing ${EZDSL_TARGET_NAME}EncodingTable from ${EZDSL_INPUT}"
         VERBATIM
     )
 
     target_sources(${EZDSL_TARGET} PRIVATE
         "${GEN_HEADER}"
         "${GEN_SOURCE}"
+        "${GEN_ENCODING_HEADER}"
     )
 
     target_include_directories(${EZDSL_TARGET} PUBLIC
