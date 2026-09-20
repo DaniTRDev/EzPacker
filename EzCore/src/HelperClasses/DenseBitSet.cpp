@@ -52,8 +52,10 @@ bool DenseBitSet::unionWith(const DenseBitSet &other)
 bool DenseBitSet::computeLiveIn(const DenseBitSet &use, const DenseBitSet &liveOut, const DenseBitSet &def)
 {
     bool changed = false;
-    // Compute Use | (LiveOut & ~Def) across all words
-    for (size_t i = 0; i < m_words.size(); ++i)
+    // Bound by the shortest operand so the transfer stays within every bitset's word storage.
+    size_t count = std::min({ m_words.size(), use.m_words.size(), liveOut.m_words.size(), def.m_words.size() });
+    // Compute Use | (LiveOut & ~Def) across the shared word bounds
+    for (size_t i = 0; i < count; ++i)
     {
         uint64_t oldVal = m_words[i];
         uint64_t newVal = use.m_words[i] | (liveOut.m_words[i] & ~def.m_words[i]);

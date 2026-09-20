@@ -47,4 +47,11 @@ if (EZPACKER_BUILD_TESTS)
             "gtest;GTest::gtest_main"
             "tests/T_IntrusiveLinkedList.cpp"
     )
+
+    EzPacker_AddTest(
+            "T_DenseBitSet"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_DenseBitSet.cpp"
+    )
 endif ()
