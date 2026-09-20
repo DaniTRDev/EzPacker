@@ -95,12 +95,6 @@ class X86_64TargetDesc : public TargetDesc
     /// Returns the x86-64 relocation resolver used to patch encoded branch fields.
     TargetRelocationResolver *getRelocationResolver() override;
 
-    /// Returns the generated encoding descriptor for a table id, or nullptr.
-    const EzCodeEmitter::TableGen::EncodingDesc *getEncodingDesc(size_t id) override;
-
-    /// Returns the generated encoding descriptor registered under an instruction name, or nullptr.
-    const EzCodeEmitter::TableGen::EncodingDesc *findEncodingDesc(const char *name) override;
-
     /// Returns the System V AMD64 calling convention instance.
     CallingConvDesc *getSysVCallingConv() const { return m_sysVConv.get(); }
 

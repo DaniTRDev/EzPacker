@@ -3,7 +3,7 @@
 
 #include "EzCodeEmitterCommon.h"
 #include "GenericCodeEmitter.h"
-#include "TableGen/EncodingDesc.h"
+#include "X86_64/Encoding/X86_64EncodingDesc.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Operand/MirOperands.h"
 #include <functional>
@@ -18,12 +18,12 @@ namespace EzCodeEmitter::X86_64
  * Supplied by the target descriptor (which owns the generated encoding table), so the
  * emitter stays independent from generated code and from EzTriple.
  */
-using EncodingResolver = std::function<const TableGen::EncodingDesc *(MirTargetInstructionDesc *)>;
+using EncodingResolver = std::function<const EncodingDesc *(MirTargetInstructionDesc *)>;
 
 /**
  * Concrete x86-64 Machine Code Emitter implementing GenericCodeEmitter.
  * Encodes target-lowered machine instructions into binary sections by interpreting the
- * declarative TableGen::EncodingDesc supplied for each instruction descriptor.
+ * declarative EncodingDesc supplied for each instruction descriptor.
  */
 class X86_64CodeEmitter : public GenericCodeEmitter
 {
@@ -40,7 +40,7 @@ class X86_64CodeEmitter : public GenericCodeEmitter
      * Starts a function described by a MIR function, remembering it for stack-frame
      * resolution and deriving the entry label name from it.
      */
-    void beginFunction(CodeEmitterContext *ctx, MirFunction *func);
+    void beginFunction(CodeEmitterContext *ctx, MirFunction *func) override;
 
     /**
      * Materializes and binds the label identified by labelId at the current position.
@@ -55,7 +55,7 @@ class X86_64CodeEmitter : public GenericCodeEmitter
     /**
      * Ends the current function and associates the flushed state with func.
      */
-    void endFunction(CodeEmitterContext *ctx, MirFunction *func);
+    void endFunction(CodeEmitterContext *ctx, MirFunction *func) override;
 
     /**
      * Encodes and emits a single lowered target instruction via the table-driven encoder.
@@ -85,9 +85,9 @@ class X86_64CodeEmitter : public GenericCodeEmitter
      * Converts EzMir operands into the target-neutral representation consumed by the
      * table-driven encoder, resolving stack slots and global references to memory.
      */
-    bool buildResolvedOperands(const TableGen::EncodingDesc &enc,
+    bool buildResolvedOperands(const EncodingDesc &enc,
                                std::span<MirOperand *> operands,
-                               std::vector<TableGen::ResolvedOperand> &resolved) const;
+                               std::vector<ResolvedOperand> &resolved) const;
 
   private:
     CodeEmitterContext *m_ctx{ nullptr };  ///< Active emission context (labels/relocations/sections).

@@ -237,39 +237,28 @@ MirRegisterBank *X86_64TargetDesc::createRegisterBank(const char *name)
 
 /**
  * Creates the x86-64 code emitter and installs a resolver that maps an instruction's encoding id
- * (falling back to its name) to the generated TableGen encoding description.
+ * (falling back to its name) to the generated x86-64 encoding description.
  *
+ * The target owns this binding so the shared emitter seam stays free of x86 encoding types.
  * Caller takes ownership of the returned emitter.
  */
 GenericCodeEmitter *X86_64TargetDesc::createCodeEmitter()
 {
     auto *emitter = new EzCodeEmitter::X86_64::X86_64CodeEmitter();
     emitter->setEncodingResolver(
-            [this](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::TableGen::EncodingDesc *
+            [](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::X86_64::EncodingDesc *
             {
                 if (!desc)
                 {
                     return nullptr;
                 }
-                if (const auto *enc = getEncodingDesc(desc->getEncodingId()))
+                if (const auto *enc = EzCodeEmitter::X86_64::getEncodingDesc(desc->getEncodingId()))
                 {
                     return enc;
                 }
-                return findEncodingDesc(desc->getName());
+                return EzCodeEmitter::X86_64::findEncodingDesc(desc->getName());
             });
     return emitter;
-}
-
-/// Looks up a generated x86-64 encoding description by table id.
-const EzCodeEmitter::TableGen::EncodingDesc *X86_64TargetDesc::getEncodingDesc(size_t id)
-{
-    return EzCodeEmitter::TableGen::x86_64::getEncodingDesc(id);
-}
-
-/// Looks up a generated x86-64 encoding description by instruction name.
-const EzCodeEmitter::TableGen::EncodingDesc *X86_64TargetDesc::findEncodingDesc(const char *name)
-{
-    return EzCodeEmitter::TableGen::x86_64::findEncodingDesc(name);
 }
 
 /// Lazily creates and returns the x86-64 relocation resolver.

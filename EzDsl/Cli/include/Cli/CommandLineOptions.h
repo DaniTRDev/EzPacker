@@ -19,7 +19,7 @@ enum class GeneratorKind
     Legalizer,           // CppLegalizerGenerator
     Rules,               // CppLegalizeRuleGenerator
     TargetInstructions,  // CppTargetInstructionGenerator
-    TargetEncodings,     // CppTargetEncodingGenerator
+    TargetEncodings,     // CppEncodingTableGenerator
     InstructionSelector, // CppInstructionSelectorGenerator
     CallingConv,         // CppCallingConvGenerator
     RegisterInfo,        // CppRegisterInfoGenerator

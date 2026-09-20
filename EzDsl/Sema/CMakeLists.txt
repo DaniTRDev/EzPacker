@@ -1,4 +1,6 @@
 set(EZDSL_SEMA_FILES_LIST
+    "include/Sema/Encoding/EncodingDialect.h"
+    "include/Sema/Encoding/X86_64EncodingDialect.h"
     "include/Sema/Scope.h"
     "include/Sema/SemaContext.h"
     "include/Sema/Symbol.h"
@@ -21,6 +23,8 @@ set(EZDSL_SEMA_FILES_LIST
     "include/SemaPasses/RegisterPass.h"
     "include/SemaPasses/TargetDescPass.h"
 
+    "src/Sema/Encoding/EncodingDialect.cpp"
+    "src/Sema/Encoding/X86_64EncodingDialect.cpp"
     "src/Sema/Scope.cpp"
     "src/Sema/SemaContext.cpp"
     "src/Sema/Symbol.cpp"

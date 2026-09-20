@@ -1,12 +1,12 @@
-#ifndef EZPACKER_BRANCH_RELAXER_H
-#define EZPACKER_BRANCH_RELAXER_H
+#ifndef EZCODEEMITTER_X86_64_BRANCH_RELAXER_H
+#define EZCODEEMITTER_X86_64_BRANCH_RELAXER_H
 
 #include "EzCodeEmitterCommon.h"
-#include "TableGen/InstructionEncoder.h"
+#include "X86_64/Encoding/X86_64InstructionEncoder.h"
 #include <unordered_map>
 #include <vector>
 
-namespace EzCodeEmitter
+namespace EzCodeEmitter::X86_64
 {
 
 /**
@@ -24,10 +24,10 @@ enum class StreamItemKind : uint8_t
  */
 struct BranchItem
 {
-    MirId m_targetId{ MIRID_INVALID };                                 ///< Label this branch targets.
-    bool m_isConditional{ false };                                     ///< True for Jcc, false for JMP.
-    TableGen::ConditionCode m_condition{ TableGen::ConditionCode::E }; ///< Predicate used by conditional branches.
-    bool m_isRelaxed{ false }; // false = Short (2 bytes), true = Near (5/6 bytes)
+    MirId m_targetId{ MIRID_INVALID };             ///< Label this branch targets.
+    bool m_isConditional{ false };                 ///< True for Jcc, false for JMP.
+    ConditionCode m_condition{ ConditionCode::E }; ///< Predicate used by conditional branches.
+    bool m_isRelaxed{ false };                     // false = Short (2 bytes), true = Near (5/6 bytes)
 
     /**
      * Returns the encoded length of the branch given its current relaxation state.
@@ -90,7 +90,7 @@ struct StreamItem
     /**
      * Builds a conditional jump branch item guarded by the given condition code.
      */
-    static StreamItem Jcc(TableGen::ConditionCode cc, MirId targetId)
+    static StreamItem Jcc(ConditionCode cc, MirId targetId)
     {
         StreamItem it;
         it.m_kind = StreamItemKind::Branch;
@@ -135,7 +135,7 @@ class BranchRelaxer
     /**
      * Emits a conditional jump to the target label.
      */
-    void emitJcc(TableGen::ConditionCode cc, MirId targetLabelId);
+    void emitJcc(ConditionCode cc, MirId targetLabelId);
 
     /**
      * Performs iterative branch relaxation until fixed point convergence.
@@ -158,6 +158,6 @@ class BranchRelaxer
     std::vector<StreamItem> m_items; ///< Ordered stream of data, labels and branches to resolve.
 };
 
-} // namespace EzCodeEmitter
+} // namespace EzCodeEmitter::X86_64
 
-#endif // EZPACKER_BRANCH_RELAXER_H
+#endif // EZCODEEMITTER_X86_64_BRANCH_RELAXER_H

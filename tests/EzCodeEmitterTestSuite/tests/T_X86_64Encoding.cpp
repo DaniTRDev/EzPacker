@@ -1,8 +1,8 @@
 #include "EzCodeEmitterTestSuite.h"
 #include "Helpers.h"
 #include "X86_64/X86_64CodeEmitter.h"
-#include "TableGen/EncodingDesc.h"
-#include "TableGen/InstructionEncoder.h"
+#include "X86_64/Encoding/X86_64EncodingDesc.h"
+#include "X86_64/Encoding/X86_64InstructionEncoder.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirRegisterClass.h"
@@ -31,8 +31,8 @@ std::vector<uint8_t> emitInstruction(MirTargetInstructionDesc *desc,
 
     CodeEmitterContext context(diag, sections, alloc);
     X86_64CodeEmitter emitter;
-    emitter.setEncodingResolver([](MirTargetInstructionDesc *d) -> const TableGen::EncodingDesc *
-                                { return TableGen::x86_64::findEncodingDesc(d->getName()); });
+    emitter.setEncodingResolver([](MirTargetInstructionDesc *d) -> const EncodingDesc *
+                                { return findEncodingDesc(d->getName()); });
 
     emitter.beginFunction(&context, "test_fn");
     emitter.emitInst(desc, operands);
@@ -155,12 +155,10 @@ TEST_F(EzCodeEmitterTestSuite, TestTableDrivenEmitterProducesExpectedBytes)
 }
 
 /**
- * Direct unit coverage of the target-agnostic TableGen::InstructionEncoder runtime.
+ * Direct unit coverage of the target-agnostic InstructionEncoder runtime.
  */
 TEST_F(EzCodeEmitterTestSuite, TestRuntimeInstructionEncoderPrimitives)
 {
-    using namespace TableGen;
-
     {
         // MOV r/m64, r64 -> 48 89 /r with reg=src, rm=dst.
         EncodingDesc desc{};
@@ -183,7 +181,7 @@ TEST_F(EzCodeEmitterTestSuite, TestRuntimeInstructionEncoderPrimitives)
 
         std::vector<uint8_t> out;
         EncodeResult result;
-        ASSERT_TRUE(TableGen::InstructionEncoder::encode(desc, ops, out, result));
+        ASSERT_TRUE(InstructionEncoder::encode(desc, ops, out, result));
         ASSERT_EQ(out.size(), 3u);
         EXPECT_EQ(out[0], 0x48);
         EXPECT_EQ(out[1], 0x89);
@@ -208,7 +206,7 @@ TEST_F(EzCodeEmitterTestSuite, TestRuntimeInstructionEncoderPrimitives)
 
         std::vector<uint8_t> out;
         EncodeResult result;
-        ASSERT_TRUE(TableGen::InstructionEncoder::encode(desc, ops, out, result));
+        ASSERT_TRUE(InstructionEncoder::encode(desc, ops, out, result));
         ASSERT_EQ(out.size(), 6u);
         EXPECT_EQ(out[0], 0x0F);
         EXPECT_EQ(out[1], 0x85);
@@ -225,6 +223,6 @@ TEST_F(EzCodeEmitterTestSuite, TestRuntimeInstructionEncoderPrimitives)
         std::vector<ResolvedOperand> ops;
         std::vector<uint8_t> out;
         EncodeResult result;
-        EXPECT_FALSE(TableGen::InstructionEncoder::encode(desc, ops, out, result));
+        EXPECT_FALSE(InstructionEncoder::encode(desc, ops, out, result));
     }
 }

@@ -1,7 +1,25 @@
 #include "EzDslLexerTestSuite.h"
+#include "Ast/EncodingDefLangAst.h"
 #include "Ast/TargetInstDefLangAst.h"
 #include "Parser/ParseContext.h"
 #include "Parser/TargetInstDefLang.h"
+
+namespace
+{
+// Returns the value of the first directive with the given key, or nullptr.
+const DSL::Ast::Encoding::Value *findDirectiveValue(const DSL::Ast::Encoding::EncodingDecl &encoding,
+                                                    std::string_view key)
+{
+    for (const auto &directive : encoding.m_directives)
+    {
+        if (directive.m_key.m_node == key)
+        {
+            return &directive.m_value;
+        }
+    }
+    return nullptr;
+}
+} // namespace
 
 /**
  * Test fixture for the target instruction definition (.idf) dialect parser.
@@ -126,4 +144,82 @@ TEST_F(TargetInstDefLangTest, TestTargetInstructionFile)
 
     EXPECT_EQ(res->m_instructions[1].m_instName.m_node, "ADD32rm");
     EXPECT_EQ(res->m_instructions[1].m_operands.size(), 3);
+}
+
+/**
+ * Verifies the generic ENCODING block parses into arch-neutral directives: an
+ * identifier form, a byte-list opcode, an integer digit and operand bindings.
+ */
+TEST_F(TargetInstDefLangTest, TestGenericEncodingDirectives)
+{
+    std::string test = R"(
+        target_inst ADD32rr(GPR32:dst OUT, GPR32:src1 IN, GPR32:src2 IN) {
+            MNEMONIC("addl");
+            ENCODING {
+                form: rr;
+                opcode: [0x01];
+                opcode_digit: 0;
+                operands { src2 => reg; dst => rm_reg; };
+                coalesce: src1;
+            };
+        };
+    )";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TargetInstDef::TargetInstDecl, DSL::Ast::TargetInstDef::TargetInstDecl>();
+    ASSERT_TRUE(res.has_value());
+    ASSERT_TRUE(res->m_encoding.has_value());
+    const auto &enc = res->m_encoding.value();
+    EXPECT_FALSE(enc.m_backend.has_value());
+    ASSERT_EQ(enc.m_directives.size(), 5);
+
+    const auto *form = findDirectiveValue(enc, "form");
+    ASSERT_NE(form, nullptr);
+    ASSERT_TRUE(std::holds_alternative<DSL::Ast::Common::Identifier>(*form));
+    EXPECT_EQ(std::get<DSL::Ast::Common::Identifier>(*form).m_node, "rr");
+
+    const auto *opcode = findDirectiveValue(enc, "opcode");
+    ASSERT_NE(opcode, nullptr);
+    ASSERT_TRUE(std::holds_alternative<std::pmr::vector<uint8_t>>(*opcode));
+    ASSERT_EQ(std::get<std::pmr::vector<uint8_t>>(*opcode).size(), 1u);
+    EXPECT_EQ(std::get<std::pmr::vector<uint8_t>>(*opcode)[0], 0x01);
+
+    const auto *digit = findDirectiveValue(enc, "opcode_digit");
+    ASSERT_NE(digit, nullptr);
+    ASSERT_TRUE(std::holds_alternative<int64_t>(*digit));
+    EXPECT_EQ(std::get<int64_t>(*digit), 0);
+
+    const auto *operands = findDirectiveValue(enc, "operands");
+    ASSERT_NE(operands, nullptr);
+    ASSERT_TRUE(std::holds_alternative<std::pmr::vector<DSL::Ast::Encoding::OperandBinding>>(*operands));
+    const auto &bindings = std::get<std::pmr::vector<DSL::Ast::Encoding::OperandBinding>>(*operands);
+    ASSERT_EQ(bindings.size(), 2u);
+    EXPECT_EQ(bindings[0].m_operand.m_node, "src2");
+    EXPECT_EQ(bindings[0].m_field.m_node, "reg");
+    EXPECT_EQ(bindings[1].m_operand.m_node, "dst");
+    EXPECT_EQ(bindings[1].m_field.m_node, "rm_reg");
+}
+
+/**
+ * Verifies the optional explicit backend selector parses into `m_backend`.
+ */
+TEST_F(TargetInstDefLangTest, TestGenericEncodingBackendSelector)
+{
+    std::string test = R"(
+        target_inst FOO(GPR32:dst OUT) {
+            ENCODING [stub] { bits: 3; };
+        };
+    )";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::TargetInstDef::TargetInstDecl, DSL::Ast::TargetInstDef::TargetInstDecl>();
+    ASSERT_TRUE(res.has_value());
+    ASSERT_TRUE(res->m_encoding.has_value());
+    ASSERT_TRUE(res->m_encoding->m_backend.has_value());
+    EXPECT_EQ(res->m_encoding->m_backend->m_node, "stub");
+
+    const auto *bits = findDirectiveValue(res->m_encoding.value(), "bits");
+    ASSERT_NE(bits, nullptr);
+    ASSERT_TRUE(std::holds_alternative<int64_t>(*bits));
+    EXPECT_EQ(std::get<int64_t>(*bits), 3);
 }

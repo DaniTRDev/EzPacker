@@ -6,7 +6,7 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Type/MirType.h"
-#include "TableGen/InstructionEncoder.h"
+#include "X86_64/Encoding/X86_64InstructionEncoder.h"
 #include <string_view>
 
 namespace EzCodeEmitter::X86_64
@@ -115,18 +115,18 @@ uint8_t X86_64CodeEmitter::mapRegister(MirRegister *reg) const
     return id < 32 ? static_cast<uint8_t>(id) : InvalidRegister;
 }
 
-bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
+bool X86_64CodeEmitter::buildResolvedOperands(const EncodingDesc &enc,
                                               std::span<MirOperand *> operands,
-                                              std::vector<TableGen::ResolvedOperand> &resolved) const
+                                              std::vector<ResolvedOperand> &resolved) const
 {
-    resolved.assign(operands.size(), TableGen::ResolvedOperand{});
+    resolved.assign(operands.size(), ResolvedOperand{});
 
     // Returns true when the operand at index is bound to a memory slot in this encoding.
     auto usesMemorySlot = [&enc](size_t index)
     {
         for (uint8_t i = 0; i < enc.m_operandCount; ++i)
         {
-            if (enc.m_operands[i].m_operandIndex == index && enc.m_operands[i].m_slot == TableGen::EncSlotKind::RmMem)
+            if (enc.m_operands[i].m_operandIndex == index && enc.m_operands[i].m_slot == EncSlotKind::RmMem)
             {
                 return true;
             }
@@ -137,7 +137,7 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
     // Converts a MIR memory/reference operand into a target-neutral EncMemory form.
     auto buildMemory = [&](MirOperand *op)
     {
-        TableGen::EncMemory mem;
+        EncMemory mem;
         if (op->getType() == MirOperandType::Memory)
         {
             auto *mirMem = op->get<MirMemory>();
@@ -199,7 +199,7 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
             continue;
         }
 
-        TableGen::ResolvedOperand &out = resolved[i];
+        ResolvedOperand &out = resolved[i];
         switch (op->getType())
         {
             case MirOperandType::Register:
@@ -210,7 +210,7 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
                     return false;
                 }
                 uint8_t physical = mapRegister(reg);
-                out.m_kind = TableGen::ResolvedOperand::Kind::Register;
+                out.m_kind = ResolvedOperand::Kind::Register;
                 out.m_isFpr = isFprEncoding(physical);
                 out.m_reg = isFprEncoding(physical) ? fprIndex(physical) : physical;
                 out.m_sizeBytes = operandSizeBytes(op, reg);
@@ -219,14 +219,14 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
             case MirOperandType::Integer:
             {
                 auto *imm = op->get<MirInteger>();
-                out.m_kind = TableGen::ResolvedOperand::Kind::Immediate;
+                out.m_kind = ResolvedOperand::Kind::Immediate;
                 out.m_imm = imm ? imm->getValue().getI64() : 0;
                 out.m_sizeBytes = operandSizeBytes(op, nullptr);
                 break;
             }
             case MirOperandType::Memory:
             {
-                out.m_kind = TableGen::ResolvedOperand::Kind::Memory;
+                out.m_kind = ResolvedOperand::Kind::Memory;
                 out.m_mem = buildMemory(op);
                 out.m_sizeBytes = operandSizeBytes(op, nullptr);
                 break;
@@ -235,12 +235,12 @@ bool X86_64CodeEmitter::buildResolvedOperands(const TableGen::EncodingDesc &enc,
             {
                 if (usesMemorySlot(i))
                 {
-                    out.m_kind = TableGen::ResolvedOperand::Kind::Memory;
+                    out.m_kind = ResolvedOperand::Kind::Memory;
                     out.m_mem = buildMemory(op);
                 }
                 else
                 {
-                    out.m_kind = TableGen::ResolvedOperand::Kind::Immediate;
+                    out.m_kind = ResolvedOperand::Kind::Immediate;
                     out.m_needsReloc = true;
                 }
                 break;
@@ -260,8 +260,8 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
         return false;
     }
 
-    const TableGen::EncodingDesc *enc = m_encodingResolver(desc);
-    if (!enc || enc->m_form == TableGen::EncForm::None)
+    const EncodingDesc *enc = m_encodingResolver(desc);
+    if (!enc || enc->m_form == EncForm::None)
     {
         return false;
     }
@@ -272,7 +272,7 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
         return false;
     }
 
-    std::vector<TableGen::ResolvedOperand> resolved;
+    std::vector<ResolvedOperand> resolved;
     if (!buildResolvedOperands(*enc, operands, resolved))
     {
         return false;
@@ -284,18 +284,17 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
     // whose destination and first source register differ.
     if (enc->m_coalesceSrc != 0xFF && enc->m_coalesceSrc < resolved.size() && !resolved.empty())
     {
-        const TableGen::ResolvedOperand &dst = resolved[0];
-        const TableGen::ResolvedOperand &src = resolved[enc->m_coalesceSrc];
-        if (dst.m_kind == TableGen::ResolvedOperand::Kind::Register &&
-            src.m_kind == TableGen::ResolvedOperand::Kind::Register &&
+        const ResolvedOperand &dst = resolved[0];
+        const ResolvedOperand &src = resolved[enc->m_coalesceSrc];
+        if (dst.m_kind == ResolvedOperand::Kind::Register && src.m_kind == ResolvedOperand::Kind::Register &&
             (dst.m_reg != src.m_reg || dst.m_isFpr != src.m_isFpr))
         {
-            TableGen::InstructionEncoder::encodeRegisterMove(dst, src, bytes);
+            InstructionEncoder::encodeRegisterMove(dst, src, bytes);
         }
     }
 
-    TableGen::EncodeResult result;
-    if (!TableGen::InstructionEncoder::encode(*enc, resolved, bytes, result))
+    EncodeResult result;
+    if (!InstructionEncoder::encode(*enc, resolved, bytes, result))
     {
         return false;
     }
@@ -307,7 +306,7 @@ bool X86_64CodeEmitter::tryEmitTableDriven(MirTargetInstructionDesc *desc, std::
         for (size_t i = 0; i < resolved.size() && !relocRef; ++i)
         {
             bool needsReloc = resolved[i].m_needsReloc ||
-                    (resolved[i].m_kind == TableGen::ResolvedOperand::Kind::Memory && resolved[i].m_mem.m_needsReloc);
+                    (resolved[i].m_kind == ResolvedOperand::Kind::Memory && resolved[i].m_mem.m_needsReloc);
             if (needsReloc && operands[i]->getType() == MirOperandType::Reference)
             {
                 relocRef = operands[i]->get<MirReference>();

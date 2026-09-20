@@ -1,8 +1,8 @@
-#include "TableGen/InstructionEncoder.h"
+#include "X86_64/Encoding/X86_64InstructionEncoder.h"
 
 #include <cstdint>
 
-namespace EzCodeEmitter::TableGen
+namespace EzCodeEmitter::X86_64
 {
 
 namespace
@@ -888,4 +888,4 @@ void InstructionEncoder::emitJccNear(std::vector<uint8_t> &out, ConditionCode cc
     emitImm(out, disp, 4);
 }
 
-} // namespace EzCodeEmitter::TableGen
+} // namespace EzCodeEmitter::X86_64

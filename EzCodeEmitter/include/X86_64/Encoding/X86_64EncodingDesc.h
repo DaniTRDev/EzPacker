@@ -1,10 +1,10 @@
-#ifndef EZCODEEMITTER_TABLEGEN_ENCODING_DESC_H
-#define EZCODEEMITTER_TABLEGEN_ENCODING_DESC_H
+#ifndef EZCODEEMITTER_X86_64_ENCODING_DESC_H
+#define EZCODEEMITTER_X86_64_ENCODING_DESC_H
 
 #include <cstddef>
 #include <cstdint>
 
-namespace EzCodeEmitter::TableGen
+namespace EzCodeEmitter::X86_64
 {
 
 /**
@@ -208,20 +208,6 @@ struct ResolvedOperand
     bool m_needsReloc{ false };
 };
 
-/**
- * Result metadata produced alongside the emitted bytes.
- */
-struct EncodeResult
-{
-    bool m_hasReloc{ false }; ///< True when the emitted instruction contains a relocation field.
-    /// Byte offset (within the emitted instruction) of the relocation field.
-    size_t m_relocOffset{ 0 };
-    /// Width of the relocation field in bits (8 or 32).
-    uint8_t m_relocBits{ 32 };
-    /// True when the relocation is a PC-relative branch (vs. a data/PC-relative fixup).
-    bool m_isBranch{ false };
-};
+} // namespace EzCodeEmitter::X86_64
 
-} // namespace EzCodeEmitter::TableGen
-
-#endif // EZCODEEMITTER_TABLEGEN_ENCODING_DESC_H
+#endif // EZCODEEMITTER_X86_64_ENCODING_DESC_H

@@ -1,13 +1,14 @@
-#ifndef EZCODEEMITTER_TABLEGEN_INSTRUCTION_ENCODER_H
-#define EZCODEEMITTER_TABLEGEN_INSTRUCTION_ENCODER_H
+#ifndef EZCODEEMITTER_X86_64_INSTRUCTION_ENCODER_H
+#define EZCODEEMITTER_X86_64_INSTRUCTION_ENCODER_H
 
-#include "TableGen/EncodingDesc.h"
+#include "X86_64/Encoding/X86_64EncodingDesc.h"
+#include "Encoding/EncodeResult.h"
 
 #include <cstdint>
 #include <span>
 #include <vector>
 
-namespace EzCodeEmitter::TableGen
+namespace EzCodeEmitter::X86_64
 {
 
 /**
@@ -90,6 +91,6 @@ class InstructionEncoder
     static void emitJccNear(std::vector<uint8_t> &out, ConditionCode cc, int32_t disp);
 };
 
-} // namespace EzCodeEmitter::TableGen
+} // namespace EzCodeEmitter::X86_64
 
-#endif // EZCODEEMITTER_TABLEGEN_INSTRUCTION_ENCODER_H
+#endif // EZCODEEMITTER_X86_64_INSTRUCTION_ENCODER_H

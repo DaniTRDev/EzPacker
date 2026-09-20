@@ -1,7 +1,7 @@
 #include "EzCodeEmitterTestSuite.h"
 #include "Helpers.h"
 #include "X86_64/X86_64CodeEmitter.h"
-#include "TableGen/EncodingDesc.h"
+#include "X86_64/Encoding/X86_64EncodingDesc.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "x86_64EncodingTable.h"
@@ -18,8 +18,8 @@ TEST_F(EzCodeEmitterTestSuite, TestFullEmitterIntegration)
     CodeEmitterContext context(getDiagCollector(), sections, getAllocator());
 
     X86_64CodeEmitter emitter;
-    emitter.setEncodingResolver([](MirTargetInstructionDesc *desc) -> const TableGen::EncodingDesc *
-                                { return TableGen::x86_64::findEncodingDesc(desc->getName()); });
+    emitter.setEncodingResolver([](MirTargetInstructionDesc *desc) -> const EncodingDesc *
+                                { return findEncodingDesc(desc->getName()); });
     emitter.beginFunction(&context, "main");
 
     MirOperandBuilder opBuilder(getBuilderCtx());

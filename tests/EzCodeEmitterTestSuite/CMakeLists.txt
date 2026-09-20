@@ -39,8 +39,8 @@ EzPacker_AddTest(
 )
 
 EzPacker_AddTest(
-        "T_TableGenEncoding"
+        "T_X86_64Encoding"
         "EzCodeEmitterTestSuite"
         ""
-        "tests/T_TableGenEncoding.cpp"
+        "tests/T_X86_64Encoding.cpp"
 )

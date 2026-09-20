@@ -1,6 +1,6 @@
-#include "BranchRelaxation/BranchRelaxer.h"
+#include "X86_64/BranchRelaxation/BranchRelaxer.h"
 
-namespace EzCodeEmitter
+namespace EzCodeEmitter::X86_64
 {
 
 void BranchRelaxer::emitBytes(const uint8_t *data, size_t size)
@@ -17,7 +17,7 @@ void BranchRelaxer::defineLabel(MirId labelId) { m_items.push_back(StreamItem::L
 
 void BranchRelaxer::emitJmp(MirId targetLabelId) { m_items.push_back(StreamItem::Jmp(targetLabelId)); }
 
-void BranchRelaxer::emitJcc(TableGen::ConditionCode cc, MirId targetLabelId)
+void BranchRelaxer::emitJcc(ConditionCode cc, MirId targetLabelId)
 {
     m_items.push_back(StreamItem::Jcc(cc, targetLabelId));
 }
@@ -131,13 +131,11 @@ size_t BranchRelaxer::relaxAndResolve(std::vector<uint8_t> &outCode,
                     // Short branch (2 bytes)
                     if (item.m_branch.m_isConditional)
                     {
-                        TableGen::InstructionEncoder::emitJccShort(outCode,
-                                                                   item.m_branch.m_condition,
-                                                                   static_cast<int8_t>(disp));
+                        InstructionEncoder::emitJccShort(outCode, item.m_branch.m_condition, static_cast<int8_t>(disp));
                     }
                     else
                     {
-                        TableGen::InstructionEncoder::emitJmpShort(outCode, static_cast<int8_t>(disp));
+                        InstructionEncoder::emitJmpShort(outCode, static_cast<int8_t>(disp));
                     }
                 }
                 else
@@ -145,13 +143,11 @@ size_t BranchRelaxer::relaxAndResolve(std::vector<uint8_t> &outCode,
                     // Near branch (5 or 6 bytes)
                     if (item.m_branch.m_isConditional)
                     {
-                        TableGen::InstructionEncoder::emitJccNear(outCode,
-                                                                  item.m_branch.m_condition,
-                                                                  static_cast<int32_t>(disp));
+                        InstructionEncoder::emitJccNear(outCode, item.m_branch.m_condition, static_cast<int32_t>(disp));
                     }
                     else
                     {
-                        TableGen::InstructionEncoder::emitJmpNear(outCode, static_cast<int32_t>(disp));
+                        InstructionEncoder::emitJmpNear(outCode, static_cast<int32_t>(disp));
                     }
                 }
                 currentOffset += branchLen;
@@ -163,4 +159,4 @@ size_t BranchRelaxer::relaxAndResolve(std::vector<uint8_t> &outCode,
     return relaxedCount;
 }
 
-} // namespace EzCodeEmitter
+} // namespace EzCodeEmitter::X86_64

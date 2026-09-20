@@ -7,7 +7,7 @@
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "CodeEmitterContext.h"
 #include "CodeSection.h"
-#include "X86_64/X86_64CodeEmitter.h"
+#include "GenericCodeEmitter.h"
 #include "Descriptors/TargetDesc.h"
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
@@ -16,6 +16,7 @@
 #include "Type/MirType.h"
 #include "FlexNumber/FlexFloat.h"
 #include <fstream>
+#include <memory>
 #include <unordered_map>
 
 namespace EzCompiler
@@ -40,24 +41,20 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         return false;
     }
 
-    ::CodeEmitterContext emitterCtx(m_ctx.getDiagCollector(), sections, m_ctx.getSessionAllocator());
-    EzCodeEmitter::X86_64::X86_64CodeEmitter emitter;
-    // Install the target's table lookup: prefer the encoding id, falling back to the name.
-    if (TargetDesc *targetDesc = m_ctx.getTargetDesc())
+    TargetDesc *targetDesc = m_ctx.getTargetDesc();
+    if (!targetDesc)
     {
-        emitter.setEncodingResolver(
-                [targetDesc](MirTargetInstructionDesc *desc) -> const EzCodeEmitter::TableGen::EncodingDesc *
-                {
-                    if (!desc)
-                    {
-                        return nullptr;
-                    }
-                    if (const auto *enc = targetDesc->getEncodingDesc(desc->getEncodingId()))
-                    {
-                        return enc;
-                    }
-                    return targetDesc->findEncodingDesc(desc->getName());
-                });
+        m_ctx.getDiagCollector()->error("EzCompiler", "No target descriptor configured for emission");
+        return false;
+    }
+
+    ::CodeEmitterContext emitterCtx(m_ctx.getDiagCollector(), sections, m_ctx.getSessionAllocator());
+    // The target installs its own encoding resolution; this layer stays target-agnostic.
+    std::unique_ptr<GenericCodeEmitter> emitter(targetDesc->createCodeEmitter());
+    if (!emitter)
+    {
+        m_ctx.getDiagCollector()->error("EzCompiler", "Target did not provide a code emitter");
+        return false;
     }
 
     std::vector<EzCodeEmitter::ObjectFormat::ObjectSymbol> symbols;
@@ -198,7 +195,7 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         }
 
         uint64_t fnOffset = textSection->getCurrentOffset();
-        emitter.beginFunction(&emitterCtx, func);
+        emitter->beginFunction(&emitterCtx, func);
 
         for (MirBlock *block : func->getBlocks())
         {
@@ -206,7 +203,7 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             {
                 continue;
             }
-            emitter.bindLabel(block->getId());
+            emitter->bindLabel(block->getId());
 
             for (MirInstruction *inst : block->getInstructions())
             {
@@ -217,13 +214,13 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                 if (inst->getTargetDesc())
                 {
                     const auto &ops = inst->getOperands();
-                    emitter.emitInst(inst->getTargetDesc(),
-                                     std::span(const_cast<MirOperand **>(ops.data()), ops.size()));
+                    emitter->emitInst(inst->getTargetDesc(),
+                                      std::span(const_cast<MirOperand **>(ops.data()), ops.size()));
                 }
             }
         }
 
-        emitter.endFunction(&emitterCtx, func);
+        emitter->endFunction(&emitterCtx, func);
         uint64_t fnSize = textSection->getCurrentOffset() - fnOffset;
 
         EzCodeEmitter::ObjectFormat::ObjectSymbol sym{ .m_name = std::string(func->getName()),

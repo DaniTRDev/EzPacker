@@ -1,7 +1,8 @@
 #include "EzCodeEmitterTestSuite.h"
-#include "BranchRelaxation/BranchRelaxer.h"
+#include "X86_64/BranchRelaxation/BranchRelaxer.h"
 
 using namespace EzCodeEmitter;
+using namespace EzCodeEmitter::X86_64;
 
 // A short forward JMP stays 2 bytes and resolves to a positive disp8.
 TEST_F(EzCodeEmitterTestSuite, TestShortForwardBranch)
@@ -85,7 +86,7 @@ TEST_F(EzCodeEmitterTestSuite, TestConditionalJumpRelaxation)
 {
     BranchRelaxer relaxer;
     // JE forward to label 42
-    relaxer.emitJcc(TableGen::ConditionCode::E, 42);
+    relaxer.emitJcc(ConditionCode::E, 42);
     // 300 bytes of padding
     std::vector<uint8_t> padding(300, 0x90);
     relaxer.emitBytes(padding);

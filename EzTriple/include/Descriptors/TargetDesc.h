@@ -7,11 +7,6 @@
 class GenericCodeEmitter;
 class TargetRelocationResolver;
 
-namespace EzCodeEmitter::TableGen
-{
-struct EncodingDesc;
-}
-
 /**
  * Interface used to store target-dependent information (CPU-level).
  *
@@ -126,16 +121,6 @@ class TargetDesc
      * in-place relocation patching.
      */
     virtual TargetRelocationResolver *getRelocationResolver() { return nullptr; }
-
-    /**
-     * Returns the declarative encoding for a generated encoding-table id, or nullptr.
-     */
-    virtual const EzCodeEmitter::TableGen::EncodingDesc *getEncodingDesc(size_t /*id*/) { return nullptr; }
-
-    /**
-     * Returns the declarative encoding registered under an instruction name, or nullptr.
-     */
-    virtual const EzCodeEmitter::TableGen::EncodingDesc *findEncodingDesc(const char * /*name*/) { return nullptr; }
 };
 
 #endif // EZTRIPLE_TARGET_DESC_H

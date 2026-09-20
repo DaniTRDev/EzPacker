@@ -1,15 +1,48 @@
 #include "EzDslCodeGeneratorsTestSuite.h"
 #include "Ast/TargetInstDefLangAst.h"
-#include "CodeGenerators/CppTargetEncodingGenerator.h"
+#include "CodeGenerators/CppEncodingTableGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Parser/ParseContext.h"
 #include "Parser/TargetInstDefLang.h"
+#include "Sema/Encoding/EncodingDialect.h"
 #include "Sema/SymbolTable.h"
+#include "Sema/Symbols/TargetSymbols.h"
 #include "SemaPasses/TargetInstPass.h"
 
 #include <filesystem>
 
 using namespace CodeGenerators;
+
+namespace
+{
+
+/**
+ * Test-only dialect/backend pair demonstrating that a new ISA requires only a dialect
+ * plus a codegen backend, with no edits to the generic parser, sema or generator.
+ */
+class StubEncodingDialect : public Sema::Encoding::EncodingDialect
+{
+  public:
+    std::string_view name() const override { return "stub"; }
+
+    bool validate(const DSL::Ast::Encoding::EncodingDecl &encoding,
+                  const DSL::Ast::TargetInstDef::TargetInstDecl & /*inst*/,
+                  DiagnosticCollector * /*diag*/) override
+    {
+        return !encoding.m_directives.empty();
+    }
+};
+
+class StubEncodingBackend : public EncodingCodegenBackend
+{
+  public:
+    std::string includeHeader() const override { return "Stub/StubEncodingDesc.h"; }
+    std::string namespaceName() const override { return "Stub::Encoding"; }
+    std::string arrayType() const override { return "StubDesc"; }
+    std::string row(const Symbols::TargetInstructionSymbol & /*sym*/) const override { return "StubDesc{}"; }
+};
+
+} // namespace
 
 /**
  * Fixture for generating table-driven encoding descriptors from target-instruction (.idf) sources.
@@ -73,7 +106,7 @@ TEST_F(CppTargetEncodingGeneratorTest, TestEncodingTableGeneration)
 
     ASSERT_TRUE(parseAndRunPass(idfSource));
 
-    CppTargetEncodingGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "AMD64");
+    CppEncodingTableGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "AMD64");
     ASSERT_TRUE(generator.run());
 
     auto headerPath = m_testTempDir / "AMD64EncodingTable.h";
@@ -81,8 +114,8 @@ TEST_F(CppTargetEncodingGeneratorTest, TestEncodingTableGeneration)
 
     std::string header = readFileContent(headerPath);
 
-    EXPECT_NE(header.find("#include \"TableGen/EncodingDesc.h\""), std::string::npos);
-    EXPECT_NE(header.find("namespace EzCodeEmitter::TableGen::AMD64"), std::string::npos);
+    EXPECT_NE(header.find("#include \"X86_64/Encoding/X86_64EncodingDesc.h\""), std::string::npos);
+    EXPECT_NE(header.find("namespace EzCodeEmitter::X86_64"), std::string::npos);
     EXPECT_NE(header.find("inline constexpr EncodingDesc s_encodings[]"), std::string::npos);
     EXPECT_NE(header.find("inline constexpr std::size_t s_encodingCount = 4;"), std::string::npos);
 
@@ -142,4 +175,42 @@ TEST_F(CppTargetEncodingGeneratorTest, TestJccRequiresConditionCode)
     )";
 
     EXPECT_FALSE(parseAndRunPass(idfSource));
+}
+
+// A test-only second ISA (dialect + backend) generates its own table without touching shared code.
+TEST_F(CppTargetEncodingGeneratorTest, StubDialectAndBackendGenerateOwnTable)
+{
+    static StubEncodingDialect stubDialect;
+    static StubEncodingBackend stubBackend;
+    Sema::Encoding::registerEncodingDialect("stub", &stubDialect);
+    registerEncodingBackend("stubisa", &stubBackend);
+
+    std::string idfSource = R"(
+        target STUBISA;
+        target_inst BAR(GPR32:dst OUT) {
+            MNEMONIC("bar");
+            ENCODING [stub] { bits: 3; };
+        };
+    )";
+    ASSERT_TRUE(parseAndRunPass(idfSource));
+
+    CppEncodingTableGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "stubisa");
+    ASSERT_TRUE(generator.run());
+
+    auto headerPath = m_testTempDir / "stubisaEncodingTable.h";
+    ASSERT_TRUE(std::filesystem::exists(headerPath));
+    std::string header = readFileContent(headerPath);
+
+    EXPECT_NE(header.find("#include \"Stub/StubEncodingDesc.h\""), std::string::npos);
+    EXPECT_NE(header.find("namespace Stub::Encoding"), std::string::npos);
+    EXPECT_NE(header.find("inline constexpr StubDesc s_encodings[]"), std::string::npos);
+    EXPECT_NE(header.find("StubDesc{},"), std::string::npos);
+    EXPECT_NE(header.find("inline const StubDesc *findEncodingDesc(const char *name)"), std::string::npos);
+}
+
+// An unknown target with no registered backend fails generation rather than emitting a table.
+TEST_F(CppTargetEncodingGeneratorTest, UnknownTargetBackendFails)
+{
+    CppEncodingTableGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "not_a_target");
+    EXPECT_FALSE(generator.run());
 }

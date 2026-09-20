@@ -3,6 +3,7 @@
 
 #include "EzDslSemaCommon.h"
 #include "SymbolCommon.h"
+#include "Ast/EncodingDefLangAst.h"
 #include "Ast/TargetInstDefLangAst.h"
 
 namespace Symbols
@@ -23,13 +24,13 @@ struct TargetOperandSymbol
  */
 struct TargetInstructionSymbol
 {
-    std::string_view m_name;                                         // Opcode name.
-    std::string_view m_mnemonic;                                     // Assembly mnemonic.
-    std::pmr::vector<TargetOperandSymbol> m_operands;                // Operand signature.
-    std::pmr::vector<std::string_view> m_flags;                      // Behavioral flags.
-    std::pmr::vector<std::string_view> m_implicitDefs;               // Implicitly defined registers.
-    std::pmr::vector<std::string_view> m_implicitUses;               // Implicitly used registers.
-    std::optional<DSL::Ast::TargetInstDef::EncodingDecl> m_encoding; // Optional machine encoding.
+    std::string_view m_name;                                    // Opcode name.
+    std::string_view m_mnemonic;                                // Assembly mnemonic.
+    std::pmr::vector<TargetOperandSymbol> m_operands;           // Operand signature.
+    std::pmr::vector<std::string_view> m_flags;                 // Behavioral flags.
+    std::pmr::vector<std::string_view> m_implicitDefs;          // Implicitly defined registers.
+    std::pmr::vector<std::string_view> m_implicitUses;          // Implicitly used registers.
+    std::optional<DSL::Ast::Encoding::EncodingDecl> m_encoding; // Optional generic machine encoding.
 
     /**
      * Checks whether the instruction carries the named behavioral flag.

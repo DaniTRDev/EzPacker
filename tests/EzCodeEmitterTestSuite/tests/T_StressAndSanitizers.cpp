@@ -1,20 +1,21 @@
 #include "EzCodeEmitterTestSuite.h"
 #include "Helpers.h"
-#include "TableGen/EncodingDesc.h"
-#include "TableGen/InstructionEncoder.h"
-#include "BranchRelaxation/BranchRelaxer.h"
+#include "X86_64/Encoding/X86_64EncodingDesc.h"
+#include "X86_64/Encoding/X86_64InstructionEncoder.h"
+#include "X86_64/BranchRelaxation/BranchRelaxer.h"
 #include <chrono>
 
 using namespace EzCodeEmitter;
+using namespace EzCodeEmitter::X86_64;
 
 namespace
 {
 
-using TableGen::EncForm;
-using TableGen::EncodingDesc;
-using TableGen::EncOperandBinding;
-using TableGen::EncRegClass;
-using TableGen::EncSlotKind;
+using EncForm = EzCodeEmitter::X86_64::EncForm;
+using EncodingDesc = EzCodeEmitter::X86_64::EncodingDesc;
+using EncOperandBinding = EzCodeEmitter::X86_64::EncOperandBinding;
+using EncRegClass = EzCodeEmitter::X86_64::EncRegClass;
+using EncSlotKind = EzCodeEmitter::X86_64::EncSlotKind;
 
 /**
  * Builds a two-operand, two-address register instruction descriptor with the given
@@ -56,10 +57,10 @@ TEST_F(EzCodeEmitterTestSuite, TestMassiveBasicBlockEmission)
     const EncodingDesc addDesc = makeMrForm(0x01, /*sizeOperand=*/0, /*regOperand=*/1, /*rmOperand=*/0);
     const EncodingDesc xorDesc = makeMrForm(0x31, /*sizeOperand=*/0, /*regOperand=*/1, /*rmOperand=*/0);
 
-    std::vector<TableGen::ResolvedOperand> operands(2);
-    operands[0].m_kind = TableGen::ResolvedOperand::Kind::Register;
+    std::vector<ResolvedOperand> operands(2);
+    operands[0].m_kind = ResolvedOperand::Kind::Register;
     operands[0].m_sizeBytes = 8;
-    operands[1].m_kind = TableGen::ResolvedOperand::Kind::Register;
+    operands[1].m_kind = ResolvedOperand::Kind::Register;
     operands[1].m_sizeBytes = 8;
 
     for (size_t i = 0; i < NUM_INSTRUCTIONS; ++i)
@@ -68,17 +69,17 @@ TEST_F(EzCodeEmitterTestSuite, TestMassiveBasicBlockEmission)
         operands[0].m_reg = static_cast<uint8_t>(i % 16);
         operands[1].m_reg = static_cast<uint8_t>((i + 1) % 16);
 
-        TableGen::EncodeResult result;
+        EncodeResult result;
         switch (i % 3)
         {
             case 0:
-                TableGen::InstructionEncoder::encode(movDesc, operands, buf, result);
+                InstructionEncoder::encode(movDesc, operands, buf, result);
                 break;
             case 1:
-                TableGen::InstructionEncoder::encode(addDesc, operands, buf, result);
+                InstructionEncoder::encode(addDesc, operands, buf, result);
                 break;
             default:
-                TableGen::InstructionEncoder::encode(xorDesc, operands, buf, result);
+                InstructionEncoder::encode(xorDesc, operands, buf, result);
                 break;
         }
 
@@ -108,7 +109,7 @@ TEST_F(EzCodeEmitterTestSuite, TestMassiveBranchRelaxationStress)
 
     for (size_t i = 0; i < NUM_BRANCHES; ++i)
     {
-        relaxer.emitJcc(TableGen::ConditionCode::NE, static_cast<MirId>(i + 1));
+        relaxer.emitJcc(ConditionCode::NE, static_cast<MirId>(i + 1));
         relaxer.emitBytes(padding);
         relaxer.defineLabel(static_cast<MirId>(i + 1));
     }

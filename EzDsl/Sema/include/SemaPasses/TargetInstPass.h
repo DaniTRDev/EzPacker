@@ -3,6 +3,7 @@
 
 #include "EzDslSemaCommon.h"
 #include "Ast/TargetInstDefLangAst.h"
+#include <string_view>
 
 class DiagnosticCollector;
 class SymbolTable;
@@ -24,10 +25,12 @@ class TargetInstPass
   private:
     /**
      * Validates a single target instruction declaration.
+     * @param targetName Optional target name used to select an encoding dialect.
      */
     static bool validateInstruction(DiagnosticCollector *collector,
                                     SymbolTable *table,
-                                    const DSL::Ast::TargetInstDef::TargetInstDecl &inst);
+                                    const DSL::Ast::TargetInstDef::TargetInstDecl &inst,
+                                    std::string_view targetName);
 };
 
 #endif // EZDSL_TARGET_INST_PASS_H

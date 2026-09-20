@@ -3,6 +3,7 @@
 
 #include "EzCodeEmitterCommon.h"
 #include "CodeEmitterContext.h"
+#include "Function/MirFunction.h"
 
 class MirOperand;
 class MirTargetInstructionDesc;
@@ -28,6 +29,17 @@ class GenericCodeEmitter
     virtual void beginFunction(CodeEmitterContext *ctx, std::string_view name) = 0;
 
     /**
+     * Begins a function described by a MIR function.
+     *
+     * The default delegates to the name-based overload using the function's name, so targets
+     * that do not need the function body only implement the string_view overload.
+     */
+    virtual void beginFunction(CodeEmitterContext *ctx, MirFunction *func)
+    {
+        beginFunction(ctx, func ? func->getName() : std::string_view{});
+    }
+
+    /**
      * Binds the given label ID to the emitter so the next instructions are emitted inside this label.
      */
     virtual void bindLabel(MirId labelId) = 0;
@@ -36,6 +48,13 @@ class GenericCodeEmitter
      * Ends a function.
      */
     virtual void endFunction(CodeEmitterContext *ctx) = 0;
+
+    /**
+     * Ends a function described by a MIR function.
+     *
+     * The default delegates to the context-only overload.
+     */
+    virtual void endFunction(CodeEmitterContext *ctx, MirFunction *func) { endFunction(ctx); }
 
     /**
      * Emits the instruction with the given operands and target desc.

@@ -8,7 +8,7 @@
 #include "CodeGenerators/CppMirInstructionGenerator.h"
 #include "CodeGenerators/CppMirTypeTableGenerator.h"
 #include "CodeGenerators/CppTargetInstructionGenerator.h"
-#include "CodeGenerators/CppTargetEncodingGenerator.h"
+#include "CodeGenerators/CppEncodingTableGenerator.h"
 #include "CodeGenerators/CppInstructionSelectorGenerator.h"
 #include "CodeGenerators/CppCallingConvGenerator.h"
 #include "CodeGenerators/CppRegisterInfoGenerator.h"
@@ -1290,7 +1290,7 @@ DriverResult Driver::run()
                 gInfo.generatorName = "CppTargetInstructionGenerator";
                 break;
             case GeneratorKind::TargetEncodings:
-                gInfo.generatorName = "CppTargetEncodingGenerator";
+                gInfo.generatorName = "CppEncodingTableGenerator";
                 break;
             case GeneratorKind::InstructionSelector:
                 gInfo.generatorName = "CppInstructionSelectorGenerator";
@@ -1452,7 +1452,7 @@ DriverResult Driver::run()
         if (target.empty())
             target = "Target";
 
-        CppTargetEncodingGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
+        CppEncodingTableGenerator generator(&diagCollector, &symbolTable, m_options.outputPath, target);
         if (!generator.run() || errorTracker.hasErrors())
         {
             result.success = false;
