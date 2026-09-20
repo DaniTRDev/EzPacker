@@ -11,6 +11,22 @@
 #include "Operand/MirOperands.h"
 #include "Printer/MirPrinter.h"
 
+/**
+ * Extracts the binding-token register id from a token-bound ABI instruction. Returns MIRID_INVALID
+ * when the instruction has no first operand or that operand is not a register.
+ */
+static MirId getTokenId(const MirInstruction *instr)
+{
+    const auto &operands = instr->getOperands();
+    if (operands.empty() || !operands[0])
+    {
+        return MIRID_INVALID;
+    }
+
+    const MirRegister *reg = operands[0]->get<MirRegister>();
+    return reg ? reg->getRegId() : MIRID_INVALID;
+}
+
 /// Stores the builder context used to inspect and rewrite instructions.
 MirAbiLowererPass::MirAbiLowererPass(MirBuilderContext *ctx) : m_ctx(ctx) {}
 
@@ -26,9 +42,15 @@ MirPassIterationPlace MirAbiLowererPass::getIterationPlace() const { return MirP
  */
 MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
+    MirFunction *func = *it;
+    if (!func)
+    {
+        m_ctx->getDiagCollector()->error(getName(), "Cannot lower ABI for an invalid function");
+        return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
+    }
+
     bool modifiedMir = false;
     MirAbiLowerer abiLowerer(m_ctx);
-    MirFunction *func = *it;
     CallingConvDesc *cc = func->getCallingConv();
 
     // Token id -> the still-unlowered PUSH/POP group accumulated for that call/return/args token.
@@ -44,9 +66,26 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             MirInstruction *instr = *instrIt;
             MirInstructionOpCode op = instr->getOpCode();
 
+            // Every handled opcode carries its binding-token register as the first operand.
+            const bool needsToken = op == MirInstructionOpCode::PUSH_ARG || op == MirInstructionOpCode::PUSH_RET ||
+                    op == MirInstructionOpCode::CALL || op == MirInstructionOpCode::RET ||
+                    op == MirInstructionOpCode::POP_ARG || op == MirInstructionOpCode::POP_RET ||
+                    op == MirInstructionOpCode::END_ARG;
+
+            MirId tokenId = MIRID_INVALID;
+            if (needsToken)
+            {
+                tokenId = getTokenId(instr);
+                if (tokenId == MIRID_INVALID)
+                {
+                    m_ctx->getDiagCollector()->builder(Diag_Error, getName())
+                            << instr->getSourceRef() << "Malformed ABI instruction: missing binding token register";
+                    return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
+                }
+            }
+
             if (op == MirInstructionOpCode::PUSH_ARG)
             {
-                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] =
                         pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Call, m_ctx->getGlobalAllocator());
                 mapIt->second.m_pushList.push_back(instr);
@@ -59,7 +98,6 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             }
             else if (op == MirInstructionOpCode::PUSH_RET)
             {
-                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] =
                         pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Return, m_ctx->getGlobalAllocator());
                 mapIt->second.m_pushList.push_back(instr);
@@ -72,7 +110,6 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             }
             else if (op == MirInstructionOpCode::CALL)
             {
-                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] =
                         pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Call, m_ctx->getGlobalAllocator());
 
@@ -85,7 +122,6 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             }
             else if (op == MirInstructionOpCode::RET)
             {
-                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] =
                         pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Return, m_ctx->getGlobalAllocator());
 
@@ -98,7 +134,6 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             }
             else if (op == MirInstructionOpCode::POP_ARG)
             {
-                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
                                                             UnloweredBlockType::FunctionArgs,
                                                             m_ctx->getGlobalAllocator());
@@ -112,7 +147,6 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             }
             else if (op == MirInstructionOpCode::POP_RET)
             {
-                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] =
                         pendingBlocks.try_emplace(tokenId, UnloweredBlockType::Call, m_ctx->getGlobalAllocator());
                 mapIt->second.m_popList.push_back(instr);
@@ -125,7 +159,6 @@ MirPassResult MirAbiLowererPass::run(IntrusiveLinkedList<MirFunction>::const_ite
             }
             else if (op == MirInstructionOpCode::END_ARG)
             {
-                MirId tokenId = instr->getOperands()[0]->get<MirRegister>()->getRegId();
                 auto [mapIt, _] = pendingBlocks.try_emplace(tokenId,
                                                             UnloweredBlockType::FunctionArgs,
                                                             m_ctx->getGlobalAllocator());
