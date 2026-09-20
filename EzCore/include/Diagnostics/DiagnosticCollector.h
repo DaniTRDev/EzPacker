@@ -37,16 +37,7 @@ class DiagnosticCollector
     template <typename... Args>
     DiagnosticBuilder error(const std::string_view &sender, std::format_string<Args...> fmt, Args &&...args)
     {
-        auto b = builder(Diag_Error, sender);
-
-        // Only format and append if enabled.
-        // If disabled, 'b' acts as an inactive dummy builder that consumes chained calls for free.
-        if (isDiagEnabledForType(Diag_Error))
-        {
-            b << std::format(fmt, std::forward<Args>(args)...);
-        }
-
-        return b;
+        return buildAndAppend(Diag_Error, sender, fmt, std::forward<Args>(args)...);
     }
 
     /**
@@ -61,14 +52,7 @@ class DiagnosticCollector
     template <typename... Args>
     DiagnosticBuilder trace(const std::string_view &sender, std::format_string<Args...> fmt, Args &&...args)
     {
-        auto b = builder(Diag_Trace, sender);
-
-        if (isDiagEnabledForType(Diag_Trace))
-        {
-            b << std::format(fmt, std::forward<Args>(args)...);
-        }
-
-        return b;
+        return buildAndAppend(Diag_Trace, sender, fmt, std::forward<Args>(args)...);
     }
 
     /**
@@ -109,6 +93,28 @@ class DiagnosticCollector
     std::pmr::memory_resource *getAllocator();
 
   private:
+    /**
+     * Shared implementation for the error/trace convenience overloads: builds a message of the
+     * given type and appends the formatted text only when that type is enabled, so disabled
+     * diagnostics never pay for formatting.
+     */
+    template <typename... Args>
+    DiagnosticBuilder buildAndAppend(DiagnosticMessageType type,
+                                     const std::string_view &sender,
+                                     std::format_string<Args...> fmt,
+                                     Args &&...args)
+    {
+        auto b = builder(type, sender);
+
+        // If disabled, 'b' acts as an inactive dummy builder that consumes chained calls for free.
+        if (isDiagEnabledForType(type))
+        {
+            b << std::format(fmt, std::forward<Args>(args)...);
+        }
+
+        return b;
+    }
+
     std::atomic<uint8_t> m_enabledDiags;                  // Enabled diagnostic types; atomic to match the documented thread-safety.
     std::list<DiagnosticListener *> m_listeners;          // Registered observers notified when messages are committed.
     std::pmr::synchronized_pool_resource m_diagScopePool; // Thread-safe arena backing all messages and scopes.
