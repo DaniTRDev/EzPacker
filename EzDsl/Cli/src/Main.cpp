@@ -1,6 +1,7 @@
 #include "Cli/CommandLineOptions.h"
 #include "Cli/Driver.h"
 #include "CliExitCode.h"
+#include "EzTargetsX86_64Dsl.h"
 
 #include <iostream>
 
@@ -9,6 +10,9 @@ int main(int argc, char *argv[])
 {
     try
     {
+        // Register the target DSL plugins available to this tool before any generation.
+        EzTargets::X86_64::registerDsl();
+
         Cli::CommandLineParser parser;
         std::string errorMessage;
         auto options = parser.parse(argc, argv, errorMessage);

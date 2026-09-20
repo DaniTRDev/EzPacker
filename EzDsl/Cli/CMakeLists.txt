@@ -12,7 +12,7 @@ set(EZDSL_CLI_LIB_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzDslCliLib"
         FILE_LIST ${EZDSL_CLI_LIB_FILES_LIST}
         PRECOMPILED_HEADER "include/EzDslCliCommon.h"
-        LINKED_LIBRARIES "EzDslCodeGenerators;EzDslSema;EzDslLexer;EzCore;argparse"
+        LINKED_LIBRARIES "EzDslCodeGenerators;EzDslSema;EzDslLexer;EzCore;argparse;EzTargetsX86_64Dsl"
         INCLUDED_DIRS "include"
 )
 

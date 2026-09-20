@@ -7,7 +7,7 @@ set(EZDSLCLITESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzDslCliTestSuite"
         FILE_LIST ${EZDSLCLITESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER ""
-        LINKED_LIBRARIES "EzDslCliLib;EzDslCodeGenerators;EzDslSema;EzDslLexer;EzCore;argparse;gtest;GTest::gtest_main"
+        LINKED_LIBRARIES "EzDslCliLib;EzDslCodeGenerators;EzDslSema;EzDslLexer;EzTargetsX86_64Dsl;EzCore;argparse;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include"
 )
 

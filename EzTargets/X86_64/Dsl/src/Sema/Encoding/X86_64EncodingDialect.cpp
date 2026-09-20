@@ -318,16 +318,18 @@ namespace
 // Registers the x86-64 dialect (and legacy target-name aliases) at load time.
 struct X86_64DialectRegistrar
 {
-    X86_64DialectRegistrar()
-    {
-        static X86_64EncodingDialect s_dialect;
-        registerEncodingDialect("x86_64", &s_dialect);
-        registerEncodingDialect("amd64", &s_dialect);
-        registerEncodingDialect("x86-64", &s_dialect);
-    }
+    X86_64DialectRegistrar() { registerX86_64EncodingDialect(); }
 };
 
 const X86_64DialectRegistrar s_registrar;
 } // namespace
+
+void registerX86_64EncodingDialect()
+{
+    static X86_64EncodingDialect s_dialect;
+    registerEncodingDialect("x86_64", &s_dialect);
+    registerEncodingDialect("amd64", &s_dialect);
+    registerEncodingDialect("x86-64", &s_dialect);
+}
 
 } // namespace Sema::Encoding

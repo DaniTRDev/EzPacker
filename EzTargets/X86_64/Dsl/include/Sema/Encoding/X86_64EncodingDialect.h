@@ -73,6 +73,9 @@ class X86_64EncodingDialect : public EncodingDialect
                   DiagnosticCollector *diag) override;
 };
 
+/** Registers the x86-64 encoding dialect (and legacy target-name aliases) into the registry. */
+void registerX86_64EncodingDialect();
+
 } // namespace Sema::Encoding
 
 #endif // EZDSL_SEMA_X86_64_ENCODING_DIALECT_H

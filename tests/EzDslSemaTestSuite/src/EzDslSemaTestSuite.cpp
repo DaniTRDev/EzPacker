@@ -1,4 +1,5 @@
 #include "EzDslSemaTestSuite.h"
+#include "EzTargetsX86_64Dsl.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Diagnostics/DiagnosticLogger.h"
 #include "Sema/Symbol.h"
@@ -40,6 +41,8 @@ SymbolTable *EzDslSemaTestSuite::getSymbolTable() { return m_symbolTable; }
  */
 void EzDslSemaTestSuite::create()
 {
+    EzTargets::X86_64::registerDsl();
+
     std::pmr::polymorphic_allocator<> alloc(&m_allocator);
     m_diagnosticCollector = alloc.new_object<DiagnosticCollector>();
     m_sourceManager = alloc.new_object<SourceManager>(std::filesystem::current_path(), &m_allocator);

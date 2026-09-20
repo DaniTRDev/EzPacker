@@ -24,6 +24,9 @@ class X86_64EncodingCodegenBackend : public EncodingCodegenBackend
     std::string row(const Symbols::TargetInstructionSymbol &sym, DiagnosticCollector *diag = nullptr) const override;
 };
 
+/** Registers the x86-64 encoding codegen backend (and legacy target-name aliases) into the registry. */
+void registerX86_64EncodingCodegenBackend();
+
 } // namespace CodeGenerators
 
 #endif // EZDSL_X86_64_ENCODING_CODEGEN_BACKEND_H

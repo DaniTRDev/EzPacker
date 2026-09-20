@@ -141,18 +141,20 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
 // Registers the x86-64 backend (and legacy target-name aliases) at load time.
 struct X86_64BackendRegistrar
 {
-    X86_64BackendRegistrar()
-    {
-        static X86_64EncodingCodegenBackend s_backend;
-        registerEncodingBackend("x86_64", &s_backend);
-        registerEncodingBackend("amd64", &s_backend);
-        registerEncodingBackend("x86-64", &s_backend);
-    }
+    X86_64BackendRegistrar() { registerX86_64EncodingCodegenBackend(); }
 };
 
 const X86_64BackendRegistrar s_registrar;
 
 } // namespace
+
+void registerX86_64EncodingCodegenBackend()
+{
+    static X86_64EncodingCodegenBackend s_backend;
+    registerEncodingBackend("x86_64", &s_backend);
+    registerEncodingBackend("amd64", &s_backend);
+    registerEncodingBackend("x86-64", &s_backend);
+}
 
 std::string X86_64EncodingCodegenBackend::row(const Symbols::TargetInstructionSymbol &sym,
                                               DiagnosticCollector *diag) const

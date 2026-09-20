@@ -1,3 +1,5 @@
+add_subdirectory(Dsl)
+
 # x86-64 target subproject.
 #
 # Defines the runtime target library (EzTargetsX86_64) and drives the DSL code generators
