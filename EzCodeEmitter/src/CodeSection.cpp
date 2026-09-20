@@ -266,14 +266,27 @@ uint64_t CodeSection::getCurrentOffset() const
         return m_buffer.size();
     }
 
-    // Pre-finalize the current offset is the sum of data emitted up to the cursor.
+    // Pre-finalize the offset is the effect of every node up to and including the cursor,
+    // applying alignment padding the same way finalize() does so pending Align nodes are counted.
     uint64_t sz = 0;
     for (SectionNode *n = m_head; n != nullptr; n = n->m_next)
     {
-        if (n->m_kind == SectionNodeKind::Data)
+        if (n->m_kind == SectionNodeKind::Align)
+        {
+            if (n->m_alignment > 1)
+            {
+                uint64_t rem = sz % n->m_alignment;
+                if (rem != 0)
+                {
+                    sz += n->m_alignment - rem;
+                }
+            }
+        }
+        else if (n->m_kind == SectionNodeKind::Data)
         {
             sz += n->m_data.size();
         }
+
         if (n == m_cursor)
         {
             break;

@@ -190,7 +190,8 @@ class CodeSection
     bool patchBytesWithEndian(uint64_t offset, const uint8_t *data, size_t size, TargetEndianness inputEndianness);
 
     /**
-     * Returns the current cumulative byte offset in the section.
+     * Returns the cumulative byte offset where the next emitted byte lands, applying any pending
+     * alignment padding exactly as finalize() will.
      */
     uint64_t getCurrentOffset() const;
 

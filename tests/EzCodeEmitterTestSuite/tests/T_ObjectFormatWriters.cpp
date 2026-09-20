@@ -160,3 +160,29 @@ TEST_F(EzCodeEmitterTestSuite, TestCoffObjectWriter)
     std::memcpy(&numSymbols, &coffBytes[12], 4);
     EXPECT_EQ(numSymbols, 2u);
 }
+
+// Regression for the compiler WEI-01 lead: getCurrentOffset must include pending alignment padding
+// so symbols recorded after alignTo() are not placed at the pre-padding offset.
+TEST_F(EzCodeEmitterTestSuite, TestCurrentOffsetAccountsForAlignment)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateElfSections(sections, getAllocator());
+
+    CodeSection *dataSec = sections[SectionType::Data];
+    ASSERT_NE(dataSec, nullptr);
+
+    dataSec->emit8(0xAA);
+    EXPECT_EQ(dataSec->getCurrentOffset(), 1u);
+
+    // The next emitted byte must start at an 8-byte boundary.
+    dataSec->alignTo(8);
+    EXPECT_EQ(dataSec->getCurrentOffset(), 8u);
+
+    dataSec->emit8(0xBB);
+    EXPECT_EQ(dataSec->getCurrentOffset(), 9u);
+
+    dataSec->finalize();
+    ASSERT_EQ(dataSec->getData().size(), 9u);
+    EXPECT_EQ(dataSec->getData()[0], 0xAA);
+    EXPECT_EQ(dataSec->getData()[8], 0xBB);
+}
