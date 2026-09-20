@@ -3,6 +3,7 @@
 #include "Block/MirBlock.h"
 #include "Block/MirBlockBuilder.h"
 #include "Function/MirFunction.h"
+#include "Function/MirFunctionBuilder.h"
 #include "Instruction/MirInstructionBuilder.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
@@ -403,6 +404,50 @@ TEST_F(LivenessAnalysisTest, TestVariableRedefinitionKillsLiveness)
     // B1 must push %v0 to B2
     EXPECT_TRUE(IsLiveOut(res, b1->getId(), v0->getRegId()));
     EXPECT_TRUE(IsLiveIn(res, b2->getId(), v0->getRegId()));
+}
+
+/**
+ * Regression for WEI-01: a cached liveness analysis must retain the results of every function, not
+ * only the last one the manager iterated. Asserts both functions' blocks are present in the result.
+ */
+TEST_F(LivenessAnalysisTest, TestMultipleFunctionsRetainResults)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirOperandBuilder opBuilder(ctx);
+
+    // First function (%a = 1; ret %a) reuses the suite's synthetic TEST function.
+    MirRegister *a = createInt32Reg("a");
+    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
+    MirBlock *funcAEntry = getTestFunc()->getEntryPoint();
+    {
+        MirInstructionBuilder builderA(ctx, funcAEntry, InsertionType::Append, funcAEntry->end());
+        builderA.MOV(a, imm1);
+        builderA.RET(a);
+    }
+
+    // Second function (%b = 2; ret %b) is appended after the first in the context.
+    MirFunctionBuilder funcBuilder(ctx);
+    MirFunction *funcB = funcBuilder.build(getTypeTable()->i32(), {}, "secondFunc");
+    ASSERT_NE(funcB, nullptr);
+
+    MirRegister *b = createInt32Reg("b");
+    MirInteger *imm2 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(2));
+    MirBlock *funcBEntry = funcB->getEntryPoint();
+    {
+        MirInstructionBuilder builderB(ctx, funcBEntry, InsertionType::Append, funcBEntry->end());
+        builderB.MOV(b, imm2);
+        builderB.RET(b);
+    }
+
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    ASSERT_NE(res, nullptr);
+
+    // Both functions' local defs must survive in the cached result.
+    EXPECT_TRUE(HasLocalDef(res, funcAEntry->getId(), a->getRegId()));
+    EXPECT_TRUE(HasLocalDef(res, funcBEntry->getId(), b->getRegId()));
 }
 
 /**

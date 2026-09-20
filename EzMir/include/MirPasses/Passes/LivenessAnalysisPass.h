@@ -81,7 +81,7 @@ class LivenessAnalysisPass : public IMirAnalysisPass
     void computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
 
   private:
-    LivenessResult m_result;            // Last computed liveness sets.
+    LivenessResult m_result;            // Accumulated liveness sets for every function, keyed by global block ID.
     class MirBuilderContext *m_ctx;     // Context whose functions are inspected.
     std::pmr::memory_resource *m_arena; // Arena backing the result containers.
 };

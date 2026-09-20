@@ -63,7 +63,9 @@ LivenessResult *LivenessAnalysisPass::getResult() { return &m_result; }
 MirPassIterationPlace LivenessAnalysisPass::getIterationPlace() const { return MirPassIterationPlace::Function; }
 
 /**
- * Clears all def/use/live-in/live-out sets so the pass can run on another function.
+ * Clears all def/use/live-in/live-out sets. Invoked by the manager once before it iterates the
+ * function list; results for every visited function are accumulated afterwards, keyed by the
+ * globally unique block ID, exactly like CodeFlowAnalysisPass.
  */
 void LivenessAnalysisPass::reset()
 {
@@ -74,8 +76,9 @@ void LivenessAnalysisPass::reset()
 }
 
 /**
- * Obtains (or computes) the CFG analysis, resets prior state and runs the global liveness solver
- * over the target function.
+ * Obtains (or computes) the CFG analysis and runs the global liveness solver over the target
+ * function. Results are accumulated (not reset) across functions so the cached analysis holds
+ * valid live sets for every function; the manager's single reset() sets the contract.
  */
 MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it,
                                         MirPassManager *passManager)
@@ -85,7 +88,6 @@ MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_
     auto *cfgPass = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx);
     auto *cfg = cfgPass->getResult();
 
-    reset();
     computeGlobalLiveness(func, cfg);
 
     return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
