@@ -443,10 +443,11 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
 
             auto &ops = inst->getOperands();
 
-            // 1. Rename READ operands first
+            // 1. Rename READ operands first. Test the flag bitwise so ReadWrite operands are
+            //    recognized as reads too (matching getUsedRegisters/getDefinedRegisters).
             for (size_t i = 0; i < inst->getOperandCount(); i++)
             {
-                if (inst->getOperandFlag(i) == MirOperandFlag::Read)
+                if (inst->getOperandFlag(i) & MirOperandFlag::Read)
                 {
                     MirRegister *op = inst->getOpAs<MirRegister>(i);
                     if (op && op->isVirtual())
@@ -488,10 +489,13 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
                 }
             }
 
-            // 2. Rename WRITE operands
+            // 2. Rename WRITE operands. Pure writes get a fresh SSA name; ReadWrite operands were
+            //    already renamed as reads above and are left untouched to avoid assigning a new
+            //    name off the post-rename reaching definition.
             for (size_t i = 0; i < inst->getOperandCount(); ++i)
             {
-                if (inst->getOperandFlag(i) == MirOperandFlag::Write)
+                MirOperandFlag writeFlag = inst->getOperandFlag(i);
+                if ((writeFlag & MirOperandFlag::Write) && !(writeFlag & MirOperandFlag::Read))
                 {
                     MirRegister *op = inst->getOpAs<MirRegister>(i);
                     if (op && op->isVirtual())
