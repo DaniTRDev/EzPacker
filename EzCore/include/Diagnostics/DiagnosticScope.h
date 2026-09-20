@@ -41,17 +41,11 @@ class DiagnosticScope
     void setAction(DiagnosticScopeAction action);
 
     /**
-     * Mark this scope because there was an error somewhere inside it.
-     */
-    void setHasFatalErrors(bool value);
-
-    /**
      * Returns the list of arena-backed messages.
      */
     const std::pmr::vector<DiagnosticMessage> &getMessages() const;
 
   private:
-    bool m_hasFatalErrors;                          // True once a fatal error has been recorded in this scope.
     DiagnosticScopeAction m_action;                 // How the collected messages are handled when the scope ends.
     std::pmr::vector<DiagnosticMessage> m_messages; // Arena-allocated messages gathered while inside the scope.
 };

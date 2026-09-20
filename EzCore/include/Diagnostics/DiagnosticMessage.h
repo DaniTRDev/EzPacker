@@ -89,17 +89,6 @@ class DiagnosticMessage
      */
     DiagnosticMessage(std::pmr::memory_resource *alloc);
 
-    /**
-     * Parameterized internal constructor used by DiagnosticBuilder upon flush.
-     */
-    DiagnosticMessage(DiagnosticMessageType type,
-                      class SourceReference *primarySourceRef,
-                      const std::string_view &mainMsg,
-                      const std::string_view &sender,
-                      std::pmr::memory_resource *alloc,
-                      const std::list<DiagnosticNote> &notes = {});
-
-  private:
     DiagnosticMessageType m_type; // Severity classification of this message.
 
     // A reference to the parent scope/object that executed a traverse operation and created a diagnostic in any of

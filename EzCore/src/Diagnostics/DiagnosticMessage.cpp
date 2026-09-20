@@ -10,23 +10,6 @@ DiagnosticMessage::DiagnosticMessage(std::pmr::memory_resource *alloc) :
 }
 
 /**
- * Creates a fully-populated message, copying the main text and sender into arena-backed strings
- * and adopting the supplied note list.
- */
-DiagnosticMessage::DiagnosticMessage(DiagnosticMessageType type,
-                                     class SourceReference *primarySourceRef,
-                                     const std::string_view &mainMsg,
-                                     const std::string_view &sender,
-                                     std::pmr::memory_resource *alloc,
-                                     const std::list<DiagnosticNote> &notes) :
-    m_type(type), m_primarySourceRef(primarySourceRef), m_mainMessage(alloc), m_sender(alloc), m_notes(notes)
-{
-    // Ensure copy.
-    m_mainMessage += mainMsg;
-    m_sender += sender;
-}
-
-/**
  * Returns the severity classification of this message.
  */
 DiagnosticMessageType DiagnosticMessage::getType() const { return m_type; }

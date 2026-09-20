@@ -97,11 +97,6 @@ class DiagnosticCollector
     void endScope();
 
     /**
-     * Sets the current scope's action. This does not affect top-most scope.
-     */
-    void setScopeAction(DiagnosticScopeAction action);
-
-    /**
      * Pushes a new message to the diagnostic message list. If the current scope is the top-most (1), every listener
      * is notified.
      */

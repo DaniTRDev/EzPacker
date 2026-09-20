@@ -136,18 +136,6 @@ void DiagnosticCollector::endScope()
 }
 
 /**
- * Changes the action of the current scope, ignoring the request when only the root scope exists.
- */
-void DiagnosticCollector::setScopeAction(DiagnosticScopeAction action)
-{
-    std::lock_guard lock(m_mutex);
-    if (m_scopes.size() > 1)
-    {
-        m_scopes.back().setAction(action);
-    }
-}
-
-/**
  * Receives a message from a builder. At the root scope it notifies listeners immediately and
  * records the message; inside nested scopes it buffers the message. Error messages additionally
  * mark the current scope as having fatal errors.
@@ -178,11 +166,6 @@ void DiagnosticCollector::onDiag(DiagnosticMessage message)
     else
     {
         scope.appendMessage(message);
-    }
-
-    if (message.getType() == Diag_Error)
-    {
-        scope.setHasFatalErrors(true);
     }
 }
 
