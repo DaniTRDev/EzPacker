@@ -299,6 +299,8 @@ std::string_view CodeSection::getName() const { return m_name; }
 
 std::span<const uint8_t> CodeSection::getData() const { return m_buffer; }
 
+std::span<uint8_t> CodeSection::getMutableData() { return std::span<uint8_t>(m_buffer.data(), m_buffer.size()); }
+
 SectionNode *CodeSection::createDataNode()
 {
     void *mem = m_alloc->allocate(sizeof(SectionNode), alignof(SectionNode));

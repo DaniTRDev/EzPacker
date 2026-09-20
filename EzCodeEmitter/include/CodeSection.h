@@ -205,6 +205,12 @@ class CodeSection
      */
     std::span<const uint8_t> getData() const;
 
+    /**
+     * Returns a mutable view over the serialized byte buffer, used for in-place relocation
+     * patching (available after finalize()).
+     */
+    std::span<uint8_t> getMutableData();
+
   private:
     /**
      * Allocates and constructs a fresh Data node from the section allocator.

@@ -9,6 +9,7 @@
 #include "CodeSection.h"
 #include "GenericCodeEmitter.h"
 #include "Descriptors/TargetDesc.h"
+#include "Descriptors/TargetRelocationResolver.h"
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
 #include "Operand/MirOperands.h"
@@ -243,7 +244,9 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
     // Patch intra-function branches and build object relocations
     std::vector<EzCodeEmitter::ObjectFormat::ObjectRelocEntry> objectRelocs;
-    auto secData = textSection->getData();
+    std::span<uint8_t> textBytes = textSection->getMutableData();
+    // Target-owned hook that owns the opcode/displacement knowledge for in-place branch patching.
+    TargetRelocationResolver *relocResolver = targetDesc->getRelocationResolver();
     const auto &allRelocs = emitterCtx.getRelocations();
     auto itTextRelocs = allRelocs.find(textSection);
     if (itTextRelocs != allRelocs.end())
@@ -261,35 +264,10 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             if (ref->isBlock())
             {
                 CodeLabel *targetLabel = emitterCtx.findLabel(ref->getRefId());
-                if (targetLabel && instOffset < secData.size())
+                if (targetLabel && relocResolver && instOffset < textBytes.size())
                 {
-                    uint64_t targetOffset = targetLabel->getAddress();
-                    uint8_t op0 = secData[instOffset];
-                    if (op0 == 0xE9) // JMP near: 5 bytes
-                    {
-                        uint64_t dispOffset = instOffset + 1;
-                        uint64_t nextRip = instOffset + 5;
-                        int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) -
-                                                            static_cast<int64_t>(nextRip));
-                        textSection->patch32(dispOffset, static_cast<uint32_t>(disp));
-                    }
-                    else if (op0 == 0x0F && instOffset + 1 < secData.size() &&
-                             (secData[instOffset + 1] & 0xF0) == 0x80) // Jcc near: 6 bytes
-                    {
-                        uint64_t dispOffset = instOffset + 2;
-                        uint64_t nextRip = instOffset + 6;
-                        int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) -
-                                                            static_cast<int64_t>(nextRip));
-                        textSection->patch32(dispOffset, static_cast<uint32_t>(disp));
-                    }
-                    else if (op0 == 0xE8) // CALL near: 5 bytes
-                    {
-                        uint64_t dispOffset = instOffset + 1;
-                        uint64_t nextRip = instOffset + 5;
-                        int32_t disp = static_cast<int32_t>(static_cast<int64_t>(targetOffset) -
-                                                            static_cast<int64_t>(nextRip));
-                        textSection->patch32(dispOffset, static_cast<uint32_t>(disp));
-                    }
+                    // Delegate the opcode sniff and displacement computation to the target.
+                    relocResolver->patch(textBytes, *reloc, targetLabel->getAddress(), reloc->m_relocType);
                 }
             }
             else if (ref->isFunction())
