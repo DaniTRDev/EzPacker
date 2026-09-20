@@ -44,12 +44,12 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
   - Fix: shared comparison helper.
   - Status: new
 
-- [ ] **P1 · DUP-06 — `DiagnosticCollector` error/trace overloads are four copies**
+- [x] **P1 · DUP-06 — `DiagnosticCollector` error/trace overloads are four copies**
   - Where: `EzCore/include/Diagnostics/DiagnosticCollector.h:36-49,55,60-71,77` and
     `EzCore/src/Diagnostics/DiagnosticCollector.cpp:32-44,49-59`
   - Why: templated + non-templated `error`/`trace` all do "builder, if enabled append, return".
   - Fix: one private `makeBuilderAndAppend(type, sender, message)`.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P2 · DUP-07 — `SourceManager` entry creation duplicated**
   - Where: `EzCore/src/SourceManager/SourceManager.cpp:73-87` vs `:264-288`
@@ -65,46 +65,46 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
 
 ## 3. Legacy / un-removed code
 
-- [ ] **P1 · LEG-01 — `DiagnosticScope::m_hasFatalErrors` is write-only**
+- [x] **P1 · LEG-01 — `DiagnosticScope::m_hasFatalErrors` is write-only**
   - Where: `EzCore/include/Diagnostics/DiagnosticScope.h:46,54`,
     `EzCore/src/Diagnostics/DiagnosticCollector.cpp:183-186`
   - Why: set but never read anywhere in the repo; consumers use `ErrorCollector` instead.
   - Fix: delete field and assignment.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · LEG-02 — Unused public `SourceManager` API**
+- [x] **P1 · LEG-02 — Unused public `SourceManager` API**
   - Where: `EzCore/include/SourceManager/SourceManager.h:80,85` (+ impls `:294-301,306`)
   - Why: `getSourceBuffer` and `getIncludePaths` have zero call sites repo-wide.
   - Fix: delete or document as external API.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · LEG-03 — Unused `DiagnosticCollector::setScopeAction`**
+- [x] **P1 · LEG-03 — Unused `DiagnosticCollector::setScopeAction`**
   - Where: `EzCore/include/Diagnostics/DiagnosticCollector.h:102`,
     `EzCore/src/Diagnostics/DiagnosticCollector.cpp:141-148`
   - Why: no call sites.
   - Fix: delete.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · LEG-04 — Unused 6-arg `DiagnosticMessage` constructor**
+- [x] **P1 · LEG-04 — Unused 6-arg `DiagnosticMessage` constructor**
   - Where: `EzCore/include/Diagnostics/DiagnosticMessage.h:95-100`,
     `EzCore/src/Diagnostics/DiagnosticMessage.cpp:16-27`
   - Why: the builder only uses the 1-arg (allocator) constructor.
   - Fix: delete.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · LEG-05 — Dead `FlexInt`/`FlexFloat` members**
+- [x] **P1 · LEG-05 — Dead `FlexInt`/`FlexFloat` members**
   - Where: `FlexInt.cpp:189,222,227,237,544-552,568-576,644`,
     `FlexFloat.cpp:184,216,492`
   - Why: `fitsIn`, `hasError`, `isEven`, `isOdd`, `getI8..getU32`, `dump` have zero callers;
     `m_lastErr` is only ever assigned, never observed.
   - Fix: delete the dead surface (or wire the error path intentionally).
-  - Status: new
+  - Status: fixed
 
-- [ ] **P2 · LEG-06 — `EzCore` CMake omits a real header**
+- [x] **P2 · LEG-06 — `EzCore` CMake omits a real header**
   - Where: `EzCore/CMakeLists.txt`
   - Why: `include/SourceManager/GenericSourceManager.h` is not listed while every other header is.
   - Fix: add it (or drop the explicit header list).
-  - Status: new
+  - Status: fixed
 
 - [ ] **P2 · LEG-07 — Stale `<EzCore.h>` reference outside the build**
   - Where: `EzFrontend/EzLexer/include/EzLexerCommon.h:21`
@@ -116,65 +116,65 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
 
 ## 4. Weird scenarios / old hacks
 
-- [ ] **P0 · WEI-01 — `SourceManager` is implicitly copyable while owning raw arena memory**
+- [x] **P0 · WEI-01 — `SourceManager` is implicitly copyable while owning raw arena memory**
   - Where: `EzCore/include/SourceManager/SourceManager.h:14-113`,
     `EzCore/src/SourceManager/SourceManager.cpp:41-52`
   - Why: user-declared destructor suppresses move but not copy; a copy double-frees
     `SourceFileEntry` and leaves map keys pointing into the original arena.
   - Fix: `SourceManager(const SourceManager&) = delete;` + deleted assignment.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P0 · WEI-02 — `DenseBitSet::computeLiveIn` can index out of bounds**
+- [x] **P0 · WEI-02 — `DenseBitSet::computeLiveIn` can index out of bounds**
   - Where: `EzCore/src/HelperClasses/DenseBitSet.cpp:52-64`
   - Why: loop bounded by `m_words.size()` then indexes `use`/`liveOut`/`def` unconditionally;
     sibling `unionWith` (`:33-46`) correctly uses `std::min`.
   - Fix: bound by the min of all word counts and/or assert equal widths.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P0 · WEI-03 — Throwing `~DiagnosticBuilder` and null-deref after flush/move**
+- [x] **P0 · WEI-03 — Throwing `~DiagnosticBuilder` and null-deref after flush/move**
   - Where: `EzCore/src/Diagnostics/DiagnosticBuilder.cpp:37,98-101`,
     `EzCore/include/Diagnostics/DiagnosticBuilder.h:44,59`
   - Why: destructor calls `flush()` → collector, which can throw during unwinding;
     `isDiagEnabledForType()` dereferences `m_collector` after it has been nulled by flush/move.
   - Fix: make flush non-throwing / guard null; null-check before appending notes.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · WEI-04 — `FlexFloat` widths below 32 bits are not clamped/rounded**
+- [x] **P1 · WEI-04 — `FlexFloat` widths below 32 bits are not clamped/rounded**
   - Where: `EzCore/src/FlexNumber/FlexFloat.cpp:653-682,407-423`
   - Why: `clampToFloatBounds()` handles only 32/64; `getPrecBits()` returns 24 for all `<= 32`,
     so a 16-bit half keeps 24-bit precision and `dump()` emits wrong binary16 payloads.
   - Fix: implement per-width precision/exponent handling or reject unsupported widths.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · WEI-05 — `populateLineRanges` always appends a phantom final line**
+- [x] **P1 · WEI-05 — `populateLineRanges` always appends a phantom final line**
   - Where: `EzCore/src/SourceManager/SourceManager.cpp:20-24`
   - Why: condition `lineStart <= content.size()` is always true despite the comment about
     trailing newlines, shifting EOF line lookups.
   - Fix: only push the final range when the last char was not `\n`.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · WEI-06 — `m_enabledDiags` touched without the mutex**
+- [x] **P1 · WEI-06 — `m_enabledDiags` touched without the mutex**
   - Where: `EzCore/include/Diagnostics/DiagnosticCollector.h:116,122`,
     `EzCore/src/Diagnostics/DiagnosticCollector.cpp:18,85`
   - Why: class advertises thread-safety; `isDiagEnabledForType`/`enableDiag` are unlocked and
     are called on the builder-creation path before any lock.
   - Fix: lock, or document/remove the thread-safety contract.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · WEI-07 — `loadFile` trusts `tellg()` (SIZE_MAX allocation on failure)**
+- [x] **P1 · WEI-07 — `loadFile` trusts `tellg()` (SIZE_MAX allocation on failure)**
   - Where: `EzCore/src/SourceManager/SourceManager.cpp:260-262`
   - Why: failed seek returns `-1` → cast to a huge size → enormous allocation.
   - Fix: check `std::streampos`/`tellg()` result before casting.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · WEI-08 — Exception types do not match their meaning/docs**
+- [x] **P1 · WEI-08 — Exception types do not match their meaning/docs**
   - Where: `EzCore/src/FlexNumber/FlexInt.cpp:598-601`,
     `EzCore/src/FlexNumber/FlexFloat.cpp:475-478,367-372`,
     `EzCore/include/FlexNumber/FlexFloat.h:186-188`
   - Why: narrowing throws `std::bad_alloc`; float narrowing throws `std::runtime_error` while
     the header documents `std::bad_alloc`; divide-by-zero throws `std::runtime_error`.
   - Fix: define a single error policy and align docs.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P2 · WEI-09 — Inconsistent null-listener checks**
   - Where: `EzCore/src/Diagnostics/DiagnosticCollector.cpp:113` vs `:170-173`
@@ -210,7 +210,7 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
     `DiagnosticMessage.h:54,64`, `DiagnosticCollector.h:30,37,55,61,77`, `StringUtils.h:10,23`
   - Why: `string_view` is trivially copyable.
   - Fix: pass by value.
-  - Status: new
+  - Status: in-progress
 
 - [ ] **P1 · OPT-02 — Excessive message copies in the diagnostics path**
   - Where: `EzCore/src/Diagnostics/DiagnosticCollector.cpp:112,127,176,180`
@@ -219,19 +219,19 @@ All leads are unverified until checked. See `ReviewProcess.md` for legend and fo
   - Fix: add `DiagnosticMessage&&` overloads and use move iterators.
   - Status: new
 
-- [ ] **P1 · OPT-03 — `StringUtils` `tolower`/`toupper` UB on signed `char`**
+- [x] **P1 · OPT-03 — `StringUtils` `tolower`/`toupper` UB on signed `char`**
   - Where: `EzCore/include/StringUtils.h:15,28`
   - Why: passing a negative `char` is UB; duplicated EzDsl copies do the cast correctly.
   - Fix: `static_cast<unsigned char>` inside the core helper, then adopt it repo-wide
     (see `CrossProjectReview.md` XPR-02).
-  - Status: new
+  - Status: fixed
 
 - [ ] **P2 · OPT-04 — Redundant / missing includes**
   - Where: `EzCore/include/EzCoreCommon.h:4,12` (`<memory>` twice, unused `<stack>`/`<functional>`);
     `StringUtils.h` (`<algorithm>`, `<cctype>`); `FlexFloat.cpp` uses `std::realloc/free` but
     includes `<cstring>` instead of `<cstdlib>`.
   - Fix: trim/add.
-  - Status: new
+  - Status: in-progress
 
 - [ ] **P2 · OPT-05 — Unnecessary deep copies in FlexNumber**
   - Where: `EzCore/src/FlexNumber/FlexFloat.cpp:206` (copies whole `bf_t`),
@@ -271,15 +271,15 @@ Use the standard gate in `ReviewProcess.md`. Add smoke coverage for FlexNumber c
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| WEI-01 | P0 | Weird | new | — | `SourceManager` copy ownership |
-| WEI-02 | P0 | Weird | new | — | `DenseBitSet::computeLiveIn` bounds |
-| WEI-03 | P0 | Weird | new | — | `~DiagnosticBuilder` / null after flush |
-| WEI-04 | P1 | Weird | new | — | sub-32-bit `FlexFloat` |
-| WEI-05 | P1 | Weird | new | — | phantom trailing line |
-| WEI-06 | P1 | Weird | new | — | unlocked `m_enabledDiags` |
-| WEI-07 | P1 | Weird | new | — | unchecked `tellg()` |
-| WEI-08 | P1 | Weird | new | — | exception-type mismatches |
-| DUP-01..06 | P1 | Duplication | new | — | FlexNumber + diagnostics duplication |
-| LEG-01..05 | P1 | Legacy | new | — | dead fields/APIs/methods |
-| OPT-01..03 | P1 | Optimization | new | — | string_view/copies/tolower |
-| DUP-07..08, LEG-06..07, WEI-09..12, OPT-04..07 | P2 | mixed | new | — | polish |
+| WEI-01 | P0 | Weird | fixed | — | `SourceManager` copy ownership |
+| WEI-02 | P0 | Weird | fixed | — | `DenseBitSet::computeLiveIn` bounds |
+| WEI-03 | P0 | Weird | fixed | — | `~DiagnosticBuilder` / null after flush |
+| WEI-04 | P1 | Weird | fixed | — | sub-32-bit `FlexFloat` |
+| WEI-05 | P1 | Weird | fixed | — | phantom trailing line |
+| WEI-06 | P1 | Weird | fixed | — | unlocked `m_enabledDiags` |
+| WEI-07 | P1 | Weird | fixed | — | unchecked `tellg()` |
+| WEI-08 | P1 | Weird | fixed | — | exception-type mismatches |
+| DUP-01..06 | P1 | Duplication | in-progress | — | DUP-06 fixed; DUP-01..05 open |
+| LEG-01..05 | P1 | Legacy | fixed | — | dead fields/APIs/methods |
+| OPT-01..03 | P1 | Optimization | in-progress | — | OPT-03 fixed; OPT-01 in-progress; OPT-02 open |
+| DUP-07..08, LEG-06..07, WEI-09..12, OPT-04..07 | P2 | mixed | in-progress | — | LEG-06 fixed; OPT-04 in-progress; rest open |

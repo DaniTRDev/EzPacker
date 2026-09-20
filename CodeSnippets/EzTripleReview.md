@@ -164,18 +164,18 @@ All leads are unverified until checked. See `ReviewProcess.md`.
 
 ## 4. Weird scenarios / old hacks
 
-- [ ] **P0 · WEI-01 — Null dereference before the null check in `MirAbiLowererPass`**
+- [x] **P0 · WEI-01 — Null dereference before the null check in `MirAbiLowererPass`**
   - Where: `src/AbiLowerer/MirAbiLowererPass.cpp:31-32` (and unchecked operand access
     `:49,62,75,88,101,115,128`)
   - Why: every other pass checks `func` first; this one constructs the signature first.
   - Fix: guard + validate operand tags/bounds.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P0 · WEI-02 — `MirRegisterAllocatorPass` dereferences the target descriptor unchecked**
+- [x] **P0 · WEI-02 — `MirRegisterAllocatorPass` dereferences the target descriptor unchecked**
   - Where: `src/RegisterAllocator/MirRegisterAllocatorPass.cpp:14-15`
   - Why: null target/allocator crashes in the constructor before `run()` can validate.
   - Fix: validate before storing.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P1 · WEI-03 — Inconsistent calling-convention null checks**
   - Where: `src/RegisterAllocator/MirRegisterAllocator.cpp:63` (guarded) vs `:113,120,349`
@@ -322,8 +322,8 @@ on a large MIR module and re-run `T_X86_64TargetDesc`, `T_MirInstructionSelector
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| WEI-01 | P0 | Weird | new | — | AbiLowerer null deref |
-| WEI-02 | P0 | Weird | new | — | RegAlloc target deref |
+| WEI-01 | P0 | Weird | fixed | — | AbiLowerer null deref |
+| WEI-02 | P0 | Weird | fixed | — | RegAlloc target deref |
 | DUP-01..08 | P1 | Duplication | new | — | legalizer/ABI/target duplication |
 | LEG-01..09 | P1 | Legacy | new | — | dead module/orphaned files/fields |
 | WEI-03..05 | P1 | Weird | new | — | null checks/string dispatch/init |

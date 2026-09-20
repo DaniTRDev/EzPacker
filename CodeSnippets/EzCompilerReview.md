@@ -13,14 +13,14 @@ All leads are unverified until checked. See `ReviewProcess.md`.
 
 ## 2. Duplicated code
 
-- [ ] **P0 · DUP-01 — x86-64 branch patching duplicated; the target resolver is bypassed**
+- [x] **P0 · DUP-01 — x86-64 branch patching duplicated; the target resolver is bypassed**
   - Where: `EzCompiler/src/EmissionEngine.cpp:251-294` (inline opcode recognition + `target - nextRip`)
     vs `EzTriple/src/Targets/X86_64/X86_64RelocationResolver.cpp:25-84`
   - Why: `TargetDesc::getRelocationResolver()` is never called in production (only in
     `tests/EzTripleTestSuite/tests/T_X86_64TargetDesc.cpp:195`); the two copies of frame-size and
     offset knowledge can diverge. This is the clearest leftover of the emitter-seam refactor.
   - Fix: route patching through the target's relocation resolver.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P1 · DUP-02 — ELF/COFF writer setup duplicated**
   - Where: `EzCompiler/src/EmissionEngine.cpp:357-388`
@@ -125,12 +125,12 @@ All leads are unverified until checked. See `ReviewProcess.md`.
 
 ## 4. Weird scenarios / old hacks
 
-- [ ] **P0 · WEI-01 — Global-variable symbol offsets computed before alignment padding**
+- [x] **P0 · WEI-01 — Global-variable symbol offsets computed before alignment padding**
   - Where: `EmissionEngine.cpp:120-124` with `CodeSection.cpp:262-283` vs `:134-176`
   - Why: `getCurrentOffset()` ignores pending `Align` nodes, so a symbol after a padded region is
     recorded at the wrong offset (e.g. 1-byte global followed by an 8-byte global).
   - Fix: account for pending alignment when computing offsets.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P1 · WEI-02 — Shared sections are finalized multiple times**
   - Where: `EmissionEngine.cpp:236-242` iterating `binDesc->getSections()`, where
@@ -249,8 +249,8 @@ byte-identical after routing through `X86_64RelocationResolver`; capture a `sha2
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| DUP-01 | P0 | Duplication | new | — | branch patching vs resolver |
-| WEI-01 | P0 | Weird | new | — | global symbol offsets vs alignment |
+| DUP-01 | P0 | Duplication | fixed | — | branch patching vs resolver |
+| WEI-01 | P0 | Weird | fixed | — | global symbol offsets vs alignment |
 | DUP-02..05 | P1 | Duplication | new | — | writers/symbols/pipeline/dumps |
 | LEG-01..08 | P1 | Legacy | new | — | dead API/options/frontend |
 | WEI-02..07 | P1 | Weird | new | — | finalize/swallowed errors/ownership |

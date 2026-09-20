@@ -143,7 +143,7 @@ All leads are unverified until checked. See `ReviewProcess.md`.
 
 ## 4. Weird scenarios / old hacks
 
-- [ ] **P0 · WEI-01 — Analysis cache returns the last function's result**
+- [x] **P0 · WEI-01 — Analysis cache returns the last function's result**
   - Where: `EzMir/src/MirPasses/MirPassManager.cpp:199`,
     `EzMir/src/MirPasses/Passes/LivenessAnalysisPass.cpp:88`,
     `EzTriple/src/RegisterAllocator/MirRegisterAllocatorPass.cpp:60-63`
@@ -151,23 +151,23 @@ All leads are unverified until checked. See `ReviewProcess.md`.
     cached `getResult()` holds only the last function's liveness; every other function gets the
     wrong live sets. `CodeFlowAnalysisPass` does not reset per function — inconsistent contract.
   - Fix: define one `reset()` contract and/or key cached results by function.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P0 · WEI-02 — PMR containers escape the arena in `MirBuilderContext`**
+- [x] **P0 · WEI-02 — PMR containers escape the arena in `MirBuilderContext`**
   - Where: `EzMir/src/Builder/MirBuilderContext.cpp:19-21`,
     `EzMir/include/Builder/MirBuilderContext.h:117,120,123`
   - Why: only three maps are built on `m_globalResource`; `m_globalVars`, the hot
     `m_registerIdToRegister`, and `m_typeIdToClass` use the default heap, contradicting the
     arena design.
   - Fix: construct with `m_globalResource`.
-  - Status: new
+  - Status: fixed
 
-- [ ] **P1 · WEI-03 — SSA rename skips `ReadWrite` operands**
+- [x] **P1 · WEI-03 — SSA rename skips `ReadWrite` operands**
   - Where: `EzMir/src/MirPasses/Passes/NonSsaToSsaPass.cpp:449,494`
   - Why: exact `==` comparisons against `Read`/`Write` miss `ReadWrite`; builder code uses
     bitwise `&`.
   - Fix: use bitwise flag tests.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P1 · WEI-04 — Parser `SourceManager` lifetime vs retained `SourceReference`s**
   - Where: `EzMir/src/Parser/MirParser.cpp:1270-1273,1333-1336,1364-1367`
@@ -335,10 +335,10 @@ functions whose liveness differs and a `ReadWrite` operand.
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| WEI-01 | P0 | Weird | new | — | liveness cache/last function |
-| WEI-02 | P0 | Weird | new | — | PMR escape in context |
+| WEI-01 | P0 | Weird | fixed | — | liveness cache/last function |
+| WEI-02 | P0 | Weird | fixed | — | PMR escape in context |
 | DUP-01..06 | P1 | Duplication | new | — | parser/builder/operand duplication |
 | LEG-01..09 | P1 | Legacy | new | — | dead ctors/APIs/tables |
-| WEI-03..08 | P1 | Weird | new | — | SSA/parser lifetime/hacks |
+| WEI-03..08 | P1 | Weird | in-progress | — | WEI-03 fixed; WEI-04..08 open |
 | OPT-01..06 | P1 | Optimization | new | — | copies/vectors/lookups |
 | DUP-07..08, LEG-10, WEI-09..13, OPT-07..10 | P2 | mixed | new | — | polish |

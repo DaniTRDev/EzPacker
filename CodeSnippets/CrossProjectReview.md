@@ -66,14 +66,14 @@ All leads are unverified until checked. See `ReviewProcess.md`.
 
 ## 2. Duplication that crosses project boundaries
 
-- [ ] **P0 · XPR-08 — x86 branch patching exists in EzCompiler and EzTriple**
+- [x] **P0 · XPR-08 — x86 branch patching exists in EzCompiler and EzTriple**
   - Where: `EzCompiler/src/EmissionEngine.cpp:251-294` vs
     `EzTriple/src/Targets/X86_64/X86_64RelocationResolver.cpp:25-84`
   - Why: the compiler re-implements target-specific relocation semantics while the target
     resolver is never called in production. See `EzCompilerReview.md` DUP-01 / `EzTripleReview.md`
     WEI-10.
   - Fix: emit through `TargetDesc::getRelocationResolver()`.
-  - Status: new
+  - Status: fixed
 
 - [ ] **P1 · XPR-09 — ELF/COFF section + writer logic spread across three projects**
   - Where: section creation in `EzCodeEmitter/src/Helpers.cpp:25,94,154-166`; descriptor wrappers
@@ -152,7 +152,7 @@ unless the change is explicitly intended to alter output.
 
 | ID | Severity | Category | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
-| XPR-08 | P0 | Duplication | new | — | branch patching duplicated |
+| XPR-08 | P0 | Duplication | fixed | — | branch patching duplicated |
 | XPR-01..04 | P1 | Duplication | new | — | registry/string/collect/PCH |
 | XPR-09..10 | P1 | Duplication | new | — | object format/vocabulary |
 | XPR-13 | P1 | Legacy | new | — | orphaned target files |

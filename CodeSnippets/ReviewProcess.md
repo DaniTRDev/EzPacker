@@ -100,3 +100,26 @@ diff <(tail -n +12 /tmp/ezgen/x86_64EncodingTable.h) \
 
 A change is acceptable only if the gate is green (or the delta is explained) and, for the
 emitter path, the generated output remains byte-identical unless the change is intentional.
+
+## Implementation progress
+
+Branch `InstructionSelUpgrade`. Each project file marks implemented leads as `fixed` (or
+`in-progress` for partial work) and records the remaining ones in its findings tracker.
+
+| Tier | Findings | Status |
+| --- | --- | --- |
+| P0 | EzCore WEI-01/02/03; EzMir WEI-01/02; EzTriple WEI-01/02; EzCompiler DUP-01, WEI-01; XPR-08 | fixed |
+| P1 | EzCore LEG-01..06, WEI-04..08, DUP-06 | fixed |
+| P1 | EzCore OPT-01, OPT-04 | in-progress |
+| P1 | EzMir WEI-03 | fixed |
+
+Notes:
+
+- New regression tests: `T_DenseBitSet` (WEI-02), `T_SourceManager` (WEI-05/07), a two-function
+  liveness case (EzMir WEI-01), and an object-writer alignment case (EzCompiler WEI-01).
+- The branch-patching refactor (DUP-01/XPR-08) was verified to keep the sample object output
+  byte-identical before and after.
+- Verified with `cmake --build` and `ctest` on 63 tests. Note: the EzDsl code-generation suites
+  share output paths and can race under `ctest -j`; run them serially (`-j1`) for a clean result.
+- Remaining P1/P2 findings across EzMir, EzTriple, EzDsl, EzCompiler and CrossProject are tracked
+  in their respective project files.
