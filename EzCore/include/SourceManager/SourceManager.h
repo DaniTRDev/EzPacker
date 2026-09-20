@@ -24,6 +24,11 @@ class SourceManager : public GenericSourceManager
      */
     ~SourceManager();
 
+    // Non-copyable: entries and map keys are raw pointers into the arena, so a copy would
+    // double-free and leave the copied map keys dangling. Ownership is always by pointer.
+    SourceManager(const SourceManager &) = delete;
+    SourceManager &operator=(const SourceManager &) = delete;
+
     /**
      * Checks if a source buffer with the given name or path exists in the path-to-ID lookup map.
      */
