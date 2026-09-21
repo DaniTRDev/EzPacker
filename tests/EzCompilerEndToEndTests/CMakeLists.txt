@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.27)
 
-# Helper tool to validate generated Linux ELF64 relocatable objects
+# Detect host operating system
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+    set(HOST_IS_WINDOWS TRUE)
+elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    set(HOST_IS_LINUX TRUE)
+else()
+    message(WARNING "Host OS (${CMAKE_HOST_SYSTEM_NAME}) is neither Windows nor Linux. Defaulting to Linux.")
+    set(HOST_IS_LINUX TRUE)
+endif()
+
+# Helper tool to validate generated ELF64 relocatable objects (built on Linux, or validated when cross-generating)
 add_executable(elf_validator elf_validator.c)
 
 set(E2E_TESTS
@@ -42,37 +52,45 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
         VERBATIM
     )
 
-    # 3. Compile and link C test harness with the generated Windows object file
+    # Select the host object to link into the native test runner
+    if(HOST_IS_WINDOWS)
+        set(HOST_OBJ "${WIN_OBJ}")
+    else()
+        set(HOST_OBJ "${LINUX_OBJ}")
+    endif()
+
+    # 3. Compile and link C test harness with the matching host object file
     add_custom_command(
         OUTPUT "${TEST_EXE}"
-        COMMAND "${CMAKE_C_COMPILER}" "${C_TEST_FILE}" "${WIN_OBJ}" -o "${TEST_EXE}"
-        DEPENDS "${C_TEST_FILE}" "${WIN_OBJ}"
-        COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_test (${TEST_NAME}_test.c + ${TEST_NAME}_win.obj)"
+        COMMAND "${CMAKE_C_COMPILER}" "${C_TEST_FILE}" "${HOST_OBJ}" -o "${TEST_EXE}"
+        DEPENDS "${C_TEST_FILE}" "${HOST_OBJ}"
+        COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_test (${TEST_NAME}_test.c + ${HOST_OBJ})"
         VERBATIM
     )
 
     list(APPEND ALL_E2E_OUTPUTS "${WIN_OBJ}" "${LINUX_OBJ}" "${TEST_EXE}")
 
-    # 4. Register CTest runtime test for Windows
+    # 4. Register CTest runtime test for the host executable
     add_test(
         NAME "EzCompilerEndToEnd_${TEST_NAME}"
         COMMAND "${TEST_EXE}"
     )
 
-    # 5. Register CTest ELF validation test for Linux
+    # 5. Register ELF validator test
     add_test(
         NAME "EzCompilerEndToEnd_${TEST_NAME}_ElfValidate"
         COMMAND elf_validator "${LINUX_OBJ}"
     )
 
-    if (WIN32)
+    # Apply Windows-specific environment path tweaks if running on Windows
+    if(HOST_IS_WINDOWS)
         set_tests_properties("EzCompilerEndToEnd_${TEST_NAME}" PROPERTIES
             ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${COMPILER_DIR}"
         )
         set_tests_properties("EzCompilerEndToEnd_${TEST_NAME}_ElfValidate" PROPERTIES
             ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${COMPILER_DIR}"
         )
-    endif ()
+    endif()
 endforeach()
 
 # Master CMake target for the end-to-end test suite
