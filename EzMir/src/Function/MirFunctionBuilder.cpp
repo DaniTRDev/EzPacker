@@ -57,7 +57,11 @@ MirFunctionBuilder &MirFunctionBuilder::addParamFront(MirFunction *func, MirRegi
  */
 MirFunctionBuilder &MirFunctionBuilder::addPhysRegUse(MirFunction *func, const class MirRegisterRef &ref)
 {
-    func->m_usedCalleeSavedRegs.push_back(ref);
+    if (std::find(func->m_usedCalleeSavedRegs.begin(), func->m_usedCalleeSavedRegs.end(), ref) ==
+        func->m_usedCalleeSavedRegs.end())
+    {
+        func->m_usedCalleeSavedRegs.push_back(ref);
+    }
     return *this;
 }
 

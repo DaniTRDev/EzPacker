@@ -299,10 +299,10 @@ void MirInstruction::eraseFromOwner()
                                       {
                                           return;
                                       }
-                                      if (flag & MirOperandFlag::Write)
-                                      {
-                                          regInfo->clearDef(reg->getRegId());
-                                      }
+                                       if (flag & MirOperandFlag::Write)
+                                       {
+                                           regInfo->clearDef(reg->getRegId(), this);
+                                       }
                                       if (flag & MirOperandFlag::Read)
                                       {
                                           regInfo->removeUse(reg->getRegId(), this);

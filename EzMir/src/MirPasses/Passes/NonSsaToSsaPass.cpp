@@ -36,8 +36,25 @@ MirPassIterationPlace NonSsaToSsaPass::getIterationPlace() const { return MirPas
  */
 MirPassResult NonSsaToSsaPass::run(IntrusiveLinkedList<MirFunction>::const_iterator it, MirPassManager *passManager)
 {
-    CodeFlowResult *cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
     MirFunction *func = *it;
+
+    // If the function already contains PHI nodes, it is already in SSA form.
+    // Running SSA reconstruction would destroy existing PHI operand mappings.
+    for (const MirBlock *block : func->getBlocks())
+    {
+        for (const MirInstruction *inst : block->getInstructions())
+        {
+            if (inst->hasOpcode(MirInstructionOpCode::PHI))
+            {
+                m_ctx->getDiagCollector()->trace("NonSsaToSsaPass",
+                                                 "Function '{}' already contains PHI nodes; skipping SSA construction",
+                                                 func->getName());
+                return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = true };
+            }
+        }
+    }
+
+    CodeFlowResult *cfg = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx)->getResult();
 
     m_ctx->getDiagCollector()->trace("NonSsaToSsaPass", "--- Starting SSA Construction for function ---");
 
@@ -92,6 +109,19 @@ NonSsaToSsaPass::createPhiInstruction(MirInstructionBuilder *iBuilder, MirId reg
 void NonSsaToSsaPass::buildVirtualRegDefPlaces(MirFunction *func)
 {
     auto &defSites = m_result.m_defSites;
+
+    if (func->getEntryPoint())
+    {
+        MirId entryId = func->getEntryPoint()->getId();
+        for (MirRegister *param : func->getParameters())
+        {
+            if (param && param->isVirtual())
+            {
+                defSites[param->getRegId()].insert(entryId);
+            }
+        }
+    }
+
     for (const MirBlock *block : func->getBlocks())
     {
         MirId bId = block->getId();
@@ -434,6 +464,20 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
 
         MirInstructionBuilder iBuilder(m_ctx, block, InsertionType::Append);
         std::pmr::vector<MirId> pushedRegisters(m_resc);
+
+        // --- 0. Initialize function parameters at entry block ---
+        if (func->getEntryPoint() && blockId == func->getEntryPoint()->getId())
+        {
+            for (MirRegister *param : func->getParameters())
+            {
+                if (param && param->isVirtual())
+                {
+                    MirId pId = param->getRegId();
+                    varStacks[pId].push_back(param);
+                    pushedRegisters.push_back(pId);
+                }
+            }
+        }
 
         // --- A. Process PHI destinations ---
         for (MirInstruction *inst : block->getInstructions())

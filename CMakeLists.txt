@@ -59,6 +59,7 @@ if (EZPACKER_BUILD_TESTS)
     add_subdirectory(tests/EzTripleTestSuite)
     add_subdirectory(tests/EzCodeEmitterTestSuite)
     add_subdirectory(tests/EzCompilerTestSuite)
+    add_subdirectory(tests/EzCompilerEndToEndTests)
 
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
 endif ()

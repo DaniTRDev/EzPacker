@@ -590,11 +590,7 @@ bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx
         }
 
         const auto &paramNameTok = lexer.nextToken();
-        std::string_view paramName = paramNameTok.m_strVal;
-        if (paramName.empty())
-        {
-            paramName = paramNameTok.m_text;
-        }
+        std::string_view paramName = paramNameTok.m_text.empty() ? paramNameTok.m_strVal : paramNameTok.m_text;
 
         MirRegister *paramReg = opBuilder.buildVReg(paramType, paramName, paramNameTok.m_ref);
         params.push_back(paramReg);

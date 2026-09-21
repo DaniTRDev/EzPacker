@@ -448,7 +448,7 @@ void MirInstructionBuilder::unregisterOperand(MirInstruction *instr, MirOperand 
                                                   return;
 
                                               if (effectiveFlag & MirOperandFlag::Write)
-                                                  regInfo->clearDef(reg->getRegId());
+                                                  regInfo->clearDef(reg->getRegId(), instr);
 
                                               if (effectiveFlag & MirOperandFlag::Read)
                                                   regInfo->removeUse(reg->getRegId(), instr);

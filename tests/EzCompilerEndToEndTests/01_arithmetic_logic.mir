@@ -1,0 +1,46 @@
+; Test Suite: 01_arithmetic_logic.mir
+; Tests 64-bit and 32-bit arithmetic, multiplication, and bitwise logic operations.
+
+fn @add_sub_64(i64 %a, i64 %b, i64 %c) -> i64 {
+entry:
+    %sum = ADD i64 %a, %b;
+    %diff = SUB i64 %sum, %c;
+    RET i64 %diff;
+}
+
+fn @mul_add_64(i64 %a, i64 %b, i64 %c) -> i64 {
+entry:
+    %prod = IMUL i64 %a, %b;
+    %res = ADD i64 %prod, %c;
+    RET i64 %res;
+}
+
+fn @bitwise_chain_64(i64 %a, i64 %b, i64 %c) -> i64 {
+entry:
+    %and_val = AND i64 %a, %b;
+    %or_val = OR i64 %and_val, %c;
+    %res = XOR i64 %or_val, %a;
+    RET i64 %res;
+}
+
+fn @arithmetic_32(i32 %a, i32 %b, i32 %c) -> i32 {
+entry:
+    %sum = ADD i32 %a, %b;
+    %prod = IMUL i32 %sum, %c;
+    RET i32 %prod;
+}
+
+fn @bitwise_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %and_val = AND i32 %a, %b;
+    %xor_val = XOR i32 %a, %b;
+    %res = OR i32 %and_val, %xor_val;
+    RET i32 %res;
+}
+
+fn @sub_from_zero_64(i64 %a) -> i64 {
+entry:
+    %zero = MOV i64 0;
+    %neg = SUB i64 %zero, %a;
+    RET i64 %neg;
+}

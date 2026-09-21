@@ -53,7 +53,18 @@ void MirParserContext::enterFunction(MirFunction *func)
     {
         if (param && !param->getName().empty())
         {
-            m_registers[param->getName()] = param;
+            std::string_view pName = param->getName();
+            m_registers.insert_or_assign(std::pmr::string(pName, m_arena), param);
+            if (pName.starts_with("%"))
+            {
+                m_registers.insert_or_assign(std::pmr::string(pName.substr(1), m_arena), param);
+            }
+            else
+            {
+                std::pmr::string withPct("%", m_arena);
+                withPct += pName;
+                m_registers.insert_or_assign(withPct, param);
+            }
         }
     }
 
@@ -239,15 +250,15 @@ MirRegister *MirParserContext::declareRegister(std::string_view name,
                                                SourceReference *ref,
                                                MirRegisterClass *regClass)
 {
-    auto it = m_registers.find(name);
-    if (it != m_registers.end())
+    MirRegister *existing = resolveRegister(name, ref);
+    if (existing)
     {
         if (m_diag)
         {
             m_diag->error("MirParser", "Redefinition of register '%{}'", name) << ref;
         }
         recordError();
-        return it->second;
+        return existing;
     }
 
     MirRegister *reg = materializeRegister(name, type, ref, regClass);
@@ -265,6 +276,24 @@ MirRegister *MirParserContext::resolveRegister(std::string_view name, SourceRefe
     {
         return it->second;
     }
+    if (name.starts_with("%"))
+    {
+        auto itWithout = m_registers.find(name.substr(1));
+        if (itWithout != m_registers.end())
+        {
+            return itWithout->second;
+        }
+    }
+    else
+    {
+        std::pmr::string withPct("%", m_arena);
+        withPct += name;
+        auto itWith = m_registers.find(withPct);
+        if (itWith != m_registers.end())
+        {
+            return itWith->second;
+        }
+    }
     return nullptr;
 }
 
@@ -277,10 +306,10 @@ MirRegister *MirParserContext::getOrCreateRegister(std::string_view name,
                                                    SourceReference *ref,
                                                    MirRegisterClass *regClass)
 {
-    auto it = m_registers.find(name);
-    if (it != m_registers.end())
+    MirRegister *existing = resolveRegister(name, ref);
+    if (existing)
     {
-        return it->second;
+        return existing;
     }
 
     MirRegister *reg = materializeRegister(name, type, ref, regClass);

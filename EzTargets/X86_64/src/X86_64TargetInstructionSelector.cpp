@@ -590,7 +590,20 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
 
         // An undefined virtual register (an SSA "undef" phantom) has no reaching definition, so
         // there is nothing to move; detect it from the SSA metadata rather than the register name.
-        const bool isUndefined = inReg->isVirtual() && regInfo && regInfo->getDef(inReg->getRegId()) == nullptr;
+        bool isParam = false;
+        if (func)
+        {
+            for (MirRegister *param : func->getParameters())
+            {
+                if (param && param->getRegId() == inReg->getRegId())
+                {
+                    isParam = true;
+                    break;
+                }
+            }
+        }
+        const bool isUndefined = inReg->getName() == "undef" ||
+                (!isParam && inReg->isVirtual() && regInfo && regInfo->getDef(inReg->getRegId()) == nullptr);
         if (isUndefined)
         {
             continue;
@@ -605,7 +618,13 @@ bool X86_64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInstr
         auto it = predBlock->getInstructions().end();
         for (auto bit = predBlock->getInstructions().begin(); bit != predBlock->getInstructions().end(); ++bit)
         {
-            bool isBr = bool((*bit)->getFlags() & MirInstructionFlags::IsBranch) ||
+            MirInstructionFlags flags = (*bit)->getFlags();
+            if ((*bit)->getTargetDesc())
+            {
+                flags = (*bit)->getTargetDesc()->getTargetFlags();
+            }
+            bool isBr = bool(flags & MirInstructionFlags::IsBranch) ||
+                    bool(flags & MirInstructionFlags::IsTerminator) ||
                     ((*bit)->getOpCode() == MirInstructionOpCode::JMP) ||
                     ((*bit)->getOpCode() == MirInstructionOpCode::BR_COND);
             if (isBr)

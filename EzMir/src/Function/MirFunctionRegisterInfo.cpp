@@ -37,13 +37,16 @@ size_t MirFunctionRegisterInfo::getUseCount(MirId regId) const
 /**
  * Clears the recorded defining instruction for the register if it is tracked.
  */
-void MirFunctionRegisterInfo::clearDef(MirId regId)
+void MirFunctionRegisterInfo::clearDef(MirId regId, class MirInstruction *inst)
 {
     auto it = m_vregs.find(regId);
     if (it == m_vregs.end())
         return;
 
-    it->second.m_defInst = nullptr;
+    if (inst == nullptr || it->second.m_defInst == inst)
+    {
+        it->second.m_defInst = nullptr;
+    }
 }
 
 /**

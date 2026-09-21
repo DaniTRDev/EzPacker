@@ -3,6 +3,7 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirTargetInstructionDesc.h"
 #include "MirPasses/MirPassManager.h"
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "Operand/MirOperands.h"
@@ -174,6 +175,10 @@ MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_
         for (const MirInstruction *inst : instructions)
         {
             MirInstructionFlags flags = inst->getFlags();
+            if (inst->getTargetDesc())
+            {
+                flags = flags | inst->getTargetDesc()->getTargetFlags();
+            }
             if (flags & MirInstructionFlags::IsBranch)
             {
                 bool foundAnyTarget = false;

@@ -52,11 +52,29 @@ bool MirInstructionSelector::selectFunction(MirBuilderContext *ctx, MirFunction 
     m_currentFunction = func;
 
     bool allOk = true;
-    for (MirBlock *block : func->getBlocks())
+    bool progress = true;
+    while (progress)
     {
-        if (!selectBlock(ctx, block))
+        progress = false;
+        for (MirBlock *block : func->getBlocks())
         {
-            allOk = false;
+            bool hasUnselected = false;
+            for (MirInstruction *inst : block->getInstructions())
+            {
+                if (!inst->isSelected() && inst->getTargetDesc() == nullptr)
+                {
+                    hasUnselected = true;
+                    break;
+                }
+            }
+            if (hasUnselected)
+            {
+                progress = true;
+                if (!selectBlock(ctx, block))
+                {
+                    allOk = false;
+                }
+            }
         }
     }
     return allOk;

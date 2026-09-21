@@ -1,0 +1,41 @@
+; Test Suite: 04_memory_access.mir
+; Tests load and store operations with pointer offsets and buffer manipulations.
+
+fn @mem_read_write(ptr %buf, i64 %val) -> i64 {
+entry:
+    STORE [ptr %buf + 0], i64 %val;
+    %read_back = LOAD i64 [ptr %buf + 0];
+    RET i64 %read_back;
+}
+
+fn @mem_accumulate(ptr %buf) -> i64 {
+entry:
+    %v0 = LOAD i64 [ptr %buf + 0];
+    %v1 = LOAD i64 [ptr %buf + 8];
+    %v2 = LOAD i64 [ptr %buf + 16];
+    %s0 = ADD i64 %v0, %v1;
+    %total = ADD i64 %s0, %v2;
+    RET i64 %total;
+}
+
+fn @mem_swap(ptr %buf) -> i64 {
+entry:
+    %a = LOAD i64 [ptr %buf + 0];
+    %b = LOAD i64 [ptr %buf + 8];
+    STORE [ptr %buf + 0], i64 %b;
+    STORE [ptr %buf + 8], i64 %a;
+    %zero = MOV i64 0;
+    RET i64 %zero;
+}
+
+fn @mem_scale_elements(ptr %buf, i64 %factor) -> i64 {
+entry:
+    %v0 = LOAD i64 [ptr %buf + 0];
+    %v1 = LOAD i64 [ptr %buf + 8];
+    %s0 = IMUL i64 %v0, %factor;
+    %s1 = IMUL i64 %v1, %factor;
+    STORE [ptr %buf + 0], i64 %s0;
+    STORE [ptr %buf + 8], i64 %s1;
+    %zero = MOV i64 0;
+    RET i64 %zero;
+}

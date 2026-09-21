@@ -1,0 +1,40 @@
+; Test Suite: 03_calling_conventions.mir
+; Tests argument passing (1, 2, 3, 4 arguments) and internal function calls.
+
+fn @call_unary(i64 %a) -> i64 {
+entry:
+    %c = MOV i64 10;
+    %res = ADD i64 %a, %c;
+    RET i64 %res;
+}
+
+fn @call_binary(i64 %a, i64 %b) -> i64 {
+entry:
+    %sum = ADD i64 %a, %b;
+    %diff = SUB i64 %a, %b;
+    %res = IMUL i64 %sum, %diff;
+    RET i64 %res;
+}
+
+fn @call_ternary(i64 %a, i64 %b, i64 %c) -> i64 {
+entry:
+    %ab = ADD i64 %a, %b;
+    %res = ADD i64 %ab, %c;
+    RET i64 %res;
+}
+
+fn @call_quaternary(i64 %a, i64 %b, i64 %c, i64 %d) -> i64 {
+entry:
+    %ab = ADD i64 %a, %b;
+    %cd = ADD i64 %c, %d;
+    %res = IMUL i64 %ab, %cd;
+    RET i64 %res;
+}
+
+fn @call_composite(i64 %x, i64 %y) -> i64 {
+entry:
+    %u = CALL i64 @call_unary, %x;
+    %b = CALL i64 @call_binary, %x, %y;
+    %res = ADD i64 %u, %b;
+    RET i64 %res;
+}

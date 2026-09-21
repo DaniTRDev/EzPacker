@@ -98,6 +98,26 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
                 }
             }
 
+            // In 2-address architectures (like x86-64), instructions dst = src1 OP src2 copy src1
+            // into dst before the operation. If dst shares a physical register with src2 (operand index >= 2),
+            // materializing the move would destroy src2 before it can be read.
+            if (defs.size() == 1 && inst->getOperandCount() >= 3)
+            {
+                const MirRegisterRef &defReg = defs[0];
+                for (size_t i = 2; i < inst->getOperandCount(); ++i)
+                {
+                    if (inst->getOperand(i) && inst->getOperand(i)->isOfType<MirRegister>())
+                    {
+                        MirRegisterRef srcReg = inst->getOperand(i)->get<MirRegister>()->getRef();
+                        if (defReg != srcReg)
+                        {
+                            addNode(defReg, ctx).insert(srcReg);
+                            addNode(srcReg, ctx).insert(defReg);
+                        }
+                    }
+                }
+            }
+
             // Erase DEFs from live set
             for (const MirRegisterRef &defRegRef : defs)
             {

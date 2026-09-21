@@ -56,9 +56,9 @@ class MirFunctionRegisterInfo
     size_t getUseCount(MirId regId) const;
 
     /**
-     * Clears the definition of the given register.
+     * Clears the definition of the given register (optionally only if defined by inst).
      */
-    void clearDef(MirId regId);
+    void clearDef(MirId regId, class MirInstruction *inst = nullptr);
 
     /**
      * Records a definition of the given register by the given instruction.
