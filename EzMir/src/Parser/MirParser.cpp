@@ -94,6 +94,15 @@ bool MirParser::matchToken(Parser::MirLexer &lexer, Parser::MirTokenKind kind, s
  */
 Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserContext &pCtx)
 {
+    if (lexer.isAtEnd())
+    {
+        if (m_diag)
+        {
+            m_diag->error("MirParser", "Unexpected end of input while parsing type");
+        }
+        return nullptr;
+    }
+
     const auto &tok = lexer.peekToken();
     auto *mr = pCtx.getArena();
     std::pmr::polymorphic_allocator<Ast::MirAstType> alloc(mr);
@@ -162,44 +171,48 @@ Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserConte
     // Void type
     if (tok.m_kind == Parser::MirTokenKind::TypeVoid)
     {
-        lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Void;
         astType->m_name = "void";
         astType->m_ref = tok.m_ref;
+
+        lexer.nextToken();
         return astType;
     }
 
     // Token type
     if (tok.m_kind == Parser::MirTokenKind::TypeToken)
     {
-        lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Token;
         astType->m_name = tok.m_text;
         astType->m_ref = tok.m_ref;
+
+        lexer.nextToken();
         return astType;
     }
 
     // Primitive integer / float types: i1..i256, f32..f128
     if (tok.m_kind >= Parser::MirTokenKind::TypeI1 && tok.m_kind <= Parser::MirTokenKind::TypeF128)
     {
-        lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Primitive;
         astType->m_name = tok.m_text;
         astType->m_ref = tok.m_ref;
+
+        lexer.nextToken();
         return astType;
     }
 
     // Unknown or identifier type
     if (tok.m_kind == Parser::MirTokenKind::Identifier)
     {
-        lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Primitive;
         astType->m_name = tok.m_text;
         astType->m_ref = tok.m_ref;
+
+        lexer.nextToken();
         return astType;
     }
 

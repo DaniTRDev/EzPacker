@@ -15,19 +15,18 @@ set(EZCOMPILER_LIB_FILES_LIST
         "src/FrontendAdapter.cpp"
         "src/CompilationPipeline.cpp"
         "src/EmissionEngine.cpp"
-        "src/Targets/X86_64TargetRegistration.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzCompilerLib"
         FILE_LIST ${EZCOMPILER_LIB_FILES_LIST}
         PRECOMPILED_HEADER "include/EzCompilerCommon.h"
-        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;argparse;EzTargetsX86_64"
-        INCLUDED_DIRS "include;../EzCodeEmitter/include;../EzTriple/include;../EzMir/include;../EzCore/include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/include"
+        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;argparse"
+        INCLUDED_DIRS "include;../EzCodeEmitter/include;../EzTriple/include;../EzMir/include;../EzCore/include"
 )
 
 EzCMK_AddExecutable(NAME "ezc"
         FILE_LIST "src/Main.cpp"
         PRECOMPILED_HEADER "include/EzCompilerCommon.h"
-        LINKED_LIBRARIES "EzCompilerLib"
-        INCLUDED_DIRS "include"
+        LINKED_LIBRARIES "EzCompilerLib;EzTargetsX86_64Registration"
+        INCLUDED_DIRS "include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/Registration/include"
 )

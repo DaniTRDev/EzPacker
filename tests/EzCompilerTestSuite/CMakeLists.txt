@@ -6,8 +6,8 @@ set(EZCOMPILERTESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzCompilerTestSuite"
         FILE_LIST ${EZCOMPILERTESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER ""
-        LINKED_LIBRARIES "EzCompilerLib;EzTriple;EzMir;EzCore;EzCodeEmitter;gtest;GTest::gtest_main"
-        INCLUDED_DIRS "include;../../EzCompiler/include;../../EzCodeEmitter/include;../../EzTriple/include;../../EzMir/include;../../EzCore/include"
+        LINKED_LIBRARIES "EzCompilerLib;EzTargetsX86_64Registration;EzTriple;EzMir;EzCore;EzCodeEmitter;gtest;GTest::gtest_main"
+        INCLUDED_DIRS "include;../../EzCompiler/include;../../EzCodeEmitter/include;../../EzTriple/include;../../EzMir/include;../../EzCore/include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/Registration/include"
 )
 
 EzPacker_AddTest(
