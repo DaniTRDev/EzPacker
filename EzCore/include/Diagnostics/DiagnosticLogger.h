@@ -12,10 +12,10 @@ class DiagnosticLogger : public DiagnosticListener
 {
   public:
     /**
-     * Creates the logger linked to the given source manager.
-
+     * Creates the logger linked to the given source manager. If outLogPath is not empty, a new file will be created and
+     * its content will be filled with the logs notified to this class.
      */
-    DiagnosticLogger(class SourceManager *sourceManager);
+    DiagnosticLogger(class SourceManager *sourceManager, std::string outLogPath = "");
 
     /**
      * Method called when a new diagnostic message is emitted. It will log its content using EzLogger. Depending on

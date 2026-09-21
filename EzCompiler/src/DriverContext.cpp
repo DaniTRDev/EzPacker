@@ -18,13 +18,27 @@ bool DriverContext::initialize()
         workingDir = std::filesystem::path(".");
     }
 
+    const auto &outDiagPath = m_options.diagOutFilePath;
     m_sourceManager = std::make_unique<SourceManager>(workingDir, &m_sessionArena);
     m_diagCollector = std::make_unique<DiagnosticCollector>();
-    m_diagLogger = std::make_unique<DiagnosticLogger>(m_sourceManager.get());
+    m_diagLogger = std::make_unique<DiagnosticLogger>(m_sourceManager.get(), outDiagPath);
 
     // Apply the requested severity threshold to the collector (default keeps error+warning).
-    DiagnosticMessageType enabled = static_cast<DiagnosticMessageType>(
-            DiagnosticMessageType::Diag_Error | DiagnosticMessageType::Diag_Warning);
+    DiagnosticMessageType enabled =
+            static_cast<DiagnosticMessageType>(DiagnosticMessageType::Diag_Error | DiagnosticMessageType::Diag_Warning);
+
+    if (m_options.verbose)
+    {
+        enabled = static_cast<DiagnosticMessageType>(enabled | DiagnosticMessageType::Diag_Trace |
+                                                     DiagnosticMessageType::Diag_Debug);
+        m_diagCollector->trace("DriverContext", "Verbose mode enabled");
+    }
+
+    if (!outDiagPath.empty())
+    {
+        m_diagCollector->trace("DriverContext", "Dumping diagnostics to file path: {}", outDiagPath);
+    }
+
     switch (m_options.diagThreshold)
     {
         case DiagnosticMessageType::Diag_Error:
@@ -34,8 +48,8 @@ bool DriverContext::initialize()
             enabled = static_cast<DiagnosticMessageType>(enabled | DiagnosticMessageType::Diag_Trace);
             break;
         case DiagnosticMessageType::Diag_Debug:
-            enabled = static_cast<DiagnosticMessageType>(
-                    enabled | DiagnosticMessageType::Diag_Trace | DiagnosticMessageType::Diag_Debug);
+            enabled = static_cast<DiagnosticMessageType>(enabled | DiagnosticMessageType::Diag_Trace |
+                                                         DiagnosticMessageType::Diag_Debug);
             break;
         default:
             break;

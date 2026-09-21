@@ -39,6 +39,7 @@ struct CommandLineOptions
 {
     std::string inputFilePath;                            ///< Source/IR file to compile.
     std::string outputFilePath;                           ///< Destination file path.
+    std::string diagOutFilePath;                          ///< Destination of the diagnostic log file.
     TargetTriple target{ TargetTriple::getHostTriple() }; ///< Requested target triple.
     EmissionStage emissionStage{ EmissionStage::Object }; ///< Stage at which compilation stops.
     OptimizationLevel optLevel{ OptimizationLevel::O0 };  ///< Requested optimization level.

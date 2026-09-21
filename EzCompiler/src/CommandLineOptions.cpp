@@ -80,6 +80,11 @@ void CommandLineParser::setupArguments()
             .metavar("<level>")
             .default_value(std::string("warning"));
 
+    m_program->add_argument("--diag-out")
+            .help("Sets the output file for diagnostics")
+            .metavar("<path>")
+            .default_value(std::string(""));
+
     m_program->add_argument("-V", "--version")
             .help("Print version information")
             .default_value(false)
@@ -190,8 +195,8 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
     const bool opt1 = m_program->get<bool>("-O1");
     const bool opt2 = m_program->get<bool>("-O2");
     const bool optS = m_program->get<bool>("-Os");
-    const int optFlagCount = static_cast<int>(opt0) + static_cast<int>(opt1) + static_cast<int>(opt2) +
-            static_cast<int>(optS);
+    const int optFlagCount =
+            static_cast<int>(opt0) + static_cast<int>(opt1) + static_cast<int>(opt2) + static_cast<int>(optS);
     if (optFlagCount > 1)
     {
         outError = "conflicting optimization flags: choose at most one of -O0, -O1, -O2, -Os";
@@ -245,6 +250,9 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
         outError = "unknown diagnostic level '" + diagLvl + "': expected error, warning, trace or debug";
         return false;
     }
+
+    std::string outDiagPath = m_program->get<std::string>("--diag-out");
+    outOptions.diagOutFilePath = outDiagPath;
 
     return true;
 }

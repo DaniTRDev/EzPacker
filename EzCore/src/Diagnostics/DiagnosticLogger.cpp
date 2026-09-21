@@ -5,8 +5,8 @@
 /**
  * Creates the source manager lookup and the synchronous EzLogger sink used for output.
  */
-DiagnosticLogger::DiagnosticLogger(class SourceManager *sourceManager) :
-    m_sourceManager(sourceManager), m_logger(EzLogger::createSyncLogger("EzPacker"))
+DiagnosticLogger::DiagnosticLogger(class SourceManager *sourceManager, std::string outLogPath) :
+    m_sourceManager(sourceManager), m_logger(EzLogger::createSyncLogger("EzPacker", outLogPath))
 {
 }
 
