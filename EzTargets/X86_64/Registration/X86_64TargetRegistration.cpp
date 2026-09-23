@@ -21,12 +21,14 @@ void registerTarget()
             "x86_64",
             [](const EzCompiler::TargetTriple &triple,
                MirBuilderContext *mirCtx,
-               bool isPositionIndependent) -> EzCompiler::ResolvedTarget
+               bool isPositionIndependent,
+               const std::vector<std::string> &features) -> EzCompiler::ResolvedTarget
             {
                 EzCompiler::ResolvedTarget result;
 
                 auto target = std::make_unique<EzTargets::X86_64::X86_64TargetDesc>(mirCtx);
                 target->setPositionIndependent(isPositionIndependent);
+                target->applyFeatures(features);
                 target->initialize();
 
                 // Select the object format from the triple's own predicates: Windows maps to

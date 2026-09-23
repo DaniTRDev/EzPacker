@@ -73,3 +73,52 @@ TEST_F(EzCompilerTestSuite, TestTargetResolverResolution)
     EXPECT_STREQ(ctxWin.getCallingConv()->getName(), "Win64");
     EXPECT_STREQ(ctxWin.getBinaryDesc()->getName(), "x86_64-coff");
 }
+
+// Verifies target features specified via CommandLineOptions are applied to the resolved TargetDesc.
+TEST_F(EzCompilerTestSuite, TestTargetResolverFeatures)
+{
+    // Test 1: Enable AVX
+    {
+        CommandLineOptions opt;
+        opt.target = TargetTriple::parse("x86_64-pc-windows-msvc");
+        opt.targetFeatures = {"+avx"};
+
+        DriverContext ctx(opt);
+        EXPECT_TRUE(ctx.initialize());
+        ASSERT_NE(ctx.getTargetDesc(), nullptr);
+
+        EXPECT_TRUE(ctx.getTargetDesc()->hasExtension("sse2"));
+        EXPECT_TRUE(ctx.getTargetDesc()->hasExtension("avx"));
+        EXPECT_FALSE(ctx.getTargetDesc()->hasExtension("avx2"));
+    }
+
+    // Test 2: Enable AVX2 then disable AVX (avx2 must be torn down recursively)
+    {
+        CommandLineOptions opt;
+        opt.target = TargetTriple::parse("x86_64-pc-windows-msvc");
+        opt.targetFeatures = {"+avx2", "-avx"};
+
+        DriverContext ctx(opt);
+        EXPECT_TRUE(ctx.initialize());
+        ASSERT_NE(ctx.getTargetDesc(), nullptr);
+
+        EXPECT_FALSE(ctx.getTargetDesc()->hasExtension("avx2"));
+        EXPECT_FALSE(ctx.getTargetDesc()->hasExtension("avx"));
+        EXPECT_TRUE(ctx.getTargetDesc()->hasExtension("sse2"));
+    }
+
+    // Test 3: Disable baseline SSE (sse2 also disabled because sse2 implies sse)
+    {
+        CommandLineOptions opt;
+        opt.target = TargetTriple::parse("x86_64-pc-windows-msvc");
+        opt.targetFeatures = {"-sse"};
+
+        DriverContext ctx(opt);
+        EXPECT_TRUE(ctx.initialize());
+        ASSERT_NE(ctx.getTargetDesc(), nullptr);
+
+        EXPECT_FALSE(ctx.getTargetDesc()->hasExtension("sse"));
+        EXPECT_FALSE(ctx.getTargetDesc()->hasExtension("sse2"));
+    }
+}
+

@@ -21,7 +21,10 @@ void TargetResolver::registerTarget(std::string_view arch, TargetFactory factory
     targetRegistry().add(arch, std::move(factory));
 }
 
-ResolvedTarget TargetResolver::resolve(const TargetTriple &triple, MirBuilderContext *mirCtx, bool isPositionIndependent)
+ResolvedTarget TargetResolver::resolve(const TargetTriple &triple,
+                                      MirBuilderContext *mirCtx,
+                                      bool isPositionIndependent,
+                                      const std::vector<std::string> &features)
 {
     TargetFactory factory = targetRegistry().find(triple.getArch());
     if (!factory)
@@ -30,7 +33,7 @@ ResolvedTarget TargetResolver::resolve(const TargetTriple &triple, MirBuilderCon
         return {};
     }
 
-    return factory(triple, mirCtx, isPositionIndependent);
+    return factory(triple, mirCtx, isPositionIndependent, features);
 }
 
 } // namespace EzCompiler

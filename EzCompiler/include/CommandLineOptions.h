@@ -49,6 +49,7 @@ struct CommandLineOptions
     bool timePasses{ false };            ///< Reports per-pass execution times.
     bool isPositionIndependent{ false }; ///< Generates position-independent code.
     DiagnosticMessageType diagThreshold{ DiagnosticMessageType::Diag_Warning }; ///< Minimum reported severity.
+    std::vector<std::string> targetFeatures; ///< Target feature modifiers (e.g. "+avx", "-sse").
 };
 
 /**

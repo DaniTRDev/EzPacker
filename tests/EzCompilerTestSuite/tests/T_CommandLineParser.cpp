@@ -148,3 +148,49 @@ TEST_F(EzCompilerTestSuite, TestUnknownDiagLevelRejected)
     EXPECT_TRUE(parser.parse(valid, options, err));
     EXPECT_EQ(options.diagThreshold, DiagnosticMessageType::Diag_Trace);
 }
+
+// Target feature flags: --target-feature, -mattr, and -m<feature> / -mno-<feature>
+TEST_F(EzCompilerTestSuite, TestTargetFeatureCommandLineOptions)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
+
+    // 1. --target-feature
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "--target-feature", "+avx", "--target-feature", "-sse" };
+        EXPECT_TRUE(parser.parse(args, options, err)) << "Parse error: " << err;
+        ASSERT_EQ(options.targetFeatures.size(), 2u);
+        EXPECT_EQ(options.targetFeatures[0], "+avx");
+        EXPECT_EQ(options.targetFeatures[1], "-sse");
+    }
+
+    // 2. -mattr
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "-mattr=+avx2,-sse4.1" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        ASSERT_EQ(options.targetFeatures.size(), 2u);
+        EXPECT_EQ(options.targetFeatures[0], "+avx2");
+        EXPECT_EQ(options.targetFeatures[1], "-sse4.1");
+    }
+
+    // 3. Dynamic machine flags: -mavx, -mno-avx, -msse2
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "-mavx", "-mno-sse" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        ASSERT_EQ(options.targetFeatures.size(), 2u);
+        EXPECT_EQ(options.targetFeatures[0], "+avx");
+        EXPECT_EQ(options.targetFeatures[1], "-sse");
+    }
+
+    // 4. Combined machine flags, --target-feature, and -mattr
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "-mavx", "--target-feature", "+sse4.2", "-mattr=+bmi" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        ASSERT_EQ(options.targetFeatures.size(), 3u);
+        EXPECT_EQ(options.targetFeatures[0], "+avx");
+        EXPECT_EQ(options.targetFeatures[1], "+sse4.2");
+        EXPECT_EQ(options.targetFeatures[2], "+bmi");
+    }
+}
+

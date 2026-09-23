@@ -66,7 +66,8 @@ bool DriverContext::initialize()
             std::make_unique<MirBuilderContext>(nullptr, m_diagCollector.get(), m_typeTable.get(), &m_sessionArena);
 
     // Select concrete target descriptors for the requested triple.
-    auto resolved = TargetResolver::resolve(m_options.target, m_builderCtx.get(), m_options.isPositionIndependent);
+    auto resolved = TargetResolver::resolve(
+            m_options.target, m_builderCtx.get(), m_options.isPositionIndependent, m_options.targetFeatures);
     if (!resolved.m_targetDesc)
     {
         return false;

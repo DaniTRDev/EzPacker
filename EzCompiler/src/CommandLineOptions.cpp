@@ -1,5 +1,7 @@
 #include "CommandLineOptions.h"
+#include <format>
 #include <iostream>
+#include <sstream>
 
 namespace EzCompiler
 {
@@ -85,6 +87,16 @@ void CommandLineParser::setupArguments()
             .metavar("<path>")
             .default_value(std::string(""));
 
+    m_program->add_argument("--target-feature")
+            .help("Enable or disable target features (e.g. +avx2, -sse)")
+            .append()
+            .default_value(std::vector<std::string>{});
+
+    m_program->add_argument("-mattr")
+            .help("Target-specific attributes/extensions string (e.g. +avx2,-sse)")
+            .metavar("<features>")
+            .default_value(std::string(""));
+
     m_program->add_argument("-V", "--version")
             .help("Print version information")
             .default_value(false)
@@ -109,9 +121,77 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
     setupArguments();
     outOptions = CommandLineOptions();
 
+    std::vector<std::string> filteredArgs;
+    filteredArgs.reserve(args.size());
+    std::vector<std::string> extractedFeatures;
+
+    for (size_t i = 0; i < args.size(); ++i)
+    {
+        const auto &arg = args[i];
+
+        if (arg == "--target-feature")
+        {
+            if (i + 1 < args.size())
+            {
+                extractedFeatures.push_back(args[++i]);
+            }
+            continue;
+        }
+        if (arg.rfind("--target-feature=", 0) == 0)
+        {
+            extractedFeatures.push_back(arg.substr(17));
+            continue;
+        }
+        if (arg == "-mattr")
+        {
+            if (i + 1 < args.size())
+            {
+                std::stringstream ss(args[++i]);
+                std::string item;
+                while (std::getline(ss, item, ','))
+                {
+                    if (!item.empty())
+                    {
+                        extractedFeatures.push_back(std::move(item));
+                    }
+                }
+            }
+            continue;
+        }
+        if (arg.rfind("-mattr=", 0) == 0)
+        {
+            std::stringstream ss(arg.substr(7));
+            std::string item;
+            while (std::getline(ss, item, ','))
+            {
+                if (!item.empty())
+                {
+                    extractedFeatures.push_back(std::move(item));
+                }
+            }
+            continue;
+        }
+
+        // Extract dynamic -m machine feature flags (e.g. -mavx, -mno-avx, -msse2)
+        if (arg.rfind("-m", 0) == 0 && arg != "-m")
+        {
+            std::string_view featureName = std::string_view(arg).substr(2); // strip "-m"
+            if (featureName.rfind("no-", 0) == 0)
+            {
+                extractedFeatures.push_back(std::format("-{}", featureName.substr(3)));
+            }
+            else
+            {
+                extractedFeatures.push_back(std::format("+{}", featureName));
+            }
+            continue;
+        }
+        filteredArgs.push_back(arg);
+    }
+
     try
     {
-        m_program->parse_args(args);
+        m_program->parse_args(filteredArgs);
     }
     catch (const std::exception &err)
     {
@@ -253,6 +333,9 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
 
     std::string outDiagPath = m_program->get<std::string>("--diag-out");
     outOptions.diagOutFilePath = outDiagPath;
+
+    // Target features collected from --target-feature, -mattr, and dynamic -m flags
+    outOptions.targetFeatures = std::move(extractedFeatures);
 
     return true;
 }
