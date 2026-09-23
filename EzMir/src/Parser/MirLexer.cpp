@@ -1,5 +1,6 @@
 #include "Parser/MirLexer.h"
 #include "Parser/MirParserContext.h"
+#include "Diagnostics/DiagnosticCollector.h"
 #include <charconv>
 #include <cctype>
 
@@ -89,15 +90,62 @@ void MirLexer::skipWhitespaceAndComments()
             continue;
         }
 
-        // LLVM style single-line comment: ; ... (only when at start of line)
-        if (c == ';' && atStartOfLine)
+        // C-style block comment: /* ... */
+        if (c == '/' && peekNextChar() == '*')
         {
-            ++m_cursor;
-            while (m_cursor < m_source.size() && m_source[m_cursor] != '\n')
+            m_cursor += 2;
+            while (m_cursor < m_source.size())
             {
+                if (m_source[m_cursor] == '*' && peekNextChar() == '/')
+                {
+                    m_cursor += 2;
+                    break;
+                }
+                if (m_source[m_cursor] == '\n')
+                {
+                    atStartOfLine = true;
+                }
                 ++m_cursor;
             }
             continue;
+        }
+
+        // LLVM style single-line comment: ; ...
+        // Allowed at start of line, or when preceded on the same line by ':' (after a label) or ';' (after an instruction)
+        if (c == ';')
+        {
+            bool isComment = atStartOfLine;
+            if (!isComment)
+            {
+                size_t back = m_cursor;
+                while (back > 0)
+                {
+                    --back;
+                    char prev = m_source[back];
+                    if (prev == '\n')
+                    {
+                        break;
+                    }
+                    if (!std::isspace(static_cast<unsigned char>(prev)))
+                    {
+                        if (prev == ':' || prev == ';')
+                        {
+                            isComment = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (isComment)
+            {
+                ++m_cursor;
+                while (m_cursor < m_source.size() && m_source[m_cursor] != '\n')
+                {
+                    ++m_cursor;
+                }
+                continue;
+            }
         }
 
         // Found non-whitespace, non-comment token start
@@ -339,15 +387,29 @@ MirToken MirLexer::lexNumber(size_t startPos)
         {
             ++m_cursor;
         }
+
+        tok.m_length = m_cursor - startPos;
+        tok.m_text = m_source.substr(startPos, tok.m_length);
+        tok.m_ref = m_ctx.createRef(startPos, tok.m_length);
+
+        if (digitsStart == m_cursor)
+        {
+            if (m_ctx.getDiagCollector())
+            {
+                m_ctx.getDiagCollector()->error("MirLexer", "Invalid hex literal without digits: '{}'", tok.m_text)
+                        << tok.m_ref;
+            }
+            m_ctx.recordError();
+            tok.m_kind = MirTokenKind::Unknown;
+            return tok;
+        }
+
         std::string_view hexStr = m_source.substr(digitsStart, m_cursor - digitsStart);
         uint64_t val = 0;
         std::from_chars(hexStr.data(), hexStr.data() + hexStr.size(), val, 16);
 
         tok.m_kind = MirTokenKind::IntegerLiteral;
         tok.m_intVal = isNegative ? -static_cast<int64_t>(val) : static_cast<int64_t>(val);
-        tok.m_length = m_cursor - startPos;
-        tok.m_text = m_source.substr(startPos, tok.m_length);
-        tok.m_ref = m_ctx.createRef(startPos, tok.m_length);
         return tok;
     }
 
@@ -416,12 +478,14 @@ MirToken MirLexer::lexString(size_t startPos)
     tok.m_kind = MirTokenKind::StringLiteral;
 
     getChar(); // Consume opening '"'
+    bool closed = false;
 
     while (m_cursor < m_source.size())
     {
         char c = getChar();
         if (c == '"')
         {
+            closed = true;
             break;
         }
         if (c == '\\' && m_cursor < m_source.size())
@@ -437,14 +501,21 @@ MirToken MirLexer::lexString(size_t startPos)
                 tok.m_strVal += '\\';
             else if (esc == '"')
                 tok.m_strVal += '"';
-            else if (esc == '0' && m_cursor < m_source.size() && std::isxdigit(static_cast<unsigned char>(peekChar())))
+            else if (esc == '0')
             {
-                // Hex escape like \0A or \00
-                char hex[3] = { '0', peekChar(), '\0' };
-                getChar();
-                uint8_t byteVal = 0;
-                std::from_chars(hex, hex + 2, byteVal, 16);
-                tok.m_strVal += static_cast<char>(byteVal);
+                if (m_cursor < m_source.size() && std::isxdigit(static_cast<unsigned char>(peekChar())))
+                {
+                    // Hex escape like \0A or \00
+                    char hex[3] = { '0', peekChar(), '\0' };
+                    getChar();
+                    uint8_t byteVal = 0;
+                    std::from_chars(hex, hex + 2, byteVal, 16);
+                    tok.m_strVal += static_cast<char>(byteVal);
+                }
+                else
+                {
+                    tok.m_strVal += '\0';
+                }
             }
             else if ((esc == 'x' || esc == 'X') && m_cursor + 1 < m_source.size() &&
                      std::isxdigit(static_cast<unsigned char>(m_source[m_cursor])) &&
@@ -470,6 +541,17 @@ MirToken MirLexer::lexString(size_t startPos)
     tok.m_length = m_cursor - startPos;
     tok.m_text = m_source.substr(startPos, tok.m_length);
     tok.m_ref = m_ctx.createRef(startPos, tok.m_length);
+
+    if (!closed)
+    {
+        if (m_ctx.getDiagCollector())
+        {
+            m_ctx.getDiagCollector()->error("MirLexer", "Unclosed string literal") << tok.m_ref;
+        }
+        m_ctx.recordError();
+        tok.m_kind = MirTokenKind::Unknown;
+    }
+
     return tok;
 }
 

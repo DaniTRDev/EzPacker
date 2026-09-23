@@ -37,7 +37,7 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
     # 1. Compile MIR file to Windows x64 COFF object
     add_custom_command(
         OUTPUT "${WIN_OBJ}"
-        COMMAND "${EZC_BIN}" --target x86_64-pc-windows-coff "${MIR_FILE}" -o "${WIN_OBJ}"
+        COMMAND ${CMAKE_COMMAND} -E env "PATH=${CMAKE_BINARY_DIR}/bin;${COMPILER_DIR};$ENV{PATH}" "${EZC_BIN}" --target x86_64-pc-windows-coff "${MIR_FILE}" -o "${WIN_OBJ}"
         DEPENDS ezc "${MIR_FILE}"
         COMMENT "[EzCompiler E2E] Compiling ${TEST_NAME}.mir -> ${TEST_NAME}_win.obj (x86_64 COFF)"
         VERBATIM
@@ -46,7 +46,7 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
     # 2. Compile MIR file to Linux x64 ELF object
     add_custom_command(
         OUTPUT "${LINUX_OBJ}"
-        COMMAND "${EZC_BIN}" --target x86_64-linux-gnu "${MIR_FILE}" -o "${LINUX_OBJ}"
+        COMMAND ${CMAKE_COMMAND} -E env "PATH=${CMAKE_BINARY_DIR}/bin;${COMPILER_DIR};$ENV{PATH}" "${EZC_BIN}" --target x86_64-linux-gnu "${MIR_FILE}" -o "${LINUX_OBJ}"
         DEPENDS ezc "${MIR_FILE}"
         COMMENT "[EzCompiler E2E] Compiling ${TEST_NAME}.mir -> ${TEST_NAME}_linux.o (x86_64 ELF)"
         VERBATIM

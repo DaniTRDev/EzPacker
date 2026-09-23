@@ -28,6 +28,9 @@ struct MirParserOptions
 {
     bool verifySsa{ true };               // When true, enforce single-definition/use SSA constraints while parsing.
     bool allowTargetInstructions{ true }; // When true, accept target-specific instruction syntax.
+    bool enableLogging{ true };           // When true, emit informational trace logs via DiagnosticCollector.
+    size_t maxErrors{ 30 };               // Stop parsing after N errors to avoid cascades.
+    bool warnOnUnusedLabels{ false };     // When true, warn about basic blocks that are defined but never referenced.
 };
 
 /**
@@ -119,6 +122,16 @@ class MirParser
      * Consumes the next token, requiring it to be of the given kind; reports errorMsg otherwise.
      */
     bool matchToken(Parser::MirLexer &lexer, Parser::MirTokenKind kind, std::string_view errorMsg);
+
+    /**
+     * Resynchronizes parser state to the next statement or block boundary after an instruction error.
+     */
+    void syncToNextInstruction(Parser::MirLexer &lexer);
+
+    /**
+     * Resynchronizes parser state to the next top-level declaration after an error.
+     */
+    void syncToNextTopLevel(Parser::MirLexer &lexer);
 
   private:
     MirBuilderContext *m_ctx{ nullptr };            // Context receiving constructed MIR entities.

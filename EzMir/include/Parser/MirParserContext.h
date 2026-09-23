@@ -55,10 +55,11 @@ template <typename TValue> using PmrStringMap = std::pmr::unordered_map<std::pmr
  */
 enum class SymbolKind
 {
-    Register,   ///< A local virtual/physical register.
-    BasicBlock, ///< A basic block label within the current function.
-    Function,   ///< A module-level function.
-    GlobalVar   ///< A module-level global variable.
+    Register,         ///< A local virtual/physical register.
+    BasicBlock,       ///< A basic block label within the current function.
+    Function,         ///< A module-level function.
+    GlobalVar,        ///< A module-level global variable.
+    GlobalOrFunction  ///< A module-level symbol that could be either a function or global variable.
 };
 
 /**
@@ -108,8 +109,24 @@ class MirParserContext
     void enterFunction(MirFunction *func);
     /**
      * Leaves the current function scope and clears its function-scoped tables.
+     * Returns false if any block/register validation errors occurred.
      */
-    void exitFunction();
+    bool exitFunction();
+
+    // Instruction forward-reference binding
+    /**
+     * Marks the start of a new instruction statement so fixups queued during its operand parsing
+     * can be bound to the constructed instruction.
+     */
+    void beginInstruction();
+    /**
+     * Attaches the newly constructed instruction to all forward reference fixups queued since beginInstruction().
+     */
+    void bindInstruction(MirInstruction *inst);
+    /**
+     * Cancels any uncommitted forward references queued for the current instruction upon parse error.
+     */
+    void cancelInstruction();
 
     // Source reference creation helper
     /**
@@ -189,6 +206,40 @@ class MirParserContext
      */
     bool resolveAllPendingFixups();
 
+    // SSA and register definition tracking
+    /**
+     * Records a virtual register definition for the current function.
+     * If verifySsa is true and the register was already defined, emits an error with a note
+     * referencing the previous definition, records a parse error, and returns false.
+     */
+    bool recordRegisterDef(std::string_view name, SourceReference *ref, bool verifySsa);
+    /**
+     * Returns true if the named virtual register has been defined in the current function scope.
+     */
+    bool hasRegisterDef(std::string_view name) const;
+    /**
+     * Returns the source reference where the register was defined, or nullptr.
+     */
+    SourceReference *getRegisterDefRef(std::string_view name) const;
+    /**
+     * Records a use of a register for use-before-def tracking.
+     */
+    void recordRegisterUse(std::string_view name, SourceReference *ref);
+
+    // Block definition tracking
+    /**
+     * Marks a basic block as explicitly defined by a label: declaration in the function body.
+     */
+    void markBlockDefined(std::string_view name, SourceReference *ref);
+    /**
+     * Marks a basic block as referenced by a branch target or phi edge.
+     */
+    void markBlockReferenced(std::string_view name, SourceReference *ref);
+    /**
+     * Returns true if the named block has been explicitly defined with a label.
+     */
+    bool isBlockDefined(std::string_view name) const;
+
     /**
      * Increments the parse error counter.
      */
@@ -255,6 +306,15 @@ class MirParserContext
 
     // Worklist of forward references to patch
     std::pmr::vector<UnresolvedReference> m_pendingFixups; // Queued unresolved operand references.
+    std::pmr::vector<size_t> m_currentInstructionFixups;   // Indices in m_pendingFixups for current instruction.
+
+    // Block tracking for definition-before-reference validation
+    PmrStringMap<SourceReference *> m_definedBlocks;
+    PmrStringMap<SourceReference *> m_referencedBlocks;
+
+    // Register tracking for SSA validation and use-before-def checks
+    PmrStringMap<SourceReference *> m_regDefs;
+    PmrStringMap<SourceReference *> m_regUses;
 
     size_t m_errorCount{ 0 }; // Number of errors reported during parsing.
 };

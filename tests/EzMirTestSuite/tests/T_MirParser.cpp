@@ -9,6 +9,9 @@
 #include "Operand/MirOperands.h"
 #include "Type/MirTypeTable.h"
 #include "Type/MirType.h"
+#include "Diagnostics/DiagnosticCollector.h"
+#include "Diagnostics/DiagnosticListener.h"
+#include "Diagnostics/DiagnosticMessage.h"
 
 class MirParserTest : public MirTestSuiteAsGtest
 {
@@ -303,3 +306,213 @@ entry:
     bool result = parser.parseModule(badSyntax, "bad_syntax.mir");
     EXPECT_FALSE(result);
 }
+
+/**
+ * TMP-10: Forward Function and Global Fixups
+ * Verifies that calls to forward functions and references to forward globals are properly patched
+ * to MirReference operands rather than remaining as raw runtime symbols.
+ */
+TEST_F(MirParserTest, TMP_10_ForwardFunctionAndGlobalFixups)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view mirCode = R"mir(
+fn @caller() -> i64 {
+entry:
+    %fn_ref = CALL i64 @target_func;
+    %val = LOAD i64 @target_var;
+    RET i64 %val;
+}
+
+fn @target_func() -> i64 {
+entry:
+    RET i64 42;
+}
+
+@target_var = internal var i64 = 100;
+)mir";
+
+    bool success = parser.parseModule(mirCode, "fwd_func_var.mir");
+    EXPECT_TRUE(success);
+
+    MirFunction *caller = nullptr;
+    for (MirFunction *fn : ctx->getFunctions())
+    {
+        if (fn && fn->getName() == "caller")
+        {
+            caller = fn;
+            break;
+        }
+    }
+    ASSERT_NE(caller, nullptr);
+    MirBlock *entry = caller->getEntryPoint();
+    ASSERT_NE(entry, nullptr);
+
+    auto instIt = entry->getInstructions().begin();
+    ASSERT_NE(instIt, entry->getInstructions().end());
+
+    // CALL instruction: second operand should be a MirReference to target_func
+    MirInstruction *callInst = *instIt++;
+    ASSERT_EQ(callInst->getOpCode(), getOpCodeFromStr("CALL"));
+    ASSERT_GE(callInst->getOperands().size(), 2);
+    MirOperand *calleeOp = callInst->getOperands()[1];
+    ASSERT_EQ(calleeOp->getType(), MirOperandType::Reference);
+    auto *calleeRef = static_cast<MirReference *>(calleeOp);
+    EXPECT_TRUE(calleeRef->isFunction());
+    MirFunction *targetFn = ctx->getFuncById(calleeRef->getRefId());
+    ASSERT_NE(targetFn, nullptr);
+    EXPECT_EQ(targetFn->getName(), "target_func");
+
+    // LOAD instruction: second operand should be a MirReference to target_var
+    ASSERT_NE(instIt, entry->getInstructions().end());
+    MirInstruction *loadInst = *instIt++;
+    ASSERT_EQ(loadInst->getOpCode(), getOpCodeFromStr("LOAD"));
+    ASSERT_GE(loadInst->getOperands().size(), 2);
+    MirOperand *varOp = loadInst->getOperands()[1];
+    ASSERT_EQ(varOp->getType(), MirOperandType::Reference);
+    auto *varRef = static_cast<MirReference *>(varOp);
+    EXPECT_TRUE(varRef->isGlobalVar());
+    MirGlobalVar *targetGv = ctx->getGVarById(varRef->getRefId());
+    ASSERT_NE(targetGv, nullptr);
+    EXPECT_EQ(targetGv->getName(), "target_var");
+}
+
+/**
+ * TMP-11: SSA Violation Detection
+ * Verifies that defining a virtual register more than once triggers an SSA violation diagnostic.
+ */
+TEST_F(MirParserTest, TMP_11_SsaViolationDetection)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParserOptions options;
+    options.verifySsa = true;
+    EzMir::MirParser parser(ctx, nullptr, options);
+
+    std::string_view mirCode = R"mir(
+fn @ssa_violator() -> i64 {
+entry:
+    %v0 = MOV i64 1;
+    %v0 = MOV i64 2;
+    RET i64 %v0;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "ssa_violation.mir");
+    EXPECT_FALSE(success);
+}
+
+/**
+ * TMP-12: Undefined Block Diagnostics
+ * Verifies that branching to a non-existent basic block label reports a diagnostic and fails.
+ */
+TEST_F(MirParserTest, TMP_12_UndefinedBlockDiagnostics)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view mirCode = R"mir(
+fn @bad_branch() -> void {
+entry:
+    BR label %non_existent_block;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "bad_branch.mir");
+    EXPECT_FALSE(success);
+}
+
+/**
+ * TMP-13: Panic-Mode Error Recovery
+ * Verifies that the parser resynchronizes past instruction errors to catch subsequent statements
+ * without cascading or aborting prematurely.
+ */
+TEST_F(MirParserTest, TMP_13_ErrorRecovery)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParserOptions options;
+    options.maxErrors = 10;
+    EzMir::MirParser parser(ctx, nullptr, options);
+
+    std::string_view mirCode = R"mir(
+fn @recovery_test() -> i64 {
+entry:
+    %v0 = non_existent_opcode_1 i64 1;
+    %v1 = MOV i64 10;
+    %v2 = non_existent_opcode_2 i64 2;
+    %res = ADD i64 %v1, 20;
+    RET i64 %res;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "recovery.mir");
+    EXPECT_FALSE(success);
+}
+
+/**
+ * TMP-14: Telemetry Logging
+ * Verifies that trace logging is emitted when enableLogging is true.
+ */
+TEST_F(MirParserTest, TMP_14_TelemetryLogging)
+{
+    class LogCaptureListener : public DiagnosticListener
+    {
+      public:
+        size_t m_traceCount{ 0 };
+        void onDiag(const DiagnosticMessage &msg) override
+        {
+            if (msg.getType() == Diag_Trace)
+            {
+                ++m_traceCount;
+            }
+        }
+    };
+
+    MirBuilderContext *ctx = getBuilderCtx();
+    LogCaptureListener listener;
+    ctx->getDiagCollector()->addListener(&listener);
+
+    EzMir::MirParserOptions options;
+    options.enableLogging = true;
+    EzMir::MirParser parser(ctx, nullptr, options);
+
+    std::string_view mirCode = R"mir(
+fn @logged_func() -> void {
+entry:
+    RET;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "logging.mir");
+    EXPECT_TRUE(success);
+    EXPECT_GT(listener.m_traceCount, 0);
+
+    ctx->getDiagCollector()->removeListener(&listener);
+}
+
+/**
+ * TMP-15: Lexer Edge Cases
+ * Verifies block comments, inline comments, and string escape sequences.
+ */
+TEST_F(MirParserTest, TMP_15_LexerEdgeCases)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view mirCode = R"mir(
+/* Multi-line block comment
+   spanning multiple lines
+   with special symbols: @ % * / -> ; */
+@str = internal const [12 x i8] = "Hello\n\t\0World"; /* Inline block comment */
+
+; Single-line comment at start of line
+fn @comment_test() -> void {
+entry: ; Single-line comment after colon
+    RET; ; Single-line comment after semicolon
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "comments.mir");
+    EXPECT_TRUE(success);
+}
+

@@ -89,6 +89,53 @@ bool MirParser::matchToken(Parser::MirLexer &lexer, Parser::MirTokenKind kind, s
 }
 
 /**
+ * Resynchronizes parser state to the next statement or block boundary after an instruction error.
+ */
+void MirParser::syncToNextInstruction(Parser::MirLexer &lexer)
+{
+    while (!lexer.isAtEnd())
+    {
+        const auto &tok = lexer.peekToken();
+        if (tok.m_kind == Parser::MirTokenKind::RBrace || tok.m_kind == Parser::MirTokenKind::EndOfFile)
+        {
+            return;
+        }
+        if (tok.m_kind == Parser::MirTokenKind::Semicolon)
+        {
+            lexer.nextToken(); // Consume ';'
+            return;
+        }
+        // Stop before the next basic block label (e.g. bb1:)
+        if ((tok.m_kind == Parser::MirTokenKind::LocalName || tok.m_kind == Parser::MirTokenKind::Identifier) &&
+            lexer.peekToken(1).m_kind == Parser::MirTokenKind::Colon)
+        {
+            return;
+        }
+        lexer.nextToken();
+    }
+}
+
+/**
+ * Resynchronizes parser state to the next top-level declaration after an error.
+ */
+void MirParser::syncToNextTopLevel(Parser::MirLexer &lexer)
+{
+    while (!lexer.isAtEnd())
+    {
+        const auto &tok = lexer.peekToken();
+        if (tok.m_kind == Parser::MirTokenKind::KwFn ||
+            tok.m_kind == Parser::MirTokenKind::KwDeclare ||
+            tok.m_kind == Parser::MirTokenKind::KwTarget ||
+            tok.m_kind == Parser::MirTokenKind::GlobalName ||
+            tok.m_kind == Parser::MirTokenKind::EndOfFile)
+        {
+            return;
+        }
+        lexer.nextToken();
+    }
+}
+
+/**
  * Parses a type expression into its AST form: "ptr[<type>]", "[N x type]", "void", "token",
  * primitive iN/fN types and bare identifier type names.
  */
@@ -649,6 +696,12 @@ bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx
     pCtx.declareFunction(fnName, func);
     pCtx.enterFunction(func);
 
+    if (m_options.enableLogging && m_diag)
+    {
+        m_diag->trace("MirParser", "Entering function '@{}' ({} parameters)", fnName, params.size());
+    }
+
+    bool parseSuccess = true;
     while (lexer.peekToken().m_kind != Parser::MirTokenKind::RBrace &&
            lexer.peekToken().m_kind != Parser::MirTokenKind::EndOfFile)
     {
@@ -660,19 +713,24 @@ bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx
 
         if (!parseBasicBlock(lexer, pCtx, func))
         {
-            pCtx.exitFunction();
-            return false;
+            parseSuccess = false;
+            break;
         }
     }
 
     if (!matchToken(lexer, Parser::MirTokenKind::RBrace, "Expected '}' at end of function body"))
     {
-        pCtx.exitFunction();
-        return false;
+        parseSuccess = false;
     }
 
-    pCtx.exitFunction();
-    return true;
+    bool exitSuccess = pCtx.exitFunction();
+
+    if (m_options.enableLogging && m_diag)
+    {
+        m_diag->trace("MirParser", "Exited function '@{}' (success: {})", fnName, parseSuccess && exitSuccess);
+    }
+
+    return parseSuccess && exitSuccess;
 }
 
 /**
@@ -702,6 +760,12 @@ bool MirParser::parseBasicBlock(Parser::MirLexer &lexer, MirParserContext &pCtx,
     {
         block = pCtx.getOrCreateBlock(rawName, labelTok.m_ref);
     }
+    pCtx.markBlockDefined(rawName, labelTok.m_ref);
+
+    if (m_options.enableLogging && m_diag)
+    {
+        m_diag->trace("MirParser", "Parsing basic block '{}'", rawName);
+    }
 
     // Parse instructions until next block label, closing brace '}', or EOF
     while (lexer.peekToken().m_kind != Parser::MirTokenKind::RBrace &&
@@ -727,13 +791,31 @@ bool MirParser::parseBasicBlock(Parser::MirLexer &lexer, MirParserContext &pCtx,
             }
             lexer.nextToken(); // Consume ':'
             block = pCtx.declareBlock(nextBlockName, labelNameTok.m_ref);
+            if (!block)
+            {
+                block = pCtx.getOrCreateBlock(nextBlockName, labelNameTok.m_ref);
+            }
+            pCtx.markBlockDefined(nextBlockName, labelNameTok.m_ref);
+            if (m_options.enableLogging && m_diag)
+            {
+                m_diag->trace("MirParser", "Parsing basic block '{}'", nextBlockName);
+            }
             continue;
         }
 
         MirInstruction *inst = parseInstructionStatement(lexer, pCtx, block);
         if (!inst)
         {
-            return false;
+            syncToNextInstruction(lexer);
+            if (m_options.maxErrors > 0 && pCtx.getErrorCount() >= m_options.maxErrors)
+            {
+                if (m_diag)
+                {
+                    m_diag->error("MirParser", "Too many errors encountered; stopping parser");
+                }
+                return false;
+            }
+            continue;
         }
     }
 
@@ -753,6 +835,8 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, Mi
         return nullptr;
     }
 
+    pCtx.beginInstruction();
+
     std::vector<MirOperand *> operands;
     std::string_view opcodeName;
     SourceReference *instRef = firstTok.m_ref;
@@ -763,6 +847,7 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, Mi
         auto dstTok = lexer.nextToken();
         if (!matchToken(lexer, Parser::MirTokenKind::Equal, "Expected '=' in instruction assignment"))
         {
+            pCtx.cancelInstruction();
             return nullptr;
         }
 
@@ -775,6 +860,8 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, Mi
         {
             instType = pCtx.resolveType(parseAstType(lexer, pCtx));
         }
+
+        pCtx.recordRegisterDef(dstTok.m_text, dstTok.m_ref, m_options.verifySsa);
 
         MirRegister *dstReg = pCtx.getOrCreateRegister(dstTok.m_text, instType, dstTok.m_ref);
         operands.push_back(dstReg);
@@ -800,6 +887,7 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, Mi
             m_diag->error("MirParser", "Unknown instruction opcode '{}'", opcodeName) << instRef;
         }
         pCtx.recordError();
+        pCtx.cancelInstruction();
         return nullptr;
     }
 
@@ -823,11 +911,21 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, Mi
     if (operandError || !matchToken(lexer, Parser::MirTokenKind::Semicolon, "Expected ';' after instruction"))
     {
         pCtx.recordError();
+        pCtx.cancelInstruction();
         return nullptr;
     }
 
     MirInstructionBuilder instBuilder(m_ctx, block, InsertionType::Append);
-    return instBuilder.build(opCode, instRef, operands);
+    MirInstruction *inst = instBuilder.build(opCode, instRef, operands);
+    if (inst)
+    {
+        pCtx.bindInstruction(inst);
+    }
+    else
+    {
+        pCtx.cancelInstruction();
+    }
+    return inst;
 }
 
 /**
@@ -846,8 +944,20 @@ MirMemory *MirParser::parseMemoryOperand(Parser::MirLexer &lexer,
     }
 
     const auto baseTok = lexer.nextToken();
+    if (baseTok.m_kind != Parser::MirTokenKind::LocalName)
+    {
+        if (m_diag)
+        {
+            m_diag->error("MirParser", "Expected register as memory operand base, got '{}'", baseTok.m_text)
+                    << baseTok.m_ref;
+        }
+        pCtx.recordError();
+        return nullptr;
+    }
+
     MirType *ptrType = m_ctx->getTypeTable()->getPtr(m_ctx->getTypeTable()->i8());
     MirRegister *baseReg = pCtx.getOrCreateRegister(baseTok.m_text, ptrType, baseTok.m_ref);
+    pCtx.recordRegisterUse(baseTok.m_text, baseTok.m_ref);
 
     MirRegister *indexReg = nullptr;
     uint8_t scale = 1;
@@ -864,6 +974,7 @@ MirMemory *MirParser::parseMemoryOperand(Parser::MirLexer &lexer,
         {
             auto idxTok = lexer.nextToken();
             indexReg = pCtx.getOrCreateRegister(idxTok.m_text, m_ctx->getTypeTable()->i64(), idxTok.m_ref);
+            pCtx.recordRegisterUse(idxTok.m_text, idxTok.m_ref);
             if (lexer.peekToken().m_kind == Parser::MirTokenKind::Star)
             {
                 lexer.nextToken(); // Consume '*'
@@ -919,6 +1030,7 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
         {
             name = name.substr(1);
         }
+        pCtx.markBlockReferenced(name, lblTok.m_ref);
         MirBlock *blk = pCtx.getOrCreateBlock(name, lblTok.m_ref);
         return opBuilder.buildRef(blk, lblTok.m_ref);
     }
@@ -956,10 +1068,12 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                     bName = bName.substr(1);
                 }
                 pCtx.getOrCreateBlock(bName, blkTok.m_ref);
+                pCtx.markBlockReferenced(bName, blkTok.m_ref);
 
                 // Build operand for incoming value
                 if (valTok.m_kind == Parser::MirTokenKind::LocalName)
                 {
+                    pCtx.recordRegisterUse(valTok.m_text, valTok.m_ref);
                     return pCtx.getOrCreateRegister(valTok.m_text, expectedType, valTok.m_ref);
                 }
                 else if (valTok.m_kind == Parser::MirTokenKind::IntegerLiteral)
@@ -968,6 +1082,25 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                             ? expectedType
                             : m_ctx->getTypeTable()->i64();
                     return buildIntSafe(opBuilder, immType, valTok.m_intVal, valTok.m_ref, m_diag, pCtx);
+                }
+                else if (valTok.m_kind == Parser::MirTokenKind::FloatLiteral)
+                {
+                    MirType *fType = (expectedType && expectedType->getKind() == MirTypeKind::FloatingPoint)
+                            ? expectedType
+                            : m_ctx->getTypeTable()->f64();
+                    try
+                    {
+                        return opBuilder.buildFloat(fType, FlexFloat(valTok.m_floatVal), valTok.m_ref);
+                    }
+                    catch (const std::exception &ex)
+                    {
+                        if (m_diag)
+                        {
+                            m_diag->error("MirParser", "Float literal error: {}", ex.what()) << valTok.m_ref;
+                        }
+                        pCtx.recordError();
+                        return nullptr;
+                    }
                 }
             }
 
@@ -985,6 +1118,10 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
     {
         auto gTok = lexer.nextToken();
         std::string_view symName = gTok.m_strVal.empty() ? gTok.m_text : gTok.m_strVal;
+        if (symName.starts_with("@"))
+        {
+            symName = symName.substr(1);
+        }
 
         int64_t offset = 0;
         if (lexer.peekToken().m_kind == Parser::MirTokenKind::Plus)
@@ -1004,7 +1141,7 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
         }
 
         // Check if forward reference or runtime symbol
-        pCtx.recordForwardReference(symName, targetInst, operandIdx, SymbolKind::Function, gTok.m_ref);
+        pCtx.recordForwardReference(symName, targetInst, operandIdx, SymbolKind::GlobalOrFunction, gTok.m_ref);
         return opBuilder.buildRtSymbol(std::pmr::string(symName, pCtx.getArena()), gTok.m_ref);
     }
 
@@ -1042,6 +1179,7 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
 
         auto regTok = lexer.nextToken();
         std::string_view regName = regTok.m_text;
+        pCtx.recordRegisterUse(regName, regTok.m_ref);
 
         // Class binding: %p0(rax:GPR64). The asm-name/class pair is parsed and currently dropped
         // because the parser has no target register-class registry to bind it against; malformed
@@ -1203,6 +1341,12 @@ bool MirParser::parseModule(std::string_view source, std::string_view bufferName
         Parser::MirLexer lexer(source, pCtx);
         Ast::MirAstModule module(pCtx.getArena());
 
+        if (m_options.enableLogging && m_diag)
+        {
+            m_diag->enableDiag(Diag_Trace);
+            m_diag->trace("MirParser", "Beginning parsing of buffer '{}' ({} bytes)", bufferName, source.size());
+        }
+
         while (lexer.peekToken().m_kind != Parser::MirTokenKind::EndOfFile)
         {
             if (lexer.peekToken().m_kind == Parser::MirTokenKind::Semicolon)
@@ -1213,16 +1357,31 @@ bool MirParser::parseModule(std::string_view source, std::string_view bufferName
 
             if (!parseTopLevelDecl(lexer, pCtx, module))
             {
-                return false;
+                pCtx.recordError();
+                if (m_options.maxErrors > 0 && pCtx.getErrorCount() >= m_options.maxErrors)
+                {
+                    if (m_diag)
+                    {
+                        m_diag->error("MirParser", "Too many errors encountered; stopping parser");
+                    }
+                    if (m_options.enableLogging && m_diag)
+                    {
+                        m_diag->trace("MirParser", "Parsing aborted due to error limit");
+                    }
+                    return false;
+                }
+                syncToNextTopLevel(lexer);
             }
         }
 
-        if (!pCtx.resolveAllPendingFixups())
+        bool fixupsOk = pCtx.resolveAllPendingFixups();
+
+        if (m_options.enableLogging && m_diag)
         {
-            return false;
+            m_diag->trace("MirParser", "Parsing completed with {} errors", pCtx.getErrorCount());
         }
 
-        if (pCtx.hasErrors())
+        if (!fixupsOk || pCtx.hasErrors())
         {
             return false;
         }

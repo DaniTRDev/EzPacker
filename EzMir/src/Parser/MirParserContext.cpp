@@ -29,7 +29,8 @@ MirParserContext::MirParserContext(MirBuilderContext *bCtx,
                                    size_t sourceId) :
     m_bCtx(bCtx), m_diag(diagCollector), m_arena(arena ? arena : std::pmr::get_default_resource()),
     m_sourceMgr(sourceMgr), m_sourceId(sourceId), m_registers(m_arena), m_blocks(m_arena), m_globals(m_arena),
-    m_functions(m_arena), m_pendingFixups(m_arena)
+    m_functions(m_arena), m_pendingFixups(m_arena), m_currentInstructionFixups(m_arena),
+    m_definedBlocks(m_arena), m_referencedBlocks(m_arena), m_regDefs(m_arena), m_regUses(m_arena)
 {
 }
 
@@ -42,6 +43,11 @@ void MirParserContext::enterFunction(MirFunction *func)
     m_currentFunction = func;
     m_registers.clear();
     m_blocks.clear();
+    m_definedBlocks.clear();
+    m_referencedBlocks.clear();
+    m_regDefs.clear();
+    m_regUses.clear();
+    m_currentInstructionFixups.clear();
 
     if (!func)
     {
@@ -55,15 +61,18 @@ void MirParserContext::enterFunction(MirFunction *func)
         {
             std::string_view pName = param->getName();
             m_registers.insert_or_assign(std::pmr::string(pName, m_arena), param);
+            m_regDefs.insert_or_assign(std::pmr::string(pName, m_arena), param->getSourceRef());
             if (pName.starts_with("%"))
             {
                 m_registers.insert_or_assign(std::pmr::string(pName.substr(1), m_arena), param);
+                m_regDefs.insert_or_assign(std::pmr::string(pName.substr(1), m_arena), param->getSourceRef());
             }
             else
             {
                 std::pmr::string withPct("%", m_arena);
                 withPct += pName;
                 m_registers.insert_or_assign(withPct, param);
+                m_regDefs.insert_or_assign(withPct, param->getSourceRef());
             }
         }
     }
@@ -81,14 +90,36 @@ void MirParserContext::enterFunction(MirFunction *func)
 }
 
 /**
- * Patches pending block/register references, then clears the function scope.
+ * Patches pending block/register references, validates that all referenced blocks were defined,
+ * then clears the function scope.
  */
-void MirParserContext::exitFunction()
+bool MirParserContext::exitFunction()
 {
-    resolvePendingFunctionFixups();
+    bool success = resolvePendingFunctionFixups();
+
+    // Verify all referenced basic blocks were defined in the function body
+    for (const auto &[name, ref] : m_referencedBlocks)
+    {
+        if (!isBlockDefined(name))
+        {
+            if (m_diag)
+            {
+                m_diag->error("MirParser", "Undefined basic block label '%{}'", name) << ref;
+            }
+            recordError();
+            success = false;
+        }
+    }
+
     m_registers.clear();
     m_blocks.clear();
+    m_definedBlocks.clear();
+    m_referencedBlocks.clear();
+    m_regDefs.clear();
+    m_regUses.clear();
+    m_currentInstructionFixups.clear();
     m_currentFunction = nullptr;
+    return success;
 }
 
 /**
@@ -337,8 +368,11 @@ MirBlock *MirParserContext::declareBlock(std::string_view name, SourceReference 
     if (it != m_blocks.end())
     {
         // Check if this was already declared and populated
+        markBlockDefined(name, ref);
         return it->second;
     }
+
+    markBlockDefined(name, ref);
 
     // If function has an empty skeleton entry point block, reuse it for the first declared block
     MirBlock *entry = m_currentFunction->getEntryPoint();
@@ -368,6 +402,8 @@ MirBlock *MirParserContext::getOrCreateBlock(std::string_view name, SourceRefere
     {
         return nullptr;
     }
+
+    markBlockReferenced(name, ref);
 
     auto it = m_blocks.find(name);
     if (it != m_blocks.end())
@@ -439,13 +475,165 @@ MirFunction *MirParserContext::resolveFunction(std::string_view name, SourceRefe
 }
 
 /**
+ * Marks the start of a new instruction statement so fixups queued during its operand parsing
+ * can be bound to the constructed instruction.
+ */
+void MirParserContext::beginInstruction()
+{
+    m_currentInstructionFixups.clear();
+}
+
+/**
+ * Attaches the newly constructed instruction to all forward reference fixups queued since beginInstruction().
+ */
+void MirParserContext::bindInstruction(MirInstruction *inst)
+{
+    for (size_t idx : m_currentInstructionFixups)
+    {
+        if (idx < m_pendingFixups.size())
+        {
+            m_pendingFixups[idx].m_targetInstruction = inst;
+        }
+    }
+    m_currentInstructionFixups.clear();
+}
+
+/**
+ * Cancels any uncommitted forward references queued for the current instruction upon parse error.
+ */
+void MirParserContext::cancelInstruction()
+{
+    while (!m_currentInstructionFixups.empty())
+    {
+        size_t idx = m_currentInstructionFixups.back();
+        m_currentInstructionFixups.pop_back();
+        if (idx < m_pendingFixups.size())
+        {
+            m_pendingFixups.erase(m_pendingFixups.begin() + idx);
+        }
+    }
+}
+
+/**
+ * Marks a basic block as explicitly defined by a label: declaration in the function body.
+ */
+void MirParserContext::markBlockDefined(std::string_view name, SourceReference *ref)
+{
+    std::string_view baseName = name.starts_with("%") ? name.substr(1) : name;
+    m_definedBlocks.insert_or_assign(std::pmr::string(baseName, m_arena), ref);
+}
+
+/**
+ * Marks a basic block as referenced by a branch target or phi edge.
+ */
+void MirParserContext::markBlockReferenced(std::string_view name, SourceReference *ref)
+{
+    std::string_view baseName = name.starts_with("%") ? name.substr(1) : name;
+    m_referencedBlocks.insert_or_assign(std::pmr::string(baseName, m_arena), ref);
+}
+
+/**
+ * Returns true if the named block has been explicitly defined with a label.
+ */
+bool MirParserContext::isBlockDefined(std::string_view name) const
+{
+    std::string_view baseName = name.starts_with("%") ? name.substr(1) : name;
+    return m_definedBlocks.find(baseName) != m_definedBlocks.end();
+}
+
+/**
+ * Records a virtual register definition for the current function.
+ * If verifySsa is true and the register was already defined, emits an error with a note
+ * referencing the previous definition, records a parse error, and returns false.
+ */
+bool MirParserContext::recordRegisterDef(std::string_view name, SourceReference *ref, bool verifySsa)
+{
+    std::string_view baseName = name.starts_with("%") ? name.substr(1) : name;
+
+    std::string_view numPart;
+    if (name.starts_with("%p"))
+    {
+        numPart = name.substr(2);
+    }
+    else if (name.starts_with("p"))
+    {
+        numPart = name.substr(1);
+    }
+    bool isPhysReg = false;
+    if (!numPart.empty())
+    {
+        size_t physId = 0;
+        auto [end, ec] = std::from_chars(numPart.data(), numPart.data() + numPart.size(), physId);
+        if (ec == std::errc() && end == numPart.data() + numPart.size())
+        {
+            isPhysReg = true;
+        }
+    }
+
+    if (verifySsa && !isPhysReg)
+    {
+        auto it = m_regDefs.find(baseName);
+        if (it != m_regDefs.end())
+        {
+            if (m_diag)
+            {
+                auto b = m_diag->error("MirParser", "SSA violation: multiple definitions of virtual register '%{}'", name);
+                b << ref;
+                if (it->second)
+                {
+                    b.appendNote(it->second, "Previously defined here");
+                }
+            }
+            recordError();
+            return false;
+        }
+    }
+
+    m_regDefs.insert_or_assign(std::pmr::string(baseName, m_arena), ref);
+    std::pmr::string withPct("%", m_arena);
+    withPct += baseName;
+    m_regDefs.insert_or_assign(withPct, ref);
+    return true;
+}
+
+/**
+ * Returns true if the named virtual register has been defined in the current function scope.
+ */
+bool MirParserContext::hasRegisterDef(std::string_view name) const
+{
+    std::string_view baseName = name.starts_with("%") ? name.substr(1) : name;
+    return m_regDefs.find(baseName) != m_regDefs.end();
+}
+
+/**
+ * Returns the source reference where the register was defined, or nullptr.
+ */
+SourceReference *MirParserContext::getRegisterDefRef(std::string_view name) const
+{
+    std::string_view baseName = name.starts_with("%") ? name.substr(1) : name;
+    auto it = m_regDefs.find(baseName);
+    return it != m_regDefs.end() ? it->second : nullptr;
+}
+
+/**
+ * Records a use of a register for use-before-def tracking.
+ */
+void MirParserContext::recordRegisterUse(std::string_view name, SourceReference *ref)
+{
+    std::string_view baseName = name.starts_with("%") ? name.substr(1) : name;
+    m_regUses.insert_or_assign(std::pmr::string(baseName, m_arena), ref);
+}
+
+/**
  * Queues a not-yet-resolvable symbol reference for later patching, capturing its name and the
  * operand slot to replace.
  */
 void MirParserContext::recordForwardReference(
         std::string_view name, MirInstruction *inst, size_t operandIdx, SymbolKind kind, SourceReference *ref)
 {
+    size_t newIdx = m_pendingFixups.size();
     m_pendingFixups.emplace_back(name, inst, operandIdx, kind, ref, m_arena);
+    m_currentInstructionFixups.push_back(newIdx);
 }
 
 /**
@@ -519,7 +707,52 @@ bool MirParserContext::resolveAllPendingFixups()
 
     for (const auto &fixup : m_pendingFixups)
     {
-        if (fixup.m_kind == SymbolKind::Function)
+        if (fixup.m_kind == SymbolKind::GlobalOrFunction)
+        {
+            MirFunction *fn = resolveFunction(fixup.m_symbolName, fixup.m_ref);
+            if (fn)
+            {
+                if (fixup.m_targetInstruction)
+                {
+                    MirReference *fnRef = opBuilder.buildRef(fn, fixup.m_ref);
+                    MirInstructionBuilder instBuilder(m_bCtx, fixup.m_targetInstruction);
+                    instBuilder.swapOperand(fixup.m_targetInstruction, fnRef, fixup.m_operandIndex);
+                    if (m_diag)
+                    {
+                        m_diag->trace("MirParser", "Resolved forward function reference '@{}'", fixup.m_symbolName)
+                                << fixup.m_ref;
+                    }
+                }
+            }
+            else
+            {
+                MirGlobalVar *gv = resolveGlobal(fixup.m_symbolName, fixup.m_ref);
+                if (gv)
+                {
+                    if (fixup.m_targetInstruction)
+                    {
+                        MirReference *gvRef = opBuilder.buildRef(gv, 0, fixup.m_ref);
+                        MirInstructionBuilder instBuilder(m_bCtx, fixup.m_targetInstruction);
+                        instBuilder.swapOperand(fixup.m_targetInstruction, gvRef, fixup.m_operandIndex);
+                        if (m_diag)
+                        {
+                            m_diag->trace("MirParser", "Resolved forward global variable reference '@{}'", fixup.m_symbolName)
+                                    << fixup.m_ref;
+                        }
+                    }
+                }
+                else
+                {
+                    if (m_diag)
+                    {
+                        m_diag->error("MirParser", "Undefined symbol '@{}'", fixup.m_symbolName) << fixup.m_ref;
+                    }
+                    recordError();
+                    success = false;
+                }
+            }
+        }
+        else if (fixup.m_kind == SymbolKind::Function)
         {
             MirFunction *fn = resolveFunction(fixup.m_symbolName, fixup.m_ref);
             if (fn && fixup.m_targetInstruction)
@@ -527,10 +760,13 @@ bool MirParserContext::resolveAllPendingFixups()
                 MirReference *fnRef = opBuilder.buildRef(fn, fixup.m_ref);
                 MirInstructionBuilder instBuilder(m_bCtx, fixup.m_targetInstruction);
                 instBuilder.swapOperand(fixup.m_targetInstruction, fnRef, fixup.m_operandIndex);
+                if (m_diag)
+                {
+                    m_diag->trace("MirParser", "Resolved function reference '@{}'", fixup.m_symbolName) << fixup.m_ref;
+                }
             }
             else if (!fn)
             {
-                // Also check runtime symbols or emit error
                 if (m_diag)
                 {
                     m_diag->error("MirParser", "Undefined function '@{}'", fixup.m_symbolName) << fixup.m_ref;
@@ -547,6 +783,11 @@ bool MirParserContext::resolveAllPendingFixups()
                 MirReference *gvRef = opBuilder.buildRef(gv, 0, fixup.m_ref);
                 MirInstructionBuilder instBuilder(m_bCtx, fixup.m_targetInstruction);
                 instBuilder.swapOperand(fixup.m_targetInstruction, gvRef, fixup.m_operandIndex);
+                if (m_diag)
+                {
+                    m_diag->trace("MirParser", "Resolved global variable reference '@{}'", fixup.m_symbolName)
+                            << fixup.m_ref;
+                }
             }
             else if (!gv)
             {
@@ -561,6 +802,7 @@ bool MirParserContext::resolveAllPendingFixups()
     }
 
     m_pendingFixups.clear();
+    m_currentInstructionFixups.clear();
     return success;
 }
 
