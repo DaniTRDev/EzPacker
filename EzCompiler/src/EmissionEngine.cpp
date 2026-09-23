@@ -16,6 +16,7 @@
 #include "Operand/MirOperands.h"
 #include "GlobalVar/MirGlobalVar.h"
 #include "Type/MirType.h"
+#include "FlexNumber/FlexInt.h"
 #include "FlexNumber/FlexFloat.h"
 #include <filesystem>
 #include <fstream>
@@ -94,9 +95,13 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         gvarById[gvar->getId()] = gvar;
 
-        // Size the object from its pointee type, rounding bits up to whole bytes.
-        MirType *pointeeType = gvar->getType() ? gvar->getType()->getPointedType() : nullptr;
-        size_t gvSize = pointeeType ? (pointeeType->getTotalSizeInBits() + 7) / 8 : 8;
+        // Size the object from its value or pointee type, rounding bits up to whole bytes.
+        MirType *valType = gvar->getType();
+        if (valType && valType->getKind() == MirTypeKind::Pointer && valType->getPointedType())
+        {
+            valType = valType->getPointedType();
+        }
+        size_t gvSize = valType ? (valType->getTotalSizeInBits() + 7) / 8 : 8;
         if (gvSize == 0)
         {
             gvSize = 8;
@@ -114,7 +119,14 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         if (init && init->getType() == MirOperandType::Integer)
         {
-            if (init->get<MirInteger>()->getValue().getI64() == 0)
+            if (init->get<MirInteger>()->getValue().isZero())
+            {
+                isZero = true;
+            }
+        }
+        else if (init && init->getType() == MirOperandType::FloatingPoint)
+        {
+            if (init->get<MirFloat>()->getValue().isZero())
             {
                 isZero = true;
             }
@@ -154,27 +166,16 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
             }
             else if (init && init->getType() == MirOperandType::Integer)
             {
-                int64_t val = init->get<MirInteger>()->getValue().getI64();
                 std::vector<uint8_t> valBytes(gvSize, 0);
-                for (size_t b = 0; b < gvSize && b < 8; ++b)
-                {
-                    valBytes[b] = static_cast<uint8_t>((val >> (b * 8)) & 0xFF);
-                }
+                const FlexInt &val = init->get<MirInteger>()->getValue();
+                val.writeBytes(valBytes, Endianness::Little);
                 sec->emitBytes(valBytes.data(), valBytes.size());
             }
             else if (init && init->getType() == MirOperandType::FloatingPoint)
             {
                 std::vector<uint8_t> valBytes(gvSize, 0);
-                if (gvSize == 4)
-                {
-                    float fval = init->get<MirFloat>()->getValue().getFloat();
-                    std::memcpy(valBytes.data(), &fval, 4);
-                }
-                else
-                {
-                    double dval = init->get<MirFloat>()->getValue().getDouble();
-                    std::memcpy(valBytes.data(), &dval, std::min<size_t>(gvSize, 8));
-                }
+                const FlexFloat &fval = init->get<MirFloat>()->getValue();
+                fval.writeIeeeBytes(valBytes, Endianness::Little);
                 sec->emitBytes(valBytes.data(), valBytes.size());
             }
             else

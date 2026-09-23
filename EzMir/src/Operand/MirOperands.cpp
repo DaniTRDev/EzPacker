@@ -30,12 +30,16 @@ MirInteger::MirInteger(MirType *type, FlexInt value, SourceReference *ref) : Mir
 std::string MirInteger::toString() const
 {
     std::string_view typeName = getMirType() ? getMirType()->getName() : "i64";
-    int64_t val = m_int.getI64();
-    if (val >= 0 && val <= 9)
+    if (m_int.getBitSize() <= 64)
     {
-        return std::format("{} {}", typeName, val);
+        int64_t val = m_int.getI64();
+        if (val >= 0 && val <= 9)
+        {
+            return std::format("{} {}", typeName, val);
+        }
+        return std::format("{} 0x{:X}", typeName, val);
     }
-    return std::format("{} 0x{:X}", typeName, val);
+    return std::format("{} 0x{}", typeName, m_int.toString(16));
 }
 
 /**

@@ -217,3 +217,65 @@ TEST_F(EzCompilerTestSuite, TestUnsupportedSourceFormatRejected)
 
     std::filesystem::remove(srcPath);
 }
+
+// Compiles a module with 128-bit and 256-bit globals through the full pipeline and verifies byte serialization in object output.
+TEST_F(EzCompilerTestSuite, TestArbitraryPrecisionGlobalEmission)
+{
+    const std::string mirPath = "test_big_globals.mir";
+    const std::string outPath = "test_big_globals.o";
+    const std::string mirContent = R"mir(
+@g_imm128 = internal var i128 = 0x112233445566778899aabbccddeeff00;
+@g_imm256 = internal var i256 = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef;
+
+fn @main() -> i64 {
+entry:
+    %v0 = MOV i64 0;
+    RET i64 %v0;
+}
+)mir";
+
+    {
+        std::ofstream out(mirPath);
+        out << mirContent;
+    }
+
+    CommandLineOptions options;
+    options.inputFilePath = mirPath;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.outputFilePath = outPath;
+    options.emissionStage = EmissionStage::Object;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    ASSERT_TRUE(MirModuleLoader::loadMirFile(ctx, mirPath, *ctx.getBuilderContext()));
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    EmissionEngine emitter(ctx);
+    EXPECT_TRUE(emitter.emitModule(*ctx.getBuilderContext(), outPath));
+
+    ASSERT_TRUE(std::filesystem::exists(outPath));
+    uintmax_t fileSize = std::filesystem::file_size(outPath);
+    ASSERT_GE(fileSize, 64u);
+
+    // Read full object file bytes
+    std::ifstream inFile(outPath, std::ios::binary);
+    ASSERT_TRUE(inFile.is_open());
+    std::vector<uint8_t> fileBytes((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+    inFile.close();
+
+    // Verify 16-byte pattern of 0x112233445566778899aabbccddeeff00 is present in full width (not truncated to 8 bytes)
+    const std::vector<uint8_t> expected128 = {
+        0x00, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99,
+        0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11
+    };
+
+    auto it = std::search(fileBytes.begin(), fileBytes.end(), expected128.begin(), expected128.end());
+    EXPECT_NE(it, fileBytes.end()) << "Full 16-byte sequence for 128-bit integer was not found in object output!";
+
+    std::filesystem::remove(mirPath);
+    std::filesystem::remove(outPath);
+}
+

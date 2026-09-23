@@ -182,14 +182,14 @@ Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserConte
         return nullptr;
     }
 
-    const auto &tok = lexer.peekToken();
+    const auto &peek = lexer.peekToken();
     auto *mr = pCtx.getArena();
     std::pmr::polymorphic_allocator<Ast::MirAstType> alloc(mr);
 
     // Pointer type: ptr or ptr<Type>
-    if (tok.m_kind == Parser::MirTokenKind::TypePtr)
+    if (peek.m_kind == Parser::MirTokenKind::TypePtr)
     {
-        lexer.nextToken();
+        auto tok = lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Pointer;
         astType->m_name = "ptr";
@@ -208,12 +208,12 @@ Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserConte
     }
 
     // Array type: [14 x i8]
-    if (tok.m_kind == Parser::MirTokenKind::LBracket)
+    if (peek.m_kind == Parser::MirTokenKind::LBracket)
     {
-        lexer.nextToken(); // Consume '['
+        auto bracketTok = lexer.nextToken(); // Consume '['
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Array;
-        astType->m_ref = tok.m_ref;
+        astType->m_ref = bracketTok.m_ref;
 
         const auto &sizeTok = lexer.peekToken();
         if (sizeTok.m_kind != Parser::MirTokenKind::IntegerLiteral)
@@ -248,51 +248,47 @@ Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserConte
     }
 
     // Void type
-    if (tok.m_kind == Parser::MirTokenKind::TypeVoid)
+    if (peek.m_kind == Parser::MirTokenKind::TypeVoid)
     {
+        auto tok = lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Void;
         astType->m_name = "void";
         astType->m_ref = tok.m_ref;
-
-        lexer.nextToken();
         return astType;
     }
 
     // Token type
-    if (tok.m_kind == Parser::MirTokenKind::TypeToken)
+    if (peek.m_kind == Parser::MirTokenKind::TypeToken)
     {
+        auto tok = lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Token;
         astType->m_name = tok.m_text;
         astType->m_ref = tok.m_ref;
-
-        lexer.nextToken();
         return astType;
     }
 
     // Primitive integer / float types: i1..i256, f32..f128, and custom iN/fN
-    if ((tok.m_kind >= Parser::MirTokenKind::TypeI1 && tok.m_kind <= Parser::MirTokenKind::TypeF128) ||
-        tok.m_kind == Parser::MirTokenKind::TypeCustom)
+    if ((peek.m_kind >= Parser::MirTokenKind::TypeI1 && peek.m_kind <= Parser::MirTokenKind::TypeF128) ||
+        peek.m_kind == Parser::MirTokenKind::TypeCustom)
     {
+        auto tok = lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Primitive;
         astType->m_name = tok.m_text;
         astType->m_ref = tok.m_ref;
-
-        lexer.nextToken();
         return astType;
     }
 
     // Unknown or identifier type
-    if (tok.m_kind == Parser::MirTokenKind::Identifier)
+    if (peek.m_kind == Parser::MirTokenKind::Identifier)
     {
+        auto tok = lexer.nextToken();
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Primitive;
         astType->m_name = tok.m_text;
         astType->m_ref = tok.m_ref;
-
-        lexer.nextToken();
         return astType;
     }
 
@@ -312,12 +308,12 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
         lexer.nextToken(); // Consume type prefix
     }
 
-    const auto &tok = lexer.peekToken();
+    const auto &peek = lexer.peekToken();
     auto *mr = pCtx.getArena();
 
-    if (tok.m_kind == Parser::MirTokenKind::IntegerLiteral)
+    if (peek.m_kind == Parser::MirTokenKind::IntegerLiteral)
     {
-        lexer.nextToken();
+        auto tok = lexer.nextToken();
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::Integer;
         init.m_intVal = tok.m_intVal;
@@ -326,9 +322,9 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
         return init;
     }
 
-    if (tok.m_kind == Parser::MirTokenKind::FloatLiteral)
+    if (peek.m_kind == Parser::MirTokenKind::FloatLiteral)
     {
-        lexer.nextToken();
+        auto tok = lexer.nextToken();
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::Float;
         init.m_floatVal = tok.m_floatVal;
@@ -337,9 +333,9 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
         return init;
     }
 
-    if (tok.m_kind == Parser::MirTokenKind::StringLiteral)
+    if (peek.m_kind == Parser::MirTokenKind::StringLiteral)
     {
-        lexer.nextToken();
+        auto tok = lexer.nextToken();
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::String;
         init.m_strVal = tok.m_strVal;
@@ -348,9 +344,9 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
     }
 
     // Array constant: [ c1, c2, ... ]
-    if (tok.m_kind == Parser::MirTokenKind::LBracket)
+    if (peek.m_kind == Parser::MirTokenKind::LBracket)
     {
-        lexer.nextToken();
+        auto tok = lexer.nextToken();
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::Array;
         init.m_ref = tok.m_ref;
@@ -373,19 +369,19 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
     }
 
     // Zero-initializer identifier or <zeroinit>
-    if (tok.m_kind == Parser::MirTokenKind::Identifier && (tok.m_text == "zeroinitializer" || tok.m_text == "zeroinit"))
+    if (peek.m_kind == Parser::MirTokenKind::Identifier && (peek.m_text == "zeroinitializer" || peek.m_text == "zeroinit"))
     {
-        lexer.nextToken();
+        auto tok = lexer.nextToken();
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::ZeroInit;
         init.m_ref = tok.m_ref;
         return init;
     }
 
-    if (tok.m_kind == Parser::MirTokenKind::LAngle)
+    if (peek.m_kind == Parser::MirTokenKind::LAngle)
     {
         lexer.nextToken();
-        const auto &idTok = lexer.nextToken();
+        const auto idTok = lexer.nextToken();
         matchToken(lexer, Parser::MirTokenKind::RAngle, "Expected '>' after zeroinit");
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::ZeroInit;
