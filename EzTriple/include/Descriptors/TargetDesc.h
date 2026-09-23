@@ -3,6 +3,7 @@
 
 #include "EzTripleCommon.h"
 #include "Operand/MirRegisterReference.h"
+#include "Descriptors/TargetExtensionSet.h"
 
 #include <memory>
 
@@ -123,6 +124,46 @@ class TargetDesc
      * in-place relocation patching.
      */
     virtual TargetRelocationResolver *getRelocationResolver() { return nullptr; }
+
+    /**
+     * Checks if the specified extension is enabled for this target.
+     */
+    virtual bool hasExtension(std::string_view name) const { return m_extensions.has(name); }
+
+    /**
+     * Checks if an extension is supported and recognized by this target.
+     */
+    virtual bool isExtensionSupported(std::string_view name) const { return m_extensions.isSupported(name); }
+
+    /**
+     * Enables or disables an extension on this target.
+     */
+    virtual bool setExtension(std::string_view name, bool enabled = true) { return m_extensions.set(name, enabled); }
+
+    /**
+     * Applies a list of feature modifiers (e.g. {"+avx", "-sse"}).
+     */
+    virtual bool applyFeatures(const std::vector<std::string> &features, std::string *outError = nullptr)
+    {
+        return m_extensions.applyFeatures(features, outError);
+    }
+
+    /**
+     * Applies a comma-separated feature string (e.g. "+avx2,-sse4.1").
+     */
+    virtual bool applyFeatureString(std::string_view featureString, std::string *outError = nullptr)
+    {
+        return m_extensions.applyFeatureString(featureString, outError);
+    }
+
+    /**
+     * Returns the target's extension set.
+     */
+    const TargetExtensionSet &getExtensionSet() const { return m_extensions; }
+    TargetExtensionSet &getExtensionSet() { return m_extensions; }
+
+  protected:
+    TargetExtensionSet m_extensions;
 };
 
 #endif // EZTRIPLE_TARGET_DESC_H

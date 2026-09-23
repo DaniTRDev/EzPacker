@@ -28,6 +28,16 @@ X86_64TargetDesc::X86_64TargetDesc(MirBuilderContext *ctx) :
     m_convs(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),
     m_binaries(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource())
 {
+    m_extensions.registerExtension("sse", "Streaming SIMD Extensions", true);
+    m_extensions.registerExtension("sse2", "Streaming SIMD Extensions 2", true, { "sse" });
+    m_extensions.registerExtension("sse3", "Streaming SIMD Extensions 3", false, { "sse2" });
+    m_extensions.registerExtension("ssse3", "Supplemental Streaming SIMD Extensions 3", false, { "sse3" });
+    m_extensions.registerExtension("sse4_1", "Streaming SIMD Extensions 4.1", false, { "ssse3" });
+    m_extensions.registerExtension("sse4.1", "Streaming SIMD Extensions 4.1", false, { "sse4_1" });
+    m_extensions.registerExtension("sse4_2", "Streaming SIMD Extensions 4.2", false, { "sse4_1" });
+    m_extensions.registerExtension("sse4.2", "Streaming SIMD Extensions 4.2", false, { "sse4_2" });
+    m_extensions.registerExtension("avx", "Advanced Vector Extensions", false, { "sse4_2" });
+    m_extensions.registerExtension("avx2", "Advanced Vector Extensions 2", false, { "avx" });
 }
 
 /**

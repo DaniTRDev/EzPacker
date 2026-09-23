@@ -59,3 +59,11 @@ EzPacker_AddTest(
         "tests/T_X86_64RelocationResolver.cpp"
 )
 
+EzPacker_AddTest(
+        "T_TargetExtensionSet"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_TargetExtensionSet.cpp"
+)
+
+
