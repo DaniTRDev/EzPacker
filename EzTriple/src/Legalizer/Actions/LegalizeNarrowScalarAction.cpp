@@ -47,21 +47,11 @@ splitOperand(MirOperand *op,
     if (op->isOfType<MirInteger>())
     {
         MirInteger *imm = op->get<MirInteger>();
-        if (numChunks == 2)
-        {
-            FlexInt loVal = imm->getValue().getLowHalf();
-            FlexInt hiVal = imm->getValue().getHighHalf();
-            chunks.push_back(ob.buildInt(narrowType, loVal));
-            chunks.push_back(ob.buildInt(narrowType, hiVal));
-            return chunks;
-        }
-
-        uint64_t rawVal = imm->getValue().getU64();
-        uint64_t mask = (narrowBits >= 64) ? ~0ULL : ((1ULL << narrowBits) - 1ULL);
+        const FlexInt &val = imm->getValue();
         for (size_t k = 0; k < numChunks; ++k)
         {
-            uint64_t piece = (k * narrowBits < 64) ? ((rawVal >> (k * narrowBits)) & mask) : 0ULL;
-            chunks.push_back(ob.buildInt(narrowType, FlexInt(piece, narrowBits)));
+            FlexInt piece = val.extractBits(k * narrowBits, narrowBits, false);
+            chunks.push_back(ob.buildInt(narrowType, std::move(piece)));
         }
         return chunks;
     }

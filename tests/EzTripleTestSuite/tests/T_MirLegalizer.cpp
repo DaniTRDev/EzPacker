@@ -506,3 +506,131 @@ TEST_F(MirLegalizerTest, TestLegalizerCycleDetection)
     bool ok = legalizer.legalizeBlock(block);
     EXPECT_FALSE(ok);
 }
+
+// Verifies narrowing a 128-bit instruction with a big integer immediate extracts both halves without 64-bit truncation.
+TEST_F(MirLegalizerTest, TestNarrowScalarBigImmediate)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_imm128_test", typeTable->i64());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    // 128-bit literal: 0x1122334455667788_99aabbccddeeff00
+    FlexInt bigVal("0x112233445566778899aabbccddeeff00", 128, false);
+    MirInteger *imm = ob.buildInt(typeTable->i128(), bigVal);
+
+    ib.ADD(dst, lhs, imm);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify lowered sequence: UNMERGE (lhs), UADDO, UADDE, MERGE
+    auto &instructions = block->getInstructions();
+    ASSERT_EQ(instructions.size(), 4);
+    std::vector<MirInstruction *> instList(instructions.begin(), instructions.end());
+
+    // Instruction 1: UADDO dst0, carry, lhs0, imm_lo
+    MirInstruction *uaddo = instList[1];
+    EXPECT_EQ(uaddo->getOpCode(), MirInstructionOpCode::UADDO);
+    ASSERT_GE(uaddo->getOperandCount(), 4);
+    auto *immLo = dynamic_cast<MirInteger *>(uaddo->getOperand(3));
+    ASSERT_NE(immLo, nullptr);
+    EXPECT_EQ(immLo->getValue().getU64(), 0x99aabbccddeeff00ULL);
+
+    // Instruction 2: UADDE dst1, carryOut, lhs1, imm_hi, carry
+    MirInstruction *uadde = instList[2];
+    EXPECT_EQ(uadde->getOpCode(), MirInstructionOpCode::UADDE);
+    ASSERT_GE(uadde->getOperandCount(), 5);
+    auto *immHi = dynamic_cast<MirInteger *>(uadde->getOperand(3));
+    ASSERT_NE(immHi, nullptr);
+    EXPECT_EQ(immHi->getValue().getU64(), 0x1122334455667788ULL);
+}
+
+// Verifies narrowing a 256-bit instruction with a 4-chunk big integer immediate extracts all 4 64-bit chunks accurately.
+TEST_F(MirLegalizerTest, TestNarrowScalar256BitImmediate)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_imm256_test", typeTable->i64());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i256(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i256(), "lhs");
+    // 256-bit literal with non-zero words at all 4 positions
+    FlexInt bigVal256("0x44444444333333332222222211111111", 256, false);
+    // Let's set word 0: 0x11111111, word 1: 0x22222222, word 2: 0x33333333, word 3: 0x44444444
+    std::vector<uint64_t> limbs = { 0x0123456789abcdefULL, 0xfedcba9876543210ULL, 0x1111222233334444ULL, 0x5555666677778888ULL };
+    FlexInt limbVal = FlexInt::fromLimbs64(limbs, 256, false);
+    MirInteger *imm = ob.buildInt(typeTable->i256(), limbVal);
+
+    ib.XOR(dst, lhs, imm);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify lowered sequence: UNMERGE (lhs), XOR x 4, MERGE
+    auto &instructions = block->getInstructions();
+    ASSERT_EQ(instructions.size(), 6);
+    std::vector<MirInstruction *> instList256(instructions.begin(), instructions.end());
+
+    for (size_t k = 0; k < 4; ++k)
+    {
+        MirInstruction *xorInst = instList256[1 + k];
+        EXPECT_EQ(xorInst->getOpCode(), MirInstructionOpCode::XOR);
+        ASSERT_GE(xorInst->getOperandCount(), 3);
+        auto *chunkImm = dynamic_cast<MirInteger *>(xorInst->getOperand(2));
+        ASSERT_NE(chunkImm, nullptr);
+        EXPECT_EQ(chunkImm->getValue().getU64(), limbs[k]) << "Chunk " << k << " mismatch!";
+    }
+}
+
+// Verifies that a 128-bit division is lowered to __divti3 runtime libcall.
+TEST_F(MirLegalizerTest, TestLibcall128BitDivision)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("libcall128_test", typeTable->i128());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.SDIV(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, "__divti3");
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CALL instruction is emitted targeting __divti3
+    bool foundCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            foundCall = true;
+            ASSERT_GE(inst->getOperandCount(), 2);
+            auto *rtSym = dynamic_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+            ASSERT_NE(rtSym, nullptr);
+            EXPECT_EQ(rtSym->getSymbolName(), "__divti3");
+        }
+    }
+    EXPECT_TRUE(foundCall);
+}
+
