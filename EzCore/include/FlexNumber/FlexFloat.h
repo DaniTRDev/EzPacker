@@ -193,7 +193,8 @@ class FlexFloat
     /**
      * Deserializes raw IEEE 754 binary interchange bytes into a FlexFloat.
      */
-    static FlexFloat readIeeeBytes(std::span<const uint8_t> src, size_t bitWidth, Endianness endian = Endianness::Little);
+    static FlexFloat
+    readIeeeBytes(std::span<const uint8_t> src, size_t bitWidth, Endianness endian = Endianness::Little);
 
     /**
      * Bitcasts the float directly into a FlexInt containing the raw IEEE 754 binary pattern.
@@ -231,7 +232,7 @@ class FlexFloat
 
     /**
      * Shared implementation of the value-returning arithmetic operators: copies this instance and
-     * applies op (a pointer to a compound-assignment member) to the copy.
+     * applies op (a pointer to a compound-assignment member) to the copy. Op is an operator.
      */
     template <typename Op> FlexFloat applyBinary(const FlexFloat &other, Op op) const
     {
