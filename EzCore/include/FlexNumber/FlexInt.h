@@ -2,6 +2,25 @@
 #define EZCORE_FLEX_INT_H
 
 #include "EzCoreCommon.h"
+#include <span>
+
+/**
+ * Overflow handling behavior for arithmetic clamping.
+ */
+enum class OverflowPolicy
+{
+    Wrap, // Silent two's-complement modular wrap-around modulo 2^N (standard compiler IR behavior)
+    Trap  // Throws std::overflow_error or std::underflow_error upon range boundary violation
+};
+
+/**
+ * Endianness format for raw byte serialization and deserialization.
+ */
+enum class Endianness
+{
+    Little,
+    Big
+};
 
 /**
  * Multi-precision arbitrary-width integer wrapper built atop LibTomMath's mp_int structure.
@@ -199,6 +218,116 @@ class FlexInt
     size_t getBitSize() const noexcept;
 
     /**
+     * Constructs a multi-precision integer from an array of 64-bit limbs in little-endian order.
+     */
+    static FlexInt fromLimbs64(std::span<const uint64_t> limbs, size_t bitWidth, bool isSigned);
+
+    /**
+     * Adds other to this and stores in result, returning true if an overflow or underflow occurred.
+     */
+    bool addWithOverflow(const FlexInt &other, FlexInt &result) const;
+
+    /**
+     * Subtracts other from this and stores in result, returning true if an overflow or underflow occurred.
+     */
+    bool subWithOverflow(const FlexInt &other, FlexInt &result) const;
+
+    /**
+     * Multiplies other with this and stores in result, returning true if an overflow or underflow occurred.
+     */
+    bool mulWithOverflow(const FlexInt &other, FlexInt &result) const;
+
+    /**
+     * Returns the bitwise NOT (ones' complement) of this integer.
+     */
+    FlexInt operator~() const;
+
+    /**
+     * Returns the bitwise AND of this integer and other.
+     */
+    FlexInt operator&(const FlexInt &other) const;
+
+    /**
+     * Bitwise ANDs other into this value in-place.
+     */
+    FlexInt &operator&=(const FlexInt &other);
+
+    /**
+     * Returns the bitwise OR of this integer and other.
+     */
+    FlexInt operator|(const FlexInt &other) const;
+
+    /**
+     * Bitwise ORs other into this value in-place.
+     */
+    FlexInt &operator|=(const FlexInt &other);
+
+    /**
+     * Returns the bitwise XOR of this integer and other.
+     */
+    FlexInt operator^(const FlexInt &other) const;
+
+    /**
+     * Bitwise XORs other into this value in-place.
+     */
+    FlexInt &operator^=(const FlexInt &other);
+
+    /**
+     * Performs a logical shift left (<<) by shiftBits, filling vacated bits with zeros.
+     */
+    FlexInt shl(size_t shiftBits) const;
+
+    /**
+     * Performs a logical shift right by shiftBits, filling vacated bits with zeros.
+     */
+    FlexInt lshr(size_t shiftBits) const;
+
+    /**
+     * Performs an arithmetic shift right by shiftBits, filling vacated bits with sign bits.
+     */
+    FlexInt ashr(size_t shiftBits) const;
+
+    /**
+     * Bitwise left shift operator.
+     */
+    FlexInt operator<<(size_t shiftBits) const { return shl(shiftBits); }
+
+    /**
+     * Bitwise right shift operator (arithmetic if signed, logical if unsigned).
+     */
+    FlexInt operator>>(size_t shiftBits) const { return m_isSigned ? ashr(shiftBits) : lshr(shiftBits); }
+
+    /**
+     * In-place bitwise left shift operator.
+     */
+    FlexInt &operator<<=(size_t shiftBits);
+
+    /**
+     * In-place bitwise right shift operator.
+     */
+    FlexInt &operator>>=(size_t shiftBits);
+
+    /**
+     * Extracts an arbitrary slice of bits [startBit, startBit + numBits - 1].
+     */
+    FlexInt extractBits(size_t startBit, size_t numBits, bool resultSigned = false) const;
+
+    /**
+     * Extracts the k-th 64-bit word of this integer (wordIndex * 64 .. wordIndex * 64 + 63).
+     */
+    uint64_t extractWord64(size_t wordIndex) const;
+
+    /**
+     * Serializes the two's complement binary representation into the destination byte span.
+     */
+    void writeBytes(std::span<uint8_t> dest, Endianness endian = Endianness::Little) const;
+
+    /**
+     * Deserializes raw binary bytes into a FlexInt of the specified width and signedness.
+     */
+    static FlexInt readBytes(std::span<const uint8_t> src, size_t bitWidth, bool isSigned, Endianness endian = Endianness::Little);
+
+    /**
      * Extends or truncates the integer to a new bit size and signedness representation.
      */
     void extend(size_t newBitSize, bool isSigned);
@@ -208,12 +337,14 @@ class FlexInt
      */
     std::string toString(size_t radix = 10) const;
 
-  private:
+  public:
     /**
      * Enforces two's complement bit bounds, wrapping or sign-extending values to strictly fit within m_bitWidth.
+     * Returns true if an overflow or underflow occurred.
      */
-    void clampToTwosComplement();
+    bool clampToTwosComplement(OverflowPolicy policy = OverflowPolicy::Wrap);
 
+  private:
     /**
      * Throws std::invalid_argument when other's bit width or signedness does not match this instance.
      */

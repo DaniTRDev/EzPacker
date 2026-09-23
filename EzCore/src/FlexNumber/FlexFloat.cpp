@@ -19,9 +19,9 @@ FlexFloat::FlexFloat(size_t bitWidth) : m_bitWidth(bitWidth), m_lastErr(0)
 {
     // Sub-32-bit layouts need dedicated exponent/mantissa handling that is not implemented, so
     // reject them instead of silently keeping binary32 precision/range.
-    if (bitWidth != 0 && bitWidth < 32)
+    if (bitWidth != 0 && bitWidth < 16)
     {
-        throw std::invalid_argument("FlexFloat does not support widths below 32 bits.");
+        throw std::invalid_argument("FlexFloat does not support widths below 16 bits.");
     }
 
     libbf::bf_context_init(&m_bfCtx, bf_realloc_wrapper, nullptr);
@@ -362,6 +362,8 @@ size_t FlexFloat::getBitSize() const noexcept { return m_bitWidth; }
  */
 libbf::limb_t FlexFloat::getPrecBits() const
 {
+    if (m_bitWidth == 16)
+        return 11; // binary16 mantissa
     if (m_bitWidth <= 32)
         return 24; // binary32 mantissa
     if (m_bitWidth <= 64)
@@ -440,8 +442,8 @@ void FlexFloat::extend(size_t newBitSize)
     if (newBitSize < m_bitWidth)
         throw std::invalid_argument("FlexFloat::extend cannot be used to down-cast precision widths.");
 
-    if (newBitSize != 0 && newBitSize < 32)
-        throw std::invalid_argument("FlexFloat does not support widths below 32 bits.");
+    if (newBitSize != 0 && newBitSize < 16)
+        throw std::invalid_argument("FlexFloat does not support widths below 16 bits.");
 
     if (newBitSize == m_bitWidth)
         return;
@@ -486,7 +488,11 @@ void FlexFloat::clampToFloatBounds()
         double currentVal;
         libbf::bf_get_float64(&m_number, &currentVal, libbf::BF_RNDN);
 
-        if (m_bitWidth == 32)
+        if (m_bitWidth == 16)
+        {
+            libbf::bf_round(&m_number, 11, libbf::BF_RNDN);
+        }
+        else if (m_bitWidth == 32)
         {
             if (currentVal > static_cast<double>(std::numeric_limits<float>::max()))
                 throw std::overflow_error("FlexFloat arithmetic caused an f32 precision target overflow.");
@@ -506,4 +512,197 @@ void FlexFloat::clampToFloatBounds()
     {
         libbf::bf_round(&m_number, getPrecBits(), libbf::BF_RNDN);
     }
+}
+
+namespace
+{
+struct IeeeParams
+{
+    size_t totalBits;
+    size_t expBits;
+    size_t prec;
+    int64_t bias;
+};
+
+static IeeeParams getIeeeParams(size_t bitWidth)
+{
+    if (bitWidth == 16)
+        return { 16, 5, 11, 15 };
+    if (bitWidth == 32)
+        return { 32, 8, 24, 127 };
+    if (bitWidth == 64)
+        return { 64, 11, 53, 1023 };
+    if (bitWidth == 128)
+        return { 128, 15, 113, 16383 };
+    if (bitWidth == 256)
+        return { 256, 19, 237, 262143 };
+
+    size_t expBits = static_cast<size_t>(std::round(4.0 * std::log2(static_cast<double>(bitWidth)))) - 13;
+    size_t prec = bitWidth - expBits;
+    int64_t bias = (1LL << (expBits - 1)) - 1;
+    return { bitWidth, expBits, prec, bias };
+}
+} // namespace
+
+FlexInt FlexFloat::bitcastToFlexInt() const
+{
+    auto p = getIeeeParams(m_bitWidth);
+    size_t fracBits = p.prec - 1;
+
+    libbf::bf_t b_s;
+    libbf::bf_t *b = &b_s;
+    libbf::bf_init(const_cast<libbf::bf_context_t *>(&m_bfCtx), b);
+    libbf::bf_set(b, &m_number);
+
+    if (libbf::bf_is_finite(b))
+    {
+        libbf::bf_round(b, static_cast<libbf::limb_t>(p.prec),
+                        libbf::BF_RNDN | BF_FLAG_SUBNORMAL | libbf::bf_set_exp_bits(static_cast<int>(p.expBits)));
+    }
+
+    FlexInt rawBits(uint64_t(0), p.totalBits);
+    uint64_t sgn = b->sign ? 1ULL : 0ULL;
+    FlexInt signPart = FlexInt(sgn, p.totalBits).shl(p.totalBits - 1);
+
+    if (libbf::bf_is_nan(b))
+    {
+        uint64_t maxExp = (1ULL << p.expBits) - 1ULL;
+        FlexInt expPart = FlexInt(maxExp, p.totalBits).shl(fracBits);
+        FlexInt fracPart = FlexInt(uint64_t(1), p.totalBits).shl(fracBits - 1);
+        rawBits = signPart | expPart | fracPart;
+    }
+    else if (b->expn == BF_EXP_INF)
+    {
+        uint64_t maxExp = (1ULL << p.expBits) - 1ULL;
+        FlexInt expPart = FlexInt(maxExp, p.totalBits).shl(fracBits);
+        rawBits = signPart | expPart;
+    }
+    else if (b->expn == BF_EXP_ZERO || b->len == 0)
+    {
+        rawBits = signPart;
+    }
+    else
+    {
+        int64_t e = b->expn + p.bias - 1;
+        std::vector<uint64_t> limbs(b->len);
+        for (libbf::limb_t i = 0; i < b->len; ++i)
+        {
+            limbs[i] = static_cast<uint64_t>(b->tab[i]);
+        }
+        size_t mantissaBitWidth = b->len * LIMB_BITS;
+        FlexInt mantissaInt = FlexInt::fromLimbs64(limbs, mantissaBitWidth, false);
+        size_t msbPos = mantissaBitWidth - 1;
+
+        FlexInt fracPart(uint64_t(0), p.totalBits);
+        uint64_t expField = 0;
+
+        if (e <= 0)
+        {
+            // Subnormal
+            expField = 0;
+            size_t shift = static_cast<size_t>(1 - e);
+            if (shift <= fracBits)
+            {
+                size_t numExtract = fracBits + 1 - shift;
+                size_t startBit = msbPos + 1 - numExtract;
+                FlexInt extracted = mantissaInt.extractBits(startBit, numExtract, false);
+                for (size_t k = 0; k < numExtract; ++k)
+                {
+                    if (extracted.extractBits(k, 1, false).getU64() != 0)
+                    {
+                        fracPart |= FlexInt(uint64_t(1), p.totalBits).shl(k);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Normal
+            expField = static_cast<uint64_t>(e);
+            size_t startBit = (msbPos >= fracBits) ? (msbPos - fracBits) : 0;
+            size_t count = (msbPos >= fracBits) ? fracBits : msbPos;
+            FlexInt extracted = mantissaInt.extractBits(startBit, count, false);
+            size_t shiftUp = fracBits - count;
+            for (size_t k = 0; k < count; ++k)
+            {
+                if (extracted.extractBits(k, 1, false).getU64() != 0)
+                {
+                    fracPart |= FlexInt(uint64_t(1), p.totalBits).shl(k + shiftUp);
+                }
+            }
+        }
+
+        FlexInt expPart = FlexInt(expField, p.totalBits).shl(fracBits);
+        rawBits = signPart | expPart | fracPart;
+    }
+
+    libbf::bf_delete(b);
+    return rawBits;
+}
+
+FlexFloat FlexFloat::bitcastFromFlexInt(const FlexInt &rawBits, size_t bitWidth)
+{
+    auto p = getIeeeParams(bitWidth);
+    size_t fracBits = p.prec - 1;
+
+    FlexFloat res(bitWidth);
+    uint64_t sgn = rawBits.extractBits(p.totalBits - 1, 1, false).getU64();
+    uint64_t expField = rawBits.extractBits(fracBits, p.expBits, false).getU64();
+    FlexInt frac = rawBits.extractBits(0, fracBits, false);
+    uint64_t maxExp = (1ULL << p.expBits) - 1ULL;
+
+    if (expField == maxExp)
+    {
+        if (frac.isZero())
+        {
+            libbf::bf_set_inf(&res.m_number, static_cast<int>(sgn));
+        }
+        else
+        {
+            libbf::bf_set_nan(&res.m_number);
+        }
+        return res;
+    }
+
+    if (expField == 0)
+    {
+        if (frac.isZero())
+        {
+            libbf::bf_set_zero(&res.m_number, static_cast<int>(sgn));
+            return res;
+        }
+
+        std::string hexStr = frac.toString(16);
+        FlexFloat fracFloat("0x" + hexStr, bitWidth, 16);
+        int64_t shiftExp = (1 - p.bias) - static_cast<int64_t>(fracBits);
+        libbf::bf_mul_2exp(&fracFloat.m_number, shiftExp, res.getPrecBits(), libbf::BF_RNDN);
+        libbf::bf_set(&res.m_number, &fracFloat.m_number);
+        res.m_number.sign = static_cast<int>(sgn);
+        return res;
+    }
+
+    FlexInt fullMantissa(uint64_t(1), fracBits + 2);
+    fullMantissa = fullMantissa.shl(fracBits);
+    FlexInt fracExtended = frac;
+    fracExtended.extend(fracBits + 2, false);
+    fullMantissa |= fracExtended;
+
+    std::string hexStr = fullMantissa.toString(16);
+    FlexFloat mantFloat("0x" + hexStr, bitWidth, 16);
+    int64_t shiftExp = static_cast<int64_t>(expField) - p.bias - static_cast<int64_t>(fracBits);
+    libbf::bf_mul_2exp(&mantFloat.m_number, shiftExp, res.getPrecBits(), libbf::BF_RNDN);
+    libbf::bf_set(&res.m_number, &mantFloat.m_number);
+    res.m_number.sign = static_cast<int>(sgn);
+    return res;
+}
+
+void FlexFloat::writeIeeeBytes(std::span<uint8_t> dest, Endianness endian) const
+{
+    bitcastToFlexInt().writeBytes(dest, endian);
+}
+
+FlexFloat FlexFloat::readIeeeBytes(std::span<const uint8_t> src, size_t bitWidth, Endianness endian)
+{
+    FlexInt rawBits = FlexInt::readBytes(src, bitWidth, false, endian);
+    return bitcastFromFlexInt(rawBits, bitWidth);
 }

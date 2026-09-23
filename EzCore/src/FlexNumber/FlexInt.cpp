@@ -323,8 +323,8 @@ void FlexInt::ensureSplittableWidth() const
 }
 
 /**
- * Returns this value mapped into the unsigned range [0, 2^m_bitWidth): for negative values
- * 2^m_bitWidth is added to the remainder. The caller owns the returned mp_int and must clear it.
+ * Returns this value mapped into the unsigned range [0, 2^m_bitWidth): negative values are
+ * normalized by adding 2^m_bitWidth. The caller owns the returned mp_int and must mp_clear it.
  */
 mp_int FlexInt::normalizedUnsigned() const
 {
@@ -332,23 +332,47 @@ mp_int FlexInt::normalizedUnsigned() const
     if (mp_init(&result) != MP_OKAY)
         throw std::bad_alloc();
 
+    if (m_bitWidth == 0)
+    {
+        mp_zero(&result);
+        return result;
+    }
+
+    if (m_bitWidth <= 64)
+    {
+        uint64_t u = getU64();
+        uint64_t mask = (m_bitWidth == 64) ? ~0ULL : ((1ULL << m_bitWidth) - 1ULL);
+        u &= mask;
+        mp_set_u64(&result, u);
+        return result;
+    }
+
     if (mp_isneg(&m_number) == MP_YES)
     {
-        mp_int fullRange;
-        if (mp_init(&fullRange) != MP_OKAY)
+        mp_int fullRange, magMod;
+        if (mp_init_multi(&fullRange, &magMod, nullptr) != MP_OKAY)
         {
             mp_clear(&result);
             throw std::bad_alloc();
         }
 
         m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
-        m_lastErr = mp_mod(&m_number, &fullRange, &result);
-        m_lastErr = mp_add(&result, &fullRange, &result);
-        mp_clear(&fullRange);
+        m_lastErr = mp_mod_2d(&m_number, static_cast<int>(m_bitWidth), &magMod);
+        magMod.sign = MP_ZPOS;
+
+        if (mp_iszero(&magMod) == MP_YES)
+        {
+            mp_zero(&result);
+        }
+        else
+        {
+            m_lastErr = mp_sub(&fullRange, &magMod, &result);
+        }
+        mp_clear_multi(&fullRange, &magMod, nullptr);
     }
     else
     {
-        m_lastErr = mp_copy(&m_number, &result);
+        m_lastErr = mp_mod_2d(&m_number, static_cast<int>(m_bitWidth), &result);
     }
 
     return result;
@@ -528,16 +552,23 @@ void FlexInt::extend(size_t newBitSize, bool isSigned)
  * (using native 64-bit arithmetic for widths <=64 and libtommath for larger widths), and any
  * overflow/underflow is reported by throwing std::overflow_error / std::underflow_error.
  */
-void FlexInt::clampToTwosComplement()
+/**
+ * Constrains the value to the representable range of m_bitWidth bits: values already in range
+ * return via a bit-count fast path, otherwise the value is truncated/two's-complement wrapped
+ * (using native 64-bit arithmetic for widths <=64 and libtommath for larger widths). If policy is
+ * Trap, overflow/underflow is reported by throwing std::overflow_error / std::underflow_error.
+ * Returns true if an overflow or underflow occurred.
+ */
+bool FlexInt::clampToTwosComplement(OverflowPolicy policy)
 {
     if (m_bitWidth == 0)
-        return;
+        return false;
 
     // -------------------------------------------------------------------------
     // O(1) FAST-PATH: Inspect bit count to verify if m_number already fits
     // -------------------------------------------------------------------------
     if (mp_iszero(&m_number) == MP_YES)
-        return;
+        return false;
 
     bool overflowDetected = false;
     bool underflowDetected = false;
@@ -551,14 +582,14 @@ void FlexInt::clampToTwosComplement()
             // Valid signed range: [-2^(m_bitWidth - 1), 2^(m_bitWidth - 1) - 1]
             if (bits < static_cast<int>(m_bitWidth))
             {
-                return; // Strictly within (-2^(m_bitWidth - 1), 0)
+                return false; // Strictly within (-2^(m_bitWidth - 1), 0)
             }
             else if (bits == static_cast<int>(m_bitWidth))
             {
                 // Fits ONLY if magnitude is exactly 2^(m_bitWidth - 1) (single MSB set)
                 if (mp_cnt_lsb(&m_number) == maxBits)
                 {
-                    return;
+                    return false;
                 }
                 underflowDetected = true;
             }
@@ -572,7 +603,7 @@ void FlexInt::clampToTwosComplement()
             // Positive signed: max value is 2^(m_bitWidth - 1) - 1 (requires <= m_bitWidth - 1 bits)
             if (bits <= maxBits)
             {
-                return;
+                return false;
             }
             overflowDetected = true;
         }
@@ -588,7 +619,7 @@ void FlexInt::clampToTwosComplement()
         {
             if (bits <= static_cast<int>(m_bitWidth))
             {
-                return;
+                return false;
             }
             overflowDetected = true;
         }
@@ -662,16 +693,22 @@ void FlexInt::clampToTwosComplement()
         mp_clear_multi(&fullRange, &modMask, nullptr);
     }
 
-    if (overflowDetected)
+    bool hadOverflow = overflowDetected || underflowDetected;
+    if (policy == OverflowPolicy::Trap)
     {
-        m_lastErr = MP_VAL;
-        throw std::overflow_error("FlexInt arithmetic operation caused an overflow.");
+        if (overflowDetected)
+        {
+            m_lastErr = MP_VAL;
+            throw std::overflow_error("FlexInt arithmetic operation caused an overflow.");
+        }
+        if (underflowDetected)
+        {
+            m_lastErr = MP_VAL;
+            throw std::underflow_error("FlexInt arithmetic operation caused an underflow.");
+        }
     }
-    if (underflowDetected)
-    {
-        m_lastErr = MP_VAL;
-        throw std::underflow_error("FlexInt arithmetic operation caused an underflow.");
-    }
+
+    return hadOverflow;
 }
 
 /**
@@ -697,5 +734,537 @@ std::string FlexInt::toString(size_t radix) const
     if (!res.empty() && res.back() == '\0')
         res.pop_back();
 
+    return res;
+}
+
+/**
+ * Constructs a multi-precision integer from an array of 64-bit limbs in little-endian order.
+ */
+FlexInt FlexInt::fromLimbs64(std::span<const uint64_t> limbs, size_t bitWidth, bool isSigned)
+{
+    FlexInt res(uint64_t(0), bitWidth);
+    res.m_isSigned = isSigned;
+    if (limbs.empty() || bitWidth == 0)
+        return res;
+
+    mp_zero(&res.m_number);
+    for (size_t i = 0; i < limbs.size(); ++i)
+    {
+        if (i * 64 >= bitWidth)
+            break;
+        if (limbs[i] == 0)
+            continue;
+        mp_int limbMp, shiftedLimb;
+        if (res.m_lastErr = mp_init_multi(&limbMp, &shiftedLimb, nullptr); res.m_lastErr != MP_OKAY)
+            throw std::bad_alloc();
+        mp_set_u64(&limbMp, limbs[i]);
+        res.m_lastErr = mp_mul_2d(&limbMp, static_cast<int>(i * 64), &shiftedLimb);
+        res.m_lastErr = mp_add(&res.m_number, &shiftedLimb, &res.m_number);
+        mp_clear_multi(&shiftedLimb, &limbMp, nullptr);
+    }
+    res.clampToTwosComplement(OverflowPolicy::Wrap);
+    return res;
+}
+
+/**
+ * Adds other to this and stores in result, returning true if an overflow or underflow occurred.
+ */
+bool FlexInt::addWithOverflow(const FlexInt &other, FlexInt &result) const
+{
+    checkCompatible(other);
+    result = *this;
+    result.m_lastErr = mp_add(&result.m_number, &other.m_number, &result.m_number);
+    return result.clampToTwosComplement(OverflowPolicy::Wrap);
+}
+
+/**
+ * Subtracts other from this and stores in result, returning true if an overflow or underflow occurred.
+ */
+bool FlexInt::subWithOverflow(const FlexInt &other, FlexInt &result) const
+{
+    checkCompatible(other);
+    result = *this;
+    result.m_lastErr = mp_sub(&result.m_number, &other.m_number, &result.m_number);
+    return result.clampToTwosComplement(OverflowPolicy::Wrap);
+}
+
+/**
+ * Multiplies other with this and stores in result, returning true if an overflow or underflow occurred.
+ */
+bool FlexInt::mulWithOverflow(const FlexInt &other, FlexInt &result) const
+{
+    checkCompatible(other);
+    result = *this;
+    result.m_lastErr = mp_mul(&result.m_number, &other.m_number, &result.m_number);
+    return result.clampToTwosComplement(OverflowPolicy::Wrap);
+}
+
+/**
+ * Returns the bitwise NOT (ones' complement) of this integer.
+ */
+FlexInt FlexInt::operator~() const
+{
+    FlexInt result(uint64_t(0), m_bitWidth);
+    result.m_isSigned = m_isSigned;
+    if (m_bitWidth == 0)
+        return result;
+
+    mp_int norm = normalizedUnsigned();
+    mp_int mask;
+    if (m_lastErr = mp_init(&mask); m_lastErr != MP_OKAY)
+    {
+        mp_clear(&norm);
+        throw std::bad_alloc();
+    }
+    m_lastErr = mp_2expt(&mask, static_cast<int>(m_bitWidth));
+    m_lastErr = mp_decr(&mask);
+    m_lastErr = mp_xor(&norm, &mask, &norm);
+    mp_clear(&mask);
+
+    if (m_isSigned)
+    {
+        mp_int signBit, fullRange;
+        if (m_lastErr = mp_init_multi(&signBit, &fullRange, nullptr); m_lastErr == MP_OKAY)
+        {
+            m_lastErr = mp_2expt(&signBit, static_cast<int>(m_bitWidth - 1));
+            if (mp_cmp(&norm, &signBit) != MP_LT)
+            {
+                m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
+                m_lastErr = mp_sub(&norm, &fullRange, &result.m_number);
+            }
+            else
+            {
+                m_lastErr = mp_copy(&norm, &result.m_number);
+            }
+            mp_clear_multi(&signBit, &fullRange, nullptr);
+        }
+    }
+    else
+    {
+        m_lastErr = mp_copy(&norm, &result.m_number);
+    }
+    mp_clear(&norm);
+    return result;
+}
+
+/**
+ * Returns the bitwise AND of this integer and other.
+ */
+FlexInt FlexInt::operator&(const FlexInt &other) const
+{
+    checkCompatible(other);
+    FlexInt result(uint64_t(0), m_bitWidth);
+    result.m_isSigned = m_isSigned;
+    if (m_bitWidth == 0)
+        return result;
+
+    mp_int normA = normalizedUnsigned();
+    mp_int normB = other.normalizedUnsigned();
+    mp_int andRes;
+    if (m_lastErr = mp_init(&andRes); m_lastErr != MP_OKAY)
+    {
+        mp_clear(&normA);
+        mp_clear(&normB);
+        throw std::bad_alloc();
+    }
+    m_lastErr = mp_and(&normA, &normB, &andRes);
+    mp_clear(&normA);
+    mp_clear(&normB);
+
+    if (m_isSigned)
+    {
+        mp_int signBit, fullRange;
+        if (m_lastErr = mp_init_multi(&signBit, &fullRange, nullptr); m_lastErr == MP_OKAY)
+        {
+            m_lastErr = mp_2expt(&signBit, static_cast<int>(m_bitWidth - 1));
+            if (mp_cmp(&andRes, &signBit) != MP_LT)
+            {
+                m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
+                m_lastErr = mp_sub(&andRes, &fullRange, &result.m_number);
+            }
+            else
+            {
+                m_lastErr = mp_copy(&andRes, &result.m_number);
+            }
+            mp_clear_multi(&signBit, &fullRange, nullptr);
+        }
+    }
+    else
+    {
+        m_lastErr = mp_copy(&andRes, &result.m_number);
+    }
+    mp_clear(&andRes);
+    return result;
+}
+
+/**
+ * Bitwise ANDs other into this value in-place.
+ */
+FlexInt &FlexInt::operator&=(const FlexInt &other)
+{
+    *this = *this & other;
+    return *this;
+}
+
+/**
+ * Returns the bitwise OR of this integer and other.
+ */
+FlexInt FlexInt::operator|(const FlexInt &other) const
+{
+    checkCompatible(other);
+    FlexInt result(uint64_t(0), m_bitWidth);
+    result.m_isSigned = m_isSigned;
+    if (m_bitWidth == 0)
+        return result;
+
+    mp_int normA = normalizedUnsigned();
+    mp_int normB = other.normalizedUnsigned();
+    mp_int orRes;
+    if (m_lastErr = mp_init(&orRes); m_lastErr != MP_OKAY)
+    {
+        mp_clear(&normA);
+        mp_clear(&normB);
+        throw std::bad_alloc();
+    }
+    m_lastErr = mp_or(&normA, &normB, &orRes);
+    mp_clear(&normA);
+    mp_clear(&normB);
+
+    if (m_isSigned)
+    {
+        mp_int signBit, fullRange;
+        if (m_lastErr = mp_init_multi(&signBit, &fullRange, nullptr); m_lastErr == MP_OKAY)
+        {
+            m_lastErr = mp_2expt(&signBit, static_cast<int>(m_bitWidth - 1));
+            if (mp_cmp(&orRes, &signBit) != MP_LT)
+            {
+                m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
+                m_lastErr = mp_sub(&orRes, &fullRange, &result.m_number);
+            }
+            else
+            {
+                m_lastErr = mp_copy(&orRes, &result.m_number);
+            }
+            mp_clear_multi(&signBit, &fullRange, nullptr);
+        }
+    }
+    else
+    {
+        m_lastErr = mp_copy(&orRes, &result.m_number);
+    }
+    mp_clear(&orRes);
+    return result;
+}
+
+/**
+ * Bitwise ORs other into this value in-place.
+ */
+FlexInt &FlexInt::operator|=(const FlexInt &other)
+{
+    *this = *this | other;
+    return *this;
+}
+
+/**
+ * Returns the bitwise XOR of this integer and other.
+ */
+FlexInt FlexInt::operator^(const FlexInt &other) const
+{
+    checkCompatible(other);
+    FlexInt result(uint64_t(0), m_bitWidth);
+    result.m_isSigned = m_isSigned;
+    if (m_bitWidth == 0)
+        return result;
+
+    mp_int normA = normalizedUnsigned();
+    mp_int normB = other.normalizedUnsigned();
+    mp_int xorRes;
+    if (m_lastErr = mp_init(&xorRes); m_lastErr != MP_OKAY)
+    {
+        mp_clear(&normA);
+        mp_clear(&normB);
+        throw std::bad_alloc();
+    }
+    m_lastErr = mp_xor(&normA, &normB, &xorRes);
+    mp_clear(&normA);
+    mp_clear(&normB);
+
+    if (m_isSigned)
+    {
+        mp_int signBit, fullRange;
+        if (m_lastErr = mp_init_multi(&signBit, &fullRange, nullptr); m_lastErr == MP_OKAY)
+        {
+            m_lastErr = mp_2expt(&signBit, static_cast<int>(m_bitWidth - 1));
+            if (mp_cmp(&xorRes, &signBit) != MP_LT)
+            {
+                m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
+                m_lastErr = mp_sub(&xorRes, &fullRange, &result.m_number);
+            }
+            else
+            {
+                m_lastErr = mp_copy(&xorRes, &result.m_number);
+            }
+            mp_clear_multi(&signBit, &fullRange, nullptr);
+        }
+    }
+    else
+    {
+        m_lastErr = mp_copy(&xorRes, &result.m_number);
+    }
+    mp_clear(&xorRes);
+    return result;
+}
+
+/**
+ * Bitwise XORs other into this value in-place.
+ */
+FlexInt &FlexInt::operator^=(const FlexInt &other)
+{
+    *this = *this ^ other;
+    return *this;
+}
+
+/**
+ * Performs a logical shift left (<<) by shiftBits, filling vacated bits with zeros.
+ */
+FlexInt FlexInt::shl(size_t shiftBits) const
+{
+    if (shiftBits >= m_bitWidth || m_bitWidth == 0)
+        return FlexInt(uint64_t(0), m_bitWidth);
+
+    FlexInt result(*this);
+    mp_int norm = normalizedUnsigned();
+    m_lastErr = mp_mul_2d(&norm, static_cast<int>(shiftBits), &result.m_number);
+    mp_clear(&norm);
+    result.clampToTwosComplement(OverflowPolicy::Wrap);
+    return result;
+}
+
+/**
+ * Performs a logical shift right by shiftBits, filling vacated bits with zeros.
+ */
+FlexInt FlexInt::lshr(size_t shiftBits) const
+{
+    if (shiftBits >= m_bitWidth || m_bitWidth == 0)
+        return FlexInt(uint64_t(0), m_bitWidth);
+
+    FlexInt result(uint64_t(0), m_bitWidth);
+    result.m_isSigned = m_isSigned;
+    mp_int norm = normalizedUnsigned();
+    m_lastErr = mp_div_2d(&norm, static_cast<int>(shiftBits), &result.m_number, nullptr);
+    mp_clear(&norm);
+    result.clampToTwosComplement(OverflowPolicy::Wrap);
+    return result;
+}
+
+/**
+ * Performs an arithmetic shift right by shiftBits, filling vacated bits with sign bits.
+ */
+FlexInt FlexInt::ashr(size_t shiftBits) const
+{
+    if (!m_isSigned || !isNeg())
+        return lshr(shiftBits);
+
+    if (m_bitWidth == 0)
+        return FlexInt(uint64_t(0), 0);
+
+    if (shiftBits >= m_bitWidth)
+        return FlexInt(int64_t(-1), m_bitWidth);
+
+    FlexInt result(uint64_t(0), m_bitWidth);
+    result.m_isSigned = true;
+    mp_int norm = normalizedUnsigned();
+    mp_int shifted;
+    if (m_lastErr = mp_init(&shifted); m_lastErr != MP_OKAY)
+    {
+        mp_clear(&norm);
+        throw std::bad_alloc();
+    }
+    m_lastErr = mp_div_2d(&norm, static_cast<int>(shiftBits), &shifted, nullptr);
+    mp_clear(&norm);
+
+    mp_int highMask, fullRange;
+    if (m_lastErr = mp_init_multi(&highMask, &fullRange, nullptr); m_lastErr != MP_OKAY)
+    {
+        mp_clear(&shifted);
+        throw std::bad_alloc();
+    }
+    m_lastErr = mp_2expt(&fullRange, static_cast<int>(m_bitWidth));
+    m_lastErr = mp_2expt(&highMask, static_cast<int>(m_bitWidth - shiftBits));
+    m_lastErr = mp_sub(&fullRange, &highMask, &highMask);
+    m_lastErr = mp_or(&shifted, &highMask, &shifted);
+    m_lastErr = mp_sub(&shifted, &fullRange, &result.m_number);
+    mp_clear_multi(&highMask, &fullRange, &shifted, nullptr);
+
+    return result;
+}
+
+/**
+ * In-place bitwise left shift operator.
+ */
+FlexInt &FlexInt::operator<<=(size_t shiftBits)
+{
+    *this = shl(shiftBits);
+    return *this;
+}
+
+/**
+ * In-place bitwise right shift operator.
+ */
+FlexInt &FlexInt::operator>>=(size_t shiftBits)
+{
+    *this = (*this >> shiftBits);
+    return *this;
+}
+
+/**
+ * Extracts an arbitrary slice of bits [startBit, startBit + numBits - 1].
+ */
+FlexInt FlexInt::extractBits(size_t startBit, size_t numBits, bool resultSigned) const
+{
+    FlexInt result(uint64_t(0), numBits);
+    result.m_isSigned = resultSigned;
+    if (numBits == 0)
+        return result;
+
+    if (startBit >= m_bitWidth)
+    {
+        if (m_isSigned && isNeg())
+        {
+            if (resultSigned)
+            {
+                mp_set_i64(&result.m_number, -1);
+            }
+            else
+            {
+                m_lastErr = mp_2expt(&result.m_number, static_cast<int>(numBits));
+                m_lastErr = mp_decr(&result.m_number);
+            }
+        }
+        return result;
+    }
+
+    mp_int norm = normalizedUnsigned();
+    if (startBit > 0)
+    {
+        m_lastErr = mp_div_2d(&norm, static_cast<int>(startBit), &norm, nullptr);
+    }
+    m_lastErr = mp_mod_2d(&norm, static_cast<int>(numBits), &norm);
+
+    // If slice extends beyond m_bitWidth and value is negative, sign-extend the top bits
+    if (startBit + numBits > m_bitWidth && m_isSigned && isNeg())
+    {
+        size_t availableBits = m_bitWidth - startBit;
+        mp_int extMask, numBitsRange;
+        if (m_lastErr = mp_init_multi(&extMask, &numBitsRange, nullptr); m_lastErr == MP_OKAY)
+        {
+            m_lastErr = mp_2expt(&numBitsRange, static_cast<int>(numBits));
+            m_lastErr = mp_2expt(&extMask, static_cast<int>(availableBits));
+            m_lastErr = mp_sub(&numBitsRange, &extMask, &extMask);
+            m_lastErr = mp_or(&norm, &extMask, &norm);
+            mp_clear_multi(&extMask, &numBitsRange, nullptr);
+        }
+    }
+
+    if (resultSigned)
+    {
+        mp_int signBit, fullRange;
+        if (m_lastErr = mp_init_multi(&signBit, &fullRange, nullptr); m_lastErr == MP_OKAY)
+        {
+            m_lastErr = mp_2expt(&signBit, static_cast<int>(numBits - 1));
+            if (mp_cmp(&norm, &signBit) != MP_LT)
+            {
+                m_lastErr = mp_2expt(&fullRange, static_cast<int>(numBits));
+                m_lastErr = mp_sub(&norm, &fullRange, &result.m_number);
+            }
+            else
+            {
+                m_lastErr = mp_copy(&norm, &result.m_number);
+            }
+            mp_clear_multi(&signBit, &fullRange, nullptr);
+        }
+    }
+    else
+    {
+        m_lastErr = mp_copy(&norm, &result.m_number);
+    }
+
+    mp_clear(&norm);
+    return result;
+}
+
+/**
+ * Extracts the k-th 64-bit word of this integer (wordIndex * 64 .. wordIndex * 64 + 63).
+ */
+uint64_t FlexInt::extractWord64(size_t wordIndex) const
+{
+    size_t startBit = wordIndex * 64;
+    if (startBit >= m_bitWidth)
+    {
+        return (m_isSigned && isNeg()) ? ~0ULL : 0ULL;
+    }
+    FlexInt slice = extractBits(startBit, 64, false);
+    return slice.getU64();
+}
+
+/**
+ * Serializes the two's complement binary representation into the destination byte span.
+ */
+void FlexInt::writeBytes(std::span<uint8_t> dest, Endianness endian) const
+{
+    size_t destSize = dest.size();
+    for (size_t i = 0; i < destSize; ++i)
+    {
+        uint8_t b = 0;
+        size_t bitOffset = i * 8;
+        if (bitOffset < m_bitWidth)
+        {
+            size_t bitsToExtract = std::min(size_t(8), m_bitWidth - bitOffset);
+            b = static_cast<uint8_t>(extractBits(bitOffset, bitsToExtract, false).getU64());
+        }
+        else if (m_isSigned && isNeg())
+        {
+            b = 0xFF;
+        }
+
+        if (endian == Endianness::Little)
+        {
+            dest[i] = b;
+        }
+        else
+        {
+            dest[destSize - 1 - i] = b;
+        }
+    }
+}
+
+/**
+ * Deserializes raw binary bytes into a FlexInt of the specified width and signedness.
+ */
+FlexInt FlexInt::readBytes(std::span<const uint8_t> src, size_t bitWidth, bool isSigned, Endianness endian)
+{
+    FlexInt res(uint64_t(0), bitWidth);
+    res.m_isSigned = isSigned;
+    if (src.empty() || bitWidth == 0)
+        return res;
+
+    mp_zero(&res.m_number);
+    size_t srcSize = src.size();
+    for (size_t i = 0; i < srcSize; ++i)
+    {
+        if (i * 8 >= bitWidth)
+            break;
+        uint8_t byteVal = (endian == Endianness::Little) ? src[i] : src[srcSize - 1 - i];
+        if (byteVal == 0)
+            continue;
+        mp_int byteMp, shiftedByte;
+        if (res.m_lastErr = mp_init_multi(&byteMp, &shiftedByte, nullptr); res.m_lastErr != MP_OKAY)
+            throw std::bad_alloc();
+        mp_set_u64(&byteMp, byteVal);
+        res.m_lastErr = mp_mul_2d(&byteMp, static_cast<int>(i * 8), &shiftedByte);
+        res.m_lastErr = mp_add(&res.m_number, &shiftedByte, &res.m_number);
+        mp_clear_multi(&shiftedByte, &byteMp, nullptr);
+    }
+    res.clampToTwosComplement(OverflowPolicy::Wrap);
     return res;
 }

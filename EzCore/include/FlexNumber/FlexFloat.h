@@ -2,6 +2,7 @@
 #define EZCORE_FLEX_FLOAT_H
 
 #include "EzCoreCommon.h"
+#include "FlexNumber/FlexInt.h"
 
 /**
  * This class acts as a wrapper for LibBF's arbitrary-precision bf_t engine. It provides a set of utility methods
@@ -183,6 +184,26 @@ class FlexFloat
      * Returns the string representation of the number with the given radix.
      */
     std::string toString(size_t radix = 2) const;
+
+    /**
+     * Serializes this float into raw IEEE 754 binary interchange bytes.
+     */
+    void writeIeeeBytes(std::span<uint8_t> dest, Endianness endian = Endianness::Little) const;
+
+    /**
+     * Deserializes raw IEEE 754 binary interchange bytes into a FlexFloat.
+     */
+    static FlexFloat readIeeeBytes(std::span<const uint8_t> src, size_t bitWidth, Endianness endian = Endianness::Little);
+
+    /**
+     * Bitcasts the float directly into a FlexInt containing the raw IEEE 754 binary pattern.
+     */
+    FlexInt bitcastToFlexInt() const;
+
+    /**
+     * Bitcasts a raw IEEE 754 binary pattern from FlexInt into a FlexFloat.
+     */
+    static FlexFloat bitcastFromFlexInt(const FlexInt &rawBits, size_t bitWidth);
 
   private:
     /**
