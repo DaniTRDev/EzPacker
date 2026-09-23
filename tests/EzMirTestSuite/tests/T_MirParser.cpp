@@ -516,3 +516,176 @@ entry: ; Single-line comment after colon
     EXPECT_TRUE(success);
 }
 
+/**
+ * TMP_16: Arbitrary-Precision Dynamic Integer Types
+ * Verifies that dynamic iN types (i48, i512, i1024) are parsed, interned, and correctly tracked.
+ */
+TEST_F(MirParserTest, TMP_16_ArbitraryPrecisionIntegerTypes)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view mirCode = R"mir(
+@g_i48 = internal var i48 = 0x123456789abc;
+@g_i512 = internal var i512 = 0x100000000000000000000000000000001;
+
+fn @wide_int_fn(i512 %a, i48 %b) -> i512 {
+entry:
+    %v0 = ADD i512 %a, %a;
+    RET i512 %v0;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "wide_ints.mir");
+    EXPECT_TRUE(success);
+
+    MirTypeTable *tt = ctx->getTypeTable();
+    EXPECT_NE(tt, nullptr);
+
+    // Verify globals
+    MirGlobalVar *g48 = nullptr;
+    MirGlobalVar *g512 = nullptr;
+    for (MirGlobalVar *g : ctx->getGlobalVars())
+    {
+        if (g->getName() == "g_i48") g48 = g;
+        if (g->getName() == "g_i512") g512 = g;
+    }
+    ASSERT_NE(g48, nullptr);
+    ASSERT_NE(g512, nullptr);
+    EXPECT_EQ(g48->getType()->getTotalSizeInBits(), 48);
+    EXPECT_EQ(g512->getType()->getTotalSizeInBits(), 512);
+
+    // Verify initializer preserved precision
+    ASSERT_NE(g512->getInitializer(), nullptr);
+    auto *intInit = dynamic_cast<MirInteger *>(g512->getInitializer());
+    ASSERT_NE(intInit, nullptr);
+    EXPECT_EQ(intInit->getValue().getBitSize(), 512);
+
+    // Verify function parameter types
+    MirFunction *fn = nullptr;
+    for (MirFunction *f : ctx->getFunctions())
+    {
+        if (f->getName() == "wide_int_fn")
+        {
+            fn = f;
+            break;
+        }
+    }
+    ASSERT_NE(fn, nullptr);
+    EXPECT_EQ(fn->getReturnType()->getTotalSizeInBits(), 512);
+    ASSERT_EQ(fn->getParameters().size(), 2);
+    auto it = fn->getParameters().begin();
+    EXPECT_EQ((*it)->getMirType()->getTotalSizeInBits(), 512);
+    ++it;
+    EXPECT_EQ((*it)->getMirType()->getTotalSizeInBits(), 48);
+}
+
+/**
+ * TMP_17: Arbitrary-Precision Float Types
+ * Verifies that dynamic fN types (f16, f80, f256) are parsed and correctly sized.
+ */
+TEST_F(MirParserTest, TMP_17_ArbitraryPrecisionFloatTypes)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view mirCode = R"mir(
+@g_f16 = internal var f16 = 1.5;
+@g_f80 = internal var f80 = 2.71828;
+@g_f256 = internal var f256 = 3.14159265358979323846;
+
+fn @wide_float_fn(f256 %a) -> f256 {
+entry:
+    %v0 = FADD f256 %a, %a;
+    RET f256 %v0;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "wide_floats.mir");
+    EXPECT_TRUE(success);
+
+    MirGlobalVar *gf16 = nullptr;
+    MirGlobalVar *gf80 = nullptr;
+    MirGlobalVar *gf256 = nullptr;
+    for (MirGlobalVar *g : ctx->getGlobalVars())
+    {
+        if (g->getName() == "g_f16") gf16 = g;
+        if (g->getName() == "g_f80") gf80 = g;
+        if (g->getName() == "g_f256") gf256 = g;
+    }
+    ASSERT_NE(gf16, nullptr);
+    ASSERT_NE(gf80, nullptr);
+    ASSERT_NE(gf256, nullptr);
+    EXPECT_EQ(gf16->getType()->getTotalSizeInBits(), 16);
+    EXPECT_EQ(gf80->getType()->getTotalSizeInBits(), 80);
+    EXPECT_EQ(gf256->getType()->getTotalSizeInBits(), 256);
+
+    MirFunction *fn = nullptr;
+    for (MirFunction *f : ctx->getFunctions())
+    {
+        if (f->getName() == "wide_float_fn")
+        {
+            fn = f;
+            break;
+        }
+    }
+    ASSERT_NE(fn, nullptr);
+    EXPECT_EQ(fn->getReturnType()->getTotalSizeInBits(), 256);
+}
+
+/**
+ * TMP_18: Big Literals and Radix Prefixes
+ * Verifies binary (0b), hex (0x), octal (0o), and negative arbitrary-precision integer/float literals.
+ */
+TEST_F(MirParserTest, TMP_18_BigLiteralsAndRadixPrefixes)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view mirCode = R"mir(
+@g_bin = internal var i32 = 0b101010;
+@g_oct = internal var i32 = 0o755;
+@g_hex128 = internal var i128 = 0x112233445566778899aabbccddeeff00;
+@g_neg = internal var i128 = -0x1234;
+
+fn @lit_fn() -> i128 {
+entry:
+    %v0 = MOV i128 0x112233445566778899aabbccddeeff00;
+    RET i128 %v0;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "literals.mir");
+    EXPECT_TRUE(success);
+
+    MirGlobalVar *gbin = nullptr;
+    MirGlobalVar *goct = nullptr;
+    MirGlobalVar *ghex = nullptr;
+    for (MirGlobalVar *g : ctx->getGlobalVars())
+    {
+        if (g->getName() == "g_bin") gbin = g;
+        if (g->getName() == "g_oct") goct = g;
+        if (g->getName() == "g_hex128") ghex = g;
+    }
+    ASSERT_NE(gbin, nullptr);
+    ASSERT_NE(goct, nullptr);
+    ASSERT_NE(ghex, nullptr);
+
+    auto *binInit = dynamic_cast<MirInteger *>(gbin->getInitializer());
+    ASSERT_NE(binInit, nullptr);
+    EXPECT_EQ(binInit->getValue().getU64(), 42ULL);
+
+    auto *octInit = dynamic_cast<MirInteger *>(goct->getInitializer());
+    ASSERT_NE(octInit, nullptr);
+    EXPECT_EQ(octInit->getValue().getU64(), 493ULL); // 0755 octal = 493 decimal
+
+    auto *hexInit = dynamic_cast<MirInteger *>(ghex->getInitializer());
+    ASSERT_NE(hexInit, nullptr);
+    EXPECT_EQ(hexInit->getValue().getBitSize(), 128);
+    // Lower 64 bits: 0x99aabbccddeeff00
+    EXPECT_EQ(hexInit->getValue().extractWord64(0), 0x99aabbccddeeff00ULL);
+    // Upper 64 bits: 0x1122334455667788
+    EXPECT_EQ(hexInit->getValue().extractWord64(1), 0x1122334455667788ULL);
+}
+
+

@@ -56,8 +56,9 @@ enum class MirTokenKind : uint8_t
     TypeF64,   ///< "f64" floating-point type.
     TypeF128,  ///< "f128" floating-point type.
     TypePtr,   ///< "ptr" pointer type.
-    TypeVoid,  ///< "void" type.
-    TypeToken, ///< "token" opaque token type.
+    TypeVoid,   ///< "void" type.
+    TypeToken,  ///< "token" opaque token type.
+    TypeCustom, ///< Dynamic arbitrary-width integer/float type (e.g. i48, i512, f16, f256).
 
     // Delimiters & Operators
     Equal,     // =
@@ -80,6 +81,14 @@ enum class MirTokenKind : uint8_t
 
     Unknown ///< Unrecognized character; retained so the parser can diagnose it.
 };
+
+/**
+ * Returns true if the token kind represents a primitive, pointer, or custom type spelling.
+ */
+inline bool isTypeToken(MirTokenKind kind) noexcept
+{
+    return kind >= MirTokenKind::TypeI1 && kind <= MirTokenKind::TypeCustom;
+}
 
 /**
  * A single lexed token with its kind, spelling, decoded literal payload and source span.

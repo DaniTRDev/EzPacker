@@ -81,7 +81,7 @@ FlexInt::FlexInt(std::string_view numberStr, size_t bitWidth, bool _signed, size
     if (m_lastErr = mp_init(&m_number); m_lastErr != MP_OKAY)
         throw std::bad_alloc();
 
-    if (numberStr.empty() || radix < 2 || radix > 64)
+    if (numberStr.empty() || (radix != 0 && (radix < 2 || radix > 64)))
     {
         throw std::invalid_argument("Could not decode number because it is invalid or radix is out of bounds");
     }
@@ -92,20 +92,61 @@ FlexInt::FlexInt(std::string_view numberStr, size_t bitWidth, bool _signed, size
         throw std::invalid_argument("Empty or whitespace-only string passed to FlexInt");
     }
 
+    std::string_view str = numberStr.substr(scanIdx);
+    bool isNeg = false;
+    if (!str.empty() && str[0] == '-')
+    {
+        isNeg = true;
+        str.remove_prefix(1);
+    }
+    else if (!str.empty() && str[0] == '+')
+    {
+        str.remove_prefix(1);
+    }
+
+    if (str.size() >= 2 && str[0] == '0')
+    {
+        char p = str[1];
+        if (p == 'x' || p == 'X')
+        {
+            radix = 16;
+            str.remove_prefix(2);
+        }
+        else if (p == 'b' || p == 'B')
+        {
+            radix = 2;
+            str.remove_prefix(2);
+        }
+        else if (p == 'o' || p == 'O')
+        {
+            radix = 8;
+            str.remove_prefix(2);
+        }
+    }
+
+    if (radix == 0)
+    {
+        radix = 10;
+    }
+
+    if (str.empty())
+    {
+        throw std::invalid_argument("Literal string has no digits after prefix");
+    }
+
     m_bitWidth = bitWidth;
     m_isSigned = _signed;
 
-    std::string safeStr(numberStr.substr(scanIdx));
-
-    if (radix == 16 && safeStr.size() > 2 && safeStr[0] == '0' && (safeStr[1] == 'x' || safeStr[1] == 'X'))
-    {
-        safeStr = safeStr.substr(2);
-    }
-
+    std::string safeStr(str);
     if (m_lastErr = mp_read_radix(&m_number, safeStr.c_str(), int(radix)); m_lastErr != MP_OKAY)
     {
         throw std::invalid_argument("Error while decoding number from string: LibTomMath error " +
                                  std::to_string(m_lastErr));
+    }
+
+    if (isNeg)
+    {
+        m_lastErr = mp_neg(&m_number, &m_number);
     }
 
     clampToTwosComplement();

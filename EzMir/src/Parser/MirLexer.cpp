@@ -413,6 +413,76 @@ MirToken MirLexer::lexNumber(size_t startPos)
         return tok;
     }
 
+    if (peekChar() == '0' && (peekNextChar() == 'b' || peekNextChar() == 'B'))
+    {
+        getChar(); // '0'
+        getChar(); // 'b'
+        size_t digitsStart = m_cursor;
+        while (m_cursor < m_source.size() && (m_source[m_cursor] == '0' || m_source[m_cursor] == '1'))
+        {
+            ++m_cursor;
+        }
+
+        tok.m_length = m_cursor - startPos;
+        tok.m_text = m_source.substr(startPos, tok.m_length);
+        tok.m_ref = m_ctx.createRef(startPos, tok.m_length);
+
+        if (digitsStart == m_cursor)
+        {
+            if (m_ctx.getDiagCollector())
+            {
+                m_ctx.getDiagCollector()->error("MirLexer", "Invalid binary literal without digits: '{}'", tok.m_text)
+                        << tok.m_ref;
+            }
+            m_ctx.recordError();
+            tok.m_kind = MirTokenKind::Unknown;
+            return tok;
+        }
+
+        std::string_view binStr = m_source.substr(digitsStart, m_cursor - digitsStart);
+        uint64_t val = 0;
+        std::from_chars(binStr.data(), binStr.data() + binStr.size(), val, 2);
+
+        tok.m_kind = MirTokenKind::IntegerLiteral;
+        tok.m_intVal = isNegative ? -static_cast<int64_t>(val) : static_cast<int64_t>(val);
+        return tok;
+    }
+
+    if (peekChar() == '0' && (peekNextChar() == 'o' || peekNextChar() == 'O'))
+    {
+        getChar(); // '0'
+        getChar(); // 'o'
+        size_t digitsStart = m_cursor;
+        while (m_cursor < m_source.size() && (m_source[m_cursor] >= '0' && m_source[m_cursor] <= '7'))
+        {
+            ++m_cursor;
+        }
+
+        tok.m_length = m_cursor - startPos;
+        tok.m_text = m_source.substr(startPos, tok.m_length);
+        tok.m_ref = m_ctx.createRef(startPos, tok.m_length);
+
+        if (digitsStart == m_cursor)
+        {
+            if (m_ctx.getDiagCollector())
+            {
+                m_ctx.getDiagCollector()->error("MirLexer", "Invalid octal literal without digits: '{}'", tok.m_text)
+                        << tok.m_ref;
+            }
+            m_ctx.recordError();
+            tok.m_kind = MirTokenKind::Unknown;
+            return tok;
+        }
+
+        std::string_view octStr = m_source.substr(digitsStart, m_cursor - digitsStart);
+        uint64_t val = 0;
+        std::from_chars(octStr.data(), octStr.data() + octStr.size(), val, 8);
+
+        tok.m_kind = MirTokenKind::IntegerLiteral;
+        tok.m_intVal = isNegative ? -static_cast<int64_t>(val) : static_cast<int64_t>(val);
+        return tok;
+    }
+
     // Decimal or Float
     bool isFloat = false;
     while (m_cursor < m_source.size() && std::isdigit(static_cast<unsigned char>(m_source[m_cursor])))
@@ -696,6 +766,25 @@ MirToken MirLexer::lexIdentifierOrKeyword(size_t startPos)
     {
         tok.m_kind = MirTokenKind::TypeToken;
         return tok;
+    }
+
+    // Dynamic arbitrary-width integer or floating-point type: iN or fN
+    if (t.size() > 1 && (t[0] == 'i' || t[0] == 'f'))
+    {
+        bool allDigits = true;
+        for (size_t i = 1; i < t.size(); ++i)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(t[i])))
+            {
+                allDigits = false;
+                break;
+            }
+        }
+        if (allDigits)
+        {
+            tok.m_kind = MirTokenKind::TypeCustom;
+            return tok;
+        }
     }
 
     tok.m_kind = MirTokenKind::Identifier;

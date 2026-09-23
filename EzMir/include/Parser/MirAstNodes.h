@@ -74,13 +74,14 @@ struct MirAstConstantInit
     int64_t m_intVal{ 0 };                           ///< Integer value for ConstantKind::Integer.
     double m_floatVal{ 0.0 };                        ///< Floating-point value for ConstantKind::Float.
     std::pmr::string m_strVal;                       ///< Text payload for ConstantKind::String.
+    std::pmr::string m_rawText;                      ///< Exact raw textual representation for arbitrary-precision integers/floats.
     std::pmr::vector<MirAstConstantInit> m_elements; ///< Element list for ConstantKind::Array.
     SourceReference *m_ref{ nullptr };               ///< Source location of this initializer expression.
 
     /**
      * Allocates the string and element containers from the supplied PMR arena.
      */
-    explicit MirAstConstantInit(std::pmr::memory_resource *mr) : m_strVal(mr), m_elements(mr) {}
+    explicit MirAstConstantInit(std::pmr::memory_resource *mr) : m_strVal(mr), m_rawText(mr), m_elements(mr) {}
 };
 
 /**

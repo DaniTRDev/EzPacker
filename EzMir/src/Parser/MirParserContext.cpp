@@ -187,6 +187,36 @@ MirType *MirParserContext::resolveType(const Ast::MirAstType *astType)
             if (name == "ptr")
                 return tt->getPtr(tt->i8());
 
+            // Dynamic arbitrary-width integer types: iN (e.g. i48, i512, i1024, i65535)
+            if (name.size() > 1 && name[0] == 'i')
+            {
+                size_t bitWidth = 0;
+                auto [ptr, ec] = std::from_chars(name.data() + 1, name.data() + name.size(), bitWidth);
+                if (ec == std::errc{} && ptr == name.data() + name.size() && bitWidth >= 1 && bitWidth <= 65535)
+                {
+                    size_t align = (bitWidth <= 1) ? 1 :
+                                   (bitWidth <= 8) ? 8 :
+                                   (bitWidth <= 16) ? 16 :
+                                   (bitWidth <= 32) ? 32 : 64;
+                    return tt->create(MirTypeKind::Integer, bitWidth, align, {}, name, MirTypeTable::CustomCompactId);
+                }
+            }
+
+            // Dynamic floating-point types: fN (e.g. f16, f80, f256)
+            if (name.size() > 1 && name[0] == 'f')
+            {
+                size_t bitWidth = 0;
+                auto [ptr, ec] = std::from_chars(name.data() + 1, name.data() + name.size(), bitWidth);
+                if (ec == std::errc{} && ptr == name.data() + name.size() &&
+                    (bitWidth == 16 || bitWidth == 32 || bitWidth == 64 || bitWidth == 80 || bitWidth == 128 || bitWidth == 256))
+                {
+                    size_t align = (bitWidth <= 16) ? 16 :
+                                   (bitWidth <= 32) ? 32 :
+                                   (bitWidth <= 64) ? 64 : 128;
+                    return tt->create(MirTypeKind::FloatingPoint, bitWidth, align, {}, name, MirTypeTable::CustomCompactId);
+                }
+            }
+
             if (m_diag)
             {
                 m_diag->error("MirParser", "Unknown primitive type '{}'", name) << astType->m_ref;

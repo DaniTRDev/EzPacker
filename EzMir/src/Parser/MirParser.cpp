@@ -24,8 +24,40 @@ namespace
 {
 
 /**
- * Builds an integer operand from a raw literal value at the destination type's width, translating
+ * Builds an integer operand from a raw text literal at the destination type's width, translating
  * FlexInt overflow/errors into a parser diagnostic and a recorded parse error.
+ */
+MirInteger *buildIntSafe(MirOperandBuilder &opBuilder,
+                         MirType *type,
+                         std::string_view rawText,
+                         SourceReference *ref,
+                         DiagnosticCollector *diag,
+                         MirParserContext &pCtx)
+{
+    if (!type)
+    {
+        return nullptr;
+    }
+    size_t bitWidth = type->getTotalSizeInBits();
+    try
+    {
+        bool isSigned = (!rawText.empty() && rawText[0] == '-');
+        FlexInt val(rawText, bitWidth, isSigned);
+        return opBuilder.buildInt(type, std::move(val), ref);
+    }
+    catch (const std::exception &ex)
+    {
+        if (diag)
+        {
+            diag->error("MirParser", "Integer literal overflow or error: {}", ex.what()) << ref;
+        }
+        pCtx.recordError();
+        return nullptr;
+    }
+}
+
+/**
+ * Builds an integer operand from a 64-bit value at the destination type's width.
  */
 MirInteger *buildIntSafe(MirOperandBuilder &opBuilder,
                          MirType *type,
@@ -42,7 +74,7 @@ MirInteger *buildIntSafe(MirOperandBuilder &opBuilder,
     try
     {
         FlexInt val = (rawVal >= 0) ? FlexInt(static_cast<uint64_t>(rawVal), bitWidth) : FlexInt(rawVal, bitWidth);
-        return opBuilder.buildInt(type, val, ref);
+        return opBuilder.buildInt(type, std::move(val), ref);
     }
     catch (const std::exception &ex)
     {
@@ -239,8 +271,9 @@ Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserConte
         return astType;
     }
 
-    // Primitive integer / float types: i1..i256, f32..f128
-    if (tok.m_kind >= Parser::MirTokenKind::TypeI1 && tok.m_kind <= Parser::MirTokenKind::TypeF128)
+    // Primitive integer / float types: i1..i256, f32..f128, and custom iN/fN
+    if ((tok.m_kind >= Parser::MirTokenKind::TypeI1 && tok.m_kind <= Parser::MirTokenKind::TypeF128) ||
+        tok.m_kind == Parser::MirTokenKind::TypeCustom)
     {
         auto *astType = alloc.new_object<Ast::MirAstType>(mr);
         astType->m_kind = Ast::TypeKind::Primitive;
@@ -273,10 +306,8 @@ Ast::MirAstType *MirParser::parseAstType(Parser::MirLexer &lexer, MirParserConte
  */
 std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirLexer &lexer, MirParserContext &pCtx)
 {
-    // Optional type prefix: e.g. i64 100, f32 1.5
-    if ((lexer.peekToken().m_kind >= Parser::MirTokenKind::TypeI1 &&
-         lexer.peekToken().m_kind <= Parser::MirTokenKind::TypeToken) ||
-        lexer.peekToken().m_kind == Parser::MirTokenKind::TypePtr)
+    // Optional type prefix: e.g. i64 100, f32 1.5, i512 0x...
+    if (Parser::isTypeToken(lexer.peekToken().m_kind))
     {
         lexer.nextToken(); // Consume type prefix
     }
@@ -290,6 +321,7 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::Integer;
         init.m_intVal = tok.m_intVal;
+        init.m_rawText = tok.m_text;
         init.m_ref = tok.m_ref;
         return init;
     }
@@ -300,6 +332,7 @@ std::optional<Ast::MirAstConstantInit> MirParser::parseConstantInit(Parser::MirL
         Ast::MirAstConstantInit init(mr);
         init.m_kind = Ast::ConstantKind::Float;
         init.m_floatVal = tok.m_floatVal;
+        init.m_rawText = tok.m_text;
         init.m_ref = tok.m_ref;
         return init;
     }
@@ -490,7 +523,9 @@ bool MirParser::parseGlobalVarDecl(Parser::MirLexer &lexer, MirParserContext &pC
     {
         if (initOpt->m_kind == Ast::ConstantKind::Integer)
         {
-            MirInteger *imm = buildIntSafe(opBuilder, type, initOpt->m_intVal, initOpt->m_ref, m_diag, pCtx);
+            MirInteger *imm = !initOpt->m_rawText.empty()
+                ? buildIntSafe(opBuilder, type, initOpt->m_rawText, initOpt->m_ref, m_diag, pCtx)
+                : buildIntSafe(opBuilder, type, initOpt->m_intVal, initOpt->m_ref, m_diag, pCtx);
             if (imm)
             {
                 gvBuilder.setInitializer(imm);
@@ -500,7 +535,11 @@ bool MirParser::parseGlobalVarDecl(Parser::MirLexer &lexer, MirParserContext &pC
         {
             try
             {
-                gvBuilder.setInitializer(opBuilder.buildFloat(type, FlexFloat(initOpt->m_floatVal), initOpt->m_ref));
+                size_t bitWidth = type ? type->getTotalSizeInBits() : 64;
+                FlexFloat ff = !initOpt->m_rawText.empty()
+                    ? FlexFloat(initOpt->m_rawText, bitWidth)
+                    : FlexFloat(initOpt->m_floatVal);
+                gvBuilder.setInitializer(opBuilder.buildFloat(type, std::move(ff), initOpt->m_ref));
             }
             catch (const std::exception &ex)
             {
@@ -855,8 +894,7 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, Mi
         opcodeName = opTok.m_text;
         instRef = opTok.m_ref;
 
-        if (lexer.peekToken().m_kind >= Parser::MirTokenKind::TypeI1 &&
-            lexer.peekToken().m_kind <= Parser::MirTokenKind::TypeToken)
+        if (Parser::isTypeToken(lexer.peekToken().m_kind))
         {
             instType = pCtx.resolveType(parseAstType(lexer, pCtx));
         }
@@ -872,8 +910,7 @@ MirInstruction *MirParser::parseInstructionStatement(Parser::MirLexer &lexer, Mi
         opcodeName = opTok.m_text;
         instRef = opTok.m_ref;
 
-        if (lexer.peekToken().m_kind >= Parser::MirTokenKind::TypeI1 &&
-            lexer.peekToken().m_kind <= Parser::MirTokenKind::TypeToken)
+        if (Parser::isTypeToken(lexer.peekToken().m_kind))
         {
             instType = pCtx.resolveType(parseAstType(lexer, pCtx));
         }
@@ -1081,7 +1118,7 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                     MirType *immType = (expectedType && expectedType->getKind() == MirTypeKind::Integer)
                             ? expectedType
                             : m_ctx->getTypeTable()->i64();
-                    return buildIntSafe(opBuilder, immType, valTok.m_intVal, valTok.m_ref, m_diag, pCtx);
+                    return buildIntSafe(opBuilder, immType, valTok.m_text, valTok.m_ref, m_diag, pCtx);
                 }
                 else if (valTok.m_kind == Parser::MirTokenKind::FloatLiteral)
                 {
@@ -1090,7 +1127,11 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                             : m_ctx->getTypeTable()->f64();
                     try
                     {
-                        return opBuilder.buildFloat(fType, FlexFloat(valTok.m_floatVal), valTok.m_ref);
+                        size_t bitWidth = fType ? fType->getTotalSizeInBits() : 64;
+                        FlexFloat ff = !valTok.m_text.empty()
+                            ? FlexFloat(valTok.m_text, bitWidth)
+                            : FlexFloat(valTok.m_floatVal);
+                        return opBuilder.buildFloat(fType, std::move(ff), valTok.m_ref);
                     }
                     catch (const std::exception &ex)
                     {
@@ -1174,7 +1215,7 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                 }
             }
             MirType *stkType = expectedType ? expectedType : m_ctx->getTypeTable()->i64();
-            return buildIntSafe(opBuilder, stkType, idxTok.m_intVal, sTok.m_ref, m_diag, pCtx);
+            return buildIntSafe(opBuilder, stkType, idxTok.m_text, sTok.m_ref, m_diag, pCtx);
         }
 
         auto regTok = lexer.nextToken();
@@ -1202,35 +1243,20 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
         return pCtx.getOrCreateRegister(regName, expectedType, regTok.m_ref);
     }
 
-    // Integer immediate: 42, 0x10
+    // Integer immediate: 42, 0x10, 0b101, -128
     if (tok.m_kind == Parser::MirTokenKind::IntegerLiteral)
     {
         auto immTok = lexer.nextToken();
         MirType *immType = nullptr;
         if (expectedType && expectedType->getKind() == MirTypeKind::Integer)
         {
-            size_t bw = expectedType->getTotalSizeInBits();
-            if (bw < 64)
-            {
-                uint64_t maxUnsigned = (bw == 64) ? ~0ULL : ((1ULL << bw) - 1ULL);
-                int64_t minSigned = -(1LL << (bw - 1));
-                int64_t maxSigned = (1LL << (bw - 1)) - 1;
-                if ((immTok.m_intVal >= 0 && static_cast<uint64_t>(immTok.m_intVal) <= maxUnsigned) ||
-                    (immTok.m_intVal < 0 && immTok.m_intVal >= minSigned && immTok.m_intVal <= maxSigned))
-                {
-                    immType = expectedType;
-                }
-            }
-            else
-            {
-                immType = expectedType;
-            }
+            immType = expectedType;
         }
         if (!immType)
         {
             immType = m_ctx->getTypeTable()->i64();
         }
-        return buildIntSafe(opBuilder, immType, immTok.m_intVal, immTok.m_ref, m_diag, pCtx);
+        return buildIntSafe(opBuilder, immType, immTok.m_text, immTok.m_ref, m_diag, pCtx);
     }
 
     // Float immediate: 3.14
@@ -1242,7 +1268,11 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
                 : m_ctx->getTypeTable()->f64();
         try
         {
-            return opBuilder.buildFloat(fType, FlexFloat(fTok.m_floatVal), fTok.m_ref);
+            size_t bitWidth = fType ? fType->getTotalSizeInBits() : 64;
+            FlexFloat ff = !fTok.m_text.empty()
+                ? FlexFloat(fTok.m_text, bitWidth)
+                : FlexFloat(fTok.m_floatVal);
+            return opBuilder.buildFloat(fType, std::move(ff), fTok.m_ref);
         }
         catch (const std::exception &ex)
         {
@@ -1255,9 +1285,8 @@ MirOperand *MirParser::parseOperand(Parser::MirLexer &lexer,
         }
     }
 
-    // Explicit Type prefix on operand: e.g. i64 %v0, ptr [ptr %v0 + 8], i64 42
-    if ((tok.m_kind >= Parser::MirTokenKind::TypeI1 && tok.m_kind <= Parser::MirTokenKind::TypeToken) ||
-        tok.m_kind == Parser::MirTokenKind::TypePtr)
+    // Explicit Type prefix on operand: e.g. i64 %v0, ptr [ptr %v0 + 8], i64 42, i512 0x...
+    if (Parser::isTypeToken(tok.m_kind))
     {
         Ast::MirAstType *astType = parseAstType(lexer, pCtx);
         MirType *explicitType = pCtx.resolveType(astType);
