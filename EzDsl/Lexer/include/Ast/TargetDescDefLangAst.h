@@ -1,6 +1,7 @@
 #ifndef EZDSLLEXER_TARGET_DESC_DEF_LANG_AST_H
 #define EZDSLLEXER_TARGET_DESC_DEF_LANG_AST_H
 
+#include "Ast/RegisterDefLangAst.h"
 #include "CommonAstNodes.h"
 #include "EzDslLexerCommon.h"
 
@@ -43,7 +44,7 @@ struct TargetDescDecl
 {
     Common::Identifier m_name; // Target name (also its symbol).
 
-    std::optional<Common::StringLiteral> m_registers;       // Path to the sibling `.reg` file.
+    std::optional<Common::StringLiteral> m_registers;       // Legacy path to the sibling `.reg` file.
     std::optional<Common::StringLiteral> m_instructions;    // Path to the sibling `.idf` file.
     std::pmr::vector<Common::StringLiteral> m_callingConvs; // Paths to calling convention files.
 
@@ -59,6 +60,9 @@ struct TargetDescDecl
     std::pmr::vector<LibcallEntry> mLibcalls;       // Libcall id-to-symbol mappings.
     std::pmr::vector<ComponentBinding> mComponents; // Strategy-slot to C++ type bindings.
     std::pmr::vector<ExtensionDef> m_extensions;    // Target extensions (features) defined by this target.
+
+    std::pmr::vector<RegisterDef::RegisterBankDecl> m_registerBanks; // Declared register banks.
+    std::pmr::vector<RegisterDef::SpecialRegDecl> m_specialRegs;    // Declared special/pseudo registers.
 };
 
 /**
