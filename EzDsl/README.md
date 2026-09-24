@@ -1,8 +1,8 @@
 # EzDSL: Compiler Backend Description Language Suite
 
-**EzDSL** is a declarative Domain-Specific Language (DSL) suite engineered for compiler backends and code generators within the **EzPacker** toolchain. Inspired by modern compiler architectures (such as LLVM's TableGen and GlobalISel), EzDSL cleanly decouples target architecture definitions, hardware instruction encodings, calling conventions, legalization action matrices, IR-to-IR rewrite rules, and instruction selection patterns into specialized, human-readable sub-languages.
+[`EzDSL`](file:///E:/Repos/EzPacker/EzDsl) is a declarative Domain-Specific Language (DSL) suite engineered for compiler backends and code generators within the **EzPacker** toolchain. Inspired by modern compiler architectures (such as LLVM's TableGen and GlobalISel), EzDSL cleanly decouples target architecture definitions, hardware instruction encodings, calling conventions, legalization action matrices, IR-to-IR rewrite rules, and instruction selection patterns into specialized, human-readable sub-languages.
 
-EzDSL provides a complete processing pipeline: Lexy-based zero-copy parsing, semantic validation passes, hierarchical symbol tables, ten C++ code generators (`CppMirTypeTableGenerator`, `CppMirInstructionGenerator`, `CppLegalizerGenerator`, `CppLegalizeRuleGenerator`, `CppTargetInstructionGenerator`, `CppEncodingTableGenerator`, `CppInstructionSelectorGenerator`, `CppCallingConvGenerator`, `CppRegisterInfoGenerator`, `CppTargetDescGenerator`), and a dedicated command-line compiler driver (`EzDslCli`).
+EzDSL provides a complete processing pipeline: **Lexy**-based zero-copy parsing, semantic validation passes, hierarchical symbol tables, ten C++ code generators (`CppMirTypeTableGenerator`, `CppMirInstructionGenerator`, `CppLegalizerGenerator`, `CppLegalizeRuleGenerator`, `CppTargetInstructionGenerator`, `CppEncodingTableGenerator`, `CppInstructionSelectorGenerator`, `CppCallingConvGenerator`, `CppRegisterInfoGenerator`, `CppTargetDescGenerator`), and a dedicated command-line compiler driver (`EzDslCli`).
 
 ---
 
@@ -22,9 +22,10 @@ EzDSL provides a complete processing pipeline: Lexy-based zero-copy parsing, sem
    - [Type Definitions (`.tyf`)](#type-definitions-tyf)
 4. [Semantic Analysis & Symbol Table Architecture](#4-semantic-analysis--symbol-table-architecture)
 5. [C++ Code Generators](#5-c-code-generators)
-6. [CLI Driver (`EzDsl-cli`) & Options](#6-cli-driver-ezdsl-cli--options)
+6. [CLI Driver (`EzDslCli`) & Options](#6-cli-driver-ezdslcli--options)
 7. [CMake Build System Integration](#7-cmake-build-system-integration)
 8. [Memory Architecture](#8-memory-architecture)
+9. [Testing & Test Suite Breakdown](#9-testing--test-suite-breakdown)
 
 ---
 
@@ -53,7 +54,7 @@ All EzDSL sub-languages share a unified lexical foundation:
 * **Literals**:
   - String Literals: Double-quoted strings (`"add $rd, $rs1, $rs2"`).
   - Integer Literals: Signed 64-bit integer values in Decimal (`42`, `-2048`), Hexadecimal (`0x1A2F`), Binary (`0b1010`), or Octal (`0o755`).
-* **Source Tracking**: Every AST node wraps `DSL::Ast::Common::SourcedAstNode<T>`, binding zero-copy `SourceReference*` pointers for diagnostics.
+* **Source Tracking**: Every AST node wraps `DSL::Ast::Common::SourcedAstNode<T>`, binding zero-copy [`SourceReference*`](file:///E:/Repos/EzPacker/EzCore/include/SourceManager/GenericSourceManager.h) pointers for diagnostics.
 * **Typed Identifiers**: Unified syntax across all declarations:
   $$\text{Type}(\text{Param})\text{:\$Name} \quad \text{or} \quad \text{Type:Name}$$
   - `GPR:rd`: Base register class `GPR`, identifier `rd`.
@@ -298,7 +299,7 @@ bindingToken __bindToken;
 
 ## 4. Semantic Analysis & Symbol Table Architecture
 
-EzDSL features a dedicated semantic validation pipeline (`EzDsl/Sema/include/Sema/`, `EzDsl/Sema/include/SemaPasses/`):
+EzDSL features a dedicated semantic validation pipeline ([`EzDsl/Sema/include/Sema/`](file:///E:/Repos/EzPacker/EzDsl/Sema/include/Sema/), [`EzDsl/Sema/include/SemaPasses/`](file:///E:/Repos/EzPacker/EzDsl/Sema/include/SemaPasses/)):
 
 - **`SymbolTable` & `Scope`**: Hierarchical lexical symbol table allocating through `std::pmr::memory_resource`. Manages typed `Symbol` instances across all sub-languages.
 - **`TypePass`**: Ingests `TypeDefFile` ASTs, registers interned types, validates bitwidths, and populates the symbol table.
@@ -314,7 +315,7 @@ EzDSL features a dedicated semantic validation pipeline (`EzDsl/Sema/include/Sem
 
 ## 5. C++ Code Generators
 
-EzDSL translates verified AST and symbol table models into production C++ source and header files (`EzDsl/CodeGenerators/`):
+EzDSL translates verified AST and symbol table models into production C++ source and header files ([`EzDsl/CodeGenerators/`](file:///E:/Repos/EzPacker/EzDsl/CodeGenerators/)):
 
 - **`CppMirTypeTableGenerator`**: Synthesizes `MirTypeTable.h` and `MirTypeTable.cpp`. Generates direct accessor methods (`i32()`, `f64()`, `getPtr()`, `getArray()`, `getClass()`), memory-interning structures, and layout initialization logic via `IMirTargetTypeLayout`.
 - **`CppMirInstructionGenerator`**: Synthesizes `MirInstructionSetDefs.h`. Emits `INSTRUCTION(name, tier, category, operands, flags)` macro tables defining opcodes, instruction categories, and operand validation metadata.
@@ -322,11 +323,11 @@ EzDSL translates verified AST and symbol table models into production C++ source
 - **`CppTargetInstructionGenerator`**: Synthesizes `<Target>TargetInstructionTable.h` and `<Target>TargetInstructionTable.cpp`. Generates the target opcode enumeration, static instruction descriptor table (`MirTargetInstructionDesc[]`) with operand classes, directionality, latency, execution flags, and implicit registers, and exposes `create<Target>TargetInstructionTable(std::pmr::memory_resource*)`.
 - **`CppEncodingTableGenerator`**: Synthesizes `<Target>EncodingTable.h`. Emits the declarative machine-encoding table consumed by the code emitter.
 - **`CppInstructionSelectorGenerator`**: Synthesizes `<Target>InstructionSelector.h` and `<Target>InstructionSelector.cpp`. Generates a target-specialized `MirInstructionSelector` subclass that embodies Maximal Munch pattern matching tables, tree pattern predicates, addressing mode matching routines, and target instruction emission lowering.
-- **`CppCallingConvGenerator`** / **`CppRegisterInfoGenerator`** / **`CppTargetDescGenerator`**: Synthesize the calling-convention descriptors, register bank/class metadata and the target descriptor that ties the generated components together.
+- **`CppCallingConvGenerator`** / **`CppRegisterInfoGenerator`** / **`CppTargetDescGenerator`**: Synthesize the calling-convention descriptors, register bank/class metadata, and the target descriptor that ties the generated components together.
 
 ---
 
-## 6. CLI Driver (`EzDsl-cli`) & Options
+## 6. CLI Driver (`EzDslCli`) & Options
 
 `EzDslCli` is the standalone executable driver used to process EzDSL backend definitions during build time.
 
@@ -455,3 +456,46 @@ EzDslGenRegisterInfo(
 EzDSL is built on `std::pmr::monotonic_buffer_resource` arenas:
 - **Zero-allocation ASTs**: AST collections, literals, and symbol tables share a contiguous memory block.
 - **Fast teardown**: Releasing the top-level arena instantly frees all AST memory without individual node deallocations.
+
+---
+
+## 9. Testing & Test Suite Breakdown
+
+EzDSL features modular test suites covering every tier of the language processing pipeline:
+
+### Lexer & Parser Tests ([`tests/EzDslLexerTestSuite/tests/`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/))
+- [`T_CallingConvDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_CallingConvDefLang.cpp): Lexing and parsing `.ezcc` calling conventions, preservation lists, and classification blocks.
+- [`T_InstructionSelectDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_InstructionSelectDefLang.cpp): Lexing `.isf` patterns, addressing mode trees, and select blocks.
+- [`T_IrInstructionDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_IrInstructionDefLang.cpp): Parsing `.irdf` generic instruction opcode definitions and directionality constraints.
+- [`T_LegalizeActionDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_LegalizeActionDefLang.cpp): Parsing `.lad` legalization action declarations, `LEGAL`, `WIDENS`, and `NARROWS`.
+- [`T_LegalizeRuleDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_LegalizeRuleDefLang.cpp): Parsing `.lrd` IR-to-IR pattern matching and expansion blocks.
+- [`T_TargetDescDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_TargetDescDefLang.cpp): Parsing `.tdesc` manifests, register banks, classes, and sub-register hierarchies.
+- [`T_TargetInstDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_TargetInstDefLang.cpp): Parsing `.idf` hardware instructions, flags, and `ENCODING` clauses.
+- [`T_TypeDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslLexerTestSuite/tests/T_TypeDefLang.cpp): Parsing `.tyf` primitive type declarations.
+
+### Semantic Validation Tests ([`tests/EzDslSemaTestSuite/tests/`](file:///E:/Repos/EzPacker/tests/EzDslSemaTestSuite/tests/))
+- [`T_CallingConvDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslSemaTestSuite/tests/T_CallingConvDefLang.cpp): Semantic validation of ABI alignment, preservation sets, and return slots.
+- [`T_IrInstructionDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslSemaTestSuite/tests/T_IrInstructionDefLang.cpp): Verifying generic IR directionality (`IN`, `OUT`, `INOUT`) and category invariants.
+- [`T_LegalizeActionDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslSemaTestSuite/tests/T_LegalizeActionDefLang.cpp): Verifying type legality tables and narrowing/widening target sanity.
+- [`T_TargetDescDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslSemaTestSuite/tests/T_TargetDescDefLang.cpp): Consolidated verification of register banks, sub-register alias relations, and component bindings.
+- [`T_TargetInstPass.cpp`](file:///E:/Repos/EzPacker/tests/EzDslSemaTestSuite/tests/T_TargetInstPass.cpp): Validating target instruction operands, mnemonics, and implicit register effects.
+- [`T_TypeDefLang.cpp`](file:///E:/Repos/EzPacker/tests/EzDslSemaTestSuite/tests/T_TypeDefLang.cpp): Verifying type uniqueness and bitwidth bounds.
+
+### Code Generator Tests ([`tests/EzDslCodeGeneratorsTestSuite/tests/`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/))
+- [`T_CppCallingConvGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppCallingConvGenerator.cpp): Tests calling convention C++ synthesis.
+- [`T_CppEncodingTableGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppEncodingTableGenerator.cpp): Tests machine encoding table C++ emission.
+- [`T_CppInstructionSelectorGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppInstructionSelectorGenerator.cpp): Tests instruction selector subclass synthesis.
+- [`T_CppLegalizerGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppLegalizerGenerator.cpp) & [`T_CppLegalizeRuleGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppLegalizeRuleGenerator.cpp): Tests legalizer action and rule code generation.
+- [`T_CppMirInstructionGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppMirInstructionGenerator.cpp): Tests MIR instruction macro table generation.
+- [`T_CppMirTypeTableGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppMirTypeTableGenerator.cpp): Tests `MirTypeTable` class synthesis.
+- [`T_CppRegisterInfoGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppRegisterInfoGenerator.cpp): Tests target register bank, class, and descriptor table synthesis.
+- [`T_CppTargetDescGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppTargetDescGenerator.cpp): Tests target descriptor initialization wiring.
+- [`T_CppTargetInstructionGenerator.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppTargetInstructionGenerator.cpp): Tests target instruction descriptor table synthesis.
+- [`T_CppSourceEmitter.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCodeGeneratorsTestSuite/tests/T_CppSourceEmitter.cpp): Tests C++ source indentation, header guards, and stream formatting utilities.
+
+### CLI Driver Tests ([`tests/EzDslCliTestSuite/tests/`](file:///E:/Repos/EzPacker/tests/EzDslCliTestSuite/tests/))
+- [`T_CommandLineParser.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCliTestSuite/tests/T_CommandLineParser.cpp): Tests flag parsing, include search paths, and auto-discovery overrides.
+- [`T_Driver.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCliTestSuite/tests/T_Driver.cpp): Tests end-to-end execution of `EzDslCli` across all sub-language files.
+- [`T_DriverLegalizeRules.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCliTestSuite/tests/T_DriverLegalizeRules.cpp): Tests multi-file companion rule compilation (`--rules`).
+- [`T_EzMirIntegration.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCliTestSuite/tests/T_EzMirIntegration.cpp): Tests compile-and-link verification of generated C++ files inside `EzMir`.
+- [`T_InfoDumper.cpp`](file:///E:/Repos/EzPacker/tests/EzDslCliTestSuite/tests/T_InfoDumper.cpp): Tests AST, symbol table, and JSON metadata dumping flags.
