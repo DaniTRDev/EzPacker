@@ -202,6 +202,7 @@ TEST_F(CppMirInstructionGeneratorTest, TestAllCategoriesAndTiers)
     declareRawInstruction("InstControlFlow", IrInstCategory::ControlFlow, IrInstTier::HighLevel, IrInstFlag::IsBranch);
     declareRawInstruction("InstCasting", IrInstCategory::Casting, IrInstTier::HighLevel, IrInstFlag::DestLarger);
     declareRawInstruction("InstSystem", IrInstCategory::System, IrInstTier::HighLevel, IrInstFlag::HasSideEffect);
+    declareRawInstruction("InstVector", IrInstCategory::Vector, IrInstTier::HighLevel, IrInstFlag::None);
 
     auto outHeader = m_testTempDir / "CategoriesDefs.h";
     CppMirInstructionGenerator generator(getDiagCollector(), getSymbolTable(), outHeader);
@@ -218,6 +219,7 @@ TEST_F(CppMirInstructionGeneratorTest, TestAllCategoriesAndTiers)
     EXPECT_TRUE(content.find("MirCat_ControlFlow") != std::string::npos);
     EXPECT_TRUE(content.find("MirCat_Casting") != std::string::npos);
     EXPECT_TRUE(content.find("MirCat_System") != std::string::npos);
+    EXPECT_TRUE(content.find("MirCat_Vector") != std::string::npos);
 
     // Verify tiers
     EXPECT_TRUE(content.find("T(HighLevel)") != std::string::npos);

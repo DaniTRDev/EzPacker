@@ -174,7 +174,7 @@ bool IrInstructionPass::validateFlagsAndCategory(DiagnosticCollector *collector,
     const bool isPureCompute =
             (inst.m_body.m_category == IrInstCategory::Arithmetic ||
              inst.m_body.m_category == IrInstCategory::Bitwise || inst.m_body.m_category == IrInstCategory::Compare ||
-             inst.m_body.m_category == IrInstCategory::Casting);
+             inst.m_body.m_category == IrInstCategory::Casting || inst.m_body.m_category == IrInstCategory::Vector);
 
     if (isPureCompute && numOut == 0 && !hasFlag(IrInstFlag::HasSideEffect))
     {

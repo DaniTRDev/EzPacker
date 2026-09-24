@@ -518,3 +518,143 @@ ir_inst TARGET_INST() {
     TIER(TargetLow);
     FLAGS(HasSideEffect);
 }
+
+// ============================================================================
+// VECTOR & SIMD INSTRUCTIONS
+// ============================================================================
+
+// Vector Addition: dst = src1 + src2 (elementwise)
+ir_inst VADD(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Vector Subtraction: dst = src1 - src2 (elementwise)
+ir_inst VSUB(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Multiplication: dst = src1 * src2 (elementwise)
+ir_inst VMUL(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Vector Division: dst = src1 / src2 (elementwise)
+ir_inst VDIV(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Arithmetic Negation: dst = -src (elementwise)
+ir_inst VNEG(Register:dst OUT, Register:src IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Bitwise AND: dst = src1 & src2
+ir_inst VAND(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Vector Bitwise OR: dst = src1 | src2
+ir_inst VOR(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Vector Bitwise XOR: dst = src1 ^ src2
+ir_inst VXOR(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Vector Bitwise NOT: dst = ~src
+ir_inst VNOT(Register:dst OUT, Register:src IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Bitwise AND-NOT: dst = ~src1 & src2
+ir_inst VANDN(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Elementwise Minimum: dst = min(src1, src2)
+ir_inst VMIN(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Elementwise Maximum: dst = max(src1, src2)
+ir_inst VMAX(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Horizontal Addition: dst = hadd(src1, src2)
+ir_inst VHADD(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Horizontal Subtraction: dst = hsub(src1, src2)
+ir_inst VHSUB(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Vector Memory Load: loads vector from address [src] into vector register [dst]
+ir_inst VLOAD(Register:dst OUT, AddressSource:src IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(ReadsMemory);
+}
+
+// Vector Memory Store: stores vector [src] to memory address [dst]
+ir_inst VSTORE(AddressSource:dst IN, Register:src IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(WritesMemory, HasSideEffect);
+}
+
+// Vector Shuffle: permutes elements from src1 and src2 using immediate mask
+ir_inst VSHUFFLE(Register:dst OUT, Register:src1 IN, Register:src2 IN, Integer:mask IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+}
+
+// Vector Element Extract: extracts lane [idx] from vector [src] into [dst]
+ir_inst VEXTRACT(Register:dst OUT, Register:src IN, Integer:idx IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+}
+
+// Vector Element Insert: inserts scalar or vector element [val] into lane [idx] of [src]
+ir_inst VINSERT(Register:dst OUT, Register:src IN, AnyValue:val IN, Integer:idx IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+}
+
+// Vector Broadcast: broadcasts scalar/element [src] across all lanes of [dst]
+ir_inst VBROADCAST(Register:dst OUT, AnyValue:src IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+}

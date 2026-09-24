@@ -185,7 +185,8 @@ enum MirInstructionCategory : uint8_t
     MirCat_Compare,      // Relational comparisons (CMP_EQ, CMP_NE, CMP_LT, etc.)
     MirCat_ControlFlow,  // Branches, jumps, calls, returns, phi nodes (BR, JMP, CALL, RET, PHI)
     MirCat_Casting,      // Type conversions, truncations, extensions (CAST, TRUNC, ZEXT, SEXT)
-    MirCat_System        // System calls, interrupts, inline assembly
+    MirCat_System,       // System calls, interrupts, inline assembly
+    MirCat_Vector        // Vector/SIMD computations and data manipulation
 };
 
 /**

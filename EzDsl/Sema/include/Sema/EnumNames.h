@@ -62,6 +62,8 @@ constexpr std::string_view irCategoryName(DSL::Ast::IrInstDef::IrInstCategory ca
             return "Casting";
         case IrInstCategory::System:
             return "System";
+        case IrInstCategory::Vector:
+            return "Vector";
     }
     return "Unknown";
 }

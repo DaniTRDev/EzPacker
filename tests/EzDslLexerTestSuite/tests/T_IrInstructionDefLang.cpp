@@ -363,3 +363,27 @@ ir_inst BAD(Register:dst OUT) {
     auto res = ctx.parse<DSL::Parser::IrInstDef::IrInstDefFile, DSL::Ast::IrInstDef::IrInstDefFile>();
     EXPECT_FALSE(res.has_value());
 }
+
+/**
+ * Verifies parsing a Vector category instruction with SizeMatch and IsCommutative flags.
+ */
+TEST_F(IrInstDefLangTest, TestVectorCategoryInstruction)
+{
+    std::string test = R"dsl(
+ir_inst VADD(Register:dst OUT, Register:src1 IN, Register:src2 IN) {
+    CATEGORY(Vector);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+)dsl";
+    ParseContext ctx = createParseContextFromBuff("test", test);
+
+    auto res = ctx.parse<DSL::Parser::IrInstDef::IrInstDecl, DSL::Ast::IrInstDef::IrInstDecl>();
+    ASSERT_TRUE(res.has_value());
+    EXPECT_EQ(res->m_name.m_node, "VADD");
+    EXPECT_EQ(res->m_body.m_category, DSL::Ast::IrInstDef::IrInstCategory::Vector);
+    EXPECT_EQ(res->m_body.m_tier, DSL::Ast::IrInstDef::IrInstTier::HighLevel);
+    ASSERT_EQ(res->m_body.m_flags.size(), 2);
+    EXPECT_EQ(res->m_body.m_flags[0], DSL::Ast::IrInstDef::IrInstFlag::SizeMatch);
+    EXPECT_EQ(res->m_body.m_flags[1], DSL::Ast::IrInstDef::IrInstFlag::IsCommutative);
+}

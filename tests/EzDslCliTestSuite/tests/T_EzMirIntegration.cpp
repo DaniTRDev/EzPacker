@@ -234,7 +234,29 @@ TEST_F(EzMirIntegrationTest, GenerateAndVerifyEzMirInstructionDefs)
     EXPECT_TRUE(content.find("INSTRUCTION(NOP,") != std::string::npos);
     EXPECT_TRUE(content.find("INSTRUCTION(HALT,") != std::string::npos);
 
-    // 7. Verify flags on critical instructions
+    // 7. Vector & SIMD instructions
+    EXPECT_TRUE(content.find("INSTRUCTION(VADD,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VSUB,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VMUL,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VDIV,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VNEG,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VAND,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VOR,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VXOR,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VNOT,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VANDN,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VMIN,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VMAX,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VHADD,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VHSUB,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VLOAD,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VSTORE,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VSHUFFLE,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VEXTRACT,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VINSERT,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VBROADCAST,") != std::string::npos);
+
+    // 8. Verify flags on critical instructions
     EXPECT_TRUE(content.find("F(VariadicArgs)") != std::string::npos);
     EXPECT_TRUE(content.find("F(IsTerminator)") != std::string::npos);
     EXPECT_TRUE(content.find("F(IsBranch)") != std::string::npos);

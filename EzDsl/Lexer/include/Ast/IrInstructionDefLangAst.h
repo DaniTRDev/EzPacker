@@ -64,7 +64,8 @@ enum class IrInstCategory : uint8_t
     Compare,      // Comparisons producing flags/booleans.
     ControlFlow,  // Branches, calls, returns.
     Casting,      // Width/representation conversions.
-    System        // Intrinsics and runtime operations.
+    System,       // Intrinsics and runtime operations.
+    Vector        // Vector/SIMD computations and data manipulation.
 };
 
 /**
