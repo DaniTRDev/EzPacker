@@ -254,3 +254,37 @@ rule SubZero {
     EXPECT_NE(source.find("case MirInstructionOpCode::SDIV:"), std::string::npos);
     EXPECT_NE(source.find("case MirInstructionOpCode::SUB:"), std::string::npos);
 }
+
+// Verifies when { hasExtension("avx"); } generates a ctx.m_targetDesc->hasExtension check.
+TEST_F(CppLegalizeRuleGeneratorTest, TestHasExtensionRuleGeneration)
+{
+    std::string sourceText = R"dsl(
+rule SubWithAvx {
+    match {
+        SUB i32:$dst, i32:$lhs, i32:$rhs;
+    };
+    when {
+        hasExtension("avx");
+    };
+    emit {
+        SUB i32:$dst, i32:$lhs, i32:$rhs;
+    };
+};
+)dsl";
+
+    auto ast = parseLrd(sourceText);
+    ASSERT_TRUE(ast.has_value());
+
+    bool passResult = LegalizeRulePass::run(getDiagCollector(), getSymbolTable(), &ast.value());
+    ASSERT_TRUE(passResult);
+
+    CppLegalizeRuleGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "AMD64");
+    ASSERT_TRUE(generator.run());
+
+    std::string source = readFile(m_testTempDir / "AMD64LegalizerRules.cpp");
+
+    EXPECT_NE(source.find("#include \"Descriptors/TargetDesc.h\""), std::string::npos);
+    EXPECT_NE(source.find("if (!ctx.m_targetDesc || !ctx.m_targetDesc->hasExtension(\"avx\")) return LegalizationResult::NotModified;"),
+              std::string::npos);
+}
+

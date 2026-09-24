@@ -135,3 +135,35 @@ TEST_F(CppInstructionSelectorGeneratorTest, TestInstructionSelectorGeneration)
     EXPECT_NE(sourceContent.find("noInterveningStore(defInst, inst)"), std::string::npos);
     EXPECT_NE(sourceContent.find("isSimm32"), std::string::npos);
 }
+
+// Verifies when { hasExtension("avx"); } generates a m_targetDesc->hasExtension check.
+TEST_F(CppInstructionSelectorGeneratorTest, TestHasExtensionGuardGeneration)
+{
+    std::string isfSource = R"(
+        target AMD64;
+
+        pattern Select_ADD32rr_AVX [cost = 1] {
+            match {
+                ADD i32:$dst, i32:$src1, i32:$src2;
+            };
+            when {
+                hasExtension("avx");
+            };
+            select {
+                VADD32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+            };
+        };
+    )";
+
+    ASSERT_TRUE(parseAndRunPass(isfSource));
+
+    CppInstructionSelectorGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "AMD64");
+    ASSERT_TRUE(generator.run());
+
+    auto sourcePath = m_testTempDir / "AMD64InstructionSelector.cpp";
+    ASSERT_TRUE(std::filesystem::exists(sourcePath));
+
+    std::string sourceContent = readFileContent(sourcePath);
+    EXPECT_NE(sourceContent.find("if (m_targetDesc && m_targetDesc->hasExtension(\"avx\"))"), std::string::npos);
+}
+

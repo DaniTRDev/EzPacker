@@ -233,6 +233,30 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                     {
                         auto patScope = emitter.enterBlock();
 
+                        // Check target extension / feature when clauses
+                        std::string extCheck;
+                        for (const auto &when : pat->m_whenClauses)
+                        {
+                            if (when.m_predicate.m_node == "hasExtension" || when.m_predicate.m_node == "hasFeature")
+                            {
+                                if (!when.m_args.empty())
+                                {
+                                    if (!extCheck.empty())
+                                    {
+                                        extCheck += " && ";
+                                    }
+                                    extCheck += std::format("m_targetDesc && m_targetDesc->hasExtension(\"{}\")",
+                                                            EscapeString(when.m_args[0].m_node, EscapeMode::CppStringLiteral));
+                                }
+                            }
+                        }
+
+                        std::optional<CppSourceEmitter::Scope> extScope;
+                        if (!extCheck.empty())
+                        {
+                            extScope.emplace(emitter.enterBlock(std::format("if ({})", extCheck)));
+                        }
+
                         // Check if any operand is a nested tree
                         int nestedOpIdx = -1;
                         for (size_t i = 0; i < pat->m_matchTree.m_operands.size(); ++i)

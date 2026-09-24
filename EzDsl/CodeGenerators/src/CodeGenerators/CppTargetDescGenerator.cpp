@@ -176,6 +176,25 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
         emitter.emitLine("inline constexpr std::size_t s_libcallCount = {};", decl ? decl->mLibcalls.size() : 0);
         emitter.emitBlankLine();
 
+        emitter.emitLine("inline constexpr const char *s_targetExtensions[] =");
+        {
+            auto s = emitter.enterScope("{", "};");
+            if (!decl || decl->m_extensions.empty())
+            {
+                emitter.emitLine("\"\",");
+            }
+            else
+            {
+                for (const auto &ext : decl->m_extensions)
+                {
+                    emitter.emitLine("\"{}\",", escapeString(ext.m_name.m_node));
+                }
+            }
+        }
+        emitter.emitLine("inline constexpr std::size_t s_targetExtensionCount = {};",
+                         decl ? decl->m_extensions.size() : 0);
+        emitter.emitBlankLine();
+
         emitter.emitComment("Concrete target descriptor generated from the .tdesc manifest.");
         {
             auto classScope = emitter.enterClass(className, "public TargetDesc");
@@ -247,6 +266,32 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
         emitter.dedent();
         {
             auto body = emitter.enterScope();
+            if (decl && !decl->m_extensions.empty())
+            {
+                emitter.emitComment("Register target extensions defined in the .tdesc manifest.");
+                for (const auto &ext : decl->m_extensions)
+                {
+                    const bool isDefault = ext.m_default.has_value() && ext.m_default->m_node;
+                    std::string desc = ext.m_description.has_value() ? escapeString(ext.m_description->m_node) : "";
+
+                    std::string impliesStr = "{";
+                    for (size_t i = 0; i < ext.m_implies.size(); ++i)
+                    {
+                        if (i > 0)
+                        {
+                            impliesStr += ", ";
+                        }
+                        impliesStr += std::format("\"{}\"", escapeString(ext.m_implies[i].m_node));
+                    }
+                    impliesStr += "}";
+
+                    emitter.emitLine("m_extensions.registerExtension(\"{}\", \"{}\", {}, {});",
+                                     escapeString(ext.m_name.m_node),
+                                     desc,
+                                     isDefault ? "true" : "false",
+                                     impliesStr);
+                }
+            }
         }
         emitter.emitBlankLine();
 

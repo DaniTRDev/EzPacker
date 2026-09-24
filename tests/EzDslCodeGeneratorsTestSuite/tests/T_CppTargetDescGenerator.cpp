@@ -165,3 +165,55 @@ TEST_F(CppTargetDescGeneratorTest, FailsWithoutTargetSymbolAndOnNullInputs)
     CppTargetDescGenerator genNullTable(getDiagCollector(), nullptr, m_testTempDir, "X86_64");
     EXPECT_FALSE(genNullTable.run());
 }
+
+// Verifies target extensions declared in the manifest are emitted into tables and registered in the constructor.
+TEST_F(CppTargetDescGeneratorTest, EmitsTargetExtensions)
+{
+    std::string manifestWithExt = R"(
+target X86_64 {
+    pointer_size: 8;
+    stack_slot:   8;
+    object_formats: [ELF];
+    default_calling_conv: SysV_AMD64;
+
+    extensions {
+        sse {
+            default: true;
+            description: "Streaming SIMD Extensions";
+        };
+        sse2 {
+            default: true;
+            implies: [sse];
+        };
+        avx {
+            implies: [sse2];
+            description: "Advanced Vector Extensions";
+        };
+    }
+}
+)";
+
+    ASSERT_TRUE(parseAndRunPass(manifestWithExt));
+
+    CppTargetDescGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "X86_64");
+    ASSERT_TRUE(generator.run());
+
+    auto headerPath = m_testTempDir / "X86_64TargetDesc.h";
+    auto sourcePath = m_testTempDir / "X86_64TargetDesc.cpp";
+    ASSERT_TRUE(std::filesystem::exists(headerPath));
+    ASSERT_TRUE(std::filesystem::exists(sourcePath));
+
+    std::string header = readFileContent(headerPath);
+    std::string source = readFileContent(sourcePath);
+
+    EXPECT_NE(header.find("inline constexpr const char *s_targetExtensions[] ="), std::string::npos);
+    EXPECT_NE(header.find("\"sse\","), std::string::npos);
+    EXPECT_NE(header.find("\"sse2\","), std::string::npos);
+    EXPECT_NE(header.find("\"avx\","), std::string::npos);
+    EXPECT_NE(header.find("s_targetExtensionCount = 3;"), std::string::npos);
+
+    EXPECT_NE(source.find("m_extensions.registerExtension(\"sse\", \"Streaming SIMD Extensions\", true, {})"), std::string::npos);
+    EXPECT_NE(source.find("m_extensions.registerExtension(\"sse2\", \"\", true, {\"sse\"})"), std::string::npos);
+    EXPECT_NE(source.find("m_extensions.registerExtension(\"avx\", \"Advanced Vector Extensions\", false, {\"sse2\"})"), std::string::npos);
+}
+

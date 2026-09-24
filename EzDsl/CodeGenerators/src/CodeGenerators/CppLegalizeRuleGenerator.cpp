@@ -129,6 +129,7 @@ void CppLegalizeRuleGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitInclude("Type/MirType.h", false);
     emitter.emitInclude("Type/MirTypeTable.h", false);
     emitter.emitInclude("Block/MirBlock.h", false);
+    emitter.emitInclude("Descriptors/TargetDesc.h", false);
     emitter.emitBlankLine();
 
     // Collect all parsed legalize rules in symbol-table order.
@@ -149,6 +150,10 @@ void CppLegalizeRuleGenerator::emitSource(CppSourceEmitter &emitter,
     {
         for (const auto &p : r->m_predicates)
         {
+            if (p.m_name == "hasExtension" || p.m_name == "hasFeature")
+            {
+                continue;
+            }
             predicates.emplace(std::string(p.m_name), p.m_args.size());
         }
 
@@ -322,6 +327,22 @@ void CppLegalizeRuleGenerator::emitSource(CppSourceEmitter &emitter,
             emitter.emitLine("// 2. Evaluate 'when' predicates");
             for (const auto &p : r->m_predicates)
             {
+                if (p.m_name == "hasExtension" || p.m_name == "hasFeature")
+                {
+                    std::string extName;
+                    if (!p.m_args.empty())
+                    {
+                        if (std::holds_alternative<std::string_view>(p.m_args[0]))
+                        {
+                            extName = std::string(std::get<std::string_view>(p.m_args[0]));
+                        }
+                    }
+                    emitter.emitLine(
+                            "if (!ctx.m_targetDesc || !ctx.m_targetDesc->hasExtension(\"{}\")) return LegalizationResult::NotModified;",
+                            EscapeString(extName, EscapeMode::CppStringLiteral));
+                    continue;
+                }
+
                 std::string callArgs;
                 for (size_t a = 0; a < p.m_args.size(); ++a)
                 {
