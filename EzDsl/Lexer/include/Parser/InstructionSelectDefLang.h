@@ -240,26 +240,41 @@ struct PatternTreeRule
 };
 
 /**
- * Parses a `predicate($a, $b);` guard clause into a PatternWhen.
+ * Parses a `predicate($a, $b);` or `hasExtension("avx");` guard clause into a PatternWhen.
  */
 struct PatternWhenRule
 {
     static constexpr auto whitespace = Common::Whitespace;
 
     /**
-     * Parses a `,`-separated list of SSA variable arguments.
+     * Parses an argument to a when-predicate: SSA variable ($var), string literal ("avx"), or identifier (avx).
+     */
+    struct WhenArg
+    {
+        static constexpr auto rule = (dsl::peek(dsl::lit_c<'$'>) >> dsl::p<SsaVarName>) |
+                (dsl::peek(dsl::lit_c<'"'>) >> dsl::p<Common::StringLiteral>) |
+                (dsl::else_ >> dsl::p<Common::Identifier>);
+        static constexpr auto value = lexy::callback<Ast::Common::Identifier>(
+                [](Ast::Common::Identifier id) { return id; },
+                [](Ast::Common::StringLiteral str)
+                { return Ast::Common::Identifier{ str.m_node, str.m_sourceRef }; });
+    };
+
+    /**
+     * Parses a `,`-separated list of predicate arguments.
      */
     struct ArgList
     {
-        static constexpr auto whitespace = Common::Whitespace;
-        static constexpr auto rule = dsl::list(dsl::p<SsaVarName>, dsl::sep(dsl::lit_c<','>));
+        static constexpr auto rule = dsl::list(dsl::p<WhenArg>, dsl::sep(dsl::lit_c<','>));
         static constexpr auto value = Common::PmrAsList<std::pmr::vector<Ast::Common::Identifier>>;
     };
 
     static constexpr auto rule = []
     {
         auto pred = dsl::p<Common::Identifier>;
-        auto args = dsl::parenthesized(dsl::opt(dsl::peek(dsl::lit_c<'$'>) >> dsl::p<ArgList>));
+        auto args = dsl::parenthesized(
+                dsl::opt(dsl::peek(dsl::ascii::alpha_digit_underscore | dsl::lit_c<'$'> | dsl::lit_c<'"'>) >>
+                         dsl::p<ArgList>));
         return pred + args + dsl::lit_c<';'>;
     }();
 

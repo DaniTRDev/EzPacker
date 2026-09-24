@@ -100,6 +100,46 @@ bool TargetDescPass::run(class DiagnosticCollector *collector,
         }
     }
 
+    std::unordered_set<std::string_view> extensionNames;
+    for (const auto &ext : file->m_extensions)
+    {
+        if (ext.m_name.m_node.empty())
+        {
+            collector->error(PassName, "Extension name must not be empty.")
+                    << ext.m_name.m_sourceRef;
+            hasErrors = true;
+            continue;
+        }
+
+        if (!extensionNames.insert(ext.m_name.m_node).second)
+        {
+            collector->error(PassName, "Duplicate extension '{}'.", ext.m_name.m_node)
+                    << ext.m_name.m_sourceRef;
+            hasErrors = true;
+        }
+    }
+
+    // Check that implied extensions exist and don't imply self
+    for (const auto &ext : file->m_extensions)
+    {
+        for (const auto &implied : ext.m_implies)
+        {
+            if (implied.m_node == ext.m_name.m_node)
+            {
+                collector->error(PassName, "Extension '{}' cannot imply itself.", ext.m_name.m_node)
+                        << implied.m_sourceRef;
+                hasErrors = true;
+            }
+            else if (extensionNames.find(implied.m_node) == extensionNames.end())
+            {
+                collector->error(PassName, "Extension '{}' implies unknown extension '{}'.",
+                                 ext.m_name.m_node, implied.m_node)
+                        << implied.m_sourceRef;
+                hasErrors = true;
+            }
+        }
+    }
+
     if (hasErrors)
     {
         collector->error(PassName, "Target descriptor pass completed with errors.");

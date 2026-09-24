@@ -149,3 +149,96 @@ target Dup {
     TargetDescPass pass;
     EXPECT_FALSE(pass.run(getDiagCollector(), getSymbolTable(), &ast.value()));
 }
+
+// Verifies valid extensions pass semantic analysis.
+TEST_F(TargetDescPassTest, AcceptsValidExtensions)
+{
+    std::string source = R"(
+target ValidExt {
+    pointer_size: 8;
+    stack_slot: 8;
+    object_formats: [ELF];
+    default_calling_conv: C;
+
+    extensions {
+        sse {
+            default: true;
+        };
+        sse2 {
+            default: true;
+            implies: [sse];
+        };
+        avx {
+            implies: [sse2];
+        };
+    }
+}
+)";
+
+    EXPECT_TRUE(parseAndRun(source));
+    auto *sym = getSymbolTable()->getSymByName("ValidExt", SymbolType::TargetDesc);
+    ASSERT_NE(sym, nullptr);
+    const auto *descSym = sym->getIf<Symbols::TargetDescSymbol>();
+    ASSERT_NE(descSym, nullptr);
+    ASSERT_NE(descSym->m_astNode, nullptr);
+    EXPECT_EQ(descSym->m_astNode->m_extensions.size(), 3u);
+}
+
+// Verifies duplicate extension definitions are rejected.
+TEST_F(TargetDescPassTest, RejectsDuplicateExtension)
+{
+    std::string source = R"(
+target BadExt {
+    pointer_size: 8;
+    stack_slot: 8;
+    object_formats: [ELF];
+    default_calling_conv: C;
+
+    extensions {
+        avx { default: true; };
+        avx { default: false; }
+    }
+}
+)";
+
+    EXPECT_FALSE(parseAndRun(source));
+}
+
+// Verifies self-implication is rejected.
+TEST_F(TargetDescPassTest, RejectsSelfImpliedExtension)
+{
+    std::string source = R"(
+target BadExt {
+    pointer_size: 8;
+    stack_slot: 8;
+    object_formats: [ELF];
+    default_calling_conv: C;
+
+    extensions {
+        avx { implies: [avx]; }
+    }
+}
+)";
+
+    EXPECT_FALSE(parseAndRun(source));
+}
+
+// Verifies implying an undeclared extension is rejected.
+TEST_F(TargetDescPassTest, RejectsUnknownImpliedExtension)
+{
+    std::string source = R"(
+target BadExt {
+    pointer_size: 8;
+    stack_slot: 8;
+    object_formats: [ELF];
+    default_calling_conv: C;
+
+    extensions {
+        avx { implies: [non_existent_feature]; }
+    }
+}
+)";
+
+    EXPECT_FALSE(parseAndRun(source));
+}
+

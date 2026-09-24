@@ -128,3 +128,83 @@ TEST_F(TargetDescDefLangTest, RejectsMissingTargetKeyword)
     auto ast = parse("X86_64 { pointer_size: 8; }");
     EXPECT_FALSE(ast.has_value());
 }
+
+/**
+ * Verifies parsing an extension block with default flags, implied dependencies, and descriptions.
+ */
+TEST_F(TargetDescDefLangTest, ParsesExtensionBlock)
+{
+    std::string source = R"(
+target X86_64 {
+    pointer_size: 8;
+    stack_slot:   8;
+    object_formats: [ELF, COFF];
+    default_calling_conv: SysV_AMD64;
+
+    extensions {
+        sse {
+            default: true;
+            description: "Streaming SIMD Extensions";
+        };
+        sse2 {
+            default: true;
+            implies: [sse];
+        };
+        avx {
+            implies: [sse2];
+            description: "Advanced Vector Extensions";
+        };
+    }
+}
+)";
+
+    auto ast = parse(source);
+    ASSERT_TRUE(ast.has_value());
+    ASSERT_EQ(ast->m_extensions.size(), 3u);
+
+    EXPECT_EQ(ast->m_extensions[0].m_name.m_node, "sse");
+    ASSERT_TRUE(ast->m_extensions[0].m_default.has_value());
+    EXPECT_TRUE(ast->m_extensions[0].m_default->m_node);
+    ASSERT_TRUE(ast->m_extensions[0].m_description.has_value());
+    EXPECT_EQ(ast->m_extensions[0].m_description->m_node, "Streaming SIMD Extensions");
+    EXPECT_TRUE(ast->m_extensions[0].m_implies.empty());
+
+    EXPECT_EQ(ast->m_extensions[1].m_name.m_node, "sse2");
+    ASSERT_TRUE(ast->m_extensions[1].m_default.has_value());
+    EXPECT_TRUE(ast->m_extensions[1].m_default->m_node);
+    ASSERT_EQ(ast->m_extensions[1].m_implies.size(), 1u);
+    EXPECT_EQ(ast->m_extensions[1].m_implies[0].m_node, "sse");
+
+    EXPECT_EQ(ast->m_extensions[2].m_name.m_node, "avx");
+    EXPECT_FALSE(ast->m_extensions[2].m_default.has_value());
+    ASSERT_EQ(ast->m_extensions[2].m_implies.size(), 1u);
+    EXPECT_EQ(ast->m_extensions[2].m_implies[0].m_node, "sse2");
+    ASSERT_TRUE(ast->m_extensions[2].m_description.has_value());
+    EXPECT_EQ(ast->m_extensions[2].m_description->m_node, "Advanced Vector Extensions");
+}
+
+/**
+ * Verifies parsing the list shorthand for extensions.
+ */
+TEST_F(TargetDescDefLangTest, ParsesExtensionList)
+{
+    std::string source = R"(
+target X86_64 {
+    pointer_size: 8;
+    stack_slot:   8;
+    object_formats: [ELF];
+    default_calling_conv: SysV_AMD64;
+
+    extensions: [sse, sse2, avx, avx2];
+}
+)";
+
+    auto ast = parse(source);
+    ASSERT_TRUE(ast.has_value());
+    ASSERT_EQ(ast->m_extensions.size(), 4u);
+    EXPECT_EQ(ast->m_extensions[0].m_name.m_node, "sse");
+    EXPECT_EQ(ast->m_extensions[1].m_name.m_node, "sse2");
+    EXPECT_EQ(ast->m_extensions[2].m_name.m_node, "avx");
+    EXPECT_EQ(ast->m_extensions[3].m_name.m_node, "avx2");
+}
+

@@ -138,6 +138,20 @@ bool InstructionSelectPass::validatePattern(DiagnosticCollector *collector,
     // Validate when clauses
     for (const auto &when : pattern.m_whenClauses)
     {
+        if (when.m_predicate.m_node == "hasExtension" || when.m_predicate.m_node == "hasFeature")
+        {
+            if (when.m_args.empty())
+            {
+                collector->error(PassName,
+                                 "Pattern '{}': '{}' predicate requires an extension name argument",
+                                 pattern.m_name.m_node,
+                                 when.m_predicate.m_node)
+                        << when.m_predicate.m_sourceRef;
+                return false;
+            }
+            continue;
+        }
+
         for (const auto &arg : when.m_args)
         {
             if (boundVars.find(arg.m_node) == boundVars.end())

@@ -21,17 +21,22 @@ struct SsaVarName
 };
 
 /**
- * Parses a predicate argument: `$var`, an integer literal, or a bare identifier, as a PredicateArg variant.
+ * Parses a predicate argument: `$var`, a string literal, an integer literal, or a bare identifier, as a PredicateArg variant.
  */
 struct PredicateArg
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = (dsl::peek(dsl::lit_c<'$'>) >> dsl::p<SsaVarName>) |
+            (dsl::peek(dsl::lit_c<'"'>) >> dsl::p<Common::StringLiteral>) |
             (dsl::peek(dsl::ascii::digit | dsl::lit_c<'-'> | dsl::lit_c<'+'>) >> dsl::p<Common::IntegerLiteral>) |
             (dsl::else_ >> dsl::p<Common::Identifier>);
 
     static constexpr auto value = lexy::callback<Ast::LegalizeRuleDef::PredicateArg>(
             [](Ast::Common::Identifier id) { return Ast::LegalizeRuleDef::PredicateArg{ std::move(id) }; },
+            [](Ast::Common::StringLiteral str)
+            {
+                return Ast::LegalizeRuleDef::PredicateArg{ Ast::Common::Identifier{ str.m_node, str.m_sourceRef } };
+            },
             [](Ast::Common::IntegerLiteral lit) { return Ast::LegalizeRuleDef::PredicateArg{ lit }; });
 };
 
@@ -56,7 +61,7 @@ struct RuleWhen
     {
         auto name = dsl::p<Common::Identifier>;
         auto args = dsl::parenthesized(dsl::opt(
-                dsl::peek(dsl::ascii::alpha_digit_underscore | dsl::lit_c<'$'> | dsl::lit_c<'-'> | dsl::lit_c<'+'>) >>
+                dsl::peek(dsl::ascii::alpha_digit_underscore | dsl::lit_c<'$'> | dsl::lit_c<'-'> | dsl::lit_c<'+'> | dsl::lit_c<'"'>) >>
                 dsl::p<ArgList>));
         return name + args + dsl::lit_c<';'>;
     }();

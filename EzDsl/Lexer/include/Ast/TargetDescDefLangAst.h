@@ -26,6 +26,17 @@ struct ComponentBinding
 };
 
 /**
+ * One target extension definition.
+ */
+struct ExtensionDef
+{
+    Common::Identifier m_name;                         // Extension name (e.g. sse, avx, etc.)
+    std::optional<Common::BooleanLiteral> m_default;    // Whether enabled by default (default: true/false)
+    std::pmr::vector<Common::Identifier> m_implies;     // Other extensions implied by this extension
+    std::optional<Common::StringLiteral> m_description; // Human-readable description
+};
+
+/**
  * Declarative description of a target, referencing sibling config files and target constants.
  */
 struct TargetDescDecl
@@ -47,6 +58,7 @@ struct TargetDescDecl
 
     std::pmr::vector<LibcallEntry> mLibcalls;       // Libcall id-to-symbol mappings.
     std::pmr::vector<ComponentBinding> mComponents; // Strategy-slot to C++ type bindings.
+    std::pmr::vector<ExtensionDef> m_extensions;    // Target extensions (features) defined by this target.
 };
 
 /**

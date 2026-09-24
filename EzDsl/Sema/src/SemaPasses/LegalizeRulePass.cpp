@@ -338,6 +338,20 @@ bool LegalizeRulePass::processPredicate(DiagnosticCollector *collector,
                                         const DSL::Ast::LegalizeRuleDef::RuleWhen &predicate,
                                         std::string_view ruleName)
 {
+    if (predicate.m_predicateName.m_node == "hasExtension" || predicate.m_predicateName.m_node == "hasFeature")
+    {
+        if (predicate.m_arguments.empty())
+        {
+            collector->error(PassName,
+                             "Predicate '{}' in rule '{}' requires an extension name argument",
+                             predicate.m_predicateName.m_node,
+                             ruleName)
+                    << predicate.m_predicateName.m_sourceRef;
+            return false;
+        }
+        return true;
+    }
+
     bool success = true;
     std::string contextMsg = "predicate '" + std::string(predicate.m_predicateName.m_node) + "'";
 

@@ -11,6 +11,7 @@ namespace DSL::Parser::TargetDesc
 namespace dsl = ::lexy::dsl;
 
 using Ast::TargetDesc::ComponentBinding;
+using Ast::TargetDesc::ExtensionDef;
 using Ast::TargetDesc::LibcallEntry;
 using Ast::TargetDesc::TargetDescFile;
 
@@ -28,7 +29,8 @@ using TargetDescItem =
                      std::pair<Common::Keyword<"object_formats">, std::pmr::vector<Ast::Common::Identifier>>,
                      std::pair<Common::Keyword<"default_calling_conv">, Ast::Common::Identifier>,
                      std::pair<Common::Keyword<"libcalls">, std::pmr::vector<LibcallEntry>>,
-                     std::pair<Common::Keyword<"components">, std::pmr::vector<ComponentBinding>>>;
+                     std::pair<Common::Keyword<"components">, std::pmr::vector<ComponentBinding>>,
+                     std::pair<Common::Keyword<"extensions">, std::pmr::vector<ExtensionDef>>>;
 
 /**
  * Parses a `[ "a", "b" ]` list of string literals into a PMR vector.
@@ -238,6 +240,121 @@ struct ComponentsDecl
 };
 
 /**
+ * Item within an extension block: default, implies, or description.
+ */
+using ExtensionFieldItem =
+        std::variant<std::pair<Common::Keyword<"default">, Ast::Common::BooleanLiteral>,
+                     std::pair<Common::Keyword<"implies">, std::pmr::vector<Ast::Common::Identifier>>,
+                     std::pair<Common::Keyword<"description">, Ast::Common::StringLiteral>>;
+
+struct ExtensionDefaultDecl
+{
+    static constexpr auto rule = Common::Keyword<"default">::rule >>
+            (dsl::lit_c<':'> >> dsl::p<Common::BooleanLiteral>);
+    static constexpr auto value = lexy::callback<ExtensionFieldItem>(
+            [](Ast::Common::BooleanLiteral b)
+            { return std::make_pair(Common::Keyword<"default">{}, std::move(b)); });
+};
+
+struct ExtensionImpliesDecl
+{
+    static constexpr auto rule = Common::Keyword<"implies">::rule >>
+            (dsl::lit_c<':'> >> dsl::p<IdentifierList>);
+    static constexpr auto value = lexy::callback<ExtensionFieldItem>(
+            [](std::pmr::vector<Ast::Common::Identifier> ids)
+            { return std::make_pair(Common::Keyword<"implies">{}, std::move(ids)); });
+};
+
+struct ExtensionDescriptionDecl
+{
+    static constexpr auto rule = Common::Keyword<"description">::rule >>
+            (dsl::lit_c<':'> >> dsl::p<Common::StringLiteral>);
+    static constexpr auto value = lexy::callback<ExtensionFieldItem>(
+            [](Ast::Common::StringLiteral s)
+            { return std::make_pair(Common::Keyword<"description">{}, std::move(s)); });
+};
+
+struct ExtensionFieldEntry
+{
+    static constexpr auto rule = []
+    {
+        auto def = dsl::peek(Common::Keyword<"default">::rule) >> dsl::p<ExtensionDefaultDecl>;
+        auto imp = dsl::peek(Common::Keyword<"implies">::rule) >> dsl::p<ExtensionImpliesDecl>;
+        auto desc = dsl::peek(Common::Keyword<"description">::rule) >> dsl::p<ExtensionDescriptionDecl>;
+        auto inner = def | imp | desc;
+        return inner + dsl::opt(dsl::lit_c<';'>);
+    }();
+    static constexpr auto value = lexy::callback<ExtensionFieldItem>([](ExtensionFieldItem item, auto...) { return item; });
+};
+
+struct ExtensionFieldList
+{
+    static constexpr auto rule = dsl::curly_bracketed.opt_list(dsl::p<ExtensionFieldEntry>);
+    static constexpr auto value = Common::PmrAsList<ExtensionFieldItem>;
+};
+
+struct ExtensionBlockEntryParser
+{
+    static constexpr auto rule = dsl::p<Common::Identifier> + dsl::opt(dsl::p<ExtensionFieldList>) + dsl::opt(dsl::lit_c<';'>);
+    static constexpr auto value = lexy::callback<ExtensionDef>(
+            [](Ast::Common::Identifier name, std::pmr::vector<ExtensionFieldItem> fields, auto...)
+            {
+                ExtensionDef def{};
+                def.m_name = std::move(name);
+                for (auto &f : fields)
+                {
+                    std::visit(
+                            [&](auto &&val)
+                            {
+                                using T = std::decay_t<decltype(val.first)>;
+                                if constexpr (std::is_same_v<T, Common::Keyword<"default">>)
+                                    def.m_default = std::move(val.second);
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"implies">>)
+                                    def.m_implies = std::move(val.second);
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"description">>)
+                                    def.m_description = std::move(val.second);
+                            },
+                            f);
+                }
+                return def;
+            },
+            [](Ast::Common::Identifier name, lexy::nullopt, auto...)
+            {
+                ExtensionDef def{};
+                def.m_name = std::move(name);
+                return def;
+            });
+};
+
+struct ExtensionBlockList
+{
+    static constexpr auto rule = dsl::curly_bracketed.opt_list(dsl::p<ExtensionBlockEntryParser>);
+    static constexpr auto value = Common::PmrAsList<ExtensionDef>;
+};
+
+struct ExtensionsDecl
+{
+    static constexpr auto whitespace = Common::Whitespace;
+    static constexpr auto rule = Common::Keyword<"extensions">::rule >>
+            ((dsl::lit_c<':'> >> dsl::p<IdentifierList>) | dsl::p<ExtensionBlockList>);
+    static constexpr auto value = lexy::callback<TargetDescItem>(
+            [](std::pmr::vector<Ast::Common::Identifier> ids)
+            {
+                std::pmr::vector<ExtensionDef> defs;
+                defs.reserve(ids.size());
+                for (auto &id : ids)
+                {
+                    ExtensionDef def{};
+                    def.m_name = std::move(id);
+                    defs.push_back(std::move(def));
+                }
+                return std::make_pair(Common::Keyword<"extensions">{}, std::move(defs));
+            },
+            [](std::pmr::vector<ExtensionDef> defs)
+            { return std::make_pair(Common::Keyword<"extensions">{}, std::move(defs)); });
+};
+
+/**
  * Dispatches one body field of a target description to the matching `*Decl` sub-parser.
  */
 struct BodyEntry
@@ -256,8 +373,9 @@ struct BodyEntry
         auto dcc = dsl::peek(Common::Keyword<"default_calling_conv">::rule) >> dsl::p<DefaultCallingConvDecl>;
         auto libcalls = dsl::peek(Common::Keyword<"libcalls">::rule) >> dsl::p<LibcallsDecl>;
         auto components = dsl::peek(Common::Keyword<"components">::rule) >> dsl::p<ComponentsDecl>;
+        auto extensions = dsl::peek(Common::Keyword<"extensions">::rule) >> dsl::p<ExtensionsDecl>;
 
-        auto inner = registers | instructions | convs | ptr | stack | ip | disp | formats | dcc | libcalls | components;
+        auto inner = registers | instructions | convs | ptr | stack | ip | disp | formats | dcc | libcalls | components | extensions;
         return inner + dsl::opt(dsl::lit_c<';'>);
     }();
     static constexpr auto value = lexy::callback<TargetDescItem>([](TargetDescItem item, auto...) { return item; });
@@ -315,6 +433,8 @@ struct TargetDescFileParser
                                     file.mLibcalls = std::move(field.second);
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"components">>)
                                     file.mComponents = std::move(field.second);
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"extensions">>)
+                                    file.m_extensions = std::move(field.second);
                             },
                             item);
                 }

@@ -194,3 +194,40 @@ TEST_F(InstructionSelectDefLangTest, TestInstructionSelectFile)
     EXPECT_EQ(res->m_patterns[0].m_name.m_node, "Select_ADD32rr");
     EXPECT_EQ(res->m_patterns[1].m_name.m_node, "Select_ADD32ri");
 }
+
+/**
+ * Verifies that when clauses accept string literals and identifiers such as hasExtension("avx").
+ */
+TEST_F(InstructionSelectDefLangTest, TestHasExtensionWhenClause)
+{
+    std::string test = R"(
+        pattern Select_VADDPS [cost = 1] {
+            match {
+                FADD v4f32:$dst, v4f32:$src1, v4f32:$src2;
+            };
+            when {
+                hasExtension("avx");
+                hasFeature(sse4_1);
+            };
+            select {
+                VADDPS VR128:$dst, VR128:$src1, VR128:$src2;
+            };
+        };
+    )";
+
+    ParseContext ctx = createParseContextFromBuff("test", test);
+    auto res = ctx.parse<DSL::Parser::InstructionSelectDef::SelectionPatternRule,
+                         DSL::Ast::InstructionSelectDef::SelectionPattern>();
+    ASSERT_TRUE(res.has_value());
+    EXPECT_EQ(res->m_name.m_node, "Select_VADDPS");
+    ASSERT_EQ(res->m_whenClauses.size(), 2u);
+
+    EXPECT_EQ(res->m_whenClauses[0].m_predicate.m_node, "hasExtension");
+    ASSERT_EQ(res->m_whenClauses[0].m_args.size(), 1u);
+    EXPECT_EQ(res->m_whenClauses[0].m_args[0].m_node, "avx");
+
+    EXPECT_EQ(res->m_whenClauses[1].m_predicate.m_node, "hasFeature");
+    ASSERT_EQ(res->m_whenClauses[1].m_args.size(), 1u);
+    EXPECT_EQ(res->m_whenClauses[1].m_args[0].m_node, "sse4_1");
+}
+
