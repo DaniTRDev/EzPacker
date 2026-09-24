@@ -20,12 +20,21 @@ EzDSL provides a complete processing pipeline: **Lexy**-based zero-copy parsing,
    - [Legalization Rewrite Rules (`.lrd`)](#legalization-rewrite-rules-lrd)
    - [Instruction Selection Patterns (`.isf`)](#instruction-selection-patterns-isf)
    - [Type Definitions (`.tyf`)](#type-definitions-tyf)
-4. [Semantic Analysis & Symbol Table Architecture](#4-semantic-analysis--symbol-table-architecture)
-5. [C++ Code Generators](#5-c-code-generators)
-6. [CLI Driver (`EzDslCli`) & Options](#6-cli-driver-ezdslcli--options)
-7. [CMake Build System Integration](#7-cmake-build-system-integration)
-8. [Memory Architecture](#8-memory-architecture)
-9. [Testing & Test Suite Breakdown](#9-testing--test-suite-breakdown)
+4. [Exhaustive Keyword & Lexical Reference](#4-exhaustive-keyword--lexical-reference)
+   - [Generic IR Instructions (`.irdf`)](#generic-ir-instructions-irdf)
+   - [Legalization Actions (`.lad`)](#legalization-actions-lad-1)
+   - [Legalization Rewrite Rules (`.lrd`)](#legalization-rewrite-rules-lrd-1)
+   - [Target Instruction Definitions (`.idf`)](#target-instruction-definitions-idf-1)
+   - [Calling Conventions (`.ezcc` / `.ccd`)](#calling-conventions-ezcc--ccd-1)
+   - [Target Descriptors & Register Banks (`.tdesc`)](#target-descriptors--register-banks-tdesc)
+   - [Instruction Selection Patterns (`.isf`)](#instruction-selection-patterns-isf-1)
+   - [Type Definitions (`.tyf`)](#type-definitions-tyf-1)
+5. [Semantic Analysis & Symbol Table Architecture](#5-semantic-analysis--symbol-table-architecture)
+6. [C++ Code Generators](#6-c-code-generators)
+7. [CLI Driver (`EzDslCli`) & Options](#7-cli-driver-ezdslcli--options)
+8. [CMake Build System Integration](#8-cmake-build-system-integration)
+9. [Memory Architecture](#9-memory-architecture)
+10. [Testing & Test Suite Breakdown](#10-testing--test-suite-breakdown)
 
 ---
 
@@ -297,7 +306,228 @@ bindingToken __bindToken;
 
 ---
 
-## 4. Semantic Analysis & Symbol Table Architecture
+## 4. Exhaustive Keyword & Lexical Reference
+
+This section catalogs every reserved keyword, declaration token, instruction flag, category, tier, legalization clause, and configuration directive recognized across the EzDSL language suite.
+
+### Generic IR Instructions (`.irdf`)
+
+#### Structural Declarations
+- **`inst`** / **`ir_inst`**: Initiates a generic IR instruction opcode declaration.
+- **`CATEGORY`**: Defines the functional classification block: `CATEGORY(CategoryName);`.
+- **`TIER`**: Defines the compiler abstraction tier: `TIER(TierName);`.
+- **`FLAGS`**: Declares behavioral and verification flags: `FLAGS(Flag1, Flag2, ...);`.
+
+#### Operand Types & Masks
+| Operand Keyword | Target MIR Representation / Constraint |
+|:---|:---|
+| **`Register`** | Virtual or physical register ([`MirRegister`](file:///E:/Repos/EzPacker/EzMir/include/Operand/MirOperands.h#L233)). |
+| **`Integer`** | Immediate arbitrary-precision integer literal ([`MirInteger`](file:///E:/Repos/EzPacker/EzMir/include/Operand/MirOperands.h#L79)). |
+| **`FloatingPoint`** | Immediate arbitrary-precision IEEE-754 float literal ([`MirFloat`](file:///E:/Repos/EzPacker/EzMir/include/Operand/MirOperands.h#L39)). |
+| **`Memory`** | Base-plus-displacement memory operand ([`MirMemory`](file:///E:/Repos/EzPacker/EzMir/include/Operand/MirOperands.h#L318)). |
+| **`Reference`** | Symbolic reference to a block, function, global, or stack slot ([`MirReference`](file:///E:/Repos/EzPacker/EzMir/include/Operand/MirOperands.h#L119)). |
+| **`RuntimeSymbol`** | External runtime symbol reference ([`MirRuntimeSymbol`](file:///E:/Repos/EzPacker/EzMir/include/Operand/MirOperands.h#L199)). |
+| **`VariadicArgs`** | Variadic operand expansion slot (used for `CALL` or `PHI`). |
+| **`Immediate`** | Composite mask: `Integer` \| `FloatingPoint`. |
+| **`RegIntImm`** | Composite mask: `Register` \| `Integer` (standard ALU inputs). |
+| **`RegFloatImm`** | Composite mask: `Register` \| `FloatingPoint`. |
+| **`RegImm`** | Composite mask: `Register` \| `Integer` \| `FloatingPoint`. |
+| **`AddressSource`** | Composite mask: `Memory` \| `Reference`. |
+| **`AnyValue`** | Composite mask: `Register` \| `Integer` \| `FloatingPoint`. |
+| **`Any`** | Wildcard matching any operand kind (`0xFFFF`). |
+
+#### Operand Directionality
+- **`IN`**: Read-only input operand (consumed by the instruction).
+- **`OUT`**: Destination definition operand (defined/written by the instruction).
+- **`INOUT`**: Input-output operand (both read and written in-place).
+
+#### Instruction Categories (`MirInstructionCategory`)
+- **`DataMovement`**: Register copies, immediate loading (`MOV`).
+- **`Memory`**: Pointer dereferences, memory reads and writes (`LOAD`, `STORE`).
+- **`Arithmetic`**: Math operations (`ADD`, `SUB`, `MUL`, `DIV`, `NEG`).
+- **`Bitwise`**: Logical bit operations and shifts (`AND`, `OR`, `XOR`, `SHL`, `SHR`).
+- **`Compare`**: Relational comparisons (`CMP_EQ`, `CMP_NE`, `CMP_LT`, `CMP_LE`, `CMP_GT`, `CMP_GE`).
+- **`ControlFlow`**: Control flow branches, jumps, calls, returns, phi-nodes (`BR`, `JMP`, `CALL`, `RET`, `PHI`).
+- **`Casting`**: Type conversions, truncations, and extensions (`CAST`, `TRUNC`, `ZEXT`, `SEXT`, `BITCAST`).
+- **`System`**: System calls, trap instructions, interrupts, fences.
+- **`Vector`**: SIMD vector computations and lane packing.
+
+#### Instruction Tiers (`MirInstructionTier`)
+- **`HighLevel`**: Standard frontend SSA operations emitted by source compilers and IR builders.
+- **`PassInternal`**: Intermediate lowering primitives used by passes (`PUSH_ARG`, `POP_ARG`, `PUSH_RET`, `POP_RET`, `MERGE_VALUES`, `UNMERGE_VALUES`).
+- **`TargetLow`**: Low-level instructions tied to physical register classes and machine encodings (`TARGET_INST`).
+
+#### Behavioral Instruction Flags (`MirInstructionFlags`)
+| Flag Keyword | Semantic Guarantee & Verification Effect |
+|:---|:---|
+| **`SizeMatch`** | Enforces that all operands have identical bitwidths. |
+| **`DestLarger`** | Destination operand bitwidth must strictly exceed source operand bitwidth (e.g. `ZEXT`, `SEXT`). |
+| **`DestSmaller`** | Destination operand bitwidth must be strictly smaller than source bitwidth (e.g. `TRUNC`). |
+| **`ReadsMemory`** | Instruction reads from memory; prevents unsafe hoisting across aliasing stores. |
+| **`WritesMemory`** | Instruction writes to memory; marks memory side-effects. |
+| **`IsTerminator`** | Instruction terminates a basic block (no instructions may follow it in the block). |
+| **`IsBranch`** | Conditional or unconditional control-flow branch. |
+| **`IsCall`** | Subroutine procedure call. |
+| **`IsReturn`** | Function return instruction. |
+| **`HasSideEffect`** | Instruction has unmodeled external effects; prevents Dead Code Elimination (DCE). |
+| **`IsCommutative`** | Binary operation is commutative: $\text{op}(a, b) \equiv \text{op}(b, a)$. |
+| **`ReadsCPUFlags`** | Instruction reads hardware condition flags (e.g. conditional branches). |
+| **`WritesCPUFlags`** | Instruction modifies hardware condition flags (e.g. ALU arithmetic). |
+| **`TreatAsSigned`** | Arithmetic or comparison evaluates operands with signed two's-complement semantics. |
+| **`VariadicArgs`** | Instruction takes a variable number of arguments (e.g. `CALL`, `PHI`). |
+| **`IsMove`** | Pure register-to-register or constant move instruction. |
+
+---
+
+### Legalization Actions (`.lad`)
+
+#### Structural Declarations
+- **`action`**: Declares a legalization legality table for an opcode: `action OpcodeName { ... };`.
+- **`CLAMP_SCALAR`**: Sets minimum and maximum hardware scalar clamping boundaries: `CLAMP_SCALAR(i32, i64);`.
+
+#### Legalization Action Clauses
+| Action Keyword | Legalizer Transformation Semantics |
+|:---|:---|
+| **`LEGAL`** | The operation is natively legal for the specified type(s): `LEGAL(i32, i64);` or `LEGAL(i32:0, i8:1);`. |
+| **`WIDENS`** | Promotes/widens scalar type to a larger supported legal type: `WIDENS(i1, i8, i16) >> i32;`. |
+| **`NARROWS`** | Splits/decomposes an oversized type into multiple smaller scalar parts: `NARROWS(i128) >> i64;`. |
+| **`LIBCALL`** | Replaces the operation with a call to an external runtime library function: `LIBCALL(i128) >> "__divdi3";`. |
+| **`LOWER`** | Dispatches legalization to a target-specialized lowering handler: `LOWER(i64) >> LowerRotL;`. |
+| **`CUSTOM`** | Directs legalizer to execute a sequence of `.lrd` rewrite rules: `CUSTOM(i64) >> Rule1 >> Rule2;`. |
+| **`BITCAST`** | Reinterprets the operand bit pattern to an alternative type of identical size: `BITCAST(f32) >> i32;`. |
+| **`UNSUPPORTED`** | Explicitly marks the combination as unsupported and uncompilable. |
+
+---
+
+### Legalization Rewrite Rules (`.lrd`)
+
+- **`rule`**: Declares an IR-to-IR pattern expansion rule: `rule RuleName { ... };`.
+- **`match`**: Declares the generic input MIR pattern template to match: `match { OP $dst, $lhs, $rhs; };`.
+- **`when`**: Guard clause declaring a boolean predicate condition: `when { isSubtarget64Bit(); };`.
+- **`expand`**: Replacement block generating the decomposed MIR instructions.
+- **`$name`**: SSA variable binder: binds source registers in `match` and materializes them in `expand`.
+- **Standard Decomposition Opcodes**:
+  - `MERGE_VALUES`: Combines multiple scalar parts into a wide scalar.
+  - `UNMERGE_VALUES`: Splits a wide scalar into multiple smaller scalar parts (`$lo`, `$hi`).
+  - `UADDO` / `UADDE`: Unsigned add with carry-out / carry-in.
+  - `USUBO` / `USUBE`: Unsigned subtract with borrow-out / borrow-in.
+
+---
+
+### Target Instruction Definitions (`.idf`)
+
+#### Directives & Declarations
+- **`target`**: Sets the target architecture dialect: `target AMD64;`.
+- **`target_inst`**: Declares a concrete machine instruction: `target_inst Name(operands) { ... };`.
+- **`MNEMONIC`**: Declares assembly mnemonic string: `MNEMONIC("movl");`.
+- **`FLAGS`**: Associates instruction flags with the target instruction: `FLAGS(ReadsMemory, HasSideEffect);`.
+- **`IMPLICIT_DEFS`**: Registers implicitly written by hardware: `IMPLICIT_DEFS(EFLAGS, RAX);`.
+- **`IMPLICIT_USES`**: Registers implicitly read by hardware: `IMPLICIT_USES(RSP);`.
+- **`ENCODING`**: Declarative machine encoding clause defining hardware byte layouts.
+
+#### Operand Directions
+- **`IN`**, **`OUT`**, **`INOUT`**: Dataflow access directions for target instruction operands.
+
+---
+
+### Calling Conventions (`.ezcc` / `.ccd`)
+
+#### Root Declaration
+- **`calling_conv`**: Declares a calling convention definition: `calling_conv Name { ... };`.
+
+#### `stack { ... }` Block Keywords
+- **`align`**: Stack alignment boundary in bytes: `align: 16`.
+- **`growth`**: Stack growth direction: `growth: down` or `growth: up`.
+- **`cleanup`**: Stack parameter cleanup responsibility: `cleanup: caller` or `cleanup: callee`.
+- **`shadow_space`**: Fixed stack allocation preceding parameters (e.g. `shadow_space: 32` for Win64).
+- **`red_zone`**: Scratch area below stack pointer preserved across calls (e.g. `red_zone: 128` for SysV).
+- **`sp`**: Physical stack pointer register name: `sp: rsp`.
+- **`fp`**: Physical frame pointer register name: `fp: rbp`.
+- **`lr`**: Link register name (for RISC architectures): `lr: x30`.
+
+#### `preserve { ... }` Block Keywords
+- **`callee_saved`**: List of non-volatile registers preserved by callee: `callee_saved: [rbx, rbp, r12, r13, r14, r15]`.
+- **`caller_saved`**: List of volatile scratch registers: `caller_saved: [rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11]`.
+
+#### `classify { ... }` Block Keywords
+- **`types`**: Maps primitive types to an ABI classification: `types [i1, i8, i16, i32, i64, ptr] => INTEGER`.
+- **`aggregate`**: Classification block for structs and unions.
+- **`when`** / **`else`**: Conditional branch selection for aggregate sizing.
+- **`size`**: Size comparison conditions: `size > 16`, `size <= 8`, `size in [1..8]`.
+- **`by_ref`**: Aggregate must be passed indirectly by reference (`by_ref(implicit_copy: true)`).
+- **`hfa`** / **`hva`**: Homogeneous Floating-point / Vector Aggregates.
+- **`is_pod`**, **`has_unaligned_fields`**, **`non_trivial_copy`**, **`non_trivial_destructor`**: Structural predicates.
+- **`decompose`**: Deconstructs aggregate across multiple scalar register slots (`elements_le: 2`).
+
+#### `pass { ... }` & `return { ... }` Keywords
+- **`class`**: Binds an ABI class to an allocation sequence.
+- **`registers`**: Ordered sequence of physical registers allocated for the class.
+- **`fallback`**: Action when registers are exhausted: `fallback: stack(8, 8)`.
+- **`order`**: Parameter allocation order: `order: left_to_right` vs `right_to_left`.
+- **`split`**: Policy allowing arguments to span across registers and stack: `split: true`.
+- **`all_or_nothing`**: Enforces that an argument must fit entirely in registers or spill entirely to stack.
+- **`sret`**: Struct-return configuration: `sret(register: rdi, consumes_arg_slot: true, return_ptr: rax)`.
+
+---
+
+### Target Descriptors & Register Banks (`.tdesc`)
+
+#### Architecture Metadata
+- **`target`**: Root target block: `target TargetName { ... };`.
+- **`instructions`**: Relative path to companion `.idf` file: `instructions: "x86_64_instructions.idf";`.
+- **`calling_convs`**: List of companion `.ezcc` files: `calling_convs: ["SysV_AMD64.ezcc"];`.
+- **`pointer_size`**: Target pointer size in bytes: `pointer_size: 8;`.
+- **`stack_slot`**: Target natural stack slot alignment in bytes: `stack_slot: 8;`.
+- **`instruction_pointer`**: Name of the instruction pointer register: `instruction_pointer: rip;`.
+- **`mem_disp_type`**: Type used for memory displacement offsets: `mem_disp_type: i64;`.
+- **`object_formats`**: List of supported object containers: `object_formats: [ELF, COFF];`.
+- **`default_calling_conv`**: Name of the default calling convention: `default_calling_conv: SysV_AMD64;`.
+- **`libcalls`**: Map of runtime helper symbols: `libcalls { __divdi3: "__divdi3" };`.
+- **`components`**: Binding of backend pass implementations:
+  - `frame_lowerer`: Target frame lowerer class name.
+  - `instruction_selector`: Target instruction selector class name.
+  - `legalizer`: Target legalizer class name.
+  - `register_allocator`: Target register allocator class name.
+- **`extensions`**: Feature flags supported by target: `extensions { avx2, sse4_1 };`.
+
+#### Register Bank & Class Directives
+- **`register_bank`**: Declares a hardware register bank: `register_bank GPR { ... };`.
+- **`classes`**: Declares register classes and their bitwidths: `classes { GPR32: 32, GPR64: 64 };`.
+- **`sub_register`**: Declares wide-to-narrow aliasing relationships: `sub_register { GPR64 <: GPR32 };`.
+- **`registers`**: Enumerates physical registers: `registers { ... };`.
+- **`enc`**: Hardware register encoding integer: `rax enc 0`.
+- **`names`**: Per-class assembly string aliases: `names { rax: GPR64, eax: GPR32 };`.
+- **`special`**: Declares dedicated architectural registers: `special { rip: 16 };`.
+
+---
+
+### Instruction Selection Patterns (`.isf`)
+
+- **`target`**: Associates pattern file with target dialect: `target AMD64;`.
+- **`addrmode`**: Declares a complex addressing mode matcher: `addrmode ModeName(params) { ... };`.
+- **`variant`**: Declares an addressing mode variant branch: `variant BaseDisp { ... };`.
+- **`pattern`**: Declares an instruction selection pattern: `pattern PatternName [cost = 1] { ... };`.
+- **`cost`**: Heuristic pattern selection cost (lower cost patterns are preferred).
+- **`match`**: Tree pattern of generic MIR opcodes to match.
+- **`when`**: Guard clause with C++ pattern predicates.
+- **`select`**: Target machine instruction emission template.
+- **`imm`**, **`simm`**, **`uimm`**: Immediate value classifiers.
+- **Built-in Predicates**: `isSimm32($imm)`, `isSimm8($imm)`, `hasOneUse($val)`, `noInterveningStore($val)`.
+
+---
+
+### Type Definitions (`.tyf`)
+
+- **`integer`**: Declares an arbitrary-width integer type: `integer i32(32);`.
+- **`float`**: Declares an arbitrary-precision floating-point type: `float f64(64);`.
+- **`void`**: Declares the void type: `void void;`.
+- **`bindingToken`**: Declares an opaque binding token: `bindingToken __bindToken;`.
+- **`pointer`**: Declares pointer types: `pointer ptr(64);`.
+- **`vector`**: Declares SIMD vector types: `vector v128(128);`.
+
+---
+
+## 5. Semantic Analysis & Symbol Table Architecture
 
 EzDSL features a dedicated semantic validation pipeline ([`EzDsl/Sema/include/Sema/`](file:///E:/Repos/EzPacker/EzDsl/Sema/include/Sema/), [`EzDsl/Sema/include/SemaPasses/`](file:///E:/Repos/EzPacker/EzDsl/Sema/include/SemaPasses/)):
 
@@ -313,7 +543,7 @@ EzDSL features a dedicated semantic validation pipeline ([`EzDsl/Sema/include/Se
 
 ---
 
-## 5. C++ Code Generators
+## 6. C++ Code Generators
 
 EzDSL translates verified AST and symbol table models into production C++ source and header files ([`EzDsl/CodeGenerators/`](file:///E:/Repos/EzPacker/EzDsl/CodeGenerators/)):
 
@@ -327,7 +557,7 @@ EzDSL translates verified AST and symbol table models into production C++ source
 
 ---
 
-## 6. CLI Driver (`EzDslCli`) & Options
+## 7. CLI Driver (`EzDslCli`) & Options
 
 `EzDslCli` is the standalone executable driver used to process EzDSL backend definitions during build time.
 
@@ -388,7 +618,7 @@ EzDslCli [options] -i <input_file>
 
 ---
 
-## 7. CMake Build System Integration
+## 8. CMake Build System Integration
 
 EzDSL integrates cleanly into CMake build workflows via helper modules in `EzMir/CMake/` and `EzTriple/CMake/`:
 
@@ -451,7 +681,7 @@ EzDslGenRegisterInfo(
 
 ---
 
-## 8. Memory Architecture
+## 9. Memory Architecture
 
 EzDSL is built on `std::pmr::monotonic_buffer_resource` arenas:
 - **Zero-allocation ASTs**: AST collections, literals, and symbol tables share a contiguous memory block.
@@ -459,7 +689,7 @@ EzDSL is built on `std::pmr::monotonic_buffer_resource` arenas:
 
 ---
 
-## 9. Testing & Test Suite Breakdown
+## 10. Testing & Test Suite Breakdown
 
 EzDSL features modular test suites covering every tier of the language processing pipeline:
 
