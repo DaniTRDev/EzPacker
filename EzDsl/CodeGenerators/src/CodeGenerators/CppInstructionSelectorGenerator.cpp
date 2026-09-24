@@ -280,13 +280,39 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                                 auto ifScope = emitter.enterBlock();
                                 emitter.emitLine("auto *vregOp = inst->getOperand({})->get<MirRegister>();",
                                                  nestedOpIdx);
-                                emitter.emitLine("if (vregOp)");
+                                std::string vregCheck = "vregOp";
+                                for (size_t opIdx = 0; opIdx < pat->m_matchTree.m_operands.size(); ++opIdx)
+                                {
+                                    if (static_cast<int>(opIdx) == nestedOpIdx)
+                                        continue;
+                                    const auto &op = pat->m_matchTree.m_operands[opIdx];
+                                    if (op.m_kind == DSL::Ast::InstructionSelectDef::PatternOperand::Kind::SsaRegister)
+                                    {
+                                        vregCheck += std::format(" && inst->getOperand({})->isOfType<MirRegister>()", opIdx);
+                                        if (op.m_type.has_value())
+                                        {
+                                            vregCheck += std::format(" && inst->getOperand({})->getMirType() && "
+                                                                     "inst->getOperand({})->getMirType()->getName() == \"{}\"",
+                                                                     opIdx,
+                                                                     opIdx,
+                                                                     EscapeString(op.m_type->m_node, EscapeMode::CppStringLiteral));
+                                        }
+                                    }
+                                }
+                                emitter.emitLine("if ({})", vregCheck);
                                 {
                                     auto vregScope = emitter.enterBlock();
                                     emitter.emitLine("MirInstruction *defInst = getDefiningInstruction(ctx, vregOp);");
-                                    emitter.emitLine("if (defInst && defInst->getOpCode() == MirInstructionOpCode::{} "
-                                                     "&& hasOneUse(vregOp) && noInterveningStore(defInst, inst))",
-                                                     nestedTree.m_opcode.m_node);
+                                    std::string defCheck = std::format("defInst && defInst->getOpCode() == MirInstructionOpCode::{} "
+                                                                       "&& hasOneUse(vregOp) && noInterveningStore(defInst, inst)",
+                                                                       nestedTree.m_opcode.m_node);
+                                    if (!nestedTree.m_operands.empty() && nestedTree.m_operands[0].m_type.has_value())
+                                    {
+                                        defCheck += std::format(" && defInst->getOperand(0)->getMirType() && "
+                                                                "defInst->getOperand(0)->getMirType()->getName() == \"{}\"",
+                                                                EscapeString(nestedTree.m_operands[0].m_type->m_node, EscapeMode::CppStringLiteral));
+                                    }
+                                    emitter.emitLine("if ({})", defCheck);
                                     {
                                         auto defScope = emitter.enterBlock();
                                         emitter.emitLine(
@@ -378,7 +404,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                                                                 m_targetName,
                                                                 selInst.m_targetOpcode.m_node);
                                             emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);",
-                                                             targetDescCall);
+                                                              targetDescCall);
                                         }
 
                                         emitter.emitLine("defInst->eraseFromOwner();");
@@ -416,9 +442,48 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                                 if (hasImmWhen)
                                 {
                                     // Match immediate
-                                    emitter.emitLine("auto *imm = inst->getOperand({})->get<MirInteger>();",
-                                                     pat->m_matchTree.m_operands.size() - 1);
-                                    emitter.emitLine("if (imm && isSimm32(imm->getValue().getI64()))");
+                                    std::string immCond;
+                                    for (size_t opIdx = 0; opIdx < pat->m_matchTree.m_operands.size(); ++opIdx)
+                                    {
+                                        const auto &op = pat->m_matchTree.m_operands[opIdx];
+                                        if (op.m_kind == DSL::Ast::InstructionSelectDef::PatternOperand::Kind::SsaRegister)
+                                        {
+                                            if (!immCond.empty())
+                                                immCond += " && ";
+                                            immCond += std::format("inst->getOperand({})->isOfType<MirRegister>()", opIdx);
+                                            if (op.m_type.has_value())
+                                            {
+                                                immCond += std::format(" && inst->getOperand({})->getMirType() && "
+                                                                       "inst->getOperand({})->getMirType()->getName() == \"{}\"",
+                                                                       opIdx,
+                                                                       opIdx,
+                                                                       EscapeString(op.m_type->m_node, EscapeMode::CppStringLiteral));
+                                            }
+                                        }
+                                        else if (op.m_kind == DSL::Ast::InstructionSelectDef::PatternOperand::Kind::ImmediateSymbol)
+                                        {
+                                            if (!immCond.empty())
+                                                immCond += " && ";
+                                            immCond += std::format("inst->getOperand({})->isOfType<MirInteger>()", opIdx);
+                                            if (op.m_type.has_value())
+                                            {
+                                                immCond += std::format(" && inst->getOperand({})->getMirType() && "
+                                                                       "inst->getOperand({})->getMirType()->getName() == \"{}\"",
+                                                                       opIdx,
+                                                                       opIdx,
+                                                                       EscapeString(op.m_type->m_node, EscapeMode::CppStringLiteral));
+                                            }
+                                        }
+                                    }
+
+                                    size_t lastIdx = pat->m_matchTree.m_operands.size() - 1;
+                                    emitter.emitLine("auto *imm = inst->getOperand({})->get<MirInteger>();", lastIdx);
+                                    std::string predCheck = "imm && isSimm32(imm->getValue().getI64())";
+                                    if (!immCond.empty())
+                                    {
+                                        predCheck = std::format("{} && {}", immCond, predCheck);
+                                    }
+                                    emitter.emitLine("if ({})", predCheck);
                                     {
                                         auto immScope = emitter.enterBlock();
                                         emitter.emitLine(
@@ -453,7 +518,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                                                                 m_targetName,
                                                                 selInst.m_targetOpcode.m_node);
                                             emitter.emitLine("ib.buildTarget({}, inst->getSourceRef(), emittedOps);",
-                                                             targetDescCall);
+                                                              targetDescCall);
                                         }
                                         emitter.emitLine("inst->eraseFromOwner();");
                                         emitter.emitLine("return true;");
@@ -465,13 +530,22 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                                     std::string regCond;
                                     for (size_t opIdx = 0; opIdx < pat->m_matchTree.m_operands.size(); ++opIdx)
                                     {
-                                        if (pat->m_matchTree.m_operands[opIdx].m_kind ==
+                                        const auto &op = pat->m_matchTree.m_operands[opIdx];
+                                        if (op.m_kind ==
                                             DSL::Ast::InstructionSelectDef::PatternOperand::Kind::SsaRegister)
                                         {
                                             if (!regCond.empty())
                                                 regCond += " && ";
                                             regCond +=
                                                     std::format("inst->getOperand({})->isOfType<MirRegister>()", opIdx);
+                                            if (op.m_type.has_value())
+                                            {
+                                                regCond += std::format(" && inst->getOperand({})->getMirType() && "
+                                                                       "inst->getOperand({})->getMirType()->getName() == \"{}\"",
+                                                                       opIdx,
+                                                                       opIdx,
+                                                                       EscapeString(op.m_type->m_node, EscapeMode::CppStringLiteral));
+                                            }
                                         }
                                     }
 

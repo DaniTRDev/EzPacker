@@ -247,3 +247,520 @@ pattern Select_RET [cost = 1] {
         RET;
     };
 };
+
+// ============================================================================
+// Vector SSE Patterns
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// SSE (v4f32)
+// ----------------------------------------------------------------------------
+
+pattern Select_VADD_v4f32 [cost = 1] {
+    match {
+        VADD v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        ADDPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v4f32 [cost = 1] {
+    match {
+        VSUB v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        SUBPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v4f32 [cost = 1] {
+    match {
+        VMUL v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        MULPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v4f32 [cost = 1] {
+    match {
+        VDIV v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        DIVPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v4f32 [cost = 1] {
+    match {
+        VAND v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        ANDPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v4f32 [cost = 1] {
+    match {
+        VOR v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        ORPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v4f32 [cost = 1] {
+    match {
+        VXOR v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        XORPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VANDN_v4f32 [cost = 1] {
+    match {
+        VANDN v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        ANDNPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v4f32 [cost = 1] {
+    match {
+        VMIN v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        MINPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v4f32 [cost = 1] {
+    match {
+        VMAX v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        MAXPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// ----------------------------------------------------------------------------
+// SSE2 (v2f64, v4i32, v16i8, v8i16, v2i64)
+// ----------------------------------------------------------------------------
+
+pattern Select_VADD_v2f64 [cost = 1] {
+    match {
+        VADD v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        ADDPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v2f64 [cost = 1] {
+    match {
+        VSUB v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        SUBPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v2f64 [cost = 1] {
+    match {
+        VMUL v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MULPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v2f64 [cost = 1] {
+    match {
+        VDIV v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        DIVPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v2f64 [cost = 1] {
+    match {
+        VAND v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        ANDPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v2f64 [cost = 1] {
+    match {
+        VOR v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        ORPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v2f64 [cost = 1] {
+    match {
+        VXOR v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        XORPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VANDN_v2f64 [cost = 1] {
+    match {
+        VANDN v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        ANDNPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v2f64 [cost = 1] {
+    match {
+        VMIN v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MINPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v2f64 [cost = 1] {
+    match {
+        VMAX v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MAXPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v4i32 [cost = 1] {
+    match {
+        VADD v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PADDDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v4i32 [cost = 1] {
+    match {
+        VSUB v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PSUBDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v16i8 [cost = 1] {
+    match {
+        VADD v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PADDBrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v16i8 [cost = 1] {
+    match {
+        VSUB v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PSUBBrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v8i16 [cost = 1] {
+    match {
+        VADD v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PADDWrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v8i16 [cost = 1] {
+    match {
+        VSUB v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PSUBWrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v8i16 [cost = 1] {
+    match {
+        VMUL v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PMULLWrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v2i64 [cost = 1] {
+    match {
+        VADD v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PADDQrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v2i64 [cost = 1] {
+    match {
+        VSUB v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PSUBQrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v4i32 [cost = 1] {
+    match {
+        VAND v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PANDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v4i32 [cost = 1] {
+    match {
+        VOR v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PORrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v4i32 [cost = 1] {
+    match {
+        VXOR v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        PXORrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// ----------------------------------------------------------------------------
+// SSE3 (v4f32, v2f64)
+// ----------------------------------------------------------------------------
+
+pattern Select_VHADD_v4f32 [cost = 1] {
+    match {
+        VHADD v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse3");
+    };
+    select {
+        HADDPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VHADD_v2f64 [cost = 1] {
+    match {
+        VHADD v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse3");
+    };
+    select {
+        HADDPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VHSUB_v4f32 [cost = 1] {
+    match {
+        VHSUB v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("sse3");
+    };
+    select {
+        HSUBPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VHSUB_v2f64 [cost = 1] {
+    match {
+        VHSUB v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("sse3");
+    };
+    select {
+        HSUBPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// ----------------------------------------------------------------------------
+// SSSE3 (v4i32)
+// ----------------------------------------------------------------------------
+
+pattern Select_VHADD_v4i32 [cost = 1] {
+    match {
+        VHADD v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("ssse3");
+    };
+    select {
+        PHADDDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VHSUB_v4i32 [cost = 1] {
+    match {
+        VHSUB v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("ssse3");
+    };
+    select {
+        PHSUBDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// ----------------------------------------------------------------------------
+// SSE4.1 (v4i32)
+// ----------------------------------------------------------------------------
+
+pattern Select_VMUL_v4i32 [cost = 1] {
+    match {
+        VMUL v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse4_1");
+    };
+    select {
+        PMULLDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v4i32 [cost = 1] {
+    match {
+        VMIN v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse4_1");
+    };
+    select {
+        PMINSDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v4i32 [cost = 1] {
+    match {
+        VMAX v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("sse4_1");
+    };
+    select {
+        PMAXSDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+

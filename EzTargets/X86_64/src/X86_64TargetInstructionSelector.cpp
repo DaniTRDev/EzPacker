@@ -50,6 +50,19 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
         case MirInstructionOpCode::FMUL:
         case MirInstructionOpCode::FDIV:
             return selectFloatALU(ctx, inst);
+        case MirInstructionOpCode::VADD:
+        case MirInstructionOpCode::VSUB:
+        case MirInstructionOpCode::VMUL:
+        case MirInstructionOpCode::VDIV:
+        case MirInstructionOpCode::VAND:
+        case MirInstructionOpCode::VOR:
+        case MirInstructionOpCode::VXOR:
+        case MirInstructionOpCode::VANDN:
+        case MirInstructionOpCode::VMIN:
+        case MirInstructionOpCode::VMAX:
+        case MirInstructionOpCode::VHADD:
+        case MirInstructionOpCode::VHSUB:
+            return selectVectorALU(ctx, inst);
         case MirInstructionOpCode::SITOFP:
         case MirInstructionOpCode::FPTOSI:
             return selectFloatCvt(ctx, inst);
@@ -701,6 +714,152 @@ bool X86_64TargetInstructionSelector::selectFloatALU(MirBuilderContext *ctx, Mir
 }
 
 /**
+ * Lowers vector arithmetic, logical, and horizontal operations into SSE/AVX target instructions.
+ */
+bool X86_64TargetInstructionSelector::selectVectorALU(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("VR128"));
+    }
+    if (auto *r = lhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("VR128"));
+    }
+    if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("VR128"));
+    }
+
+    std::string_view typeName = dst->getMirType() ? dst->getMirType()->getName() : "v4f32";
+
+    auto hasExt = [&](std::string_view ext)
+    {
+        return m_targetDesc && m_targetDesc->hasExtension(ext);
+    };
+
+    x86_64TargetInst::OpCode op = x86_64TargetInst::ADDPSrr;
+    if (typeName == "v4f32")
+    {
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::VADD: if (!hasExt("sse")) return false; op = x86_64TargetInst::ADDPSrr; break;
+            case MirInstructionOpCode::VSUB: if (!hasExt("sse")) return false; op = x86_64TargetInst::SUBPSrr; break;
+            case MirInstructionOpCode::VMUL: if (!hasExt("sse")) return false; op = x86_64TargetInst::MULPSrr; break;
+            case MirInstructionOpCode::VDIV: if (!hasExt("sse")) return false; op = x86_64TargetInst::DIVPSrr; break;
+            case MirInstructionOpCode::VAND: if (!hasExt("sse")) return false; op = x86_64TargetInst::ANDPSrr; break;
+            case MirInstructionOpCode::VOR:  if (!hasExt("sse")) return false; op = x86_64TargetInst::ORPSrr; break;
+            case MirInstructionOpCode::VXOR: if (!hasExt("sse")) return false; op = x86_64TargetInst::XORPSrr; break;
+            case MirInstructionOpCode::VANDN: if (!hasExt("sse")) return false; op = x86_64TargetInst::ANDNPSrr; break;
+            case MirInstructionOpCode::VMIN: if (!hasExt("sse")) return false; op = x86_64TargetInst::MINPSrr; break;
+            case MirInstructionOpCode::VMAX: if (!hasExt("sse")) return false; op = x86_64TargetInst::MAXPSrr; break;
+            case MirInstructionOpCode::VHADD: if (!hasExt("sse3")) return false; op = x86_64TargetInst::HADDPSrr; break;
+            case MirInstructionOpCode::VHSUB: if (!hasExt("sse3")) return false; op = x86_64TargetInst::HSUBPSrr; break;
+            default: return false;
+        }
+    }
+    else if (typeName == "v2f64")
+    {
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::VADD: if (!hasExt("sse2")) return false; op = x86_64TargetInst::ADDPDrr; break;
+            case MirInstructionOpCode::VSUB: if (!hasExt("sse2")) return false; op = x86_64TargetInst::SUBPDrr; break;
+            case MirInstructionOpCode::VMUL: if (!hasExt("sse2")) return false; op = x86_64TargetInst::MULPDrr; break;
+            case MirInstructionOpCode::VDIV: if (!hasExt("sse2")) return false; op = x86_64TargetInst::DIVPDrr; break;
+            case MirInstructionOpCode::VAND: if (!hasExt("sse2")) return false; op = x86_64TargetInst::ANDPDrr; break;
+            case MirInstructionOpCode::VOR:  if (!hasExt("sse2")) return false; op = x86_64TargetInst::ORPDrr; break;
+            case MirInstructionOpCode::VXOR: if (!hasExt("sse2")) return false; op = x86_64TargetInst::XORPDrr; break;
+            case MirInstructionOpCode::VANDN: if (!hasExt("sse2")) return false; op = x86_64TargetInst::ANDNPDrr; break;
+            case MirInstructionOpCode::VMIN: if (!hasExt("sse2")) return false; op = x86_64TargetInst::MINPDrr; break;
+            case MirInstructionOpCode::VMAX: if (!hasExt("sse2")) return false; op = x86_64TargetInst::MAXPDrr; break;
+            case MirInstructionOpCode::VHADD: if (!hasExt("sse3")) return false; op = x86_64TargetInst::HADDPDrr; break;
+            case MirInstructionOpCode::VHSUB: if (!hasExt("sse3")) return false; op = x86_64TargetInst::HSUBPDrr; break;
+            default: return false;
+        }
+    }
+    else if (typeName == "v4i32")
+    {
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::VADD: if (!hasExt("sse2")) return false; op = x86_64TargetInst::PADDDrr; break;
+            case MirInstructionOpCode::VSUB: if (!hasExt("sse2")) return false; op = x86_64TargetInst::PSUBDrr; break;
+            case MirInstructionOpCode::VMUL: if (!hasExt("sse4_1")) return false; op = x86_64TargetInst::PMULLDrr; break;
+            case MirInstructionOpCode::VAND: if (!hasExt("sse2")) return false; op = x86_64TargetInst::PANDrr; break;
+            case MirInstructionOpCode::VOR:  if (!hasExt("sse2")) return false; op = x86_64TargetInst::PORrr; break;
+            case MirInstructionOpCode::VXOR: if (!hasExt("sse2")) return false; op = x86_64TargetInst::PXORrr; break;
+            case MirInstructionOpCode::VMIN: if (!hasExt("sse4_1")) return false; op = x86_64TargetInst::PMINSDrr; break;
+            case MirInstructionOpCode::VMAX: if (!hasExt("sse4_1")) return false; op = x86_64TargetInst::PMAXSDrr; break;
+            case MirInstructionOpCode::VHADD: if (!hasExt("ssse3")) return false; op = x86_64TargetInst::PHADDDrr; break;
+            case MirInstructionOpCode::VHSUB: if (!hasExt("ssse3")) return false; op = x86_64TargetInst::PHSUBDrr; break;
+            default: return false;
+        }
+    }
+    else if (typeName == "v16i8")
+    {
+        if (!hasExt("sse2")) return false;
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::VADD: op = x86_64TargetInst::PADDBrr; break;
+            case MirInstructionOpCode::VSUB: op = x86_64TargetInst::PSUBBrr; break;
+            case MirInstructionOpCode::VAND: op = x86_64TargetInst::PANDrr; break;
+            case MirInstructionOpCode::VOR:  op = x86_64TargetInst::PORrr; break;
+            case MirInstructionOpCode::VXOR: op = x86_64TargetInst::PXORrr; break;
+            default: return false;
+        }
+    }
+    else if (typeName == "v8i16")
+    {
+        if (!hasExt("sse2")) return false;
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::VADD: op = x86_64TargetInst::PADDWrr; break;
+            case MirInstructionOpCode::VSUB: op = x86_64TargetInst::PSUBWrr; break;
+            case MirInstructionOpCode::VMUL: op = x86_64TargetInst::PMULLWrr; break;
+            case MirInstructionOpCode::VAND: op = x86_64TargetInst::PANDrr; break;
+            case MirInstructionOpCode::VOR:  op = x86_64TargetInst::PORrr; break;
+            case MirInstructionOpCode::VXOR: op = x86_64TargetInst::PXORrr; break;
+            default: return false;
+        }
+    }
+    else if (typeName == "v2i64")
+    {
+        if (!hasExt("sse2")) return false;
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::VADD: op = x86_64TargetInst::PADDQrr; break;
+            case MirInstructionOpCode::VSUB: op = x86_64TargetInst::PSUBQrr; break;
+            case MirInstructionOpCode::VAND: op = x86_64TargetInst::PANDrr; break;
+            case MirInstructionOpCode::VOR:  op = x86_64TargetInst::PORrr; break;
+            case MirInstructionOpCode::VXOR: op = x86_64TargetInst::PXORrr; break;
+            default: return false;
+        }
+    }
+    else
+    {
+        return false;
+    }
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
+                   inst->getSourceRef(),
+                   { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
+}
+
+/**
  * Lowers integer-to-float (SITOFP) and float-to-integer (FPTOSI) conversions to CVTSI2SS/SD and
  * CVTTSS2SI/CVTTSD2SI, picking the GPR/FPR classes from the operand widths.
  */
@@ -822,6 +981,28 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
 
         auto op = isDouble ? x86_64TargetInst::MOVSDrr : x86_64TargetInst::MOVSSrr;
         ib.buildTarget(x86_64TargetInst::getTargetDesc(op),
+                       inst->getSourceRef(),
+                       { dst, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+
+    // 2b. Vector register moves: MOVAPSrr
+    bool isVector = (dst->getMirType() && dst->getMirType()->getKind() == MirTypeKind::Vector);
+    if (isVector)
+    {
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass("VR128"));
+        }
+        if (auto *r = src->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass("VR128"));
+        }
+
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOVAPSrr),
                        inst->getSourceRef(),
                        { dst, src });
         inst->eraseFromOwner();
