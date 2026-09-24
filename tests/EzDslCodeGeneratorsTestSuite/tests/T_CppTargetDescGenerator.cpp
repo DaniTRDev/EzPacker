@@ -217,3 +217,43 @@ target X86_64 {
     EXPECT_NE(source.find("m_extensions.registerExtension(\"avx\", \"Advanced Vector Extensions\", false, {\"sse2\"})"), std::string::npos);
 }
 
+// Verifies the production x86_64.tdesc manifest parses, passes Sema, and generates target extensions.
+TEST_F(CppTargetDescGeneratorTest, ParsesAndGeneratesRealX86_64Tdesc)
+{
+    std::filesystem::path manifestPath;
+    std::filesystem::path current = std::filesystem::current_path();
+    for (int i = 0; i < 6; ++i)
+    {
+        auto candidate = current / "EzTargets" / "X86_64" / "targets" / "x86_64" / "x86_64.tdesc";
+        if (std::filesystem::exists(candidate))
+        {
+            manifestPath = candidate;
+            break;
+        }
+        if (current.has_parent_path() && current != current.parent_path())
+        {
+            current = current.parent_path();
+        }
+    }
+    ASSERT_FALSE(manifestPath.empty()) << "Could not find x86_64.tdesc from cwd " << std::filesystem::current_path();
+
+    std::string content = readFileContent(manifestPath);
+    ASSERT_TRUE(parseAndRunPass(content));
+
+    CppTargetDescGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "X86_64");
+    ASSERT_TRUE(generator.run());
+
+    auto headerPath = m_testTempDir / "X86_64TargetDesc.h";
+    auto sourcePath = m_testTempDir / "X86_64TargetDesc.cpp";
+    ASSERT_TRUE(std::filesystem::exists(headerPath));
+    ASSERT_TRUE(std::filesystem::exists(sourcePath));
+
+    std::string header = readFileContent(headerPath);
+    std::string source = readFileContent(sourcePath);
+
+    EXPECT_NE(header.find("s_targetExtensionCount = 8;"), std::string::npos);
+    EXPECT_NE(source.find("m_extensions.registerExtension(\"avx2\", \"Advanced Vector Extensions 2 (AVX2)\", false, {\"avx\"})"),
+              std::string::npos);
+}
+
+

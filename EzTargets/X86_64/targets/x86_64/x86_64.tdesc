@@ -1,0 +1,55 @@
+target X86_64 {
+    instructions:  "x86_64_instructions.idf";
+    calling_convs: ["x86_64_calling_conv.ezcc"];
+
+    pointer_size: 8;
+    stack_slot:   8;
+
+    instruction_pointer: rip;
+    mem_disp_type: i64;
+
+    object_formats: [ELF, COFF];
+    default_calling_conv: SysV_AMD64;
+
+    extensions {
+        sse {
+            default: true;
+            description: "Streaming SIMD Extensions (SSE)";
+        };
+        sse2 {
+            default: true;
+            implies: [sse];
+            description: "Streaming SIMD Extensions 2 (SSE2)";
+        };
+        sse3 {
+            implies: [sse2];
+            description: "Streaming SIMD Extensions 3 (SSE3)";
+        };
+        ssse3 {
+            implies: [sse3];
+            description: "Supplemental Streaming SIMD Extensions 3 (SSSE3)";
+        };
+        sse4_1 {
+            implies: [ssse3];
+            description: "Streaming SIMD Extensions 4.1";
+        };
+        sse4_2 {
+            implies: [sse4_1];
+            description: "Streaming SIMD Extensions 4.2";
+        };
+        avx {
+            implies: [sse4_2];
+            description: "Advanced Vector Extensions (AVX)";
+        };
+        avx2 {
+            implies: [avx];
+            description: "Advanced Vector Extensions 2 (AVX2)";
+        };
+    }
+
+    components {
+        frame_lowerer:        X86_64FrameLowerer;
+        instruction_selector: X86_64TargetInstructionSelector;
+        register_allocator:   X86_64RegisterAllocator
+    }
+}
