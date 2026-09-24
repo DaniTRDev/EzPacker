@@ -1,9 +1,9 @@
 #include "CodeGenerators/CppRegisterInfoGenerator.h"
-#include "Ast/RegisterDefLangAst.h"
+#include "Ast/TargetDescDefLangAst.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-#include "Sema/Symbols/RegisterSymbols.h"
+#include "Sema/Symbols/TargetDescSymbols.h"
 
 #include <cctype>
 #include <format>
@@ -52,7 +52,7 @@ struct CollectedRegisterData
     std::string m_targetName;                ///< Target name used during collection.
 };
 
-// Locates the single RegisterFile symbol and flattens its banks/classes/registers into table rows.
+// Locates the single TargetDesc symbol and flattens its banks/classes/registers into table rows.
 CollectedRegisterData collectData(const SymbolTable *table, std::string_view targetName)
 {
     CollectedRegisterData data;
@@ -63,12 +63,12 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
         return data;
     }
 
-    // Exactly one register file is expected; the first one found wins.
-    const DSL::Ast::RegisterDef::RegisterFile *file = nullptr;
-    const auto files = table->collect<Symbols::RegisterFileSymbol>(SymbolType::RegisterFile);
+    // Exactly one target descriptor is expected; the first one found wins.
+    const DSL::Ast::TargetDesc::TargetDescDecl *file = nullptr;
+    const auto files = table->collect<Symbols::TargetDescSymbol>(SymbolType::TargetDesc);
     if (!files.empty())
     {
-        if (const auto *fileSym = files.front()->getIf<Symbols::RegisterFileSymbol>())
+        if (const auto *fileSym = files.front()->getIf<Symbols::TargetDescSymbol>())
         {
             file = fileSym->m_astNode;
         }
@@ -79,7 +79,12 @@ CollectedRegisterData collectData(const SymbolTable *table, std::string_view tar
         return data;
     }
 
-    for (const auto &bank : file->m_banks)
+    if (data.m_targetName.empty())
+    {
+        data.m_targetName = std::string(file->m_name.m_node);
+    }
+
+    for (const auto &bank : file->m_registerBanks)
     {
         const std::string bankName(bank.m_name.m_node);
 

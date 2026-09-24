@@ -47,7 +47,6 @@ enum class LanguageDialect
     TargetInstDef,     // .idf
     InstructionSelect, // .isf
     CallingConv,       // .ezcc, .ccd
-    RegisterDef,       // .reg
     TargetDesc         // .tdesc
 };
 

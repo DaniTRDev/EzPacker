@@ -41,8 +41,7 @@ enum class SymbolType : uint8_t
     // .ezcc / .ccd Calling Convention files.
     CallingConv,
 
-    // .reg Register Definition files.
-    RegisterFile,
+    // Register declarations (embedded in .tdesc).
     RegisterBank,
     RegisterClass,
     Register,
@@ -83,7 +82,6 @@ class Symbol
                                     Symbols::AddrModeSymbol,
                                     Symbols::SelectionPatternSymbol,
                                     Symbols::CallingConvSymbol,
-                                    Symbols::RegisterFileSymbol,
                                     Symbols::RegisterBankSymbol,
                                     Symbols::RegisterClassSymbol,
                                     Symbols::RegisterSymbol,

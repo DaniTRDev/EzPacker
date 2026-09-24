@@ -1,12 +1,13 @@
 #include "EzDslCodeGeneratorsTestSuite.h"
-#include "Ast/RegisterDefLangAst.h"
+#include "Ast/TargetDescDefLangAst.h"
 #include "CodeGenerators/CppRegisterInfoGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Parser/ParseContext.h"
-#include "Parser/RegisterDefLang.h"
+#include "Parser/TargetDescDefLang.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-#include "SemaPasses/RegisterPass.h"
+#include "Sema/Symbols/TargetDescSymbols.h"
+#include "SemaPasses/TargetDescPass.h"
 
 #include <chrono>
 #include <filesystem>
@@ -19,47 +20,53 @@ using namespace CodeGenerators;
 class CppRegisterInfoGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
-    // Parses a register definition and runs the register semantic pass.
+    // Parses a target descriptor and runs the target descriptor semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
-        ParseContext ctx = createParseContextFromBuff(std::format("gen_reg_{}.reg", m_sourceId++), source);
-        m_ast = ctx.parse<DSL::Parser::RegisterDef::RegisterDefFile, DSL::Ast::RegisterDef::RegisterFile>();
+        ParseContext ctx = createParseContextFromBuff(std::format("gen_reg_{}.tdesc", m_sourceId++), source);
+        m_ast = ctx.parse<DSL::Parser::TargetDesc::TargetDescFileParser, DSL::Ast::TargetDesc::TargetDescFile>();
         if (!m_ast.has_value())
         {
             return false;
         }
 
-        RegisterPass pass;
+        TargetDescPass pass;
         return pass.run(getDiagCollector(), getSymbolTable(), &m_ast.value());
     }
 
     static constexpr const char *s_validRegisterFile = R"(
-target X86_64;
+target X86_64 {
+    pointer_size: 8;
+    stack_slot: 8;
+    instruction_pointer: rip;
+    object_formats: [ELF];
+    default_calling_conv: C;
 
-register_bank GPR {
-    classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
-    sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
-    registers {
-        rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
-        rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
+    register_bank GPR {
+        classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
+        sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
+        registers {
+            rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
+            rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
+        }
     }
-}
 
-register_bank FPR {
-    classes { FPR32: 32, FPR64: 64 }
-    sub_register { FPR64 <: FPR32 }
-    registers {
-        xmm0 enc 0 names { xmm0: FPR32, xmm0: FPR64 }
+    register_bank FPR {
+        classes { FPR32: 32, FPR64: 64 }
+        sub_register { FPR64 <: FPR32 }
+        registers {
+            xmm0 enc 0 names { xmm0: FPR32, xmm0: FPR64 }
+        }
     }
-}
 
-special {
-    rip: 16
+    special {
+        rip: 16
+    }
 }
 )";
 
     size_t m_sourceId{ 0 };
-    std::optional<DSL::Ast::RegisterDef::RegisterFile> m_ast;
+    std::optional<DSL::Ast::TargetDesc::TargetDescFile> m_ast;
 };
 
 // Generates flat register tables and verifies encodings, aliases, special regs, and count constants.

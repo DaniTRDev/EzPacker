@@ -35,11 +35,6 @@ namespace DSL::Ast::CallingConvDef
 struct CallingConventionDefFile;
 }
 
-namespace DSL::Ast::RegisterDef
-{
-struct RegisterFile;
-}
-
 namespace DSL::Ast::TargetDesc
 {
 struct TargetDescFile;
@@ -108,10 +103,6 @@ class InfoDumper
     static void dumpCallingConvAst(const DSL::Ast::CallingConvDef::CallingConventionDefFile &file,
                                    OutputFormat format,
                                    std::ostream &os);
-
-    /** Writes a parsed .reg AST in the requested format. */
-    static void
-    dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &file, OutputFormat format, std::ostream &os);
 
     /** Writes a parsed .tdesc AST in the requested format. */
     static void
