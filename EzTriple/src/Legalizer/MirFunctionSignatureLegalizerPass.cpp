@@ -88,16 +88,9 @@ MirPassResult MirFunctionSignatureLegalizerPass::run(IntrusiveLinkedList<MirFunc
     }
 
     MirRegister *token = opBuilder.buildVReg(m_ctx->getTypeTable()->__bindToken());
-    bool firstInserted = false;
-
     for (MirRegister *param : func->getParameters())
     {
         builder.build(MirInstructionOpCode::POP_ARG, param->getSourceRef(), { token, param });
-        if (!firstInserted && !entryPoint->getInstructions().empty())
-        {
-            builder.changeInsertionType(InsertionType::InsertAfter);
-            firstInserted = true;
-        }
         modified = true;
     }
 

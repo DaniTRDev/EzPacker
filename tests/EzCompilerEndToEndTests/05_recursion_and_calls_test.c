@@ -2,8 +2,10 @@
 #include <stdint.h>
 #include <assert.h>
 
-extern int64_t factorial(int64_t n);
-extern int64_t fibonacci(int64_t n);
+#include "abi_test_common.h"
+
+ABI_ATTR extern int64_t factorial(int64_t n);
+ABI_ATTR extern int64_t fibonacci(int64_t n);
 
 int main(void) {
     printf("[E2E Test 05] Running recursion and calls tests...\n");

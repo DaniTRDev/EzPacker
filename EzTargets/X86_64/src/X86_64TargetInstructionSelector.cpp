@@ -135,7 +135,6 @@ bool X86_64TargetInstructionSelector::selectBR_COND(MirBuilderContext *ctx, MirI
     ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::CMP32ri),
                    inst->getSourceRef(),
                    { cond, zeroImm });
-    ib.changeInsertionType(InsertionType::InsertAfter);
 
     // Emit: JNE %trueBlock
     ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JNE),
@@ -234,7 +233,6 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
     ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV32ri),
                    inst->getSourceRef(),
                    { dst, zeroImm });
-    ib.changeInsertionType(InsertionType::InsertAfter);
 
     // 2. Emit CMP (CMP64ri/rr or CMP32ri/rr)
     if (rhs->getType() == MirOperandType::Integer)

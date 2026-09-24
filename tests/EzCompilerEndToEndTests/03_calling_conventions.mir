@@ -38,3 +38,58 @@ entry:
     %res = ADD i64 %u, %b;
     RET i64 %res;
 }
+
+fn @call_5args(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e) -> i64 {
+entry:
+    %s1 = ADD i64 %a, %b;
+    %s2 = ADD i64 %s1, %c;
+    %s3 = ADD i64 %s2, %d;
+    %res = SUB i64 %s3, %e;
+    RET i64 %res;
+}
+
+fn @call_6args(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f) -> i64 {
+entry:
+    %s1 = ADD i64 %a, %b;
+    %s2 = ADD i64 %s1, %c;
+    %s3 = ADD i64 %s2, %d;
+    %s4 = ADD i64 %s3, %e;
+    %res = SUB i64 %s4, %f;
+    RET i64 %res;
+}
+
+fn @call_7args(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f, i64 %g) -> i64 {
+entry:
+    %s1 = ADD i64 %a, %b;
+    %s2 = ADD i64 %s1, %c;
+    %s3 = ADD i64 %s2, %d;
+    %s4 = ADD i64 %s3, %e;
+    %s5 = ADD i64 %s4, %f;
+    %res = SUB i64 %s5, %g;
+    RET i64 %res;
+}
+
+fn @call_8args(i64 %a, i64 %b, i64 %c, i64 %d, i64 %e, i64 %f, i64 %g, i64 %h) -> i64 {
+entry:
+    %s1 = ADD i64 %a, %b;
+    %s2 = ADD i64 %s1, %c;
+    %s3 = ADD i64 %s2, %d;
+    %s4 = ADD i64 %s3, %e;
+    %s5 = ADD i64 %s4, %f;
+    %s6 = ADD i64 %s5, %g;
+    %res = ADD i64 %s6, %h;
+    RET i64 %res;
+}
+
+fn @call_8args_32(i32 %a, i32 %b, i32 %c, i32 %d, i32 %e, i32 %f, i32 %g, i32 %h) -> i32 {
+entry:
+    %s1 = ADD i32 %a, %b;
+    %s2 = ADD i32 %s1, %c;
+    %s3 = ADD i32 %s2, %d;
+    %s4 = ADD i32 %s3, %e;
+    %s5 = ADD i32 %s4, %f;
+    %s6 = ADD i32 %s5, %g;
+    %res = ADD i32 %s6, %h;
+    RET i32 %res;
+}
+

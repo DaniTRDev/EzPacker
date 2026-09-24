@@ -57,15 +57,10 @@ class EmitOrdered
     {
     }
 
-    /// Emits an instruction and switches subsequent emissions to InsertAfter.
+    /// Emits an instruction before the anchor in order.
     void emit(MirInstructionOpCode opcode, const std::vector<MirOperand *> &operands)
     {
         m_builder.build(opcode, m_sourceRef, operands);
-        if (!m_switched)
-        {
-            m_builder.changeInsertionType(InsertionType::InsertAfter);
-            m_switched = true;
-        }
     }
 
     /// Callable form so the helper can be passed where an emit callback is expected.
@@ -74,7 +69,6 @@ class EmitOrdered
   private:
     MirInstructionBuilder &m_builder;     ///< Builder receiving the emitted instructions.
     SourceReference *m_sourceRef;         ///< Source reference attached to every emitted instruction.
-    bool m_switched{ false };             ///< Whether the builder has been moved past the anchor.
 };
 
 #endif // EZTRIPLE_LEGALIZE_ACTION_COMMON_H

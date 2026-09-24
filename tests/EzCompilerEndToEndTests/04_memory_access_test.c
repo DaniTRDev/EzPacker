@@ -2,10 +2,12 @@
 #include <stdint.h>
 #include <assert.h>
 
-extern int64_t mem_read_write(int64_t *buf, int64_t val);
-extern int64_t mem_accumulate(const int64_t *buf);
-extern int64_t mem_swap(int64_t *buf);
-extern int64_t mem_scale_elements(int64_t *buf, int64_t factor);
+#include "abi_test_common.h"
+
+ABI_ATTR extern int64_t mem_read_write(int64_t *buf, int64_t val);
+ABI_ATTR extern int64_t mem_accumulate(const int64_t *buf);
+ABI_ATTR extern int64_t mem_swap(int64_t *buf);
+ABI_ATTR extern int64_t mem_scale_elements(int64_t *buf, int64_t factor);
 
 int main(void) {
     printf("[E2E Test 04] Running memory access tests...\n");

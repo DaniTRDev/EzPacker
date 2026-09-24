@@ -36,8 +36,27 @@ void MirFrameLowerer::calculateFrameLayout(FrameLowererCtx &ctx)
     size_t currentOffset = analysisData->m_calleeSavedAreaSize;
     const bool growsDown = cc->doesStackGrowsDownwards();
 
+    size_t incomingParamOffset = 16 + cc->getShadowSpaceSize();
+
     for (StackFrameObject *obj : func->getStackFrame()->getObjects())
     {
+        if (obj->m_source == StackFrameObjectSource::Parameter)
+        {
+            size_t objSize = obj->m_type->getTotalSizeInBytes();
+            size_t objAlign = std::max((obj->m_type->getMaxAlignmentInBits() + 7) / 8, slotSize);
+            incomingParamOffset = (incomingParamOffset + objAlign - 1) & ~(objAlign - 1);
+            obj->m_offset = static_cast<int64_t>(incomingParamOffset);
+            incomingParamOffset += std::max(objSize, slotSize);
+
+            if (ctx.m_ctx->getDiagCollector()->isDiagEnabledForType(Diag_Trace))
+            {
+                auto log = ctx.m_ctx->getDiagCollector()->builder(Diag_Trace, "MirFrameLowerer");
+                log << "Lowered stack frame parameter object" << func->getSourceRef();
+                log.appendNote(func->getSourceRef(), "{}", MirPrinter::printToString(obj));
+            }
+            continue;
+        }
+
         size_t objSize = obj->m_type->getTotalSizeInBytes();
         size_t objAlign = std::max((obj->m_type->getMaxAlignmentInBits() + 7) / 8, slotSize);
 

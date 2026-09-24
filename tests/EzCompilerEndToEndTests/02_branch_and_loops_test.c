@@ -2,10 +2,12 @@
 #include <stdint.h>
 #include <assert.h>
 
-extern int64_t max_of_two(int64_t a, int64_t b);
-extern int64_t clamp_range(int64_t val, int64_t min_val, int64_t max_val);
-extern int64_t sum_loop(int64_t n);
-extern int64_t power_of_two(int64_t exp);
+#include "abi_test_common.h"
+
+ABI_ATTR extern int64_t max_of_two(int64_t a, int64_t b);
+ABI_ATTR extern int64_t clamp_range(int64_t val, int64_t min_val, int64_t max_val);
+ABI_ATTR extern int64_t sum_loop(int64_t n);
+ABI_ATTR extern int64_t power_of_two(int64_t exp);
 
 int main(void) {
     printf("[E2E Test 02] Running branch and loop tests...\n");

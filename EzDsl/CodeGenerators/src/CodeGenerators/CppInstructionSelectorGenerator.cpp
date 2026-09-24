@@ -346,6 +346,12 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                                                                      "getTypeTable()->i32(), reg, disp0));");
                                                     emitter.dedent();
                                                     emitter.emitLine("}");
+                                                    emitter.emitLine("else");
+                                                    emitter.emitLine("{");
+                                                    emitter.indent();
+                                                    emitter.emitLine("emittedOps.push_back(memTarget);");
+                                                    emitter.dedent();
+                                                    emitter.emitLine("}");
                                                 }
                                                 else
                                                 {

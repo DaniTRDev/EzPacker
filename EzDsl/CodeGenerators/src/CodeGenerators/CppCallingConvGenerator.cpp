@@ -183,7 +183,8 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
         };
         emitter.emitBlankLine();
 
-        // Resolves a register name through the default class, falling back to the dense id when absent.
+        // Resolves a register name through the default class, returning static_cast<size_t>(-1) when absent,
+        // or falling back to the dense id when no register class is bound (mock mode).
         emitter.emitLine("size_t {}::resolveRegId(std::string_view name, size_t fallback) const", className);
         {
             auto body = emitter.enterBlock();
@@ -191,6 +192,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
             {
                 auto ifClass = emitter.enterBlock();
                 emitter.emitLine("if (auto *desc = m_defaultClass->getReg(name)) return desc->m_id;");
+                emitter.emitLine("return static_cast<size_t>(-1);");
             }
             emitter.emitLine("return fallback;");
         }
@@ -209,19 +211,25 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
             auto ctorBody = emitter.enterBlock();
             for (size_t i = 0; i < file.m_calleeSaved.size(); ++i)
             {
+                emitter.emitLine("if (size_t regId = resolveRegId(\"{}\", {}); regId != static_cast<size_t>(-1))",
+                                 file.m_calleeSaved[i].m_node,
+                                 i + file.m_callerSaved.size());
+                emitter.indent();
                 emitter.emitLine(
-                        "m_allCalleeSaved.push_back(MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {}))); // {}",
-                        file.m_calleeSaved[i].m_node,
-                        i + file.m_callerSaved.size(),
+                        "m_allCalleeSaved.push_back(MirRegisterRef(m_defaultClass, regId)); // {}",
                         file.m_calleeSaved[i].m_node);
+                emitter.dedent();
             }
             for (size_t i = 0; i < file.m_callerSaved.size(); ++i)
             {
+                emitter.emitLine("if (size_t regId = resolveRegId(\"{}\", {}); regId != static_cast<size_t>(-1))",
+                                 file.m_callerSaved[i].m_node,
+                                 i);
+                emitter.indent();
                 emitter.emitLine(
-                        "m_allCallerSaved.push_back(MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {}))); // {}",
-                        file.m_callerSaved[i].m_node,
-                        i,
+                        "m_allCallerSaved.push_back(MirRegisterRef(m_defaultClass, regId)); // {}",
                         file.m_callerSaved[i].m_node);
+                emitter.dedent();
             }
         }
         emitter.emitBlankLine();
@@ -254,8 +262,10 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
         if (file.m_stack.m_linkRegister.has_value())
         {
             size_t lrId = findRegId(file.m_stack.m_linkRegister->m_node).value_or(0);
-            emitter.emitLine("std::optional<MirRegisterRef> {}::getLinkRegister() const {{ return "
-                             "MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {})); }}",
+            emitter.emitLine("std::optional<MirRegisterRef> {}::getLinkRegister() const {{ "
+                             "size_t id = resolveRegId(\"{}\", {}); "
+                             "if (id == static_cast<size_t>(-1)) return std::nullopt; "
+                             "return MirRegisterRef(m_defaultClass, id); }}",
                              className,
                              file.m_stack.m_linkRegister->m_node,
                              lrId);

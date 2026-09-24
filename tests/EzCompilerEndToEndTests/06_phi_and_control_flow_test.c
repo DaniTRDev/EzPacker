@@ -2,8 +2,10 @@
 #include <stdint.h>
 #include <assert.h>
 
-extern int64_t abs_difference(int64_t a, int64_t b);
-extern int64_t multi_phi_diamond(int64_t cond_val, int64_t x, int64_t y);
+#include "abi_test_common.h"
+
+ABI_ATTR extern int64_t abs_difference(int64_t a, int64_t b);
+ABI_ATTR extern int64_t multi_phi_diamond(int64_t cond_val, int64_t x, int64_t y);
 
 int main(void) {
     printf("[E2E Test 06] Running PHI and control flow tests...\n");

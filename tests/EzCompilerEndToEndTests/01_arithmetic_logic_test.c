@@ -2,12 +2,14 @@
 #include <stdint.h>
 #include <assert.h>
 
-extern int64_t add_sub_64(int64_t a, int64_t b, int64_t c);
-extern int64_t mul_add_64(int64_t a, int64_t b, int64_t c);
-extern int64_t bitwise_chain_64(int64_t a, int64_t b, int64_t c);
-extern int32_t arithmetic_32(int32_t a, int32_t b, int32_t c);
-extern int32_t bitwise_32(int32_t a, int32_t b);
-extern int64_t sub_from_zero_64(int64_t a);
+#include "abi_test_common.h"
+
+ABI_ATTR extern int64_t add_sub_64(int64_t a, int64_t b, int64_t c);
+ABI_ATTR extern int64_t mul_add_64(int64_t a, int64_t b, int64_t c);
+ABI_ATTR extern int64_t bitwise_chain_64(int64_t a, int64_t b, int64_t c);
+ABI_ATTR extern int32_t arithmetic_32(int32_t a, int32_t b, int32_t c);
+ABI_ATTR extern int32_t bitwise_32(int32_t a, int32_t b);
+ABI_ATTR extern int64_t sub_from_zero_64(int64_t a);
 
 int main(void) {
     printf("[E2E Test 01] Running arithmetic and bitwise tests...\n");

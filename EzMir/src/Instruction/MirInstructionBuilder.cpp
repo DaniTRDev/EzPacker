@@ -381,7 +381,7 @@ void MirInstructionBuilder::finalizeInstruction(MirInstruction *instr, SourceRef
             }
             case InsertionType::InsertBefore:
             {
-                m_insertionPoint.m_iterator = instructions.insert(m_insertionPoint.m_iterator, instr);
+                instructions.insert(m_insertionPoint.m_iterator, instr);
                 break;
             }
             case InsertionType::InsertAfter:

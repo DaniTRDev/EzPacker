@@ -52,43 +52,81 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
         VERBATIM
     )
 
-    # Select the host object to link into the native test runner
     if(HOST_IS_WINDOWS)
-        set(HOST_OBJ "${WIN_OBJ}")
-    else()
-        set(HOST_OBJ "${LINUX_OBJ}")
-    endif()
+        set(WIN_TEST_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_win_test${CMAKE_EXECUTABLE_SUFFIX}")
+        set(LINUX_TEST_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_linux_test${CMAKE_EXECUTABLE_SUFFIX}")
 
-    # 3. Compile and link C test harness with the matching host object file
-    add_custom_command(
-        OUTPUT "${TEST_EXE}"
-        COMMAND "${CMAKE_C_COMPILER}" "${C_TEST_FILE}" "${HOST_OBJ}" -o "${TEST_EXE}"
-        DEPENDS "${C_TEST_FILE}" "${HOST_OBJ}"
-        COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_test (${TEST_NAME}_test.c + ${HOST_OBJ})"
-        VERBATIM
-    )
+        # 3a. Compile and link Windows test runner (Win64 ABI)
+        add_custom_command(
+            OUTPUT "${WIN_TEST_EXE}"
+            COMMAND "${CMAKE_C_COMPILER}" -DABI_WIN64 "${C_TEST_FILE}" "${WIN_OBJ}" -o "${WIN_TEST_EXE}"
+            DEPENDS "${C_TEST_FILE}" "${WIN_OBJ}"
+            COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_win_test (${TEST_NAME}_test.c [Win64] + ${WIN_OBJ})"
+            VERBATIM
+        )
 
-    list(APPEND ALL_E2E_OUTPUTS "${WIN_OBJ}" "${LINUX_OBJ}" "${TEST_EXE}")
+        # 3b. Compile and link Linux test runner (SysV ABI) via MinGW GCC
+        add_custom_command(
+            OUTPUT "${LINUX_TEST_EXE}"
+            COMMAND "${CMAKE_C_COMPILER}" -DABI_SYSV "${C_TEST_FILE}" "${LINUX_OBJ}" -o "${LINUX_TEST_EXE}"
+            DEPENDS "${C_TEST_FILE}" "${LINUX_OBJ}"
+            COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_linux_test (${TEST_NAME}_test.c [SysV] + ${LINUX_OBJ})"
+            VERBATIM
+        )
 
-    # 4. Register CTest runtime test for the host executable
-    add_test(
-        NAME "EzCompilerEndToEnd_${TEST_NAME}"
-        COMMAND "${TEST_EXE}"
-    )
+        list(APPEND ALL_E2E_OUTPUTS "${WIN_OBJ}" "${LINUX_OBJ}" "${WIN_TEST_EXE}" "${LINUX_TEST_EXE}")
 
-    # 5. Register ELF validator test
-    add_test(
-        NAME "EzCompilerEndToEnd_${TEST_NAME}_ElfValidate"
-        COMMAND elf_validator "${LINUX_OBJ}"
-    )
+        # 4a. Register CTest runtime test for Win64 executable
+        add_test(
+            NAME "EzCompilerEndToEnd_${TEST_NAME}_Win64"
+            COMMAND "${WIN_TEST_EXE}"
+        )
 
-    # Apply Windows-specific environment path tweaks if running on Windows
-    if(HOST_IS_WINDOWS)
-        set_tests_properties("EzCompilerEndToEnd_${TEST_NAME}" PROPERTIES
+        # 4b. Register CTest runtime test for SysV executable
+        add_test(
+            NAME "EzCompilerEndToEnd_${TEST_NAME}_SysV"
+            COMMAND "${LINUX_TEST_EXE}"
+        )
+
+        # 5. Register ELF validator test
+        add_test(
+            NAME "EzCompilerEndToEnd_${TEST_NAME}_ElfValidate"
+            COMMAND elf_validator "${LINUX_OBJ}"
+        )
+
+        set_tests_properties("EzCompilerEndToEnd_${TEST_NAME}_Win64" PROPERTIES
+            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${COMPILER_DIR}"
+        )
+        set_tests_properties("EzCompilerEndToEnd_${TEST_NAME}_SysV" PROPERTIES
             ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${COMPILER_DIR}"
         )
         set_tests_properties("EzCompilerEndToEnd_${TEST_NAME}_ElfValidate" PROPERTIES
             ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${COMPILER_DIR}"
+        )
+    else()
+        set(LINUX_TEST_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_linux_test${CMAKE_EXECUTABLE_SUFFIX}")
+
+        # 3. Compile and link Linux test runner (SysV ABI)
+        add_custom_command(
+            OUTPUT "${LINUX_TEST_EXE}"
+            COMMAND "${CMAKE_C_COMPILER}" -DABI_SYSV "${C_TEST_FILE}" "${LINUX_OBJ}" -o "${LINUX_TEST_EXE}"
+            DEPENDS "${C_TEST_FILE}" "${LINUX_OBJ}"
+            COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_linux_test (${TEST_NAME}_test.c [SysV] + ${LINUX_OBJ})"
+            VERBATIM
+        )
+
+        list(APPEND ALL_E2E_OUTPUTS "${WIN_OBJ}" "${LINUX_OBJ}" "${LINUX_TEST_EXE}")
+
+        # 4. Register CTest runtime test for SysV executable
+        add_test(
+            NAME "EzCompilerEndToEnd_${TEST_NAME}_SysV"
+            COMMAND "${LINUX_TEST_EXE}"
+        )
+
+        # 5. Register ELF validator test
+        add_test(
+            NAME "EzCompilerEndToEnd_${TEST_NAME}_ElfValidate"
+            COMMAND elf_validator "${LINUX_OBJ}"
         )
     endif()
 endforeach()
