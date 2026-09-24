@@ -107,7 +107,8 @@ uint8_t X86_64CodeEmitter::mapRegister(MirRegister *reg) const
     if (MirRegisterClass *regClass = reg->getRegClass())
     {
         std::string_view className = regClass->getName();
-        if (className.find("FPR") != std::string_view::npos && id < 16)
+        if ((className.find("FPR") != std::string_view::npos ||
+             className.find("VR") != std::string_view::npos) && id < 16)
         {
             return static_cast<uint8_t>(16 + id);
         }

@@ -67,6 +67,7 @@ TEST_F(EzCodeEmitterTestSuite, TestTableDrivenEmitterProducesExpectedBytes)
     MirRegisterClass gpr8Class("GPR8", nullptr, getAllocator());
     MirRegisterClass fpr32Class("FPR32", nullptr, getAllocator());
     MirRegisterClass fpr64Class("FPR64", nullptr, getAllocator());
+    MirRegisterClass vr128Class("VR128", nullptr, getAllocator());
 
     auto makeReg = [&](MirType *type, size_t id, MirRegisterClass *cls) -> MirRegister *
     {
@@ -81,6 +82,7 @@ TEST_F(EzCodeEmitterTestSuite, TestTableDrivenEmitterProducesExpectedBytes)
     auto g8 = [&](size_t id) { return makeReg(i8, id, &gpr8Class); };
     auto s32 = [&](size_t id) { return makeReg(f32, id, &fpr32Class); };
     auto s64 = [&](size_t id) { return makeReg(f64, id, &fpr64Class); };
+    auto v128 = [&](size_t id) { return makeReg(getTypeTable()->v4f32(), id, &vr128Class); };
 
     MirRegister *r0 = g64(0);
     MirRegister *r1 = g64(1);
@@ -97,6 +99,10 @@ TEST_F(EzCodeEmitterTestSuite, TestTableDrivenEmitterProducesExpectedBytes)
     MirRegister *x2 = s32(2);
     MirRegister *y0 = s64(0);
     MirRegister *y1 = s64(1);
+    MirRegister *v0 = v128(0);
+    MirRegister *v1 = v128(1);
+    MirRegister *v2 = v128(2);
+    MirRegister *v8 = v128(8);
 
     MirInteger *imm8 = opBuilder.buildInt(i8, FlexInt(3, 8));
     MirInteger *imm16 = opBuilder.buildInt(i16, FlexInt(7, 16));
@@ -152,6 +158,21 @@ TEST_F(EzCodeEmitterTestSuite, TestTableDrivenEmitterProducesExpectedBytes)
     expect("ADDSD", { y0, y0, y1 }, { 0xF2, 0x0F, 0x58, 0xC1 });
     expect("CVTSI2SS", { x0, d1 }, { 0xF3, 0x0F, 0x2A, 0xC1 });
     expect("CVTSI2SS", { x0, r1 }, { 0xF3, 0x48, 0x0F, 0x2A, 0xC1 });
+
+    // SSE vector operations across versions (SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2).
+    expect("ADDPSrr", { v0, v0, v1 }, { 0x0F, 0x58, 0xC1 });
+    expect("ADDPSrr", { v0, v1, v2 }, { 0x0F, 0x28, 0xC1, 0x0F, 0x58, 0xC2 });
+    expect("ADDPSrr", { v0, v0, v8 }, { 0x41, 0x0F, 0x58, 0xC0 });
+    expect("MOVAPSrr", { v0, v1 }, { 0x0F, 0x28, 0xC1 });
+    expect("ADDPDrr", { v0, v0, v1 }, { 0x66, 0x0F, 0x58, 0xC1 });
+    expect("PADDBrr", { v0, v0, v1 }, { 0x66, 0x0F, 0xFC, 0xC1 });
+    expect("PADDDrr", { v0, v0, v1 }, { 0x66, 0x0F, 0xFE, 0xC1 });
+    expect("MOVDQUrr", { v0, v1 }, { 0xF3, 0x0F, 0x6F, 0xC1 });
+    expect("HADDPSrr", { v0, v0, v1 }, { 0xF2, 0x0F, 0x7C, 0xC1 });
+    expect("HADDPDrr", { v0, v0, v1 }, { 0x66, 0x0F, 0x7C, 0xC1 });
+    expect("PHADDDrr", { v0, v0, v1 }, { 0x66, 0x0F, 0x38, 0x02, 0xC1 });
+    expect("PMULLDrr", { v0, v0, v1 }, { 0x66, 0x0F, 0x38, 0x40, 0xC1 });
+    expect("PCMPGTQrr", { v0, v0, v1 }, { 0x66, 0x0F, 0x38, 0x37, 0xC1 });
 }
 
 /**

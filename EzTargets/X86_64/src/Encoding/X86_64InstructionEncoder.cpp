@@ -825,12 +825,27 @@ void InstructionEncoder::encodeRegisterMove(const ResolvedOperand &dst,
 {
     if (dst.m_isFpr || src.m_isFpr)
     {
-        // Scalar SSE move: F3/F2 0F 10 /r with reg=dst and rm=src.
-        out.push_back(dst.m_sizeBytes == 4 ? 0xF3 : 0xF2);
-
         Rex rex;
         rex.r = extBit(dst.m_reg);
         rex.b = extBit(src.m_reg);
+
+        if (dst.m_sizeBytes == 16 || src.m_sizeBytes == 16)
+        {
+            // 128-bit vector move: MOVAPS 0F 28 /r with reg=dst and rm=src.
+            if (rex.isNeeded())
+            {
+                out.push_back(rex.encode());
+            }
+
+            out.push_back(0x0F);
+            out.push_back(0x28);
+            out.push_back(InstructionEncoder::encodeModRM(3, low3(dst.m_reg), low3(src.m_reg)));
+            return;
+        }
+
+        // Scalar SSE move: F3/F2 0F 10 /r with reg=dst and rm=src.
+        out.push_back(dst.m_sizeBytes == 4 ? 0xF3 : 0xF2);
+
         if (rex.isNeeded())
         {
             out.push_back(rex.encode());
