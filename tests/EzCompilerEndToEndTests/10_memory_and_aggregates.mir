@@ -1,0 +1,112 @@
+; Test Suite: 10_memory_and_aggregates.mir
+; Tests multi-width memory load/store (i8, i16, i32, i64),
+; struct-like aggregate memory layouts (Point2D, Vector3D),
+; in-place memory updates, and fixed-offset array transformations.
+
+fn @mem_byte_roundtrip(ptr %buf, i8 %val) -> i8 {
+entry:
+    STORE [ptr %buf + 0], i8 %val;
+    %read_back = LOAD i8 [ptr %buf + 0];
+    RET i8 %read_back;
+}
+
+fn @mem_word_roundtrip(ptr %buf, i16 %val) -> i16 {
+entry:
+    STORE [ptr %buf + 0], i16 %val;
+    %read_back = LOAD i16 [ptr %buf + 0];
+    RET i16 %read_back;
+}
+
+fn @mem_dword_roundtrip(ptr %buf, i32 %val) -> i32 {
+entry:
+    STORE [ptr %buf + 0], i32 %val;
+    %read_back = LOAD i32 [ptr %buf + 0];
+    RET i32 %read_back;
+}
+
+fn @mem_qword_roundtrip(ptr %buf, i64 %val) -> i64 {
+entry:
+    STORE [ptr %buf + 0], i64 %val;
+    %read_back = LOAD i64 [ptr %buf + 0];
+    RET i64 %read_back;
+}
+
+fn @point2d_dist_sq(ptr %p1, ptr %p2) -> i32 {
+entry:
+    %x1 = LOAD i32 [ptr %p1 + 0];
+    %y1 = LOAD i32 [ptr %p1 + 4];
+    %x2 = LOAD i32 [ptr %p2 + 0];
+    %y2 = LOAD i32 [ptr %p2 + 4];
+    %dx = SUB i32 %x1, %x2;
+    %dy = SUB i32 %y1, %y2;
+    %dx2 = IMUL i32 %dx, %dx;
+    %dy2 = IMUL i32 %dy, %dy;
+    %dist_sq = ADD i32 %dx2, %dy2;
+    RET i32 %dist_sq;
+}
+
+fn @point2d_translate(ptr %p, i32 %dx, i32 %dy) -> i32 {
+entry:
+    %x = LOAD i32 [ptr %p + 0];
+    %y = LOAD i32 [ptr %p + 4];
+    %new_x = ADD i32 %x, %dx;
+    %new_y = ADD i32 %y, %dy;
+    STORE [ptr %p + 0], i32 %new_x;
+    STORE [ptr %p + 4], i32 %new_y;
+    %zero = MOV i32 0;
+    RET i32 %zero;
+}
+
+fn @vec3_dot(ptr %v1, ptr %v2) -> i32 {
+entry:
+    %x1 = LOAD i32 [ptr %v1 + 0];
+    %y1 = LOAD i32 [ptr %v1 + 4];
+    %z1 = LOAD i32 [ptr %v1 + 8];
+    %x2 = LOAD i32 [ptr %v2 + 0];
+    %y2 = LOAD i32 [ptr %v2 + 4];
+    %z2 = LOAD i32 [ptr %v2 + 8];
+    %prod_x = IMUL i32 %x1, %x2;
+    %prod_y = IMUL i32 %y1, %y2;
+    %prod_z = IMUL i32 %z1, %z2;
+    %xy = ADD i32 %prod_x, %prod_y;
+    %total = ADD i32 %xy, %prod_z;
+    RET i32 %total;
+}
+
+fn @vec3_cross_z(ptr %v1, ptr %v2) -> i32 {
+entry:
+    %x1 = LOAD i32 [ptr %v1 + 0];
+    %y1 = LOAD i32 [ptr %v1 + 4];
+    %x2 = LOAD i32 [ptr %v2 + 0];
+    %y2 = LOAD i32 [ptr %v2 + 4];
+    %x1y2 = IMUL i32 %x1, %y2;
+    %y1x2 = IMUL i32 %y1, %x2;
+    %z = SUB i32 %x1y2, %y1x2;
+    RET i32 %z;
+}
+
+fn @array4_sum_32(ptr %arr) -> i32 {
+entry:
+    %e0 = LOAD i32 [ptr %arr + 0];
+    %e1 = LOAD i32 [ptr %arr + 4];
+    %e2 = LOAD i32 [ptr %arr + 8];
+    %e3 = LOAD i32 [ptr %arr + 12];
+    %s01 = ADD i32 %e0, %e1;
+    %s23 = ADD i32 %e2, %e3;
+    %res = ADD i32 %s01, %s23;
+    RET i32 %res;
+}
+
+fn @array4_reverse_32(ptr %arr) -> i32 {
+entry:
+    %e0 = LOAD i32 [ptr %arr + 0];
+    %e1 = LOAD i32 [ptr %arr + 4];
+    %e2 = LOAD i32 [ptr %arr + 8];
+    %e3 = LOAD i32 [ptr %arr + 12];
+    STORE [ptr %arr + 0], i32 %e3;
+    STORE [ptr %arr + 4], i32 %e2;
+    STORE [ptr %arr + 8], i32 %e1;
+    STORE [ptr %arr + 12], i32 %e0;
+    %zero = MOV i32 0;
+    RET i32 %zero;
+}

@@ -69,11 +69,12 @@ bool MirInstructionSelector::selectFunction(MirBuilderContext *ctx, MirFunction 
             }
             if (hasUnselected)
             {
-                progress = true;
                 if (!selectBlock(ctx, block))
                 {
                     allOk = false;
+                    return false;
                 }
+                progress = true;
             }
         }
     }

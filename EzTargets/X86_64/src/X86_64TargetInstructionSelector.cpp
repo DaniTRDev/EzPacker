@@ -970,12 +970,12 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
         std::string_view fprClass = isDouble ? "FPR64" : "FPR32";
         if (auto *r = dst->get<MirRegister>())
         {
-            if (!r->getRegClass())
+            if (!r->getRegClass() || (r->getRegClass()->getName() != fprClass && r->getRegClass()->getName() != "VR128"))
                 r->setClass(findClass(fprClass));
         }
         if (auto *r = src->get<MirRegister>())
         {
-            if (!r->getRegClass())
+            if (!r->getRegClass() || (r->getRegClass()->getName() != fprClass && r->getRegClass()->getName() != "VR128"))
                 r->setClass(findClass(fprClass));
         }
 
@@ -993,12 +993,12 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
     {
         if (auto *r = dst->get<MirRegister>())
         {
-            if (!r->getRegClass())
+            if (!r->getRegClass() || r->getRegClass()->getName() != std::string_view("VR128"))
                 r->setClass(findClass("VR128"));
         }
         if (auto *r = src->get<MirRegister>())
         {
-            if (!r->getRegClass())
+            if (!r->getRegClass() || r->getRegClass()->getName() != std::string_view("VR128"))
                 r->setClass(findClass("VR128"));
         }
 

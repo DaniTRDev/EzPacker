@@ -92,7 +92,7 @@ void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("public:");
             emitter.indent();
             emitter.emitLine(
-                    "explicit {}(class MirBuilderContext *ctx, class MirRegisterClass *defaultRegClass = nullptr);",
+                    "explicit {}(class MirBuilderContext *ctx, class MirRegisterClass *defaultRegClass = nullptr, class MirRegisterClass *fpRegClass = nullptr);",
                     className);
             emitter.emitLine("~{}() override = default;", className);
             emitter.emitBlankLine();
@@ -122,15 +122,18 @@ void CppCallingConvGenerator::emitHeader(CppSourceEmitter &emitter,
                              "*_class) override;");
             emitter.dedent();
             emitter.emitBlankLine();
-            // Private state: allocator context, default class and cached saved-register sets.
+            // Private state: allocator context, default class, fp class and cached saved-register sets.
             emitter.emitLine("private:");
             emitter.indent();
             emitter.emitLine("class MirBuilderContext *m_ctx;");
             emitter.emitLine("class MirRegisterClass *m_defaultClass;");
+            emitter.emitLine("class MirRegisterClass *m_fpClass;");
             emitter.emitLine("std::pmr::vector<MirRegisterRef> m_allCalleeSaved;");
             emitter.emitLine("std::pmr::vector<MirRegisterRef> m_allCallerSaved;");
             emitter.emitLine("std::pmr::vector<MirRegisterRef> m_empty;");
             emitter.emitBlankLine();
+            emitter.emitLine("class MirRegisterClass *resolveClassForType(class MirType *type, bool isFp) const;");
+            emitter.emitLine("MirRegisterRef resolveReg(std::string_view name, size_t fallback, class MirType *type = nullptr, bool isFp = false) const;");
             emitter.emitLine("size_t resolveRegId(std::string_view name, size_t fallback) const;");
             emitter.dedent();
         }
@@ -155,6 +158,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitInclude("Type/MirType.h");
     emitter.emitInclude("Builder/MirBuilderContext.h");
     emitter.emitInclude("Operand/MirRegisterClass.h");
+    emitter.emitInclude("Operand/MirRegisterBank.h");
     emitter.emitBlankLine();
 
     for (const Symbol *sym : convs)
@@ -183,26 +187,112 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
         };
         emitter.emitBlankLine();
 
-        // Resolves a register name through the default class, returning static_cast<size_t>(-1) when absent,
-        // or falling back to the dense id when no register class is bound (mock mode).
+        // Resolves the register class appropriate for the given type and kind.
+        emitter.emitLine("MirRegisterClass *{}::resolveClassForType(MirType *type, bool isFp) const", className);
+        {
+            auto body = emitter.enterBlock();
+            emitter.emitLine("if (isFp)");
+            {
+                auto ifFp = emitter.enterBlock();
+                emitter.emitLine("if (m_fpClass)");
+                {
+                    auto ifFpClass = emitter.enterBlock();
+                    emitter.emitLine("if (auto *bank = m_fpClass->getBank())");
+                    {
+                        auto ifBank = emitter.enterBlock();
+                        emitter.emitLine("if (type)");
+                        {
+                            auto ifType = emitter.enterBlock();
+                            emitter.emitLine("if (type->getKind() == MirTypeKind::Vector)");
+                            emitter.indent();
+                            emitter.emitLine("if (auto *cls = bank->getClass(\"VR128\")) return cls;");
+                            emitter.dedent();
+                            emitter.emitLine("else if (type->getTotalSizeInBits() == 32)");
+                            emitter.indent();
+                            emitter.emitLine("if (auto *cls = bank->getClass(\"FPR32\")) return cls;");
+                            emitter.dedent();
+                            emitter.emitLine("else if (type->getTotalSizeInBits() == 64)");
+                            emitter.indent();
+                            emitter.emitLine("if (auto *cls = bank->getClass(\"FPR64\")) return cls;");
+                            emitter.dedent();
+                        }
+                    }
+                    emitter.emitLine("return m_fpClass;");
+                }
+                emitter.emitLine("return nullptr;");
+            }
+            emitter.emitLine("if (m_defaultClass)");
+            {
+                auto ifDef = emitter.enterBlock();
+                emitter.emitLine("if (auto *bank = m_defaultClass->getBank())");
+                {
+                    auto ifBank = emitter.enterBlock();
+                    emitter.emitLine("if (type)");
+                    {
+                        auto ifType = emitter.enterBlock();
+                        emitter.emitLine("size_t bits = type->getTotalSizeInBits();");
+                        emitter.emitLine("if (bits <= 8) { if (auto *cls = bank->getClass(\"GPR8\")) return cls; }");
+                        emitter.emitLine("else if (bits <= 16) { if (auto *cls = bank->getClass(\"GPR16\")) return cls; }");
+                        emitter.emitLine("else if (bits <= 32) { if (auto *cls = bank->getClass(\"GPR32\")) return cls; }");
+                        emitter.emitLine("else if (bits <= 64) { if (auto *cls = bank->getClass(\"GPR64\")) return cls; }");
+                    }
+                }
+                emitter.emitLine("return m_defaultClass;");
+            }
+            emitter.emitLine("return nullptr;");
+        }
+        emitter.emitBlankLine();
+
+        // Resolves a register name to a MirRegisterRef with appropriate register class and ID.
+        emitter.emitLine("MirRegisterRef {}::resolveReg(std::string_view name, size_t fallback, MirType *type, bool isFp) const", className);
+        {
+            auto body = emitter.enterBlock();
+            emitter.emitLine("MirRegisterClass *regClass = resolveClassForType(type, isFp);");
+            emitter.emitLine("if (regClass)");
+            {
+                auto ifCls = emitter.enterBlock();
+                emitter.emitLine("if (auto *desc = regClass->getReg(name)) return MirRegisterRef(regClass, desc->m_id);");
+            }
+            emitter.emitLine("if (m_defaultClass)");
+            {
+                auto ifDef = emitter.enterBlock();
+                emitter.emitLine("if (auto *desc = m_defaultClass->getReg(name)) return MirRegisterRef(m_defaultClass, desc->m_id);");
+            }
+            emitter.emitLine("if (m_fpClass)");
+            {
+                auto ifFp = emitter.enterBlock();
+                emitter.emitLine("if (auto *desc = m_fpClass->getReg(name)) return MirRegisterRef(m_fpClass, desc->m_id);");
+            }
+            emitter.emitLine("if (name.size() >= 4 && name.rfind(\"xmm\", 0) == 0)");
+            {
+                auto ifXmm = emitter.enterBlock();
+                emitter.emitLine("size_t id = 0;");
+                emitter.emitLine("for (size_t i = 3; i < name.size(); ++i)");
+                {
+                    auto forDigits = emitter.enterBlock();
+                    emitter.emitLine("if (name[i] >= '0' && name[i] <= '9') id = id * 10 + (name[i] - '0');");
+                }
+                emitter.emitLine("return MirRegisterRef(regClass ? regClass : m_fpClass, id);");
+            }
+            emitter.emitLine("if (m_defaultClass) return MirRegisterRef(m_defaultClass, static_cast<size_t>(-1));");
+            emitter.emitLine("return MirRegisterRef(nullptr, fallback);");
+        }
+        emitter.emitBlankLine();
+
+        // Resolves a register name through resolveReg and extracts the register ID.
         emitter.emitLine("size_t {}::resolveRegId(std::string_view name, size_t fallback) const", className);
         {
             auto body = emitter.enterBlock();
-            emitter.emitLine("if (m_defaultClass)");
-            {
-                auto ifClass = emitter.enterBlock();
-                emitter.emitLine("if (auto *desc = m_defaultClass->getReg(name)) return desc->m_id;");
-                emitter.emitLine("return static_cast<size_t>(-1);");
-            }
-            emitter.emitLine("return fallback;");
+            emitter.emitLine("return resolveReg(name, fallback).getId();");
         }
         emitter.emitBlankLine();
 
         // Constructor
-        emitter.emitLine("{}::{}(MirBuilderContext *ctx, MirRegisterClass *defaultRegClass) :", className, className);
+        emitter.emitLine("{}::{}(MirBuilderContext *ctx, MirRegisterClass *defaultRegClass, MirRegisterClass *fpRegClass) :", className, className);
         emitter.indent();
         emitter.emitLine("m_ctx(ctx),");
         emitter.emitLine("m_defaultClass(defaultRegClass),");
+        emitter.emitLine("m_fpClass(fpRegClass),");
         emitter.emitLine("m_allCalleeSaved(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),");
         emitter.emitLine("m_allCallerSaved(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()),");
         emitter.emitLine("m_empty(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource())");
@@ -211,23 +301,23 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
             auto ctorBody = emitter.enterBlock();
             for (size_t i = 0; i < file.m_calleeSaved.size(); ++i)
             {
-                emitter.emitLine("if (size_t regId = resolveRegId(\"{}\", {}); regId != static_cast<size_t>(-1))",
+                emitter.emitLine("if (MirRegisterRef reg = resolveReg(\"{}\", {}); reg.getId() != static_cast<size_t>(-1))",
                                  file.m_calleeSaved[i].m_node,
                                  i + file.m_callerSaved.size());
                 emitter.indent();
                 emitter.emitLine(
-                        "m_allCalleeSaved.push_back(MirRegisterRef(m_defaultClass, regId)); // {}",
+                        "m_allCalleeSaved.push_back(reg); // {}",
                         file.m_calleeSaved[i].m_node);
                 emitter.dedent();
             }
             for (size_t i = 0; i < file.m_callerSaved.size(); ++i)
             {
-                emitter.emitLine("if (size_t regId = resolveRegId(\"{}\", {}); regId != static_cast<size_t>(-1))",
+                emitter.emitLine("if (MirRegisterRef reg = resolveReg(\"{}\", {}); reg.getId() != static_cast<size_t>(-1))",
                                  file.m_callerSaved[i].m_node,
                                  i);
                 emitter.indent();
                 emitter.emitLine(
-                        "m_allCallerSaved.push_back(MirRegisterRef(m_defaultClass, regId)); // {}",
+                        "m_allCallerSaved.push_back(reg); // {}",
                         file.m_callerSaved[i].m_node);
                 emitter.dedent();
             }
@@ -263,9 +353,9 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
         {
             size_t lrId = findRegId(file.m_stack.m_linkRegister->m_node).value_or(0);
             emitter.emitLine("std::optional<MirRegisterRef> {}::getLinkRegister() const {{ "
-                             "size_t id = resolveRegId(\"{}\", {}); "
-                             "if (id == static_cast<size_t>(-1)) return std::nullopt; "
-                             "return MirRegisterRef(m_defaultClass, id); }}",
+                             "MirRegisterRef ref = resolveReg(\"{}\", {}); "
+                             "if (ref.getId() == static_cast<size_t>(-1)) return std::nullopt; "
+                             "return ref; }}",
                              className,
                              file.m_stack.m_linkRegister->m_node,
                              lrId);
@@ -278,13 +368,11 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
 
         size_t fpId = findRegId(file.m_stack.m_framePointer.m_node).value_or(0);
         size_t spId = findRegId(file.m_stack.m_stackPointer.m_node).value_or(0);
-        emitter.emitLine("MirRegisterRef {}::getFramePointerReg() const {{ return MirRegisterRef(m_defaultClass, "
-                         "resolveRegId(\"{}\", {})); }}",
+        emitter.emitLine("MirRegisterRef {}::getFramePointerReg() const {{ return resolveReg(\"{}\", {}); }}",
                          className,
                          file.m_stack.m_framePointer.m_node,
                          fpId);
-        emitter.emitLine("MirRegisterRef {}::getStackPointerReg() const {{ return MirRegisterRef(m_defaultClass, "
-                         "resolveRegId(\"{}\", {})); }}",
+        emitter.emitLine("MirRegisterRef {}::getStackPointerReg() const {{ return resolveReg(\"{}\", {}); }}",
                          className,
                          file.m_stack.m_stackPointer.m_node,
                          spId);
@@ -324,7 +412,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
         {
             auto body = emitter.enterBlock();
             emitter.emitLine("if (!type) {{ out.push_back(CallingConvTypeClass::Integer); return; }}");
-            emitter.emitLine("if (type->getKind() == MirTypeKind::FloatingPoint) {{ "
+            emitter.emitLine("if (type->getKind() == MirTypeKind::FloatingPoint || type->getKind() == MirTypeKind::Vector) {{ "
                              "out.push_back(CallingConvTypeClass::Float); return; }}");
             emitter.emitLine("if (type->getKind() == MirTypeKind::Pointer || type->getKind() == MirTypeKind::Integer) "
                              "{{ out.push_back(CallingConvTypeClass::Integer); return; }}");
@@ -367,34 +455,29 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
                             }
                             if (floatBinding && intBinding)
                             {
-                                emitter.emitLine("if (type && type->getKind() == MirTypeKind::FloatingPoint) return "
-                                                 "ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
-                                                 "resolveRegId(\"{}\", {})), sizeInBytes);",
+                                emitter.emitLine("if (type && (type->getKind() == MirTypeKind::FloatingPoint || type->getKind() == MirTypeKind::Vector)) return "
+                                                 "ArgumentLocationDesc::Reg(resolveReg(\"{}\", {}, type, true), sizeInBytes);",
                                                  floatBinding->m_register.m_node,
                                                  findRegId(floatBinding->m_register.m_node).value_or(0));
-                                emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
-                                                 "resolveRegId(\"{}\", {})), sizeInBytes);",
+                                emitter.emitLine("return ArgumentLocationDesc::Reg(resolveReg(\"{}\", {}, type, false), sizeInBytes);",
                                                  intBinding->m_register.m_node,
                                                  findRegId(intBinding->m_register.m_node).value_or(0));
                             }
                             else if (floatBinding)
                             {
-                                emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
-                                                 "resolveRegId(\"{}\", {})), sizeInBytes);",
+                                emitter.emitLine("return ArgumentLocationDesc::Reg(resolveReg(\"{}\", {}, type, true), sizeInBytes);",
                                                  floatBinding->m_register.m_node,
                                                  findRegId(floatBinding->m_register.m_node).value_or(0));
                             }
                             else if (intBinding)
                             {
-                                emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
-                                                 "resolveRegId(\"{}\", {})), sizeInBytes);",
+                                emitter.emitLine("return ArgumentLocationDesc::Reg(resolveReg(\"{}\", {}, type, false), sizeInBytes);",
                                                  intBinding->m_register.m_node,
                                                  findRegId(intBinding->m_register.m_node).value_or(0));
                             }
                             else if (!slot.m_bindings.empty())
                             {
-                                emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, "
-                                                 "resolveRegId(\"{}\", {})), sizeInBytes);",
+                                emitter.emitLine("return ArgumentLocationDesc::Reg(resolveReg(\"{}\", {}, type, false), sizeInBytes);",
                                                  slot.m_bindings[0].m_register.m_node,
                                                  findRegId(slot.m_bindings[0].m_register.m_node).value_or(0));
                             }
@@ -426,7 +509,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
                         std::holds_alternative<DSL::Ast::CallingConvDef::RegisterSequence>(floatRule->m_source))
                     {
                         const auto &seq = std::get<DSL::Ast::CallingConvDef::RegisterSequence>(floatRule->m_source);
-                        emitter.emitLine("if (type && type->getKind() == MirTypeKind::FloatingPoint)");
+                        emitter.emitLine("if (type && (type->getKind() == MirTypeKind::FloatingPoint || type->getKind() == MirTypeKind::Vector))");
                         {
                             auto floatBlock = emitter.enterBlock();
                             emitter.emitLine("size_t cursor = callState->getBankCursor(\"{}\");",
@@ -437,7 +520,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
                             {
                                 if (r > 0)
                                     sseRegsStr += ", ";
-                                sseRegsStr += std::format("MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {}))",
+                                sseRegsStr += std::format("resolveReg(\"{}\", {}, type, true)",
                                                           seq.m_registers[r].m_node,
                                                           findRegId(seq.m_registers[r].m_node).value_or(0));
                             }
@@ -468,7 +551,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
                             {
                                 if (r > 0)
                                     intRegsStr += ", ";
-                                intRegsStr += std::format("MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {}))",
+                                intRegsStr += std::format("resolveReg(\"{}\", {}, type, false)",
                                                           seq.m_registers[r].m_node,
                                                           findRegId(seq.m_registers[r].m_node).value_or(0));
                             }
@@ -484,7 +567,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
                     }
 
                     emitter.emitLine("MirRegisterRef reg;");
-                    emitter.emitLine("if (callState->allocate(m_defaultClass, reg))");
+                    emitter.emitLine("if (callState->allocate(resolveClassForType(type, false), reg))");
                     {
                         auto ifAlloc = emitter.enterBlock();
                         emitter.emitLine("return ArgumentLocationDesc::Reg(reg, sizeInBytes);");
@@ -497,7 +580,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
                     // No explicit placement rules: hand the whole decision to the lowering state.
                     emitter.emitLine("callState->advanceArg();");
                     emitter.emitLine("MirRegisterRef reg;");
-                    emitter.emitLine("if (callState->allocate(m_defaultClass, reg))");
+                    emitter.emitLine("if (callState->allocate(resolveClassForType(type, false), reg))");
                     {
                         auto ifAlloc = emitter.enterBlock();
                         emitter.emitLine("return ArgumentLocationDesc::Reg(reg, sizeInBytes);");
@@ -528,7 +611,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
             {
                 auto ifSret = emitter.enterBlock();
                 emitter.emitLine("return ArgumentLocationDesc::Indirect(false, true, sizeInBytes, "
-                                 "MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {})));",
+                                 "resolveReg(\"{}\", {}));",
                                  sretRegName,
                                  sretRegId);
             }
@@ -561,14 +644,13 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
             // Prefer the floating-point return register when one is declared and distinct.
             if (floatRetRegId != intRetRegId || !floatRetName.empty())
             {
-                emitter.emitLine("if (type && type->getKind() == MirTypeKind::FloatingPoint) return "
-                                 "ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", {})), "
+                emitter.emitLine("if (type && (type->getKind() == MirTypeKind::FloatingPoint || type->getKind() == MirTypeKind::Vector)) return "
+                                 "ArgumentLocationDesc::Reg(resolveReg(\"{}\", {}, type, true), "
                                  "sizeInBytes);",
                                  floatRetName,
                                  floatRetRegId);
             }
-            emitter.emitLine("return ArgumentLocationDesc::Reg(MirRegisterRef(m_defaultClass, resolveRegId(\"{}\", "
-                             "{})), sizeInBytes);",
+            emitter.emitLine("return ArgumentLocationDesc::Reg(resolveReg(\"{}\", {}, type, false), sizeInBytes);",
                              intRetName,
                              intRetRegId);
         }

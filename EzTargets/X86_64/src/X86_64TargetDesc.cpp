@@ -143,8 +143,8 @@ void X86_64TargetDesc::initialize()
     }
 
     // 5. Calling Conventions
-    m_sysVConv = std::make_unique<SysV_AMD64CallingConvDesc>(m_ctx, m_gpr64);
-    m_win64Conv = std::make_unique<Win64CallingConvDesc>(m_ctx, m_gpr64);
+    m_sysVConv = std::make_unique<SysV_AMD64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);
+    m_win64Conv = std::make_unique<Win64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);
 
     m_convs.clear();
     m_convs.push_back(m_sysVConv.get());

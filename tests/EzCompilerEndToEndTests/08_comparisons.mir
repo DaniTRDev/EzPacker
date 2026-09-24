@@ -1,0 +1,108 @@
+; Test Suite: 08_comparisons.mir
+; Tests comparison operations (CMP_EQ, CMP_NE, CMP_SLT, CMP_SLE, CMP_SGT, CMP_SGE,
+; CMP_ULT, CMP_ULE, CMP_UGT, CMP_UGE) for both 32-bit and 64-bit integers,
+; combined with conditional branches (BR_COND).
+
+fn @cmp_eq_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_EQ i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_ne_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_NE i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_slt_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_SLT i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_sle_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_SLE i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_sgt_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_SGT i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_sge_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_SGE i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_ult_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_ULT i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_ule_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_ULE i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_ugt_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_UGT i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_uge_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = CMP_UGE i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @cmp_slt_64(i64 %a, i64 %b) -> i64 {
+entry:
+    %res = CMP_SLT i64 %a, %b;
+    RET i64 %res;
+}
+
+fn @cmp_ult_64(i64 %a, i64 %b) -> i64 {
+entry:
+    %res = CMP_ULT i64 %a, %b;
+    RET i64 %res;
+}
+
+fn @min_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %cond = CMP_SLT i1 %a, %b;
+    BR_COND %cond, label %is_less, label %is_ge;
+is_less:
+    RET i32 %a;
+is_ge:
+    RET i32 %b;
+}
+
+fn @max_64(i64 %a, i64 %b) -> i64 {
+entry:
+    %cond = CMP_SGT i1 %a, %b;
+    BR_COND %cond, label %is_greater, label %is_le;
+is_greater:
+    RET i64 %a;
+is_le:
+    RET i64 %b;
+}
+
+fn @abs_32(i32 %x) -> i32 {
+entry:
+    %zero = MOV i32 0;
+    %cond = CMP_SLT i1 %x, %zero;
+    BR_COND %cond, label %neg, label %pos;
+neg:
+    %res = SUB i32 %zero, %x;
+    RET i32 %res;
+pos:
+    RET i32 %x;
+}
