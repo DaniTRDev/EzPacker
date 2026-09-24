@@ -12,7 +12,7 @@ EzDSL provides a complete processing pipeline: Lexy-based zero-copy parsing, sem
 2. [Common Lexical & Grammar Foundation](#2-common-lexical--grammar-foundation)
 3. [Language Specifications](#3-language-specifications)
    - [Target Descriptor Definitions (`.tdesc`)](#target-descriptor-definitions-tdesc)
-   - [Register Definitions (`.reg`)](#register-definitions-reg)
+   - [Target Register Definitions](#target-register-definitions)
    - [Target Instruction Definitions (`.idf`)](#target-instruction-definitions-idf)
    - [Calling Convention Definitions (`.ezcc` / `.ccd`)](#calling-convention-definitions-ezcc--ccd)
    - [Generic IR Instruction Definitions (`.irdf`)](#generic-ir-instruction-definitions-irdf)
@@ -32,8 +32,7 @@ EzDSL provides a complete processing pipeline: Lexy-based zero-copy parsing, sem
 
 | Sub-Language | Extension | Primary Domain | Generated Artifacts / Roles |
 |:---|:---|:---|:---|
-| **Target Descriptor** | `.tdesc` | Object formats, components, libcalls and ABI defaults | `<Target>TargetDesc.h` / `.cpp` descriptor wiring |
-| **Register Definition** | `.reg` | Register banks, classes, sub-register aliases, special registers | `<Target>RegisterInfo.h` flat register tables |
+| **Target Descriptor** | `.tdesc` | Object formats, components, libcalls, register banks/classes and ABI defaults | `<Target>TargetDesc.h` / `.cpp` descriptor wiring, `<Target>RegisterInfo.h` |
 | **Target Instruction Definition** | `.idf` | Operand constraints, mnemonics, flags and generic `ENCODING` blocks | `<Target>TargetInstructionTable.h/.cpp`, `<Target>EncodingTable.h` |
 | **Calling Convention** | `.ezcc` / `.ccd` | Stack layout, preservation sets, ABI classification, argument/return rules | `<Target>CallingConvDesc.h` / `.cpp` ABI lowerers |
 | **Generic IR Definition** | `.irdf` | Canonical IR opcode catalog, categories, flags | `MirInstructionSetDefs.h` (C++ MIR opcode enum & metadata) |
@@ -66,10 +65,9 @@ All EzDSL sub-languages share a unified lexical foundation:
 ## 3. Language Specifications
 
 ### Target Descriptor Definitions (`.tdesc`)
-Declares the target root, its referenced definition files, sizes, object formats, libcalls and component bindings:
+Declares the target root, its referenced definition files, sizes, object formats, register banks, classes, aliases, special registers, libcalls and component bindings:
 ```dsl
 target X86_64 {
-    registers:     "x86_64_registers.reg";
     instructions:  "x86_64_instructions.idf";
     calling_convs: ["x86_64_calling_conv.ezcc"];
 
@@ -81,6 +79,19 @@ target X86_64 {
 
     object_formats: [ELF, COFF];
     default_calling_conv: SysV_AMD64;
+
+    register_bank GPR {
+        classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
+        sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
+        registers {
+            rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
+            rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
+        }
+    }
+
+    special {
+        rip: 16
+    }
 
     libcalls {
         __returnNothing: "__returnNothing";
@@ -94,24 +105,12 @@ target X86_64 {
 }
 ```
 
-### Register Definitions (`.reg`)
-Declares register banks, classes, sub-register aliases, physical registers and special registers:
-```dsl
-target X86_64;
-
-register_bank GPR {
-    classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
-    sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
-    registers {
-        rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
-        rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
-    }
-}
-
-special {
-    rip: 16
-}
-```
+### Target Register Definitions
+Register banks, classes, sub-register alias hierarchies, and special registers are declared directly inside `.tdesc` files:
+- **`classes`**: Defines register classes and their physical bit widths (`GPR64: 64`).
+- **`sub_register`**: Declares wide-to-narrow aliasing relationships (`GPR64 <: GPR32, GPR32 <: GPR16`).
+- **`registers`**: Enumerates physical registers with hardware encodings and per-class assembly names (`rax enc 0 names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }`).
+- **`special`**: Declares dedicated pseudo-registers (such as the instruction pointer `rip: 16`).
 
 ### Target Instruction Definitions (`.idf`)
 Specifies machine instruction encodings, operand constraints, register directions, mnemonics, and side-effect flags:
@@ -304,9 +303,8 @@ EzDSL features a dedicated semantic validation pipeline (`EzDsl/Sema/include/Sem
 - **`SymbolTable` & `Scope`**: Hierarchical lexical symbol table allocating through `std::pmr::memory_resource`. Manages typed `Symbol` instances across all sub-languages.
 - **`TypePass`**: Ingests `TypeDefFile` ASTs, registers interned types, validates bitwidths, and populates the symbol table.
 - **`IrInstructionPass`**: Ingests `IrInstDefFile` ASTs, verifies operand counts, category invariants, and directionality rules (`IN`, `OUT`, `INOUT`).
-- **`RegisterPass`**: Resolves register banks, classes, hardware sub-register alias hierarchies and bit sizes, and registers physical/special registers with encoding-collision checks.
 - **`CallingConvPass`**: Validates stack alignment/growth, caller/callee preservation sets, ABI classification rules, and argument/return placement declarations.
-- **`TargetDescPass`**: Ingests `.tdesc` manifests, validating pointer/stack sizes, instruction pointer and default calling convention references, object formats, libcalls and component slots.
+- **`TargetDescPass`**: Ingests `.tdesc` manifests, validating pointer/stack sizes, register banks, classes, sub-register alias hierarchies, bit sizes, hardware encodings, special registers, instruction pointer references, default calling convention references, object formats, libcalls and component slots.
 - **`LegalizeActionPass`**: Ingests `.lad` ASTs, validates legality matrices, type constraints, and widening/narrowing targets.
 - **`LegalizeRulePass`**: Ingests `.lrd` ASTs, checks SSA variable scoping between match and emit templates, and validates guard predicates.
 - **`TargetInstPass`**: Ingests `.idf` ASTs, verifies operand names/directions, operand class constraints, instruction flags, implicit register defs/uses, and generic `ENCODING` blocks against the selected dialect.
@@ -347,15 +345,15 @@ EzDslCli [options] -i <input_file>
 | `.idf` | `TargetInstDef` | `TargetInstructions` (`CppTargetInstructionGenerator`) |
 | `.isf` | `InstructionSelect` | `InstructionSelector` (`CppInstructionSelectorGenerator`) |
 | `.ezcc` / `.ccd` | `CallingConv` | `CallingConv` (`CppCallingConvGenerator`) |
-| `.reg` | `RegisterDef` | `RegisterInfo` (`CppRegisterInfoGenerator`) |
 | `.tdesc` | `TargetDesc` | `TargetDesc` (`CppTargetDescGenerator`) |
 
 `--emit-target-encodings` additionally synthesizes `<Target>EncodingTable.h` from the `ENCODING` blocks of an `.idf` input.
+`--emit-registers` synthesizes `<Target>RegisterInfo.h` from the register declarations of a `.tdesc` input.
 
 ### Available Options:
 | Flag | Description |
 |:---|:---|
-| `-i, --input <file>` | Input EzDSL definition file (`.tyf`, `.irdf`, `.lad`, `.lrd`, `.idf`, `.isf`, `.ezcc`, `.ccd`, `.reg`, `.tdesc`). |
+| `-i, --input <file>` | Input EzDSL definition file (`.tyf`, `.irdf`, `.lad`, `.lrd`, `.idf`, `.isf`, `.ezcc`, `.ccd`, `.tdesc`). |
 | `-o, --output <path>` | Output destination directory or file path (default: `.`). |
 | `-I, --include <dir>` | Directory to search for imported DSL files (repeatable). |
 | `--target <name>` | Target architecture name (e.g. `AMD64`, `AArch64`). |
@@ -368,7 +366,7 @@ EzDslCli [options] -i <input_file>
 | `--emit-target-encodings` | Synthesize Target `EncodingTable.h` from `.idf` `ENCODING` blocks. |
 | `--emit-instruction-selector` | Synthesize Target `InstructionSelector.h` and `.cpp`. |
 | `--emit-calling-conv` | Synthesize Target `CallingConvDesc.h` and `.cpp`. |
-| `--emit-registers` | Synthesize Target `RegisterInfo.h`. |
+| `--emit-registers` | Synthesize Target `RegisterInfo.h` from `.tdesc`. |
 | `--emit-target-desc` | Synthesize Target `TargetDesc.h` and `.cpp`. |
 | `--rules <file>` | Companion `.lrd` rewrite rules for a `.lad` legalizer run. |
 | `--types <file>` | Dependency `.tyf` type definition file. |
@@ -438,6 +436,14 @@ EzDslGenCallingConv(
     TARGET EzTriple
     INPUT ${CMAKE_CURRENT_SOURCE_DIR}/SysV_AMD64.ezcc
     TARGET_NAME AMD64
+    OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64
+)
+
+# Generate C++ RegisterInfo from target descriptor
+EzDslGenRegisterInfo(
+    TARGET EzTargetsX86_64
+    INPUT ${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64.tdesc
+    TARGET_NAME x86_64
     OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64
 )
 ```
