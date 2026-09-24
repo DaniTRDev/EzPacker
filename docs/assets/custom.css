@@ -94,21 +94,25 @@ code, kbd, samp, pre, .fragment {
   margin-bottom: 0.75rem;
 }
 
-.ez-card a.card-title {
+.ez-card a.card-title,
+.ez-card a.el {
   margin: 0 0 0.5rem 0;
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--ez-primary-hover) !important;
-  text-decoration: none;
+  text-decoration: none !important;
   display: block;
 }
 
-.ez-card a.card-title:hover {
-  text-decoration: underline;
+.ez-card a.card-title:hover,
+.ez-card a.el:hover {
+  text-decoration: underline !important;
 }
 
-.ez-card p.card-desc {
-  margin: 0;
+.ez-card p.card-desc,
+.ez-card span.card-desc {
+  display: block;
+  margin-top: 0.5rem;
   font-size: 0.95rem;
   line-height: 1.5;
   color: var(--ez-text-muted);
