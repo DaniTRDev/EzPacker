@@ -8,7 +8,7 @@ namespace EzCompiler
 
 /**
  * Standard target triple representing architecture, vendor, operating system, and ABI/format.
- * Follows the canonical format <arch>-<vendor>-<sys>-<abi>.
+ * Follows the canonical format `[arch]-[vendor]-[sys]-[abi]`.
  */
 class TargetTriple
 {

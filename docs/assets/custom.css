@@ -1,0 +1,193 @@
+/* EzPacker Modern Doxygen Theme Enhancements */
+
+:root {
+  --ez-primary: #38bdf8;
+  --ez-primary-hover: #0ea5e9;
+  --ez-secondary: #6366f1;
+  --ez-accent: #a855f7;
+  --ez-bg-card: rgba(255, 255, 255, 0.85);
+  --ez-border-card: rgba(226, 232, 240, 0.8);
+  --ez-shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  --ez-code-bg: #f8fafc;
+  --ez-text-muted: #64748b;
+}
+
+@media (prefers-color-scheme: dark), [data-theme="dark"] {
+  :root {
+    --ez-bg-card: rgba(30, 41, 59, 0.7);
+    --ez-border-card: rgba(51, 65, 85, 0.8);
+    --ez-shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.35);
+    --ez-code-bg: #0f172a;
+    --ez-text-muted: #94a3b8;
+  }
+}
+
+/* Global Typography & Font Stacking */
+body, #nav-tree, .navpath {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+code, kbd, samp, pre, .fragment {
+  font-family: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, Menlo, monospace !important;
+  font-size: 0.9em;
+}
+
+/* Hero Banner Styling */
+.ez-hero {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(99, 102, 241, 0.15) 50%, rgba(168, 85, 247, 0.12) 100%);
+  border: 1px solid var(--ez-border-card);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  box-shadow: var(--ez-shadow-card);
+  backdrop-filter: blur(8px);
+}
+
+.ez-hero h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, #0284c7 0%, #4f46e5 50%, #9333ea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.ez-hero p.tagline {
+  font-size: 1.25rem;
+  color: var(--ez-text-muted);
+  max-width: 800px;
+  margin: 0 auto 1.5rem auto;
+  line-height: 1.6;
+}
+
+/* Interactive Card Grid */
+.ez-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.ez-card {
+  background: var(--ez-bg-card);
+  border: 1px solid var(--ez-border-card);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--ez-shadow-card);
+  display: flex;
+  flex-direction: column;
+  text-decoration: none !important;
+  color: inherit !important;
+}
+
+.ez-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--ez-primary);
+  box-shadow: 0 12px 28px -4px rgba(56, 189, 248, 0.2);
+}
+
+.ez-card .card-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.ez-card a.card-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ez-primary-hover) !important;
+  text-decoration: none;
+  display: block;
+}
+
+.ez-card a.card-title:hover {
+  text-decoration: underline;
+}
+
+.ez-card p.card-desc {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ez-text-muted);
+}
+
+/* Badges & Pills */
+.ez-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #0284c7;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  margin-right: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+/* GitHub Alert Callouts */
+blockquote {
+  border-left: 4px solid var(--ez-secondary) !important;
+  padding: 0.8rem 1.2rem !important;
+  margin: 1.2rem 0 !important;
+  background: var(--ez-bg-card);
+  border-radius: 0 8px 8px 0;
+  box-shadow: var(--ez-shadow-card);
+}
+
+blockquote > p {
+  margin: 0.3rem 0;
+}
+
+/* Code Blocks & Fragments */
+div.fragment {
+  border: 1px solid var(--ez-border-card) !important;
+  background-color: var(--ez-code-bg) !important;
+  border-radius: 8px !important;
+  padding: 1rem !important;
+  margin: 1rem 0 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Polished Tables */
+table.markdownTable {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--ez-shadow-card);
+}
+
+table.markdownTable th {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: var(--ez-secondary);
+  font-weight: 700;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid var(--ez-border-card);
+  text-align: left;
+}
+
+table.markdownTable td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--ez-border-card);
+  font-size: 0.92rem;
+}
+
+table.markdownTable tr:hover {
+  background-color: rgba(56, 189, 248, 0.04);
+}
+
+/* Sidebar & Navigation Tree Tweaks */
+#nav-tree {
+  font-size: 0.92rem;
+}
+
+#nav-tree .selected {
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: var(--ez-primary-hover) !important;
+  border-radius: 4px;
+}
