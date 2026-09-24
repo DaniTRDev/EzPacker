@@ -16,7 +16,8 @@ enum class TypeKind : uint8_t
     FloatingPoint, // IEEE floating-point scalar (16/32/64/128 bits).
     Void,          // Void/no-value type.
     BindingToken,  // Opaque token used only to bind operands.
-    Pointer        // Target pointer type.
+    Pointer,       // Target pointer type.
+    Vector         // Vector SIMD type (e.g. 128/256/512 bits).
 };
 
 /**

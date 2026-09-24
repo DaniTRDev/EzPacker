@@ -85,17 +85,35 @@ TEST_F(EzTripleTestSuite, TestX86_64TargetDescExtensions)
     // Default baseline
     EXPECT_TRUE(target.hasExtension("sse"));
     EXPECT_TRUE(target.hasExtension("SSE2"));
+    EXPECT_FALSE(target.hasExtension("sse3"));
+    EXPECT_FALSE(target.hasExtension("ssse3"));
+    EXPECT_FALSE(target.hasExtension("sse4a"));
+    EXPECT_FALSE(target.hasExtension("sse4_1"));
+    EXPECT_FALSE(target.hasExtension("sse4_2"));
     EXPECT_FALSE(target.hasExtension("avx"));
     EXPECT_FALSE(target.hasExtension("avx2"));
+
+    // Enable sse4a (implies sse3, sse2, sse)
+    target.applyFeatures({ "+sse4a" });
+    EXPECT_TRUE(target.hasExtension("sse4a"));
+    EXPECT_TRUE(target.hasExtension("sse3"));
+    EXPECT_TRUE(target.hasExtension("sse2"));
+    EXPECT_TRUE(target.hasExtension("sse"));
+    EXPECT_FALSE(target.hasExtension("sse4_1"));
 
     // Enable AVX
     target.applyFeatures({ "+avx" });
     EXPECT_TRUE(target.hasExtension("avx"));
+    EXPECT_TRUE(target.hasExtension("sse4_2"));
+    EXPECT_TRUE(target.hasExtension("sse4_1"));
+    EXPECT_TRUE(target.hasExtension("ssse3"));
     EXPECT_TRUE(target.hasExtension("sse2"));
 
     // Disable SSE
     target.applyFeatures({ "-sse" });
     EXPECT_FALSE(target.hasExtension("sse"));
     EXPECT_FALSE(target.hasExtension("sse2"));
+    EXPECT_FALSE(target.hasExtension("sse3"));
+    EXPECT_FALSE(target.hasExtension("sse4a"));
     EXPECT_FALSE(target.hasExtension("avx"));
 }

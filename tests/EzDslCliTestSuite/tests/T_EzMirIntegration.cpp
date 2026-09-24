@@ -111,13 +111,16 @@ TEST_F(EzMirIntegrationTest, GenerateAndVerifyEzMirTypeTable)
     EXPECT_TRUE(hContent.find("f32 = 11,") != std::string::npos);
     EXPECT_TRUE(hContent.find("f64 = 12,") != std::string::npos);
     EXPECT_TRUE(hContent.find("f128 = 13,") != std::string::npos);
+    EXPECT_TRUE(hContent.find("v4f32 = 14,") != std::string::npos);
+    EXPECT_TRUE(hContent.find("v2f64 = 15,") != std::string::npos);
+    EXPECT_TRUE(hContent.find("v4i32 = 18,") != std::string::npos);
     EXPECT_TRUE(hContent.find("Custom = 255") != std::string::npos);
 
     // ptr is pointer type, must NOT have a compact ID
     EXPECT_TRUE(hContent.find("ptr =") == std::string::npos);
 
-    // 3. MachineTypeCount (12 primitive types)
-    EXPECT_TRUE(hContent.find("constexpr size_t MachineTypeCount = 12;") != std::string::npos);
+    // 3. MachineTypeCount (24 primitive types)
+    EXPECT_TRUE(hContent.find("constexpr size_t MachineTypeCount = 24;") != std::string::npos);
 
     // 4. MirTypeTable Class Declarations & Accessor Methods
     EXPECT_TRUE(hContent.find("class MirTypeTable") != std::string::npos);

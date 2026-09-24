@@ -15,7 +15,8 @@ enum class MirTypeKind : uint8_t
     Pointer,       // Pointer type referencing a pointee MirType
     Array,         // Homogeneous sequential collection of elements of a base type (e.g., i32[3])
     Void,          // Unit or empty type representing lack of value
-    BindingToken   // Token type used for control-flow or lowering bindings (e.g., PUSH_ARGS to CALL, PUSH_RET to RET)
+    BindingToken,  // Token type used for control-flow or lowering bindings (e.g., PUSH_ARGS to CALL, PUSH_RET to RET)
+    Vector         // Vector SIMD type (e.g. v4f32, v2f64, v4i32, 128/256/512 bits)
 };
 
 /**

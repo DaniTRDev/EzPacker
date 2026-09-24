@@ -85,13 +85,20 @@ TEST_F(EzTripleTestSuite, TestX86_64RegisterBanksAndClasses)
 
     MirRegisterClass *fpr64 = fprBank->getClass("FPR64");
     MirRegisterClass *fpr32 = fprBank->getClass("FPR32");
+    MirRegisterClass *vr128 = fprBank->getClass("VR128");
     ASSERT_NE(fpr64, nullptr);
     ASSERT_NE(fpr32, nullptr);
+    ASSERT_NE(vr128, nullptr);
+    EXPECT_EQ(target.getVr128Class(), vr128);
 
     EXPECT_EQ(fpr64->getRegs().size(), 16u);
     EXPECT_EQ(fpr32->getRegs().size(), 16u);
+    EXPECT_EQ(vr128->getRegs().size(), 16u);
     EXPECT_NE(fpr64->getReg("xmm0"), nullptr);
     EXPECT_NE(fpr64->getReg("xmm15"), nullptr);
+    EXPECT_NE(vr128->getReg("xmm0"), nullptr);
+    EXPECT_NE(vr128->getReg("xmm15"), nullptr);
+    EXPECT_EQ(vr128->getReg("xmm0")->m_bitSize, 128u);
 }
 
 // Verifies the SysV and Win64 conventions with alignment, shadow space, and stack direction.

@@ -32,6 +32,8 @@ constexpr std::string_view typeKindName(DSL::Ast::TypeDef::TypeKind kind) noexce
             return "BindingToken";
         case TypeKind::Pointer:
             return "Pointer";
+        case TypeKind::Vector:
+            return "Vector";
     }
     return "Unknown";
 }

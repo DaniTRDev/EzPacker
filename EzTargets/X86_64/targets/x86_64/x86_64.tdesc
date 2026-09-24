@@ -29,6 +29,10 @@ target X86_64 {
             implies: [sse3];
             description: "Supplemental Streaming SIMD Extensions 3 (SSSE3)";
         };
+        sse4a {
+            implies: [sse3];
+            description: "AMD Streaming SIMD Extensions 4a (SSE4a)";
+        };
         sse4_1 {
             implies: [ssse3];
             description: "Streaming SIMD Extensions 4.1";

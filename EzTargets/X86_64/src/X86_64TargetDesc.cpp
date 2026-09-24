@@ -32,6 +32,7 @@ X86_64TargetDesc::X86_64TargetDesc(MirBuilderContext *ctx) :
     m_extensions.registerExtension("sse2", "Streaming SIMD Extensions 2", true, { "sse" });
     m_extensions.registerExtension("sse3", "Streaming SIMD Extensions 3", false, { "sse2" });
     m_extensions.registerExtension("ssse3", "Supplemental Streaming SIMD Extensions 3", false, { "sse3" });
+    m_extensions.registerExtension("sse4a", "AMD Streaming SIMD Extensions 4a", false, { "sse3" });
     m_extensions.registerExtension("sse4_1", "Streaming SIMD Extensions 4.1", false, { "ssse3" });
     m_extensions.registerExtension("sse4.1", "Streaming SIMD Extensions 4.1", false, { "sse4_1" });
     m_extensions.registerExtension("sse4_2", "Streaming SIMD Extensions 4.2", false, { "sse4_1" });
@@ -81,9 +82,11 @@ void X86_64TargetDesc::initialize()
 
     m_fpr64 = classAlloc.new_object<MirRegisterClass>("FPR64", m_fprBank, alloc);
     m_fpr32 = classAlloc.new_object<MirRegisterClass>("FPR32", m_fprBank, alloc);
+    m_vr128 = classAlloc.new_object<MirRegisterClass>("VR128", m_fprBank, alloc);
 
     m_fprBank->addClass("FPR64", m_fpr64);
     m_fprBank->addClass("FPR32", m_fpr32);
+    m_fprBank->addClass("VR128", m_vr128);
 
     m_banks.clear();
     m_banks.push_back(m_gprBank);
@@ -136,6 +139,7 @@ void X86_64TargetDesc::initialize()
     {
         m_fpr32->addRegister(xmm, 32, 0, {});
         m_fpr64->addRegister(xmm, 64, 0, { m_fpr32->getReg(xmm) });
+        m_vr128->addRegister(xmm, 128, 0, { m_fpr64->getReg(xmm) });
     }
 
     // 5. Calling Conventions
