@@ -1,0 +1,636 @@
+#include "EzTripleTestSuite.h"
+#include "Function/MirFunctionBuilder.h"
+#include "Instruction/MirInstruction.h"
+#include "Legalizer/Actions/LegalizeBitcastAction.h"
+#include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeLibcallAction.h"
+#include "Legalizer/Actions/LegalizeNarrowScalarAction.h"
+#include "Legalizer/Actions/LegalizeReturnAction.h"
+#include "Legalizer/Actions/LegalizeWidenScalarAction.h"
+#include "Legalizer/MirFunctionSignatureLegalizerPass.h"
+#include "Legalizer/MirLegalizer.h"
+#include "Legalizer/MirLegalizerPass.h"
+#include "Operand/MirOperandBuilder.h"
+
+/**
+ * Fixture for MIR legalization actions, signature legalization, and the legalizer pass.
+ */
+class MirLegalizerTest : public EzTripleTestSuite
+{
+};
+
+// Verifies signature legalization inserts POP_ARG for each parameter and an END_ARG.
+TEST_F(MirLegalizerTest, TestFunctionSignatureLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("add_params", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirOperandBuilder opBuilder(ctx);
+    MirRegister *p0 = opBuilder.buildVReg(typeTable->i32(), "a");
+    MirRegister *p1 = opBuilder.buildVReg(typeTable->i32(), "b");
+    MirFunctionBuilder(ctx).addParam(func, p0).addParam(func, p1);
+
+    MirFunctionSignatureLegalizerPass sigPass(ctx, getTargetDesc());
+    IntrusiveLinkedList<MirFunction> funcList;
+    funcList.push_back(func);
+
+    auto result = sigPass.run(funcList.begin(), nullptr);
+    EXPECT_TRUE(result.m_succeeded);
+    EXPECT_TRUE(result.m_modifiedMir);
+
+    // Verify entry block contains POP_ARG, POP_ARG, END_ARG
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 3);
+
+    auto it = instructions.begin();
+    MirInstruction *pop0 = *it++;
+    MirInstruction *pop1 = *it++;
+    MirInstruction *endArg = *it++;
+
+    EXPECT_EQ(pop0->getOpCodeName(), std::string("POP_ARG"));
+    EXPECT_EQ(pop1->getOpCodeName(), std::string("POP_ARG"));
+    EXPECT_EQ(endArg->getOpCodeName(), std::string("END_ARG"));
+}
+
+// Verifies a large return type prepends a pointer sret parameter.
+TEST_F(MirLegalizerTest, TestSretFunctionSignatureLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    // 256-bit return type exceeds register return capacity -> requires SRET
+    auto *func = createTestFunction("sret_func", typeTable->i256());
+
+    MirOperandBuilder opBuilder(ctx);
+    MirRegister *p0 = opBuilder.buildVReg(typeTable->i32(), "val");
+    MirFunctionBuilder(ctx).addParam(func, p0);
+
+    MirFunctionSignatureLegalizerPass sigPass(ctx, getTargetDesc());
+    IntrusiveLinkedList<MirFunction> funcList;
+    funcList.push_back(func);
+
+    auto result = sigPass.run(funcList.begin(), nullptr);
+    EXPECT_TRUE(result.m_succeeded);
+    EXPECT_TRUE(result.m_modifiedMir);
+
+    // Verify SRET pointer was prepended to parameters
+    EXPECT_EQ(func->getParameters().size(), 2);
+    MirRegister *sretPtr = func->getParameters().front();
+    EXPECT_EQ(sretPtr->getMirType()->getKind(), MirTypeKind::Pointer);
+}
+
+// Verifies call legalization wraps the call with PUSH_ARG and POP_RET.
+TEST_F(MirLegalizerTest, TestCallLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("caller", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dest = ob.buildVReg(typeTable->i32(), "ret_val");
+    MirRegister *arg0 = ob.buildVReg(typeTable->i32(), "arg0");
+    MirReference *callee = ob.buildRef(func);
+
+    // Emit generic CALL: dest = CALL callee, arg0
+    ib.CALL(dest, callee, arg0);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeCall(legCtx);
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Check that PUSH_ARG was inserted before CALL and POP_RET after CALL
+    auto &instList = block->getInstructions();
+    EXPECT_EQ(instList.size(), 3);
+
+    auto cur = instList.begin();
+    MirInstruction *pushInst = *cur++;
+    MirInstruction *callInst = *cur++;
+    MirInstruction *popInst = *cur++;
+
+    EXPECT_EQ(pushInst->getOpCodeName(), std::string("PUSH_ARG"));
+    EXPECT_EQ(callInst->getOpCodeName(), std::string("CALL"));
+    EXPECT_EQ(popInst->getOpCodeName(), std::string("POP_RET"));
+}
+
+// Verifies return legalization emits PUSH_RET before the tokenized RET.
+TEST_F(MirLegalizerTest, TestReturnLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("returner", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *retVal = ob.buildVReg(typeTable->i32(), "res");
+    ib.RET(retVal);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeReturn(legCtx);
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Check that PUSH_RET was emitted and RET now uses the binding token
+    auto &instList = block->getInstructions();
+    EXPECT_EQ(instList.size(), 2);
+
+    auto cur = instList.begin();
+    MirInstruction *pushRet = *cur++;
+    MirInstruction *retInst = *cur++;
+
+    EXPECT_EQ(pushRet->getOpCodeName(), std::string("PUSH_RET"));
+    EXPECT_EQ(retInst->getOpCodeName(), std::string("RET"));
+}
+
+// Verifies widen-scalar legalization reports a successful legalization.
+TEST_F(MirLegalizerTest, TestWidenScalarLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("widen_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i8(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i8(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i8(), "rhs");
+
+    ib.ADD(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeWidenScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+}
+
+// Verifies narrow-scalar legalization reports a successful legalization.
+TEST_F(MirLegalizerTest, TestNarrowScalarLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i64(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i64(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i64(), "rhs");
+
+    ib.ADD(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+}
+
+// Verifies a float-to-int bitcast legalization reports success.
+TEST_F(MirLegalizerTest, TestBitcastLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("bitcast_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i32(), "dst");
+    MirRegister *src = ob.buildVReg(typeTable->f32(), "src");
+
+    ib.MOV(dst, src);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeBitcast(legCtx, 1, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+}
+
+// Verifies a division is lowered to the requested libcall helper.
+TEST_F(MirLegalizerTest, TestLibcallLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("libcall_test", typeTable->i64());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i64(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i64(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i64(), "rhs");
+
+    ib.DIV(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, "__divdi3");
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+}
+
+// Verifies the full legalizer pass legalizes a function with a parameter and return.
+TEST_F(MirLegalizerTest, TestFullLegalizerPass)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("full_legalize", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *p0 = ob.buildVReg(typeTable->i32(), "x");
+    MirFunctionBuilder(ctx).addParam(func, p0);
+
+    MirRegister *retVal = ob.buildVReg(typeTable->i32(), "y");
+    ib.RET(retVal);
+
+    MirLegalizerPass pass(ctx, getTargetDesc());
+    IntrusiveLinkedList<MirFunction> funcList;
+    funcList.push_back(func);
+
+    auto result = pass.run(funcList.begin(), nullptr);
+    EXPECT_TRUE(result.m_succeeded);
+    EXPECT_TRUE(result.m_modifiedMir);
+}
+
+// Verifies widening a compare's inputs inserts ZEXTs while leaving the i1 result.
+TEST_F(MirLegalizerTest, TestWidenCompareLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("widen_cmp_test", typeTable->i1());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i1(), "cond");
+    MirRegister *lhs = ob.buildVReg(typeTable->i8(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i8(), "rhs");
+
+    ib.CMP_EQ(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeWidenScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CMP_EQ dst is still i1 and inputs were widened
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 3); // ZEXT lhs, ZEXT rhs, CMP_EQ dst
+}
+
+// Verifies widening a signed division emits SEXTs, the widened IDIV, and a TRUNC.
+TEST_F(MirLegalizerTest, TestWidenSignedArithmeticLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("widen_signed_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i8(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i8(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i8(), "rhs");
+
+    ib.IDIV(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeWidenScalar(legCtx, 0, typeTable->i32());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    auto &instructions = block->getInstructions();
+    auto cur = instructions.begin();
+    MirInstruction *sext1 = *cur++;
+    MirInstruction *sext2 = *cur++;
+    MirInstruction *idivInst = *cur++;
+    MirInstruction *truncInst = *cur++;
+
+    EXPECT_EQ(sext1->getOpCodeName(), std::string("SEXT"));
+    EXPECT_EQ(sext2->getOpCodeName(), std::string("SEXT"));
+    EXPECT_EQ(idivInst->getOpCodeName(), std::string("IDIV"));
+    EXPECT_EQ(truncInst->getOpCodeName(), std::string("TRUNC"));
+}
+
+// Verifies narrowing a wide SUB expands into unmerge/bottom/merge sequences.
+TEST_F(MirLegalizerTest, TestNarrowSubAndNegLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_sub_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.SUB(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify SUB was lowered to UNMERGE x2, USUBO, USUBE, MERGE
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 5);
+}
+
+// Verifies narrowing a wide XOR expands into unmerge/bitwise/merge sequences.
+TEST_F(MirLegalizerTest, TestNarrowBitwiseLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_bitwise_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.XOR(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify XOR was lowered to UNMERGE x2, XOR x2, MERGE
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 5);
+}
+
+// Verifies narrowing a wide compare expands into unmerge, two compares, and an AND.
+TEST_F(MirLegalizerTest, TestNarrowCompareLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_cmp_test", typeTable->i1());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i1(), "eq");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.CMP_EQ(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CMP_EQ lowered to UNMERGE x2, CMP_EQ x2, AND, MOV dst
+    auto &instructions = block->getInstructions();
+    EXPECT_EQ(instructions.size(), 6);
+}
+
+// Verifies the worklist legalizer leaves every instruction in the block legal.
+TEST_F(MirLegalizerTest, TestWorklistBlockLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("worklist_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    // Add 1: i8 ADD (needs widening to i32)
+    MirRegister *d1 = ob.buildVReg(typeTable->i8(), "d1");
+    MirRegister *s1 = ob.buildVReg(typeTable->i8(), "s1");
+    MirRegister *s2 = ob.buildVReg(typeTable->i8(), "s2");
+    ib.ADD(d1, s1, s2);
+
+    // Add 2: i16 SUB (needs widening to i32)
+    MirRegister *d2 = ob.buildVReg(typeTable->i16(), "d2");
+    MirRegister *s3 = ob.buildVReg(typeTable->i16(), "s3");
+    MirRegister *s4 = ob.buildVReg(typeTable->i16(), "s4");
+    ib.SUB(d2, s3, s4);
+
+    // Add 3: i32 ADD (already legal)
+    MirRegister *d3 = ob.buildVReg(typeTable->i32(), "d3");
+    MirRegister *s5 = ob.buildVReg(typeTable->i32(), "s5");
+    MirRegister *s6 = ob.buildVReg(typeTable->i32(), "s6");
+    ib.ADD(d3, s5, s6);
+
+    MirLegalizer legalizer(ctx, getTargetDesc());
+    bool ok = legalizer.legalizeBlock(block);
+    EXPECT_TRUE(ok);
+
+    // All instructions in the block must now be legal according to getTargetDesc()->getLegalizerInfo()
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst && !inst->isErased())
+        {
+            auto q = legalizer.buildQuery(inst);
+            auto resp = getTargetDesc()->getLegalizerInfo()->query(q);
+            EXPECT_TRUE(resp.isLegal()) << "Instruction " << inst->getOpCodeName() << " should be legal";
+        }
+    }
+}
+
+/**
+ * Legalizer info that intentionally defines a widen/narrow cycle for cycle-detection testing.
+ */
+class CyclicMockLegalizerInfo : public LegalizerInfo
+{
+  public:
+    CyclicMockLegalizerInfo(MirTypeTable *tt)
+    {
+        auto *i8 = tt->i8();
+        auto *i16 = tt->i16();
+
+        // Intentionally create a cycle: i8 widens to i16, and i16 narrows to i8
+        getActionDefinitions(MirInstructionOpCode::ADD).widenScalarTo(0, { i8 }, i16).narrowScalarTo(0, { i16 }, i8);
+    }
+};
+
+// Verifies a cyclic legalizer definition is detected and aborts cleanly.
+TEST_F(MirLegalizerTest, TestLegalizerCycleDetection)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("cycle_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *d = ob.buildVReg(typeTable->i8(), "d");
+    MirRegister *s1 = ob.buildVReg(typeTable->i8(), "s1");
+    MirRegister *s2 = ob.buildVReg(typeTable->i8(), "s2");
+    ib.ADD(d, s1, s2);
+
+    // Use a custom TargetDesc that returns CyclicMockLegalizerInfo
+    class CyclicTargetDesc : public MockTargetDesc
+    {
+      public:
+        CyclicTargetDesc(MirBuilderContext *bCtx) : MockTargetDesc(bCtx)
+        {
+            m_cyclicInfo = std::make_unique<CyclicMockLegalizerInfo>(bCtx->getTypeTable());
+        }
+        LegalizerInfo *getLegalizerInfo() override { return m_cyclicInfo.get(); }
+
+      private:
+        std::unique_ptr<CyclicMockLegalizerInfo> m_cyclicInfo;
+    };
+
+    CyclicTargetDesc cyclicTarget(ctx);
+    MirLegalizer legalizer(ctx, &cyclicTarget);
+
+    // The cycle detection budget should catch the cycle and abort cleanly returning false
+    bool ok = legalizer.legalizeBlock(block);
+    EXPECT_FALSE(ok);
+}
+
+// Verifies narrowing a 128-bit instruction with a big integer immediate extracts both halves without 64-bit truncation.
+TEST_F(MirLegalizerTest, TestNarrowScalarBigImmediate)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_imm128_test", typeTable->i64());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    // 128-bit literal: 0x1122334455667788_99aabbccddeeff00
+    FlexInt bigVal("0x112233445566778899aabbccddeeff00", 128, false);
+    MirInteger *imm = ob.buildInt(typeTable->i128(), bigVal);
+
+    ib.ADD(dst, lhs, imm);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify lowered sequence: UNMERGE (lhs), UADDO, UADDE, MERGE
+    auto &instructions = block->getInstructions();
+    ASSERT_EQ(instructions.size(), 4);
+    std::vector<MirInstruction *> instList(instructions.begin(), instructions.end());
+
+    // Instruction 1: UADDO dst0, carry, lhs0, imm_lo
+    MirInstruction *uaddo = instList[1];
+    EXPECT_EQ(uaddo->getOpCode(), MirInstructionOpCode::UADDO);
+    ASSERT_GE(uaddo->getOperandCount(), 4);
+    auto *immLo = dynamic_cast<MirInteger *>(uaddo->getOperand(3));
+    ASSERT_NE(immLo, nullptr);
+    EXPECT_EQ(immLo->getValue().getU64(), 0x99aabbccddeeff00ULL);
+
+    // Instruction 2: UADDE dst1, carryOut, lhs1, imm_hi, carry
+    MirInstruction *uadde = instList[2];
+    EXPECT_EQ(uadde->getOpCode(), MirInstructionOpCode::UADDE);
+    ASSERT_GE(uadde->getOperandCount(), 5);
+    auto *immHi = dynamic_cast<MirInteger *>(uadde->getOperand(3));
+    ASSERT_NE(immHi, nullptr);
+    EXPECT_EQ(immHi->getValue().getU64(), 0x1122334455667788ULL);
+}
+
+// Verifies narrowing a 256-bit instruction with a 4-chunk big integer immediate extracts all 4 64-bit chunks accurately.
+TEST_F(MirLegalizerTest, TestNarrowScalar256BitImmediate)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("narrow_imm256_test", typeTable->i64());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i256(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i256(), "lhs");
+    // 256-bit literal with non-zero words at all 4 positions
+    FlexInt bigVal256("0x44444444333333332222222211111111", 256, false);
+    // Let's set word 0: 0x11111111, word 1: 0x22222222, word 2: 0x33333333, word 3: 0x44444444
+    std::vector<uint64_t> limbs = { 0x0123456789abcdefULL, 0xfedcba9876543210ULL, 0x1111222233334444ULL, 0x5555666677778888ULL };
+    FlexInt limbVal = FlexInt::fromLimbs64(limbs, 256, false);
+    MirInteger *imm = ob.buildInt(typeTable->i256(), limbVal);
+
+    ib.XOR(dst, lhs, imm);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeNarrowScalar(legCtx, 0, typeTable->i64());
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify lowered sequence: UNMERGE (lhs), XOR x 4, MERGE
+    auto &instructions = block->getInstructions();
+    ASSERT_EQ(instructions.size(), 6);
+    std::vector<MirInstruction *> instList256(instructions.begin(), instructions.end());
+
+    for (size_t k = 0; k < 4; ++k)
+    {
+        MirInstruction *xorInst = instList256[1 + k];
+        EXPECT_EQ(xorInst->getOpCode(), MirInstructionOpCode::XOR);
+        ASSERT_GE(xorInst->getOperandCount(), 3);
+        auto *chunkImm = dynamic_cast<MirInteger *>(xorInst->getOperand(2));
+        ASSERT_NE(chunkImm, nullptr);
+        EXPECT_EQ(chunkImm->getValue().getU64(), limbs[k]) << "Chunk " << k << " mismatch!";
+    }
+}
+
+// Verifies that a 128-bit division is lowered to __divti3 runtime libcall.
+TEST_F(MirLegalizerTest, TestLibcall128BitDivision)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("libcall128_test", typeTable->i128());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.SDIV(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, "__divti3");
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CALL instruction is emitted targeting __divti3
+    bool foundCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            foundCall = true;
+            ASSERT_GE(inst->getOperandCount(), 2);
+            auto *rtSym = dynamic_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+            ASSERT_NE(rtSym, nullptr);
+            EXPECT_EQ(rtSym->getSymbolName(), "__divti3");
+        }
+    }
+    EXPECT_TRUE(foundCall);
+}
+

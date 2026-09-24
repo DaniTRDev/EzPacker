@@ -1,0 +1,42 @@
+; Module: recursive_factorial.mir
+; Demonstrates single and multiple recursion, parameter passing, caller-saved register clobbering,
+; and object-level relocation emission (ELF64 R_X86_64_PLT32 and COFF IMAGE_REL_AMD64_REL32).
+
+; Classic recursive factorial computation:
+; factorial(n) = 1 if n <= 1 else n * factorial(n - 1)
+fn @factorial(i64 %n) -> i64 {
+entry:
+    %one = MOV i64 1;
+    %is_base = CMP_SLE i1 %n, %one;
+    BR_COND %is_base, label %base_case, label %recursive_case;
+
+base_case:
+    RET i64 %one;
+
+recursive_case:
+    %n_minus_one = SUB i64 %n, %one;
+    %rec = CALL i64 @factorial, %n_minus_one;
+    %result = IMUL i64 %n, %rec;
+    RET i64 %result;
+}
+
+; Double recursive Fibonacci computation:
+; fibonacci(n) = n if n <= 1 else fibonacci(n - 1) + fibonacci(n - 2)
+; Tests preserving intermediate results across multiple function calls via callee-saved registers.
+fn @fibonacci(i64 %n) -> i64 {
+entry:
+    %one = MOV i64 1;
+    %is_base = CMP_SLE i1 %n, %one;
+    BR_COND %is_base, label %fib_base, label %fib_rec;
+
+fib_base:
+    RET i64 %n;
+
+fib_rec:
+    %n1 = SUB i64 %n, 1;
+    %fib1 = CALL i64 @fibonacci, %n1;
+    %n2 = SUB i64 %n, 2;
+    %fib2 = CALL i64 @fibonacci, %n2;
+    %total = ADD i64 %fib1, %fib2;
+    RET i64 %total;
+}

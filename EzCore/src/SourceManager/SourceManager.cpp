@@ -1,171 +1,365 @@
 #include "SourceManager/SourceManager.h"
 #include <algorithm>
-#include <stdexcept>
+#include <fstream>
 
-SourceManager::SourceManager(const std::filesystem::path &workingPath) : m_workingPath(workingPath) {}
+// Scans content buffer for newline boundaries and constructs 1-based SourceLineRange records
+static void populateLineRanges(SourceFileEntry *entry)
+{
+    const auto &content = entry->m_content;
+    size_t lineStart = 0;
+    size_t lineNumber = 1;
 
+    for (size_t i = 0; i < content.size(); ++i)
+    {
+        if (content[i] == '\n')
+        {
+            entry->m_lines.push_back({ lineStart, i, lineNumber++ });
+            lineStart = i + 1;
+        }
+    }
+    // Record the final line only when the buffer does not already end with a newline, so a
+    // trailing '\n' does not create a phantom empty line at EOF.
+    if (content.empty() || content.back() != '\n')
+    {
+        entry->m_lines.push_back({ lineStart, content.size(), lineNumber });
+    }
+}
+
+/**
+ * Initializes the working directory and arena-backed containers, reserving slot 0 as a null
+ * sentinel so source IDs are 1-based.
+ */
+SourceManager::SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc) :
+    m_workingPath(workingPath), m_alloc(alloc), m_includePaths(m_alloc), m_pathToIdMap(m_alloc), m_sourceFiles(m_alloc)
+{
+    // Slot 0 reserved as a nullptr sentinel so 1-based IDs match indexing
+    m_sourceFiles.push_back(nullptr);
+}
+
+/**
+ * Explicitly runs each SourceFileEntry destructor and returns its arena memory to the resource.
+ */
+SourceManager::~SourceManager()
+{
+    // Explicitly destroy and deallocate each arena-allocated SourceFileEntry
+    for (SourceFileEntry *entry : m_sourceFiles)
+    {
+        if (entry != nullptr)
+        {
+            entry->~SourceFileEntry();
+            m_alloc->deallocate(entry, sizeof(SourceFileEntry), alignof(SourceFileEntry));
+        }
+    }
+}
+
+/**
+ * Returns true when the name or canonical path is already present in the registry.
+ */
 bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) const
 {
-    size_t id = std::hash<std::string_view>{}(resolveSourcePath(sourceName).string());
-    return m_sources.contains(id);
+    return m_pathToIdMap.find(sourceName) != m_pathToIdMap.end();
 }
 
-size_t SourceManager::addSourceContent(const std::string &name, const std::string &content)
+/**
+ * Registers in-memory content under name, precomputes its line table and returns the new 1-based
+ * ID, or 0 if the name is already registered. The entry and its strings are allocated in the arena.
+ */
+size_t SourceManager::addSourceContent(const std::string &name, const std::string_view &content)
 {
-    std::string resolvedName = resolveSourcePath(name).string();
-    size_t id = std::hash<std::string>{}(resolvedName);
-
-    if (m_sources.contains(id))
-        return 0; // Source with the same name already exists, return 0 to indicate failure.
-
-    // Store the content
-    m_sources[id] = content;
-    m_sourcesNames[id] = resolvedName;
-
-    // We will build the line ranges.
-    std::vector<LineSourceRange> &lines = m_sourceLines[id];
-    lines.reserve(content.size() / 40); // Optimization: estimate avg line length of 40 chars.
-
-    size_t lineStart = 0;
-    size_t currentPos = 0;
-    const size_t contentSize = content.size();
-
-    while (currentPos < contentSize)
+    if (doesSourceNameExist(name))
     {
-        if (content[currentPos] == '\n')
+        return 0;
+    }
+
+    SourceFileEntry *entry = createEntry(std::pmr::string(content, m_alloc), std::pmr::string(name, m_alloc));
+    return registerEntry(entry);
+}
+
+/**
+ * Allocates an arena-backed SourceFileEntry from the given content/name, precomputes its line
+ * table, and returns the entry without registering it.
+ */
+SourceFileEntry *SourceManager::createEntry(std::pmr::string content, std::pmr::string name)
+{
+    void *entryMem = m_alloc->allocate(sizeof(SourceFileEntry), alignof(SourceFileEntry));
+    SourceFileEntry *entry = new (entryMem)
+            SourceFileEntry{ std::move(content), std::move(name), std::pmr::vector<SourceLineRange>(m_alloc) };
+
+    populateLineRanges(entry);
+    return entry;
+}
+
+/**
+ * Assigns entry the next 1-based ID, registers it in the path map and source list, and returns
+ * that ID. The map key points at the entry's arena-backed name so it outlives the map.
+ */
+size_t SourceManager::registerEntry(SourceFileEntry *entry)
+{
+    size_t newId = m_sourceFiles.size();
+    m_pathToIdMap.emplace(entry->m_name, newId);
+    m_sourceFiles.push_back(entry);
+    return newId;
+}
+
+/**
+ * Allocates a SourceReference for [startOffset, startOffset+length) in sourceId, clamping the end
+ * to the file length. Returns nullptr for invalid IDs, entries or start offsets.
+ */
+SourceReference *SourceManager::createReference(size_t startOffset, size_t length, size_t sourceId)
+{
+    if (sourceId == 0 || sourceId >= m_sourceFiles.size())
+    {
+        return nullptr;
+    }
+
+    SourceFileEntry *entry = m_sourceFiles[sourceId];
+    if (!entry)
+    {
+        return nullptr;
+    }
+
+    size_t fileLength = entry->m_content.size();
+    if (startOffset > fileLength)
+    {
+        return nullptr;
+    }
+
+    size_t endOffset = std::min(startOffset + length, fileLength);
+
+    void *mem = m_alloc->allocate(sizeof(SourceReference), alignof(SourceReference));
+    return new (mem) SourceReference{ startOffset, endOffset, sourceId };
+}
+
+/**
+ * Resolves the file by name and delegates to the ID-based createReference; returns nullptr when
+ * the name is unknown.
+ */
+SourceReference *SourceManager::createReference(size_t startOffset, size_t length, const std::string_view &sourceFile)
+{
+    auto it = m_pathToIdMap.find(sourceFile);
+    if (it == m_pathToIdMap.end())
+    {
+        return nullptr;
+    }
+    return createReference(startOffset, length, it->second);
+}
+
+/**
+ * Locates the precomputed line containing the reference's begin offset via upper_bound, then
+ * verifies the offset lies within the preceding range. Returns nullptr when no range matches.
+ * The returned pointer references the entry's line table and is read-only.
+ */
+const SourceLineRange *SourceManager::getReferenceLine(SourceReference *ref) const
+{
+    if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
+    {
+        return nullptr;
+    }
+
+    SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
+    if (!entry || entry->m_lines.empty())
+    {
+        return nullptr;
+    }
+
+    // Binary search for the line range containing ref->m_beginOffset
+    auto it = std::upper_bound(entry->m_lines.begin(),
+                               entry->m_lines.end(),
+                               ref->m_beginOffset,
+                               [](size_t val, const SourceLineRange &range) { return val < range.m_beginOffset; });
+
+    if (it != entry->m_lines.begin())
+    {
+        --it;
+        // Verify the offset falls within this line range
+        if (ref->m_beginOffset >= it->m_beginOffset && ref->m_beginOffset <= it->m_endOffset)
         {
-            // Store offset and length (excluding the newline character)
-            lines.push_back({ .m_start = lineStart, .m_length = currentPos - lineStart });
-            lineStart = currentPos + 1;
+            return &(*it);
         }
-        currentPos++;
     }
 
-    // Handle the last line (if the file doesn't end with a newline, or even if it's empty)
-    if (lineStart <= contentSize)
+    return nullptr;
+}
+
+/**
+ * Registers an include directory, canonicalizing it when it exists and storing it unchanged
+ * otherwise.
+ */
+void SourceManager::addIncludePath(const std::filesystem::path &path)
+{
+    std::error_code ec;
+    if (std::filesystem::exists(path, ec))
     {
-        lines.push_back({ .m_start = lineStart, .m_length = contentSize - lineStart });
+        m_includePaths.push_back(std::filesystem::weakly_canonical(path, ec));
+    }
+    else
+    {
+        m_includePaths.push_back(path);
+    }
+}
+
+/**
+ * Resolves a source path by trying, in order: an existing absolute path, the directory of the
+ * including file, the working directory, then each registered include path. Falls back to a
+ * working-directory-relative canonical path when nothing exists.
+ */
+std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::path &sourceFile,
+                                                       const std::optional<std::filesystem::path> &relativeTo) const
+{
+    std::error_code ec;
+
+    if (sourceFile.is_absolute() && std::filesystem::exists(sourceFile, ec))
+    {
+        return std::filesystem::weakly_canonical(sourceFile, ec);
     }
 
-    return id;
+    // Relative to the including source file's directory
+    if (relativeTo.has_value())
+    {
+        auto candidate = *relativeTo / sourceFile;
+        if (std::filesystem::exists(candidate, ec))
+        {
+            return std::filesystem::weakly_canonical(candidate, ec);
+        }
+    }
+
+    // Relative to working directory
+    auto workingCandidate = m_workingPath / sourceFile;
+    if (std::filesystem::exists(workingCandidate, ec))
+    {
+        return std::filesystem::weakly_canonical(workingCandidate, ec);
+    }
+
+    // Search in registered include search paths
+    for (const auto &incPath : m_includePaths)
+    {
+        auto candidate = incPath / sourceFile;
+        if (std::filesystem::exists(candidate, ec))
+        {
+            return std::filesystem::weakly_canonical(candidate, ec);
+        }
+    }
+
+    // Fallback: Return weakly canonical path relative to working directory or as-is
+    if (sourceFile.is_absolute())
+    {
+        return std::filesystem::weakly_canonical(sourceFile, ec);
+    }
+    return std::filesystem::weakly_canonical(m_workingPath / sourceFile, ec);
 }
 
-SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, const std::string &sourceFile)
+/**
+ * Resolves and reads filePath into an arena-backed entry, reusing the existing ID for an
+ * already-loaded canonical path. Returns the new ID, or std::nullopt when the file cannot be
+ * opened or read fully.
+ */
+std::optional<size_t> SourceManager::loadFile(const std::filesystem::path &filePath,
+                                              const std::optional<std::filesystem::path> &relativeTo)
 {
-    size_t id = std::hash<std::string>{}(resolveSourcePath(sourceFile).string());
-    return createReference(col, length, line, id);
+    std::filesystem::path resolvedPath = resolveSourcePath(filePath, relativeTo);
+    std::string canonicalName = resolvedPath.string();
+
+    // Avoid loading duplicate entries
+    auto it = m_pathToIdMap.find(canonicalName);
+    if (it != m_pathToIdMap.end())
+    {
+        return it->second;
+    }
+
+    std::ifstream file(resolvedPath, std::ios::in | std::ios::binary);
+    if (!file.is_open())
+    {
+        return std::nullopt;
+    }
+
+    // A failed end-seek leaves tellg() at -1; casting that to size_t would request a huge allocation.
+    file.seekg(0, std::ios::end);
+    std::streampos endPos = file.tellg();
+    if (endPos == std::streampos(-1))
+    {
+        return std::nullopt;
+    }
+    size_t fileSize = static_cast<size_t>(endPos);
+    file.seekg(0, std::ios::beg);
+
+    // Read into an arena string first so a short read can bail out before any entry is registered.
+    std::pmr::string content(fileSize, '\0', m_alloc);
+    if (fileSize > 0)
+    {
+        file.read(content.data(), static_cast<std::streamsize>(fileSize));
+        if (!file)
+        {
+            return std::nullopt;
+        }
+    }
+
+    SourceFileEntry *entry = createEntry(std::move(content), std::pmr::string(canonicalName, m_alloc));
+    return registerEntry(entry);
 }
 
-SourceReference SourceManager::createReference(size_t col, size_t length, size_t line, size_t sourceId)
+/**
+ * Returns a view of the full line containing the reference (terminators excluded), or an empty
+ * view when the reference line cannot be resolved.
+ */
+std::string_view SourceManager::getRawLineContent(SourceReference *ref) const
 {
-    auto it = m_sourceLines.find(sourceId);
-    if (it == m_sourceLines.end())
-        return {}; // File not found
-
-    const std::vector<LineSourceRange> &lines = it->second;
-
-    if (line >= lines.size())
-        return {}; // Invalid line number
-
-    const LineSourceRange &lineRange = lines[line];
-
-    // Bounds check: Column + Length must not exceed the actual line length
-    if ((col + length) > lineRange.m_length)
+    const SourceLineRange *lineRange = getReferenceLine(ref);
+    if (!lineRange)
+    {
         return {};
-
-    SourceReference ref;
-    ref.m_valid = true;
-    ref.m_col = col;
-    ref.m_length = length;
-    ref.m_line = line;
-    ref.m_sourceFileId = sourceId;
-
-    return ref;
-}
-
-const std::filesystem::path &SourceManager::getWorkingPath() const { return m_workingPath; }
-
-std::filesystem::path SourceManager::resolveSourcePath(const std::filesystem::path &sourceFile) const
-{
-    std::filesystem::path sourcePath;
-    if (sourceFile.is_relative())
-    {
-        sourcePath = m_workingPath / sourceFile;
-    }
-    return sourcePath;
-}
-
-std::string SourceManager::getRawLineContent(const SourceReference &ref)
-{
-    if (!ref.m_valid)
-        return "";
-
-    auto itSource = m_sources.find(ref.m_sourceFileId);
-    auto itLines = m_sourceLines.find(ref.m_sourceFileId);
-
-    if (itSource == m_sources.end() || itLines == m_sourceLines.end())
-        return "";
-
-    const std::vector<LineSourceRange> &lines = itLines->second;
-    if (ref.m_line >= lines.size())
-        return "";
-
-    const LineSourceRange &lineRange = lines[ref.m_line];
-    const std::string &fullSource = itSource->second;
-
-    return fullSource.substr(lineRange.m_start, lineRange.m_length);
-}
-
-std::string SourceManager::getReferenceContent(const SourceReference &ref)
-{
-    auto lineContentOpt = getRawLineContent(ref);
-
-    if (lineContentOpt.empty())
-        return "Internal Compiler Error: Invalid SourceReference";
-
-    std::string lineContent = lineContentOpt;
-    std::string indent;
-    indent.reserve(ref.m_col);
-
-    // Build indentation mirroring tabs
-    for (size_t i = 0; i < ref.m_col && i < lineContent.size(); ++i)
-    {
-        indent += (lineContent[i] == '\t') ? '\t' : ' ';
     }
 
-    size_t markLength = ref.m_length;
-    if (ref.m_col + markLength > lineContent.size())
-    {
-        markLength = (ref.m_col < lineContent.size()) ? lineContent.size() - ref.m_col : 0;
-    }
-    if (markLength == 0)
-        markLength = 1;
-
-    std::string squiggles = "^";
-    if (markLength > 1)
-        squiggles += std::string(markLength - 1, '~');
-
-    return std::format("{}\n{}{}", lineContent, indent, squiggles);
+    const SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
+    return std::string_view(entry->m_content.data() + lineRange->m_beginOffset, lineRange->length());
 }
 
+/**
+ * Returns a view of the exact referenced byte span, or an empty view when the reference is
+ * invalid or its offsets fall outside the file content.
+ */
+std::string_view SourceManager::getReferenceContent(SourceReference *ref) const
+{
+    if (!ref || ref->m_sourceFileId == 0 || ref->m_sourceFileId >= m_sourceFiles.size())
+    {
+        return {};
+    }
+
+    const SourceFileEntry *entry = m_sourceFiles[ref->m_sourceFileId];
+    if (!entry)
+    {
+        return {};
+    }
+
+    const auto &content = entry->m_content;
+    if (ref->m_beginOffset > content.size() || ref->m_endOffset > content.size() ||
+        ref->m_beginOffset > ref->m_endOffset)
+    {
+        return {};
+    }
+
+    return std::string_view(content.data() + ref->m_beginOffset, ref->length());
+}
+
+/**
+ * Returns the full content of the source with the given ID, or an empty view if invalid.
+ */
 std::string_view SourceManager::getSourceContent(size_t id) const
 {
-    auto it = m_sources.find(id);
-    if (it == m_sources.end())
+    if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
     {
-        return "";
+        return {};
     }
-
-    return it->second;
+    return m_sourceFiles[id]->m_content;
 }
 
+/**
+ * Returns the registered display name of the source with the given ID, or an empty view if invalid.
+ */
 std::string_view SourceManager::getSourceName(size_t id) const
 {
-    auto it = m_sourcesNames.find(id);
-    if (it == m_sourcesNames.end())
+    if (id == 0 || id >= m_sourceFiles.size() || !m_sourceFiles[id])
     {
-        return "";
+        return {};
     }
-
-    return it->second;
+    return m_sourceFiles[id]->m_name;
 }

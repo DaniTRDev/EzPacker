@@ -1,0 +1,43 @@
+; Test Suite: 06_phi_and_control_flow.mir
+; Tests complex diamonds and multiple PHI nodes in merge blocks.
+
+fn @abs_difference(i64 %a, i64 %b) -> i64 {
+entry:
+    %is_gt = CMP_SGT i1 %a, %b;
+    BR_COND %is_gt, label %a_greater, label %b_greater;
+
+a_greater:
+    %diff1 = SUB i64 %a, %b;
+    BR label %exit;
+
+b_greater:
+    %diff2 = SUB i64 %b, %a;
+    BR label %exit;
+
+exit:
+    %res = PHI i64 [%diff1, %a_greater], [%diff2, %b_greater];
+    RET i64 %res;
+}
+
+fn @multi_phi_diamond(i64 %cond_val, i64 %x, i64 %y) -> i64 {
+entry:
+    %zero = MOV i64 0;
+    %is_pos = CMP_SGT i1 %cond_val, %zero;
+    BR_COND %is_pos, label %true_branch, label %false_branch;
+
+true_branch:
+    %tx = ADD i64 %x, 10;
+    %ty = ADD i64 %y, 20;
+    BR label %join;
+
+false_branch:
+    %fx = SUB i64 %x, 5;
+    %fy = SUB i64 %y, 15;
+    BR label %join;
+
+join:
+    %rx = PHI i64 [%tx, %true_branch], [%fx, %false_branch];
+    %ry = PHI i64 [%ty, %true_branch], [%fy, %false_branch];
+    %res = ADD i64 %rx, %ry;
+    RET i64 %res;
+}

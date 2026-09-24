@@ -1,0 +1,520 @@
+// ============================================================================
+// DATA MOVEMENT
+// ============================================================================
+
+// Copies a value into a destination register: dst = src.
+ir_inst MOV(Register:dst OUT, AnyValue:src IN) {
+    CATEGORY(DataMovement);
+    TIER(HighLevel);
+}
+
+// Loads an effective memory address into a register without dereferencing: dst = &src.
+ir_inst MOV_ADDR(Register:dst OUT, AddressSource:src IN) {
+    CATEGORY(DataMovement);
+    TIER(HighLevel);
+}
+
+// SSA Phi function: selects incoming register value based on predecessor basic block.
+// 1 destination (OUT), followed by variadic incoming operand pairs/values (IN).
+ir_inst PHI(Register:dst OUT, VariadicArgs:incoming IN) {
+    CATEGORY(DataMovement);
+    TIER(HighLevel);
+    FLAGS(VariadicArgs);
+}
+
+// Internal pass instruction: places argument register into a call frame buffer or target slot.
+ir_inst PUSH_ARG(Register:token IN, Register:val IN) {
+    CATEGORY(DataMovement);
+    TIER(PassInternal);
+    FLAGS(HasSideEffect);
+}
+
+// Internal pass instruction: places return value into caller's return slot.
+ir_inst PUSH_RET(Register:token IN, Register:val IN) {
+    CATEGORY(DataMovement);
+    TIER(PassInternal);
+    FLAGS(HasSideEffect);
+}
+
+// Internal pass instruction: extracts parameter from function frame into register.
+ir_inst POP_ARG(Register:token IN, Register:dst OUT) {
+    CATEGORY(DataMovement);
+    TIER(PassInternal);
+    FLAGS(HasSideEffect);
+}
+
+// Internal pass instruction: marks end of argument setup before a function call.
+ir_inst END_ARG(Register:token IN) {
+    CATEGORY(DataMovement);
+    TIER(PassInternal);
+    FLAGS(HasSideEffect);
+}
+
+// Internal pass instruction: retrieves function call's returned value into local register.
+ir_inst POP_RET(Register:token IN, Register:dst OUT) {
+    CATEGORY(DataMovement);
+    TIER(PassInternal);
+    FLAGS(HasSideEffect);
+}
+
+// Combines multiple smaller scalars into a single wider scalar or vector.
+// 1 destination (OUT), followed by variadic source values (IN).
+ir_inst MERGE_VALUES(Register:dst OUT, VariadicArgs:srcs IN) {
+    CATEGORY(DataMovement);
+    TIER(HighLevel);
+    FLAGS(VariadicArgs);
+}
+
+// Splits a wide scalar or vector into multiple smaller scalar components.
+// Variadic destination registers (OUT), followed by 1 source value (IN).
+ir_inst UNMERGE_VALUES(VariadicArgs:dsts OUT, Register:src IN) {
+    CATEGORY(DataMovement);
+    TIER(HighLevel);
+    FLAGS(VariadicArgs);
+}
+
+// Branchless conditional selection: dst = cond ? trueVal : falseVal.
+ir_inst SELECT(Register:dst OUT, Register:cond IN, AnyValue:trueVal IN, AnyValue:falseVal IN) {
+    CATEGORY(DataMovement);
+    TIER(HighLevel);
+}
+
+// ============================================================================
+// MEMORY ACCESS
+// ============================================================================
+
+// Loads value from memory at address [src] into register [dst]: dst = *src.
+ir_inst LOAD(Register:dst OUT, AddressSource:src IN) {
+    CATEGORY(Memory);
+    TIER(HighLevel);
+    FLAGS(ReadsMemory);
+}
+
+// Stores value into memory at address [dst]: *dst = src.
+ir_inst STORE(AddressSource:dst IN, AnyValue:src IN) {
+    CATEGORY(Memory);
+    TIER(HighLevel);
+    FLAGS(WritesMemory, HasSideEffect);
+}
+
+// Pushes a register onto hardware stack.
+ir_inst PUSH(Register:src IN) {
+    CATEGORY(Memory);
+    TIER(HighLevel);
+    FLAGS(ReadsMemory, HasSideEffect);
+}
+
+// Pops top value off hardware stack into register.
+ir_inst POP(Register:dst OUT) {
+    CATEGORY(Memory);
+    TIER(HighLevel);
+    FLAGS(WritesMemory, HasSideEffect);
+}
+
+// Allocates stack frame space (alloca) and returns base address pointer.
+ir_inst ALLOC(Register:dst OUT) {
+    CATEGORY(Memory);
+    TIER(HighLevel);
+    FLAGS(HasSideEffect);
+}
+
+// Deallocates or frees dynamically allocated memory.
+ir_inst DALLOC(Register:dst OUT, Register:src IN) {
+    CATEGORY(Memory);
+    TIER(HighLevel);
+    FLAGS(HasSideEffect);
+}
+
+// ============================================================================
+// ARITHMETIC (INTEGER ALU)
+// ============================================================================
+
+// Integer Addition: dst = lhs + rhs.
+ir_inst ADD(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Integer Subtraction: dst = lhs - rhs.
+ir_inst SUB(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Unsigned Add with Overflow: returns (sum, carry_out:i1).
+ir_inst UADDO(Register:dstSum OUT, Register:dstCarry OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(IsCommutative);
+}
+
+// Unsigned Add with Carry-in and Carry-out: returns (sum, carry_out:i1).
+ir_inst UADDE(Register:dstSum OUT, Register:dstCarry OUT, Register:lhs IN, RegIntImm:rhs IN, Register:carryIn IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+}
+
+// Unsigned Sub with Overflow: returns (sub, borrow_out:i1).
+ir_inst USUBO(Register:dstSub OUT, Register:dstBorrow OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(IsCommutative);
+}
+
+// Unsigned Sub with Borrow-in and Borrow-out: returns (sub, borrow_out:i1).
+ir_inst USUBE(Register:dstSub OUT, Register:dstBorrow OUT, Register:lhs IN, RegIntImm:rhs IN, Register:borrowIn IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+}
+
+// Unsigned Multiplication High: dst = (lhs * rhs) >> BitWidth.
+ir_inst UMULH(Register:dst OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Signed Multiplication High: dst = (lhs * rhs) >> BitWidth.
+ir_inst SMULH(Register:dst OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative, TreatAsSigned);
+}
+
+// Unsigned Integer Multiplication: dst = lhs * rhs.
+ir_inst MUL(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Signed Integer Multiplication: dst = lhs * rhs.
+ir_inst IMUL(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative, TreatAsSigned);
+}
+
+// Unsigned Integer Division: dst = lhs / rhs.
+ir_inst DIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Signed Integer Division: dst = lhs / rhs.
+ir_inst IDIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, TreatAsSigned);
+}
+
+// Signed Integer Division (alias): dst = lhs / rhs.
+ir_inst SDIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, TreatAsSigned);
+}
+
+// Unsigned Integer Division (alias): dst = lhs / rhs.
+ir_inst UDIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Integer Remainder / Modulo: dst = lhs % rhs.
+ir_inst REM(Register:dst OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Unary Arithmetic Negation (Two's complement): dst = -src.
+ir_inst NEG(Register:dst OUT, Register:src IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+}
+
+// ============================================================================
+// ARITHMETIC (FLOATING-POINT ALU)
+// ============================================================================
+
+// Floating-Point Addition: dst = lhs + rhs.
+ir_inst FADD(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Floating-Point Subtraction: dst = lhs - rhs.
+ir_inst FSUB(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Floating-Point Multiplication: dst = lhs * rhs.
+ir_inst FMUL(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Floating-Point Division: dst = lhs / rhs.
+ir_inst FDIV(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Arithmetic);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// ============================================================================
+// BITWISE LOGIC
+// ============================================================================
+
+// Bitwise AND: dst = lhs & rhs.
+ir_inst AND(Register:dst OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Bitwise);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Bitwise OR: dst = lhs | rhs.
+ir_inst OR(Register:dst OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Bitwise);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Bitwise XOR (Exclusive OR): dst = lhs ^ rhs.
+ir_inst XOR(Register:dst OUT, Register:lhs IN, RegIntImm:rhs IN) {
+    CATEGORY(Bitwise);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Unary Bitwise NOT (One's complement): dst = ~src.
+ir_inst NOT(Register:dst OUT, Register:src IN) {
+    CATEGORY(Bitwise);
+    TIER(HighLevel);
+}
+
+// Logical Shift Left: dst = val << amt (zero-fill).
+ir_inst SHL(Register:dst OUT, Register:val IN, RegIntImm:amt IN) {
+    CATEGORY(Bitwise);
+    TIER(HighLevel);
+}
+
+// Logical Shift Right: dst = val >> amt (zero-fill).
+ir_inst SHR(Register:dst OUT, Register:val IN, RegIntImm:amt IN) {
+    CATEGORY(Bitwise);
+    TIER(HighLevel);
+}
+
+// Arithmetic Shift Right: dst = val >> amt (sign-propagating).
+ir_inst SAR(Register:dst OUT, Register:val IN, RegIntImm:amt IN) {
+    CATEGORY(Bitwise);
+    TIER(HighLevel);
+    FLAGS(TreatAsSigned);
+}
+
+// ============================================================================
+// COMPARISONS & CONTROL FLOW
+// ============================================================================
+
+// Integer Equality Comparison: dst = (lhs == rhs). Returns boolean i1.
+ir_inst CMP_EQ(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Integer Inequality Comparison: dst = (lhs != rhs). Returns boolean i1.
+ir_inst CMP_NE(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, IsCommutative);
+}
+
+// Signed Integer Less Than: dst = (lhs < rhs). Returns boolean i1.
+ir_inst CMP_SLT(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, TreatAsSigned);
+}
+
+// Signed Integer Less Than or Equal: dst = (lhs <= rhs). Returns boolean i1.
+ir_inst CMP_SLE(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, TreatAsSigned);
+}
+
+// Signed Integer Greater Than: dst = (lhs > rhs). Returns boolean i1.
+ir_inst CMP_SGT(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, TreatAsSigned);
+}
+
+// Signed Integer Greater Than or Equal: dst = (lhs >= rhs). Returns boolean i1.
+ir_inst CMP_SGE(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch, TreatAsSigned);
+}
+
+// Unsigned Integer Less Than: dst = (lhs < rhs). Returns boolean i1.
+ir_inst CMP_ULT(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Unsigned Integer Less Than or Equal: dst = (lhs <= rhs). Returns boolean i1.
+ir_inst CMP_ULE(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Unsigned Integer Greater Than: dst = (lhs > rhs). Returns boolean i1.
+ir_inst CMP_UGT(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Unsigned Integer Greater Than or Equal: dst = (lhs >= rhs). Returns boolean i1.
+ir_inst CMP_UGE(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Floating-Point Comparison. Returns boolean i1.
+ir_inst FCMP(Register:dst OUT, Register:lhs IN, RegImm:rhs IN) {
+    CATEGORY(Compare);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// Unconditional Jump / Branch. Jumps directly to target basic block.
+ir_inst JMP(Reference:target IN) {
+    CATEGORY(ControlFlow);
+    TIER(HighLevel);
+    FLAGS(IsTerminator, IsBranch);
+}
+
+// Conditional Branch: if (cond) goto trueBlock else goto falseBlock.
+ir_inst BR_COND(Register:cond IN, Reference:trueBlock IN, Reference:falseBlock IN) {
+    CATEGORY(ControlFlow);
+    TIER(HighLevel);
+    FLAGS(IsTerminator, IsBranch);
+}
+
+// Function Call: dst = call target(args...).
+// 1 destination (OUT), 1 call target (IN), followed by variadic arguments (IN).
+ir_inst CALL(Register:dst OUT, AnyValue:target IN, VariadicArgs:args IN) {
+    CATEGORY(ControlFlow);
+    TIER(HighLevel);
+    FLAGS(IsCall, HasSideEffect, VariadicArgs);
+}
+
+// Return from Function: returns execution and optional value to caller.
+ir_inst RET(AnyValue:val IN) {
+    CATEGORY(ControlFlow);
+    TIER(HighLevel);
+    FLAGS(IsTerminator, IsReturn, HasSideEffect);
+}
+
+// ============================================================================
+// TYPE CASTING & CONVERSIONS
+// ============================================================================
+
+// Integer Truncation: narrows integer bit-width (e.g., i64 -> i32).
+ir_inst TRUNC(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+    FLAGS(DestSmaller);
+}
+
+// Zero Extension: extends unsigned integer with leading zeros (e.g., u8 -> u32).
+ir_inst ZEXT(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+    FLAGS(DestLarger);
+}
+
+// Sign Extension: extends signed integer preserving sign bit (e.g., i8 -> i32).
+ir_inst SEXT(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+    FLAGS(DestLarger);
+}
+
+// Floating-Point Extension: widens float precision (e.g., f32 -> f64).
+ir_inst FPEXT(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+    FLAGS(DestLarger);
+}
+
+// Floating-Point Truncation: narrows float precision (e.g., f64 -> f32).
+ir_inst FPTRUNC(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+    FLAGS(DestSmaller);
+}
+
+// Signed Integer to Floating-Point Conversion (e.g., i32 -> f32).
+ir_inst SITOFP(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+}
+
+// Floating-Point to Signed Integer Conversion (e.g., f32 -> i32).
+ir_inst FPTOSI(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+}
+
+// Bitcast / Reinterpretation: converts type without altering underlying bits (e.g., f32 <-> i32).
+ir_inst BITCAST(Register:dst OUT, Register:src IN) {
+    CATEGORY(Casting);
+    TIER(HighLevel);
+    FLAGS(SizeMatch);
+}
+
+// ============================================================================
+// SYSTEM & SPECIAL
+// ============================================================================
+
+// Invokes an OS-level system call interrupt.
+ir_inst SYSCALL(AnyValue:payload IN) {
+    CATEGORY(System);
+    TIER(HighLevel);
+    FLAGS(HasSideEffect);
+}
+
+// No Operation: placeholder instruction that performs no action.
+ir_inst NOP() {
+    CATEGORY(System);
+    TIER(HighLevel);
+}
+
+// Halts CPU execution / traps program state.
+ir_inst HALT() {
+    CATEGORY(System);
+    TIER(HighLevel);
+    FLAGS(IsTerminator, HasSideEffect);
+}
+
+// Target instruction placeholder used during instruction selection (ISel).
+ir_inst TARGET_INST() {
+    CATEGORY(System);
+    TIER(TargetLow);
+    FLAGS(HasSideEffect);
+}

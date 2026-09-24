@@ -1,0 +1,76 @@
+; Test Suite: 02_branch_and_loops.mir
+; Tests conditional branches, comparison predicates, and loop structures with PHI nodes.
+
+fn @max_of_two(i64 %a, i64 %b) -> i64 {
+entry:
+    %is_gt = CMP_SGT i1 %a, %b;
+    BR_COND %is_gt, label %a_bigger, label %b_bigger;
+
+a_bigger:
+    RET i64 %a;
+
+b_bigger:
+    RET i64 %b;
+}
+
+fn @clamp_range(i64 %val, i64 %min_val, i64 %max_val) -> i64 {
+entry:
+    %lt_min = CMP_SLT i1 %val, %min_val;
+    BR_COND %lt_min, label %ret_min, label %check_max;
+
+ret_min:
+    RET i64 %min_val;
+
+check_max:
+    %gt_max = CMP_SGT i1 %val, %max_val;
+    BR_COND %gt_max, label %ret_max, label %ret_val;
+
+ret_max:
+    RET i64 %max_val;
+
+ret_val:
+    RET i64 %val;
+}
+
+fn @sum_loop(i64 %n) -> i64 {
+entry:
+    %zero = MOV i64 0;
+    %one = MOV i64 1;
+    BR label %loop_header;
+
+loop_header:
+    %i = PHI i64 [%one, %entry], [%next_i, %loop_body];
+    %acc = PHI i64 [%zero, %entry], [%next_acc, %loop_body];
+    %cond = CMP_SLE i1 %i, %n;
+    BR_COND %cond, label %loop_body, label %loop_exit;
+
+loop_body:
+    %next_acc = ADD i64 %acc, %i;
+    %next_i = ADD i64 %i, %one;
+    BR label %loop_header;
+
+loop_exit:
+    RET i64 %acc;
+}
+
+fn @power_of_two(i64 %exp) -> i64 {
+entry:
+    %one = MOV i64 1;
+    %two = MOV i64 2;
+    %zero = MOV i64 0;
+    BR label %pow_header;
+
+pow_header:
+    %count = PHI i64 [%exp, %entry], [%next_count, %pow_body];
+    %res = PHI i64 [%one, %entry], [%next_res, %pow_body];
+    %cond = CMP_SGT i1 %count, %zero;
+    BR_COND %cond, label %pow_body, label %pow_exit;
+
+pow_body:
+    %next_res = IMUL i64 %res, %two;
+    %next_count = SUB i64 %count, %one;
+    BR label %pow_header;
+
+pow_exit:
+    RET i64 %res;
+}

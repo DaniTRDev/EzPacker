@@ -1,0 +1,33 @@
+// EzPacker Custom MIR Module: calling_conventions.mir
+// Demonstrates function argument lowering and ABI differences between
+// System V AMD64 (Linux: RDI, RSI, RDX, RCX) and Microsoft x64 (Windows: RCX, RDX, R8, R9).
+
+fn @pass_unary(i64 %x) -> i64 {
+entry:
+    %c = MOV i64 1;
+    %res = ADD i64 %x, %c;
+    RET i64 %res;
+}
+
+fn @pass_binary(i64 %x, i64 %y) -> i64 {
+entry:
+    %sum = ADD i64 %x, %y;
+    %diff = SUB i64 %x, %y;
+    %res = IMUL i64 %sum, %diff;
+    RET i64 %res;
+}
+
+fn @pass_ternary(i64 %x, i64 %y, i64 %z) -> i64 {
+entry:
+    %xy = ADD i64 %x, %y;
+    %xyz = ADD i64 %xy, %z;
+    RET i64 %xyz;
+}
+
+fn @pass_quaternary(i64 %a, i64 %b, i64 %c, i64 %d) -> i64 {
+entry:
+    %ab = ADD i64 %a, %b;
+    %cd = ADD i64 %c, %d;
+    %res = IMUL i64 %ab, %cd;
+    RET i64 %res;
+}

@@ -1,57 +1,76 @@
-# EzCore CMake build configuration
+set(EZCORE_FILES_LIST
+        "include/EzCoreCommon.h"
+        "include/EzCommonStd.h"
+        "include/CliExitCode.h"
+        "include/StringUtils.h"
+        "include/NameRegistry.h"
+        "include/LibBFWrapper.h"
+        "include/Diagnostics/DiagnosticBuilder.h"
+        "include/Diagnostics/DiagnosticCollector.h"
+        "include/Diagnostics/DiagnosticListener.h"
+        "include/Diagnostics/DiagnosticLogger.h"
+        "include/Diagnostics/DiagnosticMessage.h"
+        "include/Diagnostics/DiagnosticScope.h"
+        "include/FlexNumber/FlexFloat.h"
+        "include/FlexNumber/FlexInt.h"
+        "include/HelperClasses/DenseBitSet.h"
+        "include/HelperClasses/IntrusiveLinkedList.h"
+        "include/SourceManager/GenericSourceManager.h"
+        "include/SourceManager/SourceManager.h"
 
-function(GetLibraryBuildType out)
-    if (EZPACKER_BUILD_STATIC)
-        set(${out} "STATIC" PARENT_SCOPE)
-    else ()
-        set(${out} "SHARED" PARENT_SCOPE)
-    endif ()
-endfunction()
+        "src/Diagnostics/DiagnosticBuilder.cpp"
+        "src/Diagnostics/DiagnosticCollector.cpp"
+        "src/Diagnostics/DiagnosticLogger.cpp"
+        "src/Diagnostics/DiagnosticMessage.cpp"
+        "src/Diagnostics/DiagnosticScope.cpp"
+        "src/FlexNumber/FlexFloat.cpp"
+        "src/FlexNumber/FlexInt.cpp"
+        "src/HelperClasses/DenseBitSet.cpp"
+        "src/SourceManager/SourceManager.cpp"
+)
 
-function(BuildEzCore)
-    GetLibraryBuildType(EZCORE_BUILD_TYPE)
-    message(STATUS "Building EzCore as ${EZCORE_BUILD_TYPE}")
+EzCMK_ConfigureLib(NAME "EzCore"
+        FILE_LIST ${EZCORE_FILES_LIST}
+        PRECOMPILED_HEADER "include/EzCoreCommon.h"
+        LINKED_LIBRARIES "EzLogger;libtommath;LibBF"
+        INCLUDED_DIRS "include"
+)
 
-    add_library("EzCore" ${EZCORE_BUILD_TYPE}
-            "include/EzCore.h"
-            "include/EzCoreCommon.h"
-            "include/MathUtils.h"
-            "include/StringUtils.h"
-            "include/ErrorCollector/ErrorCollector.h"
-            "include/ErrorCollector/ErrorEmitter.h"
-            "include/LogCollector/LogCollector.h"
-            "include/Logger/SourceLoggingSink.h"
-            "include/SourceManager/SourceManager.h"
-            "include/TypedPool/TypedArrayPool.h"
-            "include/TypedPool/TypedPool.h"
-
-            "src/MathUtils.cpp"
-            "src/ErrorCollector/ErrorCollector.cpp"
-            "src/ErrorCollector/ErrorEmitter.cpp"
-            "src/LogCollector/LogCollector.cpp"
-            "src/Logger/SourceLogger.cpp"
-            "src/SourceManager/SourceManager.cpp"
-    )
-
-    # Set precompiled header
-    target_precompile_headers(EzCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/EzCoreCommon.h")
-
-    # Add include directories and link dependencies
-    target_link_libraries(EzCore PUBLIC EzLogger gtest gtest_main)
-    target_include_directories(EzCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" ${gtest_build_include_dirs})
-endfunction()
-
-BuildEzCore()
-
-# Add tests
 if (EZPACKER_BUILD_TESTS)
     message(STATUS "Building tests for EzCore")
 
-    #EzPacker_AddTest(
-    #       "T_EzCoreTest"
-    #       ""
-    #       "EzCore"
-    #       ""
-    #       "${CMAKE_CURRENT_SOURCE_DIR}/tests/TestEzCore.cpp"
-    #)
+    EzPacker_AddTest(
+            "T_DiagnosticLogger"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_DiagnosticLogger.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_IntrusiveLinkedList"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_IntrusiveLinkedList.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_DenseBitSet"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_DenseBitSet.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_SourceManager"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_SourceManager.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_FlexNumber"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_FlexNumber.cpp"
+    )
 endif ()

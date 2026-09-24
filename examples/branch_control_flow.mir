@@ -1,0 +1,66 @@
+; Module: branch_control_flow.mir
+; Demonstrates conditional control flow, comparison operations, and multiple return paths in EzPacker.
+; Both Linux (SysV AMD64) and Windows (x64 MSVC) calling conventions and object formats are supported.
+
+; Computes the absolute difference |a - b| between two signed 64-bit integers.
+; Demonstrates conditional branch with join block.
+fn @abs_diff(i64 %a, i64 %b) -> i64 {
+entry:
+    %is_gt = CMP_SGT i1 %a, %b;
+    BR_COND %is_gt, label %a_greater, label %b_greater;
+
+a_greater:
+    %diff1 = SUB i64 %a, %b;
+    BR label %exit;
+
+b_greater:
+    %diff2 = SUB i64 %b, %a;
+    BR label %exit;
+
+exit:
+    %res = PHI i64 [%diff1, %a_greater], [%diff2, %b_greater];
+    RET i64 %res;
+}
+
+; Clamps an input value to the range [min_val, max_val].
+; Demonstrates multi-argument management (3 args), cascading conditional branches, and multiple return paths.
+fn @clamp(i64 %val, i64 %min_val, i64 %max_val) -> i64 {
+entry:
+    %is_less = CMP_SLT i1 %val, %min_val;
+    BR_COND %is_less, label %ret_min, label %check_upper;
+
+ret_min:
+    RET i64 %min_val;
+
+check_upper:
+    %is_greater = CMP_SGT i1 %val, %max_val;
+    BR_COND %is_greater, label %ret_max, label %ret_val;
+
+ret_max:
+    RET i64 %max_val;
+
+ret_val:
+    RET i64 %val;
+}
+
+; Evaluates parity and applies distinct transformations.
+; If n is odd  -> 3n + 1
+; If n is even -> n - 2
+fn @collatz_step(i64 %n) -> i64 {
+entry:
+    %one = MOV i64 1;
+    %rem = AND i64 %n, %one;
+    %is_odd = CMP_EQ i1 %rem, %one;
+    BR_COND %is_odd, label %odd_path, label %even_path;
+
+odd_path:
+    %three = MOV i64 3;
+    %three_n = IMUL i64 %n, %three;
+    %res = ADD i64 %three_n, %one;
+    RET i64 %res;
+
+even_path:
+    %two = MOV i64 2;
+    %diff = SUB i64 %n, %two;
+    RET i64 %diff;
+}

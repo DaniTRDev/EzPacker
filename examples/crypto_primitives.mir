@@ -1,0 +1,32 @@
+// EzPacker Custom MIR Module: crypto_primitives.mir
+// Demonstrates symmetric cryptographic transformations, complex dataflow,
+// and bitwise-arithmetic interleaving (Feistel round and 64-bit mixer).
+
+fn @feistel_round(i64 %left, i64 %right, i64 %round_key) -> i64 {
+entry:
+    %c_mult = MOV i64 14781283;
+    %f1 = IMUL i64 %right, %c_mult;
+    %f2 = XOR i64 %f1, %round_key;
+    %new_right = XOR i64 %left, %f2;
+    RET i64 %new_right;
+}
+
+fn @murmur_mix64(i64 %key) -> i64 {
+entry:
+    %c1 = MOV i64 104729;
+    %m1 = IMUL i64 %key, %c1;
+    %mask = MOV i64 16777215;
+    %masked = AND i64 %m1, %mask;
+    %c2 = MOV i64 734567;
+    %m2 = ADD i64 %masked, %c2;
+    RET i64 %m2;
+}
+
+fn @main() -> i64 {
+entry:
+    %seed = MOV i64 987654321;
+    %rkey = MOV i64 123456789;
+    %h = ADD i64 %seed, %rkey;
+    %out = XOR i64 %h, %seed;
+    RET i64 %out;
+}

@@ -1,125 +1,123 @@
-#ifndef EZPACKER_SOURCEMANAGER_H
-#define EZPACKER_SOURCEMANAGER_H
+#ifndef EZCORE_SOURCE_MANAGER_H
+#define EZCORE_SOURCE_MANAGER_H
 
 #include "EzCoreCommon.h"
+#include "GenericSourceManager.h"
+#include <filesystem>
+#include <optional>
 
 /**
- * This struct represents a reference to the source code.
+ * Concrete source file registry managing arena-backed file buffers, include paths, and debug symbol spans.
+ * Provides thread-compatible storage of SourceFileEntry instances, line-to-offset binary mapping,
+ * and canonical include path resolution for the compiler frontend and AST/MIR diagnostics.
  */
-struct SourceReference
-{
-    bool m_valid{ false };
-    size_t m_col{ 0 };
-    size_t m_length{ 0 };
-    size_t m_line{ 0 };
-
-    size_t m_sourceFileId{ 0 };
-};
-
-struct LineSourceRange
-{
-    size_t m_start;  // Byte offset in the file where line starts
-    size_t m_length; // Length of the line (excluding newline)
-};
-
-/**
- * This class is responsible of debug symbols. It keeps references to the original content of
- * source files and translates references to content from the file.
- */
-class SourceManager
+class SourceManager : public GenericSourceManager
 {
   public:
     /**
-     * @brief Constructs a SourceManager with the given working path.
-     * @param workingPath The working path to resolve relative paths for source files.
+     * Constructs a SourceManager with a root working directory and a PMR memory resource for arena allocations.
      */
-    SourceManager(const std::filesystem::path &workingPath);
+    SourceManager(const std::filesystem::path &workingPath, std::pmr::memory_resource *alloc);
 
     /**
-     * @brief Checks if a source with the given name already exists in the manager.
-     * @param sourceName The name of the source to check.
-     * @returns True if the source exists, false otherwise.
+     * Destructor freeing all allocated SourceFileEntry objects through the memory resource.
      */
-    bool doesSourceNameExist(const std::string_view &sourceName) const;
+    ~SourceManager();
+
+    // Non-copyable: entries and map keys are raw pointers into the arena, so a copy would
+    // double-free and leave the copied map keys dangling. Ownership is always by pointer.
+    SourceManager(const SourceManager &) = delete;
+    SourceManager &operator=(const SourceManager &) = delete;
 
     /**
-     * @brief Creates a source reference that can be used to show source content.
-     * @param col The column index of the reference.
-     * @param length The length of the reference.
-     * @param line The line index of the reference.
-     * @param sourceId The ID of the source file.
-     * @returns The created SourceReference.
+     * Checks if a source buffer with the given name or path exists in the path-to-ID lookup map.
      */
-    SourceReference createReference(size_t col, size_t length, size_t line, size_t sourceId);
+    bool doesSourceNameExist(const std::string_view &sourceName) const override;
 
     /**
-     * @brief Creates a source reference that can be used to show source content.
-     * @param col The column index of the reference.
-     * @param length The length of the reference.
-     * @param line The line index of the reference.
-     * @param sourceFile The path of the source file.
-     * @returns The created SourceReference.
+     * Adds an in-memory source file with the specified name and content string view.
+     * Computes line bounds and registers the entry. Returns the new 1-based ID, or 0 if name already exists.
      */
-    SourceReference createReference(size_t col, size_t length, size_t line, const std::string &sourceFile);
+    size_t addSourceContent(const std::string &name, const std::string_view &content) override;
 
     /**
-     * @brief Adds a new source file using given content and name.
-     * @param name The name of the source file.
-     * @param content The content of the source file.
-     * @returns The ID of the source file, or 0 if a source with the same name already exists.
+     * Allocates and initializes a SourceReference for a byte interval within the file indicated by sourceId.
+     * Returns nullptr if sourceId is invalid or startOffset exceeds file length.
      */
-    size_t addSourceContent(const std::string &name, const std::string &content);
+    SourceReference *createReference(size_t startOffset, size_t length, size_t sourceId) override;
 
     /**
-     * @brief Returns the working path of the source manager.
-     * @returns The working path.
+     * Allocates and initializes a SourceReference using registered source file name.
+     * Returns nullptr if source file is not found in the registry.
      */
-    const std::filesystem::path &getWorkingPath() const;
+    SourceReference *createReference(size_t startOffset, size_t length, const std::string_view &sourceFile) override;
 
     /**
-     * @brief Resolves the given source file path to an absolute path based on the working directory.
-     * @param sourceFile The path to resolve.
-     * @returns The resolved absolute path.
+     * Finds the precomputed 1-based line interval enclosing the given SourceReference via binary search.
+     * Returns a read-only pointer into the entry's line table, or nullptr if reference or source entry is
+     * invalid. The pointer stays valid as long as the owning SourceManager is alive and no further sources
+     * are registered (registration never reallocates an existing entry's line table).
      */
-    std::filesystem::path resolveSourcePath(const std::filesystem::path &sourceFile) const;
+    const SourceLineRange *getReferenceLine(SourceReference *ref) const override;
 
     /**
-     * @brief Returns the raw line of where this reference was created.
-     * @param ref The source reference.
-     * @returns The raw line content, or an empty string if not found.
+     * Adds an include directory to the search list, converting existing paths to weakly canonical forms.
      */
-    std::string getRawLineContent(const SourceReference &ref);
+    void addIncludePath(const std::filesystem::path &path) override;
 
     /**
-     * @brief Returns the line content of the given reference.
-     * @param ref The source reference.
-     * @returns The line content.
+     * Resolves a file path relative to an including file, the working directory, or registered include paths.
+     * Returns the weakly canonical path.
      */
-    std::string getReferenceContent(const SourceReference &ref);
+    std::filesystem::path
+    resolveSourcePath(const std::filesystem::path &sourceFile,
+                      const std::optional<std::filesystem::path> &relativeTo = std::nullopt) const override;
 
     /**
-     * @brief Returns the source content for the given ID.
-     * @param id The source file ID.
-     * @returns The full content of the source file, or an empty string if not found.
+     * Reads a source file from disk into the PMR arena, creates line index entries, and assigns a source ID.
+     * Avoids duplicate loads if canonical path is already registered. Returns assigned ID or std::nullopt on error.
      */
-    std::string_view getSourceContent(size_t id) const;
+    std::optional<size_t> loadFile(const std::filesystem::path &filePath,
+                                   const std::optional<std::filesystem::path> &relativeTo = std::nullopt) override;
 
     /**
-     * @brief Returns the source name of the given source file id.
-     * @param id The source file ID.
-     * @returns The source name.
+     * Returns a zero-copy string view of the full line containing the given SourceReference.
      */
-    std::string_view getSourceName(size_t id) const;
+    std::string_view getRawLineContent(SourceReference *ref) const override;
+
+    /**
+     * Returns a zero-copy string view of the exact text span referenced by the given SourceReference.
+     */
+    std::string_view getReferenceContent(SourceReference *ref) const override;
+
+    /**
+     * Returns the full content string view for the source file with the given numeric ID.
+     */
+    std::string_view getSourceContent(size_t id) const override;
+
+    /**
+     * Returns the registered name or path for the source file with the given numeric ID.
+     */
+    std::string_view getSourceName(size_t id) const override;
 
   private:
-  private:
-    std::filesystem::path m_workingPath;
-    // full file path, file content divided in lines.
-    std::map<size_t, std::vector<LineSourceRange>> m_sourceLines;
-    std::map<size_t, std::string> m_sources;
+    /**
+     * Allocates an arena-backed SourceFileEntry for the given content/name, precomputes its line
+     * table, and returns the still-unregistered entry.
+     */
+    SourceFileEntry *createEntry(std::pmr::string content, std::pmr::string name);
 
-    // id, name
-    std::map<size_t, std::string> m_sourcesNames;
+    /**
+     * Assigns entry the next 1-based ID, registers it in the name map and source list, and returns
+     * that ID.
+     */
+    size_t registerEntry(SourceFileEntry *entry);
+
+    std::filesystem::path m_workingPath; // Base directory used to resolve relative source paths.
+    std::pmr::memory_resource *m_alloc;  // Arena that owns file entries and their buffer/line storage.
+    std::pmr::vector<std::filesystem::path> m_includePaths;          // Search directories for include resolution.
+    std::pmr::unordered_map<std::string_view, size_t> m_pathToIdMap; // Canonical path/name -> 1-based source ID.
+    std::pmr::vector<SourceFileEntry *> m_sourceFiles; // Indexed by (ID - 1); owns each loaded file entry.
 };
 
-#endif // EZPACKER_SOURCEMANAGER_H
+#endif // EZCORE_SOURCE_MANAGER_H

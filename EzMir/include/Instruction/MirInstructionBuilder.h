@@ -1,0 +1,238 @@
+#ifndef EZPACKER_MIR_INSTRUCTION_BUILDER_H
+#define EZPACKER_MIR_INSTRUCTION_BUILDER_H
+
+#include "EzMirCommon.h"
+#include "MirInstructionSet.h"
+#include "Builder/MirBuilder.h"
+#include "HelperClasses/IntrusiveLinkedList.h"
+#include <span>
+
+/**
+ * Mode specifying how newly constructed instructions are inserted into a basic block.
+ */
+enum class InsertionType : uint8_t
+{
+    InsertAfter,  // Insert after the cursor iterator position
+    InsertBefore, // Insert before the cursor iterator position
+    Append        // Append to the end of the block's instruction list
+};
+
+/**
+ * State describing the insertion cursor within a basic block.
+ */
+struct MirInstructionInsertionPoint
+{
+    /**
+     * Placement mode (Append, InsertBefore, InsertAfter).
+     */
+    InsertionType m_type;
+
+    /**
+     * Target basic block receiving constructed instructions.
+     */
+    class MirBlock *m_block;
+
+    /**
+     * List iterator cursor position for InsertBefore / InsertAfter modes.
+     */
+    IntrusiveLinkedList<class MirInstruction>::iterator m_iterator{};
+};
+
+/**
+ * High-level and target instruction builder.
+ * Constructs MirInstruction objects in the context memory arena, attaches operands,
+ * validates constraints, and splices instructions into basic blocks at configured insertion points.
+ *
+ * Error contract (builder layer): invalid arguments that indicate a programming error - a null
+ * instruction/operand or an out-of-range operand index - throw std::runtime_error, consistently with
+ * operator<<. Validated user input is diagnosed by the parser layer, never by this builder.
+ */
+class MirInstructionBuilder : public MirBuilder<class MirInstruction>
+{
+  public:
+    /**
+     * Constructs an instruction builder with an explicit insertion point cursor.
+     */
+    MirInstructionBuilder(class MirBuilderContext *ctx, MirInstructionInsertionPoint insertionPoint);
+
+    /**
+     * Constructs an instruction builder positioned at the specified block, insertion mode, and iterator.
+     */
+    MirInstructionBuilder(class MirBuilderContext *ctx,
+                          class MirBlock *block,
+                          InsertionType type,
+                          IntrusiveLinkedList<MirInstruction>::iterator it = {});
+
+    /**
+     * Constructs an instruction builder positioned relative to an existing instruction.
+     */
+    MirInstructionBuilder(class MirBuilderContext *ctx,
+                          class MirInstruction *inst,
+                          InsertionType type = InsertionType::InsertBefore);
+
+    /**
+     * Builds and inserts an instruction with opcode, source ref, and initializer list of operand pointers.
+     */
+    MirInstruction *build(MirInstructionOpCode opcode,
+                          class SourceReference *ref,
+                          const std::initializer_list<class MirOperand *> &operands = {});
+
+    /**
+     * Builds and inserts an instruction with opcode, source ref, and std::vector of operand pointers.
+     */
+    MirInstruction *build(MirInstructionOpCode opcode,
+                          class SourceReference *ref,
+                          const std::vector<class MirOperand *> &operands = {});
+
+    /**
+     * Builds and inserts an instruction with opcode, source ref, and polymorphic vector of operand pointers.
+     */
+    MirInstruction *build(MirInstructionOpCode opcode,
+                          class SourceReference *ref,
+                          const std::pmr::vector<class MirOperand *> &operands);
+
+    /**
+     * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
+     */
+    MirInstruction *buildTarget(const class MirTargetInstructionDesc *targetDesc,
+                                class SourceReference *srcRef,
+                                std::initializer_list<class MirOperand *> operands);
+
+    /**
+     * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
+     */
+    MirInstruction *buildTarget(const class MirTargetInstructionDesc *targetDesc,
+                                class SourceReference *srcRef,
+                                const std::vector<class MirOperand *> &operands);
+
+    /**
+     * Builds and inserts a target-specific machine instruction (TARGET_INST) bound to a MirTargetInstructionDesc.
+     */
+    MirInstruction *buildTarget(const class MirTargetInstructionDesc *targetDesc,
+                                class SourceReference *srcRef,
+                                const std::pmr::vector<class MirOperand *> &operands);
+
+    /**
+     * Appends an operand to the instruction currently being constructed.
+     */
+    MirInstructionBuilder &operator<<(class MirOperand *operand);
+
+// Define the macro to generate a method for each instruction opcode (e.g. ADD, SUB, MOV, BR, CALL, RET).
+#define INSTRUCTION(NAME, tier, category, ops, flags)                                                                  \
+    template <typename... OperandTypes>                                                                                \
+    MirInstruction *NAME(class SourceReference *sourceRef, OperandTypes &&...operands)                                 \
+    {                                                                                                                  \
+        std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
+        MirInstruction *instr = build(MirInstructionOpCode::NAME, sourceRef, operandList);                             \
+                                                                                                                       \
+        return instr;                                                                                                  \
+    }                                                                                                                  \
+    template <typename... OperandTypes> MirInstruction *NAME(OperandTypes &&...operands)                               \
+    {                                                                                                                  \
+        std::initializer_list<MirOperand *> operandList = { std::forward<OperandTypes>(operands)... };                 \
+        MirInstruction *instr = build(MirInstructionOpCode::NAME, nullptr, operandList);                               \
+                                                                                                                       \
+        return instr;                                                                                                  \
+    }
+
+#include "Instruction/MirInstructionSetDefs.h"
+#undef INSTRUCTION
+    /**
+     * Adds an operand to END the given instruction operand list.
+     */
+    MirInstructionBuilder &addOperand(MirInstruction *instr, MirOperand *operand);
+
+    /**
+     * Adds an operand to BEGIN the given instruction operand list.
+     */
+    MirInstructionBuilder &addOperandFront(MirInstruction *instr, MirOperand *operand);
+
+    /**
+     * Clears the operands of a given instruction.
+     */
+    MirInstructionBuilder &clearOperands(MirInstruction *instr);
+
+    /**
+     * Clears the operand at the given position. Throws std::runtime_error when instr is null or pos
+     * is out of range.
+     */
+    MirInstructionBuilder &clearOperand(MirInstruction *instr, size_t pos);
+
+    /**
+     * Erases an instruction from its owning list, block and function. Throws std::runtime_error when
+     * instr is null.
+     */
+    MirInstructionBuilder &erase(MirInstruction *instr);
+
+    /**
+     * Swap operand at the given index with the one provided. Throws std::runtime_error when instr or
+     * newOperand is null, or when index is out of range.
+     */
+    MirInstructionBuilder &swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index);
+
+    /**
+     * Updates the insertion mode (Append, InsertBefore, InsertAfter) at the current cursor.
+     */
+    void changeInsertionType(InsertionType type);
+
+    /**
+     * Sets the complete insertion point cursor structure.
+     */
+    void setInsertionPoint(MirInstructionInsertionPoint insertionPoint);
+
+    /**
+     * Sets the target block, insertion mode, and iterator cursor position.
+     */
+    void setInsertionPoint(class MirBlock *block,
+                           InsertionType type,
+                           IntrusiveLinkedList<class MirInstruction>::iterator it = {});
+
+  private:
+    /**
+     * Shared body of every build()/buildTarget() overload: allocates the instruction, optionally
+     * attaches a target descriptor, appends each operand and finalizes the insertion.
+     */
+    MirInstruction *buildImpl(MirInstructionOpCode opcode,
+                              class SourceReference *ref,
+                              std::span<class MirOperand *const> operands,
+                              const class MirTargetInstructionDesc *targetDesc);
+
+    /**
+     * Returns the register info of the instruction either by getting the instr owners or using the owner of the linked
+     * block.
+     */
+    class MirFunctionRegisterInfo *getRegInfo(MirInstruction *instr) const;
+
+    /**
+     * Allocates an unlinked MirInstruction instance in the arena allocator.
+     */
+    MirInstruction *createInstruction(MirInstructionOpCode opcode, SourceReference *ref);
+
+    /**
+     * Logs diagnostic trace and splices the instruction into the basic block intrusive list.
+     */
+    void finalizeInstruction(MirInstruction *instr, SourceReference *ref);
+
+    /**
+     * Register the operand in the register information of the owning func.
+     */
+    void registerOperand(MirInstruction *instr, MirOperand *op, size_t index);
+
+    /**
+     * Unregisters the operand in the register information of the owning func.
+     */
+    void unregisterOperand(MirInstruction *instr, MirOperand *op, size_t index);
+
+  private:
+    /**
+     * Context providing memory resources and diagnostic logging.
+     */
+    class MirBuilderContext *m_ctx;
+
+    /**
+     * Current cursor position and insertion strategy.
+     */
+    MirInstructionInsertionPoint m_insertionPoint;
+};
+
+#endif // EZPACKER_MIR_INSTRUCTION_BUILDER_H

@@ -1,0 +1,85 @@
+calling_convention SysV_AMD64 {
+    stack {
+        align: 16,
+        growth: down,
+        cleanup: caller,
+        shadow_space: 0,
+        red_zone: 128,
+        sp: rsp,
+        fp: rbp
+    }
+
+    preserve callee: [rbx, rsp, rbp, r12, r13, r14, r15]
+    preserve caller: [rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11, xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7]
+
+    classify {
+        types [i8, i16, i32, i64, ptr] => integer
+        types [f32, f64] => sse
+        aggregate {
+            when non_trivial || unaligned || size > 64 => memory,
+            slice: 8 bytes,
+            precedence: [memory, integer, sse],
+            policy: all_or_nothing
+        }
+    }
+
+    arguments {
+        pass integer => seq([rdi, rsi, rdx, rcx, r8, r9]), fallback: stack(8)
+        pass sse => seq([xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7]), fallback: stack(8)
+        pass memory => stack(8)
+    }
+
+    returns {
+        sret {
+            ptr: rdi,
+            consumes_slot: true,
+            returns: rax
+        }
+        pass integer => seq([rax, rdx])
+        pass sse => seq([xmm0, xmm1])
+    }
+
+    varargs {
+        vector_count_reg: al,
+        duplicate_floats_to_gpr: false,
+        stack_align: 8
+    }
+}
+
+calling_convention Win64 {
+    stack {
+        align: 16,
+        growth: down,
+        cleanup: caller,
+        shadow_space: 32,
+        sp: rsp,
+        fp: rbp
+    }
+
+    preserve callee: [rbx, rbp, rdi, rsi, r12, r13, r14, r15]
+    preserve caller: [rax, rcx, rdx, r8, r9, r10, r11, xmm0, xmm1, xmm2, xmm3, xmm4, xmm5]
+
+    classify {
+        types [i8, i16, i32, i64, ptr] => integer
+        types [f32, f64] => sse
+    }
+
+    arguments {
+        slots [
+            { integer: rcx, sse: xmm0 },
+            { integer: rdx, sse: xmm1 },
+            { integer: r8, sse: xmm2 },
+            { integer: r9, sse: xmm3 }
+        ], fallback: stack(8)
+    }
+
+    returns {
+        sret {
+            ptr: rcx,
+            consumes_slot: true,
+            returns: rax
+        }
+        pass integer => seq([rax])
+        pass sse => seq([xmm0])
+    }
+}

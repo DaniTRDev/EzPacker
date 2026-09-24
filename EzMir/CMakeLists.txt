@@ -1,0 +1,92 @@
+set(EZMIR_FILES_LIST
+        "include/EzMirCommon.h"
+        "include/Block/MirBlock.h"
+        "include/Block/MirBlockBuilder.h"
+        "include/Builder/MirBuilder.h"
+        "include/Builder/MirBuilderContext.h"
+        "include/Instruction/MirInstruction.h"
+        "include/Instruction/MirInstructionBuilder.h"
+        "include/Instruction/MirInstructionMetadata.h"
+        "include/Instruction/MirInstructionSet.h"
+        "include/Instruction/MirTargetInstructionDesc.h"
+        "include/MirPasses/IMirAnalysisPass.h"
+        "include/MirPasses/IMirTransformPass.h"
+        "include/MirPasses/MirPass.h"
+        "include/MirPasses/MirPassManager.h"
+        "include/Function/ArgumentLocationDesc.h"
+        "include/Function/CallingConvDesc.h"
+        "include/Function/CallLoweringState.h"
+        "include/Function/MirFunction.h"
+        "include/Function/MirFunctionBuilder.h"
+        "include/Function/MirFunctionRegisterInfo.h"
+        "include/Function/MirFunctionStackFrame.h"
+        "include/GlobalVar/MirGlobalVar.h"
+        "include/GlobalVar/MirGlobalVarBuilder.h"
+        "include/MirPasses/Passes/CodeFlowAnalysisPass.h"
+        "include/MirPasses/Passes/LivenessAnalysisPass.h"
+        "include/MirPasses/Passes/NonSsaToSsaPass.h"
+        "include/Operand/MirOperand.h"
+        "include/Operand/MirOperandBuilder.h"
+        "include/Operand/MirOperands.h"
+        "include/Operand/MirRegisterBank.h"
+        "include/Operand/MirRegisterClass.h"
+        "include/Operand/MirRegisterReference.h"
+        "include/Parser/MirAstNodes.h"
+        "include/Parser/MirLexer.h"
+        "include/Parser/MirParserContext.h"
+        "include/Parser/MirParser.h"
+        "include/Printer/MirPrinter.h"
+        "include/Type/MirType.h"
+        
+        "src/Block/MirBlock.cpp"
+        "src/Block/MirBlockBuilder.cpp"
+        "src/Builder/MirBuilderContext.cpp"
+        "src/Instruction/MirInstructionBuilder.cpp"
+        "src/Instruction/MirInstruction.cpp"
+        "src/Instruction/MirTargetInstructionDesc.cpp"
+        "src/Function/ArgumentLocationDesc.cpp"
+        "src/Function/CallLoweringState.cpp"
+        "src/Function/MirFunction.cpp"
+        "src/Function/MirFunctionBuilder.cpp"
+        "src/Function/MirFunctionRegisterInfo.cpp"
+        "src/Function/MirFunctionStackFrame.cpp"
+        "src/GlobalVar/MirGlobalVar.cpp"
+        "src/GlobalVar/MirGlobalVarBuilder.cpp"
+        "src/MirPasses/MirPass.cpp"
+        "src/MirPasses/MirPassManager.cpp"
+        "src/MirPasses/Passes/CodeFlowAnalysisPass.cpp"
+        "src/MirPasses/Passes/LivenessAnalysisPass.cpp"
+        "src/MirPasses/Passes/NonSsaToSsaPass.cpp"
+        "src/Operand/MirOperand.cpp"
+        "src/Operand/MirOperandBuilder.cpp"
+        "src/Operand/MirOperands.cpp"
+        "src/Operand/MirRegisterBank.cpp"
+        "src/Operand/MirRegisterClass.cpp"
+        "src/Operand/MirRegisterReference.cpp"
+        "src/Parser/MirLexer.cpp"
+        "src/Parser/MirParserContext.cpp"
+        "src/Parser/MirParser.cpp"
+        "src/Printer/MirPrinter.cpp"
+        "src/Type/MirType.cpp"
+)
+
+EzCMK_ConfigureLib(NAME "EzMir"
+        FILE_LIST ${EZMIR_FILES_LIST}
+        PRECOMPILED_HEADER "include/EzMirCommon.h"
+        LINKED_LIBRARIES "EzCore;foonathan::lexy"
+        INCLUDED_DIRS "include")
+
+include(CMake/EzDslGenTypeTable.cmake)
+include(CMake/EzDslGenMirInstructions.cmake)
+
+EzDslGenerateTypeTable(
+    TARGET EzMir
+    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/types.tyf"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/Type"
+)
+
+EzDslGenMirInstructions(
+    TARGET EzMir
+    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/instructions.irdf"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/Instruction"
+)

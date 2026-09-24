@@ -1,0 +1,22 @@
+// EzPacker Custom MIR Module: math_ops.mir
+// Demonstrates multi-function compilation, 64-bit integer arithmetic, bitwise logic, and ABI lowering.
+
+fn @vector_math(i64 %a, i64 %b) -> i64 {
+entry:
+    %c100 = MOV i64 100;
+    %sum = ADD i64 %a, %c100;
+    %c32 = MOV i64 32;
+    %diff = SUB i64 %b, %c32;
+    %prod = IMUL i64 %sum, %diff;
+    %mask = AND i64 %a, %b;
+    %result = XOR i64 %prod, %mask;
+    RET i64 %result;
+}
+
+fn @main() -> i64 {
+entry:
+    %val = MOV i64 42;
+    %bias = MOV i64 10;
+    %out = ADD i64 %val, %bias;
+    RET i64 %out;
+}

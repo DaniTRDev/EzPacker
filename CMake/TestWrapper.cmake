@@ -12,6 +12,11 @@ function(EzPacker_AddTest NAME TESTED_TARGET LIBRARIES FILES)
             TEST_FILES "${FIXED_FILE_LIST}"
             TEST_LIBRARIES "${LIBRARIES};gtest")
 
+    if (WIN32)
+        get_filename_component(COMPILER_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        set_tests_properties(${NAME} PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${COMPILER_DIR}")
+    endif ()
+
     set(EZPACKER_TEST_FILES ${EZPACKER_TEST_FILES} ${FIXED_FILE_LIST} CACHE STRING "Testing files" FORCE)
     set(EZPACKER_TEST_LIBRARIES ${EZPACKER_TEST_LIBRARIES} "${TESTED_TARGET};${LIBRARIES};" CACHE STRING "Testing libraries used by tests" FORCE)
 endfunction()

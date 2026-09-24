@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "customLaunchSetupCommands": [
+        {
+          "description": "Disable debuginfod",
+          "text": "set debuginfod enabled off",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Specify exec file",
+          "text": "-file-exec-and-symbols /home/alex/shared/stack/pidm",
+          "ignoreFailures": true
+        }
+      ],
+      "setupCommands": [
+        {
+          "description": "Disable debuginfod to prevent hanging on startup",
+          "text": "set debuginfod enabled off",
+          "ignoreFailures": true
+        }
+      ],
+      "name": "CMake: Debug Binary",
+      "type": "lldb",
+      "request": "launch",
+      // ${workspaceFolderBasename} matches the root directory name, just like in the Zed config
+      "program": "${workspaceFolder}/build/${workspaceFolderBasename}",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "CMake: Compile Project"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+    "cmake.debugConfig": {
+        "setupCommands": [
+            {
+                "description": "Disable debuginfod to prevent hanging on startup",
+                "text": "set debuginfod enabled off",
+                "ignoreFailures": true
+            }
+        ]
+    }
+}

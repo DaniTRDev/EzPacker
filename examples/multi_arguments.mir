@@ -1,0 +1,31 @@
+; Module: multi_arguments.mir
+; Demonstrates multi-argument parameter management across x86-64 calling conventions.
+; SysV AMD64 (Linux) uses: RDI, RSI, RDX, RCX, R8, R9.
+; Win64 (Windows) uses: RCX, RDX, R8, R9 with a 32-byte shadow store area on the stack.
+
+; 4-Argument 64-bit function: calculates a linear combination (a + b + c + d)
+fn @linear_combination_4arg(i64 %a, i64 %b, i64 %c, i64 %d) -> i64 {
+entry:
+    %ab = ADD i64 %a, %b;
+    %abc = ADD i64 %ab, %c;
+    %abcd = ADD i64 %abc, %d;
+    RET i64 %abcd;
+}
+
+; 4-Argument 32-bit vector operation: computes 4D dot product (x1*y1 + x2*y2)
+fn @dot_product_4d_32bit(i32 %x1, i32 %y1, i32 %x2, i32 %y2) -> i32 {
+entry:
+    %p1 = IMUL i32 %x1, %y1;
+    %p2 = IMUL i32 %x2, %y2;
+    %dot = ADD i32 %p1, %p2;
+    RET i32 %dot;
+}
+
+; 3-Argument mixed arithmetic and bitwise function
+fn @blend_channels(i64 %ch0, i64 %ch1, i64 %mask) -> i64 {
+entry:
+    %a = AND i64 %ch0, %mask;
+    %b = AND i64 %ch1, %mask;
+    %blended = OR i64 %a, %b;
+    RET i64 %blended;
+}
