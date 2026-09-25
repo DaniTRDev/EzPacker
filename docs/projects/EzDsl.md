@@ -1,298 +1,304 @@
 # EzDsl Subproject Documentation
 
-[EzPacker Documentation Index](../index.md) > **EzDsl**
+[EzPacker Documentation Index](../index.md) > [Subprojects](EzDsl.md) > **EzDsl** | [Doxygen API Reference](../doxygen/index.html)
 
 ---
 
 ## 1. Overview & Architectural Role
 
-`EzDsl` is the domain-specific meta-compiler toolkit powering EzPacker. Instead of manually writing thousands of error-prone lines of C++ boilerplate to describe CPU register sets, instruction encodings, calling conventions, legalization matrices, and instruction selection patterns, developers express these declaratively in high-level DSL files.
+`EzDsl` is EzPacker's domain-specific language compiler and code generator toolchain. Writing compiler backend components (instruction selectors, register class hierarchies, ABI calling conventions, legalization decision tables, and binary instruction encoders) by hand in C++ is error-prone, verbose, and difficult to maintain.
 
-During compilation of EzPacker (via CMake custom commands), `ezdsl_cli` parses these DSL files, validates their semantics, and synthesizes optimized, type-safe C++ headers and static lookup tables.
+EzDsl solves this problem by allowing backend architects to express target architectures declaratively in high-level DSL specification files. The `ezdsl-cli` compiler validates these descriptions through semantic analysis and generates optimized, type-safe C++20 code used directly by `EzMir`, `EzTriple`, and `EzTargets`.
 
 ```
-+-----------------------------------------------------------------------------------+
-|                                  EzDsl Pipeline                                   |
-|                                                                                   |
-|  DSL Source Files                                                                 |
-|   - types.tyf             (Types)                                                 |
-|   - instructions.irdf     (Generic IR Opcodes)                                    |
-|   - x86_64.tdesc          (Target Descriptors & Register Banks)                   |
-|   - x86_64_calling_conv   (Calling Conventions)                                   |
-|   - x86_64_legalize.lad   (Legalization Actions)                                  |
-|   - x86_64_rules.lrd      (Legalization Rewrite Rules)                            |
-|   - x86_64_instructions   (Target Instruction Definitions & Encodings)            |
-|   - x86_64_patterns.isf   (Instruction Selection Patterns)                        |
-|                            |                                                      |
-|                            v                                                      |
-|   +--------------------------------------------------+                            |
-|   |                  EzDsl/Lexer                     |                            |
-|   |   - Uses foonathan/lexy parser combinators       |                            |
-|   |   - Builds typed AST nodes (CommonAstNodes.h)    |                            |
-|   +--------------------------------------------------+                            |
-|                            |                                                      |
-|                            v                                                      |
-|   +--------------------------------------------------+                            |
-|   |                  EzDsl/Sema                      |                            |
-|   |   - Scopes, Symbol Tables, and Resolvers         |                            |
-|   |   - Semantic Passes (TypePass, TargetInstPass..) |                            |
-|   |   - Target Encoding Dialects                     |                            |
-|   +--------------------------------------------------+                            |
-|                            |                                                      |
-|                            v                                                      |
-|   +--------------------------------------------------+                            |
-|   |             EzDsl/CodeGenerators                 |                            |
-|   |   - Synthesizes C++ Source Code & Tables         |                            |
-|   |   - Dense 2D matrices, maximal munch matchers    |                            |
-|   +--------------------------------------------------+                            |
-|                            |                                                      |
-|                            v                                                      |
-|  Generated C++ Headers & Source Files (included by EzMir, EzTriple, EzTargets)    |
-+-----------------------------------------------------------------------------------+
+ +-------------------------------------------------------------------------------+
+ |                            Declarative DSL Files                              |
+ | .tyf (Types)   .irdf (MIR Ops)    .rdf (Registers)   .tidf (Target Insts)     |
+ | .edf (Encoding).ccdf (CallingConv).lrd (Legal Rules) .isf (Inst Selection)    |
+ +-------------------------------------------------------------------------------+
+                                        |
+                                        v
+ +-------------------------------------------------------------------------------+
+ |                          EzDsl Compiler Toolchain                             |
+ |                                                                               |
+ | 1. Lexer & Parser     --> Specialized AST nodes for each language dialect     |
+ | 2. Semantic Analysis  --> Symbol tables, type validation, scope hierarchies   |
+ | 3. Code Generators    --> Specialized C++ emitters producing C++20 code       |
+ +-------------------------------------------------------------------------------+
+                                        |
+                                        v
+ +-------------------------------------------------------------------------------+
+ |                            Generated C++ Artifacts                            |
+ | - MirTypeTable.generated.h / .cpp      - TargetDesc.generated.h / .cpp        |
+ | - LegalizerActionTable.generated.cpp   - InstructionSelector.generated.cpp    |
+ | - TargetEncodingTable.generated.cpp    - CallingConv.generated.cpp            |
+ +-------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Subproject Structure
+## 2. EzDSL Dialects & File Extensions
 
-EzDsl is divided into four cleanly decoupled submodules:
+EzDSL comprises multiple specialized dialects, each addressing a distinct compiler subsystem:
 
-| Submodule | Directory | Responsibility |
-| :--- | :--- | :--- |
-| **`EzDsl::Lexer`** | `EzDsl/Lexer/` | Lexical analysis and parsing using `lexy`. Emits ASTs for all 8 DSL dialects. |
-| **`EzDsl::Sema`** | `EzDsl/Sema/` | Semantic analysis, symbol resolution, scoping, validation passes, and target encoding dialects. |
-| **`EzDsl::CodeGenerators`** | `EzDsl/CodeGenerators/` | Backend emitters synthesizing C++ headers, static lookup tables, and decision trees. |
-| **`EzDsl::Cli`** | `EzDsl/Cli/` | Standalone CLI executable `ezdsl_cli` used during build time and development. |
-
----
-
-## 3. The 8 DSL Languages
-
-### 3.1 Type Definition Language (`.tyf`)
-Defines the primitive and vector types available across the compiler.
-- **File**: `EzMir/types.tyf`
-- **Example**:
-  ```tyf
-  integer i32(32);
-  integer i64(64);
-  float f32(32);
-  float f64(64);
-  vector v4f32(128, 128); // 128-bit vector with 128-bit alignment
-  vector v8f32(256, 256); // 256-bit AVX vector
-  ```
-- **Generated Code**: Type enumeration, size tables, and runtime type descriptors in `MirTypeTable.h`.
-
-### 3.2 IR Instruction Definition Language (`.irdf`)
-Defines generic machine-independent MIR opcodes, their operand arities, directions, categories, and execution tiers.
-- **File**: `EzMir/instructions.irdf`
-- **Example**:
-  ```irdf
-  ir_inst ADD(Register:dst OUT, AnyValue:lhs IN, AnyValue:rhs IN) {
-      CATEGORY(Arithmetic);
-      TIER(HighLevel);
-      FLAGS(IsCommutative);
-  }
-  ```
-- **Generated Code**: `MirInstructionOpCode` enum and metadata lookup tables.
-
-### 3.3 Target Descriptor Language (`.tdesc`)
-Describes a hardware architecture: pointer size, stack slot size, object formats, register banks, register classes, sub-register hierarchies, hardware encodings, and CPU extensions.
-- **File**: `EzTargets/X86_64/targets/x86_64/x86_64.tdesc`
-- **Example**:
-  ```tdesc
-  target X86_64 {
-      pointer_size: 8;
-      stack_slot:   8;
-      instruction_pointer: rip;
-      object_formats: [ELF, COFF];
-      default_calling_conv: SysV_AMD64;
-
-      register_bank GPR {
-          classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
-          sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
-          registers {
-              rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
-              rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
-          }
-      }
-
-      extensions {
-          sse  { default: true; };
-          sse2 { implies: [sse]; };
-          avx  { implies: [sse4_2]; };
-      }
-  }
-  ```
-- **Generated Code**: Target descriptor initialization, register tables, sub-register masks, and extension graphs.
-
-### 3.4 Calling Convention Language (`.ezcc`, `.ccd`)
-Specifies stack alignment, growth direction, shadow space, red zone, callee/caller saved registers, argument classification, and return registers.
-- **File**: `EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc`
-- **Example**:
-  ```ezcc
-  calling_convention SysV_AMD64 {
-      stack {
-          align: 16,
-          growth: down,
-          cleanup: caller,
-          shadow_space: 0,
-          red_zone: 128,
-          sp: rsp,
-          fp: rbp
-      }
-      preserve callee: [rbx, rsp, rbp, r12, r13, r14, r15]
-      preserve caller: [rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11]
-
-      classify {
-          types [i8, i16, i32, i64, ptr] => integer
-          types [f32, f64] => sse
-      }
-
-      arguments {
-          pass integer => seq([rdi, rsi, rdx, rcx, r8, r9]), fallback: stack(8)
-          pass sse => seq([xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7]), fallback: stack(8)
-      }
-
-      returns {
-          pass integer => seq([rax, rdx])
-          pass sse => seq([xmm0, xmm1])
-      }
-  }
-  ```
-- **Generated Code**: Calling convention tables consumed by `MirAbiLowerer`.
-
-### 3.5 Legalization Action Language (`.lad`)
-Defines the primary legality matrix and action responses for generic opcodes on a given target.
-- **File**: `EzTargets/X86_64/targets/x86_64/x86_64_legalize.lad`
-- **Example**:
-  ```lad
-  target AMD64;
-  type_set GPR_SCALARS = (i8, i16, i32, i64);
-
-  action MOV {
-      LEGAL(GPR_SCALARS, ptr, f32, f64);
-      WIDENS(i1) >> i32;
-  };
-
-  action SDIV {
-      LEGAL(i32, i64);
-      CUSTOM(i8, i16);
-      LIBCALL(i128);
-  };
-  ```
-- **Generated Code**: Dense 2D primary legality matrix (`LegalizerInfo`).
-
-### 3.6 Legalization Rule Language (`.lrd`)
-Expresses declarative rewrite rules for strength reduction and algebraic simplification.
-- **File**: `EzTargets/X86_64/targets/x86_64/x86_64_rules.lrd`
-- **Example**:
-  ```lrd
-  rule SDivPow2_32 {
-      match {
-          SDIV i32:$dst, i32:$lhs, imm(i32):$c;
-      };
-      when {
-          isPowTwo($c);
-          isPositiveConst($c);
-      };
-      emit {
-          SAR i32:$dst, i32:$lhs, log2Pow2($c);
-      };
-  };
-  ```
-- **Generated Code**: Pattern rewrite dispatchers invoked by the legalizer.
-
-### 3.7 Target Instruction Definition Language (`.idf`)
-Declares hardware instructions, mnemonics, operands, flags, and binary encoding rules.
-- **File**: `EzTargets/X86_64/targets/x86_64/x86_64_instructions.idf`
-- **Example**:
-  ```idf
-  target_inst ADD64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
-      MNEMONIC("addq");
-      FLAGS(IsCommutative);
-      ENCODING {
-          form: rr;
-          opcode: [0x01];
-          rex_w: true;
-          operands { src2 => reg; dst => rm_reg; };
-          coalesce: src1;
-          size: dst;
-      };
-  };
-  ```
-- **Generated Code**: Target instruction metadata array and encoding lookup tables.
-
-### 3.8 Instruction Selection Pattern Language (`.isf`)
-Defines tree-matching rewrite patterns and addressing modes for Bottom-Up Maximal Munch.
-- **File**: `EzTargets/X86_64/targets/x86_64/x86_64_patterns.isf`
-- **Example**:
-  ```isf
-  addrmode AddrModeRegImm(GPR64:base, simm32:disp = 0) {
-      variant BaseDisp { match { ADD ptr:$base, imm(i32):$disp; }; };
-      variant BaseOnly { match { ptr:$base; }; };
-  };
-
-  pattern Select_ADD64rm [cost = 2] {
-      match {
-          ADD i64:$dst, i64:$src1, (LOAD i64:$tmp, AddrModeRegImm($base, $disp));
-      };
-      when {
-          hasOneUse($tmp);
-          noInterveningStore($tmp);
-      };
-      select {
-          ADD64rm GPR64:$dst, GPR64:$src1, [$base, $disp];
-      };
-  };
-  ```
-- **Generated Code**: Instruction selector decision tree matching expressions to target instructions.
+| Extension | Language Dialect | Parser Class | Emitted Artifact |
+|---|---|---|---|
+| `.tyf` | `TypeDef` | `TypeDefLang` | Interned type singletons and `MirTypeTable` extensions |
+| `.irdf` | `IrInstDef` | `IrInstructionDefLang` | Generic MIR opcodes, operand arities, and flags |
+| `.rdf` | `RegisterDef` | `RegisterDefLang` | Hardware register banks, register classes, and aliases |
+| `.tidf` / `.idf` | `TargetInstDef` | `TargetInstDefLang` | Machine instructions, operand constraints, execution latency |
+| `.edf` | `EncodingDef` | `EncodingDefLang` | Binary encoding templates (ModR/M, SIB, REX, opcode maps) |
+| `.ccdf` / `.ezcc` | `CallingConv` | `CallingConvDefLang` | Argument/return register assignments and shadow space |
+| `.tddf` / `.tdesc` | `TargetDesc` | `TargetDescDefLang` | Target descriptor wiring, pointer widths, and alignments |
+| `.lad` | `LegalizeAction` | `LegalizeActionDefLang` | 3-tier legalization action table matrix |
+| `.lrd` | `LegalizeRule` | `LegalizeRuleDefLang` | Pattern-based algebraic rewrite and legalization rules |
+| `.isdf` / `.isf` | `InstructionSelect` | `InstructionSelectDefLang` | Bottom-Up Maximal Munch pattern matching trees |
 
 ---
 
-## 4. Code Generators
+## 3. The 3-Stage Toolchain Architecture
 
-Located in `EzDsl/CodeGenerators/`, each generator converts semantic symbols and ASTs into high-performance C++ code:
-- **`CppMirTypeTableGenerator`**: Synthesizes the runtime type table.
-- **`CppMirInstructionGenerator`**: Synthesizes generic instruction enums and flags.
-- **`CppRegisterInfoGenerator`**: Synthesizes register tables, sub-register hierarchies, and register masks.
-- **`CppCallingConvGenerator`**: Synthesizes calling convention descriptor tables.
-- **`CppLegalizerGenerator`**: Synthesizes the dense 2D primary matrix for $O(1)$ legality lookup.
-- **`CppLegalizeRuleGenerator`**: Synthesizes rule matcher callbacks for strength reductions.
-- **`CppTargetInstructionGenerator`**: Synthesizes target instruction metadata arrays.
-- **`CppEncodingTableGenerator`**: Synthesizes binary encoding lookup tables.
-- **`CppInstructionSelectorGenerator`**: Synthesizes the Bottom-Up Maximal Munch matcher.
-- **`CppTargetDescGenerator`**: Synthesizes the target descriptor factory and setup logic.
+### 3.1 Lexer & Recursive Descent Parser (`EzDsl/Lexer/`)
+- Each dialect has a specialized parser class derived from or utilizing `ParseContext`:
+  - `TypeDefLang`, `IrInstructionDefLang`, `RegisterDefLang`, `TargetInstDefLang`, `EncodingDefLang`, `CallingConvDefLang`, `LegalizeActionDefLang`, `LegalizeRuleDefLang`, `InstructionSelectDefLang`, `TargetDescDefLang`.
+- Produces typed AST nodes declared in `EzDsl/Lexer/include/Ast/` (e.g., `TypeDefAst`, `RegisterDefAst`, `TargetInstDefAst`, `CallingConvDefAst`, `LegalizeRuleDefAst`).
+
+### 3.2 Semantic Analysis (Sema) (`EzDsl/Sema/`)
+- Driven by `PassDriver` (`SemaPasses/PassDriver.h`).
+- Executes dialect passes in dependency order:
+  1. `TypePass`: Validates type names, vector layouts, and scalar widths.
+  2. `IrInstructionPass`: Validates opcode names, operand types, and commutative flags.
+  3. `CallingConvPass`: Validates parameter registers, return registers, and shadow space sizes.
+  4. `TargetInstPass`: Verifies operand count matching and register class constraints.
+  5. `LegalizeActionPass` & `LegalizeRulePass`: Checks predicate function signatures, transform helper references, and type compatibility.
+  6. `InstructionSelectPass`: Validates pattern DAGs, ensuring every input operand maps to an instruction operand or bound variable.
+- Maintains hierarchical symbol tables (`SymbolTable.h`, `Scope.h`).
+
+### 3.3 Code Generators (`EzDsl/CodeGenerators/`)
+Classes derived from `CodeGenerator` generate clean, formatted C++20 code:
+
+| Generator Class | Header Location | Description |
+|---|---|---|
+| `CppMirTypeTableGenerator` | `CodeGenerators/CppMirTypeTableGenerator.h` | Emits type table registration and query routines. |
+| `CppMirInstructionGenerator` | `CodeGenerators/CppMirInstructionGenerator.h` | Emits opcode enum constants and instruction descriptor tables. |
+| `CppLegalizerGenerator` | `CodeGenerators/CppLegalizerGenerator.h` | Emits the primary legality matrix and signature matching tables. |
+| `CppLegalizeRuleGenerator` | `CodeGenerators/CppLegalizeRuleGenerator.h` | Emits C++ rule execution functions and pattern dispatchers. |
+| `CppTargetInstructionGenerator` | `CodeGenerators/CppTargetInstructionGenerator.h` | Emits machine instruction descriptor structs. |
+| `CppEncodingTableGenerator` | `CodeGenerators/CppEncodingTableGenerator.h` | Emits opcode tables, ModR/M layouts, and byte serializers. |
+| `CppInstructionSelectorGenerator` | `CodeGenerators/CppInstructionSelectorGenerator.h` | Emits tree-matcher decision trees for Bottom-Up Maximal Munch. |
+| `CppCallingConvGenerator` | `CodeGenerators/CppCallingConvGenerator.h` | Emits calling convention descriptor structures. |
+| `CppRegisterInfoGenerator` | `CodeGenerators/CppRegisterInfoGenerator.h` | Emits register classes, physical IDs, and bitmasks. |
+| `CppTargetDescGenerator` | `CodeGenerators/CppTargetDescGenerator.h` | Emits the root target descriptor class wiring all subsystems. |
 
 ---
 
-## 5. CLI Tool: `ezdsl_cli`
+## 4. Dialect Syntax Examples
 
-The `ezdsl_cli` executable provides command-line inspection and manual code generation:
+### 4.1 Type Definitions (`types.tyf`)
+```dsl
+types {
+    scalar i1   : bits(1);
+    scalar i8   : bits(8);
+    scalar i16  : bits(16);
+    scalar i32  : bits(32);
+    scalar i64  : bits(64);
+    scalar i128 : bits(128);
 
-### Command-Line Arguments
+    float f32 : bits(32);
+    float f64 : bits(64);
+
+    pointer ptr : bits(64);
+
+    vector v4f32 : element(f32), count(4);
+    vector v2f64 : element(f64), count(2);
+}
+```
+
+### 4.2 Register Definitions (`registers.rdf`)
+```dsl
+registers x86_64 {
+    bank GPR {
+        reg rax : id(0), dwarf(0);
+        reg rcx : id(1), dwarf(2);
+        reg rdx : id(2), dwarf(1);
+        reg rbx : id(3), dwarf(3);
+        reg rsp : id(4), dwarf(7);
+        reg rbp : id(5), dwarf(6);
+        reg rsi : id(6), dwarf(4);
+        reg rdi : id(7), dwarf(5);
+        reg r8  : id(8), dwarf(8);
+        reg r9  : id(9), dwarf(9);
+        reg r10 : id(10), dwarf(10);
+        reg r11 : id(11), dwarf(11);
+        reg r12 : id(12), dwarf(12);
+        reg r13 : id(13), dwarf(13);
+        reg r14 : id(14), dwarf(14);
+        reg r15 : id(15), dwarf(15);
+    }
+
+    class GR64 : bank(GPR), type(i64) {
+        members = [rax, rcx, rdx, rbx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15];
+        spill_size = 8;
+        spill_alignment = 8;
+    }
+}
+```
+
+### 4.3 Calling Convention (`sysv.ccdf`)
+```dsl
+calling_convention SysV_AMD64 {
+    return_regs {
+        i32: [rax];
+        i64: [rax, rdx];
+        f32: [xmm0];
+        f64: [xmm0, xmm1];
+    }
+
+    param_regs {
+        integer: [rdi, rsi, rdx, rcx, r8, r9];
+        float:   [xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7];
+    }
+
+    callee_saved: [rbx, rsp, rbp, r12, r13, r14, r15];
+    shadow_space: 0;
+}
+```
+
+### 4.4 Legalization Rules (`rules.lrd`)
+```dsl
+legalize_rules x86_64 {
+    // Strength reduction: Multiply by positive power-of-two -> Arithmetic Left Shift
+    rule MulToShl {
+        match: (IMUL ?dst:i64, ?lhs:i64, ?imm:i64);
+        when:  isPowTwo(?imm);
+        emit:  (SHL ?dst, ?lhs, log2Pow2(?imm));
+    }
+
+    // Convert equality comparison with zero to TEST
+    rule CmpZeroToTest {
+        match: (CMP_EQ ?dst:i1, ?src:i64, 0);
+        emit:  (TEST64rr ?dst, ?src, ?src);
+    }
+}
+```
+
+### 4.5 Instruction Selection (`patterns.isdf`)
+```dsl
+patterns x86_64 {
+    pattern Add64_RR {
+        match: (ADD ?dst:i64, ?src1:i64, ?src2:i64);
+        emit:  (ADD64rr ?dst, ?src1, ?src2);
+    }
+
+    // Fold load into add: ADD dst, src1, (LOAD addr) -> ADD64rm dst, src1, addr
+    pattern Add64_RM {
+        match: (ADD ?dst:i64, ?src1:i64, (LOAD ?addr:ptr));
+        emit:  (ADD64rm ?dst, ?src1, ?addr);
+    }
+}
+```
+
+---
+
+## 5. Command-Line Interface (`ezdsl-cli`)
+
+The `ezdsl-cli` executable provides complete control over parsing, verification, and code generation.
+
+### Exact CLI Options (`Cli::CliOptions`)
+
+```text
+Usage: ezdsl-cli [options] <input-file>
+
+Positional Arguments:
+  <input-file>                   Primary DSL input file to process
+
+Output and Namespace:
+  -o, --output <path>            Destination file or directory for generated artifacts [default: .]
+  -t, --target <name>            Target identifier substituted into generated code (e.g. x86_64)
+  -n, --namespace <root>         Namespace root the code is emitted into [default: EzTargets]
+  -I, --include <dir>            Additional search paths for imported DSL files (repeatable)
+
+Input File Overrides:
+  --rules <file.lrd>             Explicit path to legalization rules file
+  --types <file.tyf>             Explicit path to types definition file
+  --instructions <file.irdf>     Explicit path to IR instructions file
+
+Emission Toggles:
+  --emit-rules                   Generate legalization rewrite rules
+  --emit-target-instructions     Generate target machine instruction descriptors
+  --emit-target-encodings        Generate instruction encoding lookup tables
+  --emit-instruction-selector    Generate tree-pattern instruction selector
+  --emit-calling-conv            Generate calling convention descriptors
+  --emit-registers               Generate register classes and physical IDs
+  --emit-target-desc             Generate root target descriptor wiring class
+
+Generator Overrides:
+  --generator <kind>             Explicitly select code generator:
+                                 (Auto, TypeTable, Instructions, Legalizer, Rules,
+                                  TargetInstructions, TargetEncodings, InstructionSelector,
+                                  CallingConv, RegisterInfo, TargetDesc)
+  --header-only                  Emit only the C++ header (.h) artifact
+  --source-only                  Emit only the C++ implementation (.cpp) artifact
+
+Introspection and Debugging:
+  --dump-info                    Print general input/output file metadata
+  --dump-ast                     Print the parsed Abstract Syntax Tree
+  --dump-symbols                 Print the populated semantic symbol table
+  --dump-files                   Print the list of generated/expected files
+  --format <text|json>           Output serialization format for dumps [default: text]
+  --dry-run                      Simulate pipeline without writing files to disk
+  --check-only                   Validate syntax and semantics without code generation
+  -v, --verbose                  Enable verbose trace diagnostics
+  -q, --quiet                    Suppress non-error diagnostic output
+```
+
+### CLI Execution Examples
+
 ```bash
-ezdsl_cli [options]
-```
-- `--input <path>`: Primary input DSL file.
-- `--output <path>`: Destination path for generated C++ source/header.
-- `--generator <kind>`: Generator to invoke (`Auto`, `TypeTable`, `Instructions`, `Legalizer`, `Rules`, `TargetInstructions`, `TargetEncodings`, `InstructionSelector`, `CallingConv`, `RegisterInfo`, `TargetDesc`).
-- `--dump-ast`: Prints the parsed AST to stdout.
-- `--dump-symbols`: Prints the resolved symbol table.
-- `--format <text|json>`: Output format for dumps (default: `text`).
+# Verify syntax and semantic validity of x86-64 target rules
+ezdsl-cli --check-only -t x86_64 EzTargets/X86_64/Dsl/x86_64_rules.lrd
 
-### Example Usage
-```bash
-# Validate and dump AST of a target descriptor
-ezdsl_cli --input targets/x86_64/x86_64.tdesc --dump-ast
+# Emit C++ target instruction descriptors
+ezdsl-cli --emit-target-instructions \
+          -t x86_64 \
+          -o build/generated/ \
+          EzTargets/X86_64/Dsl/x86_64_instructions.tidf
 
-# Manually generate calling convention C++ tables
-ezdsl_cli --input targets/x86_64/x86_64_calling_conv.ezcc --output X86_64CallingConv.h --generator CallingConv
+# Dump AST in JSON format for external tooling inspection
+ezdsl-cli --dump-ast --format json EzTargets/X86_64/Dsl/x86_64_sysv.ccdf
 ```
 
 ---
 
-## 6. API Reference & Further Reading
+## 6. Header & Class Index
 
-- Generated Doxygen API documentation: [Doxygen Documentation Index](../doxygen/index.html)
-- Next subproject: [EzCodeEmitter Subproject Documentation](EzCodeEmitter.md)
-- Return to [EzPacker Landing Page](../index.md)
+| Component | Header Location | Key Classes / Structs |
+|---|---|---|
+| CLI Options | `EzDsl/Cli/include/Cli/CommandLineOptions.h` | `CliOptions`, `GeneratorKind`, `LanguageDialect`, `OutputFormat` |
+| CLI Driver | `EzDsl/Cli/include/Cli/Driver.h` | `Driver` |
+| Parsers | `EzDsl/Lexer/include/Parser/ParseContext.h` | `ParseContext` |
+| Parsers | `EzDsl/Lexer/include/Parser/TypeDefLang.h` | `TypeDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/IrInstructionDefLang.h` | `IrInstructionDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/RegisterDefLang.h` | `RegisterDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/TargetInstDefLang.h` | `TargetInstDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/EncodingDefLang.h` | `EncodingDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/CallingConvDefLang.h` | `CallingConvDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/LegalizeActionDefLang.h` | `LegalizeActionDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/LegalizeRuleDefLang.h` | `LegalizeRuleDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/InstructionSelectDefLang.h` | `InstructionSelectDefLang` |
+| Parsers | `EzDsl/Lexer/include/Parser/TargetDescDefLang.h` | `TargetDescDefLang` |
+| Sema | `EzDsl/Sema/include/SemaPasses/PassDriver.h` | `PassDriver` |
+| Sema | `EzDsl/Sema/include/Sema/SymbolTable.h` | `SymbolTable` |
+| Sema | `EzDsl/Sema/include/Sema/Scope.h` | `Scope` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CodeGenerator.h` | `CodeGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppMirTypeTableGenerator.h` | `CppMirTypeTableGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppMirInstructionGenerator.h` | `CppMirInstructionGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppLegalizerGenerator.h` | `CppLegalizerGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppLegalizeRuleGenerator.h` | `CppLegalizeRuleGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppTargetInstructionGenerator.h` | `CppTargetInstructionGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppEncodingTableGenerator.h` | `CppEncodingTableGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppInstructionSelectorGenerator.h` | `CppInstructionSelectorGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppCallingConvGenerator.h` | `CppCallingConvGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppRegisterInfoGenerator.h` | `CppRegisterInfoGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppTargetDescGenerator.h` | `CppTargetDescGenerator` |
+| Code Generators | `EzDsl/CodeGenerators/include/CodeGenerators/CppSourceEmitter.h` | `CppSourceEmitter` |

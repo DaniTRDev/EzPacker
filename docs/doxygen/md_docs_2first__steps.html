@@ -137,12 +137,12 @@ Syntax Breakdown</h2>
 </div><!-- fragment --><p> On Windows, <span class="tt"><a class="el" href="namespace_ez_compiler.html">EzCompiler</a></span> automatically emits a PE/COFF object file <span class="tt">simple_math.obj</span>; on Linux, it emits an ELF64 object file <span class="tt">simple_math.o</span>.</p>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md69"></a>
 3.2 Explicit Target Triples</h2>
-<p>You can cross-compile or explicitly request a specific OS object format using <span class="tt">-target</span>:</p>
+<p>You can cross-compile or explicitly request a specific OS object format using <span class="tt">--target</span>:</p>
 <div class="fragment"><div class="line"># Target Linux ELF64 (uses System V AMD64 calling convention)</div>
-<div class="line">EzCompiler simple_math.mir -target x86_64-unknown-linux-gnu -o simple_math.o</div>
+<div class="line">EzCompiler simple_math.mir --target x86_64-unknown-linux-gnu -o simple_math.o</div>
 <div class="line"> </div>
 <div class="line"># Target Windows PE/COFF (uses Microsoft Win64 calling convention)</div>
-<div class="line">EzCompiler simple_math.mir -target x86_64-pc-windows-coff -o simple_math.obj</div>
+<div class="line">EzCompiler simple_math.mir --target x86_64-pc-windows-coff -o simple_math.obj</div>
 </div><!-- fragment --><hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md71"></a>
 4. Inspecting the Compiler Pipeline Stages</h1>
@@ -206,12 +206,12 @@ Syntax Breakdown</h2>
 </div><!-- fragment --><hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md83"></a>
 6. Inspecting EzDsl Files (For Target Developers)</h1>
-<p>If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the <span class="tt">ezdsl_cli</span> tool to validate <a class="el" href="namespace_d_s_l.html">DSL</a> files:</p>
+<p>If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the <span class="tt">ezdsl-cli</span> tool to validate <a class="el" href="namespace_d_s_l.html">DSL</a> files:</p>
 <div class="fragment"><div class="line"># Validate and dump AST of a target descriptor</div>
-<div class="line">ezdsl_cli --input EzTargets/X86_64/targets/x86_64/x86_64.tdesc --dump-ast</div>
+<div class="line">ezdsl-cli --dump-ast EzTargets/X86_64/Dsl/x86_64_rules.lrd</div>
 <div class="line"> </div>
 <div class="line"># Validate and dump symbol definitions of calling conventions</div>
-<div class="line">ezdsl_cli --input EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symbols</div>
+<div class="line">ezdsl-cli --dump-symbols EzTargets/X86_64/Dsl/x86_64_sysv.ccdf</div>
 </div><!-- fragment --><hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md85"></a>
 7. Next Steps</h1>

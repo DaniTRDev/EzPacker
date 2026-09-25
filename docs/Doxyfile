@@ -34,7 +34,8 @@ EXCLUDE_PATTERNS       = */cmake-build-*/* \
                          */build/* \
                          */LibBf/* \
                          */.git/* \
-                         */.idea/*
+                         */.idea/* \
+                         */docs/doxygen/*
 
 MARKDOWN_SUPPORT       = YES
 AUTOLINK_SUPPORT       = YES

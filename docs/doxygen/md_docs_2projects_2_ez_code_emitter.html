@@ -94,182 +94,389 @@ $(function(){initNavTree('md_docs_2projects_2_ez_code_emitter.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p><a class="anchor" id="autotoc_md123"></a></p>
-<p><a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Documentation Index</a> &gt; <b><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a></b></p>
+<p><a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Documentation Index</a> &gt; <a class="el" href="md_docs_2projects_2_ez_code_emitter.html" title="EzCodeEmitter Subproject Documentation">Subprojects</a> &gt; <b><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a></b> | <a href="../doxygen/index.html">Doxygen API Reference</a></p>
 <hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md125"></a>
 1. Overview &amp; Architectural Role</h1>
-<p><span class="tt"><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a></span> is the binary serialization and machine code generation library of EzPacker. Once the compiler backend has lowered, selected, and register-allocated machine instructions, <span class="tt"><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a></span> translates these instructions into raw binary byte streams, manages object sections, tracks internal/external relocations, and writes valid relocatable object files conforming to industry-standard formats:</p><ul>
-<li><b>ELF64</b> (<span class="tt">.o</span>) for Linux, FreeBSD, and macOS.</li>
-<li><b>PE/COFF</b> (<span class="tt">.obj</span>) for Microsoft Windows.</li>
-</ul>
-<div class="fragment"><div class="line">       +-------------------------------------------------------------+</div>
-<div class="line">       |                  Lowered Machine Instructions               |</div>
-<div class="line">       +-------------------------------------------------------------+</div>
-<div class="line">                                      |</div>
-<div class="line">                                      v</div>
-<div class="line">                       +-----------------------------+</div>
-<div class="line">                       |     GenericCodeEmitter      |</div>
-<div class="line">                       |  (e.g., X86_64CodeEmitter)  |</div>
-<div class="line">                       +-----------------------------+</div>
-<div class="line">                                      |</div>
-<div class="line">       +------------------------------+------------------------------+</div>
-<div class="line">       |                                                             |</div>
-<div class="line">       v                                                             v</div>
-<div class="line">+-------------------------------+                     +-------------------------------+</div>
-<div class="line">|          CodeSection          |                     |       ObjectRelocEntry        |</div>
-<div class="line">|  - Text (.text)               |                     |  - Offset within section      |</div>
-<div class="line">|  - Data (.data)               |                     |  - Target symbol              |</div>
-<div class="line">|  - Rodata (.rodata)           |                     |  - Relocation Type (PLT32..)  |</div>
-<div class="line">|  - Bss (.bss)                 |                     |  - Addend                     |</div>
-<div class="line">+-------------------------------+                     +-------------------------------+</div>
-<div class="line">       |                                                             |</div>
-<div class="line">       +------------------------------+------------------------------+</div>
-<div class="line">                                      |</div>
-<div class="line">                                      v</div>
-<div class="line">                       +-----------------------------+</div>
-<div class="line">                       |        IObjectWriter        |</div>
-<div class="line">                       +-----------------------------+</div>
-<div class="line">                                      |</div>
-<div class="line">                     +----------------+----------------+</div>
-<div class="line">                     |                                 |</div>
-<div class="line">                     v                                 v</div>
-<div class="line">          +--------------------+             +--------------------+</div>
-<div class="line">          |    Elf64Writer     |             |     CoffWriter     |</div>
-<div class="line">          |  (System V ELF64)  |             | (Microsoft PE/COFF)|</div>
-<div class="line">          +--------------------+             +--------------------+</div>
-<div class="line">                     |                                 |</div>
-<div class="line">                     v                                 v</div>
-<div class="line">               output.o (Linux)                output.obj (Windows)</div>
+<p><span class="tt"><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a></span> is EzPacker's binary machine code emission and object file container serialization library. It bridges target-lowered <span class="tt"><a class="el" href="class_mir_instruction.html">MirInstruction</a></span> sequences and concrete executable object files on disk (<span class="tt">.o</span> and <span class="tt">.obj</span>).</p>
+<p>It provides:</p><ol type="1">
+<li><b>Dynamic Linked Code Sections (<span class="tt"><a class="el" href="class_code_section.html">CodeSection</a></span>)</b>: A node-based stream representation that allows non-linear code insertion, forward label references, and deferred alignment resolution.</li>
+<li><b>Contextual State Tracking (<span class="tt"><a class="el" href="class_code_emitter_context.html">CodeEmitterContext</a></span>)</b>: Management of code labels, relocations, section cursors, and scratch memory across modules.</li>
+<li><b>Generic Target Interface (<span class="tt"><a class="el" href="class_generic_code_emitter.html">GenericCodeEmitter</a></span>)</b>: The abstract contract every target machine code emitter implements.</li>
+<li><b>Relocatable Object File Writers (<span class="tt">IObjectWriter</span>)</b>: Production implementations for <b>ELF64</b> (System V Linux/BSD) and <b>PE-COFF</b> (Microsoft Windows).</li>
+</ol>
+<div class="fragment"><div class="line">Lowered MIR Functions</div>
+<div class="line">        |</div>
+<div class="line">        v</div>
+<div class="line">+-----------------------------------------------------------+</div>
+<div class="line">|              GenericCodeEmitter::emitInst()               |</div>
+<div class="line">| (Interprets TargetInstructionDesc and emits machine bytes)|</div>
+<div class="line">+-----------------------------------------------------------+</div>
+<div class="line">        |</div>
+<div class="line">        v</div>
+<div class="line">+-----------------------------------------------------------+</div>
+<div class="line">|                 CodeSection Linked Nodes                  |</div>
+<div class="line">|  [Data Chunk] &lt;-&gt; [Label Marker] &lt;-&gt; [Align Directive]    |</div>
+<div class="line">+-----------------------------------------------------------+</div>
+<div class="line">        |</div>
+<div class="line">        v (finalize() flattens nodes &amp; resolves label offsets)</div>
+<div class="line">+-----------------------------------------------------------+</div>
+<div class="line">|                   CodeEmitterContext                      |</div>
+<div class="line">|    Aggregates: Flattened Buffers, Labels &amp; Relocations     |</div>
+<div class="line">+-----------------------------------------------------------+</div>
+<div class="line">        |</div>
+<div class="line">        v</div>
+<div class="line">+-----------------------------------------------------------+</div>
+<div class="line">|             IObjectWriter (Elf64Writer / CoffWriter)      |</div>
+<div class="line">|  - Formats Section Headers, Symbol Tables &amp; Relocations   |</div>
+<div class="line">|  - Emits .o (ELF64) or .obj (PE-COFF) Binary Byte Stream  |</div>
+<div class="line">+-----------------------------------------------------------+</div>
 </div><!-- fragment --><hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md127"></a>
-2. Core Abstractions &amp; Classes</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md128"></a>
-2.1 <span class="tt">GenericCodeEmitter</span> (<span class="tt">include/GenericCodeEmitter.h</span>)</h2>
-<p>The target-agnostic interface through which compilation engines drive code emission. Target-specific emitters (e.g. <span class="tt">X86_64CodeEmitter</span> in <span class="tt"><a class="el" href="namespace_ez_targets.html">EzTargets</a></span>) derive from this class.</p>
-<ul>
-<li><span class="tt">beginFunction(CodeEmitterContext *ctx, MirFunction *func)</span>: Initializes emission for a function, setting up label tracking and starting the function symbol.</li>
-<li><span class="tt">bindLabel(MirId labelId)</span>: Binds a basic block label ID to the current byte offset in <span class="tt">.text</span>, resolving pending forward jumps.</li>
-<li><span class="tt">emitInstruction(CodeEmitterContext *ctx, MirInstruction *inst)</span>: Encodes a single target instruction into raw bytes and appends it to the active code section.</li>
-<li><span class="tt">endFunction(CodeEmitterContext *ctx, MirFunction *func)</span>: Finalizes function emission, calculates function size, and marks the function symbol boundary.</li>
-<li><span class="tt">finalize(CodeEmitterContext *ctx)</span>: Runs post-emission passes such as branch relaxation (converting 8-bit short jumps to 32-bit near jumps when necessary).</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md129"></a>
-2.2 <span class="tt">CodeEmitterContext</span> (<span class="tt">include/CodeEmitterContext.h</span>)</h2>
-<p>The working state container passed through the emission pipeline:</p><ul>
-<li>Holds the target memory resource.</li>
-<li>Owns the map of active sections (<span class="tt">std::pmr::unordered_map&lt;<a class="el" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a>, CodeSection*&gt;</span>).</li>
-<li>Tracks defined labels and their linear byte offsets.</li>
-<li>Collects <span class="tt">ObjectSymbol</span> definitions and <span class="tt">ObjectRelocEntry</span> records.</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md130"></a>
-2.3 <span class="tt">CodeSection</span> (<span class="tt">include/CodeSection.h</span>)</h2>
-<p>Encapsulates an individual binary section:</p><ul>
-<li><b><span class="tt"><a class="el" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a></span></b>: <span class="tt">Text</span> (executable code), <span class="tt">Data</span> (initialized writable data), <span class="tt">Rodata</span> (read-only constants and string literals), <span class="tt">Bss</span> (uninitialized zeroed data).</li>
-<li><b>Data Buffer</b>: Contiguous byte buffer (<span class="tt">std::pmr::vector&lt;uint8_t&gt;</span>).</li>
-<li><b>Alignment</b>: Section alignment requirement in bytes (e.g. 16-byte alignment).</li>
-<li><b>Relocations</b>: List of relocation entries targeting this section.</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md131"></a>
-2.4 <span class="tt">ObjectSymbol</span> (<span class="tt">include/ObjectFormat/ObjectSymbol.h</span>)</h2>
-<p>Defines a symbol exported to or required by the object file:</p><ul>
-<li><span class="tt">m_name</span>: <a class="el" href="class_symbol.html">Symbol</a> name string.</li>
-<li><span class="tt">m_binding</span>: <span class="tt">Local</span>, <span class="tt">Global</span>, or <span class="tt">Weak</span>.</li>
-<li><span class="tt">m_type</span>: <span class="tt">Function</span>, <span class="tt">Object</span>, or <span class="tt">Section</span>.</li>
-<li><span class="tt">m_section</span>: Target section index.</li>
-<li><span class="tt">m_value</span>: Byte offset within the section.</li>
-<li><span class="tt">m_size</span>: Size of the symbol in bytes.</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md132"></a>
-2.5 <span class="tt">ObjectRelocEntry</span> (<span class="tt">include/ObjectFormat/ObjectSymbol.h</span>)</h2>
-<p>Describes a relocation fixup to be resolved by the system linker:</p><ul>
-<li><span class="tt">m_section</span>: The section containing the location that needs patching.</li>
-<li><span class="tt">m_offset</span>: Byte offset from the start of the section to the relocation site.</li>
-<li><span class="tt">m_symbolName</span>: <a class="el" href="class_symbol.html">Symbol</a> referenced by the relocation.</li>
-<li><span class="tt">m_type</span>: Target-specific relocation opcode (e.g. <span class="tt">R_X86_64_PLT32</span> or <span class="tt">IMAGE_REL_AMD64_REL32</span>).</li>
-<li><span class="tt">m_addend</span>: Constant offset added to the symbol value.</li>
-</ul>
-<hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md134"></a>
-3. Object File Writers (<span class="tt">IObjectWriter</span>)</h1>
-<p>EzPacker defines a format-agnostic interface <span class="tt">IObjectWriter</span> (<span class="tt"><a class="el" href="_i_object_writer_8h.html">include/ObjectFormat/IObjectWriter.h</a></span>) so the compiler driver can write either format without modifying emission logic:</p>
-<div class="fragment"><div class="line"><span class="keyword">class </span>IObjectWriter {</div>
-<div class="line">  <span class="keyword">public</span>:</div>
-<div class="line">    <span class="keyword">virtual</span> ~IObjectWriter() = <span class="keywordflow">default</span>;</div>
-<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> addSymbol(<span class="keyword">const</span> ObjectSymbol &amp;sym) = 0;</div>
-<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> addRelocation(<span class="keyword">const</span> ObjectRelocEntry &amp;reloc) = 0;</div>
-<div class="line">    <span class="keyword">virtual</span> std::vector&lt;uint8_t&gt; write(<span class="keyword">const</span> std::pmr::unordered_map&lt;SectionType, CodeSection*&gt; &amp;sections) = 0;</div>
-<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> clear() = 0;</div>
+2. Dynamic Linked Code Sections (<span class="tt">CodeSection.h</span>)</h1>
+<p>Object emission often requires writing data non-linearly: jumping back to patch jump offsets, creating alignment padding whose final byte length is only known after all preceding basic blocks are assembled, or referencing forward labels.</p>
+<p>To solve this, <span class="tt"><a class="el" href="class_code_section.html">CodeSection</a></span> models the byte stream as a doubly-linked list of <span class="tt"><a class="el" href="struct_section_node.html">SectionNode</a></span> elements:</p>
+<div class="fragment"><div class="line"><span class="keyword">enum class</span> <a class="code hl_enumeration" href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2">SectionNodeKind</a> : uint8_t</div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daf6068daa29dbb05a7ead1e3b5a48bbee">Data</a>,  <span class="comment">// Chunk of emitted raw bytes</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2ab021df6aac4654c454f46c77646e745f">Label</a>, <span class="comment">// Label marker / bookmark</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2ad12fbc9a2ba3b0b91a4190959b4c966b">Align</a>  <span class="comment">// Dynamic alignment directive</span></div>
 <div class="line">};</div>
-</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md135"></a>
-3.1 <span class="tt">Elf64Writer</span> (<span class="tt">include/ObjectFormat/Elf64Writer.h</span>)</h2>
-<p>Emits standard relocatable 64-bit ELF files (<span class="tt">.o</span>) conforming to the System V Application Binary Interface:</p><ul>
-<li><b>ELF Header (<span class="tt">Elf64_Ehdr</span>)</b>: Sets machine type (<span class="tt">EM_X86_64</span>), file type (<span class="tt">ET_REL</span>), entry point (0), and section header offsets.</li>
-<li><b>Section Headers (<span class="tt">Elf64_Shdr</span>)</b>: Declares <span class="tt">.text</span>, <span class="tt">.data</span>, <span class="tt">.rodata</span>, <span class="tt">.bss</span>, <span class="tt">.symtab</span>, <span class="tt">.strtab</span>, <span class="tt">.shstrtab</span>, and <span class="tt">.rela.text</span>.</li>
-<li><b>String Tables</b>: Emits <span class="tt">.shstrtab</span> (section names) and <span class="tt">.strtab</span> (symbol names).</li>
-<li><b><a class="el" href="class_symbol.html">Symbol</a> Table (<span class="tt">.symtab</span>)</b>: Serializes <span class="tt">Elf64_Sym</span> entries, correctly separating local symbols from global symbols as mandated by ELF standards.</li>
-<li><b>Relocation Sections (<span class="tt">.rela.text</span>)</b>: Serializes <span class="tt">Elf64_Rela</span> entries with explicit 64-bit addends (<span class="tt">r_offset</span>, <span class="tt">r_info</span>, <span class="tt">r_addend</span>). Supports <span class="tt">R_X86_64_64</span>, <span class="tt">R_X86_64_PC32</span>, <span class="tt">R_X86_64_PLT32</span>, <span class="tt">R_X86_64_GOTPCREL</span>.</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md136"></a>
-3.2 <span class="tt">CoffWriter</span> (<span class="tt">include/ObjectFormat/CoffWriter.h</span>)</h2>
-<p>Emits Microsoft PE/COFF relocatable object files (<span class="tt">.obj</span>) compatible with Microsoft <span class="tt">link.exe</span>, LLVM <span class="tt">lld-link</span>, and MinGW GCC:</p><ul>
-<li><b>COFF File Header (<span class="tt">IMAGE_FILE_HEADER</span>)</b>: Sets machine architecture (<span class="tt">IMAGE_FILE_MACHINE_AMD64</span>), number of sections, timestamp, and pointer to symbol table.</li>
-<li><b>Section Headers (<span class="tt">IMAGE_SECTION_HEADER</span>)</b>: Declares <span class="tt">.text</span>, <span class="tt">.data</span>, <span class="tt">.rdata</span>, <span class="tt">.bss</span> with flags (<span class="tt">IMAGE_SCN_CNT_CODE</span>, <span class="tt">IMAGE_SCN_MEM_EXECUTE</span>, <span class="tt">IMAGE_SCN_MEM_READ</span>, <span class="tt">IMAGE_SCN_ALIGN_16BYTES</span>).</li>
-<li><b><a class="el" href="class_symbol.html">Symbol</a> Table</b>: Emits standard 18-byte <span class="tt">IMAGE_SYMBOL</span> records. Short names (&lt;= 8 chars) are stored inline; longer names are stored as byte offsets into the trailing string table.</li>
-<li><b>COFF Relocations</b>: Emits <span class="tt">IMAGE_RELOCATION</span> records (<span class="tt">r_vaddr</span>, <span class="tt">r_symndx</span>, <span class="tt">r_type</span>) supporting <span class="tt">IMAGE_REL_AMD64_ADDR64</span>, <span class="tt">IMAGE_REL_AMD64_REL32</span>, <span class="tt">IMAGE_REL_AMD64_ADDR32NB</span>.</li>
-</ul>
-<hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md138"></a>
-4. Usage Example: Serializing an Object File</h1>
-<div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_elf64_writer_8h.html">ObjectFormat/Elf64Writer.h</a>&quot;</span></div>
-<div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_coff_writer_8h.html">ObjectFormat/CoffWriter.h</a>&quot;</span></div>
-<div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_code_section_8h.html">CodeSection.h</a>&quot;</span></div>
-<div class="line"><span class="preprocessor">#include &lt;fstream&gt;</span></div>
 <div class="line"> </div>
-<div class="line"><span class="comment">// Create sections</span></div>
-<div class="line">std::pmr::monotonic_buffer_resource arena;</div>
-<div class="line"><a class="code hl_class" href="class_code_section.html">CodeSection</a> textSection(<a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da9dffbf69ffba8bc38bc4e01abf4b1675">SectionType::Text</a>, &amp;arena);</div>
+<div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_section_node.html">SectionNode</a></div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_enumeration" href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2">SectionNodeKind</a> <a class="code hl_variable" href="struct_section_node.html#aedcd5f551808996161444cabf821aff6">m_kind</a>;</div>
+<div class="line">    <a class="code hl_struct" href="struct_section_node.html">SectionNode</a> *<a class="code hl_variable" href="struct_section_node.html#a06adf89462fab2e96ec33b6e28846e61">m_prev</a>{ <span class="keyword">nullptr</span> };</div>
+<div class="line">    <a class="code hl_function" href="struct_section_node.html#a31bf6a42803f6fe33b71de5e29dc7257">SectionNode</a> *<a class="code hl_variable" href="struct_section_node.html#a2757e0c28751dee5e1886ab0a381990d">m_next</a>{ <span class="keyword">nullptr</span> };</div>
 <div class="line"> </div>
-<div class="line"><span class="comment">// Emit raw x86_64 instructions: mov eax, 42; ret</span></div>
-<div class="line"><span class="keyword">const</span> uint8_t code[] = { 0xb8, 0x2a, 0x00, 0x00, 0x00, 0xc3 };</div>
-<div class="line">textSection.appendBytes(code, <span class="keyword">sizeof</span>(code));</div>
+<div class="line">    <span class="comment">// Payload for Data</span></div>
+<div class="line">    std::pmr::vector&lt;uint8_t&gt; <a class="code hl_variable" href="struct_section_node.html#a1c509e94c194331f45c4d083172b7de5">m_data</a>;</div>
 <div class="line"> </div>
-<div class="line">std::pmr::unordered_map&lt;SectionType, CodeSection*&gt; sections(&amp;arena);</div>
-<div class="line">sections[<a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da9dffbf69ffba8bc38bc4e01abf4b1675">SectionType::Text</a>] = &amp;textSection;</div>
+<div class="line">    <span class="comment">// Payload for Label</span></div>
+<div class="line">    <a class="code hl_typedef" href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a> <a class="code hl_variable" href="struct_section_node.html#a988174aa3abe6f15c28438d9ee42905b">m_labelId</a>{ <a class="code hl_variable" href="_ez_mir_common_8h.html#a8cfee6c0fa4d31b1b2afb4ceedd5bb72">MIRID_INVALID</a> };</div>
+<div class="line">    uint64_t <a class="code hl_variable" href="struct_section_node.html#a7ceb7f8774d9548397228d02d01583e8">m_calculatedOffset</a>{ 0 };</div>
 <div class="line"> </div>
-<div class="line"><span class="comment">// Configure ELF64 Writer</span></div>
-<div class="line"><a class="code hl_class" href="class_ez_code_emitter_1_1_object_format_1_1_elf64_writer.html">EzCodeEmitter::ObjectFormat::Elf64Writer</a> writer;</div>
-<div class="line">ObjectSymbol sym{</div>
-<div class="line">    .m_name = <span class="stringliteral">&quot;get_answer&quot;</span>,</div>
-<div class="line">    .m_binding = SymbolBinding::Global,</div>
-<div class="line">    .m_type = SymbolType::Function,</div>
-<div class="line">    .m_section = 1, <span class="comment">// .text</span></div>
-<div class="line">    .m_value = 0,</div>
-<div class="line">    .m_size = <span class="keyword">sizeof</span>(code)</div>
+<div class="line">    <span class="comment">// Payload for Align</span></div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_variable" href="struct_section_node.html#afffcb4feac0a26e909bfb06df4725f7d">m_alignment</a>{ 1 };</div>
+<div class="line">    uint8_t <a class="code hl_variable" href="struct_section_node.html#a7162a8438f9878ba675e1b86312649f6">m_padByte</a>{ 0 };</div>
 <div class="line">};</div>
-<div class="line">writer.<a class="code hl_function" href="class_ez_code_emitter_1_1_object_format_1_1_elf64_writer.html#ae182863d91f2e4a502fa9ef97bf3e180">addSymbol</a>(sym);</div>
-<div class="line"> </div>
-<div class="line"><span class="comment">// Serialize to binary vector</span></div>
-<div class="line">std::vector&lt;uint8_t&gt; objectBytes = writer.<a class="code hl_function" href="class_ez_code_emitter_1_1_object_format_1_1_elf64_writer.html#a80ce136207863395dd04d14e6d10fb2a">write</a>(sections);</div>
-<div class="line"> </div>
-<div class="line"><span class="comment">// Write to file</span></div>
-<div class="line">std::ofstream out(<span class="stringliteral">&quot;answer.o&quot;</span>, std::ios::binary);</div>
-<div class="line">out.write(<span class="keyword">reinterpret_cast&lt;</span><span class="keyword">const </span><span class="keywordtype">char</span>*<span class="keyword">&gt;</span>(objectBytes.data()), objectBytes.size());</div>
-<div class="ttc" id="a_code_section_8h_html"><div class="ttname"><a href="_code_section_8h.html">CodeSection.h</a></div></div>
+<div class="ttc" id="a_code_section_8h_html_a51d549969f6c12486266226dfbe5f1a2"><div class="ttname"><a href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2">SectionNodeKind</a></div><div class="ttdeci">SectionNodeKind</div><div class="ttdef"><b>Definition</b> CodeSection.h:52</div></div>
+<div class="ttc" id="a_code_section_8h_html_a51d549969f6c12486266226dfbe5f1a2ab021df6aac4654c454f46c77646e745f"><div class="ttname"><a href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2ab021df6aac4654c454f46c77646e745f">SectionNodeKind::Label</a></div><div class="ttdeci">@ Label</div><div class="ttdef"><b>Definition</b> CodeSection.h:54</div></div>
+<div class="ttc" id="a_code_section_8h_html_a51d549969f6c12486266226dfbe5f1a2ad12fbc9a2ba3b0b91a4190959b4c966b"><div class="ttname"><a href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2ad12fbc9a2ba3b0b91a4190959b4c966b">SectionNodeKind::Align</a></div><div class="ttdeci">@ Align</div><div class="ttdef"><b>Definition</b> CodeSection.h:55</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37daf6068daa29dbb05a7ead1e3b5a48bbee"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daf6068daa29dbb05a7ead1e3b5a48bbee">SectionType::Data</a></div><div class="ttdeci">@ Data</div><div class="ttdoc">Mutable initialized data (&quot;.data&quot;).</div><div class="ttdef"><b>Definition</b> CodeSection.h:18</div></div>
+<div class="ttc" id="a_ez_mir_common_8h_html_a8cfee6c0fa4d31b1b2afb4ceedd5bb72"><div class="ttname"><a href="_ez_mir_common_8h.html#a8cfee6c0fa4d31b1b2afb4ceedd5bb72">MIRID_INVALID</a></div><div class="ttdeci">constexpr MirId MIRID_INVALID</div><div class="ttdef"><b>Definition</b> EzMirCommon.h:26</div></div>
+<div class="ttc" id="a_ez_mir_common_8h_html_ab1307ee84ae25f8bddd9220cdd0bc957"><div class="ttname"><a href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a></div><div class="ttdeci">size_t MirId</div><div class="ttdef"><b>Definition</b> EzMirCommon.h:21</div></div>
+<div class="ttc" id="astruct_section_node_html"><div class="ttname"><a href="struct_section_node.html">SectionNode</a></div><div class="ttdef"><b>Definition</b> CodeSection.h:62</div></div>
+<div class="ttc" id="astruct_section_node_html_a06adf89462fab2e96ec33b6e28846e61"><div class="ttname"><a href="struct_section_node.html#a06adf89462fab2e96ec33b6e28846e61">SectionNode::m_prev</a></div><div class="ttdeci">SectionNode * m_prev</div><div class="ttdoc">Previous node in the doubly-linked stream (nullptr at head).</div><div class="ttdef"><b>Definition</b> CodeSection.h:64</div></div>
+<div class="ttc" id="astruct_section_node_html_a1c509e94c194331f45c4d083172b7de5"><div class="ttname"><a href="struct_section_node.html#a1c509e94c194331f45c4d083172b7de5">SectionNode::m_data</a></div><div class="ttdeci">std::pmr::vector&lt; uint8_t &gt; m_data</div><div class="ttdoc">Raw bytes accumulated for this data chunk.</div><div class="ttdef"><b>Definition</b> CodeSection.h:68</div></div>
+<div class="ttc" id="astruct_section_node_html_a2757e0c28751dee5e1886ab0a381990d"><div class="ttname"><a href="struct_section_node.html#a2757e0c28751dee5e1886ab0a381990d">SectionNode::m_next</a></div><div class="ttdeci">SectionNode * m_next</div><div class="ttdoc">Next node in the doubly-linked stream (nullptr at tail).</div><div class="ttdef"><b>Definition</b> CodeSection.h:65</div></div>
+<div class="ttc" id="astruct_section_node_html_a31bf6a42803f6fe33b71de5e29dc7257"><div class="ttname"><a href="struct_section_node.html#a31bf6a42803f6fe33b71de5e29dc7257">SectionNode::SectionNode</a></div><div class="ttdeci">SectionNode(SectionNodeKind kind, std::pmr::memory_resource *alloc)</div><div class="ttdef"><b>Definition</b> CodeSection.h:78</div></div>
+<div class="ttc" id="astruct_section_node_html_a7162a8438f9878ba675e1b86312649f6"><div class="ttname"><a href="struct_section_node.html#a7162a8438f9878ba675e1b86312649f6">SectionNode::m_padByte</a></div><div class="ttdeci">uint8_t m_padByte</div><div class="ttdoc">Fill byte inserted to satisfy the alignment.</div><div class="ttdef"><b>Definition</b> CodeSection.h:76</div></div>
+<div class="ttc" id="astruct_section_node_html_a7ceb7f8774d9548397228d02d01583e8"><div class="ttname"><a href="struct_section_node.html#a7ceb7f8774d9548397228d02d01583e8">SectionNode::m_calculatedOffset</a></div><div class="ttdeci">uint64_t m_calculatedOffset</div><div class="ttdoc">Byte offset resolved during finalize().</div><div class="ttdef"><b>Definition</b> CodeSection.h:72</div></div>
+<div class="ttc" id="astruct_section_node_html_a988174aa3abe6f15c28438d9ee42905b"><div class="ttname"><a href="struct_section_node.html#a988174aa3abe6f15c28438d9ee42905b">SectionNode::m_labelId</a></div><div class="ttdeci">MirId m_labelId</div><div class="ttdoc">MIR id of the label marker.</div><div class="ttdef"><b>Definition</b> CodeSection.h:71</div></div>
+<div class="ttc" id="astruct_section_node_html_aedcd5f551808996161444cabf821aff6"><div class="ttname"><a href="struct_section_node.html#aedcd5f551808996161444cabf821aff6">SectionNode::m_kind</a></div><div class="ttdeci">SectionNodeKind m_kind</div><div class="ttdoc">Discriminant selecting which payload below is active.</div><div class="ttdef"><b>Definition</b> CodeSection.h:63</div></div>
+<div class="ttc" id="astruct_section_node_html_afffcb4feac0a26e909bfb06df4725f7d"><div class="ttname"><a href="struct_section_node.html#afffcb4feac0a26e909bfb06df4725f7d">SectionNode::m_alignment</a></div><div class="ttdeci">size_t m_alignment</div><div class="ttdoc">Required power-of-two alignment in bytes.</div><div class="ttdef"><b>Definition</b> CodeSection.h:75</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md128"></a>
+2.1 Section Categorization (<span class="tt">SectionType</span>)</h2>
+<div class="fragment"><div class="line"><span class="keyword">enum class</span> <a class="code hl_enumeration" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a> : uint8_t</div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da9dffbf69ffba8bc38bc4e01abf4b1675">Text</a>,             <span class="comment">// Executable machine code (&quot;.text&quot;)</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da131fb182a881796e7606ed6da27f1197">ReadOnly</a>,         <span class="comment">// Read-only constants without relocations (&quot;.rodata&quot;)</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da7245c859a3ddc3bcfa00adaa4dabbf7d">ReadOnlyWithRel</a>,  <span class="comment">// Read-only data requiring relocations (&quot;.data.rel.ro&quot;)</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daa87842d43de0d6fb7d0aef9c7801982c">CString</a>,          <span class="comment">// Null-terminated string literals</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da4ff26f9aabec822655a200fe5f07ac05">Const4</a>,           <span class="comment">// 4-byte scalar constants</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da65c5a4f837926c8ea019ac0159a40960">Const8</a>,           <span class="comment">// 8-byte scalar constants</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daf7c27f86790265d96cc589ea7bdf8fe9">Const16AndBigger</a>, <span class="comment">// 16-byte-or-larger constants (SIMD)</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daf6068daa29dbb05a7ead1e3b5a48bbee">Data</a>,             <span class="comment">// Mutable initialized data (&quot;.data&quot;)</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37dae6cfcb8b36ffb98b9ed21a151414cc96">DataWithRel</a>,      <span class="comment">// Mutable data requiring relocations</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da709c4757487ad2f21e722762ab2a3854">NonInitialized</a>,   <span class="comment">// Zero-initialized unallocated storage (&quot;.bss&quot;)</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da90589c47f06eb971d548591f23c285af">Custom</a>,           <span class="comment">// Target-specific metadata/exception tables</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daec0fc0100c4fc1ce4eea230c3dc10360">Undefined</a>         <span class="comment">// External symbol reference</span></div>
+<div class="line">};</div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37d"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a></div><div class="ttdeci">SectionType</div><div class="ttdef"><b>Definition</b> CodeSection.h:10</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37da131fb182a881796e7606ed6da27f1197"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da131fb182a881796e7606ed6da27f1197">SectionType::ReadOnly</a></div><div class="ttdeci">@ ReadOnly</div><div class="ttdoc">Read-only constants without relocations (&quot;.rodata&quot;).</div><div class="ttdef"><b>Definition</b> CodeSection.h:12</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37da4ff26f9aabec822655a200fe5f07ac05"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da4ff26f9aabec822655a200fe5f07ac05">SectionType::Const4</a></div><div class="ttdeci">@ Const4</div><div class="ttdoc">4-byte scalar constants (floats/integers).</div><div class="ttdef"><b>Definition</b> CodeSection.h:15</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37da65c5a4f837926c8ea019ac0159a40960"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da65c5a4f837926c8ea019ac0159a40960">SectionType::Const8</a></div><div class="ttdeci">@ Const8</div><div class="ttdoc">8-byte scalar constants (doubles/integers).</div><div class="ttdef"><b>Definition</b> CodeSection.h:16</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37da709c4757487ad2f21e722762ab2a3854"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da709c4757487ad2f21e722762ab2a3854">SectionType::NonInitialized</a></div><div class="ttdeci">@ NonInitialized</div><div class="ttdoc">Zero-initialized storage with no file bytes (&quot;.bss&quot;).</div><div class="ttdef"><b>Definition</b> CodeSection.h:20</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37da7245c859a3ddc3bcfa00adaa4dabbf7d"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da7245c859a3ddc3bcfa00adaa4dabbf7d">SectionType::ReadOnlyWithRel</a></div><div class="ttdeci">@ ReadOnlyWithRel</div><div class="ttdoc">Read-only data that still requires relocations (&quot;.data.rel.ro&quot;).</div><div class="ttdef"><b>Definition</b> CodeSection.h:13</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37da90589c47f06eb971d548591f23c285af"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da90589c47f06eb971d548591f23c285af">SectionType::Custom</a></div><div class="ttdeci">@ Custom</div><div class="ttdoc">Target-specific metadata/exception tables.</div><div class="ttdef"><b>Definition</b> CodeSection.h:21</div></div>
 <div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37da9dffbf69ffba8bc38bc4e01abf4b1675"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da9dffbf69ffba8bc38bc4e01abf4b1675">SectionType::Text</a></div><div class="ttdeci">@ Text</div><div class="ttdoc">Executable machine code (&quot;.text&quot;).</div><div class="ttdef"><b>Definition</b> CodeSection.h:11</div></div>
-<div class="ttc" id="a_coff_writer_8h_html"><div class="ttname"><a href="_coff_writer_8h.html">CoffWriter.h</a></div></div>
-<div class="ttc" id="a_elf64_writer_8h_html"><div class="ttname"><a href="_elf64_writer_8h.html">Elf64Writer.h</a></div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37daa87842d43de0d6fb7d0aef9c7801982c"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daa87842d43de0d6fb7d0aef9c7801982c">SectionType::CString</a></div><div class="ttdeci">@ CString</div><div class="ttdoc">Null-terminated string literals.</div><div class="ttdef"><b>Definition</b> CodeSection.h:14</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37dae6cfcb8b36ffb98b9ed21a151414cc96"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37dae6cfcb8b36ffb98b9ed21a151414cc96">SectionType::DataWithRel</a></div><div class="ttdeci">@ DataWithRel</div><div class="ttdoc">Mutable data that requires relocations.</div><div class="ttdef"><b>Definition</b> CodeSection.h:19</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37daec0fc0100c4fc1ce4eea230c3dc10360"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daec0fc0100c4fc1ce4eea230c3dc10360">SectionType::Undefined</a></div><div class="ttdeci">@ Undefined</div><div class="ttdoc">Symbol is not defined in this module (SHN_UNDEF / COFF section 0).</div><div class="ttdef"><b>Definition</b> CodeSection.h:22</div></div>
+<div class="ttc" id="a_code_section_8h_html_abf4fefac0b05e2eb306b0e1cff6df37daf7c27f86790265d96cc589ea7bdf8fe9"><div class="ttname"><a href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37daf7c27f86790265d96cc589ea7bdf8fe9">SectionType::Const16AndBigger</a></div><div class="ttdeci">@ Const16AndBigger</div><div class="ttdoc">16-byte-or-larger constants (vectors/SIMD).</div><div class="ttdef"><b>Definition</b> CodeSection.h:17</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md129"></a>
+2.2 <span class="tt">CodeSection</span> Operations</h2>
+<div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_code_section.html">CodeSection</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <a class="code hl_function" href="class_code_section.html#afdabcc4c7f690f0edc3a1ec30a9e8657">CodeSection</a>(<a class="code hl_struct" href="struct_section_flags.html">SectionFlags</a> flags,</div>
+<div class="line">                <a class="code hl_enumeration" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a> type,</div>
+<div class="line">                <span class="keywordtype">size_t</span> alignment,</div>
+<div class="line">                <a class="code hl_enumeration" href="_code_section_8h.html#a694798b52d62dfb1ffb4d51e74576316">TargetEndianness</a> endianness,</div>
+<div class="line">                uint8_t padByte,</div>
+<div class="line">                std::string_view name,</div>
+<div class="line">                std::pmr::memory_resource *alloc);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Emitting data into active cursor block</span></div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#aba2f6868206fd81705b42998041833a8">emit8</a>(uint8_t val);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#a98cbed306290bacc12e913c732f4485f">emit16</a>(uint16_t val);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#af92959cbf4cb2b6842d61c3006d7268b">emit32</a>(uint32_t val);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#a50010a3daf0f7d1fe097f4c4b77ba325">emit64</a>(uint64_t val);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#ae9ebea205be57f16a5039120e6cfc7c2">emitBytes</a>(<span class="keyword">const</span> uint8_t *data, <span class="keywordtype">size_t</span> size);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#af52f452a2a881a6ff516ea4495c5e830">emitBytesWithEndian</a>(<span class="keyword">const</span> uint8_t *data, <span class="keywordtype">size_t</span> size, <a class="code hl_enumeration" href="_code_section_8h.html#a694798b52d62dfb1ffb4d51e74576316">TargetEndianness</a> inputEndianness);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Node insertion &amp; cursor management</span></div>
+<div class="line">    <a class="code hl_struct" href="struct_section_node.html">SectionNode</a> *<a class="code hl_function" href="class_code_section.html#a257af1b025ec7ffe71c802eceba33656">bindLabel</a>(<a class="code hl_typedef" href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a> labelId);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#a5d2d960612e3a7c9290878dc205eb734">alignTo</a>(<span class="keywordtype">size_t</span> alignment);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#a43ed9247cafe2b40763c112ee60f2369">setCursor</a>(<a class="code hl_struct" href="struct_section_node.html">SectionNode</a> *node);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#a6e52e82f53e2d4c3382283f5212e0839">resetCursorToEnd</a>();</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Flattening and post-finalize patching</span></div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_section.html#a5f4c6706cb15f8ec2473156d8343d490">finalize</a>(); <span class="comment">// Flattens all nodes into m_buffer, computing label offsets</span></div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_code_section.html#ad166ed2cf31bc3823da56cfa91fa9b26">patch32</a>(uint64_t offset, uint32_t val);</div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_code_section.html#a7409edb37a51450c525e516a44327430">patch64</a>(uint64_t offset, uint64_t val);</div>
+<div class="line"> </div>
+<div class="line">    uint64_t <a class="code hl_function" href="class_code_section.html#ad17dfba228e95d45a0ca347f675480fc">getCurrentOffset</a>() <span class="keyword">const</span>;</div>
+<div class="line">};</div>
+<div class="ttc" id="a_code_section_8h_html_a694798b52d62dfb1ffb4d51e74576316"><div class="ttname"><a href="_code_section_8h.html#a694798b52d62dfb1ffb4d51e74576316">TargetEndianness</a></div><div class="ttdeci">TargetEndianness</div><div class="ttdef"><b>Definition</b> CodeSection.h:39</div></div>
 <div class="ttc" id="aclass_code_section_html"><div class="ttname"><a href="class_code_section.html">CodeSection</a></div><div class="ttdef"><b>Definition</b> CodeSection.h:86</div></div>
-<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_elf64_writer_html"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_elf64_writer.html">EzCodeEmitter::ObjectFormat::Elf64Writer</a></div><div class="ttdef"><b>Definition</b> Elf64Writer.h:20</div></div>
-<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_elf64_writer_html_a80ce136207863395dd04d14e6d10fb2a"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_elf64_writer.html#a80ce136207863395dd04d14e6d10fb2a">EzCodeEmitter::ObjectFormat::Elf64Writer::write</a></div><div class="ttdeci">std::vector&lt; uint8_t &gt; write(const std::pmr::unordered_map&lt; SectionType, CodeSection * &gt; &amp;sections) override</div></div>
-<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_elf64_writer_html_ae182863d91f2e4a502fa9ef97bf3e180"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_elf64_writer.html#ae182863d91f2e4a502fa9ef97bf3e180">EzCodeEmitter::ObjectFormat::Elf64Writer::addSymbol</a></div><div class="ttdeci">void addSymbol(const ObjectSymbol &amp;sym) override</div></div>
+<div class="ttc" id="aclass_code_section_html_a257af1b025ec7ffe71c802eceba33656"><div class="ttname"><a href="class_code_section.html#a257af1b025ec7ffe71c802eceba33656">CodeSection::bindLabel</a></div><div class="ttdeci">SectionNode * bindLabel(MirId labelId)</div></div>
+<div class="ttc" id="aclass_code_section_html_a43ed9247cafe2b40763c112ee60f2369"><div class="ttname"><a href="class_code_section.html#a43ed9247cafe2b40763c112ee60f2369">CodeSection::setCursor</a></div><div class="ttdeci">void setCursor(SectionNode *node)</div></div>
+<div class="ttc" id="aclass_code_section_html_a50010a3daf0f7d1fe097f4c4b77ba325"><div class="ttname"><a href="class_code_section.html#a50010a3daf0f7d1fe097f4c4b77ba325">CodeSection::emit64</a></div><div class="ttdeci">void emit64(uint64_t val)</div></div>
+<div class="ttc" id="aclass_code_section_html_a5d2d960612e3a7c9290878dc205eb734"><div class="ttname"><a href="class_code_section.html#a5d2d960612e3a7c9290878dc205eb734">CodeSection::alignTo</a></div><div class="ttdeci">void alignTo(size_t alignment)</div></div>
+<div class="ttc" id="aclass_code_section_html_a5f4c6706cb15f8ec2473156d8343d490"><div class="ttname"><a href="class_code_section.html#a5f4c6706cb15f8ec2473156d8343d490">CodeSection::finalize</a></div><div class="ttdeci">void finalize()</div></div>
+<div class="ttc" id="aclass_code_section_html_a6e52e82f53e2d4c3382283f5212e0839"><div class="ttname"><a href="class_code_section.html#a6e52e82f53e2d4c3382283f5212e0839">CodeSection::resetCursorToEnd</a></div><div class="ttdeci">void resetCursorToEnd()</div></div>
+<div class="ttc" id="aclass_code_section_html_a7409edb37a51450c525e516a44327430"><div class="ttname"><a href="class_code_section.html#a7409edb37a51450c525e516a44327430">CodeSection::patch64</a></div><div class="ttdeci">bool patch64(uint64_t offset, uint64_t val)</div></div>
+<div class="ttc" id="aclass_code_section_html_a98cbed306290bacc12e913c732f4485f"><div class="ttname"><a href="class_code_section.html#a98cbed306290bacc12e913c732f4485f">CodeSection::emit16</a></div><div class="ttdeci">void emit16(uint16_t val)</div></div>
+<div class="ttc" id="aclass_code_section_html_aba2f6868206fd81705b42998041833a8"><div class="ttname"><a href="class_code_section.html#aba2f6868206fd81705b42998041833a8">CodeSection::emit8</a></div><div class="ttdeci">void emit8(uint8_t val)</div></div>
+<div class="ttc" id="aclass_code_section_html_ad166ed2cf31bc3823da56cfa91fa9b26"><div class="ttname"><a href="class_code_section.html#ad166ed2cf31bc3823da56cfa91fa9b26">CodeSection::patch32</a></div><div class="ttdeci">bool patch32(uint64_t offset, uint32_t val)</div></div>
+<div class="ttc" id="aclass_code_section_html_ad17dfba228e95d45a0ca347f675480fc"><div class="ttname"><a href="class_code_section.html#ad17dfba228e95d45a0ca347f675480fc">CodeSection::getCurrentOffset</a></div><div class="ttdeci">uint64_t getCurrentOffset() const</div></div>
+<div class="ttc" id="aclass_code_section_html_ae9ebea205be57f16a5039120e6cfc7c2"><div class="ttname"><a href="class_code_section.html#ae9ebea205be57f16a5039120e6cfc7c2">CodeSection::emitBytes</a></div><div class="ttdeci">void emitBytes(const uint8_t *data, size_t size)</div></div>
+<div class="ttc" id="aclass_code_section_html_af52f452a2a881a6ff516ea4495c5e830"><div class="ttname"><a href="class_code_section.html#af52f452a2a881a6ff516ea4495c5e830">CodeSection::emitBytesWithEndian</a></div><div class="ttdeci">void emitBytesWithEndian(const uint8_t *data, size_t size, TargetEndianness inputEndianness)</div></div>
+<div class="ttc" id="aclass_code_section_html_af92959cbf4cb2b6842d61c3006d7268b"><div class="ttname"><a href="class_code_section.html#af92959cbf4cb2b6842d61c3006d7268b">CodeSection::emit32</a></div><div class="ttdeci">void emit32(uint32_t val)</div></div>
+<div class="ttc" id="aclass_code_section_html_afdabcc4c7f690f0edc3a1ec30a9e8657"><div class="ttname"><a href="class_code_section.html#afdabcc4c7f690f0edc3a1ec30a9e8657">CodeSection::CodeSection</a></div><div class="ttdeci">CodeSection(SectionFlags flags, SectionType type, size_t alignment, TargetEndianness endianness, uint8_t padByte, std::string_view name, std::pmr::memory_resource *alloc)</div></div>
+<div class="ttc" id="astruct_section_flags_html"><div class="ttname"><a href="struct_section_flags.html">SectionFlags</a></div><div class="ttdef"><b>Definition</b> CodeSection.h:29</div></div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md140"></a>
-5. API Reference &amp; Further Reading</h1>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md131"></a>
+3. Emission Context &amp; Relocations (<span class="tt">CodeEmitterContext.h</span>)</h1>
+<p><span class="tt"><a class="el" href="class_code_emitter_context.html">CodeEmitterContext</a></span> manages the lifetime of labels and relocations during code generation across all modules and sections:</p>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md132"></a>
+3.1 Relocation Fixup Types (<span class="tt">TargetCodeRelocationType</span>)</h2>
+<div class="fragment"><div class="line"><span class="keyword">enum class</span> <a class="code hl_enumeration" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a> : uint8_t</div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_enumvalue" href="_mir_instruction_metadata_8h.html#a2b0a34e525d8f8948e7cd2dc9d30fe62a6adf97f83acf6453d4a6a4b1070f3754">None</a>,</div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda2783feae5efb387bca2045c71b359f2f">Absolute32</a>,  <span class="comment">// Direct 32-bit absolute address fixup</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cdaadbd299284ce2d999649e894dff1441a">Absolute64</a>,  <span class="comment">// Direct 64-bit absolute address fixup</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda5b64637d481d90f69f96d0131324c1c4">PCRel32</a>,     <span class="comment">// 32-bit signed PC-relative (RIP-relative) data displacement</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda24d717993fa25601a220a356defa36bc">BranchRel32</a>, <span class="comment">// 32-bit signed PC-relative branch or call offset</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda5a701ba8a2d0ff0750372f03393087e5">GOTPCREL</a>,    <span class="comment">// 32-bit PC-relative reference to Global Offset Table entry</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda6d738fbac5034f1d83a4127dcb45eb99">PLTRel32</a>     <span class="comment">// 32-bit PC-relative reference to Procedure Linkage Table entry</span></div>
+<div class="line">};</div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cd"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a></div><div class="ttdeci">TargetCodeRelocationType</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:18</div></div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cda24d717993fa25601a220a356defa36bc"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda24d717993fa25601a220a356defa36bc">TargetCodeRelocationType::BranchRel32</a></div><div class="ttdeci">@ BranchRel32</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:32</div></div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cda2783feae5efb387bca2045c71b359f2f"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda2783feae5efb387bca2045c71b359f2f">TargetCodeRelocationType::Absolute32</a></div><div class="ttdeci">@ Absolute32</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:23</div></div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cda5a701ba8a2d0ff0750372f03393087e5"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda5a701ba8a2d0ff0750372f03393087e5">TargetCodeRelocationType::GOTPCREL</a></div><div class="ttdeci">@ GOTPCREL</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:35</div></div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cda5b64637d481d90f69f96d0131324c1c4"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda5b64637d481d90f69f96d0131324c1c4">TargetCodeRelocationType::PCRel32</a></div><div class="ttdeci">@ PCRel32</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:29</div></div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cda6d738fbac5034f1d83a4127dcb45eb99"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda6d738fbac5034f1d83a4127dcb45eb99">TargetCodeRelocationType::PLTRel32</a></div><div class="ttdeci">@ PLTRel32</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:38</div></div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cdaadbd299284ce2d999649e894dff1441a"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cdaadbd299284ce2d999649e894dff1441a">TargetCodeRelocationType::Absolute64</a></div><div class="ttdeci">@ Absolute64</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:26</div></div>
+<div class="ttc" id="a_mir_instruction_metadata_8h_html_a2b0a34e525d8f8948e7cd2dc9d30fe62a6adf97f83acf6453d4a6a4b1070f3754"><div class="ttname"><a href="_mir_instruction_metadata_8h.html#a2b0a34e525d8f8948e7cd2dc9d30fe62a6adf97f83acf6453d4a6a4b1070f3754">ExpectedOperandType::None</a></div><div class="ttdeci">@ None</div><div class="ttdef"><b>Definition</b> MirInstructionMetadata.h:13</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md133"></a>
+3.2 Label &amp; Relocation Records</h2>
+<div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_code_label.html">CodeLabel</a></div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_class" href="class_code_section.html">CodeSection</a> *<a class="code hl_variable" href="struct_code_label.html#aed58d9c51c12117ce27c31d2eb45304b">m_definingSection</a>{ <span class="keyword">nullptr</span> };</div>
+<div class="line">    <a class="code hl_struct" href="struct_section_node.html">SectionNode</a> *<a class="code hl_variable" href="struct_code_label.html#ac34864d5e7858927d8917e93a9ceb972">m_node</a>{ <span class="keyword">nullptr</span> };</div>
+<div class="line">    <a class="code hl_typedef" href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a> <a class="code hl_variable" href="struct_code_label.html#ae579e39cdf31df6eae695d781c18cf27">m_id</a>{ <a class="code hl_variable" href="_ez_mir_common_8h.html#a8cfee6c0fa4d31b1b2afb4ceedd5bb72">MIRID_INVALID</a> };</div>
+<div class="line">    uint64_t <a class="code hl_variable" href="struct_code_label.html#abaefab3f53bf27fa2fe9fba9bcf8a35d">m_currentOffset</a>{ 0 };</div>
+<div class="line">    uint64_t <a class="code hl_variable" href="struct_code_label.html#a27f34ffc387ae614158b1c668da74eb7">m_labelAddress</a>{ 0 };</div>
+<div class="line">    std::string_view <a class="code hl_variable" href="struct_code_label.html#a6185595c6f9f84ee4c82290ba8f857a7">m_name</a>{};</div>
+<div class="line"> </div>
+<div class="line">    uint64_t <a class="code hl_function" href="struct_code_label.html#ab9a1b8112bcffb78fbb51c3041413240">getAddress</a>()<span class="keyword"> const </span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="struct_code_label.html#ac34864d5e7858927d8917e93a9ceb972">m_node</a> ? <a class="code hl_variable" href="struct_code_label.html#ac34864d5e7858927d8917e93a9ceb972">m_node</a>-&gt;m_calculatedOffset : <a class="code hl_variable" href="struct_code_label.html#a27f34ffc387ae614158b1c668da74eb7">m_labelAddress</a>; }</div>
+<div class="line">};</div>
+<div class="line"> </div>
+<div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_code_relocation.html">CodeRelocation</a></div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_enumeration" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a> <a class="code hl_variable" href="struct_code_relocation.html#a6caa6f7746cfc9972fedbad034901527">m_relocType</a>{ <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda6adf97f83acf6453d4a6a4b1070f3754">TargetCodeRelocationType::None</a> };</div>
+<div class="line">    CodeSection *<a class="code hl_variable" href="struct_code_relocation.html#aead4cafb9454e82b4304dc14736f8a3f">m_definingSection</a>{ <span class="keyword">nullptr</span> };</div>
+<div class="line">    MirReference *<a class="code hl_variable" href="struct_code_relocation.html#ac4e31d33596c0444e0819fa31b28c8f8">m_srcRef</a>{ <span class="keyword">nullptr</span> }; <span class="comment">// Originating MIR reference</span></div>
+<div class="line">    uint64_t <a class="code hl_variable" href="struct_code_relocation.html#a28ab0c230ab49038b4c371c8ccb2f9ee">m_address</a>{ 0 };          <span class="comment">// Offset from start of section</span></div>
+<div class="line">};</div>
+<div class="ttc" id="a_code_emitter_context_8h_html_ad4c9146b45971ea57c56732ded5525cda6adf97f83acf6453d4a6a4b1070f3754"><div class="ttname"><a href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda6adf97f83acf6453d4a6a4b1070f3754">TargetCodeRelocationType::None</a></div><div class="ttdeci">@ None</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:20</div></div>
+<div class="ttc" id="astruct_code_label_html"><div class="ttname"><a href="struct_code_label.html">CodeLabel</a></div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:45</div></div>
+<div class="ttc" id="astruct_code_label_html_a27f34ffc387ae614158b1c668da74eb7"><div class="ttname"><a href="struct_code_label.html#a27f34ffc387ae614158b1c668da74eb7">CodeLabel::m_labelAddress</a></div><div class="ttdeci">uint64_t m_labelAddress</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:50</div></div>
+<div class="ttc" id="astruct_code_label_html_a6185595c6f9f84ee4c82290ba8f857a7"><div class="ttname"><a href="struct_code_label.html#a6185595c6f9f84ee4c82290ba8f857a7">CodeLabel::m_name</a></div><div class="ttdeci">std::string_view m_name</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:51</div></div>
+<div class="ttc" id="astruct_code_label_html_ab9a1b8112bcffb78fbb51c3041413240"><div class="ttname"><a href="struct_code_label.html#ab9a1b8112bcffb78fbb51c3041413240">CodeLabel::getAddress</a></div><div class="ttdeci">uint64_t getAddress() const</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:53</div></div>
+<div class="ttc" id="astruct_code_label_html_abaefab3f53bf27fa2fe9fba9bcf8a35d"><div class="ttname"><a href="struct_code_label.html#abaefab3f53bf27fa2fe9fba9bcf8a35d">CodeLabel::m_currentOffset</a></div><div class="ttdeci">uint64_t m_currentOffset</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:49</div></div>
+<div class="ttc" id="astruct_code_label_html_ac34864d5e7858927d8917e93a9ceb972"><div class="ttname"><a href="struct_code_label.html#ac34864d5e7858927d8917e93a9ceb972">CodeLabel::m_node</a></div><div class="ttdeci">SectionNode * m_node</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:47</div></div>
+<div class="ttc" id="astruct_code_label_html_ae579e39cdf31df6eae695d781c18cf27"><div class="ttname"><a href="struct_code_label.html#ae579e39cdf31df6eae695d781c18cf27">CodeLabel::m_id</a></div><div class="ttdeci">MirId m_id</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:48</div></div>
+<div class="ttc" id="astruct_code_label_html_aed58d9c51c12117ce27c31d2eb45304b"><div class="ttname"><a href="struct_code_label.html#aed58d9c51c12117ce27c31d2eb45304b">CodeLabel::m_definingSection</a></div><div class="ttdeci">CodeSection * m_definingSection</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:46</div></div>
+<div class="ttc" id="astruct_code_relocation_html"><div class="ttname"><a href="struct_code_relocation.html">CodeRelocation</a></div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:60</div></div>
+<div class="ttc" id="astruct_code_relocation_html_a28ab0c230ab49038b4c371c8ccb2f9ee"><div class="ttname"><a href="struct_code_relocation.html#a28ab0c230ab49038b4c371c8ccb2f9ee">CodeRelocation::m_address</a></div><div class="ttdeci">uint64_t m_address</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:64</div></div>
+<div class="ttc" id="astruct_code_relocation_html_a6caa6f7746cfc9972fedbad034901527"><div class="ttname"><a href="struct_code_relocation.html#a6caa6f7746cfc9972fedbad034901527">CodeRelocation::m_relocType</a></div><div class="ttdeci">TargetCodeRelocationType m_relocType</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:61</div></div>
+<div class="ttc" id="astruct_code_relocation_html_ac4e31d33596c0444e0819fa31b28c8f8"><div class="ttname"><a href="struct_code_relocation.html#ac4e31d33596c0444e0819fa31b28c8f8">CodeRelocation::m_srcRef</a></div><div class="ttdeci">MirReference * m_srcRef</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:63</div></div>
+<div class="ttc" id="astruct_code_relocation_html_aead4cafb9454e82b4304dc14736f8a3f"><div class="ttname"><a href="struct_code_relocation.html#aead4cafb9454e82b4304dc14736f8a3f">CodeRelocation::m_definingSection</a></div><div class="ttdeci">CodeSection * m_definingSection</div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:62</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md134"></a>
+3.3 <span class="tt">CodeEmitterContext</span> API</h2>
+<div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <a class="code hl_function" href="class_code_emitter_context.html#a063ff20225d4bc2538c4575f124e037d">CodeEmitterContext</a>(<a class="code hl_class" href="class_diagnostic_collector.html">DiagnosticCollector</a> *diagCollector,</div>
+<div class="line">                       <span class="keyword">const</span> std::pmr::unordered_map&lt;SectionType, CodeSection *&gt; &amp;sections,</div>
+<div class="line">                       std::pmr::memory_resource *alloc);</div>
+<div class="line">    <a class="code hl_function" href="class_code_emitter_context.html#a95780d05d6593664c1e9fcf2f38461ae">~CodeEmitterContext</a>();</div>
+<div class="line"> </div>
+<div class="line">    <a class="code hl_struct" href="struct_code_label.html">CodeLabel</a> *<a class="code hl_function" href="class_code_emitter_context.html#a7611a642fd634ec5d04edbad7539c7e2">getOrCreateLabel</a>(<a class="code hl_class" href="class_code_section.html">CodeSection</a> *definingSection, <a class="code hl_typedef" href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a> <span class="keywordtype">id</span>, std::string_view name);</div>
+<div class="line">    <a class="code hl_struct" href="struct_code_label.html">CodeLabel</a> *<a class="code hl_function" href="class_code_emitter_context.html#a0e5d3cb8ebe05833c3f2e60f98fdcd9c">getCurrentLabel</a>() <span class="keyword">const</span>;</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_emitter_context.html#a3c37c69f52e5e8030b4dc003672547a8">bindLabel</a>(<a class="code hl_struct" href="struct_code_label.html">CodeLabel</a> *label);</div>
+<div class="line"> </div>
+<div class="line">    <a class="code hl_struct" href="struct_code_relocation.html">CodeRelocation</a> *<a class="code hl_function" href="class_code_emitter_context.html#a367e9c55302a8b73d6af898e1e5ad7b4">addReloc</a>(<a class="code hl_class" href="class_mir_reference.html">MirReference</a> *srcRef, <a class="code hl_enumeration" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a> relocType);</div>
+<div class="line">    <a class="code hl_struct" href="struct_code_relocation.html">CodeRelocation</a> *<a class="code hl_function" href="class_code_emitter_context.html#a4c3ccae826c28e1d0978da688b483dd8">addRelocAt</a>(<a class="code hl_class" href="class_mir_reference.html">MirReference</a> *srcRef, <a class="code hl_enumeration" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a> relocType, uint64_t address);</div>
+<div class="line"> </div>
+<div class="line">    <a class="code hl_class" href="class_code_section.html">CodeSection</a> *<a class="code hl_function" href="class_code_emitter_context.html#aba178b83c3796eff4fdff14dd936ee70">getCurrentSection</a>() <span class="keyword">const</span>;</div>
+<div class="line">    <a class="code hl_class" href="class_code_section.html">CodeSection</a> *<a class="code hl_function" href="class_code_emitter_context.html#a3174aacfe0ed80ca1a69df7bdda246b6">getSection</a>(<a class="code hl_enumeration" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a> type) <span class="keyword">const</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_code_emitter_context.html#aa849b1523507b4d2938e8a41b14944ea">resetFuncState</a>(<a class="code hl_class" href="class_mir_function.html">MirFunction</a> *currentFunc);</div>
+<div class="line">    <a class="code hl_struct" href="struct_code_label.html">CodeLabel</a> *<a class="code hl_function" href="class_code_emitter_context.html#ae8fba5104011e1b8d0c4949a85fbb2a6">findLabel</a>(<a class="code hl_typedef" href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a> <span class="keywordtype">id</span>) <span class="keyword">const</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">const</span> std::pmr::unordered_map&lt;CodeSection *, std::pmr::vector&lt;CodeRelocation *&gt;&gt; &amp;<a class="code hl_function" href="class_code_emitter_context.html#ac75cf37b5dab4712ac7c821d4e381a6e">getRelocations</a>() <span class="keyword">const</span>;</div>
+<div class="line">};</div>
+<div class="ttc" id="aclass_code_emitter_context_html"><div class="ttname"><a href="class_code_emitter_context.html">CodeEmitterContext</a></div><div class="ttdef"><b>Definition</b> CodeEmitterContext.h:72</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a063ff20225d4bc2538c4575f124e037d"><div class="ttname"><a href="class_code_emitter_context.html#a063ff20225d4bc2538c4575f124e037d">CodeEmitterContext::CodeEmitterContext</a></div><div class="ttdeci">CodeEmitterContext(DiagnosticCollector *diagCollector, const std::pmr::unordered_map&lt; SectionType, CodeSection * &gt; &amp;sections, std::pmr::memory_resource *alloc)</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a0e5d3cb8ebe05833c3f2e60f98fdcd9c"><div class="ttname"><a href="class_code_emitter_context.html#a0e5d3cb8ebe05833c3f2e60f98fdcd9c">CodeEmitterContext::getCurrentLabel</a></div><div class="ttdeci">CodeLabel * getCurrentLabel() const</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a3174aacfe0ed80ca1a69df7bdda246b6"><div class="ttname"><a href="class_code_emitter_context.html#a3174aacfe0ed80ca1a69df7bdda246b6">CodeEmitterContext::getSection</a></div><div class="ttdeci">CodeSection * getSection(SectionType type) const</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a367e9c55302a8b73d6af898e1e5ad7b4"><div class="ttname"><a href="class_code_emitter_context.html#a367e9c55302a8b73d6af898e1e5ad7b4">CodeEmitterContext::addReloc</a></div><div class="ttdeci">CodeRelocation * addReloc(MirReference *srcRef, TargetCodeRelocationType relocType)</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a3c37c69f52e5e8030b4dc003672547a8"><div class="ttname"><a href="class_code_emitter_context.html#a3c37c69f52e5e8030b4dc003672547a8">CodeEmitterContext::bindLabel</a></div><div class="ttdeci">void bindLabel(CodeLabel *label)</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a4c3ccae826c28e1d0978da688b483dd8"><div class="ttname"><a href="class_code_emitter_context.html#a4c3ccae826c28e1d0978da688b483dd8">CodeEmitterContext::addRelocAt</a></div><div class="ttdeci">CodeRelocation * addRelocAt(MirReference *srcRef, TargetCodeRelocationType relocType, uint64_t address)</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a7611a642fd634ec5d04edbad7539c7e2"><div class="ttname"><a href="class_code_emitter_context.html#a7611a642fd634ec5d04edbad7539c7e2">CodeEmitterContext::getOrCreateLabel</a></div><div class="ttdeci">CodeLabel * getOrCreateLabel(CodeSection *definingSection, MirId id, std::string_view name)</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_a95780d05d6593664c1e9fcf2f38461ae"><div class="ttname"><a href="class_code_emitter_context.html#a95780d05d6593664c1e9fcf2f38461ae">CodeEmitterContext::~CodeEmitterContext</a></div><div class="ttdeci">~CodeEmitterContext()</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_aa849b1523507b4d2938e8a41b14944ea"><div class="ttname"><a href="class_code_emitter_context.html#aa849b1523507b4d2938e8a41b14944ea">CodeEmitterContext::resetFuncState</a></div><div class="ttdeci">void resetFuncState(MirFunction *currentFunc)</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_aba178b83c3796eff4fdff14dd936ee70"><div class="ttname"><a href="class_code_emitter_context.html#aba178b83c3796eff4fdff14dd936ee70">CodeEmitterContext::getCurrentSection</a></div><div class="ttdeci">CodeSection * getCurrentSection() const</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_ac75cf37b5dab4712ac7c821d4e381a6e"><div class="ttname"><a href="class_code_emitter_context.html#ac75cf37b5dab4712ac7c821d4e381a6e">CodeEmitterContext::getRelocations</a></div><div class="ttdeci">const std::pmr::unordered_map&lt; CodeSection *, std::pmr::vector&lt; CodeRelocation * &gt; &gt; &amp; getRelocations() const</div></div>
+<div class="ttc" id="aclass_code_emitter_context_html_ae8fba5104011e1b8d0c4949a85fbb2a6"><div class="ttname"><a href="class_code_emitter_context.html#ae8fba5104011e1b8d0c4949a85fbb2a6">CodeEmitterContext::findLabel</a></div><div class="ttdeci">CodeLabel * findLabel(MirId id) const</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html"><div class="ttname"><a href="class_diagnostic_collector.html">DiagnosticCollector</a></div><div class="ttdef"><b>Definition</b> DiagnosticCollector.h:16</div></div>
+<div class="ttc" id="aclass_mir_function_html"><div class="ttname"><a href="class_mir_function.html">MirFunction</a></div><div class="ttdef"><b>Definition</b> MirFunction.h:29</div></div>
+<div class="ttc" id="aclass_mir_reference_html"><div class="ttname"><a href="class_mir_reference.html">MirReference</a></div><div class="ttdef"><b>Definition</b> MirOperands.h:120</div></div>
+</div><!-- fragment --><hr  />
+<h1 class="doxsection"><a class="anchor" id="autotoc_md136"></a>
+4. Generic Target Code Emitter (<span class="tt">GenericCodeEmitter.h</span>)</h1>
+<p>The abstract interface implemented by each target architecture (e.g. <span class="tt">X86_64CodeEmitter</span>):</p>
+<div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_generic_code_emitter.html">GenericCodeEmitter</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <span class="keyword">virtual</span> <a class="code hl_function" href="class_generic_code_emitter.html#a14d214784ce0bd938a1db326e29063b5">~GenericCodeEmitter</a>() = <span class="keywordflow">default</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a37085e4e417c950de5736d32c1013552">beginFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx, std::string_view name) = 0;</div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a37085e4e417c950de5736d32c1013552">beginFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx, <a class="code hl_class" href="class_mir_function.html">MirFunction</a> *func);</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a82a34a0c7bfefe1ba65ed779b0e0dfa7">bindLabel</a>(<a class="code hl_typedef" href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a> labelId) = 0;</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a0202dcac0c104c18cbac369d9be5210a">endFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx) = 0;</div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a0202dcac0c104c18cbac369d9be5210a">endFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx, <a class="code hl_class" href="class_mir_function.html">MirFunction</a> *func);</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#ad6596c4e3c5fddf96be281fe6c2ebddf">emitInst</a>(<span class="keyword">const</span> <a class="code hl_class" href="class_mir_target_instruction_desc.html">MirTargetInstructionDesc</a> *desc, std::span&lt;MirOperand *const&gt; operands) = 0;</div>
+<div class="line">};</div>
+<div class="ttc" id="aclass_generic_code_emitter_html"><div class="ttname"><a href="class_generic_code_emitter.html">GenericCodeEmitter</a></div><div class="ttdef"><b>Definition</b> GenericCodeEmitter.h:22</div></div>
+<div class="ttc" id="aclass_generic_code_emitter_html_a0202dcac0c104c18cbac369d9be5210a"><div class="ttname"><a href="class_generic_code_emitter.html#a0202dcac0c104c18cbac369d9be5210a">GenericCodeEmitter::endFunction</a></div><div class="ttdeci">virtual void endFunction(CodeEmitterContext *ctx)=0</div></div>
+<div class="ttc" id="aclass_generic_code_emitter_html_a14d214784ce0bd938a1db326e29063b5"><div class="ttname"><a href="class_generic_code_emitter.html#a14d214784ce0bd938a1db326e29063b5">GenericCodeEmitter::~GenericCodeEmitter</a></div><div class="ttdeci">virtual ~GenericCodeEmitter()=default</div></div>
+<div class="ttc" id="aclass_generic_code_emitter_html_a37085e4e417c950de5736d32c1013552"><div class="ttname"><a href="class_generic_code_emitter.html#a37085e4e417c950de5736d32c1013552">GenericCodeEmitter::beginFunction</a></div><div class="ttdeci">virtual void beginFunction(CodeEmitterContext *ctx, std::string_view name)=0</div></div>
+<div class="ttc" id="aclass_generic_code_emitter_html_a82a34a0c7bfefe1ba65ed779b0e0dfa7"><div class="ttname"><a href="class_generic_code_emitter.html#a82a34a0c7bfefe1ba65ed779b0e0dfa7">GenericCodeEmitter::bindLabel</a></div><div class="ttdeci">virtual void bindLabel(MirId labelId)=0</div></div>
+<div class="ttc" id="aclass_generic_code_emitter_html_ad6596c4e3c5fddf96be281fe6c2ebddf"><div class="ttname"><a href="class_generic_code_emitter.html#ad6596c4e3c5fddf96be281fe6c2ebddf">GenericCodeEmitter::emitInst</a></div><div class="ttdeci">virtual void emitInst(const MirTargetInstructionDesc *desc, std::span&lt; MirOperand *const &gt; operands)=0</div></div>
+<div class="ttc" id="aclass_mir_target_instruction_desc_html"><div class="ttname"><a href="class_mir_target_instruction_desc.html">MirTargetInstructionDesc</a></div><div class="ttdef"><b>Definition</b> MirTargetInstructionDesc.h:16</div></div>
+</div><!-- fragment --><hr  />
+<h1 class="doxsection"><a class="anchor" id="autotoc_md138"></a>
+5. Relocatable Object File Writers (<span class="tt">IObjectWriter.h</span>)</h1>
+<p><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a> serializes in-memory code sections into industry-standard binary object files:</p>
+<div class="fragment"><div class="line"><span class="keyword">namespace </span><a class="code hl_namespace" href="namespace_ez_code_emitter_1_1_object_format.html">EzCodeEmitter::ObjectFormat</a></div>
+<div class="line">{</div>
+<div class="line"> </div>
+<div class="line"><span class="keyword">struct </span>ObjectSymbol</div>
+<div class="line">{</div>
+<div class="line">    std::string_view <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a21498d2f3c63a38e2a780256a32a20fb">m_name</a>;</div>
+<div class="line">    <a class="code hl_enumeration" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a> <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#ad253ec8387328c212b5c3874a7ab7e9c">m_section</a>{ <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da9dffbf69ffba8bc38bc4e01abf4b1675">SectionType::Text</a> };</div>
+<div class="line">    uint64_t <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a2c5524ee3d618b3aba879cad17eed457">m_offset</a>{ 0 };</div>
+<div class="line">    uint64_t <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a237f0afa9f8d2d2b3281130aaa523fc3">m_size</a>{ 0 };</div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a8cc5434372457725ce11edfeb56c4e98">m_isGlobal</a>{ <span class="keyword">true</span> };</div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#aba3620ece7d65a4250aa9c5598397702">m_isFunction</a>{ <span class="keyword">false</span> };</div>
+<div class="line">};</div>
+<div class="line"> </div>
+<div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html">ObjectRelocEntry</a></div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_enumeration" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a> <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#a10a0f122f550deef51282e1aefaca0d8">m_section</a>{ <a class="code hl_enumvalue" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da9dffbf69ffba8bc38bc4e01abf4b1675">SectionType::Text</a> };</div>
+<div class="line">    uint64_t <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#ac5bfb89d4aff3b19c719e3fdc26046cc">m_offset</a>{ 0 };</div>
+<div class="line">    std::string_view <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#a08c041744c7fcfaf62af6f0e4e7100e1">m_symbolName</a>;</div>
+<div class="line">    <a class="code hl_enumeration" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a> <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#a83f8540f0ed17522b94c28aa119b8c5e">m_type</a>{ <a class="code hl_enumvalue" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cda6adf97f83acf6453d4a6a4b1070f3754">TargetCodeRelocationType::None</a> };</div>
+<div class="line">    int64_t <a class="code hl_variable" href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#ad372c1507016351984c7e57347d58293">m_addend</a>{ 0 };</div>
+<div class="line">};</div>
+<div class="line"> </div>
+<div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html">IObjectWriter</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <span class="keyword">virtual</span> <a class="code hl_function" href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#aa6bda427606d3ffcc3b371ea1a7d2fbb">~IObjectWriter</a>() = <span class="keywordflow">default</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#ac5346c6fb63cf7adf39912b3e0d191d2">addSymbol</a>(<span class="keyword">const</span> ObjectSymbol &amp;sym) = 0;</div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#a7a791d3c67595e19029d277ea27c25bc">addRelocation</a>(<span class="keyword">const</span> ObjectRelocEntry &amp;reloc) = 0;</div>
+<div class="line">    <span class="keyword">virtual</span> std::vector&lt;uint8_t&gt; <a class="code hl_function" href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#a81fe5437faad5d43b870572df4e033ec">write</a>(<span class="keyword">const</span> std::pmr::unordered_map&lt;SectionType, CodeSection *&gt; &amp;sections) = 0;</div>
+<div class="line">    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code hl_function" href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#a3334f0f23b3f1f6312bd933fac809e5c">clear</a>() = 0;</div>
+<div class="line">};</div>
+<div class="line"> </div>
+<div class="line">}</div>
+<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_i_object_writer_html"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html">EzCodeEmitter::ObjectFormat::IObjectWriter</a></div><div class="ttdef"><b>Definition</b> IObjectWriter.h:20</div></div>
+<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_i_object_writer_html_a3334f0f23b3f1f6312bd933fac809e5c"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#a3334f0f23b3f1f6312bd933fac809e5c">EzCodeEmitter::ObjectFormat::IObjectWriter::clear</a></div><div class="ttdeci">virtual void clear()=0</div></div>
+<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_i_object_writer_html_a7a791d3c67595e19029d277ea27c25bc"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#a7a791d3c67595e19029d277ea27c25bc">EzCodeEmitter::ObjectFormat::IObjectWriter::addRelocation</a></div><div class="ttdeci">virtual void addRelocation(const ObjectRelocEntry &amp;reloc)=0</div></div>
+<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_i_object_writer_html_a81fe5437faad5d43b870572df4e033ec"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#a81fe5437faad5d43b870572df4e033ec">EzCodeEmitter::ObjectFormat::IObjectWriter::write</a></div><div class="ttdeci">virtual std::vector&lt; uint8_t &gt; write(const std::pmr::unordered_map&lt; SectionType, CodeSection * &gt; &amp;sections)=0</div></div>
+<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_i_object_writer_html_aa6bda427606d3ffcc3b371ea1a7d2fbb"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#aa6bda427606d3ffcc3b371ea1a7d2fbb">EzCodeEmitter::ObjectFormat::IObjectWriter::~IObjectWriter</a></div><div class="ttdeci">virtual ~IObjectWriter()=default</div></div>
+<div class="ttc" id="aclass_ez_code_emitter_1_1_object_format_1_1_i_object_writer_html_ac5346c6fb63cf7adf39912b3e0d191d2"><div class="ttname"><a href="class_ez_code_emitter_1_1_object_format_1_1_i_object_writer.html#ac5346c6fb63cf7adf39912b3e0d191d2">EzCodeEmitter::ObjectFormat::IObjectWriter::addSymbol</a></div><div class="ttdeci">virtual void addSymbol(const ObjectSymbol &amp;sym)=0</div></div>
+<div class="ttc" id="anamespace_ez_code_emitter_1_1_object_format_html"><div class="ttname"><a href="namespace_ez_code_emitter_1_1_object_format.html">EzCodeEmitter::ObjectFormat</a></div><div class="ttdef"><b>Definition</b> CoffWriter.h:11</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry_html"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html">EzCodeEmitter::ObjectFormat::ObjectRelocEntry</a></div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:35</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry_html_a08c041744c7fcfaf62af6f0e4e7100e1"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#a08c041744c7fcfaf62af6f0e4e7100e1">EzCodeEmitter::ObjectFormat::ObjectRelocEntry::m_symbolName</a></div><div class="ttdeci">std::string_view m_symbolName</div><div class="ttdoc">Name of the symbol the relocation points at.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:38</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry_html_a10a0f122f550deef51282e1aefaca0d8"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#a10a0f122f550deef51282e1aefaca0d8">EzCodeEmitter::ObjectFormat::ObjectRelocEntry::m_section</a></div><div class="ttdeci">SectionType m_section</div><div class="ttdoc">Section containing the field to be patched.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:36</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry_html_a83f8540f0ed17522b94c28aa119b8c5e"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#a83f8540f0ed17522b94c28aa119b8c5e">EzCodeEmitter::ObjectFormat::ObjectRelocEntry::m_type</a></div><div class="ttdeci">TargetCodeRelocationType m_type</div><div class="ttdoc">Fixup semantics.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:39</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry_html_ac5bfb89d4aff3b19c719e3fdc26046cc"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#ac5bfb89d4aff3b19c719e3fdc26046cc">EzCodeEmitter::ObjectFormat::ObjectRelocEntry::m_offset</a></div><div class="ttdeci">uint64_t m_offset</div><div class="ttdoc">Byte offset of the relocation field in that section.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:37</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry_html_ad372c1507016351984c7e57347d58293"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_reloc_entry.html#ad372c1507016351984c7e57347d58293">EzCodeEmitter::ObjectFormat::ObjectRelocEntry::m_addend</a></div><div class="ttdeci">int64_t m_addend</div><div class="ttdoc">Constant added to the resolved symbol value.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:40</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_symbol_html_a21498d2f3c63a38e2a780256a32a20fb"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a21498d2f3c63a38e2a780256a32a20fb">EzCodeEmitter::ObjectFormat::ObjectSymbol::m_name</a></div><div class="ttdeci">std::string_view m_name</div><div class="ttdoc">Symbol name as it appears in the object file.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:21</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_symbol_html_a237f0afa9f8d2d2b3281130aaa523fc3"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a237f0afa9f8d2d2b3281130aaa523fc3">EzCodeEmitter::ObjectFormat::ObjectSymbol::m_size</a></div><div class="ttdeci">uint64_t m_size</div><div class="ttdoc">Size of the symbol&#39;s data in bytes.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:24</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_symbol_html_a2c5524ee3d618b3aba879cad17eed457"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a2c5524ee3d618b3aba879cad17eed457">EzCodeEmitter::ObjectFormat::ObjectSymbol::m_offset</a></div><div class="ttdeci">uint64_t m_offset</div><div class="ttdoc">Byte offset from the start of its section.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:23</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_symbol_html_a8cc5434372457725ce11edfeb56c4e98"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#a8cc5434372457725ce11edfeb56c4e98">EzCodeEmitter::ObjectFormat::ObjectSymbol::m_isGlobal</a></div><div class="ttdeci">bool m_isGlobal</div><div class="ttdoc">True for external linkage, false for local.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:25</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_symbol_html_aba3620ece7d65a4250aa9c5598397702"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#aba3620ece7d65a4250aa9c5598397702">EzCodeEmitter::ObjectFormat::ObjectSymbol::m_isFunction</a></div><div class="ttdeci">bool m_isFunction</div><div class="ttdoc">True when the symbol marks executable code.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:26</div></div>
+<div class="ttc" id="astruct_ez_code_emitter_1_1_object_format_1_1_object_symbol_html_ad253ec8387328c212b5c3874a7ab7e9c"><div class="ttname"><a href="struct_ez_code_emitter_1_1_object_format_1_1_object_symbol.html#ad253ec8387328c212b5c3874a7ab7e9c">EzCodeEmitter::ObjectFormat::ObjectSymbol::m_section</a></div><div class="ttdeci">SectionType m_section</div><div class="ttdoc">Section the symbol is defined in.</div><div class="ttdef"><b>Definition</b> ObjectSymbol.h:22</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md139"></a>
+5.1 <span class="tt">Elf64Writer</span> (<span class="tt">ObjectFormat/Elf64Writer.h</span>)</h2>
 <ul>
-<li>Generated Doxygen API documentation: <a href="../doxygen/index.html">Doxygen Documentation Index</a></li>
-<li>Next subproject: <a class="el" href="md_docs_2projects_2_ez_triple.html" title="EzTriple Subproject Documentation">EzTriple Subproject Documentation</a></li>
-<li>Return to <a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Landing Page</a> </li>
+<li>Generates 64-bit relocatable ELF object files (<span class="tt">ET_REL</span>).</li>
+<li>Builds ELF section headers (<span class="tt">.text</span>, <span class="tt">.rodata</span>, <span class="tt">.data</span>, <span class="tt">.bss</span>, <span class="tt">.symtab</span>, <span class="tt">.strtab</span>, <span class="tt">.rela.text</span>).</li>
+<li>Maps <span class="tt"><a class="el" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a></span> into AMD64 ELF relocation types (<span class="tt">R_X86_64_64</span>, <span class="tt">R_X86_64_32</span>, <span class="tt">R_X86_64_PC32</span>, <span class="tt">R_X86_64_PLT32</span>, <span class="tt">R_X86_64_GOTPCREL</span>).</li>
 </ul>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md140"></a>
+5.2 <span class="tt">CoffWriter</span> (<span class="tt">ObjectFormat/CoffWriter.h</span>)</h2>
+<ul>
+<li>Generates Microsoft Common Object File Format (<span class="tt">PE-COFF</span>) relocatable object files.</li>
+<li>Builds COFF section headers (<span class="tt">.text$mn</span>, <span class="tt">.rdata</span>, <span class="tt">.data</span>).</li>
+<li>Maps <span class="tt"><a class="el" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a></span> into AMD64 COFF relocation types (<span class="tt">IMAGE_REL_AMD64_ADDR64</span>, <span class="tt">IMAGE_REL_AMD64_ADDR32NB</span>, <span class="tt">IMAGE_REL_AMD64_REL32</span>).</li>
+</ul>
+<hr  />
+<h1 class="doxsection"><a class="anchor" id="autotoc_md142"></a>
+6. Header &amp; Class Index</h1>
+<table class="markdownTable">
+<tr class="markdownTableHead">
+<th class="markdownTableHeadNone">Component  </th><th class="markdownTableHeadNone">Header Location  </th><th class="markdownTableHeadNone">Key Classes / Structs  </th></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Sections  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_code_section_8h.html">EzCodeEmitter/include/CodeSection.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_code_section.html">CodeSection</a></span>, <span class="tt"><a class="el" href="struct_section_node.html">SectionNode</a></span>, <span class="tt"><a class="el" href="_code_section_8h.html#a51d549969f6c12486266226dfbe5f1a2">SectionNodeKind</a></span>, <span class="tt"><a class="el" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a></span>, <span class="tt"><a class="el" href="struct_section_flags.html">SectionFlags</a></span>, <span class="tt"><a class="el" href="_code_section_8h.html#a694798b52d62dfb1ffb4d51e74576316">TargetEndianness</a></span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Context  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_code_emitter_context_8h.html">EzCodeEmitter/include/CodeEmitterContext.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_code_emitter_context.html">CodeEmitterContext</a></span>, <span class="tt"><a class="el" href="struct_code_label.html">CodeLabel</a></span>, <span class="tt"><a class="el" href="struct_code_relocation.html">CodeRelocation</a></span>, <span class="tt"><a class="el" href="_code_emitter_context_8h.html#ad4c9146b45971ea57c56732ded5525cd">TargetCodeRelocationType</a></span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Interface  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_generic_code_emitter_8h.html">EzCodeEmitter/include/GenericCodeEmitter.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_generic_code_emitter.html">GenericCodeEmitter</a></span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Results  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_encode_result_8h.html">EzCodeEmitter/include/Encoding/EncodeResult.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt">EncodeResult</span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Object Writer  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_i_object_writer_8h.html">EzCodeEmitter/include/ObjectFormat/IObjectWriter.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt">IObjectWriter</span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Object Writer  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_object_symbol_8h.html">EzCodeEmitter/include/ObjectFormat/ObjectSymbol.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt">ObjectSymbol</span>, <span class="tt">ObjectRelocEntry</span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Object Writer  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_elf64_writer_8h.html">EzCodeEmitter/include/ObjectFormat/Elf64Writer.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt">Elf64Writer</span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Object Writer  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_coff_writer_8h.html">EzCodeEmitter/include/ObjectFormat/CoffWriter.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt">CoffWriter</span>  </td></tr>
+</table>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

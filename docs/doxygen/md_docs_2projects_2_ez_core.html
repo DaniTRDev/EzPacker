@@ -94,11 +94,12 @@ $(function(){initNavTree('md_docs_2projects_2_ez_core.html','',''); });
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p><a class="anchor" id="autotoc_md162"></a></p>
-<p><a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Documentation Index</a> &gt; <b>EzCore</b></p>
+<p><a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Documentation Index</a> &gt; <a class="el" href="md_docs_2projects_2_ez_core.html" title="EzCore Subproject Documentation">Subprojects</a> &gt; <b>EzCore</b> | <a href="../doxygen/index.html">Doxygen API Reference</a></p>
 <hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md164"></a>
 1. Overview &amp; Architectural Role</h1>
-<p><span class="tt">EzCore</span> is the foundational utility and infrastructure library for EzPacker. Every other non-vendored subproject (<span class="tt"><a class="el" href="namespace_ez_mir.html">EzMir</a></span>, <span class="tt">EzDsl</span>, <span class="tt"><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a></span>, <span class="tt"><a class="el" href="namespace_ez_triple.html">EzTriple</a></span>, <span class="tt"><a class="el" href="namespace_ez_compiler.html">EzCompiler</a></span>, <span class="tt"><a class="el" href="namespace_ez_targets.html">EzTargets</a></span>) depends on <span class="tt">EzCore</span>. It provides standardized primitives, polymorphic memory management abstractions, a fluent compiler diagnostic reporting engine, arbitrary-precision numerical representations for compiler constants, specialized compiler data structures, and source coordinate mapping.</p>
+<p><span class="tt">EzCore</span> is the foundational utility and infrastructure library of the EzPacker compiler framework. Every other non-vendored subproject in the repository—including <span class="tt"><a class="el" href="namespace_ez_mir.html">EzMir</a></span>, <span class="tt">EzDsl</span>, <span class="tt"><a class="el" href="namespace_ez_code_emitter.html">EzCodeEmitter</a></span>, <span class="tt"><a class="el" href="namespace_ez_triple.html">EzTriple</a></span>, <span class="tt"><a class="el" href="namespace_ez_compiler.html">EzCompiler</a></span>, and <span class="tt"><a class="el" href="namespace_ez_targets.html">EzTargets</a></span>—directly depends upon <span class="tt">EzCore</span>.</p>
+<p>It is deliberately designed to provide machine-independent primitives, zero-overhead data structures, high-performance polymorphic memory management abstractions, a fluent and thread-safe compiler diagnostic reporting engine, arbitrary-precision numerical representations for compiler constants, and unified source coordinate management.</p>
 <div class="fragment"><div class="line">  +-------------------------------------------------------------+</div>
 <div class="line">  |                         EzCompiler                          |</div>
 <div class="line">  +-------------------------------------------------------------+</div>
@@ -120,202 +121,509 @@ $(function(){initNavTree('md_docs_2projects_2_ez_core.html','',''); });
 Key Responsibilities</h2>
 <ul>
 <li><b>Polymorphic Memory Resource (PMR) Integration</b>: Standardized allocation patterns using <span class="tt">std::pmr::memory_resource</span> to minimize heap churn during compilation passes.</li>
-<li><b>Compiler Diagnostic Subsystem</b>: Structured, thread-safe, severity-graded diagnostic emission with line-column coordinates, source snippets, and ANSI color highlighting.</li>
-<li><b>Arbitrary-Precision Numbers (<span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a></span> and <span class="tt"><a class="el" href="class_flex_float.html">FlexFloat</a></span>)</b>: Machine-independent constant representation capable of modeling any target integer width (1 to 256+ bits) and IEEE 754 floating-point format (f32, f64, f128).</li>
-<li><b>Compiler-Optimized Containers</b>: Intrusive linked lists for zero-overhead instruction streams and dense bit sets for bit-vector dataflow analysis.</li>
-<li><b>Source Coordinate Tracking</b>: Unified buffer and coordinate management translating byte offsets into file, line, and column positions.</li>
+<li><b>Compiler Diagnostic Subsystem</b>: Thread-safe diagnostic collection, severity classification, scoped message staging, formatted note appending, and ANSI terminal rendering.</li>
+<li><b>Arbitrary-Precision Numbers (<span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a></span> and <span class="tt"><a class="el" href="class_flex_float.html">FlexFloat</a></span>)</b>: Machine-independent constant representation capable of modeling any target integer bit-width (1 to 256+ bits) using LibTomMath and floating-point values using LibBf.</li>
+<li><b>Compiler-Optimized Containers</b>: <span class="tt"><a class="el" href="class_intrusive_linked_list.html">IntrusiveLinkedList</a>&lt;T&gt;</span> for zero-overhead instruction streams and <span class="tt"><a class="el" href="class_dense_bit_set.html">DenseBitSet</a></span> for fast bit-vector dataflow analysis and liveness transfer functions.</li>
+<li><b>Source Coordinate Tracking</b>: Unified buffer and coordinate management translating byte offsets into file, line, and column positions via binary search over precomputed line tables.</li>
 </ul>
 <hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md167"></a>
 2. Polymorphic Memory Architecture (PMR)</h1>
-<p>EzPacker leverages C++20 Polymorphic Memory Resources (<span class="tt">&lt;memory_resource&gt;</span>) across all data-intensive operations. Rather than binding containers to global <span class="tt">malloc</span>/<span class="tt">free</span>, core compiler entities take a <span class="tt">std::pmr::memory_resource*</span> or receive monotonic arena allocators.</p>
+<p>EzPacker leverages C++20 Polymorphic Memory Resources (<span class="tt">&lt;memory_resource&gt;</span>) across all data-intensive operations. Rather than binding containers to global heap allocation (<span class="tt">malloc</span>/<span class="tt">free</span>), core compiler entities accept a <span class="tt">std::pmr::memory_resource*</span> or receive monotonic arena allocators.</p>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md168"></a>
 Core PMR Guidelines in EzPacker</h2>
 <ol type="1">
-<li><b>Pass-Scoped Arenas</b>: Intensive compilation passes (e.g. <span class="tt"><a class="el" href="class_mir_register_allocator_pass.html">MirRegisterAllocatorPass</a></span>, <span class="tt"><a class="el" href="class_code_flow_analysis_pass.html">CodeFlowAnalysisPass</a></span>) create local monotonic buffers (<span class="tt">std::pmr::monotonic_buffer_resource</span>) on top of the parent driver allocator. When the pass completes, all intermediate graphs, interference tables, and temporary nodes are discarded simultaneously in $O(1)$ without per-node deallocations.</li>
-<li><b>Standard Typedefs</b>: Container aliases in <span class="tt"><a class="el" href="_ez_common_std_8h.html">EzCommonStd.h</a></span> enforce PMR semantics: <div class="fragment"><div class="line"><span class="keyword">namespace </span>std::pmr {</div>
-<div class="line">    <span class="keyword">using </span>string;</div>
-<div class="line">    <span class="keyword">using </span>vector;</div>
-<div class="line">    <span class="keyword">using </span>unordered_map;</div>
-<div class="line">    <span class="keyword">using </span>unordered_set;</div>
-<div class="line">    <span class="keyword">using </span>set;</div>
-<div class="line">}</div>
+<li><b>Pass-Scoped Arenas</b>: Intensive compilation passes (e.g., <span class="tt"><a class="el" href="class_liveness_analysis_pass.html">LivenessAnalysisPass</a></span>, <span class="tt"><a class="el" href="class_mir_register_allocator_pass.html">MirRegisterAllocatorPass</a></span>) create local monotonic buffers (<span class="tt">std::pmr::monotonic_buffer_resource</span>) on top of the parent driver allocator. When the pass completes, all intermediate graphs, interference tables, and temporary nodes are discarded simultaneously in $O(1)$ time without per-node deallocations.</li>
+<li><b>Session Arenas</b>: Module-level entities (<span class="tt"><a class="el" href="class_mir_function.html">MirFunction</a></span>, <span class="tt"><a class="el" href="class_mir_block.html">MirBlock</a></span>, <span class="tt"><a class="el" href="class_mir_instruction.html">MirInstruction</a></span>, <span class="tt"><a class="el" href="class_mir_operand.html">MirOperand</a></span>, <span class="tt"><a class="el" href="struct_source_file_entry.html">SourceFileEntry</a></span>) live inside the compilation session arena managed by <span class="tt">DriverContext</span> or <span class="tt"><a class="el" href="class_mir_builder_context.html">MirBuilderContext</a></span>.</li>
+<li><b>Explicit Allocator Propagation</b>: Classes storing dynamically allocated state require an explicit allocator parameter in their constructor. Standard PMR typedefs from <span class="tt">&lt;vector&gt;</span>, <span class="tt">&lt;string&gt;</span>, <span class="tt">&lt;unordered_map&gt;</span>, and <span class="tt">&lt;unordered_set&gt;</span> are used throughout: <div class="fragment"><div class="line">std::pmr::vector&lt;T&gt;</div>
+<div class="line">std::pmr::string</div>
+<div class="line">std::pmr::unordered_map&lt;Key, Value&gt;</div>
+<div class="line">std::pmr::unordered_set&lt;Key&gt;</div>
 </div><!-- fragment --></li>
-<li><b>Explicit Allocator Propagation</b>: Classes storing dynamically allocated state require an explicit allocator parameter in their constructor.</li>
 </ol>
 <hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md170"></a>
 3. Diagnostic Engine</h1>
-<p>EzPacker includes a modern, fluent compiler diagnostics system defined in <span class="tt">EzCore/include/Diagnostics/</span>.</p>
-<div class="fragment"><div class="line">DiagnosticCollector</div>
+<p>The EzPacker diagnostic subsystem (<span class="tt">EzCore/include/Diagnostics/</span>) provides structured, thread-safe, severity-graded diagnostic emission with line-column coordinates, source snippets, secondary notes, and color highlighting.</p>
+<div class="fragment"><div class="line">DiagnosticCollector (Thread-Safe Sink &amp; Scope Stack)</div>
 <div class="line">       |</div>
-<div class="line">       +--&gt; builder(type, sender) ---&gt; DiagnosticBuilder</div>
+<div class="line">       +--&gt; builder(type, sender) ---&gt; DiagnosticBuilder (Single-Thread RAII)</div>
 <div class="line">       |                                    |</div>
-<div class="line">       |                                    +--&gt; .at(loc)</div>
-<div class="line">       |                                    +--&gt; .message(...)</div>
-<div class="line">       |                                    +--&gt; .note(...)</div>
-<div class="line">       |                                    +--&gt; .emit()</div>
+<div class="line">       |                                    +--&gt; operator&lt;&lt;(std::string_view)</div>
+<div class="line">       |                                    +--&gt; operator&lt;&lt;(SourceReference*)</div>
+<div class="line">       |                                    +--&gt; appendNote(...)</div>
+<div class="line">       |                                    +--&gt; flush() (or on ~DiagnosticBuilder)</div>
 <div class="line">       v</div>
-<div class="line">DiagnosticListener (e.g., DiagnosticLogger)</div>
+<div class="line">DiagnosticListener (e.g. DiagnosticLogger)</div>
 </div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md171"></a>
-3.1 Diagnostic Message Types &amp; Locations</h2>
+3.1 Severity Classification (<span class="tt">DiagnosticMessage.h</span>)</h2>
+<p>Diagnostics are categorized via the <span class="tt"><a class="el" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a></span> bitflag enumeration:</p>
+<div class="fragment"><div class="line"><span class="keyword">enum</span> <a class="code hl_enumeration" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a> : uint8_t</div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a85f9ded1dc5946aa0c2a0462592ca4b1">Diag_None</a>    = 0,</div>
+<div class="line">    <a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab5d32509a1b9222f94a024372e00a982">Diag_Debug</a>   = 1,         <span class="comment">// Debug information emitted during development or tracing.</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5">Diag_Error</a>   = (1 &lt;&lt; 1),  <span class="comment">// Error condition preventing compilation or analysis.</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a952f3bd4bf660f4e9bbe72e5eb2cd220">Diag_Trace</a>   = (1 &lt;&lt; 2),  <span class="comment">// Trace information during specific compiler passes.</span></div>
+<div class="line">    <a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a6aa25d4a19506233e2944911f9e0e40c">Diag_Warning</a> = (1 &lt;&lt; 3)   <span class="comment">// Warning condition that does not halt compilation.</span></div>
+<div class="line">};</div>
+<div class="ttc" id="a_diagnostic_message_8h_html_a4599fe56a82cf438f7393d33f1d2fe44"><div class="ttname"><a href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a></div><div class="ttdeci">DiagnosticMessageType</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:10</div></div>
+<div class="ttc" id="a_diagnostic_message_8h_html_a4599fe56a82cf438f7393d33f1d2fe44a6aa25d4a19506233e2944911f9e0e40c"><div class="ttname"><a href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a6aa25d4a19506233e2944911f9e0e40c">Diag_Warning</a></div><div class="ttdeci">@ Diag_Warning</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:15</div></div>
+<div class="ttc" id="a_diagnostic_message_8h_html_a4599fe56a82cf438f7393d33f1d2fe44a85f9ded1dc5946aa0c2a0462592ca4b1"><div class="ttname"><a href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a85f9ded1dc5946aa0c2a0462592ca4b1">Diag_None</a></div><div class="ttdeci">@ Diag_None</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:11</div></div>
+<div class="ttc" id="a_diagnostic_message_8h_html_a4599fe56a82cf438f7393d33f1d2fe44a952f3bd4bf660f4e9bbe72e5eb2cd220"><div class="ttname"><a href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a952f3bd4bf660f4e9bbe72e5eb2cd220">Diag_Trace</a></div><div class="ttdeci">@ Diag_Trace</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:14</div></div>
+<div class="ttc" id="a_diagnostic_message_8h_html_a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5"><div class="ttname"><a href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5">Diag_Error</a></div><div class="ttdeci">@ Diag_Error</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:13</div></div>
+<div class="ttc" id="a_diagnostic_message_8h_html_a4599fe56a82cf438f7393d33f1d2fe44ab5d32509a1b9222f94a024372e00a982"><div class="ttname"><a href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab5d32509a1b9222f94a024372e00a982">Diag_Debug</a></div><div class="ttdeci">@ Diag_Debug</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:12</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md172"></a>
+3.2 Diagnostic Records &amp; Notes</h2>
 <ul>
-<li><b><span class="tt"><a class="el" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a></span></b> (<span class="tt"><a class="el" href="_diagnostic_message_8h.html">DiagnosticMessage.h</a></span>):<ul>
-<li><span class="tt"><a class="el" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a952f3bd4bf660f4e9bbe72e5eb2cd220">Diag_Trace</a></span>: Granular compiler debugging output.</li>
-<li><span class="tt">Diag_Info</span>: Informational status updates (e.g., pass timings).</li>
-<li><span class="tt"><a class="el" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a6aa25d4a19506233e2944911f9e0e40c">Diag_Warning</a></span>: Non-fatal issues (e.g., unreachable basic blocks, deprecated syntax).</li>
-<li><span class="tt"><a class="el" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5">Diag_Error</a></span>: Compilation errors halting code generation.</li>
-<li><span class="tt">Diag_Fatal</span>: Unrecoverable compiler crashes or internal assertion violations.</li>
+<li><b><span class="tt"><a class="el" href="struct_diagnostic_note.html">DiagnosticNote</a></span></b>: A supplementary annotation attached to a diagnostic message providing additional context or secondary source spans: <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_diagnostic_note.html">DiagnosticNote</a></div>
+<div class="line">{</div>
+<div class="line">    <a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *<a class="code hl_variable" href="struct_diagnostic_note.html#ac71933821990042333715e20a3c1a103">m_sourceRef</a>{ <span class="keyword">nullptr</span> }; <span class="comment">// Source span this note refers to, or nullptr.</span></div>
+<div class="line">    std::pmr::string <a class="code hl_variable" href="struct_diagnostic_note.html#ae71e9df5b3044c165c2ad89f8df632b7">m_noteContent</a>{};        <span class="comment">// Arena-allocated note text.</span></div>
+<div class="line">};</div>
+<div class="ttc" id="astruct_diagnostic_note_html"><div class="ttname"><a href="struct_diagnostic_note.html">DiagnosticNote</a></div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:22</div></div>
+<div class="ttc" id="astruct_diagnostic_note_html_ac71933821990042333715e20a3c1a103"><div class="ttname"><a href="struct_diagnostic_note.html#ac71933821990042333715e20a3c1a103">DiagnosticNote::m_sourceRef</a></div><div class="ttdeci">class SourceReference * m_sourceRef</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:23</div></div>
+<div class="ttc" id="astruct_diagnostic_note_html_ae71e9df5b3044c165c2ad89f8df632b7"><div class="ttname"><a href="struct_diagnostic_note.html#ae71e9df5b3044c165c2ad89f8df632b7">DiagnosticNote::m_noteContent</a></div><div class="ttdeci">std::pmr::string m_noteContent</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:24</div></div>
+<div class="ttc" id="astruct_source_reference_html"><div class="ttname"><a href="struct_source_reference.html">SourceReference</a></div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:13</div></div>
+</div><!-- fragment --></li>
+<li><b><span class="tt"><a class="el" href="class_diagnostic_message.html">DiagnosticMessage</a></span></b>: The fundamental diagnostic record holding:<ul>
+<li><span class="tt"><a class="el" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a> getType() const</span></li>
+<li><span class="tt">std::string_view getSender() const</span>: Identifier name of the emitting compiler component.</li>
+<li><span class="tt">std::string_view getMainMsg() const</span>: Primary diagnostic text.</li>
+<li><span class="tt"><a class="el" href="struct_source_reference.html">SourceReference</a> *getPrimarySourceRef() const</span>: Primary location pointer.</li>
+<li><span class="tt">const std::list&lt;<a class="el" href="struct_diagnostic_note.html">DiagnosticNote</a>&gt; &amp;getNotes() const</span>: List of contextual notes.</li>
 </ul>
 </li>
-<li><b><span class="tt">DiagnosticSourceLocation</span></b> (<span class="tt"><a class="el" href="_diagnostic_message_8h.html">DiagnosticMessage.h</a></span>):<ul>
-<li>Encapsulates file name, byte offset, line number, column number, and length span.</li>
-</ul>
-</li>
-</ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md172"></a>
-3.2 Key Classes</h2>
-<ul>
-<li><b><span class="tt"><a class="el" href="class_diagnostic_collector.html">DiagnosticCollector</a></span></b> (<span class="tt"><a class="el" href="_diagnostic_collector_8h.html">DiagnosticCollector.h</a></span>): Central thread-safe sink for all diagnostics. Maintains active severity filters, counts total errors/warnings, and dispatches messages to registered listeners.</li>
-<li><b><span class="tt"><a class="el" href="class_diagnostic_builder.html">DiagnosticBuilder</a></span></b> (<span class="tt"><a class="el" href="_diagnostic_builder_8h.html">DiagnosticBuilder.h</a></span>): RAII-capable fluent builder for assembling diagnostics. Supports message formatting via <span class="tt">std::format</span>, attaching primary and secondary source spans, and appending explanatory notes.</li>
-<li><b><span class="tt"><a class="el" href="class_diagnostic_logger.html">DiagnosticLogger</a></span></b> (<span class="tt"><a class="el" href="_diagnostic_logger_8h.html">DiagnosticLogger.h</a></span>): Implements <span class="tt"><a class="el" href="class_diagnostic_listener.html">DiagnosticListener</a></span> to print compiler diagnostics to <span class="tt">stderr</span> or a log file, complete with ANSI color highlighting and source code context previews.</li>
-<li><b><span class="tt"><a class="el" href="class_diagnostic_scope.html">DiagnosticScope</a></span></b> (<span class="tt"><a class="el" href="_diagnostic_scope_8h.html">DiagnosticScope.h</a></span>): RAII helper pushing contextual tags (e.g. current function, current pass) onto the active diagnostic context.</li>
 </ul>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md173"></a>
-3.3 Example: Emitting a Diagnostic</h2>
+3.3 Diagnostic Collector (<span class="tt">DiagnosticCollector.h</span>)</h2>
+<p><span class="tt"><a class="el" href="class_diagnostic_collector.html">DiagnosticCollector</a></span> is the central thread-safe sink for all compiler diagnostics. It maintains a stack of active diagnostic scopes, manages registered listeners, and controls active severity bitmasks.</p>
+<div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_diagnostic_collector.html">DiagnosticCollector</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <a class="code hl_function" href="class_diagnostic_collector.html#af11eb40c71782ee05572f3897247a90d">DiagnosticCollector</a>();</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Severity filtering</span></div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_diagnostic_collector.html#a8d1dabe10cf071ac3f650254e259bbb4">isDiagEnabledForType</a>(<a class="code hl_enumeration" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a> type) <span class="keyword">const</span>;</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_collector.html#acbfaa701e8281439148779ab24021037">enableDiag</a>(<a class="code hl_enumeration" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a> type);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_collector.html#a92e5ce1ddf98ae28cb38a2dce4a6ebda">setEnabledDiags</a>(<a class="code hl_enumeration" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a> types);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Factory methods returning single-thread builders</span></div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> <a class="code hl_function" href="class_diagnostic_collector.html#af69136ca8500ccdd0e74a85734f27c8c">builder</a>(<a class="code hl_enumeration" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a> type, std::string_view sender);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Formatted convenience builders (only formats if severity is enabled)</span></div>
+<div class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span>... Args&gt;</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> <a class="code hl_function" href="class_diagnostic_collector.html#affe23f5c337763860cd49704ffd887e6">error</a>(std::string_view sender, std::format_string&lt;Args...&gt; fmt, Args &amp;&amp;...args);</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> <a class="code hl_function" href="class_diagnostic_collector.html#affe23f5c337763860cd49704ffd887e6">error</a>(std::string_view sender, std::string_view message);</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span>... Args&gt;</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> <a class="code hl_function" href="class_diagnostic_collector.html#afd42d827cba2fd401a5e3865b7290965">warn</a>(std::string_view sender, std::format_string&lt;Args...&gt; fmt, Args &amp;&amp;...args);</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> <a class="code hl_function" href="class_diagnostic_collector.html#afd42d827cba2fd401a5e3865b7290965">warn</a>(std::string_view sender, std::string_view message);</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span>... Args&gt;</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> <a class="code hl_function" href="class_diagnostic_collector.html#a4cf0cb142dea3cb4ca4e9e19badccb9e">trace</a>(std::string_view sender, std::format_string&lt;Args...&gt; fmt, Args &amp;&amp;...args);</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> <a class="code hl_function" href="class_diagnostic_collector.html#a4cf0cb142dea3cb4ca4e9e19badccb9e">trace</a>(std::string_view sender, std::string_view message);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Listener registration</span></div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_collector.html#a6eda50dcc75ea098d5c1fb8684dbc16c">addListener</a>(<a class="code hl_class" href="class_diagnostic_listener.html">DiagnosticListener</a> *listener);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_collector.html#a20f6fc570f8323a019a99f68505020be">removeListener</a>(<a class="code hl_class" href="class_diagnostic_listener.html">DiagnosticListener</a> *listener);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Scoped transaction handling</span></div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_collector.html#a63f77cd9c4d0d07f4158adbf23080d44">beginScope</a>(<a class="code hl_enumeration" href="_diagnostic_scope_8h.html#a86aee68584ca4f9a382c03921f4e0eb7">DiagnosticScopeAction</a> action);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_collector.html#a923022f9c9160590b62a7f96d905a9fc">endScope</a>();</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Commit a message directly</span></div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_collector.html#ae277fe77ba2ad5e4adc50af1ba39c2fe">onDiag</a>(<a class="code hl_class" href="class_diagnostic_message.html">DiagnosticMessage</a> message);</div>
+<div class="line"> </div>
+<div class="line">    std::pmr::memory_resource *<a class="code hl_function" href="class_diagnostic_collector.html#a8a527b66b95a1a5107ab0987495f1e73">getAllocator</a>();</div>
+<div class="line">};</div>
+<div class="ttc" id="a_diagnostic_scope_8h_html_a86aee68584ca4f9a382c03921f4e0eb7"><div class="ttname"><a href="_diagnostic_scope_8h.html#a86aee68584ca4f9a382c03921f4e0eb7">DiagnosticScopeAction</a></div><div class="ttdeci">DiagnosticScopeAction</div><div class="ttdef"><b>Definition</b> DiagnosticScope.h:8</div></div>
+<div class="ttc" id="aclass_diagnostic_builder_html"><div class="ttname"><a href="class_diagnostic_builder.html">DiagnosticBuilder</a></div><div class="ttdef"><b>Definition</b> DiagnosticBuilder.h:11</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html"><div class="ttname"><a href="class_diagnostic_collector.html">DiagnosticCollector</a></div><div class="ttdef"><b>Definition</b> DiagnosticCollector.h:16</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a20f6fc570f8323a019a99f68505020be"><div class="ttname"><a href="class_diagnostic_collector.html#a20f6fc570f8323a019a99f68505020be">DiagnosticCollector::removeListener</a></div><div class="ttdeci">void removeListener(DiagnosticListener *listener)</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a4cf0cb142dea3cb4ca4e9e19badccb9e"><div class="ttname"><a href="class_diagnostic_collector.html#a4cf0cb142dea3cb4ca4e9e19badccb9e">DiagnosticCollector::trace</a></div><div class="ttdeci">DiagnosticBuilder trace(std::string_view sender, std::format_string&lt; Args... &gt; fmt, Args &amp;&amp;...args)</div><div class="ttdef"><b>Definition</b> DiagnosticCollector.h:53</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a63f77cd9c4d0d07f4158adbf23080d44"><div class="ttname"><a href="class_diagnostic_collector.html#a63f77cd9c4d0d07f4158adbf23080d44">DiagnosticCollector::beginScope</a></div><div class="ttdeci">void beginScope(DiagnosticScopeAction action)</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a6eda50dcc75ea098d5c1fb8684dbc16c"><div class="ttname"><a href="class_diagnostic_collector.html#a6eda50dcc75ea098d5c1fb8684dbc16c">DiagnosticCollector::addListener</a></div><div class="ttdeci">void addListener(DiagnosticListener *listener)</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a8a527b66b95a1a5107ab0987495f1e73"><div class="ttname"><a href="class_diagnostic_collector.html#a8a527b66b95a1a5107ab0987495f1e73">DiagnosticCollector::getAllocator</a></div><div class="ttdeci">std::pmr::memory_resource * getAllocator()</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a8d1dabe10cf071ac3f650254e259bbb4"><div class="ttname"><a href="class_diagnostic_collector.html#a8d1dabe10cf071ac3f650254e259bbb4">DiagnosticCollector::isDiagEnabledForType</a></div><div class="ttdeci">bool isDiagEnabledForType(DiagnosticMessageType type) const</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a923022f9c9160590b62a7f96d905a9fc"><div class="ttname"><a href="class_diagnostic_collector.html#a923022f9c9160590b62a7f96d905a9fc">DiagnosticCollector::endScope</a></div><div class="ttdeci">void endScope()</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_a92e5ce1ddf98ae28cb38a2dce4a6ebda"><div class="ttname"><a href="class_diagnostic_collector.html#a92e5ce1ddf98ae28cb38a2dce4a6ebda">DiagnosticCollector::setEnabledDiags</a></div><div class="ttdeci">void setEnabledDiags(DiagnosticMessageType types)</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_acbfaa701e8281439148779ab24021037"><div class="ttname"><a href="class_diagnostic_collector.html#acbfaa701e8281439148779ab24021037">DiagnosticCollector::enableDiag</a></div><div class="ttdeci">void enableDiag(DiagnosticMessageType type)</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_ae277fe77ba2ad5e4adc50af1ba39c2fe"><div class="ttname"><a href="class_diagnostic_collector.html#ae277fe77ba2ad5e4adc50af1ba39c2fe">DiagnosticCollector::onDiag</a></div><div class="ttdeci">void onDiag(DiagnosticMessage message)</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_af11eb40c71782ee05572f3897247a90d"><div class="ttname"><a href="class_diagnostic_collector.html#af11eb40c71782ee05572f3897247a90d">DiagnosticCollector::DiagnosticCollector</a></div><div class="ttdeci">DiagnosticCollector()</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_af69136ca8500ccdd0e74a85734f27c8c"><div class="ttname"><a href="class_diagnostic_collector.html#af69136ca8500ccdd0e74a85734f27c8c">DiagnosticCollector::builder</a></div><div class="ttdeci">DiagnosticBuilder builder(DiagnosticMessageType type, std::string_view sender)</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_afd42d827cba2fd401a5e3865b7290965"><div class="ttname"><a href="class_diagnostic_collector.html#afd42d827cba2fd401a5e3865b7290965">DiagnosticCollector::warn</a></div><div class="ttdeci">DiagnosticBuilder warn(std::string_view sender, std::format_string&lt; Args... &gt; fmt, Args &amp;&amp;...args)</div><div class="ttdef"><b>Definition</b> DiagnosticCollector.h:69</div></div>
+<div class="ttc" id="aclass_diagnostic_collector_html_affe23f5c337763860cd49704ffd887e6"><div class="ttname"><a href="class_diagnostic_collector.html#affe23f5c337763860cd49704ffd887e6">DiagnosticCollector::error</a></div><div class="ttdeci">DiagnosticBuilder error(std::string_view sender, std::format_string&lt; Args... &gt; fmt, Args &amp;&amp;...args)</div><div class="ttdef"><b>Definition</b> DiagnosticCollector.h:38</div></div>
+<div class="ttc" id="aclass_diagnostic_listener_html"><div class="ttname"><a href="class_diagnostic_listener.html">DiagnosticListener</a></div><div class="ttdef"><b>Definition</b> DiagnosticListener.h:10</div></div>
+<div class="ttc" id="aclass_diagnostic_message_html"><div class="ttname"><a href="class_diagnostic_message.html">DiagnosticMessage</a></div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:32</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md174"></a>
+3.4 Diagnostic Builder (<span class="tt">DiagnosticBuilder.h</span>)</h2>
+<p><span class="tt"><a class="el" href="class_diagnostic_builder.html">DiagnosticBuilder</a></span> provides a single-thread RAII wrapper for assembling diagnostics. It prevents duplicate error emissions by deleting copy constructors and automatically commits its accumulated message to the parent collector upon destruction (or via an explicit <span class="tt">.flush()</span> call).</p>
+<div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <a class="code hl_function" href="class_diagnostic_builder.html#a3427576829da2c20a12a66a219181a36">DiagnosticBuilder</a>(<span class="keyword">const</span> <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;) = <span class="keyword">delete</span>;</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#afda8177fea42db0e76ef92e8af9cf382">operator=</a>(<span class="keyword">const</span> <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;) = <span class="keyword">delete</span>;</div>
+<div class="line">    <a class="code hl_function" href="class_diagnostic_builder.html#a3427576829da2c20a12a66a219181a36">DiagnosticBuilder</a>(<a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;&amp;other);</div>
+<div class="line">    <a class="code hl_function" href="class_diagnostic_builder.html#a7e05a3b55a82bfd6605b6169b8394848">~DiagnosticBuilder</a>(); <span class="comment">// Flushes message into collector</span></div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Primary message building</span></div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#ad91750dc0ffa0d5122a26ce3fb0bea71">operator&lt;&lt;</a>(std::string_view str);</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#ad91750dc0ffa0d5122a26ce3fb0bea71">operator&lt;&lt;</a>(<a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *sourceRef);</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#a25d7ce89a454e5ea8b1c3b2004a402ac">build</a>(<a class="code hl_enumeration" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a> type, std::string_view sender);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Formatted note appending</span></div>
+<div class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span>... Args&gt;</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#a87b3721983eed673fab37ea1d9a9cc71">appendNote</a>(<a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *ref, std::format_string&lt;Args...&gt; fmt, Args &amp;&amp;...args);</div>
+<div class="line"> </div>
+<div class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span>... Args&gt;</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#a87b3721983eed673fab37ea1d9a9cc71">appendNote</a>(std::format_string&lt;Args...&gt; fmt, Args &amp;&amp;...args);</div>
+<div class="line"> </div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#a87b3721983eed673fab37ea1d9a9cc71">appendNote</a>(<a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *sourceRef, std::string_view message);</div>
+<div class="line">    <a class="code hl_class" href="class_diagnostic_builder.html">DiagnosticBuilder</a> &amp;<a class="code hl_function" href="class_diagnostic_builder.html#a87b3721983eed673fab37ea1d9a9cc71">appendNote</a>(std::string_view message);</div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_diagnostic_builder.html#a07465964b230fe36fde3d4811030bbbb">flush</a>();</div>
+<div class="line">};</div>
+<div class="ttc" id="aclass_diagnostic_builder_html_a07465964b230fe36fde3d4811030bbbb"><div class="ttname"><a href="class_diagnostic_builder.html#a07465964b230fe36fde3d4811030bbbb">DiagnosticBuilder::flush</a></div><div class="ttdeci">void flush()</div></div>
+<div class="ttc" id="aclass_diagnostic_builder_html_a25d7ce89a454e5ea8b1c3b2004a402ac"><div class="ttname"><a href="class_diagnostic_builder.html#a25d7ce89a454e5ea8b1c3b2004a402ac">DiagnosticBuilder::build</a></div><div class="ttdeci">DiagnosticBuilder &amp; build(DiagnosticMessageType type, std::string_view sender)</div></div>
+<div class="ttc" id="aclass_diagnostic_builder_html_a3427576829da2c20a12a66a219181a36"><div class="ttname"><a href="class_diagnostic_builder.html#a3427576829da2c20a12a66a219181a36">DiagnosticBuilder::DiagnosticBuilder</a></div><div class="ttdeci">DiagnosticBuilder(const DiagnosticBuilder &amp;)=delete</div></div>
+<div class="ttc" id="aclass_diagnostic_builder_html_a7e05a3b55a82bfd6605b6169b8394848"><div class="ttname"><a href="class_diagnostic_builder.html#a7e05a3b55a82bfd6605b6169b8394848">DiagnosticBuilder::~DiagnosticBuilder</a></div><div class="ttdeci">~DiagnosticBuilder()</div></div>
+<div class="ttc" id="aclass_diagnostic_builder_html_a87b3721983eed673fab37ea1d9a9cc71"><div class="ttname"><a href="class_diagnostic_builder.html#a87b3721983eed673fab37ea1d9a9cc71">DiagnosticBuilder::appendNote</a></div><div class="ttdeci">DiagnosticBuilder &amp; appendNote(class SourceReference *ref, std::format_string&lt; Args... &gt; fmt, Args &amp;&amp;...args)</div><div class="ttdef"><b>Definition</b> DiagnosticBuilder.h:42</div></div>
+<div class="ttc" id="aclass_diagnostic_builder_html_ad91750dc0ffa0d5122a26ce3fb0bea71"><div class="ttname"><a href="class_diagnostic_builder.html#ad91750dc0ffa0d5122a26ce3fb0bea71">DiagnosticBuilder::operator&lt;&lt;</a></div><div class="ttdeci">DiagnosticBuilder &amp; operator&lt;&lt;(std::string_view str)</div></div>
+<div class="ttc" id="aclass_diagnostic_builder_html_afda8177fea42db0e76ef92e8af9cf382"><div class="ttname"><a href="class_diagnostic_builder.html#afda8177fea42db0e76ef92e8af9cf382">DiagnosticBuilder::operator=</a></div><div class="ttdeci">DiagnosticBuilder &amp; operator=(const DiagnosticBuilder &amp;)=delete</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md175"></a>
+3.5 Usage Example: Reporting Compiler Diagnostics</h2>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_diagnostic_collector_8h.html">Diagnostics/DiagnosticCollector.h</a>&quot;</span></div>
 <div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_diagnostic_logger_8h.html">Diagnostics/DiagnosticLogger.h</a>&quot;</span></div>
+<div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_source_manager_8h.html">SourceManager/SourceManager.h</a>&quot;</span></div>
 <div class="line"> </div>
+<div class="line"><span class="comment">// 1. Initialize collector and attach a logger</span></div>
 <div class="line"><a class="code hl_class" href="class_diagnostic_collector.html">DiagnosticCollector</a> collector;</div>
 <div class="line"><a class="code hl_class" href="class_diagnostic_logger.html">DiagnosticLogger</a> logger(std::cerr);</div>
 <div class="line">collector.<a class="code hl_function" href="class_diagnostic_collector.html#a6eda50dcc75ea098d5c1fb8684dbc16c">addListener</a>(&amp;logger);</div>
 <div class="line"> </div>
-<div class="line">DiagnosticSourceLocation loc{</div>
-<div class="line">    .m_file = <span class="stringliteral">&quot;arithmetic.mir&quot;</span>,</div>
-<div class="line">    .m_line = 12,</div>
-<div class="line">    .m_col = 5,</div>
-<div class="line">    .m_length = 4</div>
-<div class="line">};</div>
+<div class="line"><span class="comment">// Enable errors and warnings</span></div>
+<div class="line">collector.<a class="code hl_function" href="class_diagnostic_collector.html#a92e5ce1ddf98ae28cb38a2dce4a6ebda">setEnabledDiags</a>(<span class="keyword">static_cast&lt;</span><a class="code hl_enumeration" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a><span class="keyword">&gt;</span>(<a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5">Diag_Error</a> | <a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44a6aa25d4a19506233e2944911f9e0e40c">Diag_Warning</a>));</div>
 <div class="line"> </div>
-<div class="line"><span class="comment">// Fluent diagnostic creation</span></div>
-<div class="line">collector.<a class="code hl_function" href="class_diagnostic_collector.html#af69136ca8500ccdd0e74a85734f27c8c">builder</a>(<a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5">DiagnosticMessageType::Diag_Error</a>, <span class="stringliteral">&quot;InstructionSelector&quot;</span>)</div>
-<div class="line">    .at(loc)</div>
-<div class="line">    .message(<span class="stringliteral">&quot;Cannot select target instruction for opcode &#39;{}&#39; with type &#39;i128&#39;&quot;</span>, <span class="stringliteral">&quot;ADD&quot;</span>)</div>
-<div class="line">    .note(<span class="stringliteral">&quot;Hardware target &#39;x86_64&#39; requires 128-bit additions to be legalized into ADD64 + ADC64&quot;</span>)</div>
-<div class="line">    .emit();</div>
+<div class="line"><span class="comment">// 2. Obtain a source reference from SourceManager</span></div>
+<div class="line"><a class="code hl_class" href="class_source_manager.html">SourceManager</a> srcMgr(std::filesystem::current_path(), collector.<a class="code hl_function" href="class_diagnostic_collector.html#a8a527b66b95a1a5107ab0987495f1e73">getAllocator</a>());</div>
+<div class="line"><span class="keywordtype">size_t</span> fileId = srcMgr.addSourceContent(<span class="stringliteral">&quot;test.mir&quot;</span>, <span class="stringliteral">&quot;fn @main() -&gt; i32 {\n    %0 = add.i128 %a, %b\n}\n&quot;</span>);</div>
+<div class="line"><a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *srcRef = srcMgr.createReference(28, 16, fileId);</div>
 <div class="line"> </div>
-<div class="line"><span class="keywordflow">if</span> (collector.hasErrors()) {</div>
-<div class="line">    std::cerr &lt;&lt; <span class="stringliteral">&quot;Compilation failed with &quot;</span> &lt;&lt; collector.getErrorCount() &lt;&lt; <span class="stringliteral">&quot; errors.\n&quot;</span>;</div>
-<div class="line">}</div>
+<div class="line"><span class="comment">// 3. Emit a formatted error with an attached note</span></div>
+<div class="line">collector.<a class="code hl_function" href="class_diagnostic_collector.html#affe23f5c337763860cd49704ffd887e6">error</a>(<span class="stringliteral">&quot;InstructionSelector&quot;</span>, <span class="stringliteral">&quot;Cannot select target instruction for opcode &#39;{}&#39; with type &#39;i128&#39;&quot;</span>, <span class="stringliteral">&quot;ADD&quot;</span>)</div>
+<div class="line">    &lt;&lt; srcRef</div>
+<div class="line">    &lt;&lt; <span class="stringliteral">&quot; [unsupported on target arch]&quot;</span>;</div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Or use the fluent builder with an attached note:</span></div>
+<div class="line"><span class="keyword">auto</span> b = collector.<a class="code hl_function" href="class_diagnostic_collector.html#af69136ca8500ccdd0e74a85734f27c8c">builder</a>(<a class="code hl_enumvalue" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5">Diag_Error</a>, <span class="stringliteral">&quot;Legalizer&quot;</span>);</div>
+<div class="line">b &lt;&lt; <span class="stringliteral">&quot;Operand width exceeds maximum scalar hardware register width&quot;</span> &lt;&lt; srcRef;</div>
+<div class="line">b.appendNote(<span class="stringliteral">&quot;Target &#39;x86_64&#39; requires 128-bit operations to be decomposed via NarrowScalar&quot;</span>);</div>
+<div class="line">b.flush();</div>
 <div class="ttc" id="a_diagnostic_collector_8h_html"><div class="ttname"><a href="_diagnostic_collector_8h.html">DiagnosticCollector.h</a></div></div>
 <div class="ttc" id="a_diagnostic_logger_8h_html"><div class="ttname"><a href="_diagnostic_logger_8h.html">DiagnosticLogger.h</a></div></div>
-<div class="ttc" id="a_diagnostic_message_8h_html_a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5"><div class="ttname"><a href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44ab21c3c203d9bddd312dc04eca74d7bd5">Diag_Error</a></div><div class="ttdeci">@ Diag_Error</div><div class="ttdef"><b>Definition</b> DiagnosticMessage.h:13</div></div>
-<div class="ttc" id="aclass_diagnostic_collector_html"><div class="ttname"><a href="class_diagnostic_collector.html">DiagnosticCollector</a></div><div class="ttdef"><b>Definition</b> DiagnosticCollector.h:16</div></div>
-<div class="ttc" id="aclass_diagnostic_collector_html_a6eda50dcc75ea098d5c1fb8684dbc16c"><div class="ttname"><a href="class_diagnostic_collector.html#a6eda50dcc75ea098d5c1fb8684dbc16c">DiagnosticCollector::addListener</a></div><div class="ttdeci">void addListener(DiagnosticListener *listener)</div></div>
-<div class="ttc" id="aclass_diagnostic_collector_html_af69136ca8500ccdd0e74a85734f27c8c"><div class="ttname"><a href="class_diagnostic_collector.html#af69136ca8500ccdd0e74a85734f27c8c">DiagnosticCollector::builder</a></div><div class="ttdeci">DiagnosticBuilder builder(DiagnosticMessageType type, std::string_view sender)</div></div>
+<div class="ttc" id="a_source_manager_8h_html"><div class="ttname"><a href="_source_manager_8h.html">SourceManager.h</a></div></div>
 <div class="ttc" id="aclass_diagnostic_logger_html"><div class="ttname"><a href="class_diagnostic_logger.html">DiagnosticLogger</a></div><div class="ttdef"><b>Definition</b> DiagnosticLogger.h:12</div></div>
+<div class="ttc" id="aclass_source_manager_html"><div class="ttname"><a href="class_source_manager.html">SourceManager</a></div><div class="ttdef"><b>Definition</b> SourceManager.h:15</div></div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md175"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md177"></a>
 4. Arbitrary-Precision Constants: <span class="tt">FlexInt</span> &amp; <span class="tt">FlexFloat</span></h1>
-<p>Compiler backends must compute and manipulate integer and floating-point constants of arbitrary target bit-widths without host architecture overflow or undefined behavior.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md176"></a>
+<p>Compiler frontends and backends must evaluate and manipulate integer and floating-point constants of arbitrary target bit-widths without host architecture overflow or undefined behavior.</p>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md178"></a>
 4.1 <span class="tt">FlexInt</span> (<span class="tt">FlexNumber/FlexInt.h</span>)</h2>
-<p><span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a></span> wraps <span class="tt">libtommath</span> (<span class="tt">mp_int</span>) to provide arbitrary-precision, two's-complement integer arithmetic with explicit bit-width tracking and sign-awareness.</p>
+<p><span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a></span> is a multi-precision, two's-complement integer wrapper built atop LibTomMath (<span class="tt">mp_int</span>). It provides exact signed and unsigned integer arithmetic, bit slicing, word extraction, binary serialization, and legalization splitting.</p>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md179"></a>
+Constructors &amp; State</h3>
 <ul>
-<li><b>Arbitrary Bit Widths</b>: Models types from <span class="tt">i1</span> (booleans) up to <span class="tt">i256</span> or higher.</li>
-<li><b>Arithmetic Operations</b>: Full support for <span class="tt">+</span>, <span class="tt">-</span>, <span class="tt">*</span>, <span class="tt">/</span>, <span class="tt">%</span> (signed and unsigned).</li>
-<li><b>Bitwise Operations</b>: <span class="tt">&amp;</span>, <span class="tt">|</span>, <span class="tt">^</span>, <span class="tt">~</span>, <span class="tt">&lt;&lt;</span>, <span class="tt">&gt;&gt;</span> (arithmetic and logical shifts).</li>
-<li><b>Sign Extension &amp; Truncation</b>:<ul>
-<li><span class="tt">signExtend(targetBits)</span>: Extends the sign bit to larger bit widths.</li>
-<li><span class="tt">zeroExtend(targetBits)</span>: Zero-extends to larger bit widths.</li>
-<li><span class="tt">truncate(targetBits)</span>: Truncates high bits.</li>
+<li><span class="tt">explicit <a class="el" href="class_flex_int.html">FlexInt</a>(uint32_t value, size_t bitWidth = 32)</span></li>
+<li><span class="tt">explicit <a class="el" href="class_flex_int.html">FlexInt</a>(uint64_t value, size_t bitWidth = 64)</span></li>
+<li><span class="tt">explicit <a class="el" href="class_flex_int.html">FlexInt</a>(int32_t value, size_t bitWidth = 32)</span></li>
+<li><span class="tt">explicit <a class="el" href="class_flex_int.html">FlexInt</a>(int64_t value, size_t bitWidth = 64)</span></li>
+<li><span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a>(std::string_view numberStr, size_t bitWidth, bool _signed, size_t radix = 10)</span>: Supports parsing prefixes <span class="tt">0x</span> (hex), <span class="tt">0b</span> (binary), <span class="tt">0o</span> (octal), and decimal.</li>
+<li><span class="tt">static <a class="el" href="class_flex_int.html">FlexInt</a> fromLimbs64(std::span&lt;const uint64_t&gt; limbs, size_t bitWidth, bool isSigned)</span></li>
 </ul>
-</li>
-<li><b>Host Conversions</b>: Safe extraction to <span class="tt">int64_t</span>, <span class="tt">uint64_t</span>, <span class="tt">int32_t</span>, <span class="tt">uint32_t</span> with bounds validation.</li>
-<li><b>String Formatting</b>: Formats to decimal, hexadecimal (<span class="tt">0x...</span>), and binary representations.</li>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md180"></a>
+Arithmetic &amp; Overflow Checking</h3>
+<ul>
+<li>Operators: <span class="tt">+</span>, <span class="tt">+=</span>, <span class="tt">++</span>, <span class="tt">-</span>, <span class="tt">-=</span>, <span class="tt">--</span>, <span class="tt">*</span>, <span class="tt">*=</span>, <span class="tt">/</span>, <span class="tt">/=</span>, <span class="tt">%</span>, <span class="tt">%=</span></li>
+<li>Comparisons: <span class="tt">&gt;</span>, <span class="tt">&gt;=</span>, <span class="tt">&lt;</span>, <span class="tt">&lt;=</span>, <span class="tt">==</span>, <span class="tt">!=</span></li>
+<li>Status queries: <span class="tt">isNeg()</span>, <span class="tt">isPositive()</span>, <span class="tt">isSigned()</span>, <span class="tt">isZero()</span>, <span class="tt">getBitSize()</span></li>
+<li>Overflow-checked operations: <div class="fragment"><div class="line"><span class="keywordtype">bool</span> addWithOverflow(<span class="keyword">const</span> <a class="code hl_class" href="class_flex_int.html">FlexInt</a> &amp;other, <a class="code hl_class" href="class_flex_int.html">FlexInt</a> &amp;result) <span class="keyword">const</span>;</div>
+<div class="line"><span class="keywordtype">bool</span> subWithOverflow(<span class="keyword">const</span> <a class="code hl_class" href="class_flex_int.html">FlexInt</a> &amp;other, <a class="code hl_class" href="class_flex_int.html">FlexInt</a> &amp;result) <span class="keyword">const</span>;</div>
+<div class="line"><span class="keywordtype">bool</span> mulWithOverflow(<span class="keyword">const</span> <a class="code hl_class" href="class_flex_int.html">FlexInt</a> &amp;other, <a class="code hl_class" href="class_flex_int.html">FlexInt</a> &amp;result) <span class="keyword">const</span>;</div>
+<div class="ttc" id="aclass_flex_int_html"><div class="ttname"><a href="class_flex_int.html">FlexInt</a></div><div class="ttdef"><b>Definition</b> FlexInt.h:32</div></div>
+</div><!-- fragment --></li>
 </ul>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md181"></a>
+Bitwise, Shift &amp; Slice Operations</h3>
+<ul>
+<li>Bitwise operators: <span class="tt">~</span>, <span class="tt">&amp;</span>, <span class="tt">&amp;=</span>, <span class="tt">|</span>, <span class="tt">|=</span>, <span class="tt">^</span>, <span class="tt">^=</span></li>
+<li>Logical and arithmetic shifts: <div class="fragment"><div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> shl(<span class="keywordtype">size_t</span> shiftBits) <span class="keyword">const</span>;</div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> lshr(<span class="keywordtype">size_t</span> shiftBits) <span class="keyword">const</span>; <span class="comment">// Zero-fill</span></div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> ashr(<span class="keywordtype">size_t</span> shiftBits) <span class="keyword">const</span>; <span class="comment">// Sign-fill</span></div>
+</div><!-- fragment --></li>
+<li>Bit extraction &amp; word slicing: <div class="fragment"><div class="line"><span class="comment">// Extracts an arbitrary slice of bits [startBit, startBit + numBits - 1]</span></div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> extractBits(<span class="keywordtype">size_t</span> startBit, <span class="keywordtype">size_t</span> numBits, <span class="keywordtype">bool</span> resultSigned = <span class="keyword">false</span>) <span class="keyword">const</span>;</div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Extracts the k-th 64-bit limb (wordIndex * 64 .. wordIndex * 64 + 63)</span></div>
+<div class="line">uint64_t extractWord64(<span class="keywordtype">size_t</span> wordIndex) <span class="keyword">const</span>;</div>
+</div><!-- fragment --></li>
+</ul>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md182"></a>
+Legalization &amp; Splitting Helpers</h3>
+<ul>
+<li><span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a> getHighHalf() const</span>: Splits this integer and extracts the upper $N/2$ bits.</li>
+<li><span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a> getLowHalf() const</span>: Splits this integer and extracts the lower $N/2$ bits.</li>
+<li><span class="tt">void extend(size_t newBitSize, bool isSigned)</span>: Extends or truncates the integer to a new bit size.</li>
+<li><span class="tt">bool clampToTwosComplement(<a class="el" href="_flex_int_8h.html#a0ada8f647402027261407be09bdf25ff">OverflowPolicy</a> policy = <a class="el" href="_flex_int_8h.html#a0ada8f647402027261407be09bdf25ffaa212b19ef5f2fb30acf92e6cbccc1f2d">OverflowPolicy::Wrap</a>)</span>: Clamps value to fit strictly within $2^N$ two's-complement bounds. <span class="tt"><a class="el" href="_flex_int_8h.html#a0ada8f647402027261407be09bdf25ffaa212b19ef5f2fb30acf92e6cbccc1f2d">OverflowPolicy::Wrap</a></span> silently wraps modulo $2^N$; <span class="tt"><a class="el" href="_flex_int_8h.html#a0ada8f647402027261407be09bdf25ffa8b9038a4896d530d239f4af3bbb30357">OverflowPolicy::Trap</a></span> throws <span class="tt">std::overflow_error</span>.</li>
+</ul>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md183"></a>
+Serialization &amp; Conversions</h3>
+<ul>
+<li><span class="tt">int64_t getI64() const</span></li>
+<li><span class="tt">uint64_t getU64() const</span></li>
+<li><span class="tt">std::string toString(size_t radix = 10) const</span></li>
+<li><span class="tt">void writeBytes(std::span&lt;uint8_t&gt; dest, <a class="el" href="_flex_int_8h.html#a4f3ee12da30a1e47c52dc137b4627cab">Endianness</a> endian = <a class="el" href="_flex_int_8h.html#a4f3ee12da30a1e47c52dc137b4627caba0f9197b3e286a7522984831949087332">Endianness::Little</a>) const</span></li>
+<li><span class="tt">static <a class="el" href="class_flex_int.html">FlexInt</a> readBytes(std::span&lt;const uint8_t&gt; src, size_t bitWidth, bool isSigned, <a class="el" href="_flex_int_8h.html#a4f3ee12da30a1e47c52dc137b4627cab">Endianness</a> endian = <a class="el" href="_flex_int_8h.html#a4f3ee12da30a1e47c52dc137b4627caba0f9197b3e286a7522984831949087332">Endianness::Little</a>)</span></li>
+</ul>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md184"></a>
+Example: <span class="tt">FlexInt</span> in Compiler Constant Folding</h3>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_flex_int_8h.html">FlexNumber/FlexInt.h</a>&quot;</span></div>
 <div class="line"> </div>
-<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> a(0x7FFFFFFF, 32, <span class="keyword">true</span>); <span class="comment">// 32-bit signed max</span></div>
-<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> b(1, 32, <span class="keyword">true</span>);</div>
-<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> sum = a + b; <span class="comment">// Does not overflow host types</span></div>
+<div class="line"><span class="comment">// 64-bit signed integer</span></div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> valA(0x7FFFFFFFFFFFFFFFLL, 64);</div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> valB(1LL, 64);</div>
 <div class="line"> </div>
-<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> mask = FlexInt::allOnes(64);</div>
-<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> shifted = mask.logicalShiftRight(16);</div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> result(0, 64);</div>
+<div class="line"><span class="keywordtype">bool</span> didOverflow = valA.addWithOverflow(valB, result);</div>
+<div class="line"><span class="comment">// didOverflow == true, result wraps around to 0x8000000000000000 (-9223372036854775808)</span></div>
+<div class="line"> </div>
+<div class="line"><span class="comment">// Splitting 128-bit integers during NarrowScalar legalization</span></div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> bigInt(<span class="stringliteral">&quot;0x123456789ABCDEF00FEDCBA987654321&quot;</span>, 128, <span class="keyword">false</span>, 16);</div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> high64 = bigInt.<a class="code hl_function" href="class_flex_int.html#a501fcb03fc7789ff430957c9566dc53c">getHighHalf</a>(); <span class="comment">// 0x123456789ABCDEF0</span></div>
+<div class="line"><a class="code hl_class" href="class_flex_int.html">FlexInt</a> low64 = bigInt.<a class="code hl_function" href="class_flex_int.html#a84998618e6c36ce3371460264baedbf4">getLowHalf</a>();   <span class="comment">// 0x0FEDCBA987654321</span></div>
 <div class="ttc" id="a_flex_int_8h_html"><div class="ttname"><a href="_flex_int_8h.html">FlexInt.h</a></div></div>
-<div class="ttc" id="aclass_flex_int_html"><div class="ttname"><a href="class_flex_int.html">FlexInt</a></div><div class="ttdef"><b>Definition</b> FlexInt.h:32</div></div>
-</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md177"></a>
+<div class="ttc" id="aclass_flex_int_html_a501fcb03fc7789ff430957c9566dc53c"><div class="ttname"><a href="class_flex_int.html#a501fcb03fc7789ff430957c9566dc53c">FlexInt::getHighHalf</a></div><div class="ttdeci">FlexInt getHighHalf() const</div></div>
+<div class="ttc" id="aclass_flex_int_html_a84998618e6c36ce3371460264baedbf4"><div class="ttname"><a href="class_flex_int.html#a84998618e6c36ce3371460264baedbf4">FlexInt::getLowHalf</a></div><div class="ttdeci">FlexInt getLowHalf() const</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md185"></a>
 4.2 <span class="tt">FlexFloat</span> (<span class="tt">FlexNumber/FlexFloat.h</span>)</h2>
-<p><span class="tt"><a class="el" href="class_flex_float.html">FlexFloat</a></span> wraps Bellard's <span class="tt">LibBf</span> (<span class="tt">bf_t</span>) to provide IEEE 754-compliant floating-point arithmetic across any target precision:</p><ul>
-<li><span class="tt">f32</span>: Single precision (24-bit significand, 8-bit exponent).</li>
-<li><span class="tt">f64</span>: Double precision (53-bit significand, 11-bit exponent).</li>
-<li><span class="tt">f128</span>: Quadruple precision (113-bit significand, 15-bit exponent).</li>
-<li>IEEE 754 rounding modes: Nearest-even, toward zero, toward +infinity, toward -infinity.</li>
-<li>Detection and creation of infinities, quiet NaNs, signaling NaNs, and signed zeros.</li>
-</ul>
-<hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md179"></a>
-5. Specialized Compiler Data Structures</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md180"></a>
-5.1 <span class="tt">DenseBitSet</span> (<span class="tt">HelperClasses/DenseBitSet.h</span>)</h2>
-<p>A dense, word-aligned bit vector tailored for fast iterative dataflow analysis passes (such as liveness analysis, reaching definitions, and available expressions).</p>
-<ul>
-<li><b>Operations</b>:<ul>
-<li><span class="tt">setBit(size_t index)</span> / <span class="tt">clearBit(size_t index)</span> / <span class="tt">testBit(size_t index)</span></li>
-<li>In-place bitwise operations: <span class="tt">unionWith(other)</span>, <span class="tt">intersectWith(other)</span>, <span class="tt">differenceWith(other)</span></li>
-<li>Comparison: <span class="tt">isSubsetOf(other)</span>, equality check <span class="tt">==</span></li>
-<li>Population count: <span class="tt">count()</span></li>
-<li>Fast iteration over set bits: <span class="tt">forEachSetBit(Callback&amp;&amp; cb)</span> skips 64-bit zero words entirely.</li>
-</ul>
-</li>
-</ul>
-<div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_dense_bit_set_8h.html">HelperClasses/DenseBitSet.h</a>&quot;</span></div>
-<div class="line"> </div>
-<div class="line"><a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a> liveIn(128); <span class="comment">// 128 virtual registers</span></div>
-<div class="line"><a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a> gen(128);</div>
-<div class="line"><a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a> kill(128);</div>
-<div class="line"> </div>
-<div class="line">gen.setBit(4);</div>
-<div class="line">gen.setBit(12);</div>
-<div class="line">kill.setBit(4);</div>
-<div class="line"> </div>
-<div class="line">liveIn.differenceWith(kill); <span class="comment">// liveIn = liveIn \ kill</span></div>
-<div class="line">liveIn.unionWith(gen);        <span class="comment">// liveIn = liveIn U gen</span></div>
-<div class="ttc" id="a_dense_bit_set_8h_html"><div class="ttname"><a href="_dense_bit_set_8h.html">DenseBitSet.h</a></div></div>
-<div class="ttc" id="aclass_dense_bit_set_html"><div class="ttname"><a href="class_dense_bit_set.html">DenseBitSet</a></div><div class="ttdef"><b>Definition</b> DenseBitSet.h:12</div></div>
-</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md181"></a>
-5.2 <span class="tt">IntrusiveLinkedList&lt;T&gt;</span> (<span class="tt">HelperClasses/IntrusiveLinkedList.h</span>)</h2>
-<p>An intrusive doubly-linked list template where the previous and next pointers reside directly inside the node object (<span class="tt"><a class="el" href="class_mir_instruction.html">MirInstruction</a></span>).</p>
-<ul>
-<li><b>Zero Allocation Overhead</b>: Inserting or removing instructions in basic blocks requires zero heap allocation.</li>
-<li><b>$O(1)$ Splicing &amp; Iteration</b>: Basic block instruction splitting, hoisting, and reordering are executed in constant time.</li>
-<li><b>Iterator Stability</b>: Inserting before or after an iterator does not invalidate existing iterators.</li>
-</ul>
-<hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md183"></a>
-6. Source Management (<span class="tt">SourceManager</span>)</h1>
-<p>Defined in <span class="tt"><a class="el" href="_source_manager_8h.html">SourceManager/SourceManager.h</a></span> and <span class="tt"><a class="el" href="_generic_source_manager_8h.html">GenericSourceManager.h</a></span>, the source manager abstracts loading and inspecting source files and textual MIR:</p><ul>
-<li>Loads source files into contiguous memory buffers.</li>
-<li>Maintains line-start offset tables for O(log N) binary-search coordinate translation from linear byte offsets to <span class="tt">(line, column)</span>.</li>
-<li>Extracts source line slices for compiler error messages with caret indicators.</li>
-</ul>
-<hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md185"></a>
-7. Additional Utilities</h1>
-<ul>
-<li><b><span class="tt"><a class="el" href="_cli_exit_code_8h.html">CliExitCode.h</a></span></b>: Enumerates standard process exit codes (<span class="tt">Success = 0</span>, <span class="tt">InvalidArgs = 1</span>, <span class="tt">CompilationFailed = 2</span>, <span class="tt">InternalError = 3</span>).</li>
-<li><b><span class="tt"><a class="el" href="_name_registry_8h.html">NameRegistry.h</a></span></b>: Fast string intern pool and unique identifier dispenser for temporary symbols and basic block labels.</li>
-<li><b><span class="tt"><a class="el" href="_string_utils_8h.html">StringUtils.h</a></span></b>: String manipulation functions (trim, split, join, case conversion, integer parsing).</li>
-<li><b><span class="tt"><a class="el" href="_ez_common_std_8h.html">EzCommonStd.h</a></span></b>: Common standard library includes and PMR type definitions.</li>
-</ul>
+<p><span class="tt"><a class="el" href="class_flex_float.html">FlexFloat</a></span> wraps LibBf (<span class="tt">bf_t</span>) to provide arbitrary-precision floating-point arithmetic compliant with IEEE 754 standards. It natively models 32-bit single precision (<span class="tt">f32</span>), 64-bit double precision (<span class="tt">f64</span>), and 128-bit quadruple precision (<span class="tt">f128</span>).</p>
 <hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md187"></a>
-8. API Reference &amp; Further Reading</h1>
-<ul>
-<li>Generated Doxygen API documentation: <a href="../doxygen/index.html">Doxygen Documentation Index</a></li>
-<li>Next subproject: <a class="el" href="md_docs_2projects_2_ez_mir.html" title="EzMir Subproject Documentation">EzMir Subproject Documentation</a></li>
-<li>Return to <a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Landing Page</a> </li>
+5. High-Performance Compiler Containers</h1>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md188"></a>
+5.1 <span class="tt">IntrusiveLinkedList&lt;T&gt;</span> (<span class="tt">HelperClasses/IntrusiveLinkedList.h</span>)</h2>
+<p>Standard containers like <span class="tt">std::list</span> allocate a heap node header for every element inserted. EzPacker's <span class="tt"><a class="el" href="class_intrusive_linked_list.html">IntrusiveLinkedList</a>&lt;T&gt;</span> embeds the doubly-linked list pointers (<span class="tt">m_prev</span>, <span class="tt">m_next</span>) directly within the element itself, resulting in:</p><ul>
+<li><b>Zero dynamic memory allocations</b> on insertion or removal.</li>
+<li><b>Cache-locality advantages</b> when iterating through instruction streams.</li>
+<li><b>$O(1)$ splicing and reordering</b> of basic blocks and instructions.</li>
 </ul>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md189"></a>
+Concept Requirements on Element Type <span class="tt">T</span></h3>
+<p>Any class stored in <span class="tt"><a class="el" href="class_intrusive_linked_list.html">IntrusiveLinkedList</a>&lt;T&gt;</span> (such as <span class="tt"><a class="el" href="class_mir_instruction.html">MirInstruction</a></span>, <span class="tt"><a class="el" href="class_mir_block.html">MirBlock</a></span>, or <span class="tt"><a class="el" href="class_mir_function.html">MirFunction</a></span>) must provide: </p><div class="fragment"><div class="line">T* getPrev() const noexcept;</div>
+<div class="line"><span class="keywordtype">void</span> setPrev(T* prev) noexcept;</div>
+<div class="line">T* getNext() const noexcept;</div>
+<div class="line"><span class="keywordtype">void</span> setNext(T* next) noexcept;</div>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md190"></a>
+API Methods</h3>
+<div class="fragment"><div class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</div>
+<div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_intrusive_linked_list.html">IntrusiveLinkedList</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <span class="keyword">class </span>iterator; <span class="comment">// Bidirectional iterator (operator*, operator-&gt;, ++, --, ==, !=)</span></div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_intrusive_linked_list.html#a6c8edf36f20ae7cbfbf40e0669840414">empty</a>() <span class="keyword">const</span>;</div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_function" href="class_intrusive_linked_list.html#a2409b1faa4edbb2e8f518e1ceedc9e41">size</a>() <span class="keyword">const</span>;</div>
+<div class="line">    T *<a class="code hl_function" href="class_intrusive_linked_list.html#aff02f62ccfd2ce861a4a52a036ad07d1">front</a>() <span class="keyword">const</span>;</div>
+<div class="line">    T *<a class="code hl_function" href="class_intrusive_linked_list.html#a01406e298797c274a1a99edafa2a4af3">back</a>() <span class="keyword">const</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_intrusive_linked_list.html#ab33c5e52f6b2566fe384b99d03923533">push_back</a>(T *node);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_intrusive_linked_list.html#a0f013ffe98fb36fa6e7e47cbc9a758c2">push_front</a>(T *node);</div>
+<div class="line">    iterator <a class="code hl_function" href="class_intrusive_linked_list.html#ac400c7b01f5a529482677f8f5b3b6e0a">insert</a>(iterator pos, T *node);</div>
+<div class="line">    iterator <a class="code hl_function" href="class_intrusive_linked_list.html#ab81ff26714a8974b8d7ab67bb04054b4">erase</a>(iterator pos);</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_intrusive_linked_list.html#a65c683f8c49bd00109aa1886ba4768af">clear</a>();</div>
+<div class="line"> </div>
+<div class="line">    iterator <a class="code hl_function" href="class_intrusive_linked_list.html#af3e7ed745197a1fa6f783eb473724565">begin</a>();</div>
+<div class="line">    iterator <a class="code hl_function" href="class_intrusive_linked_list.html#afec8f7d8c770a9e1a2f2c29ebfea3f1d">end</a>();</div>
+<div class="line">};</div>
+<div class="ttc" id="aclass_intrusive_linked_list_html"><div class="ttname"><a href="class_intrusive_linked_list.html">IntrusiveLinkedList</a></div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:14</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_a01406e298797c274a1a99edafa2a4af3"><div class="ttname"><a href="class_intrusive_linked_list.html#a01406e298797c274a1a99edafa2a4af3">IntrusiveLinkedList::back</a></div><div class="ttdeci">T * back() const</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:215</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_a0f013ffe98fb36fa6e7e47cbc9a758c2"><div class="ttname"><a href="class_intrusive_linked_list.html#a0f013ffe98fb36fa6e7e47cbc9a758c2">IntrusiveLinkedList::push_front</a></div><div class="ttdeci">void push_front(T *node)</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:237</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_a2409b1faa4edbb2e8f518e1ceedc9e41"><div class="ttname"><a href="class_intrusive_linked_list.html#a2409b1faa4edbb2e8f518e1ceedc9e41">IntrusiveLinkedList::size</a></div><div class="ttdeci">size_t size() const</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:205</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_a65c683f8c49bd00109aa1886ba4768af"><div class="ttname"><a href="class_intrusive_linked_list.html#a65c683f8c49bd00109aa1886ba4768af">IntrusiveLinkedList::clear</a></div><div class="ttdeci">void clear()</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:537</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_a6c8edf36f20ae7cbfbf40e0669840414"><div class="ttname"><a href="class_intrusive_linked_list.html#a6c8edf36f20ae7cbfbf40e0669840414">IntrusiveLinkedList::empty</a></div><div class="ttdeci">bool empty() const</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:200</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_ab33c5e52f6b2566fe384b99d03923533"><div class="ttname"><a href="class_intrusive_linked_list.html#ab33c5e52f6b2566fe384b99d03923533">IntrusiveLinkedList::push_back</a></div><div class="ttdeci">void push_back(T *node)</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:220</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_ab81ff26714a8974b8d7ab67bb04054b4"><div class="ttname"><a href="class_intrusive_linked_list.html#ab81ff26714a8974b8d7ab67bb04054b4">IntrusiveLinkedList::erase</a></div><div class="ttdeci">iterator erase(iterator pos)</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:286</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_ac400c7b01f5a529482677f8f5b3b6e0a"><div class="ttname"><a href="class_intrusive_linked_list.html#ac400c7b01f5a529482677f8f5b3b6e0a">IntrusiveLinkedList::insert</a></div><div class="ttdeci">iterator insert(iterator pos, T *node)</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:254</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_af3e7ed745197a1fa6f783eb473724565"><div class="ttname"><a href="class_intrusive_linked_list.html#af3e7ed745197a1fa6f783eb473724565">IntrusiveLinkedList::begin</a></div><div class="ttdeci">iterator begin()</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:154</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_afec8f7d8c770a9e1a2f2c29ebfea3f1d"><div class="ttname"><a href="class_intrusive_linked_list.html#afec8f7d8c770a9e1a2f2c29ebfea3f1d">IntrusiveLinkedList::end</a></div><div class="ttdeci">iterator end()</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:159</div></div>
+<div class="ttc" id="aclass_intrusive_linked_list_html_aff02f62ccfd2ce861a4a52a036ad07d1"><div class="ttname"><a href="class_intrusive_linked_list.html#aff02f62ccfd2ce861a4a52a036ad07d1">IntrusiveLinkedList::front</a></div><div class="ttdeci">T * front() const</div><div class="ttdef"><b>Definition</b> IntrusiveLinkedList.h:210</div></div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md191"></a>
+5.2 <span class="tt">DenseBitSet</span> (<span class="tt">HelperClasses/DenseBitSet.h</span>)</h2>
+<p><span class="tt"><a class="el" href="class_dense_bit_set.html">DenseBitSet</a></span> is a compact, 64-bit word-aligned bit vector optimized specifically for compiler dataflow analysis and register liveness computations. It avoids per-bit branch overhead by processing 64 bits at a time via native CPU 64-bit integer operations.</p>
+<div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <a class="code hl_function" href="class_dense_bit_set.html#abf8983a273952f3289a7e2a954f2c5b4">DenseBitSet</a>() = <span class="keywordflow">default</span>;</div>
+<div class="line">    <span class="keyword">explicit</span> <a class="code hl_function" href="class_dense_bit_set.html#abf8983a273952f3289a7e2a954f2c5b4">DenseBitSet</a>(<span class="keywordtype">size_t</span> numBits);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Bit manipulation</span></div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_dense_bit_set.html#a8c26ed47a22da519691cfb58674dd231">set</a>(<span class="keywordtype">size_t</span> bit);</div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_dense_bit_set.html#a6769b0126021bd5e98c1ae4d54633568">test</a>(<span class="keywordtype">size_t</span> bit) <span class="keyword">const</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Bitwise union: this |= other</span></div>
+<div class="line">    <span class="comment">// Returns true if this bitset changed value (new bits were set)</span></div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_dense_bit_set.html#a4d91d6479cb778454cc581afa3d129d8">unionWith</a>(<span class="keyword">const</span> <a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a> &amp;other);</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Evaluates compiler liveness transfer equation:</span></div>
+<div class="line">    <span class="comment">// LiveIn = Use | (LiveOut &amp; ~Def)</span></div>
+<div class="line">    <span class="comment">// Updates internal words in-place and returns true if any word changed value.</span></div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_dense_bit_set.html#a995f0e1fd54484cf18fb40a3c5d898e3">computeLiveIn</a>(<span class="keyword">const</span> <a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a> &amp;use, <span class="keyword">const</span> <a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a> &amp;liveOut, <span class="keyword">const</span> <a class="code hl_class" href="class_dense_bit_set.html">DenseBitSet</a> &amp;def);</div>
+<div class="line"> </div>
+<div class="line"><span class="keyword">private</span>:</div>
+<div class="line">    std::vector&lt;uint64_t&gt; m_words;</div>
+<div class="line">};</div>
+<div class="ttc" id="aclass_dense_bit_set_html"><div class="ttname"><a href="class_dense_bit_set.html">DenseBitSet</a></div><div class="ttdef"><b>Definition</b> DenseBitSet.h:12</div></div>
+<div class="ttc" id="aclass_dense_bit_set_html_a4d91d6479cb778454cc581afa3d129d8"><div class="ttname"><a href="class_dense_bit_set.html#a4d91d6479cb778454cc581afa3d129d8">DenseBitSet::unionWith</a></div><div class="ttdeci">bool unionWith(const DenseBitSet &amp;other)</div></div>
+<div class="ttc" id="aclass_dense_bit_set_html_a6769b0126021bd5e98c1ae4d54633568"><div class="ttname"><a href="class_dense_bit_set.html#a6769b0126021bd5e98c1ae4d54633568">DenseBitSet::test</a></div><div class="ttdeci">bool test(size_t bit) const</div></div>
+<div class="ttc" id="aclass_dense_bit_set_html_a8c26ed47a22da519691cfb58674dd231"><div class="ttname"><a href="class_dense_bit_set.html#a8c26ed47a22da519691cfb58674dd231">DenseBitSet::set</a></div><div class="ttdeci">void set(size_t bit)</div></div>
+<div class="ttc" id="aclass_dense_bit_set_html_a995f0e1fd54484cf18fb40a3c5d898e3"><div class="ttname"><a href="class_dense_bit_set.html#a995f0e1fd54484cf18fb40a3c5d898e3">DenseBitSet::computeLiveIn</a></div><div class="ttdeci">bool computeLiveIn(const DenseBitSet &amp;use, const DenseBitSet &amp;liveOut, const DenseBitSet &amp;def)</div></div>
+<div class="ttc" id="aclass_dense_bit_set_html_abf8983a273952f3289a7e2a954f2c5b4"><div class="ttname"><a href="class_dense_bit_set.html#abf8983a273952f3289a7e2a954f2c5b4">DenseBitSet::DenseBitSet</a></div><div class="ttdeci">DenseBitSet()=default</div></div>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md192"></a>
+Transfer Function Evaluation in Liveness Analysis</h3>
+<p>In iterative backward dataflow analysis, evaluating whether any block's <span class="tt">LiveIn</span> set changed is the termination condition. <span class="tt">computeLiveIn</span> performs: </p><div class="fragment"><div class="line">LiveIn = Use ∪ (LiveOut \ Def)</div>
+</div><!-- fragment --><p> over raw 64-bit words using bitwise instructions (<span class="tt">word_use | (word_liveOut &amp; ~word_def)</span>), returning <span class="tt">true</span> immediately if any word changes, allowing the outer fixed-point loop to detect convergence with minimal overhead.</p>
+<hr  />
+<h1 class="doxsection"><a class="anchor" id="autotoc_md194"></a>
+6. Source Coordinate &amp; File Tracking</h1>
+<p>The source management subsystem (<span class="tt">EzCore/include/SourceManager/</span>) translates raw source byte streams into file names, line numbers, and column offsets without duplicating buffer contents.</p>
+<div class="fragment"><div class="line">SourceManager (GenericSourceManager)</div>
+<div class="line">      |</div>
+<div class="line">      +-- addSourceContent(name, content) / loadFile(path)</div>
+<div class="line">      |          |</div>
+<div class="line">      |          v</div>
+<div class="line">      |     SourceFileEntry</div>
+<div class="line">      |      +-- m_content (Arena-backed string)</div>
+<div class="line">      |      +-- m_name</div>
+<div class="line">      |      +-- m_lines (std::pmr::vector&lt;SourceLineRange&gt;, sorted)</div>
+<div class="line">      |</div>
+<div class="line">      +-- createReference(start, len, sourceId) ---&gt; SourceReference</div>
+<div class="line">      |</div>
+<div class="line">      +-- getReferenceLine(ref) -------------------&gt; SourceLineRange (via binary search)</div>
+<div class="line">      +-- getRawLineContent(ref) ------------------&gt; std::string_view</div>
+<div class="line">      +-- getReferenceContent(ref) ----------------&gt; std::string_view</div>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md195"></a>
+6.1 Descriptors</h2>
+<ul>
+<li><b><span class="tt"><a class="el" href="struct_source_reference.html">SourceReference</a></span></b>: A lightweight 24-byte span descriptor attached to AST nodes, MIR instructions, and diagnostics: <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_source_reference.html">SourceReference</a></div>
+<div class="line">{</div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_variable" href="struct_source_reference.html#a667c0aedf58a17ef49dcc8741f39cbe7">m_beginOffset</a>{ 0 };  <span class="comment">// Byte offset of first character of span</span></div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_variable" href="struct_source_reference.html#a052c88680afeedc5dc21b4e3901f23df">m_endOffset</a>{ 0 };    <span class="comment">// Byte offset one past last character</span></div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_variable" href="struct_source_reference.html#a204dd054e62ab90ee72576e1b6f8cc88">m_sourceFileId</a>{ 0 }; <span class="comment">// 1-based numeric ID of source file</span></div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_function" href="struct_source_reference.html#a12b009dfbdd01f44495a97056f988430">length</a>()<span class="keyword"> const </span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="struct_source_reference.html#a052c88680afeedc5dc21b4e3901f23df">m_endOffset</a> - <a class="code hl_variable" href="struct_source_reference.html#a667c0aedf58a17ef49dcc8741f39cbe7">m_beginOffset</a>; }</div>
+<div class="line">};</div>
+<div class="ttc" id="astruct_source_reference_html_a052c88680afeedc5dc21b4e3901f23df"><div class="ttname"><a href="struct_source_reference.html#a052c88680afeedc5dc21b4e3901f23df">SourceReference::m_endOffset</a></div><div class="ttdeci">size_t m_endOffset</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:15</div></div>
+<div class="ttc" id="astruct_source_reference_html_a12b009dfbdd01f44495a97056f988430"><div class="ttname"><a href="struct_source_reference.html#a12b009dfbdd01f44495a97056f988430">SourceReference::length</a></div><div class="ttdeci">size_t length() const</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:21</div></div>
+<div class="ttc" id="astruct_source_reference_html_a204dd054e62ab90ee72576e1b6f8cc88"><div class="ttname"><a href="struct_source_reference.html#a204dd054e62ab90ee72576e1b6f8cc88">SourceReference::m_sourceFileId</a></div><div class="ttdeci">size_t m_sourceFileId</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:16</div></div>
+<div class="ttc" id="astruct_source_reference_html_a667c0aedf58a17ef49dcc8741f39cbe7"><div class="ttname"><a href="struct_source_reference.html#a667c0aedf58a17ef49dcc8741f39cbe7">SourceReference::m_beginOffset</a></div><div class="ttdeci">size_t m_beginOffset</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:14</div></div>
+</div><!-- fragment --></li>
+<li><b><span class="tt"><a class="el" href="struct_source_line_range.html">SourceLineRange</a></span></b>: Precomputed line bounds stored inside each source entry: <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_source_line_range.html">SourceLineRange</a></div>
+<div class="line">{</div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_variable" href="struct_source_line_range.html#aebdab83237eeb50eaf6392fb80b0128c">m_beginOffset</a>{ 0 }; <span class="comment">// Byte offset where line begins</span></div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_variable" href="struct_source_line_range.html#a75f58fa46b18be89de86b4ed8d936c6d">m_endOffset</a>{ 0 };   <span class="comment">// Byte offset past line content (excluding terminator)</span></div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_variable" href="struct_source_line_range.html#a829c26a6f577900f604a0dc4f04f185f">m_lineNumber</a>{ 0 };  <span class="comment">// 1-based line number</span></div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_function" href="struct_source_line_range.html#aab4dff00a866c4bcd7d6d0459eda55df">length</a>()<span class="keyword"> const </span>{ <span class="keywordflow">return</span> <a class="code hl_variable" href="struct_source_line_range.html#a75f58fa46b18be89de86b4ed8d936c6d">m_endOffset</a> - <a class="code hl_variable" href="struct_source_line_range.html#aebdab83237eeb50eaf6392fb80b0128c">m_beginOffset</a>; }</div>
+<div class="line">};</div>
+<div class="ttc" id="astruct_source_line_range_html"><div class="ttname"><a href="struct_source_line_range.html">SourceLineRange</a></div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:28</div></div>
+<div class="ttc" id="astruct_source_line_range_html_a75f58fa46b18be89de86b4ed8d936c6d"><div class="ttname"><a href="struct_source_line_range.html#a75f58fa46b18be89de86b4ed8d936c6d">SourceLineRange::m_endOffset</a></div><div class="ttdeci">size_t m_endOffset</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:30</div></div>
+<div class="ttc" id="astruct_source_line_range_html_a829c26a6f577900f604a0dc4f04f185f"><div class="ttname"><a href="struct_source_line_range.html#a829c26a6f577900f604a0dc4f04f185f">SourceLineRange::m_lineNumber</a></div><div class="ttdeci">size_t m_lineNumber</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:31</div></div>
+<div class="ttc" id="astruct_source_line_range_html_aab4dff00a866c4bcd7d6d0459eda55df"><div class="ttname"><a href="struct_source_line_range.html#aab4dff00a866c4bcd7d6d0459eda55df">SourceLineRange::length</a></div><div class="ttdeci">size_t length() const</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:36</div></div>
+<div class="ttc" id="astruct_source_line_range_html_aebdab83237eeb50eaf6392fb80b0128c"><div class="ttname"><a href="struct_source_line_range.html#aebdab83237eeb50eaf6392fb80b0128c">SourceLineRange::m_beginOffset</a></div><div class="ttdeci">size_t m_beginOffset</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:29</div></div>
+</div><!-- fragment --></li>
+<li><b><span class="tt"><a class="el" href="struct_source_file_entry.html">SourceFileEntry</a></span></b>: Arena-allocated file descriptor: <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_source_file_entry.html">SourceFileEntry</a></div>
+<div class="line">{</div>
+<div class="line">    std::pmr::string <a class="code hl_variable" href="struct_source_file_entry.html#acae299b3fa8194ab54c65b1bf26410d3">m_content</a>;</div>
+<div class="line">    std::pmr::string <a class="code hl_variable" href="struct_source_file_entry.html#ae57a2cbc6c315cb9bb8e8c4a31d330dd">m_name</a>;</div>
+<div class="line">    std::pmr::vector&lt;SourceLineRange&gt; <a class="code hl_variable" href="struct_source_file_entry.html#aaf1822613a592a29cc05c3b02b018a05">m_lines</a>; <span class="comment">// Sorted by m_beginOffset for binary search</span></div>
+<div class="line">};</div>
+<div class="ttc" id="astruct_source_file_entry_html"><div class="ttname"><a href="struct_source_file_entry.html">SourceFileEntry</a></div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:44</div></div>
+<div class="ttc" id="astruct_source_file_entry_html_aaf1822613a592a29cc05c3b02b018a05"><div class="ttname"><a href="struct_source_file_entry.html#aaf1822613a592a29cc05c3b02b018a05">SourceFileEntry::m_lines</a></div><div class="ttdeci">std::pmr::vector&lt; SourceLineRange &gt; m_lines</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:47</div></div>
+<div class="ttc" id="astruct_source_file_entry_html_acae299b3fa8194ab54c65b1bf26410d3"><div class="ttname"><a href="struct_source_file_entry.html#acae299b3fa8194ab54c65b1bf26410d3">SourceFileEntry::m_content</a></div><div class="ttdeci">std::pmr::string m_content</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:45</div></div>
+<div class="ttc" id="astruct_source_file_entry_html_ae57a2cbc6c315cb9bb8e8c4a31d330dd"><div class="ttname"><a href="struct_source_file_entry.html#ae57a2cbc6c315cb9bb8e8c4a31d330dd">SourceFileEntry::m_name</a></div><div class="ttdeci">std::pmr::string m_name</div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:46</div></div>
+</div><!-- fragment --></li>
+</ul>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md196"></a>
+6.2 <span class="tt">SourceManager</span> API</h2>
+<div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_source_manager.html">SourceManager</a> : <span class="keyword">public</span> <a class="code hl_class" href="class_generic_source_manager.html">GenericSourceManager</a></div>
+<div class="line">{</div>
+<div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <a class="code hl_function" href="class_source_manager.html#a27a1859353b9bca04e64480048b794bd">SourceManager</a>(<span class="keyword">const</span> std::filesystem::path &amp;workingPath, std::pmr::memory_resource *alloc);</div>
+<div class="line">    <a class="code hl_function" href="class_source_manager.html#a1aaf363af19e27658a8d45d1b66a6c60">~SourceManager</a>();</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Ingestion</span></div>
+<div class="line">    <span class="keywordtype">size_t</span> <a class="code hl_function" href="class_source_manager.html#a5448b7bfa072c6c0782a65c349bbac7d">addSourceContent</a>(<span class="keyword">const</span> std::string &amp;name, <span class="keyword">const</span> std::string_view &amp;content) <span class="keyword">override</span>;</div>
+<div class="line">    std::optional&lt;size_t&gt; <a class="code hl_function" href="class_source_manager.html#a72b4c6a0470b29c7ddd787d1f51f4d1e">loadFile</a>(<span class="keyword">const</span> std::filesystem::path &amp;filePath,</div>
+<div class="line">                                   <span class="keyword">const</span> std::optional&lt;std::filesystem::path&gt; &amp;relativeTo = std::nullopt) <span class="keyword">override</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Span creation</span></div>
+<div class="line">    <a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *<a class="code hl_function" href="class_source_manager.html#a98a466464ca9082dfdf92ce2bc111da3">createReference</a>(<span class="keywordtype">size_t</span> startOffset, <span class="keywordtype">size_t</span> length, <span class="keywordtype">size_t</span> sourceId) <span class="keyword">override</span>;</div>
+<div class="line">    <a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *<a class="code hl_function" href="class_source_manager.html#a98a466464ca9082dfdf92ce2bc111da3">createReference</a>(<span class="keywordtype">size_t</span> startOffset, <span class="keywordtype">size_t</span> length, <span class="keyword">const</span> std::string_view &amp;sourceFile) <span class="keyword">override</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Location resolution</span></div>
+<div class="line">    <span class="keyword">const</span> <a class="code hl_struct" href="struct_source_line_range.html">SourceLineRange</a> *<a class="code hl_function" href="class_source_manager.html#a2a87a324e0cf93381796e7ed8634efaf">getReferenceLine</a>(<a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *ref) <span class="keyword">const override</span>;</div>
+<div class="line">    std::string_view <a class="code hl_function" href="class_source_manager.html#ab9757fad455b0d6de29dbcdf4e88613b">getRawLineContent</a>(<a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *ref) <span class="keyword">const override</span>;</div>
+<div class="line">    std::string_view <a class="code hl_function" href="class_source_manager.html#a34f33c3a0815e79e97adc7a5dc021fef">getReferenceContent</a>(<a class="code hl_struct" href="struct_source_reference.html">SourceReference</a> *ref) <span class="keyword">const override</span>;</div>
+<div class="line">    std::string_view <a class="code hl_function" href="class_source_manager.html#a80fbe92bdac3132fb552b0cf50846783">getSourceContent</a>(<span class="keywordtype">size_t</span> <span class="keywordtype">id</span>) <span class="keyword">const override</span>;</div>
+<div class="line"> </div>
+<div class="line">    <span class="comment">// Include path resolution</span></div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_source_manager.html#aee7e9927c1d80084f40a02e385feb238">addIncludePath</a>(<span class="keyword">const</span> std::filesystem::path &amp;path) <span class="keyword">override</span>;</div>
+<div class="line">    std::filesystem::path <a class="code hl_function" href="class_source_manager.html#aa5941cdd4d4eb6bb0acb8bec955c29f0">resolveSourcePath</a>(<span class="keyword">const</span> std::filesystem::path &amp;sourceFile,</div>
+<div class="line">                                           <span class="keyword">const</span> std::optional&lt;std::filesystem::path&gt; &amp;relativeTo = std::nullopt) <span class="keyword">const override</span>;</div>
+<div class="line">};</div>
+<div class="ttc" id="aclass_generic_source_manager_html"><div class="ttname"><a href="class_generic_source_manager.html">GenericSourceManager</a></div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:55</div></div>
+<div class="ttc" id="aclass_source_manager_html_a1aaf363af19e27658a8d45d1b66a6c60"><div class="ttname"><a href="class_source_manager.html#a1aaf363af19e27658a8d45d1b66a6c60">SourceManager::~SourceManager</a></div><div class="ttdeci">~SourceManager()</div></div>
+<div class="ttc" id="aclass_source_manager_html_a27a1859353b9bca04e64480048b794bd"><div class="ttname"><a href="class_source_manager.html#a27a1859353b9bca04e64480048b794bd">SourceManager::SourceManager</a></div><div class="ttdeci">SourceManager(const std::filesystem::path &amp;workingPath, std::pmr::memory_resource *alloc)</div></div>
+<div class="ttc" id="aclass_source_manager_html_a2a87a324e0cf93381796e7ed8634efaf"><div class="ttname"><a href="class_source_manager.html#a2a87a324e0cf93381796e7ed8634efaf">SourceManager::getReferenceLine</a></div><div class="ttdeci">const SourceLineRange * getReferenceLine(SourceReference *ref) const override</div></div>
+<div class="ttc" id="aclass_source_manager_html_a34f33c3a0815e79e97adc7a5dc021fef"><div class="ttname"><a href="class_source_manager.html#a34f33c3a0815e79e97adc7a5dc021fef">SourceManager::getReferenceContent</a></div><div class="ttdeci">std::string_view getReferenceContent(SourceReference *ref) const override</div></div>
+<div class="ttc" id="aclass_source_manager_html_a5448b7bfa072c6c0782a65c349bbac7d"><div class="ttname"><a href="class_source_manager.html#a5448b7bfa072c6c0782a65c349bbac7d">SourceManager::addSourceContent</a></div><div class="ttdeci">size_t addSourceContent(const std::string &amp;name, const std::string_view &amp;content) override</div></div>
+<div class="ttc" id="aclass_source_manager_html_a72b4c6a0470b29c7ddd787d1f51f4d1e"><div class="ttname"><a href="class_source_manager.html#a72b4c6a0470b29c7ddd787d1f51f4d1e">SourceManager::loadFile</a></div><div class="ttdeci">std::optional&lt; size_t &gt; loadFile(const std::filesystem::path &amp;filePath, const std::optional&lt; std::filesystem::path &gt; &amp;relativeTo=std::nullopt) override</div></div>
+<div class="ttc" id="aclass_source_manager_html_a80fbe92bdac3132fb552b0cf50846783"><div class="ttname"><a href="class_source_manager.html#a80fbe92bdac3132fb552b0cf50846783">SourceManager::getSourceContent</a></div><div class="ttdeci">std::string_view getSourceContent(size_t id) const override</div></div>
+<div class="ttc" id="aclass_source_manager_html_a98a466464ca9082dfdf92ce2bc111da3"><div class="ttname"><a href="class_source_manager.html#a98a466464ca9082dfdf92ce2bc111da3">SourceManager::createReference</a></div><div class="ttdeci">SourceReference * createReference(size_t startOffset, size_t length, size_t sourceId) override</div></div>
+<div class="ttc" id="aclass_source_manager_html_aa5941cdd4d4eb6bb0acb8bec955c29f0"><div class="ttname"><a href="class_source_manager.html#aa5941cdd4d4eb6bb0acb8bec955c29f0">SourceManager::resolveSourcePath</a></div><div class="ttdeci">std::filesystem::path resolveSourcePath(const std::filesystem::path &amp;sourceFile, const std::optional&lt; std::filesystem::path &gt; &amp;relativeTo=std::nullopt) const override</div></div>
+<div class="ttc" id="aclass_source_manager_html_ab9757fad455b0d6de29dbcdf4e88613b"><div class="ttname"><a href="class_source_manager.html#ab9757fad455b0d6de29dbcdf4e88613b">SourceManager::getRawLineContent</a></div><div class="ttdeci">std::string_view getRawLineContent(SourceReference *ref) const override</div></div>
+<div class="ttc" id="aclass_source_manager_html_aee7e9927c1d80084f40a02e385feb238"><div class="ttname"><a href="class_source_manager.html#aee7e9927c1d80084f40a02e385feb238">SourceManager::addIncludePath</a></div><div class="ttdeci">void addIncludePath(const std::filesystem::path &amp;path) override</div></div>
+</div><!-- fragment --><hr  />
+<h1 class="doxsection"><a class="anchor" id="autotoc_md198"></a>
+7. Header &amp; Class Index</h1>
+<table class="markdownTable">
+<tr class="markdownTableHead">
+<th class="markdownTableHeadNone">Component  </th><th class="markdownTableHeadNone">Header Location  </th><th class="markdownTableHeadNone">Key Classes / Structs  </th></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Diagnostics  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_diagnostic_message_8h.html">EzCore/include/Diagnostics/DiagnosticMessage.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_diagnostic_message_8h.html#a4599fe56a82cf438f7393d33f1d2fe44">DiagnosticMessageType</a></span>, <span class="tt"><a class="el" href="struct_diagnostic_note.html">DiagnosticNote</a></span>, <span class="tt"><a class="el" href="class_diagnostic_message.html">DiagnosticMessage</a></span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Diagnostics  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_diagnostic_collector_8h.html">EzCore/include/Diagnostics/DiagnosticCollector.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_diagnostic_collector.html">DiagnosticCollector</a></span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Diagnostics  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_diagnostic_builder_8h.html">EzCore/include/Diagnostics/DiagnosticBuilder.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_diagnostic_builder.html">DiagnosticBuilder</a></span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Diagnostics  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_diagnostic_listener_8h.html">EzCore/include/Diagnostics/DiagnosticListener.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_diagnostic_listener.html">DiagnosticListener</a></span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Diagnostics  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_diagnostic_logger_8h.html">EzCore/include/Diagnostics/DiagnosticLogger.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_diagnostic_logger.html">DiagnosticLogger</a></span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Diagnostics  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_diagnostic_scope_8h.html">EzCore/include/Diagnostics/DiagnosticScope.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_diagnostic_scope.html">DiagnosticScope</a></span>, <span class="tt"><a class="el" href="_diagnostic_scope_8h.html#a86aee68584ca4f9a382c03921f4e0eb7">DiagnosticScopeAction</a></span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Multi-Precision  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_flex_int_8h.html">EzCore/include/FlexNumber/FlexInt.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_flex_int.html">FlexInt</a></span>, <span class="tt"><a class="el" href="_flex_int_8h.html#a0ada8f647402027261407be09bdf25ff">OverflowPolicy</a></span>, <span class="tt"><a class="el" href="_flex_int_8h.html#a4f3ee12da30a1e47c52dc137b4627cab">Endianness</a></span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Multi-Precision  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_flex_float_8h.html">EzCore/include/FlexNumber/FlexFloat.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_flex_float.html">FlexFloat</a></span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Containers  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_intrusive_linked_list_8h.html">EzCore/include/HelperClasses/IntrusiveLinkedList.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_intrusive_linked_list.html">IntrusiveLinkedList</a>&lt;T&gt;</span>, <span class="tt">iterator</span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Containers  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_dense_bit_set_8h.html">EzCore/include/HelperClasses/DenseBitSet.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_dense_bit_set.html">DenseBitSet</a></span>  </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone">Source Coordinates  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_generic_source_manager_8h.html">EzCore/include/SourceManager/GenericSourceManager.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="struct_source_reference.html">SourceReference</a></span>, <span class="tt"><a class="el" href="struct_source_line_range.html">SourceLineRange</a></span>, <span class="tt"><a class="el" href="struct_source_file_entry.html">SourceFileEntry</a></span>, <span class="tt"><a class="el" href="class_generic_source_manager.html">GenericSourceManager</a></span>  </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone">Source Coordinates  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="_source_manager_8h.html">EzCore/include/SourceManager/SourceManager.h</a></span>  </td><td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_source_manager.html">SourceManager</a></span>  </td></tr>
+</table>
 </div></div><!-- contents -->
 </div><!-- PageDoc -->
 </div><!-- doc-content -->

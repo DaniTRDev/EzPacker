@@ -53,14 +53,14 @@ EzCompiler simple_math.mir -o simple_math.o
 On Windows, `EzCompiler` automatically emits a PE/COFF object file `simple_math.obj`; on Linux, it emits an ELF64 object file `simple_math.o`.
 
 ### 3.2 Explicit Target Triples
-You can cross-compile or explicitly request a specific OS object format using `-target`:
+You can cross-compile or explicitly request a specific OS object format using `--target`:
 
 ```bash
 # Target Linux ELF64 (uses System V AMD64 calling convention)
-EzCompiler simple_math.mir -target x86_64-unknown-linux-gnu -o simple_math.o
+EzCompiler simple_math.mir --target x86_64-unknown-linux-gnu -o simple_math.o
 
 # Target Windows PE/COFF (uses Microsoft Win64 calling convention)
-EzCompiler simple_math.mir -target x86_64-pc-windows-coff -o simple_math.obj
+EzCompiler simple_math.mir --target x86_64-pc-windows-coff -o simple_math.obj
 ```
 
 ---
@@ -156,14 +156,14 @@ my_app.exe
 
 ## 6. Inspecting EzDsl Files (For Target Developers)
 
-If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the `ezdsl_cli` tool to validate DSL files:
+If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the `ezdsl-cli` tool to validate DSL files:
 
 ```bash
 # Validate and dump AST of a target descriptor
-ezdsl_cli --input EzTargets/X86_64/targets/x86_64/x86_64.tdesc --dump-ast
+ezdsl-cli --dump-ast EzTargets/X86_64/Dsl/x86_64_rules.lrd
 
 # Validate and dump symbol definitions of calling conventions
-ezdsl_cli --input EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symbols
+ezdsl-cli --dump-symbols EzTargets/X86_64/Dsl/x86_64_sysv.ccdf
 ```
 
 ---

@@ -126,34 +126,37 @@ var NAVTREE =
     ] ],
     [ "EzCodeEmitter Subproject Documentation", "md_docs_2projects_2_ez_code_emitter.html", [
       [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md125", null ],
-      [ "2. Core Abstractions &amp; Classes", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md127", [
-        [ "2.1 <span class=\"tt\">GenericCodeEmitter</span> (<span class=\"tt\">include/GenericCodeEmitter.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md128", null ],
-        [ "2.2 <span class=\"tt\">CodeEmitterContext</span> (<span class=\"tt\">include/CodeEmitterContext.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md129", null ],
-        [ "2.3 <span class=\"tt\">CodeSection</span> (<span class=\"tt\">include/CodeSection.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md130", null ],
-        [ "2.4 <span class=\"tt\">ObjectSymbol</span> (<span class=\"tt\">include/ObjectFormat/ObjectSymbol.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md131", null ],
-        [ "2.5 <span class=\"tt\">ObjectRelocEntry</span> (<span class=\"tt\">include/ObjectFormat/ObjectSymbol.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md132", null ]
+      [ "2. Dynamic Linked Code Sections (<span class=\"tt\">CodeSection.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md127", [
+        [ "2.1 Section Categorization (<span class=\"tt\">SectionType</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md128", null ],
+        [ "2.2 <span class=\"tt\">CodeSection</span> Operations", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md129", null ]
       ] ],
-      [ "3. Object File Writers (<span class=\"tt\">IObjectWriter</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md134", [
-        [ "3.1 <span class=\"tt\">Elf64Writer</span> (<span class=\"tt\">include/ObjectFormat/Elf64Writer.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md135", null ],
-        [ "3.2 <span class=\"tt\">CoffWriter</span> (<span class=\"tt\">include/ObjectFormat/CoffWriter.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md136", null ]
+      [ "3. Emission Context &amp; Relocations (<span class=\"tt\">CodeEmitterContext.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md131", [
+        [ "3.1 Relocation Fixup Types (<span class=\"tt\">TargetCodeRelocationType</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md132", null ],
+        [ "3.2 Label &amp; Relocation Records", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md133", null ],
+        [ "3.3 <span class=\"tt\">CodeEmitterContext</span> API", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md134", null ]
       ] ],
-      [ "4. Usage Example: Serializing an Object File", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md138", null ],
-      [ "5. API Reference &amp; Further Reading", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md140", null ]
+      [ "4. Generic Target Code Emitter (<span class=\"tt\">GenericCodeEmitter.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md136", null ],
+      [ "5. Relocatable Object File Writers (<span class=\"tt\">IObjectWriter.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md138", [
+        [ "5.1 <span class=\"tt\">Elf64Writer</span> (<span class=\"tt\">ObjectFormat/Elf64Writer.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md139", null ],
+        [ "5.2 <span class=\"tt\">CoffWriter</span> (<span class=\"tt\">ObjectFormat/CoffWriter.h</span>)", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md140", null ]
+      ] ],
+      [ "6. Header &amp; Class Index", "md_docs_2projects_2_ez_code_emitter.html#autotoc_md142", null ]
     ] ],
     [ "EzCompiler Subproject Documentation", "md_docs_2projects_2_ez_compiler.html", [
-      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_compiler.html#autotoc_md143", null ],
-      [ "2. Core Components", "md_docs_2projects_2_ez_compiler.html#autotoc_md145", [
-        [ "2.1 <span class=\"tt\">CommandLineOptions</span> &amp; <span class=\"tt\">CommandLineParser</span> (<span class=\"tt\">include/CommandLineOptions.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md146", [
-          [ "Key Configuration Fields:", "md_docs_2projects_2_ez_compiler.html#autotoc_md147", null ]
-        ] ],
-        [ "2.2 <span class=\"tt\">DriverContext</span> (<span class=\"tt\">include/DriverContext.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md149", null ],
-        [ "2.3 <span class=\"tt\">TargetTriple</span> (<span class=\"tt\">include/TargetTriple.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md151", null ],
-        [ "2.4 <span class=\"tt\">TargetResolver</span> (<span class=\"tt\">include/TargetResolver.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md153", null ],
-        [ "2.5 <span class=\"tt\">CompilationPipeline</span> (<span class=\"tt\">include/CompilationPipeline.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md155", null ],
-        [ "2.6 <span class=\"tt\">EmissionEngine</span> (<span class=\"tt\">include/EmissionEngine.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md157", null ]
+      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_compiler.html#autotoc_md145", null ],
+      [ "2. Driver Context &amp; Lifecycle (<span class=\"tt\">DriverContext.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md147", null ],
+      [ "3. Target Triples &amp; Dynamic Target Resolution", "md_docs_2projects_2_ez_compiler.html#autotoc_md149", [
+        [ "3.1 <span class=\"tt\">TargetTriple</span> (<span class=\"tt\">TargetTriple.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md150", null ],
+        [ "3.2 <span class=\"tt\">TargetResolver</span> (<span class=\"tt\">TargetResolver.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md151", null ]
       ] ],
-      [ "3. CLI Command-Line Reference", "md_docs_2projects_2_ez_compiler.html#autotoc_md159", null ],
-      [ "4. API Reference &amp; Further Reading", "md_docs_2projects_2_ez_compiler.html#autotoc_md161", null ]
+      [ "4. The Compilation Pipeline (<span class=\"tt\">CompilationPipeline.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md153", [
+        [ "Pass Sequence:", "md_docs_2projects_2_ez_compiler.html#autotoc_md154", null ]
+      ] ],
+      [ "5. Machine Code Emission Engine (<span class=\"tt\">EmissionEngine.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md156", null ],
+      [ "6. Command-Line Options (<span class=\"tt\">ezc</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md158", [
+        [ "Exact CLI Options (<span class=\"tt\">CommandLineOptions.h</span>)", "md_docs_2projects_2_ez_compiler.html#autotoc_md159", null ]
+      ] ],
+      [ "7. Header &amp; Class Index", "md_docs_2projects_2_ez_compiler.html#autotoc_md161", null ]
     ] ],
     [ "EzCore Subproject Documentation", "md_docs_2projects_2_ez_core.html", [
       [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_core.html#autotoc_md164", [
@@ -163,98 +166,118 @@ var NAVTREE =
         [ "Core PMR Guidelines in EzPacker", "md_docs_2projects_2_ez_core.html#autotoc_md168", null ]
       ] ],
       [ "3. Diagnostic Engine", "md_docs_2projects_2_ez_core.html#autotoc_md170", [
-        [ "3.1 Diagnostic Message Types &amp; Locations", "md_docs_2projects_2_ez_core.html#autotoc_md171", null ],
-        [ "3.2 Key Classes", "md_docs_2projects_2_ez_core.html#autotoc_md172", null ],
-        [ "3.3 Example: Emitting a Diagnostic", "md_docs_2projects_2_ez_core.html#autotoc_md173", null ]
+        [ "3.1 Severity Classification (<span class=\"tt\">DiagnosticMessage.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md171", null ],
+        [ "3.2 Diagnostic Records &amp; Notes", "md_docs_2projects_2_ez_core.html#autotoc_md172", null ],
+        [ "3.3 Diagnostic Collector (<span class=\"tt\">DiagnosticCollector.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md173", null ],
+        [ "3.4 Diagnostic Builder (<span class=\"tt\">DiagnosticBuilder.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md174", null ],
+        [ "3.5 Usage Example: Reporting Compiler Diagnostics", "md_docs_2projects_2_ez_core.html#autotoc_md175", null ]
       ] ],
-      [ "4. Arbitrary-Precision Constants: <span class=\"tt\">FlexInt</span> &amp; <span class=\"tt\">FlexFloat</span>", "md_docs_2projects_2_ez_core.html#autotoc_md175", [
-        [ "4.1 <span class=\"tt\">FlexInt</span> (<span class=\"tt\">FlexNumber/FlexInt.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md176", null ],
-        [ "4.2 <span class=\"tt\">FlexFloat</span> (<span class=\"tt\">FlexNumber/FlexFloat.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md177", null ]
+      [ "4. Arbitrary-Precision Constants: <span class=\"tt\">FlexInt</span> &amp; <span class=\"tt\">FlexFloat</span>", "md_docs_2projects_2_ez_core.html#autotoc_md177", [
+        [ "4.1 <span class=\"tt\">FlexInt</span> (<span class=\"tt\">FlexNumber/FlexInt.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md178", [
+          [ "Constructors &amp; State", "md_docs_2projects_2_ez_core.html#autotoc_md179", null ],
+          [ "Arithmetic &amp; Overflow Checking", "md_docs_2projects_2_ez_core.html#autotoc_md180", null ],
+          [ "Bitwise, Shift &amp; Slice Operations", "md_docs_2projects_2_ez_core.html#autotoc_md181", null ],
+          [ "Legalization &amp; Splitting Helpers", "md_docs_2projects_2_ez_core.html#autotoc_md182", null ],
+          [ "Serialization &amp; Conversions", "md_docs_2projects_2_ez_core.html#autotoc_md183", null ],
+          [ "Example: <span class=\"tt\">FlexInt</span> in Compiler Constant Folding", "md_docs_2projects_2_ez_core.html#autotoc_md184", null ]
+        ] ],
+        [ "4.2 <span class=\"tt\">FlexFloat</span> (<span class=\"tt\">FlexNumber/FlexFloat.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md185", null ]
       ] ],
-      [ "5. Specialized Compiler Data Structures", "md_docs_2projects_2_ez_core.html#autotoc_md179", [
-        [ "5.1 <span class=\"tt\">DenseBitSet</span> (<span class=\"tt\">HelperClasses/DenseBitSet.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md180", null ],
-        [ "5.2 <span class=\"tt\">IntrusiveLinkedList&lt;T&gt;</span> (<span class=\"tt\">HelperClasses/IntrusiveLinkedList.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md181", null ]
+      [ "5. High-Performance Compiler Containers", "md_docs_2projects_2_ez_core.html#autotoc_md187", [
+        [ "5.1 <span class=\"tt\">IntrusiveLinkedList&lt;T&gt;</span> (<span class=\"tt\">HelperClasses/IntrusiveLinkedList.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md188", [
+          [ "Concept Requirements on Element Type <span class=\"tt\">T</span>", "md_docs_2projects_2_ez_core.html#autotoc_md189", null ],
+          [ "API Methods", "md_docs_2projects_2_ez_core.html#autotoc_md190", null ]
+        ] ],
+        [ "5.2 <span class=\"tt\">DenseBitSet</span> (<span class=\"tt\">HelperClasses/DenseBitSet.h</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md191", [
+          [ "Transfer Function Evaluation in Liveness Analysis", "md_docs_2projects_2_ez_core.html#autotoc_md192", null ]
+        ] ]
       ] ],
-      [ "6. Source Management (<span class=\"tt\">SourceManager</span>)", "md_docs_2projects_2_ez_core.html#autotoc_md183", null ],
-      [ "7. Additional Utilities", "md_docs_2projects_2_ez_core.html#autotoc_md185", null ],
-      [ "8. API Reference &amp; Further Reading", "md_docs_2projects_2_ez_core.html#autotoc_md187", null ]
+      [ "6. Source Coordinate &amp; File Tracking", "md_docs_2projects_2_ez_core.html#autotoc_md194", [
+        [ "6.1 Descriptors", "md_docs_2projects_2_ez_core.html#autotoc_md195", null ],
+        [ "6.2 <span class=\"tt\">SourceManager</span> API", "md_docs_2projects_2_ez_core.html#autotoc_md196", null ]
+      ] ],
+      [ "7. Header &amp; Class Index", "md_docs_2projects_2_ez_core.html#autotoc_md198", null ]
     ] ],
     [ "EzDsl Subproject Documentation", "md_docs_2projects_2_ez_dsl.html", [
-      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_dsl.html#autotoc_md190", null ],
-      [ "2. Subproject Structure", "md_docs_2projects_2_ez_dsl.html#autotoc_md192", null ],
-      [ "3. The 8 DSL Languages", "md_docs_2projects_2_ez_dsl.html#autotoc_md194", [
-        [ "3.1 Type Definition Language (<span class=\"tt\">.tyf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md195", null ],
-        [ "3.2 IR Instruction Definition Language (<span class=\"tt\">.irdf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md196", null ],
-        [ "3.3 Target Descriptor Language (<span class=\"tt\">.tdesc</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md197", null ],
-        [ "3.4 Calling Convention Language (<span class=\"tt\">.ezcc</span>, <span class=\"tt\">.ccd</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md198", null ],
-        [ "3.5 Legalization Action Language (<span class=\"tt\">.lad</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md199", null ],
-        [ "3.6 Legalization Rule Language (<span class=\"tt\">.lrd</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md200", null ],
-        [ "3.7 Target Instruction Definition Language (<span class=\"tt\">.idf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md201", null ],
-        [ "3.8 Instruction Selection Pattern Language (<span class=\"tt\">.isf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md202", null ]
+      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_dsl.html#autotoc_md201", null ],
+      [ "2. EzDSL Dialects &amp; File Extensions", "md_docs_2projects_2_ez_dsl.html#autotoc_md203", null ],
+      [ "3. The 3-Stage Toolchain Architecture", "md_docs_2projects_2_ez_dsl.html#autotoc_md205", [
+        [ "3.1 Lexer &amp; Recursive Descent Parser (<span class=\"tt\">EzDsl/Lexer/</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md206", null ],
+        [ "3.2 Semantic Analysis (Sema) (<span class=\"tt\">EzDsl/Sema/</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md207", null ],
+        [ "3.3 Code Generators (<span class=\"tt\">EzDsl/CodeGenerators/</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md208", null ]
       ] ],
-      [ "4. Code Generators", "md_docs_2projects_2_ez_dsl.html#autotoc_md204", null ],
-      [ "5. CLI Tool: <span class=\"tt\">ezdsl_cli</span>", "md_docs_2projects_2_ez_dsl.html#autotoc_md206", [
-        [ "Command-Line Arguments", "md_docs_2projects_2_ez_dsl.html#autotoc_md207", null ],
-        [ "Example Usage", "md_docs_2projects_2_ez_dsl.html#autotoc_md208", null ]
+      [ "4. Dialect Syntax Examples", "md_docs_2projects_2_ez_dsl.html#autotoc_md210", [
+        [ "4.1 Type Definitions (<span class=\"tt\">types.tyf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md211", null ],
+        [ "4.2 Register Definitions (<span class=\"tt\">registers.rdf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md212", null ],
+        [ "4.3 Calling Convention (<span class=\"tt\">sysv.ccdf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md213", null ],
+        [ "4.4 Legalization Rules (<span class=\"tt\">rules.lrd</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md214", null ],
+        [ "4.5 Instruction Selection (<span class=\"tt\">patterns.isdf</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md215", null ]
       ] ],
-      [ "6. API Reference &amp; Further Reading", "md_docs_2projects_2_ez_dsl.html#autotoc_md210", null ]
+      [ "5. Command-Line Interface (<span class=\"tt\">ezdsl-cli</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md217", [
+        [ "Exact CLI Options (<span class=\"tt\">Cli::CliOptions</span>)", "md_docs_2projects_2_ez_dsl.html#autotoc_md218", null ],
+        [ "CLI Execution Examples", "md_docs_2projects_2_ez_dsl.html#autotoc_md219", null ]
+      ] ],
+      [ "6. Header &amp; Class Index", "md_docs_2projects_2_ez_dsl.html#autotoc_md221", null ]
     ] ],
     [ "EzMir Subproject Documentation", "md_docs_2projects_2_ez_mir.html", [
-      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_mir.html#autotoc_md213", null ],
-      [ "2. In-Memory Intermediate Representation (IR)", "md_docs_2projects_2_ez_mir.html#autotoc_md215", [
-        [ "2.1 <span class=\"tt\">MirFunction</span> (<span class=\"tt\">Function/MirFunction.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md216", null ],
-        [ "2.2 <span class=\"tt\">MirBlock</span> (<span class=\"tt\">Block/MirBlock.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md217", null ],
-        [ "2.3 <span class=\"tt\">MirInstruction</span> (<span class=\"tt\">Instruction/MirInstruction.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md218", null ],
-        [ "2.4 <span class=\"tt\">MirOperand</span> (<span class=\"tt\">Operand/MirOperand.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md219", null ],
-        [ "2.5 <span class=\"tt\">MirType</span> (<span class=\"tt\">Type/MirType.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md220", null ]
+      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_mir.html#autotoc_md224", null ],
+      [ "2. In-Memory Intermediate Representation (IR)", "md_docs_2projects_2_ez_mir.html#autotoc_md226", [
+        [ "2.1 <span class=\"tt\">MirFunction</span> (<span class=\"tt\">Function/MirFunction.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md227", null ],
+        [ "2.2 <span class=\"tt\">MirBlock</span> (<span class=\"tt\">Block/MirBlock.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md228", null ],
+        [ "2.3 <span class=\"tt\">MirInstruction</span> (<span class=\"tt\">Instruction/MirInstruction.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md229", null ],
+        [ "2.4 <span class=\"tt\">MirOperand</span> (<span class=\"tt\">Operand/MirOperand.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md230", null ],
+        [ "2.5 <span class=\"tt\">MirType</span> &amp; <span class=\"tt\">MirTypeTable</span> (<span class=\"tt\">Type/MirType.h</span>, <span class=\"tt\">Type/MirTypeTable.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md231", null ]
       ] ],
-      [ "3. Middle-End Pass Framework", "md_docs_2projects_2_ez_mir.html#autotoc_md222", [
-        [ "3.1 <span class=\"tt\">CodeFlowAnalysisPass</span> (<span class=\"tt\">MirPasses/Passes/CodeFlowAnalysisPass.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md223", null ],
-        [ "3.2 <span class=\"tt\">NonSsaToSsaPass</span> (<span class=\"tt\">MirPasses/Passes/NonSsaToSsaPass.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md224", null ],
-        [ "3.3 <span class=\"tt\">LivenessAnalysisPass</span> (<span class=\"tt\">MirPasses/Passes/LivenessAnalysisPass.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md225", null ]
+      [ "3. Middle-End Pass Framework", "md_docs_2projects_2_ez_mir.html#autotoc_md233", [
+        [ "3.1 <span class=\"tt\">CodeFlowAnalysisPass</span> (<span class=\"tt\">MirPasses/Passes/CodeFlowAnalysisPass.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md234", null ],
+        [ "3.2 <span class=\"tt\">NonSsaToSsaPass</span> (<span class=\"tt\">MirPasses/Passes/NonSsaToSsaPass.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md235", null ],
+        [ "3.3 <span class=\"tt\">LivenessAnalysisPass</span> (<span class=\"tt\">MirPasses/Passes/LivenessAnalysisPass.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md236", null ]
       ] ],
-      [ "4. Programmatic MIR Construction (Builder API)", "md_docs_2projects_2_ez_mir.html#autotoc_md227", null ],
-      [ "5. Textual MIR: Parser &amp; Printer", "md_docs_2projects_2_ez_mir.html#autotoc_md229", [
-        [ "5.1 Textual Format Syntax", "md_docs_2projects_2_ez_mir.html#autotoc_md230", null ],
-        [ "5.2 <span class=\"tt\">MirLexer</span> &amp; <span class=\"tt\">MirParser</span> (<span class=\"tt\">Parser/MirLexer.h</span>, <span class=\"tt\">Parser/MirParser.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md231", null ],
-        [ "5.3 <span class=\"tt\">MirPrinter</span> (<span class=\"tt\">Printer/MirPrinter.h</span>)", "md_docs_2projects_2_ez_mir.html#autotoc_md232", null ]
+      [ "4. Programmatic MIR Construction (Builder API)", "md_docs_2projects_2_ez_mir.html#autotoc_md238", [
+        [ "4.1 Builder Hierarchy", "md_docs_2projects_2_ez_mir.html#autotoc_md239", null ],
+        [ "4.2 Complete Programmatic Example", "md_docs_2projects_2_ez_mir.html#autotoc_md240", null ]
       ] ],
-      [ "6. API Reference &amp; Further Reading", "md_docs_2projects_2_ez_mir.html#autotoc_md234", null ]
+      [ "5. Textual MIR Format", "md_docs_2projects_2_ez_mir.html#autotoc_md242", null ],
+      [ "6. Header &amp; Class Index", "md_docs_2projects_2_ez_mir.html#autotoc_md244", null ]
     ] ],
     [ "EzTargets Subproject Documentation", "md_docs_2projects_2_ez_targets.html", [
-      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_targets.html#autotoc_md237", null ],
-      [ "2. The x86-64 Target (<span class=\"tt\">EzTargets/X86_64</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md239", [
-        [ "2.1 Target Descriptor: <span class=\"tt\">X86_64TargetDesc</span> (<span class=\"tt\">include/X86_64TargetDesc.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md240", null ],
-        [ "2.2 Calling Conventions", "md_docs_2projects_2_ez_targets.html#autotoc_md242", [
-          [ "System V AMD64 (Linux / macOS / BSD)", "md_docs_2projects_2_ez_targets.html#autotoc_md243", null ],
-          [ "Microsoft Win64 (Windows)", "md_docs_2projects_2_ez_targets.html#autotoc_md244", null ]
+      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_targets.html#autotoc_md247", null ],
+      [ "2. X86-64 Target Architecture Implementation", "md_docs_2projects_2_ez_targets.html#autotoc_md249", [
+        [ "2.1 <span class=\"tt\">X86_64TargetDesc</span> (<span class=\"tt\">X86_64/include/X86_64TargetDesc.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md250", null ],
+        [ "2.2 Hand-Written Lowering Shims (<span class=\"tt\">X86_64/include/X86_64Lowering.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md252", null ],
+        [ "2.3 Table-Driven Machine Instruction Encoder (<span class=\"tt\">X86_64/include/Encoding/</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md254", [
+          [ "Operand Slot Classifications (<span class=\"tt\">EncSlotKind</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md255", null ],
+          [ "Instruction Forms (<span class=\"tt\">EncForm</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md256", null ]
         ] ],
-        [ "2.3 Frame Lowering: <span class=\"tt\">X86_64FrameLowerer</span> (<span class=\"tt\">include/X86_64FrameLowerer.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md246", null ],
-        [ "2.4 Instruction Selection: <span class=\"tt\">X86_64TargetInstructionSelector</span>", "md_docs_2projects_2_ez_targets.html#autotoc_md248", null ],
-        [ "2.5 Machine Code Emission &amp; Encoding", "md_docs_2projects_2_ez_targets.html#autotoc_md250", [
-          [ "<span class=\"tt\">X86_64InstructionEncoder</span> (<span class=\"tt\">include/Encoding/X86_64InstructionEncoder.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md251", null ],
-          [ "<span class=\"tt\">BranchRelaxer</span> (<span class=\"tt\">include/BranchRelaxation/BranchRelaxer.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md252", null ]
-        ] ],
-        [ "2.6 Binary Descriptors &amp; Relocations", "md_docs_2projects_2_ez_targets.html#autotoc_md254", null ],
-        [ "2.7 Build-Time Plugin: <span class=\"tt\">EzTargetsX86_64Dsl</span>", "md_docs_2projects_2_ez_targets.html#autotoc_md256", null ],
-        [ "2.8 Target Registration", "md_docs_2projects_2_ez_targets.html#autotoc_md258", null ]
+        [ "2.4 Branch Relaxation Pass (<span class=\"tt\">X86_64/include/BranchRelaxation/BranchRelaxer.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md258", null ],
+        [ "2.5 Frame Lowering (<span class=\"tt\">X86_64/include/X86_64FrameLowerer.h</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md260", null ],
+        [ "2.6 Target Registration (<span class=\"tt\">X86_64/Registration/</span>)", "md_docs_2projects_2_ez_targets.html#autotoc_md262", null ]
       ] ],
-      [ "3. API Reference &amp; Further Reading", "md_docs_2projects_2_ez_targets.html#autotoc_md260", null ]
+      [ "3. Header &amp; Class Index", "md_docs_2projects_2_ez_targets.html#autotoc_md264", null ]
     ] ],
     [ "EzTriple Subproject Documentation", "md_docs_2projects_2_ez_triple.html", [
-      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_triple.html#autotoc_md263", null ],
-      [ "2. The 5 Core Subsystems", "md_docs_2projects_2_ez_triple.html#autotoc_md265", [
-        [ "2.1 The Legalizer (<span class=\"tt\">include/Legalizer/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md266", [
-          [ "3-Tier Architecture (<span class=\"tt\">LegalizerInfo.h</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md267", null ],
-          [ "Built-In Action Handlers (<span class=\"tt\">include/Legalizer/Actions/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md268", null ]
+      [ "1. Overview &amp; Architectural Role", "md_docs_2projects_2_ez_triple.html#autotoc_md267", null ],
+      [ "2. The 5 Core Subsystems", "md_docs_2projects_2_ez_triple.html#autotoc_md269", [
+        [ "2.1 The Legalizer (<span class=\"tt\">include/Legalizer/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md270", [
+          [ "Legalization Action Kinds (<span class=\"tt\">LegalizeQuery.h</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md271", null ],
+          [ "Legality Query &amp; Response", "md_docs_2projects_2_ez_triple.html#autotoc_md272", null ],
+          [ "3-Tier Architecture", "md_docs_2projects_2_ez_triple.html#autotoc_md273", null ]
         ] ],
-        [ "2.2 ABI Lowerer (<span class=\"tt\">include/AbiLowerer/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md270", null ],
-        [ "2.3 Instruction Selector (<span class=\"tt\">include/InstructionSelector/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md272", null ],
-        [ "2.4 Register Allocator (<span class=\"tt\">include/RegisterAllocator/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md274", null ],
-        [ "2.5 Frame Lowerer (<span class=\"tt\">include/FrameLowerer/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md276", null ]
+        [ "2.2 ABI Lowerer (<span class=\"tt\">include/AbiLowerer/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md275", null ],
+        [ "2.3 Instruction Selector (<span class=\"tt\">include/InstructionSelector/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md277", null ],
+        [ "2.4 Register Allocator (<span class=\"tt\">include/RegisterAllocator/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md279", [
+          [ "Working Context (<span class=\"tt\">RegisterAllocatorCtx</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md280", null ],
+          [ "Abstract Allocator Class (<span class=\"tt\">MirRegisterAllocator</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md281", null ]
+        ] ],
+        [ "2.5 Frame Lowerer (<span class=\"tt\">include/FrameLowerer/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md283", [
+          [ "Lowering Sequence", "md_docs_2projects_2_ez_triple.html#autotoc_md284", null ]
+        ] ]
       ] ],
-      [ "3. Architecture Descriptors (<span class=\"tt\">include/Descriptors/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md278", null ],
-      [ "4. API Reference &amp; Further Reading", "md_docs_2projects_2_ez_triple.html#autotoc_md280", null ]
+      [ "3. Target Descriptors (<span class=\"tt\">include/Descriptors/</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md286", [
+        [ "3.1 <span class=\"tt\">TargetDesc</span> (<span class=\"tt\">Descriptors/TargetDesc.h</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md287", null ],
+        [ "3.2 <span class=\"tt\">TargetBinaryDesc</span> (<span class=\"tt\">Descriptors/TargetBinaryDesc.h</span>)", "md_docs_2projects_2_ez_triple.html#autotoc_md288", null ]
+      ] ],
+      [ "4. Header &amp; Class Index", "md_docs_2projects_2_ez_triple.html#autotoc_md290", null ]
     ] ],
     [ "Namespaces", "namespaces.html", [
       [ "Namespace List", "namespaces.html", "namespaces_dup" ],
@@ -307,24 +330,24 @@ var NAVTREEINDEX =
 "class_mir_global_var_builder.html#a36d397d22fd48072c2e135aa3c740b5f",
 "class_mir_register_ref.html#a3314e75a6c5cd48a713ff00c79b48e87",
 "dir_be9e14de3a55961a5b2656fbec9f2b55.html",
-"md_docs_2projects_2_ez_mir.html#autotoc_md217",
-"namespace_ez_mir_1_1_ast.html#a68a384eb3c60d7842eced1de13228f21a7413d5aedc19aa4f37d774f8365cfc7e",
-"struct_cli_1_1_driver_result.html#a9bb992bb1456c329e9b2a8c641b50e6b",
-"struct_d_s_l_1_1_ast_1_1_common_1_1_sourced_ast_node.html#ad604f3f6810a456867ff00c2507091b0",
-"struct_d_s_l_1_1_ast_1_1_legalize_rule_def_1_1_rule_instruction_operand.html#aa0a0b2e68f239cbee033fa1d17870d0b",
-"struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_le_branch.html#ad52fe31b87c74e272438d0ea3332b9e2",
-"struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_pass_rule_parser_1_1_pass_source_spec.html",
-"struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_stack_cleanup_rule.html",
-"struct_d_s_l_1_1_parser_1_1_common_1_1_keyword.html",
-"struct_d_s_l_1_1_parser_1_1_instruction_select_def_1_1_file_item.html#a95d778694748f6c21ff3e3781ecbe121",
-"struct_d_s_l_1_1_parser_1_1_ir_inst_def_1_1_body_item_1_1_category_decl.html#a0a01fff65439244a721a92229e81de67",
-"struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_type_constraint.html#a194375ead3b12c1585f078ba9c9023e9",
-"struct_d_s_l_1_1_parser_1_1_register_def_1_1_register_name_binding.html#acfc5ed352a27609a0bedcbdce1fd8cbb",
-"struct_d_s_l_1_1_parser_1_1_target_desc_1_1_mem_disp_type_decl.html#a84c7ca891e268be1946712c75c3fb873",
-"struct_d_s_l_1_1_parser_1_1_type_def_1_1_type_def_file.html#af8c73bd78fd665767ce7f53dd1d2ba26",
-"struct_ez_mir_1_1_ast_1_1_mir_ast_param.html#aad861412ab9093481df5b7d408778a6a",
-"struct_mir_function_analysis_data.html#a9ecd21bbd6c6e026497401e25af90f73",
-"struct_symbols_1_1_legalize_rule_predicate_symbol.html#a2402cdc62e11d783b8d25fa6eaf14c75"
+"md_docs_2projects_2_ez_dsl.html#autotoc_md211",
+"namespace_ez_mir_1_1_ast.html#a3764413ba1f796a48239e3261ef78d90a4410ec34d9e6c1a68100ca0ce033fb17",
+"struct_cli_1_1_cli_options.html#ab330271f5e57ce4f1a28f019081e6937",
+"struct_d_s_l_1_1_ast_1_1_calling_conv_def_1_1_varargs_def.html#aa67d7fbac782464d787426234c1101d7",
+"struct_d_s_l_1_1_ast_1_1_legalize_rule_def_1_1_rule_instruction.html",
+"struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_in_branch_1_1_size_list.html",
+"struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_pass_rule_parser_1_1_alias_source.html#a41a41ab7dac8d926773fe4eae298147c",
+"struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_sret_def_parser_1_1_ptr_decl.html#a3a24eb6c3f692018df1602d83fe97902",
+"struct_d_s_l_1_1_parser_1_1_common_1_1_comment.html#a7b1f4c9e793eb621a13f0474c7d31c95",
+"struct_d_s_l_1_1_parser_1_1_instruction_select_def_1_1_addr_mode_variant_rule_1_1_when_item.html#aba31efa2811b175c96ca5ad08ff23df4",
+"struct_d_s_l_1_1_parser_1_1_instruction_select_def_1_1_typed_prefix_ssa_operand.html#a4f2c236cf691b2ac5946a5e6096d908e",
+"struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalize_instruction_decl.html#a660bb6c587100f0471f810614a68e91b",
+"struct_d_s_l_1_1_parser_1_1_register_def_1_1_register_decl.html#ae012e73521fc38b35b6d1936175790fa",
+"struct_d_s_l_1_1_parser_1_1_target_desc_1_1_libcalls_decl.html#ae09e86d5afee8417294ff7f1b1f6baad",
+"struct_d_s_l_1_1_parser_1_1_target_inst_def_1_1_target_operand.html",
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#af61eb9cf60ef007868d8f4d6bae345f6",
+"struct_liveness_result.html",
+"struct_symbols_1_1_legalize_rule_operand_symbol.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';

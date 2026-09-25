@@ -1,172 +1,246 @@
 # EzCompiler Subproject Documentation
 
-[EzPacker Documentation Index](../index.md) > **EzCompiler**
+[EzPacker Documentation Index](../index.md) > [Subprojects](EzCompiler.md) > **EzCompiler** | [Doxygen API Reference](../doxygen/index.html)
 
 ---
 
 ## 1. Overview & Architectural Role
 
-`EzCompiler` is the top-level driver executable and compilation orchestrator of EzPacker. It coordinates front-end source loading, middle-end SSA optimization passes, EzTriple target lowering, machine code generation, and binary object serialization into a cohesive command-line compiler: `EzCompiler`.
+`EzCompiler` is the top-level driver and end-to-end compiler orchestration engine of EzPacker. It integrates all other subprojects (`EzCore`, `EzMir`, `EzTriple`, `EzCodeEmitter`, `EzTargets`) into a unified compilation pipeline and provides the `ezc` driver command-line executable.
 
 ```
-+-----------------------------------------------------------------------------------+
-|                               EzCompiler Architecture                             |
-|                                                                                   |
-|  Command-Line Arguments                                                           |
-|        |                                                                          |
-|        v                                                                          |
-|  CommandLineParser ---> CommandLineOptions                                        |
-|                               |                                                   |
-|                               v                                                   |
-|  DriverContext (PMR Arenas, DiagnosticCollector, SourceManager, TargetResolver)   |
-|        |                                                                          |
-|        v                                                                          |
-|  FrontendAdapter (Reads .mir, invokes MirLexer/MirParser)                         |
-|        |                                                                          |
-|        v                                                                          |
-|  CompilationPipeline                                                              |
-|   +-- runMiddleEndPasses    (CFG Analysis, SSA Construction, Liveness)           |
-|   |    [--emit-mir Gate]                                                          |
-|   +-- runLegalizationPasses (Signature Legalizer, Operation Legalizer)            |
-|   |    [--emit-legalized-mir Gate]                                                |
-|   +-- runTargetLoweringPasses                                                     |
-|        |-- MirAbiLowererPass                                                      |
-|        |-- MirInstructionSelectorPass                                             |
-|        |-- MirRegisterAllocatorPass                                               |
-|        |-- MirFrameLowererPass                                                    |
-|        [--emit-lowered-mir Gate]                                                  |
-|        [--emit-asm Gate]                                                          |
-|        |                                                                          |
-|        v                                                                          |
-|  EmissionEngine                                                                   |
-|   +-- GenericCodeEmitter (Encodes instructions, relaxes branches)                 |
-|   +-- IObjectWriter (Elf64Writer / CoffWriter)                                    |
-|        |                                                                          |
-|        v                                                                          |
-|  Output File (.o / .obj / .s)                                                     |
-+-----------------------------------------------------------------------------------+
+                    Command Line Invocations (ezc)
+                                  |
+                                  v
+                    +---------------------------+
+                    |    CommandLineParser      |
+                    +---------------------------+
+                                  |
+                                  v
+                    +---------------------------+
+                    |       DriverContext       |
+                    | - Memory Session Arena    |
+                    | - TargetResolver & Triple |
+                    | - Diagnostics & SourceMgr |
+                    | - MirBuilderContext       |
+                    +---------------------------+
+                                  |
+                                  v
+                    +---------------------------+
+                    |     IFrontendAdapter      |
+                    | (MirModuleLoader / Source)|
+                    +---------------------------+
+                                  |
+                                  v
+                    +---------------------------+
+                    |    CompilationPipeline    |
+                    | 1. Middle-End Passes      |
+                    | 2. Legalization Passes    |
+                    | 3. Target Lowering Passes |
+                    +---------------------------+
+                                  |
+                                  v
+                    +---------------------------+
+                    |      EmissionEngine       |
+                    | (Object Files / Assembly) |
+                    +---------------------------+
 ```
 
 ---
 
-## 2. Core Components
+## 2. Driver Context & Lifecycle (`DriverContext.h`)
 
-### 2.1 `CommandLineOptions` & `CommandLineParser` (`include/CommandLineOptions.h`)
-Parses and validates command-line flags using `p-ranav/argparse`.
-
-#### Key Configuration Fields:
-- **`inputFilePath`**: Path to the source `.mir` module.
-- **`outputFilePath`**: Destination path for emitted object or assembly files.
-- **`target`**: Target triple (`TargetTriple`), defaulting to host architecture.
-- **`emissionStage`**: Compilation stopping gate:
-  - `EmissionStage::Object`: Complete compilation emitting native `.o` or `.obj` (default).
-  - `EmissionStage::Assembly`: Halts after lowering and dumps textual assembly (`.s`).
-  - `EmissionStage::GenericMir`: Halts after middle-end passes and dumps generic SSA MIR.
-  - `EmissionStage::LegalizedMir`: Halts after legalization and dumps legalized MIR.
-  - `EmissionStage::LoweredMir`: Halts after frame lowering and dumps machine-lowered MIR.
-- **`optLevel`**: Optimization preset (`O0`, `O1`, `O2`, `Os`).
-- **`printPasses`**: Prints the banner for each pass as it runs.
-- **`timePasses`**: Measures and reports wall-clock execution time per pass.
-- **`isPositionIndependent`**: Generates Position-Independent Code (`-fPIC`).
-- **`targetFeatures`**: List of feature modifiers (e.g. `+avx`, `-sse4_2`).
-
----
-
-### 2.2 `DriverContext` (`include/DriverContext.h`)
-The central execution state container for a compilation invocation:
-- Owns the root `std::pmr::memory_resource` for the entire compiler run.
-- Owns `DiagnosticCollector` and attaches `DiagnosticLogger` configured with requested verbosity.
-- Owns `SourceManager` for buffer management and coordinate translation.
-- Resolves the requested target via `TargetResolver` and holds the active `ResolvedTarget` (containing `TargetDesc`, `TargetBinaryDesc`, and `CallingConvDesc`).
-
----
-
-### 2.3 `TargetTriple` (`include/TargetTriple.h`)
-```text
-<architecture>-<vendor>-<operating_system>-<environment>
-```
-- **`getHostTriple()`**: Detects the host environment at compile time.
-- **Object Format Predicates**: `isElf()`, `isCoff()`, `isMachO()`.
-- **Architecture Predicates**: `isX86_64()`.
-- **Operating System Predicates**: `isWindows()`, `isLinux()`, `isDarwin()`.
-
----
-
-### 2.4 `TargetResolver` (`include/TargetResolver.h`)
-A target factory registry allowing architecture libraries (such as `EzTargetsX86_64`) to register their target instantiation callbacks dynamically without introducing circular CMake dependencies.
+`DriverContext` owns the lifetime of all compiler resources throughout a compilation invocation. It guarantees that memory allocated across passes shares a single root session arena while isolating pass-local allocations.
 
 ```cpp
-// Target registration signature
-using TargetFactory = std::function<ResolvedTarget(
-    const TargetTriple &triple,
-    MirBuilderContext *mirCtx,
-    bool isPositionIndependent,
-    const std::vector<std::string> &features
-)>;
+namespace EzCompiler
+{
 
-TargetResolver::registerTarget("x86_64", x86_64Factory);
+class DriverContext
+{
+public:
+    explicit DriverContext(const CommandLineOptions &options);
+    ~DriverContext() = default;
+
+    DriverContext(const DriverContext &) = delete;
+    DriverContext &operator=(const DriverContext &) = delete;
+
+    // Initializes session arena, diagnostics, type table, builder context,
+    // and resolves target descriptors. Returns false on failure.
+    bool initialize();
+
+    std::pmr::memory_resource *getSessionAllocator();
+    const CommandLineOptions &getOptions() const;
+
+    SourceManager *getSourceManager();
+    DiagnosticCollector *getDiagCollector();
+    DiagnosticLogger *getDiagLogger();
+    MirTypeTable *getTypeTable();
+    MirBuilderContext *getBuilderContext();
+
+    TargetDesc *getTargetDesc();
+    CallingConvDesc *getCallingConv();
+    TargetBinaryDesc *getBinaryDesc();
+};
+
+}
 ```
 
 ---
 
-### 2.5 `CompilationPipeline` (`include/CompilationPipeline.h`)
-The pass orchestrator driving execution across all functions in the module:
+## 3. Target Triples & Dynamic Target Resolution
+
+### 3.1 `TargetTriple` (`TargetTriple.h`)
+
+Canonical representation of the compilation target in `<arch>-<vendor>-<sys>-<abi>` form:
+- `static TargetTriple parse(std::string_view tripleStr)`: Parses 1-, 2-, 3-, or 4-part triples (e.g., `"x86_64-linux-gnu"`, `"x86_64-pc-windows-msvc"`, `"x86_64"`).
+- `static TargetTriple getHostTriple()`: Detects host operating system and CPU architecture at runtime.
+- Predicate queries:
+  - `bool isX86_64() const`
+  - `bool isWindows() const`
+  - `bool isLinux() const`
+  - `bool isElf() const`
+  - `bool isCoff() const`
+
+### 3.2 `TargetResolver` (`TargetResolver.h`)
+
+Decouples driver orchestration from concrete architecture implementations:
+
+```cpp
+struct ResolvedTarget
+{
+    std::unique_ptr<TargetDesc> m_targetDesc;
+    CallingConvDesc *m_callingConv{ nullptr };
+    TargetBinaryDesc *m_binaryDesc{ nullptr };
+};
+
+using TargetFactory = std::function<ResolvedTarget(const TargetTriple &,
+                                                   MirBuilderContext *,
+                                                   bool isPositionIndependent,
+                                                   const std::vector<std::string> &features)>;
+
+class TargetResolver
+{
+public:
+    static void registerTarget(std::string_view arch, TargetFactory factory);
+    static ResolvedTarget resolve(const TargetTriple &triple,
+                                  MirBuilderContext *mirCtx,
+                                  bool isPositionIndependent,
+                                  const std::vector<std::string> &features = {});
+};
+```
+
+---
+
+## 4. The Compilation Pipeline (`CompilationPipeline.h`)
+
+`CompilationPipeline` orchestrates pass execution across all functions in the module, respecting early emission gates (`--emit-mir`, `--emit-legalized-mir`, `--emit-lowered-mir`, `--emit-asm`):
+
+```cpp
+class CompilationPipeline
+{
+public:
+    explicit CompilationPipeline(DriverContext &ctx);
+
+    bool runPipeline();
+    std::string dumpCurrentMir() const;
+    std::string dumpAssembly() const;
+
+private:
+    bool runMiddleEndPasses(MirFunction *func, MirPassManager &passManager);
+    bool runLegalizationPasses(MirFunction *func, MirPassManager &passManager);
+    bool runTargetLoweringPasses(MirFunction *func, MirPassManager &passManager);
+};
+```
+
+### Pass Sequence:
 1. **Middle-End Stage**:
-   - `CodeFlowAnalysisPass`: CFG and dominator tree construction.
-   - `NonSsaToSsaPass`: Standard SSA conversion.
-   - `LivenessAnalysisPass`: Virtual register live range analysis.
-   - *Inspection Gate*: If `--emit-mir` is active, dumps generic SSA MIR and cleanly terminates.
+   - `CodeFlowAnalysisPass`: CFG construction, loop analysis, dominator tree computation.
+   - `NonSsaToSsaPass`: Cytron SSA construction with `PHI` node placement.
+   - `LivenessAnalysisPass`: Backwards bit-vector analysis, live intervals calculation.
 2. **Legalization Stage**:
-   - `MirFunctionSignatureLegalizerPass`: Legalizes function argument and return types.
-   - `MirLegalizerPass`: Rewrites illegal opcodes and types into legal operations using target `LegalizerInfo`.
-   - *Inspection Gate*: If `--emit-legalized-mir` is active, dumps legalized MIR and terminates.
+   - `MirLegalizerPass`: Table-driven rewrite of illegal opcodes and types (WidenScalar, NarrowScalar, Libcall, Custom).
 3. **Target Lowering Stage**:
-   - `MirAbiLowererPass`: Lowers calling conventions, placing parameters in registers or stack slots.
-   - `MirInstructionSelectorPass`: Selects hardware instructions via Bottom-Up Maximal Munch.
-   - `MirRegisterAllocatorPass`: Colors virtual registers with hardware physical registers.
-   - `MirFrameLowererPass`: Computes stack layout and inserts function prologues and epilogues.
-   - *Inspection Gate*: If `--emit-lowered-mir` is active, dumps machine MIR and terminates.
-   - *Inspection Gate*: If `--emit-asm` is active, dumps textual assembly and terminates.
+   - `MirAbiLowererPass`: ABI calling convention parameter and return token lowering.
+   - `MirInstructionSelectorPass`: Bottom-Up Maximal Munch pattern matching and load folding.
+   - `MirRegisterAllocatorPass`: Chaitin-Briggs graph coloring, spilling, and register rewriting.
+   - `MirFrameLowererPass`: Prologue/epilogue insertion and abstract stack offset resolution.
 
 ---
 
-### 2.6 `EmissionEngine` (`include/EmissionEngine.h`)
-The final stage of binary generation:
-- Instantiates the target's `GenericCodeEmitter` via `TargetDesc::createCodeEmitter()`.
-- Emits each function into the `.text` section of `CodeEmitterContext`.
-- Binds labels and resolves internal relative branches using `BranchRelaxer`.
-- Instantiates the appropriate `IObjectWriter` (`Elf64Writer` for ELF; `CoffWriter` for COFF).
-- Transfers symbols and relocations to the writer and serializes the binary file to disk.
+## 5. Machine Code Emission Engine (`EmissionEngine.h`)
 
----
+`EmissionEngine` bridges lowered machine instructions into final object files on disk:
 
-## 3. CLI Command-Line Reference
-
-```bash
-EzCompiler [options] <input-file>
+```cpp
+class EmissionEngine
+{
+public:
+    explicit EmissionEngine(DriverContext &ctx);
+    bool emitModule(MirBuilderContext &mirCtx, std::string_view outputPath);
+};
 ```
 
-| Flag | Description | Default |
-| :--- | :--- | :--- |
-| `<input-file>` | Path to the source `.mir` module. | *Required* |
-| `-o, --output <path>` | Destination output file path. | `<input>.o` or `<input>.obj` |
-| `-target <triple>` | Target triple (e.g. `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-coff`). | Host triple |
-| `--emit-mir` | Halts after middle-end passes and dumps generic SSA MIR. | Off |
-| `--emit-legalized-mir`| Halts after legalization and dumps legalized MIR. | Off |
-| `--emit-lowered-mir` | Halts after frame lowering and dumps lowered machine MIR. | Off |
-| `--emit-asm, -S` | Halts after lowering and emits textual assembly. | Off |
-| `-O0, -O1, -O2, -Os` | Sets the compiler optimization level. | `-O0` |
-| `--print-passes` | Prints pass execution banners for debugging. | Off |
-| `--time-passes` | Measures and reports elapsed time per pass. | Off |
-| `-v, --verbose` | Enables verbose diagnostic logging. | Off |
-| `-fPIC` | Generates Position-Independent Code. | Off |
-| `-mattr=<+feat,-feat>`| Comma-separated target feature modifiers (e.g. `+avx,+sse4_2`). | Host defaults |
-| `--diag-out <path>` | Emits diagnostics log to a specified file. | `stderr` |
+1. Obtains the target's `GenericCodeEmitter` via `TargetDesc::createCodeEmitter()`.
+2. Emits instruction machine bytes into `CodeSection` node buffers.
+3. Invokes `CodeSection::finalize()` to calculate label offsets and resolve alignment directives.
+4. Selects the appropriate `IObjectWriter` (`Elf64Writer` or `CoffWriter`) based on `TargetBinaryDesc::getObjectFormat()`.
+5. Emits symbol tables, relocations, and writes binary bytes to the destination file.
 
 ---
 
-## 4. API Reference & Further Reading
+## 6. Command-Line Options (`ezc`)
 
-- Generated Doxygen API documentation: [Doxygen Documentation Index](../doxygen/index.html)
-- Next subproject: [EzTargets Subproject Documentation](EzTargets.md)
-- Return to [EzPacker Landing Page](../index.md)
+### Exact CLI Options (`CommandLineOptions.h`)
+
+```text
+Usage: ezc [options] <input-file>
+
+Positional Arguments:
+  <input-file>                   Source file or textual .mir file to compile
+
+Output Options:
+  -o, --output <file>            Destination binary object or assembly file
+  --diag-out <file>              Destination path for compiler diagnostic log
+
+Target Configuration:
+  --target <triple>              Target triple [default: host triple]
+                                 (e.g. x86_64-linux-gnu, x86_64-pc-windows-msvc)
+  -fPIC, --pic                   Generate position-independent code
+  -mattr <features>              Target feature list (e.g. +avx, -sse)
+
+Pipeline Stopping Gates:
+  --emit-obj                     Emit native binary object (.o / .obj) [default]
+  -S, --emit-asm                 Emit human-readable assembly text (.s)
+  --emit-mir                     Stop and dump generic SSA MIR
+  --emit-legalized-mir           Stop and dump legalized MIR
+  --emit-lowered-mir             Stop and dump target-lowered machine MIR
+
+Optimization Level:
+  -O0                            No optimization
+  -O1                            Basic optimizations
+  -O2                            Full optimization pipeline
+  -Os                            Size-focused optimization
+
+Diagnostic and Timing Toggles:
+  -v, --verbose                  Enable verbose compiler diagnostics
+  --print-passes                 Print pass names as they execute
+  --time-passes                  Report per-pass execution duration
+  --diag-threshold <level>       Minimum reported severity (debug, trace, warning, error)
+  --version                      Print compiler version banner
+  -h, --help                     Display usage information
+```
+
+---
+
+## 7. Header & Class Index
+
+| Component | Header Location | Key Classes / Structs |
+|---|---|---|
+| Options | `EzCompiler/include/CommandLineOptions.h` | `CommandLineOptions`, `CommandLineParser`, `EmissionStage`, `OptimizationLevel` |
+| Driver Context | `EzCompiler/include/DriverContext.h` | `DriverContext` |
+| Target Triple | `EzCompiler/include/TargetTriple.h` | `TargetTriple` |
+| Target Resolver | `EzCompiler/include/TargetResolver.h` | `TargetResolver`, `ResolvedTarget`, `TargetFactory` |
+| Pipeline | `EzCompiler/include/CompilationPipeline.h` | `CompilationPipeline` |
+| Emission Engine | `EzCompiler/include/EmissionEngine.h` | `EmissionEngine` |
+| Frontend | `EzCompiler/include/FrontendAdapter.h` | `IFrontendAdapter`, `MirModuleLoader` |

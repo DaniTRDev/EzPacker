@@ -37,7 +37,7 @@ EzPacker automates third-party dependency management through CMake's `FetchConte
 | **`GTest`** | `https://github.com/google/googletest` | GoogleTest framework for unit and integration test suites. |
 | **`libtommath`**| `https://github.com/libtom/libtommath` | Fast arbitrary-precision integer arithmetic engine for `FlexInt`. |
 | **`lexy`** | `https://github.com/foonathan/lexy` | Modern C++ parser combinator library used by `EzDsl::Lexer`. |
-| **`argparse`** | `https://github.com/p-ranav/argparse` | Argument parsing library used by `EzCompiler` and `ezdsl_cli`. |
+| **`argparse`** | `https://github.com/p-ranav/argparse` | Argument parsing library used by `EzCompiler` and `ezdsl-cli`. |
 
 ### Vendored In-Tree Dependencies
 - **`LibBf`** (`LibBf/`): Fabrice Bellard's high-precision floating-point library used by `FlexFloat` to model IEEE 754 scalar and vector types (f32, f64, f128).
@@ -113,7 +113,7 @@ You can run individual test suites targeting specific subsystems:
 | **`EzDslLexerTestSuite`** | `bin/EzDslLexerTestSuite` | Tests lexical analysis and parser combinators for all 8 DSL dialects. |
 | **`EzDslSemaTestSuite`** | `bin/EzDslSemaTestSuite` | Tests semantic analysis, symbol tables, scopes, and conflict detection. |
 | **`EzDslCodeGeneratorsTestSuite`** | `bin/EzDslCodeGeneratorsTestSuite` | Tests C++ table synthesizers and code emitter output. |
-| **`EzDslCliTestSuite`** | `bin/EzDslCliTestSuite` | Tests the `ezdsl_cli` driver executable. |
+| **`EzDslCliTestSuite`** | `bin/EzDslCliTestSuite` | Tests the `ezdsl-cli` driver executable. |
 | **`EzTripleTestSuite`** | `bin/EzTripleTestSuite` | Tests legalizer matrices, ABI lowerer, instruction selector, register allocator, and frame lowerer. |
 | **`EzCodeEmitterTestSuite`** | `bin/EzCodeEmitterTestSuite` | Tests binary machine encoding, branch relaxation, ELF64 and COFF object serialization. |
 | **`EzCompilerTestSuite`** | `bin/EzCompilerTestSuite` | Tests compiler option parsing, target resolvers, and pipeline pass sequencing. |

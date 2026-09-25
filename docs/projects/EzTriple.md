@@ -1,19 +1,18 @@
 # EzTriple Subproject Documentation
 
-[EzPacker Documentation Index](../index.md) > **EzTriple**
+[EzPacker Documentation Index](../index.md) > [Subprojects](EzTriple.md) > **EzTriple** | [Doxygen API Reference](../doxygen/index.html)
 
 ---
 
 ## 1. Overview & Architectural Role
 
-`EzTriple` is the target-independent backend lowering and machine transformation engine of EzPacker. It sits between middle-end SSA MIR and the final binary code emitter.
+`EzTriple` is the target-independent machine lowering engine of EzPacker. It sits between middle-end SSA MIR and the final binary code emitter. EzTriple executes the critical five-stage lowering pipeline that transforms abstract, target-agnostic MIR into concrete, hardware-mapped machine instructions:
 
-EzTriple executes the critical five-stage lowering pipeline that transforms generic, abstract MIR into concrete, hardware-mapped machine instructions:
-1. **Legalization**: Rewriting unsupported types and opcodes.
-2. **ABI Lowering**: Translating abstract argument/return tokens into calling-convention registers and stack slots.
-3. **Instruction Selection**: Replacing generic operations with target hardware instructions via Bottom-Up Maximal Munch.
-4. **Register Allocation**: Assigning physical hardware registers to virtual registers using Chaitin-Briggs Graph Coloring.
-5. **Frame Lowering**: Calculating stack frame layout and inserting target function prologues and epilogues (PEI).
+1. **Legalization**: Decomposes unsupported types and opcodes via table-driven rewrite rules.
+2. **ABI Lowering**: Translates procedural parameter and return tokens into hardware ABI calling convention registers and stack slots.
+3. **Instruction Selection**: Replaces generic operations with target hardware instructions via Bottom-Up Maximal Munch pattern matching.
+4. **Register Allocation**: Maps unbounded virtual registers to finite physical hardware registers using a Chaitin-Briggs graph-coloring algorithm.
+5. **Frame Lowering**: Calculates stack frame layouts, replaces abstract frame objects with base-pointer/stack-pointer displacements, and emits target function prologues and epilogues (PEI).
 
 ```
 +-------------------------------------------------------------------------------+
@@ -66,74 +65,109 @@ EzTriple executes the critical five-stage lowering pipeline that transforms gene
 ## 2. The 5 Core Subsystems
 
 ### 2.1 The Legalizer (`include/Legalizer/`)
+
 Hardware architectures do not natively support all possible integer bit-widths, vector dimensions, or high-level operations. The Legalizer transforms illegal operations into sequences of legal instructions.
 
-#### 3-Tier Architecture (`LegalizerInfo.h`)
-- **Tier 1 (Dense Primary Matrix)**: An $O(1)$ lookup table of size `OPCODE_COUNT × MAX_COMPACT_TYPES`. Queries return a `LegalityResponse` with an action kind:
-  - `Legal`: Supported directly by target hardware.
-  - `WidenScalar`: Promotes to a wider integer type (e.g. `i1` -> `i32`).
-  - `NarrowScalar`: Splits into multiple smaller operations (e.g. `i128` -> two `i64`).
-  - `Lower`: Rewrites into other generic opcodes.
-  - `Libcall`: Calls a runtime software emulation function (e.g. `__divti3`).
-  - `Custom`: Dispatches to a target-specific C++ callback.
-  - `Unsupported`: Reports a compilation error.
-- **Tier 2 (Signature Matchers)**: Evaluates multi-slot operations with differing input/output types (e.g. type conversions, truncated loads).
-- **Tier 3 (Declarative Rewrite Rules)**: Evaluates algebraic and strength-reduction rules defined in `.lrd` files (e.g. converting division by power-of-two to an arithmetic right shift).
+#### Legalization Action Kinds (`LegalizeQuery.h`)
+```cpp
+enum class LegalizeActionKind : uint8_t
+{
+    Legal = 0,    // Natively supported by hardware.
+    WidenScalar,  // Promote to a wider legal type (e.g. i8 -> i32).
+    NarrowScalar, // Split into smaller legal types (e.g. i128 -> 2x i64).
+    Bitcast,      // Reinterpret bit pattern without conversion (e.g. f32 -> i32).
+    Libcall,      // Lower into runtime helper call (e.g. __divdi3).
+    Lower,        // Decompose into standard target MIR primitives.
+    Custom,       // Target-defined C++ callback.
+    Unsupported   // Rejected combination; emits a diagnostic error.
+};
+```
 
-#### Built-In Action Handlers (`include/Legalizer/Actions/`)
-- `LegalizeWidenScalarAction`: Generates extension instructions and bit masks.
-- `LegalizeNarrowScalarAction`: Decomposes large operations using `MERGE_VALUES` and `UNMERGE_VALUES`.
-- `LegalizeBitcastAction`: Reinterprets bit representations without conversion.
-- `LegalizeLibcallAction`: Emits function calls to standard compiler-rt / libgcc routines.
+#### Legality Query & Response
+Every instruction is queried against `LegalizerInfo` using exact descriptor structs:
+
+```cpp
+struct LegalityQuery
+{
+    MirInstructionOpCode m_opcode{ MirInstructionOpCode::INVALID };
+    uint32_t m_flags{ 0 };
+    size_t m_operandCount{ 0 };
+    std::array<MirType *, 6> m_types{ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+    std::array<uint8_t, 6> m_compactIds{ 0, 0, 0, 0, 0, 0 };
+    std::array<ExpectedOperandType, 6> m_operandKinds{ ExpectedOperandType::None, ... };
+    int64_t m_immValue{ 0 };
+    bool m_hasImm{ false };
+};
+
+struct alignas(8) LegalityResponse
+{
+    LegalizeActionKind m_action{ LegalizeActionKind::Unsupported };
+    uint8_t m_slot{ 0 };               // Target operand slot (0, 1, 2)
+    uint8_t m_targetCompactId{ 0 };    // Destination compact type ID
+    uint16_t m_handlerOrStringId{ 0 }; // Libcall symbol ID or custom callback index
+
+    constexpr bool isLegal() const noexcept { return m_action == LegalizeActionKind::Legal; }
+    constexpr bool isUnsupported() const noexcept { return m_action == LegalizeActionKind::Unsupported; }
+};
+```
+
+#### 3-Tier Architecture
+1. **Tier 1 (Dense Primary Matrix)**: An $O(1)$ lookup table indexing `[Opcode][CompactTypeID]` returning an immediate `LegalityResponse`.
+2. **Tier 2 (Signature Matchers)**: Evaluates multi-operand operations with mismatched types (e.g., truncated loads, zero/sign extensions, conversions).
+3. **Tier 3 (Declarative Rewrite Rules)**: Evaluates algebraic rules and strength-reduction rewrites generated from `.lrd` specifications.
 
 ---
 
 ### 2.2 ABI Lowerer (`include/AbiLowerer/`)
-Translates high-level procedural boundaries into target calling convention rules:
-- **Token-Bound Sequences**:
-  - `PUSH_ARG` + `CALL`: Binds arguments to caller registers (`rdi`, `rsi`... on Linux; `rcx`, `rdx`... on Windows) or pushes them to stack slots.
-  - `POP_RET`: Retrieves return values from `rax` / `xmm0`.
-  - `POP_ARG` + `END_ARG`: Extracts function parameters at the entry block into local virtual registers.
-  - `PUSH_RET` + `RET`: Places return values into return registers.
+
+The ABI lowerer translates abstract procedural calls and argument passes into concrete machine registers and stack slots governed by `CallingConvDesc`:
+
+- **Argument Token Binding**:
+  - Replaces `PUSH_ARG` with moves into target argument registers (`rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9` on System V; `rcx`, `rdx`, `r8`, `r9` on Windows) or stack spill stores.
+  - Replaces `CALL` with target machine calls (`CALL64r`, `CALL64m`, `CALL64p`).
+  - Replaces `POP_RET` with moves out of target return registers (`rax`, `rdx`, `xmm0`).
+- **Function Entry/Exit**:
+  - Replaces `POP_ARG` + `END_ARG` at the entry block with moves from physical parameter registers into virtual registers.
+  - Replaces `PUSH_RET` + `RET` with assignments to the target return registers followed by machine return instructions (`RET`).
 - **Shadow Space & Red Zone**:
-  - Allocates 32 bytes of shadow space (homing space) for Microsoft Win64.
-  - Protects the 128-byte red zone under the stack pointer for System V AMD64.
-- **Caller-Saved Clobber Tracking**: Identifies all caller-saved registers clobbered by calls and marks them dead or preserved.
+  - Allocates 32 bytes of shadow space (homing space) above the return address for Win64 ABI calls.
+  - Accounts for the 128-byte System V AMD64 Red Zone under `%rsp`.
 
 ---
 
 ### 2.3 Instruction Selector (`include/InstructionSelector/`)
-Converts generic MIR opcodes into concrete hardware instructions:
+
+Transforms generic SSA opcodes into concrete machine instruction descriptors:
+
 - **Bottom-Up Maximal Munch**:
-  Traverses the instructions in each basic block in reverse order (bottom-up). Matches the largest possible subtrees against patterns generated from `.isf` files.
+  Traverses the instruction stream in reverse topological order within each basic block, matching the largest possible expression trees against pattern decision trees generated from `.isdf` files.
 - **Addressing Mode Matcher (`MirAddressingModeMatcher.h`)**:
-  Identifies memory access expressions and synthesizes complex addressing modes:
+  Synthesizes complex addressing expressions into memory operands:
   ```text
   Effective Address = Base + (Index * Scale) + Displacement
   ```
 - **Load-Folding Optimization**:
-  Automatically folds a load instruction into a consuming ALU instruction (e.g. `ADD dst, src1, (LOAD addr)` -> `ADD64rm dst, src1, addr`) provided the load result has a single use and no intervening store modifies the memory location.
-- **Register Class Assignment**:
-  Assigns `MirRegisterClass*` constraints to virtual register operands based on target instruction operand descriptors.
+  Automatically folds memory loads into consuming ALU instructions (e.g., `ADD %dst, %src, (LOAD %addr)` -> `ADD64rm %dst, %src, %addr`) when the loaded value has a single user and no intervening memory store clobbers the address.
 
 ---
 
 ### 2.4 Register Allocator (`include/RegisterAllocator/`)
-EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register Allocator**:
+
+EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register Allocator** (`MirRegisterAllocator.h`):
 
 ```
       +--------------------------------------------------+
       |        Build Interference Graph (m_iGraph)       |
       |   (Nodes = VRegs, Edges = Concurrent Liveness)   |
       +--------------------------------------------------+
-                               |
-                               v
+                                |
+                                v
       +--------------------------------------------------+
       |       Calculate Spill Costs (m_spillCosts)       |
       |          (Loop depth & usage frequency)          |
       +--------------------------------------------------+
-                               |
-                               v
+                                |
+                                v
                  +----------------------------+
                  |  Can simplify node (deg < K)?
                  +----------------------------+
@@ -158,61 +192,169 @@ EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register 
       +--------------------------------------------------+
                                |
               +----------------+----------------+
-              | Any uncolorable spill nodes?    |
-              +---------------------------------+
-                /                              \
-        [Yes]  /                                \  [No]
-              v                                  v
-    +------------------------+        +------------------------+
-    | Spill & Rewrite:       |        | Coalesce:              |
-    | - Assign Stack Slot    |        | Eliminate redundant    |
-    | - Insert Store & Loads |        | copy instructions      |
-    +------------------------+        +------------------------+
-              |                                  |
-              v                                  v
-      Restart Allocation               Allocation Complete!
+              |                                 |
+              v [Success]                       v [Spill Occurred]
+     +-------------------+            +--------------------+
+     |   RewriteColors   |            | Insert Spills/     |
+     | (VRegs -> PRegs)  |            | Reloads & Repeat   |
+     +-------------------+            +--------------------+
 ```
 
-1. **Interference Graph Construction**: Nodes represent virtual registers; undirected edges represent overlapping live ranges computed by `LivenessAnalysisPass`.
-2. **Spill Cost Calculation**: Computes the cost of spilling each register based on loop nesting depth (10^depth) and instruction count.
-3. **Simplify Phase**: Removes nodes with degree < K (where K is the count of allocatable physical registers in that register class) and pushes them onto `m_selectStack`.
-4. **Optimistic Spill Phase**: When all remaining nodes have degree >= K, selects the node with the lowest spill cost and pushes it to the stack.
-5. **Select Phase**: Pops nodes from the stack in reverse order and assigns the first available physical register that does not conflict with already-colored neighbors.
-6. **Spill & Rewrite Phase**: If an optimistic spill cannot be colored, an actual stack slot (`StackFrameObject`) is allocated. Stores are inserted immediately after definitions, loads are inserted before uses, and the allocation loop repeats.
-7. **Coalescing**: Identifies register copies (`MOV %vreg1, %vreg2`) whose live ranges do not interfere and merges them into a single virtual register, eliminating redundant copy instructions.
+#### Working Context (`RegisterAllocatorCtx`)
+```cpp
+struct RegisterAllocatorCtx
+{
+    MirBuilderContext *m_ctx;
+    MirFunction *m_targetFunction;
+    TargetDesc *m_targetDesc;
+    std::pmr::memory_resource *m_allocator;
+
+    std::pmr::vector<MirRegisterRef> m_selectStack;
+    std::pmr::unordered_set<MirRegisterRef> m_removedNodes;
+    std::pmr::unordered_set<MirRegisterRef> m_reservedRegs;
+    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_allocatedRegs;
+    std::pmr::unordered_map<MirRegisterRef, size_t> m_degree;
+    std::pmr::unordered_map<MirRegisterRef, StackFrameObject *> m_spilledRegs;
+    std::pmr::unordered_map<MirRegisterRef, std::pmr::set<MirRegisterRef>> m_iGraph;
+    std::pmr::unordered_set<MirRegisterRef> m_unspillableRegs;
+    std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
+    bool m_spillCostsValid{ false };
+};
+```
+
+#### Abstract Allocator Class (`MirRegisterAllocator`)
+```cpp
+class MirRegisterAllocator
+{
+public:
+    virtual ~MirRegisterAllocator() = default;
+
+    bool buildInterferenceGraph(LivenessResult *liveness, RegisterAllocatorCtx *ctx);
+    void evaluateInterferenceGraphDegree(RegisterAllocatorCtx *ctx);
+    bool simplify(RegisterAllocatorCtx *ctx);
+    bool selectColors(RegisterAllocatorCtx *ctx);
+    void rewriteColors(RegisterAllocatorCtx *ctx);
+
+protected:
+    double calculateSpillCost(MirRegisterRef node, RegisterAllocatorCtx *ctx);
+    void rewriteSpilledRegisters(const std::pmr::unordered_set<MirRegisterRef> &spilledNodes, RegisterAllocatorCtx *ctx);
+
+    // Target-specific pure virtual hooks
+    virtual bool isInstructionDAlloc(MirInstruction *instr) = 0;
+    virtual bool isRematerializable(MirRegister *vreg, MirInstruction *definingInst) = 0;
+    virtual MirInstruction *emitReload(RegisterAllocatorCtx *ctx,
+                                       MirBlock *block,
+                                       IntrusiveLinkedList<MirInstruction>::iterator it,
+                                       SourceReference *srcRef,
+                                       MirRegister *dstReg,
+                                       StackFrameObject *spillSlot) = 0;
+    virtual MirInstruction *emitSpill(RegisterAllocatorCtx *ctx,
+                                      MirBlock *block,
+                                      IntrusiveLinkedList<MirInstruction>::iterator it,
+                                      SourceReference *srcRef,
+                                      StackFrameObject *spillSlot,
+                                      MirRegister *srcReg) = 0;
+    virtual MirInstruction *reMaterialize(RegisterAllocatorCtx *ctx,
+                                          MirBlock *block,
+                                          IntrusiveLinkedList<MirInstruction>::iterator it,
+                                          SourceReference *srcRef,
+                                          MirRegister *dstReg,
+                                          MirInstruction *defInst) = 0;
+};
+```
 
 ---
 
 ### 2.5 Frame Lowerer (`include/FrameLowerer/`)
-Responsible for Prologue/Epilogue Insertion (PEI) and stack frame layout:
-- **`calculateFrameLayout(FrameLowererCtx &ctx)`**:
-  - Aggregates local variables, spilled registers, and parameter save areas.
-  - Aligns the stack frame to 16 bytes.
-  - Computes final positive/negative offsets from the frame pointer (`rbp`) or stack pointer (`rsp`).
-- **`insertPrologue(FrameLowererCtx &ctx)`**:
-  - Emits frame pointer setup (`push rbp; mov rbp, rsp`).
-  - Emits stack pointer adjustment (`sub rsp, FrameSize`).
-  - Emits saves for all callee-saved registers clobbered by the function.
-- **`insertEpilogue(FrameLowererCtx &ctx)`**:
-  - Emits restores for callee-saved registers in reverse order.
-  - Emits stack pointer reset (`mov rsp, rbp` or `add rsp, FrameSize`).
-  - Emits `pop rbp; ret`.
-- **`lowerAlloc` & `lowerDAlloc`**:
-  - Replaces abstract `ALLOC` instructions with effective address calculations (e.g. `LEA rsp + offset`).
+
+The Frame Lowerer executes Prologue/Epilogue Insertion (PEI) and resolves abstract stack offsets:
+
+```cpp
+struct FrameLowererCtx
+{
+    MirBuilderContext *m_ctx;
+    MirFunction *m_targetFunc;
+    TargetDesc *m_targetDesc;
+    IntrusiveLinkedList<MirInstruction>::iterator m_allocIt;
+};
+
+class MirFrameLowerer
+{
+public:
+    virtual ~MirFrameLowerer() = default;
+
+    virtual void calculateFrameLayout(FrameLowererCtx &ctx);
+    virtual void insertPrologue(FrameLowererCtx &ctx) = 0;
+    virtual void insertEpilogue(FrameLowererCtx &ctx) = 0;
+    virtual bool lowerAlloc(FrameLowererCtx &ctx) = 0;
+    virtual bool lowerDAlloc(FrameLowererCtx &ctx) = 0;
+    virtual void lowerStackObjectReferences(FrameLowererCtx &ctx);
+};
+```
+
+#### Lowering Sequence
+1. **`lowerAlloc`**: Lowers static stack allocations (`ALLOC`) into stack frame object slots.
+2. **`lowerDAlloc`**: Lowers dynamic stack allocations (`DALLOC`) by emitting stack pointer decrements (`sub rsp, size`), alignment masks, and forcing frame pointer generation.
+3. **`calculateFrameLayout`**: Computes cumulative stack size, pads to satisfy target alignment (e.g. 16 bytes), and assigns concrete base-pointer or stack-pointer offsets to each `StackFrameObject`.
+4. **`lowerStackObjectReferences`**: Replaces abstract stack object references with concrete `MirMemory` operands `[rbp - offset]` or `[rsp + offset]`.
+5. **`insertPrologue`**: Emits target instructions setting up the frame pointer (`push rbp; mov rbp, rsp`), allocating stack space (`sub rsp, FrameSize`), and preserving callee-saved registers.
+6. **`insertEpilogue`**: Emits target instructions restoring callee-saved registers, collapsing the stack frame (`mov rsp, rbp; pop rbp` or `add rsp, FrameSize`), and emitting the machine return (`ret`).
 
 ---
 
-## 3. Architecture Descriptors (`include/Descriptors/`)
+## 3. Target Descriptors (`include/Descriptors/`)
 
-- **`TargetDesc`**: Abstract interface for hardware CPUs (`getName()`, `getFrameLowerer()`, `getInstructionSelector()`, `getLegalizer()`, `getRegisterAllocator()`, `getAvailableRegisterBanks()`, `createCodeEmitter()`).
-- **`TargetBinaryDesc`**: Represents the intersection of CPU and binary format (e.g. `X86_64ElfBinaryDesc`, `X86_64CoffBinaryDesc`).
-- **`TargetExtensionSet`**: Tracks enabled CPU features (`+avx`, `+sse4.1`) and validates dependency implications.
-- **`TargetRelocationResolver`**: Architecture-specific handler for patching in-place relocations.
+### 3.1 `TargetDesc` (`Descriptors/TargetDesc.h`)
+
+The abstract CPU architecture descriptor:
+- `virtual const char *getName() const = 0`
+- `virtual MirFrameLowerer *getFrameLowerer() = 0`
+- `virtual MirInstructionSelector *getInstructionSelector() = 0`
+- `virtual MirAddressingModeMatcher *getAddressingModeMatcher()`
+- `virtual MirRegisterClass *getGprClass()`
+- `virtual MirLegalizer *getLegalizer() = 0`
+- `virtual LegalizerInfo *getLegalizerInfo() = 0`
+- `virtual MirRegisterAllocator *getRegisterAllocator() = 0`
+- `virtual MirType *getMemOperandDisplacementType() = 0`
+- `virtual MirRegisterRef getInstructionPtrReg() const = 0`
+- `virtual size_t getStackSlotSize() const = 0`
+- `virtual void initialize() = 0`
+- `virtual std::string_view getLibcallStr(uint8_t symId) = 0`
+- `virtual const std::pmr::vector<TargetBinaryDesc *> &getAvailableBinaryDescriptors() = 0`
+- `virtual const std::pmr::vector<CallingConvDesc *> &getAvailableCallingConventions() = 0`
+- `virtual std::unique_ptr<GenericCodeEmitter> createCodeEmitter() = 0`
+
+### 3.2 `TargetBinaryDesc` (`Descriptors/TargetBinaryDesc.h`)
+
+The abstract OS and object-file format descriptor:
+- `virtual bool isLittleEndian() const = 0`
+- `virtual bool isPositionIndependent() const = 0`
+- `virtual const char *getName() const = 0`
+- `virtual CodeSection *getSection(SectionType type) = 0`
+- `virtual TargetObjectFormat getObjectFormat() const = 0` (`ELF`, `COFF`, `MachO`)
+- `virtual size_t getFunctionAlignment() const = 0`
+- `virtual void initialize() = 0`
+- `virtual const std::pmr::unordered_map<SectionType, CodeSection *> &getSections() const = 0`
 
 ---
 
-## 4. API Reference & Further Reading
+## 4. Header & Class Index
 
-- Generated Doxygen API documentation: [Doxygen Documentation Index](../doxygen/index.html)
-- Next subproject: [EzCompiler Subproject Documentation](EzCompiler.md)
-- Return to [EzPacker Landing Page](../index.md)
+| Component | Header Location | Key Classes / Structs |
+|---|---|---|
+| Legalizer | `EzTriple/include/Legalizer/LegalityQuery.h` | `LegalizeActionKind`, `LegalityQuery`, `LegalityResponse` |
+| Legalizer | `EzTriple/include/Legalizer/LegalizerInfo.h` | `LegalizerInfo` |
+| Legalizer | `EzTriple/include/Legalizer/MirLegalizer.h` | `MirLegalizer` |
+| ABI Lowerer | `EzTriple/include/AbiLowerer/MirAbiLowerer.h` | `MirAbiLowerer` |
+| Instruction Selector | `EzTriple/include/InstructionSelector/MirInstructionSelector.h` | `MirInstructionSelector` |
+| Instruction Selector | `EzTriple/include/InstructionSelector/MirAddressingModeMatcher.h` | `MirAddressingModeMatcher` |
+| Register Allocator | `EzTriple/include/RegisterAllocator/MirRegisterAllocator.h` | `MirRegisterAllocator`, `RegisterAllocatorCtx` |
+| Frame Lowerer | `EzTriple/include/FrameLowerer/MirFrameLowerer.h` | `MirFrameLowerer`, `FrameLowererCtx` |
+| Descriptors | `EzTriple/include/Descriptors/TargetDesc.h` | `TargetDesc` |
+| Descriptors | `EzTriple/include/Descriptors/TargetBinaryDesc.h` | `TargetBinaryDesc`, `TargetObjectFormat` |
+| Descriptors | `EzTriple/include/Descriptors/TargetRelocationResolver.h` | `TargetRelocationResolver` |
+| Passes | `EzTriple/include/Passes/MirLegalizerPass.h` | `MirLegalizerPass` |
+| Passes | `EzTriple/include/Passes/MirAbiLowererPass.h` | `MirAbiLowererPass` |
+| Passes | `EzTriple/include/Passes/MirInstructionSelectorPass.h` | `MirInstructionSelectorPass` |
+| Passes | `EzTriple/include/Passes/MirRegisterAllocatorPass.h` | `MirRegisterAllocatorPass` |
+| Passes | `EzTriple/include/Passes/MirFrameLowererPass.h` | `MirFrameLowererPass` |

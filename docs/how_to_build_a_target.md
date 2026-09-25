@@ -29,7 +29,7 @@ All target-dependent knowledge is completely encapsulated within self-contained 
        |  - <target>_patterns.isf   |             |  - <Target>ElfBinaryDesc   |
        +----------------------------+             +----------------------------+
                      |                                           |
-                     v (ezdsl_cli via CMake)                     |
+                     v (ezdsl-cli via CMake)                     |
        +----------------------------+                            |
        |   Synthesized C++ Tables   |                            |
        +----------------------------+                            |
@@ -255,12 +255,22 @@ public:
 ```
 
 ### 3.2 Subclassing `MirFrameLowerer`
-Implement prologue/epilogue insertion:
+Implement prologue/epilogue insertion and stack allocation lowering:
 ```cpp
 #include "FrameLowerer/MirFrameLowerer.h"
 
 class RiscV64FrameLowerer : public MirFrameLowerer {
 public:
+    bool lowerAlloc(FrameLowererCtx &ctx) override {
+        // Lower static ALLOC instructions into StackFrameObject entries
+        return true;
+    }
+
+    bool lowerDAlloc(FrameLowererCtx &ctx) override {
+        // Lower dynamic DALLOC instructions into stack pointer decrements
+        return true;
+    }
+
     void calculateFrameLayout(FrameLowererCtx &ctx) override {
         // Compute frame size, align to 16 bytes, assign callee-save offsets
     }
@@ -288,13 +298,15 @@ Implement binary instruction encoding:
 
 class RiscV64CodeEmitter : public GenericCodeEmitter {
 public:
+    void beginFunction(CodeEmitterContext *ctx, std::string_view name) override;
     void beginFunction(CodeEmitterContext *ctx, MirFunction *func) override;
     void bindLabel(MirId labelId) override;
-    void emitInstruction(CodeEmitterContext *ctx, MirInstruction *inst) override {
-        // Extract opcode, format (R, I, S, B, U, J), encode 32-bit word, append to .text
-    }
+    void endFunction(CodeEmitterContext *ctx) override;
     void endFunction(CodeEmitterContext *ctx, MirFunction *func) override;
-    void finalize(CodeEmitterContext *ctx) override;
+    void emitInst(const MirTargetInstructionDesc *desc, std::span<MirOperand *const> operands) override {
+        // Interpret target descriptor, encode machine word (R, I, S, B, U, J type),
+        // and emit into the active section buffer via ctx->getCurrentSection()->emit32(...)
+    }
 };
 ```
 
@@ -412,7 +424,7 @@ namespace {
 Once registered, you can immediately compile MIR modules to your new target using `-target`:
 
 ```bash
-EzCompiler examples/arithmetic_32bit.mir -target riscv64-unknown-linux-elf --emit-asm
+EzCompiler examples/arithmetic_32bit.mir --target riscv64-unknown-linux-elf --emit-asm
 ```
 
 Verify your implementation by adding unit tests under `tests/` mirroring the x86-64 test suite (`T_MirLegalizer.cpp`, `T_MirInstructionSelector.cpp`, `T_MirRegisterAllocator.cpp`).

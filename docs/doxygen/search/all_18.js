@@ -24,15 +24,16 @@ var searchData=
   ['nonemptyoperandlist_21',['NonEmptyOperandList',['../struct_d_s_l_1_1_parser_1_1_ir_inst_def_1_1_ir_inst_decl_1_1_non_empty_operand_list.html',1,'DSL::Parser::IrInstDef::IrInstDecl::NonEmptyOperandList'],['../struct_d_s_l_1_1_parser_1_1_target_inst_def_1_1_target_inst_decl_1_1_non_empty_operand_list.html',1,'DSL::Parser::TargetInstDef::TargetInstDecl::NonEmptyOperandList']]],
   ['noninitialized_22',['NonInitialized',['../_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37da709c4757487ad2f21e722762ab2a3854',1,'CodeSection.h']]],
   ['nonssatossapass_23',['NonSsaToSsaPass',['../class_non_ssa_to_ssa_pass.html',1,'NonSsaToSsaPass'],['../class_non_ssa_to_ssa_pass.html#a7b114a70b4dba16771c3739c686347e1',1,'NonSsaToSsaPass::NonSsaToSsaPass()']]],
-  ['nonssatossapass_20h_24',['3.2 &lt;span class=&quot;tt&quot;&gt;NonSsaToSsaPass&lt;/span&gt; (&lt;span class=&quot;tt&quot;&gt;MirPasses/Passes/NonSsaToSsaPass.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_mir.html#autotoc_md224',1,'']]],
-  ['nonssatossapass_20mirpasses_20passes_20nonssatossapass_20h_25',['3.2 &lt;span class=&quot;tt&quot;&gt;NonSsaToSsaPass&lt;/span&gt; (&lt;span class=&quot;tt&quot;&gt;MirPasses/Passes/NonSsaToSsaPass.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_mir.html#autotoc_md224',1,'']]],
+  ['nonssatossapass_20h_24',['3.2 &lt;span class=&quot;tt&quot;&gt;NonSsaToSsaPass&lt;/span&gt; (&lt;span class=&quot;tt&quot;&gt;MirPasses/Passes/NonSsaToSsaPass.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_mir.html#autotoc_md235',1,'']]],
+  ['nonssatossapass_20mirpasses_20passes_20nonssatossapass_20h_25',['3.2 &lt;span class=&quot;tt&quot;&gt;NonSsaToSsaPass&lt;/span&gt; (&lt;span class=&quot;tt&quot;&gt;MirPasses/Passes/NonSsaToSsaPass.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_mir.html#autotoc_md235',1,'']]],
   ['nonssatossapass_2eh_26',['NonSsaToSsaPass.h',['../_non_ssa_to_ssa_pass_8h.html',1,'']]],
   ['nonssatossapassresult_27',['NonSsaToSsaPassResult',['../struct_non_ssa_to_ssa_pass_result.html',1,'NonSsaToSsaPassResult'],['../struct_non_ssa_to_ssa_pass_result.html#ac23e1afb88568dad5e3a811c9010f5e9',1,'NonSsaToSsaPassResult::NonSsaToSsaPassResult()']]],
   ['nontrivial_28',['NonTrivial',['../struct_d_s_l_1_1_ast_1_1_calling_conv_def_1_1_aggregate_condition.html#a7ef74892a0a650e2315235a69144848daa7f558fd6ae72e45d83647b938ffa9f4',1,'DSL::Ast::CallingConvDef::AggregateCondition']]],
   ['nop_29',['Nop',['../namespace_ez_targets_1_1_x86__64.html#a92a3341c68547a641e3347e1cb22b5b4ab7e7f2b46723f5b08d763041108f8fed',1,'EzTargets::X86_64']]],
   ['normalizekey_30',['NormalizeKey',['../_string_utils_8h.html#aa8f84f37b680986758fb8756250a6494',1,'StringUtils.h']]],
   ['normalizename_31',['normalizeName',['../class_target_extension_set.html#a7d895bce0ad5f6aced85710d4834ff23',1,'TargetExtensionSet']]],
-  ['notmodified_32',['NotModified',['../_legalize_action_common_8h.html#af2f928340046a30df80dad70871fb253ac169e6d9a1b9442001384de8dcf49ab9',1,'LegalizeActionCommon.h']]],
-  ['np_33',['NP',['../namespace_ez_targets_1_1_x86__64.html#a42dec3441801dfd4a929b26743ac0bf8a8bc2afe7028c861affc259b1c8a17640',1,'EzTargets::X86_64']]],
-  ['ns_34',['NS',['../namespace_ez_targets_1_1_x86__64.html#a42dec3441801dfd4a929b26743ac0bf8a53c8d15a175221d2127083e66a8cc937',1,'EzTargets::X86_64']]]
+  ['notes_32',['3.2 Diagnostic Records &amp;amp; Notes',['../md_docs_2projects_2_ez_core.html#autotoc_md172',1,'']]],
+  ['notmodified_33',['NotModified',['../_legalize_action_common_8h.html#af2f928340046a30df80dad70871fb253ac169e6d9a1b9442001384de8dcf49ab9',1,'LegalizeActionCommon.h']]],
+  ['np_34',['NP',['../namespace_ez_targets_1_1_x86__64.html#a42dec3441801dfd4a929b26743ac0bf8a8bc2afe7028c861affc259b1c8a17640',1,'EzTargets::X86_64']]],
+  ['ns_35',['NS',['../namespace_ez_targets_1_1_x86__64.html#a42dec3441801dfd4a929b26743ac0bf8a53c8d15a175221d2127083e66a8cc937',1,'EzTargets::X86_64']]]
 ];

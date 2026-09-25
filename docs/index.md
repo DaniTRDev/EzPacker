@@ -96,10 +96,10 @@ Every non-vendored subproject in the repository is documented in detail:
 | :--- | :--- | :--- |
 | **`EzCore`** | Foundational utilities: PMR allocators, diagnostic engine, `FlexInt`/`FlexFloat`, `DenseBitSet`, `IntrusiveLinkedList`, `SourceManager`. | [EzCore Guide](projects/EzCore.md) |
 | **`EzMir`** | Machine Intermediate Representation: `MirFunction`, `MirBlock`, `MirInstruction`, `MirOperand`, `MirType`, SSA pass framework, parser, and printer. | [EzMir Guide](projects/EzMir.md) |
-| **`EzDsl`** | Meta-compiler toolkit: Lexer (`lexy`), Sema, CodeGenerators, and `ezdsl_cli` driver for all 8 DSL dialects. | [EzDsl Guide](projects/EzDsl.md) |
+| **`EzDsl`** | Meta-compiler toolkit: Lexer, Sema, CodeGenerators, and `ezdsl-cli` driver for all 10 DSL dialects. | [EzDsl Guide](projects/EzDsl.md) |
 | **`EzCodeEmitter`** | Binary code emission: section management, relocations, `Elf64Writer` (ELF64), and `CoffWriter` (PE/COFF). | [EzCodeEmitter Guide](projects/EzCodeEmitter.md) |
 | **`EzTriple`** | Target-independent backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer. | [EzTriple Guide](projects/EzTriple.md) |
-| **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine. | [EzCompiler Guide](projects/EzCompiler.md) |
+| **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine (`ezc`). | [EzCompiler Guide](projects/EzCompiler.md) |
 | **`EzTargets`** | Architecture backends: self-contained x86-64 target (`X86_64TargetDesc`, `X86_64FrameLowerer`, `X86_64InstructionEncoder`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
 
 ### 🔍 Complete API Reference

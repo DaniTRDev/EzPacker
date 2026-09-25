@@ -128,10 +128,10 @@ entry:
 
 ```bash
 # Compile for Linux ELF
-EzCompiler examples/calling_conventions.mir -target x86_64-unknown-linux-gnu --emit-asm
+EzCompiler examples/calling_conventions.mir --target x86_64-unknown-linux-gnu --emit-asm
 
 # Compile for Windows COFF
-EzCompiler examples/calling_conventions.mir -target x86_64-pc-windows-coff --emit-asm
+EzCompiler examples/calling_conventions.mir --target x86_64-pc-windows-coff --emit-asm
 ```
 
 | Linux System V AMD64 | Windows Microsoft Win64 |

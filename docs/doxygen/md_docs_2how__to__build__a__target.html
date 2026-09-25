@@ -119,7 +119,7 @@ $(function(){initNavTree('md_docs_2how__to__build__a__target.html','',''); });
 <div class="line">|  - &lt;target&gt;_patterns.isf   |             |  - &lt;Target&gt;ElfBinaryDesc   |</div>
 <div class="line">+----------------------------+             +----------------------------+</div>
 <div class="line">              |                                           |</div>
-<div class="line">              v (ezdsl_cli via CMake)                     |</div>
+<div class="line">              v (ezdsl-cli via CMake)                     |</div>
 <div class="line">+----------------------------+                            |</div>
 <div class="line">|   Synthesized C++ Tables   |                            |</div>
 <div class="line">+----------------------------+                            |</div>
@@ -334,15 +334,25 @@ $(function(){initNavTree('md_docs_2how__to__build__a__target.html','',''); });
 <div class="ttc" id="aclass_target_desc_html_af5ebf50426aea422928861c8edb88515"><div class="ttname"><a href="class_target_desc.html#af5ebf50426aea422928861c8edb88515">TargetDesc::getLegalizerInfo</a></div><div class="ttdeci">virtual class LegalizerInfo * getLegalizerInfo()=0</div></div>
 </div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md100"></a>
 3.2 Subclassing <span class="tt">MirFrameLowerer</span></h2>
-<p>Implement prologue/epilogue insertion: </p><div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_mir_frame_lowerer_8h.html">FrameLowerer/MirFrameLowerer.h</a>&quot;</span></div>
+<p>Implement prologue/epilogue insertion and stack allocation lowering: </p><div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_mir_frame_lowerer_8h.html">FrameLowerer/MirFrameLowerer.h</a>&quot;</span></div>
 <div class="line"> </div>
 <div class="line"><span class="keyword">class </span>RiscV64FrameLowerer : <span class="keyword">public</span> <a class="code hl_class" href="class_mir_frame_lowerer.html">MirFrameLowerer</a> {</div>
 <div class="line"><span class="keyword">public</span>:</div>
-<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_mir_frame_lowerer.html#a25c73480a8e1c3abe64d16c25ee090b3">calculateFrameLayout</a>(<a class="code hl_struct" href="struct_frame_lowerer_ctx.html">FrameLowererCtx</a> &amp;ctx)<span class="keyword"> override </span>{</div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_mir_frame_lowerer.html#a569eed693a91d38093865c2508354fe0">lowerAlloc</a>(<a class="code hl_struct" href="struct_frame_lowerer_ctx.html">FrameLowererCtx</a> &amp;ctx)<span class="keyword"> override </span>{</div>
+<div class="line">        <span class="comment">// Lower static ALLOC instructions into StackFrameObject entries</span></div>
+<div class="line">        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line">    }</div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">bool</span> <a class="code hl_function" href="class_mir_frame_lowerer.html#aab05af9ec8e2e956d9c3a817d19f4872">lowerDAlloc</a>(<a class="code hl_struct" href="struct_frame_lowerer_ctx.html">FrameLowererCtx</a> &amp;ctx)<span class="keyword"> override </span>{</div>
+<div class="line">        <span class="comment">// Lower dynamic DALLOC instructions into stack pointer decrements</span></div>
+<div class="line">        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line">    }</div>
+<div class="line"> </div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_mir_frame_lowerer.html#a25c73480a8e1c3abe64d16c25ee090b3">calculateFrameLayout</a>(FrameLowererCtx &amp;ctx)<span class="keyword"> override </span>{</div>
 <div class="line">        <span class="comment">// Compute frame size, align to 16 bytes, assign callee-save offsets</span></div>
 <div class="line">    }</div>
 <div class="line"> </div>
-<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_mir_frame_lowerer.html#a4e899344cd7f45d32b3a2cd2aae626f1">insertPrologue</a>(<a class="code hl_struct" href="struct_frame_lowerer_ctx.html">FrameLowererCtx</a> &amp;ctx)<span class="keyword"> override </span>{</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_mir_frame_lowerer.html#a4e899344cd7f45d32b3a2cd2aae626f1">insertPrologue</a>(FrameLowererCtx &amp;ctx)<span class="keyword"> override </span>{</div>
 <div class="line">        <span class="comment">// Emit: addi sp, sp, -FrameSize</span></div>
 <div class="line">        <span class="comment">// Emit: sd ra, (FrameSize - 8)(sp)</span></div>
 <div class="line">        <span class="comment">// Emit: sd s0, (FrameSize - 16)(sp)</span></div>
@@ -360,7 +370,9 @@ $(function(){initNavTree('md_docs_2how__to__build__a__target.html','',''); });
 <div class="ttc" id="aclass_mir_frame_lowerer_html"><div class="ttname"><a href="class_mir_frame_lowerer.html">MirFrameLowerer</a></div><div class="ttdef"><b>Definition</b> MirFrameLowerer.h:49</div></div>
 <div class="ttc" id="aclass_mir_frame_lowerer_html_a25c73480a8e1c3abe64d16c25ee090b3"><div class="ttname"><a href="class_mir_frame_lowerer.html#a25c73480a8e1c3abe64d16c25ee090b3">MirFrameLowerer::calculateFrameLayout</a></div><div class="ttdeci">virtual void calculateFrameLayout(FrameLowererCtx &amp;ctx)</div></div>
 <div class="ttc" id="aclass_mir_frame_lowerer_html_a4e899344cd7f45d32b3a2cd2aae626f1"><div class="ttname"><a href="class_mir_frame_lowerer.html#a4e899344cd7f45d32b3a2cd2aae626f1">MirFrameLowerer::insertPrologue</a></div><div class="ttdeci">virtual void insertPrologue(FrameLowererCtx &amp;ctx)=0</div></div>
+<div class="ttc" id="aclass_mir_frame_lowerer_html_a569eed693a91d38093865c2508354fe0"><div class="ttname"><a href="class_mir_frame_lowerer.html#a569eed693a91d38093865c2508354fe0">MirFrameLowerer::lowerAlloc</a></div><div class="ttdeci">virtual bool lowerAlloc(FrameLowererCtx &amp;ctx)=0</div></div>
 <div class="ttc" id="aclass_mir_frame_lowerer_html_a734ed2fd731d194625eafe4a9dc2faf8"><div class="ttname"><a href="class_mir_frame_lowerer.html#a734ed2fd731d194625eafe4a9dc2faf8">MirFrameLowerer::insertEpilogue</a></div><div class="ttdeci">virtual void insertEpilogue(FrameLowererCtx &amp;ctx)=0</div></div>
+<div class="ttc" id="aclass_mir_frame_lowerer_html_aab05af9ec8e2e956d9c3a817d19f4872"><div class="ttname"><a href="class_mir_frame_lowerer.html#aab05af9ec8e2e956d9c3a817d19f4872">MirFrameLowerer::lowerDAlloc</a></div><div class="ttdeci">virtual bool lowerDAlloc(FrameLowererCtx &amp;ctx)=0</div></div>
 <div class="ttc" id="astruct_frame_lowerer_ctx_html"><div class="ttname"><a href="struct_frame_lowerer_ctx.html">FrameLowererCtx</a></div><div class="ttdef"><b>Definition</b> MirFrameLowerer.h:13</div></div>
 </div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md101"></a>
 3.3 Subclassing <span class="tt">GenericCodeEmitter</span></h2>
@@ -368,13 +380,15 @@ $(function(){initNavTree('md_docs_2how__to__build__a__target.html','',''); });
 <div class="line"> </div>
 <div class="line"><span class="keyword">class </span>RiscV64CodeEmitter : <span class="keyword">public</span> <a class="code hl_class" href="class_generic_code_emitter.html">GenericCodeEmitter</a> {</div>
 <div class="line"><span class="keyword">public</span>:</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a37085e4e417c950de5736d32c1013552">beginFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx, std::string_view name) <span class="keyword">override</span>;</div>
 <div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a37085e4e417c950de5736d32c1013552">beginFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx, <a class="code hl_class" href="class_mir_function.html">MirFunction</a> *func) <span class="keyword">override</span>;</div>
 <div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a82a34a0c7bfefe1ba65ed779b0e0dfa7">bindLabel</a>(<a class="code hl_typedef" href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a> labelId) <span class="keyword">override</span>;</div>
-<div class="line">    <span class="keywordtype">void</span> emitInstruction(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx, <a class="code hl_class" href="class_mir_instruction.html">MirInstruction</a> *inst)<span class="keyword"> override </span>{</div>
-<div class="line">        <span class="comment">// Extract opcode, format (R, I, S, B, U, J), encode 32-bit word, append to .text</span></div>
-<div class="line">    }</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a0202dcac0c104c18cbac369d9be5210a">endFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx) <span class="keyword">override</span>;</div>
 <div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#a0202dcac0c104c18cbac369d9be5210a">endFunction</a>(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx, <a class="code hl_class" href="class_mir_function.html">MirFunction</a> *func) <span class="keyword">override</span>;</div>
-<div class="line">    <span class="keywordtype">void</span> finalize(<a class="code hl_class" href="class_code_emitter_context.html">CodeEmitterContext</a> *ctx) <span class="keyword">override</span>;</div>
+<div class="line">    <span class="keywordtype">void</span> <a class="code hl_function" href="class_generic_code_emitter.html#ad6596c4e3c5fddf96be281fe6c2ebddf">emitInst</a>(<span class="keyword">const</span> <a class="code hl_class" href="class_mir_target_instruction_desc.html">MirTargetInstructionDesc</a> *desc, std::span&lt;MirOperand *const&gt; operands)<span class="keyword"> override </span>{</div>
+<div class="line">        <span class="comment">// Interpret target descriptor, encode machine word (R, I, S, B, U, J type),</span></div>
+<div class="line">        <span class="comment">// and emit into the active section buffer via ctx-&gt;getCurrentSection()-&gt;emit32(...)</span></div>
+<div class="line">    }</div>
 <div class="line">};</div>
 <div class="ttc" id="a_ez_mir_common_8h_html_ab1307ee84ae25f8bddd9220cdd0bc957"><div class="ttname"><a href="_ez_mir_common_8h.html#ab1307ee84ae25f8bddd9220cdd0bc957">MirId</a></div><div class="ttdeci">size_t MirId</div><div class="ttdef"><b>Definition</b> EzMirCommon.h:21</div></div>
 <div class="ttc" id="a_generic_code_emitter_8h_html"><div class="ttname"><a href="_generic_code_emitter_8h.html">GenericCodeEmitter.h</a></div></div>
@@ -383,8 +397,9 @@ $(function(){initNavTree('md_docs_2how__to__build__a__target.html','',''); });
 <div class="ttc" id="aclass_generic_code_emitter_html_a0202dcac0c104c18cbac369d9be5210a"><div class="ttname"><a href="class_generic_code_emitter.html#a0202dcac0c104c18cbac369d9be5210a">GenericCodeEmitter::endFunction</a></div><div class="ttdeci">virtual void endFunction(CodeEmitterContext *ctx)=0</div></div>
 <div class="ttc" id="aclass_generic_code_emitter_html_a37085e4e417c950de5736d32c1013552"><div class="ttname"><a href="class_generic_code_emitter.html#a37085e4e417c950de5736d32c1013552">GenericCodeEmitter::beginFunction</a></div><div class="ttdeci">virtual void beginFunction(CodeEmitterContext *ctx, std::string_view name)=0</div></div>
 <div class="ttc" id="aclass_generic_code_emitter_html_a82a34a0c7bfefe1ba65ed779b0e0dfa7"><div class="ttname"><a href="class_generic_code_emitter.html#a82a34a0c7bfefe1ba65ed779b0e0dfa7">GenericCodeEmitter::bindLabel</a></div><div class="ttdeci">virtual void bindLabel(MirId labelId)=0</div></div>
+<div class="ttc" id="aclass_generic_code_emitter_html_ad6596c4e3c5fddf96be281fe6c2ebddf"><div class="ttname"><a href="class_generic_code_emitter.html#ad6596c4e3c5fddf96be281fe6c2ebddf">GenericCodeEmitter::emitInst</a></div><div class="ttdeci">virtual void emitInst(const MirTargetInstructionDesc *desc, std::span&lt; MirOperand *const &gt; operands)=0</div></div>
 <div class="ttc" id="aclass_mir_function_html"><div class="ttname"><a href="class_mir_function.html">MirFunction</a></div><div class="ttdef"><b>Definition</b> MirFunction.h:29</div></div>
-<div class="ttc" id="aclass_mir_instruction_html"><div class="ttname"><a href="class_mir_instruction.html">MirInstruction</a></div><div class="ttdef"><b>Definition</b> MirInstruction.h:21</div></div>
+<div class="ttc" id="aclass_mir_target_instruction_desc_html"><div class="ttname"><a href="class_mir_target_instruction_desc.html">MirTargetInstructionDesc</a></div><div class="ttdef"><b>Definition</b> MirTargetInstructionDesc.h:16</div></div>
 </div><!-- fragment --><hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md103"></a>
 4. CMake Integration</h1>
@@ -489,7 +504,7 @@ $(function(){initNavTree('md_docs_2how__to__build__a__target.html','',''); });
 <h1 class="doxsection"><a class="anchor" id="autotoc_md107"></a>
 6. Testing Your Target</h1>
 <p>Once registered, you can immediately compile MIR modules to your new target using <span class="tt">-target</span>:</p>
-<div class="fragment"><div class="line">EzCompiler examples/arithmetic_32bit.mir -target riscv64-unknown-linux-elf --emit-asm</div>
+<div class="fragment"><div class="line">EzCompiler examples/arithmetic_32bit.mir --target riscv64-unknown-linux-elf --emit-asm</div>
 </div><!-- fragment --><p>Verify your implementation by adding unit tests under <span class="tt">tests/</span> mirroring the x86-64 test suite (<span class="tt">T_MirLegalizer.cpp</span>, <span class="tt">T_MirInstructionSelector.cpp</span>, <span class="tt">T_MirRegisterAllocator.cpp</span>).</p>
 <hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md109"></a>
