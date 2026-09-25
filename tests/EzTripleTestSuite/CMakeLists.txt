@@ -73,5 +73,13 @@ EzPacker_AddTest(
         "tests/T_MirRegisterCoalescer.cpp"
 )
 
+EzPacker_AddTest(
+        "T_MirTargetPeepholePass"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_MirTargetPeepholePass.cpp"
+)
+
+
 
 
