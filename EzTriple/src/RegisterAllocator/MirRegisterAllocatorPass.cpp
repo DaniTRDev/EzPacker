@@ -69,6 +69,8 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
         ctx->m_degree.clear();
         ctx->m_iGraph.clear();
         ctx->m_unspillableRegs.clear();
+        ctx->m_coalescedRegs.clear();
+        ctx->m_affinity.clear();
 
         LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
         LivenessResult *result = livenessAnalysis->getResult();
@@ -78,6 +80,12 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
             m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                     << "Failed to build interference graph for function " << func->getName();
             return cleanupFailure();
+        }
+
+        // Conservatively coalesce copy-related and two-address registers
+        if (ctx->m_coalescingEnabled)
+        {
+            m_regAllocator->coalesce(ctx);
         }
 
         // Compute Initial Node Degrees & Lock Physical Nodes

@@ -6,6 +6,7 @@
 #include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "Instruction/MirInstruction.h"
+#include "Instruction/MirInstructionBuilder.h"
 #include "Instruction/MirTargetInstructionDesc.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "Operand/MirOperandBuilder.h"
@@ -151,6 +152,299 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
     }
 
     return true;
+}
+
+/**
+ * Conservatively coalesces copy-related and two-address virtual/physical registers
+ * using Briggs and George heuristics. Returns true if any registers were coalesced.
+ */
+bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
+{
+    MirFunction *func = ctx->m_targetFunction;
+    if (!func)
+    {
+        return false;
+    }
+
+    auto getColorLimit = [&](MirRegisterClass *cls) -> size_t
+    {
+        if (!cls)
+        {
+            return 0;
+        }
+        const auto &available = cls->getRegs();
+        size_t usableCount = 0;
+        for (auto &[name, regDesc] : available)
+        {
+            MirRegisterRef physReg = MirRegisterRef::preg(regDesc);
+            if (!ctx->m_reservedRegs.contains(physReg))
+            {
+                usableCount++;
+            }
+        }
+        return usableCount;
+    };
+
+    struct CoalesceCandidate
+    {
+        MirRegisterRef dst;
+        MirRegisterRef src;
+        bool isCopy;
+    };
+
+    std::pmr::vector<CoalesceCandidate> candidates(ctx->m_allocator);
+
+    for (MirBlock *block : func->getBlocks())
+    {
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            bool isMove = (inst->getOpCode() == MirInstructionOpCode::MOV) ||
+                          (inst->getTargetDesc() &&
+                           (inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsMove));
+
+            if (isMove && inst->getOperandCount() >= 2)
+            {
+                MirOperand *op0 = inst->getOperand(0);
+                MirOperand *op1 = inst->getOperand(1);
+                if (op0 && op1 && op0->isOfType<MirRegister>() && op1->isOfType<MirRegister>())
+                {
+                    MirRegisterRef dst = op0->get<MirRegister>()->getRef();
+                    MirRegisterRef src = op1->get<MirRegister>()->getRef();
+                    if (dst != src)
+                    {
+                        candidates.push_back({ dst, src, true });
+                    }
+                }
+            }
+            else if (inst->getOperandCount() >= 3)
+            {
+                std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
+                inst->getDefinedRegisters(defs);
+                if (defs.size() == 1)
+                {
+                    MirOperand *op0 = inst->getOperand(0);
+                    MirOperand *op1 = inst->getOperand(1);
+                    if (op0 && op1 && op0->isOfType<MirRegister>() && op1->isOfType<MirRegister>())
+                    {
+                        MirRegisterRef defRef = defs[0];
+                        MirRegisterRef op0Ref = op0->get<MirRegister>()->getRef();
+                        MirRegisterRef op1Ref = op1->get<MirRegister>()->getRef();
+                        if (defRef == op0Ref && op0Ref != op1Ref)
+                        {
+                            candidates.push_back({ op0Ref, op1Ref, false });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    bool anyCoalesced = false;
+    bool changed = true;
+
+    while (changed)
+    {
+        changed = false;
+
+        for (const auto &cand : candidates)
+        {
+            MirRegisterRef u = ctx->getCoalescedLeader(cand.dst);
+            MirRegisterRef v = ctx->getCoalescedLeader(cand.src);
+
+            if (u == v)
+            {
+                continue;
+            }
+
+            // Ensure physical register is always 'u' if there is one
+            if (u.isVirtual() && v.isPhysical())
+            {
+                std::swap(u, v);
+            }
+
+            // Cannot coalesce two distinct physical registers
+            if (u.isPhysical() && v.isPhysical())
+            {
+                continue;
+            }
+
+            // Cannot coalesce reserved physical registers
+            if (ctx->m_reservedRegs.contains(u) || ctx->m_reservedRegs.contains(v))
+            {
+                continue;
+            }
+
+            // Registers must belong to the same register class
+            if (u.getClass() != v.getClass())
+            {
+                continue;
+            }
+
+            auto uIt = ctx->m_iGraph.find(u);
+            auto vIt = ctx->m_iGraph.find(v);
+            if (uIt == ctx->m_iGraph.end() || vIt == ctx->m_iGraph.end())
+            {
+                continue;
+            }
+
+            // If they interfere, they cannot be coalesced
+            if (uIt->second.contains(v) || vIt->second.contains(u))
+            {
+                continue;
+            }
+
+            bool canCoalesce = false;
+
+            if (u.isPhysical())
+            {
+                // George's criterion: for each neighbor t of v,
+                // either t already interferes with u, or t is a low-degree virtual node (deg(t) < K_t)
+                bool satisfiesGeorge = true;
+                for (const MirRegisterRef &t : vIt->second)
+                {
+                    if (t == u)
+                    {
+                        continue;
+                    }
+
+                    if (uIt->second.contains(t))
+                    {
+                        continue;
+                    }
+
+                    if (t.isVirtual())
+                    {
+                        auto tIt = ctx->m_iGraph.find(t);
+                        if (tIt != ctx->m_iGraph.end())
+                        {
+                            size_t degT = tIt->second.size();
+                            size_t Kt = getColorLimit(t.getClass());
+                            if (degT < Kt)
+                            {
+                                continue;
+                            }
+                        }
+                    }
+
+                    satisfiesGeorge = false;
+                    break;
+                }
+
+                canCoalesce = satisfiesGeorge;
+            }
+            else
+            {
+                // Both are virtual: Briggs' criterion
+                // Number of combined neighbors with significant degree (>= K_t) must be < K_u
+                size_t Ku = getColorLimit(u.getClass());
+
+                std::pmr::unordered_set<MirRegisterRef> combinedNeighbors(ctx->m_allocator);
+                for (const auto &n : uIt->second)
+                {
+                    if (n != u && n != v)
+                    {
+                        combinedNeighbors.insert(n);
+                    }
+                }
+                for (const auto &n : vIt->second)
+                {
+                    if (n != u && n != v)
+                    {
+                        combinedNeighbors.insert(n);
+                    }
+                }
+
+                size_t significantDegreeCount = 0;
+                for (const auto &t : combinedNeighbors)
+                {
+                    if (t.isPhysical())
+                    {
+                        significantDegreeCount++;
+                    }
+                    else
+                    {
+                        auto tIt = ctx->m_iGraph.find(t);
+                        if (tIt != ctx->m_iGraph.end())
+                        {
+                            size_t degT = tIt->second.size();
+                            size_t Kt = getColorLimit(t.getClass());
+                            if (degT >= Kt)
+                            {
+                                significantDegreeCount++;
+                            }
+                        }
+                    }
+                }
+
+                canCoalesce = (significantDegreeCount < Ku);
+            }
+
+            if (canCoalesce)
+            {
+                // Coalesce v into u
+                ctx->m_coalescedRegs[v] = u;
+
+                if (u.isPhysical() && ctx->m_targetFunction)
+                {
+                    if (CallingConvDesc *cc = ctx->m_targetFunction->getCallingConv())
+                    {
+                        const auto &calleeSaved = cc->getCalleeSavedRegs(u.getClass());
+                        for (auto &reg : calleeSaved)
+                        {
+                            if (reg == u)
+                            {
+                                MirFunctionBuilder fBuilder(ctx->m_ctx);
+                                fBuilder.addPhysRegUse(ctx->m_targetFunction, reg);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (ctx->m_unspillableRegs.contains(v))
+                {
+                    ctx->m_unspillableRegs.insert(u);
+                    ctx->m_unspillableRegs.erase(v);
+                }
+
+                // Merge interference edges of v into u
+                auto neighborsOfV = vIt->second;
+                for (const auto &w : neighborsOfV)
+                {
+                    if (w != u && w != v)
+                    {
+                        ctx->m_iGraph[u].insert(w);
+                        ctx->m_iGraph[w].insert(u);
+                        ctx->m_iGraph[w].erase(v);
+                    }
+                }
+
+                ctx->m_iGraph[u].erase(v);
+                ctx->m_iGraph.erase(v);
+
+                anyCoalesced = true;
+                changed = true;
+                break; // Restart candidate scan with modified graph
+            }
+            else
+            {
+                // Add affinity bias so selectColors prefers the same physical register
+                auto &affU = ctx->m_affinity[u];
+                if (std::find(affU.begin(), affU.end(), v) == affU.end())
+                {
+                    affU.push_back(v);
+                }
+
+                auto &affV = ctx->m_affinity[v];
+                if (std::find(affV.begin(), affV.end(), u) == affV.end())
+                {
+                    affV.push_back(u);
+                }
+            }
+        }
+    }
+
+    return anyCoalesced;
 }
 
 /**
@@ -365,13 +659,47 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
 
         // 3. Search for available color
         std::optional<MirRegisterRef> assignedPhysReg;
-        for (auto &[name, regDesc] : availableColors)
+
+        // Affinity-biased selection: prefer colors of coalescing/affinity partners
+        auto affIt = ctx->m_affinity.find(node);
+        if (affIt != ctx->m_affinity.end())
         {
-            MirRegisterRef ref = MirRegisterRef::preg(regDesc);
-            if (!isUsed(ref.getId()))
+            for (const MirRegisterRef &partner : affIt->second)
             {
-                assignedPhysReg = ref;
-                break;
+                MirRegisterRef leaderPartner = ctx->getCoalescedLeader(partner);
+                MirRegisterRef prefColor;
+                if (leaderPartner.isPhysical())
+                {
+                    prefColor = leaderPartner;
+                }
+                else
+                {
+                    auto it = ctx->m_allocatedRegs.find(leaderPartner);
+                    if (it != ctx->m_allocatedRegs.end())
+                    {
+                        prefColor = it->second;
+                    }
+                }
+
+                if (prefColor.isPhysical() &&
+                    prefColor.getClass() == node.getClass() && !isUsed(prefColor.getId()))
+                {
+                    assignedPhysReg = prefColor;
+                    break;
+                }
+            }
+        }
+
+        if (!assignedPhysReg.has_value())
+        {
+            for (auto &[name, regDesc] : availableColors)
+            {
+                MirRegisterRef ref = MirRegisterRef::preg(regDesc);
+                if (!isUsed(ref.getId()))
+                {
+                    assignedPhysReg = ref;
+                    break;
+                }
             }
         }
 
@@ -462,12 +790,68 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
 
                 if (regRef.isVirtual())
                 {
-                    auto it = ctx->m_allocatedRegs.find(regRef);
-                    if (it != ctx->m_allocatedRegs.end())
+                    MirRegisterRef leader = ctx->getCoalescedLeader(regRef);
+                    if (leader.isPhysical())
                     {
-                        regOp->setRef(it->second);
+                        regOp->setRef(leader);
+                    }
+                    else
+                    {
+                        auto it = ctx->m_allocatedRegs.find(leader);
+                        if (it != ctx->m_allocatedRegs.end())
+                        {
+                            regOp->setRef(it->second);
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    eliminateRedundantCopies(ctx);
+}
+
+/**
+ * Erases redundant identity copy instructions (MOV r, r) produced by register coalescing and allocation.
+ */
+void MirRegisterAllocator::eliminateRedundantCopies(RegisterAllocatorCtx *ctx)
+{
+    MirFunction *func = ctx->m_targetFunction;
+
+    for (MirBlock *block : func->getBlocks())
+    {
+        auto &instructions = block->getInstructions();
+        for (auto it = instructions.begin(); it != instructions.end();)
+        {
+            MirInstruction *inst = *it;
+            ++it;
+
+            bool isMove = (inst->getOpCode() == MirInstructionOpCode::MOV) ||
+                          (inst->getTargetDesc() &&
+                           (inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsMove));
+            if (!isMove)
+            {
+                continue;
+            }
+
+            if (inst->getOperandCount() < 2)
+            {
+                continue;
+            }
+
+            MirOperand *op0 = inst->getOperand(0);
+            MirOperand *op1 = inst->getOperand(1);
+            if (!op0 || !op1 || !op0->isOfType<MirRegister>() || !op1->isOfType<MirRegister>())
+            {
+                continue;
+            }
+
+            MirRegisterRef dst = op0->get<MirRegister>()->getRef();
+            MirRegisterRef src = op1->get<MirRegister>()->getRef();
+
+            if (dst == src)
+            {
+                MirInstructionBuilder(ctx->m_ctx, inst, InsertionType::InsertBefore).erase(inst);
             }
         }
     }
