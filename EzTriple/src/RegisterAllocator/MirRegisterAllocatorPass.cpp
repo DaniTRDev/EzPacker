@@ -13,9 +13,10 @@
  * target/context pointers are tolerated here and reported by run(), so construction never
  * dereferences them.
  */
-MirRegisterAllocatorPass::MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
+MirRegisterAllocatorPass::MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc, bool coalescingEnabled) :
     m_ctx(ctx), m_regAllocator(targetDesc ? targetDesc->getRegisterAllocator() : nullptr),
-    m_result(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()), m_targetDesc(targetDesc)
+    m_result(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()), m_targetDesc(targetDesc),
+    m_coalescingEnabled(coalescingEnabled)
 {
 }
 
@@ -51,6 +52,7 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
     std::pmr::polymorphic_allocator<> alloc(m_ctx->getGlobalAllocator());
     RegisterAllocatorCtx *ctx =
             alloc.new_object<RegisterAllocatorCtx>(m_ctx, func, m_targetDesc, m_ctx->getGlobalAllocator());
+    ctx->m_coalescingEnabled = m_coalescingEnabled;
 
     auto cleanupFailure = [&]() -> MirPassResult
     {

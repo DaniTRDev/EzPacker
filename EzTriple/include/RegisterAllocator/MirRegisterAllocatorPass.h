@@ -25,7 +25,10 @@ class MirRegisterAllocatorPass : public IMirTransformPass
     /**
      * Creates the pass linked to the given builder context and target descriptor.
      */
-    MirRegisterAllocatorPass(class MirBuilderContext *ctx, class TargetDesc *targetDesc);
+    MirRegisterAllocatorPass(class MirBuilderContext *ctx, class TargetDesc *targetDesc, bool coalescingEnabled = true);
+
+    void setCoalescingEnabled(bool enabled) { m_coalescingEnabled = enabled; }
+    [[nodiscard]] bool isCoalescingEnabled() const { return m_coalescingEnabled; }
 
     /**
      * Returns "RegisterAllocatorPass".
@@ -69,6 +72,7 @@ class MirRegisterAllocatorPass : public IMirTransformPass
     class MirRegisterAllocator *m_regAllocator; ///< Concrete target allocator implementing the coloring algorithm.
     MirRegisterAllocatorPassResult m_result;    ///< Accumulated per-function allocation results.
     class TargetDesc *m_targetDesc;             ///< Target supplying the allocator and register classes.
+    bool m_coalescingEnabled{ true };           ///< Whether coalescing is enabled.
 };
 
 #endif // EZPACKER_REGISTERALLOCATORPASS_H
