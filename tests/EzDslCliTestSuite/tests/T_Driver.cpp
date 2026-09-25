@@ -346,3 +346,41 @@ TEST_F(DriverTest, CallingConvDriverSemanticErrorFails)
     EXPECT_FALSE(result.success);
     EXPECT_TRUE(result.errorMessage.find("Semantic analysis failed") != std::string::npos);
 }
+
+// Verifies --emit-registers generates RegisterInfo header from a .tdesc file.
+TEST_F(DriverTest, EmitsRegistersFromTargetDesc)
+{
+    std::string tdescSource = R"(
+    target X86_64 {
+        pointer_size: 8;
+        stack_slot: 8;
+        instruction_pointer: rip;
+        object_formats: [ELF];
+        default_calling_conv: C;
+
+        register_bank GPR {
+            classes { GPR64: 64 }
+            registers {
+                rax enc 0 names { rax: GPR64 }
+            }
+        }
+        special {
+            rip: 16
+        }
+    }
+    )";
+
+    auto tempFile = createTempFile(m_testTempDir, "x86_64.tdesc", tdescSource);
+
+    CliOptions opts;
+    opts.inputFilePath = tempFile.string();
+    opts.outputPath = m_testTempDir.string();
+    opts.targetName = "X86_64";
+    opts.emitRegisterInfo = true;
+    opts.generator = GeneratorKind::RegisterInfo;
+
+    auto result = runDriver(opts);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(std::filesystem::exists(m_testTempDir / "X86_64RegisterInfo.h"));
+}
+

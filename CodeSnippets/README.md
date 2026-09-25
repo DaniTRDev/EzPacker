@@ -1,1 +1,0 @@
-This folder contains code snippets that come out of my mind and might be useful at any point.

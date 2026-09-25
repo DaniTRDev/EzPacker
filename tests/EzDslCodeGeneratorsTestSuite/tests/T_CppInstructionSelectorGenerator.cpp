@@ -167,3 +167,35 @@ TEST_F(CppInstructionSelectorGeneratorTest, TestHasExtensionGuardGeneration)
     EXPECT_NE(sourceContent.find("if (m_targetDesc && m_targetDesc->hasExtension(\"avx\"))"), std::string::npos);
 }
 
+// Verifies that typed operand patterns generate getMirType()->getName() == "<type>" checks.
+TEST_F(CppInstructionSelectorGeneratorTest, TestOperandTypeGuardGeneration)
+{
+    std::string isfSource = R"(
+        target AMD64;
+
+        pattern Select_VADD_v4f32 [cost = 1] {
+            match {
+                VADD v4f32:$dst, v4f32:$src1, v4f32:$src2;
+            };
+            when {
+                hasExtension("sse");
+            };
+            select {
+                ADDPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+            };
+        };
+    )";
+
+    ASSERT_TRUE(parseAndRunPass(isfSource));
+
+    CppInstructionSelectorGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "AMD64");
+    ASSERT_TRUE(generator.run());
+
+    auto sourcePath = m_testTempDir / "AMD64InstructionSelector.cpp";
+    ASSERT_TRUE(std::filesystem::exists(sourcePath));
+
+    std::string sourceContent = readFileContent(sourcePath);
+    EXPECT_NE(sourceContent.find("inst->getOperand(0)->getMirType()->getName() == \"v4f32\""), std::string::npos);
+    EXPECT_NE(sourceContent.find("inst->getOperand(1)->getMirType()->getName() == \"v4f32\""), std::string::npos);
+    EXPECT_NE(sourceContent.find("inst->getOperand(2)->getMirType()->getName() == \"v4f32\""), std::string::npos);
+}

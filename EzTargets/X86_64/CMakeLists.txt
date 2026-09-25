@@ -49,6 +49,14 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenCallingConv.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenLegalizerActionTable.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenTargetInstructions.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenInstructionSelector.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenRegisterInfo.cmake")
+
+EzDslGenRegisterInfo(
+    TARGET EzTargetsX86_64
+    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64.tdesc"
+    TARGET_NAME "x86_64"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
+)
 
 EzDslGenCallingConv(
     TARGET EzTargetsX86_64

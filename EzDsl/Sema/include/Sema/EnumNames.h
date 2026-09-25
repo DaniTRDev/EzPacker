@@ -32,6 +32,8 @@ constexpr std::string_view typeKindName(DSL::Ast::TypeDef::TypeKind kind) noexce
             return "BindingToken";
         case TypeKind::Pointer:
             return "Pointer";
+        case TypeKind::Vector:
+            return "Vector";
     }
     return "Unknown";
 }
@@ -60,6 +62,8 @@ constexpr std::string_view irCategoryName(DSL::Ast::IrInstDef::IrInstCategory ca
             return "Casting";
         case IrInstCategory::System:
             return "System";
+        case IrInstCategory::Vector:
+            return "Vector";
     }
     return "Unknown";
 }

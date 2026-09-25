@@ -1,0 +1,5 @@
+var struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser_1_1_identifier_chain_target =
+[
+    [ "rule", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser_1_1_identifier_chain_target.html#ad77d3ccd5f4a225d6bf66829a49d63a7", null ],
+    [ "value", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser_1_1_identifier_chain_target.html#a1348bc7ee99fd84b03ba4d9da5b1ba4a", null ]
+];

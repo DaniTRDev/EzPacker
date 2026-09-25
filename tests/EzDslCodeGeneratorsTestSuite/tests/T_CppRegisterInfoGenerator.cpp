@@ -1,12 +1,13 @@
 #include "EzDslCodeGeneratorsTestSuite.h"
-#include "Ast/RegisterDefLangAst.h"
+#include "Ast/TargetDescDefLangAst.h"
 #include "CodeGenerators/CppRegisterInfoGenerator.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Parser/ParseContext.h"
-#include "Parser/RegisterDefLang.h"
+#include "Parser/TargetDescDefLang.h"
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
-#include "SemaPasses/RegisterPass.h"
+#include "Sema/Symbols/TargetDescSymbols.h"
+#include "SemaPasses/TargetDescPass.h"
 
 #include <chrono>
 #include <filesystem>
@@ -19,47 +20,53 @@ using namespace CodeGenerators;
 class CppRegisterInfoGeneratorTest : public EzDslCodeGeneratorsTestSuiteAsGtest
 {
   protected:
-    // Parses a register definition and runs the register semantic pass.
+    // Parses a target descriptor and runs the target descriptor semantic pass.
     bool parseAndRunPass(const std::string &source)
     {
-        ParseContext ctx = createParseContextFromBuff(std::format("gen_reg_{}.reg", m_sourceId++), source);
-        m_ast = ctx.parse<DSL::Parser::RegisterDef::RegisterDefFile, DSL::Ast::RegisterDef::RegisterFile>();
+        ParseContext ctx = createParseContextFromBuff(std::format("gen_reg_{}.tdesc", m_sourceId++), source);
+        m_ast = ctx.parse<DSL::Parser::TargetDesc::TargetDescFileParser, DSL::Ast::TargetDesc::TargetDescFile>();
         if (!m_ast.has_value())
         {
             return false;
         }
 
-        RegisterPass pass;
+        TargetDescPass pass;
         return pass.run(getDiagCollector(), getSymbolTable(), &m_ast.value());
     }
 
     static constexpr const char *s_validRegisterFile = R"(
-target X86_64;
+target X86_64 {
+    pointer_size: 8;
+    stack_slot: 8;
+    instruction_pointer: rip;
+    object_formats: [ELF];
+    default_calling_conv: C;
 
-register_bank GPR {
-    classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
-    sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
-    registers {
-        rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
-        rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
+    register_bank GPR {
+        classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
+        sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
+        registers {
+            rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
+            rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
+        }
     }
-}
 
-register_bank FPR {
-    classes { FPR32: 32, FPR64: 64 }
-    sub_register { FPR64 <: FPR32 }
-    registers {
-        xmm0 enc 0 names { xmm0: FPR32, xmm0: FPR64 }
+    register_bank FPR {
+        classes { FPR32: 32, FPR64: 64 }
+        sub_register { FPR64 <: FPR32 }
+        registers {
+            xmm0 enc 0 names { xmm0: FPR32, xmm0: FPR64 }
+        }
     }
-}
 
-special {
-    rip: 16
+    special {
+        rip: 16
+    }
 }
 )";
 
     size_t m_sourceId{ 0 };
-    std::optional<DSL::Ast::RegisterDef::RegisterFile> m_ast;
+    std::optional<DSL::Ast::TargetDesc::TargetDescFile> m_ast;
 };
 
 // Generates flat register tables and verifies encodings, aliases, special regs, and count constants.
@@ -160,4 +167,63 @@ TEST_F(CppRegisterInfoGeneratorTest, FailsOnNullInputs)
 
     CppRegisterInfoGenerator genEmptyPath(getDiagCollector(), getSymbolTable(), "", "X86_64");
     EXPECT_FALSE(genEmptyPath.run());
+}
+
+// Verifies the production x86_64.tdesc manifest parses, passes Sema, and generates complete register tables.
+TEST_F(CppRegisterInfoGeneratorTest, ParsesAndGeneratesRealX86_64Registers)
+{
+    std::filesystem::path manifestPath;
+    std::filesystem::path current = std::filesystem::current_path();
+    for (int i = 0; i < 6; ++i)
+    {
+        auto candidate = current / "EzTargets" / "X86_64" / "targets" / "x86_64" / "x86_64.tdesc";
+        if (std::filesystem::exists(candidate))
+        {
+            manifestPath = candidate;
+            break;
+        }
+        if (current.has_parent_path() && current != current.parent_path())
+        {
+            current = current.parent_path();
+        }
+    }
+    ASSERT_FALSE(manifestPath.empty()) << "Could not find x86_64.tdesc from cwd " << std::filesystem::current_path();
+
+    std::string content = readFileContent(manifestPath);
+    ASSERT_TRUE(parseAndRunPass(content));
+
+    auto outHeader = m_testTempDir / "x86_64RegisterInfo.h";
+    CppRegisterInfoGenerator generator(getDiagCollector(), getSymbolTable(), outHeader, "x86_64");
+    ASSERT_TRUE(generator.run());
+    ASSERT_TRUE(std::filesystem::exists(outHeader));
+
+    std::string header = readFileContent(outHeader);
+
+    EXPECT_NE(header.find("namespace EzTargets::TableGen::x86_64"), std::string::npos);
+    EXPECT_NE(header.find("s_registerEntryCount = 112;"), std::string::npos);
+    EXPECT_NE(header.find("s_subRegEdgeCount = 80;"), std::string::npos);
+    EXPECT_NE(header.find("s_specialRegCount = 1;"), std::string::npos);
+
+    // GPR checks
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"GPR\", \"GPR64\", 64, 0, \"rax\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"GPR\", \"GPR32\", 32, 0, \"eax\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"GPR\", \"GPR16\", 16, 0, \"ax\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"GPR\", \"GPR8\", 8, 0, \"al\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"GPR\", \"GPR64\", 64, 15, \"r15\" },"), std::string::npos);
+
+    // FPR checks
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"FPR32\", 32, 0, \"xmm0\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"FPR64\", 64, 0, \"xmm0\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"VR128\", 128, 0, \"xmm0\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"VR128\", 128, 15, \"xmm15\" },"), std::string::npos);
+
+    // Sub-register edge checks
+    EXPECT_NE(header.find("SubRegEdge{ \"GPR64\", \"rax\", \"GPR32\", \"eax\" },"), std::string::npos);
+    EXPECT_NE(header.find("SubRegEdge{ \"VR128\", \"xmm0\", \"FPR64\", \"xmm0\" },"), std::string::npos);
+    EXPECT_NE(header.find("SubRegEdge{ \"FPR64\", \"xmm0\", \"FPR32\", \"xmm0\" },"), std::string::npos);
+
+    // Special register
+    EXPECT_NE(header.find("SpecialRegInfo{ \"rip\", 16 },"), std::string::npos);
+    EXPECT_NE(header.find("initializeRegisterBanks"), std::string::npos);
+    EXPECT_NE(header.find("getSpecialRegId"), std::string::npos);
 }

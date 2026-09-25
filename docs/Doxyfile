@@ -1,0 +1,63 @@
+# Doxyfile for EzPacker
+PROJECT_NAME           = "EzPacker"
+PROJECT_NUMBER         = "1.0.0"
+PROJECT_BRIEF          = "Modern C++20 Compiler Backend, Code Generator & Machine Intermediate Representation Framework"
+OUTPUT_DIRECTORY       = docs
+HTML_OUTPUT            = doxygen
+
+INPUT                  = docs \
+                         docs/projects \
+                         EzCore/include \
+                         EzMir/include \
+                         EzDsl/Lexer/include \
+                         EzDsl/Sema/include \
+                         EzDsl/CodeGenerators/include \
+                         EzDsl/Cli/include \
+                         EzCodeEmitter/include \
+                         EzTriple/include \
+                         EzCompiler/include \
+                         EzTargets/X86_64/include \
+                         EzTargets/X86_64/Dsl/include \
+                         EzTargets/X86_64/Registration/include
+
+USE_MDFILE_AS_MAINPAGE = docs/index.md
+HTML_EXTRA_STYLESHEET  = docs/assets/custom.css
+
+FILE_PATTERNS          = *.h \
+                         *.hpp \
+                         *.cpp \
+                         *.md
+
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */cmake-build-*/* \
+                         */_deps/* \
+                         */build/* \
+                         */LibBf/* \
+                         */.git/* \
+                         */.idea/* \
+                         */docs/doxygen/*
+
+MARKDOWN_SUPPORT       = YES
+AUTOLINK_SUPPORT       = YES
+SUBGROUPING            = YES
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = NO
+CASE_SENSE_NAMES       = NO
+SHOW_INCLUDE_FILES     = YES
+INLINE_INFO            = YES
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = YES
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+HTML_DYNAMIC_SECTIONS  = YES
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+
+HAVE_DOT               = NO
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO
+QUIET                  = YES

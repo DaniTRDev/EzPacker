@@ -13,7 +13,6 @@ namespace dsl = ::lexy::dsl;
 using Ast::RegisterDef::RegisterBankDecl;
 using Ast::RegisterDef::RegisterClassDecl;
 using Ast::RegisterDef::RegisterDecl;
-using Ast::RegisterDef::RegisterFile;
 using Ast::RegisterDef::RegisterNameBinding;
 using Ast::RegisterDef::SpecialRegDecl;
 using Ast::RegisterDef::SubRegisterEdge;
@@ -169,77 +168,6 @@ struct SpecialBlock
     static constexpr auto rule = Common::Keyword<"special">::rule >>
             dsl::curly_bracketed.list(dsl::p<SpecialRegEntry>, dsl::sep(dsl::lit_c<','>));
     static constexpr auto value = Common::PmrAsList<SpecialRegDecl>;
-};
-
-/**
- * Top-level item variant: a register bank or the special-register block.
- */
-using TopLevelItem = std::variant<RegisterBankDecl, std::pmr::vector<SpecialRegDecl>>;
-
-/**
- * Wraps a parsed register bank as a top-level item.
- */
-struct RegisterBankTopLevel
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::p<RegisterBankParser>;
-    static constexpr auto value =
-            lexy::callback<TopLevelItem>([](RegisterBankDecl bank) { return TopLevelItem{ std::move(bank) }; });
-};
-
-/**
- * Wraps a parsed special-register block as a top-level item.
- */
-struct SpecialTopLevel
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::p<SpecialBlock>;
-    static constexpr auto value = lexy::callback<TopLevelItem>([](std::pmr::vector<SpecialRegDecl> special)
-                                                               { return TopLevelItem{ std::move(special) }; });
-};
-
-/**
- * Parses the sequence of register banks and special blocks at file scope.
- */
-struct TopLevelList
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule =
-            dsl::list((dsl::peek(Common::Keyword<"register_bank">::rule) >> dsl::p<RegisterBankTopLevel>) |
-                      (dsl::peek(Common::Keyword<"special">::rule) >> dsl::p<SpecialTopLevel>));
-    static constexpr auto value = Common::PmrAsList<TopLevelItem>;
-};
-
-/**
- * Root rule for a `.reg` file.
- */
-struct RegisterDefFile
-{
-    static constexpr auto whitespace = Common::Whitespace;
-    static constexpr auto rule = dsl::terminator(dsl::eof)(Common::Keyword<"target">::rule >>
-                                                          ((dsl::p<Common::Identifier> + dsl::lit_c<';'>) +
-                                                           dsl::p<TopLevelList>));
-    static constexpr auto value = lexy::callback<RegisterFile>(
-            [](Ast::Common::Identifier target, std::pmr::vector<TopLevelItem> items)
-            {
-                RegisterFile file{};
-                file.m_target = std::move(target);
-                for (auto &item : items)
-                {
-                    if (auto *bank = std::get_if<RegisterBankDecl>(&item))
-                    {
-                        file.m_banks.push_back(std::move(*bank));
-                    }
-                    else if (auto *special = std::get_if<std::pmr::vector<SpecialRegDecl>>(&item))
-                    {
-                        for (auto &reg : *special)
-                        {
-                            file.m_specialRegs.push_back(std::move(reg));
-                        }
-                    }
-                }
-                return file;
-            });
 };
 
 } // namespace DSL::Parser::RegisterDef

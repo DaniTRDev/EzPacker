@@ -1341,6 +1341,646 @@ target_inst CVTTSD2SI(GPR64:dst OUT, FPR64:src IN) {
 };
 
 // ============================================================================
+// SSE / VECTOR INSTRUCTIONS
+// ============================================================================
+
+// --- SSE (Base) ---
+target_inst ADDPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("addps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst SUBPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("subps");
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MULPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("mulps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst DIVPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("divps");
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ANDPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("andps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x54];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ORPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("orps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x56];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst XORPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("xorps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x57];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ANDNPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("andnps");
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x55];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MAXPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("maxps");
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x5F];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MINPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("minps");
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x5D];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MOVAPSrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("movaps");
+    FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x28];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst MOVUPSrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("movups");
+    FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        opcode: [0x0F, 0x10];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+// --- SSE2 ---
+target_inst ADDPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("addpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst SUBPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("subpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MULPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("mulpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst DIVPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("divpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ANDPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("andpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x54];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ORPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("orpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x56];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst XORPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("xorpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x57];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ANDNPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("andnpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x55];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MAXPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("maxpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x5F];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MINPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("minpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x5D];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MOVAPDrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("movapd");
+    FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x28];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst MOVUPDrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("movupd");
+    FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x10];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst PADDBrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("paddb");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xFC];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PADDWrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("paddw");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xFD];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PADDDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("paddd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xFE];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PADDQrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("paddq");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xD4];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PSUBBrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("psubb");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xF8];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PSUBWrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("psubw");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xF9];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PSUBDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("psubd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xFA];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PSUBQrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("psubq");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xFB];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PMULLWrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pmullw");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xD5];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PANDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pand");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xDB];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PORrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("por");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xEB];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PXORrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pxor");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xEF];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst MOVDQArr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("movdqa");
+    FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x6F];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst MOVDQUrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("movdqu");
+    FLAGS(IsMove);
+    ENCODING {
+        form: sse;
+        prefixes: F3;
+        opcode: [0x0F, 0x6F];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+// --- SSE3 ---
+target_inst HADDPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("haddps");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x7C];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst HADDPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("haddpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x7C];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst HSUBPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("hsubps");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x7D];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst HSUBPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("hsubpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x7D];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ADDSUBPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("addsubps");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0xD0];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst ADDSUBPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("addsubpd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0xD0];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+// --- SSSE3 ---
+target_inst PHADDDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("phaddd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x02];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PHSUBDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("phsubd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x06];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PABSDrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("pabsd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x1E];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst PSHUFBrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pshufb");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x00];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+// --- SSE4.1 ---
+target_inst PMULLDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pmulld");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x40];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PMAXSDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pmaxsd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x3D];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+target_inst PMINSDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pminsd");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x39];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+// --- SSE4.2 ---
+target_inst PCMPGTQrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("pcmpgtq");
+    ENCODING {
+        form: sse;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x37];
+        operands { dst => reg; src2 => rm_reg; };
+        coalesce: src1;
+        size: dst;
+    };
+};
+
+// ============================================================================
 // SYSTEM
 // ============================================================================
 

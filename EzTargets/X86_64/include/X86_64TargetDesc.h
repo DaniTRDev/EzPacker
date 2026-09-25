@@ -49,6 +49,9 @@ class X86_64TargetDesc : public TargetDesc
     /// Returns the 64-bit general-purpose register class used as the default integer class.
     MirRegisterClass *getGprClass() override;
 
+    /// Returns the 128-bit vector register class (XMM0..XMM15).
+    MirRegisterClass *getVr128Class() const { return m_vr128; }
+
     /// Returns the x86-64 legalizer, creating it on first access.
     MirLegalizer *getLegalizer() override;
 
@@ -122,6 +125,7 @@ class X86_64TargetDesc : public TargetDesc
     MirRegisterClass *m_gpr8{ nullptr };  ///< 8-bit general-purpose register class.
     MirRegisterClass *m_fpr64{ nullptr }; ///< 64-bit floating-point register class.
     MirRegisterClass *m_fpr32{ nullptr }; ///< 32-bit floating-point register class.
+    MirRegisterClass *m_vr128{ nullptr }; ///< 128-bit vector register class.
 
     std::unique_ptr<MirFrameLowerer> m_frameLowerer;  ///< Lazily created frame lowerer.
     std::unique_ptr<MirInstructionSelector> m_isel;   ///< Lazily created instruction selector.

@@ -20,7 +20,6 @@ set(EZDSL_SEMA_FILES_LIST
     "include/SemaPasses/TargetInstPass.h"
     "include/SemaPasses/InstructionSelectPass.h"
     "include/SemaPasses/CallingConvPass.h"
-    "include/SemaPasses/RegisterPass.h"
     "include/SemaPasses/TargetDescPass.h"
 
     "src/Sema/Encoding/EncodingDialect.cpp"
@@ -34,7 +33,6 @@ set(EZDSL_SEMA_FILES_LIST
     "src/SemaPasses/TargetInstPass.cpp"
     "src/SemaPasses/InstructionSelectPass.cpp"
     "src/SemaPasses/CallingConvPass.cpp"
-    "src/SemaPasses/RegisterPass.cpp"
     "src/SemaPasses/TargetDescPass.cpp"
 )
 

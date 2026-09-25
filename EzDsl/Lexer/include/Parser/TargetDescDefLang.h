@@ -5,6 +5,7 @@
 #include "Ast/TargetDescDefLangAst.h"
 #include "EzDslLexerCommon.h"
 #include "Parser/CommonParsers.h"
+#include "Parser/RegisterDefLang.h"
 
 namespace DSL::Parser::TargetDesc
 {
@@ -16,10 +17,39 @@ using Ast::TargetDesc::LibcallEntry;
 using Ast::TargetDesc::TargetDescFile;
 
 /**
+ * Grouped register container parsed from `registers { ... }`.
+ */
+struct RegisterGroupDef
+{
+    std::pmr::vector<Ast::RegisterDef::RegisterBankDecl> m_banks;
+    std::pmr::vector<Ast::RegisterDef::SpecialRegDecl> m_specials;
+};
+
+using TargetDescRegisterGroupItem = std::variant<Ast::RegisterDef::RegisterBankDecl,
+                                                 std::pmr::vector<Ast::RegisterDef::SpecialRegDecl>>;
+
+struct RegisterGroupItemParser
+{
+    static constexpr auto rule =
+            (dsl::peek(Common::Keyword<"register_bank">::rule) >> dsl::p<RegisterDef::RegisterBankParser>) |
+            (dsl::peek(Common::Keyword<"special">::rule) >> dsl::p<RegisterDef::SpecialBlock>);
+    static constexpr auto value = lexy::callback<TargetDescRegisterGroupItem>(
+            [](Ast::RegisterDef::RegisterBankDecl bank) { return TargetDescRegisterGroupItem{ std::move(bank) }; },
+            [](std::pmr::vector<Ast::RegisterDef::SpecialRegDecl> specials)
+            { return TargetDescRegisterGroupItem{ std::move(specials) }; });
+};
+
+struct RegisterGroupBlock
+{
+    static constexpr auto rule = dsl::curly_bracketed.list(dsl::p<RegisterGroupItemParser>);
+    static constexpr auto value = Common::PmrAsList<TargetDescRegisterGroupItem>;
+};
+
+/**
  * Body field variant produced by each `.tdesc` declaration.
  */
 using TargetDescItem =
-        std::variant<std::pair<Common::Keyword<"registers">, Ast::Common::StringLiteral>,
+        std::variant<std::pair<Common::Keyword<"registers">, std::variant<Ast::Common::StringLiteral, RegisterGroupDef>>,
                      std::pair<Common::Keyword<"instructions">, Ast::Common::StringLiteral>,
                      std::pair<Common::Keyword<"calling_convs">, std::pmr::vector<Ast::Common::StringLiteral>>,
                      std::pair<Common::Keyword<"pointer_size">, Ast::Common::IntegerLiteral>,
@@ -30,7 +60,9 @@ using TargetDescItem =
                      std::pair<Common::Keyword<"default_calling_conv">, Ast::Common::Identifier>,
                      std::pair<Common::Keyword<"libcalls">, std::pmr::vector<LibcallEntry>>,
                      std::pair<Common::Keyword<"components">, std::pmr::vector<ComponentBinding>>,
-                     std::pair<Common::Keyword<"extensions">, std::pmr::vector<ExtensionDef>>>;
+                     std::pair<Common::Keyword<"extensions">, std::pmr::vector<ExtensionDef>>,
+                     std::pair<Common::Keyword<"register_bank">, Ast::RegisterDef::RegisterBankDecl>,
+                     std::pair<Common::Keyword<"special">, std::pmr::vector<Ast::RegisterDef::SpecialRegDecl>>>;
 
 /**
  * Parses a `[ "a", "b" ]` list of string literals into a PMR vector.
@@ -53,16 +85,61 @@ struct IdentifierList
 };
 
 /**
- * Parses `registers: "path"` into the registers field item.
+ * Parses `registers: "path"` or `registers { ... }` into the registers field item.
  */
 struct RegistersDecl
 {
     static constexpr auto whitespace = Common::Whitespace;
     static constexpr auto rule = Common::Keyword<"registers">::rule >>
-            (dsl::lit_c<':'> >> dsl::p<Common::StringLiteral>);
-    static constexpr auto value =
-            lexy::callback<TargetDescItem>([](Ast::Common::StringLiteral path)
-                                           { return std::make_pair(Common::Keyword<"registers">{}, std::move(path)); });
+            ((dsl::lit_c<':'> >> dsl::p<Common::StringLiteral>) | dsl::p<RegisterGroupBlock>);
+    static constexpr auto value = lexy::callback<TargetDescItem>(
+            [](Ast::Common::StringLiteral path)
+            {
+                return std::make_pair(Common::Keyword<"registers">{},
+                                      std::variant<Ast::Common::StringLiteral, RegisterGroupDef>{ std::move(path) });
+            },
+            [](std::pmr::vector<TargetDescRegisterGroupItem> items)
+            {
+                RegisterGroupDef group{};
+                for (auto &it : items)
+                {
+                    if (auto *b = std::get_if<Ast::RegisterDef::RegisterBankDecl>(&it))
+                    {
+                        group.m_banks.push_back(std::move(*b));
+                    }
+                    else if (auto *s = std::get_if<std::pmr::vector<Ast::RegisterDef::SpecialRegDecl>>(&it))
+                    {
+                        for (auto &sp : *s)
+                        {
+                            group.m_specials.push_back(std::move(sp));
+                        }
+                    }
+                }
+                return std::make_pair(Common::Keyword<"registers">{},
+                                      std::variant<Ast::Common::StringLiteral, RegisterGroupDef>{ std::move(group) });
+            });
+};
+
+/**
+ * Parses an inline `register_bank NAME { ... }` declaration inside target body.
+ */
+struct RegisterBankBodyDecl
+{
+    static constexpr auto rule = dsl::p<RegisterDef::RegisterBankParser>;
+    static constexpr auto value = lexy::callback<TargetDescItem>(
+            [](Ast::RegisterDef::RegisterBankDecl bank)
+            { return std::make_pair(Common::Keyword<"register_bank">{}, std::move(bank)); });
+};
+
+/**
+ * Parses an inline `special { ... }` declaration inside target body.
+ */
+struct SpecialBodyDecl
+{
+    static constexpr auto rule = dsl::p<RegisterDef::SpecialBlock>;
+    static constexpr auto value = lexy::callback<TargetDescItem>(
+            [](std::pmr::vector<Ast::RegisterDef::SpecialRegDecl> specials)
+            { return std::make_pair(Common::Keyword<"special">{}, std::move(specials)); });
 };
 
 /**
@@ -363,6 +440,8 @@ struct BodyEntry
     static constexpr auto rule = []
     {
         auto registers = dsl::peek(Common::Keyword<"registers">::rule) >> dsl::p<RegistersDecl>;
+        auto regBank = dsl::peek(Common::Keyword<"register_bank">::rule) >> dsl::p<RegisterBankBodyDecl>;
+        auto specialReg = dsl::peek(Common::Keyword<"special">::rule) >> dsl::p<SpecialBodyDecl>;
         auto instructions = dsl::peek(Common::Keyword<"instructions">::rule) >> dsl::p<InstructionsDecl>;
         auto convs = dsl::peek(Common::Keyword<"calling_convs">::rule) >> dsl::p<CallingConvsDecl>;
         auto ptr = dsl::peek(Common::Keyword<"pointer_size">::rule) >> dsl::p<PointerSizeDecl>;
@@ -375,7 +454,7 @@ struct BodyEntry
         auto components = dsl::peek(Common::Keyword<"components">::rule) >> dsl::p<ComponentsDecl>;
         auto extensions = dsl::peek(Common::Keyword<"extensions">::rule) >> dsl::p<ExtensionsDecl>;
 
-        auto inner = registers | instructions | convs | ptr | stack | ip | disp | formats | dcc | libcalls | components | extensions;
+        auto inner = registers | regBank | specialReg | instructions | convs | ptr | stack | ip | disp | formats | dcc | libcalls | components | extensions;
         return inner + dsl::opt(dsl::lit_c<';'>);
     }();
     static constexpr auto value = lexy::callback<TargetDescItem>([](TargetDescItem item, auto...) { return item; });
@@ -412,7 +491,34 @@ struct TargetDescFileParser
                             {
                                 using T = std::decay_t<decltype(field.first)>;
                                 if constexpr (std::is_same_v<T, Common::Keyword<"registers">>)
-                                    file.m_registers = std::move(field.second);
+                                {
+                                    if (auto *path = std::get_if<Ast::Common::StringLiteral>(&field.second))
+                                    {
+                                        file.m_registers = std::move(*path);
+                                    }
+                                    else if (auto *grp = std::get_if<RegisterGroupDef>(&field.second))
+                                    {
+                                        for (auto &b : grp->m_banks)
+                                        {
+                                            file.m_registerBanks.push_back(std::move(b));
+                                        }
+                                        for (auto &s : grp->m_specials)
+                                        {
+                                            file.m_specialRegs.push_back(std::move(s));
+                                        }
+                                    }
+                                }
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"register_bank">>)
+                                {
+                                    file.m_registerBanks.push_back(std::move(field.second));
+                                }
+                                else if constexpr (std::is_same_v<T, Common::Keyword<"special">>)
+                                {
+                                    for (auto &s : field.second)
+                                    {
+                                        file.m_specialRegs.push_back(std::move(s));
+                                    }
+                                }
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"instructions">>)
                                     file.m_instructions = std::move(field.second);
                                 else if constexpr (std::is_same_v<T, Common::Keyword<"calling_convs">>)

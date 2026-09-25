@@ -149,7 +149,7 @@ void CommandLineParser::setupArguments()
             .implicit_value(true);
 
     m_program->add_argument("--emit-registers")
-            .help("Synthesize Target RegisterInfo (.h) from .reg")
+            .help("Synthesize Target RegisterInfo (.h) from .tdesc")
             .default_value(false)
             .implicit_value(true);
 

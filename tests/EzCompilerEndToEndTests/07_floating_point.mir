@@ -1,0 +1,96 @@
+; Test Suite: 07_floating_point.mir
+; Tests scalar floating-point arithmetic (FADD, FSUB, FMUL, FDIV),
+; conversions (SITOFP, FPTOSI) for 32-bit and 64-bit precision,
+; and mixed floating-point / integer calling conventions across Win64 and SysV.
+
+fn @add_f32(f32 %a, f32 %b) -> f32 {
+entry:
+    %res = FADD f32 %a, %b;
+    RET f32 %res;
+}
+
+fn @sub_f32(f32 %a, f32 %b) -> f32 {
+entry:
+    %res = FSUB f32 %a, %b;
+    RET f32 %res;
+}
+
+fn @mul_f32(f32 %a, f32 %b) -> f32 {
+entry:
+    %res = FMUL f32 %a, %b;
+    RET f32 %res;
+}
+
+fn @div_f32(f32 %a, f32 %b) -> f32 {
+entry:
+    %res = FDIV f32 %a, %b;
+    RET f32 %res;
+}
+
+fn @add_f64(f64 %a, f64 %b) -> f64 {
+entry:
+    %res = FADD f64 %a, %b;
+    RET f64 %res;
+}
+
+fn @sub_f64(f64 %a, f64 %b) -> f64 {
+entry:
+    %res = FSUB f64 %a, %b;
+    RET f64 %res;
+}
+
+fn @mul_f64(f64 %a, f64 %b) -> f64 {
+entry:
+    %res = FMUL f64 %a, %b;
+    RET f64 %res;
+}
+
+fn @div_f64(f64 %a, f64 %b) -> f64 {
+entry:
+    %res = FDIV f64 %a, %b;
+    RET f64 %res;
+}
+
+fn @poly_f64(f64 %x, f64 %a, f64 %b, f64 %c) -> f64 {
+entry:
+    %x2 = FMUL f64 %x, %x;
+    %ax2 = FMUL f64 %a, %x2;
+    %bx = FMUL f64 %b, %x;
+    %term = FADD f64 %ax2, %bx;
+    %res = FADD f64 %term, %c;
+    RET f64 %res;
+}
+
+fn @int_to_float(i32 %x) -> f32 {
+entry:
+    %res = SITOFP f32 %x;
+    RET f32 %res;
+}
+
+fn @int64_to_double(i64 %x) -> f64 {
+entry:
+    %res = SITOFP f64 %x;
+    RET f64 %res;
+}
+
+fn @float_to_int(f32 %x) -> i32 {
+entry:
+    %res = FPTOSI i32 %x;
+    RET i32 %res;
+}
+
+fn @double_to_int64(f64 %x) -> i64 {
+entry:
+    %res = FPTOSI i64 %x;
+    RET i64 %res;
+}
+
+fn @mixed_args_add(i32 %a, f32 %b, i32 %c, f32 %d) -> f32 {
+entry:
+    %a_f = SITOFP f32 %a;
+    %c_f = SITOFP f32 %c;
+    %s1 = FADD f32 %a_f, %b;
+    %s2 = FADD f32 %s1, %c_f;
+    %res = FADD f32 %s2, %d;
+    RET f32 %res;
+}

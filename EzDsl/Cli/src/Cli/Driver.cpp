@@ -23,7 +23,6 @@
 #include "Ast/TargetInstDefLangAst.h"
 #include "Ast/InstructionSelectDefLangAst.h"
 #include "Ast/CallingConvDefLangAst.h"
-#include "Ast/RegisterDefLangAst.h"
 #include "Ast/TargetDescDefLangAst.h"
 #include "Parser/IrInstructionDefLang.h"
 #include "Parser/LegalizeActionDefLang.h"
@@ -33,7 +32,6 @@
 #include "Parser/TargetInstDefLang.h"
 #include "Parser/InstructionSelectDefLang.h"
 #include "Parser/CallingConvDefLang.h"
-#include "Parser/RegisterDefLang.h"
 #include "Parser/TargetDescDefLang.h"
 
 #include "Sema/SymbolTable.h"
@@ -51,7 +49,6 @@
 #include "SemaPasses/TargetInstPass.h"
 #include "SemaPasses/InstructionSelectPass.h"
 #include "SemaPasses/CallingConvPass.h"
-#include "SemaPasses/RegisterPass.h"
 #include "SemaPasses/TargetDescPass.h"
 
 #include "SourceManager/SourceManager.h"
@@ -361,7 +358,7 @@ constexpr ExtensionDialect kExtensionDialects[] = {
     { ".lad", LanguageDialect::LegalizeAction }, { ".lrd", LanguageDialect::LegalizeRule },
     { ".idf", LanguageDialect::TargetInstDef },  { ".isf", LanguageDialect::InstructionSelect },
     { ".ezcc", LanguageDialect::CallingConv },   { ".ccd", LanguageDialect::CallingConv },
-    { ".reg", LanguageDialect::RegisterDef },    { ".tdesc", LanguageDialect::TargetDesc },
+    { ".tdesc", LanguageDialect::TargetDesc },
 };
 
 // Metadata describing one generator: everything the driver needs besides construction itself.
@@ -395,7 +392,7 @@ constexpr GeneratorMeta kGeneratorTable[] = {
       "{}InstructionSelector", "", true, "Target" },
     { GeneratorKind::CallingConv, LanguageDialect::CallingConv, "CppCallingConvGenerator", true,
       "{}CallingConvDesc", "", true, "CallingConv" },
-    { GeneratorKind::RegisterInfo, LanguageDialect::RegisterDef, "CppRegisterInfoGenerator", true, "",
+    { GeneratorKind::RegisterInfo, LanguageDialect::TargetDesc, "CppRegisterInfoGenerator", true, "",
       "{}RegisterInfo.h", false, "Target" },
     { GeneratorKind::TargetDesc, LanguageDialect::TargetDesc, "CppTargetDescGenerator", true, "{}TargetDesc", "", true,
       "Target" },
@@ -654,7 +651,6 @@ DriverResult Driver::run()
     bool hasLoadedRules = false;
     std::optional<DSL::Ast::CallingConvDef::CallingConventionDefFile> ccAst;
     std::optional<DSL::Ast::InstructionSelectDef::InstructionSelectFile> isAst;
-    std::optional<DSL::Ast::RegisterDef::RegisterFile> regAst;
     std::optional<DSL::Ast::TargetDesc::TargetDescFile> tdAst;
 
     // Multi-dialect prelude & dependency ingestion
@@ -976,33 +972,6 @@ DriverResult Driver::run()
             break;
         }
 
-        case LanguageDialect::RegisterDef:
-        {
-            regAst = parseCtx.parse<DSL::Parser::RegisterDef::RegisterDefFile, DSL::Ast::RegisterDef::RegisterFile>();
-            if (!regAst.has_value() || errorTracker.hasErrors())
-            {
-                result.success = false;
-                result.errorMessage = "Syntax parsing failed for Register Definition file.";
-                return result;
-            }
-
-            constructCount = regAst->m_banks.size() + regAst->m_specialRegs.size();
-
-            if (m_options.dumpAst)
-            {
-                InfoDumper::dumpRegisterDefAst(*regAst, m_options.format, std::cout);
-            }
-
-            RegisterPass pass;
-            if (!pass.run(&diagCollector, &symbolTable, &regAst.value()) || errorTracker.hasErrors())
-            {
-                result.success = false;
-                result.errorMessage = "Semantic analysis failed for Register Definition file.";
-                return result;
-            }
-            break;
-        }
-
         case LanguageDialect::TargetDesc:
         {
             tdAst = parseCtx.parse<DSL::Parser::TargetDesc::TargetDescFileParser,
@@ -1076,9 +1045,6 @@ DriverResult Driver::run()
                 break;
             case LanguageDialect::CallingConv:
                 gInfo.dialectName = "CallingConv (.ezcc, .ccd)";
-                break;
-            case LanguageDialect::RegisterDef:
-                gInfo.dialectName = "RegisterDef (.reg)";
                 break;
             case LanguageDialect::TargetDesc:
                 gInfo.dialectName = "TargetDesc (.tdesc)";

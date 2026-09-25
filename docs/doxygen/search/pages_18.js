@@ -1,0 +1,28 @@
+var searchData=
+[
+  ['object_20file_0',['3.1 Basic Compilation to Native Object File',['../md_docs_2first__steps.html#autotoc_md68',1,'']]],
+  ['object_20file_20writers_20iobjectwriter_20h_1',['5. Relocatable Object File Writers (&lt;span class=&quot;tt&quot;&gt;IObjectWriter.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_code_emitter.html#autotoc_md138',1,'']]],
+  ['objectformat_20coffwriter_20h_2',['5.2 &lt;span class=&quot;tt&quot;&gt;CoffWriter&lt;/span&gt; (&lt;span class=&quot;tt&quot;&gt;ObjectFormat/CoffWriter.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_code_emitter.html#autotoc_md140',1,'']]],
+  ['objectformat_20elf64writer_20h_3',['5.1 &lt;span class=&quot;tt&quot;&gt;Elf64Writer&lt;/span&gt; (&lt;span class=&quot;tt&quot;&gt;ObjectFormat/Elf64Writer.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_code_emitter.html#autotoc_md139',1,'']]],
+  ['of_20bundled_20examples_4',['2. Walkthrough of Bundled Examples',['../md_docs_2examples.html#autotoc_md32',1,'']]],
+  ['of_20ezpacker_5',['4. Quick Taste of EzPacker',['../index.html#autotoc_md122',1,'']]],
+  ['on_20element_20type_20t_6',['Concept Requirements on Element Type &lt;span class=&quot;tt&quot;&gt;T&lt;/span&gt;',['../md_docs_2projects_2_ez_core.html#autotoc_md189',1,'']]],
+  ['on_20linux_20gcc_20clang_7',['5.2 Linking on Linux (GCC / Clang)',['../md_docs_2first__steps.html#autotoc_md80',1,'']]],
+  ['on_20windows_20msvc_8',['5.3 Linking on Windows (MSVC)',['../md_docs_2first__steps.html#autotoc_md81',1,'']]],
+  ['operand_20miroperand_20h_9',['2.4 &lt;span class=&quot;tt&quot;&gt;MirOperand&lt;/span&gt; (&lt;span class=&quot;tt&quot;&gt;Operand/MirOperand.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_mir.html#autotoc_md242',1,'']]],
+  ['operand_20slot_20classifications_20encslotkind_10',['Operand Slot Classifications (&lt;span class=&quot;tt&quot;&gt;EncSlotKind&lt;/span&gt;)',['../md_docs_2projects_2_ez_targets.html#autotoc_md267',1,'']]],
+  ['operations_11',['Operations',['../md_docs_2projects_2_ez_code_emitter.html#autotoc_md129',1,'2.2 &lt;span class=&quot;tt&quot;&gt;CodeSection&lt;/span&gt; Operations'],['../md_docs_2projects_2_ez_core.html#autotoc_md181',1,'Bitwise, Shift &amp;amp; Slice Operations']]],
+  ['option_20semantics_12',['Detailed Option Semantics',['../md_docs_2projects_2_ez_dsl.html#autotoc_md223',1,'']]],
+  ['options_13',['3. CMake Configuration Options',['../md_docs_2build__guide.html#autotoc_md10',1,'']]],
+  ['options_20commandlineoptions_20h_14',['Exact CLI Options (&lt;span class=&quot;tt&quot;&gt;CommandLineOptions.h&lt;/span&gt;)',['../md_docs_2projects_2_ez_compiler.html#autotoc_md159',1,'']]],
+  ['options_20ezc_15',['6. Command-Line Options (&lt;span class=&quot;tt&quot;&gt;ezc&lt;/span&gt;)',['../md_docs_2projects_2_ez_compiler.html#autotoc_md158',1,'']]],
+  ['options_20reference_16',['Complete Command-Line Options Reference',['../md_docs_2projects_2_ez_dsl.html#autotoc_md222',1,'']]],
+  ['or_20s_17',['4.4 Emitting Human-Readable Assembly (&lt;span class=&quot;tt&quot;&gt;--emit-asm&lt;/span&gt; or &lt;span class=&quot;tt&quot;&gt;-S&lt;/span&gt;)',['../md_docs_2first__steps.html#autotoc_md75',1,'']]],
+  ['output_20management_18',['1. Input and Output Management',['../md_docs_2projects_2_ez_dsl.html#autotoc_md224',1,'']]],
+  ['output_20x86_5f64_20linux_20_3a_19',['Compilation &amp;amp; Output (x86_64 Linux):',['../md_docs_2examples.html#autotoc_md34',1,'']]],
+  ['overflow_20checking_20',['Arithmetic &amp;amp; Overflow Checking',['../md_docs_2projects_2_ez_core.html#autotoc_md180',1,'']]],
+  ['override_20generator_21',['4. Explicit Generator Override (&lt;span class=&quot;tt&quot;&gt;--generator &amp;lt;gen&amp;gt;&lt;/span&gt;)',['../md_docs_2projects_2_ez_dsl.html#autotoc_md227',1,'']]],
+  ['overview_22',['Overview',['../index.html#autotoc_md112',1,'1. Global Architecture Overview'],['../md_docs_2examples.html#autotoc_md30',1,'1. Overview']]],
+  ['overview_20architectural_20role_23',['Overview Architectural Role',['../md_docs_2projects_2_ez_code_emitter.html#autotoc_md125',1,'1. Overview &amp;amp; Architectural Role'],['../md_docs_2projects_2_ez_compiler.html#autotoc_md145',1,'1. Overview &amp;amp; Architectural Role'],['../md_docs_2projects_2_ez_core.html#autotoc_md164',1,'1. Overview &amp;amp; Architectural Role'],['../md_docs_2projects_2_ez_dsl.html#autotoc_md201',1,'1. Overview &amp;amp; Architectural Role'],['../md_docs_2projects_2_ez_mir.html#autotoc_md236',1,'1. Overview &amp;amp; Architectural Role'],['../md_docs_2projects_2_ez_targets.html#autotoc_md259',1,'1. Overview &amp;amp; Architectural Role'],['../md_docs_2projects_2_ez_triple.html#autotoc_md279',1,'1. Overview &amp;amp; Architectural Role']]],
+  ['overviews_24',['🏛️ Subproject Overviews',['../index.html#autotoc_md119',1,'']]]
+];

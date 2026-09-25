@@ -787,6 +787,15 @@ MirToken MirLexer::lexIdentifierOrKeyword(size_t startPos)
         }
     }
 
+    // Built-in vector types (128-bit SSE, 256-bit AVX)
+    if (t == "v4f32" || t == "v2f64" || t == "v16i8" || t == "v8i16" ||
+        t == "v4i32" || t == "v2i64" || t == "v8f32" || t == "v4f64" ||
+        t == "v32i8" || t == "v16i16" || t == "v8i32" || t == "v4i64")
+    {
+        tok.m_kind = MirTokenKind::TypeCustom;
+        return tok;
+    }
+
     tok.m_kind = MirTokenKind::Identifier;
     return tok;
 }

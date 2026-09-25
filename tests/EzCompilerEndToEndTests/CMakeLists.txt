@@ -20,6 +20,10 @@ set(E2E_TESTS
     04_memory_access
     05_recursion_and_calls
     06_phi_and_control_flow
+    07_floating_point
+    08_comparisons
+    09_bitwise_logic
+    10_memory_and_aggregates
 )
 
 set(ALL_E2E_OUTPUTS "")

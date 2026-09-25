@@ -19,7 +19,8 @@ struct TypeKind
                 .map(LEXY_LIT("float"), Ast::TypeDef::TypeKind::FloatingPoint)
                 .map(LEXY_LIT("void"), Ast::TypeDef::TypeKind::Void)
                 .map(LEXY_LIT("bindingToken"), Ast::TypeDef::TypeKind::BindingToken)
-                .map(LEXY_LIT("pointer"), Ast::TypeDef::TypeKind::Pointer);
+                .map(LEXY_LIT("pointer"), Ast::TypeDef::TypeKind::Pointer)
+                .map(LEXY_LIT("vector"), Ast::TypeDef::TypeKind::Vector);
 
     static constexpr auto rule = dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha));
     static constexpr auto value = lexy::forward<Ast::TypeDef::TypeKind>;

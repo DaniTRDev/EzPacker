@@ -78,7 +78,8 @@ struct Category
             .map(LEXY_LIT("Compare"), Ast::IrInstDef::IrInstCategory::Compare)
             .map(LEXY_LIT("ControlFlow"), Ast::IrInstDef::IrInstCategory::ControlFlow)
             .map(LEXY_LIT("Casting"), Ast::IrInstDef::IrInstCategory::Casting)
-            .map(LEXY_LIT("System"), Ast::IrInstDef::IrInstCategory::System);
+            .map(LEXY_LIT("System"), Ast::IrInstDef::IrInstCategory::System)
+            .map(LEXY_LIT("Vector"), Ast::IrInstDef::IrInstCategory::Vector);
 
     static constexpr auto rule = dsl::symbol<Table>(dsl::identifier(dsl::ascii::alpha));
     static constexpr auto value = lexy::forward<Ast::IrInstDef::IrInstCategory>;

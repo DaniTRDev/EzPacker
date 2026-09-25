@@ -142,3 +142,6 @@ fabric.properties
 # Graphifyy
 /graphify-out
 /.agents
+
+# Doxygen generated output
+docs/html/

@@ -85,13 +85,20 @@ TEST_F(EzTripleTestSuite, TestX86_64RegisterBanksAndClasses)
 
     MirRegisterClass *fpr64 = fprBank->getClass("FPR64");
     MirRegisterClass *fpr32 = fprBank->getClass("FPR32");
+    MirRegisterClass *vr128 = fprBank->getClass("VR128");
     ASSERT_NE(fpr64, nullptr);
     ASSERT_NE(fpr32, nullptr);
+    ASSERT_NE(vr128, nullptr);
+    EXPECT_EQ(target.getVr128Class(), vr128);
 
     EXPECT_EQ(fpr64->getRegs().size(), 16u);
     EXPECT_EQ(fpr32->getRegs().size(), 16u);
+    EXPECT_EQ(vr128->getRegs().size(), 16u);
     EXPECT_NE(fpr64->getReg("xmm0"), nullptr);
     EXPECT_NE(fpr64->getReg("xmm15"), nullptr);
+    EXPECT_NE(vr128->getReg("xmm0"), nullptr);
+    EXPECT_NE(vr128->getReg("xmm15"), nullptr);
+    EXPECT_EQ(vr128->getReg("xmm0")->m_bitSize, 128u);
 }
 
 // Verifies the SysV and Win64 conventions with alignment, shadow space, and stack direction.
@@ -270,3 +277,146 @@ TEST_F(EzTripleTestSuite, TestSelectPhiUsesPredecessorMetadata)
     EXPECT_TRUE(hasCopyOfDst(right));
     ASSERT_NE(dst->getRegClass(), nullptr);
 }
+
+// Verifies vector ALU, horizontal, and MOV instructions select to SSE/SSE2/SSE3/SSSE3/SSE4.1 opcodes with VR128.
+TEST_F(EzTripleTestSuite, TestX86_64VectorInstructionSelection)
+{
+    X86_64TargetDesc target(getBuilderCtx());
+    target.initialize();
+
+    auto *ctx = getBuilderCtx();
+    auto *tt = ctx->getTypeTable();
+    auto *func = createTestFunction("test_vector_isel", tt->_void());
+    auto *entry = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    // 1. v4f32 VADD with SSE (enabled by default) -> ADDPSrr
+    auto *v4f32Type = tt->v4f32();
+    auto *dst1 = ob.buildVReg(v4f32Type, "dst1");
+    auto *src1a = ob.buildVReg(v4f32Type, "src1a");
+    auto *src1b = ob.buildVReg(v4f32Type, "src1b");
+    auto *inst1 = ib.VADD(dst1, src1a, src1b);
+
+    MirInstructionSelector *isel = target.getInstructionSelector();
+    ASSERT_NE(isel, nullptr);
+    ASSERT_TRUE(isel->select(ctx, inst1));
+
+    EXPECT_TRUE(inst1->isErased());
+    auto &instrs = entry->getInstructions();
+    ASSERT_FALSE(instrs.empty());
+    MirInstruction *selected1 = instrs.back();
+    ASSERT_NE(selected1->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected1->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::ADDPSrr));
+    EXPECT_STREQ(selected1->getTargetDesc()->getName(), "ADDPSrr");
+    EXPECT_EQ(dst1->getRegClass(), target.getVr128Class());
+    EXPECT_EQ(src1a->getRegClass(), target.getVr128Class());
+    EXPECT_EQ(src1b->getRegClass(), target.getVr128Class());
+
+    // 2. v2f64 VADD with SSE2 (enabled by default) -> ADDPDrr
+    auto *v2f64Type = tt->v2f64();
+    auto *dst2 = ob.buildVReg(v2f64Type, "dst2");
+    auto *src2a = ob.buildVReg(v2f64Type, "src2a");
+    auto *src2b = ob.buildVReg(v2f64Type, "src2b");
+    auto *inst2 = ib.VADD(dst2, src2a, src2b);
+
+    ASSERT_TRUE(isel->select(ctx, inst2));
+    EXPECT_TRUE(inst2->isErased());
+    MirInstruction *selected2 = instrs.back();
+    ASSERT_NE(selected2->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected2->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::ADDPDrr));
+
+    // 3. v4i32 VADD with SSE2 (enabled by default) -> PADDDrr
+    auto *v4i32Type = tt->v4i32();
+    auto *dst3 = ob.buildVReg(v4i32Type, "dst3");
+    auto *src3a = ob.buildVReg(v4i32Type, "src3a");
+    auto *src3b = ob.buildVReg(v4i32Type, "src3b");
+    auto *inst3 = ib.VADD(dst3, src3a, src3b);
+
+    ASSERT_TRUE(isel->select(ctx, inst3));
+    EXPECT_TRUE(inst3->isErased());
+    MirInstruction *selected3 = instrs.back();
+    ASSERT_NE(selected3->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected3->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::PADDDrr));
+
+    // 4. v4f32 VHADD with SSE3 (requires sse3) -> HADDPSrr
+    EXPECT_FALSE(target.hasExtension("sse3"));
+    auto *inst4 = ib.VHADD(dst1, src1a, src1b);
+    EXPECT_FALSE(isel->select(ctx, inst4)); // rejected without sse3
+
+    EXPECT_TRUE(target.getExtensionSet().enable("sse3"));
+    EXPECT_TRUE(target.hasExtension("sse3"));
+    ASSERT_TRUE(isel->select(ctx, inst4));
+    EXPECT_TRUE(inst4->isErased());
+    MirInstruction *selected4 = instrs.back();
+    ASSERT_NE(selected4->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected4->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::HADDPSrr));
+
+    // 5. v4i32 VHADD with SSSE3 (requires ssse3) -> PHADDDrr
+    EXPECT_FALSE(target.hasExtension("ssse3"));
+    auto *inst5 = ib.VHADD(dst3, src3a, src3b);
+    EXPECT_FALSE(isel->select(ctx, inst5)); // rejected without ssse3
+
+    EXPECT_TRUE(target.getExtensionSet().enable("ssse3"));
+    EXPECT_TRUE(target.hasExtension("ssse3"));
+    ASSERT_TRUE(isel->select(ctx, inst5));
+    EXPECT_TRUE(inst5->isErased());
+    MirInstruction *selected5 = instrs.back();
+    ASSERT_NE(selected5->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected5->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::PHADDDrr));
+
+    // 6. v4i32 VMUL with SSE4.1 (requires sse4_1) -> PMULLDrr
+    EXPECT_FALSE(target.hasExtension("sse4_1"));
+    auto *inst6 = ib.VMUL(dst3, src3a, src3b);
+    EXPECT_FALSE(isel->select(ctx, inst6)); // rejected without sse4_1
+
+    EXPECT_TRUE(target.getExtensionSet().enable("sse4_1"));
+    EXPECT_TRUE(target.hasExtension("sse4_1"));
+    ASSERT_TRUE(isel->select(ctx, inst6));
+    EXPECT_TRUE(inst6->isErased());
+    MirInstruction *selected6 = instrs.back();
+    ASSERT_NE(selected6->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected6->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::PMULLDrr));
+
+    // 7. Vector MOV on v4f32 -> MOVAPSrr
+    auto *dstMove = ob.buildVReg(v4f32Type, "dstMove");
+    auto *inst7 = ib.MOV(dstMove, src1a);
+    ASSERT_TRUE(isel->select(ctx, inst7));
+    EXPECT_TRUE(inst7->isErased());
+    MirInstruction *selected7 = instrs.back();
+    ASSERT_NE(selected7->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected7->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::MOVAPSrr));
+    EXPECT_EQ(dstMove->getRegClass(), target.getVr128Class());
+}
+
+// Verifies that disabling an extension prevents selection of instructions guarded by that extension.
+TEST_F(EzTripleTestSuite, TestX86_64VectorInstructionSelectionExtensionGuards)
+{
+    X86_64TargetDesc target(getBuilderCtx());
+    target.initialize();
+
+    auto *ctx = getBuilderCtx();
+    auto *tt = ctx->getTypeTable();
+    auto *func = createTestFunction("test_vector_guards", tt->_void());
+    auto *entry = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    // Disable sse4_1
+    EXPECT_TRUE(target.getExtensionSet().disable("sse4_1"));
+    EXPECT_FALSE(target.hasExtension("sse4_1"));
+
+    auto *v4i32Type = tt->v4i32();
+    auto *dst = ob.buildVReg(v4i32Type, "dst");
+    auto *src1 = ob.buildVReg(v4i32Type, "src1");
+    auto *src2 = ob.buildVReg(v4i32Type, "src2");
+
+    // VMUL on v4i32 requires sse4_1, should fail selection
+    auto *inst = ib.VMUL(dst, src1, src2);
+    MirInstructionSelector *isel = target.getInstructionSelector();
+    ASSERT_NE(isel, nullptr);
+    EXPECT_FALSE(isel->select(ctx, inst));
+}
+

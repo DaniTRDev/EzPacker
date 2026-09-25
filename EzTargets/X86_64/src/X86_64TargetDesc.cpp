@@ -16,6 +16,7 @@
 #include "X86_64RelocationResolver.h"
 #include "X86_64CodeEmitter.h"
 #include "Instruction/MirTargetInstructionDesc.h"
+#include "x86_64RegisterInfo.h"
 
 namespace EzTargets::X86_64
 {
@@ -32,6 +33,7 @@ X86_64TargetDesc::X86_64TargetDesc(MirBuilderContext *ctx) :
     m_extensions.registerExtension("sse2", "Streaming SIMD Extensions 2", true, { "sse" });
     m_extensions.registerExtension("sse3", "Streaming SIMD Extensions 3", false, { "sse2" });
     m_extensions.registerExtension("ssse3", "Supplemental Streaming SIMD Extensions 3", false, { "sse3" });
+    m_extensions.registerExtension("sse4a", "AMD Streaming SIMD Extensions 4a", false, { "sse3" });
     m_extensions.registerExtension("sse4_1", "Streaming SIMD Extensions 4.1", false, { "ssse3" });
     m_extensions.registerExtension("sse4.1", "Streaming SIMD Extensions 4.1", false, { "sse4_1" });
     m_extensions.registerExtension("sse4_2", "Streaming SIMD Extensions 4.2", false, { "sse4_1" });
@@ -61,86 +63,30 @@ void X86_64TargetDesc::initialize()
 
     auto *alloc = m_ctx->getGlobalAllocator();
 
-    // 1. Create Register Banks
-    std::pmr::polymorphic_allocator<MirRegisterBank> bankAlloc(alloc);
-    std::pmr::polymorphic_allocator<MirRegisterClass> classAlloc(alloc);
-
-    m_gprBank = bankAlloc.new_object<MirRegisterBank>("GPR", alloc);
-    m_fprBank = bankAlloc.new_object<MirRegisterBank>("FPR", alloc);
-
-    // 2. Create Register Classes
-    m_gpr64 = classAlloc.new_object<MirRegisterClass>("GPR64", m_gprBank, alloc);
-    m_gpr32 = classAlloc.new_object<MirRegisterClass>("GPR32", m_gprBank, alloc);
-    m_gpr16 = classAlloc.new_object<MirRegisterClass>("GPR16", m_gprBank, alloc);
-    m_gpr8 = classAlloc.new_object<MirRegisterClass>("GPR8", m_gprBank, alloc);
-
-    m_gprBank->addClass("GPR64", m_gpr64);
-    m_gprBank->addClass("GPR32", m_gpr32);
-    m_gprBank->addClass("GPR16", m_gpr16);
-    m_gprBank->addClass("GPR8", m_gpr8);
-
-    m_fpr64 = classAlloc.new_object<MirRegisterClass>("FPR64", m_fprBank, alloc);
-    m_fpr32 = classAlloc.new_object<MirRegisterClass>("FPR32", m_fprBank, alloc);
-
-    m_fprBank->addClass("FPR64", m_fpr64);
-    m_fprBank->addClass("FPR32", m_fpr32);
-
-    m_banks.clear();
-    m_banks.push_back(m_gprBank);
-    m_banks.push_back(m_fprBank);
-
-    // 3. Register GPRs in exact hardware encoding order (0..15):
-    //    RAX=0, RCX=1, RDX=2, RBX=3, RSP=4, RBP=5, RSI=6, RDI=7,
-    //    R8=8,  R9=9,  R10=10, R11=11, R12=12, R13=13, R14=14, R15=15
-    struct GprDef
+    // 1-4. Register Banks and Classes
+    m_banks = EzTargets::TableGen::x86_64::initializeRegisterBanks(alloc);
+    for (auto *b : m_banks)
     {
-        std::string_view name64;
-        std::string_view name32;
-        std::string_view name16;
-        std::string_view name8;
-    };
-
-    static constexpr GprDef s_gprs[] = {
-        { "rax", "eax", "ax", "al" },      // 0
-        { "rcx", "ecx", "cx", "cl" },      // 1
-        { "rdx", "edx", "dx", "dl" },      // 2
-        { "rbx", "ebx", "bx", "bl" },      // 3
-        { "rsp", "esp", "sp", "spl" },     // 4
-        { "rbp", "ebp", "bp", "bpl" },     // 5
-        { "rsi", "esi", "si", "sil" },     // 6
-        { "rdi", "edi", "di", "dil" },     // 7
-        { "r8", "r8d", "r8w", "r8b" },     // 8
-        { "r9", "r9d", "r9w", "r9b" },     // 9
-        { "r10", "r10d", "r10w", "r10b" }, // 10
-        { "r11", "r11d", "r11w", "r11b" }, // 11
-        { "r12", "r12d", "r12w", "r12b" }, // 12
-        { "r13", "r13d", "r13w", "r13b" }, // 13
-        { "r14", "r14d", "r14w", "r14b" }, // 14
-        { "r15", "r15d", "r15w", "r15b" }, // 15
-    };
-
-    for (const auto &gpr : s_gprs)
-    {
-        m_gpr8->addRegister(gpr.name8, 8, 0, {});
-        m_gpr16->addRegister(gpr.name16, 16, 0, { m_gpr8->getReg(gpr.name8) });
-        m_gpr32->addRegister(gpr.name32, 32, 0, { m_gpr16->getReg(gpr.name16) });
-        m_gpr64->addRegister(gpr.name64, 64, 0, { m_gpr32->getReg(gpr.name32) });
-    }
-
-    // 4. Register FPRs (xmm0..xmm15)
-    static constexpr std::string_view s_xmms[] = {
-        "xmm0", "xmm1", "xmm2",  "xmm3",  "xmm4",  "xmm5",  "xmm6",  "xmm7",
-        "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
-    };
-    for (const auto &xmm : s_xmms)
-    {
-        m_fpr32->addRegister(xmm, 32, 0, {});
-        m_fpr64->addRegister(xmm, 64, 0, { m_fpr32->getReg(xmm) });
+        if (std::string_view(b->getName()) == "GPR")
+        {
+            m_gprBank = b;
+            m_gpr64 = b->getClass("GPR64");
+            m_gpr32 = b->getClass("GPR32");
+            m_gpr16 = b->getClass("GPR16");
+            m_gpr8 = b->getClass("GPR8");
+        }
+        else if (std::string_view(b->getName()) == "FPR")
+        {
+            m_fprBank = b;
+            m_fpr64 = b->getClass("FPR64");
+            m_fpr32 = b->getClass("FPR32");
+            m_vr128 = b->getClass("VR128");
+        }
     }
 
     // 5. Calling Conventions
-    m_sysVConv = std::make_unique<SysV_AMD64CallingConvDesc>(m_ctx, m_gpr64);
-    m_win64Conv = std::make_unique<Win64CallingConvDesc>(m_ctx, m_gpr64);
+    m_sysVConv = std::make_unique<SysV_AMD64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);
+    m_win64Conv = std::make_unique<Win64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);
 
     m_convs.clear();
     m_convs.push_back(m_sysVConv.get());
@@ -193,10 +139,10 @@ MirRegisterAllocator *X86_64TargetDesc::getRegisterAllocator() { return m_regAll
 /// Memory displacements are 64-bit integers on x86-64.
 MirType *X86_64TargetDesc::getMemOperandDisplacementType() { return m_ctx ? m_ctx->getTypeTable()->i64() : nullptr; }
 
-/// Returns a pseudo register reference for RIP, encoded as GPR64 slot 16.
+/// Returns a pseudo register reference for RIP, retrieved from the generated register metadata.
 MirRegisterRef X86_64TargetDesc::getInstructionPtrReg() const
 {
-    return MirRegisterRef(m_gpr64, 16); // rip pseudo-ref
+    return MirRegisterRef(m_gpr64, EzTargets::TableGen::x86_64::getSpecialRegId("rip"));
 }
 
 /// Maps a legality-table libcall symbol id to the runtime symbol name it should call.

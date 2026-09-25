@@ -9,7 +9,6 @@ namespace DSL::Ast::RegisterDef
 struct RegisterBankDecl;
 struct RegisterClassDecl;
 struct RegisterDecl;
-struct RegisterFile;
 struct SpecialRegDecl;
 } // namespace DSL::Ast::RegisterDef
 
@@ -17,9 +16,9 @@ namespace Symbols
 {
 
 /**
- * Semantic symbol for a `register_bank` declaration (.reg).
+ * Semantic symbol for a `register_bank` declaration (.tdesc).
  * The flattened name/target fields are retained for consumers and tests; code generation resolves
- * banks through the RegisterFileSymbol's AST node.
+ * banks through the TargetDescSymbol's AST node.
  */
 struct RegisterBankSymbol
 {
@@ -29,7 +28,7 @@ struct RegisterBankSymbol
 };
 
 /**
- * Semantic symbol for a register class declared inside a bank (.reg).
+ * Semantic symbol for a register class declared inside a bank (.tdesc).
  * The first three fields mirror the AST for consumers/tests; code generation reads m_astNode.
  */
 struct RegisterClassSymbol
@@ -41,7 +40,7 @@ struct RegisterClassSymbol
 };
 
 /**
- * Semantic symbol for a physical register declaration (.reg), including its explicit
+ * Semantic symbol for a physical register declaration (.tdesc), including its explicit
  * hardware encoding. The scalar fields mirror the AST for consumers/tests; the register-info
  * generator resolves registers through the backing AST node.
  */
@@ -63,15 +62,6 @@ struct SpecialRegisterSymbol
     std::string_view m_target;                                         // Target it belongs to.
     uint32_t m_id{ 0 };                                                // Reserved pseudo-register id.
     const DSL::Ast::RegisterDef::SpecialRegDecl *m_astNode{ nullptr }; // Backing AST declaration.
-};
-
-/**
- * Root symbol holding the whole parsed register file, used by the register-info generator.
- */
-struct RegisterFileSymbol
-{
-    std::string_view m_target;                                       // Target described by the file.
-    const DSL::Ast::RegisterDef::RegisterFile *m_astNode{ nullptr }; // Backing AST root.
 };
 
 } // namespace Symbols

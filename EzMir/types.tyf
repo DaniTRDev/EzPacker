@@ -20,3 +20,19 @@ integer i256(256);
 float f32(32);
 float f64(64);
 float f128(128);
+
+// Vector Types (128-bit SSE)
+vector v4f32(128, 128);
+vector v2f64(128, 128);
+vector v16i8(128, 128);
+vector v8i16(128, 128);
+vector v4i32(128, 128);
+vector v2i64(128, 128);
+
+// Vector Types (256-bit AVX)
+vector v8f32(256, 256);
+vector v4f64(256, 256);
+vector v32i8(256, 256);
+vector v16i16(256, 256);
+vector v8i32(256, 256);
+vector v4i64(256, 256);

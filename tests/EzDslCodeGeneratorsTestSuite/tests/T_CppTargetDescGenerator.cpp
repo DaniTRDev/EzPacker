@@ -251,7 +251,9 @@ TEST_F(CppTargetDescGeneratorTest, ParsesAndGeneratesRealX86_64Tdesc)
     std::string header = readFileContent(headerPath);
     std::string source = readFileContent(sourcePath);
 
-    EXPECT_NE(header.find("s_targetExtensionCount = 8;"), std::string::npos);
+    EXPECT_NE(header.find("s_targetExtensionCount = 9;"), std::string::npos);
+    EXPECT_NE(source.find("m_extensions.registerExtension(\"sse4a\", \"AMD Streaming SIMD Extensions 4a (SSE4a)\", false, {\"sse3\"})"),
+              std::string::npos);
     EXPECT_NE(source.find("m_extensions.registerExtension(\"avx2\", \"Advanced Vector Extensions 2 (AVX2)\", false, {\"avx\"})"),
               std::string::npos);
 }

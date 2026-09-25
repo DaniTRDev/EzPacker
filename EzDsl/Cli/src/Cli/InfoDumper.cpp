@@ -6,7 +6,6 @@
 #include "Ast/LegalizeRuleDefLangAst.h"
 #include "Ast/TypeDefLangAst.h"
 #include "Ast/CallingConvDefLangAst.h"
-#include "Ast/RegisterDefLangAst.h"
 #include "Ast/TargetDescDefLangAst.h"
 
 #include "Sema/Symbol.h"
@@ -60,8 +59,6 @@ constexpr SymbolTypeLabels symbolTypeLabels(SymbolType type) noexcept
             return { "SelectionPattern", "SelectionPattern" };
         case SymbolType::CallingConv:
             return { "CallingConv", "CallingConv" };
-        case SymbolType::RegisterFile:
-            return { "RegisterFile", "RegisterFile" };
         case SymbolType::RegisterBank:
             return { "RegisterBank", "RegisterBank" };
         case SymbolType::RegisterClass:
@@ -715,19 +712,54 @@ void InfoDumper::dumpCallingConvAst(const DSL::Ast::CallingConvDef::CallingConve
     }
 }
 
-// Dumps the parsed .reg bank/class/register hierarchy and special registers.
-void InfoDumper::dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &file,
-                                    OutputFormat format,
-                                    std::ostream &os)
+// Dumps the parsed .tdesc manifest: formats, components, libcalls and ABI settings.
+void InfoDumper::dumpTargetDescAst(const DSL::Ast::TargetDesc::TargetDescFile &file,
+                                   OutputFormat format,
+                                   std::ostream &os)
 {
     if (format == OutputFormat::Json)
     {
         os << "{\n";
-        os << std::format("  \"target\": \"{}\",\n", escapeJson(file.m_target.m_node));
-        os << "  \"banks\": [\n";
-        for (size_t b = 0; b < file.m_banks.size(); ++b)
+        os << std::format("  \"target\": \"{}\",\n", escapeJson(file.m_name.m_node));
+        os << std::format("  \"pointer_size\": {},\n", file.m_pointerSize ? file.m_pointerSize->m_node : 0);
+        os << std::format("  \"stack_slot\": {},\n", file.m_stackSlot ? file.m_stackSlot->m_node : 0);
+        os << std::format("  \"instruction_pointer\": \"{}\",\n",
+                          file.mInstructionPointer ? escapeJson(file.mInstructionPointer->m_node) : "");
+        os << std::format("  \"default_calling_conv\": \"{}\",\n",
+                          file.mDefaultCallingConv ? escapeJson(file.mDefaultCallingConv->m_node) : "");
+        os << "  \"object_formats\": [";
+        for (size_t i = 0; i < file.mObjectFormats.size(); ++i)
         {
-            const auto &bank = file.m_banks[b];
+            os << std::format("\"{}\"", escapeJson(file.mObjectFormats[i].m_node));
+            if (i + 1 < file.mObjectFormats.size())
+                os << ", ";
+        }
+        os << "],\n";
+        os << "  \"components\": [";
+        for (size_t i = 0; i < file.mComponents.size(); ++i)
+        {
+            os << std::format("{{ \"slot\": \"{}\", \"type\": \"{}\" }}",
+                              escapeJson(file.mComponents[i].m_slot.m_node),
+                              escapeJson(file.mComponents[i].m_type.m_node));
+            if (i + 1 < file.mComponents.size())
+                os << ", ";
+        }
+        os << "],\n";
+        os << "  \"libcalls\": [";
+        for (size_t i = 0; i < file.mLibcalls.size(); ++i)
+        {
+            os << std::format("{{ \"id\": \"{}\", \"symbol\": \"{}\" }}",
+                              escapeJson(file.mLibcalls[i].m_name.m_node),
+                              escapeJson(file.mLibcalls[i].m_symbol.m_node));
+            if (i + 1 < file.mLibcalls.size())
+                os << ", ";
+        }
+        os << "],\n";
+
+        os << "  \"banks\": [\n";
+        for (size_t b = 0; b < file.m_registerBanks.size(); ++b)
+        {
+            const auto &bank = file.m_registerBanks[b];
             os << "    {\n";
             os << std::format("      \"name\": \"{}\",\n", escapeJson(bank.m_name.m_node));
 
@@ -773,7 +805,7 @@ void InfoDumper::dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &f
                 os << (r + 1 < bank.m_registers.size() ? "        },\n" : "        }\n");
             }
             os << "      ]\n";
-            os << (b + 1 < file.m_banks.size() ? "    },\n" : "    }\n");
+            os << (b + 1 < file.m_registerBanks.size() ? "    },\n" : "    }\n");
         }
         os << "  ],\n";
 
@@ -784,88 +816,6 @@ void InfoDumper::dumpRegisterDefAst(const DSL::Ast::RegisterDef::RegisterFile &f
                               escapeJson(file.m_specialRegs[s].m_name.m_node),
                               file.m_specialRegs[s].m_id.m_node);
             if (s + 1 < file.m_specialRegs.size())
-                os << ", ";
-        }
-        os << "]\n";
-        os << "}\n";
-    }
-    else
-    {
-        os << "======================================================================\n";
-        os << std::format("RegisterDef AST Dump (target: {}, {} banks)\n", file.m_target.m_node, file.m_banks.size());
-        os << "======================================================================\n";
-        for (const auto &bank : file.m_banks)
-        {
-            os << std::format("  Bank: {} ({} classes, {} registers)\n",
-                              bank.m_name.m_node,
-                              bank.m_classes.size(),
-                              bank.m_registers.size());
-            for (const auto &cls : bank.m_classes)
-            {
-                os << std::format("    Class: {:<12} {} bits\n", cls.m_name.m_node, cls.m_bitSize.m_node);
-            }
-            for (const auto &edge : bank.m_subRegisterEdges)
-            {
-                os << std::format("    Sub: {} <: {}\n", edge.m_wideClass.m_node, edge.m_narrowClass.m_node);
-            }
-            for (const auto &reg : bank.m_registers)
-            {
-                os << std::format("    Reg: {:<12} enc {:<3}", reg.m_canonicalName.m_node, reg.m_encoding.m_node);
-                for (const auto &name : reg.m_names)
-                {
-                    os << std::format(" [{}: {}]", name.m_asmName.m_node, name.m_className.m_node);
-                }
-                os << "\n";
-            }
-        }
-        for (const auto &special : file.m_specialRegs)
-        {
-            os << std::format("  Special: {} = {}\n", special.m_name.m_node, special.m_id.m_node);
-        }
-        os << "======================================================================\n";
-    }
-}
-
-// Dumps the parsed .tdesc manifest: formats, components, libcalls and ABI settings.
-void InfoDumper::dumpTargetDescAst(const DSL::Ast::TargetDesc::TargetDescFile &file,
-                                   OutputFormat format,
-                                   std::ostream &os)
-{
-    if (format == OutputFormat::Json)
-    {
-        os << "{\n";
-        os << std::format("  \"target\": \"{}\",\n", escapeJson(file.m_name.m_node));
-        os << std::format("  \"pointer_size\": {},\n", file.m_pointerSize ? file.m_pointerSize->m_node : 0);
-        os << std::format("  \"stack_slot\": {},\n", file.m_stackSlot ? file.m_stackSlot->m_node : 0);
-        os << std::format("  \"instruction_pointer\": \"{}\",\n",
-                          file.mInstructionPointer ? escapeJson(file.mInstructionPointer->m_node) : "");
-        os << std::format("  \"default_calling_conv\": \"{}\",\n",
-                          file.mDefaultCallingConv ? escapeJson(file.mDefaultCallingConv->m_node) : "");
-        os << "  \"object_formats\": [";
-        for (size_t i = 0; i < file.mObjectFormats.size(); ++i)
-        {
-            os << std::format("\"{}\"", escapeJson(file.mObjectFormats[i].m_node));
-            if (i + 1 < file.mObjectFormats.size())
-                os << ", ";
-        }
-        os << "],\n";
-        os << "  \"components\": [";
-        for (size_t i = 0; i < file.mComponents.size(); ++i)
-        {
-            os << std::format("{{ \"slot\": \"{}\", \"type\": \"{}\" }}",
-                              escapeJson(file.mComponents[i].m_slot.m_node),
-                              escapeJson(file.mComponents[i].m_type.m_node));
-            if (i + 1 < file.mComponents.size())
-                os << ", ";
-        }
-        os << "],\n";
-        os << "  \"libcalls\": [";
-        for (size_t i = 0; i < file.mLibcalls.size(); ++i)
-        {
-            os << std::format("{{ \"id\": \"{}\", \"symbol\": \"{}\" }}",
-                              escapeJson(file.mLibcalls[i].m_name.m_node),
-                              escapeJson(file.mLibcalls[i].m_symbol.m_node));
-            if (i + 1 < file.mLibcalls.size())
                 os << ", ";
         }
         os << "]\n";
@@ -901,6 +851,34 @@ void InfoDumper::dumpTargetDescAst(const DSL::Ast::TargetDesc::TargetDescFile &f
         for (const auto &libcall : file.mLibcalls)
         {
             os << std::format("    - {}: {}\n", libcall.m_name.m_node, libcall.m_symbol.m_node);
+        }
+        for (const auto &bank : file.m_registerBanks)
+        {
+            os << std::format("  Bank: {} ({} classes, {} registers)\n",
+                              bank.m_name.m_node,
+                              bank.m_classes.size(),
+                              bank.m_registers.size());
+            for (const auto &cls : bank.m_classes)
+            {
+                os << std::format("    Class: {:<12} {} bits\n", cls.m_name.m_node, cls.m_bitSize.m_node);
+            }
+            for (const auto &edge : bank.m_subRegisterEdges)
+            {
+                os << std::format("    Sub: {} <: {}\n", edge.m_wideClass.m_node, edge.m_narrowClass.m_node);
+            }
+            for (const auto &reg : bank.m_registers)
+            {
+                os << std::format("    Reg: {:<12} enc {:<3}", reg.m_canonicalName.m_node, reg.m_encoding.m_node);
+                for (const auto &nameBinding : reg.m_names)
+                {
+                    os << std::format(" [{}: {}]", nameBinding.m_asmName.m_node, nameBinding.m_className.m_node);
+                }
+                os << "\n";
+            }
+        }
+        for (const auto &special : file.m_specialRegs)
+        {
+            os << std::format("  Special: {} = {}\n", special.m_name.m_node, special.m_id.m_node);
         }
         os << "======================================================================\n";
     }

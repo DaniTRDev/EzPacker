@@ -1,0 +1,164 @@
+; Test Suite: 09_bitwise_logic.mir
+; Tests bitwise logic operations (AND, OR, XOR), bit manipulation algorithms,
+; De Morgan's laws, bitwise multiplexing, power-of-two tests, and Kernighan's popcount loop.
+
+fn @bitwise_and_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = AND i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @bitwise_or_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = OR i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @bitwise_xor_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %res = XOR i32 %a, %b;
+    RET i32 %res;
+}
+
+fn @bitwise_not_32(i32 %a) -> i32 {
+entry:
+    %all_ones = MOV i32 -1;
+    %res = XOR i32 %a, %all_ones;
+    RET i32 %res;
+}
+
+fn @bitwise_nand_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %and_val = AND i32 %a, %b;
+    %all_ones = MOV i32 -1;
+    %res = XOR i32 %and_val, %all_ones;
+    RET i32 %res;
+}
+
+fn @bitwise_nor_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %or_val = OR i32 %a, %b;
+    %all_ones = MOV i32 -1;
+    %res = XOR i32 %or_val, %all_ones;
+    RET i32 %res;
+}
+
+fn @bitwise_xnor_32(i32 %a, i32 %b) -> i32 {
+entry:
+    %xor_val = XOR i32 %a, %b;
+    %all_ones = MOV i32 -1;
+    %res = XOR i32 %xor_val, %all_ones;
+    RET i32 %res;
+}
+
+fn @bitwise_mux_32(i32 %sel, i32 %a, i32 %b) -> i32 {
+entry:
+    %a_part = AND i32 %sel, %a;
+    %all_ones = MOV i32 -1;
+    %not_sel = XOR i32 %sel, %all_ones;
+    %b_part = AND i32 %not_sel, %b;
+    %res = OR i32 %a_part, %b_part;
+    RET i32 %res;
+}
+
+fn @isolate_lowest_bit_32(i32 %x) -> i32 {
+entry:
+    %zero = MOV i32 0;
+    %neg_x = SUB i32 %zero, %x;
+    %res = AND i32 %x, %neg_x;
+    RET i32 %res;
+}
+
+fn @clear_lowest_bit_32(i32 %x) -> i32 {
+entry:
+    %one = MOV i32 1;
+    %x_minus_one = SUB i32 %x, %one;
+    %res = AND i32 %x, %x_minus_one;
+    RET i32 %res;
+}
+
+fn @is_power_of_two_32(i32 %x) -> i32 {
+entry:
+    %zero = MOV i32 0;
+    %is_pos = CMP_SGT i1 %x, %zero;
+    BR_COND %is_pos, label %check_bits, label %ret_non_pos;
+
+check_bits:
+    %one = MOV i32 1;
+    %x_minus_one = SUB i32 %x, %one;
+    %cleared = AND i32 %x, %x_minus_one;
+    %is_zero = CMP_EQ i1 %cleared, %zero;
+    BR_COND %is_zero, label %ret_true, label %ret_not_power;
+
+ret_true:
+    %one_res = MOV i32 1;
+    RET i32 %one_res;
+
+ret_non_pos:
+    %zero1 = MOV i32 0;
+    RET i32 %zero1;
+
+ret_not_power:
+    %zero2 = MOV i32 0;
+    RET i32 %zero2;
+}
+
+fn @popcount_32(i32 %x) -> i32 {
+entry:
+    %zero = MOV i32 0;
+    %one = MOV i32 1;
+    %init_is_zero = CMP_EQ i1 %x, %zero;
+    BR_COND %init_is_zero, label %exit_zero, label %loop_header;
+
+exit_zero:
+    RET i32 %zero;
+
+loop_header:
+    %curr_x = PHI i32 [%x, %entry], [%next_x, %loop_body];
+    %curr_count = PHI i32 [%zero, %entry], [%next_count, %loop_body];
+    %x_minus_one = SUB i32 %curr_x, %one;
+    %next_x = AND i32 %curr_x, %x_minus_one;
+    %next_count = ADD i32 %curr_count, %one;
+    %still_has_bits = CMP_NE i1 %next_x, %zero;
+    BR_COND %still_has_bits, label %loop_body, label %loop_exit;
+
+loop_body:
+    BR label %loop_header;
+
+loop_exit:
+    RET i32 %next_count;
+}
+
+fn @bitwise_and_64(i64 %a, i64 %b) -> i64 {
+entry:
+    %res = AND i64 %a, %b;
+    RET i64 %res;
+}
+
+fn @bitwise_or_64(i64 %a, i64 %b) -> i64 {
+entry:
+    %res = OR i64 %a, %b;
+    RET i64 %res;
+}
+
+fn @bitwise_xor_64(i64 %a, i64 %b) -> i64 {
+entry:
+    %res = XOR i64 %a, %b;
+    RET i64 %res;
+}
+
+fn @isolate_lowest_bit_64(i64 %x) -> i64 {
+entry:
+    %zero = MOV i64 0;
+    %neg_x = SUB i64 %zero, %x;
+    %res = AND i64 %x, %neg_x;
+    RET i64 %res;
+}
+
+fn @clear_lowest_bit_64(i64 %x) -> i64 {
+entry:
+    %one = MOV i64 1;
+    %x_minus_one = SUB i64 %x, %one;
+    %res = AND i64 %x, %x_minus_one;
+    RET i64 %res;
+}

@@ -186,6 +186,30 @@ MirType *MirParserContext::resolveType(const Ast::MirAstType *astType)
                 return tt->__bindToken();
             if (name == "ptr")
                 return tt->getPtr(tt->i8());
+            if (name == "v4f32")
+                return tt->v4f32();
+            if (name == "v2f64")
+                return tt->v2f64();
+            if (name == "v16i8")
+                return tt->v16i8();
+            if (name == "v8i16")
+                return tt->v8i16();
+            if (name == "v4i32")
+                return tt->v4i32();
+            if (name == "v2i64")
+                return tt->v2i64();
+            if (name == "v8f32")
+                return tt->v8f32();
+            if (name == "v4f64")
+                return tt->v4f64();
+            if (name == "v32i8")
+                return tt->v32i8();
+            if (name == "v16i16")
+                return tt->v16i16();
+            if (name == "v8i32")
+                return tt->v8i32();
+            if (name == "v4i64")
+                return tt->v4i64();
 
             // Dynamic arbitrary-width integer types: iN (e.g. i48, i512, i1024, i65535)
             if (name.size() > 1 && name[0] == 'i')

@@ -84,6 +84,36 @@ bool TypePass::run(class DiagnosticCollector *collector, class SymbolTable *tabl
                 break;
             }
 
+            case DSL::Ast::TypeDef::TypeKind::Vector:
+            {
+                if (!type.m_bitSize.has_value())
+                {
+                    collector->error(passName,
+                                     "Vector type '{}' requires an explicit bit size (e.g., '{}(128)').",
+                                     typeName,
+                                     typeName)
+                            << type.m_name.m_sourceRef;
+                    hasErrors = true;
+                    continue;
+                }
+
+                auto bitSize = type.m_bitSize->m_node;
+                if (bitSize != 64 && bitSize != 128 && bitSize != 256 && bitSize != 512 && bitSize != 1024)
+                {
+                    collector->error(
+                            passName,
+                            "Unsupported vector width {} for type '{}'. Supported widths: 64, 128, 256, 512, 1024.",
+                            bitSize,
+                            typeName)
+                            << type.m_bitSize->m_sourceRef;
+                    hasErrors = true;
+                    continue;
+                }
+
+                resolvedBitWidth = static_cast<uint32_t>(bitSize);
+                break;
+            }
+
             case DSL::Ast::TypeDef::TypeKind::Void:
             case DSL::Ast::TypeDef::TypeKind::BindingToken:
             case DSL::Ast::TypeDef::TypeKind::Pointer:

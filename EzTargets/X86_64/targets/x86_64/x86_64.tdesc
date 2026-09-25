@@ -11,6 +11,56 @@ target X86_64 {
     object_formats: [ELF, COFF];
     default_calling_conv: SysV_AMD64;
 
+    register_bank GPR {
+        classes { GPR8: 8, GPR16: 16, GPR32: 32, GPR64: 64 }
+        sub_register { GPR16 <: GPR8, GPR32 <: GPR16, GPR64 <: GPR32 }
+        registers {
+            rax enc 0  names { rax: GPR64, eax: GPR32, ax: GPR16, al: GPR8 }
+            rcx enc 1  names { rcx: GPR64, ecx: GPR32, cx: GPR16, cl: GPR8 }
+            rdx enc 2  names { rdx: GPR64, edx: GPR32, dx: GPR16, dl: GPR8 }
+            rbx enc 3  names { rbx: GPR64, ebx: GPR32, bx: GPR16, bl: GPR8 }
+            rsp enc 4  names { rsp: GPR64, esp: GPR32, sp: GPR16, spl: GPR8 }
+            rbp enc 5  names { rbp: GPR64, ebp: GPR32, bp: GPR16, bpl: GPR8 }
+            rsi enc 6  names { rsi: GPR64, esi: GPR32, si: GPR16, sil: GPR8 }
+            rdi enc 7  names { rdi: GPR64, edi: GPR32, di: GPR16, dil: GPR8 }
+            r8  enc 8  names { r8: GPR64,  r8d: GPR32,  r8w: GPR16,  r8b: GPR8 }
+            r9  enc 9  names { r9: GPR64,  r9d: GPR32,  r9w: GPR16,  r9b: GPR8 }
+            r10 enc 10 names { r10: GPR64, r10d: GPR32, r10w: GPR16, r10b: GPR8 }
+            r11 enc 11 names { r11: GPR64, r11d: GPR32, r11w: GPR16, r11b: GPR8 }
+            r12 enc 12 names { r12: GPR64, r12d: GPR32, r12w: GPR16, r12b: GPR8 }
+            r13 enc 13 names { r13: GPR64, r13d: GPR32, r13w: GPR16, r13b: GPR8 }
+            r14 enc 14 names { r14: GPR64, r14d: GPR32, r14w: GPR16, r14b: GPR8 }
+            r15 enc 15 names { r15: GPR64, r15d: GPR32, r15w: GPR16, r15b: GPR8 }
+        }
+    }
+
+    register_bank FPR {
+        classes { FPR32: 32, FPR64: 64, VR128: 128 }
+        sub_register { VR128 <: FPR64, FPR64 <: FPR32 }
+        registers {
+            xmm0  enc 0  names { xmm0: FPR32,  xmm0: FPR64,  xmm0: VR128 }
+            xmm1  enc 1  names { xmm1: FPR32,  xmm1: FPR64,  xmm1: VR128 }
+            xmm2  enc 2  names { xmm2: FPR32,  xmm2: FPR64,  xmm2: VR128 }
+            xmm3  enc 3  names { xmm3: FPR32,  xmm3: FPR64,  xmm3: VR128 }
+            xmm4  enc 4  names { xmm4: FPR32,  xmm4: FPR64,  xmm4: VR128 }
+            xmm5  enc 5  names { xmm5: FPR32,  xmm5: FPR64,  xmm5: VR128 }
+            xmm6  enc 6  names { xmm6: FPR32,  xmm6: FPR64,  xmm6: VR128 }
+            xmm7  enc 7  names { xmm7: FPR32,  xmm7: FPR64,  xmm7: VR128 }
+            xmm8  enc 8  names { xmm8: FPR32,  xmm8: FPR64,  xmm8: VR128 }
+            xmm9  enc 9  names { xmm9: FPR32,  xmm9: FPR64,  xmm9: VR128 }
+            xmm10 enc 10 names { xmm10: FPR32, xmm10: FPR64, xmm10: VR128 }
+            xmm11 enc 11 names { xmm11: FPR32, xmm11: FPR64, xmm11: VR128 }
+            xmm12 enc 12 names { xmm12: FPR32, xmm12: FPR64, xmm12: VR128 }
+            xmm13 enc 13 names { xmm13: FPR32, xmm13: FPR64, xmm13: VR128 }
+            xmm14 enc 14 names { xmm14: FPR32, xmm14: FPR64, xmm14: VR128 }
+            xmm15 enc 15 names { xmm15: FPR32, xmm15: FPR64, xmm15: VR128 }
+        }
+    }
+
+    special {
+        rip: 16
+    }
+
     extensions {
         sse {
             default: true;
@@ -28,6 +78,10 @@ target X86_64 {
         ssse3 {
             implies: [sse3];
             description: "Supplemental Streaming SIMD Extensions 3 (SSSE3)";
+        };
+        sse4a {
+            implies: [sse3];
+            description: "AMD Streaming SIMD Extensions 4a (SSE4a)";
         };
         sse4_1 {
             implies: [ssse3];

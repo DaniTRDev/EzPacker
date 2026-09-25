@@ -67,16 +67,6 @@ struct SpecialRegDecl
     Common::IntegerLiteral m_id; // Identifier reserved outside allocatable encodings.
 };
 
-/**
- * Root of a parsed .reg file.
- */
-struct RegisterFile
-{
-    Common::Identifier m_target;                    // Target name this register file describes.
-    std::pmr::vector<RegisterBankDecl> m_banks;     // All declared register banks.
-    std::pmr::vector<SpecialRegDecl> m_specialRegs; // All declared special/pseudo registers.
-};
-
 } // namespace DSL::Ast::RegisterDef
 
 #endif // EZDSLLEXER_REGISTER_DEF_LANG_AST_H

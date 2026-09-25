@@ -111,13 +111,16 @@ TEST_F(EzMirIntegrationTest, GenerateAndVerifyEzMirTypeTable)
     EXPECT_TRUE(hContent.find("f32 = 11,") != std::string::npos);
     EXPECT_TRUE(hContent.find("f64 = 12,") != std::string::npos);
     EXPECT_TRUE(hContent.find("f128 = 13,") != std::string::npos);
+    EXPECT_TRUE(hContent.find("v4f32 = 14,") != std::string::npos);
+    EXPECT_TRUE(hContent.find("v2f64 = 15,") != std::string::npos);
+    EXPECT_TRUE(hContent.find("v4i32 = 18,") != std::string::npos);
     EXPECT_TRUE(hContent.find("Custom = 255") != std::string::npos);
 
     // ptr is pointer type, must NOT have a compact ID
     EXPECT_TRUE(hContent.find("ptr =") == std::string::npos);
 
-    // 3. MachineTypeCount (12 primitive types)
-    EXPECT_TRUE(hContent.find("constexpr size_t MachineTypeCount = 12;") != std::string::npos);
+    // 3. MachineTypeCount (24 primitive types)
+    EXPECT_TRUE(hContent.find("constexpr size_t MachineTypeCount = 24;") != std::string::npos);
 
     // 4. MirTypeTable Class Declarations & Accessor Methods
     EXPECT_TRUE(hContent.find("class MirTypeTable") != std::string::npos);
@@ -231,7 +234,29 @@ TEST_F(EzMirIntegrationTest, GenerateAndVerifyEzMirInstructionDefs)
     EXPECT_TRUE(content.find("INSTRUCTION(NOP,") != std::string::npos);
     EXPECT_TRUE(content.find("INSTRUCTION(HALT,") != std::string::npos);
 
-    // 7. Verify flags on critical instructions
+    // 7. Vector & SIMD instructions
+    EXPECT_TRUE(content.find("INSTRUCTION(VADD,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VSUB,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VMUL,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VDIV,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VNEG,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VAND,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VOR,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VXOR,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VNOT,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VANDN,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VMIN,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VMAX,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VHADD,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VHSUB,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VLOAD,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VSTORE,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VSHUFFLE,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VEXTRACT,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VINSERT,") != std::string::npos);
+    EXPECT_TRUE(content.find("INSTRUCTION(VBROADCAST,") != std::string::npos);
+
+    // 8. Verify flags on critical instructions
     EXPECT_TRUE(content.find("F(VariadicArgs)") != std::string::npos);
     EXPECT_TRUE(content.find("F(IsTerminator)") != std::string::npos);
     EXPECT_TRUE(content.find("F(IsBranch)") != std::string::npos);
