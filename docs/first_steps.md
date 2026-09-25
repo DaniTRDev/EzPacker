@@ -104,15 +104,21 @@ Output:
 [Pipeline] Running CodeFlowAnalysisPass on @calculate ... [0.042 ms]
 [Pipeline] Running NonSsaToSsaPass on @calculate ... [0.031 ms]
 [Pipeline] Running LivenessAnalysisPass on @calculate ... [0.058 ms]
+[Pipeline] Running MirPeepholePass on @calculate ... [0.024 ms]
+[Pipeline] Running LivenessAnalysisPass on @calculate ... [0.019 ms]
 [Pipeline] Running MirFunctionSignatureLegalizerPass on @calculate ... [0.021 ms]
 [Pipeline] Running MirLegalizerPass on @calculate ... [0.065 ms]
 [Pipeline] Running MirAbiLowererPass on @calculate ... [0.049 ms]
 [Pipeline] Running MirInstructionSelectorPass on @calculate ... [0.112 ms]
 [Pipeline] Running MirRegisterAllocatorPass on @calculate ... [0.184 ms]
 [Pipeline] Running MirFrameLowererPass on @calculate ... [0.038 ms]
-[Emission] Emitted 28 bytes to .text section.
+[Pipeline] Running MirTargetPeepholePass on @calculate ... [0.029 ms]
+[Emission] Emitted 24 bytes to .text section.
 [Writer] Generated 64-bit relocatable object file: simple_math.o
 ```
+
+> [!NOTE]
+> When compiling with `-O1`, `-O2` (or `-Os`), the pipeline executes `MirPeepholePass` in the middle-end, activates conservative register coalescing and copy affinity in `MirRegisterAllocatorPass`, and executes `MirTargetPeepholePass` in the backend. Under `-O0`, optimization passes are skipped and coalescing is disabled.
 
 ---
 

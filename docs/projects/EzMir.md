@@ -45,6 +45,7 @@ EzMir serves as the universal pivot of the entire compiler:
 | - CodeFlowAnalysisPass      |       | (Emits human-readable textual MIR)      |
 | - NonSsaToSsaPass           |       +-----------------------------------------+
 | - LivenessAnalysisPass      |
+| - MirPeepholePass           |
 +-----------------------------+
        |
        v
@@ -127,15 +128,15 @@ EzPacker features a comprehensive type system capable of representing arbitrary 
 EzMir passes operate on `MirFunction` instances and are orchestrated by `MirPassManager` (`MirPasses/MirPassManager.h`).
 
 ```
-       +---------------------------------------------+
-       |               MirPassManager                |
-       +---------------------------------------------+
-         |                      |                   |
-         v                      v                   v
-   +------------------+  +------------------+  +-------------------+
-   | CodeFlowAnalysis |  |   NonSsaToSsa    |  | LivenessAnalysis  |
-   | CFG & Dominators |  | SSA Construction |  | Live Intervals    |
-   +------------------+  +------------------+  +-------------------+
+       +-------------------------------------------------------------+
+       |                       MirPassManager                        |
+       +-------------------------------------------------------------+
+         |                    |                   |                 |
+         v                    v                   v                 v
+   +----------------+  +----------------+  +---------------+  +---------------+
+   | CodeFlowPass   |  |  NonSsaToSsa   |  | LivenessPass  |  | MirPeephole   |
+   | CFG & Dominance|  | Cytron SSA     |  | LiveIntervals |  | SSA Optimizer |
+   +----------------+  +----------------+  +---------------+  +---------------+
 ```
 
 ### 3.1 `CodeFlowAnalysisPass` (`MirPasses/Passes/CodeFlowAnalysisPass.h`)
@@ -159,6 +160,28 @@ EzMir passes operate on `MirFunction` instances and are orchestrated by `MirPass
 - Computes linear **Live Intervals** $[start, end]$ for every virtual and physical register.
 - Surfaces the `LivenessResult` structure directly consumed by `MirRegisterAllocator`.
 
+### 3.4 `MirPeepholePass` (`MirPasses/Passes/MirPeepholePass.h`)
+Generic SSA-level transformation pass (`IMirTransformPass`) active during optimization stages (`-O1`, `-O2`, `-Os`). Iterates over basic blocks and instructions until a fixed point is reached or the iteration budget is exhausted:
+- **Algebraic Identities**:
+  - `ADD %dst, %src, 0` / `ADD %dst, 0, %src` $\to$ `MOV %dst, %src`
+  - `SUB %dst, %src, 0` $\to$ `MOV %dst, %src`
+  - `SUB %dst, %src, %src` $\to$ `MOV %dst, 0`
+  - `IMUL %dst, %src, 1` / `IMUL %dst, 1, %src` $\to$ `MOV %dst, %src`
+  - `IMUL %dst, %src, 0` / `IMUL %dst, 0, %src` $\to$ `MOV %dst, 0`
+  - `AND %dst, %src, 0` / `AND %dst, 0, %src` $\to$ `MOV %dst, 0`
+  - `AND %dst, %src, -1` / `AND %dst, -1, %src` $\to$ `MOV %dst, %src`
+  - `OR %dst, %src, 0` / `OR %dst, 0, %src` $\to$ `MOV %dst, %src`
+  - `XOR %dst, %src, %src` $\to$ `MOV %dst, 0`
+  - `XOR %dst, %src, 0` / `XOR %dst, 0, %src` $\to$ `MOV %dst, %src`
+  - `SHL / LSHR / ASHR %dst, %src, 0` $\to$ `MOV %dst, %src`
+- **Redundant Move Elimination**:
+  - Eliminates self-moves (`MOV %x, %x`).
+  - Eliminates reciprocal copies (`MOV %a, %b; MOV %b, %a` $\to$ second copy removed).
+- **Dead Code Elimination After Terminators**:
+  - Prunes dead, unreachable instructions occurring strictly after basic block terminators (`RET`, `JMP`, `UNREACHABLE`).
+- **Fall-Through Jump Elimination**:
+  - Erases unconditional `JMP` / `BR` instructions whose destination target is the immediately sequential basic block (`block->getNext()`).
+
 ---
 
 ## 4. Programmatic MIR Construction (Builder API)
@@ -174,7 +197,7 @@ EzMir provides a clean, factory-based builder architecture designed for compiler
 3. **`MirBlockBuilder`** (`Block/MirBlockBuilder.h`):
    Appends `MirBlock` nodes to the function and produces child instruction builders.
 4. **`MirInstructionBuilder`** (`Instruction/MirInstructionBuilder.h`):
-   Constructs instructions at a configurable insertion point (`Append`, `InsertBefore`, `InsertAfter`). Generates high-level opcode methods (`ADD`, `MOV`, `SUB`, `RET`, `JMP`, etc.) and target instruction methods (`buildTarget`).
+   Constructs instructions at a configurable insertion point (`Append`, `InsertBefore`, `InsertAfter`). Generates high-level opcode methods (`ADD`, `MOV`, `SUB`, `RET`, `JMP`, etc.), target instruction methods (`buildTarget`), and the `setOperand(MirInstruction *instr, size_t pos, MirOperand *newOperand)` utility for in-place operand substitution with automatic def/use tracking synchronization.
 5. **`MirOperandBuilder`** (`Operand/MirOperandBuilder.h`):
    Constructs virtual registers, physical registers, memory operands, constants, and symbol references.
 
@@ -299,3 +322,4 @@ exit:
 | Passes | `EzMir/include/MirPasses/Passes/CodeFlowAnalysisPass.h` | `CodeFlowAnalysisPass` |
 | Passes | `EzMir/include/MirPasses/Passes/NonSsaToSsaPass.h` | `NonSsaToSsaPass` |
 | Passes | `EzMir/include/MirPasses/Passes/LivenessAnalysisPass.h` | `LivenessAnalysisPass`, `LivenessResult` |
+| Passes | `EzMir/include/MirPasses/Passes/MirPeepholePass.h` | `MirPeepholePass` |

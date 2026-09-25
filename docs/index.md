@@ -17,22 +17,24 @@ flowchart TD
         Parser --> InMemMIR["In-Memory SSA MIR\n(MirFunction, MirBlock, MirInstruction)"]
     end
 
-    subgraph MiddleEnd["2. Middle-End Analysis & SSA"]
+    subgraph MiddleEnd["2. Middle-End Analysis & Optimization"]
         InMemMIR --> CFGPass["CodeFlowAnalysisPass\n(CFG, Dominance Tree)"]
         CFGPass --> SSAPass["NonSsaToSsaPass\n(Phi Node Placement, Renaming)"]
         SSAPass --> LivenessPass["LivenessAnalysisPass\n(Bit-Vector Dataflow, Live Intervals)"]
+        LivenessPass --> PeepholePass["MirPeepholePass (-O1/-O2/-Os)\n(Algebraic Identities, Self-Moves, Dead Code, Fall-Through)"]
     end
 
     subgraph Lowering["3. Target Lowering Pipeline (EzTriple)"]
-        LivenessPass --> Legalizer["MirLegalizerPass\n(3-Tier Legality Matrix: Widen, Narrow, Lower)"]
+        PeepholePass --> Legalizer["MirLegalizerPass\n(3-Tier Legality Matrix: Widen, Narrow, Lower)"]
         Legalizer --> ABILower["MirAbiLowererPass\n(Token Lowering, Parameter & Return Registers)"]
         ABILower --> ISel["MirInstructionSelectorPass\n(Bottom-Up Maximal Munch, Load-Folding)"]
-        ISel --> RegAlloc["MirRegisterAllocatorPass\n(Chaitin-Briggs Graph Coloring, Spilling)"]
+        ISel --> RegAlloc["MirRegisterAllocatorPass\n(Chaitin-Briggs Coloring, Conservative Coalescing, Copy Removal)"]
         RegAlloc --> FrameLower["MirFrameLowererPass\n(Prologue/Epilogue Insertion, Stack Layout)"]
+        FrameLower --> TargetPeephole["MirTargetPeepholePass (-O1/-O2/-Os)\n(Machine Move Removal, Spill Forwarding, Dead Stores)"]
     end
 
     subgraph Backend["4. Machine Code Emission (EzCodeEmitter)"]
-        FrameLower --> CodeEmitter["GenericCodeEmitter\n(X86_64InstructionEncoder, BranchRelaxer)"]
+        TargetPeephole --> CodeEmitter["GenericCodeEmitter\n(X86_64InstructionEncoder, BranchRelaxer)"]
         CodeEmitter --> Sections["CodeSection (.text, .data, .rodata) &\nRelocations (ObjectRelocEntry)"]
         Sections --> ObjectWriter{"IObjectWriter\n(Format Dispatch)"}
         ObjectWriter -->|Linux / BSD| ElfWriter["Elf64Writer\n(System V ELF64 .o)"]
@@ -73,9 +75,10 @@ flowchart LR
 ## 2. Core Capabilities & Design Highlights
 
 - **Pure C++20 Design**: Leverages concepts, `<format>`, ranges, and polymorphic memory resources (`std::pmr`) for memory efficiency and zero heap fragmentation during pass execution.
+- **Multi-Stage Optimization Pipeline**: Generic SSA peephole optimizer (`MirPeepholePass`), conservative copy/two-address register coalescing (George & Briggs criteria) with copy affinity coloring, redundant copy elimination, and post-frame machine peephole optimizer (`MirTargetPeepholePass`).
 - **Table-Driven 3-Tier Legalizer**: Dense primary matrix indexed by opcode and compact type provides $O(1)$ legality dispatch, combined with multi-slot signature matchers and declarative strength reduction rules.
 - **Bottom-Up Maximal Munch Instruction Selection**: Tree-matching pattern matching that automatically synthesizes SIB addressing modes and performs opportunistic memory load-folding (`ADD64rm`).
-- **Production Chaitin-Briggs Graph-Coloring Register Allocator**: Full interference graph construction, loop-depth spill cost estimation, optimistic simplification, register spilling, and copy coalescing.
+- **Production Chaitin-Briggs Graph-Coloring Register Allocator**: Full interference graph construction, loop-depth spill cost estimation, optimistic simplification, register spilling, and conservative coalescing.
 - **Dual Calling Convention & Binary Format Support**: Built-in support for both **System V AMD64** (Linux/macOS) and **Microsoft Win64** (Windows) calling conventions, with native emitters for **ELF64** (`.o`) and **PE/COFF** (`.obj`).
 - **Complete Vector Extension Support**: Implication-aware CPU feature tracking supporting SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, and AVX2.
 
@@ -103,7 +106,12 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzTargets`** | Architecture backends: self-contained x86-64 target (`X86_64TargetDesc`, `X86_64FrameLowerer`, `X86_64InstructionEncoder`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
 
 ### 🔍 Complete API Reference
-- **[Generated Doxygen API Documentation](doxygen/index.html)**: Interactive class hierarchies, inheritance diagrams, member documentation, and source code cross-references.
+- **[Generated Doxygen API Documentation](doxygen/index.html)**: Interactive class hierarchies, inheritance diagrams, member documentation, and source code cross-references. Generate locally on demand via:
+  ```bash
+  cmake --build <build-dir> --target doxygen
+  # or
+  cmake --build <build-dir> --target docs
+  ```
 
 ---
 

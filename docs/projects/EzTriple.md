@@ -6,13 +6,14 @@
 
 ## 1. Overview & Architectural Role
 
-`EzTriple` is the target-independent machine lowering engine of EzPacker. It sits between middle-end SSA MIR and the final binary code emitter. EzTriple executes the critical five-stage lowering pipeline that transforms abstract, target-agnostic MIR into concrete, hardware-mapped machine instructions:
+`EzTriple` is the target-independent machine lowering engine of EzPacker. It sits between middle-end SSA MIR and the final binary code emitter. EzTriple executes the critical machine lowering and optimization pipeline that transforms abstract, target-agnostic MIR into concrete, hardware-mapped machine instructions:
 
 1. **Legalization**: Decomposes unsupported types and opcodes via table-driven rewrite rules.
 2. **ABI Lowering**: Translates procedural parameter and return tokens into hardware ABI calling convention registers and stack slots.
 3. **Instruction Selection**: Replaces generic operations with target hardware instructions via Bottom-Up Maximal Munch pattern matching.
-4. **Register Allocation**: Maps unbounded virtual registers to finite physical hardware registers using a Chaitin-Briggs graph-coloring algorithm.
+4. **Register Allocation**: Maps unbounded virtual registers to finite physical hardware registers using a Chaitin-Briggs graph-coloring algorithm, extended with conservative copy coalescing, affinity coloring, and redundant copy elimination.
 5. **Frame Lowering**: Calculates stack frame layouts, replaces abstract frame objects with base-pointer/stack-pointer displacements, and emits target function prologues and epilogues (PEI).
+6. **Target Machine Peephole Optimization**: Scans post-frame machine instructions to remove redundant physical moves, eliminate adjacent fall-through jumps, forward spill slots, and simplify zero-identity ALU operations.
 
 ```
 +-------------------------------------------------------------------------------+
@@ -45,7 +46,8 @@
 |  +-------------------------------------+                                      |
 |  |  MirRegisterAllocatorPass           | <-- Register Classes & Banks (.tdesc)|
 |  | - Chaitin-Briggs Graph Coloring     |                                      |
-|  | - Interference Graph & Spilling     |                                      |
+|  | - Conservative Coalescing (George)  |                                      |
+|  | - Affinity Coloring & Copy Removal  |                                      |
 |  +-------------------------------------+                                      |
 |        |                                                                      |
 |        v                                                                      |
@@ -53,6 +55,13 @@
 |  |     MirFrameLowererPass             | <-- Target Stack Frame Layout        |
 |  | - Prologue / Epilogue Insertion     |                                      |
 |  | - ALLOC / DALLOC Lowering           |                                      |
+|  +-------------------------------------+                                      |
+|        |                                                                      |
+|        v                                                                      |
+|  +-------------------------------------+                                      |
+|  |    MirTargetPeepholePass (-O1/-O2)  | <-- Machine Peephole Optimization    |
+|  | - Redundant Move & Jump Elimination |                                      |
+|  | - Spill/Reload Forwarding & Dead St.|                                      |
 |  +-------------------------------------+                                      |
 |        |                                                                      |
 |        v                                                                      |
@@ -219,6 +228,11 @@ struct RegisterAllocatorCtx
     std::pmr::unordered_set<MirRegisterRef> m_unspillableRegs;
     std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
     bool m_spillCostsValid{ false };
+
+    // Coalescing & affinity state
+    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_coalescedRegs;
+    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_affinity;
+    bool m_coalescingEnabled{ true };
 };
 ```
 
@@ -231,13 +245,28 @@ public:
 
     bool buildInterferenceGraph(LivenessResult *liveness, RegisterAllocatorCtx *ctx);
     void evaluateInterferenceGraphDegree(RegisterAllocatorCtx *ctx);
+    bool coalesce(RegisterAllocatorCtx *ctx);
     bool simplify(RegisterAllocatorCtx *ctx);
     bool selectColors(RegisterAllocatorCtx *ctx);
     void rewriteColors(RegisterAllocatorCtx *ctx);
+    void eliminateRedundantCopies(RegisterAllocatorCtx *ctx);
 
 protected:
     double calculateSpillCost(MirRegisterRef node, RegisterAllocatorCtx *ctx);
     void rewriteSpilledRegisters(const std::pmr::unordered_set<MirRegisterRef> &spilledNodes, RegisterAllocatorCtx *ctx);
+```
+
+#### Conservative Coalescing & Copy Optimization
+When coalescing is enabled (`m_coalescingEnabled = true`, active at `-O1`, `-O2`, `-Os`):
+1. **Conservative Coalescing Criteria**:
+   - **George's Criterion (Virtual into Physical)**: Merges virtual register $u$ into physical register $v$ if every neighbor $t$ of $u$ either already interferes with $v$ or has low degree ($\text{deg}(t) < K$). Guarantees the physical node's simplification degree does not increase unsafely.
+   - **Briggs' Criterion (Virtual into Virtual)**: Merges non-interfering virtual registers $u$ and $v$ if the combined node has fewer than $K$ neighbors of significant degree ($\ge K$).
+   - **Two-Address Constraint Preservation**: Automatically coalesces destination registers with first source operands (`m_coalesceSrc`) for destructive operations (e.g. x86-64 ALU instructions).
+2. **Affinity-Biased Color Selection (`selectColors`)**:
+   - Records affinity preferences between copy-related register pairs in `m_affinity`.
+   - When assigning a physical color to an uncolored node, checks if its copy partner has already been colored and prioritizes that exact physical register if legal and unconstrained.
+3. **Redundant Copy Elimination (`eliminateRedundantCopies`)**:
+   - Executed after `rewriteColors()`. Scans all basic blocks and erases machine move instructions (`MOV64rr`, etc.) whose destination and source resolve to the exact same physical register.
 
     // Target-specific pure virtual hooks
     virtual bool isInstructionDAlloc(MirInstruction *instr) = 0;
@@ -302,6 +331,27 @@ public:
 
 ---
 
+### 2.6 Target Machine Peephole Optimizer (`include/Passes/MirTargetPeepholePass.h`)
+
+The `MirTargetPeepholePass` operates directly on concrete target machine instructions post-frame lowering (`MirFrameLowererPass`), executing when optimization is enabled (`-O1`, `-O2`, `-Os`). It eliminates machine-level redundancies introduced by instruction selection, register allocation, and spill/reload insertion:
+
+1. **Redundant Physical Move Elimination**:
+   - Self-moves: `MOV64rr %r, %r` $\to$ erased.
+   - Reciprocal copies: `MOV64rr %r1, %r2; MOV64rr %r2, %r1` $\to$ second copy erased.
+2. **Adjacent Fall-Through Jump Elimination**:
+   - Erases unconditional machine branches (e.g. `JMP label`) where the target basic block is the immediate sequential fall-through successor (`block->getNext()`).
+3. **Machine ALU Zero-Identities**:
+   - Simplifies zero-effect arithmetic instructions such as `ADD64ri %r, %r, 0` or `SUB64ri %r, %r, 0` by removing the instruction entirely.
+4. **Spill/Reload Forwarding**:
+   - Scans consecutive instructions for a store to a stack frame displacement followed by a load from the same stack displacement into another register (`MOV [rsp+disp], %r1; MOV %r2, [rsp+disp]`).
+   - Rewrites the reload into a direct register-to-register copy (`MOV %r2, %r1`), eliminating an unnecessary memory load.
+5. **Redundant Consecutive Reload Elimination**:
+   - Identifies consecutive reloads from the same stack offset into the same register without intervening clobbers and erases the redundant reload.
+6. **Dead Store Elimination**:
+   - Erases consecutive stores to the same stack slot before any intervening load, call, or memory barrier instruction.
+
+---
+
 ## 3. Target Descriptors (`include/Descriptors/`)
 
 ### 3.1 `TargetDesc` (`Descriptors/TargetDesc.h`)
@@ -358,3 +408,5 @@ The abstract OS and object-file format descriptor:
 | Passes | `EzTriple/include/Passes/MirInstructionSelectorPass.h` | `MirInstructionSelectorPass` |
 | Passes | `EzTriple/include/Passes/MirRegisterAllocatorPass.h` | `MirRegisterAllocatorPass` |
 | Passes | `EzTriple/include/Passes/MirFrameLowererPass.h` | `MirFrameLowererPass` |
+| Passes | `EzTriple/include/Passes/MirTargetPeepholePass.h` | `MirTargetPeepholePass` |
+
