@@ -144,4 +144,5 @@ fabric.properties
 /.agents
 
 # Doxygen generated output
-docs/html/
+docs/html/
+docs/doxygen/

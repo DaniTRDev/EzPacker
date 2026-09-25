@@ -1,5 +1,0 @@
-var struct_d_s_l_1_1_parser_1_1_common_1_1_pmr_container_traits_3_01std_1_1vector_3_01_t_00_01_alloc_01_4_01_4 =
-[
-    [ "container_type", "struct_d_s_l_1_1_parser_1_1_common_1_1_pmr_container_traits_3_01std_1_1vector_3_01_t_00_01_alloc_01_4_01_4.html#abe699cb5fca73235914cb134dc7281e1", null ],
-    [ "value_type", "struct_d_s_l_1_1_parser_1_1_common_1_1_pmr_container_traits_3_01std_1_1vector_3_01_t_00_01_alloc_01_4_01_4.html#a21dab7e0f4149db81e56494e5d564244", null ]
-];
