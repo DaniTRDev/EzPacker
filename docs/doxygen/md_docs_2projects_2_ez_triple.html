@@ -93,10 +93,10 @@ $(function(){initNavTree('md_docs_2projects_2_ez_triple.html','',''); });
   <div class="headertitle"><div class="title">EzTriple Subproject Documentation </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md265"></a></p>
+<div class="textblock"><p><a class="anchor" id="autotoc_md277"></a></p>
 <p><a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Documentation Index</a> &gt; <a class="el" href="md_docs_2projects_2_ez_triple.html" title="EzTriple Subproject Documentation">Subprojects</a> &gt; <b><a class="el" href="namespace_ez_triple.html">EzTriple</a></b> | <a href="../doxygen/index.html">Doxygen API Reference</a></p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md267"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md279"></a>
 1. Overview &amp; Architectural Role</h1>
 <p><span class="tt"><a class="el" href="namespace_ez_triple.html">EzTriple</a></span> is the target-independent machine lowering engine of EzPacker. It sits between middle-end SSA MIR and the final binary code emitter. <a class="el" href="namespace_ez_triple.html">EzTriple</a> executes the critical five-stage lowering pipeline that transforms abstract, target-agnostic MIR into concrete, hardware-mapped machine instructions:</p>
 <ol type="1">
@@ -150,12 +150,12 @@ $(function(){initNavTree('md_docs_2projects_2_ez_triple.html','',''); });
 <div class="line">|  Lowered Machine Instructions (Ready for EzCodeEmitter)                       |</div>
 <div class="line">+-------------------------------------------------------------------------------+</div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md269"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md281"></a>
 2. The 5 Core Subsystems</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md270"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md282"></a>
 2.1 The Legalizer (<span class="tt">include/Legalizer/</span>)</h2>
 <p>Hardware architectures do not natively support all possible integer bit-widths, vector dimensions, or high-level operations. The Legalizer transforms illegal operations into sequences of legal instructions.</p>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md271"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md283"></a>
 Legalization Action Kinds (<span class="tt">LegalizeQuery.h</span>)</h3>
 <div class="fragment"><div class="line"><span class="keyword">enum class</span> <a class="code hl_enumeration" href="_legality_query_8h.html#aa9447c3f61d261f86779f4ba6843c6f2">LegalizeActionKind</a> : uint8_t</div>
 <div class="line">{</div>
@@ -177,7 +177,7 @@ Legalization Action Kinds (<span class="tt">LegalizeQuery.h</span>)</h3>
 <div class="ttc" id="a_legality_query_8h_html_aa9447c3f61d261f86779f4ba6843c6f2ac6eb61c242646175ff519114fe11b775"><div class="ttname"><a href="_legality_query_8h.html#aa9447c3f61d261f86779f4ba6843c6f2ac6eb61c242646175ff519114fe11b775">LegalizeActionKind::NarrowScalar</a></div><div class="ttdeci">@ NarrowScalar</div><div class="ttdef"><b>Definition</b> LegalityQuery.h:19</div></div>
 <div class="ttc" id="a_legality_query_8h_html_aa9447c3f61d261f86779f4ba6843c6f2ade5987a7f31f22f03245d2249545d349"><div class="ttname"><a href="_legality_query_8h.html#aa9447c3f61d261f86779f4ba6843c6f2ade5987a7f31f22f03245d2249545d349">LegalizeActionKind::WidenScalar</a></div><div class="ttdeci">@ WidenScalar</div><div class="ttdef"><b>Definition</b> LegalityQuery.h:18</div></div>
 <div class="ttc" id="a_legality_query_8h_html_aa9447c3f61d261f86779f4ba6843c6f2af0368c43b98cff179e7cb55daa205add"><div class="ttname"><a href="_legality_query_8h.html#aa9447c3f61d261f86779f4ba6843c6f2af0368c43b98cff179e7cb55daa205add">LegalizeActionKind::Bitcast</a></div><div class="ttdeci">@ Bitcast</div><div class="ttdef"><b>Definition</b> LegalityQuery.h:20</div></div>
-</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md272"></a>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md284"></a>
 Legality Query &amp; Response</h3>
 <p>Every instruction is queried against <span class="tt"><a class="el" href="class_legalizer_info.html">LegalizerInfo</a></span> using exact descriptor structs:</p>
 <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_legality_query.html">LegalityQuery</a></div>
@@ -220,7 +220,7 @@ Legality Query &amp; Response</h3>
 <div class="ttc" id="astruct_legality_response_html_af75582edd5b14d53bd9b50345aaf20ad"><div class="ttname"><a href="struct_legality_response.html#af75582edd5b14d53bd9b50345aaf20ad">LegalityResponse::m_slot</a></div><div class="ttdeci">uint8_t m_slot</div><div class="ttdef"><b>Definition</b> LegalityQuery.h:54</div></div>
 <div class="ttc" id="astruct_legality_response_html_afca74136643092a7bd6de2046ebbfcbd"><div class="ttname"><a href="struct_legality_response.html#afca74136643092a7bd6de2046ebbfcbd">LegalityResponse::m_action</a></div><div class="ttdeci">LegalizeActionKind m_action</div><div class="ttdef"><b>Definition</b> LegalityQuery.h:53</div></div>
 <div class="ttc" id="astruct_legality_response_html_afea705de0a168ea94aae61436dd51c8d"><div class="ttname"><a href="struct_legality_response.html#afea705de0a168ea94aae61436dd51c8d">LegalityResponse::isUnsupported</a></div><div class="ttdeci">constexpr bool isUnsupported() const noexcept</div><div class="ttdoc">True when no legalization strategy exists and a diagnostic should be emitted.</div><div class="ttdef"><b>Definition</b> LegalityQuery.h:62</div></div>
-</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md273"></a>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md285"></a>
 3-Tier Architecture</h3>
 <ol type="1">
 <li><b>Tier 1 (Dense Primary Matrix)</b>: An $O(1)$ lookup table indexing <span class="tt">[Opcode][CompactTypeID]</span> returning an immediate <span class="tt"><a class="el" href="struct_legality_response.html">LegalityResponse</a></span>.</li>
@@ -228,7 +228,7 @@ Legality Query &amp; Response</h3>
 <li><b>Tier 3 (Declarative Rewrite Rules)</b>: Evaluates algebraic rules and strength-reduction rewrites generated from <span class="tt">.lrd</span> specifications.</li>
 </ol>
 <hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md275"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md287"></a>
 2.2 ABI Lowerer (<span class="tt">include/AbiLowerer/</span>)</h2>
 <p>The ABI lowerer translates abstract procedural calls and argument passes into concrete machine registers and stack slots governed by <span class="tt"><a class="el" href="class_calling_conv_desc.html">CallingConvDesc</a></span>:</p>
 <ul>
@@ -250,17 +250,17 @@ Legality Query &amp; Response</h3>
 </li>
 </ul>
 <hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md277"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md289"></a>
 2.3 Instruction Selector (<span class="tt">include/InstructionSelector/</span>)</h2>
 <p>Transforms generic SSA opcodes into concrete machine instruction descriptors:</p>
 <ul>
-<li><b>Bottom-Up Maximal Munch</b>: Traverses the instruction stream in reverse topological order within each basic block, matching the largest possible expression trees against pattern decision trees generated from <span class="tt">.isdf</span> files.</li>
+<li><b>Bottom-Up Maximal Munch</b>: Traverses the instruction stream in reverse topological order within each basic block, matching the largest possible expression trees against pattern decision trees generated from <span class="tt">.isf</span> files.</li>
 <li><b>Addressing Mode Matcher (<span class="tt"><a class="el" href="_mir_addressing_mode_matcher_8h.html">MirAddressingModeMatcher.h</a></span>)</b>: Synthesizes complex addressing expressions into memory operands: <div class="fragment"><div class="line">Effective Address = Base + (Index * Scale) + Displacement</div>
 </div><!-- fragment --></li>
 <li><b>Load-Folding Optimization</b>: Automatically folds memory loads into consuming ALU instructions (e.g., <span class="tt">ADD dst, src, (LOAD addr)</span> -&gt; <span class="tt">ADD64rm dst, src, addr</span>) when the loaded value has a single user and no intervening memory store clobbers the address.</li>
 </ul>
 <hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md279"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md291"></a>
 2.4 Register Allocator (<span class="tt">include/RegisterAllocator/</span>)</h2>
 <p><a class="el" href="namespace_ez_triple.html">EzTriple</a> implements a production-grade <b>Chaitin-Briggs Graph-Coloring Register Allocator</b> (<span class="tt"><a class="el" href="_mir_register_allocator_8h.html">MirRegisterAllocator.h</a></span>):</p>
 <div class="fragment"><div class="line"> +--------------------------------------------------+</div>
@@ -305,7 +305,7 @@ Legality Query &amp; Response</h3>
 <div class="line">|   RewriteColors   |            | Insert Spills/     |</div>
 <div class="line">| (VRegs -&gt; PRegs)  |            | Reloads &amp; Repeat   |</div>
 <div class="line">+-------------------+            +--------------------+</div>
-</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md280"></a>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md292"></a>
 Working Context (<span class="tt">RegisterAllocatorCtx</span>)</h3>
 <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_register_allocator_ctx.html">RegisterAllocatorCtx</a></div>
 <div class="line">{</div>
@@ -343,7 +343,7 @@ Working Context (<span class="tt">RegisterAllocatorCtx</span>)</h3>
 <div class="ttc" id="astruct_register_allocator_ctx_html_ac4378864ddb6d654e8e71656498cfc0b"><div class="ttname"><a href="struct_register_allocator_ctx.html#ac4378864ddb6d654e8e71656498cfc0b">RegisterAllocatorCtx::m_spillCosts</a></div><div class="ttdeci">std::pmr::unordered_map&lt; MirRegisterRef, double &gt; m_spillCosts</div><div class="ttdef"><b>Definition</b> MirRegisterAllocator.h:53</div></div>
 <div class="ttc" id="astruct_register_allocator_ctx_html_aca43d155f5043719204fe7357ad16250"><div class="ttname"><a href="struct_register_allocator_ctx.html#aca43d155f5043719204fe7357ad16250">RegisterAllocatorCtx::m_allocator</a></div><div class="ttdeci">std::pmr::memory_resource * m_allocator</div><div class="ttdef"><b>Definition</b> MirRegisterAllocator.h:18</div></div>
 <div class="ttc" id="astruct_register_allocator_ctx_html_ad43f2d2730a61d9b5209c4ada3fde2a2"><div class="ttname"><a href="struct_register_allocator_ctx.html#ad43f2d2730a61d9b5209c4ada3fde2a2">RegisterAllocatorCtx::m_unspillableRegs</a></div><div class="ttdeci">std::pmr::unordered_set&lt; MirRegisterRef &gt; m_unspillableRegs</div><div class="ttdef"><b>Definition</b> MirRegisterAllocator.h:50</div></div>
-</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md281"></a>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md293"></a>
 Abstract Allocator Class (<span class="tt">MirRegisterAllocator</span>)</h3>
 <div class="fragment"><div class="line"><span class="keyword">class </span><a class="code hl_class" href="class_mir_register_allocator.html">MirRegisterAllocator</a></div>
 <div class="line">{</div>
@@ -405,7 +405,7 @@ Abstract Allocator Class (<span class="tt">MirRegisterAllocator</span>)</h3>
 <div class="ttc" id="astruct_source_reference_html"><div class="ttname"><a href="struct_source_reference.html">SourceReference</a></div><div class="ttdef"><b>Definition</b> GenericSourceManager.h:13</div></div>
 <div class="ttc" id="astruct_stack_frame_object_html"><div class="ttname"><a href="struct_stack_frame_object.html">StackFrameObject</a></div><div class="ttdef"><b>Definition</b> MirFunctionStackFrame.h:21</div></div>
 </div><!-- fragment --><hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md283"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md295"></a>
 2.5 Frame Lowerer (<span class="tt">include/FrameLowerer/</span>)</h2>
 <p>The Frame Lowerer executes Prologue/Epilogue Insertion (PEI) and resolves abstract stack offsets:</p>
 <div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code hl_struct" href="struct_frame_lowerer_ctx.html">FrameLowererCtx</a></div>
@@ -441,7 +441,7 @@ Abstract Allocator Class (<span class="tt">MirRegisterAllocator</span>)</h3>
 <div class="ttc" id="astruct_frame_lowerer_ctx_html_a3beaaf60deb61e1aec909fe1cdd57f04"><div class="ttname"><a href="struct_frame_lowerer_ctx.html#a3beaaf60deb61e1aec909fe1cdd57f04">FrameLowererCtx::m_ctx</a></div><div class="ttdeci">class MirBuilderContext * m_ctx</div><div class="ttdef"><b>Definition</b> MirFrameLowerer.h:14</div></div>
 <div class="ttc" id="astruct_frame_lowerer_ctx_html_aaaf15a6f415478aac1265f219b365ba3"><div class="ttname"><a href="struct_frame_lowerer_ctx.html#aaaf15a6f415478aac1265f219b365ba3">FrameLowererCtx::m_allocIt</a></div><div class="ttdeci">IntrusiveLinkedList&lt; classMirInstruction &gt;::iterator m_allocIt</div><div class="ttdef"><b>Definition</b> MirFrameLowerer.h:19</div></div>
 <div class="ttc" id="astruct_frame_lowerer_ctx_html_aaec2dba9e7f222ecb5d42fa65cc461c4"><div class="ttname"><a href="struct_frame_lowerer_ctx.html#aaec2dba9e7f222ecb5d42fa65cc461c4">FrameLowererCtx::m_targetFunc</a></div><div class="ttdeci">class MirFunction * m_targetFunc</div><div class="ttdef"><b>Definition</b> MirFrameLowerer.h:15</div></div>
-</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md284"></a>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md296"></a>
 Lowering Sequence</h3>
 <ol type="1">
 <li><b><span class="tt">lowerAlloc</span></b>: Lowers static stack allocations (<span class="tt">ALLOC</span>) into stack frame object slots.</li>
@@ -452,9 +452,9 @@ Lowering Sequence</h3>
 <li><b><span class="tt">insertEpilogue</span></b>: Emits target instructions restoring callee-saved registers, collapsing the stack frame (<span class="tt">mov rsp, rbp; pop rbp</span> or <span class="tt">add rsp, FrameSize</span>), and emitting the machine return (<span class="tt">ret</span>).</li>
 </ol>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md286"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md298"></a>
 3. Target Descriptors (<span class="tt">include/Descriptors/</span>)</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md287"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md299"></a>
 3.1 <span class="tt">TargetDesc</span> (<span class="tt">Descriptors/TargetDesc.h</span>)</h2>
 <p>The abstract CPU architecture descriptor:</p><ul>
 <li><span class="tt">virtual const char *getName() const = 0</span></li>
@@ -474,7 +474,7 @@ Lowering Sequence</h3>
 <li><span class="tt">virtual const std::pmr::vector&lt;<a class="el" href="class_calling_conv_desc.html">CallingConvDesc</a> *&gt; &amp;getAvailableCallingConventions() = 0</span></li>
 <li><span class="tt">virtual std::unique_ptr&lt;<a class="el" href="class_generic_code_emitter.html">GenericCodeEmitter</a>&gt; createCodeEmitter() = 0</span></li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md288"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md300"></a>
 3.2 <span class="tt">TargetBinaryDesc</span> (<span class="tt">Descriptors/TargetBinaryDesc.h</span>)</h2>
 <p>The abstract OS and object-file format descriptor:</p><ul>
 <li><span class="tt">virtual bool isLittleEndian() const = 0</span></li>
@@ -487,7 +487,7 @@ Lowering Sequence</h3>
 <li><span class="tt">virtual const std::pmr::unordered_map&lt;<a class="el" href="_code_section_8h.html#abf4fefac0b05e2eb306b0e1cff6df37d">SectionType</a>, <a class="el" href="class_code_section.html">CodeSection</a> *&gt; &amp;getSections() const = 0</span></li>
 </ul>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md290"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md302"></a>
 4. Header &amp; Class Index</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">

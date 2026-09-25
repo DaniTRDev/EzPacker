@@ -1,5 +1,16 @@
 var NAVTREEINDEX28 =
 {
+"struct_symbols_1_1_legalize_action_symbol.html#a8769733c73b173cba87e9ca6bad3adf3":[12,0,14,6,1],
+"struct_symbols_1_1_legalize_action_symbol.html#a8769733c73b173cba87e9ca6bad3adf3":[13,0,10,6,1],
+"struct_symbols_1_1_legalize_action_symbol.html#ae75e89b6674962782063985449f486f9":[12,0,14,6,0],
+"struct_symbols_1_1_legalize_action_symbol.html#ae75e89b6674962782063985449f486f9":[13,0,10,6,0],
+"struct_symbols_1_1_legalize_rule_instruction_symbol.html":[12,0,14,7],
+"struct_symbols_1_1_legalize_rule_instruction_symbol.html":[13,0,10,7],
+"struct_symbols_1_1_legalize_rule_instruction_symbol.html#a75a19207f5755fffdd1759b8dcfcbcb9":[12,0,14,7,1],
+"struct_symbols_1_1_legalize_rule_instruction_symbol.html#a75a19207f5755fffdd1759b8dcfcbcb9":[13,0,10,7,1],
+"struct_symbols_1_1_legalize_rule_instruction_symbol.html#ae03fdd46d3a31762dac6add2c2e839c4":[12,0,14,7,0],
+"struct_symbols_1_1_legalize_rule_instruction_symbol.html#ae03fdd46d3a31762dac6add2c2e839c4":[13,0,10,7,0],
+"struct_symbols_1_1_legalize_rule_operand_symbol.html":[12,0,14,8],
 "struct_symbols_1_1_legalize_rule_operand_symbol.html":[13,0,10,8],
 "struct_symbols_1_1_legalize_rule_operand_symbol.html#a0db2e26cc9a80f09b896f04a3e2c4d9e":[12,0,14,8,4],
 "struct_symbols_1_1_legalize_rule_operand_symbol.html#a0db2e26cc9a80f09b896f04a3e2c4d9e":[13,0,10,8,4],

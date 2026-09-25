@@ -29,7 +29,7 @@ All target-dependent knowledge is completely encapsulated within self-contained 
        |  - <target>_patterns.isf   |             |  - <Target>ElfBinaryDesc   |
        +----------------------------+             +----------------------------+
                      |                                           |
-                     v (ezdsl-cli via CMake)                     |
+                     v (EzDslCli via CMake)                     |
        +----------------------------+                            |
        |   Synthesized C++ Tables   |                            |
        +----------------------------+                            |

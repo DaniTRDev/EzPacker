@@ -1,5 +1,16 @@
 var NAVTREEINDEX26 =
 {
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#a35be412bced1ad7be79923b077791345":[13,0,5,0,9,5],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#a94a85e07a4691f7708cb67fb8c848666":[12,0,6,0,9,3],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#a94a85e07a4691f7708cb67fb8c848666":[13,0,5,0,9,3],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#aa3f23fd1f32762f808c5acf990402635":[12,0,6,0,9,8],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#aa3f23fd1f32762f808c5acf990402635":[13,0,5,0,9,8],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#adc27483923aa8987840d7a8944658782":[12,0,6,0,9,11],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#adc27483923aa8987840d7a8944658782":[13,0,5,0,9,11],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#ae4b5c6e7ea03e5395953dd5f69466039":[12,0,6,0,9,1],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#ae4b5c6e7ea03e5395953dd5f69466039":[13,0,5,0,9,1],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#ae6b0704fe1beb77010ec8f61607de9e3":[12,0,6,0,9,6],
+"struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#ae6b0704fe1beb77010ec8f61607de9e3":[13,0,5,0,9,6],
 "struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#af61eb9cf60ef007868d8f4d6bae345f6":[12,0,6,0,9,2],
 "struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#af61eb9cf60ef007868d8f4d6bae345f6":[13,0,5,0,9,2],
 "struct_ez_mir_1_1_ast_1_1_mir_ast_operand.html#af91394033320254cf744bcdbe41d91d9":[12,0,6,0,9,7],
@@ -238,16 +249,5 @@ var NAVTREEINDEX26 =
 "struct_legality_query.html#abd36af0925e1bce2105abeb903c4c35e":[13,0,45,7],
 "struct_legality_query.html#ac435a895aec74b8941c209a686a56464":[13,0,45,5],
 "struct_legality_query.html#ae7ea6738a3ba9c7eb8d8753685c1ef08":[13,0,45,6],
-"struct_legality_response.html":[13,0,46],
-"struct_legality_response.html#a4b4a37417a89f8b946d837a1b91e4e24":[13,0,46,5],
-"struct_legality_response.html#a84de5867c698210878d9cfd403f4c5cc":[13,0,46,0],
-"struct_legality_response.html#abc1f59da5be0eb8884b6028be0588007":[13,0,46,3],
-"struct_legality_response.html#af75582edd5b14d53bd9b50345aaf20ad":[13,0,46,4],
-"struct_legality_response.html#afca74136643092a7bd6de2046ebbfcbd":[13,0,46,2],
-"struct_legality_response.html#afea705de0a168ea94aae61436dd51c8d":[13,0,46,1],
-"struct_legalize_ctx.html":[13,0,48],
-"struct_legalize_ctx.html#a5d7e049a7b5db18c4d49413468ba297c":[13,0,48,1],
-"struct_legalize_ctx.html#a5ebff7a387e416befb25d2c35c13e584":[13,0,48,2],
-"struct_legalize_ctx.html#aefb18f5efe346c3f1d0fb903373b2c46":[13,0,48,3],
-"struct_legalize_ctx.html#af5f01ffbd3f02e7443b8d477be077f8e":[13,0,48,0]
+"struct_legality_response.html":[13,0,46]
 };

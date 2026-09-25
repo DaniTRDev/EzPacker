@@ -1,5 +1,16 @@
 var NAVTREEINDEX27 =
 {
+"struct_legality_response.html#a4b4a37417a89f8b946d837a1b91e4e24":[13,0,46,5],
+"struct_legality_response.html#a84de5867c698210878d9cfd403f4c5cc":[13,0,46,0],
+"struct_legality_response.html#abc1f59da5be0eb8884b6028be0588007":[13,0,46,3],
+"struct_legality_response.html#af75582edd5b14d53bd9b50345aaf20ad":[13,0,46,4],
+"struct_legality_response.html#afca74136643092a7bd6de2046ebbfcbd":[13,0,46,2],
+"struct_legality_response.html#afea705de0a168ea94aae61436dd51c8d":[13,0,46,1],
+"struct_legalize_ctx.html":[13,0,48],
+"struct_legalize_ctx.html#a5d7e049a7b5db18c4d49413468ba297c":[13,0,48,1],
+"struct_legalize_ctx.html#a5ebff7a387e416befb25d2c35c13e584":[13,0,48,2],
+"struct_legalize_ctx.html#aefb18f5efe346c3f1d0fb903373b2c46":[13,0,48,3],
+"struct_legalize_ctx.html#af5f01ffbd3f02e7443b8d477be077f8e":[13,0,48,0],
 "struct_liveness_result.html":[13,0,52],
 "struct_liveness_result.html#a21460189104d2f65a8864d8e3a04d672":[13,0,52,3],
 "struct_liveness_result.html#a498f3736b158febc35a1f2b84e7dc9bd":[13,0,52,1],
@@ -238,16 +249,5 @@ var NAVTREEINDEX27 =
 "struct_symbols_1_1_legalize_action_symbol.html":[12,0,14,6],
 "struct_symbols_1_1_legalize_action_symbol.html":[13,0,10,6],
 "struct_symbols_1_1_legalize_action_symbol.html#a09a999d7d81a15ca9916863290fefdec":[12,0,14,6,2],
-"struct_symbols_1_1_legalize_action_symbol.html#a09a999d7d81a15ca9916863290fefdec":[13,0,10,6,2],
-"struct_symbols_1_1_legalize_action_symbol.html#a8769733c73b173cba87e9ca6bad3adf3":[12,0,14,6,1],
-"struct_symbols_1_1_legalize_action_symbol.html#a8769733c73b173cba87e9ca6bad3adf3":[13,0,10,6,1],
-"struct_symbols_1_1_legalize_action_symbol.html#ae75e89b6674962782063985449f486f9":[12,0,14,6,0],
-"struct_symbols_1_1_legalize_action_symbol.html#ae75e89b6674962782063985449f486f9":[13,0,10,6,0],
-"struct_symbols_1_1_legalize_rule_instruction_symbol.html":[12,0,14,7],
-"struct_symbols_1_1_legalize_rule_instruction_symbol.html":[13,0,10,7],
-"struct_symbols_1_1_legalize_rule_instruction_symbol.html#a75a19207f5755fffdd1759b8dcfcbcb9":[12,0,14,7,1],
-"struct_symbols_1_1_legalize_rule_instruction_symbol.html#a75a19207f5755fffdd1759b8dcfcbcb9":[13,0,10,7,1],
-"struct_symbols_1_1_legalize_rule_instruction_symbol.html#ae03fdd46d3a31762dac6add2c2e839c4":[12,0,14,7,0],
-"struct_symbols_1_1_legalize_rule_instruction_symbol.html#ae03fdd46d3a31762dac6add2c2e839c4":[13,0,10,7,0],
-"struct_symbols_1_1_legalize_rule_operand_symbol.html":[12,0,14,8]
+"struct_symbols_1_1_legalize_action_symbol.html#a09a999d7d81a15ca9916863290fefdec":[13,0,10,6,2]
 };

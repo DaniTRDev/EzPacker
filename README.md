@@ -24,7 +24,7 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 ### Subproject Documentation
 - **[EzCore](docs/projects/EzCore.md)** - PMR memory allocators, diagnostic engine, `FlexInt`/`FlexFloat`, `DenseBitSet`, `IntrusiveLinkedList`.
 - **[EzMir](docs/projects/EzMir.md)** - Intermediate representation: functions, blocks, instructions, operands, SSA pass pipeline.
-- **[EzDsl](docs/projects/EzDsl.md)** - Meta-compiler toolkit and `ezdsl-cli` driver for all 10 DSL dialects.
+- **[EzDsl](docs/projects/EzDsl.md)** - Meta-compiler toolkit and `EzDslCli` driver for all 10 DSL dialects.
 - **[EzCodeEmitter](docs/projects/EzCodeEmitter.md)** - Binary machine code emission, section management, ELF64, and PE/COFF writers.
 - **[EzTriple](docs/projects/EzTriple.md)** - Backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer.
 - **[EzCompiler](docs/projects/EzCompiler.md)** - Compiler driver executable, options parsing, and pipeline orchestration.

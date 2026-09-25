@@ -93,10 +93,10 @@ $(function(){initNavTree('md_docs_2projects_2_ez_targets.html','',''); });
   <div class="headertitle"><div class="title">EzTargets Subproject Documentation </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md245"></a></p>
+<div class="textblock"><p><a class="anchor" id="autotoc_md257"></a></p>
 <p><a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Documentation Index</a> &gt; <a class="el" href="md_docs_2projects_2_ez_targets.html" title="EzTargets Subproject Documentation">Subprojects</a> &gt; <b><a class="el" href="namespace_ez_targets.html">EzTargets</a></b> | <a href="../doxygen/index.html">Doxygen API Reference</a></p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md247"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md259"></a>
 1. Overview &amp; Architectural Role</h1>
 <p><span class="tt"><a class="el" href="namespace_ez_targets.html">EzTargets</a></span> provides concrete hardware CPU target implementations for EzPacker. It integrates target-specific code generation, machine instruction definitions, register banks, calling conventions, binary object writers, branch relaxation, and hardware instruction encoders.</p>
 <p>The primary target architecture currently implemented in <a class="el" href="namespace_ez_targets.html">EzTargets</a> is <b>x86-64 (AMD64)</b>, with native support for both <b>System V AMD64</b> (Linux, macOS, BSD) and <b>Microsoft x64</b> (Windows) ABIs.</p>
@@ -131,9 +131,9 @@ $(function(){initNavTree('md_docs_2projects_2_ez_targets.html','',''); });
 <div class="line">| - X86_64CodeEmitter                              |</div>
 <div class="line">+--------------------------------------------------+</div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md249"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md261"></a>
 2. X86-64 Target Architecture Implementation</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md250"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md262"></a>
 2.1 <span class="tt">X86_64TargetDesc</span> (<span class="tt">X86_64/include/X86_64TargetDesc.h</span>)</h2>
 <p><span class="tt">X86_64TargetDesc</span> inherits from <span class="tt"><a class="el" href="class_target_desc.html">TargetDesc</a></span> (<span class="tt"><a class="el" href="namespace_ez_triple.html">EzTriple</a></span>) and serves as the central factory and descriptor for the AMD64 architecture:</p>
 <ul>
@@ -161,7 +161,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_targets.html','',''); });
 </li>
 </ul>
 <hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md252"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md264"></a>
 2.2 Hand-Written Lowering Shims (<span class="tt">X86_64/include/X86_64Lowering.h</span>)</h2>
 <p>The generated legalizer action table and rewrite rules (<span class="tt">.lrd</span>) reference hand-written x86-64 lowering functions and predicate/transform helpers:</p>
 <div class="fragment"><div class="line"><span class="comment">// Canonical declarations matching DSL-visible contracts:</span></div>
@@ -184,7 +184,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_targets.html','',''); });
 <div class="ttc" id="a_x86__64_lowering_8h_html_ac13ff2ab74725c5104563fd6478188c5"><div class="ttname"><a href="_x86__64_lowering_8h.html#ac13ff2ab74725c5104563fd6478188c5">AMD64CallLowering</a></div><div class="ttdeci">LegalizationResult AMD64CallLowering(LegalizeCtx &amp;ctx)</div></div>
 <div class="ttc" id="astruct_legalize_ctx_html"><div class="ttname"><a href="struct_legalize_ctx.html">LegalizeCtx</a></div><div class="ttdef"><b>Definition</b> LegalizeActionCommon.h:32</div></div>
 </div><!-- fragment --><hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md254"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md266"></a>
 2.3 Table-Driven Machine Instruction Encoder (<span class="tt">X86_64/include/Encoding/</span>)</h2>
 <p>Rather than maintaining a massive hard-coded switch statement for emitting machine bytes, <a class="el" href="namespace_ez_targets.html">EzTargets</a> features a data-driven, table-interpreted instruction encoder (<span class="tt">InstructionEncoder</span>):</p>
 <div class="fragment"><div class="line"><span class="keyword">namespace </span><a class="code hl_namespace" href="namespace_ez_targets_1_1_x86__64.html">EzTargets::X86_64</a></div>
@@ -221,7 +221,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_targets.html','',''); });
 <div class="ttc" id="anamespace_ez_targets_1_1_x86__64_html"><div class="ttname"><a href="namespace_ez_targets_1_1_x86__64.html">EzTargets::X86_64</a></div><div class="ttdef"><b>Definition</b> BranchRelaxer.h:10</div></div>
 <div class="ttc" id="anamespace_ez_targets_1_1_x86__64_html_a42dec3441801dfd4a929b26743ac0bf8"><div class="ttname"><a href="namespace_ez_targets_1_1_x86__64.html#a42dec3441801dfd4a929b26743ac0bf8">EzTargets::X86_64::ConditionCode</a></div><div class="ttdeci">ConditionCode</div><div class="ttdef"><b>Definition</b> X86_64EncodingDesc.h:17</div></div>
 <div class="ttc" id="astruct_ez_code_emitter_1_1_encode_result_html"><div class="ttname"><a href="struct_ez_code_emitter_1_1_encode_result.html">EzCodeEmitter::EncodeResult</a></div><div class="ttdef"><b>Definition</b> EncodeResult.h:18</div></div>
-</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md255"></a>
+</div><!-- fragment --><h3 class="doxsection"><a class="anchor" id="autotoc_md267"></a>
 Operand Slot Classifications (<span class="tt">EncSlotKind</span>)</h3>
 <p><span class="tt">EncSlotKind</span> defines the structural role an operand plays within the x86-64 instruction encoding:</p><ul>
 <li><span class="tt">Reg</span>: Operand placed into the <span class="tt">ModR/M.reg</span> field.</li>
@@ -232,11 +232,11 @@ Operand Slot Classifications (<span class="tt">EncSlotKind</span>)</h3>
 <li><span class="tt">Rel8</span>, <span class="tt">Rel32</span>: PC-relative branch displacements.</li>
 <li><span class="tt">CondCode</span>: Condition code digit folded into the opcode byte.</li>
 </ul>
-<h3 class="doxsection"><a class="anchor" id="autotoc_md256"></a>
+<h3 class="doxsection"><a class="anchor" id="autotoc_md268"></a>
 Instruction Forms (<span class="tt">EncForm</span>)</h3>
 <p>A form selects the structural encoding algorithm: <span class="tt">Rr</span> (reg-reg), <span class="tt">Rm</span> (reg-mem load), <span class="tt">Mr</span> (mem-reg store), <span class="tt">Ri</span> (reg-imm ALU), <span class="tt">MovRI</span> (immediate move / MOVABS), <span class="tt">Movzx</span> (zero-extend), <span class="tt">Movsx</span> (sign-extend), <span class="tt">Lea</span> (load effective address), <span class="tt">Unary</span> (NOT/NEG), <span class="tt">Test</span> (TEST), <span class="tt">Shift</span> (SHL/SHR), <span class="tt">ImulRR</span>, <span class="tt">ImulRI</span>, <span class="tt">Div</span>, <span class="tt">Jcc</span>, <span class="tt">Jmp</span>, <span class="tt">Call</span>, <span class="tt">Ret</span>, <span class="tt">Push</span>, <span class="tt">Pop</span>, <span class="tt">Nop</span>, <span class="tt">Syscall</span>, <span class="tt">Setcc</span>, <span class="tt">Sse</span>, <span class="tt">Cvt</span>.</p>
 <hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md258"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md270"></a>
 2.4 Branch Relaxation Pass (<span class="tt">X86_64/include/BranchRelaxation/BranchRelaxer.h</span>)</h2>
 <p>During early emission, conditional and unconditional jumps are optimistically emitted using compact 2-byte short encodings (<span class="tt">JMP rel8</span>, <span class="tt">Jcc rel8</span>).</p>
 <p>However, if basic block sizes grow large (exceeding signed 8-bit displacement $[-128, +127]$), <span class="tt">BranchRelaxer</span> runs:</p><ol type="1">
@@ -250,7 +250,7 @@ Instruction Forms (<span class="tt">EncForm</span>)</h3>
 <li>Iterates to a fixed point until all branch offsets are valid and stable.</li>
 </ol>
 <hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md260"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md272"></a>
 2.5 Frame Lowering (<span class="tt">X86_64/include/X86_64FrameLowerer.h</span>)</h2>
 <p><span class="tt">X86_64FrameLowerer</span> translates abstract stack operations into concrete x86-64 stack adjustments:</p>
 <ul>
@@ -270,7 +270,7 @@ Instruction Forms (<span class="tt">EncForm</span>)</h3>
 </li>
 </ul>
 <hr  />
-<h2 class="doxsection"><a class="anchor" id="autotoc_md262"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md274"></a>
 2.6 Target Registration (<span class="tt">X86_64/Registration/</span>)</h2>
 <p>The target registers itself into the global <span class="tt">TargetResolver</span> through <span class="tt"><a class="el" href="_ez_targets_x86__64_registration_8h.html">EzTargetsX86_64Registration.h</a></span>:</p>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &quot;Registration/EzTargetsX86_64Registration.h&quot;</span></div>
@@ -279,7 +279,7 @@ Instruction Forms (<span class="tt">EncForm</span>)</h3>
 <div class="line"><a class="code hl_function" href="namespace_ez_targets_1_1_x86__64.html#a4123350884063b2005e12200bb924cf3">EzTargets::X86_64::registerTarget</a>();</div>
 <div class="ttc" id="anamespace_ez_targets_1_1_x86__64_html_a4123350884063b2005e12200bb924cf3"><div class="ttname"><a href="namespace_ez_targets_1_1_x86__64.html#a4123350884063b2005e12200bb924cf3">EzTargets::X86_64::registerTarget</a></div><div class="ttdeci">void registerTarget()</div></div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md264"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md276"></a>
 3. Header &amp; Class Index</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">

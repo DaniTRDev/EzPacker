@@ -156,14 +156,14 @@ my_app.exe
 
 ## 6. Inspecting EzDsl Files (For Target Developers)
 
-If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the `ezdsl-cli` tool to validate DSL files:
+If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the `EzDslCli` tool to validate DSL files:
 
 ```bash
-# Validate and dump AST of a target descriptor
-ezdsl-cli --dump-ast EzTargets/X86_64/Dsl/x86_64_rules.lrd
+# Validate and dump AST of legalization rules
+EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_rules.lrd --dump-ast
 
 # Validate and dump symbol definitions of calling conventions
-ezdsl-cli --dump-symbols EzTargets/X86_64/Dsl/x86_64_sysv.ccdf
+EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symbols
 ```
 
 ---

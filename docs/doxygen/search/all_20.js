@@ -20,13 +20,14 @@ var searchData=
   ['vendor_20cmake_17',['Fetched Dependencies (&lt;span class=&quot;tt&quot;&gt;CMake/Vendor.cmake&lt;/span&gt;)',['../md_docs_2build__guide.html#autotoc_md7',1,'']]],
   ['vendored_20in_20tree_20dependencies_18',['Vendored In-Tree Dependencies',['../md_docs_2build__guide.html#autotoc_md8',1,'']]],
   ['verbose_19',['verbose',['../struct_cli_1_1_cli_options.html#ab330271f5e57ce4f1a28f019081e6937',1,'Cli::CliOptions::verbose'],['../struct_ez_compiler_1_1_command_line_options.html#ab19b86be1a4669223ebf61a7f3b55223',1,'EzCompiler::CommandLineOptions::verbose']]],
-  ['verification_20harness_20',['3. End-to-End Verification Harness',['../md_docs_2examples.html#autotoc_md56',1,'']]],
-  ['verifyssa_21',['verifySsa',['../struct_ez_mir_1_1_mir_parser_options.html#a9a145b9fcb46bf7b0c087e361f4bea7f',1,'EzMir::MirParserOptions']]],
-  ['via_20ctest_22',['5.1 Running All Tests via CTest',['../md_docs_2build__guide.html#autotoc_md18',1,'']]],
-  ['view_23',['view',['../class_code_generators_1_1_cpp_source_emitter.html#afcd0b62b97f1b5c4ddfc4aada2e01f47',1,'CodeGenerators::CppSourceEmitter']]],
-  ['visitoperandregisters_24',['visitOperandRegisters',['../class_mir_instruction.html#a925a94e8d77d38329b4cbed5a4f10f40',1,'MirInstruction']]],
-  ['visual_20studio_202022_20generator_25',['4.1 Windows (Visual Studio 2022 Generator)',['../md_docs_2build__guide.html#autotoc_md13',1,'']]],
-  ['void_26',['Void',['../namespace_ez_mir_1_1_ast.html#a534800c6b0af94605a5b0b5a2bce71f2a81ceb48a978444906d80119200aa358d',1,'EzMir::Ast::Void'],['../_mir_type_8h.html#a33d31796e9735246db5c476d0551a86da81ceb48a978444906d80119200aa358d',1,'Void:&#160;MirType.h'],['../namespace_d_s_l_1_1_ast_1_1_type_def.html#a70c0cdf8df1f59106a9c7dd3481a81b1a81ceb48a978444906d80119200aa358d',1,'DSL::Ast::TypeDef::Void']]],
-  ['vreg_27',['vreg',['../class_mir_register_ref.html#aa8e1c640b5a2a8cfedbdb5a095198db8',1,'MirRegisterRef::vreg(size_t id)'],['../class_mir_register_ref.html#a3314e75a6c5cd48a713ff00c79b48e87',1,'MirRegisterRef::vreg(size_t id, class MirRegisterClass *_class)']]],
-  ['vs_20microsoft_20win64_20abi_28',['2.3 &lt;span class=&quot;tt&quot;&gt;calling_conventions.mir&lt;/span&gt;: System V vs Microsoft Win64 ABI',['../md_docs_2examples.html#autotoc_md39',1,'']]]
+  ['verification_20flags_20',['6. Introspection, Dump &amp;amp; Verification Flags',['../md_docs_2projects_2_ez_dsl.html#autotoc_md229',1,'']]],
+  ['verification_20harness_21',['3. End-to-End Verification Harness',['../md_docs_2examples.html#autotoc_md56',1,'']]],
+  ['verifyssa_22',['verifySsa',['../struct_ez_mir_1_1_mir_parser_options.html#a9a145b9fcb46bf7b0c087e361f4bea7f',1,'EzMir::MirParserOptions']]],
+  ['via_20ctest_23',['5.1 Running All Tests via CTest',['../md_docs_2build__guide.html#autotoc_md18',1,'']]],
+  ['view_24',['view',['../class_code_generators_1_1_cpp_source_emitter.html#afcd0b62b97f1b5c4ddfc4aada2e01f47',1,'CodeGenerators::CppSourceEmitter']]],
+  ['visitoperandregisters_25',['visitOperandRegisters',['../class_mir_instruction.html#a925a94e8d77d38329b4cbed5a4f10f40',1,'MirInstruction']]],
+  ['visual_20studio_202022_20generator_26',['4.1 Windows (Visual Studio 2022 Generator)',['../md_docs_2build__guide.html#autotoc_md13',1,'']]],
+  ['void_27',['Void',['../namespace_ez_mir_1_1_ast.html#a534800c6b0af94605a5b0b5a2bce71f2a81ceb48a978444906d80119200aa358d',1,'EzMir::Ast::Void'],['../_mir_type_8h.html#a33d31796e9735246db5c476d0551a86da81ceb48a978444906d80119200aa358d',1,'Void:&#160;MirType.h'],['../namespace_d_s_l_1_1_ast_1_1_type_def.html#a70c0cdf8df1f59106a9c7dd3481a81b1a81ceb48a978444906d80119200aa358d',1,'DSL::Ast::TypeDef::Void']]],
+  ['vreg_28',['vreg',['../class_mir_register_ref.html#aa8e1c640b5a2a8cfedbdb5a095198db8',1,'MirRegisterRef::vreg(size_t id)'],['../class_mir_register_ref.html#a3314e75a6c5cd48a713ff00c79b48e87',1,'MirRegisterRef::vreg(size_t id, class MirRegisterClass *_class)']]],
+  ['vs_20microsoft_20win64_20abi_29',['2.3 &lt;span class=&quot;tt&quot;&gt;calling_conventions.mir&lt;/span&gt;: System V vs Microsoft Win64 ABI',['../md_docs_2examples.html#autotoc_md39',1,'']]]
 ];

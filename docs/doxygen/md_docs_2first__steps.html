@@ -206,12 +206,12 @@ Syntax Breakdown</h2>
 </div><!-- fragment --><hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md83"></a>
 6. Inspecting EzDsl Files (For Target Developers)</h1>
-<p>If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the <span class="tt">ezdsl-cli</span> tool to validate <a class="el" href="namespace_d_s_l.html">DSL</a> files:</p>
-<div class="fragment"><div class="line"># Validate and dump AST of a target descriptor</div>
-<div class="line">ezdsl-cli --dump-ast EzTargets/X86_64/Dsl/x86_64_rules.lrd</div>
+<p>If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the <span class="tt">EzDslCli</span> tool to validate <a class="el" href="namespace_d_s_l.html">DSL</a> files:</p>
+<div class="fragment"><div class="line"># Validate and dump AST of legalization rules</div>
+<div class="line">EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_rules.lrd --dump-ast</div>
 <div class="line"> </div>
 <div class="line"># Validate and dump symbol definitions of calling conventions</div>
-<div class="line">ezdsl-cli --dump-symbols EzTargets/X86_64/Dsl/x86_64_sysv.ccdf</div>
+<div class="line">EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symbols</div>
 </div><!-- fragment --><hr  />
 <h1 class="doxsection"><a class="anchor" id="autotoc_md85"></a>
 7. Next Steps</h1>

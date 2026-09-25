@@ -93,10 +93,10 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
   <div class="headertitle"><div class="title">EzMir Subproject Documentation </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="autotoc_md222"></a></p>
+<div class="textblock"><p><a class="anchor" id="autotoc_md234"></a></p>
 <p><a class="el" href="index.html#md_docs_2index" title="EzPacker: Modern C++20 Compiler Backend &amp; Code Generation Framework">EzPacker Documentation Index</a> &gt; <a class="el" href="md_docs_2projects_2_ez_mir.html" title="EzMir Subproject Documentation">Subprojects</a> &gt; <b><a class="el" href="namespace_ez_mir.html">EzMir</a></b> | <a href="../doxygen/index.html">Doxygen API Reference</a></p>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md224"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md236"></a>
 1. Overview &amp; Architectural Role</h1>
 <p><span class="tt"><a class="el" href="namespace_ez_mir.html">EzMir</a></span> (Machine Intermediate Representation) is the core representation and middle-end analysis layer of EzPacker. It models functions, basic blocks, instructions, operands, and types in both high-level generic Static Single Assignment (SSA) form and low-level target-lowered machine instruction form.</p>
 <p><a class="el" href="namespace_ez_mir.html">EzMir</a> serves as the universal pivot of the entire compiler:</p><ol type="1">
@@ -140,9 +140,9 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <div class="line">       v</div>
 <div class="line">  To EzTriple Lowering Pipeline</div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md226"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md238"></a>
 2. In-Memory Intermediate Representation (IR)</h1>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md227"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md239"></a>
 2.1 <span class="tt">MirFunction</span> (<span class="tt">Function/MirFunction.h</span>)</h2>
 <p>The top-level entity representing a callable routine.</p><ul>
 <li><b>Name &amp; Coordinates</b>: Identifier symbol (e.g., <span class="tt">@calculate_hash</span>) and associated <span class="tt"><a class="el" href="struct_source_reference.html">SourceReference</a></span>.</li>
@@ -164,7 +164,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 </ul>
 </li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md228"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md240"></a>
 2.2 <span class="tt">MirBlock</span> (<span class="tt">Block/MirBlock.h</span>)</h2>
 <p>A single-entry, single-exit basic block:</p><ul>
 <li><b>Instruction Container</b>: Holds an <span class="tt"><a class="el" href="class_intrusive_linked_list.html">IntrusiveLinkedList</a>&lt;<a class="el" href="class_mir_instruction.html">MirInstruction</a>&gt;</span> providing zero-heap-allocation insertion, erasure, and iteration.</li>
@@ -172,7 +172,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <li><b>Terminator</b>: The last instruction in a well-formed basic block must have terminator semantics (<span class="tt">RET</span>, <span class="tt">BR_COND</span>, <span class="tt">JMP</span>, or <span class="tt">UNREACHABLE</span>).</li>
 <li><b>Phi Functions</b>: SSA <span class="tt">PHI</span> nodes positioned strictly at the beginning of the block prior to normal instructions.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md229"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md241"></a>
 2.3 <span class="tt">MirInstruction</span> (<span class="tt">Instruction/MirInstruction.h</span>)</h2>
 <p>Represents a single executable operation:</p><ul>
 <li><b>Opcode</b>:<ul>
@@ -191,7 +191,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 </li>
 <li><b>Intrusive Links</b>: Embedded <span class="tt">m_prev</span> and <span class="tt">m_next</span> pointers satisfying <span class="tt"><a class="el" href="class_intrusive_linked_list.html">IntrusiveLinkedList</a>&lt;<a class="el" href="class_mir_instruction.html">MirInstruction</a>&gt;</span>.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md230"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md242"></a>
 2.4 <span class="tt">MirOperand</span> (<span class="tt">Operand/MirOperand.h</span>)</h2>
 <p>The polymorphic operand hierarchy representing instruction inputs and outputs:</p>
 <table class="markdownTable">
@@ -210,7 +210,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <tr class="markdownTableRowEven">
 <td class="markdownTableBodyNone"><span class="tt"><a class="el" href="class_mir_runtime_symbol.html">MirRuntimeSymbol</a></span>  </td><td class="markdownTableBodyNone"><span class="tt">Operand/MirRuntimeSymbol.h</span>  </td><td class="markdownTableBodyNone">Named external runtime symbol (e.g., <span class="tt">@__divti3</span>).  </td></tr>
 </table>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md231"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md243"></a>
 2.5 <span class="tt">MirType</span> &amp; <span class="tt">MirTypeTable</span> (<span class="tt">Type/MirType.h</span>, <span class="tt">Type/MirTypeTable.h</span>)</h2>
 <p>EzPacker features a comprehensive type system capable of representing arbitrary scalar integers, IEEE floats, pointers, and SIMD vectors. Type instances are immutable and canonicalized (interned) in <span class="tt">MirTypeTable</span>:</p>
 <ul>
@@ -222,7 +222,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <li><b>256-bit Vector (AVX)</b>: <span class="tt">v8f32</span>, <span class="tt">v4f64</span>, <span class="tt">v32i8</span>, <span class="tt">v16i16</span>, <span class="tt">v8i32</span>, <span class="tt">v4i64</span>.</li>
 </ul>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md233"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md245"></a>
 3. Middle-End Pass Framework</h1>
 <p><a class="el" href="namespace_ez_mir.html">EzMir</a> passes operate on <span class="tt"><a class="el" href="class_mir_function.html">MirFunction</a></span> instances and are orchestrated by <span class="tt"><a class="el" href="class_mir_pass_manager.html">MirPassManager</a></span> (<span class="tt"><a class="el" href="_mir_pass_manager_8h.html">MirPasses/MirPassManager.h</a></span>).</p>
 <div class="fragment"><div class="line">    +---------------------------------------------+</div>
@@ -234,7 +234,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <div class="line">| CodeFlowAnalysis |  |   NonSsaToSsa    |  | LivenessAnalysis  |</div>
 <div class="line">| CFG &amp; Dominators |  | SSA Construction |  | Live Intervals    |</div>
 <div class="line">+------------------+  +------------------+  +-------------------+</div>
-</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md234"></a>
+</div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md246"></a>
 3.1 <span class="tt">CodeFlowAnalysisPass</span> (<span class="tt">MirPasses/Passes/CodeFlowAnalysisPass.h</span>)</h2>
 <ul>
 <li>Traverses basic blocks to establish explicit CFG edges (<span class="tt">predecessors</span>, <span class="tt">successors</span>).</li>
@@ -242,7 +242,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <li>Computes the <b>Dominator Tree</b> and <b>Dominance Frontiers</b> using the Lengauer-Tarjan algorithm.</li>
 <li>Identifies loop headers and back-edges.</li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md235"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md247"></a>
 3.2 <span class="tt">NonSsaToSsaPass</span> (<span class="tt">MirPasses/Passes/NonSsaToSsaPass.h</span>)</h2>
 <ul>
 <li>Converts non-SSA or partially-SSA code into minimal Static Single Assignment (SSA) form using Cytron's algorithm:<ol type="1">
@@ -252,7 +252,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 </ol>
 </li>
 </ul>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md236"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md248"></a>
 3.3 <span class="tt">LivenessAnalysisPass</span> (<span class="tt">MirPasses/Passes/LivenessAnalysisPass.h</span>)</h2>
 <ul>
 <li>Executes backwards bit-vector dataflow analysis across all basic blocks using <span class="tt"><a class="el" href="class_dense_bit_set.html">DenseBitSet</a></span>.</li>
@@ -262,10 +262,10 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <li>Surfaces the <span class="tt"><a class="el" href="struct_liveness_result.html">LivenessResult</a></span> structure directly consumed by <span class="tt"><a class="el" href="class_mir_register_allocator.html">MirRegisterAllocator</a></span>.</li>
 </ul>
 <hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md238"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md250"></a>
 4. Programmatic MIR Construction (Builder API)</h1>
 <p><a class="el" href="namespace_ez_mir.html">EzMir</a> provides a clean, factory-based builder architecture designed for compilers and frontend code generators. All builders allocate objects directly within the <span class="tt"><a class="el" href="class_mir_builder_context.html">MirBuilderContext</a></span> memory arena.</p>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md239"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md251"></a>
 4.1 Builder Hierarchy</h2>
 <ol type="1">
 <li><b><span class="tt"><a class="el" href="class_mir_builder_context.html">MirBuilderContext</a></span></b> (<span class="tt"><a class="el" href="_mir_builder_context_8h.html">Builder/MirBuilderContext.h</a></span>): Central state owning the session memory arena, type table, diagnostic sink, and global ID counter.</li>
@@ -274,7 +274,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <li><b><span class="tt"><a class="el" href="class_mir_instruction_builder.html">MirInstructionBuilder</a></span></b> (<span class="tt"><a class="el" href="_mir_instruction_builder_8h.html">Instruction/MirInstructionBuilder.h</a></span>): Constructs instructions at a configurable insertion point (<span class="tt">Append</span>, <span class="tt">InsertBefore</span>, <span class="tt">InsertAfter</span>). Generates high-level opcode methods (<span class="tt">ADD</span>, <span class="tt">MOV</span>, <span class="tt">SUB</span>, <span class="tt">RET</span>, <span class="tt">JMP</span>, etc.) and target instruction methods (<span class="tt">buildTarget</span>).</li>
 <li><b><span class="tt"><a class="el" href="class_mir_operand_builder.html">MirOperandBuilder</a></span></b> (<span class="tt"><a class="el" href="_mir_operand_builder_8h.html">Operand/MirOperandBuilder.h</a></span>): Constructs virtual registers, physical registers, memory operands, constants, and symbol references.</li>
 </ol>
-<h2 class="doxsection"><a class="anchor" id="autotoc_md240"></a>
+<h2 class="doxsection"><a class="anchor" id="autotoc_md252"></a>
 4.2 Complete Programmatic Example</h2>
 <p>The following C++20 code demonstrates constructing a complete function: <span class="tt">fn @calculate(i32 a, i32 b) -&gt; i32 { return a + b; }</span></p>
 <div class="fragment"><div class="line"><span class="preprocessor">#include &quot;<a class="code" href="_mir_builder_context_8h.html">Builder/MirBuilderContext.h</a>&quot;</span></div>
@@ -344,7 +344,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <div class="ttc" id="aclass_mir_register_html"><div class="ttname"><a href="class_mir_register.html">MirRegister</a></div><div class="ttdef"><b>Definition</b> MirOperands.h:235</div></div>
 <div class="ttc" id="aclass_mir_type_html"><div class="ttname"><a href="class_mir_type.html">MirType</a></div><div class="ttdef"><b>Definition</b> MirType.h:30</div></div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md242"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md254"></a>
 5. Textual MIR Format</h1>
 <p>EzPacker supports a clean textual representation for serialization, unit testing, and human inspection.</p>
 <div class="fragment"><div class="line">fn @dot_product(ptr %arr_a, ptr %arr_b, i32 %n) -&gt; i32 {</div>
@@ -375,7 +375,7 @@ $(function(){initNavTree('md_docs_2projects_2_ez_mir.html','',''); });
 <div class="line">    ret %acc.0</div>
 <div class="line">}</div>
 </div><!-- fragment --><hr  />
-<h1 class="doxsection"><a class="anchor" id="autotoc_md244"></a>
+<h1 class="doxsection"><a class="anchor" id="autotoc_md256"></a>
 6. Header &amp; Class Index</h1>
 <table class="markdownTable">
 <tr class="markdownTableHead">

@@ -140,7 +140,7 @@ The ABI lowerer translates abstract procedural calls and argument passes into co
 Transforms generic SSA opcodes into concrete machine instruction descriptors:
 
 - **Bottom-Up Maximal Munch**:
-  Traverses the instruction stream in reverse topological order within each basic block, matching the largest possible expression trees against pattern decision trees generated from `.isdf` files.
+  Traverses the instruction stream in reverse topological order within each basic block, matching the largest possible expression trees against pattern decision trees generated from `.isf` files.
 - **Addressing Mode Matcher (`MirAddressingModeMatcher.h`)**:
   Synthesizes complex addressing expressions into memory operands:
   ```text
