@@ -1,98 +1,62 @@
-# Doxyfile 1.16+ configuration for EzPacker
-# Project Configuration
+# Doxyfile for EzPacker
 PROJECT_NAME           = "EzPacker"
-PROJECT_NUMBER         = "0.1.0"
-PROJECT_BRIEF          = "A Modular, Multi-Tier Compiler Infrastructure & Backend in C++20"
-PROJECT_LOGO           = docs/assets/logo.svg
-OUTPUT_DIRECTORY       = docs/html
-CREATE_SUBDIRS         = NO
-OUTPUT_LANGUAGE        = English
+PROJECT_NUMBER         = "1.0.0"
+PROJECT_BRIEF          = "Modern C++20 Compiler Backend, Code Generator & Machine Intermediate Representation Framework"
+OUTPUT_DIRECTORY       = docs
+HTML_OUTPUT            = doxygen
 
-# Build options
-EXTRACT_ALL            = YES
-EXTRACT_PRIVATE        = NO
-EXTRACT_PACKAGE        = NO
-EXTRACT_STATIC         = YES
-EXTRACT_LOCAL_CLASSES  = YES
-EXTRACT_LOCAL_METHODS  = NO
-EXTRACT_ANON_NSPACES   = NO
-HIDE_UNDOC_MEMBERS     = NO
-HIDE_UNDOC_CLASSES     = NO
-HIDE_FRIEND_COMPOUNDS  = NO
-HIDE_IN_BODY_DOCS      = NO
-INTERNAL_DOCS          = NO
-CASE_SENSE_NAMES       = YES
-HIDE_SCOPE_NAMES       = NO
-SHOW_INCLUDE_FILES     = YES
-INLINE_INFO            = YES
-SORT_MEMBER_DOCS       = YES
-SORT_BRIEF_DOCS        = NO
-SORT_MEMBERS_CTORS_1ST = YES
-GENERATE_DEPRECATEDLIST= YES
-GENERATE_TODOLIST      = YES
-
-# Input files
-INPUT                  = docs/mainpage.md \
-                         docs/pages \
+INPUT                  = docs \
+                         docs/projects \
                          EzCore/include \
                          EzMir/include \
-                         EzDsl/Cli/include \
-                         EzDsl/CodeGenerators/include \
                          EzDsl/Lexer/include \
                          EzDsl/Sema/include \
+                         EzDsl/CodeGenerators/include \
+                         EzDsl/Cli/include \
                          EzCodeEmitter/include \
                          EzTriple/include \
                          EzCompiler/include \
-                         EzTargets/X86_64/include
-USE_MDFILE_AS_MAINPAGE = docs/mainpage.md
-RECURSIVE              = YES
-FILE_PATTERNS          = *.h *.hpp *.md *.dox
-EXCLUDE_PATTERNS       = */tests/* */cmake-build* */.git/* */LibBf/* */.idea/* */README.md
-EXAMPLE_PATH           = examples
-EXAMPLE_PATTERNS       = *.mir *.cpp
-EXAMPLE_RECURSIVE      = YES
-IMAGE_PATH             = docs/assets
+                         EzTargets/X86_64/include \
+                         EzTargets/X86_64/Dsl/include \
+                         EzTargets/X86_64/Registration/include
 
-# Markdown and language support
+USE_MDFILE_AS_MAINPAGE = docs/index.md
+HTML_EXTRA_STYLESHEET  = docs/assets/custom.css
+
+FILE_PATTERNS          = *.h \
+                         *.hpp \
+                         *.cpp \
+                         *.md
+
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */cmake-build-*/* \
+                         */_deps/* \
+                         */build/* \
+                         */LibBf/* \
+                         */.git/* \
+                         */.idea/*
+
 MARKDOWN_SUPPORT       = YES
 AUTOLINK_SUPPORT       = YES
-BUILTIN_STL_SUPPORT    = YES
-JAVADOC_AUTOBRIEF      = YES
+SUBGROUPING            = YES
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = NO
+CASE_SENSE_NAMES       = NO
+SHOW_INCLUDE_FILES     = YES
+INLINE_INFO            = YES
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = YES
 
-# Source browsing
-SOURCE_BROWSER         = YES
-INLINE_SOURCES         = NO
-STRIP_CODE_COMMENTS    = YES
-REFERENCED_BY_RELATION = YES
-REFERENCES_RELATION    = YES
-REFERENCES_LINK_SOURCE = YES
-
-# HTML output options
 GENERATE_HTML          = YES
-HTML_OUTPUT            = .
-HTML_FILE_EXTENSION    = .html
-HTML_EXTRA_STYLESHEET  = docs/assets/custom.css
-HTML_EXTRA_FILES       = docs/assets/logo.svg
-HTML_COLORSTYLE        = TOGGLE
-HTML_DYNAMIC_MENUS     = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
 HTML_DYNAMIC_SECTIONS  = YES
 DISABLE_INDEX          = NO
-GENERATE_TREEVIEW      = YES
-FULL_SIDEBAR           = YES
-TREEVIEW_WIDTH         = 280
-SEARCHENGINE           = YES
+FULL_SIDEBAR           = NO
 
-# Disable unused outputs
-GENERATE_LATEX         = NO
-GENERATE_RTF           = NO
-GENERATE_MAN           = NO
-GENERATE_XML           = NO
-
-# Preprocessing
-ENABLE_PREPROCESSING   = YES
-MACRO_EXPANSION        = YES
-SEARCH_INCLUDES        = YES
-
-# Graphs and diagrams
 HAVE_DOT               = NO
-CLASS_DIAGRAMS         = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO
+QUIET                  = YES

@@ -1,0 +1,27 @@
+var class_mir_function =
+[
+    [ "MirFunction", "class_mir_function.html#a6fdf1cd89eee6e823d28206d1f93bc21", null ],
+    [ "begin", "class_mir_function.html#adc08717e67b9ea6f095edfa8647ab11d", null ],
+    [ "end", "class_mir_function.html#ac066dd996d187840054324f7f5f250e9", null ],
+    [ "getAnalysisData", "class_mir_function.html#afe5bd8881378984b7b551800499dbff9", null ],
+    [ "getBlock", "class_mir_function.html#a6831cad38672cbfae9260a594fb057c6", null ],
+    [ "getBlockCount", "class_mir_function.html#a53721a5ef143a74f02ce34940aec5106", null ],
+    [ "getBlocks", "class_mir_function.html#adc2bbde3b01caee4550e1a6af837d640", null ],
+    [ "getCallingConv", "class_mir_function.html#a84772ac3bd6fcc1980eff88c99c3ca6b", null ],
+    [ "getEntryPoint", "class_mir_function.html#a96aea534f3c576a18ef70c143df0641e", null ],
+    [ "getId", "class_mir_function.html#a33166f48602cb76e63bc4cfdf62c061c", null ],
+    [ "getName", "class_mir_function.html#a5f2f860df291171e1c32275e2ea67eb3", null ],
+    [ "getNext", "class_mir_function.html#a82f4a60eeeba04e29bb0e6a79da66d2b", null ],
+    [ "getParamCount", "class_mir_function.html#aad57f23020b915621395ce5b23314b83", null ],
+    [ "getParameters", "class_mir_function.html#a57554e3ff3accbd3716500d59b0f1ff9", null ],
+    [ "getPrev", "class_mir_function.html#a85e93204f147407d74d3d9d8b6699b8a", null ],
+    [ "getRegisterInfo", "class_mir_function.html#af4fab00ce517ca8405f4f76b0b1a9002", null ],
+    [ "getReturnType", "class_mir_function.html#a0ce6662032f92dfb31e4adfd7225c1b8", null ],
+    [ "getSourceRef", "class_mir_function.html#aea620227500f6009cd75071ca2708b60", null ],
+    [ "getStackFrame", "class_mir_function.html#a7cf9893075595cd2735a742be8f4e89e", null ],
+    [ "getType", "class_mir_function.html#a0ca4148fd7d65beff99b7babdb1b5d27", null ],
+    [ "getUsedCalleeSavedRegs", "class_mir_function.html#a9b029230556aace6ec5288c231e1310d", null ],
+    [ "IntrusiveLinkedList< MirFunction >", "class_mir_function.html#adae943ec51cae19729aa3da3650b85f3", null ],
+    [ "MirBlockBuilder", "class_mir_function.html#a25648252a69e05ef284e07d26d959175", null ],
+    [ "MirFunctionBuilder", "class_mir_function.html#a4f3780a1e06dae8593647026d75d2620", null ]
+];
