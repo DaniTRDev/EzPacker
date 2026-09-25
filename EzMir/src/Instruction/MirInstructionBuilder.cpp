@@ -299,6 +299,14 @@ MirInstructionBuilder &MirInstructionBuilder::swapOperand(MirInstruction *instr,
 }
 
 /**
+ * Replaces the operand at pos with newOperand, safely updating register def/use tracking.
+ */
+MirInstructionBuilder &MirInstructionBuilder::setOperand(MirInstruction *instr, size_t pos, MirOperand *newOperand)
+{
+    return swapOperand(instr, newOperand, pos);
+}
+
+/**
  * Modifies the insertion mode (Append, InsertBefore, InsertAfter) of the active insertion point.
  */
 void MirInstructionBuilder::changeInsertionType(InsertionType type) { m_insertionPoint.m_type = type; }

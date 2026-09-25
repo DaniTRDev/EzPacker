@@ -171,6 +171,11 @@ class MirInstructionBuilder : public MirBuilder<class MirInstruction>
     MirInstructionBuilder &swapOperand(MirInstruction *instr, MirOperand *newOperand, size_t index);
 
     /**
+     * Replaces the operand at pos with newOperand, safely updating register def/use tracking.
+     */
+    MirInstructionBuilder &setOperand(MirInstruction *instr, size_t pos, MirOperand *newOperand);
+
+    /**
      * Updates the insertion mode (Append, InsertBefore, InsertAfter) at the current cursor.
      */
     void changeInsertionType(InsertionType type);
