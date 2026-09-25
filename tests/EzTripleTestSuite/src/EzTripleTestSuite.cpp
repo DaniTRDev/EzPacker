@@ -458,7 +458,10 @@ MockTargetDesc::MockTargetDesc(MirBuilderContext *ctx) :
             "MOV64rr",
             9,
             std::initializer_list<MirOperandFlag>{ MirOperandFlag::Write, MirOperandFlag::Read },
-            std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass });
+            std::initializer_list<MirRegisterClass *>{ m_gprClass, m_gprClass },
+            std::initializer_list<MirRegisterRef>{},
+            std::initializer_list<MirRegisterRef>{},
+            MirInstructionFlags::IsMove);
 }
 
 // Memory operand displacements use the i64 type.

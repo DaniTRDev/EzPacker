@@ -66,4 +66,20 @@ EzPacker_AddTest(
         "tests/T_TargetExtensionSet.cpp"
 )
 
+EzPacker_AddTest(
+        "T_MirRegisterCoalescer"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_MirRegisterCoalescer.cpp"
+)
+
+EzPacker_AddTest(
+        "T_MirTargetPeepholePass"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_MirTargetPeepholePass.cpp"
+)
+
+
+
 

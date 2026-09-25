@@ -53,13 +53,36 @@ struct RegisterAllocatorCtx
     std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
     bool m_spillCostsValid{ false };
 
+    // Union-find representative map for coalesced registers (virtual reg -> leader reg)
+    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_coalescedRegs;
+
+    // Affinity relations for biased coloring (reg -> list of copy/two-address partner registers)
+    std::pmr::unordered_map<MirRegisterRef, std::pmr::vector<MirRegisterRef>> m_affinity;
+
+    // Controls whether conservative coalescing is executed during allocation
+    bool m_coalescingEnabled{ true };
+
+    [[nodiscard]] MirRegisterRef getCoalescedLeader(MirRegisterRef reg) const
+    {
+        while (true)
+        {
+            auto it = m_coalescedRegs.find(reg);
+            if (it == m_coalescedRegs.end() || it->second == reg)
+            {
+                return reg;
+            }
+            reg = it->second;
+        }
+    }
+
     explicit RegisterAllocatorCtx(class MirBuilderContext *ctx,
                                   class MirFunction *targetFunction,
                                   class TargetDesc *targetDesc,
                                   std::pmr::memory_resource *alloc) :
         m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc), m_allocator(alloc),
         m_selectStack(alloc), m_removedNodes(alloc), m_reservedRegs(alloc), m_allocatedRegs(alloc), m_degree(alloc),
-        m_spilledRegs(alloc), m_iGraph(alloc), m_unspillableRegs(alloc), m_spillCosts(alloc)
+        m_spilledRegs(alloc), m_iGraph(alloc), m_unspillableRegs(alloc), m_spillCosts(alloc),
+        m_coalescedRegs(alloc), m_affinity(alloc)
     {
     }
 };
@@ -77,6 +100,12 @@ class MirRegisterAllocator
      * Builds the interference graph from the given context and liveness analysis.
      */
     bool buildInterferenceGraph(class LivenessResult *liveness, class RegisterAllocatorCtx *ctx);
+
+    /**
+     * Conservatively coalesces copy-related and two-address virtual/physical registers
+     * using Briggs and George heuristics. Returns true if any registers were coalesced.
+     */
+    bool coalesce(class RegisterAllocatorCtx *ctx);
 
     /**
      * Simplifies the graph by removing nodes whose degree < K_class and pushing onto selectStack.
@@ -98,6 +127,11 @@ class MirRegisterAllocator
      * Rewrites virtual registers to the assigned colors (physical registers).
      */
     void rewriteColors(class RegisterAllocatorCtx *ctx);
+
+    /**
+     * Erases redundant identity copy instructions (MOV r, r) produced by register coalescing and allocation.
+     */
+    void eliminateRedundantCopies(class RegisterAllocatorCtx *ctx);
 
   protected:
     /**

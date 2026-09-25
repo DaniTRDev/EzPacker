@@ -1,8 +1,0 @@
-var struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser =
-[
-    [ "IdentifierChainTarget", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser_1_1_identifier_chain_target.html", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser_1_1_identifier_chain_target" ],
-    [ "StringTarget", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser_1_1_string_target.html", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser_1_1_string_target" ],
-    [ "rule", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser.html#ab718b8064f187fd2e4e14377c90bcccc", null ],
-    [ "value", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser.html#ae04922c8ff2aa2a8bb32737875a84b8e", null ],
-    [ "whitespace", "struct_d_s_l_1_1_parser_1_1_legalize_action_def_1_1_legalization_clause_1_1_target_parser.html#af019ca36fdd079462e5aa2ae12caa0df", null ]
-];

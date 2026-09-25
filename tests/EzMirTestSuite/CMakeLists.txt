@@ -89,3 +89,10 @@ EzPacker_AddTest(
         ""
         "tests/T_MirRegisterDescriptor.cpp"
 )
+
+EzPacker_AddTest(
+        "T_MirPeepholePass"
+        "EzMirTestSuite"
+        ""
+        "tests/T_MirPeepholePass.cpp"
+)

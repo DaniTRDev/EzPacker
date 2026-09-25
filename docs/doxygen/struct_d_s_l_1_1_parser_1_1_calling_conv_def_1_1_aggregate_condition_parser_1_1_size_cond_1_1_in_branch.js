@@ -1,7 +1,0 @@
-var struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_in_branch =
-[
-    [ "SizeList", "struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_in_branch_1_1_size_list.html", "struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_in_branch_1_1_size_list" ],
-    [ "rule", "struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_in_branch.html#af114a3b694346ec1483a0a27ad282243", null ],
-    [ "value", "struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_in_branch.html#acd523bdacb7755334ce8dbbd49ce7ed3", null ],
-    [ "whitespace", "struct_d_s_l_1_1_parser_1_1_calling_conv_def_1_1_aggregate_condition_parser_1_1_size_cond_1_1_in_branch.html#a8bc78c4028bcc2f53013e9ff1234480f", null ]
-];

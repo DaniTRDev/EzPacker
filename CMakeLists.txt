@@ -58,9 +58,12 @@ if (DOXYGEN_FOUND)
         COMMENT "Generating API documentation with Doxygen"
         VERBATIM
     )
-    message(STATUS "Doxygen found (${DOXYGEN_VERSION}): 'docs' target is available")
+    if (NOT TARGET doxygen)
+        add_custom_target(doxygen DEPENDS docs)
+    endif ()
+    message(STATUS "Doxygen found (${DOXYGEN_VERSION}): 'docs' and 'doxygen' targets are available")
 else ()
-    message(STATUS "Doxygen not found: 'docs' target is disabled")
+    message(STATUS "Doxygen not found: 'docs' and 'doxygen' targets are disabled")
 endif ()
 
 

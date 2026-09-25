@@ -13,9 +13,10 @@
  * target/context pointers are tolerated here and reported by run(), so construction never
  * dereferences them.
  */
-MirRegisterAllocatorPass::MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc) :
+MirRegisterAllocatorPass::MirRegisterAllocatorPass(MirBuilderContext *ctx, TargetDesc *targetDesc, bool coalescingEnabled) :
     m_ctx(ctx), m_regAllocator(targetDesc ? targetDesc->getRegisterAllocator() : nullptr),
-    m_result(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()), m_targetDesc(targetDesc)
+    m_result(ctx ? ctx->getGlobalAllocator() : std::pmr::get_default_resource()), m_targetDesc(targetDesc),
+    m_coalescingEnabled(coalescingEnabled)
 {
 }
 
@@ -51,6 +52,7 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
     std::pmr::polymorphic_allocator<> alloc(m_ctx->getGlobalAllocator());
     RegisterAllocatorCtx *ctx =
             alloc.new_object<RegisterAllocatorCtx>(m_ctx, func, m_targetDesc, m_ctx->getGlobalAllocator());
+    ctx->m_coalescingEnabled = m_coalescingEnabled;
 
     auto cleanupFailure = [&]() -> MirPassResult
     {
@@ -69,6 +71,8 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
         ctx->m_degree.clear();
         ctx->m_iGraph.clear();
         ctx->m_unspillableRegs.clear();
+        ctx->m_coalescedRegs.clear();
+        ctx->m_affinity.clear();
 
         LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
         LivenessResult *result = livenessAnalysis->getResult();
@@ -78,6 +82,12 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
             m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                     << "Failed to build interference graph for function " << func->getName();
             return cleanupFailure();
+        }
+
+        // Conservatively coalesce copy-related and two-address registers
+        if (ctx->m_coalescingEnabled)
+        {
+            m_regAllocator->coalesce(ctx);
         }
 
         // Compute Initial Node Degrees & Lock Physical Nodes

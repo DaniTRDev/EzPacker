@@ -9,12 +9,14 @@
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "MirPasses/Passes/NonSsaToSsaPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
+#include "MirPasses/Passes/MirPeepholePass.h"
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 #include "Legalizer/MirLegalizerPass.h"
 #include "AbiLowerer/MirAbiLowererPass.h"
 #include "InstructionSelector/MirInstructionSelectorPass.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 #include "FrameLowerer/MirFrameLowererPass.h"
+#include "Passes/MirTargetPeepholePass.h"
 #include "MirPasses/MirPassManager.h"
 #include <chrono>
 
@@ -240,6 +242,21 @@ bool CompilationPipeline::runMiddleEndPasses(MirFunction *func, MirPassManager &
         return false;
     }
 
+    if (m_ctx.getOptions().optLevel != OptimizationLevel::O0)
+    {
+        if (!runCheckedPass<MirPeepholePass>(
+                    "MirPeepholePass", func, &passManager, "Generic peephole optimization failed", bCtx))
+        {
+            return false;
+        }
+        passManager.invalidateAnalysis();
+        if (!runCheckedPass<LivenessAnalysisPass>(
+                    "LivenessAnalysisPass", func, &passManager, "Liveness analysis update failed", bCtx))
+        {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -287,8 +304,15 @@ bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func, MirPassMana
         return false;
     }
 
+    const bool enableCoalescing = (m_ctx.getOptions().optLevel != OptimizationLevel::O0);
     if (!runCheckedPass<MirRegisterAllocatorPass>(
-                "MirRegisterAllocatorPass", func, &passManager, "Register allocation failed", bCtx, targetDesc))
+                "MirRegisterAllocatorPass",
+                func,
+                &passManager,
+                "Register allocation failed",
+                bCtx,
+                targetDesc,
+                enableCoalescing))
     {
         return false;
     }
@@ -297,6 +321,15 @@ bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func, MirPassMana
                 "MirFrameLowererPass", func, &passManager, "Frame lowering failed", bCtx, targetDesc))
     {
         return false;
+    }
+
+    if (m_ctx.getOptions().optLevel != OptimizationLevel::O0)
+    {
+        if (!runCheckedPass<MirTargetPeepholePass>(
+                    "MirTargetPeepholePass", func, &passManager, "Target peephole optimization failed", bCtx, targetDesc))
+        {
+            return false;
+        }
     }
 
     return true;
