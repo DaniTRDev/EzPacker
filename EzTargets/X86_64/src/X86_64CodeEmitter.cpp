@@ -35,10 +35,21 @@ constexpr uint8_t FramePointerEncoding = 5; // RBP
  */
 uint8_t operandSizeBytes(MirOperand *op, MirRegister *reg)
 {
-    (void)reg;
     if (op)
     {
         MirType *type = op->getMirType();
+        if (type)
+        {
+            size_t bits = type->getTotalSizeInBits();
+            if (bits > 0)
+            {
+                return static_cast<uint8_t>((bits + 7) / 8);
+            }
+        }
+    }
+    if (reg)
+    {
+        MirType *type = reg->getMirType();
         if (type)
         {
             size_t bits = type->getTotalSizeInBits();

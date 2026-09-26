@@ -336,6 +336,12 @@ bool MirVerifierPass::verifyOperandKinds(MirInstruction *inst, const MirInstruct
                            ExpectedOperandType::RuntimeSymbol | ExpectedOperandType::Integer;
         }
 
+        // For MOV instructions, operand 1 can be a symbolic reference (address of global or stack slot).
+        if (inst->hasOpcode(MirInstructionOpCode::MOV) && i == 1)
+        {
+            expectedType = expectedType | ExpectedOperandType::Reference;
+        }
+
         // If variadic slot is ExpectedOperandType::VariadicArgs, accept Any
         if (expectedType & ExpectedOperandType::VariadicArgs)
         {

@@ -194,6 +194,106 @@ pattern Select_XOR32rr [cost = 1] {
 };
 
 // ============================================================================
+// Floating-Point Arithmetic Patterns
+// ============================================================================
+
+pattern Select_FADD32rr [cost = 1] {
+    match {
+        FADD f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        ADDSS FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FADD64rr [cost = 1] {
+    match {
+        FADD f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        ADDSD FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+pattern Select_FSUB32rr [cost = 1] {
+    match {
+        FSUB f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        SUBSS FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FSUB64rr [cost = 1] {
+    match {
+        FSUB f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        SUBSD FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+pattern Select_FMUL32rr [cost = 1] {
+    match {
+        FMUL f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        MULSS FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FMUL64rr [cost = 1] {
+    match {
+        FMUL f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MULSD FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+pattern Select_FDIV32rr [cost = 1] {
+    match {
+        FDIV f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        DIVSS FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FDIV64rr [cost = 1] {
+    match {
+        FDIV f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        DIVSD FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+// ============================================================================
 // Data Movement Patterns
 // ============================================================================
 
@@ -238,6 +338,103 @@ pattern Select_MOV32rr [cost = 1] {
         MOV32rr GPR32:$dst, GPR32:$src;
     };
 };
+
+pattern Select_MOV32f [cost = 1] {
+    match {
+        MOV f32:$dst, f32:$src;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        MOVSSrr FPR32:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_MOV64f [cost = 1] {
+    match {
+        MOV f64:$dst, f64:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MOVSDrr FPR64:$dst, FPR64:$src;
+    };
+};
+
+pattern Select_MOV_v4f32 [cost = 1] {
+    match {
+        MOV v4f32:$dst, v4f32:$src;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        MOVAPSrr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v2f64 [cost = 1] {
+    match {
+        MOV v2f64:$dst, v2f64:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MOVAPDrr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v4i32 [cost = 1] {
+    match {
+        MOV v4i32:$dst, v4i32:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v2i64 [cost = 1] {
+    match {
+        MOV v2i64:$dst, v2i64:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v16i8 [cost = 1] {
+    match {
+        MOV v16i8:$dst, v16i8:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v8i16 [cost = 1] {
+    match {
+        MOV v8i16:$dst, v8i16:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        MOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
 
 pattern Select_RET [cost = 1] {
     match {
