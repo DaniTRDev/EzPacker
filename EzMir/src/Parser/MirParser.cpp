@@ -615,12 +615,18 @@ bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer,
         }
 
         Ast::MirAstType *astType = parseAstType(lexer, pCtx);
-        if (astType)
+        if (!astType)
         {
-            if (MirType *t = pCtx.resolveType(astType))
+            if (m_diag)
             {
-                paramTypes.push_back(t);
+                m_diag->error("MirParser", "Expected parameter type in function declaration") << lexer.peekToken().m_ref;
             }
+            return false;
+        }
+
+        if (MirType *t = pCtx.resolveType(astType))
+        {
+            paramTypes.push_back(t);
         }
 
         if (lexer.peekToken().m_kind == Parser::MirTokenKind::Comma)
@@ -696,16 +702,32 @@ bool MirParser::parseFunctionDef(Parser::MirLexer &lexer,
            lexer.peekToken().m_kind != Parser::MirTokenKind::EndOfFile)
     {
         Ast::MirAstType *astType = parseAstType(lexer, pCtx);
+        if (!astType)
+        {
+            if (m_diag)
+            {
+                m_diag->error("MirParser", "Expected parameter type in function signature") << lexer.peekToken().m_ref;
+            }
+            return false;
+        }
+
         MirType *paramType = pCtx.resolveType(astType);
         if (!paramType && m_ctx)
         {
             paramType = m_ctx->getTypeTable()->i64();
         }
 
-        const auto &paramNameTok = lexer.nextToken();
-        std::string_view paramName = paramNameTok.m_text.empty() ? paramNameTok.m_strVal : paramNameTok.m_text;
+        std::string_view paramName;
+        SourceReference *paramRef = lexer.peekToken().m_ref;
+        if (lexer.peekToken().m_kind != Parser::MirTokenKind::Comma &&
+            lexer.peekToken().m_kind != Parser::MirTokenKind::RParen)
+        {
+            const auto &paramNameTok = lexer.nextToken();
+            paramName = paramNameTok.m_text.empty() ? paramNameTok.m_strVal : paramNameTok.m_text;
+            paramRef = paramNameTok.m_ref;
+        }
 
-        MirRegister *paramReg = opBuilder.buildVReg(paramType, paramName, paramNameTok.m_ref);
+        MirRegister *paramReg = opBuilder.buildVReg(paramType, paramName, paramRef);
         params.push_back(paramReg);
 
         if (lexer.peekToken().m_kind == Parser::MirTokenKind::Comma)

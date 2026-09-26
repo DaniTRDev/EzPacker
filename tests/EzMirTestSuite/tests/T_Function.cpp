@@ -242,3 +242,106 @@ TEST_F(FunctionTest, TestFunc1ParameterNStackObj)
     EXPECT_TRUE(FuncStackFrameObj(func, 1, i16, obj2->m_source));
     EXPECT_TRUE(FuncStackFrameObj(func, 2, i16, obj3->m_source));
 }
+
+/**
+ * Verifies function linkage options (External, Internal, Weak) and linkage modification.
+ */
+TEST_F(FunctionTest, TestFunctionLinkage)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirFunctionBuilder builder(ctx);
+    MirType *i32 = ctx->getTypeTable()->i32();
+
+    // Default linkage is External
+    MirFunction *defaultFunc = builder.build(i32, {}, "defaultFunc");
+    EXPECT_EQ(defaultFunc->getLinkage(), MirLinkage::External);
+
+    // Explicit Internal linkage
+    MirFunction *internalFunc = builder.build(i32, {}, "internalFunc", MirLinkage::Internal);
+    EXPECT_EQ(internalFunc->getLinkage(), MirLinkage::Internal);
+
+    // Explicit Weak linkage
+    MirFunction *weakFunc = builder.build(i32, {}, "weakFunc", MirLinkage::Weak);
+    EXPECT_EQ(weakFunc->getLinkage(), MirLinkage::Weak);
+
+    // Mutating linkage via setLinkage
+    defaultFunc->setLinkage(MirLinkage::Internal);
+    EXPECT_EQ(defaultFunc->getLinkage(), MirLinkage::Internal);
+    defaultFunc->setLinkage(MirLinkage::Weak);
+    EXPECT_EQ(defaultFunc->getLinkage(), MirLinkage::Weak);
+    defaultFunc->setLinkage(MirLinkage::External);
+    EXPECT_EQ(defaultFunc->getLinkage(), MirLinkage::External);
+}
+
+/**
+ * Verifies declaring an extern function prototype (no basic blocks, isDeclaration() == true).
+ */
+TEST_F(FunctionTest, TestFunctionDeclaration)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirFunctionBuilder builder(ctx);
+    MirOperandBuilder opBuilder(ctx);
+    MirTypeTable *types = ctx->getTypeTable();
+    MirType *i32 = types->i32();
+    MirType *ptr = types->getPtr(types->_void());
+
+    MirRegister *arg0 = opBuilder.buildVReg(ptr, "arg0");
+    MirFunction *declFunc = builder.declare(i32, { arg0 }, "puts", MirLinkage::External);
+
+    ASSERT_NE(declFunc, nullptr);
+    EXPECT_EQ(declFunc->getName(), "puts");
+    EXPECT_EQ(declFunc->getReturnType(), i32);
+    EXPECT_EQ(declFunc->getLinkage(), MirLinkage::External);
+    EXPECT_TRUE(declFunc->isDeclaration());
+    EXPECT_FALSE(declFunc->isDefinition());
+    EXPECT_EQ(declFunc->getBlockCount(), 0);
+    EXPECT_EQ(declFunc->getParamCount(), 1);
+    EXPECT_TRUE(FuncParam(declFunc, 0, ptr, "arg0"));
+}
+
+/**
+ * Verifies declaring an extern function prototype from type signatures alone.
+ */
+TEST_F(FunctionTest, TestFunctionDeclareWithTypes)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirFunctionBuilder builder(ctx);
+    MirTypeTable *types = ctx->getTypeTable();
+    MirType *i32 = types->i32();
+    MirType *i64 = types->i64();
+    MirType *ptr = types->getPtr(types->_void());
+
+    MirFunction *declFunc = builder.declare(i32, { i64, ptr }, "read_bytes", MirLinkage::Weak);
+
+    ASSERT_NE(declFunc, nullptr);
+    EXPECT_EQ(declFunc->getName(), "read_bytes");
+    EXPECT_EQ(declFunc->getReturnType(), i32);
+    EXPECT_EQ(declFunc->getLinkage(), MirLinkage::Weak);
+    EXPECT_TRUE(declFunc->isDeclaration());
+    EXPECT_FALSE(declFunc->isDefinition());
+    EXPECT_EQ(declFunc->getBlockCount(), 0);
+    EXPECT_EQ(declFunc->getParamCount(), 2);
+
+    auto it = declFunc->getParameters().begin();
+    EXPECT_EQ((*it)->getMirType(), i64);
+    std::advance(it, 1);
+    EXPECT_EQ((*it)->getMirType(), ptr);
+}
+
+/**
+ * Verifies that definitions created via builder.build(...) have entry block and isDefinition() == true.
+ */
+TEST_F(FunctionTest, TestFunctionDefinitionSemantics)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirFunctionBuilder builder(ctx);
+    MirType *voidType = ctx->getTypeTable()->_void();
+
+    MirFunction *defFunc = builder.build(voidType, {}, "defined_function");
+
+    ASSERT_NE(defFunc, nullptr);
+    EXPECT_FALSE(defFunc->isDeclaration());
+    EXPECT_TRUE(defFunc->isDefinition());
+    EXPECT_EQ(defFunc->getBlockCount(), 1);
+    EXPECT_NE(defFunc->getEntryPoint(), nullptr);
+}

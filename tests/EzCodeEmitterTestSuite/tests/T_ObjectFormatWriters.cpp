@@ -217,3 +217,160 @@ TEST_F(EzCodeEmitterTestSuite, TestWritersRejectUnsupportedSections)
     coffWriter.addSymbol(customSym);
     EXPECT_THROW(coffWriter.write(coffSections), std::runtime_error);
 }
+
+// Verifies ELF64 symbol table emission for global, local, weak, and undefined symbols.
+TEST_F(EzCodeEmitterTestSuite, TestElf64SymbolLinkageAndWeak)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateElfSections(sections, getAllocator());
+
+    CodeSection *textSec = sections[SectionType::Text];
+    textSec->emit8(0xC3); // ret
+    textSec->finalize();
+
+    Elf64Writer elfWriter;
+
+    ObjectSymbol symGlobal{ .m_name = "sym_global",
+                            .m_section = SectionType::Text,
+                            .m_offset = 0,
+                            .m_size = 1,
+                            .m_isGlobal = true,
+                            .m_isWeak = false,
+                            .m_isFunction = true };
+    elfWriter.addSymbol(symGlobal);
+
+    ObjectSymbol symLocal{ .m_name = "sym_local",
+                           .m_section = SectionType::Text,
+                           .m_offset = 0,
+                           .m_size = 1,
+                           .m_isGlobal = false,
+                           .m_isWeak = false,
+                           .m_isFunction = true };
+    elfWriter.addSymbol(symLocal);
+
+    ObjectSymbol symWeak{ .m_name = "sym_weak",
+                          .m_section = SectionType::Text,
+                          .m_offset = 0,
+                          .m_size = 1,
+                          .m_isGlobal = true,
+                          .m_isWeak = true,
+                          .m_isFunction = true };
+    elfWriter.addSymbol(symWeak);
+
+    ObjectSymbol symExtern{ .m_name = "sym_extern",
+                            .m_section = SectionType::Undefined,
+                            .m_offset = 0,
+                            .m_size = 0,
+                            .m_isGlobal = true,
+                            .m_isWeak = false,
+                            .m_isFunction = true };
+    elfWriter.addSymbol(symExtern);
+
+    ObjectSymbol symWeakExtern{ .m_name = "sym_weak_extern",
+                                .m_section = SectionType::Undefined,
+                                .m_offset = 0,
+                                .m_size = 0,
+                                .m_isGlobal = true,
+                                .m_isWeak = true,
+                                .m_isFunction = true };
+    elfWriter.addSymbol(symWeakExtern);
+
+    std::vector<uint8_t> elfBytes = elfWriter.write(sections);
+    ASSERT_GE(elfBytes.size(), 64u);
+
+    // Locate section headers
+    uint64_t e_shoff = 0;
+    std::memcpy(&e_shoff, &elfBytes[40], 8);
+    uint16_t e_shentsize = 0;
+    std::memcpy(&e_shentsize, &elfBytes[58], 2);
+    uint16_t e_shnum = 0;
+    std::memcpy(&e_shnum, &elfBytes[60], 2);
+
+    ASSERT_GT(e_shoff, 0u);
+    ASSERT_GT(e_shnum, 0u);
+
+    // Find .symtab and .strtab sections
+    uint64_t symtabOffset = 0;
+    uint64_t symtabSize = 0;
+    uint32_t strtabSecIdx = 0;
+
+    for (uint16_t i = 0; i < e_shnum; ++i)
+    {
+        const uint8_t *shdr = &elfBytes[e_shoff + i * e_shentsize];
+        uint32_t sh_type = 0;
+        std::memcpy(&sh_type, shdr + 4, 4);
+
+        if (sh_type == 2) // SHT_SYMTAB
+        {
+            std::memcpy(&symtabOffset, shdr + 24, 8);
+            std::memcpy(&symtabSize, shdr + 32, 8);
+            std::memcpy(&strtabSecIdx, shdr + 40, 4);
+            break;
+        }
+    }
+
+    ASSERT_GT(symtabOffset, 0u);
+    ASSERT_GT(symtabSize, 0u);
+
+    // Read .strtab offset
+    const uint8_t *strtabHdr = &elfBytes[e_shoff + strtabSecIdx * e_shentsize];
+    uint64_t strtabOffset = 0;
+    std::memcpy(&strtabOffset, strtabHdr + 24, 8);
+
+    struct ParsedSym
+    {
+        std::string name;
+        uint8_t bind;
+        uint16_t shndx;
+    };
+    std::vector<ParsedSym> symbols;
+
+    constexpr size_t ELF_SYM_SIZE = 24;
+    size_t numSyms = symtabSize / ELF_SYM_SIZE;
+    for (size_t i = 0; i < numSyms; ++i)
+    {
+        const uint8_t *symData = &elfBytes[symtabOffset + i * ELF_SYM_SIZE];
+        uint32_t st_name = 0;
+        std::memcpy(&st_name, symData, 4);
+        uint8_t st_info = symData[4];
+        uint16_t st_shndx = 0;
+        std::memcpy(&st_shndx, symData + 6, 2);
+
+        const char *namePtr = reinterpret_cast<const char *>(&elfBytes[strtabOffset + st_name]);
+        symbols.push_back({ std::string(namePtr), static_cast<uint8_t>(st_info >> 4), st_shndx });
+    }
+
+    auto findSym = [&](std::string_view name) -> const ParsedSym * {
+        for (const auto &s : symbols)
+        {
+            if (s.name == name) return &s;
+        }
+        return nullptr;
+    };
+
+    // STB_LOCAL = 0, STB_GLOBAL = 1, STB_WEAK = 2
+    const ParsedSym *psGlobal = findSym("sym_global");
+    ASSERT_NE(psGlobal, nullptr);
+    EXPECT_EQ(psGlobal->bind, 1); // STB_GLOBAL
+    EXPECT_NE(psGlobal->shndx, 0);
+
+    const ParsedSym *psLocal = findSym("sym_local");
+    ASSERT_NE(psLocal, nullptr);
+    EXPECT_EQ(psLocal->bind, 0); // STB_LOCAL
+    EXPECT_NE(psLocal->shndx, 0);
+
+    const ParsedSym *psWeak = findSym("sym_weak");
+    ASSERT_NE(psWeak, nullptr);
+    EXPECT_EQ(psWeak->bind, 2); // STB_WEAK
+    EXPECT_NE(psWeak->shndx, 0);
+
+    const ParsedSym *psExtern = findSym("sym_extern");
+    ASSERT_NE(psExtern, nullptr);
+    EXPECT_EQ(psExtern->bind, 1); // STB_GLOBAL
+    EXPECT_EQ(psExtern->shndx, 0); // SHN_UNDEF
+
+    const ParsedSym *psWeakExtern = findSym("sym_weak_extern");
+    ASSERT_NE(psWeakExtern, nullptr);
+    EXPECT_EQ(psWeakExtern->bind, 2); // STB_WEAK
+    EXPECT_EQ(psWeakExtern->shndx, 0); // SHN_UNDEF
+}

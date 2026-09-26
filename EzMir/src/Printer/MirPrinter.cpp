@@ -131,8 +131,18 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
         return printToString(function, MirPrinterDetail::Detailed);
     }
 
+    auto formatTypeName = [](MirType *type) -> std::string {
+        if (!type)
+            return "void";
+        if (type->getKind() == MirTypeKind::Void || type->getName() == "_void")
+            return "void";
+        if (type->getKind() == MirTypeKind::Pointer)
+            return "ptr";
+        return std::string(type->getName());
+    };
+
     std::string fnName = !function->getName().empty() ? std::string(function->getName()) : "anonymous";
-    std::string retType = function->getReturnType() ? std::string(function->getReturnType()->getName()) : "void";
+    std::string retType = formatTypeName(function->getReturnType());
 
     std::string linkagePrefix = "";
     if (function->getLinkage() == MirLinkage::Internal)
@@ -152,7 +162,7 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
         {
             if (!firstParam)
                 result += ", ";
-            result += param->getMirType() ? param->getMirType()->getName() : "i64";
+            result += formatTypeName(param->getMirType());
             firstParam = false;
         }
         result += std::format(") -> {};\n", retType);
@@ -165,7 +175,7 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
     {
         if (!firstParam)
             result += ", ";
-        std::string typeStr = param->getMirType() ? std::string(param->getMirType()->getName()) : "i64";
+        std::string typeStr = formatTypeName(param->getMirType());
         std::string pName =
                 !param->getName().empty() ? std::string(param->getName()) : std::format("%v{}", param->getRegId());
         if (!pName.starts_with("%"))
