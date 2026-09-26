@@ -22,6 +22,7 @@ set(EZMIR_FILES_LIST
         "include/Function/MirFunctionStackFrame.h"
         "include/GlobalVar/MirGlobalVar.h"
         "include/GlobalVar/MirGlobalVarBuilder.h"
+        "include/Linkage/MirLinkage.h"
         "include/MirPasses/Passes/CodeFlowAnalysisPass.h"
         "include/MirPasses/Passes/LivenessAnalysisPass.h"
         "include/MirPasses/Passes/NonSsaToSsaPass.h"

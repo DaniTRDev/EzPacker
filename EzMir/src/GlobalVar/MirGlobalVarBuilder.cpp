@@ -49,7 +49,7 @@ MirGlobalVarBuilder &MirGlobalVarBuilder::setInitializer(MirOperand *initializer
 /**
  * Constructs and allocates a new MirGlobalVar in the context arena allocator with a unique MIR ID.
  */
-MirGlobalVar *MirGlobalVarBuilder::build(MirGlobalVarLinkage linkage,
+MirGlobalVar *MirGlobalVarBuilder::build(MirLinkage linkage,
                                          MirType *type,
                                          std::pmr::string name,
                                          SourceReference *sourceRef)

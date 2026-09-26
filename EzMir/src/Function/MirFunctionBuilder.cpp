@@ -72,6 +72,7 @@ MirFunctionBuilder &MirFunctionBuilder::addPhysRegUse(MirFunction *func, const c
 MirFunction *MirFunctionBuilder::build(class MirType *returnType,
                                        std::initializer_list<MirRegister *> parameters,
                                        const std::string_view &name,
+                                       MirLinkage linkage,
                                        class CallingConvDesc *cc,
                                        class SourceReference *sourceRef)
 {
@@ -100,7 +101,8 @@ MirFunction *MirFunctionBuilder::build(class MirType *returnType,
                                                           m_ctx->createId(),
                                                           sourceRef,
                                                           std::move(pmrName),
-                                                          arena);
+                                                          arena,
+                                                          linkage);
 
     // Craft an initial entry block so every function begins with a valid basic block.
     MirBlockBuilder builder(m_ctx, func);
@@ -126,4 +128,14 @@ MirFunction *MirFunctionBuilder::build(class MirType *returnType,
 
     setBuildResult(func);
     return func;
+}
+
+MirFunction *MirFunctionBuilder::build(class MirType *returnType,
+                                       std::initializer_list<MirRegister *> parameters,
+                                       const std::string_view &name,
+                                       class CallingConvDesc *cc,
+                                       class SourceReference *sourceRef,
+                                       MirLinkage linkage)
+{
+    return build(returnType, parameters, name, linkage, cc, sourceRef);
 }
