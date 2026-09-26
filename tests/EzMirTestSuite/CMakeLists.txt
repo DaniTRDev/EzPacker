@@ -95,4 +95,11 @@ EzPacker_AddTest(
         "EzMirTestSuite"
         ""
         "tests/T_MirPeepholePass.cpp"
+)
+
+EzPacker_AddTest(
+        "T_MirVerifierPass"
+        "EzMirTestSuite"
+        ""
+        "tests/T_MirVerifierPass.cpp"
 )
