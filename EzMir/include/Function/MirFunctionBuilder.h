@@ -59,6 +59,27 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
                        class SourceReference *sourceRef = nullptr,
                        MirLinkage linkage = MirLinkage::External);
 
+    /**
+     * Declares an external function prototype without a body (no basic blocks),
+     * similar to an 'extern' function declaration in C.
+     */
+    MirFunction *declare(class MirType *returnType,
+                         std::initializer_list<MirRegister *> parameters,
+                         const std::string_view &name = "",
+                         MirLinkage linkage = MirLinkage::External,
+                         class CallingConvDesc *cc = nullptr,
+                         class SourceReference *sourceRef = nullptr);
+
+    /**
+     * Declares an external function prototype from a list of parameter types without a body.
+     */
+    MirFunction *declare(class MirType *returnType,
+                         std::initializer_list<class MirType *> parameterTypes,
+                         const std::string_view &name = "",
+                         MirLinkage linkage = MirLinkage::External,
+                         class CallingConvDesc *cc = nullptr,
+                         class SourceReference *sourceRef = nullptr);
+
   private:
     class MirBuilderContext *m_ctx; // Context providing the arena, diagnostics and registration.
 };
