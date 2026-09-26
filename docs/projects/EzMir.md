@@ -61,7 +61,11 @@ EzMir serves as the universal pivot of the entire compiler:
 The top-level entity representing a callable routine.
 - **Name & Coordinates**: Identifier symbol (e.g., `@calculate_hash`) and associated `SourceReference`.
 - **Calling Convention**: Pointer to `CallingConvDesc` specifying parameter placement, return registers, and preservation rules.
-- **Return Type & Parameters**: Monomorphic return type (`MirType*`) and formal parameter list (`std::pmr::vector<MirRegister*>`).
+- **Linkage (`MirLinkage`)**: External visibility and binding (`MirLinkage::External`, `MirLinkage::Internal`, `MirLinkage::Weak`). Queried via `getLinkage()` and modified via `setLinkage()`.
+- **Declarations vs. Definitions**:
+  - `isDeclaration()`: True when the function has 0 basic blocks (e.g. extern C declarations such as `declare @puts(ptr) -> i32;`). External declarations are excluded from code optimization/lowering passes and emitted as undefined symbols (`SHN_UNDEF`).
+  - `isDefinition()`: True when the function has 1 or more basic blocks containing executable code.
+- **Return Type & Parameters**: Monomorphic return type (`MirType*`) and formal parameter list (`const std::pmr::list<MirRegister*>&`).
 - **Basic Block Stream**: An intrusive sequence of `MirBlock` nodes stored via `IntrusiveLinkedList<MirBlock>`, with the head block serving as the function entry point.
 - **`MirFunctionStackFrame`**: Manages all function stack allocations:
   - Local fixed stack objects (`StackFrameObject`).
@@ -74,7 +78,14 @@ The top-level entity representing a callable routine.
   - Physical register mapping assigned during register allocation.
   - Callee-saved register usage sets.
 
-### 2.2 `MirBlock` (`Block/MirBlock.h`)
+### 2.2 `MirGlobalVar` & Linkage (`GlobalVar/MirGlobalVar.h`, `Linkage/MirLinkage.h`)
+
+Global variables represent statically allocated data objects:
+- **Linkage**: Configured with `MirLinkage` (`External`, `Internal`, `Weak`). Controls whether the symbol is exported (`STB_GLOBAL` / `COFF_SYM_CLASS_EXTERNAL`), private to the translation unit (`STB_LOCAL` / `COFF_SYM_CLASS_STATIC`), or weak (`STB_WEAK`).
+- **Immutability & Section Placement**: Immutable constants go to read-only memory (`.rodata`), zero-initialized or uninitialized variables go to `.bss`, and initialized mutable variables go to `.data`.
+- **Initializers**: Multi-precision integer or floating-point literal operands.
+
+### 2.3 `MirBlock` (`Block/MirBlock.h`)
 
 A single-entry, single-exit basic block:
 - **Instruction Container**: Holds an `IntrusiveLinkedList<MirInstruction>` providing zero-heap-allocation insertion, erasure, and iteration.
@@ -193,12 +204,16 @@ EzMir provides a clean, factory-based builder architecture designed for compiler
 1. **`MirBuilderContext`** (`Builder/MirBuilderContext.h`):
    Central state owning the session memory arena, type table, diagnostic sink, and global ID counter.
 2. **`MirFunctionBuilder`** (`Function/MirFunctionBuilder.h`):
-   Instantiates `MirFunction` objects and produces child block builders.
-3. **`MirBlockBuilder`** (`Block/MirBlockBuilder.h`):
+   Instantiates `MirFunction` objects and produces child block builders:
+   - `build(...)`: Constructs a function definition with an initial entry point basic block (`isDefinition() == true`). Supports configuring `MirLinkage` (`External`, `Internal`, `Weak`).
+   - `declare(...)`: Constructs an external function declaration without any basic blocks (`getBlockCount() == 0`, `isDeclaration() == true`). Accepts parameter registers or parameter type lists (`std::span<MirType* const>` or `std::initializer_list<MirType*>`).
+3. **`MirGlobalVarBuilder`** (`GlobalVar/MirGlobalVarBuilder.h`):
+   Constructs global variable declarations with configurable type, immutability, `MirLinkage`, and initializer operands.
+4. **`MirBlockBuilder`** (`Block/MirBlockBuilder.h`):
    Appends `MirBlock` nodes to the function and produces child instruction builders.
-4. **`MirInstructionBuilder`** (`Instruction/MirInstructionBuilder.h`):
+5. **`MirInstructionBuilder`** (`Instruction/MirInstructionBuilder.h`):
    Constructs instructions at a configurable insertion point (`Append`, `InsertBefore`, `InsertAfter`). Generates high-level opcode methods (`ADD`, `MOV`, `SUB`, `RET`, `JMP`, etc.), target instruction methods (`buildTarget`), and the `setOperand(MirInstruction *instr, size_t pos, MirOperand *newOperand)` utility for in-place operand substitution with automatic def/use tracking synchronization.
-5. **`MirOperandBuilder`** (`Operand/MirOperandBuilder.h`):
+6. **`MirOperandBuilder`** (`Operand/MirOperandBuilder.h`):
    Constructs virtual registers, physical registers, memory operands, constants, and symbol references.
 
 ### 4.2 Complete Programmatic Example
@@ -262,7 +277,36 @@ instrBuilder.RET(sumReg);
 
 EzPacker supports a clean textual representation for serialization, unit testing, and human inspection.
 
+### 5.1 Global Variables & External Declarations
 ```mir
+; Global variables with linkage (internal, external, weak)
+@greeting = internal const [14 x i8] "Hello, World!\0A\00";
+@counter  = external var i64 = 0;
+@flag     = weak var i32 = 1;
+
+; External function prototypes (C-style declarations)
+declare @puts(ptr) -> i32;
+weak declare @custom_init(i64) -> void;
+extern fn @external_worker(ptr, i32) -> void;
+```
+
+### 5.2 Function Definitions with Linkage
+```mir
+; Module-private helper function
+internal fn @compute_offset(i32 %index) -> i64 {
+entry:
+    %ext = sext i32 %index -> i64;
+    %off = mul i64 %ext, 4;
+    ret i64 %off;
+}
+
+; Weakly-linked default handler (can be overridden by another object)
+weak fn @fallback_handler() -> void {
+entry:
+    ret;
+}
+
+; Public function entry point
 fn @dot_product(ptr %arr_a, ptr %arr_b, i32 %n) -> i32 {
 entry:
     %acc.0 = mov.i32 0
@@ -298,9 +342,11 @@ exit:
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
+| Linkage | `EzMir/include/Linkage/MirLinkage.h` | `MirLinkage` |
 | Function | `EzMir/include/Function/MirFunction.h` | `MirFunction` |
 | Function Frame | `EzMir/include/Function/MirFunctionStackFrame.h` | `MirFunctionStackFrame`, `StackFrameObject` |
 | Register Info | `EzMir/include/Function/MirFunctionRegisterInfo.h` | `MirFunctionRegisterInfo` |
+| Global Variable | `EzMir/include/GlobalVar/MirGlobalVar.h` | `MirGlobalVar` |
 | Block | `EzMir/include/Block/MirBlock.h` | `MirBlock` |
 | Instruction | `EzMir/include/Instruction/MirInstruction.h` | `MirInstruction`, `MirInstructionFlags` |
 | Instruction Set | `EzMir/include/Instruction/MirInstructionSet.h` | `MirInstructionOpCode` |
@@ -315,6 +361,7 @@ exit:
 | Types | `EzMir/include/Type/MirTypeTable.h` | `MirTypeTable` |
 | Builders | `EzMir/include/Builder/MirBuilderContext.h` | `MirBuilderContext` |
 | Builders | `EzMir/include/Function/MirFunctionBuilder.h` | `MirFunctionBuilder` |
+| Builders | `EzMir/include/GlobalVar/MirGlobalVarBuilder.h` | `MirGlobalVarBuilder` |
 | Builders | `EzMir/include/Block/MirBlockBuilder.h` | `MirBlockBuilder` |
 | Builders | `EzMir/include/Instruction/MirInstructionBuilder.h` | `MirInstructionBuilder`, `MirInstructionInsertionPoint`, `InsertionType` |
 | Builders | `EzMir/include/Operand/MirOperandBuilder.h` | `MirOperandBuilder` |
@@ -323,3 +370,5 @@ exit:
 | Passes | `EzMir/include/MirPasses/Passes/NonSsaToSsaPass.h` | `NonSsaToSsaPass` |
 | Passes | `EzMir/include/MirPasses/Passes/LivenessAnalysisPass.h` | `LivenessAnalysisPass`, `LivenessResult` |
 | Passes | `EzMir/include/MirPasses/Passes/MirPeepholePass.h` | `MirPeepholePass` |
+| Printer | `EzMir/include/Printer/MirPrinter.h` | `MirPrinter`, `MirPrinterMode`, `MirPrinterDetail` |
+| Parser | `EzMir/include/Parser/MirParser.h` | `MirParser`, `MirParserOptions` |
