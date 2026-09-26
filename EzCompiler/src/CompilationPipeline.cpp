@@ -72,6 +72,11 @@ struct MirDumpFormatter
 {
     void beginFunction(std::string &out, const MirFunction *func) const
     {
+        if (func && func->isDeclaration())
+        {
+            out += std::format("declare @{}()\n\n", func->getName());
+            return;
+        }
         out += std::format("function @{}() {{\n", func->getName());
     }
 
@@ -82,7 +87,14 @@ struct MirDumpFormatter
 
     void instruction(std::string &out, const MirInstruction *inst) const { out += std::format("    {}\n", inst->toString()); }
 
-    void endFunction(std::string &out, const MirFunction *) const { out += "}\n\n"; }
+    void endFunction(std::string &out, const MirFunction *func) const
+    {
+        if (func && func->isDeclaration())
+        {
+            return;
+        }
+        out += "}\n\n";
+    }
 };
 
 /// Formats the assembly-like listing (global labels, per-block labels, mnemonics).
@@ -90,6 +102,11 @@ struct AssemblyDumpFormatter
 {
     void beginFunction(std::string &out, const MirFunction *func) const
     {
+        if (func && func->isDeclaration())
+        {
+            out += std::format(".extern {}\n\n", func->getName());
+            return;
+        }
         out += std::format(".globl {}\n", func->getName());
         out += std::format("{}:\n", func->getName());
     }
@@ -143,7 +160,7 @@ bool CompilationPipeline::runPipeline()
 
     for (MirFunction *func : bCtx->getFunctions())
     {
-        if (!func)
+        if (!func || func->isDeclaration())
         {
             continue;
         }

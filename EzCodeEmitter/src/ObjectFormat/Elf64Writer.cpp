@@ -83,6 +83,7 @@ constexpr uint64_t SHF_INFO_LINK = 0x40;
 // Symbol binding (high nibble of st_info) and type (low nibble).
 constexpr uint8_t STB_LOCAL = 0;
 constexpr uint8_t STB_GLOBAL = 1;
+constexpr uint8_t STB_WEAK = 2;
 constexpr uint8_t STT_NOTYPE = 0;
 constexpr uint8_t STT_OBJECT = 1;
 constexpr uint8_t STT_FUNC = 2;
@@ -248,7 +249,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
     {
         Elf64_Sym elfSym{};
         elfSym.st_name = addString(strtab, sym.m_name);
-        uint8_t bind = sym.m_isGlobal ? STB_GLOBAL : STB_LOCAL;
+        uint8_t bind = sym.m_isWeak ? STB_WEAK : (sym.m_isGlobal ? STB_GLOBAL : STB_LOCAL);
         uint8_t symType = sym.m_isFunction ? STT_FUNC : STT_OBJECT;
         // st_info packs binding in the high nibble and symbol type in the low nibble.
         elfSym.st_info = (bind << 4) | (symType & 0x0F);
