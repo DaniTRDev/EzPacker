@@ -41,7 +41,7 @@ EzCMK_ConfigureLib(NAME "EzTargetsX86_64"
         FILE_LIST ${EZTARGETS_X86_64_FILES_LIST}
         PRECOMPILED_HEADER "include/EzTargetsX86_64Common.h"
         LINKED_LIBRARIES "EzTriple;EzCodeEmitter;EzMir;EzCore"
-        INCLUDED_DIRS "include;${CMAKE_SOURCE_DIR}/EzCodeEmitter/include;${CMAKE_SOURCE_DIR}/EzTriple/include;${CMAKE_SOURCE_DIR}/EzMir/include;${CMAKE_SOURCE_DIR}/EzCore/include")
+        INCLUDED_DIRS "include")
 
 set(EZ_X86_64_NAMESPACE_ROOT "EzTargets::X86_64")
 
