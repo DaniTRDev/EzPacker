@@ -25,6 +25,7 @@ EzCMK_SetLibraryBuildType("SHARED")
 
 include("CMake/Vendor.cmake") # Fetch 3rd party libs.
 include("CMake/TestWrapper.cmake")
+include("CMake/CopyStandardLibraries.cmake")
 
 option(EZPACKER_ENABLE_SANITIZERS "Enable Address and Undefined Behavior Sanitizers" OFF)
 if (EZPACKER_ENABLE_SANITIZERS)
@@ -79,4 +80,13 @@ if (EZPACKER_BUILD_TESTS)
     add_subdirectory(tests/EzCompilerEndToEndTests)
 
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
+endif ()
+
+if (TARGET EzPacker_CopyStandardLibraries)
+    if (TARGET ezc)
+        add_dependencies(ezc EzPacker_CopyStandardLibraries)
+    endif ()
+    if (TARGET EzDslCli)
+        add_dependencies(EzDslCli EzPacker_CopyStandardLibraries)
+    endif ()
 endif ()
