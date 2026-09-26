@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "StringUtils.h"
+#include "Linkage/MirLinkage.h"
 
 /**
  * Unique identifier type used across all MIR entities (functions, blocks, instructions, operands, global variables).

@@ -10,6 +10,7 @@
 #include "MirPasses/Passes/NonSsaToSsaPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "MirPasses/Passes/MirPeepholePass.h"
+#include "MirPasses/Passes/MirVerifierPass.h"
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 #include "Legalizer/MirLegalizerPass.h"
 #include "AbiLowerer/MirAbiLowererPass.h"
@@ -72,6 +73,11 @@ struct MirDumpFormatter
 {
     void beginFunction(std::string &out, const MirFunction *func) const
     {
+        if (func && func->isDeclaration())
+        {
+            out += std::format("declare @{}()\n\n", func->getName());
+            return;
+        }
         out += std::format("function @{}() {{\n", func->getName());
     }
 
@@ -82,7 +88,14 @@ struct MirDumpFormatter
 
     void instruction(std::string &out, const MirInstruction *inst) const { out += std::format("    {}\n", inst->toString()); }
 
-    void endFunction(std::string &out, const MirFunction *) const { out += "}\n\n"; }
+    void endFunction(std::string &out, const MirFunction *func) const
+    {
+        if (func && func->isDeclaration())
+        {
+            return;
+        }
+        out += "}\n\n";
+    }
 };
 
 /// Formats the assembly-like listing (global labels, per-block labels, mnemonics).
@@ -90,6 +103,11 @@ struct AssemblyDumpFormatter
 {
     void beginFunction(std::string &out, const MirFunction *func) const
     {
+        if (func && func->isDeclaration())
+        {
+            out += std::format(".extern {}\n\n", func->getName());
+            return;
+        }
         out += std::format(".globl {}\n", func->getName());
         out += std::format("{}:\n", func->getName());
     }
@@ -143,9 +161,15 @@ bool CompilationPipeline::runPipeline()
 
     for (MirFunction *func : bCtx->getFunctions())
     {
-        if (!func)
+        if (!func || func->isDeclaration())
         {
             continue;
+        }
+
+        // 0. Input MIR Verification Pass (verifies SizeMatch, operand types, invariants before middle-end)
+        if (!runInputVerification(func, middleEndManager))
+        {
+            return false;
         }
 
         // 1. Middle-End Passes (CFG, SSA, Liveness)
@@ -218,6 +242,13 @@ bool CompilationPipeline::runCheckedPass(std::string_view passName,
         return reportPassFailure(failureMessage);
     }
     return true;
+}
+
+bool CompilationPipeline::runInputVerification(MirFunction *func, MirPassManager &passManager)
+{
+    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
+    return runCheckedPass<MirVerifierPass>(
+            "MirVerifierPass", func, &passManager, "Input MIR verification failed", bCtx);
 }
 
 bool CompilationPipeline::runMiddleEndPasses(MirFunction *func, MirPassManager &passManager)

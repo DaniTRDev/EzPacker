@@ -72,6 +72,7 @@ MirFunctionBuilder &MirFunctionBuilder::addPhysRegUse(MirFunction *func, const c
 MirFunction *MirFunctionBuilder::build(class MirType *returnType,
                                        std::initializer_list<MirRegister *> parameters,
                                        const std::string_view &name,
+                                       MirLinkage linkage,
                                        class CallingConvDesc *cc,
                                        class SourceReference *sourceRef)
 {
@@ -100,7 +101,8 @@ MirFunction *MirFunctionBuilder::build(class MirType *returnType,
                                                           m_ctx->createId(),
                                                           sourceRef,
                                                           std::move(pmrName),
-                                                          arena);
+                                                          arena,
+                                                          linkage);
 
     // Craft an initial entry block so every function begins with a valid basic block.
     MirBlockBuilder builder(m_ctx, func);
@@ -119,6 +121,143 @@ MirFunction *MirFunctionBuilder::build(class MirType *returnType,
     }
 
     // Registration enforces global ID uniqueness; abort if it fails.
+    if (!m_ctx->appendFunction(func))
+    {
+        return nullptr;
+    }
+
+    setBuildResult(func);
+    return func;
+}
+
+MirFunction *MirFunctionBuilder::build(class MirType *returnType,
+                                       std::initializer_list<MirRegister *> parameters,
+                                       const std::string_view &name,
+                                       class CallingConvDesc *cc,
+                                       class SourceReference *sourceRef,
+                                       MirLinkage linkage)
+{
+    return build(returnType, parameters, name, linkage, cc, sourceRef);
+}
+
+MirFunction *MirFunctionBuilder::declare(class MirType *returnType,
+                                         std::initializer_list<MirRegister *> parameters,
+                                         const std::string_view &name,
+                                         MirLinkage linkage,
+                                         class CallingConvDesc *cc,
+                                         class SourceReference *sourceRef)
+{
+    const auto &t = m_ctx->getTypeTable();
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
+    std::pmr::polymorphic_allocator<MirFunction> funcAlloc(arena);
+    std::pmr::polymorphic_allocator<MirFunctionStackFrame> funcStackFrameAlloc(arena);
+
+    auto *stackFrame =
+            funcStackFrameAlloc.new_object<MirFunctionStackFrame>(std::pmr::vector<StackFrameObject *>(arena));
+    MirType *funcType = t->getFuncType(returnType, parameters, name);
+
+    if (!cc)
+    {
+        cc = m_ctx->getDefaultCallingConvention();
+    }
+
+    std::pmr::string pmrName(name, arena);
+    MirFunction *func = funcAlloc.new_object<MirFunction>(cc,
+                                                          stackFrame,
+                                                          returnType,
+                                                          funcType,
+                                                          m_ctx->createId(),
+                                                          sourceRef,
+                                                          std::move(pmrName),
+                                                          arena,
+                                                          linkage);
+
+    func->m_parameters.insert(func->m_parameters.begin(), parameters.begin(), parameters.end());
+
+    if (m_ctx->getDiagCollector()->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+    {
+        auto diagBuilder =
+                m_ctx->getDiagCollector()->trace("MirFunctionBuilder", "Declared func with id: {}", func->getId());
+        diagBuilder.appendNote(sourceRef, MirPrinter::printToString(func, MirPrinterDetail::Detailed));
+        diagBuilder.appendNote("Using calling convention: {}", cc->getName());
+    }
+
+    if (!m_ctx->appendFunction(func))
+    {
+        return nullptr;
+    }
+
+    setBuildResult(func);
+    return func;
+}
+
+MirFunction *MirFunctionBuilder::declare(class MirType *returnType,
+                                         std::initializer_list<class MirType *> parameterTypes,
+                                         const std::string_view &name,
+                                         MirLinkage linkage,
+                                         class CallingConvDesc *cc,
+                                         class SourceReference *sourceRef)
+{
+    return declare(returnType,
+                   std::span<MirType *const>(parameterTypes.begin(), parameterTypes.size()),
+                   name,
+                   linkage,
+                   cc,
+                   sourceRef);
+}
+
+MirFunction *MirFunctionBuilder::declare(class MirType *returnType,
+                                         std::span<class MirType *const> parameterTypes,
+                                         const std::string_view &name,
+                                         MirLinkage linkage,
+                                         class CallingConvDesc *cc,
+                                         class SourceReference *sourceRef)
+{
+    MirOperandBuilder opBuilder(m_ctx);
+    std::pmr::vector<MirRegister *> paramRegs(m_ctx->getGlobalAllocator());
+    paramRegs.reserve(parameterTypes.size());
+    for (MirType *paramType : parameterTypes)
+    {
+        paramRegs.push_back(opBuilder.buildVReg(paramType, ""));
+    }
+
+    const auto &t = m_ctx->getTypeTable();
+    std::pmr::memory_resource *arena = m_ctx->getGlobalAllocator();
+    std::pmr::polymorphic_allocator<MirFunction> funcAlloc(arena);
+    std::pmr::polymorphic_allocator<MirFunctionStackFrame> funcStackFrameAlloc(arena);
+
+    auto *stackFrame =
+            funcStackFrameAlloc.new_object<MirFunctionStackFrame>(std::pmr::vector<StackFrameObject *>(arena));
+
+    std::pmr::list<MirRegister *> paramList(paramRegs.begin(), paramRegs.end(), arena);
+    MirType *funcType = t->getFuncType(returnType, paramList, name);
+
+    if (!cc)
+    {
+        cc = m_ctx->getDefaultCallingConvention();
+    }
+
+    std::pmr::string pmrName(name, arena);
+    MirFunction *func = funcAlloc.new_object<MirFunction>(cc,
+                                                          stackFrame,
+                                                          returnType,
+                                                          funcType,
+                                                          m_ctx->createId(),
+                                                          sourceRef,
+                                                          std::move(pmrName),
+                                                          arena,
+                                                          linkage);
+
+    func->m_parameters.insert(func->m_parameters.begin(), paramRegs.begin(), paramRegs.end());
+
+    if (m_ctx->getDiagCollector()->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))
+    {
+        auto diagBuilder =
+                m_ctx->getDiagCollector()->trace("MirFunctionBuilder", "Declared func with id: {}", func->getId());
+        diagBuilder.appendNote(sourceRef, MirPrinter::printToString(func, MirPrinterDetail::Detailed));
+        diagBuilder.appendNote("Using calling convention: {}", cc->getName());
+    }
+
     if (!m_ctx->appendFunction(func))
     {
         return nullptr;

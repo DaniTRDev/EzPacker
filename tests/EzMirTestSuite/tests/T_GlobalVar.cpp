@@ -164,3 +164,25 @@ TEST_F(GlobalVarTest, TestGlobalVariableWeakLinkage)
     EXPECT_TRUE(IsGlobalVar(global, "g_weakVar", types->i64(), false, MirGlobalVarLinkage::Weak));
     EXPECT_TRUE(IsZeroInitialized(global));
 }
+
+/**
+ * Verifies mutating global variable linkage via setLinkage and using MirLinkage directly.
+ */
+TEST_F(GlobalVarTest, TestGlobalVarLinkageOptions)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirTypeTable *types = getTypeTable();
+
+    MirGlobalVarBuilder builder(ctx);
+    MirGlobalVar *global = builder.build(MirLinkage::External, types->i32(), "g_linkageVar");
+    EXPECT_EQ(global->getLinkage(), MirLinkage::External);
+
+    global->setLinkage(MirLinkage::Internal);
+    EXPECT_EQ(global->getLinkage(), MirLinkage::Internal);
+
+    global->setLinkage(MirLinkage::Weak);
+    EXPECT_EQ(global->getLinkage(), MirLinkage::Weak);
+
+    global->setLinkage(MirLinkage::External);
+    EXPECT_EQ(global->getLinkage(), MirLinkage::External);
+}

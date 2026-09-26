@@ -131,31 +131,51 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
         return printToString(function, MirPrinterDetail::Detailed);
     }
 
-    std::string fnName = !function->getName().empty() ? std::string(function->getName()) : "anonymous";
-    std::string retType = function->getReturnType() ? std::string(function->getReturnType()->getName()) : "void";
+    auto formatTypeName = [](MirType *type) -> std::string {
+        if (!type)
+            return "void";
+        if (type->getKind() == MirTypeKind::Void || type->getName() == "_void")
+            return "void";
+        if (type->getKind() == MirTypeKind::Pointer)
+            return "ptr";
+        return std::string(type->getName());
+    };
 
-    if (function->getBlocks().empty())
+    std::string fnName = !function->getName().empty() ? std::string(function->getName()) : "anonymous";
+    std::string retType = formatTypeName(function->getReturnType());
+
+    std::string linkagePrefix = "";
+    if (function->getLinkage() == MirLinkage::Internal)
     {
-        std::string result = std::format("declare @{}(", fnName);
+        linkagePrefix = "internal ";
+    }
+    else if (function->getLinkage() == MirLinkage::Weak)
+    {
+        linkagePrefix = "weak ";
+    }
+
+    if (function->isDeclaration())
+    {
+        std::string result = std::format("{}declare @{}(", linkagePrefix, fnName);
         bool firstParam = true;
         for (MirRegister *param : function->getParameters())
         {
             if (!firstParam)
                 result += ", ";
-            result += param->getMirType() ? param->getMirType()->getName() : "i64";
+            result += formatTypeName(param->getMirType());
             firstParam = false;
         }
         result += std::format(") -> {};\n", retType);
         return result;
     }
 
-    std::string result = std::format("fn @{}(", fnName);
+    std::string result = std::format("{}fn @{}(", linkagePrefix, fnName);
     bool firstParam = true;
     for (MirRegister *param : function->getParameters())
     {
         if (!firstParam)
             result += ", ";
-        std::string typeStr = param->getMirType() ? std::string(param->getMirType()->getName()) : "i64";
+        std::string typeStr = formatTypeName(param->getMirType());
         std::string pName =
                 !param->getName().empty() ? std::string(param->getName()) : std::format("%v{}", param->getRegId());
         if (!pName.starts_with("%"))
@@ -305,7 +325,25 @@ std::string MirPrinter::printToString(MirFunction *function, MirPrinterDetail de
     // Signature header
     std::pmr::string fnName = !function->getName().empty() ? function->getName() : "<anonymous>";
     std::string_view retTypeName = function->getReturnType() ? function->getReturnType()->getName() : "void";
-    result += std::format("fn {}() -> {} [params: {}]\n", fnName, retTypeName, function->getParameters().size());
+    std::string_view linkageStr = "external";
+    switch (function->getLinkage())
+    {
+        case MirLinkage::External:
+            linkageStr = "external";
+            break;
+        case MirLinkage::Internal:
+            linkageStr = "internal";
+            break;
+        case MirLinkage::Weak:
+            linkageStr = "weak";
+            break;
+    }
+    result += std::format("{}fn {}() -> {} [params: {}, linkage: {}]\n",
+                          function->isDeclaration() ? "declare " : "",
+                          fnName,
+                          retTypeName,
+                          function->getParameters().size(),
+                          linkageStr);
 
     // Parameters
     result += "  Params:\n";

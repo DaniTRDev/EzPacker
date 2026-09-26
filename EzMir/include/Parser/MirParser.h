@@ -89,11 +89,17 @@ class MirParser
     /**
      * Parses a function prototype ("declare").
      */
-    bool parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module);
+    bool parseFunctionDecl(Parser::MirLexer &lexer,
+                           MirParserContext &pCtx,
+                           Ast::MirAstModule &module,
+                           MirLinkage linkage = MirLinkage::External);
     /**
      * Parses a function definition body.
      */
-    bool parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule &module);
+    bool parseFunctionDef(Parser::MirLexer &lexer,
+                          MirParserContext &pCtx,
+                          Ast::MirAstModule &module,
+                          MirLinkage linkage = MirLinkage::External);
     /**
      * Parses one labeled basic block and its instructions into func.
      */

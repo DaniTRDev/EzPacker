@@ -20,7 +20,7 @@ class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
      * Allocates and initializes a new MirGlobalVar in the context arena allocator.
      * Generates a unique MIR ID and logs trace diagnostics.
      */
-    MirGlobalVar *build(MirGlobalVarLinkage linkage,
+    MirGlobalVar *build(MirLinkage linkage,
                         class MirType *type,
                         std::pmr::string name,
                         class SourceReference *sourceRef = nullptr);

@@ -35,13 +35,14 @@ namespace
  * are referenced but never defined in this module. Undefined symbols carry SectionType::Undefined,
  * which both object writers map to the "no section" index (SHN_UNDEF / COFF section 0).
  */
-EzCodeEmitter::ObjectFormat::ObjectSymbol makeUndefinedFunctionSymbol(std::string_view name)
+EzCodeEmitter::ObjectFormat::ObjectSymbol makeUndefinedFunctionSymbol(std::string_view name, bool isWeak = false)
 {
     return { .m_name = name,
              .m_section = SectionType::Undefined,
              .m_offset = 0,
              .m_size = 0,
              .m_isGlobal = true,
+             .m_isWeak = isWeak,
              .m_isFunction = true };
 }
 
@@ -189,7 +190,8 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                             .m_section = targetSecType,
                             .m_offset = gvOffset,
                             .m_size = gvSize,
-                            .m_isGlobal = (gvar->getLinkage() != MirGlobalVarLinkage::Internal),
+                            .m_isGlobal = (gvar->getLinkage() != MirLinkage::Internal),
+                            .m_isWeak = (gvar->getLinkage() == MirLinkage::Weak),
                             .m_isFunction = false });
     }
 
@@ -203,10 +205,10 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         funcById[func->getId()] = func;
 
-        if (func->getBlockCount() == 0)
+        if (func->isDeclaration())
         {
             // External declaration
-            symbols.push_back(makeUndefinedFunctionSymbol(func->getName()));
+            symbols.push_back(makeUndefinedFunctionSymbol(func->getName(), func->getLinkage() == MirLinkage::Weak));
             continue;
         }
 
@@ -245,7 +247,8 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                             .m_section = SectionType::Text,
                             .m_offset = fnOffset,
                             .m_size = fnSize,
-                            .m_isGlobal = true,
+                            .m_isGlobal = (func->getLinkage() != MirLinkage::Internal),
+                            .m_isWeak = (func->getLinkage() == MirLinkage::Weak),
                             .m_isFunction = true });
     }
 
@@ -312,7 +315,10 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                 {
                     if (definedSymbolNames.insert(calleeName).second)
                     {
-                        symbols.push_back(makeUndefinedFunctionSymbol(calleeName));
+                        bool isWeak = (itFunc != funcById.end() && itFunc->second)
+                                ? (itFunc->second->getLinkage() == MirLinkage::Weak)
+                                : false;
+                        symbols.push_back(makeUndefinedFunctionSymbol(calleeName, isWeak));
                     }
 
                     // Ask the resolver for the exact displacement-field offset (opcode dependent

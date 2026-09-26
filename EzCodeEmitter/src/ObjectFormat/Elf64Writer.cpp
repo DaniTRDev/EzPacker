@@ -83,6 +83,7 @@ constexpr uint64_t SHF_INFO_LINK = 0x40;
 // Symbol binding (high nibble of st_info) and type (low nibble).
 constexpr uint8_t STB_LOCAL = 0;
 constexpr uint8_t STB_GLOBAL = 1;
+constexpr uint8_t STB_WEAK = 2;
 constexpr uint8_t STT_NOTYPE = 0;
 constexpr uint8_t STT_OBJECT = 1;
 constexpr uint8_t STT_FUNC = 2;
@@ -237,18 +238,34 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
     processCodeSection(SectionType::NonInitialized, ".bss", SHT_NOBITS, SHF_ALLOC | SHF_WRITE, 8);
 
     // Build Symbols
+    // In ELF, all symbols with STB_LOCAL binding must precede weak and global symbols.
+    // sh_info of the SHT_SYMTAB section holds the index of the first non-local symbol (1 + numLocalSymbols).
+    std::vector<EzCodeEmitter::ObjectFormat::ObjectSymbol> sortedSymbols = m_symbols;
+    std::stable_partition(sortedSymbols.begin(), sortedSymbols.end(), [](const auto &sym) {
+        return !sym.m_isWeak && !sym.m_isGlobal;
+    });
+
+    uint32_t numLocalSymbols = 0;
+    for (const auto &sym : sortedSymbols)
+    {
+        if (!sym.m_isWeak && !sym.m_isGlobal)
+        {
+            numLocalSymbols++;
+        }
+    }
+
     std::vector<Elf64_Sym> symTable;
-    symTable.reserve(m_symbols.size() + 1);
+    symTable.reserve(sortedSymbols.size() + 1);
     // 0. NULL symbol
     symTable.push_back(Elf64_Sym{ 0, 0, 0, 0, 0, 0 });
 
     std::unordered_map<std::string_view, uint32_t> symIndexMap;
 
-    for (const auto &sym : m_symbols)
+    for (const auto &sym : sortedSymbols)
     {
         Elf64_Sym elfSym{};
         elfSym.st_name = addString(strtab, sym.m_name);
-        uint8_t bind = sym.m_isGlobal ? STB_GLOBAL : STB_LOCAL;
+        uint8_t bind = sym.m_isWeak ? STB_WEAK : (sym.m_isGlobal ? STB_GLOBAL : STB_LOCAL);
         uint8_t symType = sym.m_isFunction ? STT_FUNC : STT_OBJECT;
         // st_info packs binding in the high nibble and symbol type in the low nibble.
         elfSym.st_info = (bind << 4) | (symType & 0x0F);
@@ -320,7 +337,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
         symDesc.flags = 0;
         symDesc.align = 8;
         symDesc.entsize = sizeof(Elf64_Sym);
-        symDesc.info = 1; // 1 + number of local symbols
+        symDesc.info = 1 + numLocalSymbols; // 1 + number of local symbols (index of first non-local symbol)
         symDesc.data.resize(symTable.size() * sizeof(Elf64_Sym));
         std::memcpy(symDesc.data.data(), symTable.data(), symDesc.data.size());
         sectionDescs.push_back(std::move(symDesc));

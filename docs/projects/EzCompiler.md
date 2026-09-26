@@ -147,6 +147,7 @@ public:
     std::string dumpAssembly() const;
 
 private:
+    bool runInputVerification(MirFunction *func, MirPassManager &passManager);
     bool runMiddleEndPasses(MirFunction *func, MirPassManager &passManager);
     bool runLegalizationPasses(MirFunction *func, MirPassManager &passManager);
     bool runTargetLoweringPasses(MirFunction *func, MirPassManager &passManager);
@@ -154,17 +155,23 @@ private:
 ```
 
 ### Pass Sequence:
+0. **Input Verification Stage** (Pre-Middle-End):
+   - `MirVerifierPass`: Validates input MIR structural invariants, expected operand kinds, DEF register constraints, and opcode flags (`SizeMatch`, `DestLarger`, `DestSmaller`, `TreatAsSigned`) on each function before middle-end transformations begin.
 1. **Middle-End Stage**:
    - `CodeFlowAnalysisPass`: CFG construction, loop analysis, dominator tree computation.
    - `NonSsaToSsaPass`: Cytron SSA construction with `PHI` node placement.
    - `LivenessAnalysisPass`: Backwards bit-vector analysis, live intervals calculation.
+   - `MirPeepholePass` *(enabled when `optLevel != OptimizationLevel::O0`)*: Generic SSA algebraic identities, self/reciprocal move elimination, dead code elimination after terminators, and fall-through jump removal.
+   - `LivenessAnalysisPass` *(refreshed when `optLevel != OptimizationLevel::O0`)*: Re-evaluates register intervals following peephole transformations.
 2. **Legalization Stage**:
+   - `MirFunctionSignatureLegalizerPass`: Legalizes formal parameters and returns against target register and stack conventions.
    - `MirLegalizerPass`: Table-driven rewrite of illegal opcodes and types (WidenScalar, NarrowScalar, Libcall, Custom).
 3. **Target Lowering Stage**:
    - `MirAbiLowererPass`: ABI calling convention parameter and return token lowering.
    - `MirInstructionSelectorPass`: Bottom-Up Maximal Munch pattern matching and load folding.
-   - `MirRegisterAllocatorPass`: Chaitin-Briggs graph coloring, spilling, and register rewriting.
+   - `MirRegisterAllocatorPass`: Chaitin-Briggs graph coloring, spilling, and register rewriting. Runs with conservative coalescing (`coalesce()`), copy affinity biasing, and redundant copy removal enabled when `optLevel != OptimizationLevel::O0`.
    - `MirFrameLowererPass`: Prologue/epilogue insertion and abstract stack offset resolution.
+   - `MirTargetPeepholePass` *(enabled when `optLevel != OptimizationLevel::O0`)*: Target machine-level peephole optimization (machine move/jump elimination, spill/reload forwarding, zero-identity ALU simplification, dead store elimination).
 
 ---
 

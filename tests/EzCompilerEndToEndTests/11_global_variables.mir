@@ -1,0 +1,196 @@
+; Test Suite: 11_global_variables.mir
+; Tests global variable storage classes, linkage bindings, and memory operations:
+; - .data: mutable initialized scalars (i8, i16, i32, i64)
+; - .rodata: constant scalar (external const i32)
+; - .bss: uninitialized and zero-initialized scalars (i32, i64)
+; - Linkage bindings: external (STB_GLOBAL), internal (STB_LOCAL), weak (STB_WEAK)
+; - Access: address calculation via LEA64r/MOV ptr and LOAD/STORE operations
+
+@g_byte = external var i8 = 42;
+@g_word = external var i16 = 1234;
+@g_dword = external var i32 = 100000;
+@g_qword = external var i64 = 0x1122334455667788;
+@g_const_int = external const i32 = 987654;
+@g_bss_int = external var i32;
+@g_bss_zero = external var i64 = 0;
+@g_internal_counter = internal var i32 = 10;
+@g_weak_val = weak var i32 = 777;
+
+; --- Getters ---
+
+fn @get_g_byte() -> i8 {
+entry:
+    %p = MOV ptr @g_byte;
+    %v = LOAD i8 [ptr %p + 0];
+    RET i8 %v;
+}
+
+fn @get_g_word() -> i16 {
+entry:
+    %p = MOV ptr @g_word;
+    %v = LOAD i16 [ptr %p + 0];
+    RET i16 %v;
+}
+
+fn @get_g_dword() -> i32 {
+entry:
+    %p = MOV ptr @g_dword;
+    %v = LOAD i32 [ptr %p + 0];
+    RET i32 %v;
+}
+
+fn @get_g_qword() -> i64 {
+entry:
+    %p = MOV ptr @g_qword;
+    %v = LOAD i64 [ptr %p + 0];
+    RET i64 %v;
+}
+
+fn @get_g_const_int() -> i32 {
+entry:
+    %p = MOV ptr @g_const_int;
+    %v = LOAD i32 [ptr %p + 0];
+    RET i32 %v;
+}
+
+fn @get_g_bss_int() -> i32 {
+entry:
+    %p = MOV ptr @g_bss_int;
+    %v = LOAD i32 [ptr %p + 0];
+    RET i32 %v;
+}
+
+fn @get_g_bss_zero() -> i64 {
+entry:
+    %p = MOV ptr @g_bss_zero;
+    %v = LOAD i64 [ptr %p + 0];
+    RET i64 %v;
+}
+
+fn @get_internal_counter() -> i32 {
+entry:
+    %p = MOV ptr @g_internal_counter;
+    %v = LOAD i32 [ptr %p + 0];
+    RET i32 %v;
+}
+
+fn @get_g_weak_val() -> i32 {
+entry:
+    %p = MOV ptr @g_weak_val;
+    %v = LOAD i32 [ptr %p + 0];
+    RET i32 %v;
+}
+
+; --- Setters ---
+
+fn @set_g_byte(i8 %val) -> i8 {
+entry:
+    %p = MOV ptr @g_byte;
+    STORE [ptr %p + 0], i8 %val;
+    RET i8 %val;
+}
+
+fn @set_g_word(i16 %val) -> i16 {
+entry:
+    %p = MOV ptr @g_word;
+    STORE [ptr %p + 0], i16 %val;
+    RET i16 %val;
+}
+
+fn @set_g_dword(i32 %val) -> i32 {
+entry:
+    %p = MOV ptr @g_dword;
+    STORE [ptr %p + 0], i32 %val;
+    RET i32 %val;
+}
+
+fn @set_g_qword(i64 %val) -> i64 {
+entry:
+    %p = MOV ptr @g_qword;
+    STORE [ptr %p + 0], i64 %val;
+    RET i64 %val;
+}
+
+fn @set_g_bss_int(i32 %val) -> i32 {
+entry:
+    %p = MOV ptr @g_bss_int;
+    STORE [ptr %p + 0], i32 %val;
+    RET i32 %val;
+}
+
+fn @set_g_bss_zero(i64 %val) -> i64 {
+entry:
+    %p = MOV ptr @g_bss_zero;
+    STORE [ptr %p + 0], i64 %val;
+    RET i64 %val;
+}
+
+fn @set_internal_counter(i32 %val) -> i32 {
+entry:
+    %p = MOV ptr @g_internal_counter;
+    STORE [ptr %p + 0], i32 %val;
+    RET i32 %val;
+}
+
+; --- Complex Operations ---
+
+fn @inc_internal_counter() -> i32 {
+entry:
+    %p = MOV ptr @g_internal_counter;
+    %cur = LOAD i32 [ptr %p + 0];
+    %next = ADD i32 %cur, 1;
+    STORE [ptr %p + 0], i32 %next;
+    RET i32 %next;
+}
+
+fn @accumulate_into_bss(i32 %delta) -> i32 {
+entry:
+    %p = MOV ptr @g_bss_int;
+    %cur = LOAD i32 [ptr %p + 0];
+    %next = ADD i32 %cur, %delta;
+    STORE [ptr %p + 0], i32 %next;
+    RET i32 %next;
+}
+
+fn @compute_cross_globals(i64 %scale) -> i64 {
+entry:
+    %p_qw = MOV ptr @g_qword;
+    %qw = LOAD i64 [ptr %p_qw + 0];
+    %prod = IMUL i64 %qw, %scale;
+    %res = ADD i64 %prod, 100;
+    RET i64 %res;
+}
+
+fn @reset_all_globals() -> i32 {
+entry:
+    %v_b = MOV i8 42;
+    %p_b = MOV ptr @g_byte;
+    STORE [ptr %p_b + 0], i8 %v_b;
+
+    %v_w = MOV i16 1234;
+    %p_w = MOV ptr @g_word;
+    STORE [ptr %p_w + 0], i16 %v_w;
+
+    %v_dw = MOV i32 100000;
+    %p_dw = MOV ptr @g_dword;
+    STORE [ptr %p_dw + 0], i32 %v_dw;
+
+    %v_qw = MOV i64 0x1122334455667788;
+    %p_qw = MOV ptr @g_qword;
+    STORE [ptr %p_qw + 0], i64 %v_qw;
+
+    %v_bss = MOV i32 0;
+    %p_bss = MOV ptr @g_bss_int;
+    STORE [ptr %p_bss + 0], i32 %v_bss;
+
+    %v_bss_z = MOV i64 0;
+    %p_bss_z = MOV ptr @g_bss_zero;
+    STORE [ptr %p_bss_z + 0], i64 %v_bss_z;
+
+    %v_ic = MOV i32 10;
+    %p_ic = MOV ptr @g_internal_counter;
+    STORE [ptr %p_ic + 0], i32 %v_ic;
+
+    %zero = MOV i32 0;
+    RET i32 %zero;
+}

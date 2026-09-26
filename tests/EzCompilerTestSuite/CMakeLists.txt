@@ -37,3 +37,10 @@ EzPacker_AddTest(
         ""
         "tests/T_OptimizationPipeline.cpp"
 )
+
+EzPacker_AddTest(
+        "T_CompilerVerificationPipeline"
+        "EzCompilerTestSuite"
+        ""
+        "tests/T_VerificationPipeline.cpp"
+)

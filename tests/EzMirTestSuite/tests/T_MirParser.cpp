@@ -688,4 +688,140 @@ entry:
     EXPECT_EQ(hexInit->getValue().extractWord64(1), 0x1122334455667788ULL);
 }
 
+/**
+ * TMP_19: Function Linkage and Extern Declarations
+ * Verifies parsing declare, weak declare, internal fn, weak fn, extern fn, and standard fn.
+ */
+TEST_F(MirParserTest, TMP_19_FunctionLinkageAndExternDeclarations)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view mirCode = R"mir(
+declare @puts(ptr) -> i32;
+weak declare @opt_func(i64) -> void;
+extern fn @ext_decl(i32, ptr) -> i32;
+
+internal fn @internal_calc(i32 %a) -> i32 {
+entry:
+    RET i32 %a;
+}
+
+weak fn @weak_impl() -> i32 {
+entry:
+    %v = MOV i32 10;
+    RET i32 %v;
+}
+
+fn @main() -> i32 {
+entry:
+    %ret = CALL i32 @puts;
+    RET i32 %ret;
+}
+)mir";
+
+    bool success = parser.parseModule(mirCode, "linkage_test.mir");
+    EXPECT_TRUE(success);
+
+    MirFunction *fnPuts = nullptr;
+    MirFunction *fnOpt = nullptr;
+    MirFunction *fnExtDecl = nullptr;
+    MirFunction *fnInternal = nullptr;
+    MirFunction *fnWeak = nullptr;
+    MirFunction *fnMain = nullptr;
+
+    for (MirFunction *f : ctx->getFunctions())
+    {
+        if (f->getName() == "puts") fnPuts = f;
+        else if (f->getName() == "opt_func") fnOpt = f;
+        else if (f->getName() == "ext_decl") fnExtDecl = f;
+        else if (f->getName() == "internal_calc") fnInternal = f;
+        else if (f->getName() == "weak_impl") fnWeak = f;
+        else if (f->getName() == "main") fnMain = f;
+    }
+
+    ASSERT_NE(fnPuts, nullptr);
+    EXPECT_TRUE(fnPuts->isDeclaration());
+    EXPECT_FALSE(fnPuts->isDefinition());
+    EXPECT_EQ(fnPuts->getBlockCount(), 0);
+    EXPECT_EQ(fnPuts->getLinkage(), MirLinkage::External);
+    EXPECT_EQ(fnPuts->getParamCount(), 1);
+
+    ASSERT_NE(fnOpt, nullptr);
+    EXPECT_TRUE(fnOpt->isDeclaration());
+    EXPECT_FALSE(fnOpt->isDefinition());
+    EXPECT_EQ(fnOpt->getBlockCount(), 0);
+    EXPECT_EQ(fnOpt->getLinkage(), MirLinkage::Weak);
+    EXPECT_EQ(fnOpt->getParamCount(), 1);
+
+    ASSERT_NE(fnExtDecl, nullptr);
+    EXPECT_TRUE(fnExtDecl->isDeclaration());
+    EXPECT_FALSE(fnExtDecl->isDefinition());
+    EXPECT_EQ(fnExtDecl->getBlockCount(), 0);
+    EXPECT_EQ(fnExtDecl->getLinkage(), MirLinkage::External);
+    EXPECT_EQ(fnExtDecl->getParamCount(), 2);
+
+    ASSERT_NE(fnInternal, nullptr);
+    EXPECT_FALSE(fnInternal->isDeclaration());
+    EXPECT_TRUE(fnInternal->isDefinition());
+    EXPECT_EQ(fnInternal->getLinkage(), MirLinkage::Internal);
+
+    ASSERT_NE(fnWeak, nullptr);
+    EXPECT_FALSE(fnWeak->isDeclaration());
+    EXPECT_TRUE(fnWeak->isDefinition());
+    EXPECT_EQ(fnWeak->getLinkage(), MirLinkage::Weak);
+
+    ASSERT_NE(fnMain, nullptr);
+    EXPECT_FALSE(fnMain->isDeclaration());
+    EXPECT_TRUE(fnMain->isDefinition());
+    EXPECT_EQ(fnMain->getLinkage(), MirLinkage::External);
+}
+
+/**
+ * TMP_20: Round Trip Linkage Printer and Parser
+ * Verifies that functions formatted by MirPrinter can be parsed back preserving linkage and declarations.
+ */
+TEST_F(MirParserTest, TMP_20_RoundTripLinkagePrinterParser)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    EzMir::MirParser parser(ctx);
+
+    std::string_view initialMir = R"mir(
+declare @ext_func(ptr) -> i32;
+weak declare @weak_ext(i64) -> void;
+
+internal fn @internal_fn() -> void {
+entry:
+    RET;
+}
+
+weak fn @weak_fn() -> void {
+entry:
+    RET;
+}
+
+fn @external_fn() -> void {
+entry:
+    RET;
+}
+)mir";
+
+    bool firstParse = parser.parseModule(initialMir, "initial.mir");
+    ASSERT_TRUE(firstParse);
+
+    std::string printed = MirPrinter::printModule(ctx, MirPrinterMode::Parseable);
+    EXPECT_FALSE(printed.empty());
+
+    // Verify printed format contains the expected keywords
+    EXPECT_NE(printed.find("declare @ext_func(ptr) -> i32;"), std::string::npos);
+    EXPECT_NE(printed.find("weak declare @weak_ext(i64) -> void;"), std::string::npos);
+    EXPECT_NE(printed.find("internal fn @internal_fn()"), std::string::npos);
+    EXPECT_NE(printed.find("weak fn @weak_fn()"), std::string::npos);
+    EXPECT_NE(printed.find("fn @external_fn()"), std::string::npos);
+
+    EzMir::MirParser parser2(ctx);
+    bool secondParse = parser2.parseModule(printed, "roundtrip.mir");
+    EXPECT_TRUE(secondParse);
+}
+
 

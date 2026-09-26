@@ -159,6 +159,9 @@ void MirParser::syncToNextTopLevel(Parser::MirLexer &lexer)
             tok.m_kind == Parser::MirTokenKind::KwDeclare ||
             tok.m_kind == Parser::MirTokenKind::KwTarget ||
             tok.m_kind == Parser::MirTokenKind::GlobalName ||
+            tok.m_kind == Parser::MirTokenKind::KwExternal ||
+            tok.m_kind == Parser::MirTokenKind::KwInternal ||
+            tok.m_kind == Parser::MirTokenKind::KwWeak ||
             tok.m_kind == Parser::MirTokenKind::EndOfFile)
         {
             return;
@@ -561,9 +564,29 @@ bool MirParser::parseGlobalVarDecl(Parser::MirLexer &lexer, MirParserContext &pC
  * Parses a function prototype (declare @name(params) -> ret;), building a MirFunction with no body
  * and registering it in the parser symbol table.
  */
-bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule & /*module*/)
+bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer,
+                                  MirParserContext &pCtx,
+                                  Ast::MirAstModule & /*module*/,
+                                  MirLinkage linkage)
 {
     lexer.nextToken(); // Consume 'declare'
+
+    // Optional linkage after 'declare': e.g. declare weak @func...
+    if (lexer.peekToken().m_kind == Parser::MirTokenKind::KwExternal)
+    {
+        linkage = MirLinkage::External;
+        lexer.nextToken();
+    }
+    else if (lexer.peekToken().m_kind == Parser::MirTokenKind::KwInternal)
+    {
+        linkage = MirLinkage::Internal;
+        lexer.nextToken();
+    }
+    else if (lexer.peekToken().m_kind == Parser::MirTokenKind::KwWeak)
+    {
+        linkage = MirLinkage::Weak;
+        lexer.nextToken();
+    }
 
     const auto nameTok = lexer.nextToken();
     if (nameTok.m_kind != Parser::MirTokenKind::GlobalName)
@@ -592,12 +615,18 @@ bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCt
         }
 
         Ast::MirAstType *astType = parseAstType(lexer, pCtx);
-        if (astType)
+        if (!astType)
         {
-            if (MirType *t = pCtx.resolveType(astType))
+            if (m_diag)
             {
-                paramTypes.push_back(t);
+                m_diag->error("MirParser", "Expected parameter type in function declaration") << lexer.peekToken().m_ref;
             }
+            return false;
+        }
+
+        if (MirType *t = pCtx.resolveType(astType))
+        {
+            paramTypes.push_back(t);
         }
 
         if (lexer.peekToken().m_kind == Parser::MirTokenKind::Comma)
@@ -629,7 +658,12 @@ bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCt
     }
 
     MirFunctionBuilder funcBuilder(m_ctx);
-    MirFunction *func = funcBuilder.build(retType, {}, fnName, nullptr, nameTok.m_ref);
+    MirFunction *func = funcBuilder.declare(retType,
+                                            std::span<MirType *const>(paramTypes.data(), paramTypes.size()),
+                                            fnName,
+                                            linkage,
+                                            nullptr,
+                                            nameTok.m_ref);
     pCtx.declareFunction(fnName, func);
     return true;
 }
@@ -638,7 +672,10 @@ bool MirParser::parseFunctionDecl(Parser::MirLexer &lexer, MirParserContext &pCt
  * Parses a function definition (fn @name(params) -> ret [attrs] { blocks }): builds the function
  * and its parameter registers, enters its scope and parses each basic block until the closing brace.
  */
-bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx, Ast::MirAstModule & /*module*/)
+bool MirParser::parseFunctionDef(Parser::MirLexer &lexer,
+                                 MirParserContext &pCtx,
+                                 Ast::MirAstModule & /*module*/,
+                                 MirLinkage linkage)
 {
     const auto fnTok = lexer.nextToken(); // Consume 'fn'
 
@@ -665,16 +702,32 @@ bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx
            lexer.peekToken().m_kind != Parser::MirTokenKind::EndOfFile)
     {
         Ast::MirAstType *astType = parseAstType(lexer, pCtx);
+        if (!astType)
+        {
+            if (m_diag)
+            {
+                m_diag->error("MirParser", "Expected parameter type in function signature") << lexer.peekToken().m_ref;
+            }
+            return false;
+        }
+
         MirType *paramType = pCtx.resolveType(astType);
         if (!paramType && m_ctx)
         {
             paramType = m_ctx->getTypeTable()->i64();
         }
 
-        const auto &paramNameTok = lexer.nextToken();
-        std::string_view paramName = paramNameTok.m_text.empty() ? paramNameTok.m_strVal : paramNameTok.m_text;
+        std::string_view paramName;
+        SourceReference *paramRef = lexer.peekToken().m_ref;
+        if (lexer.peekToken().m_kind != Parser::MirTokenKind::Comma &&
+            lexer.peekToken().m_kind != Parser::MirTokenKind::RParen)
+        {
+            const auto &paramNameTok = lexer.nextToken();
+            paramName = paramNameTok.m_text.empty() ? paramNameTok.m_strVal : paramNameTok.m_text;
+            paramRef = paramNameTok.m_ref;
+        }
 
-        MirRegister *paramReg = opBuilder.buildVReg(paramType, paramName, paramNameTok.m_ref);
+        MirRegister *paramReg = opBuilder.buildVReg(paramType, paramName, paramRef);
         params.push_back(paramReg);
 
         if (lexer.peekToken().m_kind == Parser::MirTokenKind::Comma)
@@ -716,13 +769,28 @@ bool MirParser::parseFunctionDef(Parser::MirLexer &lexer, MirParserContext &pCtx
         matchToken(lexer, Parser::MirTokenKind::RBracket, "Expected ']' at end of attribute list");
     }
 
-    if (!matchToken(lexer, Parser::MirTokenKind::LBrace, "Expected '{' to begin function body"))
+    // Semicolon introduces a function prototype / extern declaration without a body
+    if (lexer.peekToken().m_kind == Parser::MirTokenKind::Semicolon)
+    {
+        lexer.nextToken(); // Consume ';'
+        MirFunctionBuilder funcBuilder(m_ctx);
+        MirFunction *func =
+                funcBuilder.declare(retType, std::initializer_list<MirRegister*>{}, fnName, linkage, nullptr, nameTok.m_ref);
+        for (MirRegister *paramReg : params)
+        {
+            funcBuilder.addParam(func, paramReg);
+        }
+        pCtx.declareFunction(fnName, func);
+        return true;
+    }
+
+    if (!matchToken(lexer, Parser::MirTokenKind::LBrace, "Expected '{' to begin function body or ';' for declaration"))
     {
         return false;
     }
 
     MirFunctionBuilder funcBuilder(m_ctx);
-    MirFunction *func = funcBuilder.build(retType, {}, fnName, nullptr, nameTok.m_ref);
+    MirFunction *func = funcBuilder.build(retType, {}, fnName, linkage, nullptr, nameTok.m_ref);
     for (MirRegister *paramReg : params)
     {
         funcBuilder.addParam(func, paramReg);
@@ -1326,6 +1394,38 @@ bool MirParser::parseTopLevelDecl(Parser::MirLexer &lexer, MirParserContext &pCt
     if (tok.m_kind == Parser::MirTokenKind::KwFn)
     {
         return parseFunctionDef(lexer, pCtx, module);
+    }
+
+    if (tok.m_kind == Parser::MirTokenKind::KwExternal ||
+        tok.m_kind == Parser::MirTokenKind::KwInternal ||
+        tok.m_kind == Parser::MirTokenKind::KwWeak)
+    {
+        MirLinkage linkage = MirLinkage::External;
+        if (tok.m_kind == Parser::MirTokenKind::KwInternal)
+        {
+            linkage = MirLinkage::Internal;
+        }
+        else if (tok.m_kind == Parser::MirTokenKind::KwWeak)
+        {
+            linkage = MirLinkage::Weak;
+        }
+        auto linkTok = lexer.nextToken(); // Consume linkage
+
+        const auto &nextTok = lexer.peekToken();
+        if (nextTok.m_kind == Parser::MirTokenKind::KwDeclare)
+        {
+            return parseFunctionDecl(lexer, pCtx, module, linkage);
+        }
+        if (nextTok.m_kind == Parser::MirTokenKind::KwFn)
+        {
+            return parseFunctionDef(lexer, pCtx, module, linkage);
+        }
+
+        if (m_diag)
+        {
+            m_diag->error("MirParser", "Expected 'fn' or 'declare' after linkage '{}'", linkTok.m_text) << nextTok.m_ref;
+        }
+        return false;
     }
 
     if (m_diag)

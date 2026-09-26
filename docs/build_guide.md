@@ -130,10 +130,12 @@ Example running a single test suite:
 
 EzPacker integrates Doxygen documentation generation directly into CMake.
 
-### 6.1 Using the CMake `docs` Target
-If Doxygen is detected during CMake configuration, a `docs` custom target is automatically created:
+### 6.1 Using the CMake `doxygen` / `docs` Target
+If Doxygen is detected during CMake configuration, custom targets `doxygen` and `docs` are automatically created:
 
 ```bash
+cmake --build build --target doxygen
+# or
 cmake --build build --target docs
 ```
 

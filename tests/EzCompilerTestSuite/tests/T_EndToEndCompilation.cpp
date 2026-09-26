@@ -279,3 +279,164 @@ entry:
     std::filesystem::remove(outPath);
 }
 
+// Compiles a module declaring an extern C function (@puts) and calling it,
+// verifying undefined symbol emission, internal/weak linkage bindings, and relocations.
+TEST_F(EzCompilerTestSuite, TestExternFunctionAndLinkageEndToEnd)
+{
+    const std::string mirPath = "test_extern_linkage.mir";
+    const std::string outPath = "test_extern_linkage.o";
+    const std::string mirContent = R"mir(
+declare @puts(ptr) -> i32;
+
+internal fn @internal_helper() -> i32 {
+entry:
+    %v = MOV i32 42;
+    RET i32 %v;
+}
+
+weak fn @weak_helper() -> i32 {
+entry:
+    %w = MOV i32 100;
+    RET i32 %w;
+}
+
+fn @main() -> i32 {
+entry:
+    %res = CALL i32 @puts;
+    RET i32 %res;
+}
+)mir";
+
+    {
+        std::ofstream out(mirPath);
+        out << mirContent;
+    }
+
+    CommandLineOptions options;
+    options.inputFilePath = mirPath;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.outputFilePath = outPath;
+    options.emissionStage = EmissionStage::Object;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    ASSERT_TRUE(MirModuleLoader::loadMirFile(ctx, mirPath, *ctx.getBuilderContext()));
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    EmissionEngine emitter(ctx);
+    EXPECT_TRUE(emitter.emitModule(*ctx.getBuilderContext(), outPath));
+
+    ASSERT_TRUE(std::filesystem::exists(outPath));
+    uintmax_t fileSize = std::filesystem::file_size(outPath);
+    ASSERT_GE(fileSize, 64u);
+
+    // Read full object file bytes
+    std::ifstream inFile(outPath, std::ios::binary);
+    ASSERT_TRUE(inFile.is_open());
+    std::vector<uint8_t> fileBytes((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+    inFile.close();
+
+    // Parse ELF64 headers to verify symbol table
+    uint64_t e_shoff = 0;
+    std::memcpy(&e_shoff, &fileBytes[40], 8);
+    uint16_t e_shentsize = 0;
+    std::memcpy(&e_shentsize, &fileBytes[58], 2);
+    uint16_t e_shnum = 0;
+    std::memcpy(&e_shnum, &fileBytes[60], 2);
+
+    ASSERT_GT(e_shoff, 0u);
+    ASSERT_GT(e_shnum, 0u);
+
+    uint64_t symtabOffset = 0;
+    uint64_t symtabSize = 0;
+    uint32_t strtabSecIdx = 0;
+    bool foundRelaText = false;
+
+    for (uint16_t i = 0; i < e_shnum; ++i)
+    {
+        const uint8_t *shdr = &fileBytes[e_shoff + i * e_shentsize];
+        uint32_t sh_type = 0;
+        std::memcpy(&sh_type, shdr + 4, 4);
+
+        if (sh_type == 2) // SHT_SYMTAB
+        {
+            std::memcpy(&symtabOffset, shdr + 24, 8);
+            std::memcpy(&symtabSize, shdr + 32, 8);
+            std::memcpy(&strtabSecIdx, shdr + 40, 4);
+        }
+        else if (sh_type == 4) // SHT_RELA
+        {
+            foundRelaText = true;
+        }
+    }
+
+    ASSERT_GT(symtabOffset, 0u);
+    ASSERT_GT(symtabSize, 0u);
+    EXPECT_TRUE(foundRelaText);
+
+    const uint8_t *strtabHdr = &fileBytes[e_shoff + strtabSecIdx * e_shentsize];
+    uint64_t strtabOffset = 0;
+    std::memcpy(&strtabOffset, strtabHdr + 24, 8);
+
+    struct ParsedSym
+    {
+        std::string name;
+        uint8_t bind;
+        uint16_t shndx;
+    };
+    std::vector<ParsedSym> symbols;
+
+    constexpr size_t ELF_SYM_SIZE = 24;
+    size_t numSyms = symtabSize / ELF_SYM_SIZE;
+    for (size_t i = 0; i < numSyms; ++i)
+    {
+        const uint8_t *symData = &fileBytes[symtabOffset + i * ELF_SYM_SIZE];
+        uint32_t st_name = 0;
+        std::memcpy(&st_name, symData, 4);
+        uint8_t st_info = symData[4];
+        uint16_t st_shndx = 0;
+        std::memcpy(&st_shndx, symData + 6, 2);
+
+        const char *namePtr = reinterpret_cast<const char *>(&fileBytes[strtabOffset + st_name]);
+        symbols.push_back({ std::string(namePtr), static_cast<uint8_t>(st_info >> 4), st_shndx });
+    }
+
+    auto findSym = [&](std::string_view name) -> const ParsedSym * {
+        for (const auto &s : symbols)
+        {
+            if (s.name == name) return &s;
+        }
+        return nullptr;
+    };
+
+    // Verify puts is undefined external function
+    const ParsedSym *psPuts = findSym("puts");
+    ASSERT_NE(psPuts, nullptr);
+    EXPECT_EQ(psPuts->bind, 1); // STB_GLOBAL
+    EXPECT_EQ(psPuts->shndx, 0); // SHN_UNDEF
+
+    // Verify internal_helper is local
+    const ParsedSym *psInternal = findSym("internal_helper");
+    ASSERT_NE(psInternal, nullptr);
+    EXPECT_EQ(psInternal->bind, 0); // STB_LOCAL
+    EXPECT_NE(psInternal->shndx, 0); // defined in .text
+
+    // Verify weak_helper is weak
+    const ParsedSym *psWeak = findSym("weak_helper");
+    ASSERT_NE(psWeak, nullptr);
+    EXPECT_EQ(psWeak->bind, 2); // STB_WEAK
+    EXPECT_NE(psWeak->shndx, 0); // defined in .text
+
+    // Verify main is global
+    const ParsedSym *psMain = findSym("main");
+    ASSERT_NE(psMain, nullptr);
+    EXPECT_EQ(psMain->bind, 1); // STB_GLOBAL
+    EXPECT_NE(psMain->shndx, 0); // defined in .text
+
+    std::filesystem::remove(mirPath);
+    std::filesystem::remove(outPath);
+}
+

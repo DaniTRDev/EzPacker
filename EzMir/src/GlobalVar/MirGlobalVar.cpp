@@ -8,7 +8,7 @@
  */
 MirGlobalVar::MirGlobalVar(bool constant,
                            MirId id,
-                           MirGlobalVarLinkage linkage,
+                           MirLinkage linkage,
                            MirType *type,
                            MirOperand *initializer,
                            SourceReference *sourceRef,
@@ -31,7 +31,12 @@ MirId MirGlobalVar::getId() const { return m_id; }
 /**
  * Returns the linkage specification for cross-module symbol resolution.
  */
-MirGlobalVarLinkage MirGlobalVar::getLinkage() const { return m_linkage; }
+MirLinkage MirGlobalVar::getLinkage() const { return m_linkage; }
+
+/**
+ * Sets the linkage specification for cross-module symbol resolution.
+ */
+void MirGlobalVar::setLinkage(MirLinkage linkage) { m_linkage = linkage; }
 
 /**
  * Returns the pointer type associated with the global variable's memory address.

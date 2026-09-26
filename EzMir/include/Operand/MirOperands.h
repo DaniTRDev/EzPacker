@@ -362,6 +362,16 @@ class MirMemory : public MirOperand
     bool hasIndexReg() const { return m_index != nullptr; }
 
     /**
+     * Sets the base pointer register.
+     */
+    void setBase(MirRegister *base) { m_base = base; }
+
+    /**
+     * Sets the index register.
+     */
+    void setIndex(MirRegister *index) { m_index = index; }
+
+    /**
      * Returns true if this is simple [base + displacement] with no index.
      */
     bool isSimpleBaseDisp() const { return m_index == nullptr && m_scale <= 1; }

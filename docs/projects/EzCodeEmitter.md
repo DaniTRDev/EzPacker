@@ -246,8 +246,15 @@ struct ObjectSymbol
     uint64_t m_offset{ 0 };
     uint64_t m_size{ 0 };
     bool m_isGlobal{ true };
+    bool m_isWeak{ false };
     bool m_isFunction{ false };
 };
+
+// Symbol binding and section resolution semantics:
+// - `m_isWeak`: Emits `STB_WEAK` in ELF64.
+// - `m_isGlobal`: Emits `STB_GLOBAL` in ELF64 (when not weak) or `COFF_SYM_CLASS_EXTERNAL` in COFF.
+// - Local (`!m_isGlobal`): Emits `STB_LOCAL` in ELF64 or `COFF_SYM_CLASS_STATIC` in COFF.
+// - Undefined symbols (`SectionType::Undefined`): Emits `SHN_UNDEF` (section 0) in ELF64 and section number 0 in COFF for external function declarations.
 
 struct ObjectRelocEntry
 {

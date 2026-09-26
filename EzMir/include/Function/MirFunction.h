@@ -42,7 +42,28 @@ class MirFunction
                 MirId id,
                 class SourceReference *sourceRef,
                 std::pmr::string name,
-                std::pmr::memory_resource *alloc);
+                std::pmr::memory_resource *alloc,
+                MirLinkage linkage = MirLinkage::External);
+
+    /**
+     * Returns the symbol linkage and visibility specification for this function.
+     */
+    MirLinkage getLinkage() const;
+
+    /**
+     * Sets the symbol linkage and visibility specification for this function.
+     */
+    void setLinkage(MirLinkage linkage);
+
+    /**
+     * Checks if this function is an external declaration without a body (has 0 basic blocks).
+     */
+    bool isDeclaration() const;
+
+    /**
+     * Checks if this function is a definition with a body (has 1 or more basic blocks).
+     */
+    bool isDefinition() const;
 
     /**
      * Returns the target calling convention descriptor for this function.
@@ -183,6 +204,7 @@ class MirFunction
     std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock; // Block lookup by ID.
 
     std::pmr::string m_name; // Function symbol name.
+    MirLinkage m_linkage{ MirLinkage::External }; // Symbol linkage visibility.
 
     // Set filled by MirRegisterAllocatorPass that contains which callee-saved registers were consume by this function.
     std::pmr::vector<class MirRegisterRef> m_usedCalleeSavedRegs;

@@ -45,6 +45,7 @@ EzMir serves as the universal pivot of the entire compiler:
 | - CodeFlowAnalysisPass      |       | (Emits human-readable textual MIR)      |
 | - NonSsaToSsaPass           |       +-----------------------------------------+
 | - LivenessAnalysisPass      |
+| - MirPeepholePass           |
 +-----------------------------+
        |
        v
@@ -60,7 +61,11 @@ EzMir serves as the universal pivot of the entire compiler:
 The top-level entity representing a callable routine.
 - **Name & Coordinates**: Identifier symbol (e.g., `@calculate_hash`) and associated `SourceReference`.
 - **Calling Convention**: Pointer to `CallingConvDesc` specifying parameter placement, return registers, and preservation rules.
-- **Return Type & Parameters**: Monomorphic return type (`MirType*`) and formal parameter list (`std::pmr::vector<MirRegister*>`).
+- **Linkage (`MirLinkage`)**: External visibility and binding (`MirLinkage::External`, `MirLinkage::Internal`, `MirLinkage::Weak`). Queried via `getLinkage()` and modified via `setLinkage()`.
+- **Declarations vs. Definitions**:
+  - `isDeclaration()`: True when the function has 0 basic blocks (e.g. extern C declarations such as `declare @puts(ptr) -> i32;`). External declarations are excluded from code optimization/lowering passes and emitted as undefined symbols (`SHN_UNDEF`).
+  - `isDefinition()`: True when the function has 1 or more basic blocks containing executable code.
+- **Return Type & Parameters**: Monomorphic return type (`MirType*`) and formal parameter list (`const std::pmr::list<MirRegister*>&`).
 - **Basic Block Stream**: An intrusive sequence of `MirBlock` nodes stored via `IntrusiveLinkedList<MirBlock>`, with the head block serving as the function entry point.
 - **`MirFunctionStackFrame`**: Manages all function stack allocations:
   - Local fixed stack objects (`StackFrameObject`).
@@ -73,7 +78,14 @@ The top-level entity representing a callable routine.
   - Physical register mapping assigned during register allocation.
   - Callee-saved register usage sets.
 
-### 2.2 `MirBlock` (`Block/MirBlock.h`)
+### 2.2 `MirGlobalVar` & Linkage (`GlobalVar/MirGlobalVar.h`, `Linkage/MirLinkage.h`)
+
+Global variables represent statically allocated data objects:
+- **Linkage**: Configured with `MirLinkage` (`External`, `Internal`, `Weak`). Controls whether the symbol is exported (`STB_GLOBAL` / `COFF_SYM_CLASS_EXTERNAL`), private to the translation unit (`STB_LOCAL` / `COFF_SYM_CLASS_STATIC`), or weak (`STB_WEAK`).
+- **Immutability & Section Placement**: Immutable constants go to read-only memory (`.rodata`), zero-initialized or uninitialized variables go to `.bss`, and initialized mutable variables go to `.data`.
+- **Initializers**: Multi-precision integer or floating-point literal operands.
+
+### 2.3 `MirBlock` (`Block/MirBlock.h`)
 
 A single-entry, single-exit basic block:
 - **Instruction Container**: Holds an `IntrusiveLinkedList<MirInstruction>` providing zero-heap-allocation insertion, erasure, and iteration.
@@ -127,30 +139,43 @@ EzPacker features a comprehensive type system capable of representing arbitrary 
 EzMir passes operate on `MirFunction` instances and are orchestrated by `MirPassManager` (`MirPasses/MirPassManager.h`).
 
 ```
-       +---------------------------------------------+
-       |               MirPassManager                |
-       +---------------------------------------------+
-         |                      |                   |
-         v                      v                   v
-   +------------------+  +------------------+  +-------------------+
-   | CodeFlowAnalysis |  |   NonSsaToSsa    |  | LivenessAnalysis  |
-   | CFG & Dominators |  | SSA Construction |  | Live Intervals    |
-   +------------------+  +------------------+  +-------------------+
+       +-------------------------------------------------------------------------------+
+       |                                MirPassManager                                 |
+       +-------------------------------------------------------------------------------+
+         |                    |                   |                 |                |
+         v                    v                   v                 v                v
+   +----------------+  +----------------+  +----------------+  +---------------+  +---------------+
+   |  VerifierPass  |  |  CodeFlowPass  |  |  NonSsaToSsa   |  | LivenessPass  |  | MirPeephole   |
+   | Invariant Check|  | CFG & Dominance|  | Cytron SSA     |  | LiveIntervals |  | SSA Optimizer |
+   +----------------+  +----------------+  +----------------+  +---------------+  +---------------+
 ```
 
-### 3.1 `CodeFlowAnalysisPass` (`MirPasses/Passes/CodeFlowAnalysisPass.h`)
+### 3.1 `MirVerifierPass` (`MirPasses/Passes/MirVerifierPass.h`)
+- Validates the structural integrity and semantic invariants of the input MIR prior to starting any middle-end analysis or transformation:
+  1. **Opcode Validity**: Rejects uninitialized, sentinel (`INVALID`), or out-of-range instruction opcodes.
+  2. **Operand Arity**: Enforces strict operand count for non-variadic instructions, minimum arity for variadic instructions, and allows optional void returns for `RET`.
+  3. **Operand Kind Conformance**: Validates each operand against the `ExpectedOperandType` bitmask declared in the opcode's metadata (`Register`, `Integer`, `FloatingPoint`, `Memory`, `Reference`, `RuntimeSymbol`, `RegIntImm`, `RegImm`, `AddressSource`, `AnyValue`).
+  4. **Dataflow Access Constraints**: Enforces that destination operands marked `MirOperandFlag::Write` (DEF) are writable registers (`MirRegister`).
+  5. **Semantic Flag & Bit-Width Invariants**:
+     - `SizeMatch`: Ensures identical bit-width across all value operands in ALU, bitwise, vector, and `BITCAST` operations. For relational comparisons (`CMP_*`), enforces matching bit-width between the compared `lhs` and `rhs` operands.
+     - `DestLarger`: Enforces that destination bit-width strictly exceeds source bit-width (`ZEXT`, `SEXT`, `FPEXT`).
+     - `DestSmaller`: Enforces that destination bit-width is strictly smaller than source bit-width (`TRUNC`, `FPTRUNC`).
+  6. **Type Consistency**: Validates that `TreatAsSigned` instructions operate on integer scalars, and verifies type discipline across floating-point ALU and conversion operations (`SITOFP`, `FPTOSI`).
+  7. **Control-Flow Invariants**: Warns on unreachable dead code trailing basic block terminators (`IsTerminator`), allowing `MirPeepholePass` to safely eliminate them.
+
+### 3.2 `CodeFlowAnalysisPass` (`MirPasses/Passes/CodeFlowAnalysisPass.h`)
 - Traverses basic blocks to establish explicit CFG edges (`predecessors`, `successors`).
 - Removes unreachable dead blocks.
 - Computes the **Dominator Tree** and **Dominance Frontiers** using the Lengauer-Tarjan algorithm.
 - Identifies loop headers and back-edges.
 
-### 3.2 `NonSsaToSsaPass` (`MirPasses/Passes/NonSsaToSsaPass.h`)
+### 3.3 `NonSsaToSsaPass` (`MirPasses/Passes/NonSsaToSsaPass.h`)
 - Converts non-SSA or partially-SSA code into minimal Static Single Assignment (SSA) form using Cytron's algorithm:
   1. Computes iterated dominance frontiers ($IDF$) for every multi-block variable.
   2. Places `PHI` nodes at the beginning of iterated dominance frontier blocks.
   3. Renames variables into versioned virtual registers via a dominator tree depth-first walk.
 
-### 3.3 `LivenessAnalysisPass` (`MirPasses/Passes/LivenessAnalysisPass.h`)
+### 3.4 `LivenessAnalysisPass` (`MirPasses/Passes/LivenessAnalysisPass.h`)
 - Executes backwards bit-vector dataflow analysis across all basic blocks using `DenseBitSet`.
 - Computes `LiveIn` and `LiveOut` sets for each block using the transfer function:
   ```text
@@ -158,6 +183,28 @@ EzMir passes operate on `MirFunction` instances and are orchestrated by `MirPass
   ```
 - Computes linear **Live Intervals** $[start, end]$ for every virtual and physical register.
 - Surfaces the `LivenessResult` structure directly consumed by `MirRegisterAllocator`.
+
+### 3.5 `MirPeepholePass` (`MirPasses/Passes/MirPeepholePass.h`)
+Generic SSA-level transformation pass (`IMirTransformPass`) active during optimization stages (`-O1`, `-O2`, `-Os`). Iterates over basic blocks and instructions until a fixed point is reached or the iteration budget is exhausted:
+- **Algebraic Identities**:
+  - `ADD %dst, %src, 0` / `ADD %dst, 0, %src` $\to$ `MOV %dst, %src`
+  - `SUB %dst, %src, 0` $\to$ `MOV %dst, %src`
+  - `SUB %dst, %src, %src` $\to$ `MOV %dst, 0`
+  - `IMUL %dst, %src, 1` / `IMUL %dst, 1, %src` $\to$ `MOV %dst, %src`
+  - `IMUL %dst, %src, 0` / `IMUL %dst, 0, %src` $\to$ `MOV %dst, 0`
+  - `AND %dst, %src, 0` / `AND %dst, 0, %src` $\to$ `MOV %dst, 0`
+  - `AND %dst, %src, -1` / `AND %dst, -1, %src` $\to$ `MOV %dst, %src`
+  - `OR %dst, %src, 0` / `OR %dst, 0, %src` $\to$ `MOV %dst, %src`
+  - `XOR %dst, %src, %src` $\to$ `MOV %dst, 0`
+  - `XOR %dst, %src, 0` / `XOR %dst, 0, %src` $\to$ `MOV %dst, %src`
+  - `SHL / LSHR / ASHR %dst, %src, 0` $\to$ `MOV %dst, %src`
+- **Redundant Move Elimination**:
+  - Eliminates self-moves (`MOV %x, %x`).
+  - Eliminates reciprocal copies (`MOV %a, %b; MOV %b, %a` $\to$ second copy removed).
+- **Dead Code Elimination After Terminators**:
+  - Prunes dead, unreachable instructions occurring strictly after basic block terminators (`RET`, `JMP`, `UNREACHABLE`).
+- **Fall-Through Jump Elimination**:
+  - Erases unconditional `JMP` / `BR` instructions whose destination target is the immediately sequential basic block (`block->getNext()`).
 
 ---
 
@@ -170,12 +217,16 @@ EzMir provides a clean, factory-based builder architecture designed for compiler
 1. **`MirBuilderContext`** (`Builder/MirBuilderContext.h`):
    Central state owning the session memory arena, type table, diagnostic sink, and global ID counter.
 2. **`MirFunctionBuilder`** (`Function/MirFunctionBuilder.h`):
-   Instantiates `MirFunction` objects and produces child block builders.
-3. **`MirBlockBuilder`** (`Block/MirBlockBuilder.h`):
+   Instantiates `MirFunction` objects and produces child block builders:
+   - `build(...)`: Constructs a function definition with an initial entry point basic block (`isDefinition() == true`). Supports configuring `MirLinkage` (`External`, `Internal`, `Weak`).
+   - `declare(...)`: Constructs an external function declaration without any basic blocks (`getBlockCount() == 0`, `isDeclaration() == true`). Accepts parameter registers or parameter type lists (`std::span<MirType* const>` or `std::initializer_list<MirType*>`).
+3. **`MirGlobalVarBuilder`** (`GlobalVar/MirGlobalVarBuilder.h`):
+   Constructs global variable declarations with configurable type, immutability, `MirLinkage`, and initializer operands.
+4. **`MirBlockBuilder`** (`Block/MirBlockBuilder.h`):
    Appends `MirBlock` nodes to the function and produces child instruction builders.
-4. **`MirInstructionBuilder`** (`Instruction/MirInstructionBuilder.h`):
-   Constructs instructions at a configurable insertion point (`Append`, `InsertBefore`, `InsertAfter`). Generates high-level opcode methods (`ADD`, `MOV`, `SUB`, `RET`, `JMP`, etc.) and target instruction methods (`buildTarget`).
-5. **`MirOperandBuilder`** (`Operand/MirOperandBuilder.h`):
+5. **`MirInstructionBuilder`** (`Instruction/MirInstructionBuilder.h`):
+   Constructs instructions at a configurable insertion point (`Append`, `InsertBefore`, `InsertAfter`). Generates high-level opcode methods (`ADD`, `MOV`, `SUB`, `RET`, `JMP`, etc.), target instruction methods (`buildTarget`), and the `setOperand(MirInstruction *instr, size_t pos, MirOperand *newOperand)` utility for in-place operand substitution with automatic def/use tracking synchronization.
+6. **`MirOperandBuilder`** (`Operand/MirOperandBuilder.h`):
    Constructs virtual registers, physical registers, memory operands, constants, and symbol references.
 
 ### 4.2 Complete Programmatic Example
@@ -239,7 +290,36 @@ instrBuilder.RET(sumReg);
 
 EzPacker supports a clean textual representation for serialization, unit testing, and human inspection.
 
+### 5.1 Global Variables & External Declarations
 ```mir
+; Global variables with linkage (internal, external, weak)
+@greeting = internal const [14 x i8] "Hello, World!\0A\00";
+@counter  = external var i64 = 0;
+@flag     = weak var i32 = 1;
+
+; External function prototypes (C-style declarations)
+declare @puts(ptr) -> i32;
+weak declare @custom_init(i64) -> void;
+extern fn @external_worker(ptr, i32) -> void;
+```
+
+### 5.2 Function Definitions with Linkage
+```mir
+; Module-private helper function
+internal fn @compute_offset(i32 %index) -> i64 {
+entry:
+    %ext = sext i32 %index -> i64;
+    %off = mul i64 %ext, 4;
+    ret i64 %off;
+}
+
+; Weakly-linked default handler (can be overridden by another object)
+weak fn @fallback_handler() -> void {
+entry:
+    ret;
+}
+
+; Public function entry point
 fn @dot_product(ptr %arr_a, ptr %arr_b, i32 %n) -> i32 {
 entry:
     %acc.0 = mov.i32 0
@@ -275,9 +355,11 @@ exit:
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
+| Linkage | `EzMir/include/Linkage/MirLinkage.h` | `MirLinkage` |
 | Function | `EzMir/include/Function/MirFunction.h` | `MirFunction` |
 | Function Frame | `EzMir/include/Function/MirFunctionStackFrame.h` | `MirFunctionStackFrame`, `StackFrameObject` |
 | Register Info | `EzMir/include/Function/MirFunctionRegisterInfo.h` | `MirFunctionRegisterInfo` |
+| Global Variable | `EzMir/include/GlobalVar/MirGlobalVar.h` | `MirGlobalVar` |
 | Block | `EzMir/include/Block/MirBlock.h` | `MirBlock` |
 | Instruction | `EzMir/include/Instruction/MirInstruction.h` | `MirInstruction`, `MirInstructionFlags` |
 | Instruction Set | `EzMir/include/Instruction/MirInstructionSet.h` | `MirInstructionOpCode` |
@@ -292,10 +374,15 @@ exit:
 | Types | `EzMir/include/Type/MirTypeTable.h` | `MirTypeTable` |
 | Builders | `EzMir/include/Builder/MirBuilderContext.h` | `MirBuilderContext` |
 | Builders | `EzMir/include/Function/MirFunctionBuilder.h` | `MirFunctionBuilder` |
+| Builders | `EzMir/include/GlobalVar/MirGlobalVarBuilder.h` | `MirGlobalVarBuilder` |
 | Builders | `EzMir/include/Block/MirBlockBuilder.h` | `MirBlockBuilder` |
 | Builders | `EzMir/include/Instruction/MirInstructionBuilder.h` | `MirInstructionBuilder`, `MirInstructionInsertionPoint`, `InsertionType` |
 | Builders | `EzMir/include/Operand/MirOperandBuilder.h` | `MirOperandBuilder` |
 | Passes | `EzMir/include/MirPasses/MirPassManager.h` | `MirPassManager` |
+| Passes | `EzMir/include/MirPasses/Passes/MirVerifierPass.h` | `MirVerifierPass`, `MirVerifierPassResult` |
 | Passes | `EzMir/include/MirPasses/Passes/CodeFlowAnalysisPass.h` | `CodeFlowAnalysisPass` |
 | Passes | `EzMir/include/MirPasses/Passes/NonSsaToSsaPass.h` | `NonSsaToSsaPass` |
 | Passes | `EzMir/include/MirPasses/Passes/LivenessAnalysisPass.h` | `LivenessAnalysisPass`, `LivenessResult` |
+| Passes | `EzMir/include/MirPasses/Passes/MirPeepholePass.h` | `MirPeepholePass` |
+| Printer | `EzMir/include/Printer/MirPrinter.h` | `MirPrinter`, `MirPrinterMode`, `MirPrinterDetail` |
+| Parser | `EzMir/include/Parser/MirParser.h` | `MirParser`, `MirParserOptions` |

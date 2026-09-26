@@ -4,16 +4,6 @@
 #include "EzMirCommon.h"
 
 /**
- * Linkage visibility and resolution rules for global variables across compilation units.
- */
-enum class MirGlobalVarLinkage : uint8_t
-{
-    External = 0, // Visible globally across translation units (standard external symbol)
-    Internal,     // Private to this module / translation unit (static symbol)
-    Weak          // Mergeable at link time; can be overridden by a non-weak definition
-};
-
-/**
  * Represents a global variable in MIR.
  * The variable's MirType is always a pointer type pointing to the underlying data type,
  * reflecting memory-location semantics in MIR.
@@ -27,7 +17,7 @@ class MirGlobalVar
      */
     MirGlobalVar(bool constant,
                  MirId id,
-                 MirGlobalVarLinkage linkage,
+                 MirLinkage linkage,
                  class MirType *type,
                  class MirOperand *initializer,
                  class SourceReference *sourceRef,
@@ -46,7 +36,12 @@ class MirGlobalVar
     /**
      * Retrieves the symbol linkage and visibility specification.
      */
-    MirGlobalVarLinkage getLinkage() const;
+    MirLinkage getLinkage() const;
+
+    /**
+     * Sets the symbol linkage and visibility specification.
+     */
+    void setLinkage(MirLinkage linkage);
 
     /**
      * Retrieves the pointer type associated with this global variable.
@@ -82,7 +77,7 @@ class MirGlobalVar
     /**
      * Linkage visibility of the symbol.
      */
-    MirGlobalVarLinkage m_linkage;
+    MirLinkage m_linkage;
 
     /**
      * Pointer type referring to the value type of the global variable.

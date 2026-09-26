@@ -17,12 +17,33 @@ MirFunction::MirFunction(CallingConvDesc *callingConv,
                          MirId id,
                          SourceReference *sourceRef,
                          std::pmr::string name,
-                         std::pmr::memory_resource *alloc) :
+                         std::pmr::memory_resource *alloc,
+                         MirLinkage linkage) :
     m_callingConv(callingConv), m_entryPoint(nullptr), m_regInfo(alloc), m_stackFrame(stackFrame),
     m_returnType(returnType), m_type(type), m_id(id), m_sourceRef(sourceRef), m_parameters(alloc),
-    m_blockIdToBlock(alloc), m_name(std::move(name)), m_usedCalleeSavedRegs(alloc)
+    m_blockIdToBlock(alloc), m_name(std::move(name)), m_linkage(linkage), m_usedCalleeSavedRegs(alloc)
 {
 }
+
+/**
+ * Returns the symbol linkage and visibility specification for this function.
+ */
+MirLinkage MirFunction::getLinkage() const { return m_linkage; }
+
+/**
+ * Sets the symbol linkage and visibility specification for this function.
+ */
+void MirFunction::setLinkage(MirLinkage linkage) { m_linkage = linkage; }
+
+/**
+ * Checks if this function is an external declaration without a body (has 0 basic blocks).
+ */
+bool MirFunction::isDeclaration() const { return m_blocks.empty(); }
+
+/**
+ * Checks if this function is a definition with a body (has 1 or more basic blocks).
+ */
+bool MirFunction::isDefinition() const { return !m_blocks.empty(); }
 
 /**
  * Returns the calling convention that governs parameter passing and register preservation.

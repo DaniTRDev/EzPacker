@@ -23,6 +23,7 @@ struct ObjectSymbol
     uint64_t m_offset{ 0 };                     ///< Byte offset from the start of its section.
     uint64_t m_size{ 0 };                       ///< Size of the symbol's data in bytes.
     bool m_isGlobal{ true };                    ///< True for external linkage, false for local.
+    bool m_isWeak{ false };                     ///< True for weak linkage.
     bool m_isFunction{ false };                 ///< True when the symbol marks executable code.
 };
 
