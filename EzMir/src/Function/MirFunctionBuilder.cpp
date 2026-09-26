@@ -198,6 +198,21 @@ MirFunction *MirFunctionBuilder::declare(class MirType *returnType,
                                          class CallingConvDesc *cc,
                                          class SourceReference *sourceRef)
 {
+    return declare(returnType,
+                   std::span<MirType *const>(parameterTypes.begin(), parameterTypes.size()),
+                   name,
+                   linkage,
+                   cc,
+                   sourceRef);
+}
+
+MirFunction *MirFunctionBuilder::declare(class MirType *returnType,
+                                         std::span<class MirType *const> parameterTypes,
+                                         const std::string_view &name,
+                                         MirLinkage linkage,
+                                         class CallingConvDesc *cc,
+                                         class SourceReference *sourceRef)
+{
     MirOperandBuilder opBuilder(m_ctx);
     std::pmr::vector<MirRegister *> paramRegs(m_ctx->getGlobalAllocator());
     paramRegs.reserve(parameterTypes.size());

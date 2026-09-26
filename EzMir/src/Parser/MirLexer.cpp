@@ -675,7 +675,7 @@ MirToken MirLexer::lexIdentifierOrKeyword(size_t startPos)
         tok.m_kind = MirTokenKind::KwVar;
         return tok;
     }
-    if (t == "external")
+    if (t == "external" || t == "extern")
     {
         tok.m_kind = MirTokenKind::KwExternal;
         return tok;

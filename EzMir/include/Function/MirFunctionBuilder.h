@@ -80,6 +80,16 @@ class MirFunctionBuilder : public MirBuilder<class MirFunction>
                          class CallingConvDesc *cc = nullptr,
                          class SourceReference *sourceRef = nullptr);
 
+    /**
+     * Declares an external function prototype from a span/vector of parameter types without a body.
+     */
+    MirFunction *declare(class MirType *returnType,
+                         std::span<class MirType *const> parameterTypes,
+                         const std::string_view &name = "",
+                         MirLinkage linkage = MirLinkage::External,
+                         class CallingConvDesc *cc = nullptr,
+                         class SourceReference *sourceRef = nullptr);
+
   private:
     class MirBuilderContext *m_ctx; // Context providing the arena, diagnostics and registration.
 };
