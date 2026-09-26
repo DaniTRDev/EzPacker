@@ -147,6 +147,7 @@ public:
     std::string dumpAssembly() const;
 
 private:
+    bool runInputVerification(MirFunction *func, MirPassManager &passManager);
     bool runMiddleEndPasses(MirFunction *func, MirPassManager &passManager);
     bool runLegalizationPasses(MirFunction *func, MirPassManager &passManager);
     bool runTargetLoweringPasses(MirFunction *func, MirPassManager &passManager);
@@ -154,6 +155,8 @@ private:
 ```
 
 ### Pass Sequence:
+0. **Input Verification Stage** (Pre-Middle-End):
+   - `MirVerifierPass`: Validates input MIR structural invariants, expected operand kinds, DEF register constraints, and opcode flags (`SizeMatch`, `DestLarger`, `DestSmaller`, `TreatAsSigned`) on each function before middle-end transformations begin.
 1. **Middle-End Stage**:
    - `CodeFlowAnalysisPass`: CFG construction, loop analysis, dominator tree computation.
    - `NonSsaToSsaPass`: Cytron SSA construction with `PHI` node placement.

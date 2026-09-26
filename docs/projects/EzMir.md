@@ -139,30 +139,43 @@ EzPacker features a comprehensive type system capable of representing arbitrary 
 EzMir passes operate on `MirFunction` instances and are orchestrated by `MirPassManager` (`MirPasses/MirPassManager.h`).
 
 ```
-       +-------------------------------------------------------------+
-       |                       MirPassManager                        |
-       +-------------------------------------------------------------+
-         |                    |                   |                 |
-         v                    v                   v                 v
-   +----------------+  +----------------+  +---------------+  +---------------+
-   | CodeFlowPass   |  |  NonSsaToSsa   |  | LivenessPass  |  | MirPeephole   |
-   | CFG & Dominance|  | Cytron SSA     |  | LiveIntervals |  | SSA Optimizer |
-   +----------------+  +----------------+  +---------------+  +---------------+
+       +-------------------------------------------------------------------------------+
+       |                                MirPassManager                                 |
+       +-------------------------------------------------------------------------------+
+         |                    |                   |                 |                |
+         v                    v                   v                 v                v
+   +----------------+  +----------------+  +----------------+  +---------------+  +---------------+
+   |  VerifierPass  |  |  CodeFlowPass  |  |  NonSsaToSsa   |  | LivenessPass  |  | MirPeephole   |
+   | Invariant Check|  | CFG & Dominance|  | Cytron SSA     |  | LiveIntervals |  | SSA Optimizer |
+   +----------------+  +----------------+  +----------------+  +---------------+  +---------------+
 ```
 
-### 3.1 `CodeFlowAnalysisPass` (`MirPasses/Passes/CodeFlowAnalysisPass.h`)
+### 3.1 `MirVerifierPass` (`MirPasses/Passes/MirVerifierPass.h`)
+- Validates the structural integrity and semantic invariants of the input MIR prior to starting any middle-end analysis or transformation:
+  1. **Opcode Validity**: Rejects uninitialized, sentinel (`INVALID`), or out-of-range instruction opcodes.
+  2. **Operand Arity**: Enforces strict operand count for non-variadic instructions, minimum arity for variadic instructions, and allows optional void returns for `RET`.
+  3. **Operand Kind Conformance**: Validates each operand against the `ExpectedOperandType` bitmask declared in the opcode's metadata (`Register`, `Integer`, `FloatingPoint`, `Memory`, `Reference`, `RuntimeSymbol`, `RegIntImm`, `RegImm`, `AddressSource`, `AnyValue`).
+  4. **Dataflow Access Constraints**: Enforces that destination operands marked `MirOperandFlag::Write` (DEF) are writable registers (`MirRegister`).
+  5. **Semantic Flag & Bit-Width Invariants**:
+     - `SizeMatch`: Ensures identical bit-width across all value operands in ALU, bitwise, vector, and `BITCAST` operations. For relational comparisons (`CMP_*`), enforces matching bit-width between the compared `lhs` and `rhs` operands.
+     - `DestLarger`: Enforces that destination bit-width strictly exceeds source bit-width (`ZEXT`, `SEXT`, `FPEXT`).
+     - `DestSmaller`: Enforces that destination bit-width is strictly smaller than source bit-width (`TRUNC`, `FPTRUNC`).
+  6. **Type Consistency**: Validates that `TreatAsSigned` instructions operate on integer scalars, and verifies type discipline across floating-point ALU and conversion operations (`SITOFP`, `FPTOSI`).
+  7. **Control-Flow Invariants**: Warns on unreachable dead code trailing basic block terminators (`IsTerminator`), allowing `MirPeepholePass` to safely eliminate them.
+
+### 3.2 `CodeFlowAnalysisPass` (`MirPasses/Passes/CodeFlowAnalysisPass.h`)
 - Traverses basic blocks to establish explicit CFG edges (`predecessors`, `successors`).
 - Removes unreachable dead blocks.
 - Computes the **Dominator Tree** and **Dominance Frontiers** using the Lengauer-Tarjan algorithm.
 - Identifies loop headers and back-edges.
 
-### 3.2 `NonSsaToSsaPass` (`MirPasses/Passes/NonSsaToSsaPass.h`)
+### 3.3 `NonSsaToSsaPass` (`MirPasses/Passes/NonSsaToSsaPass.h`)
 - Converts non-SSA or partially-SSA code into minimal Static Single Assignment (SSA) form using Cytron's algorithm:
   1. Computes iterated dominance frontiers ($IDF$) for every multi-block variable.
   2. Places `PHI` nodes at the beginning of iterated dominance frontier blocks.
   3. Renames variables into versioned virtual registers via a dominator tree depth-first walk.
 
-### 3.3 `LivenessAnalysisPass` (`MirPasses/Passes/LivenessAnalysisPass.h`)
+### 3.4 `LivenessAnalysisPass` (`MirPasses/Passes/LivenessAnalysisPass.h`)
 - Executes backwards bit-vector dataflow analysis across all basic blocks using `DenseBitSet`.
 - Computes `LiveIn` and `LiveOut` sets for each block using the transfer function:
   ```text
@@ -171,7 +184,7 @@ EzMir passes operate on `MirFunction` instances and are orchestrated by `MirPass
 - Computes linear **Live Intervals** $[start, end]$ for every virtual and physical register.
 - Surfaces the `LivenessResult` structure directly consumed by `MirRegisterAllocator`.
 
-### 3.4 `MirPeepholePass` (`MirPasses/Passes/MirPeepholePass.h`)
+### 3.5 `MirPeepholePass` (`MirPasses/Passes/MirPeepholePass.h`)
 Generic SSA-level transformation pass (`IMirTransformPass`) active during optimization stages (`-O1`, `-O2`, `-Os`). Iterates over basic blocks and instructions until a fixed point is reached or the iteration budget is exhausted:
 - **Algebraic Identities**:
   - `ADD %dst, %src, 0` / `ADD %dst, 0, %src` $\to$ `MOV %dst, %src`
@@ -366,6 +379,7 @@ exit:
 | Builders | `EzMir/include/Instruction/MirInstructionBuilder.h` | `MirInstructionBuilder`, `MirInstructionInsertionPoint`, `InsertionType` |
 | Builders | `EzMir/include/Operand/MirOperandBuilder.h` | `MirOperandBuilder` |
 | Passes | `EzMir/include/MirPasses/MirPassManager.h` | `MirPassManager` |
+| Passes | `EzMir/include/MirPasses/Passes/MirVerifierPass.h` | `MirVerifierPass`, `MirVerifierPassResult` |
 | Passes | `EzMir/include/MirPasses/Passes/CodeFlowAnalysisPass.h` | `CodeFlowAnalysisPass` |
 | Passes | `EzMir/include/MirPasses/Passes/NonSsaToSsaPass.h` | `NonSsaToSsaPass` |
 | Passes | `EzMir/include/MirPasses/Passes/LivenessAnalysisPass.h` | `LivenessAnalysisPass`, `LivenessResult` |
