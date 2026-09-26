@@ -782,27 +782,39 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
 
             for (size_t i = 0; i < operands.size(); ++i)
             {
-                if (!operands[i]->isOfType<MirRegister>())
-                    continue;
-
-                MirRegister *regOp = operands[i]->get<MirRegister>();
-                MirRegisterRef regRef = regOp->getRef();
-
-                if (regRef.isVirtual())
+                auto rewriteReg = [&](MirRegister *reg)
                 {
-                    MirRegisterRef leader = ctx->getCoalescedLeader(regRef);
-                    if (leader.isPhysical())
+                    if (!reg)
                     {
-                        regOp->setRef(leader);
+                        return;
                     }
-                    else
+                    MirRegisterRef regRef = reg->getRef();
+                    if (regRef.isVirtual())
                     {
-                        auto it = ctx->m_allocatedRegs.find(leader);
-                        if (it != ctx->m_allocatedRegs.end())
+                        MirRegisterRef leader = ctx->getCoalescedLeader(regRef);
+                        if (leader.isPhysical())
                         {
-                            regOp->setRef(it->second);
+                            reg->setRef(leader);
+                        }
+                        else
+                        {
+                            auto it = ctx->m_allocatedRegs.find(leader);
+                            if (it != ctx->m_allocatedRegs.end())
+                            {
+                                reg->setRef(it->second);
+                            }
                         }
                     }
+                };
+
+                if (operands[i]->isOfType<MirRegister>())
+                {
+                    rewriteReg(operands[i]->get<MirRegister>());
+                }
+                else if (auto *mem = operands[i]->get<MirMemory>())
+                {
+                    rewriteReg(mem->getBase());
+                    rewriteReg(mem->getIndex());
                 }
             }
         }

@@ -517,6 +517,41 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
 
             auto &ops = inst->getOperands();
 
+            // Helper to resolve a virtual register read to its current reaching definition.
+            auto renameReadReg = [&](MirRegister *op) -> MirRegister *
+            {
+                if (!op || !op->isVirtual())
+                {
+                    return op;
+                }
+                MirId origReg = op->getRegId();
+                auto &stack = varStacks[origReg];
+                if (!stack.empty())
+                {
+                    collector->trace("NonSsaToSsaPass",
+                                     "Renamed READ operand from base reg {} -> reaching definition reg {}",
+                                     origReg,
+                                     stack.back()->getRegId())
+                            << inst->getSourceRef();
+                    return stack.back();
+                }
+                if (undefRegs.find(origReg) == undefRegs.end())
+                {
+                    undefRegs[origReg] = oBuilder.buildVReg(op->getMirType(),
+                                                            "undef",
+                                                            op->getSourceRef(),
+                                                            op->getRegClass());
+                }
+                auto diag = collector->trace(
+                        "NonSsaToSsaPass",
+                        "Uninitialized READ detected for base reg {}. Resolved to undef reg {}",
+                        origReg,
+                        undefRegs[origReg]->getRegId());
+                diag << inst->getSourceRef();
+                diag.appendNote("Inst reads from a register that lacks a dominator definition path.");
+                return undefRegs[origReg];
+            };
+
             // 1. Rename READ operands first. Test the flag bitwise so ReadWrite operands are
             //    recognized as reads too (matching getUsedRegisters/getDefinedRegisters).
             for (size_t i = 0; i < inst->getOperandCount(); i++)
@@ -526,39 +561,18 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
                     MirRegister *op = inst->getOpAs<MirRegister>(i);
                     if (op && op->isVirtual())
                     {
-                        MirId origReg = op->getRegId();
-                        auto &stack = varStacks[origReg];
-
-                        if (!stack.empty())
-                        {
-                            iBuilder.swapOperand(inst, stack.back(), i);
-
-                            collector->trace("NonSsaToSsaPass",
-                                             "Renamed READ operand from base reg {} -> reaching definition reg {}",
-                                             origReg,
-                                             stack.back()->getRegId())
-                                    << inst->getSourceRef();
-                        }
-                        else
-                        {
-                            if (undefRegs.find(origReg) == undefRegs.end())
-                            {
-                                undefRegs[origReg] = oBuilder.buildVReg(op->getMirType(),
-                                                                        "undef",
-                                                                        op->getSourceRef(),
-                                                                        op->getRegClass());
-                            }
-
-                            iBuilder.swapOperand(inst, undefRegs[origReg], i);
-
-                            auto diag = collector->trace(
-                                    "NonSsaToSsaPass",
-                                    "Uninitialized READ detected for base reg {}. Resolved to undef reg {}",
-                                    origReg,
-                                    undefRegs[origReg]->getRegId());
-                            diag << inst->getSourceRef();
-                            diag.appendNote("Inst reads from a register that lacks a dominator definition path.");
-                        }
+                        iBuilder.swapOperand(inst, renameReadReg(op), i);
+                    }
+                }
+                if (auto *mem = inst->getOperand(i)->get<MirMemory>())
+                {
+                    if (mem->getBase() && mem->getBase()->isVirtual())
+                    {
+                        mem->setBase(renameReadReg(mem->getBase()));
+                    }
+                    if (mem->getIndex() && mem->getIndex()->isVirtual())
+                    {
+                        mem->setIndex(renameReadReg(mem->getIndex()));
                     }
                 }
             }

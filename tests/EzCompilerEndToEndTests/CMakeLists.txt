@@ -24,6 +24,7 @@ set(E2E_TESTS
     08_comparisons
     09_bitwise_logic
     10_memory_and_aggregates
+    11_global_variables
 )
 
 set(ALL_E2E_OUTPUTS "")

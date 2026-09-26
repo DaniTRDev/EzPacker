@@ -299,10 +299,10 @@ void MirInstruction::eraseFromOwner()
                                       {
                                           return;
                                       }
-                                       if (flag & MirOperandFlag::Write)
-                                       {
-                                           regInfo->clearDef(reg->getRegId(), this);
-                                       }
+                                      if (flag & MirOperandFlag::Write)
+                                      {
+                                          regInfo->clearDef(reg->getRegId(), this);
+                                      }
                                       if (flag & MirOperandFlag::Read)
                                       {
                                           regInfo->removeUse(reg->getRegId(), this);
@@ -321,8 +321,16 @@ void MirInstruction::eraseFromOwner()
 std::string MirInstruction::toString() const
 {
     std::string res;
-    res.reserve(getMetadata().m_name.size() + m_operands.size() * 16 + 1);
+    res.reserve(getMetadata().m_name.size() + (m_targetDesc ? strlen(m_targetDesc->getName()) : 0) +
+                m_operands.size() * 16 + 3);
     res += getMetadata().m_name;
+
+    if (m_targetDesc)
+    {
+        res += '(';
+        res += m_targetDesc->getName();
+        res += ')';
+    }
 
     for (auto *operand : m_operands)
     {
