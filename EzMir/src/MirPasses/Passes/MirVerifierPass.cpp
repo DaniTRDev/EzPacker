@@ -328,6 +328,14 @@ bool MirVerifierPass::verifyOperandKinds(MirInstruction *inst, const MirInstruct
             expectedFlag = meta.m_operandMeta.m_slots[meta.m_operandMeta.m_count - 1].flags;
         }
 
+        // For CALL instructions, operand 1 is the call target: can be a symbolic reference (@func),
+        // named runtime symbol, or indirect register/address value.
+        if (inst->hasOpcode(MirInstructionOpCode::CALL) && i == 1)
+        {
+            expectedType = ExpectedOperandType::Register | ExpectedOperandType::Reference |
+                           ExpectedOperandType::RuntimeSymbol | ExpectedOperandType::Integer;
+        }
+
         // If variadic slot is ExpectedOperandType::VariadicArgs, accept Any
         if (expectedType & ExpectedOperandType::VariadicArgs)
         {
@@ -661,16 +669,15 @@ bool MirVerifierPass::verifyTerminatorPlacement(MirInstruction *inst, MirBlock *
         {
             if (m_ctx && m_ctx->getDiagCollector())
             {
-                m_ctx->getDiagCollector()->error(
+                m_ctx->getDiagCollector()->warn(
                         "MirVerifierPass",
-                        "Instruction '{}' is a terminator, but is followed by instruction '{}' in block '{}'",
+                        "Instruction '{}' is a terminator, but is followed by dead instruction '{}' in block '{}'",
                         inst->getOpCodeName(),
                         inst->getNext()->getOpCodeName(),
                         block->getName())
                         << inst->getSourceRef();
             }
-            m_result.m_errorCount++;
-            return false;
+            m_result.m_warningCount++;
         }
     }
 

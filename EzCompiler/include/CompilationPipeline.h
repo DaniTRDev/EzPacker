@@ -43,6 +43,12 @@ class CompilationPipeline
 
   private:
     /**
+     * Runs input MIR verification (flags, operand kinds and sizes, structural invariants) on a function.
+     * Returns false if verification fails.
+     */
+    bool runInputVerification(MirFunction *func, MirPassManager &passManager);
+
+    /**
      * Runs CFG analysis, SSA construction and liveness analysis on a function.
      * Returns false if a pass reports failure.
      */

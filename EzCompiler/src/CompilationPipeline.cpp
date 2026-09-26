@@ -10,6 +10,7 @@
 #include "MirPasses/Passes/NonSsaToSsaPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "MirPasses/Passes/MirPeepholePass.h"
+#include "MirPasses/Passes/MirVerifierPass.h"
 #include "Legalizer/MirFunctionSignatureLegalizerPass.h"
 #include "Legalizer/MirLegalizerPass.h"
 #include "AbiLowerer/MirAbiLowererPass.h"
@@ -165,6 +166,12 @@ bool CompilationPipeline::runPipeline()
             continue;
         }
 
+        // 0. Input MIR Verification Pass (verifies SizeMatch, operand types, invariants before middle-end)
+        if (!runInputVerification(func, middleEndManager))
+        {
+            return false;
+        }
+
         // 1. Middle-End Passes (CFG, SSA, Liveness)
         if (!runMiddleEndPasses(func, middleEndManager))
         {
@@ -235,6 +242,13 @@ bool CompilationPipeline::runCheckedPass(std::string_view passName,
         return reportPassFailure(failureMessage);
     }
     return true;
+}
+
+bool CompilationPipeline::runInputVerification(MirFunction *func, MirPassManager &passManager)
+{
+    MirBuilderContext *bCtx = m_ctx.getBuilderContext();
+    return runCheckedPass<MirVerifierPass>(
+            "MirVerifierPass", func, &passManager, "Input MIR verification failed", bCtx);
 }
 
 bool CompilationPipeline::runMiddleEndPasses(MirFunction *func, MirPassManager &passManager)
