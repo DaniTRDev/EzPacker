@@ -19,7 +19,6 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 - 🛠️ **[Comprehensive Build Guide](docs/build_guide.md)** - Prerequisites, CMake options, compiling on Windows and Linux, and running tests.
 - 💡 **[Examples & Use Cases](docs/examples.md)** - In-depth breakdown of all 9 bundled MIR modules with assembly outputs.
 - 🎯 **[How to Build a Target Architecture](docs/how_to_build_a_target.md)** - Guide to adding and building new CPU targets from first principles.
-- 🔍 **[Generated Doxygen API Documentation](docs/doxygen/index.html)** - Interactive C++ API reference.
 
 ### Subproject Documentation
 - **[EzCore](docs/projects/EzCore.md)** - PMR memory allocators, diagnostic engine, `FlexInt`/`FlexFloat`, `DenseBitSet`, `IntrusiveLinkedList`.
