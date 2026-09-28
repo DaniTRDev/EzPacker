@@ -290,10 +290,8 @@ When coalescing is enabled (`m_coalescingEnabled = true`, active at `-O1`, `-O2`
                                           MirRegister *dstReg,
                                           MirInstruction *defInst) = 0;
 };
-```
 
 ---
-
 ### 2.5 Frame Lowerer (`include/FrameLowerer/`)
 
 The Frame Lowerer executes Prologue/Epilogue Insertion (PEI) and resolves abstract stack offsets:
