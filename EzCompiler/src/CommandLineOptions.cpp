@@ -224,14 +224,8 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
     outOptions.outputFilePath = m_program->get<std::string>("-o");
     if (outOptions.outputFilePath.empty())
     {
-        if (outOptions.target.isWindows())
-        {
-            outOptions.outputFilePath = "a.obj";
-        }
-        else
-        {
-            outOptions.outputFilePath = "a.o";
-        }
+        outError = "Invalid out file path";
+        return false;
     }
 
     // Emission stage. Multiple stage flags are ambiguous, so reject them rather than silently
