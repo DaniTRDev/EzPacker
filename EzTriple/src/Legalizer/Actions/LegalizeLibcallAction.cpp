@@ -3,10 +3,14 @@
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
 #include "Descriptors/TargetDesc.h"
+#include "Function/CallingConvDesc.h"
+#include "Function/MirFunction.h"
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
 #include "Instruction/MirInstructionMetadata.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Libcall/LibcallKind.h"
+#include "Libcall/TargetLibcallRegistry.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
@@ -21,7 +25,7 @@ namespace LegalizeActions
  * Replaces the current instruction with a CALL to libcallSymbol that forwards the original
  * operands, then reuses LegalizeCall to apply the target calling convention.
  */
-LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSymbol)
+LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSymbol, CallingConvDesc *overrideCC)
 {
     if (!ctx.m_ctx || libcallSymbol.empty())
     {
@@ -71,11 +75,65 @@ LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, std::string_view libcallSym
     auto callIt = std::find(ownerBlock->getInstructions().begin(), ownerBlock->getInstructions().end(), callInst);
     if (callIt != ownerBlock->getInstructions().end())
     {
+        MirFunction *func = ownerBlock->getOwner();
+        CallingConvDesc *savedCC = func ? func->getCallingConv() : nullptr;
+
+        if (overrideCC && func && overrideCC != savedCC)
+        {
+            func->setCallingConv(overrideCC);
+        }
+
         LegalizeCtx newCtx(ctx.m_ctx, ctx.m_targetDesc, callIt);
-        return LegalizeCall(newCtx);
+        auto result = LegalizeCall(newCtx);
+
+        if (overrideCC && func && overrideCC != savedCC)
+        {
+            func->setCallingConv(savedCC);
+        }
+
+        return result;
     }
 
     return LegalizationResult::Legalized;
+}
+
+/**
+ * Resolves the LibcallKind through the target's TargetLibcallRegistry (or defaults),
+ * checks availability, determines the appropriate calling convention, and lowers the call.
+ */
+LegalizationResult LegalizeLibcall(LegalizeCtx &ctx, LibcallKind kind)
+{
+    if (!ctx.m_ctx)
+    {
+        return LegalizationResult::Failed;
+    }
+
+    std::string_view sym;
+    CallingConvDesc *cc = nullptr;
+
+    if (ctx.m_targetDesc)
+    {
+        if (auto *reg = ctx.m_targetDesc->getLibcallRegistry())
+        {
+            if (!reg->isAvailable(kind))
+            {
+                return LegalizationResult::Failed;
+            }
+            sym = reg->getLibcallName(kind);
+            cc = reg->getCallingConvention(kind);
+        }
+        else
+        {
+            sym = ctx.m_targetDesc->getLibcallStr(kind);
+        }
+    }
+
+    if (sym.empty())
+    {
+        sym = getDefaultLibcallName(kind);
+    }
+
+    return LegalizeLibcall(ctx, sym, cc);
 }
 
 } // namespace LegalizeActions

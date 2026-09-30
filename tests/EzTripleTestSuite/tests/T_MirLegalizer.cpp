@@ -634,3 +634,109 @@ TEST_F(MirLegalizerTest, TestLibcall128BitDivision)
     EXPECT_TRUE(foundCall);
 }
 
+// Verifies that LegalizeLibcall accepting LibcallKind resolves the default symbol name.
+TEST_F(MirLegalizerTest, TestLibcallKindLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("libcall_kind_test", typeTable->i128());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.SDIV(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, LibcallKind::DivI128);
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CALL instruction is emitted targeting canonical __divti3
+    bool foundCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            foundCall = true;
+            ASSERT_GE(inst->getOperandCount(), 2);
+            auto *rtSym = dynamic_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+            ASSERT_NE(rtSym, nullptr);
+            EXPECT_EQ(rtSym->getSymbolName(), "__divti3");
+        }
+    }
+    EXPECT_TRUE(foundCall);
+}
+
+// Verifies that TargetLibcallRegistry symbol overrides are honored during legalization.
+TEST_F(MirLegalizerTest, TestLibcallRegistryOverrideLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("libcall_override_test", typeTable->i128());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    MirRegister *dst = ob.buildVReg(typeTable->i128(), "dst");
+    MirRegister *lhs = ob.buildVReg(typeTable->i128(), "lhs");
+    MirRegister *rhs = ob.buildVReg(typeTable->i128(), "rhs");
+
+    ib.SDIV(dst, lhs, rhs);
+
+    // Override the runtime symbol in the target's registry
+    getTargetDesc()->getLibcallRegistry()->setLibcallName(LibcallKind::DivI128, "__custom_int128_sdiv");
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, LibcallKind::DivI128);
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    // Verify CALL instruction targets the overridden symbol
+    bool foundCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            foundCall = true;
+            ASSERT_GE(inst->getOperandCount(), 2);
+            auto *rtSym = dynamic_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+            ASSERT_NE(rtSym, nullptr);
+            EXPECT_EQ(rtSym->getSymbolName(), "__custom_int128_sdiv");
+        }
+    }
+    EXPECT_TRUE(foundCall);
+}
+
+// Verifies that ActionDefinitionBuilder::libcallFor(type, LibcallKind) wires into LegalizerInfo.
+TEST_F(MirLegalizerTest, TestLibcallActionDefinitionBuilderWithKind)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+
+    LegalizerInfo info;
+    info.getActionDefinitions(MirInstructionOpCode::SDIV)
+        .libcallFor(typeTable->i128(), LibcallKind::DivI128);
+
+    LegalityQuery q{};
+    q.m_opcode = MirInstructionOpCode::SDIV;
+    q.m_operandCount = 3;
+    q.m_compactIds[0] = typeTable->i128()->getCompactId();
+    q.m_compactIds[1] = typeTable->i128()->getCompactId();
+    q.m_compactIds[2] = typeTable->i128()->getCompactId();
+
+    auto resp = info.query(q);
+    EXPECT_EQ(resp.m_action, LegalizeActionKind::Libcall);
+
+    auto kindOpt = info.getLibcallKind(resp.m_handlerOrStringId);
+    ASSERT_TRUE(kindOpt.has_value());
+    EXPECT_EQ(*kindOpt, LibcallKind::DivI128);
+
+    EXPECT_EQ(info.getLibcallSymbol(resp.m_handlerOrStringId), "__divti3");
+}
+

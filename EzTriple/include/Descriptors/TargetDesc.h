@@ -9,6 +9,8 @@
 
 class GenericCodeEmitter;
 class TargetRelocationResolver;
+class TargetLibcallRegistry;
+enum class LibcallKind : uint16_t;
 
 /**
  * Interface used to store target-dependent information (CPU-level).
@@ -84,9 +86,20 @@ class TargetDesc
     virtual void initialize() = 0;
 
     /**
+     * Returns the runtime library registry for this target, or nullptr if unspecified.
+     */
+    virtual TargetLibcallRegistry *getLibcallRegistry() { return nullptr; }
+    virtual const TargetLibcallRegistry *getLibcallRegistry() const { return nullptr; }
+
+    /**
      * Returns the name of the libcall symbol pointed by the given libcall symbol Id.
      */
     virtual std::string_view getLibcallStr(uint8_t symId) = 0;
+
+    /**
+     * Returns the runtime symbol name for the strongly-typed LibcallKind.
+     */
+    virtual std::string_view getLibcallStr(LibcallKind kind);
 
     /**
      * Returns a list with the available binary descriptors.

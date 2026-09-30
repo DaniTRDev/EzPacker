@@ -24,6 +24,9 @@ set(EZTRIPLE_FILES_LIST
         "include/Legalizer/Actions/LegalizeLibcallAction.h"
         "include/RegisterAllocator/MirRegisterAllocator.h"
         "include/Passes/MirTargetPeepholePass.h"
+        "include/Libcall/LibcallKind.h"
+        "include/Libcall/LibcallSignature.h"
+        "include/Libcall/TargetLibcallRegistry.h"
 
         "src/AbiLowerer/MirAbiLowerer.cpp"
         "src/AbiLowerer/MirAbiLowererPass.cpp"
@@ -47,6 +50,9 @@ set(EZTRIPLE_FILES_LIST
         "src/RegisterAllocator/MirRegisterAllocator.cpp"
         "src/RegisterAllocator/MirRegisterAllocatorPass.cpp"
         "src/Passes/MirTargetPeepholePass.cpp"
+        "src/Libcall/LibcallKind.cpp"
+        "src/Libcall/LibcallSignature.cpp"
+        "src/Libcall/TargetLibcallRegistry.cpp"
 )
 
 # EzTriple is the target-agnostic MIR lowering/selection framework. Concrete targets (x86-64

@@ -8,9 +8,11 @@
 #include "Type/MirType.h"
 #include "Type/MirTypeTable.h"
 
+#include "Libcall/LibcallKind.h"
 #include <array>
 #include <functional>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -167,6 +169,29 @@ class LegalizerInfo
         return {};
     }
 
+    /// Registers a standard LibcallKind, interning its default symbol name and mapping the ID.
+    uint16_t registerLibcall(LibcallKind kind)
+    {
+        std::string_view sym = getDefaultLibcallName(kind);
+        uint16_t id = registerLibcallSymbol(sym);
+        if (id >= m_idToLibcallKind.size())
+        {
+            m_idToLibcallKind.resize(id + 1, std::nullopt);
+        }
+        m_idToLibcallKind[id] = kind;
+        return id;
+    }
+
+    /// Resolves a libcall id to its LibcallKind if registered as such.
+    std::optional<LibcallKind> getLibcallKind(uint16_t id) const
+    {
+        if (id < m_idToLibcallKind.size() && m_idToLibcallKind[id].has_value())
+        {
+            return m_idToLibcallKind[id];
+        }
+        return std::nullopt;
+    }
+
   protected:
     LegalityResponse m_primaryMatrix[OPCODE_COUNT][MAX_COMPACT_TYPES]; ///< Tier 1 opcode x type legality table.
     LegalityResponse m_wildcardActions[OPCODE_COUNT];                  ///< Tier 3 unconditional per-opcode actions.
@@ -174,6 +199,7 @@ class LegalizerInfo
             m_ruleMatchers;                    ///< Tier 2 per-opcode matcher chains.
     std::vector<LegalizeHandler> m_handlers;   ///< Registered Custom/Lower callbacks.
     std::vector<std::string> m_libcallSymbols; ///< Interned libcall symbol names.
+    std::vector<std::optional<LibcallKind>> m_idToLibcallKind; ///< Mapping from libcall ID to LibcallKind.
 };
 
 /**
@@ -298,6 +324,27 @@ class ActionDefinitionBuilder
                                                            .m_slot = 0,
                                                            .m_targetCompactId = type->getCompactId(),
                                                            .m_handlerOrStringId = strId });
+            }
+        }
+        return *this;
+    }
+
+    /**
+     * Rewrites operations on the given type into a call to the specified LibcallKind runtime function.
+     */
+    ActionDefinitionBuilder &libcallFor(MirType *type, LibcallKind kind)
+    {
+        uint16_t libId = m_info->registerLibcall(kind);
+        for (auto op : m_opcodes)
+        {
+            if (type && type->getCompactId() < LegalizerInfo::MAX_COMPACT_TYPES)
+            {
+                m_info->setPrimaryMatrix(op,
+                                         type->getCompactId(),
+                                         LegalityResponse{ .m_action = LegalizeActionKind::Libcall,
+                                                           .m_slot = 0,
+                                                           .m_targetCompactId = type->getCompactId(),
+                                                           .m_handlerOrStringId = libId });
             }
         }
         return *this;

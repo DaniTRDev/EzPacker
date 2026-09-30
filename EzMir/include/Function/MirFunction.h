@@ -71,6 +71,11 @@ class MirFunction
     class CallingConvDesc *getCallingConv() const;
 
     /**
+     * Sets the target calling convention descriptor for this function.
+     */
+    void setCallingConv(class CallingConvDesc *callingConv);
+
+    /**
      * Returns an inmutable reference to the intrusive linked list of basic blocks comprising this function.
      */
     const IntrusiveLinkedList<class MirBlock> &getBlocks() const;

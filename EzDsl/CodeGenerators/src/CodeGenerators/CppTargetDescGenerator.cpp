@@ -102,6 +102,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
     emitter.emitBlankLine();
 
     emitter.emitInclude("Descriptors/TargetDesc.h");
+    emitter.emitInclude("Libcall/TargetLibcallRegistry.h");
     emitter.emitInclude("Operand/MirRegisterReference.h");
     emitter.emitBlankLine();
 
@@ -233,6 +234,8 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
                              decl && decl->m_stackSlot.has_value() ? decl->m_stackSlot->m_node : 8);
             emitter.emitLine("void initialize() override;");
             emitter.emitLine("std::string_view getLibcallStr(uint8_t symId) override;");
+            emitter.emitLine("TargetLibcallRegistry *getLibcallRegistry() override {{ return &m_libcallRegistry; }}");
+            emitter.emitLine("const TargetLibcallRegistry *getLibcallRegistry() const override {{ return &m_libcallRegistry; }}");
             emitter.emitLine("const std::pmr::vector<TargetBinaryDesc *> &getAvailableBinaryDescriptors() override;");
             emitter.emitLine("const std::pmr::vector<CallingConvDesc *> &getAvailableCallingConventions() override;");
             emitter.emitLine("const std::pmr::vector<MirRegisterBank *> &getAvailableRegisterBanks() override;");
@@ -272,6 +275,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_elfBinary;");
             emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_coffBinary;");
             emitter.emitLine("std::unique_ptr<TargetRelocationResolver> m_relocResolver;");
+            emitter.emitLine("TargetLibcallRegistry m_libcallRegistry;");
             emitter.emitBlankLine();
             emitter.emitLine("std::pmr::vector<MirRegisterBank *> m_banks;");
             emitter.emitLine("std::pmr::vector<CallingConvDesc *> m_convs;");
@@ -451,6 +455,17 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
             emitter.emitLine("m_binaries.clear();");
             emitter.emitLine("m_binaries.push_back(m_elfBinary.get());");
             emitter.emitLine("m_binaries.push_back(m_coffBinary.get());");
+            emitter.emitBlankLine();
+            emitter.emitComment("11. Libcall Registry Defaults");
+            emitter.emitLine("m_libcallRegistry.initDefaults(\"{}\", \"linux\", CrtFlavor::Gnu);", targetLower);
+            if (decl && !decl->mLibcalls.empty())
+            {
+                for (const auto &libcall : decl->mLibcalls)
+                {
+                    emitter.emitLine("if (auto kind = m_libcallRegistry.findKindByName(\"{}\"))", escapeString(libcall.m_name.m_node));
+                    emitter.emitLine("    m_libcallRegistry.setLibcallName(*kind, \"{}\");", escapeString(libcall.m_symbol.m_node));
+                }
+            }
         }
         emitter.emitBlankLine();
 
