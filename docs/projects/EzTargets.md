@@ -47,9 +47,11 @@ The primary target architecture currently implemented in EzTargets is **x86-64 (
 
 ## 2. X86-64 Target Architecture Implementation
 
-### 2.1 `X86_64TargetDesc` (`X86_64/include/X86_64TargetDesc.h`)
+### 2.1 `X86_64TargetDesc` (Generated via `EzDslGenTargetDesc`)
 
-`X86_64TargetDesc` inherits from `TargetDesc` (`EzTriple`) and serves as the central factory and descriptor for the AMD64 architecture:
+`X86_64TargetDesc` is automatically synthesized from `targets/x86_64/x86_64.tdesc` by `EzDslGenTargetDesc` (`CppTargetDescGenerator`). It is defined in namespace `EzTargets::TableGen::X86_64` with a type alias `EzTargets::X86_64::X86_64TargetDesc` for seamless integration.
+
+Inheriting from `TargetDesc` (`EzTriple`), it serves as the central factory and descriptor for the AMD64 architecture:
 
 - **Architecture Name**: `"x86_64"`.
 - **Register Banks**:
@@ -59,12 +61,19 @@ The primary target architecture currently implemented in EzTargets is **x86-64 (
   - `GR64` (`getGprClass()`): 64-bit integer registers.
   - `VR128` (`getVr128Class()`): 128-bit SIMD registers.
 - **Stack Slot Size**: 8 bytes.
+- **Memory Displacement Type**: `i64` (`getMemOperandDisplacementType()`).
 - **Binary Descriptors**:
   - `X86_64ElfBinaryDesc` for System V Linux ELF64 objects.
   - `X86_64CoffBinaryDesc` for Microsoft Windows PE-COFF objects.
 - **Calling Conventions**:
   - `SysV_AMD64`: Arguments in `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`; returns in `rax`, `rdx`.
   - `Win64`: Arguments in `rcx`, `rdx`, `r8`, `r9`; 32-byte shadow space; returns in `rax`.
+- **Runtime Components**:
+  - `X86_64FrameLowerer` (`getFrameLowerer()`).
+  - `X86_64InstructionSelector` (`getInstructionSelector()`).
+  - `X86_64RegisterAllocator` (`getRegisterAllocator()`).
+  - `X86_64CodeEmitter` (`createCodeEmitter()`).
+  - `X86_64RelocationResolver` (`getRelocationResolver()`).
 
 ---
 
@@ -188,7 +197,7 @@ EzTargets::X86_64::registerTarget();
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
-| Target Descriptor | `EzTargets/X86_64/include/X86_64TargetDesc.h` | `X86_64TargetDesc` |
+| Target Descriptor | Generated (`generated/x86_64/X86_64TargetDesc.h`) | `X86_64TargetDesc` |
 | Lowering Shims | `EzTargets/X86_64/include/X86_64Lowering.h` | `AMD64CallLowering`, `AMD64ReturnLowering`, `isPowTwo`, `log2Pow2` |
 | Instruction Encoder | `EzTargets/X86_64/include/Encoding/X86_64InstructionEncoder.h` | `InstructionEncoder` |
 | Encoding Descriptors | `EzTargets/X86_64/include/Encoding/X86_64EncodingDesc.h` | `EncodingDesc`, `EncSlotKind`, `EncForm`, `ConditionCode` |

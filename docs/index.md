@@ -103,7 +103,7 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzCodeEmitter`** | Binary code emission: section management, relocations, `Elf64Writer` (ELF64), and `CoffWriter` (PE/COFF). | [EzCodeEmitter Guide](projects/EzCodeEmitter.md) |
 | **`EzTriple`** | Target-independent backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer. | [EzTriple Guide](projects/EzTriple.md) |
 | **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine (`ezc`). | [EzCompiler Guide](projects/EzCompiler.md) |
-| **`EzTargets`** | Architecture backends: self-contained x86-64 target (`X86_64TargetDesc`, `X86_64FrameLowerer`, `X86_64InstructionEncoder`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
+| **`EzTargets`** | Architecture backends: self-contained x86-64 target (synthesized `X86_64TargetDesc`, `X86_64FrameLowerer`, `X86_64InstructionEncoder`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
 
 ### 🔍 Complete API Reference
 - **[Generated Doxygen API Documentation](doxygen/index.html)**: Interactive class hierarchies, inheritance diagrams, member documentation, and source code cross-references. Generate locally on demand via:

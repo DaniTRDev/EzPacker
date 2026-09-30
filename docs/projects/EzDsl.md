@@ -534,14 +534,21 @@ EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64.tdesc \
          --target AMD64 \
          --namespace-root "EzTargets::X86_64"
 
-# 6. Synthesize instruction selector pattern matcher
+# 6. Synthesize target descriptor class from .tdesc
+EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64.tdesc \
+         -o build/generated/AMD64 \
+         --emit-target-desc \
+         --target AMD64 \
+         --namespace-root "EzTargets::X86_64"
+
+# 7. Synthesize instruction selector pattern matcher
 EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_patterns.isf \
          -o build/generated/AMD64 \
          --emit-instruction-selector \
          --target AMD64 \
          --namespace-root "EzTargets::X86_64"
 
-# 7. Synthesize legalizer action table with companion rules file
+# 8. Synthesize legalizer action table with companion rules file
 EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_legalize.lad \
          --rules EzTargets/X86_64/targets/x86_64/x86_64_rules.lrd \
          -o build/generated/AMD64 \
@@ -549,13 +556,13 @@ EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_legalize.lad \
          --target AMD64 \
          --namespace-root "EzTargets::X86_64"
 
-# 8. Dump parsed AST in JSON format for external tooling inspection
+# 9. Dump parsed AST in JSON format for external tooling inspection
 EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-ast --format json
 
-# 9. Dump semantic symbol table in text format
+# 10. Dump semantic symbol table in text format
 EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_legalize.lad --dump-symbols
 
-# 10. Inspect file metadata, dialect detection, and construct counts
+# 11. Inspect file metadata, dialect detection, and construct counts
 EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64.tdesc --dump-info
 ```
 
