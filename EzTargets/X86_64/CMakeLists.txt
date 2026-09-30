@@ -11,7 +11,6 @@ add_subdirectory(Registration)
 
 set(EZTARGETS_X86_64_FILES_LIST
         "include/EzTargetsX86_64Common.h"
-        "include/X86_64TargetDesc.h"
         "include/X86_64Lowering.h"
         "include/X86_64FrameLowerer.h"
         "include/X86_64RegisterAllocator.h"
@@ -24,7 +23,6 @@ set(EZTARGETS_X86_64_FILES_LIST
         "include/Encoding/X86_64InstructionEncoder.h"
         "include/BranchRelaxation/BranchRelaxer.h"
 
-        "src/X86_64TargetDesc.cpp"
         "src/X86_64Lowering.cpp"
         "src/X86_64FrameLowerer.cpp"
         "src/X86_64RegisterAllocator.cpp"
@@ -50,11 +48,20 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenLegalizerActionTable.cmake
 include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenTargetInstructions.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenInstructionSelector.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenRegisterInfo.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/../CMake/EzDslGenTargetDesc.cmake")
 
 EzDslGenRegisterInfo(
     TARGET EzTargetsX86_64
     INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64.tdesc"
-    TARGET_NAME "x86_64"
+    TARGET_NAME "X86_64"
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
+)
+
+EzDslGenTargetDesc(
+    TARGET EzTargetsX86_64
+    INPUT  "${CMAKE_CURRENT_SOURCE_DIR}/targets/x86_64/x86_64.tdesc"
+    TARGET_NAME "X86_64"
+    NAMESPACE_ROOT "EzTargets"
     OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/x86_64"
 )
 

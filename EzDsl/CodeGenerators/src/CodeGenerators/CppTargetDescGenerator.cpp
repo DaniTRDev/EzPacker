@@ -4,6 +4,7 @@
 #include "Sema/Symbol.h"
 #include "Sema/SymbolTable.h"
 #include "Sema/Symbols/TargetDescSymbols.h"
+#include "StringUtils.h"
 
 #include <cctype>
 #include <format>
@@ -216,12 +217,13 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("explicit {}(MirBuilderContext *ctx);", className);
             emitter.emitLine("~{}() override;", className);
             emitter.emitBlankLine();
+            std::string targetNameStr = StrToLower(decl ? std::string(decl->m_name.m_node) : m_targetName);
             emitter.emitLine("const char *getName() const override {{ return \"{}\"; }}",
-                             escapeString(decl ? decl->m_name.m_node : m_targetName));
+                             escapeString(targetNameStr));
             emitter.emitLine("MirFrameLowerer *getFrameLowerer() override;");
             emitter.emitLine("MirInstructionSelector *getInstructionSelector() override;");
             emitter.emitLine("MirRegisterClass *getGprClass() override;");
-            emitter.emitLine("MirRegisterClass *getVr128Class() const {{ return m_vr128; }}");
+            emitter.emitLine("MirRegisterClass *getVr128Class() const { return m_vr128; }");
             emitter.emitLine("MirLegalizer *getLegalizer() override;");
             emitter.emitLine("LegalizerInfo *getLegalizerInfo() override;");
             emitter.emitLine("MirRegisterAllocator *getRegisterAllocator() override;");
@@ -239,26 +241,26 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("TargetRelocationResolver *getRelocationResolver() override;");
             emitter.emitBlankLine();
             emitter.emitComment("Convenience accessors for target-specific conventions, formats and settings.");
-            emitter.emitLine("void setPositionIndependent(bool isPositionIndependent) {{ m_isPic = isPositionIndependent; }}");
-            emitter.emitLine("CallingConvDesc *getSysVCallingConv() const {{ return m_sysVConv.get(); }}");
-            emitter.emitLine("CallingConvDesc *getWin64CallingConv() const {{ return m_win64Conv.get(); }}");
-            emitter.emitLine("TargetBinaryDesc *getElfBinaryDesc() const {{ return m_elfBinary.get(); }}");
-            emitter.emitLine("TargetBinaryDesc *getCoffBinaryDesc() const {{ return m_coffBinary.get(); }}");
+            emitter.emitLine("void setPositionIndependent(bool isPositionIndependent) { m_isPic = isPositionIndependent; }");
+            emitter.emitLine("CallingConvDesc *getSysVCallingConv() const { return m_sysVConv.get(); }");
+            emitter.emitLine("CallingConvDesc *getWin64CallingConv() const { return m_win64Conv.get(); }");
+            emitter.emitLine("TargetBinaryDesc *getElfBinaryDesc() const { return m_elfBinary.get(); }");
+            emitter.emitLine("TargetBinaryDesc *getCoffBinaryDesc() const { return m_coffBinary.get(); }");
             emitter.emitBlankLine();
             emitter.emitLine("private:");
-            emitter.emitLine("MirBuilderContext *m_ctx{{ nullptr }};");
-            emitter.emitLine("bool m_initialized{{ false }};");
-            emitter.emitLine("bool m_isPic{{ false }};");
+            emitter.emitLine("MirBuilderContext *m_ctx{ nullptr };");
+            emitter.emitLine("bool m_initialized{ false };");
+            emitter.emitLine("bool m_isPic{ false };");
             emitter.emitBlankLine();
-            emitter.emitLine("MirRegisterBank *m_gprBank{{ nullptr }};");
-            emitter.emitLine("MirRegisterBank *m_fprBank{{ nullptr }};");
-            emitter.emitLine("MirRegisterClass *m_gpr64{{ nullptr }};");
-            emitter.emitLine("MirRegisterClass *m_gpr32{{ nullptr }};");
-            emitter.emitLine("MirRegisterClass *m_gpr16{{ nullptr }};");
-            emitter.emitLine("MirRegisterClass *m_gpr8{{ nullptr }};");
-            emitter.emitLine("MirRegisterClass *m_fpr64{{ nullptr }};");
-            emitter.emitLine("MirRegisterClass *m_fpr32{{ nullptr }};");
-            emitter.emitLine("MirRegisterClass *m_vr128{{ nullptr }};");
+            emitter.emitLine("MirRegisterBank *m_gprBank{ nullptr };");
+            emitter.emitLine("MirRegisterBank *m_fprBank{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_gpr64{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_gpr32{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_gpr16{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_gpr8{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_fpr64{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_fpr32{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_vr128{ nullptr };");
             emitter.emitBlankLine();
             emitter.emitLine("std::unique_ptr<MirFrameLowerer> m_frameLowerer;");
             emitter.emitLine("std::unique_ptr<MirInstructionSelector> m_isel;");
@@ -339,6 +341,8 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
 
     {
         auto nsScope = emitter.enterNamespace(std::format("{}::TableGen::{}", m_namespaceRoot, ns));
+        emitter.emitBlankLine();
+        emitter.emitLine("using namespace {}::{};", m_namespaceRoot, ns);
         emitter.emitBlankLine();
 
         emitter.emitLine("{}::{} (MirBuilderContext *ctx) :", className, className);
