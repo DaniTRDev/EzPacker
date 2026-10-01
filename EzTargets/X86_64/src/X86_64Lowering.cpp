@@ -1,5 +1,6 @@
 #include "X86_64Lowering.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
+#include "Legalizer/Actions/LegalizeLibcallAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
 #include <bit>
 #include <cstdint>
@@ -9,6 +10,12 @@ LegalizationResult AMD64CallLowering(LegalizeCtx &ctx) { return LegalizeActions:
 
 /// Entry point registered as the AMD64 RET/lower handler; dispatches to the shared return legalizer.
 LegalizationResult AMD64ReturnLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeReturn(ctx); }
+
+/// Entry point registered as the AMD64 THROW/lower handler; lowers to runtime __ez_throw call.
+LegalizationResult AMD64ThrowLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeLibcall(ctx, "__ez_throw"); }
+
+/// Entry point registered as the AMD64 CATCH/lower handler; lowers to runtime __ez_get_current_exception call.
+LegalizationResult AMD64CatchLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeLibcall(ctx, "__ez_get_current_exception"); }
 
 /// Predicate used by legalization rules: true when val is a positive power of two.
 bool isPowTwo(int64_t val) { return val > 0 && (val & (val - 1)) == 0; }

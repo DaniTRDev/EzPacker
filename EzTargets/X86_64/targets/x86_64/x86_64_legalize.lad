@@ -306,6 +306,18 @@ action RET {
     LOWER >> AMD64ReturnLowering;
 };
 
+action TRY {
+    LEGAL(ptr);
+};
+
+action THROW {
+    LOWER >> AMD64ThrowLowering;
+};
+
+action CATCH {
+    LOWER >> AMD64CatchLowering;
+};
+
 // ============================================================================
 // CONVERSIONS
 // ============================================================================

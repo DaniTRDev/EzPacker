@@ -1,7 +1,6 @@
 #ifndef EZCORE_RTTI_DESCRIPTOR_H
 #define EZCORE_RTTI_DESCRIPTOR_H
 
-#include "EzCoreCommon.h"
 #include <string_view>
 #include <cstdint>
 

@@ -2,13 +2,17 @@
 #define EZEXCEPTION_RUNTIME_H
 
 #include <setjmp.h>
+#ifdef __cplusplus
 #include <cstdint>
-#ifndef __cplusplus
+#else
+#include <stdint.h>
 #include <stdbool.h>
 #endif
 
 #if defined(_WIN32)
-  #if defined(EZEXCEPTION_RUNTIME_EXPORTS)
+  #if defined(ABI_SYSV)
+    #define EZ_EX_API __attribute__((sysv_abi))
+  #elif defined(EZEXCEPTION_RUNTIME_EXPORTS)
     #define EZ_EX_API __declspec(dllexport)
   #else
     #define EZ_EX_API

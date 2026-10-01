@@ -23,7 +23,6 @@ target_include_directories(EzExceptionRuntime PUBLIC
         "runtime"
         "${CMAKE_CURRENT_SOURCE_DIR}/../EzCore/include"
 )
-target_link_libraries(EzExceptionRuntime PUBLIC EzCore)
 
 EzCMK_AddExecutable(NAME "ez-ld"
         FILE_LIST "src/Main.cpp"

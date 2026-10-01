@@ -85,6 +85,8 @@ The generated legalizer action table and rewrite rules (`.lrd`) reference hand-w
 // Canonical declarations matching DSL-visible contracts:
 LegalizationResult AMD64CallLowering(LegalizeCtx &ctx);
 LegalizationResult AMD64ReturnLowering(LegalizeCtx &ctx);
+LegalizationResult AMD64ThrowLowering(LegalizeCtx &ctx);
+LegalizationResult AMD64CatchLowering(LegalizeCtx &ctx);
 
 // Predicate helpers for rewrite rules
 bool isPowTwo(int64_t val);        // True when val is a positive power of two
@@ -94,6 +96,13 @@ bool isPositiveConst(int64_t val); // True when val is strictly positive
 int64_t log2Pow2(int64_t val); // Returns floor(log2(val)), i.e. trailing zero count
 int64_t sub1(int64_t val);     // Returns val - 1 (used for power-of-two minus one masks)
 ```
+
+#### Exception Lowering Details
+- `AMD64ThrowLowering`: Lowers high-level `THROW(payload)` instructions into a runtime libcall to `__ez_throw(payload)`.
+- `AMD64CatchLowering`: Lowers high-level `CATCH(dst)` instructions into a runtime libcall to `__ez_get_current_exception()`, binding the caught payload to the destination register.
+- `X86_64TargetInstructionSelector::selectTRY`: Emits an unconditional jump to the try body basic block, integrating with the SjLj exception landing pad structure.
+- `X86_64TargetInstructionSelector::selectCALL`: Automatically resolves `MirRuntimeSymbol` operands into `MirReference` objects and external declarations, generating standard branch relocations (`IMAGE_REL_AMD64_REL32` / `R_X86_64_PLT32`) for all runtime symbols.
+
 
 ---
 

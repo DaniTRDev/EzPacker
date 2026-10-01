@@ -233,3 +233,136 @@ TEST_F(EzTripleTestSuite, TestExceptionLibcalls)
     EXPECT_EQ(enterSig.paramTypes[0], LibcallTypeKind::Ptr);
 }
 
+// Verifies arithmetic and bitwise compiler-rt libcalls: providers, kind names, symbols, and signatures.
+TEST_F(EzTripleTestSuite, TestCompilerRtArithmeticAndBitwiseLibcalls)
+{
+    // Provider checks
+    EXPECT_TRUE(isCompilerRt(LibcallKind::DivI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::UDivI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::RemI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::URemI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::MulI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::ShlI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::LShrI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::AShrI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::PopcountI32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::PopcountI64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::PopcountI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::ClzI32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::ClzI64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::ClzI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CtzI32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CtzI64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CtzI128));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::ParityI32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::ParityI64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::ParityI128));
+
+    // Kind names
+    EXPECT_EQ(getLibcallKindName(LibcallKind::DivI128), "DivI128");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::UDivI128), "UDivI128");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::MulI128), "MulI128");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::ShlI128), "ShlI128");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::PopcountI64), "PopcountI64");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::ClzI64), "ClzI64");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::CtzI64), "CtzI64");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::ParityI64), "ParityI64");
+
+    // Default GNU symbols
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::DivI128), "__divti3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::UDivI128), "__udivti3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::RemI128), "__modti3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::URemI128), "__umodti3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::MulI128), "__multi3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::ShlI128), "__ashlti3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::LShrI128), "__lshrti3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::AShrI128), "__ashrti3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::PopcountI32), "__popcountsi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::PopcountI64), "__popcountdi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::PopcountI128), "__popcountti2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::ClzI32), "__clzsi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::ClzI64), "__clzdi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::ClzI128), "__clzti2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CtzI32), "__ctzsi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CtzI64), "__ctzdi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CtzI128), "__ctzti2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::ParityI32), "__paritysi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::ParityI64), "__paritydi2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::ParityI128), "__parityti2");
+
+    // Canonical signatures
+    const auto &popSig = getCanonicalSignature(LibcallKind::PopcountI64);
+    EXPECT_EQ(popSig.returnType, LibcallTypeKind::I32);
+    ASSERT_EQ(popSig.paramTypes.size(), 1u);
+    EXPECT_EQ(popSig.paramTypes[0], LibcallTypeKind::I64);
+
+    const auto &mul128Sig = getCanonicalSignature(LibcallKind::MulI128);
+    EXPECT_EQ(mul128Sig.returnType, LibcallTypeKind::I128);
+    ASSERT_EQ(mul128Sig.paramTypes.size(), 2u);
+    EXPECT_EQ(mul128Sig.paramTypes[0], LibcallTypeKind::I128);
+    EXPECT_EQ(mul128Sig.paramTypes[1], LibcallTypeKind::I128);
+}
+
+// Verifies soft-float arithmetic, comparison, and conversion compiler-rt libcalls.
+TEST_F(EzTripleTestSuite, TestCompilerRtSoftFloatLibcalls)
+{
+    // Provider checks
+    EXPECT_TRUE(isCompilerRt(LibcallKind::AddF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::SubF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::MulF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::DivF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::AddF64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::SubF64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::MulF64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::DivF64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CmpEqF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CmpLtF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CmpLeF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CmpGtF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CmpGeF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CmpNeF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::CmpUnordF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::Int32ToF32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::Int64ToF64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::F32ToInt32));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::F64ToInt64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::F32ToF64));
+    EXPECT_TRUE(isCompilerRt(LibcallKind::F64ToF32));
+
+    // Default GNU symbols
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::AddF32), "__addsf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::SubF32), "__subsf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::MulF32), "__mulsf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::DivF32), "__divsf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::AddF64), "__adddf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::SubF64), "__subdf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::MulF64), "__muldf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::DivF64), "__divdf3");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CmpEqF32), "__eqsf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CmpLtF32), "__ltsf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CmpLeF32), "__lesf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CmpGtF32), "__gtsf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CmpGeF32), "__gesf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CmpNeF32), "__nesf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::CmpUnordF32), "__unordsf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::Int32ToF32), "__floatsisf");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::Int64ToF64), "__floatdidf");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::F32ToInt32), "__fixsfsi");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::F64ToInt64), "__fixdfdi");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::F32ToF64), "__extendsfdf2");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::F64ToF32), "__truncdfsf2");
+
+    // Signatures
+    const auto &addF32Sig = getCanonicalSignature(LibcallKind::AddF32);
+    EXPECT_EQ(addF32Sig.returnType, LibcallTypeKind::F32);
+    ASSERT_EQ(addF32Sig.paramTypes.size(), 2u);
+    EXPECT_EQ(addF32Sig.paramTypes[0], LibcallTypeKind::F32);
+    EXPECT_EQ(addF32Sig.paramTypes[1], LibcallTypeKind::F32);
+
+    const auto &cmpEqSig = getCanonicalSignature(LibcallKind::CmpEqF32);
+    EXPECT_EQ(cmpEqSig.returnType, LibcallTypeKind::I32);
+    ASSERT_EQ(cmpEqSig.paramTypes.size(), 2u);
+    EXPECT_EQ(cmpEqSig.paramTypes[0], LibcallTypeKind::F32);
+    EXPECT_EQ(cmpEqSig.paramTypes[1], LibcallTypeKind::F32);
+}
+

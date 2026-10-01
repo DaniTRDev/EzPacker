@@ -1,0 +1,57 @@
+; ==============================================================================
+; EzCompiler End-to-End Test 12: Structured Exception Handling (SjLj)
+;
+; Tests:
+;   - TRY, THROW, CATCH intermediate representation instructions
+;   - x86_64 target lowering to __ez_throw and __ez_get_current_exception
+;   - Win64 (COFF) and SysV (ELF) ABI calling conventions for exception libcalls
+; ==============================================================================
+
+fn @test_simple_throw_catch(i64 %val) -> i64 {
+entry:
+    TRY label %try_body, label %catch_block;
+
+try_body:
+    %limit = MOV i64 100;
+    %cond = CMP_SLT i1 %val, %limit;
+    BR_COND %cond, label %do_throw, label %do_normal;
+
+do_normal:
+    %two = MOV i64 2;
+    %res = IMUL i64 %val, %two;
+    RET i64 %res;
+
+do_throw:
+    %code = MOV i64 42;
+    THROW i64 %code;
+
+catch_block:
+    %ex = CATCH i64;
+    %zero = MOV i64 0;
+    %neg = SUB i64 %zero, %ex;
+    RET i64 %neg;
+}
+
+fn @test_conditional_throw(i64 %balance, i64 %debit) -> i64 {
+entry:
+    TRY label %verify, label %on_err;
+
+verify:
+    %insufficient = CMP_SLT i1 %balance, %debit;
+    BR_COND %insufficient, label %fail, label %succeed;
+
+succeed:
+    %rem = SUB i64 %balance, %debit;
+    RET i64 %rem;
+
+fail:
+    %code = MOV i64 402;
+    THROW i64 %code;
+
+on_err:
+    %ex = CATCH i64;
+    %penalty = MOV i64 10;
+    %zero = MOV i64 0;
+    %res = SUB i64 %zero, %penalty;
+    RET i64 %res;
+}

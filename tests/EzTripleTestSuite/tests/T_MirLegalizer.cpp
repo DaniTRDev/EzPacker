@@ -740,3 +740,152 @@ TEST_F(MirLegalizerTest, TestLibcallActionDefinitionBuilderWithKind)
     EXPECT_EQ(info.getLibcallSymbol(resp.m_handlerOrStringId), "__divti3");
 }
 
+// Verifies that a soft-float addition is lowered to the compiler-rt __addsf3 runtime libcall.
+TEST_F(MirLegalizerTest, TestCompilerRtSoftFloatLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+
+    auto *func = createTestFunction("soft_float_add_test", typeTable->f32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    auto *dst = ob.buildVReg(typeTable->f32(), "dst");
+    auto *lhs = ob.buildVReg(typeTable->f32(), "lhs");
+    auto *rhs = ob.buildVReg(typeTable->f32(), "rhs");
+    ib.FADD(dst, lhs, rhs);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, LibcallKind::AddF32);
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    bool foundCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            foundCall = true;
+            ASSERT_GE(inst->getOperandCount(), 2);
+            auto *rtSym = dynamic_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+            ASSERT_NE(rtSym, nullptr);
+            EXPECT_EQ(rtSym->getSymbolName(), "__addsf3");
+        }
+    }
+    EXPECT_TRUE(foundCall);
+}
+
+// Verifies that bitwise popcount is lowered to compiler-rt __popcountdi2 runtime libcall.
+TEST_F(MirLegalizerTest, TestCompilerRtBitwiseLegalization)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+
+    auto *func = createTestFunction("popcount_test", typeTable->i32());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    auto *dst = ob.buildVReg(typeTable->i32(), "dst");
+    auto *src = ob.buildVReg(typeTable->i64(), "src");
+    ib.MOV(dst, src);
+
+    auto it = block->getInstructions().begin();
+    LegalizeCtx legCtx(ctx, getTargetDesc(), it);
+    auto res = LegalizeActions::LegalizeLibcall(legCtx, LibcallKind::PopcountI64);
+    EXPECT_EQ(res, LegalizationResult::Legalized);
+
+    bool foundCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            foundCall = true;
+            ASSERT_GE(inst->getOperandCount(), 2);
+            auto *rtSym = dynamic_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+            ASSERT_NE(rtSym, nullptr);
+            EXPECT_EQ(rtSym->getSymbolName(), "__popcountdi2");
+        }
+    }
+    EXPECT_TRUE(foundCall);
+}
+
+// Verifies that THROW and CATCH instructions are lowered into runtime exception libcalls.
+TEST_F(MirLegalizerTest, TestCompilerRtExceptionLowering)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+
+    auto *func = createTestFunction("exception_lowering_test", typeTable->_void());
+    auto *block = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    // 1. Test THROW lowering to __ez_throw
+    auto *payload = ob.buildVReg(typeTable->i64(), "payload");
+    ib.THROW(payload);
+
+    auto throwIt = block->getInstructions().begin();
+    LegalizeCtx throwLegCtx(ctx, getTargetDesc(), throwIt);
+    auto throwRes = LegalizeActions::LegalizeLibcall(throwLegCtx, "__ez_throw");
+    EXPECT_EQ(throwRes, LegalizationResult::Legalized);
+
+    bool foundThrowCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            foundThrowCall = true;
+            ASSERT_GE(inst->getOperandCount(), 1);
+            // Non-destination call has callee at operand 0 (or operand 1 if binding token present)
+            MirOperand *calleeOp = nullptr;
+            for (size_t i = 0; i < inst->getOperandCount(); ++i)
+            {
+                if (inst->getOperand(i)->getType() == MirOperandType::RuntimeSymbol)
+                {
+                    calleeOp = inst->getOperand(i);
+                    break;
+                }
+            }
+            ASSERT_NE(calleeOp, nullptr);
+            auto *rtSym = static_cast<MirRuntimeSymbol *>(calleeOp);
+            EXPECT_EQ(rtSym->getSymbolName(), "__ez_throw");
+        }
+    }
+    EXPECT_TRUE(foundThrowCall);
+
+    // 2. Test CATCH lowering to __ez_get_current_exception
+    auto *dst = ob.buildVReg(typeTable->i64(), "caught");
+    ib.CATCH(dst);
+
+    auto catchIt = --block->getInstructions().end();
+    LegalizeCtx catchLegCtx(ctx, getTargetDesc(), catchIt);
+    auto catchRes = LegalizeActions::LegalizeLibcall(catchLegCtx, "__ez_get_current_exception");
+    EXPECT_EQ(catchRes, LegalizationResult::Legalized);
+
+    bool foundCatchCall = false;
+    for (MirInstruction *inst : block->getInstructions())
+    {
+        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        {
+            for (size_t i = 0; i < inst->getOperandCount(); ++i)
+            {
+                if (inst->getOperand(i)->getType() == MirOperandType::RuntimeSymbol)
+                {
+                    auto *rtSym = static_cast<MirRuntimeSymbol *>(inst->getOperand(i));
+                    if (rtSym->getSymbolName() == "__ez_get_current_exception")
+                    {
+                        foundCatchCall = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    EXPECT_TRUE(foundCatchCall);
+}
+

@@ -145,4 +145,8 @@ fabric.properties
 
 # Doxygen generated output
 docs/html/
-docs/doxygen/
+docs/doxygen/
+
+# JetBrains / CLion IDE
+.idea/
+
