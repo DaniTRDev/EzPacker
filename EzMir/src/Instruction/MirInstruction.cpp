@@ -146,23 +146,14 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
         return MirOperandFlag::None;
     }
 
-    // 1. Locate the variadic expansion slot if one exists. The slot position is encoded directly
-    //    in the generated metadata by declaring that operand with ExpectedOperandType::VariadicArgs
-    //    (e.g. UNMERGE_VALUES repeats a leading OUT slot, PHI/MERGE_VALUES/CALL a trailing IN slot).
-    size_t varSlot = size_t(-1);
-    for (size_t i = 0; i < metaCount; ++i)
-    {
-        if (opMeta.m_slots[i].type & ExpectedOperandType::VariadicArgs)
-        {
-            varSlot = i;
-            break;
-        }
-    }
+    // 1. Locate the variadic expansion slot if one exists.
+    int8_t varSlot = opMeta.m_varSlot;
 
     // 2. Elastic variadic slot resolution
-    if (varSlot != size_t(-1))
+    if (varSlot != -1)
     {
-        size_t trailingFixedCount = metaCount - 1 - varSlot;
+        size_t uVarSlot = static_cast<size_t>(varSlot);
+        size_t trailingFixedCount = metaCount - 1 - uVarSlot;
 
         // Malformed operand count safety fallback
         if (totalOperands < metaCount - 1)
@@ -171,7 +162,7 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
         }
 
         // Leading fixed operands before the variadic slice
-        if (index < varSlot)
+        if (index < uVarSlot)
         {
             return opMeta.m_slots[index].flags;
         }
@@ -184,7 +175,7 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
         // In the variadic expansion range (inherits Read/Write/ReadWrite from slot descriptor)
         else
         {
-            return opMeta.m_slots[varSlot].flags;
+            return opMeta.m_slots[uVarSlot].flags;
         }
     }
 
@@ -224,6 +215,7 @@ const std::pmr::vector<MirOperand *> &MirInstruction::getOperands() const { retu
 void MirInstruction::getDefinedRegisters(std::pmr::vector<MirRegisterRef> &out) const
 {
     out.clear();
+    out.reserve(m_operands.size() + (m_targetDesc ? m_targetDesc->getImplicitDefs().size() : 0));
 
     for (size_t i = 0; i < m_operands.size(); ++i)
     {
@@ -254,6 +246,7 @@ void MirInstruction::getDefinedRegisters(std::pmr::vector<MirRegisterRef> &out) 
 void MirInstruction::getUsedRegisters(std::pmr::vector<MirRegisterRef> &out) const
 {
     out.clear();
+    out.reserve(m_operands.size() * 2 + (m_targetDesc ? m_targetDesc->getImplicitUses().size() : 0));
 
     for (size_t i = 0; i < m_operands.size(); ++i)
     {

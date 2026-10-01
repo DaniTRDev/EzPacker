@@ -37,6 +37,7 @@ std::string MirPrinter::printModule(MirBuilderContext *ctx, MirPrinterMode mode)
     }
 
     std::string result;
+    result.reserve(1024);
     for (MirGlobalVar *var : ctx->getGlobalVars())
     {
         result += printGlobalVar(var, mode);
@@ -169,7 +170,9 @@ std::string MirPrinter::printFunction(MirFunction *function, MirPrinterMode mode
         return result;
     }
 
-    std::string result = std::format("{}fn @{}(", linkagePrefix, fnName);
+    std::string result;
+    result.reserve(512);
+    result += std::format("{}fn @{}(", linkagePrefix, fnName);
     bool firstParam = true;
     for (MirRegister *param : function->getParameters())
     {
@@ -214,7 +217,9 @@ std::string MirPrinter::printBlock(MirBlock *block, MirPrinterMode mode)
         blkName = blkName.substr(1);
     }
 
-    std::string result = std::format("{}:\n", blkName);
+    std::string result;
+    result.reserve(block->getInstrCount() * 32 + 16);
+    result += std::format("{}:\n", blkName);
     for (MirInstruction *instr : block->getInstructions())
     {
         result += printInstruction(instr, mode);

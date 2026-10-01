@@ -132,6 +132,14 @@ EzPacker features a comprehensive type system capable of representing arbitrary 
 - **128-bit Vector (SSE)**: `v4f32`, `v2f64`, `v16i8`, `v8i16`, `v4i32`, `v2i64`.
 - **256-bit Vector (AVX)**: `v8f32`, `v4f64`, `v32i8`, `v16i16`, `v8i32`, `v4i64`.
 
+### 2.6 `MirBuilderContext` (`Builder/MirBuilderContext.h`)
+
+The central coordination, memory management, and symbol interning context for constructing MIR modules:
+- **Monotonic Memory Arena**: Coordinates a `std::pmr::monotonic_buffer_resource` backing functions, blocks, instructions, and operands.
+- **O(1) Entity Lookup**: Indexes functions, basic blocks, global variables, and virtual registers using `std::pmr::unordered_map<MirId, ...>` to avoid logarithmic tree traversal overhead during middle-end optimization passes and code emission.
+- **Cache-Contiguous Globals**: Manages global variables in a `std::pmr::vector<MirGlobalVar*>` providing cache-friendly sequential iteration.
+- **Elastic Operand Metadata**: Precomputes variadic operand expansion slots in `MirOperandMetadataList` to ensure constant-time dataflow flag queries (`getOperandFlag`).
+
 ---
 
 ## 3. Middle-End Pass Framework

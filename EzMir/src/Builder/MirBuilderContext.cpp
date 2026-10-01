@@ -228,4 +228,4 @@ std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { r
 /**
  * Returns the mutable list of global variables registered in this context.
  */
-std::pmr::list<MirGlobalVar *> &MirBuilderContext::getGlobalVars() { return m_globalVars; }
+std::pmr::vector<MirGlobalVar *> &MirBuilderContext::getGlobalVars() { return m_globalVars; }

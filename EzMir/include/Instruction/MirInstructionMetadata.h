@@ -114,6 +114,7 @@ struct MirOperandMetadataList
 {
     std::array<MirOperandMetadata, MirMaxOperandSlots> m_slots{};
     uint8_t m_count{ 0 };
+    int8_t m_varSlot{ -1 }; // Precomputed 0-based index of VariadicArgs slot, or -1 if none.
 
     constexpr MirOperandMetadataList() = default;
 
@@ -123,6 +124,10 @@ struct MirOperandMetadataList
         size_t i = 0;
         for (const MirOperandMetadata &slot : slots)
         {
+            if (slot.type & ExpectedOperandType::VariadicArgs)
+            {
+                m_varSlot = static_cast<int8_t>(i);
+            }
             // at() fails constant evaluation (and throws at runtime) if a declaration ever exceeds
             // the fixed capacity instead of silently truncating its operand signature.
             m_slots.at(i++) = slot;

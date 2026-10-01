@@ -100,9 +100,9 @@ class MirBuilderContext
     std::pmr::monotonic_buffer_resource *getGlobalAllocator();
 
     /**
-     * Returns the mutable list of global variables registered in this context.
+     * Returns the mutable vector of global variables registered in this context.
      */
-    std::pmr::list<class MirGlobalVar *> &getGlobalVars();
+    std::pmr::vector<class MirGlobalVar *> &getGlobalVars();
 
   private:
     class CallingConvDesc *m_defaultCallingConv; // Default calling convention used when building functions.
@@ -114,12 +114,12 @@ class MirBuilderContext
     std::pmr::monotonic_buffer_resource *m_globalResource;
 
     IntrusiveLinkedList<class MirFunction> m_functions; // Used to quickly iterate over defined functions.
-    std::pmr::list<class MirGlobalVar *> m_globalVars;  // Used to quickly iterate over defined global variables.
+    std::pmr::vector<class MirGlobalVar *> m_globalVars; // Used to quickly iterate over defined global variables.
 
-    std::pmr::map<MirId, class MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
-    std::pmr::map<MirId, class MirFunction *> m_functionIdToFunc;     // Used to search for functions.
-    std::pmr::map<MirId, class MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
-    std::pmr::map<MirId, class MirRegister *> m_registerIdToRegister; // Used to search for registers.
+    std::pmr::unordered_map<MirId, class MirBlock *> m_blockIdToBlock;          // Used to search for blocks.
+    std::pmr::unordered_map<MirId, class MirFunction *> m_functionIdToFunc;     // Used to search for functions.
+    std::pmr::unordered_map<MirId, class MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
+    std::pmr::unordered_map<MirId, class MirRegister *> m_registerIdToRegister; // Used to search for registers.
 };
 
 #endif // EZMIR_MIR_BUILDER_CONTEXT_H
