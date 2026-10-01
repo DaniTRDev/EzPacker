@@ -200,3 +200,36 @@ TEST_F(EzTripleTestSuite, TestTargetLibcallRegistryOpcodeInference)
     EXPECT_EQ(reg.findKindForOpcode(MirInstructionOpCode::FADD, tt->f32()), LibcallKind::AddF32);
     EXPECT_EQ(reg.findKindForOpcode(MirInstructionOpCode::FDIV, tt->f64()), LibcallKind::DivF64);
 }
+
+// Verifies exception handling runtime libcalls and signatures
+TEST_F(EzTripleTestSuite, TestExceptionLibcalls)
+{
+    EXPECT_TRUE(isCRuntime(LibcallKind::EzTryEnter));
+    EXPECT_TRUE(isCRuntime(LibcallKind::EzTryLeave));
+    EXPECT_TRUE(isCRuntime(LibcallKind::EzThrow));
+    EXPECT_TRUE(isCRuntime(LibcallKind::EzCatchMatch));
+    EXPECT_TRUE(isCRuntime(LibcallKind::EzGetCurrentEx));
+
+    EXPECT_EQ(getLibcallKindName(LibcallKind::EzTryEnter), "EzTryEnter");
+    EXPECT_EQ(getLibcallKindName(LibcallKind::EzThrow), "EzThrow");
+
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::EzTryEnter), "__ez_try_enter");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::EzTryLeave), "__ez_try_leave");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::EzThrow), "__ez_throw");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::EzCatchMatch), "__ez_catch_matches");
+    EXPECT_EQ(getDefaultLibcallName(LibcallKind::EzGetCurrentEx), "__ez_get_current_exception");
+
+    const auto &throwSig = getCanonicalSignature(LibcallKind::EzThrow);
+    EXPECT_EQ(throwSig.returnType, LibcallTypeKind::Void);
+    EXPECT_TRUE(throwSig.isNoReturn);
+    ASSERT_EQ(throwSig.paramTypes.size(), 3u);
+    EXPECT_EQ(throwSig.paramTypes[0], LibcallTypeKind::Ptr);
+    EXPECT_EQ(throwSig.paramTypes[1], LibcallTypeKind::Ptr);
+    EXPECT_EQ(throwSig.paramTypes[2], LibcallTypeKind::Ptr);
+
+    const auto &enterSig = getCanonicalSignature(LibcallKind::EzTryEnter);
+    EXPECT_EQ(enterSig.returnType, LibcallTypeKind::Void);
+    ASSERT_EQ(enterSig.paramTypes.size(), 1u);
+    EXPECT_EQ(enterSig.paramTypes[0], LibcallTypeKind::Ptr);
+}
+

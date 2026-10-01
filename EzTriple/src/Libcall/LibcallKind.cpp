@@ -135,9 +135,16 @@ LibcallProvider getLibcallProvider(LibcallKind kind)
         case LibcallKind::Exit:
             return LibcallProvider::CRuntime;
 
-        // Target builtins
         case LibcallKind::StackProbe:
             return LibcallProvider::TargetBuiltin;
+
+        // Exception handling
+        case LibcallKind::EzTryEnter:
+        case LibcallKind::EzTryLeave:
+        case LibcallKind::EzThrow:
+        case LibcallKind::EzCatchMatch:
+        case LibcallKind::EzGetCurrentEx:
+            return LibcallProvider::CRuntime;
 
         default:
             return LibcallProvider::Custom;
@@ -273,6 +280,11 @@ std::string_view getLibcallKindName(LibcallKind kind)
         case LibcallKind::Abort: return "Abort";
         case LibcallKind::Exit: return "Exit";
         case LibcallKind::StackProbe: return "StackProbe";
+        case LibcallKind::EzTryEnter: return "EzTryEnter";
+        case LibcallKind::EzTryLeave: return "EzTryLeave";
+        case LibcallKind::EzThrow: return "EzThrow";
+        case LibcallKind::EzCatchMatch: return "EzCatchMatch";
+        case LibcallKind::EzGetCurrentEx: return "EzGetCurrentEx";
         default: return "Unknown";
     }
 }
@@ -447,6 +459,13 @@ std::string_view getDefaultLibcallName(LibcallKind kind, CrtFlavor flavor)
 
         // Stack Probe
         case LibcallKind::StackProbe: return (flavor == CrtFlavor::Gnu) ? "___chkstk_ms" : "__chkstk";
+
+        // Exception Handling runtime
+        case LibcallKind::EzTryEnter: return "__ez_try_enter";
+        case LibcallKind::EzTryLeave: return "__ez_try_leave";
+        case LibcallKind::EzThrow: return "__ez_throw";
+        case LibcallKind::EzCatchMatch: return "__ez_catch_matches";
+        case LibcallKind::EzGetCurrentEx: return "__ez_get_current_exception";
 
         default: return {};
     }

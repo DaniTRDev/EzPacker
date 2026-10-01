@@ -181,6 +181,13 @@ const LibcallSignature &getCanonicalSignature(LibcallKind kind)
         // Target builtins
         map[LibcallKind::StackProbe] = { .returnType = LibcallTypeKind::Void, .paramTypes = { LibcallTypeKind::SizeT } };
 
+        // Exception handling runtime
+        map[LibcallKind::EzTryEnter] = { .returnType = LibcallTypeKind::Void, .paramTypes = { LibcallTypeKind::Ptr } };
+        map[LibcallKind::EzTryLeave] = { .returnType = LibcallTypeKind::Void, .paramTypes = { LibcallTypeKind::Ptr } };
+        map[LibcallKind::EzThrow] = { .returnType = LibcallTypeKind::Void, .paramTypes = { LibcallTypeKind::Ptr, LibcallTypeKind::Ptr, LibcallTypeKind::Ptr }, .isNoReturn = true };
+        map[LibcallKind::EzCatchMatch] = { .returnType = LibcallTypeKind::I32, .paramTypes = { LibcallTypeKind::Ptr, LibcallTypeKind::Ptr } };
+        map[LibcallKind::EzGetCurrentEx] = { .returnType = LibcallTypeKind::Ptr, .paramTypes = {} };
+
         return map;
     }();
 

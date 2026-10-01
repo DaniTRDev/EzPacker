@@ -189,6 +189,13 @@ enum class LibcallKind : uint16_t
     // --- Stack Probing (Target builtins) ---
     StackProbe,
 
+    // --- Exception Handling (C runtime & EzExceptionRuntime) ---
+    EzTryEnter,
+    EzTryLeave,
+    EzThrow,
+    EzCatchMatch,
+    EzGetCurrentEx,
+
     COUNT
 };
 

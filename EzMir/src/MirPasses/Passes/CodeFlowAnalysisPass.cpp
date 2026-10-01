@@ -225,6 +225,11 @@ MirPassResult CodeFlowAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_
 
                 break; // Return statements instantly terminate block evaluation
             }
+            else if (flags & MirInstructionFlags::IsTerminator)
+            {
+                hasUnconditionalJump = true;
+                break; // Block terminator with no intra-block fallthrough (e.g. THROW, HALT)
+            }
         }
 
         // Natural code fallthrough logic:

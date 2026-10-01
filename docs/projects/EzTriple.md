@@ -364,7 +364,8 @@ EzTriple provides a unified, target-configurable runtime library call (`libcall`
     - **Memory Routines**: Standard memory operations (`memcpy`, `memmove`, `memset`, `memcmp`).
     - **Math Functions**: Standard transcendental and math routines (`sin`, `cos`, `pow`, `exp`, `log`, `sqrt`, `fma`).
     - **Stack Probing**: Architecture/OS specific stack checking (`__chkstk`, `___chkstk_ms`).
-  - Provider classification via `LibcallProvider`: `CompilerRt`, `Crt`, or `TargetCustom`.
+    - **Exception Handling**: Standard setjmp/longjmp runtime helper routines (`__ez_try_enter`, `__ez_try_leave`, `__ez_throw`, `__ez_catch_matches`, `__ez_get_current_exception`).
+  - Provider classification via `LibcallProvider`: `CompilerRt`, `Crt`, `EzRuntime`, or `TargetCustom`.
   - CRT flavor management via `CrtFlavor`: `Gnu`, `Msvc`, `Musl`, `Darwin`, and `Freestanding`. Enables seamless target adaptation between GNU glibc/libgcc, MSVC CRT, Musl libc, and bare-metal environments.
 
 - **Libcall Signatures (`LibcallSignature.h`)**:
