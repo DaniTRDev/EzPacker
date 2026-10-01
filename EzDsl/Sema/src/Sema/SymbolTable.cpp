@@ -9,7 +9,7 @@ SymbolTable::SymbolTable(std::pmr::memory_resource *alloc) :
     enterScope("global");
 }
 
-ScopeId SymbolTable::createScope(ScopeId parentId, const std::string_view &debugName)
+ScopeId SymbolTable::createScope(ScopeId parentId, std::string_view debugName)
 {
     // Allocate the scope in the arena; its id is its index in the scope list.
     std::pmr::polymorphic_allocator<> alloc(m_alloc);
@@ -27,18 +27,18 @@ Symbol *SymbolTable::getSymById(SymbolId id) const
     return m_symbols[id];
 }
 
-Symbol *SymbolTable::getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope)
+Symbol *SymbolTable::getSymByName(std::string_view name, std::optional<ScopeId> startingScope)
 {
     return getSymByNameImpl(name, std::nullopt, startingScope);
 }
 
-Symbol *SymbolTable::getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope)
+Symbol *SymbolTable::getSymByName(std::string_view name, SymbolType type, std::optional<ScopeId> startingScope)
 {
     return getSymByNameImpl(name, type, startingScope);
 }
 
 Symbol *
-SymbolTable::getSymByNameImpl(const std::string_view &name, std::optional<SymbolType> type, std::optional<ScopeId> startingScope)
+SymbolTable::getSymByNameImpl(std::string_view name, std::optional<SymbolType> type, std::optional<ScopeId> startingScope)
 {
     // Same bottom-up lookup for both overloads, optionally matching only the requested symbol type.
     ScopeId cursor = startingScope.value_or(m_currentScopeId);
@@ -108,7 +108,7 @@ std::pmr::memory_resource *SymbolTable::getAllocator() { return m_alloc; }
 
 const std::pmr::vector<Symbol *> &SymbolTable::getSymbols() const { return m_symbols; }
 
-Symbol *SymbolTable::getSymInScope(ScopeId id, const std::string_view &name, std::optional<SymbolType> type) const
+Symbol *SymbolTable::getSymInScope(ScopeId id, std::string_view name, std::optional<SymbolType> type) const
 {
     if (id >= m_scopes.size())
         return nullptr;

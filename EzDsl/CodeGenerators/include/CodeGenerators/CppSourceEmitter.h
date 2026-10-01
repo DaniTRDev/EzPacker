@@ -104,7 +104,11 @@ class CppSourceEmitter
     /** Formats the arguments and appends the result as a line. */
     template <typename... Args> void emitLine(std::format_string<Args...> fmt, Args &&...args)
     {
-        emitLine(std::format(fmt, std::forward<Args>(args)...));
+        applyIndent();
+        std::format_to(std::back_inserter(m_buffer), fmt, std::forward<Args>(args)...);
+        m_buffer.push_back('\n');
+        m_atStartOfLine = true;
+        m_lastWasBlank = false;
     }
 
     /** Appends raw text verbatim; a trailing newline is not added unless present in text. */
@@ -113,7 +117,10 @@ class CppSourceEmitter
     /** Formats the arguments and appends the result verbatim. */
     template <typename... Args> void emit(std::format_string<Args...> fmt, Args &&...args)
     {
-        emit(std::format(fmt, std::forward<Args>(args)...));
+        applyIndent();
+        std::format_to(std::back_inserter(m_buffer), fmt, std::forward<Args>(args)...);
+        m_atStartOfLine = (!m_buffer.empty() && m_buffer.back() == '\n');
+        m_lastWasBlank = false;
     }
 
     /** Appends text without applying indentation, preserving it exactly as given. */

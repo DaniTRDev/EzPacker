@@ -102,6 +102,15 @@ Classes derived from `CodeGenerator` generate clean, formatted, header-guarded C
 | `CppRegisterInfoGenerator` | `RegisterInfo` | `TargetDesc` (`.tdesc`) | `CodeGenerators/CppRegisterInfoGenerator.h` | `<Target>RegisterInfo.h` (single header) |
 | `CppTargetDescGenerator` | `TargetDesc` | `TargetDesc` (`.tdesc`) | `CodeGenerators/CppTargetDescGenerator.h` | `<Target>TargetDesc.h`, `.cpp` |
 
+### 3.4 Performance & Architecture Optimizations
+
+1. **Zero-Allocation Source Formatting (`CppSourceEmitter`)**:
+   - `CppSourceEmitter::emit` and `emitLine` format text directly into the internal buffer `m_buffer` using `std::format_to(std::back_inserter(m_buffer), fmt, std::make_format_args(args...))` rather than allocating temporary `std::string` objects via `std::vformat`.
+   - Given the high volume of code generation in compiler synthesis pipelines, eliminating heap reallocations on each formatted line notably reduces generation overhead and cache misses.
+
+2. **Modernized String View Semantics (`SymbolTable`)**:
+   - Harmonized symbol and scope lookup functions (`createScope`, `getSymByName`, `getSymInScope`, `getSymByNameImpl`) to pass lightweight `std::string_view` values by value rather than `const std::string_view &`, enabling direct register parameter passing per modern C++ best practices.
+
 ---
 
 ## 4. Authentic Dialect Syntax Examples

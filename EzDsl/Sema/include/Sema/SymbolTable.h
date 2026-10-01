@@ -21,7 +21,7 @@ class SymbolTable
     /**
      * Creates a new scope as a child of parentId with the specified debug name.
      */
-    ScopeId createScope(ScopeId parentId, const std::string_view &debugName);
+    ScopeId createScope(ScopeId parentId, std::string_view debugName);
 
     /**
      * Returns a pointer to the Symbol with the specified SymbolId, or nullptr if out of bounds.
@@ -32,9 +32,9 @@ class SymbolTable
      * Performs a bottom-up lexical lookup for a symbol name starting at startingScope (defaults to current scope).
      * Climbs the parent scope chain until found or the root scope is exceeded.
      */
-    Symbol *getSymByName(const std::string_view &name, std::optional<ScopeId> startingScope = std::nullopt);
+    Symbol *getSymByName(std::string_view name, std::optional<ScopeId> startingScope = std::nullopt);
     Symbol *
-    getSymByName(const std::string_view &name, SymbolType type, std::optional<ScopeId> startingScope = std::nullopt);
+    getSymByName(std::string_view name, SymbolType type, std::optional<ScopeId> startingScope = std::nullopt);
 
     /**
      * Declares a new symbol in the active scope with source reference, flags, type, semantic payload, and name.
@@ -90,13 +90,13 @@ class SymbolTable
      * Looks up a symbol name within a single specific scope without ascending to parents.
      */
     Symbol *
-    getSymInScope(ScopeId id, const std::string_view &name, std::optional<SymbolType> type = std::nullopt) const;
+    getSymInScope(ScopeId id, std::string_view name, std::optional<SymbolType> type = std::nullopt) const;
 
     /**
      * Shared bottom-up lookup used by both getSymByName overloads; type is optional.
      */
     Symbol *
-    getSymByNameImpl(const std::string_view &name, std::optional<SymbolType> type, std::optional<ScopeId> startingScope);
+    getSymByNameImpl(std::string_view name, std::optional<SymbolType> type, std::optional<ScopeId> startingScope);
 
   private:
     ScopeId m_currentScopeId;             // Scope receiving newly declared symbols.
