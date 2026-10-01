@@ -916,9 +916,12 @@ double MirRegisterAllocator::calculateSpillCost(MirRegisterRef node, RegisterAll
  */
 std::pmr::set<MirRegisterRef> &MirRegisterAllocator::addNode(const MirRegisterRef &v, RegisterAllocatorCtx *ctx)
 {
-    auto [it, inserted] = ctx->m_iGraph.try_emplace(v, std::pmr::set<MirRegisterRef>(ctx->m_allocator));
-    (void)inserted;
-    return it->second;
+    auto it = ctx->m_iGraph.find(v);
+    if (it != ctx->m_iGraph.end())
+    {
+        return it->second;
+    }
+    return ctx->m_iGraph.emplace(v, std::pmr::set<MirRegisterRef>(ctx->m_allocator)).first->second;
 }
 
 /**

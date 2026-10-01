@@ -350,6 +350,8 @@ The `MirTargetPeepholePass` operates directly on concrete target machine instruc
 6. **Dead Store Elimination**:
    - Erases consecutive stores to the same stack slot before any intervening load, call, or memory barrier instruction.
 
+All address dependency analyses in the peephole pass unify with `MirInstruction::visitOperandRegisters` and operate over zero-allocation arena containers (`std::pmr::vector`), eliminating heap churn during iterative block optimization.
+
 ---
 
 ### 2.7 Runtime Libcall Subsystem (`include/Libcall/`)

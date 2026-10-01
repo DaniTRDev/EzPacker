@@ -176,24 +176,14 @@ bool extractStore(MirInstruction *inst, MirOperand *&memOp, MirRegisterRef &srcR
     return memOp != nullptr && foundReg;
 }
 
-void collectMemoryRegisters(MirOperand *memOp, std::vector<MirRegisterRef> &regs)
+void collectMemoryRegisters(MirOperand *memOp, std::pmr::vector<MirRegisterRef> &regs)
 {
-    if (!memOp)
-    {
-        return;
-    }
-    if (memOp->isOfType<MirMemory>())
-    {
-        auto *mem = memOp->get<MirMemory>();
-        if (mem->getBase())
-        {
-            regs.push_back(mem->getBase()->getRef());
-        }
-        if (mem->getIndex())
-        {
-            regs.push_back(mem->getIndex()->getRef());
-        }
-    }
+    MirInstruction::visitOperandRegisters(memOp,
+                                          MirOperandFlag::Read,
+                                          [&regs](MirRegister *reg, MirOperandFlag)
+                                          {
+                                              regs.push_back(reg->getRef());
+                                          });
 }
 
 } // namespace
@@ -498,7 +488,7 @@ bool MirTargetPeepholePass::tryOptimizeMemoryAccesses(MirInstruction *inst, MirB
         return false;
     }
 
-    std::vector<MirRegisterRef> addressRegs;
+    std::pmr::vector<MirRegisterRef> addressRegs(m_ctx->getGlobalAllocator());
     collectMemoryRegisters(mem1, addressRegs);
 
     if (isSt)
