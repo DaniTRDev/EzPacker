@@ -216,6 +216,10 @@ Target Configuration:
   -fPIC, --pic                   Generate position-independent code
   -mattr <features>              Target feature list (e.g. +avx, -sse)
 
+RTTI & Exception Configuration:
+  --rtti                         Enable generation of runtime type info and source references [default]
+  --no-rtti, -fno-rtti           Disable generation of runtime type info and source references
+
 Pipeline Stopping Gates:
   --emit-obj                     Emit native binary object (.o / .obj) [default]
   -S, --emit-asm                 Emit human-readable assembly text (.s)

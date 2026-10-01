@@ -17,6 +17,7 @@ set(EZCORE_FILES_LIST
         "include/HelperClasses/IntrusiveLinkedList.h"
         "include/SourceManager/GenericSourceManager.h"
         "include/SourceManager/SourceManager.h"
+        "include/Rtti/RttiDescriptor.h"
 
         "src/Diagnostics/DiagnosticBuilder.cpp"
         "src/Diagnostics/DiagnosticCollector.cpp"

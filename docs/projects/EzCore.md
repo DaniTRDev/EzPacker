@@ -482,3 +482,4 @@ public:
 | Containers | `EzCore/include/HelperClasses/DenseBitSet.h` | `DenseBitSet` |
 | Source Coordinates | `EzCore/include/SourceManager/GenericSourceManager.h` | `SourceReference`, `SourceLineRange`, `SourceFileEntry`, `GenericSourceManager` |
 | Source Coordinates | `EzCore/include/SourceManager/SourceManager.h` | `SourceManager` |
+| RTTI & Exceptions | `EzCore/include/Rtti/RttiDescriptor.h` | `RttiTypeDescriptor`, `SourceRefData`, `RichExceptionPayload` |
