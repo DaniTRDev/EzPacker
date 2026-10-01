@@ -59,13 +59,13 @@ class GenericSourceManager
     /**
      * Checks if a source buffer with the specified name or canonical path is already registered.
      */
-    virtual bool doesSourceNameExist(const std::string_view &sourceName) const = 0;
+    virtual bool doesSourceNameExist(std::string_view sourceName) const = 0;
 
     /**
      * Ingests in-memory source text under the given identifier name.
      * Computes line offset tables and returns the assigned 1-based source file ID, or 0 if already registered.
      */
-    virtual size_t addSourceContent(const std::string &name, const std::string_view &content) = 0;
+    virtual size_t addSourceContent(const std::string &name, std::string_view content) = 0;
 
     /**
      * Creates an arena-allocated SourceReference descriptor for a byte range in the file designated by numeric ID.
@@ -77,7 +77,7 @@ class GenericSourceManager
      * Creates an arena-allocated SourceReference descriptor using registered file name.
      * Returns nullptr if source file is not found in the registry.
      */
-    virtual SourceReference *createReference(size_t startOffset, size_t length, const std::string_view &sourceFile) = 0;
+    virtual SourceReference *createReference(size_t startOffset, size_t length, std::string_view sourceFile) = 0;
 
     /**
      * Performs binary search over precomputed line ranges to locate the line containing the given reference.

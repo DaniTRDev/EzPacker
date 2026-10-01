@@ -5,7 +5,7 @@
  * Creates an empty message (type Diag_None, no source reference or notes) using the given arena.
  */
 DiagnosticMessage::DiagnosticMessage(std::pmr::memory_resource *alloc) :
-    m_type(Diag_None), m_primarySourceRef(nullptr), m_mainMessage(alloc), m_sender(alloc), m_notes({})
+    m_type(Diag_None), m_primarySourceRef(nullptr), m_notes(alloc), m_mainMessage(alloc), m_sender(alloc)
 {
 }
 
@@ -56,7 +56,7 @@ void DiagnosticMessage::setType(DiagnosticMessageType type) { m_type = type; }
 /**
  * Returns the notes attached to this message.
  */
-const std::list<DiagnosticNote> &DiagnosticMessage::getNotes() const { return m_notes; }
+const std::pmr::vector<DiagnosticNote> &DiagnosticMessage::getNotes() const { return m_notes; }
 
 /**
  * Returns the main message text.

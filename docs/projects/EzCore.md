@@ -341,18 +341,28 @@ public:
 
 ### 5.2 `DenseBitSet` (`HelperClasses/DenseBitSet.h`)
 
-`DenseBitSet` is a compact, 64-bit word-aligned bit vector optimized specifically for compiler dataflow analysis and register liveness computations. It avoids per-bit branch overhead by processing 64 bits at a time via native CPU 64-bit integer operations.
+`DenseBitSet` is a compact, 64-bit word-aligned bit vector optimized specifically for compiler dataflow analysis and register liveness computations. It avoids per-bit branch overhead by processing 64 bits at a time via native CPU 64-bit integer operations, and supports polymorphic memory resources (`std::pmr`) for arena allocation without default heap churn.
 
 ```cpp
 class DenseBitSet
 {
 public:
-    DenseBitSet() = default;
-    explicit DenseBitSet(size_t numBits);
+    DenseBitSet(std::pmr::memory_resource *alloc = std::pmr::get_default_resource());
+    explicit DenseBitSet(size_t numBits, std::pmr::memory_resource *alloc = std::pmr::get_default_resource());
 
     // Bit manipulation
     void set(size_t bit);
+    void reset(size_t bit);
     bool test(size_t bit) const;
+    void clear();
+
+    // Inspection & population queries
+    bool empty() const noexcept;
+    size_t size() const noexcept;      // Total capacity in bits (words * 64)
+    size_t wordCount() const noexcept; // Number of 64-bit backing words
+    size_t count() const noexcept;     // Total set bits (popcount)
+    bool any() const noexcept;
+    bool none() const noexcept;
 
     // Bitwise union: this |= other
     // Returns true if this bitset changed value (new bits were set)
@@ -363,8 +373,10 @@ public:
     // Updates internal words in-place and returns true if any word changed value.
     bool computeLiveIn(const DenseBitSet &use, const DenseBitSet &liveOut, const DenseBitSet &def);
 
+    std::pmr::memory_resource *getResource() const noexcept;
+
 private:
-    std::vector<uint64_t> m_words;
+    std::pmr::vector<uint64_t> m_words;
 };
 ```
 

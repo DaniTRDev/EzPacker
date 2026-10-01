@@ -3,9 +3,26 @@
 
 #include "EzCoreCommon.h"
 #include "StringUtils.h"
+#include <array>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+
+namespace detail
+{
+struct TransparentStringHash
+{
+    using is_transparent = void;
+    size_t operator()(std::string_view sv) const noexcept { return std::hash<std::string_view>{}(sv); }
+    size_t operator()(const std::string &s) const noexcept { return std::hash<std::string_view>{}(s); }
+};
+
+struct TransparentStringEqual
+{
+    using is_transparent = void;
+    bool operator()(std::string_view lhs, std::string_view rhs) const noexcept { return lhs == rhs; }
+};
+} // namespace detail
 
 /**
  * Case-insensitive, alias-aware registry mapping names to values of T.
@@ -15,8 +32,8 @@
  * never matches; find() returns a value-initialized T (nullptr for pointer registries) when
  * no entry exists.
  *
- * The registry is deliberately a plain value type: callers own the storage strategy (for
- * example a function-local static to dodge static-initialization order).
+ * Uses transparent string hashing and stack buffering to perform lookups with zero heap allocations.
+ * The registry is deliberately a plain value type: callers own the storage strategy.
  */
 template <typename T> class NameRegistry
 {
@@ -40,6 +57,14 @@ template <typename T> class NameRegistry
             return T{};
         }
 
+        char stackBuf[64];
+        if (name.size() <= sizeof(stackBuf))
+        {
+            std::string_view norm = NormalizeKeyToBuffer(name, stackBuf);
+            auto it = m_entries.find(norm);
+            return it == m_entries.end() ? T{} : it->second;
+        }
+
         auto it = m_entries.find(NormalizeKey(name));
         return it == m_entries.end() ? T{} : it->second;
     }
@@ -47,11 +72,23 @@ template <typename T> class NameRegistry
     /** Returns true when name resolves to an entry. */
     bool contains(std::string_view name) const
     {
-        return !name.empty() && m_entries.contains(NormalizeKey(name));
+        if (name.empty())
+        {
+            return false;
+        }
+
+        char stackBuf[64];
+        if (name.size() <= sizeof(stackBuf))
+        {
+            std::string_view norm = NormalizeKeyToBuffer(name, stackBuf);
+            return m_entries.contains(norm);
+        }
+
+        return m_entries.contains(NormalizeKey(name));
     }
 
   private:
-    std::unordered_map<std::string, T> m_entries; ///< Canonical key to registered value.
+    std::unordered_map<std::string, T, detail::TransparentStringHash, detail::TransparentStringEqual> m_entries; ///< Canonical key to registered value.
 };
 
 #endif // EZCORE_NAME_REGISTRY_H

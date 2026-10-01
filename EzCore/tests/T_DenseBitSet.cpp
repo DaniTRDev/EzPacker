@@ -61,3 +61,35 @@ TEST(DenseBitSetTest, ComputeLiveInMatchesTransferFunction)
     EXPECT_TRUE(liveIn.test(1));
     EXPECT_FALSE(liveIn.test(9));
 }
+
+/**
+ * Verifies reset, clear, count, any, none, and PMR resource backing.
+ */
+TEST(DenseBitSetTest, ResetClearCountAndPmr)
+{
+    std::pmr::monotonic_buffer_resource pool;
+    DenseBitSet bits(128, &pool);
+
+    EXPECT_EQ(bits.getResource(), &pool);
+    EXPECT_EQ(bits.wordCount(), 2u);
+    EXPECT_EQ(bits.size(), 128u);
+    EXPECT_TRUE(bits.none());
+    EXPECT_FALSE(bits.any());
+    EXPECT_EQ(bits.count(), 0u);
+
+    bits.set(10);
+    bits.set(70);
+    EXPECT_EQ(bits.count(), 2u);
+    EXPECT_TRUE(bits.any());
+    EXPECT_FALSE(bits.none());
+
+    bits.reset(10);
+    EXPECT_FALSE(bits.test(10));
+    EXPECT_TRUE(bits.test(70));
+    EXPECT_EQ(bits.count(), 1u);
+
+    bits.clear();
+    EXPECT_EQ(bits.count(), 0u);
+    EXPECT_FALSE(bits.test(70));
+    EXPECT_TRUE(bits.none());
+}

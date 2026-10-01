@@ -128,6 +128,22 @@ inline std::string NormalizeKey(std::string_view key)
 }
 
 /**
+ * Normalizes key into caller-provided stack buffer if capacity allows. Returns non-empty view on success.
+ */
+template <size_t N>
+inline std::string_view NormalizeKeyToBuffer(std::string_view key, char (&buffer)[N]) noexcept
+{
+    if (key.size() > N)
+        return {};
+    for (size_t i = 0; i < key.size(); ++i)
+    {
+        char lower = static_cast<char>(std::tolower(static_cast<unsigned char>(key[i])));
+        buffer[i] = (lower == '-' ? '_' : lower);
+    }
+    return std::string_view(buffer, key.size());
+}
+
+/**
  * Converts all characters in a given string view to lowercase using ASCII transformations.
  * Allocates and returns a new std::string of the same length with lowercase characters.
  */
@@ -142,6 +158,14 @@ inline std::string StrToLower(std::string_view str)
 }
 
 /**
+ * In-place ASCII lowercase conversion avoiding heap allocations.
+ */
+inline void StrToLowerInPlace(std::string &str)
+{
+    std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+}
+
+/**
  * Converts all characters in a given string view to uppercase using ASCII transformations.
  * Allocates and returns a new std::string of the same length with uppercase characters.
  */
@@ -153,6 +177,14 @@ inline std::string StrToUpper(std::string_view str)
     // Cast through unsigned char: passing a negative char to toupper is undefined behavior.
     std::transform(str.begin(), str.end(), upperStr.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     return upperStr;
+}
+
+/**
+ * In-place ASCII uppercase conversion avoiding heap allocations.
+ */
+inline void StrToUpperInPlace(std::string &str)
+{
+    std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
 }
 
 #endif // EZCORE_STRING_UTILS_H

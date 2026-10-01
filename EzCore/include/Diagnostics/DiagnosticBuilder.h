@@ -56,13 +56,7 @@ class DiagnosticBuilder
      */
     template <typename... Args> DiagnosticBuilder &appendNote(std::format_string<Args...> fmt, Args &&...args)
     {
-        if (!isDiagEnabledForType(m_message.getType()))
-        {
-            return *this; // Exit immediately. To avoid allocations.
-        }
-
-        // If we got here, the message can be notified to the collector. Format and send to the appendNote method.
-        return appendNoteRaw(std::format(fmt, std::forward<Args>(args)...), nullptr);
+        return appendNote(nullptr, fmt, std::forward<Args>(args)...);
     }
 
     /**

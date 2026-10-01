@@ -76,7 +76,7 @@ class DiagnosticMessage
     /**
      * Returns the list of contextual notes attached to this diagnostic.
      */
-    const std::list<DiagnosticNote> &getNotes() const;
+    const std::pmr::vector<DiagnosticNote> &getNotes() const;
 
     /**
      * Returns a string view of the primary message text.
@@ -100,9 +100,9 @@ class DiagnosticMessage
     // its sub-steps.
     class SourceReference *m_primarySourceRef{ nullptr };
 
-    std::list<DiagnosticNote> m_notes{}; // List ensure O(1) appends/removes (linked list).
-    std::pmr::string m_mainMessage;      // The main message of the diagnostic.
-    std::pmr::string m_sender;           // The component that sent the diagnostic.
+    std::pmr::vector<DiagnosticNote> m_notes; // Vector backed by arena memory resource.
+    std::pmr::string m_mainMessage;           // The main message of the diagnostic.
+    std::pmr::string m_sender;                // The component that sent the diagnostic.
 };
 
 #endif // EZCORE_DIAGNOSTIC_MESSAGE_H

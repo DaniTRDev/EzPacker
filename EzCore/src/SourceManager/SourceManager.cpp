@@ -55,7 +55,7 @@ SourceManager::~SourceManager()
 /**
  * Returns true when the name or canonical path is already present in the registry.
  */
-bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) const
+bool SourceManager::doesSourceNameExist(std::string_view sourceName) const
 {
     return m_pathToIdMap.find(sourceName) != m_pathToIdMap.end();
 }
@@ -64,7 +64,7 @@ bool SourceManager::doesSourceNameExist(const std::string_view &sourceName) cons
  * Registers in-memory content under name, precomputes its line table and returns the new 1-based
  * ID, or 0 if the name is already registered. The entry and its strings are allocated in the arena.
  */
-size_t SourceManager::addSourceContent(const std::string &name, const std::string_view &content)
+size_t SourceManager::addSourceContent(const std::string &name, std::string_view content)
 {
     if (doesSourceNameExist(name))
     {
@@ -134,7 +134,7 @@ SourceReference *SourceManager::createReference(size_t startOffset, size_t lengt
  * Resolves the file by name and delegates to the ID-based createReference; returns nullptr when
  * the name is unknown.
  */
-SourceReference *SourceManager::createReference(size_t startOffset, size_t length, const std::string_view &sourceFile)
+SourceReference *SourceManager::createReference(size_t startOffset, size_t length, std::string_view sourceFile)
 {
     auto it = m_pathToIdMap.find(sourceFile);
     if (it == m_pathToIdMap.end())

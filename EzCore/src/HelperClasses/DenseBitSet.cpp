@@ -3,7 +3,10 @@
 /**
  * Rounds numBits up to the next 64-bit word and allocates that many zero-initialized words.
  */
-DenseBitSet::DenseBitSet(size_t numBits) : m_words((numBits + 63) / 64, 0) {}
+DenseBitSet::DenseBitSet(size_t numBits, std::pmr::memory_resource *alloc) :
+    m_words((numBits + 63) / 64, 0, alloc)
+{
+}
 
 /**
  * Sets the addressed bit. Requests beyond the allocated word capacity are silently ignored.
@@ -13,6 +16,49 @@ void DenseBitSet::set(size_t bit)
     // Compute word index and set the corresponding bit flag if within allocated word capacity
     if (bit / 64 < m_words.size())
         m_words[bit / 64] |= (1ULL << (bit % 64));
+}
+
+/**
+ * Clears the addressed bit. Requests beyond the allocated word capacity are silently ignored.
+ */
+void DenseBitSet::reset(size_t bit)
+{
+    if (bit / 64 < m_words.size())
+        m_words[bit / 64] &= ~(1ULL << (bit % 64));
+}
+
+/**
+ * Resets all words to zero without deallocating backing storage.
+ */
+void DenseBitSet::clear()
+{
+    std::fill(m_words.begin(), m_words.end(), 0ULL);
+}
+
+/**
+ * Counts total set bits using std::popcount on each 64-bit word.
+ */
+size_t DenseBitSet::count() const noexcept
+{
+    size_t total = 0;
+    for (uint64_t w : m_words)
+    {
+        total += static_cast<size_t>(std::popcount(w));
+    }
+    return total;
+}
+
+/**
+ * Returns true if any word contains at least one set bit.
+ */
+bool DenseBitSet::any() const noexcept
+{
+    for (uint64_t w : m_words)
+    {
+        if (w != 0)
+            return true;
+    }
+    return false;
 }
 
 /**

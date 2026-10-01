@@ -74,7 +74,7 @@ void DiagnosticCollector::removeListener(DiagnosticListener *listener)
         return;
 
     std::lock_guard lock(m_mutex);
-    m_listeners.remove(listener);
+    std::erase(m_listeners, listener);
 }
 
 /**

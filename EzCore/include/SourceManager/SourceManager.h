@@ -32,13 +32,13 @@ class SourceManager : public GenericSourceManager
     /**
      * Checks if a source buffer with the given name or path exists in the path-to-ID lookup map.
      */
-    bool doesSourceNameExist(const std::string_view &sourceName) const override;
+    bool doesSourceNameExist(std::string_view sourceName) const override;
 
     /**
      * Adds an in-memory source file with the specified name and content string view.
      * Computes line bounds and registers the entry. Returns the new 1-based ID, or 0 if name already exists.
      */
-    size_t addSourceContent(const std::string &name, const std::string_view &content) override;
+    size_t addSourceContent(const std::string &name, std::string_view content) override;
 
     /**
      * Allocates and initializes a SourceReference for a byte interval within the file indicated by sourceId.
@@ -50,7 +50,7 @@ class SourceManager : public GenericSourceManager
      * Allocates and initializes a SourceReference using registered source file name.
      * Returns nullptr if source file is not found in the registry.
      */
-    SourceReference *createReference(size_t startOffset, size_t length, const std::string_view &sourceFile) override;
+    SourceReference *createReference(size_t startOffset, size_t length, std::string_view sourceFile) override;
 
     /**
      * Finds the precomputed 1-based line interval enclosing the given SourceReference via binary search.

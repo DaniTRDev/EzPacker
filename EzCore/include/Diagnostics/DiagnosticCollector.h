@@ -142,7 +142,7 @@ class DiagnosticCollector
     }
 
     std::atomic<uint8_t> m_enabledDiags; // Enabled diagnostic types; atomic to match the documented thread-safety.
-    std::list<DiagnosticListener *> m_listeners;          // Registered observers notified when messages are committed.
+    std::vector<DiagnosticListener *> m_listeners;        // Registered observers notified when messages are committed.
     std::pmr::synchronized_pool_resource m_diagScopePool; // Thread-safe arena backing all messages and scopes.
     std::pmr::vector<DiagnosticScope> m_scopes; // Stack of active scopes; index 0 is the always-present root scope.
     std::recursive_mutex m_mutex;               // Guards listeners, scopes and messages from concurrent access.
