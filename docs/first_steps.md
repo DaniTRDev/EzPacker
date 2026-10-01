@@ -124,9 +124,22 @@ Output:
 
 ## 5. Linking into an Executable
 
+EzPacker provides `ez-ld`, an automated system linker driver that discovers the preferred system linker (`lld-link`, `link.exe`, `ld.lld`, `ld.bfd`, or compiler drivers) and automatically links C runtime libraries, compiler legalizer helpers (`compiler-rt`), and the exception runtime (`EzExceptionRuntime`).
+
+### 5.1 Automated Linking with `ez-ld`
+```bash
+# Automatically detects the system linker and links all runtime dependencies
+ez-ld simple_math.obj main.c -o my_app.exe
+
+# Or inspect the synthesized system linker command line without executing
+ez-ld simple_math.obj main.c -o my_app.exe --dry-run
+```
+
+### 5.2 Traditional Manual Linking
+
 The object files produced by `EzPacker` are 100% compliant with standard system linkers (`ld`, `lld`, `link.exe`, `gcc`, `clang`, `cl.exe`).
 
-### 5.1 Writing a C Test Harness
+#### Writing a C Test Harness
 Create `main.c` to call your compiled function:
 
 ```c
@@ -144,14 +157,14 @@ int main(void) {
 }
 ```
 
-### 5.2 Linking on Linux (GCC / Clang)
+#### Linking on Linux (GCC / Clang)
 ```bash
 gcc main.c simple_math.o -o my_app
 ./my_app
 # Output: calculate(15, 7) = 220
 ```
 
-### 5.3 Linking on Windows (MSVC)
+#### Linking on Windows (MSVC)
 ```cmd
 cl main.c simple_math.obj /Fe:my_app.exe
 my_app.exe
@@ -160,7 +173,23 @@ my_app.exe
 
 ---
 
-## 6. Inspecting EzDsl Files (For Target Developers)
+## 6. Exception Handling & RTTI Quickstart
+
+EzPacker features native structured exception handling using C's `<setjmp.h>` setjmp/longjmp (SjLj) model:
+
+- **IR Instructions**:
+  - `TRY label %body, label %catch`: Enters protected block, saving thread-local context.
+  - `THROW <payload>`: Unwinds the active stack frame and jumps to the nearest active catch handler.
+  - `CATCH <dstRegister>`: Captures the exception payload and filters based on RTTI.
+- **RTTI & Source Reference Options**:
+  - `--rtti` (default): Captures full type descriptor metadata and source coordinates (file, line, col, func, code snippet) in `RichExceptionPayload`.
+  - `--no-rtti` / `-fno-rtti`: Strips runtime type descriptor references for minimal binary footprint.
+- **Runtime Helper**:
+  - Handled by `EzExceptionRuntime` (`libEzExceptionRuntime.a` / `EzExceptionRuntime.lib`), which `ez-ld` injects automatically.
+
+---
+
+## 7. Inspecting EzDsl Files (For Target Developers)
 
 If you are developing or modifying target descriptions, register sets, or instruction selection patterns, you can use the `EzDslCli` tool to validate DSL files:
 
@@ -174,7 +203,7 @@ EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symb
 
 ---
 
-## 7. Next Steps
+## 8. Next Steps
 
 - Consult the [Build Guide](build_guide.md) to set up and compile EzPacker from source.
 - Explore the [Examples Guide](examples.md) for deep dives into complex control flow, 64-bit hashing, memory load-folding, and recursion.
@@ -187,4 +216,5 @@ EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symb
   - [EzTriple](projects/EzTriple.md)
   - [EzCompiler](projects/EzCompiler.md)
   - [EzTargets](projects/EzTargets.md)
+  - [EzLinker](projects/EzLinker.md)
 - Explore the full C++ API in the [Doxygen Documentation](doxygen/index.html).
