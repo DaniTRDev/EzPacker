@@ -352,6 +352,39 @@ The `MirTargetPeepholePass` operates directly on concrete target machine instruc
 
 ---
 
+### 2.7 Runtime Libcall Subsystem (`include/Libcall/`)
+
+EzTriple provides a unified, target-configurable runtime library call (`libcall`) subsystem supporting both low-level compiler runtime routines (`compiler-rt` / `libgcc`) and standard C runtime library routines (`libc` / `libm`):
+
+- **Libcall Kinds (`LibcallKind.h`)**:
+  - Strongly-typed `LibcallKind` enum encompassing:
+    - **Integer Arithmetic**: Multi-word / wide integer division, modulo, and multiplication (e.g., `__divdi3`, `__udivdi3`, `__divti3`, `__multi3`).
+    - **Bitwise & Counting**: Population count, leading/trailing zero counts (`__popcountdi2`, `__clzsi2`, `__ctzsi2`).
+    - **Floating-Point Operations**: Soft-float arithmetic (`__addsf3`, `__subdf3`, `__divdf3`, `__divtf3`), comparisons (`__lesf2`, `__gtdf2`), and type conversions (`__fixsfdi`, `__floatdisf`, `__truncdfsf2`, `__extendhfsf2`).
+    - **Memory Routines**: Standard memory operations (`memcpy`, `memmove`, `memset`, `memcmp`).
+    - **Math Functions**: Standard transcendental and math routines (`sin`, `cos`, `pow`, `exp`, `log`, `sqrt`, `fma`).
+    - **Stack Probing**: Architecture/OS specific stack checking (`__chkstk`, `___chkstk_ms`).
+  - Provider classification via `LibcallProvider`: `CompilerRt`, `Crt`, or `TargetCustom`.
+  - CRT flavor management via `CrtFlavor`: `Gnu`, `Msvc`, `Musl`, `Darwin`, and `Freestanding`. Enables seamless target adaptation between GNU glibc/libgcc, MSVC CRT, Musl libc, and bare-metal environments.
+
+- **Libcall Signatures (`LibcallSignature.h`)**:
+  - First-class ABI signatures defining return types, argument types, calling convention, and purity/side-effect attributes (`isPure`, `hasNoSideEffects`).
+  - Allows the legalizer and ABI lowerer to synthesize correct call sequences directly into virtual registers without needing high-level frontend declarations.
+
+- **Target Libcall Registry (`TargetLibcallRegistry.h`)**:
+  - Per-target registry maintaining the active symbol names and signatures for all supported libcalls:
+    ```cpp
+    TargetLibcallRegistry registry(&allocator);
+    registry.initDefaults(CrtFlavor::Gnu); // Populate standard GNU/compiler-rt symbols
+    registry.setLibcallName(LibcallKind::DivI64, "__custom_div64"); // Target-specific override
+    ```
+  - Queryable via `getLibcallName(LibcallKind)`, `getLibcallSignature(LibcallKind)`, and `hasLibcall(LibcallKind)`.
+
+- **Legalizer Integration (`LegalizeLibcallAction.h`)**:
+  - Lowers unsupported generic MIR operations (e.g. 128-bit integer division or soft-float arithmetic) into formal function call sequences to the registered runtime symbol.
+
+---
+
 ## 3. Target Descriptors (`include/Descriptors/`)
 
 ### 3.1 `TargetDesc` (`Descriptors/TargetDesc.h`)
@@ -370,6 +403,8 @@ The abstract CPU architecture descriptor:
 - `virtual size_t getStackSlotSize() const = 0`
 - `virtual void initialize() = 0`
 - `virtual std::string_view getLibcallStr(uint8_t symId) = 0`
+- `virtual std::string_view getLibcallStr(LibcallKind kind)`
+- `virtual TargetLibcallRegistry *getLibcallRegistry()`
 - `virtual const std::pmr::vector<TargetBinaryDesc *> &getAvailableBinaryDescriptors() = 0`
 - `virtual const std::pmr::vector<CallingConvDesc *> &getAvailableCallingConventions() = 0`
 - `virtual std::unique_ptr<GenericCodeEmitter> createCodeEmitter() = 0`
@@ -395,6 +430,10 @@ The abstract OS and object-file format descriptor:
 | Legalizer | `EzTriple/include/Legalizer/LegalityQuery.h` | `LegalizeActionKind`, `LegalityQuery`, `LegalityResponse` |
 | Legalizer | `EzTriple/include/Legalizer/LegalizerInfo.h` | `LegalizerInfo` |
 | Legalizer | `EzTriple/include/Legalizer/MirLegalizer.h` | `MirLegalizer` |
+| Legalizer | `EzTriple/include/Legalizer/Actions/LegalizeLibcallAction.h` | `LegalizeLibcallAction` |
+| Libcall | `EzTriple/include/Libcall/LibcallKind.h` | `LibcallKind`, `LibcallProvider`, `CrtFlavor` |
+| Libcall | `EzTriple/include/Libcall/LibcallSignature.h` | `LibcallSignature` |
+| Libcall | `EzTriple/include/Libcall/TargetLibcallRegistry.h` | `TargetLibcallRegistry` |
 | ABI Lowerer | `EzTriple/include/AbiLowerer/MirAbiLowerer.h` | `MirAbiLowerer` |
 | Instruction Selector | `EzTriple/include/InstructionSelector/MirInstructionSelector.h` | `MirInstructionSelector` |
 | Instruction Selector | `EzTriple/include/InstructionSelector/MirAddressingModeMatcher.h` | `MirAddressingModeMatcher` |

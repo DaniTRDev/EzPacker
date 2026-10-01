@@ -97,6 +97,8 @@ libcalls {
     __udivdi3;
 }
 ```
+> [!NOTE]
+> The `.tdesc` `libcalls` block lists target-specific or legacy libcall symbols synthesized into index-based lookup tables (`getLibcallStr(uint8_t)`). Target descriptors also integrate with `TargetLibcallRegistry` (`getLibcallRegistry()`), providing full support for compiler-rt and C runtime functions across CRT flavors (`Gnu`, `Msvc`, `Musl`, `Darwin`, `Freestanding`).
 
 ### 2.2 Calling Convention: `<target>_calling_conv.ezcc`
 Defines stack frame alignment, growth direction, shadow space, red zone, callee-saved registers, parameter passing rules, and return registers.
@@ -250,6 +252,7 @@ The generated descriptor inherits from `TargetDesc` (`EzTriple`) and automatical
 - **Register Banks & Classes**: Initializes register banks and primary register classes (`getGprClass()`) via `initializeRegisterBanks` using metadata from the `.tdesc`.
 - **Target Metadata**: Implements `getName()`, `getStackSlotSize()`, `getInstructionPtrReg()`, and `getMemOperandDisplacementType()`.
 - **Binary Descriptors & Calling Conventions**: Populates `getAvailableBinaryDescriptors()` and `getAvailableCallingConventions()` matching the target's declared object formats and calling conventions.
+- **Libcall Registry**: Automatically instantiates a per-target `TargetLibcallRegistry` (accessible via `getLibcallRegistry()`), initialized with compiler-rt and CRT default symbols based on the target OS/CRT flavor (`Gnu`, `Msvc`, `Musl`, `Darwin`, `Freestanding`), and provides `getLibcallStr(LibcallKind)` for type-safe runtime symbol lookups.
 
 ```cpp
 // Auto-generated snippet from <Target>TargetDesc.h:
@@ -274,6 +277,8 @@ public:
 
     void initialize() override;
     std::string_view getLibcallStr(uint8_t symId) override;
+    std::string_view getLibcallStr(LibcallKind kind) override;
+    TargetLibcallRegistry *getLibcallRegistry() override;
     const std::pmr::vector<TargetBinaryDesc *> &getAvailableBinaryDescriptors() override;
     const std::pmr::vector<CallingConvDesc *> &getAvailableCallingConventions() override;
 };
