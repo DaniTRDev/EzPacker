@@ -102,4 +102,11 @@ EzPacker_AddTest(
         "EzMirTestSuite"
         ""
         "tests/T_MirVerifierPass.cpp"
+)
+
+EzPacker_AddTest(
+        "T_MirExceptions"
+        "EzMirTestSuite"
+        ""
+        "tests/T_MirExceptions.cpp"
 )
