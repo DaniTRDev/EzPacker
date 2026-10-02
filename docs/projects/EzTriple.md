@@ -268,6 +268,7 @@ When coalescing is enabled (`m_coalescingEnabled = true`, active at `-O1`, `-O2`
 3. **Redundant Copy Elimination (`eliminateRedundantCopies`)**:
    - Executed after `rewriteColors()`. Scans all basic blocks and erases machine move instructions (`MOV64rr`, etc.) whose destination and source resolve to the exact same physical register.
 
+```cpp
     // Target-specific pure virtual hooks
     virtual bool isInstructionDAlloc(MirInstruction *instr) = 0;
     virtual bool isRematerializable(MirRegister *vreg, MirInstruction *definingInst) = 0;
@@ -364,7 +365,11 @@ EzTriple provides a unified, target-configurable runtime library call (`libcall`
     - **Memory Routines**: Standard memory operations (`memcpy`, `memmove`, `memset`, `memcmp`).
     - **Math Functions**: Standard transcendental and math routines (`sin`, `cos`, `pow`, `exp`, `log`, `sqrt`, `fma`).
     - **Stack Probing**: Architecture/OS specific stack checking (`__chkstk`, `___chkstk_ms`).
-    - **Exception Handling**: Standard setjmp/longjmp runtime helper routines (`__ez_try_enter`, `__ez_try_leave`, `__ez_throw`, `__ez_catch_matches`, `__ez_get_current_exception`).
+    - **Exception Handling**: Standard setjmp/longjmp runtime helper routines:
+      - Unwind Management: `__ez_try_enter`, `__ez_try_leave`, `__ez_throw`, `__ez_get_top_frame`.
+      - Catch Filtering: `__ez_catch_matches`, `__ez_get_current_exception`, `__ez_get_current_rtti`.
+      - Canonical Defaults: `__ez_get_default_rtti`, `__ez_get_default_payload`.
+      - Reflection Helpers: `__ez_get_rtti_type_name`, `__ez_get_rtti_type_id`.
   - Provider classification via `LibcallProvider`: `CompilerRt`, `Crt`, `EzRuntime`, or `TargetCustom`.
   - CRT flavor management via `CrtFlavor`: `Gnu`, `Msvc`, `Musl`, `Darwin`, and `Freestanding`. Enables seamless target adaptation between GNU glibc/libgcc, MSVC CRT, Musl libc, and bare-metal environments.
 
@@ -374,11 +379,13 @@ EzTriple provides a unified, target-configurable runtime library call (`libcall`
 
 - **Target Libcall Registry (`TargetLibcallRegistry.h`)**:
   - Per-target registry maintaining the active symbol names and signatures for all supported libcalls:
-    ```cpp
-    TargetLibcallRegistry registry(&allocator);
-    registry.initDefaults(CrtFlavor::Gnu); // Populate standard GNU/compiler-rt symbols
-    registry.setLibcallName(LibcallKind::DivI64, "__custom_div64"); // Target-specific override
-    ```
+
+```cpp
+TargetLibcallRegistry registry(&allocator);
+registry.initDefaults(CrtFlavor::Gnu); // Populate standard GNU/compiler-rt symbols
+registry.setLibcallName(LibcallKind::DivI64, "__custom_div64"); // Target-specific override
+```
+
   - Queryable via `getLibcallName(LibcallKind)`, `getLibcallSignature(LibcallKind)`, and `hasLibcall(LibcallKind)`.
 
 - **Legalizer Integration (`LegalizeLibcallAction.h`)**:

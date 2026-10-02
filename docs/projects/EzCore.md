@@ -11,23 +11,24 @@
 It is deliberately designed to provide machine-independent primitives, zero-overhead data structures, high-performance polymorphic memory management abstractions, a fluent and thread-safe compiler diagnostic reporting engine, arbitrary-precision numerical representations for compiler constants, and unified source coordinate management.
 
 ```
-       +-------------------------------------------------------------+
-       |                         EzCompiler                          |
-       +-------------------------------------------------------------+
-         |              |                |            |            |
-         v              v                v            v            v
-     EzTargets      EzTriple       EzCodeEmitter    EzMir        EzDsl
-         \              \                /            /            /
-          +---------------+------------+-------------+------------+
-                          |            |             |
-                          v            v             v
-                     +-----------------------------------+
-                     |              EzCore               |
-                     +-----------------------------------+
-                     | PMR Allocators | Diagnostics      |
-                     | FlexInt/Float  | DenseBitSet      |
-                     | SourceManager  | IntrusiveList    |
-                     +-----------------------------------+
+       +-------------------------------------------------------------------------+
+       |                               EzCompiler                                |
+       +-------------------------------------------------------------------------+
+         |            |              |                |            |            |
+         v            v              v                v            v            v
+     EzTargets    EzLinker       EzTriple       EzCodeEmitter    EzMir        EzDsl
+         \            \              \                /            /            /
+          +------------+---------------+------------+-------------+------------+
+                                       |            |             |
+                                       v            v             v
+                                  +-----------------------------------+
+                                  |              EzCore               |
+                                  +-----------------------------------+
+                                  | PMR Allocators | Diagnostics      |
+                                  | FlexInt/Float  | DenseBitSet      |
+                                  | SourceManager  | IntrusiveList    |
+                                  | RTTI & Payloads|                  |
+                                  +-----------------------------------+
 ```
 
 ### Key Responsibilities
@@ -466,7 +467,61 @@ public:
 
 ---
 
-## 7. Header & Class Index
+## 7. Runtime Type Information (RTTI) & Exception Payload (`include/Rtti/`)
+
+The RTTI subsystem (`EzCore/include/Rtti/RttiDescriptor.h`) models rich compile-time and runtime type metadata, source coordinates, and exception payloads across the compiler and runtime.
+
+### 7.1 `RttiTypeDescriptor`
+Captures unique type identities, demangled names, inheritance hierarchies, and declaration coordinates:
+
+```cpp
+namespace EzCore
+{
+
+struct SourceRefData
+{
+    std::string_view filePath;     ///< Path to origin source file.
+    std::string_view functionName; ///< Enclosing function name.
+    uint32_t line{ 0 };            ///< 1-based source line.
+    uint32_t column{ 0 };          ///< 1-based source column.
+    std::string_view snippet;      ///< Contextual excerpt or diagnostic text.
+};
+
+struct RttiTypeDescriptor
+{
+    uint64_t typeId{ 0 };                              ///< 64-bit unique type hash (FNV-1a).
+    std::string_view typeName;                         ///< Qualified type name.
+    uint32_t numBases{ 0 };                            ///< Number of direct base types.
+    const RttiTypeDescriptor *const *bases{ nullptr }; ///< Base type array for hierarchical subtyping checks.
+    SourceRefData declarationSite;                     ///< Location where type was defined.
+
+    /// Checks if this type is identical to or derives from the target base type.
+    bool isA(const RttiTypeDescriptor *target) const;
+};
+
+}
+```
+
+- **Type Identity**: `typeId` is generated using `computeTypeId(std::string_view name)` via 64-bit FNV-1a.
+- **Hierarchical Subtyping**: `isA(target)` traverses direct and indirect base classes, enabling C++-style multicatch matching (`catch (const Base &)` matching derived thrown types).
+- **Default Invariants**:
+  - `kDefaultExceptionTypeName`: `"EzDefaultException"`
+  - `kDefaultExceptionTypeId`: `computeTypeId(kDefaultExceptionTypeName)`
+
+### 7.2 `RichExceptionPayload`
+Attaches source code coordinates directly to thrown values for rich runtime diagnostics upon unhandled exceptions:
+
+```cpp
+struct RichExceptionPayload
+{
+    void *payload{ nullptr };       ///< Pointer to active exception object or numeric code.
+    SourceRefData throwSite;        ///< Source coordinate where exception was thrown.
+};
+```
+
+---
+
+## 8. Header & Class Index
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|

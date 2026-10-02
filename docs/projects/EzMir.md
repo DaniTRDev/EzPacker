@@ -119,6 +119,11 @@ EzMir provides first-class, structured exception handling opcodes:
 | `CATCH` | `ControlFlow`, `HasSideEffect`, `VariadicArgs` | `Register:dst OUT`, `VariadicArgs:filters IN` | Placed at the entry of an exception handler basic block; binds the caught exception payload into `dst`. |
 | `THROW` | `ControlFlow`, `IsTerminator`, `HasSideEffect`, `VariadicArgs` | `AnyValue:payload IN`, `VariadicArgs:rttiInfo IN` | Raises an exception with the given payload value, transferring control to the nearest matching active handler. |
 
+#### `THROW` Operand Forms
+1. **0 Operands (`THROW`)**: Default/rethrow. Automatically lowers to `CALL @__ez_throw, @__ez_default_payload, @__ez_default_rtti`, passing the canonical default payload and default type descriptor.
+2. **1 Operand (`THROW %payload`)**: Payload throw. Automatically appends `@__ez_default_rtti` as operand 2 during target lowering, ensuring the ABI's second argument register is always initialized with a valid type descriptor.
+3. **2 Operands (`THROW %payload, @RttiDesc`)**: Full payload with explicit RTTI descriptor symbol reference, allowing typed exception discrimination and multicatch filtering at runtime.
+
 ### 2.5 `MirOperand` (`Operand/MirOperand.h`)
 
 The polymorphic operand hierarchy representing instruction inputs and outputs:
