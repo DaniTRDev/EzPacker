@@ -319,3 +319,12 @@ TEST_F(EzCompilerTestSuite, TestRttiDescriptorHierarchy)
     EXPECT_EQ(payload.throwSite.line, 77);
 }
 
+TEST_F(EzCompilerTestSuite, TestDefaultExceptionConstants)
+{
+    using namespace EzCore;
+    EXPECT_EQ(kDefaultExceptionTypeName, "EzDefaultException");
+    EXPECT_EQ(kDefaultExceptionTypeId, computeTypeId("EzDefaultException"));
+    EXPECT_NE(kDefaultExceptionTypeId, 0u);
+}
+
+

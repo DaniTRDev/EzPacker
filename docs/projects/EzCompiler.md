@@ -220,6 +220,10 @@ RTTI & Exception Configuration:
   --rtti                         Enable generation of runtime type info and source references [default]
   --no-rtti, -fno-rtti           Disable generation of runtime type info and source references
 
+> [!NOTE]
+> When `--rtti` is enabled (default), user RTTI descriptors are emitted and bound to exceptions. When `--no-rtti` is passed, user RTTI generation is suppressed, and exceptions automatically attach `__ez_default_rtti` and default payload at runtime, maintaining safe execution across calling conventions.
+
+
 Pipeline Stopping Gates:
   --emit-obj                     Emit native binary object (.o / .obj) [default]
   -S, --emit-asm                 Emit human-readable assembly text (.s)
