@@ -18,7 +18,9 @@ INPUT                  = docs \
                          EzCompiler/include \
                          EzTargets/X86_64/include \
                          EzTargets/X86_64/Dsl/include \
-                         EzTargets/X86_64/Registration/include
+                         EzTargets/X86_64/Registration/include \
+                         EzLinker/include \
+                         EzLinker/runtime
 
 USE_MDFILE_AS_MAINPAGE = docs/index.md
 HTML_EXTRA_STYLESHEET  = docs/assets/custom.css

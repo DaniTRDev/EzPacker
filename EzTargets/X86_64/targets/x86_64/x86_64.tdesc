@@ -101,9 +101,16 @@ target X86_64 {
         };
     }
 
+    libcalls {
+        __divti3:  "__divti3";
+        __udivti3: "__udivti3"
+    }
+
     components {
         frame_lowerer:        X86_64FrameLowerer;
         instruction_selector: X86_64TargetInstructionSelector;
-        register_allocator:   X86_64RegisterAllocator
+        register_allocator:   X86_64RegisterAllocator;
+        code_emitter:         X86_64CodeEmitter;
+        relocation_resolver:  X86_64RelocationResolver
     }
 }

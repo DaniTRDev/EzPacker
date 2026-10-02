@@ -35,10 +35,21 @@ constexpr uint8_t FramePointerEncoding = 5; // RBP
  */
 uint8_t operandSizeBytes(MirOperand *op, MirRegister *reg)
 {
-    (void)reg;
     if (op)
     {
         MirType *type = op->getMirType();
+        if (type)
+        {
+            size_t bits = type->getTotalSizeInBits();
+            if (bits > 0)
+            {
+                return static_cast<uint8_t>((bits + 7) / 8);
+            }
+        }
+    }
+    if (reg)
+    {
+        MirType *type = reg->getMirType();
         if (type)
         {
             size_t bits = type->getTotalSizeInBits();
@@ -182,13 +193,14 @@ bool X86_64CodeEmitter::buildResolvedOperands(const EncodingDesc &enc,
                     mem.m_base = FramePointerEncoding;
                     mem.m_disp = offset;
                 }
-                else if (ref->isGlobalVar())
+                else if (ref->isGlobalVar() || ref->isFunction())
                 {
-                    // Globals are addressed RIP-relative, with the fixup recorded as a relocation.
+                    // Globals and functions addressed via RIP-relative memory slots, with relocation.
                     mem.m_ripRel = true;
                     mem.m_needsReloc = true;
                     mem.m_disp = 0;
                 }
+
             }
         }
         return mem;

@@ -1,0 +1,68 @@
+; ==============================================================================
+; EzPacker Example: exception_handling.mir
+;
+; Demonstrates structured exception handling (SjLj) using EzPacker's native
+; TRY, THROW, and CATCH intermediate representation instructions:
+; - TRY label %body, label %handler: Establishes a protected region
+; - THROW %payload: Raises an exception with payload, auto-attaching default RTTI (@__ez_default_rtti)
+; - THROW %payload, @RttiDesc: Raises an exception with payload and explicit RTTI descriptor
+; - THROW: Raises an exception with default payload and default RTTI
+; - CATCH %dst: Captures the exception payload at the handler block
+; ==============================================================================
+
+declare @ValidationException() -> _void;
+
+fn @safe_divide(i64 %a, i64 %b) -> i64 {
+entry:
+    TRY label %try_body, label %catch_zero;
+
+try_body:
+    %zero_const = MOV i64 0;
+    %is_zero = CMP_EQ i1 %b, %zero_const;
+    BR_COND %is_zero, label %do_throw, label %do_compute;
+
+do_throw:
+    %err = MOV i64 500;
+    THROW i64 %err;
+
+do_compute:
+    %res = SUB i64 %a, %b;
+    RET i64 %res;
+
+catch_zero:
+    %caught = CATCH i64;
+    %zero = MOV i64 0;
+    %fallback = SUB i64 %zero, %caught;
+    RET i64 %fallback;
+}
+
+fn @process_account(i64 %balance, i64 %debit) -> i64 {
+entry:
+    TRY label %verify_funds, label %on_overdraft;
+
+verify_funds:
+    %insufficient = CMP_SLT i1 %balance, %debit;
+    BR_COND %insufficient, label %raise_overdraft, label %apply_debit;
+
+raise_overdraft:
+    %err_code = MOV i64 402;
+    THROW i64 %err_code;
+
+apply_debit:
+    %remaining = SUB i64 %balance, %debit;
+    RET i64 %remaining;
+
+on_overdraft:
+    %ex_code = CATCH i64;
+    %penalty = MOV i64 35;
+    %zero = MOV i64 0;
+    %neg_fee = SUB i64 %zero, %penalty;
+    RET i64 %neg_fee;
+}
+
+fn @validate_and_throw_custom(i64 %input) -> i64 {
+entry:
+    %err = MOV i64 901;
+    THROW i64 %err, @ValidationException;
+}
+

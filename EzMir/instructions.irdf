@@ -430,6 +430,29 @@ ir_inst RET(AnyValue:val IN) {
     FLAGS(IsTerminator, IsReturn, HasSideEffect);
 }
 
+// Scoped Try Boundary: Defines protected region entry.
+// Jumps to bodyBlock for normal execution, with exceptional unwinding target catchBlock.
+ir_inst TRY(Reference:bodyBlock IN, Reference:catchBlock IN) {
+    CATEGORY(ControlFlow);
+    TIER(HighLevel);
+    FLAGS(IsTerminator, IsBranch, HasSideEffect);
+}
+
+// Exception Handler Landing: Placed at the start of a catch block.
+// Receives the thrown exception object payload into dst register, with optional RTTI type filter.
+ir_inst CATCH(Register:dst OUT, VariadicArgs:filters IN) {
+    CATEGORY(ControlFlow);
+    TIER(HighLevel);
+    FLAGS(HasSideEffect, VariadicArgs);
+}
+
+// Exception Throw: Raises an exception payload with associated RTTI metadata and source references.
+ir_inst THROW(AnyValue:payload IN, VariadicArgs:rttiInfo IN) {
+    CATEGORY(ControlFlow);
+    TIER(HighLevel);
+    FLAGS(IsTerminator, HasSideEffect, VariadicArgs);
+}
+
 // ============================================================================
 // TYPE CASTING & CONVERSIONS
 // ============================================================================

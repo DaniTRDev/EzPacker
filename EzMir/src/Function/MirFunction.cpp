@@ -49,6 +49,7 @@ bool MirFunction::isDefinition() const { return !m_blocks.empty(); }
  * Returns the calling convention that governs parameter passing and register preservation.
  */
 CallingConvDesc *MirFunction::getCallingConv() const { return m_callingConv; }
+void MirFunction::setCallingConv(CallingConvDesc *callingConv) { m_callingConv = callingConv; }
 
 /**
  * Returns the function's basic blocks as a const intrusive list.

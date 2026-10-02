@@ -1,5 +1,6 @@
 #include "EzCompilerTestSuite.h"
 #include "FrontendAdapter.h"
+#include "EzLinkerDriver.h"
 #include <fstream>
 #include <filesystem>
 
@@ -438,5 +439,97 @@ entry:
 
     std::filesystem::remove(mirPath);
     std::filesystem::remove(outPath);
+}
+
+// Tests that a MIR module with TRY, THROW, CATCH parses, builds CFG, and passes SSA middle-end pipeline.
+TEST_F(EzCompilerTestSuite, TestExceptionMirPipelineInspection)
+{
+    const std::string mirPath = "test_exception_flow.mir";
+    const std::string mirContent = R"mir(
+fn @test_try_catch() -> i64 {
+entry:
+    TRY label %try_body, label %catch_handler;
+
+try_body:
+    %err = MOV i64 404;
+    THROW i64 %err;
+
+catch_handler:
+    %caught = CATCH i64;
+    RET i64 %caught;
+}
+)mir";
+
+    {
+        std::ofstream out(mirPath);
+        out << mirContent;
+    }
+
+    CommandLineOptions options;
+    options.inputFilePath = mirPath;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.emissionStage = EmissionStage::GenericMir;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    ASSERT_TRUE(MirModuleLoader::loadMirFile(ctx, mirPath, *ctx.getBuilderContext()));
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    std::string mir = pipeline.dumpCurrentMir();
+    EXPECT_FALSE(mir.empty());
+    EXPECT_NE(mir.find("TRY"), std::string::npos);
+    EXPECT_NE(mir.find("THROW"), std::string::npos);
+    EXPECT_NE(mir.find("CATCH"), std::string::npos);
+
+    std::filesystem::remove(mirPath);
+}
+
+// Tests compiling an object file and synthesizing linker arguments via EzLinkerDriver.
+TEST_F(EzCompilerTestSuite, TestCompilerAndEzLinkerIntegration)
+{
+    const std::string objPath = "test_compile_link.obj";
+    if (std::filesystem::exists(objPath))
+    {
+        std::filesystem::remove(objPath);
+    }
+
+    CommandLineOptions options;
+    options.target = TargetTriple::parse("x86_64-pc-windows-msvc");
+    options.outputFilePath = objPath;
+    options.emissionStage = EmissionStage::Object;
+    options.enableRtti = true;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    MirFunction *func = MirModuleLoader::createReturnConstFunction(ctx, "main", 0);
+    ASSERT_NE(func, nullptr);
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    EmissionEngine emitter(ctx);
+    EXPECT_TRUE(emitter.emitModule(*ctx.getBuilderContext(), objPath));
+    ASSERT_TRUE(std::filesystem::exists(objPath));
+
+    // Now drive EzLinker on the emitted object file
+    EzLinker::EzLinkerDriver linkerDriver;
+    EzLinker::LinkerOptions linkOpts;
+    linkOpts.inputFiles = { objPath };
+    linkOpts.outputFile = "test_compile_link.exe";
+    linkOpts.dryRun = true;
+    linkOpts.targetTriple = "x86_64-pc-windows-msvc";
+
+    EzLinker::LinkResult linkRes = linkerDriver.link(linkOpts);
+    EXPECT_TRUE(linkRes.success);
+    EXPECT_EQ(linkRes.exitCode, 0);
+    EXPECT_FALSE(linkRes.commandLine.empty());
+    EXPECT_NE(linkRes.commandLine.find("test_compile_link.obj"), std::string::npos);
+    EXPECT_NE(linkRes.commandLine.find("EzExceptionRuntime"), std::string::npos);
+
+    std::filesystem::remove(objPath);
 }
 

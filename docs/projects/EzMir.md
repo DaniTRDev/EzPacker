@@ -97,7 +97,7 @@ A single-entry, single-exit basic block:
 
 Represents a single executable operation:
 - **Opcode**:
-  - **Generic Opcodes** (`MirInstructionOpCode` from `Instruction/MirInstructionSet.h`): `MOV`, `ADD`, `SUB`, `IMUL`, `SDIV`, `UDIV`, `AND`, `OR`, `XOR`, `SHL`, `LSHR`, `ASHR`, `LOAD`, `STORE`, `CMP_EQ`, `CMP_SLT`, `CMP_UGT`, `BR_COND`, `JMP`, `CALL`, `RET`, `PHI`, `ALLOC`, `DALLOC`, etc.
+  - **Generic Opcodes** (`MirInstructionOpCode` from `Instruction/MirInstructionSet.h`): `MOV`, `ADD`, `SUB`, `IMUL`, `SDIV`, `UDIV`, `AND`, `OR`, `XOR`, `SHL`, `LSHR`, `ASHR`, `LOAD`, `STORE`, `CMP_EQ`, `CMP_SLT`, `CMP_UGT`, `BR_COND`, `JMP`, `CALL`, `RET`, `PHI`, `ALLOC`, `DALLOC`, `TRY`, `CATCH`, `THROW`, etc.
   - **Target Opcodes**: Bound via a pointer to `MirTargetInstructionDesc` synthesized by `EzDsl` (e.g., `ADD64rr`, `MOV32ri`, `VADDPSrr`).
 - **Operands**: Array of polymorphic `MirOperand*` pointers (destinations and sources).
 - **Flags (`MirInstructionFlags`)**:
@@ -106,9 +106,25 @@ Represents a single executable operation:
   - `IsCall` / `IsReturn`: Inter-procedural call/return boundaries.
   - `ReadsMemory` / `WritesMemory`: Memory side-effect and barrier tracking.
   - `HasSideEffect`: Inhibits dead-code elimination.
+  - `VariadicArgs`: Variable number of operands (e.g. `CALL`, `PHI`, `CATCH`, `THROW`).
 - **Intrusive Links**: Embedded `m_prev` and `m_next` pointers satisfying `IntrusiveLinkedList<MirInstruction>`.
 
-### 2.4 `MirOperand` (`Operand/MirOperand.h`)
+### 2.4 Exception Handling Instructions
+
+EzMir provides first-class, structured exception handling opcodes:
+
+| Opcode | Categories & Flags | Operands | Description |
+|---|---|---|---|
+| `TRY` | `ControlFlow`, `IsTerminator`, `IsBranch`, `HasSideEffect` | `Reference:bodyBlock IN`, `Reference:catchBlock IN` | Demarcates the entry to a protected block with normal branch to `bodyBlock` and exceptional edge to `catchBlock`. |
+| `CATCH` | `ControlFlow`, `HasSideEffect`, `VariadicArgs` | `Register:dst OUT`, `VariadicArgs:filters IN` | Placed at the entry of an exception handler basic block; binds the caught exception payload into `dst`. |
+| `THROW` | `ControlFlow`, `IsTerminator`, `HasSideEffect`, `VariadicArgs` | `AnyValue:payload IN`, `VariadicArgs:rttiInfo IN` | Raises an exception with the given payload value, transferring control to the nearest matching active handler. |
+
+#### `THROW` Operand Forms
+1. **0 Operands (`THROW`)**: Default/rethrow. Automatically lowers to `CALL @__ez_throw, @__ez_default_payload, @__ez_default_rtti`, passing the canonical default payload and default type descriptor.
+2. **1 Operand (`THROW %payload`)**: Payload throw. Automatically appends `@__ez_default_rtti` as operand 2 during target lowering, ensuring the ABI's second argument register is always initialized with a valid type descriptor.
+3. **2 Operands (`THROW %payload, @RttiDesc`)**: Full payload with explicit RTTI descriptor symbol reference, allowing typed exception discrimination and multicatch filtering at runtime.
+
+### 2.5 `MirOperand` (`Operand/MirOperand.h`)
 
 The polymorphic operand hierarchy representing instruction inputs and outputs:
 
@@ -121,7 +137,7 @@ The polymorphic operand hierarchy representing instruction inputs and outputs:
 | `MirReference` | `Operand/MirReference.h` | Symbolic reference pointing to a `MirBlock`, `MirFunction`, `MirGlobalVar`, or `StackFrameObject`. |
 | `MirRuntimeSymbol` | `Operand/MirRuntimeSymbol.h` | Named external runtime symbol (e.g., `@__divti3`). |
 
-### 2.5 `MirType` & `MirTypeTable` (`Type/MirType.h`, `Type/MirTypeTable.h`)
+### 2.6 `MirType` & `MirTypeTable` (`Type/MirType.h`, `Type/MirTypeTable.h`)
 
 EzPacker features a comprehensive type system capable of representing arbitrary scalar integers, IEEE floats, pointers, and SIMD vectors. Type instances are immutable and canonicalized (interned) in `MirTypeTable`:
 

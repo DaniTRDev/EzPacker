@@ -77,6 +77,21 @@ void CommandLineParser::setupArguments()
             .default_value(false)
             .implicit_value(true);
 
+    m_program->add_argument("--rtti")
+            .help("Enable generation of runtime type information (RTTI) and source references (default: enabled)")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("--no-rtti")
+            .help("Disable generation of runtime type information (RTTI) and source references")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("-fno-rtti")
+            .help("Alias for --no-rtti")
+            .default_value(false)
+            .implicit_value(true);
+
     m_program->add_argument("--diag-level")
             .help("Minimum diagnostic severity threshold (error, warning, trace, debug)")
             .metavar("<level>")
@@ -305,6 +320,16 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
     outOptions.printPasses = m_program->get<bool>("--print-passes");
     outOptions.timePasses = m_program->get<bool>("--time-passes");
     outOptions.isPositionIndependent = m_program->get<bool>("-fPIC");
+
+    // RTTI settings: default is enabled unless --no-rtti or -fno-rtti is explicitly passed
+    const bool rttiOn = m_program->get<bool>("--rtti");
+    const bool rttiOff = m_program->get<bool>("--no-rtti") || m_program->get<bool>("-fno-rtti");
+    if (rttiOn && rttiOff)
+    {
+        outError = "conflicting RTTI flags: choose at most one of --rtti or --no-rtti";
+        return false;
+    }
+    outOptions.enableRtti = !rttiOff;
 
     // Diag level: every documented value is accepted, anything else is a hard error so a typo
     // cannot silently leave the default threshold in place.

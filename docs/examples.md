@@ -6,13 +6,14 @@
 
 ## 1. Overview
 
-EzPacker provides 9 bundled MIR test and demonstration modules in the `examples/` directory. These modules exercise every layer of the compiler:
+EzPacker provides 10 bundled MIR test and demonstration modules in the `examples/` directory. These modules exercise every layer of the compiler:
 - High-level arithmetic and bitwise logic.
 - Complex multi-block control flow graphs with conditional branching and phi-nodes.
 - ABI lowering differences between System V AMD64 (Linux) and Microsoft Win64 (Windows).
 - Instruction selector load-folding and addressing mode synthesis.
 - Multi-exit functions with distinct epilogues.
 - Deep recursion with caller-saved register clobbering, callee-saved preservation, and object relocations.
+- Structured Exception Handling (SjLj) with `TRY`, `THROW`, and `CATCH` instructions lowered to runtime libcalls.
 
 ---
 
@@ -325,6 +326,69 @@ fib_rec:
 
 ---
 
+### 2.10 `exception_handling.mir`: Structured Exception Handling (SjLj)
+Demonstrates setjmp/longjmp (SjLj) based exception handling using EzPacker's native `TRY`, `THROW`, and `CATCH` intermediate representation instructions:
+
+```mir
+fn @safe_divide(i64 %a, i64 %b) -> i64 {
+entry:
+    TRY label %try_body, label %catch_zero;
+
+try_body:
+    %zero_const = MOV i64 0;
+    %is_zero = CMP_EQ i1 %b, %zero_const;
+    BR_COND %is_zero, label %do_throw, label %do_compute;
+
+do_throw:
+    %err = MOV i64 500;
+    THROW i64 %err;
+
+do_compute:
+    %res = SUB i64 %a, %b;
+    RET i64 %res;
+
+catch_zero:
+    %caught = CATCH i64;
+    %zero = MOV i64 0;
+    %fallback = SUB i64 %zero, %caught;
+    RET i64 %fallback;
+}
+
+fn @process_account(i64 %balance, i64 %debit) -> i64 {
+entry:
+    TRY label %verify_funds, label %on_overdraft;
+
+verify_funds:
+    %insufficient = CMP_SLT i1 %balance, %debit;
+    BR_COND %insufficient, label %raise_overdraft, label %apply_debit;
+
+raise_overdraft:
+    %err_code = MOV i64 402;
+    THROW i64 %err_code;
+
+apply_debit:
+    %remaining = SUB i64 %balance, %debit;
+    RET i64 %remaining;
+
+on_overdraft:
+    %ex_code = CATCH i64;
+    %penalty = MOV i64 35;
+    %zero = MOV i64 0;
+    %neg_fee = SUB i64 %zero, %penalty;
+    RET i64 %neg_fee;
+}
+```
+
+#### Under the Hood:
+1. `TRY label %try_body, label %catch_block` registers the protected region and handler landing pad.
+2. `THROW %payload` moves the exception payload into the platform ABI's first argument register (`rdi` on System V AMD64, `rcx` on Win64), automatically attaches `@__ez_default_rtti` as the second argument (`rsi` on System V AMD64, `rdx` on Win64), and emits a direct call to `__ez_throw`.
+3. `THROW %payload, @CustomRtti` passes the specified type descriptor symbol to `__ez_throw`, enabling rich RTTI-based inspection and hierarchical type matching.
+4. `THROW` (0-operand) automatically attaches both `@__ez_default_payload` and `@__ez_default_rtti`.
+5. `CATCH %dst` invokes runtime libcall `__ez_get_current_exception` and moves the caught exception payload into `%dst`.
+6. At link time, programs providing exception handling link against `EzExceptionRuntime`, which provides `__ez_default_rtti`, `__ez_default_payload`, and reflection helpers (`__ez_get_rtti_type_name`, `__ez_get_rtti_type_id`).
+
+---
+
 ## 3. End-to-End Verification Harness
 
 Create `test_examples.c`:
@@ -341,6 +405,8 @@ extern int64_t pass_quaternary(int64_t a, int64_t b, int64_t c, int64_t d);
 extern int64_t accumulate_offset(int64_t seed, const int64_t *buf);
 extern int64_t factorial(int64_t n);
 extern int64_t fibonacci(int64_t n);
+extern int64_t safe_divide(int64_t a, int64_t b);
+extern int64_t process_account(int64_t balance, int64_t debit);
 
 int main(void) {
     printf("Running EzPacker End-to-End Verification...\n");
@@ -371,6 +437,11 @@ int main(void) {
     assert(fibonacci(7) == 13);
     printf("factorial and fibonacci verified!\n");
 
+    // 6. Test exception handling
+    assert(safe_divide(100, 20) == 80);
+    assert(process_account(500, 200) == 300);
+    printf("exceptions verified!\n");
+
     printf("\nAll EzPacker example modules executed successfully!\n");
     return 0;
 }
@@ -384,9 +455,10 @@ EzCompiler examples/branch_control_flow.mir -o branch.o
 EzCompiler examples/calling_conventions.mir -o calling.o
 EzCompiler examples/memory_fold.mir -o memory.o
 EzCompiler examples/recursive_factorial.mir -o factorial.o
+EzCompiler examples/exception_handling.mir -o exceptions.o
 
-# 2. Link with GCC or Clang
-gcc test_examples.c arithmetic.o branch.o calling.o memory.o factorial.o -o verify_suite
+# 2. Link with GCC or Clang (linking EzExceptionRuntime)
+gcc test_examples.c arithmetic.o branch.o calling.o memory.o factorial.o exceptions.o -lEzExceptionRuntime -o verify_suite
 
 # 3. Execute
 ./verify_suite

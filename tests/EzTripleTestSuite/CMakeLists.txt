@@ -80,6 +80,13 @@ EzPacker_AddTest(
         "tests/T_MirTargetPeepholePass.cpp"
 )
 
+EzPacker_AddTest(
+        "T_LibcallRegistry"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_LibcallRegistry.cpp"
+)
+
 
 
 

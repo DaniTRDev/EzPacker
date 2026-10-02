@@ -17,7 +17,7 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 - 🏠 **[Documentation Landing Page](docs/index.md)** - Global architecture, pipeline overview, and navigation hub.
 - 🚀 **[First Steps & Quickstart](docs/first_steps.md)** - Writing your first MIR file, compiling, and linking with C/C++.
 - 🛠️ **[Comprehensive Build Guide](docs/build_guide.md)** - Prerequisites, CMake options, compiling on Windows and Linux, and running tests.
-- 💡 **[Examples & Use Cases](docs/examples.md)** - In-depth breakdown of all 9 bundled MIR modules with assembly outputs.
+- 💡 **[Examples & Use Cases](docs/examples.md)** - In-depth breakdown of all 10 bundled MIR modules with assembly outputs.
 - 🎯 **[How to Build a Target Architecture](docs/how_to_build_a_target.md)** - Guide to adding and building new CPU targets from first principles.
 
 ### Subproject Documentation
@@ -26,8 +26,9 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 - **[EzDsl](docs/projects/EzDsl.md)** - Meta-compiler toolkit and `EzDslCli` driver for all 10 DSL dialects.
 - **[EzCodeEmitter](docs/projects/EzCodeEmitter.md)** - Binary machine code emission, section management, ELF64, and PE/COFF writers.
 - **[EzTriple](docs/projects/EzTriple.md)** - Backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer.
-- **[EzCompiler](docs/projects/EzCompiler.md)** - Compiler driver executable, options parsing, and pipeline orchestration.
+- **[EzCompiler](docs/projects/EzCompiler.md)** - Compiler driver executable (`ezc`), options parsing, and pipeline orchestration.
 - **[EzTargets](docs/projects/EzTargets.md)** - Architecture backends, featuring the x86-64 target and vector extensions.
+- **[EzLinker](docs/projects/EzLinker.md)** - System linker driver (`ez-ld`), automated toolchain detection, runtime library injection, and SjLj exception runtime.
 
 ---
 

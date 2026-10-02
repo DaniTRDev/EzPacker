@@ -47,9 +47,11 @@ The primary target architecture currently implemented in EzTargets is **x86-64 (
 
 ## 2. X86-64 Target Architecture Implementation
 
-### 2.1 `X86_64TargetDesc` (`X86_64/include/X86_64TargetDesc.h`)
+### 2.1 `X86_64TargetDesc` (Generated via `EzDslGenTargetDesc`)
 
-`X86_64TargetDesc` inherits from `TargetDesc` (`EzTriple`) and serves as the central factory and descriptor for the AMD64 architecture:
+`X86_64TargetDesc` is automatically synthesized from `targets/x86_64/x86_64.tdesc` by `EzDslGenTargetDesc` (`CppTargetDescGenerator`). It is defined in namespace `EzTargets::TableGen::X86_64` with a type alias `EzTargets::X86_64::X86_64TargetDesc` for seamless integration.
+
+Inheriting from `TargetDesc` (`EzTriple`), it serves as the central factory and descriptor for the AMD64 architecture:
 
 - **Architecture Name**: `"x86_64"`.
 - **Register Banks**:
@@ -59,12 +61,19 @@ The primary target architecture currently implemented in EzTargets is **x86-64 (
   - `GR64` (`getGprClass()`): 64-bit integer registers.
   - `VR128` (`getVr128Class()`): 128-bit SIMD registers.
 - **Stack Slot Size**: 8 bytes.
+- **Memory Displacement Type**: `i64` (`getMemOperandDisplacementType()`).
 - **Binary Descriptors**:
   - `X86_64ElfBinaryDesc` for System V Linux ELF64 objects.
   - `X86_64CoffBinaryDesc` for Microsoft Windows PE-COFF objects.
 - **Calling Conventions**:
   - `SysV_AMD64`: Arguments in `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`; returns in `rax`, `rdx`.
   - `Win64`: Arguments in `rcx`, `rdx`, `r8`, `r9`; 32-byte shadow space; returns in `rax`.
+- **Runtime Components**:
+  - `X86_64FrameLowerer` (`getFrameLowerer()`).
+  - `X86_64InstructionSelector` (`getInstructionSelector()`).
+  - `X86_64RegisterAllocator` (`getRegisterAllocator()`).
+  - `X86_64CodeEmitter` (`createCodeEmitter()`).
+  - `X86_64RelocationResolver` (`getRelocationResolver()`).
 
 ---
 
@@ -76,6 +85,8 @@ The generated legalizer action table and rewrite rules (`.lrd`) reference hand-w
 // Canonical declarations matching DSL-visible contracts:
 LegalizationResult AMD64CallLowering(LegalizeCtx &ctx);
 LegalizationResult AMD64ReturnLowering(LegalizeCtx &ctx);
+LegalizationResult AMD64ThrowLowering(LegalizeCtx &ctx);
+LegalizationResult AMD64CatchLowering(LegalizeCtx &ctx);
 
 // Predicate helpers for rewrite rules
 bool isPowTwo(int64_t val);        // True when val is a positive power of two
@@ -85,6 +96,18 @@ bool isPositiveConst(int64_t val); // True when val is strictly positive
 int64_t log2Pow2(int64_t val); // Returns floor(log2(val)), i.e. trailing zero count
 int64_t sub1(int64_t val);     // Returns val - 1 (used for power-of-two minus one masks)
 ```
+
+#### Exception Lowering Details
+- `AMD64ThrowLowering`: Lowers high-level `THROW` instructions into a runtime libcall to `__ez_throw`:
+  - 1 operand (`THROW %payload`): Automatically appends `@__ez_default_rtti`, lowering to `CALL @__ez_throw, %payload, @__ez_default_rtti` so that the second argument register (`rsi` in SysV, `rdx` in Win64) is always initialized with valid canonical RTTI.
+  - 2 operands (`THROW %payload, @CustomRtti`): Preserves custom RTTI and lowers to `CALL @__ez_throw, %payload, @CustomRtti`.
+  - 0 operands (`THROW`): Synthesizes default arguments, lowering to `CALL @__ez_throw, @__ez_default_payload, @__ez_default_rtti`.
+- `AMD64CatchLowering`: Lowers high-level `CATCH(dst)` instructions into a runtime libcall to `__ez_get_current_exception()`, binding the caught payload to the destination register.
+- `X86_64TargetInstructionSelector::selectTRY`: Emits an unconditional jump to the try body basic block, integrating with the SjLj exception landing pad structure.
+- `X86_64TargetInstructionSelector::selectCALL`: Automatically resolves `MirRuntimeSymbol` operands into `MirReference` objects and external declarations, generating standard branch relocations (`IMAGE_REL_AMD64_REL32` / `R_X86_64_PLT32`) for all runtime symbols.
+- `X86_64TargetInstructionSelector::selectMOV`: Supports loading addresses of functions, global variables, and `MirRuntimeSymbol` instances into registers via `LEA64r %dst, @ref`, generating PC-relative data relocations (`PCRel32`).
+
+
 
 ---
 
@@ -188,7 +211,7 @@ EzTargets::X86_64::registerTarget();
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
-| Target Descriptor | `EzTargets/X86_64/include/X86_64TargetDesc.h` | `X86_64TargetDesc` |
+| Target Descriptor | Generated (`generated/x86_64/X86_64TargetDesc.h`) | `X86_64TargetDesc` |
 | Lowering Shims | `EzTargets/X86_64/include/X86_64Lowering.h` | `AMD64CallLowering`, `AMD64ReturnLowering`, `isPowTwo`, `log2Pow2` |
 | Instruction Encoder | `EzTargets/X86_64/include/Encoding/X86_64InstructionEncoder.h` | `InstructionEncoder` |
 | Encoding Descriptors | `EzTargets/X86_64/include/Encoding/X86_64EncodingDesc.h` | `EncodingDesc`, `EncSlotKind`, `EncForm`, `ConditionCode` |

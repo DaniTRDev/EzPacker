@@ -11,6 +11,7 @@
 #include "FlexNumber/FlexInt.h"
 #include "Block/MirBlock.h"
 #include "Function/MirFunction.h"
+#include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionRegisterInfo.h"
 #include <map>
 
@@ -72,6 +73,8 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
             return selectJMP(ctx, inst);
         case MirInstructionOpCode::BR_COND:
             return selectBR_COND(ctx, inst);
+        case MirInstructionOpCode::TRY:
+            return selectTRY(ctx, inst);
         case MirInstructionOpCode::CALL:
             return selectCALL(ctx, inst);
         case MirInstructionOpCode::LOAD:
@@ -115,6 +118,25 @@ bool X86_64TargetInstructionSelector::selectJMP(MirBuilderContext *ctx, MirInstr
     inst->eraseFromOwner();
     return true;
 }
+
+/**
+ * Lowers a TRY instruction into an unconditional branch to the protected body block.
+ */
+bool X86_64TargetInstructionSelector::selectTRY(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 1)
+    {
+        return false;
+    }
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::JMP),
+                   inst->getSourceRef(),
+                   { inst->getOperand(0) });
+    inst->eraseFromOwner();
+    return true;
+}
+
 
 /**
  * Lowers a conditional branch into CMP against zero followed by JNE to the true block and JMP to
@@ -178,10 +200,42 @@ bool X86_64TargetInstructionSelector::selectCALL(MirBuilderContext *ctx, MirInst
     for (size_t i = 0; i < inst->getOperandCount(); ++i)
     {
         auto *op = inst->getOperand(i);
-        if (op &&
-            (op->getType() == MirOperandType::Reference ||
-             (op->getType() == MirOperandType::Register && op->getMirType() &&
-              op->getMirType()->getKind() != MirTypeKind::BindingToken)))
+        if (!op)
+        {
+            continue;
+        }
+
+        if (op->getType() == MirOperandType::Reference)
+        {
+            callee = op;
+            break;
+        }
+
+        if (op->getType() == MirOperandType::RuntimeSymbol)
+        {
+            auto *rtSym = static_cast<MirRuntimeSymbol *>(op);
+            std::string_view symName = rtSym->getSymbolName();
+            MirFunction *fn = nullptr;
+            for (MirFunction *f : ctx->getFunctions())
+            {
+                if (f->getName() == symName)
+                {
+                    fn = f;
+                    break;
+                }
+            }
+            if (!fn)
+            {
+                MirFunctionBuilder fb(ctx);
+                fn = fb.declare(ctx->getTypeTable()->_void(), std::initializer_list<MirType*>{}, symName, MirLinkage::External);
+            }
+            MirOperandBuilder ob(ctx);
+            callee = ob.buildRef(fn);
+            break;
+        }
+
+        if (op->getType() == MirOperandType::Register && op->getMirType() &&
+            op->getMirType()->getKind() != MirTypeKind::BindingToken)
         {
             callee = op;
             break;
@@ -942,11 +996,11 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
 
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
 
-    // 1. Address-of global variable or stack slot: MOV %dst, @ref -> LEA64r %dst, @ref
+    // 1. Address-of global variable, function, or stack slot: MOV %dst, @ref -> LEA64r %dst, @ref
     if (src->getType() == MirOperandType::Reference)
     {
         auto *ref = src->get<MirReference>();
-        if (ref && (ref->isGlobalVar() || ref->isStackFrameObject()))
+        if (ref && (ref->isGlobalVar() || ref->isStackFrameObject() || ref->isFunction()))
         {
             if (auto *r = dst->get<MirRegister>())
             {
@@ -961,9 +1015,43 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
             return true;
         }
     }
+    else if (src->getType() == MirOperandType::RuntimeSymbol)
+    {
+        auto *rtSym = static_cast<MirRuntimeSymbol *>(src);
+        std::string_view symName = rtSym->getSymbolName();
+        MirFunction *fn = nullptr;
+        for (MirFunction *f : ctx->getFunctions())
+        {
+            if (f->getName() == symName)
+            {
+                fn = f;
+                break;
+            }
+        }
+        if (!fn)
+        {
+            MirFunctionBuilder fb(ctx);
+            fn = fb.declare(ctx->getTypeTable()->_void(), std::initializer_list<MirType*>{}, symName, MirLinkage::External);
+        }
+        MirOperandBuilder ob(ctx);
+        MirOperand *ref = ob.buildRef(fn);
+
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass("GPR64"));
+        }
+        ib.buildTarget(
+                x86_64TargetInst::getTargetDesc(x86_64TargetInst::LEA64r),
+                inst->getSourceRef(),
+                { dst, ref });
+        inst->eraseFromOwner();
+        return true;
+    }
 
     // 2. Floating point register moves: MOVSSrr / MOVSDrr
     bool isFloat = (dst->getMirType() && dst->getMirType()->getKind() == MirTypeKind::FloatingPoint);
+
     if (isFloat)
     {
         bool isDouble = (dst->getMirType()->getTotalSizeInBits() == 64);

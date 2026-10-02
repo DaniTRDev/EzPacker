@@ -40,6 +40,14 @@ flowchart TD
         ObjectWriter -->|Linux / BSD| ElfWriter["Elf64Writer\n(System V ELF64 .o)"]
         ObjectWriter -->|Windows| CoffWriter["CoffWriter\n(Microsoft PE/COFF .obj)"]
     end
+
+    subgraph Linking["5. Linking & Runtime (EzLinker / ez-ld)"]
+        ElfWriter --> Linker["EzLinkerDriver\n(Toolchain Detection & Command Synthesis)"]
+        CoffWriter --> Linker
+        Linker --> Runtime["Injected Runtimes:\n- C Standard Library (libc / msvcrt)\n- Compiler Legalizer Helpers (compiler-rt / libgcc)\n- EzExceptionRuntime (SjLj Unwinding & RTTI)"]
+        Runtime --> SystemLinker{"System Linker\n(lld, link.exe, ld, gcc)"}
+        SystemLinker --> FinalBin["Native Executable (.exe / ELF)\nor Shared Library (.dll / .so)"]
+    end
 ```
 
 ### The Declarative DSL Architecture (`EzDsl`)
@@ -89,7 +97,7 @@ flowchart LR
 ### 📖 Essential Guides
 - **[First Steps & Quickstart](first_steps.md)**: Write your first MIR module, compile to native object code, inspect intermediate pipeline states, and link with host C/C++ toolchains.
 - **[Comprehensive Build Guide](build_guide.md)**: Toolchain requirements, CMake configuration options, step-by-step compilation on Windows and Linux, running test suites, and generating docs.
-- **[Examples & Use Cases](examples.md)**: In-depth technical walkthrough of all 9 bundled MIR modules (arithmetic, control flow, ABI lowering, crypto hashing, load-folding, recursion, and epilogues).
+- **[Examples & Use Cases](examples.md)**: In-depth technical walkthrough of all 10 bundled MIR modules (arithmetic, control flow, ABI lowering, crypto hashing, load-folding, recursion, epilogues, and exceptions).
 - **[How to Build a Target Architecture](how_to_build_a_target.md)**: Complete architectural tutorial on adding a new CPU architecture backend to EzPacker from first principles.
 
 ### 🏛️ Subproject Overviews
@@ -103,7 +111,8 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzCodeEmitter`** | Binary code emission: section management, relocations, `Elf64Writer` (ELF64), and `CoffWriter` (PE/COFF). | [EzCodeEmitter Guide](projects/EzCodeEmitter.md) |
 | **`EzTriple`** | Target-independent backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer. | [EzTriple Guide](projects/EzTriple.md) |
 | **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine (`ezc`). | [EzCompiler Guide](projects/EzCompiler.md) |
-| **`EzTargets`** | Architecture backends: self-contained x86-64 target (`X86_64TargetDesc`, `X86_64FrameLowerer`, `X86_64InstructionEncoder`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
+| **`EzTargets`** | Architecture backends: self-contained x86-64 target (synthesized `X86_64TargetDesc`, `X86_64FrameLowerer`, `X86_64InstructionEncoder`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
+| **`EzLinker`** | System linker driver and exception runtime: automated toolchain detection (`lld`, `link.exe`), C stdlib / compiler-rt injection, and SjLj exception runtime (`ez-ld`). | [EzLinker Guide](projects/EzLinker.md) |
 
 ### 🔍 Complete API Reference
 - **[Generated Doxygen API Documentation](doxygen/index.html)**: Interactive class hierarchies, inheritance diagrams, member documentation, and source code cross-references. Generate locally on demand via:

@@ -14,6 +14,7 @@
 #include "Legalizer/Actions/LegalizeWidenScalarAction.h"
 #include "Legalizer/InsertionTracker.h"
 #include "Legalizer/LegalizerInfo.h"
+#include "Libcall/TargetLibcallRegistry.h"
 #include "Operand/MirOperand.h"
 #include "Operand/MirOperands.h"
 #include "Type/MirType.h"
@@ -286,6 +287,14 @@ LegalizationResult MirLegalizer::executeAction(const LegalityResponse &response,
 
         case LegalizeActionKind::Libcall:
         {
+            if (m_targetDesc && m_targetDesc->getLegalizerInfo())
+            {
+                if (auto kindOpt = m_targetDesc->getLegalizerInfo()->getLibcallKind(response.m_handlerOrStringId))
+                {
+                    return LegalizeActions::LegalizeLibcall(ctx, *kindOpt);
+                }
+            }
+
             std::string_view sym;
             if (m_targetDesc && m_targetDesc->getLegalizerInfo())
             {
@@ -297,6 +306,13 @@ LegalizationResult MirLegalizer::executeAction(const LegalityResponse &response,
             }
             if (!sym.empty())
             {
+                if (m_targetDesc && m_targetDesc->getLibcallRegistry())
+                {
+                    if (auto kind = m_targetDesc->getLibcallRegistry()->findKindByName(sym))
+                    {
+                        return LegalizeActions::LegalizeLibcall(ctx, *kind);
+                    }
+                }
                 return LegalizeActions::LegalizeLibcall(ctx, sym);
             }
 

@@ -16,6 +16,8 @@
  */
 LegalizationResult AMD64CallLowering(LegalizeCtx &ctx);
 LegalizationResult AMD64ReturnLowering(LegalizeCtx &ctx);
+LegalizationResult AMD64ThrowLowering(LegalizeCtx &ctx);
+LegalizationResult AMD64CatchLowering(LegalizeCtx &ctx);
 
 /// True when val is a positive power of two.
 bool isPowTwo(int64_t val);

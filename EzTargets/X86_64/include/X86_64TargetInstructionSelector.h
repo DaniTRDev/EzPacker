@@ -64,6 +64,9 @@ class X86_64TargetInstructionSelector : public x86_64InstructionSelector
     /// Lowers a register/immediate MOV using the generated instruction table.
     bool selectMOV(MirBuilderContext *ctx, MirInstruction *inst);
 
+    /// Lowers a TRY instruction into control flow to the protected body block.
+    bool selectTRY(MirBuilderContext *ctx, MirInstruction *inst);
+
     TargetDesc *m_targetDesc{ nullptr }; ///< Target descriptor owning the register classes used above.
 };
 } // namespace EzTargets::X86_64

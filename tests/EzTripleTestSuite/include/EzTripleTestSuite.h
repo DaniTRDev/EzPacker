@@ -17,6 +17,7 @@
 #include "Legalizer/LegalizerInfo.h"
 #include "Legalizer/Actions/LegalizeCallAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
+#include "Libcall/TargetLibcallRegistry.h"
 #include "MirPasses/MirPassManager.h"
 #include "Operand/MirOperandBuilder.h"
 #include "Operand/MirOperands.h"
@@ -380,7 +381,14 @@ class MockTargetDesc : public TargetDesc
     // Stack slots are 8 bytes wide.
     size_t getStackSlotSize() const override { return 8; }
     // Lazily constructs the mock legalizer info from the current type table.
-    void initialize() override { m_legalizerInfo = std::make_unique<MockTargetLegalizerInfo>(m_ctx->getTypeTable()); }
+    void initialize() override
+    {
+        m_legalizerInfo = std::make_unique<MockTargetLegalizerInfo>(m_ctx->getTypeTable());
+        m_libcallRegistry.initDefaults("MockArch", "linux", CrtFlavor::Gnu);
+    }
+    // Returns the mock target's libcall registry.
+    TargetLibcallRegistry *getLibcallRegistry() override { return &m_libcallRegistry; }
+    const TargetLibcallRegistry *getLibcallRegistry() const override { return &m_libcallRegistry; }
     // Maps a libcall symbol id to its runtime helper name for lowering tests.
     std::string_view getLibcallStr(uint8_t symId) override
     {
@@ -452,6 +460,7 @@ class MockTargetDesc : public TargetDesc
     std::unique_ptr<MirTargetInstructionDesc> m_descBR_COND;
     std::unique_ptr<MirTargetInstructionDesc> m_descRET;
     std::unique_ptr<MirTargetInstructionDesc> m_descMOV64rr;
+    TargetLibcallRegistry m_libcallRegistry;
 };
 
 /**

@@ -73,7 +73,7 @@ cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 # 3. Compile all targets
 cmake --build build --config Release -j
 ```
-Binaries will be placed in `build/bin/` (or `build/bin/Release/`).
+Binaries (`ezc`, `ez-ld`, `EzDslCli`) and test executables will be placed in `build/bin/` (or `build/bin/Release/`).
 
 ### 4.2 Windows / Linux (Ninja Generator)
 Using Ninja delivers significantly faster parallel compilation:
@@ -85,6 +85,7 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 # Compile all targets in parallel
 cmake --build build -j
 ```
+Binaries (`ezc`, `ez-ld`, `EzDslCli`) will be placed in `build/bin/`.
 
 ### 4.3 Enabling Sanitizers (Debug Builds)
 To build with AddressSanitizer and UndefinedBehaviorSanitizer enabled:
@@ -109,15 +110,18 @@ You can run individual test suites targeting specific subsystems:
 
 | Test Target | Executable | Scope |
 | :--- | :--- | :--- |
+| **`EzCoreTestSuite`** | `bin/EzCoreTestSuite` | Tests PMR memory allocators, arbitrary-precision `FlexInt`/`FlexFloat`, `DenseBitSet`, intrusive containers, diagnostics, and RTTI descriptors. |
 | **`EzMirTestSuite`** | `bin/EzMirTestSuite` | Tests in-memory MIR, block construction, SSA verification, and textual parsing. |
-| **`EzDslLexerTestSuite`** | `bin/EzDslLexerTestSuite` | Tests lexical analysis and parser combinators for all 8 DSL dialects. |
+| **`EzDslLexerTestSuite`** | `bin/EzDslLexerTestSuite` | Tests lexical analysis and parser combinators for all 10 DSL dialects. |
 | **`EzDslSemaTestSuite`** | `bin/EzDslSemaTestSuite` | Tests semantic analysis, symbol tables, scopes, and conflict detection. |
 | **`EzDslCodeGeneratorsTestSuite`** | `bin/EzDslCodeGeneratorsTestSuite` | Tests C++ table synthesizers and code emitter output. |
 | **`EzDslCliTestSuite`** | `bin/EzDslCliTestSuite` | Tests the `EzDslCli` driver executable. |
 | **`EzTripleTestSuite`** | `bin/EzTripleTestSuite` | Tests legalizer matrices, ABI lowerer, instruction selector, register allocator, and frame lowerer. |
 | **`EzCodeEmitterTestSuite`** | `bin/EzCodeEmitterTestSuite` | Tests binary machine encoding, branch relaxation, ELF64 and COFF object serialization. |
 | **`EzCompilerTestSuite`** | `bin/EzCompilerTestSuite` | Tests compiler option parsing, target resolvers, and pipeline pass sequencing. |
-| **`EzCompilerEndToEndTests`** | `bin/EzCompilerEndToEndTests` | Full end-to-end compilation of sample MIR modules to executable object files. |
+| **`EzLinkerTestSuite`** | `bin/EzLinkerTestSuite` | Tests system linker detection (`SystemLinkerDetector`), command synthesis (`EzLinkerDriver`), and SjLj exception runtime (`EzExceptionRuntime`). |
+| **`EzCompilerEndToEndTests`** | `bin/EzCompilerEndToEndTests` | Full end-to-end compilation of sample MIR modules to executable object files across Win64 and SysV ABIs. |
+| **`TEST_ALL`** | `bin/TEST_ALL` | Unified monolithic test runner executing all unit and integration tests. |
 
 Example running a single test suite:
 ```bash

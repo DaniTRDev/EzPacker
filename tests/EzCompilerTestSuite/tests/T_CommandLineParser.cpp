@@ -1,4 +1,5 @@
 #include "EzCompilerTestSuite.h"
+#include "Rtti/RttiDescriptor.h"
 
 using namespace EzCompiler;
 
@@ -193,4 +194,137 @@ TEST_F(EzCompilerTestSuite, TestTargetFeatureCommandLineOptions)
         EXPECT_EQ(options.targetFeatures[2], "+bmi");
     }
 }
+
+// RTTI flags: default enabled, --no-rtti, -fno-rtti, --rtti, and conflicting flag rejection
+TEST_F(EzCompilerTestSuite, TestRttiCommandLineOptions)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
+
+    // 1. Default (no RTTI flags passed) -> enabled
+    {
+        std::vector<std::string> args = { "ezc", "main.ez" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_TRUE(options.enableRtti);
+    }
+
+    // 2. Explicit --no-rtti -> disabled
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "--no-rtti" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_FALSE(options.enableRtti);
+    }
+
+    // 3. -fno-rtti alias -> disabled
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "-fno-rtti" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_FALSE(options.enableRtti);
+    }
+
+    // 4. Explicit --rtti -> enabled
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "--rtti" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_TRUE(options.enableRtti);
+    }
+
+    // 5. Conflicting flags -> error
+    {
+        std::vector<std::string> args = { "ezc", "main.ez", "--rtti", "--no-rtti" };
+        EXPECT_FALSE(parser.parse(args, options, err));
+        EXPECT_NE(err.find("conflicting RTTI flags"), std::string::npos);
+    }
+}
+
+// Verifies EzCore::RttiTypeDescriptor layout, hashing, and isA() subtyping checks
+TEST_F(EzCompilerTestSuite, TestRttiDescriptorHierarchy)
+{
+    using namespace EzCore;
+
+    // Base exception: Exception
+    RttiTypeDescriptor baseDesc{
+        .typeId = computeTypeId("Exception"),
+        .typeName = "Exception",
+        .numBases = 0,
+        .bases = nullptr,
+        .declarationSite = {
+            .filePath = "std/exception.ez",
+            .functionName = "",
+            .line = 10,
+            .column = 1,
+            .snippet = "class Exception;"
+        }
+    };
+
+    const RttiTypeDescriptor *ioBaseArray[] = { &baseDesc };
+
+    // Derived exception: IOException extends Exception
+    RttiTypeDescriptor ioDesc{
+        .typeId = computeTypeId("IOException"),
+        .typeName = "IOException",
+        .numBases = 1,
+        .bases = ioBaseArray,
+        .declarationSite = {
+            .filePath = "std/io.ez",
+            .functionName = "",
+            .line = 42,
+            .column = 5,
+            .snippet = "class IOException : Exception;"
+        }
+    };
+
+    const RttiTypeDescriptor *fnfBaseArray[] = { &ioDesc };
+
+    // Sub-derived: FileNotFoundException extends IOException
+    RttiTypeDescriptor fnfDesc{
+        .typeId = computeTypeId("FileNotFoundException"),
+        .typeName = "FileNotFoundException",
+        .numBases = 1,
+        .bases = fnfBaseArray,
+        .declarationSite = {
+            .filePath = "std/fs.ez",
+            .functionName = "",
+            .line = 105,
+            .column = 5,
+            .snippet = "class FileNotFoundException : IOException;"
+        }
+    };
+
+    // Subtyping checks
+    EXPECT_TRUE(baseDesc.isA(&baseDesc));
+    EXPECT_TRUE(ioDesc.isA(&baseDesc));
+    EXPECT_TRUE(fnfDesc.isA(&baseDesc));
+    EXPECT_TRUE(fnfDesc.isA(&ioDesc));
+    EXPECT_FALSE(baseDesc.isA(&ioDesc));
+    EXPECT_FALSE(ioDesc.isA(&fnfDesc));
+
+    // Throw site payload
+    RichExceptionPayload payload{
+        .payload = nullptr,
+        .rtti = &fnfDesc,
+        .throwSite = {
+            .filePath = "main.ez",
+            .functionName = "openFile",
+            .line = 77,
+            .column = 12,
+            .snippet = "throw new FileNotFoundException(\"data.bin\");"
+        }
+    };
+
+    EXPECT_EQ(payload.rtti->typeName, "FileNotFoundException");
+    EXPECT_TRUE(payload.rtti->isA(&baseDesc));
+    EXPECT_EQ(payload.throwSite.functionName, "openFile");
+    EXPECT_EQ(payload.throwSite.line, 77);
+}
+
+TEST_F(EzCompilerTestSuite, TestDefaultExceptionConstants)
+{
+    using namespace EzCore;
+    EXPECT_EQ(kDefaultExceptionTypeName, "EzDefaultException");
+    EXPECT_EQ(kDefaultExceptionTypeId, computeTypeId("EzDefaultException"));
+    EXPECT_NE(kDefaultExceptionTypeId, 0u);
+}
+
 
