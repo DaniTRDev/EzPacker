@@ -1340,6 +1340,74 @@ target_inst CVTTSD2SI(GPR64:dst OUT, FPR64:src IN) {
     };
 };
 
+target_inst CVTSI2SS64(FPR32:dst OUT, GPR64:src IN) {
+    MNEMONIC("cvtsi2ssq");
+    ENCODING {
+        form: cvt;
+        prefixes: F3;
+        opcode: [0x0F, 0x2A];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: src;
+    };
+};
+
+target_inst CVTSI2SD32(FPR64:dst OUT, GPR32:src IN) {
+    MNEMONIC("cvtsi2sdl");
+    ENCODING {
+        form: cvt;
+        prefixes: F2;
+        opcode: [0x0F, 0x2A];
+        operands { dst => reg; src => rm_reg; };
+        size: src;
+    };
+};
+
+target_inst CVTTSS2SI64(GPR64:dst OUT, FPR32:src IN) {
+    MNEMONIC("cvttss2siq");
+    ENCODING {
+        form: cvt;
+        prefixes: F3;
+        opcode: [0x0F, 0x2C];
+        rex_w: true;
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst CVTTSD2SI32(GPR32:dst OUT, FPR64:src IN) {
+    MNEMONIC("cvttsd2sil");
+    ENCODING {
+        form: cvt;
+        prefixes: F2;
+        opcode: [0x0F, 0x2C];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst CVTSS2SD(FPR64:dst OUT, FPR32:src IN) {
+    MNEMONIC("cvtss2sd");
+    ENCODING {
+        form: sse;
+        prefixes: F3;
+        opcode: [0x0F, 0x5A];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst CVTSD2SS(FPR32:dst OUT, FPR64:src IN) {
+    MNEMONIC("cvtsd2ss");
+    ENCODING {
+        form: sse;
+        prefixes: F2;
+        opcode: [0x0F, 0x5A];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
 // ============================================================================
 // SSE / VECTOR INSTRUCTIONS
 // ============================================================================

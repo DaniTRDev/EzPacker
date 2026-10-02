@@ -293,6 +293,126 @@ pattern Select_FDIV64rr [cost = 1] {
     };
 };
 
+pattern Select_SITOFP32to32 [cost = 1] {
+    match {
+        SITOFP f32:$dst, i32:$src;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        CVTSI2SS FPR32:$dst, GPR32:$src;
+    };
+};
+
+pattern Select_SITOFP64to32 [cost = 1] {
+    match {
+        SITOFP f32:$dst, i64:$src;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        CVTSI2SS64 FPR32:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_SITOFP32to64 [cost = 1] {
+    match {
+        SITOFP f64:$dst, i32:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        CVTSI2SD32 FPR64:$dst, GPR32:$src;
+    };
+};
+
+pattern Select_SITOFP64to64 [cost = 1] {
+    match {
+        SITOFP f64:$dst, i64:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        CVTSI2SD FPR64:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_FPTOSI32to32 [cost = 1] {
+    match {
+        FPTOSI i32:$dst, f32:$src;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        CVTTSS2SI GPR32:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_FPTOSI32to64 [cost = 1] {
+    match {
+        FPTOSI i64:$dst, f32:$src;
+    };
+    when {
+        hasExtension("sse");
+    };
+    select {
+        CVTTSS2SI64 GPR64:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_FPTOSI64to32 [cost = 1] {
+    match {
+        FPTOSI i32:$dst, f64:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        CVTTSD2SI32 GPR32:$dst, FPR64:$src;
+    };
+};
+
+pattern Select_FPTOSI64to64 [cost = 1] {
+    match {
+        FPTOSI i64:$dst, f64:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        CVTTSD2SI GPR64:$dst, FPR64:$src;
+    };
+};
+
+pattern Select_FPEXT [cost = 1] {
+    match {
+        FPEXT f64:$dst, f32:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        CVTSS2SD FPR64:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_FPTRUNC [cost = 1] {
+    match {
+        FPTRUNC f32:$dst, f64:$src;
+    };
+    when {
+        hasExtension("sse2");
+    };
+    select {
+        CVTSD2SS FPR32:$dst, FPR64:$src;
+    };
+};
+
 // ============================================================================
 // Data Movement Patterns
 // ============================================================================
