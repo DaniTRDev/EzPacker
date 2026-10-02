@@ -98,10 +98,15 @@ int64_t sub1(int64_t val);     // Returns val - 1 (used for power-of-two minus o
 ```
 
 #### Exception Lowering Details
-- `AMD64ThrowLowering`: Lowers high-level `THROW(payload)` instructions into a runtime libcall to `__ez_throw(payload)`.
+- `AMD64ThrowLowering`: Lowers high-level `THROW` instructions into a runtime libcall to `__ez_throw`:
+  - 1 operand (`THROW %payload`): Automatically appends `@__ez_default_rtti`, lowering to `CALL @__ez_throw, %payload, @__ez_default_rtti` so that the second argument register (`rsi` in SysV, `rdx` in Win64) is always initialized with valid canonical RTTI.
+  - 2 operands (`THROW %payload, @CustomRtti`): Preserves custom RTTI and lowers to `CALL @__ez_throw, %payload, @CustomRtti`.
+  - 0 operands (`THROW`): Synthesizes default arguments, lowering to `CALL @__ez_throw, @__ez_default_payload, @__ez_default_rtti`.
 - `AMD64CatchLowering`: Lowers high-level `CATCH(dst)` instructions into a runtime libcall to `__ez_get_current_exception()`, binding the caught payload to the destination register.
 - `X86_64TargetInstructionSelector::selectTRY`: Emits an unconditional jump to the try body basic block, integrating with the SjLj exception landing pad structure.
 - `X86_64TargetInstructionSelector::selectCALL`: Automatically resolves `MirRuntimeSymbol` operands into `MirReference` objects and external declarations, generating standard branch relocations (`IMAGE_REL_AMD64_REL32` / `R_X86_64_PLT32`) for all runtime symbols.
+- `X86_64TargetInstructionSelector::selectMOV`: Supports loading addresses of functions, global variables, and `MirRuntimeSymbol` instances into registers via `LEA64r %dst, @ref`, generating PC-relative data relocations (`PCRel32`).
+
 
 
 ---

@@ -11,6 +11,8 @@
 #include "Legalizer/MirLegalizer.h"
 #include "Legalizer/MirLegalizerPass.h"
 #include "Operand/MirOperandBuilder.h"
+#include "X86_64Lowering.h"
+
 
 /**
  * Fixture for MIR legalization actions, signature legalization, and the legalizer pass.
@@ -813,79 +815,171 @@ TEST_F(MirLegalizerTest, TestCompilerRtBitwiseLegalization)
     EXPECT_TRUE(foundCall);
 }
 
-// Verifies that THROW and CATCH instructions are lowered into runtime exception libcalls.
+// Verifies that THROW and CATCH instructions are lowered into runtime exception libcalls with RTTI.
 TEST_F(MirLegalizerTest, TestCompilerRtExceptionLowering)
 {
     auto *ctx = getBuilderCtx();
     auto *typeTable = ctx->getTypeTable();
 
-    auto *func = createTestFunction("exception_lowering_test", typeTable->_void());
-    auto *block = func->getEntryPoint();
-
-    MirInstructionBuilder ib(ctx, block, InsertionType::Append);
-    MirOperandBuilder ob(ctx);
-
-    // 1. Test THROW lowering to __ez_throw
-    auto *payload = ob.buildVReg(typeTable->i64(), "payload");
-    ib.THROW(payload);
-
-    auto throwIt = block->getInstructions().begin();
-    LegalizeCtx throwLegCtx(ctx, getTargetDesc(), throwIt);
-    auto throwRes = LegalizeActions::LegalizeLibcall(throwLegCtx, "__ez_throw");
-    EXPECT_EQ(throwRes, LegalizationResult::Legalized);
-
-    bool foundThrowCall = false;
-    for (MirInstruction *inst : block->getInstructions())
+    // 1. Test 1-operand THROW lowering to __ez_throw with attached default RTTI
     {
-        if (inst->getOpCode() == MirInstructionOpCode::CALL)
+        auto *func = createTestFunction("exception_throw_default_rtti", typeTable->_void());
+        auto *block = func->getEntryPoint();
+
+        MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+        MirOperandBuilder ob(ctx);
+
+        auto *payload = ob.buildVReg(typeTable->i64(), "payload");
+        ib.THROW(payload);
+
+        auto throwIt = block->getInstructions().begin();
+        LegalizeCtx throwLegCtx(ctx, getTargetDesc(), throwIt);
+        auto throwRes = AMD64ThrowLowering(throwLegCtx);
+        EXPECT_EQ(throwRes, LegalizationResult::Legalized);
+
+        // Verify that PUSH_ARG was emitted for payload and default RTTI symbol
+        bool foundDefaultRttiPush = false;
+        bool foundPayloadPush = false;
+        bool foundThrowCall = false;
+
+        for (MirInstruction *inst : block->getInstructions())
         {
-            foundThrowCall = true;
-            ASSERT_GE(inst->getOperandCount(), 1);
-            // Non-destination call has callee at operand 0 (or operand 1 if binding token present)
-            MirOperand *calleeOp = nullptr;
-            for (size_t i = 0; i < inst->getOperandCount(); ++i)
+            if (inst->getOpCode() == MirInstructionOpCode::PUSH_ARG)
             {
-                if (inst->getOperand(i)->getType() == MirOperandType::RuntimeSymbol)
+                ASSERT_GE(inst->getOperandCount(), 2);
+                if (inst->getOperand(1)->getType() == MirOperandType::RuntimeSymbol)
                 {
-                    calleeOp = inst->getOperand(i);
-                    break;
+                    auto *rtSym = static_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+                    if (rtSym->getSymbolName() == "__ez_default_rtti")
+                    {
+                        foundDefaultRttiPush = true;
+                    }
+                }
+                else if (inst->getOperand(1) == payload)
+                {
+                    foundPayloadPush = true;
                 }
             }
-            ASSERT_NE(calleeOp, nullptr);
-            auto *rtSym = static_cast<MirRuntimeSymbol *>(calleeOp);
-            EXPECT_EQ(rtSym->getSymbolName(), "__ez_throw");
-        }
-    }
-    EXPECT_TRUE(foundThrowCall);
-
-    // 2. Test CATCH lowering to __ez_get_current_exception
-    auto *dst = ob.buildVReg(typeTable->i64(), "caught");
-    ib.CATCH(dst);
-
-    auto catchIt = --block->getInstructions().end();
-    LegalizeCtx catchLegCtx(ctx, getTargetDesc(), catchIt);
-    auto catchRes = LegalizeActions::LegalizeLibcall(catchLegCtx, "__ez_get_current_exception");
-    EXPECT_EQ(catchRes, LegalizationResult::Legalized);
-
-    bool foundCatchCall = false;
-    for (MirInstruction *inst : block->getInstructions())
-    {
-        if (inst->getOpCode() == MirInstructionOpCode::CALL)
-        {
-            for (size_t i = 0; i < inst->getOperandCount(); ++i)
+            else if (inst->getOpCode() == MirInstructionOpCode::CALL)
             {
-                if (inst->getOperand(i)->getType() == MirOperandType::RuntimeSymbol)
+                foundThrowCall = true;
+            }
+        }
+        EXPECT_TRUE(foundPayloadPush);
+        EXPECT_TRUE(foundDefaultRttiPush);
+        EXPECT_TRUE(foundThrowCall);
+    }
+
+    // 2. Test 2-operand THROW lowering preserving custom RTTI symbol
+    {
+        auto *func = createTestFunction("exception_throw_custom_rtti", typeTable->_void());
+        auto *block = func->getEntryPoint();
+
+        MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+        MirOperandBuilder ob(ctx);
+
+        auto *payload = ob.buildVReg(typeTable->i64(), "payload");
+        std::pmr::string customRttiSym("CustomErrorDescriptor", ctx->getGlobalAllocator());
+        auto *customRtti = ob.buildRtSymbol(customRttiSym);
+        ib.build(MirInstructionOpCode::THROW, nullptr, { payload, customRtti });
+
+        auto throwIt = block->getInstructions().begin();
+        LegalizeCtx throwLegCtx(ctx, getTargetDesc(), throwIt);
+        auto throwRes = AMD64ThrowLowering(throwLegCtx);
+        EXPECT_EQ(throwRes, LegalizationResult::Legalized);
+
+        bool foundCustomRttiPush = false;
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            if (inst->getOpCode() == MirInstructionOpCode::PUSH_ARG)
+            {
+                if (inst->getOperand(1)->getType() == MirOperandType::RuntimeSymbol)
                 {
-                    auto *rtSym = static_cast<MirRuntimeSymbol *>(inst->getOperand(i));
-                    if (rtSym->getSymbolName() == "__ez_get_current_exception")
+                    auto *rtSym = static_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+                    if (rtSym->getSymbolName() == "CustomErrorDescriptor")
                     {
-                        foundCatchCall = true;
-                        break;
+                        foundCustomRttiPush = true;
                     }
                 }
             }
         }
+        EXPECT_TRUE(foundCustomRttiPush);
     }
-    EXPECT_TRUE(foundCatchCall);
+
+    // 3. Test 0-operand THROW lowering with default payload and default RTTI
+    {
+        auto *func = createTestFunction("exception_throw_empty", typeTable->_void());
+        auto *block = func->getEntryPoint();
+
+        MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+        ib.build(MirInstructionOpCode::THROW, nullptr, {});
+
+        auto throwIt = block->getInstructions().begin();
+        LegalizeCtx throwLegCtx(ctx, getTargetDesc(), throwIt);
+        auto throwRes = AMD64ThrowLowering(throwLegCtx);
+        EXPECT_EQ(throwRes, LegalizationResult::Legalized);
+
+        bool foundDefaultPayloadPush = false;
+        bool foundDefaultRttiPush = false;
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            if (inst->getOpCode() == MirInstructionOpCode::PUSH_ARG)
+            {
+                if (inst->getOperand(1)->getType() == MirOperandType::RuntimeSymbol)
+                {
+                    auto *rtSym = static_cast<MirRuntimeSymbol *>(inst->getOperand(1));
+                    if (rtSym->getSymbolName() == "__ez_default_payload")
+                    {
+                        foundDefaultPayloadPush = true;
+                    }
+                    else if (rtSym->getSymbolName() == "__ez_default_rtti")
+                    {
+                        foundDefaultRttiPush = true;
+                    }
+                }
+            }
+        }
+        EXPECT_TRUE(foundDefaultPayloadPush);
+        EXPECT_TRUE(foundDefaultRttiPush);
+    }
+
+    // 4. Test CATCH lowering to __ez_get_current_exception
+    {
+        auto *func = createTestFunction("exception_catch_test", typeTable->_void());
+        auto *block = func->getEntryPoint();
+
+        MirInstructionBuilder ib(ctx, block, InsertionType::Append);
+        MirOperandBuilder ob(ctx);
+
+        auto *dst = ob.buildVReg(typeTable->i64(), "caught");
+        ib.CATCH(dst);
+
+        auto catchIt = block->getInstructions().begin();
+        LegalizeCtx catchLegCtx(ctx, getTargetDesc(), catchIt);
+        auto catchRes = LegalizeActions::LegalizeLibcall(catchLegCtx, "__ez_get_current_exception");
+        EXPECT_EQ(catchRes, LegalizationResult::Legalized);
+
+        bool foundCatchCall = false;
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            if (inst->getOpCode() == MirInstructionOpCode::CALL)
+            {
+                for (size_t i = 0; i < inst->getOperandCount(); ++i)
+                {
+                    if (inst->getOperand(i)->getType() == MirOperandType::RuntimeSymbol)
+                    {
+                        auto *rtSym = static_cast<MirRuntimeSymbol *>(inst->getOperand(i));
+                        if (rtSym->getSymbolName() == "__ez_get_current_exception")
+                        {
+                            foundCatchCall = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        EXPECT_TRUE(foundCatchCall);
+    }
 }
+
 

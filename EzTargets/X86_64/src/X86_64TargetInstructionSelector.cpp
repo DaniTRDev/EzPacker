@@ -996,11 +996,11 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
 
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
 
-    // 1. Address-of global variable or stack slot: MOV %dst, @ref -> LEA64r %dst, @ref
+    // 1. Address-of global variable, function, or stack slot: MOV %dst, @ref -> LEA64r %dst, @ref
     if (src->getType() == MirOperandType::Reference)
     {
         auto *ref = src->get<MirReference>();
-        if (ref && (ref->isGlobalVar() || ref->isStackFrameObject()))
+        if (ref && (ref->isGlobalVar() || ref->isStackFrameObject() || ref->isFunction()))
         {
             if (auto *r = dst->get<MirRegister>())
             {
@@ -1015,9 +1015,43 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
             return true;
         }
     }
+    else if (src->getType() == MirOperandType::RuntimeSymbol)
+    {
+        auto *rtSym = static_cast<MirRuntimeSymbol *>(src);
+        std::string_view symName = rtSym->getSymbolName();
+        MirFunction *fn = nullptr;
+        for (MirFunction *f : ctx->getFunctions())
+        {
+            if (f->getName() == symName)
+            {
+                fn = f;
+                break;
+            }
+        }
+        if (!fn)
+        {
+            MirFunctionBuilder fb(ctx);
+            fn = fb.declare(ctx->getTypeTable()->_void(), std::initializer_list<MirType*>{}, symName, MirLinkage::External);
+        }
+        MirOperandBuilder ob(ctx);
+        MirOperand *ref = ob.buildRef(fn);
+
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass("GPR64"));
+        }
+        ib.buildTarget(
+                x86_64TargetInst::getTargetDesc(x86_64TargetInst::LEA64r),
+                inst->getSourceRef(),
+                { dst, ref });
+        inst->eraseFromOwner();
+        return true;
+    }
 
     // 2. Floating point register moves: MOVSSrr / MOVSDrr
     bool isFloat = (dst->getMirType() && dst->getMirType()->getKind() == MirTypeKind::FloatingPoint);
+
     if (isFloat)
     {
         bool isDouble = (dst->getMirType()->getTotalSizeInBits() == 64);

@@ -193,13 +193,14 @@ bool X86_64CodeEmitter::buildResolvedOperands(const EncodingDesc &enc,
                     mem.m_base = FramePointerEncoding;
                     mem.m_disp = offset;
                 }
-                else if (ref->isGlobalVar())
+                else if (ref->isGlobalVar() || ref->isFunction())
                 {
-                    // Globals are addressed RIP-relative, with the fixup recorded as a relocation.
+                    // Globals and functions addressed via RIP-relative memory slots, with relocation.
                     mem.m_ripRel = true;
                     mem.m_needsReloc = true;
                     mem.m_disp = 0;
                 }
+
             }
         }
         return mem;

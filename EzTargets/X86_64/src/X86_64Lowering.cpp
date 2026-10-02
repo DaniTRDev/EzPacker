@@ -2,6 +2,8 @@
 #include "Legalizer/Actions/LegalizeCallAction.h"
 #include "Legalizer/Actions/LegalizeLibcallAction.h"
 #include "Legalizer/Actions/LegalizeReturnAction.h"
+#include "Operand/MirOperandBuilder.h"
+#include "Operand/MirOperands.h"
 #include <bit>
 #include <cstdint>
 
@@ -11,8 +13,45 @@ LegalizationResult AMD64CallLowering(LegalizeCtx &ctx) { return LegalizeActions:
 /// Entry point registered as the AMD64 RET/lower handler; dispatches to the shared return legalizer.
 LegalizationResult AMD64ReturnLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeReturn(ctx); }
 
-/// Entry point registered as the AMD64 THROW/lower handler; lowers to runtime __ez_throw call.
-LegalizationResult AMD64ThrowLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeLibcall(ctx, "__ez_throw"); }
+/// Entry point registered as the AMD64 THROW/lower handler; lowers to runtime __ez_throw call with guaranteed RTTI.
+LegalizationResult AMD64ThrowLowering(LegalizeCtx &ctx)
+{
+    if (!ctx.m_ctx)
+    {
+        return LegalizationResult::Failed;
+    }
+
+    MirInstruction *instr = *ctx.m_it;
+    if (!instr)
+    {
+        return LegalizationResult::NotModified;
+    }
+
+    MirOperandBuilder ob(ctx.m_ctx);
+    MirInstructionBuilder ib(ctx.m_ctx, instr->getOwner(), InsertionType::InsertBefore, ctx.m_it);
+
+    if (instr->getOperandCount() == 1)
+    {
+        // 1-operand THROW %payload: attach default RTTI runtime symbol
+        std::pmr::string rttiSym("__ez_default_rtti", ctx.m_ctx->getGlobalAllocator());
+        MirRuntimeSymbol *rttiOp = ob.buildRtSymbol(rttiSym);
+        ib.addOperand(instr, rttiOp);
+    }
+    else if (instr->getOperandCount() == 0)
+    {
+        // 0-operand THROW: attach default payload and default RTTI runtime symbols
+        std::pmr::string payloadSym("__ez_default_payload", ctx.m_ctx->getGlobalAllocator());
+        MirRuntimeSymbol *payloadOp = ob.buildRtSymbol(payloadSym);
+        std::pmr::string rttiSym("__ez_default_rtti", ctx.m_ctx->getGlobalAllocator());
+        MirRuntimeSymbol *rttiOp = ob.buildRtSymbol(rttiSym);
+        ib.addOperand(instr, payloadOp);
+        ib.addOperand(instr, rttiOp);
+    }
+
+
+    return LegalizeActions::LegalizeLibcall(ctx, "__ez_throw");
+}
+
 
 /// Entry point registered as the AMD64 CATCH/lower handler; lowers to runtime __ez_get_current_exception call.
 LegalizationResult AMD64CatchLowering(LegalizeCtx &ctx) { return LegalizeActions::LegalizeLibcall(ctx, "__ez_get_current_exception"); }
