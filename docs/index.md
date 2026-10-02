@@ -84,11 +84,12 @@ flowchart LR
 
 - **Pure C++20 Design**: Leverages concepts, `<format>`, ranges, and polymorphic memory resources (`std::pmr`) for memory efficiency and zero heap fragmentation during pass execution.
 - **Multi-Stage Optimization Pipeline**: Generic SSA peephole optimizer (`MirPeepholePass`), conservative copy/two-address register coalescing (George & Briggs criteria) with copy affinity coloring, redundant copy elimination, and post-frame machine peephole optimizer (`MirTargetPeepholePass`).
-- **Table-Driven 3-Tier Legalizer**: Dense primary matrix indexed by opcode and compact type provides $O(1)$ legality dispatch, combined with multi-slot signature matchers and declarative strength reduction rules.
-- **Bottom-Up Maximal Munch Instruction Selection**: Tree-matching pattern matching that automatically synthesizes SIB addressing modes and performs opportunistic memory load-folding (`ADD64rm`).
-- **Production Chaitin-Briggs Graph-Coloring Register Allocator**: Full interference graph construction, loop-depth spill cost estimation, optimistic simplification, register spilling, and conservative coalescing.
+- **Table-Driven 3-Tier Legalizer & Libcalls**: Dense primary matrix indexed by opcode and compact type provides $O(1)$ legality dispatch, combined with multi-slot signature matchers, compiler-rt runtime libcall mappings (`__multi3`, `__divti3`), and declarative algebraic strength reduction rules.
+- **Bottom-Up Maximal Munch Instruction Selection**: Tree-matching pattern matching that automatically synthesizes SIB addressing modes, performs opportunistic memory load-folding (`ADD64rm`), and prioritizes AVX over SSE via cost-ordered matching.
+- **Production Chaitin-Briggs Graph-Coloring Register Allocator**: Full interference graph construction, loop-depth spill cost estimation, optimistic simplification, register spilling, and conservative coalescing across GPR and FPR/VR256 banks.
 - **Dual Calling Convention & Binary Format Support**: Built-in support for both **System V AMD64** (Linux/macOS) and **Microsoft Win64** (Windows) calling conventions, with native emitters for **ELF64** (`.o`) and **PE/COFF** (`.obj`).
-- **Complete Vector Extension Support**: Implication-aware CPU feature tracking supporting SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, and AVX2.
+- **Complete Vector Extension & VEX Support**: Implication-aware CPU feature tracking supporting SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, and AVX2 with dedicated 256-bit `VR256` YMM registers and table-driven 2-byte (`0xC5`) / 3-byte (`0xC4`) VEX prefix encoding.
+- **Modular Target Architecture**: `EzTargets` organized into clean architectural subsystems (`InstructionSelector`, `FrameLowerer`, `RegisterAllocator`, `Lowering`, `Descriptors`, `Relocation`, `CodeEmitter`, `BranchRelaxation`, `Encoding`) eliminating legacy fallback code.
 
 ---
 
@@ -111,7 +112,7 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzCodeEmitter`** | Binary code emission: section management, relocations, `Elf64Writer` (ELF64), and `CoffWriter` (PE/COFF). | [EzCodeEmitter Guide](projects/EzCodeEmitter.md) |
 | **`EzTriple`** | Target-independent backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer. | [EzTriple Guide](projects/EzTriple.md) |
 | **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine (`ezc`). | [EzCompiler Guide](projects/EzCompiler.md) |
-| **`EzTargets`** | Architecture backends: self-contained x86-64 target (synthesized `X86_64TargetDesc`, `X86_64FrameLowerer`, `X86_64InstructionEncoder`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
+| **`EzTargets`** | Architecture backends: modular x86-64 target (synthesized `X86_64TargetDesc`, `VR256` registers, VEX prefix encoder, compiler-rt libcalls, `X86_64FrameLowerer`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
 | **`EzLinker`** | System linker driver and exception runtime: automated toolchain detection (`lld`, `link.exe`), C stdlib / compiler-rt injection, and SjLj exception runtime (`ez-ld`). | [EzLinker Guide](projects/EzLinker.md) |
 
 ### 🔍 Complete API Reference
