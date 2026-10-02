@@ -102,8 +102,31 @@ target X86_64 {
     }
 
     libcalls {
-        __divti3:  "__divti3";
-        __udivti3: "__udivti3"
+        __divti3:      "__divti3";
+        __udivti3:     "__udivti3";
+        __modti3:      "__modti3";
+        __umodti3:     "__umodti3";
+        __multi3:      "__multi3";
+        __ashlti3:     "__ashlti3";
+        __lshrti3:     "__lshrti3";
+        __ashrti3:     "__ashrti3";
+        __popcountsi2: "__popcountsi2";
+        __popcountdi2: "__popcountdi2";
+        __popcountti2: "__popcountti2";
+        __clzsi2:      "__clzsi2";
+        __clzdi2:      "__clzdi2";
+        __clzti2:      "__clzti2";
+        __ctzsi2:      "__ctzsi2";
+        __ctzdi2:      "__ctzdi2";
+        __ctzti2:      "__ctzti2";
+        __paritysi2:   "__paritysi2";
+        __paritydi2:   "__paritydi2";
+        __parityti2:   "__parityti2";
+        memcpy:        "memcpy";
+        memmove:       "memmove";
+        memset:        "memset";
+        memcmp:        "memcmp";
+        bzero:         "bzero"
     }
 
     components {

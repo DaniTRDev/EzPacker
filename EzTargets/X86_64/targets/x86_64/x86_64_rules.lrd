@@ -119,3 +119,189 @@ rule SubZero_64 {
         MOV i64:$dst, i64:$lhs;
     };
 };
+
+// ============================================================================
+// Identity Arithmetic & Bitwise Simplifications
+// ============================================================================
+
+rule MulOne_32 {
+    match {
+        MUL i32:$dst, i32:$lhs, 1;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule MulOne_64 {
+    match {
+        MUL i64:$dst, i64:$lhs, 1;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
+
+rule IMulOne_32 {
+    match {
+        IMUL i32:$dst, i32:$lhs, 1;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule IMulOne_64 {
+    match {
+        IMUL i64:$dst, i64:$lhs, 1;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
+
+// ============================================================================
+// Power-of-2 Multiplication Strength Reductions
+// ============================================================================
+
+rule MulPow2_32 {
+    match {
+        MUL i32:$dst, i32:$lhs, imm(i32):$c;
+    };
+    when {
+        isPowTwo($c);
+        isPositiveConst($c);
+    };
+    emit {
+        SHL i32:$dst, i32:$lhs, log2Pow2($c);
+    };
+};
+
+rule MulPow2_64 {
+    match {
+        MUL i64:$dst, i64:$lhs, imm(i64):$c;
+    };
+    when {
+        isPowTwo($c);
+        isPositiveConst($c);
+    };
+    emit {
+        SHL i64:$dst, i64:$lhs, log2Pow2($c);
+    };
+};
+
+rule IMulPow2_32 {
+    match {
+        IMUL i32:$dst, i32:$lhs, imm(i32):$c;
+    };
+    when {
+        isPowTwo($c);
+        isPositiveConst($c);
+    };
+    emit {
+        SHL i32:$dst, i32:$lhs, log2Pow2($c);
+    };
+};
+
+rule IMulPow2_64 {
+    match {
+        IMUL i64:$dst, i64:$lhs, imm(i64):$c;
+    };
+    when {
+        isPowTwo($c);
+        isPositiveConst($c);
+    };
+    emit {
+        SHL i64:$dst, i64:$lhs, log2Pow2($c);
+    };
+};
+
+rule OrZero_32 {
+    match {
+        OR i32:$dst, i32:$lhs, 0;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule OrZero_64 {
+    match {
+        OR i64:$dst, i64:$lhs, 0;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
+
+rule XorZero_32 {
+    match {
+        XOR i32:$dst, i32:$lhs, 0;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule XorZero_64 {
+    match {
+        XOR i64:$dst, i64:$lhs, 0;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
+
+rule ShlZero_32 {
+    match {
+        SHL i32:$dst, i32:$lhs, 0;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule ShlZero_64 {
+    match {
+        SHL i64:$dst, i64:$lhs, 0;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
+
+rule ShrZero_32 {
+    match {
+        SHR i32:$dst, i32:$lhs, 0;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule ShrZero_64 {
+    match {
+        SHR i64:$dst, i64:$lhs, 0;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
+
+rule SarZero_32 {
+    match {
+        SAR i32:$dst, i32:$lhs, 0;
+    };
+    emit {
+        MOV i32:$dst, i32:$lhs;
+    };
+};
+
+rule SarZero_64 {
+    match {
+        SAR i64:$dst, i64:$lhs, 0;
+    };
+    emit {
+        MOV i64:$dst, i64:$lhs;
+    };
+};
