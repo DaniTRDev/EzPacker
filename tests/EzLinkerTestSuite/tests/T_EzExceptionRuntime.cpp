@@ -165,3 +165,98 @@ TEST_F(EzLinkerTestSuite, TestMultiCatch)
     __ez_try_leave(&frame);
     EXPECT_EQ(matchedBranch, 2);
 }
+
+TEST_F(EzLinkerTestSuite, TestThrowWithoutRttiAttachesDefault)
+{
+    int dummyPayload = 777;
+    bool caught = false;
+
+    EzExceptionFrame frame{};
+    __ez_try_enter(&frame);
+
+    if (setjmp(frame.jmpBuf) == 0)
+    {
+        // Throw with NULL rtti
+        __ez_throw(&dummyPayload, nullptr);
+        FAIL() << "Execution should not reach after __ez_throw";
+    }
+    else
+    {
+        void *payload = __ez_get_current_exception();
+        const void *rtti = __ez_get_current_rtti();
+
+        EXPECT_EQ(payload, &dummyPayload);
+        ASSERT_NE(rtti, nullptr);
+        EXPECT_EQ(rtti, __ez_get_default_rtti());
+        EXPECT_STREQ(__ez_get_rtti_type_name(rtti), "EzDefaultException");
+        EXPECT_EQ(__ez_get_rtti_type_id(rtti), EzCore::kDefaultExceptionTypeId);
+        caught = true;
+    }
+
+    __ez_try_leave(&frame);
+    EXPECT_TRUE(caught);
+    EXPECT_EQ(__ez_get_top_frame(), nullptr);
+}
+
+TEST_F(EzLinkerTestSuite, TestThrowNullPayloadUsesDefaultPayload)
+{
+    bool caught = false;
+
+    EzExceptionFrame frame{};
+    __ez_try_enter(&frame);
+
+    if (setjmp(frame.jmpBuf) == 0)
+    {
+        // Throw with NULL payload and NULL rtti
+        __ez_throw(nullptr, nullptr);
+        FAIL() << "Execution should not reach after __ez_throw";
+    }
+    else
+    {
+        void *payload = __ez_get_current_exception();
+        const void *rtti = __ez_get_current_rtti();
+
+        ASSERT_NE(payload, nullptr);
+        EXPECT_EQ(payload, __ez_get_default_payload());
+        ASSERT_NE(rtti, nullptr);
+        EXPECT_EQ(rtti, __ez_get_default_rtti());
+        EXPECT_STREQ(__ez_get_rtti_type_name(rtti), "EzDefaultException");
+        caught = true;
+    }
+
+    __ez_try_leave(&frame);
+    EXPECT_TRUE(caught);
+    EXPECT_EQ(__ez_get_top_frame(), nullptr);
+}
+
+TEST_F(EzLinkerTestSuite, TestRttiAccessors)
+{
+    EXPECT_STREQ(__ez_get_rtti_type_name(nullptr), "");
+    EXPECT_EQ(__ez_get_rtti_type_id(nullptr), 0u);
+
+    EzCore::RttiTypeDescriptor customDesc{
+        .typeId = EzCore::computeTypeId("MyCustomException"),
+        .typeName = "MyCustomException"
+    };
+
+    EXPECT_STREQ(__ez_get_rtti_type_name(&customDesc), "MyCustomException");
+    EXPECT_EQ(__ez_get_rtti_type_id(&customDesc), EzCore::computeTypeId("MyCustomException"));
+
+    const void *defaultRtti = __ez_get_default_rtti();
+    EXPECT_STREQ(__ez_get_rtti_type_name(defaultRtti), "EzDefaultException");
+    EXPECT_EQ(__ez_get_rtti_type_id(defaultRtti), EzCore::kDefaultExceptionTypeId);
+}
+
+TEST_F(EzLinkerTestSuite, TestCatchMatchesDefaultRtti)
+{
+    const void *defaultRtti = __ez_get_default_rtti();
+    EXPECT_EQ(__ez_catch_matches(defaultRtti, defaultRtti), 1);
+    EXPECT_EQ(__ez_catch_matches(defaultRtti, nullptr), 1); // catch-all
+
+    EzCore::RttiTypeDescriptor otherFilter{
+        .typeId = EzCore::computeTypeId("SomeOtherType"),
+        .typeName = "SomeOtherType"
+    };
+    EXPECT_EQ(__ez_catch_matches(defaultRtti, &otherFilter), 0);
+}
+

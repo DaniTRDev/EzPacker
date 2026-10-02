@@ -76,6 +76,26 @@ EZ_EX_API const void *__ez_get_current_rtti(void);
 EZ_EX_API struct EzExceptionFrame *__ez_get_top_frame(void);
 
 /**
+ * Retrieves the canonical default RTTI descriptor pointer for untyped exceptions.
+ */
+EZ_EX_API const void *__ez_get_default_rtti(void);
+
+/**
+ * Retrieves the canonical default exception payload pointer.
+ */
+EZ_EX_API const void *__ez_get_default_payload(void);
+
+/**
+ * Returns the null-terminated type name string of an RTTI descriptor, or "" if invalid.
+ */
+EZ_EX_API const char *__ez_get_rtti_type_name(const void *rtti);
+
+/**
+ * Returns the 64-bit unique type ID of an RTTI descriptor, or 0 if invalid.
+ */
+EZ_EX_API uint64_t __ez_get_rtti_type_id(const void *rtti);
+
+/**
  * Resets the thread-local exception state. Provided for unit testing and test isolation.
  */
 EZ_EX_API void __ez_runtime_reset_for_testing(void);
@@ -83,5 +103,6 @@ EZ_EX_API void __ez_runtime_reset_for_testing(void);
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif // EZEXCEPTION_RUNTIME_H

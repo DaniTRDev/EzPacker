@@ -80,6 +80,10 @@ inline constexpr uint64_t computeTypeId(std::string_view name)
     return hash;
 }
 
+inline constexpr std::string_view kDefaultExceptionTypeName = "EzDefaultException";
+inline constexpr uint64_t kDefaultExceptionTypeId = computeTypeId(kDefaultExceptionTypeName);
+
 } // namespace EzCore
 
 #endif // EZCORE_RTTI_DESCRIPTOR_H
+

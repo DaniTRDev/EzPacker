@@ -107,10 +107,18 @@ extern "C" {
     int __ez_catch_matches(const void *thrownRtti, const void *filterRtti);
     void *__ez_get_current_exception(void);
     const void *__ez_get_current_rtti(void);
+    const void *__ez_get_default_rtti(void);
+    const void *__ez_get_default_payload(void);
+    const char *__ez_get_rtti_type_name(const void *rtti);
+    uint64_t __ez_get_rtti_type_id(const void *rtti);
     struct EzExceptionFrame *__ez_get_top_frame(void);
 }
 ```
 
+- **Guaranteed RTTI Attachment & Default Fallback**:
+  - Whenever `__ez_throw(payload, rtti)` is invoked, an RTTI descriptor is guaranteed to be attached. If `rtti == NULL`, the runtime automatically attaches the canonical default RTTI descriptor `__ez_default_rtti` (`typeId = computeTypeId("EzDefaultException")`, `typeName = "EzDefaultException"`).
+  - If `payload == NULL`, the runtime provides the canonical default exception payload `__ez_default_payload` (`RichExceptionPayload`).
+  - Accessors `__ez_get_rtti_type_name(rtti)` and `__ez_get_rtti_type_id(rtti)` allow safe, C-compatible introspection without requiring C++ `std::string_view` layouts.
 - **Thread-Local Stack Unwinding**:
   - Each `TRY` block registers an `EzExceptionFrame` on the thread-local stack via `__ez_try_enter()`.
   - `__ez_throw()` saves payload and RTTI pointers, pops the active frame, and performs `longjmp()` back to the handler.
@@ -118,11 +126,13 @@ extern "C" {
 - **Multicatch & Catch-All Filtering**:
   - `__ez_catch_matches(thrownRtti, filterRtti)` evaluates type compatibility using `RttiTypeDescriptor::isA()`.
   - A `nullptr` filter acts as a catch-all (`catch (...)`).
+  - Thrown default exceptions match either catch-all filters or specific `__ez_default_rtti` filters.
 - **Uncaught Exception Reporting**:
   - If `__ez_throw()` is called with an empty exception stack, it formats a diagnostic to stderr including:
     - Thrown type name and definition site
     - Source coordinates (`file:line:col`, function name) and code snippet from `RichExceptionPayload`
     - Terminating safely via `std::abort()`
+
 
 ---
 
