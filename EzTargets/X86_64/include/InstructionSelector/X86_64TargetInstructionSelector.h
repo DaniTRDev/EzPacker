@@ -52,15 +52,6 @@ class X86_64TargetInstructionSelector : public x86_64InstructionSelector
     /// Lowers a PHI by inserting copies on the incoming edges of its block.
     bool selectPHI(MirBuilderContext *ctx, MirInstruction *inst);
 
-    /// Lowers scalar floating-point arithmetic into SSE/AVX target instructions.
-    bool selectFloatALU(MirBuilderContext *ctx, MirInstruction *inst);
-
-    /// Lowers vector arithmetic, logical, and horizontal operations into SSE/AVX target instructions.
-    bool selectVectorALU(MirBuilderContext *ctx, MirInstruction *inst);
-
-    /// Lowers floating-point conversions between integer and float types.
-    bool selectFloatCvt(MirBuilderContext *ctx, MirInstruction *inst);
-
     /// Lowers a register/immediate MOV using the generated instruction table.
     bool selectMOV(MirBuilderContext *ctx, MirInstruction *inst);
 

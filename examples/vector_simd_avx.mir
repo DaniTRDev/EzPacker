@@ -1,0 +1,43 @@
+// EzPacker Custom MIR Module: vector_simd_avx.mir
+// Demonstrates SIMD vector operations targeting x86-64 SSE and AVX/AVX2:
+// - 128-bit vector arithmetic (v4f32, v4i32) using VR128 registers (xmm0..xmm15)
+// - 256-bit vector arithmetic (v8f32, v8i32, v4f64) using VR256 registers (ymm0..ymm15)
+// - Non-destructive 3-operand instructions via table-driven VEX prefix encoding (0xC4/0xC5)
+
+fn @sse_vec4_add(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VADD v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @sse_vec4_fma_like(v4f32 %a, v4f32 %b, v4f32 %c) -> v4f32 {
+entry:
+    %prod = VMUL v4f32 %a, %b;
+    %sum = VADD v4f32 %prod, %c;
+    RET v4f32 %sum;
+}
+
+fn @avx_vec8_add(v8f32 %a, v8f32 %b) -> v8f32 {
+entry:
+    %res = VADD v8f32 %a, %b;
+    RET v8f32 %res;
+}
+
+fn @avx_vec8_fma_like(v8f32 %a, v8f32 %b, v8f32 %c) -> v8f32 {
+entry:
+    %prod = VMUL v8f32 %a, %b;
+    %sum = VADD v8f32 %prod, %c;
+    RET v8f32 %sum;
+}
+
+fn @avx_vec4_double_mul(v4f64 %a, v4f64 %b) -> v4f64 {
+entry:
+    %res = VMUL v4f64 %a, %b;
+    RET v4f64 %res;
+}
+
+fn @avx2_int_vec8_add(v8i32 %a, v8i32 %b) -> v8i32 {
+entry:
+    %res = VADD v8i32 %a, %b;
+    RET v8i32 %res;
+}

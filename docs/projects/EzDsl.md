@@ -203,6 +203,17 @@ target X86_64 {
         }
     }
 
+    register_bank FPR {
+        classes { FPR32: 32, FPR64: 64, VR128: 128, VR256: 256 }
+        sub_register { FPR64 <: FPR32, VR128 <: FPR64, VR256 <: VR128 }
+        registers {
+            xmm0  enc 0  names { ymm0:  VR256, xmm0:  VR128, xmm0_d:  FPR64, xmm0_s:  FPR32 }
+            xmm1  enc 1  names { ymm1:  VR256, xmm1:  VR128, xmm1_d:  FPR64, xmm1_s:  FPR32 }
+            // ... xmm2 .. xmm14 ...
+            xmm15 enc 15 names { ymm15: VR256, xmm15: VR128, xmm15_d: FPR64, xmm15_s: FPR32 }
+        }
+    }
+
     special {
         rip: 16
     }
@@ -211,6 +222,7 @@ target X86_64 {
         sse  { default: true;  description: "Streaming SIMD Extensions (SSE)"; };
         sse2 { default: true;  implies: [sse]; description: "Streaming SIMD Extensions 2 (SSE2)"; };
         avx  { default: false; implies: [sse2]; description: "Advanced Vector Extensions (AVX)"; };
+        avx2 { default: false; implies: [avx];  description: "Advanced Vector Extensions 2 (AVX2)"; };
     }
 }
 ```
@@ -252,27 +264,34 @@ calling_convention SysV_AMD64 {
 ```
 
 ### 4.5 Legalization Actions (`x86_64_legalize.lad`)
-Declares target legality matrices, widening, narrowing, and promotion actions:
+Declares target legality matrices, widening, narrowing, libcalls, and promotion actions:
 
 ```lad
 target AMD64;
 
 type_set GPR_SCALARS = (i8, i16, i32, i64);
+type_set VECTOR_128  = (v4f32, v2f64, v4i32, v2i64, v8i16, v16i8);
+type_set VECTOR_256  = (v8f32, v4f64, v8i32, v4i64);
 
 action MOV {
-    LEGAL(GPR_SCALARS, ptr, f32, f64);
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128, VECTOR_256);
     WIDENS(i1) >> i32;
 };
 
 action ADD {
-    LEGAL(GPR_SCALARS);
+    LEGAL(GPR_SCALARS, VECTOR_128, VECTOR_256);
     WIDENS(i1) >> i32;
     NARROWS(i128) >> i64;
 };
 
+action MUL {
+    LEGAL(GPR_SCALARS, VECTOR_128, VECTOR_256);
+    LIBCALL(i128); // Lowers to compiler-rt __multi3
+};
+
 action SDIV {
     LEGAL(i32, i64);
-    LIBCALL(i128);
+    LIBCALL(i128); // Lowers to compiler-rt __divti3
 };
 ```
 
@@ -312,6 +331,7 @@ Declares concrete machine instructions with mnemonics, operands, flags, and bina
 ```idf
 target AMD64;
 
+// Standard GPR instruction with REX prefix
 target_inst ADD64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
     MNEMONIC("addq");
     FLAGS(IsCommutative);
@@ -337,7 +357,26 @@ target_inst ADD64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
         size: dst;
     };
 };
+
+// AVX 256-bit Vector instruction with VEX prefix
+target_inst VADDPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vaddps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x58];
+        vex_l: true;   // 256-bit vector length (L=1)
+        vex_w: false;  // W=0
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
 ```
+
+- **`form: vex;`**: Selects the VEX prefix encoding engine supporting 2-byte (`0xC5`) and 3-byte (`0xC4`) prefixes.
+- **`vex_reg`**: Operand mapped to the inverted 4-bit `vvvv` field in the VEX byte sequence ($(\sim \text{reg}) \ \& \ 0\text{xF}$).
+- **`vex_l: true/false`**: Configures the vector length bit ($L=0$ for 128-bit, $L=1$ for 256-bit).
+- **`vex_w: true/false`**: Configures the 64-bit operand width bit $W$.
 
 ### 4.8 Instruction Selection Patterns (`x86_64_patterns.isf`)
 Defines tree-matching rewrite patterns and addressing modes for Bottom-Up Maximal Munch:
@@ -382,7 +421,23 @@ pattern Select_ADD64rr [cost = 1] {
         ADD64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
     };
 };
+
+// AVX 256-bit vector pattern
+pattern Select_VADDPS256rr [cost = 1] {
+    match {
+        ADD v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VADDPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
 ```
+
+> [!NOTE]
+> **Pattern Cost Ordering**: `CppInstructionSelectorGenerator` sorts pattern candidates for each IR opcode in descending order of cost (`a->m_cost > b->m_cost`). Higher-cost patterns are evaluated first. When prioritizing an AVX 128-bit instruction over a baseline SSE instruction with identical input shapes, the AVX pattern specifies `[cost = 2]` guarded by `when { hasExtension("avx"); }`, while the fallback SSE pattern uses `[cost = 1]`.
 
 ---
 

@@ -24,6 +24,13 @@ ABI_ATTR extern int64_t double_to_int64(double x);
 
 ABI_ATTR extern float mixed_args_add(int32_t a, float b, int32_t c, float d);
 
+ABI_ATTR extern double float_to_double(float x);
+ABI_ATTR extern float double_to_float(double x);
+ABI_ATTR extern float int64_to_float(int64_t x);
+ABI_ATTR extern double int32_to_double(int32_t x);
+ABI_ATTR extern int64_t float_to_int64(float x);
+ABI_ATTR extern int32_t double_to_int32(double x);
+
 int main(void) {
     printf("[E2E Test 07] Running floating-point tests...\n");
 
@@ -89,6 +96,25 @@ int main(void) {
 
     float mixed_res2 = mixed_args_add(-5, 0.5f, 15, -2.5f);
     assert(fabsf(mixed_res2 - 8.0f) < 1e-5f);
+
+    // 7. Float extension, truncation, and cross-size conversions (FPEXT, FPTRUNC, SITOFP, FPTOSI)
+    double d_ext = float_to_double(3.1415927f);
+    assert(fabs(d_ext - (double)3.1415927f) < 1e-6);
+
+    float f_trunc = double_to_float(2.718281828459);
+    assert(fabsf(f_trunc - 2.7182817f) < 1e-5f);
+
+    float f_from_i64 = int64_to_float(1000000LL);
+    assert(fabsf(f_from_i64 - 1000000.0f) < 1e-3f);
+
+    double d_from_i32 = int32_to_double(-987654);
+    assert(fabs(d_from_i32 - (-987654.0)) < 1e-9);
+
+    int64_t i64_from_f = float_to_int64(987654.25f);
+    assert(i64_from_f == 987654LL);
+
+    int32_t i32_from_d = double_to_int32(-54321.999);
+    assert(i32_from_d == -54321);
 
     printf("[E2E Test 07] PASS: All floating-point tests succeeded.\n");
     return 0;

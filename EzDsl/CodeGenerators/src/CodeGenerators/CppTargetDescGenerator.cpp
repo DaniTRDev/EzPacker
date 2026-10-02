@@ -225,6 +225,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("MirInstructionSelector *getInstructionSelector() override;");
             emitter.emitLine("MirRegisterClass *getGprClass() override;");
             emitter.emitLine("MirRegisterClass *getVr128Class() const { return m_vr128; }");
+            emitter.emitLine("MirRegisterClass *getVr256Class() const { return m_vr256; }");
             emitter.emitLine("MirLegalizer *getLegalizer() override;");
             emitter.emitLine("LegalizerInfo *getLegalizerInfo() override;");
             emitter.emitLine("MirRegisterAllocator *getRegisterAllocator() override;");
@@ -264,6 +265,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("MirRegisterClass *m_fpr64{ nullptr };");
             emitter.emitLine("MirRegisterClass *m_fpr32{ nullptr };");
             emitter.emitLine("MirRegisterClass *m_vr128{ nullptr };");
+            emitter.emitLine("MirRegisterClass *m_vr256{ nullptr };");
             emitter.emitBlankLine();
             emitter.emitLine("std::unique_ptr<MirFrameLowerer> m_frameLowerer;");
             emitter.emitLine("std::unique_ptr<MirInstructionSelector> m_isel;");
@@ -423,6 +425,7 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
                     emitter.emitLine("m_fpr64 = b->getClass(\"FPR64\");");
                     emitter.emitLine("m_fpr32 = b->getClass(\"FPR32\");");
                     emitter.emitLine("m_vr128 = b->getClass(\"VR128\");");
+                    emitter.emitLine("m_vr256 = b->getClass(\"VR256\");");
                 }
             }
             emitter.emitBlankLine();

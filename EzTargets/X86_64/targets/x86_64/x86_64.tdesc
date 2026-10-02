@@ -35,25 +35,25 @@ target X86_64 {
     }
 
     register_bank FPR {
-        classes { FPR32: 32, FPR64: 64, VR128: 128 }
-        sub_register { VR128 <: FPR64, FPR64 <: FPR32 }
+        classes { FPR32: 32, FPR64: 64, VR128: 128, VR256: 256 }
+        sub_register { VR256 <: VR128, VR128 <: FPR64, FPR64 <: FPR32 }
         registers {
-            xmm0  enc 0  names { xmm0: FPR32,  xmm0: FPR64,  xmm0: VR128 }
-            xmm1  enc 1  names { xmm1: FPR32,  xmm1: FPR64,  xmm1: VR128 }
-            xmm2  enc 2  names { xmm2: FPR32,  xmm2: FPR64,  xmm2: VR128 }
-            xmm3  enc 3  names { xmm3: FPR32,  xmm3: FPR64,  xmm3: VR128 }
-            xmm4  enc 4  names { xmm4: FPR32,  xmm4: FPR64,  xmm4: VR128 }
-            xmm5  enc 5  names { xmm5: FPR32,  xmm5: FPR64,  xmm5: VR128 }
-            xmm6  enc 6  names { xmm6: FPR32,  xmm6: FPR64,  xmm6: VR128 }
-            xmm7  enc 7  names { xmm7: FPR32,  xmm7: FPR64,  xmm7: VR128 }
-            xmm8  enc 8  names { xmm8: FPR32,  xmm8: FPR64,  xmm8: VR128 }
-            xmm9  enc 9  names { xmm9: FPR32,  xmm9: FPR64,  xmm9: VR128 }
-            xmm10 enc 10 names { xmm10: FPR32, xmm10: FPR64, xmm10: VR128 }
-            xmm11 enc 11 names { xmm11: FPR32, xmm11: FPR64, xmm11: VR128 }
-            xmm12 enc 12 names { xmm12: FPR32, xmm12: FPR64, xmm12: VR128 }
-            xmm13 enc 13 names { xmm13: FPR32, xmm13: FPR64, xmm13: VR128 }
-            xmm14 enc 14 names { xmm14: FPR32, xmm14: FPR64, xmm14: VR128 }
-            xmm15 enc 15 names { xmm15: FPR32, xmm15: FPR64, xmm15: VR128 }
+            xmm0  enc 0  names { xmm0: FPR32,  xmm0: FPR64,  xmm0: VR128, ymm0: VR256 }
+            xmm1  enc 1  names { xmm1: FPR32,  xmm1: FPR64,  xmm1: VR128, ymm1: VR256 }
+            xmm2  enc 2  names { xmm2: FPR32,  xmm2: FPR64,  xmm2: VR128, ymm2: VR256 }
+            xmm3  enc 3  names { xmm3: FPR32,  xmm3: FPR64,  xmm3: VR128, ymm3: VR256 }
+            xmm4  enc 4  names { xmm4: FPR32,  xmm4: FPR64,  xmm4: VR128, ymm4: VR256 }
+            xmm5  enc 5  names { xmm5: FPR32,  xmm5: FPR64,  xmm5: VR128, ymm5: VR256 }
+            xmm6  enc 6  names { xmm6: FPR32,  xmm6: FPR64,  xmm6: VR128, ymm6: VR256 }
+            xmm7  enc 7  names { xmm7: FPR32,  xmm7: FPR64,  xmm7: VR128, ymm7: VR256 }
+            xmm8  enc 8  names { xmm8: FPR32,  xmm8: FPR64,  xmm8: VR128, ymm8: VR256 }
+            xmm9  enc 9  names { xmm9: FPR32,  xmm9: FPR64,  xmm9: VR128, ymm9: VR256 }
+            xmm10 enc 10 names { xmm10: FPR32, xmm10: FPR64, xmm10: VR128, ymm10: VR256 }
+            xmm11 enc 11 names { xmm11: FPR32, xmm11: FPR64, xmm11: VR128, ymm11: VR256 }
+            xmm12 enc 12 names { xmm12: FPR32, xmm12: FPR64, xmm12: VR128, ymm12: VR256 }
+            xmm13 enc 13 names { xmm13: FPR32, xmm13: FPR64, xmm13: VR128, ymm13: VR256 }
+            xmm14 enc 14 names { xmm14: FPR32, xmm14: FPR64, xmm14: VR128, ymm14: VR256 }
+            xmm15 enc 15 names { xmm15: FPR32, xmm15: FPR64, xmm15: VR128, ymm15: VR256 }
         }
     }
 
@@ -102,8 +102,31 @@ target X86_64 {
     }
 
     libcalls {
-        __divti3:  "__divti3";
-        __udivti3: "__udivti3"
+        __divti3:      "__divti3";
+        __udivti3:     "__udivti3";
+        __modti3:      "__modti3";
+        __umodti3:     "__umodti3";
+        __multi3:      "__multi3";
+        __ashlti3:     "__ashlti3";
+        __lshrti3:     "__lshrti3";
+        __ashrti3:     "__ashrti3";
+        __popcountsi2: "__popcountsi2";
+        __popcountdi2: "__popcountdi2";
+        __popcountti2: "__popcountti2";
+        __clzsi2:      "__clzsi2";
+        __clzdi2:      "__clzdi2";
+        __clzti2:      "__clzti2";
+        __ctzsi2:      "__ctzsi2";
+        __ctzdi2:      "__ctzdi2";
+        __ctzti2:      "__ctzti2";
+        __paritysi2:   "__paritysi2";
+        __paritydi2:   "__paritydi2";
+        __parityti2:   "__parityti2";
+        memcpy:        "memcpy";
+        memmove:       "memmove";
+        memset:        "memset";
+        memcmp:        "memcmp";
+        bzero:         "bzero"
     }
 
     components {

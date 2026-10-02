@@ -1,13 +1,15 @@
 target AMD64;
 
 type_set GPR_SCALARS = (i8, i16, i32, i64);
+type_set VECTOR_128  = (v16i8, v8i16, v4i32, v2i64, v4f32, v2f64);
+type_set VECTOR_256  = (v32i8, v16i16, v8i32, v4i64, v8f32, v4f64);
 
 // ============================================================================
 // DATA MOVEMENT
 // ============================================================================
 
 action MOV {
-    LEGAL(GPR_SCALARS, ptr, f32, f64);
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128, VECTOR_256);
     WIDENS(i1) >> i32;
 };
 
@@ -16,29 +18,29 @@ action MOV_ADDR {
 };
 
 action SELECT {
-    LEGAL(GPR_SCALARS, ptr, f32, f64);
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128, VECTOR_256);
     WIDENS(i1, i8, i16) >> i32;
 };
 
 action PHI {
-    LEGAL(GPR_SCALARS, ptr, f32, f64);
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128, VECTOR_256);
     WIDENS(i1, i8, i16) >> i32;
 };
 
 action PUSH_ARG {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128, VECTOR_256);
 };
 
 action POP_ARG {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128, VECTOR_256);
 };
 
 action PUSH_RET {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128, VECTOR_256);
 };
 
 action POP_RET {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128, VECTOR_256);
 };
 
 action END_ARG {
@@ -62,6 +64,8 @@ action LOAD {
     LEGAL(ptr:0, ptr:1);
     LEGAL(f32:0, ptr:1);
     LEGAL(f64:0, ptr:1);
+    LEGAL(VECTOR_128:0, ptr:1);
+    LEGAL(VECTOR_256:0, ptr:1);
     WIDENS(i1:0) >> i8;
 };
 
@@ -70,6 +74,8 @@ action STORE {
     LEGAL(ptr:0, ptr:1);
     LEGAL(ptr:0, f32:1);
     LEGAL(ptr:0, f64:1);
+    LEGAL(ptr:0, VECTOR_128:1);
+    LEGAL(ptr:0, VECTOR_256:1);
     WIDENS(i1:1) >> i8;
 };
 
@@ -106,11 +112,13 @@ action SUB {
 action MUL {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__multi3";
 };
 
 action IMUL {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__multi3";
 };
 
 action SDIV {
@@ -128,16 +136,19 @@ action UDIV {
 action DIV {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__udivti3";
 };
 
 action IDIV {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__divti3";
 };
 
 action REM {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__modti3";
 };
 
 action NEG {
@@ -216,16 +227,19 @@ action XOR {
 action SHL {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__ashlti3";
 };
 
 action SHR {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__lshrti3";
 };
 
 action SAR {
     LEGAL(i32, i64);
     WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__ashrti3";
 };
 
 // ============================================================================
@@ -351,7 +365,7 @@ action FPTOSI {
 };
 
 action BITCAST {
-    LEGAL(i32, i64, f32, f64);
+    LEGAL(i32, i64, f32, f64, VECTOR_128, VECTOR_256);
 };
 
 // ============================================================================
@@ -371,5 +385,67 @@ action HALT {
 };
 
 action TARGET_INST {
-    LEGAL(_void, GPR_SCALARS, ptr);
+    LEGAL(_void, GPR_SCALARS, ptr, f32, f64, VECTOR_128, VECTOR_256);
+};
+
+// ============================================================================
+// VECTOR & SIMD OPERATIONS
+// ============================================================================
+
+action VADD {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VSUB {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VMUL {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VDIV {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VAND {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VOR {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VXOR {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VANDN {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VMIN {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VMAX {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VHADD {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VHSUB {
+    LEGAL(VECTOR_128, VECTOR_256);
+};
+
+action VLOAD {
+    LEGAL(VECTOR_128:0, ptr:1);
+    LEGAL(VECTOR_256:0, ptr:1);
+};
+
+action VSTORE {
+    LEGAL(ptr:0, VECTOR_128:1);
+    LEGAL(ptr:0, VECTOR_256:1);
 };

@@ -54,6 +54,7 @@ enum class EncSlotKind : uint8_t
     Rel8,       ///< 1-byte PC-relative placeholder.
     Rel32,      ///< 4-byte PC-relative placeholder.
     CondCode,   ///< Constant condition-code digit folded into an opcode byte.
+    VexReg,     ///< VEX.vvvv field (non-destructive register operand).
 };
 
 /**
@@ -88,6 +89,7 @@ enum class EncForm : uint8_t
     Setcc,   ///< 0F 90+cc /0
     Sse,     ///< mandatory-prefix 0F opcode /r (SSE register-register)
     Cvt,     ///< mandatory-prefix 0F 2A/2C /r scalar conversion
+    Vex,     ///< VEX prefix (0xC4/0xC5), opcode /r, 3-operand non-destructive vector form
 };
 
 /**
@@ -154,6 +156,10 @@ struct EncodingDesc
     uint8_t m_ssePrefixes{ 0 };
     uint8_t m_sseOpcode[3]{ 0, 0, 0 };
     uint8_t m_sseOpcodeLen{ 0 };
+    /// Explicit VEX.L override: 0 = 128-bit/scalar, 1 = 256-bit, 0xFF = infer from operand size.
+    uint8_t m_vexL{ 0xFF };
+    /// VEX.W bit override (0 or 1).
+    uint8_t m_vexW{ 0 };
 };
 
 /// EncPrefix bitmask values used by EncodingDesc::m_prefixes / m_ssePrefixes.

@@ -14,6 +14,7 @@
 #include "MirPasses/MirPassManager.h"
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "x86_64TargetInstructionTable.h"
+#include "x86_64LegalizerRules.h"
 
 using namespace EzTargets::X86_64;
 
@@ -148,10 +149,21 @@ TEST_F(EzTripleTestSuite, TestX86_64Subsystems)
     ASSERT_NE(descMOV64rr, nullptr);
     EXPECT_STREQ(descMOV64rr->getName(), "MOV64rr");
 
-    // Libcall resolution mirrors the generated legality table's symbol pool (i128 divide).
-    EXPECT_EQ(target.getLibcallStr(0), "__divti3");
-    EXPECT_EQ(target.getLibcallStr(1), "__udivti3");
-    EXPECT_TRUE(target.getLibcallStr(2).empty());
+    // Libcall resolution mirrors the generated legality table's symbol pool and TargetLibcallRegistry.
+    EXPECT_EQ(target.getLibcallStr(0), "__multi3");
+    EXPECT_EQ(target.getLibcallStr(1), "__divti3");
+    EXPECT_EQ(target.getLibcallStr(2), "__udivti3");
+    EXPECT_EQ(target.getLibcallStr(3), "__modti3");
+    EXPECT_EQ(target.getLibcallStr(4), "__ashlti3");
+    EXPECT_EQ(target.getLibcallStr(5), "__lshrti3");
+    EXPECT_EQ(target.getLibcallStr(6), "__ashrti3");
+    EXPECT_TRUE(target.getLibcallStr(7).empty());
+
+    ASSERT_NE(target.getLibcallRegistry(), nullptr);
+    EXPECT_EQ(target.getLibcallRegistry()->getLibcallName(LibcallKind::DivI128), "__divti3");
+    EXPECT_EQ(target.getLibcallRegistry()->getLibcallName(LibcallKind::UDivI128), "__udivti3");
+    EXPECT_EQ(target.getLibcallRegistry()->getLibcallName(LibcallKind::MulI128), "__multi3");
+    EXPECT_EQ(target.getLibcallRegistry()->getLibcallName(LibcallKind::Memcpy), "memcpy");
 }
 
 // Verifies the ELF and COFF binary descriptors and their standard sections.
@@ -419,4 +431,217 @@ TEST_F(EzTripleTestSuite, TestX86_64VectorInstructionSelectionExtensionGuards)
     ASSERT_NE(isel, nullptr);
     EXPECT_FALSE(isel->select(ctx, inst));
 }
+
+// Verifies VR256 register class and AVX/AVX2 vector instruction selection.
+TEST_F(EzTripleTestSuite, TestX86_64AvxInstructionSelectionAndVR256)
+{
+    X86_64TargetDesc target(getBuilderCtx());
+    target.initialize();
+
+    auto *ctx = getBuilderCtx();
+    auto *tt = ctx->getTypeTable();
+
+    // Verify VR256 register class
+    MirRegisterClass *vr256 = target.getVr256Class();
+    ASSERT_NE(vr256, nullptr);
+    EXPECT_STREQ(vr256->getName(), "VR256");
+    EXPECT_EQ(vr256->getRegs().size(), 16u);
+    ASSERT_NE(vr256->getReg("ymm0"), nullptr);
+    EXPECT_EQ(vr256->getReg("ymm0")->m_bitSize, 256u);
+    ASSERT_NE(vr256->getReg("ymm15"), nullptr);
+    EXPECT_EQ(vr256->getReg("ymm15")->m_bitSize, 256u);
+
+    // Verify register bank is FPR
+    auto *fprBank = vr256->getBank();
+    ASSERT_NE(fprBank, nullptr);
+    EXPECT_STREQ(fprBank->getName(), "FPR");
+
+    auto *func = createTestFunction("test_avx_isel", tt->_void());
+    auto *entry = func->getEntryPoint();
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+    MirInstructionSelector *isel = target.getInstructionSelector();
+    ASSERT_NE(isel, nullptr);
+
+    // 1. Without AVX, 256-bit VADD fails selection
+    auto *v8f32Type = tt->v8f32();
+    auto *dst8f = ob.buildVReg(v8f32Type, "dst8f");
+    auto *src8fa = ob.buildVReg(v8f32Type, "src8fa");
+    auto *src8fb = ob.buildVReg(v8f32Type, "src8fb");
+    auto *inst256 = ib.VADD(dst8f, src8fa, src8fb);
+    EXPECT_FALSE(isel->select(ctx, inst256));
+
+    // 2. Enable AVX
+    EXPECT_TRUE(target.getExtensionSet().enable("avx"));
+    EXPECT_TRUE(target.hasExtension("avx"));
+
+    // 256-bit VADD should now select VADDPS256rr with VR256
+    ASSERT_TRUE(isel->select(ctx, inst256));
+    EXPECT_TRUE(inst256->isErased());
+    auto &instrs = entry->getInstructions();
+    ASSERT_FALSE(instrs.empty());
+    MirInstruction *selected256 = instrs.back();
+    ASSERT_NE(selected256->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected256->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VADDPS256rr));
+    EXPECT_STREQ(selected256->getTargetDesc()->getName(), "VADDPS256rr");
+    EXPECT_EQ(dst8f->getRegClass(), target.getVr256Class());
+
+    // 3. 128-bit VADD with AVX enabled selects VADDPSrr (cost=1 over ADDPSrr cost=2)
+    auto *v4f32Type = tt->v4f32();
+    auto *dst4f = ob.buildVReg(v4f32Type, "dst4f");
+    auto *src4fa = ob.buildVReg(v4f32Type, "src4fa");
+    auto *src4fb = ob.buildVReg(v4f32Type, "src4fb");
+    auto *inst128 = ib.VADD(dst4f, src4fa, src4fb);
+    ASSERT_TRUE(isel->select(ctx, inst128));
+    EXPECT_TRUE(inst128->isErased());
+    MirInstruction *selected128 = instrs.back();
+    ASSERT_NE(selected128->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected128->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VADDPSrr));
+    EXPECT_STREQ(selected128->getTargetDesc()->getName(), "VADDPSrr");
+    EXPECT_EQ(dst4f->getRegClass(), target.getVr128Class());
+
+    // 4. 256-bit MOV with AVX enabled selects VMOVAPS256rr
+    auto *dstMove256 = ob.buildVReg(v8f32Type, "dstMove256");
+    auto *instMove256 = ib.MOV(dstMove256, src8fa);
+    ASSERT_TRUE(isel->select(ctx, instMove256));
+    EXPECT_TRUE(instMove256->isErased());
+    MirInstruction *selectedMove256 = instrs.back();
+    ASSERT_NE(selectedMove256->getTargetDesc(), nullptr);
+    EXPECT_EQ(selectedMove256->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VMOVAPS256rr));
+    EXPECT_EQ(dstMove256->getRegClass(), target.getVr256Class());
+
+    // 5. 256-bit integer VADD requires AVX2
+    EXPECT_FALSE(target.hasExtension("avx2"));
+    auto *v8i32Type = tt->v8i32();
+    auto *dst8i = ob.buildVReg(v8i32Type, "dst8i");
+    auto *src8ia = ob.buildVReg(v8i32Type, "src8ia");
+    auto *src8ib = ob.buildVReg(v8i32Type, "src8ib");
+    auto *instAvx2 = ib.VADD(dst8i, src8ia, src8ib);
+    EXPECT_FALSE(isel->select(ctx, instAvx2));
+
+    EXPECT_TRUE(target.getExtensionSet().enable("avx2"));
+    EXPECT_TRUE(target.hasExtension("avx2"));
+    ASSERT_TRUE(isel->select(ctx, instAvx2));
+    EXPECT_TRUE(instAvx2->isErased());
+    MirInstruction *selectedAvx2 = instrs.back();
+    ASSERT_NE(selectedAvx2->getTargetDesc(), nullptr);
+    EXPECT_EQ(selectedAvx2->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VPADDD256rr));
+    EXPECT_STREQ(selectedAvx2->getTargetDesc()->getName(), "VPADDD256rr");
+    EXPECT_EQ(dst8i->getRegClass(), target.getVr256Class());
+}
+
+// Verifies vector instruction legality for 128-bit and 256-bit vector types.
+TEST_F(EzTripleTestSuite, TestX86_64VectorLegalizationTable)
+{
+    X86_64TargetDesc target(getBuilderCtx());
+    target.initialize();
+
+    auto *legalizerInfo = target.getLegalizerInfo();
+    ASSERT_NE(legalizerInfo, nullptr);
+
+    auto *tt = getBuilderCtx()->getTypeTable();
+    auto *v4f32 = tt->v4f32();
+    auto *v8f32 = tt->v8f32();
+    auto *ptr = tt->getPtr(tt->_void());
+
+    // VADD on v4f32 and v8f32 should be Legal
+    LegalityQuery qVadd128{};
+    qVadd128.m_opcode = MirInstructionOpCode::VADD;
+    qVadd128.m_operandCount = 3;
+    qVadd128.m_compactIds[0] = v4f32->getCompactId();
+    qVadd128.m_compactIds[1] = v4f32->getCompactId();
+    qVadd128.m_compactIds[2] = v4f32->getCompactId();
+    EXPECT_TRUE(legalizerInfo->query(qVadd128).isLegal());
+
+    LegalityQuery qVadd256{};
+    qVadd256.m_opcode = MirInstructionOpCode::VADD;
+    qVadd256.m_operandCount = 3;
+    qVadd256.m_compactIds[0] = v8f32->getCompactId();
+    qVadd256.m_compactIds[1] = v8f32->getCompactId();
+    qVadd256.m_compactIds[2] = v8f32->getCompactId();
+    EXPECT_TRUE(legalizerInfo->query(qVadd256).isLegal());
+
+    // VLOAD / VSTORE on v4f32 and v8f32 (compactId 3 is the standard compact ID for 'ptr')
+    constexpr uint8_t ptrCompactId = 3;
+
+    LegalityQuery qVload{};
+    qVload.m_opcode = MirInstructionOpCode::VLOAD;
+    qVload.m_operandCount = 2;
+    qVload.m_compactIds[0] = v4f32->getCompactId();
+    qVload.m_compactIds[1] = ptrCompactId;
+    EXPECT_TRUE(legalizerInfo->query(qVload).isLegal());
+
+    LegalityQuery qVstore{};
+    qVstore.m_opcode = MirInstructionOpCode::VSTORE;
+    qVstore.m_operandCount = 2;
+    qVstore.m_compactIds[0] = ptrCompactId;
+    qVstore.m_compactIds[1] = v8f32->getCompactId();
+    EXPECT_TRUE(legalizerInfo->query(qVstore).isLegal());
+}
+
+// Verifies power-of-two multiplication strength reductions and identity simplifications.
+TEST_F(EzTripleTestSuite, TestX86_64RewriteRulesStrengthReductions)
+{
+    X86_64TargetDesc target(getBuilderCtx());
+    target.initialize();
+
+    auto *ctx = getBuilderCtx();
+    auto *tt = ctx->getTypeTable();
+    auto *func = createTestFunction("test_rules", tt->_void());
+    auto *entry = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    // 1. MUL i32:$dst, i32:$lhs, 8 -> SHL i32:$dst, i32:$lhs, 3
+    auto *dst1 = ob.buildVReg(tt->i32(), "dst1");
+    auto *lhs1 = ob.buildVReg(tt->i32(), "lhs1");
+    auto *imm8 = ob.buildInt(tt->i32(), FlexInt(static_cast<int32_t>(8)));
+    ib.MUL(dst1, lhs1, imm8);
+
+    auto it1 = entry->getInstructions().begin();
+    LegalizeCtx legCtx1(ctx, &target, it1);
+    auto res1 = x86_64Rules::applyRules(legCtx1, MirInstructionOpCode::MUL);
+    EXPECT_EQ(res1, LegalizationResult::Legalized);
+
+    MirInstruction *shlInst = entry->getInstructions().front();
+    EXPECT_EQ(shlInst->getOpCode(), MirInstructionOpCode::SHL);
+    ASSERT_EQ(shlInst->getOperandCount(), 3u);
+    auto *shlAmt = dynamic_cast<MirInteger *>(shlInst->getOperand(2));
+    ASSERT_NE(shlAmt, nullptr);
+    EXPECT_EQ(shlAmt->getValue().getI64(), 3);
+
+    // 2. MUL i32:$dst2, i32:$lhs2, 1 -> MOV i32:$dst2, i32:$lhs2
+    auto *dst2 = ob.buildVReg(tt->i32(), "dst2");
+    auto *lhs2 = ob.buildVReg(tt->i32(), "lhs2");
+    auto *imm1 = ob.buildInt(tt->i32(), FlexInt(static_cast<int32_t>(1)));
+    ib.MUL(dst2, lhs2, imm1);
+
+    auto it2 = std::prev(entry->getInstructions().end());
+    LegalizeCtx legCtx2(ctx, &target, it2);
+    auto res2 = x86_64Rules::applyRules(legCtx2, MirInstructionOpCode::MUL);
+    EXPECT_EQ(res2, LegalizationResult::Legalized);
+
+    MirInstruction *movInst = entry->getInstructions().back();
+    EXPECT_EQ(movInst->getOpCode(), MirInstructionOpCode::MOV);
+    ASSERT_EQ(movInst->getOperandCount(), 2u);
+    EXPECT_EQ(movInst->getOperand(1), lhs2);
+
+    // 3. OR i32:$dst3, i32:$lhs3, 0 -> MOV i32:$dst3, i32:$lhs3
+    auto *dst3 = ob.buildVReg(tt->i32(), "dst3");
+    auto *lhs3 = ob.buildVReg(tt->i32(), "lhs3");
+    auto *imm0 = ob.buildInt(tt->i32(), FlexInt(static_cast<int32_t>(0)));
+    ib.OR(dst3, lhs3, imm0);
+
+    auto it3 = std::prev(entry->getInstructions().end());
+    LegalizeCtx legCtx3(ctx, &target, it3);
+    auto res3 = x86_64Rules::applyRules(legCtx3, MirInstructionOpCode::OR);
+    EXPECT_EQ(res3, LegalizationResult::Legalized);
+
+    MirInstruction *movOr = entry->getInstructions().back();
+    EXPECT_EQ(movOr->getOpCode(), MirInstructionOpCode::MOV);
+    ASSERT_EQ(movOr->getOperandCount(), 2u);
+    EXPECT_EQ(movOr->getOperand(1), lhs3);
+}
+
 

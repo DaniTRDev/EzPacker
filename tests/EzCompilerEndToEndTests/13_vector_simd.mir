@@ -1,0 +1,207 @@
+; Test Suite: 13_vector_simd.mir
+; Tests 128-bit (SSE) and 256-bit (AVX/AVX2) vector arithmetic and logic operations
+; across float (v4f32, v8f32), double (v2f64, v4f64), and integer (v4i32, v8i32) vector shapes.
+
+; ============================================================================
+; 128-bit Single Precision Vector Float Operations (v4f32)
+; ============================================================================
+
+fn @vec128_f32_add(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VADD v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @vec128_f32_sub(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VSUB v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @vec128_f32_mul(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VMUL v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @vec128_f32_div(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VDIV v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @vec128_f32_and(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VAND v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @vec128_f32_or(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VOR v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @vec128_f32_xor(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VXOR v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+; ============================================================================
+; 128-bit Double Precision Vector Float Operations (v2f64)
+; ============================================================================
+
+fn @vec128_f64_add(v2f64 %a, v2f64 %b) -> v2f64 {
+entry:
+    %res = VADD v2f64 %a, %b;
+    RET v2f64 %res;
+}
+
+fn @vec128_f64_sub(v2f64 %a, v2f64 %b) -> v2f64 {
+entry:
+    %res = VSUB v2f64 %a, %b;
+    RET v2f64 %res;
+}
+
+fn @vec128_f64_mul(v2f64 %a, v2f64 %b) -> v2f64 {
+entry:
+    %res = VMUL v2f64 %a, %b;
+    RET v2f64 %res;
+}
+
+fn @vec128_f64_div(v2f64 %a, v2f64 %b) -> v2f64 {
+entry:
+    %res = VDIV v2f64 %a, %b;
+    RET v2f64 %res;
+}
+
+; ============================================================================
+; 128-bit Vector Integer Operations (v4i32)
+; ============================================================================
+
+fn @vec128_i32_add(v4i32 %a, v4i32 %b) -> v4i32 {
+entry:
+    %res = VADD v4i32 %a, %b;
+    RET v4i32 %res;
+}
+
+fn @vec128_i32_sub(v4i32 %a, v4i32 %b) -> v4i32 {
+entry:
+    %res = VSUB v4i32 %a, %b;
+    RET v4i32 %res;
+}
+
+fn @vec128_i32_mul(v4i32 %a, v4i32 %b) -> v4i32 {
+entry:
+    %res = VMUL v4i32 %a, %b;
+    RET v4i32 %res;
+}
+
+fn @vec128_i32_and(v4i32 %a, v4i32 %b) -> v4i32 {
+entry:
+    %res = VAND v4i32 %a, %b;
+    RET v4i32 %res;
+}
+
+fn @vec128_i32_or(v4i32 %a, v4i32 %b) -> v4i32 {
+entry:
+    %res = VOR v4i32 %a, %b;
+    RET v4i32 %res;
+}
+
+fn @vec128_i32_xor(v4i32 %a, v4i32 %b) -> v4i32 {
+entry:
+    %res = VXOR v4i32 %a, %b;
+    RET v4i32 %res;
+}
+
+; ============================================================================
+; 256-bit Single Precision Vector Float Operations (v8f32 - AVX)
+; ============================================================================
+
+fn @vec256_f32_add(v8f32 %a, v8f32 %b) -> v8f32 {
+entry:
+    %res = VADD v8f32 %a, %b;
+    RET v8f32 %res;
+}
+
+fn @vec256_f32_sub(v8f32 %a, v8f32 %b) -> v8f32 {
+entry:
+    %res = VSUB v8f32 %a, %b;
+    RET v8f32 %res;
+}
+
+fn @vec256_f32_mul(v8f32 %a, v8f32 %b) -> v8f32 {
+entry:
+    %res = VMUL v8f32 %a, %b;
+    RET v8f32 %res;
+}
+
+fn @vec256_f32_div(v8f32 %a, v8f32 %b) -> v8f32 {
+entry:
+    %res = VDIV v8f32 %a, %b;
+    RET v8f32 %res;
+}
+
+fn @vec256_f32_xor(v8f32 %a, v8f32 %b) -> v8f32 {
+entry:
+    %res = VXOR v8f32 %a, %b;
+    RET v8f32 %res;
+}
+
+; ============================================================================
+; 256-bit Double Precision Vector Float Operations (v4f64 - AVX)
+; ============================================================================
+
+fn @vec256_f64_add(v4f64 %a, v4f64 %b) -> v4f64 {
+entry:
+    %res = VADD v4f64 %a, %b;
+    RET v4f64 %res;
+}
+
+fn @vec256_f64_sub(v4f64 %a, v4f64 %b) -> v4f64 {
+entry:
+    %res = VSUB v4f64 %a, %b;
+    RET v4f64 %res;
+}
+
+fn @vec256_f64_mul(v4f64 %a, v4f64 %b) -> v4f64 {
+entry:
+    %res = VMUL v4f64 %a, %b;
+    RET v4f64 %res;
+}
+
+fn @vec256_f64_div(v4f64 %a, v4f64 %b) -> v4f64 {
+entry:
+    %res = VDIV v4f64 %a, %b;
+    RET v4f64 %res;
+}
+
+; ============================================================================
+; 256-bit Vector Integer Operations (v8i32 - AVX2)
+; ============================================================================
+
+fn @vec256_i32_add(v8i32 %a, v8i32 %b) -> v8i32 {
+entry:
+    %res = VADD v8i32 %a, %b;
+    RET v8i32 %res;
+}
+
+fn @vec256_i32_sub(v8i32 %a, v8i32 %b) -> v8i32 {
+entry:
+    %res = VSUB v8i32 %a, %b;
+    RET v8i32 %res;
+}
+
+fn @vec256_i32_mul(v8i32 %a, v8i32 %b) -> v8i32 {
+entry:
+    %res = VMUL v8i32 %a, %b;
+    RET v8i32 %res;
+}
+
+fn @vec256_i32_xor(v8i32 %a, v8i32 %b) -> v8i32 {
+entry:
+    %res = VXOR v8i32 %a, %b;
+    RET v8i32 %res;
+}

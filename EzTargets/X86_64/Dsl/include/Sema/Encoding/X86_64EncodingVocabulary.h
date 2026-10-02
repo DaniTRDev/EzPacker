@@ -24,14 +24,15 @@ inline constexpr std::pair<std::string_view, std::string_view> kForms[] = {
     { "jmp", "EncForm::Jmp" },       { "call", "EncForm::Call" },   { "ret", "EncForm::Ret" },
     { "push", "EncForm::Push" },     { "pop", "EncForm::Pop" },     { "nop", "EncForm::Nop" },
     { "syscall", "EncForm::Syscall" }, { "setcc", "EncForm::Setcc" }, { "sse", "EncForm::Sse" },
-    { "cvt", "EncForm::Cvt" }
+    { "cvt", "EncForm::Cvt" },       { "vex", "EncForm::Vex" }
 };
 
 inline constexpr std::pair<std::string_view, std::string_view> kFields[] = {
     { "reg", "EncSlotKind::Reg" },       { "rm_reg", "EncSlotKind::RmReg" }, { "rm_mem", "EncSlotKind::RmMem" },
     { "imm8", "EncSlotKind::Imm8" },     { "imm16", "EncSlotKind::Imm16" },  { "imm32", "EncSlotKind::Imm32" },
     { "imm64", "EncSlotKind::Imm64" },   { "imm8_signed", "EncSlotKind::Imm8Signed" },
-    { "rel8", "EncSlotKind::Rel8" },     { "rel32", "EncSlotKind::Rel32" },  { "cc", "EncSlotKind::CondCode" }
+    { "rel8", "EncSlotKind::Rel8" },     { "rel32", "EncSlotKind::Rel32" },  { "cc", "EncSlotKind::CondCode" },
+    { "vex_reg", "EncSlotKind::VexReg" }
 };
 
 /** Returns true when form is a known x86-64 ENCODING form. */

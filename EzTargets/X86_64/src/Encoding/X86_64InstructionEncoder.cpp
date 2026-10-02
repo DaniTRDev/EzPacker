@@ -715,6 +715,157 @@ bool encodeBranchForm(const EncodingDesc &desc,
     return true;
 }
 
+// Encodes a VEX-prefixed vector instruction (Vex form).
+bool encodeVexForm(const EncodingDesc &desc,
+                   std::span<const ResolvedOperand> operands,
+                   std::vector<uint8_t> &out,
+                   EzCodeEmitter::EncodeResult &result)
+{
+    const ResolvedOperand *regOp = resolve(desc, operands, EncSlotKind::Reg);
+    const ResolvedOperand *rmOp = resolve(desc, operands, EncSlotKind::RmReg);
+    if (!rmOp)
+    {
+        rmOp = resolve(desc, operands, EncSlotKind::RmMem);
+    }
+    const ResolvedOperand *vexOp = resolve(desc, operands, EncSlotKind::VexReg);
+
+    if (!regOp || !rmOp || regOp->m_kind != ResolvedOperand::Kind::Register ||
+        (rmOp->m_kind != ResolvedOperand::Kind::Register && rmOp->m_kind != ResolvedOperand::Kind::Memory))
+    {
+        return false;
+    }
+
+    const EncOperandBinding *rmBinding = findBinding(desc, EncSlotKind::RmMem);
+    const bool rmIsMemory = rmBinding && rmBinding->m_operandIndex == static_cast<uint8_t>(rmOp - operands.data());
+
+    uint8_t sizeBytes = resolveSize(desc, operands);
+
+    // Determine VEX.L:
+    uint8_t vexL = 0;
+    if (desc.m_vexL != 0xFF)
+    {
+        vexL = desc.m_vexL;
+    }
+    else
+    {
+        vexL = (sizeBytes == 32) ? 1 : 0;
+    }
+
+    // Determine VEX.W:
+    uint8_t vexW = desc.m_vexW;
+
+    // Determine pp from prefixes:
+    uint8_t pp = 0;
+    if (desc.m_prefixes & EncPrefix66)
+    {
+        pp = 1;
+    }
+    else if (desc.m_prefixes & EncPrefixF3)
+    {
+        pp = 2;
+    }
+    else if (desc.m_prefixes & EncPrefixF2)
+    {
+        pp = 3;
+    }
+
+    // Determine opcode map and real opcode byte:
+    uint8_t map = 1;
+    uint8_t opByte = 0;
+    if (desc.m_opcodeLen == 3 && desc.m_opcode[0] == 0x0F && desc.m_opcode[1] == 0x38)
+    {
+        map = 2;
+        opByte = desc.m_opcode[2];
+    }
+    else if (desc.m_opcodeLen == 3 && desc.m_opcode[0] == 0x0F && desc.m_opcode[1] == 0x3A)
+    {
+        map = 3;
+        opByte = desc.m_opcode[2];
+    }
+    else if (desc.m_opcodeLen == 2 && desc.m_opcode[0] == 0x0F)
+    {
+        map = 1;
+        opByte = desc.m_opcode[1];
+    }
+    else if (desc.m_opcodeLen == 1)
+    {
+        map = 1;
+        opByte = desc.m_opcode[0];
+    }
+    else if (desc.m_opcodeLen > 0)
+    {
+        opByte = desc.m_opcode[desc.m_opcodeLen - 1];
+    }
+
+    // Compute ModR/M & SIB
+    Rex dummyRex;
+    ModRMPlan plan;
+    if (rmIsMemory)
+    {
+        plan = buildMemoryModRM(low3(regOp->m_reg), rmOp->m_mem, dummyRex);
+    }
+    else
+    {
+        plan = buildRegisterModRM(low3(regOp->m_reg), rmOp->m_reg, dummyRex);
+    }
+
+    // Register extension bits (inverted in VEX):
+    bool rBit = extBit(regOp->m_reg);
+    bool xBit = dummyRex.x;
+    bool bBit = dummyRex.b;
+
+    uint8_t invR = rBit ? 0 : 1;
+    uint8_t invX = xBit ? 0 : 1;
+    uint8_t invB = bBit ? 0 : 1;
+
+    // vvvv field: inverted 4-bit register encoding. If no vexOp, 1111b (0xF).
+    uint8_t invVvvv = 0x0F;
+    if (vexOp && vexOp->m_kind == ResolvedOperand::Kind::Register)
+    {
+        invVvvv = static_cast<uint8_t>((~low4(vexOp->m_reg)) & 0x0Fu);
+    }
+
+    // Check if 2-byte VEX (0xC5) is possible:
+    if (map == 1 && invX == 1 && invB == 1 && vexW == 0)
+    {
+        out.push_back(0xC5);
+        uint8_t byte1 = static_cast<uint8_t>((invR << 7) | (invVvvv << 3) | (vexL << 2) | pp);
+        out.push_back(byte1);
+    }
+    else
+    {
+        out.push_back(0xC4);
+        uint8_t byte1 = static_cast<uint8_t>((invR << 7) | (invX << 6) | (invB << 5) | (map & 0x1Fu));
+        uint8_t byte2 = static_cast<uint8_t>((vexW << 7) | (invVvvv << 3) | (vexL << 2) | pp);
+        out.push_back(byte1);
+        out.push_back(byte2);
+    }
+
+    out.push_back(opByte);
+
+    size_t planStart = out.size();
+    out.insert(out.end(), plan.bytes.begin(), plan.bytes.end());
+
+    if (plan.hasReloc)
+    {
+        result.m_hasReloc = true;
+        result.m_relocOffset = planStart + plan.relocOffsetWithin;
+        result.m_relocBits = plan.relocBits;
+    }
+
+    const ResolvedOperand *immOp = resolve(desc, operands, EncSlotKind::Imm8);
+    if (!immOp)
+    {
+        immOp = resolve(desc, operands, EncSlotKind::Imm8Signed);
+    }
+    if (immOp && immOp->m_kind == ResolvedOperand::Kind::Immediate)
+    {
+        emitImm(out, immOp->m_imm, 1);
+    }
+
+    return true;
+}
+
 } // namespace
 
 bool InstructionEncoder::encode(const EncodingDesc &desc,
@@ -804,6 +955,10 @@ bool InstructionEncoder::encode(const EncodingDesc &desc,
             ok = desc.m_opcodeLen > 0;
             break;
 
+        case EncForm::Vex:
+            ok = encodeVexForm(desc, operands, bytes, result);
+            break;
+
         case EncForm::None:
         default:
             ok = false;
@@ -823,8 +978,32 @@ void InstructionEncoder::encodeRegisterMove(const ResolvedOperand &dst,
                                             const ResolvedOperand &src,
                                             std::vector<uint8_t> &out)
 {
-    if (dst.m_isFpr || src.m_isFpr)
+    if (dst.m_isFpr || src.m_isFpr || dst.m_sizeBytes >= 16 || src.m_sizeBytes >= 16)
     {
+        if (dst.m_sizeBytes == 32 || src.m_sizeBytes == 32)
+        {
+            // 256-bit vector move: VMOVAPS ymm1, ymm2 (VEX.256.0F.WIG 28 /r)
+            // dst in reg (ModR/M.reg), src in rm (ModR/M.rm). vvvv is unused (1111b).
+            uint8_t invR = extBit(dst.m_reg) ? 0 : 1;
+            uint8_t invB = extBit(src.m_reg) ? 0 : 1;
+            if (invB == 1)
+            {
+                // 2-byte VEX: 0xC5 [R vvvv L pp]
+                out.push_back(0xC5);
+                out.push_back(static_cast<uint8_t>((invR << 7) | (0x0F << 3) | (1 << 2) | 0));
+            }
+            else
+            {
+                // 3-byte VEX: 0xC4 [R X B m-mmmm] [W vvvv L pp]
+                out.push_back(0xC4);
+                out.push_back(static_cast<uint8_t>((invR << 7) | (1 << 6) | (invB << 5) | 1));
+                out.push_back(static_cast<uint8_t>((0 << 7) | (0x0F << 3) | (1 << 2) | 0));
+            }
+            out.push_back(0x28);
+            out.push_back(InstructionEncoder::encodeModRM(3, low3(dst.m_reg), low3(src.m_reg)));
+            return;
+        }
+
         Rex rex;
         rex.r = extBit(dst.m_reg);
         rex.b = extBit(src.m_reg);

@@ -200,8 +200,8 @@ TEST_F(CppRegisterInfoGeneratorTest, ParsesAndGeneratesRealX86_64Registers)
     std::string header = readFileContent(outHeader);
 
     EXPECT_NE(header.find("namespace EzTargets::TableGen::x86_64"), std::string::npos);
-    EXPECT_NE(header.find("s_registerEntryCount = 112;"), std::string::npos);
-    EXPECT_NE(header.find("s_subRegEdgeCount = 80;"), std::string::npos);
+    EXPECT_NE(header.find("s_registerEntryCount = 128;"), std::string::npos);
+    EXPECT_NE(header.find("s_subRegEdgeCount = 96;"), std::string::npos);
     EXPECT_NE(header.find("s_specialRegCount = 1;"), std::string::npos);
 
     // GPR checks
@@ -216,9 +216,12 @@ TEST_F(CppRegisterInfoGeneratorTest, ParsesAndGeneratesRealX86_64Registers)
     EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"FPR64\", 64, 0, \"xmm0\" },"), std::string::npos);
     EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"VR128\", 128, 0, \"xmm0\" },"), std::string::npos);
     EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"VR128\", 128, 15, \"xmm15\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"VR256\", 256, 0, \"ymm0\" },"), std::string::npos);
+    EXPECT_NE(header.find("RegisterInfoEntry{ \"FPR\", \"VR256\", 256, 15, \"ymm15\" },"), std::string::npos);
 
     // Sub-register edge checks
     EXPECT_NE(header.find("SubRegEdge{ \"GPR64\", \"rax\", \"GPR32\", \"eax\" },"), std::string::npos);
+    EXPECT_NE(header.find("SubRegEdge{ \"VR256\", \"ymm0\", \"VR128\", \"xmm0\" },"), std::string::npos);
     EXPECT_NE(header.find("SubRegEdge{ \"VR128\", \"xmm0\", \"FPR64\", \"xmm0\" },"), std::string::npos);
     EXPECT_NE(header.find("SubRegEdge{ \"FPR64\", \"xmm0\", \"FPR32\", \"xmm0\" },"), std::string::npos);
 

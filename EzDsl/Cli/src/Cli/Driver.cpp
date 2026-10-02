@@ -114,7 +114,21 @@ void initializeStandardTypes(SymbolTable &table)
                                                     { "i256", DSL::Ast::TypeDef::TypeKind::Integer, 256, 256 },
                                                     { "f32", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 32, 32 },
                                                     { "f64", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 64, 64 },
-                                                    { "f128", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 128, 128 } };
+                                                    { "f128", DSL::Ast::TypeDef::TypeKind::FloatingPoint, 128, 128 },
+                                                    // 128-bit Vectors
+                                                    { "v4f32", DSL::Ast::TypeDef::TypeKind::Vector, 128, 128 },
+                                                    { "v2f64", DSL::Ast::TypeDef::TypeKind::Vector, 128, 128 },
+                                                    { "v16i8", DSL::Ast::TypeDef::TypeKind::Vector, 128, 128 },
+                                                    { "v8i16", DSL::Ast::TypeDef::TypeKind::Vector, 128, 128 },
+                                                    { "v4i32", DSL::Ast::TypeDef::TypeKind::Vector, 128, 128 },
+                                                    { "v2i64", DSL::Ast::TypeDef::TypeKind::Vector, 128, 128 },
+                                                    // 256-bit Vectors
+                                                    { "v8f32", DSL::Ast::TypeDef::TypeKind::Vector, 256, 256 },
+                                                    { "v4f64", DSL::Ast::TypeDef::TypeKind::Vector, 256, 256 },
+                                                    { "v32i8", DSL::Ast::TypeDef::TypeKind::Vector, 256, 256 },
+                                                    { "v16i16", DSL::Ast::TypeDef::TypeKind::Vector, 256, 256 },
+                                                    { "v8i32", DSL::Ast::TypeDef::TypeKind::Vector, 256, 256 },
+                                                    { "v4i64", DSL::Ast::TypeDef::TypeKind::Vector, 256, 256 } };
 
     // Assign compact ids in declaration order, skipping names already provided by the input.
     uint8_t compactId = 1;
@@ -325,6 +339,68 @@ void initializeStandardIrInstructions(SymbolTable &table)
                                   static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::IsReturn) |
                                                           static_cast<uint32_t>(IrInstFlag::IsTerminator)),
                                   { { IrOperandType::AnyValue, "val", IrOperandDir::ArgIn } });
+
+    // Vector operations
+    auto vectorBinary = [&](std::string_view name, IrInstFlag extraFlags = IrInstFlag::None)
+    {
+        registerFallbackIrInstruction(table,
+                                      name,
+                                      IrInstCategory::Vector,
+                                      IrInstTier::HighLevel,
+                                      static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::SizeMatch) |
+                                                              static_cast<uint32_t>(extraFlags)),
+                                      { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                        { IrOperandType::Register, "src1", IrOperandDir::ArgIn },
+                                        { IrOperandType::Register, "src2", IrOperandDir::ArgIn } });
+    };
+
+    vectorBinary("VADD", IrInstFlag::IsCommutative);
+    vectorBinary("VSUB");
+    vectorBinary("VMUL", IrInstFlag::IsCommutative);
+    vectorBinary("VDIV");
+    vectorBinary("VAND", IrInstFlag::IsCommutative);
+    vectorBinary("VOR", IrInstFlag::IsCommutative);
+    vectorBinary("VXOR", IrInstFlag::IsCommutative);
+    vectorBinary("VANDN");
+    vectorBinary("VMIN");
+    vectorBinary("VMAX");
+    vectorBinary("VHADD");
+    vectorBinary("VHSUB");
+
+    registerFallbackIrInstruction(table,
+                                  "VLOAD",
+                                  IrInstCategory::Vector,
+                                  IrInstTier::HighLevel,
+                                  IrInstFlag::ReadsMemory,
+                                  { { IrOperandType::Register, "dst", IrOperandDir::ArgOut },
+                                    { IrOperandType::AddressSource, "src", IrOperandDir::ArgIn } });
+
+    registerFallbackIrInstruction(table,
+                                  "VSTORE",
+                                  IrInstCategory::Vector,
+                                  IrInstTier::HighLevel,
+                                  static_cast<IrInstFlag>(static_cast<uint32_t>(IrInstFlag::WritesMemory) |
+                                                          static_cast<uint32_t>(IrInstFlag::HasSideEffect)),
+                                  { { IrOperandType::AddressSource, "dst", IrOperandDir::ArgIn },
+                                    { IrOperandType::Register, "src", IrOperandDir::ArgIn } });
+}
+
+// Walks up from the current directory looking for EzMir/types.tyf; empty when not found.
+std::filesystem::path findTypesTyf()
+{
+    std::filesystem::path cur = std::filesystem::current_path();
+    for (int i = 0; i < 6; ++i)
+    {
+        auto cand = cur / "EzMir" / "types.tyf";
+        std::error_code ec;
+        if (std::filesystem::exists(cand, ec))
+            return cand;
+        if (cur.has_parent_path() && cur.parent_path() != cur)
+            cur = cur.parent_path();
+        else
+            break;
+    }
+    return {};
 }
 
 // Walks up from the current directory looking for EzMir/instructions.irdf; empty when not found.
@@ -685,6 +761,23 @@ DriverResult Driver::run()
         }
         else
         {
+            auto autoTyf = findTypesTyf();
+            if (!autoTyf.empty())
+            {
+                auto typesSourceId = sourceManager.loadFile(autoTyf);
+                if (typesSourceId.has_value())
+                {
+                    ParseContext typesParseCtx(&diagCollector, &sourceManager, *typesSourceId, &arena);
+                    auto typesAst =
+                            typesParseCtx
+                                    .parse<DSL::Parser::TypeDef::TypeDefFile, DSL::Ast::TypeDef::TypeDefFile>();
+                    if (typesAst.has_value() && !errorTracker.hasErrors())
+                    {
+                        TypePass typePass;
+                        typePass.run(&diagCollector, &symbolTable, &typesAst.value());
+                    }
+                }
+            }
             initializeStandardTypes(symbolTable);
         }
 

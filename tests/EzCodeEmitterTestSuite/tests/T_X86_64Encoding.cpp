@@ -247,3 +247,182 @@ TEST_F(EzCodeEmitterTestSuite, TestRuntimeInstructionEncoderPrimitives)
         EXPECT_FALSE(InstructionEncoder::encode(desc, ops, out, result));
     }
 }
+
+/**
+ * Verifies VEX prefix generation for 2-byte and 3-byte forms, inverted register bits,
+ * 128-bit vs 256-bit vector lengths, and register moves.
+ */
+TEST_F(EzCodeEmitterTestSuite, TestVexEncodingPrefixAndRegisters)
+{
+    // 1. VADDPS xmm0, xmm1, xmm2 -> 2-byte VEX: C5 F0 58 C2
+    {
+        EncodingDesc desc{};
+        desc.m_form = EncForm::Vex;
+        desc.m_opcode[0] = 0x0F;
+        desc.m_opcode[1] = 0x58;
+        desc.m_opcodeLen = 2;
+        desc.m_operandCount = 3;
+        desc.m_operands[0] = EncOperandBinding{ EncSlotKind::Reg, 0, EncRegClass::Any };
+        desc.m_operands[1] = EncOperandBinding{ EncSlotKind::VexReg, 1, EncRegClass::Any };
+        desc.m_operands[2] = EncOperandBinding{ EncSlotKind::RmReg, 2, EncRegClass::Any };
+        desc.m_sizeOperand = 0;
+        desc.m_vexL = 0;
+
+        std::vector<ResolvedOperand> ops(3);
+        ops[0].m_kind = ResolvedOperand::Kind::Register;
+        ops[0].m_reg = 0; // xmm0
+        ops[0].m_sizeBytes = 16;
+        ops[1].m_kind = ResolvedOperand::Kind::Register;
+        ops[1].m_reg = 1; // xmm1
+        ops[1].m_sizeBytes = 16;
+        ops[2].m_kind = ResolvedOperand::Kind::Register;
+        ops[2].m_reg = 2; // xmm2
+        ops[2].m_sizeBytes = 16;
+
+        std::vector<uint8_t> out;
+        EncodeResult result;
+        ASSERT_TRUE(InstructionEncoder::encode(desc, ops, out, result));
+        ASSERT_EQ(out.size(), 4u);
+        EXPECT_EQ(out[0], 0xC5);
+        EXPECT_EQ(out[1], 0xF0);
+        EXPECT_EQ(out[2], 0x58);
+        EXPECT_EQ(out[3], 0xC2);
+    }
+
+    // 2. VADDPS ymm0, ymm1, ymm2 -> 2-byte VEX with L=1: C5 F4 58 C2
+    {
+        EncodingDesc desc{};
+        desc.m_form = EncForm::Vex;
+        desc.m_opcode[0] = 0x0F;
+        desc.m_opcode[1] = 0x58;
+        desc.m_opcodeLen = 2;
+        desc.m_operandCount = 3;
+        desc.m_operands[0] = EncOperandBinding{ EncSlotKind::Reg, 0, EncRegClass::Any };
+        desc.m_operands[1] = EncOperandBinding{ EncSlotKind::VexReg, 1, EncRegClass::Any };
+        desc.m_operands[2] = EncOperandBinding{ EncSlotKind::RmReg, 2, EncRegClass::Any };
+        desc.m_sizeOperand = 0;
+        desc.m_vexL = 1;
+
+        std::vector<ResolvedOperand> ops(3);
+        ops[0].m_kind = ResolvedOperand::Kind::Register;
+        ops[0].m_reg = 0; // ymm0
+        ops[0].m_sizeBytes = 32;
+        ops[1].m_kind = ResolvedOperand::Kind::Register;
+        ops[1].m_reg = 1; // ymm1
+        ops[1].m_sizeBytes = 32;
+        ops[2].m_kind = ResolvedOperand::Kind::Register;
+        ops[2].m_reg = 2; // ymm2
+        ops[2].m_sizeBytes = 32;
+
+        std::vector<uint8_t> out;
+        EncodeResult result;
+        ASSERT_TRUE(InstructionEncoder::encode(desc, ops, out, result));
+        ASSERT_EQ(out.size(), 4u);
+        EXPECT_EQ(out[0], 0xC5);
+        EXPECT_EQ(out[1], 0xF4);
+        EXPECT_EQ(out[2], 0x58);
+        EXPECT_EQ(out[3], 0xC2);
+    }
+
+    // 3. Register move for 256-bit YMM: VMOVAPS ymm0, ymm1 -> C5 FC 28 C1
+    {
+        ResolvedOperand dst{};
+        dst.m_kind = ResolvedOperand::Kind::Register;
+        dst.m_reg = 0;
+        dst.m_sizeBytes = 32;
+
+        ResolvedOperand src{};
+        src.m_kind = ResolvedOperand::Kind::Register;
+        src.m_reg = 1;
+        src.m_sizeBytes = 32;
+
+        std::vector<uint8_t> bytes;
+        InstructionEncoder::encodeRegisterMove(dst, src, bytes);
+        ASSERT_EQ(bytes.size(), 4u);
+        EXPECT_EQ(bytes[0], 0xC5);
+        EXPECT_EQ(bytes[1], 0xFC);
+        EXPECT_EQ(bytes[2], 0x28);
+        EXPECT_EQ(bytes[3], 0xC1);
+    }
+
+    // 4. 3-byte VEX with extended RM register (B=1): VADDPS ymm0, ymm1, ymm8 -> C4 C1 74 58 C0
+    // rm=ymm8 (8 -> B=1, invB=0, which cannot fit in 2-byte VEX).
+    // byte0 = 0xC4
+    // byte1 = (~R=1 << 7) | (~X=1 << 6) | (~B=0 << 5) | map=1 = 0xC1
+    // byte2 = (W=0 << 7) | (~vvvv=14 << 3) | (L=1 << 2) | pp=0 = 0x74
+    // opcode = 0x58
+    // modrm = 11_000_000 = 0xC0 (reg=0, rm=0)
+    {
+        EncodingDesc desc{};
+        desc.m_form = EncForm::Vex;
+        desc.m_opcode[0] = 0x0F;
+        desc.m_opcode[1] = 0x58;
+        desc.m_opcodeLen = 2;
+        desc.m_operandCount = 3;
+        desc.m_operands[0] = EncOperandBinding{ EncSlotKind::Reg, 0, EncRegClass::Any };
+        desc.m_operands[1] = EncOperandBinding{ EncSlotKind::VexReg, 1, EncRegClass::Any };
+        desc.m_operands[2] = EncOperandBinding{ EncSlotKind::RmReg, 2, EncRegClass::Any };
+        desc.m_sizeOperand = 0;
+        desc.m_vexL = 1;
+
+        std::vector<ResolvedOperand> ops(3);
+        ops[0].m_kind = ResolvedOperand::Kind::Register;
+        ops[0].m_reg = 0; // ymm0
+        ops[0].m_sizeBytes = 32;
+        ops[1].m_kind = ResolvedOperand::Kind::Register;
+        ops[1].m_reg = 1; // ymm1
+        ops[1].m_sizeBytes = 32;
+        ops[2].m_kind = ResolvedOperand::Kind::Register;
+        ops[2].m_reg = 8; // ymm8 (forces B=1, 3-byte VEX)
+        ops[2].m_sizeBytes = 32;
+
+        std::vector<uint8_t> out;
+        EncodeResult result;
+        ASSERT_TRUE(InstructionEncoder::encode(desc, ops, out, result));
+        ASSERT_EQ(out.size(), 5u);
+        EXPECT_EQ(out[0], 0xC4);
+        EXPECT_EQ(out[1], 0xC1);
+        EXPECT_EQ(out[2], 0x74);
+        EXPECT_EQ(out[3], 0x58);
+        EXPECT_EQ(out[4], 0xC0);
+    }
+
+    // 5. 3-byte VEX with map 0F38: VPMULLD ymm0, ymm1, ymm2 -> C4 E2 75 40 C2
+    {
+        EncodingDesc desc{};
+        desc.m_form = EncForm::Vex;
+        desc.m_prefixes = EncPrefix66; // pp = 1
+        desc.m_opcode[0] = 0x0F;
+        desc.m_opcode[1] = 0x38;
+        desc.m_opcode[2] = 0x40;
+        desc.m_opcodeLen = 3;
+        desc.m_operandCount = 3;
+        desc.m_operands[0] = EncOperandBinding{ EncSlotKind::Reg, 0, EncRegClass::Any };
+        desc.m_operands[1] = EncOperandBinding{ EncSlotKind::VexReg, 1, EncRegClass::Any };
+        desc.m_operands[2] = EncOperandBinding{ EncSlotKind::RmReg, 2, EncRegClass::Any };
+        desc.m_sizeOperand = 0;
+        desc.m_vexL = 1;
+
+        std::vector<ResolvedOperand> ops(3);
+        ops[0].m_kind = ResolvedOperand::Kind::Register;
+        ops[0].m_reg = 0; // ymm0
+        ops[0].m_sizeBytes = 32;
+        ops[1].m_kind = ResolvedOperand::Kind::Register;
+        ops[1].m_reg = 1; // ymm1
+        ops[1].m_sizeBytes = 32;
+        ops[2].m_kind = ResolvedOperand::Kind::Register;
+        ops[2].m_reg = 2; // ymm2
+        ops[2].m_sizeBytes = 32;
+
+        std::vector<uint8_t> out;
+        EncodeResult result;
+        ASSERT_TRUE(InstructionEncoder::encode(desc, ops, out, result));
+        ASSERT_EQ(out.size(), 5u);
+        EXPECT_EQ(out[0], 0xC4);
+        EXPECT_EQ(out[1], 0xE2);
+        EXPECT_EQ(out[2], 0x75);
+        EXPECT_EQ(out[3], 0x40);
+        EXPECT_EQ(out[4], 0xC2);
+    }
+}
+
