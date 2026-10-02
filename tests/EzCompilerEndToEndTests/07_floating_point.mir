@@ -94,3 +94,40 @@ entry:
     %res = FADD f32 %s2, %d;
     RET f32 %res;
 }
+
+fn @float_to_double(f32 %x) -> f64 {
+entry:
+    %res = FPEXT f64 %x;
+    RET f64 %res;
+}
+
+fn @double_to_float(f64 %x) -> f32 {
+entry:
+    %res = FPTRUNC f32 %x;
+    RET f32 %res;
+}
+
+fn @int64_to_float(i64 %x) -> f32 {
+entry:
+    %res = SITOFP f32 %x;
+    RET f32 %res;
+}
+
+fn @int32_to_double(i32 %x) -> f64 {
+entry:
+    %res = SITOFP f64 %x;
+    RET f64 %res;
+}
+
+fn @float_to_int64(f32 %x) -> i64 {
+entry:
+    %res = FPTOSI i64 %x;
+    RET i64 %res;
+}
+
+fn @double_to_int32(f64 %x) -> i32 {
+entry:
+    %res = FPTOSI i32 %x;
+    RET i32 %res;
+}
+
