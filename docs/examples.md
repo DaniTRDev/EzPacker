@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-EzPacker provides 10 bundled MIR test and demonstration modules in the `examples/` directory. These modules exercise every layer of the compiler:
+EzPacker provides 12 bundled MIR test and demonstration modules in the `examples/` directory. These modules exercise every layer of the compiler:
 - High-level arithmetic and bitwise logic.
 - Complex multi-block control flow graphs with conditional branching and phi-nodes.
 - ABI lowering differences between System V AMD64 (Linux) and Microsoft Win64 (Windows).
@@ -14,6 +14,8 @@ EzPacker provides 10 bundled MIR test and demonstration modules in the `examples
 - Multi-exit functions with distinct epilogues.
 - Deep recursion with caller-saved register clobbering, callee-saved preservation, and object relocations.
 - Structured Exception Handling (SjLj) with `TRY`, `THROW`, and `CATCH` instructions lowered to runtime libcalls.
+- IEEE-754 precision conversions (`FPEXT`, `FPTRUNC`) and signed integer-to-float conversions (`SITOFP`, `FPTOSI`).
+- 128-bit SSE and 256-bit AVX/AVX2 SIMD vector operations (`v4f32`, `v8f32`, `v4i32`, `v8i32`, `v4f64`) with non-destructive 3-operand VEX prefix encoding.
 
 ---
 
@@ -178,7 +180,7 @@ The register allocator colors these chains using hardware registers without spil
 Demonstrates multiple functions within one module and power-of-two division strength reductions:
 
 ```mir
-fn @vector_math(i64 %a, i64 %b) -> i64 {
+fn @arithmetic_chain(i64 %a, i64 %b) -> i64 {
 entry:
     %c100 = MOV i64 100;
     %sum = ADD i64 %a, %c100;
@@ -385,7 +387,108 @@ on_overdraft:
 3. `THROW %payload, @CustomRtti` passes the specified type descriptor symbol to `__ez_throw`, enabling rich RTTI-based inspection and hierarchical type matching.
 4. `THROW` (0-operand) automatically attaches both `@__ez_default_payload` and `@__ez_default_rtti`.
 5. `CATCH %dst` invokes runtime libcall `__ez_get_current_exception` and moves the caught exception payload into `%dst`.
-6. At link time, programs providing exception handling link against `EzExceptionRuntime`, which provides `__ez_default_rtti`, `__ez_default_payload`, and reflection helpers (`__ez_get_rtti_type_name`, `__ez_get_rtti_type_id`).
+- Consult [How to Build a Target Architecture](how_to_build_a_target.md) to understand how instructions, encodings, and calling conventions are defined.
+- Return to the [EzPacker Documentation Index](index.md).
+
+---
+
+### 2.11 `float_conversions.mir`: Precision & Type Conversions
+
+Demonstrates IEEE-754 precision extension (`FPEXT`), truncation (`FPTRUNC`), and signed integer conversions (`SITOFP`, `FPTOSI`):
+
+```mir
+fn @single_to_double(f32 %val) -> f64 {
+entry:
+    %res = FPEXT f64 %val;
+    RET f64 %res;
+}
+
+fn @double_to_single(f64 %val) -> f32 {
+entry:
+    %res = FPTRUNC f32 %val;
+    RET f32 %res;
+}
+
+fn @int_to_float(i32 %val) -> f32 {
+entry:
+    %res = SITOFP f32 %val;
+    RET f32 %res;
+}
+
+fn @float_to_int(f32 %val) -> i32 {
+entry:
+    %res = FPTOSI i32 %val;
+    RET i32 %res;
+}
+```
+
+#### Generated x86-64 Machine Code:
+```nasm
+single_to_double:
+    cvtss2sd xmm0, xmm0
+    ret
+
+double_to_single:
+    cvtsd2ss xmm0, xmm0
+    ret
+
+int_to_float:
+    cvtsi2ss xmm0, edi
+    ret
+
+float_to_int:
+    cvttss2si eax, xmm0
+    ret
+```
+
+---
+
+### 2.12 `vector_simd_avx.mir`: 128-Bit SSE & 256-Bit AVX/AVX2 SIMD Operations
+
+Demonstrates high-performance data-parallel SIMD operations across single-precision (`v4f32`, `v8f32`), double-precision (`v4f64`), and 32-bit integer (`v4i32`, `v8i32`) vector registers:
+
+```mir
+fn @sse_vec4_add(v4f32 %a, v4f32 %b) -> v4f32 {
+entry:
+    %res = VADD v4f32 %a, %b;
+    RET v4f32 %res;
+}
+
+fn @avx_vec8_fma_like(v8f32 %a, v8f32 %b, v8f32 %c) -> v8f32 {
+entry:
+    %prod = VMUL v8f32 %a, %b;
+    %sum = VADD v8f32 %prod, %c;
+    RET v8f32 %sum;
+}
+
+fn @avx2_int_vec8_add(v8i32 %a, v8i32 %b) -> v8i32 {
+entry:
+    %res = VADD v8i32 %a, %b;
+    RET v8i32 %res;
+}
+```
+
+#### Compilation & VEX Prefix Output:
+```bash
+EzCompiler examples/vector_simd_avx.mir -mattr +avx2 -S
+```
+
+```nasm
+sse_vec4_add:
+    vaddps  xmm0, xmm0, xmm1    ; VEX-encoded non-destructive 128-bit vector add
+    ret
+
+avx_vec8_fma_like:
+    vmulps  ymm0, ymm0, ymm1    ; VEX-encoded 256-bit vector multiply
+    vaddps  ymm0, ymm0, ymm2    ; VEX-encoded 256-bit vector addition
+    ret
+
+avx2_int_vec8_add:
+    vpaddd  ymm0, ymm0, ymm1    ; AVX2 256-bit packed 32-bit integer add
+    ret
+```
+
+*Key Architectural Insight*: EzTargets' instruction encoder automatically selects compact 2-byte (`0xC5`) or 3-byte (`0xC4`) VEX prefixes, binds the second operand to the inverted `VEX.vvvv` field, and uses `VR256` (`ymm0`..`ymm15`) registers when 256-bit vector types are encountered.
 
 ---
 
@@ -407,6 +510,8 @@ extern int64_t factorial(int64_t n);
 extern int64_t fibonacci(int64_t n);
 extern int64_t safe_divide(int64_t a, int64_t b);
 extern int64_t process_account(int64_t balance, int64_t debit);
+extern double float_to_double(float x);
+extern int64_t float_to_int64(float x);
 
 int main(void) {
     printf("Running EzPacker End-to-End Verification...\n");
@@ -442,6 +547,11 @@ int main(void) {
     assert(process_account(500, 200) == 300);
     printf("exceptions verified!\n");
 
+    // 7. Test float conversions
+    assert(float_to_double(3.14159f) > 3.14158 && float_to_double(3.14159f) < 3.14160);
+    assert(float_to_int64(42.85f) == 42);
+    printf("float conversions verified!\n");
+
     printf("\nAll EzPacker example modules executed successfully!\n");
     return 0;
 }
@@ -456,9 +566,10 @@ EzCompiler examples/calling_conventions.mir -o calling.o
 EzCompiler examples/memory_fold.mir -o memory.o
 EzCompiler examples/recursive_factorial.mir -o factorial.o
 EzCompiler examples/exception_handling.mir -o exceptions.o
+EzCompiler examples/float_conversions.mir -o float_conv.o
 
 # 2. Link with GCC or Clang (linking EzExceptionRuntime)
-gcc test_examples.c arithmetic.o branch.o calling.o memory.o factorial.o exceptions.o -lEzExceptionRuntime -o verify_suite
+gcc test_examples.c arithmetic.o branch.o calling.o memory.o factorial.o exceptions.o float_conv.o -lEzExceptionRuntime -o verify_suite
 
 # 3. Execute
 ./verify_suite

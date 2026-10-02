@@ -98,7 +98,7 @@ flowchart LR
 ### 📖 Essential Guides
 - **[First Steps & Quickstart](first_steps.md)**: Write your first MIR module, compile to native object code, inspect intermediate pipeline states, and link with host C/C++ toolchains.
 - **[Comprehensive Build Guide](build_guide.md)**: Toolchain requirements, CMake configuration options, step-by-step compilation on Windows and Linux, running test suites, and generating docs.
-- **[Examples & Use Cases](examples.md)**: In-depth technical walkthrough of all 10 bundled MIR modules (arithmetic, control flow, ABI lowering, crypto hashing, load-folding, recursion, epilogues, and exceptions).
+- **[Examples & Use Cases](examples.md)**: In-depth technical walkthrough of all 12 bundled MIR modules (arithmetic, control flow, ABI lowering, crypto hashing, load-folding, recursion, epilogues, exceptions, float conversions, and vector SIMD/AVX).
 - **[How to Build a Target Architecture](how_to_build_a_target.md)**: Complete architectural tutorial on adding a new CPU architecture backend to EzPacker from first principles.
 
 ### 🏛️ Subproject Overviews

@@ -1,0 +1,40 @@
+// EzPacker Custom MIR Module: float_conversions.mir
+// Demonstrates floating-point extension (FPEXT), truncation (FPTRUNC),
+// and signed integer-to-float conversions (SITOFP, FPTOSI).
+// Target backend maps these to x86-64 CVTSS2SD, CVTSD2SS, CVTSI2SS, and CVTTSS2SI.
+
+fn @single_to_double(f32 %val) -> f64 {
+entry:
+    %res = FPEXT f64 %val;
+    RET f64 %res;
+}
+
+fn @double_to_single(f64 %val) -> f32 {
+entry:
+    %res = FPTRUNC f32 %val;
+    RET f32 %res;
+}
+
+fn @int_to_float(i32 %val) -> f32 {
+entry:
+    %res = SITOFP f32 %val;
+    RET f32 %res;
+}
+
+fn @float_to_int(f32 %val) -> i32 {
+entry:
+    %res = FPTOSI i32 %val;
+    RET i32 %res;
+}
+
+fn @int64_to_double(i64 %val) -> f64 {
+entry:
+    %res = SITOFP f64 %val;
+    RET f64 %res;
+}
+
+fn @double_to_int64(f64 %val) -> i64 {
+entry:
+    %res = FPTOSI i64 %val;
+    RET i64 %res;
+}
