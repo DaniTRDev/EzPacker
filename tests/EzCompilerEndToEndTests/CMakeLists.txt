@@ -41,11 +41,20 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
     set(TEST_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_test${CMAKE_EXECUTABLE_SUFFIX}")
 
     if(TEST_NAME STREQUAL "12_exceptions")
-        set(EXTRA_LINK_FLAGS "$<TARGET_FILE:EzExceptionRuntime>" -lstdc++)
-        set(EXTRA_DEPENDS EzExceptionRuntime)
+        set(WIN_EXTRA_LINK_FLAGS "$<TARGET_FILE:EzExceptionRuntime>" -lstdc++)
+        set(WIN_EXTRA_DEPENDS EzExceptionRuntime)
+        if(HOST_IS_WINDOWS)
+            set(LINUX_EXTRA_LINK_FLAGS "")
+            set(LINUX_EXTRA_DEPENDS "")
+        else()
+            set(LINUX_EXTRA_LINK_FLAGS "$<TARGET_FILE:EzExceptionRuntime>" -lstdc++)
+            set(LINUX_EXTRA_DEPENDS EzExceptionRuntime)
+        endif()
     else()
-        set(EXTRA_LINK_FLAGS "")
-        set(EXTRA_DEPENDS "")
+        set(WIN_EXTRA_LINK_FLAGS "")
+        set(WIN_EXTRA_DEPENDS "")
+        set(LINUX_EXTRA_LINK_FLAGS "")
+        set(LINUX_EXTRA_DEPENDS "")
     endif()
 
     # 1. Compile MIR file to Windows x64 COFF object
@@ -73,8 +82,8 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
         # 3a. Compile and link Windows test runner (Win64 ABI)
         add_custom_command(
             OUTPUT "${WIN_TEST_EXE}"
-            COMMAND "${CMAKE_C_COMPILER}" -DABI_WIN64 "${C_TEST_FILE}" "${WIN_OBJ}" ${EXTRA_LINK_FLAGS} -o "${WIN_TEST_EXE}"
-            DEPENDS "${C_TEST_FILE}" "${WIN_OBJ}" ${EXTRA_DEPENDS}
+            COMMAND "${CMAKE_C_COMPILER}" -DABI_WIN64 "${C_TEST_FILE}" "${WIN_OBJ}" ${WIN_EXTRA_LINK_FLAGS} -o "${WIN_TEST_EXE}"
+            DEPENDS "${C_TEST_FILE}" "${WIN_OBJ}" ${WIN_EXTRA_DEPENDS}
             COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_win_test (${TEST_NAME}_test.c [Win64] + ${WIN_OBJ})"
             VERBATIM
         )
@@ -82,8 +91,8 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
         # 3b. Compile and link Linux test runner (SysV ABI) via MinGW GCC
         add_custom_command(
             OUTPUT "${LINUX_TEST_EXE}"
-            COMMAND "${CMAKE_C_COMPILER}" -DABI_SYSV "${C_TEST_FILE}" "${LINUX_OBJ}" ${EXTRA_LINK_FLAGS} -o "${LINUX_TEST_EXE}"
-            DEPENDS "${C_TEST_FILE}" "${LINUX_OBJ}" ${EXTRA_DEPENDS}
+            COMMAND "${CMAKE_C_COMPILER}" -DABI_SYSV "${C_TEST_FILE}" "${LINUX_OBJ}" ${LINUX_EXTRA_LINK_FLAGS} -o "${LINUX_TEST_EXE}"
+            DEPENDS "${C_TEST_FILE}" "${LINUX_OBJ}" ${LINUX_EXTRA_DEPENDS}
             COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_linux_test (${TEST_NAME}_test.c [SysV] + ${LINUX_OBJ})"
             VERBATIM
         )
@@ -123,8 +132,8 @@ foreach(TEST_NAME IN LISTS E2E_TESTS)
         # 3. Compile and link Linux test runner (SysV ABI)
         add_custom_command(
             OUTPUT "${LINUX_TEST_EXE}"
-            COMMAND "${CMAKE_C_COMPILER}" -DABI_SYSV "${C_TEST_FILE}" "${LINUX_OBJ}" ${EXTRA_LINK_FLAGS} -o "${LINUX_TEST_EXE}"
-            DEPENDS "${C_TEST_FILE}" "${LINUX_OBJ}" ${EXTRA_DEPENDS}
+            COMMAND "${CMAKE_C_COMPILER}" -DABI_SYSV "${C_TEST_FILE}" "${LINUX_OBJ}" ${LINUX_EXTRA_LINK_FLAGS} -o "${LINUX_TEST_EXE}"
+            DEPENDS "${C_TEST_FILE}" "${LINUX_OBJ}" ${LINUX_EXTRA_DEPENDS}
             COMMENT "[EzCompiler E2E] Linking ${TEST_NAME}_linux_test (${TEST_NAME}_test.c [SysV] + ${LINUX_OBJ})"
             VERBATIM
         )

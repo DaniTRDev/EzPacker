@@ -7,7 +7,11 @@
 ;   - Win64 (COFF) and SysV (ELF) ABI calling conventions for exception libcalls
 ; ==============================================================================
 
+declare @CustomUserException() -> _void;
+
 fn @test_simple_throw_catch(i64 %val) -> i64 {
+
+
 entry:
     TRY label %try_body, label %catch_block;
 
@@ -55,3 +59,10 @@ on_err:
     %res = SUB i64 %zero, %penalty;
     RET i64 %res;
 }
+
+fn @test_throw_custom_rtti(i64 %val) -> i64 {
+entry:
+    %code = MOV i64 999;
+    THROW i64 %code, @CustomUserException;
+}
+

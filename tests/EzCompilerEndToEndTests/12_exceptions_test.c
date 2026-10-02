@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #ifndef __USE_MINGW_SETJMP_NON_SEH
 #define __USE_MINGW_SETJMP_NON_SEH 1
@@ -12,22 +14,105 @@
 // Declarations of functions defined in 12_exceptions.mir
 ABI_ATTR extern int64_t test_simple_throw_catch(int64_t val);
 ABI_ATTR extern int64_t test_conditional_throw(int64_t balance, int64_t debit);
+ABI_ATTR extern int64_t test_throw_custom_rtti(int64_t val);
+
+struct StringViewStub {
+#ifdef _MSC_VER
+    const char *data;
+    size_t size;
+#else
+    size_t size;
+    const char *data;
+#endif
+};
+
+struct SourceRefDataStub {
+    struct StringViewStub filePath;
+    struct StringViewStub functionName;
+    uint32_t line;
+    uint32_t column;
+    struct StringViewStub snippet;
+};
+
+// Binary layout matching EzCore::RttiTypeDescriptor
+struct RttiTypeDescriptorStub {
+    uint64_t typeId;
+    struct StringViewStub typeName;
+    uint32_t numBases;
+    uint32_t padding;
+    const void *bases;
+    struct SourceRefDataStub declarationSite;
+};
+
+// Export CustomUserException symbol with C linkage
+const struct RttiTypeDescriptorStub CustomUserException = {
+    .typeId = 123456789ULL,
+    .typeName = { .size = 19, .data = "CustomUserException" },
+    .numBases = 0,
+    .padding = 0,
+    .bases = NULL,
+    .declarationSite = {
+        .filePath = { .size = 20, .data = "12_exceptions_test.c" },
+        .functionName = { .size = 22, .data = "test_throw_custom_rtti" },
+        .line = 50,
+        .column = 1,
+        .snippet = { .size = 21, .data = "Custom User Exception" }
+    }
+};
 
 #if defined(ABI_SYSV) && defined(_WIN32)
-#include <stdlib.h>
 static void *s_sysv_payload = NULL;
+static const void *s_sysv_rtti = NULL;
 static struct EzExceptionFrame *s_sysv_top_frame = NULL;
 
+const struct RttiTypeDescriptorStub __ez_default_rtti = {
+    .typeId = 14695981039346656037ULL,
+    .typeName = { .size = 18, .data = "EzDefaultException" },
+    .numBases = 0,
+    .padding = 0,
+    .bases = NULL,
+    .declarationSite = {
+        .filePath = { .size = 9, .data = "<runtime>" },
+        .functionName = { .size = 9, .data = "<unknown>" },
+        .line = 0,
+        .column = 0,
+        .snippet = { .size = 17, .data = "Default exception" }
+    }
+};
+
+const char __ez_default_payload[64] = "Default exception payload";
+
+EZ_EX_API const void *__ez_get_default_rtti(void) {
+    return &__ez_default_rtti;
+}
+
+EZ_EX_API const void *__ez_get_default_payload(void) {
+    return &__ez_default_payload;
+}
+
+EZ_EX_API const char *__ez_get_rtti_type_name(const void *rtti) {
+    if (!rtti) return "";
+    const struct RttiTypeDescriptorStub *desc = (const struct RttiTypeDescriptorStub *)rtti;
+    return desc->typeName.data ? desc->typeName.data : "";
+}
+
+EZ_EX_API uint64_t __ez_get_rtti_type_id(const void *rtti) {
+    if (!rtti) return 0;
+    const struct RttiTypeDescriptorStub *desc = (const struct RttiTypeDescriptorStub *)rtti;
+    return desc->typeId;
+}
+
 EZ_EX_API void __ez_throw(void *payload, const void *rtti) {
-    (void)rtti;
     if (!s_sysv_top_frame) {
         fprintf(stderr, "fatal: uncaught SysV exception\n");
         abort();
     }
     struct EzExceptionFrame *target = s_sysv_top_frame;
     s_sysv_top_frame = target->prev;
-    s_sysv_payload = payload;
-    target->currentPayload = payload;
+    s_sysv_payload = payload ? payload : (void *)__ez_get_default_payload();
+    s_sysv_rtti = rtti ? rtti : __ez_get_default_rtti();
+    target->currentPayload = s_sysv_payload;
+    target->currentRtti = s_sysv_rtti;
     target->isCaught = 1;
     longjmp(target->jmpBuf, 1);
 }
@@ -36,10 +121,15 @@ EZ_EX_API void *__ez_get_current_exception(void) {
     return s_sysv_payload;
 }
 
+EZ_EX_API const void *__ez_get_current_rtti(void) {
+    return s_sysv_rtti;
+}
+
 EZ_EX_API int __ez_try_enter(struct EzExceptionFrame *frame) {
     if (!frame) return 0;
     frame->prev = s_sysv_top_frame;
     frame->currentPayload = NULL;
+    frame->currentRtti = NULL;
     frame->isCaught = 0;
     s_sysv_top_frame = frame;
     return 0;
@@ -74,7 +164,11 @@ int main(void) {
         } else {
             int64_t payload = (int64_t)(uintptr_t)__ez_get_current_exception();
             assert(payload == 42);
-            printf("  [Pass] test_simple_throw_catch exception path: caught payload %lld\n", (long long)payload);
+            const void *rtti = __ez_get_current_rtti();
+            assert(rtti != NULL);
+            assert(strcmp(__ez_get_rtti_type_name(rtti), "EzDefaultException") == 0);
+            printf("  [Pass] test_simple_throw_catch exception path: caught payload %lld, default RTTI: %s\n",
+                   (long long)payload, __ez_get_rtti_type_name(rtti));
         }
         __ez_try_leave(&frame);
     }
@@ -94,7 +188,31 @@ int main(void) {
         } else {
             int64_t code = (int64_t)(uintptr_t)__ez_get_current_exception();
             assert(code == 402);
-            printf("  [Pass] test_conditional_throw overdraft path: caught code %lld\n", (long long)code);
+            const void *rtti = __ez_get_current_rtti();
+            assert(rtti != NULL);
+            assert(strcmp(__ez_get_rtti_type_name(rtti), "EzDefaultException") == 0);
+            printf("  [Pass] test_conditional_throw overdraft path: caught code %lld, RTTI: %s\n",
+                   (long long)code, __ez_get_rtti_type_name(rtti));
+        }
+        __ez_try_leave(&frame);
+    }
+
+    // 5. test_throw_custom_rtti: throws 999 with CustomUserException RTTI
+    {
+        struct EzExceptionFrame frame;
+        __ez_try_enter(&frame);
+        if (setjmp(frame.jmpBuf) == 0) {
+            test_throw_custom_rtti(0);
+            assert(0 && "Expected test_throw_custom_rtti to throw!");
+        } else {
+            int64_t code = (int64_t)(uintptr_t)__ez_get_current_exception();
+            assert(code == 999);
+            const void *rtti = __ez_get_current_rtti();
+            assert(rtti != NULL);
+            assert(strcmp(__ez_get_rtti_type_name(rtti), "CustomUserException") == 0);
+            assert(__ez_get_rtti_type_id(rtti) == 123456789ULL);
+            printf("  [Pass] test_throw_custom_rtti path: caught payload %lld, custom RTTI: %s (id: %llu)\n",
+                   (long long)code, __ez_get_rtti_type_name(rtti), (unsigned long long)__ez_get_rtti_type_id(rtti));
         }
         __ez_try_leave(&frame);
     }
@@ -104,3 +222,4 @@ int main(void) {
     printf("[E2E Test 12] PASS: All exception tests succeeded.\n");
     return 0;
 }
+

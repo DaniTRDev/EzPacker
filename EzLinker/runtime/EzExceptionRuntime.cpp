@@ -6,6 +6,9 @@
 
 extern "C" {
 
+extern EZ_EX_API const EzCore::RttiTypeDescriptor __ez_default_rtti;
+extern EZ_EX_API const EzCore::RichExceptionPayload __ez_default_payload;
+
 EZ_EX_API const EzCore::RttiTypeDescriptor __ez_default_rtti = {
     .typeId = EzCore::kDefaultExceptionTypeId,
     .typeName = EzCore::kDefaultExceptionTypeName,
@@ -19,6 +22,7 @@ EZ_EX_API const EzCore::RichExceptionPayload __ez_default_payload = {
     .rtti = &__ez_default_rtti,
     .throwSite = { "<unknown>", "<unknown>", 0, 0, "Default exception payload" }
 };
+
 
 thread_local EzExceptionFrame *g_ezTopFrame = nullptr;
 thread_local void *g_ezCurrentPayload = nullptr;

@@ -4,9 +4,13 @@
 ; Demonstrates structured exception handling (SjLj) using EzPacker's native
 ; TRY, THROW, and CATCH intermediate representation instructions:
 ; - TRY label %body, label %handler: Establishes a protected region
-; - THROW %payload: Raises an exception with an error code / object payload
+; - THROW %payload: Raises an exception with payload, auto-attaching default RTTI (@__ez_default_rtti)
+; - THROW %payload, @RttiDesc: Raises an exception with payload and explicit RTTI descriptor
+; - THROW: Raises an exception with default payload and default RTTI
 ; - CATCH %dst: Captures the exception payload at the handler block
 ; ==============================================================================
+
+declare @ValidationException() -> _void;
 
 fn @safe_divide(i64 %a, i64 %b) -> i64 {
 entry:
@@ -55,3 +59,10 @@ on_overdraft:
     %neg_fee = SUB i64 %zero, %penalty;
     RET i64 %neg_fee;
 }
+
+fn @validate_and_throw_custom(i64 %input) -> i64 {
+entry:
+    %err = MOV i64 901;
+    THROW i64 %err, @ValidationException;
+}
+

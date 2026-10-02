@@ -381,9 +381,11 @@ on_overdraft:
 
 #### Under the Hood:
 1. `TRY label %try_body, label %catch_block` registers the protected region and handler landing pad.
-2. `THROW %payload` moves the exception payload into the platform ABI's first argument register (`rdi` on System V AMD64, `rcx` on Win64) and emits a direct call to `__ez_throw`.
-3. `CATCH %dst` invokes runtime libcall `__ez_get_current_exception` and moves the caught exception payload into `%dst`.
-4. At link time, programs providing exception handling link against `EzExceptionRuntime`.
+2. `THROW %payload` moves the exception payload into the platform ABI's first argument register (`rdi` on System V AMD64, `rcx` on Win64), automatically attaches `@__ez_default_rtti` as the second argument (`rsi` on System V AMD64, `rdx` on Win64), and emits a direct call to `__ez_throw`.
+3. `THROW %payload, @CustomRtti` passes the specified type descriptor symbol to `__ez_throw`, enabling rich RTTI-based inspection and hierarchical type matching.
+4. `THROW` (0-operand) automatically attaches both `@__ez_default_payload` and `@__ez_default_rtti`.
+5. `CATCH %dst` invokes runtime libcall `__ez_get_current_exception` and moves the caught exception payload into `%dst`.
+6. At link time, programs providing exception handling link against `EzExceptionRuntime`, which provides `__ez_default_rtti`, `__ez_default_payload`, and reflection helpers (`__ez_get_rtti_type_name`, `__ez_get_rtti_type_id`).
 
 ---
 
