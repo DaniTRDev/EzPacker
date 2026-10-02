@@ -205,6 +205,7 @@ void CppCallingConvGenerator::emitSource(CppSourceEmitter &emitter,
                             auto ifType = emitter.enterBlock();
                             emitter.emitLine("if (type->getKind() == MirTypeKind::Vector)");
                             emitter.indent();
+                            emitter.emitLine("if (type->getTotalSizeInBits() == 256) { if (auto *cls = bank->getClass(\"VR256\")) return cls; }");
                             emitter.emitLine("if (auto *cls = bank->getClass(\"VR128\")) return cls;");
                             emitter.dedent();
                             emitter.emitLine("else if (type->getTotalSizeInBits() == 32)");

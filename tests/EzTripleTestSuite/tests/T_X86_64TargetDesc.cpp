@@ -432,6 +432,104 @@ TEST_F(EzTripleTestSuite, TestX86_64VectorInstructionSelectionExtensionGuards)
     EXPECT_FALSE(isel->select(ctx, inst));
 }
 
+// Verifies VR256 register class and AVX/AVX2 vector instruction selection.
+TEST_F(EzTripleTestSuite, TestX86_64AvxInstructionSelectionAndVR256)
+{
+    X86_64TargetDesc target(getBuilderCtx());
+    target.initialize();
+
+    auto *ctx = getBuilderCtx();
+    auto *tt = ctx->getTypeTable();
+
+    // Verify VR256 register class
+    MirRegisterClass *vr256 = target.getVr256Class();
+    ASSERT_NE(vr256, nullptr);
+    EXPECT_STREQ(vr256->getName(), "VR256");
+    EXPECT_EQ(vr256->getRegs().size(), 16u);
+    ASSERT_NE(vr256->getReg("ymm0"), nullptr);
+    EXPECT_EQ(vr256->getReg("ymm0")->m_bitSize, 256u);
+    ASSERT_NE(vr256->getReg("ymm15"), nullptr);
+    EXPECT_EQ(vr256->getReg("ymm15")->m_bitSize, 256u);
+
+    // Verify register bank is FPR
+    auto *fprBank = vr256->getBank();
+    ASSERT_NE(fprBank, nullptr);
+    EXPECT_STREQ(fprBank->getName(), "FPR");
+
+    auto *func = createTestFunction("test_avx_isel", tt->_void());
+    auto *entry = func->getEntryPoint();
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+    MirInstructionSelector *isel = target.getInstructionSelector();
+    ASSERT_NE(isel, nullptr);
+
+    // 1. Without AVX, 256-bit VADD fails selection
+    auto *v8f32Type = tt->v8f32();
+    auto *dst8f = ob.buildVReg(v8f32Type, "dst8f");
+    auto *src8fa = ob.buildVReg(v8f32Type, "src8fa");
+    auto *src8fb = ob.buildVReg(v8f32Type, "src8fb");
+    auto *inst256 = ib.VADD(dst8f, src8fa, src8fb);
+    EXPECT_FALSE(isel->select(ctx, inst256));
+
+    // 2. Enable AVX
+    EXPECT_TRUE(target.getExtensionSet().enable("avx"));
+    EXPECT_TRUE(target.hasExtension("avx"));
+
+    // 256-bit VADD should now select VADDPS256rr with VR256
+    ASSERT_TRUE(isel->select(ctx, inst256));
+    EXPECT_TRUE(inst256->isErased());
+    auto &instrs = entry->getInstructions();
+    ASSERT_FALSE(instrs.empty());
+    MirInstruction *selected256 = instrs.back();
+    ASSERT_NE(selected256->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected256->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VADDPS256rr));
+    EXPECT_STREQ(selected256->getTargetDesc()->getName(), "VADDPS256rr");
+    EXPECT_EQ(dst8f->getRegClass(), target.getVr256Class());
+
+    // 3. 128-bit VADD with AVX enabled selects VADDPSrr (cost=1 over ADDPSrr cost=2)
+    auto *v4f32Type = tt->v4f32();
+    auto *dst4f = ob.buildVReg(v4f32Type, "dst4f");
+    auto *src4fa = ob.buildVReg(v4f32Type, "src4fa");
+    auto *src4fb = ob.buildVReg(v4f32Type, "src4fb");
+    auto *inst128 = ib.VADD(dst4f, src4fa, src4fb);
+    ASSERT_TRUE(isel->select(ctx, inst128));
+    EXPECT_TRUE(inst128->isErased());
+    MirInstruction *selected128 = instrs.back();
+    ASSERT_NE(selected128->getTargetDesc(), nullptr);
+    EXPECT_EQ(selected128->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VADDPSrr));
+    EXPECT_STREQ(selected128->getTargetDesc()->getName(), "VADDPSrr");
+    EXPECT_EQ(dst4f->getRegClass(), target.getVr128Class());
+
+    // 4. 256-bit MOV with AVX enabled selects VMOVAPS256rr
+    auto *dstMove256 = ob.buildVReg(v8f32Type, "dstMove256");
+    auto *instMove256 = ib.MOV(dstMove256, src8fa);
+    ASSERT_TRUE(isel->select(ctx, instMove256));
+    EXPECT_TRUE(instMove256->isErased());
+    MirInstruction *selectedMove256 = instrs.back();
+    ASSERT_NE(selectedMove256->getTargetDesc(), nullptr);
+    EXPECT_EQ(selectedMove256->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VMOVAPS256rr));
+    EXPECT_EQ(dstMove256->getRegClass(), target.getVr256Class());
+
+    // 5. 256-bit integer VADD requires AVX2
+    EXPECT_FALSE(target.hasExtension("avx2"));
+    auto *v8i32Type = tt->v8i32();
+    auto *dst8i = ob.buildVReg(v8i32Type, "dst8i");
+    auto *src8ia = ob.buildVReg(v8i32Type, "src8ia");
+    auto *src8ib = ob.buildVReg(v8i32Type, "src8ib");
+    auto *instAvx2 = ib.VADD(dst8i, src8ia, src8ib);
+    EXPECT_FALSE(isel->select(ctx, instAvx2));
+
+    EXPECT_TRUE(target.getExtensionSet().enable("avx2"));
+    EXPECT_TRUE(target.hasExtension("avx2"));
+    ASSERT_TRUE(isel->select(ctx, instAvx2));
+    EXPECT_TRUE(instAvx2->isErased());
+    MirInstruction *selectedAvx2 = instrs.back();
+    ASSERT_NE(selectedAvx2->getTargetDesc(), nullptr);
+    EXPECT_EQ(selectedAvx2->getTargetDesc()->getId(), static_cast<size_t>(x86_64TargetInst::VPADDD256rr));
+    EXPECT_STREQ(selectedAvx2->getTargetDesc()->getName(), "VPADDD256rr");
+    EXPECT_EQ(dst8i->getRegClass(), target.getVr256Class());
+}
+
 // Verifies vector instruction legality for 128-bit and 256-bit vector types.
 TEST_F(EzTripleTestSuite, TestX86_64VectorLegalizationTable)
 {

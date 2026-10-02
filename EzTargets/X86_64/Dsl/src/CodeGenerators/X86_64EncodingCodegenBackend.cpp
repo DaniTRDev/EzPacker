@@ -116,7 +116,8 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
                        ".m_opcode = {}, .m_opcodeLen = {}, .m_operandCount = {}, .m_operands = {}, "
                        ".m_sizeOperand = {}, .m_coalesceSrc = {}, .m_relocOperand = {}, "
                        ".m_shiftByCL = {}, .m_movabs = {}, .m_byteRex = {}, .m_condCode = {}, "
-                       ".m_hasSseVariant = {}, .m_ssePrefixes = {}, .m_sseOpcode = {}, .m_sseOpcodeLen = {} }}",
+                       ".m_hasSseVariant = {}, .m_ssePrefixes = {}, .m_sseOpcode = {}, .m_sseOpcodeLen = {}, "
+                       ".m_vexL = {}, .m_vexW = {} }}",
                        Sema::Encoding::X86Vocab::formEnum(enc.m_form),
                        static_cast<unsigned>(enc.m_prefixes),
                        rexPolicy,
@@ -135,7 +136,9 @@ std::string emitEncodingDesc(const Symbols::TargetInstructionSymbol &data, const
                        enc.m_hasSseVariant ? "true" : "false",
                        static_cast<unsigned>(enc.m_ssePrefixes),
                        toByteList(enc.m_sseOpcode),
-                       static_cast<unsigned>(enc.m_sseOpcode.size()));
+                       static_cast<unsigned>(enc.m_sseOpcode.size()),
+                       enc.m_vexL.has_value() ? static_cast<unsigned>(enc.m_vexL.value()) : 0xFFu,
+                       enc.m_vexW.has_value() ? static_cast<unsigned>(enc.m_vexW.value()) : 0u);
 }
 
 // Registers the x86-64 backend (and legacy target-name aliases) at load time.

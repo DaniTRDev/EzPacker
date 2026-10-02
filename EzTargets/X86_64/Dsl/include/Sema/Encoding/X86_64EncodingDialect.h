@@ -45,6 +45,8 @@ struct X86EncodingSpec
     bool m_hasSseVariant{ false };                 ///< Also carries an SSE opcode form.
     uint8_t m_ssePrefixes{ 0 };
     std::vector<uint8_t> m_sseOpcode;
+    std::optional<uint8_t> m_vexL;                 ///< Explicit VEX.L override.
+    std::optional<uint8_t> m_vexW;                 ///< VEX.W bit.
 };
 
 /**

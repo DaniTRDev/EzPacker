@@ -495,6 +495,18 @@ pattern Select_MOV_v4f32 [cost = 1] {
     };
 };
 
+pattern Select_MOV_v4f32_avx [cost = 2] {
+    match {
+        MOV v4f32:$dst, v4f32:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVAPSrr VR128:$dst, VR128:$src;
+    };
+};
+
 pattern Select_MOV_v2f64 [cost = 1] {
     match {
         MOV v2f64:$dst, v2f64:$src;
@@ -504,6 +516,18 @@ pattern Select_MOV_v2f64 [cost = 1] {
     };
     select {
         MOVAPDrr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v2f64_avx [cost = 2] {
+    match {
+        MOV v2f64:$dst, v2f64:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVAPDrr VR128:$dst, VR128:$src;
     };
 };
 
@@ -519,6 +543,18 @@ pattern Select_MOV_v4i32 [cost = 1] {
     };
 };
 
+pattern Select_MOV_v4i32_avx [cost = 2] {
+    match {
+        MOV v4i32:$dst, v4i32:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
 pattern Select_MOV_v2i64 [cost = 1] {
     match {
         MOV v2i64:$dst, v2i64:$src;
@@ -528,6 +564,18 @@ pattern Select_MOV_v2i64 [cost = 1] {
     };
     select {
         MOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v2i64_avx [cost = 2] {
+    match {
+        MOV v2i64:$dst, v2i64:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQArr VR128:$dst, VR128:$src;
     };
 };
 
@@ -543,6 +591,18 @@ pattern Select_MOV_v16i8 [cost = 1] {
     };
 };
 
+pattern Select_MOV_v16i8_avx [cost = 2] {
+    match {
+        MOV v16i8:$dst, v16i8:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
 pattern Select_MOV_v8i16 [cost = 1] {
     match {
         MOV v8i16:$dst, v8i16:$src;
@@ -552,6 +612,90 @@ pattern Select_MOV_v8i16 [cost = 1] {
     };
     select {
         MOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v8i16_avx [cost = 2] {
+    match {
+        MOV v8i16:$dst, v8i16:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQArr VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v8f32 [cost = 1] {
+    match {
+        MOV v8f32:$dst, v8f32:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVAPS256rr VR256:$dst, VR256:$src;
+    };
+};
+
+pattern Select_MOV_v4f64 [cost = 1] {
+    match {
+        MOV v4f64:$dst, v4f64:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVAPD256rr VR256:$dst, VR256:$src;
+    };
+};
+
+pattern Select_MOV_v8i32 [cost = 1] {
+    match {
+        MOV v8i32:$dst, v8i32:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQA256rr VR256:$dst, VR256:$src;
+    };
+};
+
+pattern Select_MOV_v4i64 [cost = 1] {
+    match {
+        MOV v4i64:$dst, v4i64:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQA256rr VR256:$dst, VR256:$src;
+    };
+};
+
+pattern Select_MOV_v32i8 [cost = 1] {
+    match {
+        MOV v32i8:$dst, v32i8:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQA256rr VR256:$dst, VR256:$src;
+    };
+};
+
+pattern Select_MOV_v16i16 [cost = 1] {
+    match {
+        MOV v16i16:$dst, v16i16:$src;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMOVDQA256rr VR256:$dst, VR256:$src;
     };
 };
 
@@ -1080,4 +1224,589 @@ pattern Select_VMAX_v4i32 [cost = 1] {
         PMAXSDrr VR128:$dst, VR128:$src1, VR128:$src2;
     };
 };
+
+// ============================================================================
+// AVX Patterns (128-bit)
+// ============================================================================
+
+pattern Select_VADD_v4f32_avx [cost = 2] {
+    match {
+        VADD v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VADDPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v4f32_avx [cost = 2] {
+    match {
+        VSUB v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VSUBPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v4f32_avx [cost = 2] {
+    match {
+        VMUL v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMULPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v4f32_avx [cost = 2] {
+    match {
+        VDIV v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VDIVPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v4f32_avx [cost = 2] {
+    match {
+        VAND v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VANDPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v4f32_avx [cost = 2] {
+    match {
+        VOR v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VORPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v4f32_avx [cost = 2] {
+    match {
+        VXOR v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VXORPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v4f32_avx [cost = 2] {
+    match {
+        VMIN v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMINPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v4f32_avx [cost = 2] {
+    match {
+        VMAX v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMAXPSrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v2f64_avx [cost = 2] {
+    match {
+        VADD v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VADDPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v2f64_avx [cost = 2] {
+    match {
+        VSUB v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VSUBPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v2f64_avx [cost = 2] {
+    match {
+        VMUL v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMULPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v2f64_avx [cost = 2] {
+    match {
+        VDIV v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VDIVPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v2f64_avx [cost = 2] {
+    match {
+        VAND v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VANDPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v2f64_avx [cost = 2] {
+    match {
+        VOR v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VORPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v2f64_avx [cost = 2] {
+    match {
+        VXOR v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VXORPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v2f64_avx [cost = 2] {
+    match {
+        VMIN v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMINPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v2f64_avx [cost = 2] {
+    match {
+        VMAX v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMAXPDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v4i32_avx2 [cost = 2] {
+    match {
+        VADD v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPADDDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v4i32_avx2 [cost = 2] {
+    match {
+        VSUB v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPSUBDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v4i32_avx2 [cost = 2] {
+    match {
+        VMUL v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPMULLDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v4i32_avx2 [cost = 2] {
+    match {
+        VAND v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPANDrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v4i32_avx2 [cost = 2] {
+    match {
+        VOR v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPORrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v4i32_avx2 [cost = 2] {
+    match {
+        VXOR v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPXORrr VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// ============================================================================
+// AVX / AVX2 Patterns (256-bit)
+// ============================================================================
+
+pattern Select_VADD_v8f32 [cost = 1] {
+    match {
+        VADD v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VADDPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VSUB_v8f32 [cost = 1] {
+    match {
+        VSUB v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VSUBPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VMUL_v8f32 [cost = 1] {
+    match {
+        VMUL v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMULPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VDIV_v8f32 [cost = 1] {
+    match {
+        VDIV v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VDIVPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VAND_v8f32 [cost = 1] {
+    match {
+        VAND v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VANDPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VOR_v8f32 [cost = 1] {
+    match {
+        VOR v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VORPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VXOR_v8f32 [cost = 1] {
+    match {
+        VXOR v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VXORPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VMIN_v8f32 [cost = 1] {
+    match {
+        VMIN v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMINPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VMAX_v8f32 [cost = 1] {
+    match {
+        VMAX v8f32:$dst, v8f32:$src1, v8f32:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMAXPS256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VADD_v4f64 [cost = 1] {
+    match {
+        VADD v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VADDPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VSUB_v4f64 [cost = 1] {
+    match {
+        VSUB v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VSUBPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VMUL_v4f64 [cost = 1] {
+    match {
+        VMUL v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMULPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VDIV_v4f64 [cost = 1] {
+    match {
+        VDIV v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VDIVPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VAND_v4f64 [cost = 1] {
+    match {
+        VAND v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VANDPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VOR_v4f64 [cost = 1] {
+    match {
+        VOR v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VORPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VXOR_v4f64 [cost = 1] {
+    match {
+        VXOR v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VXORPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VMIN_v4f64 [cost = 1] {
+    match {
+        VMIN v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMINPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VMAX_v4f64 [cost = 1] {
+    match {
+        VMAX v4f64:$dst, v4f64:$src1, v4f64:$src2;
+    };
+    when {
+        hasExtension("avx");
+    };
+    select {
+        VMAXPD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VADD_v8i32 [cost = 1] {
+    match {
+        VADD v8i32:$dst, v8i32:$src1, v8i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPADDD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VSUB_v8i32 [cost = 1] {
+    match {
+        VSUB v8i32:$dst, v8i32:$src1, v8i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPSUBD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VMUL_v8i32 [cost = 1] {
+    match {
+        VMUL v8i32:$dst, v8i32:$src1, v8i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPMULLD256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VAND_v8i32 [cost = 1] {
+    match {
+        VAND v8i32:$dst, v8i32:$src1, v8i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPAND256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VOR_v8i32 [cost = 1] {
+    match {
+        VOR v8i32:$dst, v8i32:$src1, v8i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPOR256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
+pattern Select_VXOR_v8i32 [cost = 1] {
+    match {
+        VXOR v8i32:$dst, v8i32:$src1, v8i32:$src2;
+    };
+    when {
+        hasExtension("avx2");
+    };
+    select {
+        VPXOR256rr VR256:$dst, VR256:$src1, VR256:$src2;
+    };
+};
+
 

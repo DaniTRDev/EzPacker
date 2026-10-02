@@ -115,6 +115,28 @@ bool decodeX86_64Encoding(const AstEnc::EncodingDecl &encoding, X86EncodingSpec 
             else
                 out.m_byteRex = *value;
         }
+        else if (key == "vex_l" || key == "vex_w")
+        {
+            if (const auto *val = std::get_if<bool>(&directive.m_value))
+            {
+                if (key == "vex_l")
+                    out.m_vexL = *val ? 1 : 0;
+                else
+                    out.m_vexW = *val ? 1 : 0;
+            }
+            else if (const auto *val = std::get_if<int64_t>(&directive.m_value))
+            {
+                if (key == "vex_l")
+                    out.m_vexL = static_cast<uint8_t>(*val);
+                else
+                    out.m_vexW = static_cast<uint8_t>(*val);
+            }
+            else
+            {
+                reportDecodeError(diag, "directive '" + std::string(key) + "' expects a boolean or integer", directive.m_key);
+                ok = false;
+            }
+        }
         else if (key == "prefixes" || key == "sse_prefix")
         {
             const auto *id = std::get_if<DSL::Ast::Common::Identifier>(&directive.m_value);
@@ -242,6 +264,7 @@ bool X86_64EncodingDialect::validate(const AstEnc::EncodingDecl &encoding,
     int regCount = 0;
     int rmRegCount = 0;
     int rmMemCount = 0;
+    int vexRegCount = 0;
     bool hasRel = false;
 
     for (const auto &binding : spec.m_operands)
@@ -278,11 +301,13 @@ bool X86_64EncodingDialect::validate(const AstEnc::EncodingDecl &encoding,
             ++rmRegCount;
         else if (binding.m_field == "rm_mem")
             ++rmMemCount;
+        else if (binding.m_field == "vex_reg")
+            ++vexRegCount;
         else if (binding.m_field == "rel8" || binding.m_field == "rel32")
             hasRel = true;
     }
 
-    if (regCount > 1 || rmRegCount > 1 || rmMemCount > 1)
+    if (regCount > 1 || rmRegCount > 1 || rmMemCount > 1 || vexRegCount > 1)
     {
         instError("ENCODING has more than one slot of the same register/memory kind");
         return false;

@@ -2049,6 +2049,618 @@ target_inst PCMPGTQrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
 };
 
 // ============================================================================
+// AVX / AVX2 (VEX-ENCODED VECTOR INSTRUCTIONS)
+// ============================================================================
+
+// --- AVX 128-bit Floating-Point ---
+target_inst VADDPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vaddps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VSUBPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vsubps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMULPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vmulps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VDIVPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vdivps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VADDPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vaddpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VSUBPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vsubpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMULPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vmulpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VDIVPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vdivpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VANDPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vandps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x54];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VORPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vorps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x56];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VXORPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vxorps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x57];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VANDPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vandpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x54];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VORPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vorpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x56];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VXORPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vxorpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x57];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMINPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vminps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5D];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMAXPSrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vmaxps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5F];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMINPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vminpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5D];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMAXPDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vmaxpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5F];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMOVAPSrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("vmovaps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x28];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMOVAPDrr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("vmovapd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x28];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+// --- AVX2 128-bit Integer ---
+target_inst VPADDDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vpaddd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xFE];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPSUBDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vpsubd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xFA];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPMULLDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vpmulld");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x40];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPANDrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vpand");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xDB];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPORrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vpor");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xEB];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPXORrr(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vpxor");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xEF];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMOVDQArr(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("vmovdqa");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x6F];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+// --- AVX 256-bit (VR256 / YMM) Floating-Point ---
+target_inst VADDPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vaddps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VSUBPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vsubps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMULPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vmulps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VDIVPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vdivps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VADDPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vaddpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x58];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VSUBPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vsubpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5C];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMULPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vmulpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x59];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VDIVPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vdivpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5E];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VANDPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vandps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x54];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VORPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vorps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x56];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VXORPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vxorps");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x57];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VANDPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vandpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x54];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VORPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vorpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x56];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VXORPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vxorpd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x57];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMINPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vminps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5D];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMAXPS256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vmaxps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x5F];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMINPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vminpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5D];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMAXPD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vmaxpd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x5F];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMOVAPS256rr(VR256:dst OUT, VR256:src IN) {
+    MNEMONIC("vmovaps");
+    ENCODING {
+        form: vex;
+        opcode: [0x0F, 0x28];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMOVAPD256rr(VR256:dst OUT, VR256:src IN) {
+    MNEMONIC("vmovapd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x28];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+// --- AVX2 256-bit (VR256 / YMM) Integer ---
+target_inst VPADDD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vpaddd");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xFE];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPSUBD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vpsubd");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xFA];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPMULLD256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vpmulld");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x38, 0x40];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPAND256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vpand");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xDB];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPOR256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vpor");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xEB];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VPXOR256rr(VR256:dst OUT, VR256:src1 IN, VR256:src2 IN) {
+    MNEMONIC("vpxor");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0xEF];
+        operands { dst => reg; src1 => vex_reg; src2 => rm_reg; };
+        size: dst;
+    };
+};
+
+target_inst VMOVDQA256rr(VR256:dst OUT, VR256:src IN) {
+    MNEMONIC("vmovdqa");
+    ENCODING {
+        form: vex;
+        prefixes: P66;
+        opcode: [0x0F, 0x6F];
+        operands { dst => reg; src => rm_reg; };
+        size: dst;
+    };
+};
+
+// ============================================================================
 // SYSTEM
 // ============================================================================
 
