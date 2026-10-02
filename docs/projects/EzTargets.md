@@ -212,12 +212,15 @@ EzTargets::X86_64::registerTarget();
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
 | Target Descriptor | Generated (`generated/x86_64/X86_64TargetDesc.h`) | `X86_64TargetDesc` |
-| Lowering Shims | `EzTargets/X86_64/include/X86_64Lowering.h` | `AMD64CallLowering`, `AMD64ReturnLowering`, `isPowTwo`, `log2Pow2` |
+| Instruction Selector | `EzTargets/X86_64/include/InstructionSelector/X86_64TargetInstructionSelector.h` | `X86_64TargetInstructionSelector` |
+| Lowering Shims | `EzTargets/X86_64/include/Lowering/X86_64Lowering.h` | `AMD64CallLowering`, `AMD64ReturnLowering`, `isPowTwo`, `log2Pow2` |
 | Instruction Encoder | `EzTargets/X86_64/include/Encoding/X86_64InstructionEncoder.h` | `InstructionEncoder` |
 | Encoding Descriptors | `EzTargets/X86_64/include/Encoding/X86_64EncodingDesc.h` | `EncodingDesc`, `EncSlotKind`, `EncForm`, `ConditionCode` |
-| Frame Lowerer | `EzTargets/X86_64/include/X86_64FrameLowerer.h` | `X86_64FrameLowerer` |
+| Frame Lowerer | `EzTargets/X86_64/include/FrameLowerer/X86_64FrameLowerer.h` | `X86_64FrameLowerer` |
+| Register Allocator | `EzTargets/X86_64/include/RegisterAllocator/X86_64RegisterAllocator.h` | `X86_64RegisterAllocator` |
 | Branch Relaxation | `EzTargets/X86_64/include/BranchRelaxation/BranchRelaxer.h` | `BranchRelaxer` |
-| Binary Descriptors | `EzTargets/X86_64/include/X86_64ElfBinaryDesc.h` | `X86_64ElfBinaryDesc` |
-| Binary Descriptors | `EzTargets/X86_64/include/X86_64CoffBinaryDesc.h` | `X86_64CoffBinaryDesc` |
-| Code Emitter | `EzTargets/X86_64/include/X86_64CodeEmitter.h` | `X86_64CodeEmitter` |
+| Relocation Resolver | `EzTargets/X86_64/include/Relocation/X86_64RelocationResolver.h` | `X86_64RelocationResolver` |
+| Binary Descriptors | `EzTargets/X86_64/include/Descriptors/X86_64ElfBinaryDesc.h` | `X86_64ElfBinaryDesc` |
+| Binary Descriptors | `EzTargets/X86_64/include/Descriptors/X86_64CoffBinaryDesc.h` | `X86_64CoffBinaryDesc` |
+| Code Emitter | `EzTargets/X86_64/include/CodeEmitter/X86_64CodeEmitter.h` | `X86_64CodeEmitter` |
 | Registration | `EzTargets/X86_64/Registration/include/EzTargetsX86_64Registration.h` | `registerTarget()` |

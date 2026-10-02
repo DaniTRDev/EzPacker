@@ -11,26 +11,26 @@ add_subdirectory(Registration)
 
 set(EZTARGETS_X86_64_FILES_LIST
         "include/EzTargetsX86_64Common.h"
-        "include/X86_64Lowering.h"
-        "include/X86_64FrameLowerer.h"
-        "include/X86_64RegisterAllocator.h"
-        "include/X86_64TargetInstructionSelector.h"
-        "include/X86_64ElfBinaryDesc.h"
-        "include/X86_64CoffBinaryDesc.h"
-        "include/X86_64RelocationResolver.h"
-        "include/X86_64CodeEmitter.h"
+        "include/InstructionSelector/X86_64TargetInstructionSelector.h"
+        "include/FrameLowerer/X86_64FrameLowerer.h"
+        "include/RegisterAllocator/X86_64RegisterAllocator.h"
+        "include/Lowering/X86_64Lowering.h"
+        "include/Descriptors/X86_64ElfBinaryDesc.h"
+        "include/Descriptors/X86_64CoffBinaryDesc.h"
+        "include/Relocation/X86_64RelocationResolver.h"
+        "include/CodeEmitter/X86_64CodeEmitter.h"
         "include/Encoding/X86_64EncodingDesc.h"
         "include/Encoding/X86_64InstructionEncoder.h"
         "include/BranchRelaxation/BranchRelaxer.h"
 
-        "src/X86_64Lowering.cpp"
-        "src/X86_64FrameLowerer.cpp"
-        "src/X86_64RegisterAllocator.cpp"
-        "src/X86_64TargetInstructionSelector.cpp"
-        "src/X86_64ElfBinaryDesc.cpp"
-        "src/X86_64CoffBinaryDesc.cpp"
-        "src/X86_64RelocationResolver.cpp"
-        "src/X86_64CodeEmitter.cpp"
+        "src/InstructionSelector/X86_64TargetInstructionSelector.cpp"
+        "src/FrameLowerer/X86_64FrameLowerer.cpp"
+        "src/RegisterAllocator/X86_64RegisterAllocator.cpp"
+        "src/Lowering/X86_64Lowering.cpp"
+        "src/Descriptors/X86_64ElfBinaryDesc.cpp"
+        "src/Descriptors/X86_64CoffBinaryDesc.cpp"
+        "src/Relocation/X86_64RelocationResolver.cpp"
+        "src/CodeEmitter/X86_64CodeEmitter.cpp"
         "src/Encoding/X86_64InstructionEncoder.cpp"
         "src/BranchRelaxation/BranchRelaxer.cpp"
 )
@@ -39,7 +39,7 @@ EzCMK_ConfigureLib(NAME "EzTargetsX86_64"
         FILE_LIST ${EZTARGETS_X86_64_FILES_LIST}
         PRECOMPILED_HEADER "include/EzTargetsX86_64Common.h"
         LINKED_LIBRARIES "EzTriple;EzCodeEmitter;EzMir;EzCore"
-        INCLUDED_DIRS "include")
+        INCLUDED_DIRS "include;include/InstructionSelector;include/FrameLowerer;include/RegisterAllocator;include/Lowering;include/Descriptors;include/Relocation;include/CodeEmitter;include/BranchRelaxation;include/Encoding")
 
 set(EZ_X86_64_NAMESPACE_ROOT "EzTargets::X86_64")
 
