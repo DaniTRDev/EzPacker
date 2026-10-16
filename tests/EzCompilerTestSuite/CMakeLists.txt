@@ -51,3 +51,11 @@ EzPacker_AddTest(
         ""
         "tests/T_VerificationPipeline.cpp"
 )
+
+EzPacker_AddTest(
+        "T_CFrontendAdapter"
+        "EzCompilerTestSuite"
+        ""
+        "tests/T_CFrontendAdapter.cpp"
+)
+

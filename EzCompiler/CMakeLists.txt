@@ -8,6 +8,7 @@ set(EZCOMPILER_LIB_FILES_LIST
         "include/CompilationPipeline.h"
         "include/EmissionEngine.h"
         "include/CFrontend/ChibiccWrapper.h"
+        "include/CFrontend/CFrontendAdapter.h"
 
         "src/CommandLineOptions.cpp"
         "src/DriverContext.cpp"
@@ -17,6 +18,7 @@ set(EZCOMPILER_LIB_FILES_LIST
         "src/CompilationPipeline.cpp"
         "src/EmissionEngine.cpp"
         "src/CFrontend/ChibiccWrapper.cpp"
+        "src/CFrontend/CFrontendAdapter.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzCompilerLib"
