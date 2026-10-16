@@ -15,6 +15,7 @@
 #define EV_CURRENT      1
 #define ET_REL          1
 #define EM_X86_64       62
+#define EM_RISCV        243
 
 #define SHT_NULL        0
 #define SHT_PROGBITS    1
@@ -178,8 +179,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (ehdr->e_machine != EM_X86_64) {
-        fprintf(stderr, "Error: not EM_X86_64 machine (e_machine=%u)\n", ehdr->e_machine);
+    if (ehdr->e_machine != EM_X86_64 && ehdr->e_machine != EM_RISCV) {
+        fprintf(stderr, "Error: unsupported machine (e_machine=%u, expected EM_X86_64 or EM_RISCV)\n", ehdr->e_machine);
         free(buffer);
         return 1;
     }

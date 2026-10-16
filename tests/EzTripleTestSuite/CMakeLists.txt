@@ -6,7 +6,7 @@ set(EZTRIPLETESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzTripleTestSuite"
         FILE_LIST ${EZTRIPLETESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER ""
-        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;EzTargetsX86_64;gtest;GTest::gtest_main"
+        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;EzTargetsX86_64;EzTargetsRiscV64;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include"
 )
 
@@ -87,6 +87,16 @@ EzPacker_AddTest(
         "tests/T_LibcallRegistry.cpp"
 )
 
+EzPacker_AddTest(
+        "T_RiscV64TargetDesc"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_RiscV64TargetDesc.cpp"
+)
 
-
-
+EzPacker_AddTest(
+        "T_RiscV64RelocationResolver"
+        "EzTripleTestSuite"
+        ""
+        "tests/T_RiscV64RelocationResolver.cpp"
+)
