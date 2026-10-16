@@ -785,7 +785,7 @@ target_inst JAL(GPR64:dst OUT, i64:target IN) {
 
 target_inst JALR(GPR64:dst OUT, GPR64:base IN, i64:disp IN) {
     MNEMONIC("jalr");
-    FLAGS(IsIndirectBranch);
+    FLAGS(IsBranch);
     ENCODING {
         form: i_type;
         opcode: [0x67];

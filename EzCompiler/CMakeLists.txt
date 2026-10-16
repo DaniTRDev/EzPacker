@@ -27,6 +27,6 @@ EzCMK_ConfigureLib(NAME "EzCompilerLib"
 EzCMK_AddExecutable(NAME "ezc"
         FILE_LIST "src/Main.cpp"
         PRECOMPILED_HEADER "include/EzCompilerCommon.h"
-        LINKED_LIBRARIES "EzCompilerLib;EzTargetsX86_64Registration"
-        INCLUDED_DIRS "include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/Registration/include"
+        LINKED_LIBRARIES "EzCompilerLib;EzTargetsX86_64Registration;EzTargetsRiscV64Registration"
+        INCLUDED_DIRS "include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/Registration/include;${CMAKE_SOURCE_DIR}/EzTargets/RiscV64/Registration/include"
 )
