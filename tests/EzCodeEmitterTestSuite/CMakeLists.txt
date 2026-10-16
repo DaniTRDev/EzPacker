@@ -6,7 +6,7 @@ set(EZCODEEMITTERTESTSUITE_FILES_LIST
 EzCMK_ConfigureLib(NAME "EzCodeEmitterTestSuite"
         FILE_LIST ${EZCODEEMITTERTESTSUITE_FILES_LIST}
         PRECOMPILED_HEADER ""
-        LINKED_LIBRARIES "EzCodeEmitter;EzTriple;EzMir;EzCore;EzTargetsX86_64;gtest;GTest::gtest_main"
+        LINKED_LIBRARIES "EzCodeEmitter;EzTriple;EzMir;EzCore;EzTargetsX86_64;EzTargetsRiscV64;gtest;GTest::gtest_main"
         INCLUDED_DIRS "include"
 )
 
@@ -44,3 +44,18 @@ EzPacker_AddTest(
         ""
         "tests/T_X86_64Encoding.cpp"
 )
+
+EzPacker_AddTest(
+        "T_RiscV64Encoding"
+        "EzCodeEmitterTestSuite"
+        ""
+        "tests/T_RiscV64Encoding.cpp"
+)
+
+EzPacker_AddTest(
+        "T_RiscV64CodeEmitter"
+        "EzCodeEmitterTestSuite"
+        ""
+        "tests/T_RiscV64CodeEmitter.cpp"
+)
+

@@ -8,7 +8,7 @@
 
 EzPacker is engineered for modularity and retargetability. The compiler middle-end, legalizer pipeline, register allocator, and object writers contain **zero hardcoded architecture references or `#ifdef` branches**. 
 
-All target-dependent knowledge is completely encapsulated within self-contained directories under `EzTargets/<TargetName>/`. Adding support for a new hardware architecture (such as RISC-V, ARM64, or a custom ASIC ISA) requires authoring:
+All target-dependent knowledge is completely encapsulated within self-contained directories under `EzTargets/<TargetName>/`. EzPacker provides two production reference backends in-tree: **x86-64** (`EzTargets/X86_64`) and **RISC-V 64-bit** (`EzTargets/RiscV64`). Adding support for another hardware architecture (such as ARM64, MIPS, or a custom ASIC ISA) requires authoring:
 1. **Declarative DSL Specifications**: High-level descriptions of hardware registers, instructions, encodings, calling conventions, legalizer rules, and the target descriptor (`.tdesc`).
 2. **Runtime C++ Components**: Subclasses implementing frame lowering, instruction selection dispatch, code emission, and relocation resolution wired together by the target descriptor.
 3. **CMake Wiring & Registration**: Invoking the EzDsl CMake generators (including `EzDslGenTargetDesc`) and registering the target factory with `EzCompiler::TargetResolver`.
@@ -479,6 +479,6 @@ Verify your implementation by adding unit tests under `tests/` mirroring the x86
 
 ## 7. Next Steps
 
-- Study the reference x86-64 target in [EzTargets Subproject Documentation](projects/EzTargets.md).
+- Study the production reference targets (**x86-64** and **RISC-V 64**) in [EzTargets Subproject Documentation](projects/EzTargets.md).
 - Browse the [Doxygen API Reference](doxygen/index.html).
 - Return to the [EzPacker Landing Page](index.md).

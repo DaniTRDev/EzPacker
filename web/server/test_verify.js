@@ -204,6 +204,34 @@ async function runTests() {
     throw new Error('Expected formatted hex dump in objectInfo');
   }
 
+  // 6b. Test RISC-V compilation & ELF64 object inspection
+  console.log('\nTesting RISC-V 64 compilation and ELF64 Object file inspection...');
+  const riscvRes = await runner.compile({
+    code: ex.code,
+    targetTriple: 'riscv64-unknown-linux-gnu',
+    optLevel: 'O2',
+  });
+  if (!riscvRes.success) {
+    console.error('RISC-V compilation failed unexpectedly:', riscvRes.diagnostics);
+    throw new Error('RISC-V compilation should succeed on bundled example');
+  }
+  assertNoAnsi(riscvRes.asm || '', 'riscv_asm');
+  if (!riscvRes.objectInfo) {
+    throw new Error('Expected objectInfo for RISC-V compilation');
+  }
+  if (riscvRes.objectInfo.format !== 'ELF64') {
+    throw new Error(`Expected ELF64 format for RISC-V object, got: ${riscvRes.objectInfo.format}`);
+  }
+  console.log(`[PASS] RISC-V Object format: ${riscvRes.objectInfo.format}, size: ${riscvRes.objectInfo.fileSize} bytes.`);
+  console.log(`[PASS] RISC-V Sections: ${riscvRes.objectInfo.sections.map(s => s.name).join(', ')}`);
+  console.log(`[PASS] RISC-V Symbols: ${riscvRes.objectInfo.symbols.map(s => s.name).join(', ')}`);
+  if (!riscvRes.objectInfo.sections.some(s => s.name === '.text')) {
+    throw new Error('Expected .text section in RISC-V objectInfo');
+  }
+  if (!riscvRes.objectInfo.symbols.some(s => s.name === 'main')) {
+    throw new Error('Expected main in RISC-V symbols');
+  }
+
   // 7. Test DoxygenRunner & XML parsing
   console.log('\nTesting DoxygenRunner documentation extraction...');
   const { DoxygenRunner } = await import('./dist/doxygen.js');

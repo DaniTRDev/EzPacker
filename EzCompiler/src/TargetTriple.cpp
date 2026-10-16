@@ -46,6 +46,10 @@ TargetTriple TargetTriple::parse(std::string_view tripleStr)
         {
             return getHostTriple();
         }
+        if (parts[0] == "riscv64" || parts[0] == "riscv")
+        {
+            return TargetTriple(parts[0], "unknown", "linux", "gnu");
+        }
         return TargetTriple(parts[0], "unknown", "none", "elf");
     }
 
@@ -78,6 +82,10 @@ TargetTriple TargetTriple::parse(std::string_view tripleStr)
         {
             return TargetTriple(p0, "unknown", p1, p2);
         }
+        if (p2 == "elf")
+        {
+            return TargetTriple(p0, p1, "none", "elf");
+        }
         return TargetTriple(p0, p1, p2, "none");
     }
 
@@ -98,6 +106,16 @@ TargetTriple TargetTriple::getHostTriple()
 std::string TargetTriple::toString() const { return std::format("{}-{}-{}-{}", m_arch, m_vendor, m_sys, m_abi); }
 
 bool TargetTriple::isX86_64() const noexcept { return m_arch == "x86_64" || m_arch == "amd64" || m_arch == "x64"; }
+
+bool TargetTriple::isRiscV() const noexcept
+{
+    return m_arch == "riscv" || m_arch == "riscv64" || m_arch == "riscv32" || m_arch == "rv64gc" || m_arch == "rv64";
+}
+
+bool TargetTriple::isRiscV64() const noexcept
+{
+    return m_arch == "riscv64" || m_arch == "rv64gc" || m_arch == "rv64" || (m_arch == "riscv");
+}
 
 bool TargetTriple::isWindows() const noexcept
 {

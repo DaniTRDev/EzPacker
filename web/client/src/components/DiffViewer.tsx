@@ -17,7 +17,7 @@ export const DiffViewer: React.FC = () => {
     { id: 'mir', label: '1. Generic SSA MIR' },
     { id: 'legalizedMir', label: '2. Legalized MIR' },
     { id: 'loweredMir', label: '3. Lowered Machine MIR' },
-    { id: 'asm', label: '4. x86-64 Assembly' },
+    { id: 'asm', label: '4. Target Assembly' },
   ];
 
   const getStageContent = (stageId: 'mir' | 'legalizedMir' | 'loweredMir' | 'asm') => {

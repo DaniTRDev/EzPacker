@@ -7,3 +7,4 @@
 #
 # Add target subdirectories here as they are introduced.
 add_subdirectory(X86_64)
+add_subdirectory(RiscV64)

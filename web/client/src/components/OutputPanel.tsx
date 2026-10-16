@@ -168,7 +168,7 @@ export const OutputPanel: React.FC = () => {
                       ? 'bg-zinc-800 text-emerald-300 font-semibold'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
-                  title="Final x86-64 Assembly Text (-S)"
+                  title="Final Target Assembly Text (-S)"
                 >
                   Assembly
                 </button>
@@ -182,7 +182,7 @@ export const OutputPanel: React.FC = () => {
                   }`}
                   title="Compiled Relocatable Object File (.o/.obj)"
                 >
-                  <span>Object (.obj)</span>
+                  <span>Object (.o/.obj)</span>
                 </button>
               </div>
 

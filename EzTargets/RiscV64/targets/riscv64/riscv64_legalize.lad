@@ -1,0 +1,434 @@
+target RiscV64;
+
+type_set GPR_SCALARS = (i8, i16, i32, i64);
+type_set VECTOR_128  = (v16i8, v8i16, v4i32, v2i64, v4f32, v2f64);
+
+// ============================================================================
+// DATA MOVEMENT
+// ============================================================================
+
+action MOV {
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128);
+    WIDENS(i1) >> i32;
+};
+
+action MOV_ADDR {
+    LEGAL(ptr:0, ptr:1);
+};
+
+action SELECT {
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action PHI {
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action PUSH_ARG {
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
+};
+
+action POP_ARG {
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
+};
+
+action PUSH_RET {
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
+};
+
+action POP_RET {
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
+};
+
+action END_ARG {
+    LEGAL(__bindToken);
+};
+
+action MERGE_VALUES {
+    LEGAL(GPR_SCALARS, ptr);
+};
+
+action UNMERGE_VALUES {
+    LEGAL(GPR_SCALARS, ptr);
+};
+
+// ============================================================================
+// MEMORY ACCESS
+// ============================================================================
+
+action LOAD {
+    LEGAL(GPR_SCALARS:0, ptr:1);
+    LEGAL(ptr:0, ptr:1);
+    LEGAL(f32:0, ptr:1);
+    LEGAL(f64:0, ptr:1);
+    LEGAL(VECTOR_128:0, ptr:1);
+    WIDENS(i1:0) >> i8;
+};
+
+action STORE {
+    LEGAL(ptr:0, GPR_SCALARS:1);
+    LEGAL(ptr:0, ptr:1);
+    LEGAL(ptr:0, f32:1);
+    LEGAL(ptr:0, f64:1);
+    LEGAL(ptr:0, VECTOR_128:1);
+    WIDENS(i1:1) >> i8;
+};
+
+action PUSH {
+    LEGAL(GPR_SCALARS, ptr);
+};
+
+action POP {
+    LEGAL(GPR_SCALARS, ptr);
+};
+
+action ALLOC {
+    LEGAL(ptr);
+};
+
+action DALLOC {
+    LEGAL(ptr:0, GPR_SCALARS:1);
+};
+
+// ============================================================================
+// INTEGER ARITHMETIC
+// ============================================================================
+
+action ADD {
+    LEGAL(i32, i64);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action SUB {
+    LEGAL(i32, i64);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action MUL {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__multi3";
+};
+
+action IMUL {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__multi3";
+};
+
+action SDIV {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__divti3";
+};
+
+action UDIV {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__udivti3";
+};
+
+action DIV {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__udivti3";
+};
+
+action IDIV {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__divti3";
+};
+
+action REM {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__modti3";
+};
+
+action NEG {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+};
+
+action NOT {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+};
+
+action UADDO {
+    LEGAL(i32, i64);
+};
+
+action UADDE {
+    LEGAL(i32, i64);
+};
+
+action USUBO {
+    LEGAL(i32, i64);
+};
+
+action USUBE {
+    LEGAL(i32, i64);
+};
+
+action UMULH {
+    LEGAL(i32, i64);
+};
+
+action SMULH {
+    LEGAL(i32, i64);
+};
+
+// ============================================================================
+// FLOATING-POINT ARITHMETIC
+// ============================================================================
+
+action FADD {
+    LEGAL(f32, f64);
+};
+
+action FSUB {
+    LEGAL(f32, f64);
+};
+
+action FMUL {
+    LEGAL(f32, f64);
+};
+
+action FDIV {
+    LEGAL(f32, f64);
+};
+
+// ============================================================================
+// BITWISE & SHIFTS
+// ============================================================================
+
+action AND {
+    LEGAL(i32, i64);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action OR {
+    LEGAL(i32, i64);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action XOR {
+    LEGAL(i32, i64);
+    WIDENS(i1, i8, i16) >> i32;
+};
+
+action SHL {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__ashlti3";
+};
+
+action SHR {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__lshrti3";
+};
+
+action SAR {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+    LIBCALL(i128)   >> "__ashrti3";
+};
+
+// ============================================================================
+// COMPARISONS
+// ============================================================================
+
+action CMP_EQ {
+    LEGAL(i32, i64, ptr);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_NE {
+    LEGAL(i32, i64, ptr);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_SLT {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_SLE {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_SGT {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_SGE {
+    LEGAL(i32, i64);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_ULT {
+    LEGAL(i32, i64, ptr);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_ULE {
+    LEGAL(i32, i64, ptr);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_UGT {
+    LEGAL(i32, i64, ptr);
+    WIDENS(i8, i16) >> i32;
+};
+
+action CMP_UGE {
+    LEGAL(i32, i64, ptr);
+    WIDENS(i8, i16) >> i32;
+};
+
+action FCMP {
+    LEGAL(f32, f64);
+};
+
+// ============================================================================
+// CONTROL FLOW
+// ============================================================================
+
+action JMP {
+    LEGAL(ptr);
+};
+
+action BR_COND {
+    LEGAL(i1, i32);
+};
+
+action CALL {
+    LOWER >> RiscV64CallLowering;
+};
+
+action RET {
+    LOWER >> RiscV64ReturnLowering;
+};
+
+action TRY {
+    LEGAL(ptr);
+};
+
+action THROW {
+    LOWER >> RiscV64ThrowLowering;
+};
+
+action CATCH {
+    LOWER >> RiscV64CatchLowering;
+};
+
+// ============================================================================
+// CONVERSIONS
+// ============================================================================
+
+action TRUNC {
+    LEGAL(i8, i16, i32);
+};
+
+action ZEXT {
+    LEGAL(i16, i32, i64);
+};
+
+action SEXT {
+    LEGAL(i16, i32, i64);
+};
+
+action FPEXT {
+    LEGAL(f64);
+};
+
+action FPTRUNC {
+    LEGAL(f32);
+};
+
+action SITOFP {
+    LEGAL(f32, f64);
+};
+
+action FPTOSI {
+    LEGAL(i32, i64);
+};
+
+action BITCAST {
+    LEGAL(i32, i64, f32, f64, VECTOR_128);
+};
+
+// ============================================================================
+// SYSTEM
+// ============================================================================
+
+action SYSCALL {
+    LEGAL(i64, ptr, _void);
+};
+
+action NOP {
+    LEGAL(_void);
+};
+
+action HALT {
+    LEGAL(_void);
+};
+
+action TARGET_INST {
+    LEGAL(_void, GPR_SCALARS, ptr, f32, f64, VECTOR_128);
+};
+
+// ============================================================================
+// VECTOR & SIMD OPERATIONS (RVV)
+// ============================================================================
+
+action VADD {
+    LEGAL(VECTOR_128);
+};
+
+action VSUB {
+    LEGAL(VECTOR_128);
+};
+
+action VMUL {
+    LEGAL(VECTOR_128);
+};
+
+action VDIV {
+    LEGAL(VECTOR_128);
+};
+
+action VAND {
+    LEGAL(VECTOR_128);
+};
+
+action VOR {
+    LEGAL(VECTOR_128);
+};
+
+action VXOR {
+    LEGAL(VECTOR_128);
+};
+
+action VMIN {
+    LEGAL(VECTOR_128);
+};
+
+action VMAX {
+    LEGAL(VECTOR_128);
+};
+
+action VLOAD {
+    LEGAL(VECTOR_128:0, ptr:1);
+};
+
+action VSTORE {
+    LEGAL(ptr:0, VECTOR_128:1);
+};

@@ -4,7 +4,7 @@ A web-based interactive compiler explorer and analysis environment for the **EzP
 
 ## Overview
 
-EzPacker Web Explorer provides an intuitive UI for inspecting intermediate representations (MIR), machine lowering stages, control flow graph topology, register liveness sets, stack frame layouts, and final x86-64 assembly generation.
+EzPacker Web Explorer provides an intuitive UI for inspecting intermediate representations (MIR), machine lowering stages, control flow graph topology, register liveness sets, stack frame layouts, and final target assembly generation (x86-64 and RISC-V 64-bit).
 
 ## Features
 
@@ -13,18 +13,18 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
   - Real-time compiler diagnostics with line-and-column navigation.
   - Debounced auto-compilation and `Ctrl+Enter` trigger.
 - **Seven Dedicated Workspace Tabs**:
-  1. **Assembly (`-S`)**: Clean x86-64 machine assembly code with one-click clipboard copy.
+  1. **Assembly (`-S`)**: Clean target machine assembly code (x86-64 and RISC-V 64) with one-click clipboard copy.
   2. **IR Stages**: Direct toggle between Generic MIR (`--emit-mir`), Legalized MIR (`--emit-legalized-mir`), and Lowered Machine MIR (`--emit-lowered-mir`).
   3. **IR Diff**: Side-by-side Monaco Diff Viewer comparing any two compiler stages.
   4. **Passes & Timing**: Millisecond timing waterfall for each compiler optimization and lowering pass.
   5. **Control Flow Graph (CFG)**: Basic block visualizer featuring instruction listings, predecessor/successor badges, and click-to-jump block navigation.
   6. **Register Liveness**: Color-coded `Def`, `Use`, `LiveIn`, and `LiveOut` intervals with interactive register filtering.
-  7. **Stack Frame Analysis**: Stack frame metrics (`Callee-saved`, `Total frame size`, `Locals/spills`, `16-byte alignment`), visual memory hierarchy schematic, and prologue/epilogue previews.
+  7. **Stack Frame Analysis**: Architecture-aware stack frame metrics (`Callee-saved`, `Total frame size`, `Locals/spills`, `16-byte alignment`), visual memory hierarchy schematic (showing `rbp`/`rsp` for x86-64, `s0`/`sp`/`ra` for RISC-V), and prologue/epilogue previews.
 - **Object File (.o/.obj) Inspection**:
-  - Direct binary parsing of generated PE/COFF and ELF64 object files.
+  - Direct binary parsing of generated PE/COFF, x86-64 ELF64, and RISC-V ELF64 (`EM_RISCV` = 243) object files.
   - Section tables (`.text`, `.rdata`, `.data`, `.bss`), virtual addresses, raw data sizes, and flags.
   - Full symbol table inspection with linkage (`global`/`local`/`weak`), section bindings, and values.
-  - Relocation table decoding with fixup types (e.g. `IMAGE_REL_AMD64_REL32`, `R_X86_64_PLT32`).
+  - Relocation table decoding with architecture-specific fixup types (`IMAGE_REL_AMD64_REL32`, `R_X86_64_PLT32`, `R_RISCV_BRANCH`, `R_RISCV_JAL`, `R_RISCV_CALL`, `R_RISCV_PCREL_HI20`, etc.).
   - Formatted byte and ASCII hex dump preview.
 - **Automated Doxygen Documentation Integration**:
   - Background indexing of C ABI runtime headers (`EzExceptionRuntime.h`), compiler core headers (`EzMir`, `EzCompiler`, `EzCore`), and project markdown documents.
@@ -32,9 +32,11 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
   - Interactive symbol investigation and on-demand documentation generation via `/api/doxygen/generate`.
   - Resilient error handling that surfaces non-crashing diagnostics when Doxygen is missing or misconfigured.
 - **Compiler Configuration & Targets**:
-  - Target triple selection (`x86_64-pc-windows-msvc`, `x86_64-linux-gnu`, `x86_64-apple-darwin`).
+  - Target triple selection:
+    - x86-64: `x86_64-pc-windows-msvc`, `x86_64-linux-gnu`, `x86_64-apple-darwin`
+    - RISC-V 64: `riscv64-unknown-linux-gnu`, `riscv64-unknown-elf`, `riscv64`
   - Optimization levels: `-O0`, `-O1`, `-O2`, `-Os`.
-  - Feature flags: `+avx`, `+avx2`, `+sse2`, etc.
+  - Feature flags: x86-64 (`+avx`, `+avx2`, `+sse2`, etc.) and RISC-V (`+m`, `+a`, `+f`, `+d`, `+v`, `+c`).
   - Code generation flags: Position Independent Code (`-fPIC`), RTTI toggle.
 - **12 Bundled Examples**:
   - Arithmetic, branch control flow, loops, recursive factorial, SIMD vectorization, structured exception handling (`exception_handling.mir`), and memory pointer examples from `examples/`.

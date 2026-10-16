@@ -6,6 +6,7 @@
 #include "EmissionEngine.h"
 #include "CliExitCode.h"
 #include "EzTargetsX86_64Registration.h"
+#include "EzTargetsRiscV64Registration.h"
 
 #include <exception>
 #include <iostream>
@@ -21,6 +22,7 @@ int runCompiler(int argc, char **argv)
 {
     // Register the target factories available to this executable before resolving a triple.
     EzTargets::X86_64::registerTarget();
+    EzTargets::RiscV64::registerTarget();
 
     EzCompiler::CommandLineParser parser;
     EzCompiler::CommandLineOptions options;
