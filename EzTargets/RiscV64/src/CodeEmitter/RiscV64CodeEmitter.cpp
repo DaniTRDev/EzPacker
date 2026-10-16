@@ -85,20 +85,26 @@ void RiscV64CodeEmitter::endFunction(CodeEmitterContext *ctx, MirFunction *func)
     m_currentFunc = nullptr;
 }
 
-uint8_t RiscV64CodeEmitter::mapRegister(MirRegister *reg, bool &isFpr) const
+uint8_t RiscV64CodeEmitter::mapRegister(MirRegister *reg, bool &isFpr, bool &isVr) const
 {
     if (!reg)
     {
         isFpr = false;
+        isVr = false;
         return InvalidRegister;
     }
 
     size_t id = reg->getRegId();
     isFpr = false;
+    isVr = false;
     if (MirRegisterClass *regClass = reg->getRegClass())
     {
         std::string_view className = regClass->getName();
-        if (className.find("FPR") != std::string_view::npos)
+        if (className.find("VR") != std::string_view::npos)
+        {
+            isVr = true;
+        }
+        else if (className.find("FPR") != std::string_view::npos)
         {
             isFpr = true;
         }
@@ -138,7 +144,8 @@ bool RiscV64CodeEmitter::buildResolvedOperands(const EncodingDesc &enc,
                 if (mirMem->hasBaseReg())
                 {
                     bool isFpr = false;
-                    mem.m_base = mapRegister(mirMem->getBase(), isFpr);
+                    bool isVr = false;
+                    mem.m_base = mapRegister(mirMem->getBase(), isFpr, isVr);
                 }
                 if (mirMem->getDisplacement())
                 {
@@ -189,9 +196,11 @@ bool RiscV64CodeEmitter::buildResolvedOperands(const EncodingDesc &enc,
                 if (!reg)
                     return false;
                 bool isFpr = false;
-                uint8_t physical = mapRegister(reg, isFpr);
+                bool isVr = false;
+                uint8_t physical = mapRegister(reg, isFpr, isVr);
                 out.m_kind = ResolvedOperand::Kind::Register;
                 out.m_isFpr = isFpr;
+                out.m_isVr = isVr;
                 out.m_reg = physical;
                 out.m_sizeBytes = operandSizeBytes(op, reg);
                 break;

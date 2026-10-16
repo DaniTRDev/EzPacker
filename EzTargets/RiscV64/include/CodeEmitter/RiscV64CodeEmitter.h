@@ -35,7 +35,7 @@ class RiscV64CodeEmitter : public GenericCodeEmitter
     void setEncodingResolver(EncodingResolver resolver) { m_encodingResolver = std::move(resolver); }
 
   private:
-    uint8_t mapRegister(MirRegister *reg, bool &isFpr) const;
+    uint8_t mapRegister(MirRegister *reg, bool &isFpr, bool &isVr) const;
     bool tryEmitTableDriven(const MirTargetInstructionDesc *desc, std::span<MirOperand *const> operands);
     bool buildResolvedOperands(const EncodingDesc &enc,
                                std::span<MirOperand *const> operands,

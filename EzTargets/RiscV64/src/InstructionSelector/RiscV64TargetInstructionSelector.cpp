@@ -48,8 +48,10 @@ bool RiscV64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruc
         case MirInstructionOpCode::CALL:
             return selectCALL(ctx, inst);
         case MirInstructionOpCode::LOAD:
+        case MirInstructionOpCode::VLOAD:
             return selectLOAD(ctx, inst);
         case MirInstructionOpCode::STORE:
+        case MirInstructionOpCode::VSTORE:
             return selectSTORE(ctx, inst);
         case MirInstructionOpCode::PHI:
             return selectPHI(ctx, inst);
@@ -64,6 +66,18 @@ bool RiscV64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruc
         case MirInstructionOpCode::CMP_UGT:
         case MirInstructionOpCode::CMP_UGE:
             return selectCMP(ctx, inst);
+        case MirInstructionOpCode::FCMP:
+            return selectFCMP(ctx, inst);
+        case MirInstructionOpCode::VADD:
+        case MirInstructionOpCode::VSUB:
+        case MirInstructionOpCode::VMUL:
+        case MirInstructionOpCode::VDIV:
+        case MirInstructionOpCode::VAND:
+        case MirInstructionOpCode::VOR:
+        case MirInstructionOpCode::VXOR:
+        case MirInstructionOpCode::VMIN:
+        case MirInstructionOpCode::VMAX:
+            return selectVectorALU(ctx, inst);
         case MirInstructionOpCode::RET:
             return selectRET(ctx, inst);
         default:
@@ -431,12 +445,34 @@ bool RiscV64TargetInstructionSelector::selectLOAD(MirBuilderContext *ctx, MirIns
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
     MirOperandBuilder ob(ctx);
 
+    bool isVector = (dst->getMirType() && dst->getMirType()->getKind() == MirTypeKind::Vector);
     bool isFloat = (dst->getMirType() && dst->getMirType()->getKind() == MirTypeKind::FloatingPoint);
     size_t sizeInBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64;
     riscv64TargetInst::OpCode loadOp = riscv64TargetInst::LD;
     std::string_view dstClass = "GPR64";
 
-    if (isFloat)
+    if (isVector)
+    {
+        std::string_view typeName = dst->getMirType()->getName();
+        if (typeName.find("8") != std::string_view::npos && typeName.find("16") == std::string_view::npos)
+        {
+            loadOp = riscv64TargetInst::VLE8_V;
+        }
+        else if (typeName.find("16") != std::string_view::npos)
+        {
+            loadOp = riscv64TargetInst::VLE16_V;
+        }
+        else if (typeName.find("64") != std::string_view::npos)
+        {
+            loadOp = riscv64TargetInst::VLE64_V;
+        }
+        else
+        {
+            loadOp = riscv64TargetInst::VLE32_V;
+        }
+        dstClass = "VR128";
+    }
+    else if (isFloat)
     {
         if (sizeInBits == 32)
         {
@@ -504,6 +540,36 @@ bool RiscV64TargetInstructionSelector::selectLOAD(MirBuilderContext *ctx, MirIns
         return false;
     }
 
+    if (isVector)
+    {
+        MirOperand *addrOp = baseOp;
+        bool hasNonZeroDisp = false;
+        if (dispOp->getType() == MirOperandType::Integer)
+        {
+            if (dispOp->get<MirInteger>()->getValue().getI64() != 0)
+                hasNonZeroDisp = true;
+        }
+        else
+        {
+            hasNonZeroDisp = true;
+        }
+
+        if (hasNonZeroDisp)
+        {
+            MirOperand *tmpAddr = ob.buildVReg(ctx->getTypeTable()->i64(), "vload_addr", nullptr, findClass("GPR64"));
+            ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::ADDI64ri),
+                           inst->getSourceRef(),
+                           { tmpAddr, baseOp, dispOp });
+            addrOp = tmpAddr;
+        }
+
+        ib.buildTarget(riscv64TargetInst::getTargetDesc(loadOp),
+                       inst->getSourceRef(),
+                       { dst, addrOp });
+        inst->eraseFromOwner();
+        return true;
+    }
+
     ib.buildTarget(riscv64TargetInst::getTargetDesc(loadOp),
                    inst->getSourceRef(),
                    { dst, baseOp, dispOp });
@@ -524,12 +590,34 @@ bool RiscV64TargetInstructionSelector::selectSTORE(MirBuilderContext *ctx, MirIn
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
     MirOperandBuilder ob(ctx);
 
+    bool isVector = (val->getMirType() && val->getMirType()->getKind() == MirTypeKind::Vector);
     bool isFloat = (val->getMirType() && val->getMirType()->getKind() == MirTypeKind::FloatingPoint);
     size_t sizeInBits = val->getMirType() ? val->getMirType()->getTotalSizeInBits() : 64;
     riscv64TargetInst::OpCode storeOp = riscv64TargetInst::SD;
     std::string_view valClass = "GPR64";
 
-    if (isFloat)
+    if (isVector)
+    {
+        std::string_view typeName = val->getMirType()->getName();
+        if (typeName.find("8") != std::string_view::npos && typeName.find("16") == std::string_view::npos)
+        {
+            storeOp = riscv64TargetInst::VSE8_V;
+        }
+        else if (typeName.find("16") != std::string_view::npos)
+        {
+            storeOp = riscv64TargetInst::VSE16_V;
+        }
+        else if (typeName.find("64") != std::string_view::npos)
+        {
+            storeOp = riscv64TargetInst::VSE64_V;
+        }
+        else
+        {
+            storeOp = riscv64TargetInst::VSE32_V;
+        }
+        valClass = "VR128";
+    }
+    else if (isFloat)
     {
         if (sizeInBits == 32)
         {
@@ -594,6 +682,36 @@ bool RiscV64TargetInstructionSelector::selectSTORE(MirBuilderContext *ctx, MirIn
     if (!baseOp || !dispOp)
     {
         return false;
+    }
+
+    if (isVector)
+    {
+        MirOperand *addrOp = baseOp;
+        bool hasNonZeroDisp = false;
+        if (dispOp->getType() == MirOperandType::Integer)
+        {
+            if (dispOp->get<MirInteger>()->getValue().getI64() != 0)
+                hasNonZeroDisp = true;
+        }
+        else
+        {
+            hasNonZeroDisp = true;
+        }
+
+        if (hasNonZeroDisp)
+        {
+            MirOperand *tmpAddr = ob.buildVReg(ctx->getTypeTable()->i64(), "vstore_addr", nullptr, findClass("GPR64"));
+            ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::ADDI64ri),
+                           inst->getSourceRef(),
+                           { tmpAddr, baseOp, dispOp });
+            addrOp = tmpAddr;
+        }
+
+        ib.buildTarget(riscv64TargetInst::getTargetDesc(storeOp),
+                       inst->getSourceRef(),
+                       { val, addrOp });
+        inst->eraseFromOwner();
+        return true;
     }
 
     ib.buildTarget(riscv64TargetInst::getTargetDesc(storeOp),
@@ -665,6 +783,13 @@ bool RiscV64TargetInstructionSelector::selectPHI(MirBuilderContext *ctx, MirInst
 
     size_t sizeInBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64;
     std::string_view gprClass = (sizeInBits == 64) ? "GPR64" : "GPR32";
+    if (dst->getMirType())
+    {
+        if (dst->getMirType()->getKind() == MirTypeKind::Vector)
+            gprClass = "VR128";
+        else if (dst->getMirType()->getKind() == MirTypeKind::FloatingPoint)
+            gprClass = (sizeInBits == 32) ? "FPR32" : "FPR64";
+    }
     if (!dst->getRegClass())
     {
         dst->setClass(findClass(gprClass));
@@ -775,8 +900,8 @@ bool RiscV64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInst
         }
         // Global or function reference: addi dst, zero, ref
         ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::ADDI64ri),
-                       inst->getSourceRef(),
-                       { dst, zeroReg, src });
+                           inst->getSourceRef(),
+                           { dst, zeroReg, src });
         inst->eraseFromOwner();
         return true;
     }
@@ -812,19 +937,58 @@ bool RiscV64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInst
     if (src->getType() == MirOperandType::Register)
     {
         auto *rSrc = src->get<MirRegister>();
+        auto *rDst = dst->get<MirRegister>();
         bool isFpr = false;
+        bool isVr = false;
         if (rSrc && rSrc->getRegClass())
         {
-            isFpr = (std::string_view(rSrc->getRegClass()->getName()).find("FPR") != std::string_view::npos);
+            std::string_view clsName = rSrc->getRegClass()->getName();
+            isVr = (clsName.find("VR") != std::string_view::npos);
+            isFpr = (clsName.find("FPR") != std::string_view::npos);
         }
-        if (isFpr)
+        else if (rDst && rDst->getRegClass())
         {
-            if (auto *rDst = dst->get<MirRegister>())
-            {
-                if (!rDst->getRegClass())
-                    rDst->setClass(findClass("FPR64"));
-            }
-            ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::FMV_D),
+            std::string_view clsName = rDst->getRegClass()->getName();
+            isVr = (clsName.find("VR") != std::string_view::npos);
+            isFpr = (clsName.find("FPR") != std::string_view::npos);
+        }
+        else if (src->getMirType())
+        {
+            if (src->getMirType()->getKind() == MirTypeKind::Vector)
+                isVr = true;
+            else if (src->getMirType()->getKind() == MirTypeKind::FloatingPoint)
+                isFpr = true;
+        }
+        else if (dst->getMirType())
+        {
+            if (dst->getMirType()->getKind() == MirTypeKind::Vector)
+                isVr = true;
+            else if (dst->getMirType()->getKind() == MirTypeKind::FloatingPoint)
+                isFpr = true;
+        }
+
+        if (isVr)
+        {
+            if (rDst && !rDst->getRegClass())
+                rDst->setClass(findClass("VR128"));
+            if (rSrc && !rSrc->getRegClass())
+                rSrc->setClass(findClass("VR128"));
+            ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::VMV_VV),
+                           inst->getSourceRef(),
+                           { dst, src });
+        }
+        else if (isFpr)
+        {
+            size_t sizeInBits = src->getMirType() ? src->getMirType()->getTotalSizeInBits() :
+                               (dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64);
+            std::string_view fprClass = (sizeInBits == 32) ? "FPR32" : "FPR64";
+            if (rDst && !rDst->getRegClass())
+                rDst->setClass(findClass(fprClass));
+            if (rSrc && !rSrc->getRegClass())
+                rSrc->setClass(findClass(fprClass));
+
+            auto fmvOp = (sizeInBits == 32) ? riscv64TargetInst::FMV_S : riscv64TargetInst::FMV_D;
+            ib.buildTarget(riscv64TargetInst::getTargetDesc(fmvOp),
                            inst->getSourceRef(),
                            { dst, src });
         }
@@ -870,6 +1034,122 @@ bool RiscV64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInst
     }
 
     return false;
+}
+
+bool RiscV64TargetInstructionSelector::selectFCMP(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+
+    bool is32 = (lhs->getMirType() && lhs->getMirType()->getTotalSizeInBits() == 32);
+    std::string_view fprClass = is32 ? "FPR32" : "FPR64";
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("GPR64"));
+    }
+    if (auto *r = lhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(fprClass));
+    }
+    if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(fprClass));
+    }
+
+    auto fcmpOp = is32 ? riscv64TargetInst::FEQ_S : riscv64TargetInst::FEQ_D;
+    ib.buildTarget(riscv64TargetInst::getTargetDesc(fcmpOp),
+                   inst->getSourceRef(),
+                   { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool RiscV64TargetInstructionSelector::selectVectorALU(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("VR128"));
+    }
+    if (auto *r = lhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("VR128"));
+    }
+    if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("VR128"));
+    }
+
+    bool isFloat = false;
+    if (dst->getMirType())
+    {
+        std::string_view typeName = dst->getMirType()->getName();
+        isFloat = (typeName.find("f") != std::string_view::npos);
+    }
+
+    riscv64TargetInst::OpCode op = riscv64TargetInst::VADD_VV;
+    switch (inst->getOpCode())
+    {
+        case MirInstructionOpCode::VADD:
+            op = isFloat ? riscv64TargetInst::VFADD_VV : riscv64TargetInst::VADD_VV;
+            break;
+        case MirInstructionOpCode::VSUB:
+            op = isFloat ? riscv64TargetInst::VFSUB_VV : riscv64TargetInst::VSUB_VV;
+            break;
+        case MirInstructionOpCode::VMUL:
+            op = isFloat ? riscv64TargetInst::VFMUL_VV : riscv64TargetInst::VMUL_VV;
+            break;
+        case MirInstructionOpCode::VDIV:
+            op = isFloat ? riscv64TargetInst::VFDIV_VV : riscv64TargetInst::VDIV_VV;
+            break;
+        case MirInstructionOpCode::VAND:
+            op = riscv64TargetInst::VAND_VV;
+            break;
+        case MirInstructionOpCode::VOR:
+            op = riscv64TargetInst::VOR_VV;
+            break;
+        case MirInstructionOpCode::VXOR:
+            op = riscv64TargetInst::VXOR_VV;
+            break;
+        case MirInstructionOpCode::VMIN:
+            op = riscv64TargetInst::VMIN_VV;
+            break;
+        case MirInstructionOpCode::VMAX:
+            op = riscv64TargetInst::VMAX_VV;
+            break;
+        default:
+            return false;
+    }
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    ib.buildTarget(riscv64TargetInst::getTargetDesc(op),
+                   inst->getSourceRef(),
+                   { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
 }
 
 } // namespace EzTargets::RiscV64

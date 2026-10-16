@@ -250,12 +250,21 @@ void InstructionEncoder::encodeRegisterMove(const ResolvedOperand &dst,
                                             const ResolvedOperand &src,
                                             std::vector<uint8_t> &out)
 {
-    if (dst.m_isFpr || src.m_isFpr)
+    if (dst.m_isVr || src.m_isVr)
     {
-        // fsgnj.d rd, rs1, rs1 (opcode 0x53, funct3 0, funct7 0x11, rs2 = rs1)
+        // vmv.v.v vd, vs1 (opcode 0x57, funct3 0, funct7 0x2F, vs2 = 0)
         uint32_t rd = dst.m_reg & 0x1F;
         uint32_t rs = src.m_reg & 0x1F;
-        uint32_t word = (0x11u << 25) | (rs << 20) | (rs << 15) | (0u << 12) | (rd << 7) | 0x53u;
+        uint32_t word = (0x2Fu << 25) | (0u << 20) | (rs << 15) | (0u << 12) | (rd << 7) | 0x57u;
+        emitWord(out, word);
+    }
+    else if (dst.m_isFpr || src.m_isFpr)
+    {
+        uint32_t rd = dst.m_reg & 0x1F;
+        uint32_t rs = src.m_reg & 0x1F;
+        uint32_t funct7 = (dst.m_sizeBytes <= 4 && src.m_sizeBytes <= 4) ? 0x10u : 0x11u;
+        // fsgnj.s or fsgnj.d rd, rs1, rs1 (opcode 0x53, funct3 0, funct7, rs2 = rs1)
+        uint32_t word = (funct7 << 25) | (rs << 20) | (rs << 15) | (0u << 12) | (rd << 7) | 0x53u;
         emitWord(out, word);
     }
     else

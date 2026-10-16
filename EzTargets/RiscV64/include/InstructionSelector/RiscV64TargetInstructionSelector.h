@@ -31,6 +31,8 @@ class RiscV64TargetInstructionSelector : public riscv64InstructionSelector
     bool selectMOV(MirBuilderContext *ctx, MirInstruction *inst);
     bool selectTRY(MirBuilderContext *ctx, MirInstruction *inst);
     bool selectRET(MirBuilderContext *ctx, MirInstruction *inst);
+    bool selectFCMP(MirBuilderContext *ctx, MirInstruction *inst);
+    bool selectVectorALU(MirBuilderContext *ctx, MirInstruction *inst);
 
     TargetDesc *m_targetDesc{ nullptr };
 };

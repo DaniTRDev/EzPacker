@@ -1091,5 +1091,250 @@ pattern Select_MOV_v2f64 [cost = 1] {
     };
 };
 
+// VMIN
+pattern Select_VMIN_v16i8 [cost = 1] {
+    match {
+        VMIN v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMIN_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v8i16 [cost = 1] {
+    match {
+        VMIN v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMIN_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v4i32 [cost = 1] {
+    match {
+        VMIN v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMIN_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMIN_v2i64 [cost = 1] {
+    match {
+        VMIN v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMIN_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// VMAX
+pattern Select_VMAX_v16i8 [cost = 1] {
+    match {
+        VMAX v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMAX_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v8i16 [cost = 1] {
+    match {
+        VMAX v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMAX_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v4i32 [cost = 1] {
+    match {
+        VMAX v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMAX_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMAX_v2i64 [cost = 1] {
+    match {
+        VMAX v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMAX_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// VLOAD
+pattern Select_VLOAD_v16i8 [cost = 1] {
+    match {
+        VLOAD v16i8:$dst, GPR64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VLE8_V VR128:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_VLOAD_v8i16 [cost = 1] {
+    match {
+        VLOAD v8i16:$dst, GPR64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VLE16_V VR128:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_VLOAD_v4i32 [cost = 1] {
+    match {
+        VLOAD v4i32:$dst, GPR64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VLE32_V VR128:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_VLOAD_v4f32 [cost = 1] {
+    match {
+        VLOAD v4f32:$dst, GPR64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VLE32_V VR128:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_VLOAD_v2i64 [cost = 1] {
+    match {
+        VLOAD v2i64:$dst, GPR64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VLE64_V VR128:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_VLOAD_v2f64 [cost = 1] {
+    match {
+        VLOAD v2f64:$dst, GPR64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VLE64_V VR128:$dst, GPR64:$src;
+    };
+};
+
+// VSTORE
+pattern Select_VSTORE_v16i8 [cost = 1] {
+    match {
+        VSTORE GPR64:$dst, v16i8:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSE8_V VR128:$src, GPR64:$dst;
+    };
+};
+
+pattern Select_VSTORE_v8i16 [cost = 1] {
+    match {
+        VSTORE GPR64:$dst, v8i16:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSE16_V VR128:$src, GPR64:$dst;
+    };
+};
+
+pattern Select_VSTORE_v4i32 [cost = 1] {
+    match {
+        VSTORE GPR64:$dst, v4i32:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSE32_V VR128:$src, GPR64:$dst;
+    };
+};
+
+pattern Select_VSTORE_v4f32 [cost = 1] {
+    match {
+        VSTORE GPR64:$dst, v4f32:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSE32_V VR128:$src, GPR64:$dst;
+    };
+};
+
+pattern Select_VSTORE_v2i64 [cost = 1] {
+    match {
+        VSTORE GPR64:$dst, v2i64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSE64_V VR128:$src, GPR64:$dst;
+    };
+};
+
+pattern Select_VSTORE_v2f64 [cost = 1] {
+    match {
+        VSTORE GPR64:$dst, v2f64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSE64_V VR128:$src, GPR64:$dst;
+    };
+};
+
+
 
 
