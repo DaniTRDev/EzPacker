@@ -8,7 +8,9 @@
 
 `EzTargets` provides concrete hardware CPU target implementations for EzPacker. It integrates target-specific code generation, machine instruction definitions, register banks, calling conventions, binary object writers, branch relaxation, and hardware instruction encoders.
 
-The primary target architecture currently implemented in EzTargets is **x86-64 (AMD64)**, with native support for both **System V AMD64** (Linux, macOS, BSD) and **Microsoft x64** (Windows) ABIs.
+EzTargets currently provides production backends for two major 64-bit computing architectures:
+- **x86-64 (AMD64)**: Native support for both **System V AMD64** (Linux, macOS, BSD) and **Microsoft x64** (Windows) ABIs, with full SSE and AVX/AVX2 vector extensions.
+- **RISC-V 64-bit (riscv64)**: Native support for the **RV64IMAFD** base ISA and standard extensions, **LP64D** calling convention, and **ELF64** (`EM_RISCV`) binary output.
 
 ```
        +-------------------------------------------------------------+
@@ -271,8 +273,163 @@ EzTargets::X86_64::registerTarget();
 
 ---
 
-## 3. Header & Class Index
+## 3. RISC-V 64 Target Architecture Implementation
 
+### 3.1 `RiscV64TargetDesc` (Generated via `EzDslGenTargetDesc`)
+
+`RiscV64TargetDesc` is automatically synthesized from `targets/riscv64/riscv64.tdesc` by `EzDslGenTargetDesc` (`CppTargetDescGenerator`). It is defined in namespace `EzTargets::TableGen::RiscV64` with a type alias `EzTargets::RiscV64::RiscV64TargetDesc`.
+
+Inheriting from `TargetDesc` (`EzTriple`), it serves as the central factory and descriptor for the 64-bit RISC-V architecture:
+
+- **Architecture Name**: `"riscv64"`.
+- **Target Triples**: Matches `riscv64-unknown-linux-gnu`, `riscv64-unknown-elf`, and `riscv64`.
+- **Register Banks**:
+  - `GPR`: 32 general-purpose 64-bit integer registers:
+    - `x0` (`zero`): Constant hardwired zero.
+    - `x1` (`ra`): Return address (caller-saved).
+    - `x2` (`sp`): Stack pointer (callee-saved).
+    - `x3` (`gp`): Global pointer.
+    - `x4` (`tp`): Thread pointer.
+    - `x5`–`x7` (`t0`–`t2`): Temporary registers (caller-saved).
+    - `x8` (`s0` / `fp`): Saved register 0 / frame pointer (callee-saved).
+    - `x9` (`s1`): Saved register 1 (callee-saved).
+    - `x10`–`x17` (`a0`–`a7`): Function arguments and return values (caller-saved).
+    - `x18`–`x27` (`s2`–`s11`): Saved registers 2–11 (callee-saved).
+    - `x28`–`x31` (`t3`–`t6`): Temporary registers (caller-saved).
+  - `FPR`: 32 floating-point registers:
+    - `f0`–`f7` (`ft0`–`ft7`): Temporary floating-point registers.
+    - `f8`–`f9` (`fs0`–`fs1`): Saved floating-point registers.
+    - `f10`–`f17` (`fa0`–`fa7`): Argument and return floating-point registers.
+    - `f18`–`f27` (`fs2`–`fs11`): Saved floating-point registers.
+    - `f28`–`f31` (`ft8`–`ft11`): Temporary floating-point registers.
+- **Register Classes**:
+  - `GPR64` (`getGprClass()`): 64-bit integer registers (`x0`–`x31`).
+  - `GPR32`: 32-bit integer register views (`GPR64 <: GPR32`).
+  - `FPR64`: 64-bit double-precision floating-point registers.
+  - `FPR32`: 32-bit single-precision floating-point registers (`FPR64 <: FPR32`).
+- **Stack Slot Size**: 8 bytes.
+- **Stack Alignment**: 16 bytes.
+- **Memory Displacement Type**: `i64` (`getMemOperandDisplacementType()`).
+- **Binary Descriptor**: `RiscV64ElfBinaryDesc` for System V Linux and bare-metal ELF64 objects (`EM_RISCV` = 243).
+- **Default Calling Convention**: `LP64D` (`riscv64_calling_conv.ezcc`).
+  - Scalar arguments passed in `a0`–`a7` (spill to stack with 8-byte alignment).
+  - Floating-point arguments passed in `fa0`–`fa7`.
+  - Scalar returns in `a0`, `a1`.
+  - Floating-point returns in `fa0`, `fa1`.
+  - Callee-saved: `s0`–`s11`, `sp`.
+- **Supported CPU Extensions**:
+  - `rv64m`: Integer Multiplication and Division (`mul`, `mulh`, `div`, `divu`, `rem`, `remu`, and 32-bit `*w` variants).
+  - `rv64a`: Atomic memory instructions (`lr`, `sc`, `amoswap`, `amoadd`, etc.).
+  - `rv64f`: Single-precision floating-point.
+  - `rv64d`: Double-precision floating-point (implies `rv64f`).
+  - `rv64c`: Standard 16-bit compressed instruction extensions.
+- **Runtime Components**:
+  - `RiscV64FrameLowerer` (`getFrameLowerer()`).
+  - `RiscV64TargetInstructionSelector` (`getInstructionSelector()`).
+  - `RiscV64RegisterAllocator` (`getRegisterAllocator()`).
+  - `RiscV64CodeEmitter` (`createCodeEmitter()`).
+  - `RiscV64RelocationResolver` (`getRelocationResolver()`).
+
+---
+
+### 3.2 Legalization Action Table & Libcalls (`riscv64_legalize.lad` & `riscv64_rules.lrd`)
+
+The legality matrix in `targets/riscv64/riscv64_legalize.lad` specifies:
+- **Scalar Operations**: 32-bit and 64-bit integers are natively `LEGAL`. Sub-word integers (`i1`, `i8`, `i16`) are widened to `i32`.
+- **Pointers**: `ptr` is 64-bit and natively `LEGAL`.
+- **Floating-Point**: `f32` and `f64` are natively `LEGAL` when floating-point extensions (`rv64f`, `rv64d`) are enabled.
+- **Compiler-RT Libcalls**: Operations on 128-bit integers (`i128`) are declared as `LIBCALL` and routed to runtime helpers:
+  - `MUL i128` -> `__multi3`
+  - `SDIV i128` -> `__divti3`
+  - `UDIV i128` -> `__udivti3`
+  - `SMOD i128` -> `__modti3`
+  - `UMOD i128` -> `__umodti3`
+- **Algebraic Rewrite Rules (`.lrd`)**:
+  - Transforms multiplication by positive powers of two into logical left shifts (`SLL` / `SLLI`).
+  - Transforms signed and unsigned division by positive powers of two into arithmetic/logical right shifts (`SRA` / `SRL`).
+  - Simplifies identity expressions (`x + 0 -> x`, `x * 1 -> x`, `x & -1 -> x`).
+
+---
+
+### 3.3 Instruction Encoding & Formats (`RiscV64InstructionEncoder`)
+
+`RiscV64InstructionEncoder` provides table-driven, bit-precise encoding of RISC-V 32-bit fixed-length machine instructions:
+
+| Format | Bit Layout (31..0) | Representative Instructions |
+|---|---|---|
+| **R-type** | `funct7[31:25] \| rs2[24:20] \| rs1[19:15] \| funct3[14:12] \| rd[11:7] \| opcode[6:0]` | `ADD`, `SUB`, `SLL`, `SLT`, `XOR`, `SRL`, `SRA`, `OR`, `AND`, `MUL`, `DIV` |
+| **I-type** | `imm[31:20] \| rs1[19:15] \| funct3[14:12] \| rd[11:7] \| opcode[6:0]` | `ADDI`, `SLTI`, `XORI`, `ORI`, `ANDI`, `LD`, `LW`, `LH`, `LB`, `JALR` |
+| **S-type** | `imm[31:25] \| rs2[24:20] \| rs1[19:15] \| funct3[14:12] \| imm[11:7] \| opcode[6:0]` | `SD`, `SW`, `SH`, `SB` |
+| **B-type** | `imm[31\|7\|30:25] \| rs2[24:20] \| rs1[19:15] \| funct3[14:12] \| imm[11:8\|0] \| opcode[6:0]` | `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU` |
+| **U-type** | `imm[31:12] \| rd[11:7] \| opcode[6:0]` | `LUI`, `AUIPC` |
+| **J-type** | `imm[31\|19:12\|20\|30:21] \| rd[11:7] \| opcode[6:0]` | `JAL` |
+
+#### Key Encoding Features:
+- **Immediate Range Validation**: Enforces signed 12-bit range $[-2048, 2047]$ for I-type and S-type, signed 13-bit $[-4096, 4094]$ for B-type, signed 21-bit $[-1048576, 1048574]$ for J-type, and 20-bit unsigned $[0, 0xFFFFF]$ for U-type.
+- **Branch Displacements**: Accurately packs split-field immediate bits for B-type and J-type jump targets.
+- **Register Move Synthesis**: `ADDI rd, rs, 0` synthesizes register-to-register copies (`encodeRegisterMove`).
+- **Return Synthesis**: Emits canonical `ret` pseudo-instruction as `JALR x0, 0(x1)`.
+
+---
+
+### 3.4 Frame Lowering (`RiscV64FrameLowerer`)
+
+`RiscV64FrameLowerer` manages RISC-V stack allocations and standard calling frame layouts:
+
+- **16-Byte Stack Alignment**: Standard RISC-V calling conventions require `sp` to be aligned to a 16-byte boundary at all public call sites.
+- **Standard Prologue**:
+  ```asm
+  addi sp, sp, -FrameSize
+  sd   ra, (FrameSize - 8)(sp)
+  sd   s0, (FrameSize - 16)(sp)
+  addi s0, sp, FrameSize
+  ```
+  *(Callee-saved registers `s1`–`s11` are saved below the frame pointer as required).*
+- **Standard Epilogue**:
+  ```asm
+  ld   s0, (FrameSize - 16)(sp)
+  ld   ra, (FrameSize - 8)(sp)
+  addi sp, sp, FrameSize
+  jalr zero, 0(ra)   # ret
+  ```
+- **Leaf Function Optimization**: For leaf functions that do not execute child calls and have no local stack allocations, frame setup is completely elided, executing a direct `ret`.
+
+---
+
+### 3.5 ELF64 Binary Descriptor & Relocation Resolution
+
+`RiscV64ElfBinaryDesc` sets ELF header machine architecture to `EM_RISCV` (243). `RiscV64RelocationResolver` processes RISC-V relocations:
+
+| Relocation | Value | Description |
+|---|---|---|
+| `R_RISCV_32` | 1 | Direct 32-bit relocation. |
+| `R_RISCV_64` | 2 | Direct 64-bit relocation. |
+| `R_RISCV_BRANCH` | 16 | 12-bit PC-relative branch offset (B-type). |
+| `R_RISCV_JAL` | 17 | 20-bit PC-relative jump offset (J-type). |
+| `R_RISCV_CALL` / `R_RISCV_CALL_PLT` | 18 / 19 | 32-bit PC-relative call (`auipc` + `jalr` pair). |
+| `R_RISCV_PCREL_HI20` | 23 | High 20 bits of 32-bit PC-relative offset. |
+| `R_RISCV_PCREL_LO12_I` | 24 | Low 12 bits of 32-bit PC-relative offset (I-type). |
+| `R_RISCV_PCREL_LO12_S` | 25 | Low 12 bits of 32-bit PC-relative offset (S-type). |
+| `R_RISCV_RELAX` | 51 | Linker relaxation hint. |
+
+---
+
+### 3.6 Target Registration (`RiscV64TargetRegistration.cpp`)
+
+The RISC-V 64 target registers its factory function with `TargetResolver` upon static initialization:
+
+```cpp
+#include "TargetRegistration/RiscV64TargetRegistration.h"
+
+// Automatically registers "riscv64" target factory
+EzTargets::RiscV64::registerTarget();
+```
+
+---
+
+## 4. Header & Class Index
+
+### 4.1 X86-64 Architecture
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
 | Target Descriptor | Generated (`generated/x86_64/X86_64TargetDesc.h`) | `X86_64TargetDesc` |
@@ -288,3 +445,18 @@ EzTargets::X86_64::registerTarget();
 | Binary Descriptors | `EzTargets/X86_64/include/Descriptors/X86_64CoffBinaryDesc.h` | `X86_64CoffBinaryDesc` |
 | Code Emitter | `EzTargets/X86_64/include/CodeEmitter/X86_64CodeEmitter.h` | `X86_64CodeEmitter` |
 | Registration | `EzTargets/X86_64/Registration/include/EzTargetsX86_64Registration.h` | `registerTarget()` |
+
+### 4.2 RISC-V 64 Architecture
+| Component | Header Location | Key Classes / Structs |
+|---|---|---|
+| Target Descriptor | Generated (`generated/riscv64/RiscV64TargetDesc.h`) | `RiscV64TargetDesc` |
+| Instruction Selector | `EzTargets/RiscV64/include/InstructionSelector/RiscV64TargetInstructionSelector.h` | `RiscV64TargetInstructionSelector` |
+| Instruction Encoder | `EzTargets/RiscV64/include/Encoding/RiscV64InstructionEncoder.h` | `RiscV64InstructionEncoder` |
+| Encoding Descriptors | `EzTargets/RiscV64/include/Encoding/RiscV64EncodingDesc.h` | `RiscV64EncodingDesc`, `RiscVInstFormat`, `RiscVOpcode` |
+| Frame Lowerer | `EzTargets/RiscV64/include/FrameLowerer/RiscV64FrameLowerer.h` | `RiscV64FrameLowerer` |
+| Register Allocator | `EzTargets/RiscV64/include/RegisterAllocator/RiscV64RegisterAllocator.h` | `RiscV64RegisterAllocator` |
+| Relocation Resolver | `EzTargets/RiscV64/include/Relocation/RiscV64RelocationResolver.h` | `RiscV64RelocationResolver` |
+| Binary Descriptor | `EzTargets/RiscV64/include/Descriptors/RiscV64ElfBinaryDesc.h` | `RiscV64ElfBinaryDesc` |
+| Code Emitter | `EzTargets/RiscV64/include/CodeEmitter/RiscV64CodeEmitter.h` | `RiscV64CodeEmitter` |
+| Registration | `EzTargets/RiscV64/TargetRegistration/include/TargetRegistration/RiscV64TargetRegistration.h` | `registerTarget()` |
+

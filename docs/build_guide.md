@@ -116,11 +116,11 @@ You can run individual test suites targeting specific subsystems:
 | **`EzDslSemaTestSuite`** | `bin/EzDslSemaTestSuite` | Tests semantic analysis, symbol tables, scopes, and conflict detection. |
 | **`EzDslCodeGeneratorsTestSuite`** | `bin/EzDslCodeGeneratorsTestSuite` | Tests C++ table synthesizers and code emitter output. |
 | **`EzDslCliTestSuite`** | `bin/EzDslCliTestSuite` | Tests the `EzDslCli` driver executable. |
-| **`EzTripleTestSuite`** | `bin/EzTripleTestSuite` | Tests legalizer matrices, ABI lowerer, instruction selector, register allocator, and frame lowerer. |
-| **`EzCodeEmitterTestSuite`** | `bin/EzCodeEmitterTestSuite` | Tests binary machine encoding, branch relaxation, ELF64 and COFF object serialization. |
-| **`EzCompilerTestSuite`** | `bin/EzCompilerTestSuite` | Tests compiler option parsing, target resolvers, and pipeline pass sequencing. |
+| **`EzTripleTestSuite`** | `bin/EzTripleTestSuite` | Tests legalizer matrices, ABI lowerer, instruction selector, register allocator, and frame lowerer across x86-64 and RISC-V 64 architectures. |
+| **`EzCodeEmitterTestSuite`** | `bin/EzCodeEmitterTestSuite` | Tests binary machine encoding (x86-64 ModR/M/VEX and RISC-V R/I/S/B/U/J formats), branch relaxation, ELF64 (`EM_X86_64` and `EM_RISCV`), and COFF object serialization. |
+| **`EzCompilerTestSuite`** | `bin/EzCompilerTestSuite` | Tests compiler option parsing, target resolvers (including `riscv64`), and pipeline pass sequencing. |
 | **`EzLinkerTestSuite`** | `bin/EzLinkerTestSuite` | Tests system linker detection (`SystemLinkerDetector`), command synthesis (`EzLinkerDriver`), and SjLj exception runtime (`EzExceptionRuntime`). |
-| **`EzCompilerEndToEndTests`** | `bin/EzCompilerEndToEndTests` | Full end-to-end compilation of sample MIR modules to executable object files across Win64 and SysV ABIs. |
+| **`EzCompilerEndToEndTests`** | `bin/EzCompilerEndToEndTests` | Full end-to-end compilation of sample MIR modules to executable object files across Win64, SysV AMD64, and RISC-V ELF64 ABIs. |
 | **`TEST_ALL`** | `bin/TEST_ALL` | Unified monolithic test runner executing all unit and integration tests. |
 
 Example running a single test suite:

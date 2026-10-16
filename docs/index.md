@@ -2,7 +2,7 @@
 
 Welcome to the comprehensive documentation for **EzPacker**.
 
-EzPacker is a modular, high-performance compiler backend, machine intermediate representation (MIR) framework, and binary code generation engine written in ISO C++20. It accepts strongly-typed, SSA-form machine intermediate representation and transforms it into native, relocatable machine code object files (**ELF64** for Linux; **PE/COFF** for Windows) targeting x86-64 with SSE and AVX vector extensions.
+EzPacker is a modular, high-performance compiler backend, machine intermediate representation (MIR) framework, and binary code generation engine written in ISO C++20. It accepts strongly-typed, SSA-form machine intermediate representation and transforms it into native, relocatable machine code object files (**ELF64** for Linux; **PE/COFF** for Windows) targeting x86-64 (with SSE and AVX vector extensions) and native 64-bit RISC-V (**riscv64** with standard RV64IMAFD extensions).
 
 ---
 
@@ -87,7 +87,7 @@ flowchart LR
 - **Table-Driven 3-Tier Legalizer & Libcalls**: Dense primary matrix indexed by opcode and compact type provides $O(1)$ legality dispatch, combined with multi-slot signature matchers, compiler-rt runtime libcall mappings (`__multi3`, `__divti3`), and declarative algebraic strength reduction rules.
 - **Bottom-Up Maximal Munch Instruction Selection**: Tree-matching pattern matching that automatically synthesizes SIB addressing modes, performs opportunistic memory load-folding (`ADD64rm`), and prioritizes AVX over SSE via cost-ordered matching.
 - **Production Chaitin-Briggs Graph-Coloring Register Allocator**: Full interference graph construction, loop-depth spill cost estimation, optimistic simplification, register spilling, and conservative coalescing across GPR and FPR/VR256 banks.
-- **Dual Calling Convention & Binary Format Support**: Built-in support for both **System V AMD64** (Linux/macOS) and **Microsoft Win64** (Windows) calling conventions, with native emitters for **ELF64** (`.o`) and **PE/COFF** (`.obj`).
+- **Dual Calling Convention & Binary Format Support**: Built-in support for **System V AMD64**, **Microsoft Win64**, and RISC-V **LP64D** calling conventions, with native emitters for **ELF64** (`.o`) and **PE/COFF** (`.obj`).
 - **Complete Vector Extension & VEX Support**: Implication-aware CPU feature tracking supporting SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, and AVX2 with dedicated 256-bit `VR256` YMM registers and table-driven 2-byte (`0xC5`) / 3-byte (`0xC4`) VEX prefix encoding.
 - **Modular Target Architecture**: `EzTargets` organized into clean architectural subsystems (`InstructionSelector`, `FrameLowerer`, `RegisterAllocator`, `Lowering`, `Descriptors`, `Relocation`, `CodeEmitter`, `BranchRelaxation`, `Encoding`) eliminating legacy fallback code.
 
@@ -112,7 +112,7 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzCodeEmitter`** | Binary code emission: section management, relocations, `Elf64Writer` (ELF64), and `CoffWriter` (PE/COFF). | [EzCodeEmitter Guide](projects/EzCodeEmitter.md) |
 | **`EzTriple`** | Target-independent backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer. | [EzTriple Guide](projects/EzTriple.md) |
 | **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine (`ezc`). | [EzCompiler Guide](projects/EzCompiler.md) |
-| **`EzTargets`** | Architecture backends: modular x86-64 target (synthesized `X86_64TargetDesc`, `VR256` registers, VEX prefix encoder, compiler-rt libcalls, `X86_64FrameLowerer`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
+| **`EzTargets`** | Architecture backends: modular x86-64 and RISC-V 64-bit targets (synthesized `X86_64TargetDesc` and `RiscV64TargetDesc`, `VR256` registers, VEX prefix encoder, RV64IMAFD table-driven encoder, compiler-rt libcalls, `X86_64FrameLowerer`, `RiscV64FrameLowerer`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
 | **`EzLinker`** | System linker driver and exception runtime: automated toolchain detection (`lld`, `link.exe`), C stdlib / compiler-rt injection, and SjLj exception runtime (`ez-ld`). | [EzLinker Guide](projects/EzLinker.md) |
 
 ### 🔍 Complete API Reference
