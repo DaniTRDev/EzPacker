@@ -332,4 +332,764 @@ pattern Select_RET [cost = 1] {
     };
 };
 
+// ============================================================================
+// FLOATING-POINT ALU PATTERNS
+// ============================================================================
+
+pattern Select_FADD32rr [cost = 1] {
+    match {
+        FADD f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FADD_S FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FADD64rr [cost = 1] {
+    match {
+        FADD f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FADD_D FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+pattern Select_FSUB32rr [cost = 1] {
+    match {
+        FSUB f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FSUB_S FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FSUB64rr [cost = 1] {
+    match {
+        FSUB f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FSUB_D FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+pattern Select_FMUL32rr [cost = 1] {
+    match {
+        FMUL f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FMUL_S FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FMUL64rr [cost = 1] {
+    match {
+        FMUL f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FMUL_D FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+pattern Select_FDIV32rr [cost = 1] {
+    match {
+        FDIV f32:$dst, f32:$src1, f32:$src2;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FDIV_S FPR32:$dst, FPR32:$src1, FPR32:$src2;
+    };
+};
+
+pattern Select_FDIV64rr [cost = 1] {
+    match {
+        FDIV f64:$dst, f64:$src1, f64:$src2;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FDIV_D FPR64:$dst, FPR64:$src1, FPR64:$src2;
+    };
+};
+
+// Conversions
+pattern Select_FPEXT [cost = 1] {
+    match {
+        FPEXT f64:$dst, f32:$src;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FCVT_D_S FPR64:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_FPTRUNC [cost = 1] {
+    match {
+        FPTRUNC f32:$dst, f64:$src;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FCVT_S_D FPR32:$dst, FPR64:$src;
+    };
+};
+
+pattern Select_SITOFP_i32_f32 [cost = 1] {
+    match {
+        SITOFP f32:$dst, i32:$src;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FCVT_S_W FPR32:$dst, GPR32:$src;
+    };
+};
+
+pattern Select_SITOFP_i64_f32 [cost = 1] {
+    match {
+        SITOFP f32:$dst, i64:$src;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FCVT_S_L FPR32:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_SITOFP_i32_f64 [cost = 1] {
+    match {
+        SITOFP f64:$dst, i32:$src;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FCVT_D_W FPR64:$dst, GPR32:$src;
+    };
+};
+
+pattern Select_SITOFP_i64_f64 [cost = 1] {
+    match {
+        SITOFP f64:$dst, i64:$src;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FCVT_D_L FPR64:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_FPTOSI_f32_i32 [cost = 1] {
+    match {
+        FPTOSI i32:$dst, f32:$src;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FCVT_W_S GPR32:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_FPTOSI_f32_i64 [cost = 1] {
+    match {
+        FPTOSI i64:$dst, f32:$src;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FCVT_L_S GPR64:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_FPTOSI_f64_i32 [cost = 1] {
+    match {
+        FPTOSI i32:$dst, f64:$src;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FCVT_W_D GPR32:$dst, FPR64:$src;
+    };
+};
+
+pattern Select_FPTOSI_f64_i64 [cost = 1] {
+    match {
+        FPTOSI i64:$dst, f64:$src;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FCVT_L_D GPR64:$dst, FPR64:$src;
+    };
+};
+
+pattern Select_MOV_f32 [cost = 1] {
+    match {
+        MOV f32:$dst, f32:$src;
+    };
+    when {
+        hasExtension("rv64f");
+    };
+    select {
+        FMV_S FPR32:$dst, FPR32:$src;
+    };
+};
+
+pattern Select_MOV_f64 [cost = 1] {
+    match {
+        MOV f64:$dst, f64:$src;
+    };
+    when {
+        hasExtension("rv64d");
+    };
+    select {
+        FMV_D FPR64:$dst, FPR64:$src;
+    };
+};
+
+// ============================================================================
+// VECTOR ALU PATTERNS (RVV)
+// ============================================================================
+
+// VADD
+pattern Select_VADD_v16i8 [cost = 1] {
+    match {
+        VADD v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VADD_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v8i16 [cost = 1] {
+    match {
+        VADD v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VADD_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v4i32 [cost = 1] {
+    match {
+        VADD v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VADD_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v2i64 [cost = 1] {
+    match {
+        VADD v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VADD_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v4f32 [cost = 1] {
+    match {
+        VADD v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFADD_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VADD_v2f64 [cost = 1] {
+    match {
+        VADD v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFADD_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// VSUB
+pattern Select_VSUB_v16i8 [cost = 1] {
+    match {
+        VSUB v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSUB_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v8i16 [cost = 1] {
+    match {
+        VSUB v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSUB_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v4i32 [cost = 1] {
+    match {
+        VSUB v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSUB_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v2i64 [cost = 1] {
+    match {
+        VSUB v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VSUB_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v4f32 [cost = 1] {
+    match {
+        VSUB v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFSUB_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VSUB_v2f64 [cost = 1] {
+    match {
+        VSUB v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFSUB_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// VMUL
+pattern Select_VMUL_v16i8 [cost = 1] {
+    match {
+        VMUL v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMUL_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v8i16 [cost = 1] {
+    match {
+        VMUL v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMUL_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v4i32 [cost = 1] {
+    match {
+        VMUL v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMUL_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v2i64 [cost = 1] {
+    match {
+        VMUL v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMUL_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v4f32 [cost = 1] {
+    match {
+        VMUL v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFMUL_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VMUL_v2f64 [cost = 1] {
+    match {
+        VMUL v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFMUL_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// VDIV
+pattern Select_VDIV_v16i8 [cost = 1] {
+    match {
+        VDIV v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VDIV_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v8i16 [cost = 1] {
+    match {
+        VDIV v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VDIV_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v4i32 [cost = 1] {
+    match {
+        VDIV v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VDIV_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v2i64 [cost = 1] {
+    match {
+        VDIV v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VDIV_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v4f32 [cost = 1] {
+    match {
+        VDIV v4f32:$dst, v4f32:$src1, v4f32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFDIV_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VDIV_v2f64 [cost = 1] {
+    match {
+        VDIV v2f64:$dst, v2f64:$src1, v2f64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VFDIV_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// VAND, VOR, VXOR
+pattern Select_VAND_v16i8 [cost = 1] {
+    match {
+        VAND v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VAND_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v8i16 [cost = 1] {
+    match {
+        VAND v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VAND_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v4i32 [cost = 1] {
+    match {
+        VAND v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VAND_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VAND_v2i64 [cost = 1] {
+    match {
+        VAND v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VAND_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v16i8 [cost = 1] {
+    match {
+        VOR v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v8i16 [cost = 1] {
+    match {
+        VOR v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v4i32 [cost = 1] {
+    match {
+        VOR v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VOR_v2i64 [cost = 1] {
+    match {
+        VOR v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v16i8 [cost = 1] {
+    match {
+        VXOR v16i8:$dst, v16i8:$src1, v16i8:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VXOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v8i16 [cost = 1] {
+    match {
+        VXOR v8i16:$dst, v8i16:$src1, v8i16:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VXOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v4i32 [cost = 1] {
+    match {
+        VXOR v4i32:$dst, v4i32:$src1, v4i32:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VXOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+pattern Select_VXOR_v2i64 [cost = 1] {
+    match {
+        VXOR v2i64:$dst, v2i64:$src1, v2i64:$src2;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VXOR_VV VR128:$dst, VR128:$src1, VR128:$src2;
+    };
+};
+
+// Vector MOVs
+pattern Select_MOV_v16i8 [cost = 1] {
+    match {
+        MOV v16i8:$dst, v16i8:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMV_VV VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v8i16 [cost = 1] {
+    match {
+        MOV v8i16:$dst, v8i16:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMV_VV VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v4i32 [cost = 1] {
+    match {
+        MOV v4i32:$dst, v4i32:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMV_VV VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v2i64 [cost = 1] {
+    match {
+        MOV v2i64:$dst, v2i64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMV_VV VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v4f32 [cost = 1] {
+    match {
+        MOV v4f32:$dst, v4f32:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMV_VV VR128:$dst, VR128:$src;
+    };
+};
+
+pattern Select_MOV_v2f64 [cost = 1] {
+    match {
+        MOV v2f64:$dst, v2f64:$src;
+    };
+    when {
+        hasExtension("rv64v");
+    };
+    select {
+        VMV_VV VR128:$dst, VR128:$src;
+    };
+};
+
+
 

@@ -956,6 +956,414 @@ target_inst FCVT_D_L(FPR64:dst OUT, GPR64:src IN) {
     };
 };
 
+target_inst FCVT_W_S(GPR32:dst OUT, FPR32:src IN) {
+    MNEMONIC("fcvt.w.s");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x7;
+        funct7: 0x60;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+target_inst FCVT_S_W(FPR32:dst OUT, GPR32:src IN) {
+    MNEMONIC("fcvt.s.w");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x7;
+        funct7: 0x68;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+target_inst FCVT_L_S(GPR64:dst OUT, FPR32:src IN) {
+    MNEMONIC("fcvt.l.s");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x7;
+        funct7: 0x60;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+target_inst FCVT_S_L(FPR32:dst OUT, GPR64:src IN) {
+    MNEMONIC("fcvt.s.l");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x7;
+        funct7: 0x68;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+target_inst FEQ_S(GPR64:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
+    MNEMONIC("feq.s");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x2;
+        funct7: 0x50;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst FLT_S(GPR64:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
+    MNEMONIC("flt.s");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x1;
+        funct7: 0x50;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst FLE_S(GPR64:dst OUT, FPR32:src1 IN, FPR32:src2 IN) {
+    MNEMONIC("fle.s");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x0;
+        funct7: 0x50;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst FEQ_D(GPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
+    MNEMONIC("feq.d");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x2;
+        funct7: 0x51;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst FLT_D(GPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
+    MNEMONIC("flt.d");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x1;
+        funct7: 0x51;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst FLE_D(GPR64:dst OUT, FPR64:src1 IN, FPR64:src2 IN) {
+    MNEMONIC("fle.d");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x0;
+        funct7: 0x51;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst FNEG_S(FPR32:dst OUT, FPR32:src IN) {
+    MNEMONIC("fneg.s");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x1;
+        funct7: 0x10;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+target_inst FNEG_D(FPR64:dst OUT, FPR64:src IN) {
+    MNEMONIC("fneg.d");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x1;
+        funct7: 0x11;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+target_inst FMV_S(FPR32:dst OUT, FPR32:src IN) {
+    MNEMONIC("fmv.s");
+    ENCODING {
+        form: r_type;
+        opcode: [0x53];
+        funct3: 0x0;
+        funct7: 0x10;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+// ============================================================================
+// VECTOR ARITHMETIC & MEMORY (RVV)
+// ============================================================================
+
+target_inst VADD_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vadd.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x01;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VSUB_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vsub.vv");
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x05;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VMUL_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vmul.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x2;
+        funct7: 0x4B;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VDIV_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vdiv.vv");
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x2;
+        funct7: 0x41;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VAND_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vand.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x13;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VOR_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vor.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x15;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VXOR_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vxor.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x17;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VMIN_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vmin.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x0B;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VMAX_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vmax.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x0F;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VFADD_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vfadd.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x1;
+        funct7: 0x01;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VFSUB_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vfsub.vv");
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x1;
+        funct7: 0x05;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VFMUL_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vfmul.vv");
+    FLAGS(IsCommutative);
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x1;
+        funct7: 0x49;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VFDIV_VV(VR128:dst OUT, VR128:src1 IN, VR128:src2 IN) {
+    MNEMONIC("vfdiv.vv");
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x1;
+        funct7: 0x41;
+        operands { dst => rd; src1 => rs1; src2 => rs2; };
+    };
+};
+
+target_inst VMV_VV(VR128:dst OUT, VR128:src IN) {
+    MNEMONIC("vmv.v.v");
+    ENCODING {
+        form: r_type;
+        opcode: [0x57];
+        funct3: 0x0;
+        funct7: 0x2F;
+        operands { dst => rd; src => rs1; };
+    };
+};
+
+target_inst VLE8_V(VR128:dst OUT, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vle8.v");
+    FLAGS(ReadsMemory);
+    ENCODING {
+        form: i_type;
+        opcode: [0x07];
+        funct3: 0x0;
+        funct7: 0x00;
+        operands { dst => rd; base => rs1; disp => imm12_signed; };
+    };
+};
+
+target_inst VLE16_V(VR128:dst OUT, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vle16.v");
+    FLAGS(ReadsMemory);
+    ENCODING {
+        form: i_type;
+        opcode: [0x07];
+        funct3: 0x5;
+        funct7: 0x00;
+        operands { dst => rd; base => rs1; disp => imm12_signed; };
+    };
+};
+
+target_inst VLE32_V(VR128:dst OUT, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vle32.v");
+    FLAGS(ReadsMemory);
+    ENCODING {
+        form: i_type;
+        opcode: [0x07];
+        funct3: 0x6;
+        funct7: 0x00;
+        operands { dst => rd; base => rs1; disp => imm12_signed; };
+    };
+};
+
+target_inst VLE64_V(VR128:dst OUT, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vle64.v");
+    FLAGS(ReadsMemory);
+    ENCODING {
+        form: i_type;
+        opcode: [0x07];
+        funct3: 0x7;
+        funct7: 0x00;
+        operands { dst => rd; base => rs1; disp => imm12_signed; };
+    };
+};
+
+target_inst VSE8_V(VR128:src IN, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vse8.v");
+    FLAGS(WritesMemory);
+    ENCODING {
+        form: s_type;
+        opcode: [0x27];
+        funct3: 0x0;
+        funct7: 0x00;
+        operands { src => rs2; base => rs1; disp => imm12_store; };
+    };
+};
+
+target_inst VSE16_V(VR128:src IN, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vse16.v");
+    FLAGS(WritesMemory);
+    ENCODING {
+        form: s_type;
+        opcode: [0x27];
+        funct3: 0x5;
+        funct7: 0x00;
+        operands { src => rs2; base => rs1; disp => imm12_store; };
+    };
+};
+
+target_inst VSE32_V(VR128:src IN, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vse32.v");
+    FLAGS(WritesMemory);
+    ENCODING {
+        form: s_type;
+        opcode: [0x27];
+        funct3: 0x6;
+        funct7: 0x00;
+        operands { src => rs2; base => rs1; disp => imm12_store; };
+    };
+};
+
+target_inst VSE64_V(VR128:src IN, GPR64:base IN, i64:disp IN) {
+    MNEMONIC("vse64.v");
+    FLAGS(WritesMemory);
+    ENCODING {
+        form: s_type;
+        opcode: [0x27];
+        funct3: 0x7;
+        funct7: 0x00;
+        operands { src => rs2; base => rs1; disp => imm12_store; };
+    };
+};
+
 // ============================================================================
 // PSEUDO & SYNTHETIC INSTRUCTIONS
 // ============================================================================

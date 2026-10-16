@@ -1,13 +1,14 @@
 target RiscV64;
 
 type_set GPR_SCALARS = (i8, i16, i32, i64);
+type_set VECTOR_128  = (v16i8, v8i16, v4i32, v2i64, v4f32, v2f64);
 
 // ============================================================================
 // DATA MOVEMENT
 // ============================================================================
 
 action MOV {
-    LEGAL(GPR_SCALARS, ptr, f32, f64);
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128);
     WIDENS(i1) >> i32;
 };
 
@@ -16,29 +17,29 @@ action MOV_ADDR {
 };
 
 action SELECT {
-    LEGAL(GPR_SCALARS, ptr, f32, f64);
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128);
     WIDENS(i1, i8, i16) >> i32;
 };
 
 action PHI {
-    LEGAL(GPR_SCALARS, ptr, f32, f64);
+    LEGAL(GPR_SCALARS, ptr, f32, f64, VECTOR_128);
     WIDENS(i1, i8, i16) >> i32;
 };
 
 action PUSH_ARG {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
 };
 
 action POP_ARG {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
 };
 
 action PUSH_RET {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
 };
 
 action POP_RET {
-    LEGAL(ptr, GPR_SCALARS, f32, f64);
+    LEGAL(ptr, GPR_SCALARS, f32, f64, VECTOR_128);
 };
 
 action END_ARG {
@@ -62,6 +63,7 @@ action LOAD {
     LEGAL(ptr:0, ptr:1);
     LEGAL(f32:0, ptr:1);
     LEGAL(f64:0, ptr:1);
+    LEGAL(VECTOR_128:0, ptr:1);
     WIDENS(i1:0) >> i8;
 };
 
@@ -70,6 +72,7 @@ action STORE {
     LEGAL(ptr:0, ptr:1);
     LEGAL(ptr:0, f32:1);
     LEGAL(ptr:0, f64:1);
+    LEGAL(ptr:0, VECTOR_128:1);
     WIDENS(i1:1) >> i8;
 };
 
@@ -359,7 +362,7 @@ action FPTOSI {
 };
 
 action BITCAST {
-    LEGAL(i32, i64, f32, f64);
+    LEGAL(i32, i64, f32, f64, VECTOR_128);
 };
 
 // ============================================================================
@@ -379,5 +382,53 @@ action HALT {
 };
 
 action TARGET_INST {
-    LEGAL(_void, GPR_SCALARS, ptr, f32, f64);
+    LEGAL(_void, GPR_SCALARS, ptr, f32, f64, VECTOR_128);
+};
+
+// ============================================================================
+// VECTOR & SIMD OPERATIONS (RVV)
+// ============================================================================
+
+action VADD {
+    LEGAL(VECTOR_128);
+};
+
+action VSUB {
+    LEGAL(VECTOR_128);
+};
+
+action VMUL {
+    LEGAL(VECTOR_128);
+};
+
+action VDIV {
+    LEGAL(VECTOR_128);
+};
+
+action VAND {
+    LEGAL(VECTOR_128);
+};
+
+action VOR {
+    LEGAL(VECTOR_128);
+};
+
+action VXOR {
+    LEGAL(VECTOR_128);
+};
+
+action VMIN {
+    LEGAL(VECTOR_128);
+};
+
+action VMAX {
+    LEGAL(VECTOR_128);
+};
+
+action VLOAD {
+    LEGAL(VECTOR_128:0, ptr:1);
+};
+
+action VSTORE {
+    LEGAL(ptr:0, VECTOR_128:1);
 };

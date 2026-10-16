@@ -50,7 +50,8 @@ enum class EncRegClass : uint8_t
 {
     GPR = 0, ///< General-purpose integer register (x0..x31).
     FPR = 1, ///< Floating-point register (f0..f31).
-    Any = 2, ///< Accepts either register file.
+    VR  = 2, ///< Vector register (v0..v31).
+    Any = 3, ///< Accepts any register file.
 };
 
 /**
@@ -103,6 +104,7 @@ struct ResolvedOperand
     Kind m_kind{ Kind::None };
     uint8_t m_reg{ 0 };
     bool m_isFpr{ false };
+    bool m_isVr{ false };
     uint8_t m_sizeBytes{ 8 };
     int64_t m_imm{ 0 };
     EncMemory m_mem{};

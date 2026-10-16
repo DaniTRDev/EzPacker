@@ -89,6 +89,44 @@ target RiscV64 {
         }
     }
 
+    register_bank VR {
+        classes { VR128: 128 }
+        registers {
+            v0  enc 0  names { v0:  VR128 }
+            v1  enc 1  names { v1:  VR128 }
+            v2  enc 2  names { v2:  VR128 }
+            v3  enc 3  names { v3:  VR128 }
+            v4  enc 4  names { v4:  VR128 }
+            v5  enc 5  names { v5:  VR128 }
+            v6  enc 6  names { v6:  VR128 }
+            v7  enc 7  names { v7:  VR128 }
+            v8  enc 8  names { v8:  VR128 }
+            v9  enc 9  names { v9:  VR128 }
+            v10 enc 10 names { v10: VR128 }
+            v11 enc 11 names { v11: VR128 }
+            v12 enc 12 names { v12: VR128 }
+            v13 enc 13 names { v13: VR128 }
+            v14 enc 14 names { v14: VR128 }
+            v15 enc 15 names { v15: VR128 }
+            v16 enc 16 names { v16: VR128 }
+            v17 enc 17 names { v17: VR128 }
+            v18 enc 18 names { v18: VR128 }
+            v19 enc 19 names { v19: VR128 }
+            v20 enc 20 names { v20: VR128 }
+            v21 enc 21 names { v21: VR128 }
+            v22 enc 22 names { v22: VR128 }
+            v23 enc 23 names { v23: VR128 }
+            v24 enc 24 names { v24: VR128 }
+            v25 enc 25 names { v25: VR128 }
+            v26 enc 26 names { v26: VR128 }
+            v27 enc 27 names { v27: VR128 }
+            v28 enc 28 names { v28: VR128 }
+            v29 enc 29 names { v29: VR128 }
+            v30 enc 30 names { v30: VR128 }
+            v31 enc 31 names { v31: VR128 }
+        }
+    }
+
     special {
         pc: 32
     }
@@ -110,6 +148,11 @@ target RiscV64 {
             default: true;
             implies: [rv64f];
             description: "Standard Extension for Double-Precision Floating-Point";
+        };
+        rv64v {
+            default: true;
+            implies: [rv64d];
+            description: "Standard Extension for Vector Operations";
         };
         rv64c {
             default: false;

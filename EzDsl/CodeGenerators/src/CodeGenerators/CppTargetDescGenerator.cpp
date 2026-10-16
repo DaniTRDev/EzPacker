@@ -291,9 +291,9 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("MirBuilderContext *m_ctx{ nullptr };");
             emitter.emitLine("bool m_initialized{ false };");
             emitter.emitLine("bool m_isPic{ false };");
-            emitter.emitBlankLine();
             emitter.emitLine("MirRegisterBank *m_gprBank{ nullptr };");
             emitter.emitLine("MirRegisterBank *m_fprBank{ nullptr };");
+            emitter.emitLine("MirRegisterBank *m_vrBank{ nullptr };");
             emitter.emitLine("MirRegisterClass *m_gpr64{ nullptr };");
             emitter.emitLine("MirRegisterClass *m_gpr32{ nullptr };");
             emitter.emitLine("MirRegisterClass *m_gpr16{ nullptr };");
@@ -485,6 +485,13 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
                     emitter.emitLine("m_fprBank = b;");
                     emitter.emitLine("m_fpr64 = b->getClass(\"FPR64\");");
                     emitter.emitLine("m_fpr32 = b->getClass(\"FPR32\");");
+                    emitter.emitLine("if (!m_vr128) m_vr128 = b->getClass(\"VR128\");");
+                    emitter.emitLine("if (!m_vr256) m_vr256 = b->getClass(\"VR256\");");
+                }
+                emitter.emitLine("else if (std::string_view(b->getName()) == \"VR\")");
+                {
+                    auto vrScope = emitter.enterScope();
+                    emitter.emitLine("m_vrBank = b;");
                     emitter.emitLine("m_vr128 = b->getClass(\"VR128\");");
                     emitter.emitLine("m_vr256 = b->getClass(\"VR256\");");
                 }
