@@ -36,7 +36,7 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
     - x86-64: `x86_64-pc-windows-msvc`, `x86_64-linux-gnu`, `x86_64-apple-darwin`
     - RISC-V 64: `riscv64-unknown-linux-gnu`, `riscv64-unknown-elf`, `riscv64`
   - Optimization levels: `-O0`, `-O1`, `-O2`, `-Os`.
-  - Feature flags: x86-64 (`+avx`, `+avx2`, `+sse2`, etc.) and RISC-V (`+m`, `+a`, `+f`, `+d`, `+c`).
+  - Feature flags: x86-64 (`+avx`, `+avx2`, `+sse2`, etc.) and RISC-V (`+m`, `+a`, `+f`, `+d`, `+v`, `+c`).
   - Code generation flags: Position Independent Code (`-fPIC`), RTTI toggle.
 - **12 Bundled Examples**:
   - Arithmetic, branch control flow, loops, recursive factorial, SIMD vectorization, structured exception handling (`exception_handling.mir`), and memory pointer examples from `examples/`.

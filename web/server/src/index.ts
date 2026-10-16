@@ -56,6 +56,7 @@ const targetInfo: TargetInfo = {
     { id: '+a', label: '+a', description: 'Enable Atomic Instructions (RV64A)', default: true },
     { id: '+f', label: '+f', description: 'Enable Single-Precision Floating-Point (RV64F)', default: true },
     { id: '+d', label: '+d', description: 'Enable Double-Precision Floating-Point (RV64D)', default: true },
+    { id: '+v', label: '+v', description: 'Enable Vector Extension (RVV 1.0)', default: true },
     { id: '+c', label: '+c', description: 'Enable Compressed Instructions (RVC)', default: false },
   ],
 };

@@ -10,7 +10,7 @@
 
 EzTargets currently provides production backends for two major 64-bit computing architectures:
 - **x86-64 (AMD64)**: Native support for both **System V AMD64** (Linux, macOS, BSD) and **Microsoft x64** (Windows) ABIs, with full SSE and AVX/AVX2 vector extensions.
-- **RISC-V 64-bit (riscv64)**: Native support for the **RV64IMAFD** base ISA and standard extensions, **LP64D** calling convention, and **ELF64** (`EM_RISCV`) binary output.
+- **RISC-V 64-bit (riscv64)**: Native support for the **RV64GCV** base ISA and standard extensions (including RV64IMAFDV), **LP64D** calling convention, 128-bit vector SIMD lowering, and **ELF64** (`EM_RISCV`) binary output.
 
 ```
        +-------------------------------------------------------------+
@@ -302,26 +302,29 @@ Inheriting from `TargetDesc` (`EzTriple`), it serves as the central factory and 
     - `f10`–`f17` (`fa0`–`fa7`): Argument and return floating-point registers.
     - `f18`–`f27` (`fs2`–`fs11`): Saved floating-point registers.
     - `f28`–`f31` (`ft8`–`ft11`): Temporary floating-point registers.
+  - `VR`: 32 vector registers (`v0`–`v31`) for RVV 1.0 (caller-saved).
 - **Register Classes**:
   - `GPR64` (`getGprClass()`): 64-bit integer registers (`x0`–`x31`).
   - `GPR32`: 32-bit integer register views (`GPR64 <: GPR32`).
   - `FPR64`: 64-bit double-precision floating-point registers.
   - `FPR32`: 32-bit single-precision floating-point registers (`FPR64 <: FPR32`).
+  - `VR128` (`getVr128Class()`): 128-bit vector register class (`v0`–`v31`).
 - **Stack Slot Size**: 8 bytes.
 - **Stack Alignment**: 16 bytes.
 - **Memory Displacement Type**: `i64` (`getMemOperandDisplacementType()`).
 - **Binary Descriptor**: `RiscV64ElfBinaryDesc` for System V Linux and bare-metal ELF64 objects (`EM_RISCV` = 243).
 - **Default Calling Convention**: `LP64D` (`riscv64_calling_conv.ezcc`).
   - Scalar arguments passed in `a0`–`a7` (spill to stack with 8-byte alignment).
-  - Floating-point arguments passed in `fa0`–`fa7`.
+  - Floating-point and vector arguments passed in `fa0`–`fa7` (or spilled to stack).
   - Scalar returns in `a0`, `a1`.
   - Floating-point returns in `fa0`, `fa1`.
   - Callee-saved: `s0`–`s11`, `sp`.
 - **Supported CPU Extensions**:
   - `rv64m`: Integer Multiplication and Division (`mul`, `mulh`, `div`, `divu`, `rem`, `remu`, and 32-bit `*w` variants).
   - `rv64a`: Atomic memory instructions (`lr`, `sc`, `amoswap`, `amoadd`, etc.).
-  - `rv64f`: Single-precision floating-point.
-  - `rv64d`: Double-precision floating-point (implies `rv64f`).
+  - `rv64f`: Single-precision floating-point (`flw`, `fsw`, `fadd.s`, `fsub.s`, `fmul.s`, `fdiv.s`, `feq.s`, `flt.s`, `fle.s`, `fmv.s`, `fsgnj.s`).
+  - `rv64d`: Double-precision floating-point (`fld`, `fsd`, `fadd.d`, `fsub.d`, `fmul.d`, `fdiv.d`, `feq.d`, `flt.d`, `fle.d`, `fmv.d`, `fsgnj.d`, implies `rv64f`).
+  - `rv64v`: Vector extension RVV 1.0 (`vadd.vv`, `vfadd.vv`, `vsub.vv`, `vfsub.vv`, `vmul.vv`, `vfmul.vv`, `vdiv.vv`, `vfdiv.vv`, `vand.vv`, `vor.vv`, `vxor.vv`, `vmin.vv`, `vmax.vv`, `vmv.v.v`, `vle8.v`, `vle16.v`, `vle32.v`, `vle64.v`, `vse8.v`, `vse16.v`, `vse32.v`, `vse64.v`, implies `rv64d`).
   - `rv64c`: Standard 16-bit compressed instruction extensions.
 - **Runtime Components**:
   - `RiscV64FrameLowerer` (`getFrameLowerer()`).
@@ -338,6 +341,7 @@ The legality matrix in `targets/riscv64/riscv64_legalize.lad` specifies:
 - **Scalar Operations**: 32-bit and 64-bit integers are natively `LEGAL`. Sub-word integers (`i1`, `i8`, `i16`) are widened to `i32`.
 - **Pointers**: `ptr` is 64-bit and natively `LEGAL`.
 - **Floating-Point**: `f32` and `f64` are natively `LEGAL` when floating-point extensions (`rv64f`, `rv64d`) are enabled.
+- **Vector Operations**: Standard 128-bit vector types (`v16i8`, `v8i16`, `v4i32`, `v2i64`, `v4f32`, `v2f64`) are natively `LEGAL` for `VADD`, `VSUB`, `VMUL`, `VDIV`, `VAND`, `VOR`, `VXOR`, `VMIN`, `VMAX`, `VLOAD`, and `VSTORE` when `rv64v` is enabled.
 - **Compiler-RT Libcalls**: Operations on 128-bit integers (`i128`) are declared as `LIBCALL` and routed to runtime helpers:
   - `MUL i128` -> `__multi3`
   - `SDIV i128` -> `__divti3`
