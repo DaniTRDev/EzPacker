@@ -237,6 +237,10 @@ Optimization Level:
   -O2                            Full optimization pipeline
   -Os                            Size-focused optimization
 
+C Preprocessor Options:
+  -I, --include-directory <dir>  Add directory to C header search path (may be repeated)
+  -D, --define-macro <name[=val]> Predefine macro name with optional value (may be repeated)
+
 Diagnostic and Timing Toggles:
   -v, --verbose                  Enable verbose compiler diagnostics
   --print-passes                 Print pass names as they execute
@@ -248,7 +252,59 @@ Diagnostic and Timing Toggles:
 
 ---
 
-## 7. Header & Class Index
+## 7. Native C Frontend & chibicc Integration (`CFrontendAdapter`)
+
+EzPacker embeds Rui Ueyama's C11 reference C compiler (`chibicc`) as a native, in-process C frontend library (`chibicc_frontend`). This allows `ezc` to directly ingest C source files (`.c`) and preprocessed C files (`.i`), parse them into an Abstract Syntax Tree (AST), and lower them into generic SSA MIR for downstream optimization and native code emission.
+
+### Architecture
+
+```
+       C Source (.c / .i)
+               |
+               v
+  +--------------------------+
+  |      ChibiccWrapper      | <--- [-I include_dirs, -D macro_defines]
+  |  - Tokenize & Preprocess |
+  |  - Parse C11 AST (Obj)   |
+  |  - Error Trapping (SjLj) |
+  +--------------------------+
+               |
+               v AST (Obj*)
+  +--------------------------+
+  |    CFrontendAdapter      |
+  |  - Type Mapping          |
+  |  - Control Flow (CFG)    |
+  |  - SSA Lowering          |
+  |  - Expr / Stmt Lowering  |
+  +--------------------------+
+               |
+               v
+       MirModule (SSA MIR)
+               |
+               v
+       CompilationPipeline
+```
+
+### Key Components
+
+1. **`ChibiccWrapper` (`EzCompiler/include/CFrontend/ChibiccWrapper.h`)**:
+   - Encapsulates chibicc's global tokenizer, preprocessor, and parser states in a clean C++ interface.
+   - Manages include search paths (`addIncludePath`) and command-line macro definitions (`addMacroDefine`).
+   - Implements thread-safe / re-entrant error trapping via `setjmp` / `longjmp`. Syntax errors, missing includes, or unclosed macros are captured and converted into EzPacker `DiagnosticCollector` messages rather than abruptly calling `exit(1)`.
+
+2. **`CFrontendAdapter` (`EzCompiler/include/CFrontend/CFrontendAdapter.h`)**:
+   - Implements `IFrontendAdapter` to interface with `MirModuleLoader`.
+   - Traverses the chibicc AST `Obj` linked list (representing functions and global variables) and converts them into EzPacker `MirFunction`, `MirGlobalVar`, `MirBlock`, and `MirInstruction` nodes.
+   - Maps C fundamental types (`void`, `bool`, `char`, `short`, `int`, `long`, `float`, `double`, pointers, arrays) to corresponding `MirType` instances in `MirTypeTable`.
+   - Lowers control flow structures (`if-else`, `while`, `for`, `do-while`, `switch`/`case`, `goto`, `break`, `continue`, `return`) into explicit CFG basic blocks with phi-free or SSA-ready conditional branches (`BR_COND`, `BR`).
+   - Materializes register operands as needed for instructions requiring virtual registers (e.g. `IMUL`, floating-point arithmetic, bitwise shifts).
+
+3. **CLI Driver Ingestion (`FrontendAdapter.cpp`)**:
+   - `FrontendAdapter` inspects the input file extension. When `.c` or `.i` is detected, it delegates parsing to `CFrontendAdapter`, passing all configured `-I` include directories and `-D` macro definitions.
+
+---
+
+## 8. Header & Class Index
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
@@ -259,3 +315,5 @@ Diagnostic and Timing Toggles:
 | Pipeline | `EzCompiler/include/CompilationPipeline.h` | `CompilationPipeline` |
 | Emission Engine | `EzCompiler/include/EmissionEngine.h` | `EmissionEngine` |
 | Frontend | `EzCompiler/include/FrontendAdapter.h` | `IFrontendAdapter`, `MirModuleLoader` |
+| C Frontend Wrapper | `EzCompiler/include/CFrontend/ChibiccWrapper.h` | `ChibiccWrapper` |
+| C Frontend Lowerer | `EzCompiler/include/CFrontend/CFrontendAdapter.h` | `CFrontendAdapter` |

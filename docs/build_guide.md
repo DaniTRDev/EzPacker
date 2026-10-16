@@ -38,9 +38,11 @@ EzPacker automates third-party dependency management through CMake's `FetchConte
 | **`libtommath`**| `https://github.com/libtom/libtommath` | Fast arbitrary-precision integer arithmetic engine for `FlexInt`. |
 | **`lexy`** | `https://github.com/foonathan/lexy` | Modern C++ parser combinator library used by `EzDsl::Lexer`. |
 | **`argparse`** | `https://github.com/p-ranav/argparse` | Argument parsing library used by `EzCompiler` and `EzDslCli`. |
+| **`chibicc`** | `https://github.com/rui314/chibicc` | C11 reference C compiler vendored and built as a frontend static library (`chibicc_frontend`) via CMake overlay. |
 
 ### Vendored In-Tree Dependencies
 - **`LibBf`** (`LibBf/`): Fabrice Bellard's high-precision floating-point library used by `FlexFloat` to model IEEE 754 scalar and vector types (f32, f64, f128).
+- **`chibicc overlay`** (`CMake/chibicc/overlay/`): Portable compatibility overlay headers (`chibicc.h`, `strings.h`) providing MSVC and cross-platform compatibility, re-entrant error handling, and macro-injected preprocessor/tokenizer definitions without modifying upstream source files.
 
 ---
 
