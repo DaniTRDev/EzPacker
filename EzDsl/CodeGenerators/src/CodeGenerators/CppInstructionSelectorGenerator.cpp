@@ -146,6 +146,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
             auto anonScope = emitter.enterBlock();
             emitter.emitLine("[[maybe_unused]] static bool isSimm32(int64_t val) { return val >= -2147483648LL && val "
                              "<= 2147483647LL; }");
+            emitter.emitLine("[[maybe_unused]] static bool isSimm12(int64_t val) { return val >= -2048 && val <= 2047; }");
             emitter.emitLine("[[maybe_unused]] static bool isSimm8(int64_t val) { return val >= -128 && val <= 127; }");
             emitter.emitLine("[[maybe_unused]] static bool isValidScale(int64_t val) { return val == 1 || val == 2 || "
                              "val == 4 || val == 8; }");
@@ -430,12 +431,15 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
                                 auto ifScope = emitter.enterBlock();
 
                                 // Check predicates / when clauses
+                                std::string predFunc = "isSimm32";
                                 bool hasImmWhen = false;
                                 for (const auto &when : pat->m_whenClauses)
                                 {
-                                    if (when.m_predicate.m_node == "isSimm32" || when.m_predicate.m_node == "isSimm8")
+                                    if (when.m_predicate.m_node == "isSimm32" || when.m_predicate.m_node == "isSimm8" ||
+                                        when.m_predicate.m_node == "isSimm12")
                                     {
                                         hasImmWhen = true;
+                                        predFunc = std::string(when.m_predicate.m_node);
                                     }
                                 }
 
@@ -478,7 +482,7 @@ void CppInstructionSelectorGenerator::emitSource(CppSourceEmitter &emitter,
 
                                     size_t lastIdx = pat->m_matchTree.m_operands.size() - 1;
                                     emitter.emitLine("auto *imm = inst->getOperand({})->get<MirInteger>();", lastIdx);
-                                    std::string predCheck = "imm && isSimm32(imm->getValue().getI64())";
+                                    std::string predCheck = std::format("imm && {}(imm->getValue().getI64())", predFunc);
                                     if (!immCond.empty())
                                     {
                                         predCheck = std::format("{} && {}", immCond, predCheck);

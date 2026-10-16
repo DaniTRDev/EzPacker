@@ -1,0 +1,431 @@
+target RiscV64;
+
+addrmode AddrModeRegImm(GPR64:base, simm12:disp = 0) {
+    variant BaseDisp {
+        match {
+            ADD ptr:$base, imm(i32):$disp;
+        };
+        when {
+            isSimm12($disp);
+        };
+    };
+    variant BaseOnly {
+        match {
+            ptr:$base;
+        };
+    };
+};
+
+// ============================================================================
+// ARITHMETIC PATTERNS
+// ============================================================================
+
+pattern Select_ADD64ri [cost = 1] {
+    match {
+        ADD i64:$dst, i64:$src1, imm(i64):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        ADDI64ri GPR64:$dst, GPR64:$src1, $imm;
+    };
+};
+
+pattern Select_ADD64rr [cost = 1] {
+    match {
+        ADD i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        ADD64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_ADD32ri [cost = 1] {
+    match {
+        ADD i32:$dst, i32:$src1, imm(i32):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        ADDI32ri GPR32:$dst, GPR32:$src1, $imm;
+    };
+};
+
+pattern Select_ADD32rr [cost = 1] {
+    match {
+        ADD i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        ADD32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_SUB64rr [cost = 1] {
+    match {
+        SUB i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        SUB64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_SUB32rr [cost = 1] {
+    match {
+        SUB i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        SUB32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+// ============================================================================
+// BITWISE LOGIC PATTERNS
+// ============================================================================
+
+pattern Select_AND64ri [cost = 1] {
+    match {
+        AND i64:$dst, i64:$src1, imm(i64):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        ANDI64ri GPR64:$dst, GPR64:$src1, $imm;
+    };
+};
+
+pattern Select_AND64rr [cost = 1] {
+    match {
+        AND i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        AND64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_AND32ri [cost = 1] {
+    match {
+        AND i32:$dst, i32:$src1, imm(i32):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        AND32ri GPR32:$dst, GPR32:$src1, $imm;
+    };
+};
+
+pattern Select_AND32rr [cost = 1] {
+    match {
+        AND i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        AND32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_OR64ri [cost = 1] {
+    match {
+        OR i64:$dst, i64:$src1, imm(i64):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        ORI64ri GPR64:$dst, GPR64:$src1, $imm;
+    };
+};
+
+pattern Select_OR64rr [cost = 1] {
+    match {
+        OR i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        OR64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_OR32ri [cost = 1] {
+    match {
+        OR i32:$dst, i32:$src1, imm(i32):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        OR32ri GPR32:$dst, GPR32:$src1, $imm;
+    };
+};
+
+pattern Select_OR32rr [cost = 1] {
+    match {
+        OR i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        OR32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_XOR64ri [cost = 1] {
+    match {
+        XOR i64:$dst, i64:$src1, imm(i64):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        XORI64ri GPR64:$dst, GPR64:$src1, $imm;
+    };
+};
+
+pattern Select_XOR64rr [cost = 1] {
+    match {
+        XOR i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        XOR64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_XOR32ri [cost = 1] {
+    match {
+        XOR i32:$dst, i32:$src1, imm(i32):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        XOR32ri GPR32:$dst, GPR32:$src1, $imm;
+    };
+};
+
+pattern Select_XOR32rr [cost = 1] {
+    match {
+        XOR i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        XOR32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+// ============================================================================
+// MULTIPLY & DIVIDE PATTERNS
+// ============================================================================
+
+pattern Select_MUL64rr [cost = 1] {
+    match {
+        MUL i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        MUL64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_MUL32rr [cost = 1] {
+    match {
+        MUL i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        MUL32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_IMUL64rr [cost = 1] {
+    match {
+        IMUL i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        MUL64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_IMUL32rr [cost = 1] {
+    match {
+        IMUL i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        MUL32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_SDIV64rr [cost = 1] {
+    match {
+        SDIV i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        DIV64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_SDIV32rr [cost = 1] {
+    match {
+        SDIV i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        DIV32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_UDIV64rr [cost = 1] {
+    match {
+        UDIV i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        DIVU64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_UDIV32rr [cost = 1] {
+    match {
+        UDIV i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        DIVU32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+pattern Select_REM64rr [cost = 1] {
+    match {
+        REM i64:$dst, i64:$src1, i64:$src2;
+    };
+    select {
+        REM64rr GPR64:$dst, GPR64:$src1, GPR64:$src2;
+    };
+};
+
+pattern Select_REM32rr [cost = 1] {
+    match {
+        REM i32:$dst, i32:$src1, i32:$src2;
+    };
+    select {
+        REM32rr GPR32:$dst, GPR32:$src1, GPR32:$src2;
+    };
+};
+
+// ============================================================================
+// DATA MOVEMENT PATTERNS
+// ============================================================================
+
+pattern Select_MOV64rr [cost = 1] {
+    match {
+        MOV i64:$dst, i64:$src;
+    };
+    select {
+        MV GPR64:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_MOV32rr [cost = 1] {
+    match {
+        MOV i32:$dst, i32:$src;
+    };
+    select {
+        MV GPR32:$dst, GPR32:$src;
+    };
+};
+
+pattern Select_MOVptr [cost = 1] {
+    match {
+        MOV ptr:$dst, ptr:$src;
+    };
+    select {
+        MV GPR64:$dst, GPR64:$src;
+    };
+};
+
+pattern Select_MOV64ri [cost = 1] {
+    match {
+        MOV i64:$dst, imm(i64):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        ADDI64ri GPR64:$dst, GPR64:$dst, $imm;
+    };
+};
+
+pattern Select_MOV32ri [cost = 1] {
+    match {
+        MOV i32:$dst, imm(i32):$imm;
+    };
+    when {
+        isSimm12($imm);
+    };
+    select {
+        ADDI32ri GPR32:$dst, GPR32:$dst, $imm;
+    };
+};
+
+// ============================================================================
+// MEMORY ACCESS PATTERNS
+// ============================================================================
+
+pattern Select_LD [cost = 2] {
+    match {
+        LOAD i64:$dst, AddrModeRegImm($base, $disp);
+    };
+    select {
+        LD GPR64:$dst, GPR64:$base, $disp;
+    };
+};
+
+pattern Select_LW [cost = 2] {
+    match {
+        LOAD i32:$dst, AddrModeRegImm($base, $disp);
+    };
+    select {
+        LW GPR64:$dst, GPR64:$base, $disp;
+    };
+};
+
+pattern Select_LOADptr [cost = 2] {
+    match {
+        LOAD ptr:$dst, AddrModeRegImm($base, $disp);
+    };
+    select {
+        LD GPR64:$dst, GPR64:$base, $disp;
+    };
+};
+
+pattern Select_SD [cost = 2] {
+    match {
+        STORE AddrModeRegImm($base, $disp), i64:$src;
+    };
+    select {
+        SD GPR64:$src, GPR64:$base, $disp;
+    };
+};
+
+pattern Select_SW [cost = 2] {
+    match {
+        STORE AddrModeRegImm($base, $disp), i32:$src;
+    };
+    select {
+        SW GPR64:$src, GPR64:$base, $disp;
+    };
+};
+
+pattern Select_STOREptr [cost = 2] {
+    match {
+        STORE AddrModeRegImm($base, $disp), ptr:$src;
+    };
+    select {
+        SD GPR64:$src, GPR64:$base, $disp;
+    };
+};
+
+// ============================================================================
+// CONTROL FLOW PATTERNS
+// ============================================================================
+
+pattern Select_JMP [cost = 1] {
+    match {
+        JMP ptr:$target;
+    };
+    select {
+        JALR GPR64:$target, GPR64:$target, 0;
+    };
+};
