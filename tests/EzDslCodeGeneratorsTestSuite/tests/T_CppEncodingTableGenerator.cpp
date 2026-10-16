@@ -10,6 +10,7 @@
 #include "SemaPasses/TargetInstPass.h"
 
 #include <filesystem>
+#include "EzTargetsRiscV64Dsl.h"
 
 using namespace CodeGenerators;
 
@@ -217,4 +218,136 @@ TEST_F(CppTargetEncodingGeneratorTest, UnknownTargetBackendFails)
 {
     CppEncodingTableGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "not_a_target");
     EXPECT_FALSE(generator.run());
+}
+
+// Generates RISC-V encoding descriptors and verifies R, I, S, B, U, J forms and opcode/funct fields.
+TEST_F(CppTargetEncodingGeneratorTest, TestRiscVEncodingTableGeneration)
+{
+    EzTargets::RiscV64::registerDsl();
+
+    std::string idfSource = R"(
+        target RiscV64;
+
+        target_inst ADD64rr(GPR64:dst OUT, GPR64:src1 IN, GPR64:src2 IN) {
+            MNEMONIC("add");
+            FLAGS(IsCommutative);
+            ENCODING {
+                form: r_type;
+                opcode: [0x33];
+                funct3: 0x0;
+                funct7: 0x00;
+                operands { dst => rd; src1 => rs1; src2 => rs2; };
+            };
+        };
+
+        target_inst ADDI64ri(GPR64:dst OUT, GPR64:src1 IN, i64:imm IN) {
+            MNEMONIC("addi");
+            ENCODING {
+                form: i_type;
+                opcode: [0x13];
+                funct3: 0x0;
+                operands { dst => rd; src1 => rs1; imm => imm12_signed; };
+            };
+        };
+
+        target_inst SD(GPR64:src IN, GPR64:base IN, i64:offset IN) {
+            MNEMONIC("sd");
+            ENCODING {
+                form: s_type;
+                opcode: [0x23];
+                funct3: 0x3;
+                operands { src => rs2; base => rs1; offset => imm12_store; };
+            };
+        };
+
+        target_inst BEQ(GPR64:src1 IN, GPR64:src2 IN, i64:target IN) {
+            MNEMONIC("beq");
+            ENCODING {
+                form: b_type;
+                opcode: [0x63];
+                funct3: 0x0;
+                operands { src1 => rs1; src2 => rs2; target => imm12_branch; };
+            };
+        };
+
+        target_inst LUI(GPR64:dst OUT, i64:imm IN) {
+            MNEMONIC("lui");
+            ENCODING {
+                form: u_type;
+                opcode: [0x37];
+                operands { dst => rd; imm => imm20_upper; };
+            };
+        };
+
+        target_inst JAL(GPR64:dst OUT, i64:target IN) {
+            MNEMONIC("jal");
+            ENCODING {
+                form: j_type;
+                opcode: [0x6F];
+                operands { dst => rd; target => imm20_jump; };
+            };
+        };
+    )";
+
+    ASSERT_TRUE(parseAndRunPass(idfSource));
+
+    CppEncodingTableGenerator generator(getDiagCollector(), getSymbolTable(), m_testTempDir, "RiscV64");
+    ASSERT_TRUE(generator.run());
+
+    auto headerPath = m_testTempDir / "RiscV64EncodingTable.h";
+    ASSERT_TRUE(std::filesystem::exists(headerPath));
+
+    std::string header = readFileContent(headerPath);
+
+    EXPECT_NE(header.find("#include \"Encoding/RiscV64EncodingDesc.h\""), std::string::npos);
+    EXPECT_NE(header.find("namespace EzTargets::RiscV64"), std::string::npos);
+    EXPECT_NE(header.find("inline constexpr EncodingDesc s_encodings[]"), std::string::npos);
+    EXPECT_NE(header.find("inline constexpr std::size_t s_encodingCount = 6;"), std::string::npos);
+
+    // ADD64rr: RType, opcode 0x33, funct3 0x00, funct7 0x00
+    EXPECT_NE(header.find("EncForm::RType"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Rd"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Rs1"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Rs2"), std::string::npos);
+
+    // ADDI64ri: IType, opcode 0x13
+    EXPECT_NE(header.find("EncForm::IType"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Imm12Signed"), std::string::npos);
+
+    // SD: SType, opcode 0x23, funct3 0x03
+    EXPECT_NE(header.find("EncForm::SType"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Imm12Store"), std::string::npos);
+
+    // BEQ: BType, opcode 0x63, relocOperand should be 2 (target)
+    EXPECT_NE(header.find("EncForm::BType"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Imm12Branch"), std::string::npos);
+    EXPECT_NE(header.find(".m_relocOperand = 2"), std::string::npos);
+
+    // LUI: UType, opcode 0x37
+    EXPECT_NE(header.find("EncForm::UType"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Imm20Upper"), std::string::npos);
+
+    // JAL: JType, opcode 0x6F
+    EXPECT_NE(header.find("EncForm::JType"), std::string::npos);
+    EXPECT_NE(header.find("EncSlotKind::Imm20Jump"), std::string::npos);
+}
+
+// Rejects a RISC-V encoding with an unknown field or duplicate register slot.
+TEST_F(CppTargetEncodingGeneratorTest, TestRiscVInvalidEncodingIsRejected)
+{
+    EzTargets::RiscV64::registerDsl();
+
+    std::string idfSource = R"(
+        target RiscV64;
+        target_inst BAD(GPR64:dst OUT, GPR64:src IN) {
+            MNEMONIC("bad");
+            ENCODING {
+                form: r_type;
+                opcode: [0x33];
+                operands { dst => rd; src => rd; };
+            };
+        };
+    )";
+
+    EXPECT_FALSE(parseAndRunPass(idfSource));
 }
