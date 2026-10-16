@@ -84,6 +84,22 @@ add_custom_target(fuzz-ezc
     VERBATIM
 )
 
+# 4b. Custom target for measuring and profiling compiler pass performance under heavy stress
+set(YARPGEN_STRESS_BENCH "${CMAKE_CURRENT_SOURCE_DIR}/yarpgen_stress_bench.py")
+add_custom_target(stress-ezc-passes
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
+        --ezc-bin "$<TARGET_FILE:ezc>"
+        --yarpgen-bin "${YARPGEN_BIN}"
+        --target "${DEFAULT_TARGET_TRIPLE}"
+        --opt-level "all"
+        --functions 10
+        --work-dir "${CMAKE_CURRENT_BINARY_DIR}/stress_bench_work"
+    DEPENDS ezc ${YARPGEN_DEP}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMENT "[Stress] Running YARPGen Big Stress Benchmark & Pass Profiler"
+    VERBATIM
+)
+
 # 5. Deterministic Regression Tests for CTest
 if(EXISTS "${SEEDS_FILE}")
     file(STRINGS "${SEEDS_FILE}" REGRESSION_SEEDS)

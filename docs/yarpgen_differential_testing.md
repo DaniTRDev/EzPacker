@@ -156,3 +156,24 @@ To debug a failure:
    python tests/YarpgenDifferentialTests/yarpgen_runner.py --seed 401871035 --opt-levels O0
    ```
 5. When verified, add the seed to `tests/YarpgenDifferentialTests/regression_seeds.txt` so it is permanently tracked by CI!
+
+---
+
+## ⚡ Big Stress Testing & Compiler Pass Profiling
+
+To measure the real-world performance, execution time, and bottlenecks of every individual pass in EzPacker's compilation pipeline, the suite includes a dedicated multi-kernel stress profiler:
+
+```bash
+# Run the Big Stress Benchmark across all optimization levels (-O0, -O1, -O2, -Os)
+python tests/YarpgenDifferentialTests/yarpgen_stress_bench.py --functions 10 --opt-level all
+
+# Or trigger via CMake
+cmake --build cmake-build-debug --target stress-ezc-passes
+```
+
+### What It Measures:
+1. **Pass Execution Times**: Captures per-pass execution durations via `ezc --time-passes`.
+2. **Bottleneck Analysis**: Identifies top bottleneck passes (e.g., `MirRegisterAllocatorPass`, `LivenessAnalysisPass`, `MirInstructionSelectorPass`).
+3. **Multi-Scale Scalability**: Synthesizes a monolithic C stress file merging multiple distinct YARPGen function kernels, namespacing all variables and functions so they compile concurrently in a single compilation unit.
+4. **Metrics Export**: Supports exporting benchmark results to JSON (`--json-out results.json`) or Markdown tables (`--markdown-out report.md`).
+
