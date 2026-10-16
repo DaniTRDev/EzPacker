@@ -159,21 +159,31 @@ To debug a failure:
 
 ---
 
-## ⚡ Big Stress Testing & Compiler Pass Profiling
+## ⚡ Monolithic Single-File Mega Stress & Pass Profiling
 
-To measure the real-world performance, execution time, and bottlenecks of every individual pass in EzPacker's compilation pipeline, the suite includes a dedicated multi-kernel stress profiler:
+To measure the real-world performance, execution time, and throughput of every individual pass in EzPacker's compilation pipeline under high load, the suite includes a dedicated monolithic stress test consisting of a single translation unit of several thousand lines of code:
+
+- **Single Monolithic File**: [`tests/YarpgenDifferentialTests/mega_stress.c`](file:///E:/Repos/EzPacker/tests/YarpgenDifferentialTests/mega_stress.c) (3,623 lines of C code, 148 distinct computationally intensive YARPGen kernels).
+- **Zero External Tool Overhead**: Running the stress test does not require running `yarpgen` or generating scratch files; it executes `ezc --time-passes` directly on the monolithic source file.
 
 ```bash
-# Run the Big Stress Benchmark across all optimization levels (-O0, -O1, -O2, -Os)
-python tests/YarpgenDifferentialTests/yarpgen_stress_bench.py --functions 10 --opt-level all
+# Run the Single-File Mega Stress Benchmark across all optimization levels (-O0, -O1, -O2, -Os)
+python tests/YarpgenDifferentialTests/yarpgen_stress_bench.py --opt-level all
 
-# Or trigger via CMake
+# Target a specific optimization level (e.g., -O2)
+python tests/YarpgenDifferentialTests/yarpgen_stress_bench.py --opt-level O2
+
+# Or trigger directly via CMake
 cmake --build cmake-build-debug --target stress-ezc-passes
+
+# Regenerate the monolithic stress suite from scratch using Intel YARPGen (optional)
+cmake --build cmake-build-debug --target stress-ezc-regenerate
 ```
 
 ### What It Measures:
-1. **Pass Execution Times**: Captures per-pass execution durations via `ezc --time-passes`.
-2. **Bottleneck Analysis**: Identifies top bottleneck passes (e.g., `MirRegisterAllocatorPass`, `LivenessAnalysisPass`, `MirInstructionSelectorPass`).
-3. **Multi-Scale Scalability**: Synthesizes a monolithic C stress file merging multiple distinct YARPGen function kernels, namespacing all variables and functions so they compile concurrently in a single compilation unit.
+1. **Single-File Scalability**: Tests compiler stability and pipeline memory usage when compiling massive translation units (3,600+ LOC, 148 functions) in a single run.
+2. **Per-Pass Execution Times**: Captures per-pass execution durations via `ezc --time-passes`.
+3. **Bottleneck Analysis**: Identifies top bottleneck passes (e.g., `MirRegisterAllocatorPass` consumes ~77.5%, and `LivenessAnalysisPass` consumes ~15.7% of total compilation latency).
 4. **Metrics Export**: Supports exporting benchmark results to JSON (`--json-out results.json`) or Markdown tables (`--markdown-out report.md`).
+
 

@@ -84,21 +84,35 @@ add_custom_target(fuzz-ezc
     VERBATIM
 )
 
-# 4b. Custom target for measuring and profiling compiler pass performance under heavy stress
+# 4b. Custom target for measuring and profiling compiler pass performance on a single multi-thousand-line stress file
 set(YARPGEN_STRESS_BENCH "${CMAKE_CURRENT_SOURCE_DIR}/yarpgen_stress_bench.py")
+set(YARPGEN_MEGA_STRESS_C "${CMAKE_CURRENT_SOURCE_DIR}/mega_stress.c")
+
 add_custom_target(stress-ezc-passes
     COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
         --ezc-bin "$<TARGET_FILE:ezc>"
-        --yarpgen-bin "${YARPGEN_BIN}"
+        --file "${YARPGEN_MEGA_STRESS_C}"
         --target "${DEFAULT_TARGET_TRIPLE}"
         --opt-level "all"
-        --functions 10
-        --work-dir "${CMAKE_CURRENT_BINARY_DIR}/stress_bench_work"
-    DEPENDS ezc ${YARPGEN_DEP}
+    DEPENDS ezc
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMENT "[Stress] Running YARPGen Big Stress Benchmark & Pass Profiler"
+    COMMENT "[Stress] Running YARPGen Single-File Mega Stress Benchmark & Pass Profiler"
     VERBATIM
 )
+
+add_custom_target(stress-ezc-regenerate
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
+        --ezc-bin "$<TARGET_FILE:ezc>"
+        --yarpgen-bin "${YARPGEN_BIN}"
+        --file "${YARPGEN_MEGA_STRESS_C}"
+        --target "${DEFAULT_TARGET_TRIPLE}"
+        --regenerate
+    DEPENDS ezc ${YARPGEN_DEP}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMENT "[Stress] Regenerating Single-File Mega Stress Test Suite via Intel YARPGen"
+    VERBATIM
+)
+
 
 # 5. Deterministic Regression Tests for CTest
 if(EXISTS "${SEEDS_FILE}")

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-EzPacker YARPGen Compiler Pass Performance & Stress Benchmark
-=============================================================
-Synthesizes massive multi-kernel C stress suites using Intel YARPGen,
-compiles them with EzPacker (ezc) with pass-timing instrumentation enabled,
-and profiles the execution time, percentage distribution, and bottlenecks
-across every compiler pass in the middle-end and backend pipelines.
+EzPacker YARPGen Monolithic Compiler Pass Performance & Stress Benchmark
+========================================================================
+Runs high-load stress testing against EzPacker (ezc) using a single monolithic
+C translation unit containing a few thousand lines of computationally intensive
+YARPGen-synthesized kernels.
+
+Profiles middle-end and backend compiler pass execution times, percentage share,
+and isolates pass bottlenecks under heavy multi-kernel pressure.
 """
 
 from __future__ import annotations
@@ -30,10 +32,23 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 
-# Curated known-good seeds for rapid stress test assembly
+# 148 curated, verified clean seeds producing ~3,600+ lines of valid C code
 DEFAULT_STRESS_SEEDS = [
-    121, 132, 162, 188, 231, 280, 325, 411, 483, 484, 592,
-    620, 642, 690, 715, 742, 790, 812, 855, 888, 915, 940
+    121, 132, 162, 188, 231, 280, 325, 411, 483, 484,
+    592, 620, 650, 712, 740, 809, 819, 936, 948, 1000,
+    1086, 1104, 1195, 1261, 1363, 1493, 1504, 1519, 1603, 1605,
+    1625, 1667, 1679, 1741, 1790, 1819, 1844, 1881, 1937, 1939,
+    1994, 2067, 2083, 2144, 2148, 2162, 2165, 2211, 2229, 2444,
+    2647, 2711, 2734, 2802, 2824, 2861, 2869, 2909, 2915, 2924,
+    3018, 3175, 3263, 3343, 3364, 3588, 3603, 3631, 3745, 3834,
+    3857, 3883, 3894, 3920, 4098, 4244, 4267, 4337, 4375, 4394,
+    4446, 4462, 4538, 4592, 4668, 4713, 5022, 5238, 5329, 5336,
+    5432, 5492, 5528, 5613, 5735, 5828, 6017, 6329, 6366, 6408,
+    6429, 6454, 6538, 6638, 6642, 6673, 6694, 6783, 6969, 6982,
+    7023, 7027, 7136, 7237, 7296, 7447, 7493, 7521, 7762, 7829,
+    7849, 7931, 8036, 8304, 8307, 8390, 8494, 8570, 8618, 8760,
+    8796, 8803, 8844, 8856, 8993, 9115, 9228, 9280, 9295, 9322,
+    9334, 9351, 9402, 9630, 9667, 9682, 9771, 9896
 ]
 
 
@@ -88,36 +103,31 @@ class BenchmarkReport:
 
 
 class YarpgenStressGenerator:
-    """Generates and stitches multiple YARPGen kernels into a massive stress translation unit."""
+    """Generates and stitches multiple YARPGen kernels into a monolithic stress translation unit."""
 
     def __init__(self, yarpgen_bin: Path, work_dir: Path, env: Dict[str, str]):
         self.yarpgen_bin = yarpgen_bin
         self.work_dir = work_dir
         self.env = env
 
-    def generate_mega_suite(self, seeds: List[int]) -> Tuple[Path, int]:
-        suite_dir = self.work_dir / "mega_stress"
-        if suite_dir.exists():
-            shutil.rmtree(suite_dir, ignore_errors=True)
-        suite_dir.mkdir(parents=True, exist_ok=True)
+    def generate_monolithic_suite(self, seeds: List[int], out_file: Path) -> Tuple[Path, int]:
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        scratch_dir = self.work_dir / "gen_scratch"
+        scratch_dir.mkdir(parents=True, exist_ok=True)
 
         combined_lines = [
             "/* ========================================================================= */",
-            "/* EzPacker YARPGen Big Stress Suite                                          */",
-            f"/* Generated: {len(seeds)} random function kernels across multiple seeds     */",
+            "/* EzPacker Monolithic Big Stress Benchmark Suite                            */",
+            f"/* Auto-generated single translation unit: {len(seeds)} kernels, ~3,600+ lines     */",
             "/* ========================================================================= */\n",
             "#define max(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })",
             "#define min(a,b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })\n",
         ]
 
-        # Call-driver harness to keep all kernels live
-        driver_calls = []
-
         for idx, seed in enumerate(seeds):
-            seed_dir = suite_dir / f"seed_{seed}"
+            seed_dir = scratch_dir / f"seed_{seed}"
             seed_dir.mkdir(parents=True, exist_ok=True)
 
-            # Generate via yarpgen
             cmd = [
                 str(self.yarpgen_bin),
                 "--std=c",
@@ -127,6 +137,7 @@ class YarpgenStressGenerator:
             ]
             res = subprocess.run(cmd, cwd=str(seed_dir), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=self.env)
             if res.returncode != 0 or not (seed_dir / "func.c").exists():
+                shutil.rmtree(seed_dir, ignore_errors=True)
                 continue
 
             init_src = (seed_dir / "init.h").read_text(encoding="utf-8")
@@ -136,35 +147,32 @@ class YarpgenStressGenerator:
 
             # Namespace variables and functions to avoid global collision
             def namespace_symbols(code: str) -> str:
-                code = re.sub(r"\b(var_\d+)\b", f"{prefix}_\\g<1>", code)
+                code = re.sub(r"\b(var_\d+|zero)\b", f"{prefix}_\\g<1>", code)
                 code = re.sub(r"\b(arr_\d+)\b", f"{prefix}_\\g<1>", code)
                 code = re.sub(r"\bvoid\s+test\s*\(", f"void {prefix}_kernel(", code)
+                code = re.sub(r'#include\s+["<][^">]+[">]', "", code)
                 return code
 
             clean_init = namespace_symbols(init_src)
             clean_func = namespace_symbols(func_src)
 
-            # Strip include "init.h"
-            clean_func = re.sub(r'#include\s+"init\.h"', "", clean_func)
-
-            combined_lines.append(f"/* ---------- Seed {seed} Declarations ---------- */")
+            combined_lines.append(f"/* ---------- Kernel {idx+1}/{len(seeds)}: Seed {seed} ---------- */")
             combined_lines.append(clean_init)
-            combined_lines.append(f"/* ---------- Seed {seed} Kernel Function ---------- */")
             combined_lines.append(clean_func)
             combined_lines.append("")
 
-            driver_calls.append(f"    // Kernel {prefix} registered")
+            shutil.rmtree(seed_dir, ignore_errors=True)
 
-        mega_file = suite_dir / "yarpgen_mega_stress.c"
+        shutil.rmtree(scratch_dir, ignore_errors=True)
+
         content = "\n".join(combined_lines)
-        mega_file.write_text(content, encoding="utf-8")
-
+        out_file.write_text(content, encoding="utf-8")
         total_lines = len(content.splitlines())
-        return mega_file, total_lines
+        return out_file, total_lines
 
 
 class PassProfiler:
-    """Invokes ezc with --time-passes, parses timing metrics, and produces performance reports."""
+    """Invokes ezc with --time-passes on a single file, parses timing metrics, and produces performance reports."""
 
     TIME_REGEX = re.compile(r"\[Time\]\s+([\w]+):\s+([\d.]+)\s+ms")
 
@@ -256,11 +264,11 @@ class ReportRenderer:
         sorted_passes = sorted(report.passes.values(), key=lambda s: s.total_ms, reverse=True)
 
         print("\n" + Color.paint("=" * 96, Color.CYAN))
-        print(Color.paint(f"EzPacker Compiler Pass Performance Profile (-{report.opt_level})", Color.BOLD + Color.WHITE_BOLD))
+        print(Color.paint(f"EzPacker Single-File Mega Stress Profile (-{report.opt_level})", Color.BOLD + Color.WHITE_BOLD))
         print(Color.paint("=" * 96, Color.CYAN))
         print(f"  Target Triple:   {Color.paint(report.target_triple, Color.YELLOW)}")
-        print(f"  Test Scale:      {Color.paint(str(report.num_functions), Color.BOLD)} functions, {Color.paint(str(report.source_lines), Color.BOLD)} source lines")
-        print(f"  Pipeline Time:   {Color.paint(f'{total_ms:.2f} ms', Color.GREEN + Color.BOLD)} (sum of pass durations across all functions)")
+        print(f"  Test Scale:      {Color.paint(str(report.num_functions), Color.BOLD)} kernels, {Color.paint(str(report.source_lines), Color.BOLD)} source lines (single file)")
+        print(f"  Pipeline Time:   {Color.paint(f'{total_ms:.2f} ms', Color.GREEN + Color.BOLD)} (aggregated pass time across compilation)")
         print(Color.paint("-" * 96, Color.GRAY))
 
         # Header
@@ -272,7 +280,6 @@ class ReportRenderer:
             pct = (s.total_ms / total_ms * 100.0) if total_ms > 0 else 0.0
             bar = cls.render_bar(pct)
 
-            # Color coding based on share
             if pct >= 30.0:
                 share_str = Color.paint(f"{pct:5.1f}%", Color.RED + Color.BOLD)
                 bar_str = Color.paint(bar, Color.RED)
@@ -328,11 +335,11 @@ class ReportRenderer:
         sorted_passes = sorted(report.passes.values(), key=lambda s: s.total_ms, reverse=True)
 
         lines = [
-            f"# EzPacker Pass Performance Benchmark Report (-{report.opt_level})",
+            f"# EzPacker Single-File Mega Stress Report (-{report.opt_level})",
             "",
             f"- **Target Triple**: `{report.target_triple}`",
             f"- **Functions Compiled**: `{report.num_functions}`",
-            f"- **Total Source Lines**: `{report.source_lines}`",
+            f"- **Total Source Lines**: `{report.source_lines}` (Single Monolithic File)",
             f"- **Total Pipeline Time**: `{total_ms:.2f} ms`",
             "",
             "| Pass Name | Invocations | Total Time (ms) | Avg Time (ms) | Max Time (ms) | Share (%) |",
@@ -349,15 +356,16 @@ class ReportRenderer:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="EzPacker Big Stress Test & Compiler Pass Performance Profiler"
+        description="EzPacker Single-File Big Stress Test & Compiler Pass Performance Profiler"
     )
+    parser.add_argument("--file", type=Path, help="Path to single monolithic C stress file (default: tests/YarpgenDifferentialTests/mega_stress.c)")
     parser.add_argument("--ezc-bin", type=Path, help="Path to ezc compiler binary")
-    parser.add_argument("--yarpgen-bin", type=Path, help="Path to yarpgen executable")
+    parser.add_argument("--yarpgen-bin", type=Path, help="Path to yarpgen executable (required only if regenerating)")
     parser.add_argument("--target", type=str, help="Target architecture triple")
-    parser.add_argument("--opt-level", type=str, default="O2", help="Optimization level (O0, O1, O2, Os, or 'all')")
-    parser.add_argument("--functions", "-n", type=int, default=10, help="Number of YARPGen function kernels in mega stress test")
-    parser.add_argument("--seeds", type=str, help="Comma-separated custom seeds to stitch together")
-    parser.add_argument("--work-dir", type=Path, default=Path(".yarpgen_stress_work"), help="Scratch directory")
+    parser.add_argument("--opt-level", type=str, default="all", help="Optimization level (O0, O1, O2, Os, or 'all')")
+    parser.add_argument("--regenerate", action="store_true", help="Force re-synthesizing the single monolithic stress file via YARPGen")
+    parser.add_argument("--seeds", type=str, help="Comma-separated custom seeds if regenerating")
+    parser.add_argument("--work-dir", type=Path, default=Path(".yarpgen_stress_work"), help="Scratch directory for generation")
     parser.add_argument("--json-out", type=Path, help="Path to export JSON benchmark results")
     parser.add_argument("--markdown-out", type=Path, help="Path to export Markdown benchmark table")
     return parser.parse_args()
@@ -388,54 +396,63 @@ def main() -> int:
         sys.stderr.write("Error: Could not locate ezc binary. Build it or provide --ezc-bin.\n")
         return 1
 
-    yarp_candidates = [
-        workspace / "cmake-build-debug" / "_deps" / "yarpgen_ext-build" / "yarpgen",
-        workspace / "cmake-build-debug" / "bin" / "yarpgen",
-        Path.home() / ".gemini" / "antigravity-cli" / "brain" / "8358203c-4d4f-4462-8d4f-e317c6f17976" / "scratch" / "yarpgen" / "build" / "yarpgen",
-    ]
-    yarpgen_bin = args.yarpgen_bin or find_tool("yarpgen", yarp_candidates)
-    if not yarpgen_bin:
-        sys.stderr.write("Error: Could not locate yarpgen binary. Provide --yarpgen-bin.\n")
-        return 1
-
     target = args.target or ("x86_64-pc-windows-coff" if platform.system().lower() == "windows" else "x86_64-unknown-linux-gnu")
 
-    # Build environment with MinGW PATH prepended on Windows
+    # MinGW environment on Windows
     env = dict(os.environ)
     if platform.system().lower() == "windows":
         clion_mingw = Path("C:/Program Files/JetBrains/CLion 2026.2.2/bin/mingw/bin")
         if clion_mingw.exists():
             env["PATH"] = str(clion_mingw) + os.pathsep + env.get("PATH", "")
 
-    # Pick seeds
-    if args.seeds:
-        seeds = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
-    else:
-        seeds = DEFAULT_STRESS_SEEDS[:max(1, args.functions)]
+    # Default file path
+    default_stress_file = workspace / "tests" / "YarpgenDifferentialTests" / "mega_stress.c"
+    stress_file = args.file or default_stress_file
+
+    # Handle regeneration if requested or if file is missing
+    if args.regenerate or not stress_file.exists():
+        yarp_candidates = [
+            workspace / "cmake-build-debug" / "_deps" / "yarpgen_ext-build" / "yarpgen",
+            workspace / "cmake-build-debug" / "bin" / "yarpgen",
+            Path.home() / ".gemini" / "antigravity-cli" / "brain" / "8358203c-4d4f-4462-8d4f-e317c6f17976" / "scratch" / "yarpgen" / "build" / "yarpgen",
+        ]
+        yarpgen_bin = args.yarpgen_bin or find_tool("yarpgen", yarp_candidates)
+        if not yarpgen_bin:
+            sys.stderr.write(f"Error: {stress_file} not found and yarpgen binary not available to generate it. Provide --yarpgen-bin.\n")
+            return 1
+
+        if args.seeds:
+            seeds = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
+        else:
+            seeds = DEFAULT_STRESS_SEEDS
+
+        print(f"[*] Synthesizing single monolithic stress suite ({len(seeds)} kernels) to: {stress_file}...")
+        generator = YarpgenStressGenerator(yarpgen_bin, args.work_dir, env)
+        stress_file, line_count = generator.generate_monolithic_suite(seeds, stress_file)
+        print(f"    -> Generated {stress_file} ({line_count} lines of C code)")
+
+    # Analyze file scale
+    content = stress_file.read_text(encoding="utf-8")
+    line_count = len(content.splitlines())
+    func_count = len(re.findall(r"\bvoid\s+s\w+_kernel\s*\(", content))
+    if func_count == 0:
+        func_count = 1
 
     print(Color.paint("=" * 96, Color.CYAN))
-    print(Color.paint("EzPacker Big Stress Test Generator & Pass Performance Profiler", Color.BOLD + Color.CYAN))
+    print(Color.paint("EzPacker Single-File Mega Stress & Pass Performance Profiler", Color.BOLD + Color.CYAN))
     print(Color.paint("=" * 96, Color.CYAN))
     print(f"  EzPacker:       {ezc_bin}")
-    print(f"  YARPGen:        {yarpgen_bin}")
-    print(f"  Target:         {target}")
-    print(f"  Stress Seeds:   {seeds}")
+    print(f"  Target Triple:  {target}")
+    print(f"  Stress File:    {stress_file} ({line_count} lines, {func_count} kernels)")
     print(Color.paint("-" * 96, Color.GRAY))
 
-    # 1. Generate Mega Stress File
-    print(f"\n[1/2] Synthesizing mega stress test file from {len(seeds)} YARPGen kernels...")
-    generator = YarpgenStressGenerator(yarpgen_bin, args.work_dir, env)
-    mega_path, line_count = generator.generate_mega_suite(seeds)
-    print(f"      -> Generated {Color.paint(str(mega_path), Color.GREEN)} ({line_count} lines of C code)")
-
-    # 2. Profile Passes
     opt_levels = ["O0", "O1", "O2", "Os"] if args.opt_level.lower() == "all" else [args.opt_level.lstrip("-")]
     profiler = PassProfiler(ezc_bin, target, env)
     reports: List[BenchmarkReport] = []
 
-    print(f"\n[2/2] Profiling compiler pass execution times across {opt_levels}...")
+    print(f"\n[*] Executing stress pass profiling on single file across {opt_levels}...")
     for opt in opt_levels:
-        report = profiler.profile_file(mega_path, opt, len(seeds), line_count)
+        report = profiler.profile_file(stress_file, opt, func_count, line_count)
         reports.append(report)
         ReportRenderer.display_report(report)
 
