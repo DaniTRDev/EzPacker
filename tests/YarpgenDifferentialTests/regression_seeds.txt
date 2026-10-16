@@ -1,0 +1,13 @@
+# Curated Deterministic Regression Seeds for YARPGen Differential Testing Suite
+# Format: <seed> [description]
+#
+# These seeds exercise different combinations of MIR generation, C constructs,
+# integer expressions, bitwise logic, and control flow.
+# As compiler bug fixes land in EzPacker, seeds are continuously promoted to
+# this regression baseline to prevent future regressions.
+
+401871035   # Narrowing integer truncation and implicit conversions (TRUNC)
+545245296   # Unary operators, sign extensions, and scalar assignment
+326683734   # Arithmetic expressions, min/max conditionals, and boolean tests
+1045802857  # Multi-operand comparisons, type width legalization
+2130914114  # Array indexing and pointer base register address generation
