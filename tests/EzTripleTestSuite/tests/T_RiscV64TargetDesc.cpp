@@ -37,14 +37,14 @@ TEST_F(EzTripleTestSuite, TestRiscV64TargetDescInitialization)
     EXPECT_STREQ(gpr->getName(), "GPR64");
 }
 
-// Verifies the GPR and FPR banks expose their classes, register counts, and lookups.
+// Verifies the GPR, FPR, and VR banks expose their classes, register counts, and lookups.
 TEST_F(EzTripleTestSuite, TestRiscV64RegisterBanksAndClasses)
 {
     RiscV64TargetDesc target(getBuilderCtx());
     target.initialize();
 
     auto banks = target.getAvailableRegisterBanks();
-    ASSERT_EQ(banks.size(), 2u);
+    ASSERT_EQ(banks.size(), 3u);
 
     // GPR Bank
     MirRegisterBank *gprBank = banks[0];
@@ -80,6 +80,21 @@ TEST_F(EzTripleTestSuite, TestRiscV64RegisterBanksAndClasses)
     EXPECT_EQ(fpr32->getRegs().size(), 32u);
     EXPECT_NE(fpr64->getReg("ft0"), nullptr);
     EXPECT_NE(fpr64->getReg("fa0"), nullptr);
+
+    // VR Bank
+    MirRegisterBank *vrBank = banks[2];
+    ASSERT_NE(vrBank, nullptr);
+    EXPECT_STREQ(vrBank->getName(), "VR");
+
+    MirRegisterClass *vr128 = vrBank->getClass("VR128");
+    ASSERT_NE(vr128, nullptr);
+    EXPECT_EQ(vr128->getRegs().size(), 32u);
+    EXPECT_NE(vr128->getReg("v0"), nullptr);
+    EXPECT_NE(vr128->getReg("v1"), nullptr);
+    EXPECT_NE(vr128->getReg("v31"), nullptr);
+
+    // Verify TargetDesc accessor for VR128
+    EXPECT_EQ(target.getVr128Class(), vr128);
 }
 
 // Verifies calling convention descriptor properties and callee-saved registers.
