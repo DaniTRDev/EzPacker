@@ -24,8 +24,11 @@ void chibicc_reset_state(void);
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdnoreturn.h>
+#ifdef __cplusplus
+# undef noreturn
+# define noreturn [[noreturn]]
+#endif
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>

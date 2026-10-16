@@ -1,4 +1,19 @@
 #include "chibicc.h"
+#include <sys/stat.h>
+
+StringArray include_paths = {0};
+bool opt_fpic = false;
+bool opt_fcommon = true;
+char *base_file = NULL;
+
+bool file_exists(char *path) {
+  struct stat st;
+  return !stat(path, &st);
+}
+
+int align_to(int n, int align) {
+  return (n + align - 1) / align * align;
+}
 
 void strarray_push(StringArray *arr, char *s) {
   if (!arr->data) {

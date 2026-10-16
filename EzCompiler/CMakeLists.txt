@@ -7,6 +7,7 @@ set(EZCOMPILER_LIB_FILES_LIST
         "include/FrontendAdapter.h"
         "include/CompilationPipeline.h"
         "include/EmissionEngine.h"
+        "include/CFrontend/ChibiccWrapper.h"
 
         "src/CommandLineOptions.cpp"
         "src/DriverContext.cpp"
@@ -15,13 +16,14 @@ set(EZCOMPILER_LIB_FILES_LIST
         "src/FrontendAdapter.cpp"
         "src/CompilationPipeline.cpp"
         "src/EmissionEngine.cpp"
+        "src/CFrontend/ChibiccWrapper.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzCompilerLib"
         FILE_LIST ${EZCOMPILER_LIB_FILES_LIST}
         PRECOMPILED_HEADER "include/EzCompilerCommon.h"
-        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;argparse"
-        INCLUDED_DIRS "include;../EzCodeEmitter/include;../EzTriple/include;../EzMir/include;../EzCore/include"
+        LINKED_LIBRARIES "EzTriple;EzMir;EzCore;EzCodeEmitter;argparse;chibicc_frontend"
+        INCLUDED_DIRS "include;../EzCodeEmitter/include;../EzTriple/include;../EzMir/include;../EzCore/include;${chibicc_SOURCE_DIR};${chibicc_SOURCE_DIR}/shims"
 )
 
 EzCMK_AddExecutable(NAME "ezc"

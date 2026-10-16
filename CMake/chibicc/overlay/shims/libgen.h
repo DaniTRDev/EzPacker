@@ -5,16 +5,18 @@
 #include <string.h>
 
 static inline char *chibicc_shim_dirname(char *path) {
+    static char dot[] = ".";
+    static char slash[] = "/";
     if (!path || !*path)
-        return ".";
+        return dot;
     char *p = strrchr(path, '/');
     char *p2 = strrchr(path, '\\');
     if (p2 && (!p || p2 > p))
         p = p2;
     if (!p)
-        return ".";
+        return dot;
     if (p == path)
-        return "/";
+        return slash;
     *p = '\0';
     return path;
 }

@@ -19,7 +19,9 @@ static char chibicc_last_error[2048] = {0};
 
 void chibicc_set_error_jmp(jmp_buf *buf) {
   chibicc_err_jmp = buf;
-  chibicc_last_error[0] = '\0';
+  if (buf != NULL) {
+    chibicc_last_error[0] = '\0';
+  }
 }
 
 const char *chibicc_get_last_error(void) {
