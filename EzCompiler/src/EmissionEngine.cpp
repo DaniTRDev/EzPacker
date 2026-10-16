@@ -373,8 +373,16 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
     switch (binDesc->getObjectFormat())
     {
         case TargetObjectFormat::ELF:
-            writer = std::make_unique<EzCodeEmitter::ObjectFormat::Elf64Writer>();
+        {
+            auto elfWriter = std::make_unique<EzCodeEmitter::ObjectFormat::Elf64Writer>();
+            if (m_ctx.getOptions().target.isRiscV() ||
+                (targetDesc && std::string_view(targetDesc->getName()).find("riscv") != std::string_view::npos))
+            {
+                elfWriter->setMachine(243); // EM_RISCV
+            }
+            writer = std::move(elfWriter);
             break;
+        }
         case TargetObjectFormat::COFF:
             writer = std::make_unique<EzCodeEmitter::ObjectFormat::CoffWriter>();
             break;

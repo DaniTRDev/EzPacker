@@ -42,9 +42,20 @@ class Elf64Writer : public IObjectWriter
      */
     void clear() override;
 
+    /**
+     * Sets the ELF machine architecture (e.g. 62 for EM_X86_64, 243 for EM_RISCV).
+     */
+    void setMachine(uint16_t machine) noexcept { m_machine = machine; }
+
+    /**
+     * Returns the configured ELF machine architecture.
+     */
+    uint16_t getMachine() const noexcept { return m_machine; }
+
   private:
     std::vector<ObjectSymbol> m_symbols;    ///< Symbols to materialize in .symtab.
     std::vector<ObjectRelocEntry> m_relocs; ///< Relocations to materialize in .rela.text.
+    uint16_t m_machine{ 62 };               ///< ELF machine architecture (default: EM_X86_64).
 };
 
 } // namespace EzCodeEmitter::ObjectFormat

@@ -47,6 +47,16 @@ class TargetTriple
     bool isX86_64() const noexcept;
 
     /**
+     * True when the architecture names a RISC-V target (riscv / riscv64 / riscv32).
+     */
+    bool isRiscV() const noexcept;
+
+    /**
+     * True when the architecture names a 64-bit RISC-V target (riscv64 / rv64).
+     */
+    bool isRiscV64() const noexcept;
+
+    /**
      * True when the triple targets Windows (sys/abi indicate win32/msvc/coff).
      */
     bool isWindows() const noexcept;

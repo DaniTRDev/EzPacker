@@ -68,6 +68,23 @@ void emitStringArray(CppSourceEmitter &emitter,
     emitter.emitBlankLine();
 }
 
+// Checks if the target declaration includes a specific object format.
+bool hasObjectFormat(const DSL::Ast::TargetDesc::TargetDescDecl *decl, std::string_view format)
+{
+    if (!decl || decl->mObjectFormats.empty())
+    {
+        return false;
+    }
+    for (const auto &fmt : decl->mObjectFormats)
+    {
+        if (fmt.m_node == format)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 // Binds the generator to its diagnostics/symbols and normalizes an empty target name to "Target".
@@ -210,6 +227,10 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
                          decl ? decl->m_extensions.size() : 0);
         emitter.emitBlankLine();
 
+        const bool isX86 = (m_targetName == "X86_64" || m_targetName == "x86_64" || m_targetName == "x86-64" || m_targetName == "AMD64");
+        const bool hasElf = isX86 || hasObjectFormat(decl, "ELF");
+        const bool hasCoff = isX86 || hasObjectFormat(decl, "COFF");
+
         emitter.emitComment("Concrete target descriptor generated from the .tdesc manifest.");
         {
             auto classScope = emitter.enterClass(className, "public TargetDesc");
@@ -246,10 +267,25 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitBlankLine();
             emitter.emitComment("Convenience accessors for target-specific conventions, formats and settings.");
             emitter.emitLine("void setPositionIndependent(bool isPositionIndependent) { m_isPic = isPositionIndependent; }");
-            emitter.emitLine("CallingConvDesc *getSysVCallingConv() const { return m_sysVConv.get(); }");
-            emitter.emitLine("CallingConvDesc *getWin64CallingConv() const { return m_win64Conv.get(); }");
-            emitter.emitLine("TargetBinaryDesc *getElfBinaryDesc() const { return m_elfBinary.get(); }");
-            emitter.emitLine("TargetBinaryDesc *getCoffBinaryDesc() const { return m_coffBinary.get(); }");
+            if (isX86)
+            {
+                emitter.emitLine("CallingConvDesc *getSysVCallingConv() const { return m_sysVConv.get(); }");
+                emitter.emitLine("CallingConvDesc *getWin64CallingConv() const { return m_win64Conv.get(); }");
+                emitter.emitLine("TargetBinaryDesc *getElfBinaryDesc() const { return m_elfBinary.get(); }");
+                emitter.emitLine("TargetBinaryDesc *getCoffBinaryDesc() const { return m_coffBinary.get(); }");
+            }
+            else
+            {
+                emitter.emitLine("CallingConvDesc *getDefaultCallingConv() const { return m_defaultConv.get(); }");
+                if (hasElf)
+                {
+                    emitter.emitLine("TargetBinaryDesc *getElfBinaryDesc() const { return m_elfBinary.get(); }");
+                }
+                if (hasCoff)
+                {
+                    emitter.emitLine("TargetBinaryDesc *getCoffBinaryDesc() const { return m_coffBinary.get(); }");
+                }
+            }
             emitter.emitBlankLine();
             emitter.emitLine("private:");
             emitter.emitLine("MirBuilderContext *m_ctx{ nullptr };");
@@ -272,10 +308,25 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("std::unique_ptr<MirLegalizer> m_legalizer;");
             emitter.emitLine("std::unique_ptr<LegalizerInfo> m_legalizerInfo;");
             emitter.emitLine("std::unique_ptr<MirRegisterAllocator> m_regAlloc;");
-            emitter.emitLine("std::unique_ptr<CallingConvDesc> m_sysVConv;");
-            emitter.emitLine("std::unique_ptr<CallingConvDesc> m_win64Conv;");
-            emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_elfBinary;");
-            emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_coffBinary;");
+            if (isX86)
+            {
+                emitter.emitLine("std::unique_ptr<CallingConvDesc> m_sysVConv;");
+                emitter.emitLine("std::unique_ptr<CallingConvDesc> m_win64Conv;");
+                emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_elfBinary;");
+                emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_coffBinary;");
+            }
+            else
+            {
+                emitter.emitLine("std::unique_ptr<CallingConvDesc> m_defaultConv;");
+                if (hasElf)
+                {
+                    emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_elfBinary;");
+                }
+                if (hasCoff)
+                {
+                    emitter.emitLine("std::unique_ptr<TargetBinaryDesc> m_coffBinary;");
+                }
+            }
             emitter.emitLine("std::unique_ptr<TargetRelocationResolver> m_relocResolver;");
             emitter.emitLine("TargetLibcallRegistry m_libcallRegistry;");
             emitter.emitBlankLine();
@@ -329,10 +380,20 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitInclude("RegisterAllocator/MirRegisterAllocator.h");
     emitter.emitInclude("GenericCodeEmitter.h");
     emitter.emitInclude("Instruction/MirTargetInstructionDesc.h");
+    const bool isX86 = (m_targetName == "X86_64" || m_targetName == "x86_64" || m_targetName == "x86-64" || m_targetName == "AMD64");
+    const bool hasElf = isX86 || hasObjectFormat(decl, "ELF");
+    const bool hasCoff = isX86 || hasObjectFormat(decl, "COFF");
+
     emitter.emitInclude(std::format("{}FrameLowerer.h", ns));
     emitter.emitInclude(std::format("{}RegisterAllocator.h", ns));
-    emitter.emitInclude(std::format("{}ElfBinaryDesc.h", ns));
-    emitter.emitInclude(std::format("{}CoffBinaryDesc.h", ns));
+    if (hasElf)
+    {
+        emitter.emitInclude(std::format("{}ElfBinaryDesc.h", ns));
+    }
+    if (hasCoff)
+    {
+        emitter.emitInclude(std::format("{}CoffBinaryDesc.h", ns));
+    }
     emitter.emitInclude(std::format("{}CallingConvDesc.h", targetLower));
     emitter.emitInclude(std::format("{}TargetInstructionTable.h", targetLower));
     emitter.emitInclude(std::format("Encoding/{}EncodingDesc.h", ns));
@@ -430,11 +491,25 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
             }
             emitter.emitBlankLine();
             emitter.emitComment("5. Calling Conventions");
-            emitter.emitLine("m_sysVConv = std::make_unique<SysV_AMD64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);");
-            emitter.emitLine("m_win64Conv = std::make_unique<Win64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);");
-            emitter.emitLine("m_convs.clear();");
-            emitter.emitLine("m_convs.push_back(m_sysVConv.get());");
-            emitter.emitLine("m_convs.push_back(m_win64Conv.get());");
+            if (isX86)
+            {
+                emitter.emitLine("m_sysVConv = std::make_unique<SysV_AMD64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);");
+                emitter.emitLine("m_win64Conv = std::make_unique<Win64CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);");
+                emitter.emitLine("m_convs.clear();");
+                emitter.emitLine("m_convs.push_back(m_sysVConv.get());");
+                emitter.emitLine("m_convs.push_back(m_win64Conv.get());");
+            }
+            else
+            {
+                std::string defaultCCName = "Default";
+                if (decl && decl->mDefaultCallingConv.has_value())
+                {
+                    defaultCCName = std::string(decl->mDefaultCallingConv->m_node);
+                }
+                emitter.emitLine("m_defaultConv = std::make_unique<{}CallingConvDesc>(m_ctx, m_gpr64, m_fpr64);", defaultCCName);
+                emitter.emitLine("m_convs.clear();");
+                emitter.emitLine("m_convs.push_back(m_defaultConv.get());");
+            }
             emitter.emitBlankLine();
             emitter.emitComment("6. Target Instruction Descriptors Table");
             emitter.emitLine("EzTargets::{}::{}TargetInst::initializeTargetInstructionTable(this);", ns, targetLower);
@@ -451,13 +526,31 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
             emitter.emitLine("m_frameLowerer = std::make_unique<{}FrameLowerer>();", ns);
             emitter.emitBlankLine();
             emitter.emitComment("10. Binary Descriptors");
-            emitter.emitLine("m_elfBinary = std::make_unique<{}ElfBinaryDesc>(alloc, m_isPic);", ns);
-            emitter.emitLine("m_elfBinary->initialize();");
-            emitter.emitLine("m_coffBinary = std::make_unique<{}CoffBinaryDesc>(alloc);", ns);
-            emitter.emitLine("m_coffBinary->initialize();");
             emitter.emitLine("m_binaries.clear();");
-            emitter.emitLine("m_binaries.push_back(m_elfBinary.get());");
-            emitter.emitLine("m_binaries.push_back(m_coffBinary.get());");
+            if (isX86)
+            {
+                emitter.emitLine("m_elfBinary = std::make_unique<{}ElfBinaryDesc>(alloc, m_isPic);", ns);
+                emitter.emitLine("m_elfBinary->initialize();");
+                emitter.emitLine("m_coffBinary = std::make_unique<{}CoffBinaryDesc>(alloc);", ns);
+                emitter.emitLine("m_coffBinary->initialize();");
+                emitter.emitLine("m_binaries.push_back(m_elfBinary.get());");
+                emitter.emitLine("m_binaries.push_back(m_coffBinary.get());");
+            }
+            else
+            {
+                if (hasElf)
+                {
+                    emitter.emitLine("m_elfBinary = std::make_unique<{}ElfBinaryDesc>(alloc, m_isPic);", ns);
+                    emitter.emitLine("m_elfBinary->initialize();");
+                    emitter.emitLine("m_binaries.push_back(m_elfBinary.get());");
+                }
+                if (hasCoff)
+                {
+                    emitter.emitLine("m_coffBinary = std::make_unique<{}CoffBinaryDesc>(alloc);", ns);
+                    emitter.emitLine("m_coffBinary->initialize();");
+                    emitter.emitLine("m_binaries.push_back(m_coffBinary.get());");
+                }
+            }
             emitter.emitBlankLine();
             emitter.emitComment("11. Libcall Registry Defaults");
             emitter.emitLine("m_libcallRegistry.initDefaults(\"{}\", \"linux\", CrtFlavor::Gnu);", targetLower);

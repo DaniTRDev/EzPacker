@@ -96,9 +96,44 @@ constexpr uint32_t R_X86_64_PC32 = 2;
 constexpr uint32_t R_X86_64_PLT32 = 4;
 constexpr uint32_t R_X86_64_GOTPCREL = 9;
 
-// Translates a target-agnostic relocation kind into its x86-64 ELF type; NONE = no fixup.
-uint32_t mapRelocType(TargetCodeRelocationType type)
+// RISC-V relocation types (R_RISCV_*).
+constexpr uint16_t EM_RISCV = 243;
+constexpr uint32_t R_RISCV_NONE = 0;
+constexpr uint32_t R_RISCV_32 = 1;
+constexpr uint32_t R_RISCV_64 = 2;
+constexpr uint32_t R_RISCV_BRANCH = 16;
+constexpr uint32_t R_RISCV_JAL = 17;
+constexpr uint32_t R_RISCV_CALL = 18;
+constexpr uint32_t R_RISCV_CALL_PLT = 19;
+constexpr uint32_t R_RISCV_GOT_HI20 = 20;
+constexpr uint32_t R_RISCV_PCREL_HI20 = 23;
+constexpr uint32_t R_RISCV_PCREL_LO12_I = 24;
+constexpr uint32_t R_RISCV_PCREL_LO12_S = 25;
+
+// Translates a target-agnostic relocation kind into architecture-specific ELF type; NONE = no fixup.
+uint32_t mapRelocType(TargetCodeRelocationType type, uint16_t machine)
 {
+    if (machine == EM_RISCV)
+    {
+        switch (type)
+        {
+            case TargetCodeRelocationType::Absolute64:
+                return R_RISCV_64;
+            case TargetCodeRelocationType::Absolute32:
+                return R_RISCV_32;
+            case TargetCodeRelocationType::PCRel32:
+                return R_RISCV_PCREL_HI20;
+            case TargetCodeRelocationType::BranchRel32:
+                return R_RISCV_CALL_PLT;
+            case TargetCodeRelocationType::GOTPCREL:
+                return R_RISCV_GOT_HI20;
+            case TargetCodeRelocationType::PLTRel32:
+                return R_RISCV_CALL_PLT;
+            default:
+                return R_RISCV_NONE;
+        }
+    }
+
     switch (type)
     {
         case TargetCodeRelocationType::Absolute64:
@@ -309,7 +344,7 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
             {
                 symIdx = itSym->second;
             }
-            uint32_t rType = mapRelocType(reloc.m_type);
+            uint32_t rType = mapRelocType(reloc.m_type, m_machine);
             // r_info packs the symbol index in the high 32 bits and the type in the low 32.
             r.r_info = (static_cast<uint64_t>(symIdx) << 32) | (rType & 0xFFFFFFFFULL);
             r.r_addend = reloc.m_addend;
@@ -450,8 +485,8 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
     ehdr.e_ident[5] = 1; // ELFDATA2LSB (little endian)
     ehdr.e_ident[6] = 1; // EV_CURRENT
     ehdr.e_ident[7] = 0; // ELFOSABI_NONE
-    ehdr.e_type = 1;     // ET_REL
-    ehdr.e_machine = 62; // EM_X86_64
+    ehdr.e_type = 1;         // ET_REL
+    ehdr.e_machine = m_machine;
     ehdr.e_version = 1;
     ehdr.e_entry = 0;
     ehdr.e_phoff = 0;
