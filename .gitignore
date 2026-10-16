@@ -152,4 +152,9 @@ docs/xml*/
 
 # JetBrains / CLion IDE
 .idea/
+
+# Node / Web build artifacts
+node_modules/
+dist/
+*.tsbuildinfo
 
