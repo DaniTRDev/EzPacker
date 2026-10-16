@@ -103,6 +103,7 @@ flowchart LR
 - **[Comprehensive Build Guide](build_guide.md)**: Toolchain requirements, CMake configuration options, step-by-step compilation on Windows and Linux, running test suites, and generating docs.
 - **[Examples & Use Cases](examples.md)**: In-depth technical walkthrough of all 12 bundled MIR modules (arithmetic, control flow, ABI lowering, crypto hashing, load-folding, recursion, epilogues, exceptions, float conversions, and vector SIMD/AVX).
 - **[How to Build a Target Architecture](how_to_build_a_target.md)**: Complete architectural tutorial on adding a new CPU architecture backend to EzPacker from first principles.
+- **[YARPGen Differential Testing](yarpgen_differential_testing.md)**: End-to-end differential fuzzing and verification suite comparing EzPacker against GCC/Clang with automated reproducer triage.
 
 ### 🏛️ Subproject Overviews
 Every non-vendored subproject in the repository is documented in detail:
