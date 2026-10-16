@@ -143,6 +143,10 @@ fabric.properties
 /graphify-out
 /.agents
 
+# YARPGen Differential Testing Artifacts
+/.yarpgen_work/
+/yarpgen_reproducers/
+
 # Doxygen generated output
 docs/html/
 docs/doxygen/
