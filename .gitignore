@@ -146,7 +146,15 @@ fabric.properties
 # Doxygen generated output
 docs/html/
 docs/doxygen/
+docs/xml/
+docs/xml_web/
+docs/xml*/
 
 # JetBrains / CLion IDE
 .idea/
+
+# Node / Web build artifacts
+node_modules/
+dist/
+*.tsbuildinfo
 
