@@ -456,19 +456,56 @@ class FunctionLowerer
                 MirRegister *dest = m_opBuilder.buildVReg(resType, "tmp");
                 MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
 
+                auto ensureReg = [&](MirOperand *op, const std::string &hint = "reg") -> MirRegister * {
+                    if (op && op->isOfType<MirRegister>())
+                        return static_cast<MirRegister *>(op);
+                    MirType *ty = (op && op->getMirType()) ? op->getMirType() : resType;
+                    MirRegister *vreg = m_opBuilder.buildVReg(ty, hint);
+                    inst.MOV(vreg, op);
+                    return vreg;
+                };
+
+                lhs = ensureReg(lhs, "lhs");
+
+                bool rhsMustBeReg = is_flonum(node->ty) ||
+                                    node->kind == ND_MUL ||
+                                    node->kind == ND_DIV ||
+                                    node->kind == ND_MOD ||
+                                    node->kind == ND_BITAND ||
+                                    node->kind == ND_BITOR ||
+                                    node->kind == ND_BITXOR ||
+                                    node->kind == ND_SHL ||
+                                    node->kind == ND_SHR;
+
+                if (rhsMustBeReg && !rhs->isOfType<MirRegister>())
+                {
+                    rhs = ensureReg(rhs, "rhs");
+                }
+
                 switch (node->kind)
                 {
                     case ND_ADD:
-                        inst.ADD(dest, lhs, rhs);
+                        if (is_flonum(node->ty))
+                            inst.FADD(dest, lhs, rhs);
+                        else
+                            inst.ADD(dest, lhs, rhs);
                         break;
                     case ND_SUB:
-                        inst.SUB(dest, lhs, rhs);
+                        if (is_flonum(node->ty))
+                            inst.FSUB(dest, lhs, rhs);
+                        else
+                            inst.SUB(dest, lhs, rhs);
                         break;
                     case ND_MUL:
-                        inst.MUL(dest, lhs, rhs);
+                        if (is_flonum(node->ty))
+                            inst.FMUL(dest, lhs, rhs);
+                        else
+                            inst.IMUL(dest, lhs, rhs);
                         break;
                     case ND_DIV:
-                        if (node->ty->is_unsigned)
+                        if (is_flonum(node->ty))
+                            inst.FDIV(dest, lhs, rhs);
+                        else if (node->ty->is_unsigned)
                             inst.UDIV(dest, lhs, rhs);
                         else
                             inst.SDIV(dest, lhs, rhs);
@@ -523,8 +560,16 @@ class FunctionLowerer
                 MirType *resType = mapType(m_tt, node->ty);
                 MirRegister *dest = m_opBuilder.buildVReg(resType, "neg");
                 MirOperand *zero = m_opBuilder.buildInt(resType, FlexInt(0));
-                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .SUB(dest, zero, val);
+                MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                MirRegister *zeroReg = m_opBuilder.buildVReg(resType, "zero");
+                inst.MOV(zeroReg, zero);
+                if (!val->isOfType<MirRegister>())
+                {
+                    MirRegister *valReg = m_opBuilder.buildVReg(resType, "val");
+                    inst.MOV(valReg, val);
+                    val = valReg;
+                }
+                inst.SUB(dest, zeroReg, val);
                 return dest;
             }
             case ND_NOT:
@@ -533,8 +578,14 @@ class FunctionLowerer
                 MirType *resType = mapType(m_tt, node->ty);
                 MirRegister *dest = m_opBuilder.buildVReg(resType, "not");
                 MirOperand *zero = m_opBuilder.buildInt(resType, FlexInt(0));
-                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .CMP_EQ(dest, val, zero);
+                MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                if (!val->isOfType<MirRegister>())
+                {
+                    MirRegister *valReg = m_opBuilder.buildVReg(val->getMirType() ? val->getMirType() : resType, "val");
+                    inst.MOV(valReg, val);
+                    val = valReg;
+                }
+                inst.CMP_EQ(dest, val, zero);
                 return dest;
             }
             case ND_BITNOT:
@@ -543,8 +594,16 @@ class FunctionLowerer
                 MirType *resType = mapType(m_tt, node->ty);
                 MirRegister *dest = m_opBuilder.buildVReg(resType, "bitnot");
                 MirOperand *allOnes = m_opBuilder.buildInt(resType, FlexInt(-1, static_cast<uint16_t>(resType->getTotalSizeInBits())));
-                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .XOR(dest, val, allOnes);
+                MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                if (!val->isOfType<MirRegister>())
+                {
+                    MirRegister *valReg = m_opBuilder.buildVReg(resType, "val");
+                    inst.MOV(valReg, val);
+                    val = valReg;
+                }
+                MirRegister *onesReg = m_opBuilder.buildVReg(resType, "ones");
+                inst.MOV(onesReg, allOnes);
+                inst.XOR(dest, val, onesReg);
                 return dest;
             }
             case ND_ADDR:
@@ -634,6 +693,13 @@ class FunctionLowerer
 
                 MirRegister *dest = m_opBuilder.buildVReg(destType, "cast");
                 MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+
+                if (!src->isOfType<MirRegister>())
+                {
+                    MirRegister *srcReg = m_opBuilder.buildVReg(srcType, "cast_src");
+                    inst.MOV(srcReg, src);
+                    src = srcReg;
+                }
 
                 if (destType->getTotalSizeInBits() < srcType->getTotalSizeInBits())
                 {

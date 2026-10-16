@@ -59,3 +59,11 @@ EzPacker_AddTest(
         "tests/T_CFrontendAdapter.cpp"
 )
 
+EzPacker_AddTest(
+        "T_CFrontendEndToEnd"
+        "EzCompilerTestSuite"
+        ""
+        "tests/T_CFrontendEndToEnd.cpp"
+)
+
+
