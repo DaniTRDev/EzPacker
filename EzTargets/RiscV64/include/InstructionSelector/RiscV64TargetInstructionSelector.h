@@ -30,6 +30,7 @@ class RiscV64TargetInstructionSelector : public riscv64InstructionSelector
     bool selectPHI(MirBuilderContext *ctx, MirInstruction *inst);
     bool selectMOV(MirBuilderContext *ctx, MirInstruction *inst);
     bool selectTRY(MirBuilderContext *ctx, MirInstruction *inst);
+    bool selectRET(MirBuilderContext *ctx, MirInstruction *inst);
 
     TargetDesc *m_targetDesc{ nullptr };
 };

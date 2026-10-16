@@ -1,21 +1,5 @@
 target RiscV64;
 
-addrmode AddrModeRegImm(GPR64:base, simm12:disp = 0) {
-    variant BaseDisp {
-        match {
-            ADD ptr:$base, imm(i32):$disp;
-        };
-        when {
-            isSimm12($disp);
-        };
-    };
-    variant BaseOnly {
-        match {
-            ptr:$base;
-        };
-    };
-};
-
 // ============================================================================
 // ARITHMETIC PATTERNS
 // ============================================================================
@@ -335,97 +319,17 @@ pattern Select_MOVptr [cost = 1] {
     };
 };
 
-pattern Select_MOV64ri [cost = 1] {
-    match {
-        MOV i64:$dst, imm(i64):$imm;
-    };
-    when {
-        isSimm12($imm);
-    };
-    select {
-        ADDI64ri GPR64:$dst, GPR64:$dst, $imm;
-    };
-};
-
-pattern Select_MOV32ri [cost = 1] {
-    match {
-        MOV i32:$dst, imm(i32):$imm;
-    };
-    when {
-        isSimm12($imm);
-    };
-    select {
-        ADDI32ri GPR32:$dst, GPR32:$dst, $imm;
-    };
-};
-
-// ============================================================================
-// MEMORY ACCESS PATTERNS
-// ============================================================================
-
-pattern Select_LD [cost = 2] {
-    match {
-        LOAD i64:$dst, AddrModeRegImm($base, $disp);
-    };
-    select {
-        LD GPR64:$dst, GPR64:$base, $disp;
-    };
-};
-
-pattern Select_LW [cost = 2] {
-    match {
-        LOAD i32:$dst, AddrModeRegImm($base, $disp);
-    };
-    select {
-        LW GPR64:$dst, GPR64:$base, $disp;
-    };
-};
-
-pattern Select_LOADptr [cost = 2] {
-    match {
-        LOAD ptr:$dst, AddrModeRegImm($base, $disp);
-    };
-    select {
-        LD GPR64:$dst, GPR64:$base, $disp;
-    };
-};
-
-pattern Select_SD [cost = 2] {
-    match {
-        STORE AddrModeRegImm($base, $disp), i64:$src;
-    };
-    select {
-        SD GPR64:$src, GPR64:$base, $disp;
-    };
-};
-
-pattern Select_SW [cost = 2] {
-    match {
-        STORE AddrModeRegImm($base, $disp), i32:$src;
-    };
-    select {
-        SW GPR64:$src, GPR64:$base, $disp;
-    };
-};
-
-pattern Select_STOREptr [cost = 2] {
-    match {
-        STORE AddrModeRegImm($base, $disp), ptr:$src;
-    };
-    select {
-        SD GPR64:$src, GPR64:$base, $disp;
-    };
-};
-
 // ============================================================================
 // CONTROL FLOW PATTERNS
 // ============================================================================
 
-pattern Select_JMP [cost = 1] {
+pattern Select_RET [cost = 1] {
     match {
-        JMP ptr:$target;
+        RET;
     };
     select {
-        JALR GPR64:$target, GPR64:$target, 0;
+        RET;
     };
 };
+
+

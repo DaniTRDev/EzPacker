@@ -267,6 +267,7 @@ function parseCoff(buf: Buffer): ObjectAnalysis {
  * Parses ELF64 (.o) object file buffer.
  */
 function parseElf64(buf: Buffer): ObjectAnalysis {
+  const e_machine = buf.length >= 20 ? buf.readUInt16LE(18) : 0;
   const shoff = Number(buf.readBigUInt64LE(40));
   const shentsize = buf.readUInt16LE(58);
   const shnum = buf.readUInt16LE(60);
@@ -408,10 +409,28 @@ function parseElf64(buf: Buffer): ObjectAnalysis {
       const typeVal = Number(info & 0xffffffffn);
       const symName = symbolNames[symIdx] || `sym_${symIdx}`;
 
-      let typeName = `R_X86_64_${typeVal}`;
-      if (typeVal === 1) typeName = 'R_X86_64_64';
-      else if (typeVal === 2) typeName = 'R_X86_64_PC32';
-      else if (typeVal === 4) typeName = 'R_X86_64_PLT32';
+      let typeName: string;
+      if (e_machine === 243) {
+        switch (typeVal) {
+          case 1: typeName = 'R_RISCV_32'; break;
+          case 2: typeName = 'R_RISCV_64'; break;
+          case 16: typeName = 'R_RISCV_BRANCH'; break;
+          case 17: typeName = 'R_RISCV_JAL'; break;
+          case 18: typeName = 'R_RISCV_CALL'; break;
+          case 19: typeName = 'R_RISCV_CALL_PLT'; break;
+          case 23: typeName = 'R_RISCV_PCREL_HI20'; break;
+          case 24: typeName = 'R_RISCV_PCREL_LO12_I'; break;
+          case 25: typeName = 'R_RISCV_PCREL_LO12_S'; break;
+          case 26: typeName = 'R_RISCV_GOT_HI20'; break;
+          case 57: typeName = 'R_RISCV_RELAX'; break;
+          default: typeName = `R_RISCV_${typeVal}`; break;
+        }
+      } else {
+        typeName = `R_X86_64_${typeVal}`;
+        if (typeVal === 1) typeName = 'R_X86_64_64';
+        else if (typeVal === 2) typeName = 'R_X86_64_PC32';
+        else if (typeVal === 4) typeName = 'R_X86_64_PLT32';
+      }
 
       relocations.push({
         section: targetSecName,

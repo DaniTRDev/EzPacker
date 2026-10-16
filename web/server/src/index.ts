@@ -41,6 +41,9 @@ const targetInfo: TargetInfo = {
     { id: 'x86_64-linux-gnu', label: 'x86_64 Linux (GNU)', os: 'linux', arch: 'x86_64' },
     { id: 'x86_64-apple-darwin', label: 'x86_64 macOS (Darwin)', os: 'darwin', arch: 'x86_64' },
     { id: 'x86_64', label: 'Generic x86_64', os: 'generic', arch: 'x86_64' },
+    { id: 'riscv64-unknown-linux-gnu', label: 'RISC-V 64 Linux (GNU)', os: 'linux', arch: 'riscv64' },
+    { id: 'riscv64-unknown-elf', label: 'RISC-V 64 Bare-Metal (ELF)', os: 'elf', arch: 'riscv64' },
+    { id: 'riscv64', label: 'Generic RISC-V 64', os: 'generic', arch: 'riscv64' },
   ],
   features: [
     { id: '+avx', label: '+avx', description: 'Enable Advanced Vector Extensions (AVX)' },
@@ -49,6 +52,11 @@ const targetInfo: TargetInfo = {
     { id: '+sse2', label: '+sse2', description: 'Enable SSE2 128-bit vector instructions', default: true },
     { id: '+sse3', label: '+sse3', description: 'Enable SSE3 instructions' },
     { id: '+sse4.1', label: '+sse4.1', description: 'Enable SSE4.1 instructions' },
+    { id: '+m', label: '+m', description: 'Enable Integer Multiplication and Division (RV64M)', default: true },
+    { id: '+a', label: '+a', description: 'Enable Atomic Instructions (RV64A)', default: true },
+    { id: '+f', label: '+f', description: 'Enable Single-Precision Floating-Point (RV64F)', default: true },
+    { id: '+d', label: '+d', description: 'Enable Double-Precision Floating-Point (RV64D)', default: true },
+    { id: '+c', label: '+c', description: 'Enable Compressed Instructions (RVC)', default: false },
   ],
 };
 

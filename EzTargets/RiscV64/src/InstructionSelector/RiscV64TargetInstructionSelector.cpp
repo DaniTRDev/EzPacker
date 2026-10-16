@@ -64,11 +64,23 @@ bool RiscV64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruc
         case MirInstructionOpCode::CMP_UGT:
         case MirInstructionOpCode::CMP_UGE:
             return selectCMP(ctx, inst);
+        case MirInstructionOpCode::RET:
+            return selectRET(ctx, inst);
         default:
             break;
     }
 
     return false;
+}
+
+bool RiscV64TargetInstructionSelector::selectRET(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::RET),
+                   inst->getSourceRef(),
+                   {});
+    inst->eraseFromOwner();
+    return true;
 }
 
 bool RiscV64TargetInstructionSelector::selectJMP(MirBuilderContext *ctx, MirInstruction *inst)

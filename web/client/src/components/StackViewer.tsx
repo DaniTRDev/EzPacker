@@ -3,7 +3,8 @@ import { useCompilerStore } from '../store/compilerStore';
 import { Server, Shield, Layers, ArrowDown, Cpu, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const StackViewer: React.FC = () => {
-  const { result, selectedAnalysisFunc, setSelectedAnalysisFunc } = useCompilerStore();
+  const { result, selectedAnalysisFunc, setSelectedAnalysisFunc, targetTriple } = useCompilerStore();
+  const isRiscV = (targetTriple || '').includes('riscv');
 
   if (!result || !result.functions || Object.keys(result.functions).length === 0) {
     return (
@@ -45,11 +46,15 @@ export const StackViewer: React.FC = () => {
   }, [asmText, activeFuncName]);
 
   const prologueInstructions = funcAsmLines
-    .filter(l => /push|sub\s+rsp|mov\s+rbp,\s*rsp/.test(l))
+    .filter(l => isRiscV
+      ? /addi\s+sp|sd\s+(ra|s[0-9]|fp)|addi\s+(s0|fp),\s*sp/.test(l)
+      : /push|sub\s+rsp|mov\s+rbp,\s*rsp/.test(l))
     .slice(0, 4);
 
   const epilogueInstructions = funcAsmLines
-    .filter(l => /pop|add\s+rsp|ret/.test(l))
+    .filter(l => isRiscV
+      ? /ld\s+(ra|s[0-9]|fp)|addi\s+sp|ret|jr\s+ra/.test(l)
+      : /pop|add\s+rsp|ret/.test(l))
     .slice(-4);
 
   return (
@@ -128,7 +133,7 @@ export const StackViewer: React.FC = () => {
               16 <span className="text-xs font-normal text-zinc-400">bytes</span>
             </div>
             <div className="text-[10px] text-zinc-400 mt-0.5">
-              x86_64 Stack Alignment
+              {isRiscV ? 'RISC-V Stack Alignment' : 'x86_64 Stack Alignment'}
             </div>
           </div>
         </div>
@@ -138,7 +143,9 @@ export const StackViewer: React.FC = () => {
           <div className="px-3.5 py-2.5 bg-zinc-900/80 border-b border-zinc-800/80 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Server className="w-4 h-4 text-emerald-400" />
-              <span className="font-semibold text-zinc-200">x86_64 Stack Frame Memory Hierarchy</span>
+              <span className="font-semibold text-zinc-200">
+                {isRiscV ? 'RISC-V' : 'x86_64'} Stack Frame Memory Hierarchy
+              </span>
             </div>
             <span className="text-[10px] font-mono text-zinc-400">High Address ➜ Low Address</span>
           </div>
@@ -149,8 +156,16 @@ export const StackViewer: React.FC = () => {
               <div className="flex items-center space-x-2.5">
                 <span className="w-2 h-2 rounded-full bg-zinc-600"></span>
                 <div>
-                  <div className="text-xs font-medium text-zinc-300">Return Address (`[rsp + {totalSize + 8}]`)</div>
-                  <div className="text-[10px] text-zinc-400 font-sans">Pushed automatically by caller's `call` instruction</div>
+                  <div className="text-xs font-medium text-zinc-300">
+                    {isRiscV
+                      ? `Return Address (\`ra\`) (\`[sp + ${totalSize - 8}]\`)`
+                      : `Return Address (\`[rsp + ${totalSize + 8}]\`)`}
+                  </div>
+                  <div className="text-[10px] text-zinc-400 font-sans">
+                    {isRiscV
+                      ? 'Saved to frame slot on non-leaf function entry'
+                      : "Pushed automatically by caller's `call` instruction"}
+                  </div>
                 </div>
               </div>
               <span className="text-xs text-zinc-400 font-semibold">8 bytes</span>
@@ -170,7 +185,7 @@ export const StackViewer: React.FC = () => {
                 <span className={`w-2 h-2 rounded-full ${calleeSave > 0 ? 'bg-blue-400' : 'bg-zinc-700'}`}></span>
                 <div>
                   <div className="text-xs font-medium text-zinc-200">
-                    Callee-Saved Registers {calleeSave > 0 ? `(\`[rsp + ${localSize}]\`)` : '(None needed)'}
+                    Callee-Saved Registers {calleeSave > 0 ? `(\`[${isRiscV ? 'sp' : 'rsp'} + ${localSize}]\`)` : '(None needed)'}
                   </div>
                   <div className="text-[10px] text-zinc-400 font-sans">
                     {calleeSave > 0 ? 'Preserved across call ABI boundaries' : 'No callee registers clobbered'}
@@ -194,7 +209,7 @@ export const StackViewer: React.FC = () => {
                 <span className={`w-2 h-2 rounded-full ${localSize > 0 ? 'bg-amber-400' : 'bg-zinc-700'}`}></span>
                 <div>
                   <div className="text-xs font-medium text-zinc-200">
-                    Local Variables & Spilled Registers (`[rsp + 0]`)
+                    Local Variables & Spilled Registers (`[{isRiscV ? 'sp' : 'rsp'} + 0]`)
                   </div>
                   <div className="text-[10px] text-zinc-400 font-sans">
                     {localSize > 0
@@ -206,11 +221,11 @@ export const StackViewer: React.FC = () => {
               <span className="text-xs font-semibold">{localSize} bytes</span>
             </div>
 
-            {/* Bottom RSP pointer */}
+            {/* Bottom Stack Pointer */}
             <div className="pt-2 flex items-center justify-between text-[11px] font-mono text-emerald-400">
               <span className="flex items-center space-x-1">
                 <span>▲</span>
-                <span>Current Stack Pointer (RSP)</span>
+                <span>Current Stack Pointer ({isRiscV ? 'SP / x2' : 'RSP'})</span>
               </span>
               <span>Total Offset: {totalSize} bytes</span>
             </div>
@@ -239,7 +254,7 @@ export const StackViewer: React.FC = () => {
                 <span className="text-emerald-400 font-mono font-semibold">{totalSize} bytes</span> (
                 <span className="text-blue-300 font-mono">{calleeSave}B callee</span> +{' '}
                 <span className="text-amber-300 font-mono">{localSize}B local</span>
-                ), aligned to a 16-byte boundary per x86_64 ABI calling conventions.
+                ), aligned to a 16-byte boundary per {isRiscV ? 'RISC-V' : 'x86_64'} ABI calling conventions.
               </p>
             </div>
           </div>
