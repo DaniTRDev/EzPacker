@@ -120,11 +120,31 @@ void X86_64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
     }
 
     // 2. Allocate total frame stack space:
-    //    subq $frameSize, %rsp
+    //    subq $frameSize, %rsp (with stack probing if frameSize >= 4096)
     if (setup.m_analysisData && setup.m_analysisData->m_totalFrameSize > 0)
     {
+        size_t frameSize = setup.m_analysisData->m_totalFrameSize;
+        if (frameSize >= 4096)
+        {
+            // Windows x86_64 ABI requires probing stack pages every 4KB (0x1000)
+            // to touch guard pages in sequence, expanding the committed stack.
+            MirRegister *scratchReg = opBuilder.buildPhysReg(setup.m_ptrType, 11, "r11", setup.m_fpRef.getClass());
+            const MirTargetInstructionDesc *descLoad =
+                    EzTargets::X86_64::x86_64TargetInst::getTargetDesc(EzTargets::X86_64::x86_64TargetInst::LOAD64);
+
+            for (size_t offset = 4096; offset < frameSize; offset += 4096)
+            {
+                MirMemory *probeMem =
+                        opBuilder.buildMem(setup.m_i64, setup.m_spReg, FlexInt(-static_cast<int64_t>(offset)));
+                builder.buildTarget(descLoad, srcRef, { scratchReg, probeMem });
+            }
+            MirMemory *finalProbeMem =
+                    opBuilder.buildMem(setup.m_i64, setup.m_spReg, FlexInt(-static_cast<int64_t>(frameSize)));
+            builder.buildTarget(descLoad, srcRef, { scratchReg, finalProbeMem });
+        }
+
         MirInteger *sizeImm =
-                opBuilder.buildInt(setup.m_i64, FlexInt(static_cast<int64_t>(setup.m_analysisData->m_totalFrameSize)));
+                opBuilder.buildInt(setup.m_i64, FlexInt(static_cast<int64_t>(frameSize)));
         builder.buildTarget(setup.m_descSub, srcRef, { setup.m_spReg, setup.m_spReg, sizeImm });
     }
 

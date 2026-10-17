@@ -348,7 +348,8 @@ bool encodeModRMForm(const EncodingDesc &desc,
     const uint8_t *opcode = useSse ? desc.m_sseOpcode : desc.m_opcode;
     uint8_t opcodeLen = useSse ? desc.m_sseOpcodeLen : desc.m_opcodeLen;
     // Byte forms of ALU group opcodes are one less than their word/dword counterparts (e.g. 0x89 -> 0x88).
-    bool byteMinusOne = !useSse && sizeBytes == 1;
+    bool byteMinusOne = !useSse && sizeBytes == 1 &&
+            (desc.m_form == EncForm::Rr || desc.m_form == EncForm::Rm || desc.m_form == EncForm::Mr || desc.m_form == EncForm::Test);
     for (uint8_t i = 0; i < opcodeLen; ++i)
     {
         uint8_t byte = opcode[i];

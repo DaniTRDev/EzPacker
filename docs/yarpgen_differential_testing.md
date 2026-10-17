@@ -174,4 +174,37 @@ All tests are integrated into CTest and can be filtered by labels:
 - `ctest -L Stress`: Runs all single big file stress tests.
 - `ctest -L Compilation`: Runs pure compiler stability and throughput tests.
 - `ctest -L Differential`: Runs execution and checksum verification against GCC/Clang.
+- `ctest -L Regression`: Runs curated deterministic seed regression tests.
 - `ctest -L Yarpgen`: Runs the entire YARPGen test fleet.
+
+---
+
+## 🛡️ Curated Regression Seeds
+
+The test suite tracks deterministic YARPGen seeds in `tests/YarpgenDifferentialTests/regression_seeds.txt`. Each seed targets a specific language construct or lowering edge case discovered during fuzzing:
+
+| Seed | Target Construct / Fix Area |
+| :--- | :--- |
+| `401871035` | Narrowing integer truncation and implicit conversions (`TRUNC`) |
+| `545245296` | Unary operators, sign extensions, and scalar assignment |
+| `326683734` | Arithmetic expressions, min/max conditionals, and boolean tests |
+| `1045802857` | Multi-operand comparisons, type width legalization |
+| `1104` | Unsigned cast zero-extension, logical AND/OR comparison operand width matching |
+| `121` | Bitwise operations, nested ternaries, and signed comparisons |
+
+---
+
+## 🐛 Compiler Defects Discovered & Resolved via Differential Testing
+
+1. **`CMP_NE` Operand Bit-Width Mismatch in Logical AND/OR (`ND_LOGAND`, `ND_LOGOR`)**:
+   - *Problem*: In `CFrontendAdapter.cpp`, `FlexInt(0)` was constructed without an explicit bit-width, defaulting to 32 bits. When lowering boolean expressions (`i1`) or sub-byte comparisons, `buildConstant` promoted constant operand types to `i32`, producing a `CMP_NE` with operand type mismatch (`i1` vs `i32`) which triggered `MirVerifierPass` aborts.
+   - *Fix*: Created constants using explicit bit-widths derived from operand MIR types: `FlexInt(0, static_cast<uint16_t>(rhsType->getTotalSizeInBits()))`.
+2. **Unsigned Integer Literal Clamping in `ND_NUM`**:
+   - *Problem*: Integer literals with unsigned types (e.g. `(unsigned short)36391`) were treated as signed `int64_t` during AST node conversion, causing bit 15 to sign-extend and clamp to `-29145` via two's complement.
+   - *Fix*: Preserved `ty->is_unsigned` and zero-extended literals when constructing `FlexInt`.
+3. **Implicit Zero-Extension in `ND_CAST`**:
+   - *Problem*: Casting an unsigned integer to a wider type signed-extended the raw value because `imm->getValue().getI64()` was used unconditionally.
+   - *Fix*: Applied unsigned masking (`& ((1ULL << srcBits) - 1)`) when `node->lhs->ty->is_unsigned` is true.
+4. **64-bit Integer Literal Truncation on Windows**:
+   - *Problem*: Upstream `chibicc`'s `tokenize.c` used `strtoul` which returns a 32-bit `unsigned long` under the Windows LLP64 data model.
+   - *Fix*: Upgraded to `strtoull` in the overlay, preserving full 64-bit precision for large literal seeds.

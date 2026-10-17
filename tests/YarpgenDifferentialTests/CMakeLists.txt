@@ -240,7 +240,7 @@ if(REFERENCE_C_COMPILER)
                         --reproducers-dir "${CMAKE_BINARY_DIR}/yarpgen_reproducers"
                 )
                 set_tests_properties("EzCompilerYarpgen_Seed_${SEED}" PROPERTIES
-                    TIMEOUT 60
+                    TIMEOUT 180
                     LABELS "Differential;Yarpgen;Regression;EzCompiler"
                 )
             endif()

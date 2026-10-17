@@ -936,7 +936,6 @@ target_inst MOVSX32_8(GPR32:dst OUT, GPR8:src IN) {
     ENCODING {
         form: movsx;
         opcode: [0x0F, 0xBE];
-        rex_w: true;
         operands { dst => reg; src => rm_reg; };
         size: dst;
     };
@@ -947,7 +946,6 @@ target_inst MOVSX32_16(GPR32:dst OUT, GPR16:src IN) {
     ENCODING {
         form: movsx;
         opcode: [0x0F, 0xBF];
-        rex_w: true;
         operands { dst => reg; src => rm_reg; };
         size: dst;
     };
@@ -991,7 +989,6 @@ target_inst MOVZX32_8(GPR32:dst OUT, GPR8:src IN) {
     ENCODING {
         form: movzx;
         opcode: [0x0F, 0xB6];
-        rex_w: true;
         operands { dst => reg; src => rm_reg; };
         size: dst;
     };
@@ -1002,7 +999,6 @@ target_inst MOVZX32_16(GPR32:dst OUT, GPR16:src IN) {
     ENCODING {
         form: movzx;
         opcode: [0x0F, 0xB7];
-        rex_w: true;
         operands { dst => reg; src => rm_reg; };
         size: dst;
     };

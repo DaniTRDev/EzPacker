@@ -55,8 +55,29 @@ class X86_64TargetInstructionSelector : public x86_64InstructionSelector
     /// Lowers a register/immediate MOV using the generated instruction table.
     bool selectMOV(MirBuilderContext *ctx, MirInstruction *inst);
 
+    /// Lowers an integer TRUNC instruction.
+    bool selectTRUNC(MirBuilderContext *ctx, MirInstruction *inst);
+
+    /// Lowers an integer SEXT instruction.
+    bool selectSEXT(MirBuilderContext *ctx, MirInstruction *inst);
+
+    /// Lowers an integer ZEXT instruction.
+    bool selectZEXT(MirBuilderContext *ctx, MirInstruction *inst);
+
     /// Lowers a TRY instruction into control flow to the protected body block.
     bool selectTRY(MirBuilderContext *ctx, MirInstruction *inst);
+
+    /// Lowers an integer division or remainder operation (SDIV, UDIV, REM).
+    bool selectDIV(MirBuilderContext *ctx, MirInstruction *inst, bool isSigned, bool isRem);
+
+    /// Lowers integer shift operations (SHL, SHR, SAR).
+    bool selectSHIFT(MirBuilderContext *ctx, MirInstruction *inst);
+
+    /// Lowers integer subtract operation (SUB) when immediate exceeds simm32 or ISF fails.
+    bool selectSUB(MirBuilderContext *ctx, MirInstruction *inst);
+
+    /// Lowers integer add operation (ADD) when immediate exceeds simm32 or ISF fails.
+    bool selectADD(MirBuilderContext *ctx, MirInstruction *inst);
 
     TargetDesc *m_targetDesc{ nullptr }; ///< Target descriptor owning the register classes used above.
 };

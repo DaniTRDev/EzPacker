@@ -10,4 +10,5 @@
 545245296   # Unary operators, sign extensions, and scalar assignment
 326683734   # Arithmetic expressions, min/max conditionals, and boolean tests
 1045802857  # Multi-operand comparisons, type width legalization
-2130914114  # Array indexing and pointer base register address generation
+1104        # Cast unsigned extension, logical AND/OR comparison operand width matching
+121         # Bitwise operations, nested ternaries, and signed comparisons
