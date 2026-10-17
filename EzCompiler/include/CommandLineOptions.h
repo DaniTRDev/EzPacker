@@ -51,6 +51,8 @@ struct CommandLineOptions
     bool enableRtti{ true };             ///< Generates runtime type information (RTTI) and source references.
     DiagnosticMessageType diagThreshold{ DiagnosticMessageType::Diag_Warning }; ///< Minimum reported severity.
     std::vector<std::string> targetFeatures; ///< Target feature modifiers (e.g. "+avx", "-sse").
+    std::vector<std::string> includePaths;   ///< Include directories (-I) for C preprocessor lookup.
+    std::vector<std::string> macroDefines;   ///< Preprocessor macro definitions (-D).
 };
 
 /**

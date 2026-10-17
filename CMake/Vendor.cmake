@@ -29,3 +29,17 @@ EzCMK_AddVendor(https://github.com/p-ranav/argparse
         d924b84eba1f0f0adf38b20b7b4829f6f65b6570
         argparse
 )
+
+FetchContent_Declare(
+        chibicc
+        GIT_REPOSITORY https://github.com/rui314/chibicc
+        GIT_TAG 90d1f7f199cc55b13c7fdb5839d1409806633fdb
+        PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory
+                      "${CMAKE_CURRENT_SOURCE_DIR}/CMake/chibicc/overlay"
+                      "<SOURCE_DIR>"
+)
+
+EzCMK_AddVendor(https://github.com/rui314/chibicc
+        90d1f7f199cc55b13c7fdb5839d1409806633fdb
+        chibicc
+)

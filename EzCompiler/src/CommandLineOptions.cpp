@@ -12,7 +12,7 @@ void CommandLineParser::setupArguments()
     m_program->add_description("EzPacker Ahead-Of-Time Compiler Driver");
 
     m_program->add_argument("input")
-            .help("Input source file (.ez) or intermediate representation (.mir)")
+            .help("Input source file (.c, .i, .ez) or intermediate representation (.mir)")
             .default_value(std::string(""))
             .nargs(argparse::nargs_pattern::optional);
 
@@ -111,6 +111,16 @@ void CommandLineParser::setupArguments()
             .help("Target-specific attributes/extensions string (e.g. +avx2,-sse)")
             .metavar("<features>")
             .default_value(std::string(""));
+
+    m_program->add_argument("-I", "--include-directory")
+            .help("Add directory to C header search path")
+            .append()
+            .default_value(std::vector<std::string>{});
+
+    m_program->add_argument("-D", "--define-macro")
+            .help("Predefine macro name [=value]")
+            .append()
+            .default_value(std::vector<std::string>{});
 
     m_program->add_argument("-V", "--version")
             .help("Print version information")
@@ -361,6 +371,9 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
 
     // Target features collected from --target-feature, -mattr, and dynamic -m flags
     outOptions.targetFeatures = std::move(extractedFeatures);
+
+    outOptions.includePaths = m_program->get<std::vector<std::string>>("-I");
+    outOptions.macroDefines = m_program->get<std::vector<std::string>>("-D");
 
     return true;
 }

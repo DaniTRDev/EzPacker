@@ -1,4 +1,5 @@
 #include "FrontendAdapter.h"
+#include "CFrontend/CFrontendAdapter.h"
 #include "DriverContext.h"
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
@@ -44,10 +45,30 @@ bool MirModuleLoader::compileSourceToMir(DriverContext &ctx, std::string_view so
         return loadMirFile(ctx, sourcePath, outMirCtx);
     }
 
-    // The real language frontend is not wired in yet: reject unsupported inputs rather than
-    // silently synthesizing a main() that hides the missing translation.
+    if (p.extension() == ".c" || p.extension() == ".i")
+    {
+        CFrontendAdapter cAdapter;
+        for (const auto &inc : ctx.getOptions().includePaths)
+        {
+            cAdapter.addIncludePath(inc);
+        }
+        for (const auto &def : ctx.getOptions().macroDefines)
+        {
+            size_t eqPos = def.find('=');
+            if (eqPos != std::string::npos)
+            {
+                cAdapter.defineMacro(def.substr(0, eqPos), def.substr(eqPos + 1));
+            }
+            else
+            {
+                cAdapter.defineMacro(def, "1");
+            }
+        }
+        return cAdapter.compileSourceToMir(ctx, sourcePath, outMirCtx);
+    }
+
     ctx.getDiagCollector()->error("EzCompiler",
-                                  "Unsupported input format '{}': only .mir input is supported",
+                                  "Unsupported input format '{}': only .c, .i, and .mir inputs are supported",
                                   p.extension().string());
     return false;
 }
