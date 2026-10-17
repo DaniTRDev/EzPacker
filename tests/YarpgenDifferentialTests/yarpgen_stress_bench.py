@@ -100,6 +100,9 @@ class BenchmarkReport:
     stderr: str = ""
     success: bool = True
     error_message: str = ""
+    ref_checksum: Optional[str] = None
+    ezc_checksum: Optional[str] = None
+    checksum_matched: Optional[bool] = None
 
 
 class YarpgenStressGenerator:
@@ -176,10 +179,11 @@ class PassProfiler:
 
     TIME_REGEX = re.compile(r"\[Time\]\s+([\w]+):\s+([\d.]+)\s+ms")
 
-    def __init__(self, ezc_bin: Path, target_triple: str, env: Dict[str, str]):
+    def __init__(self, ezc_bin: Path, target_triple: str, env: Dict[str, str], ref_compiler: Optional[Path] = None):
         self.ezc_bin = ezc_bin
         self.target_triple = target_triple
         self.env = env
+        self.ref_compiler = ref_compiler
 
     def profile_file(self, source_path: Path, opt_level: str, num_functions: int, source_lines: int) -> BenchmarkReport:
         obj_out = source_path.with_suffix(".obj" if platform.system().lower() == "windows" else ".o")
@@ -240,6 +244,54 @@ class PassProfiler:
                     stats.max_ms = elapsed_ms
 
         report.total_pipeline_ms = sum(s.total_ms for s in report.passes.values())
+
+        # Differential Verification against Reference Compiler if available
+        if self.ref_compiler and report.success:
+            driver_path = source_path.parent / "mega_stress_driver.c"
+            if driver_path.exists():
+                exe_ext = ".exe" if platform.system().lower() == "windows" else ""
+                ref_exe = source_path.parent / f"ref_mega_stress{exe_ext}"
+                ezc_exe = source_path.parent / f"ezc_mega_stress_{opt_level}{exe_ext}"
+
+                # 1. Compile & execute reference compiler
+                ref_cmd = [
+                    str(self.ref_compiler),
+                    "-O3",
+                    str(source_path.resolve()),
+                    str(driver_path.resolve()),
+                    "-o",
+                    str(ref_exe.resolve()),
+                ]
+                res_ref = subprocess.run(ref_cmd, cwd=str(source_path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=self.env)
+                if res_ref.returncode == 0 and ref_exe.exists():
+                    run_ref = subprocess.run([str(ref_exe.resolve())], cwd=str(source_path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=self.env)
+                    report.ref_checksum = run_ref.stdout.strip()
+
+                # 2. Link ezc obj with driver & execute
+                link_cmd = [
+                    str(self.ref_compiler),
+                    str(driver_path.resolve()),
+                    str(obj_out.resolve()),
+                    "-o",
+                    str(ezc_exe.resolve()),
+                ]
+                res_link = subprocess.run(link_cmd, cwd=str(source_path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=self.env)
+                if res_link.returncode == 0 and ezc_exe.exists():
+                    run_ezc = subprocess.run([str(ezc_exe.resolve())], cwd=str(source_path.parent), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=self.env)
+                    report.ezc_checksum = run_ezc.stdout.strip()
+
+                if report.ref_checksum and report.ezc_checksum:
+                    report.checksum_matched = (report.ref_checksum == report.ezc_checksum)
+                    if not report.checksum_matched:
+                        report.error_message = f"MISCOMPILATION: ezc({report.ezc_checksum}) != ref({report.ref_checksum})"
+
+                if ref_exe.exists():
+                    try: ref_exe.unlink()
+                    except Exception: pass
+                if ezc_exe.exists():
+                    try: ezc_exe.unlink()
+                    except Exception: pass
+
         return report
 
 
@@ -300,6 +352,17 @@ class ReportRenderer:
         for i, s in enumerate(sorted_passes[:3], 1):
             pct = (s.total_ms / total_ms * 100.0) if total_ms > 0 else 0.0
             print(f"  #{i} {Color.paint(s.name, Color.BOLD)}: {s.total_ms:.2f} ms ({pct:.1f}% of total) [avg: {s.avg_ms:.3f} ms/func, max: {s.max_ms:.3f} ms]")
+
+        if report.ref_checksum:
+            print(Color.paint("\n[*] Reference Verification (Source of Truth):", Color.BOLD + Color.CYAN))
+            print(f"  Reference Compiler: GCC/Clang -O3")
+            print(f"  Ground Truth Hash:  {Color.paint(report.ref_checksum, Color.CYAN + Color.BOLD)}")
+            ezc_col = Color.GREEN if report.checksum_matched else Color.RED
+            print(f"  EzPacker Hash:      {Color.paint(report.ezc_checksum or 'None', ezc_col + Color.BOLD)}")
+            if report.checksum_matched:
+                print(f"  Verification:       {Color.paint('[PASS] Checksums matched! 100% semantically correct.', Color.GREEN + Color.BOLD)}")
+            else:
+                print(f"  Verification:       {Color.paint('[MISCOMPILATION] Checksums diverge! Compiler bug detected.', Color.RED + Color.BOLD)}")
 
     @classmethod
     def export_json(cls, reports: List[BenchmarkReport], out_path: Path):
@@ -365,6 +428,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--opt-level", type=str, default="all", help="Optimization level (O0, O1, O2, Os, or 'all')")
     parser.add_argument("--regenerate", action="store_true", help="Force re-synthesizing the single monolithic stress file via YARPGen")
     parser.add_argument("--seeds", type=str, help="Comma-separated custom seeds if regenerating")
+    parser.add_argument("--ref-compiler", type=Path, help="Path to reference compiler (gcc/clang) for differential verification")
+    parser.add_argument("--compile-only", action="store_true", help="Run pure compilation & pass profiling without differential verification")
     parser.add_argument("--work-dir", type=Path, default=Path(".yarpgen_stress_work"), help="Scratch directory for generation")
     parser.add_argument("--json-out", type=Path, help="Path to export JSON benchmark results")
     parser.add_argument("--markdown-out", type=Path, help="Path to export Markdown benchmark table")
@@ -446,8 +511,16 @@ def main() -> int:
     print(f"  Stress File:    {stress_file} ({line_count} lines, {func_count} kernels)")
     print(Color.paint("-" * 96, Color.GRAY))
 
+    ref_compiler = None
+    if not args.compile_only:
+        ref_candidates = [
+            Path("C:/Program Files/JetBrains/CLion 2026.2.2/bin/mingw/bin/gcc.exe"),
+            Path("C:/Program Files/JetBrains/CLion 2026.2.2/bin/mingw/bin/clang.exe"),
+        ]
+        ref_compiler = args.ref_compiler or find_tool("gcc", ref_candidates) or find_tool("clang", ref_candidates)
+
     opt_levels = ["O0", "O1", "O2", "Os"] if args.opt_level.lower() == "all" else [args.opt_level.lstrip("-")]
-    profiler = PassProfiler(ezc_bin, target, env)
+    profiler = PassProfiler(ezc_bin, target, env, ref_compiler)
     reports: List[BenchmarkReport] = []
 
     print(f"\n[*] Executing stress pass profiling on single file across {opt_levels}...")

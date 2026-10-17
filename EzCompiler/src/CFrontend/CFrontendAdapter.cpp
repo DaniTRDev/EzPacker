@@ -821,7 +821,7 @@ bool CFrontendAdapter::compileSourceToMir(DriverContext &ctx, std::string_view s
 
                 gb.setInitializer(opBuilder.buildInt(gType, FlexInt(initVal, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
             }
-            else
+            else if (obj->is_definition)
             {
                 gb.setInitializer(opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
             }
@@ -903,7 +903,7 @@ bool CFrontendAdapter::compileStringToMir(DriverContext &ctx, std::string_view s
                     initVal = *(const int8_t *)obj->init_data;
                 gb.setInitializer(opBuilder.buildInt(gType, FlexInt(initVal, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
             }
-            else
+            else if (obj->is_definition)
             {
                 gb.setInitializer(opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
             }
