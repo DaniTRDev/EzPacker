@@ -31,6 +31,10 @@ void ChibiccWrapper::setupDefaultMacros()
     defineMacro("__chibicc__", "1");
     defineMacro("__STDC__", "1");
     defineMacro("__STDC_VERSION__", "201112L");
+    defineMacro("__extension__", "");
+    defineMacro("__has_builtin(x)", "1");
+    defineMacro("__has_attribute(x)", "1");
+    defineMacro("__has_include(x)", "0");
 }
 
 ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
@@ -57,6 +61,14 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
     {
         strarray_push(&include_paths, const_cast<char *>(inc.c_str()));
     }
+
+#ifdef EZC_STANDALONE_HEADERS_DIR
+    static std::string s_standaloneHeadersDir = EZC_STANDALONE_HEADERS_DIR;
+    if (std::filesystem::exists(s_standaloneHeadersDir, ec))
+    {
+        strarray_push(&include_paths, const_cast<char *>(s_standaloneHeadersDir.c_str()));
+    }
+#endif
 
     for (const auto &[name, val] : m_macros)
     {

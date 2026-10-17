@@ -613,6 +613,54 @@ ezc examples/c_yarpgen_kernel.c --emit-mir
 ezc examples/c_yarpgen_kernel.c --emit-legalized-mir
 ```
 
+### 3.2 Real-World Libraries & SQLite3 Compatibility
+
+EzPacker's embedded C frontend features out-of-the-box compatibility with real-world, standalone C codebases such as SQLite 3 amalgamation (`sqlite3.c`), cryptographic libraries, and embedded OS kernels:
+
+- **Auto-Configured Standalone Standard Headers**: Standard headers `<stdint.h>`, `<stdarg.h>`, `<stdbool.h>`, `<stddef.h>`, `<float.h>`, `<stdalign.h>`, and `<stdnoreturn.h>` are bundled and searched automatically without requiring explicit `-I` flags.
+- **GCC / Clang Builtin Intrinsics**: Direct compiler support for `__builtin_expect`, `__builtin_constant_p`, `__builtin_unreachable`, `__builtin_bswap16`, `__builtin_bswap32`, `__builtin_bswap64`, `__builtin_clz`, `__builtin_ctz`, and `__builtin_popcount`.
+- **C23 / Vector Float Suffixes**: Tokenizer and frontend support for extended half-precision and float literal suffixes (`0.0f16`, `bf16`, `f32`, `f64`, `f128`), allowing clean inclusion of modern vector header intrinsics (such as GCC's `<immintrin.h>`).
+- **Variadic Function Support**: Complete `va_list`, `va_start`, `va_arg`, and `va_end` ABI support.
+
+#### Example: Freestanding SQLite3 Kernel Snippet (`examples/c_sqlite_snippet.c`)
+```c
+#include <stdint.h>
+#include <stdarg.h>
+#include <stdbool.h>
+
+struct MemBuffer {
+    uint8_t *ptr;
+    int size;
+    int capacity;
+};
+
+int sqlite3_format_error(struct MemBuffer *buf, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int code = va_arg(ap, int);
+    va_end(ap);
+    
+    // GCC 15 AVX-512 FP16 literal suffix compatibility
+    float dummy = 0.0f16;
+    
+    if (__builtin_expect(code < 0, 0)) {
+        return code;
+    }
+    return (int)(dummy + code);
+}
+```
+
+Compile directly with `ezc`:
+```bash
+ezc examples/c_sqlite_snippet.c -S -o sqlite_snippet.s
+```
+
+#### Example: Standalone SHA-256 Digest (`examples/c_sha256.c`)
+Demonstrating bitwise rotations, bswap operations, array initializers, and struct member access:
+```bash
+ezc examples/c_sha256.c -S -O2 -o sha256.s
+```
+
 ---
 
 ## 4. Next Steps

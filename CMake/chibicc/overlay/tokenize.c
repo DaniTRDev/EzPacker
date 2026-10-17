@@ -465,7 +465,19 @@ static void convert_pp_number(Token *tok) {
   long double val = strtold(tok->loc, &end);
 
   Type *ty;
-  if (*end == 'f' || *end == 'F') {
+  if (!strncasecmp(end, "f16", 3) || !strncasecmp(end, "bf16", 4)) {
+    ty = ty_float;
+    end += (*end == 'b' || *end == 'B') ? 4 : 3;
+  } else if (!strncasecmp(end, "f32", 3)) {
+    ty = ty_float;
+    end += 3;
+  } else if (!strncasecmp(end, "f64", 3)) {
+    ty = ty_double;
+    end += 3;
+  } else if (!strncasecmp(end, "f128", 4)) {
+    ty = ty_ldouble;
+    end += 4;
+  } else if (*end == 'f' || *end == 'F') {
     ty = ty_float;
     end++;
   } else if (*end == 'l' || *end == 'L') {

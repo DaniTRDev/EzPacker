@@ -73,6 +73,8 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
         case MirInstructionOpCode::CMP_UGT:
         case MirInstructionOpCode::CMP_UGE:
             return selectCMP(ctx, inst);
+        case MirInstructionOpCode::FCMP:
+            return selectFCMP(ctx, inst);
         case MirInstructionOpCode::TRUNC:
             return selectTRUNC(ctx, inst);
         case MirInstructionOpCode::SEXT:
@@ -402,6 +404,60 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
     }
 
     ib.buildTarget(x86_64TargetInst::getTargetDesc(setccOp),
+                   inst->getSourceRef(),
+                   { dst });
+
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectFCMP(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+
+    bool is32 = (lhs->getMirType() && lhs->getMirType()->getTotalSizeInBits() == 32);
+    std::string_view fprClass = is32 ? "FPR32" : "FPR64";
+
+    if (auto *r = lhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(fprClass));
+    }
+    if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(fprClass));
+    }
+
+    // 1. Zero destination register first: MOV32ri %dst, 0
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("GPR32"));
+    }
+    auto *zeroImm = ob.buildInt(ctx->getTypeTable()->i32(), FlexInt(static_cast<int32_t>(0)));
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV32ri),
+                   inst->getSourceRef(),
+                   { dst, zeroImm });
+
+    // 2. Emit UCOMISS or UCOMISD
+    auto ucomiOp = is32 ? x86_64TargetInst::UCOMISS : x86_64TargetInst::UCOMISD;
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(ucomiOp),
+                   inst->getSourceRef(),
+                   { lhs, rhs });
+
+    // 3. Emit SETA (or SETNE/SETB depending on comparison; SETA default for greater-than, SETNE for not-equal)
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::SETA),
                    inst->getSourceRef(),
                    { dst });
 

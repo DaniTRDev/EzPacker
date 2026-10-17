@@ -28,6 +28,10 @@ EzCMK_ConfigureLib(NAME "EzCompilerLib"
         INCLUDED_DIRS "include;../EzCodeEmitter/include;../EzTriple/include;../EzMir/include;../EzCore/include;${chibicc_SOURCE_DIR};${chibicc_SOURCE_DIR}/shims"
 )
 
+target_compile_definitions(EzCompilerLib PRIVATE
+        EZC_STANDALONE_HEADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../CMake/chibicc/overlay/include"
+)
+
 EzCMK_AddExecutable(NAME "ezc"
         FILE_LIST "src/Main.cpp"
         PRECOMPILED_HEADER "include/EzCompilerCommon.h"

@@ -43,6 +43,9 @@ class X86_64TargetInstructionSelector : public x86_64InstructionSelector
     /// Lowers a comparison into a CMP plus SETcc pair materializing the boolean result.
     bool selectCMP(MirBuilderContext *ctx, MirInstruction *inst);
 
+    /// Lowers a floating-point comparison into a UCOMISS/UCOMISD plus SETcc pair.
+    bool selectFCMP(MirBuilderContext *ctx, MirInstruction *inst);
+
     /// Lowers a LOAD into a target memory load, folding the address computation.
     bool selectLOAD(MirBuilderContext *ctx, MirInstruction *inst);
 
