@@ -575,9 +575,48 @@ gcc test_examples.c arithmetic.o branch.o calling.o memory.o factorial.o excepti
 ./verify_suite
 ```
 
+### 2.13 `c_yarpgen_kernel.c`: C11 Frontend & YARPGen Computation
+Demonstrates direct ingestion of C11 source code using EzPacker's embedded `chibicc` frontend, lowering C language constructs (scalar arithmetic, bitwise shifts, ternary conditional operators, and function calls) into SSA MIR and optimized machine code:
+
+```c
+extern unsigned int checksum_val;
+
+unsigned int hash_step(unsigned int acc, unsigned int val) {
+    acc ^= val + 0x9e3779b9 + (acc << 6) + (acc >> 2);
+    return acc;
+}
+
+int kernel_compute(int a, int b, int c) {
+    int x = (a > b) ? (a - b) : (b - a);
+    int y = (b > c) ? (b ^ c) : (b + c);
+    int z = (x > y) ? (x * 3) : (y / 2);
+    
+    unsigned int h = 0;
+    h = hash_step(h, (unsigned int)x);
+    h = hash_step(h, (unsigned int)y);
+    h = hash_step(h, (unsigned int)z);
+    
+    checksum_val = h;
+    return z;
+}
+```
+
+#### Compilation & Intermediate Inspection:
+```bash
+# 1. Compile to Assembly
+ezc examples/c_yarpgen_kernel.c -S
+
+# 2. Inspect Emitted Generic SSA MIR
+ezc examples/c_yarpgen_kernel.c --emit-mir
+
+# 3. Inspect Legalized MIR
+ezc examples/c_yarpgen_kernel.c --emit-legalized-mir
+```
+
 ---
 
 ## 4. Next Steps
 
+- Explore the [Interactive Web Compiler Explorer](index.md#-interactive-web-compiler-explorer-web) to inspect live MIR, CFG, and pass pipelines.
 - Consult [How to Build a Target Architecture](how_to_build_a_target.md) to understand how instructions, encodings, and calling conventions are defined.
 - Return to the [EzPacker Documentation Index](index.md).

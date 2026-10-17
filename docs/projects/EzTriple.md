@@ -378,11 +378,11 @@ EzTriple provides a unified, target-configurable runtime library call (`libcall`
 - **Target Libcall Registry (`TargetLibcallRegistry.h`)**:
   - Per-target registry maintaining the active symbol names and signatures for all supported libcalls:
 
-```cpp
-TargetLibcallRegistry registry(&allocator);
-registry.initDefaults(CrtFlavor::Gnu); // Populate standard GNU/compiler-rt symbols
-registry.setLibcallName(LibcallKind::DivI64, "__custom_div64"); // Target-specific override
-```
+    ```cpp
+    TargetLibcallRegistry registry(&allocator);
+    registry.initDefaults(CrtFlavor::Gnu); // Populate standard GNU/compiler-rt symbols
+    registry.setLibcallName(LibcallKind::DivI64, "__custom_div64"); // Target-specific override
+    ```
 
   - Queryable via `getLibcallName(LibcallKind)`, `getLibcallSignature(LibcallKind)`, and `hasLibcall(LibcallKind)`.
 

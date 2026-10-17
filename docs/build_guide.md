@@ -130,11 +130,27 @@ Example running a single test suite:
 ./build/bin/EzCompilerEndToEndTests
 ```
 
+### 5.3 YARPGen Differential Testing Targets
+When `EZPACKER_BUILD_YARPGEN_TESTS=ON` (default), the following targets are available:
+
+| Target | Description |
+| :--- | :--- |
+| **`bulk-ezc`** | Runs differential verification of all 25 bulk test files across `-O0`, `-O1`, `-O2`, `-Os` against GCC/Clang. |
+| **`bulk-ezc-compile`** | Runs pure multi-file compilation throughput and stability benchmark. |
+| **`bulk-ezc-regenerate`**| Synthesizes a new corpus of 25 small/medium C test cases via Intel YARPGen. |
+| **`stress-ezc`** | Compiles the monolithic 3,623-line `mega_stress.c` file and executes differential checksum validation against GCC/Clang. |
+| **`stress-ezc-passes`** | Profiles middle-end and backend compiler passes on `mega_stress.c` to identify performance bottlenecks. |
+| **`fuzz-ezc`** | Runs an automated differential fuzzing campaign (25 parallel seeds) with reproducer generation. |
+
+Execute via CMake:
+```bash
+cmake --build build --target bulk-ezc
+cmake --build build --target stress-ezc-passes
+```
+
 ---
 
-## 6. Building the Documentation
-
-EzPacker integrates Doxygen documentation generation directly into CMake.
+## 6. Building the Documentation & Web Explorer
 
 ### 6.1 Using the CMake `doxygen` / `docs` Target
 If Doxygen is detected during CMake configuration, custom targets `doxygen` and `docs` are automatically created:
@@ -152,6 +168,26 @@ doxygen docs/Doxyfile
 ```
 
 The generated HTML documentation will be located in `docs/doxygen/index.html`. Open this file in any web browser to explore the full interactive API reference.
+
+### 6.3 Building & Running the Web Compiler Explorer (`web/`)
+EzPacker includes an interactive web IDE and Compiler Explorer in `web/`:
+
+```bash
+# 1. Install dependencies
+cd web/server && npm install
+cd ../client && npm install
+cd ../..
+
+# 2. Build the production client
+npm run build --prefix web/client
+
+# 3. Start the server (serves the web client at http://localhost:3001)
+npm start --prefix web/server
+
+# 4. (Optional) Run server verification tests
+npm test --prefix web/server
+```
+
 
 ---
 

@@ -16,10 +16,11 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 
 - 🏠 **[Documentation Landing Page](docs/index.md)** - Global architecture, pipeline overview, and navigation hub.
 - 🚀 **[First Steps & Quickstart](docs/first_steps.md)** - Writing your first MIR file, compiling, and linking with C/C++.
-- 🛠️ **[Comprehensive Build Guide](docs/build_guide.md)** - Prerequisites, CMake options, compiling on Windows and Linux, and running tests.
-- 💡 **[Examples & Use Cases](docs/examples.md)** - In-depth breakdown of all 10 bundled MIR modules with assembly outputs.
+- 🌐 **[Web Compiler Explorer & IDE](web/)** - Local-first interactive Compiler Explorer (live Monaco editor, CFG graphs, liveness dataflow, object viewer, Doxygen hover).
+- 🛠️ **[Comprehensive Build Guide](docs/build_guide.md)** - Prerequisites, CMake options, compiling on Windows and Linux, running tests, and web IDE setup.
+- 💡 **[Examples & Use Cases](docs/examples.md)** - In-depth breakdown of bundled MIR and C11 modules with assembly outputs.
 - 🎯 **[How to Build a Target Architecture](docs/how_to_build_a_target.md)** - Guide to adding and building new CPU targets from first principles.
-- 🔬 **[YARPGen Differential Testing](docs/yarpgen_differential_testing.md)** - Automated differential fuzzing engine comparing EzPacker with GCC/Clang.
+- 🔬 **[YARPGen Differential Testing](docs/yarpgen_differential_testing.md)** - Dual-mode differential fuzzing and stress testing engine comparing EzPacker with GCC/Clang.
 
 ### Subproject Documentation
 - **[EzCore](docs/projects/EzCore.md)** - PMR memory allocators, diagnostic engine, `FlexInt`/`FlexFloat`, `DenseBitSet`, `IntrusiveLinkedList`.
@@ -30,6 +31,7 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 - **[EzCompiler](docs/projects/EzCompiler.md)** - Compiler driver executable (`ezc`), options parsing, and pipeline orchestration.
 - **[EzTargets](docs/projects/EzTargets.md)** - Architecture backends, featuring the x86-64 target (with vector extensions) and native RISC-V 64-bit target (`riscv64` with float and RVV 1.0 vector lowering).
 - **[EzLinker](docs/projects/EzLinker.md)** - System linker driver (`ez-ld`), automated toolchain detection, runtime library injection, and SjLj exception runtime.
+- **[web](web/)** - Full-stack Web Compiler Explorer and IDE powered by React, Vite, Monaco Editor, and Express.
 
 ---
 
@@ -44,6 +46,16 @@ cmake --build build -j
 
 # Run the test suite
 ctest --test-dir build --output-on-failure
+
+# Run YARPGen differential test suites (against reference GCC/Clang)
+cmake --build build --target bulk-ezc
+cmake --build build --target stress-ezc-passes
+```
+
+### 🌐 Launch Web Compiler Explorer
+```bash
+npm start --prefix web/server
+# Open http://localhost:3001 in your browser
 ```
 
 For detailed instructions and platform-specific commands, see the **[Build Guide](docs/build_guide.md)**.

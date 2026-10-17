@@ -298,10 +298,14 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
   compile: async () => {
     const { code, targetTriple, optLevel, features, isPositionIndependent, enableRtti } = get();
     set({ isCompiling: true, error: null });
-
     try {
+      const isC = !code.includes('fn @') && !code.includes('function @') &&
+        (/\b(int|void|char|short|long|float|double|struct|typedef|extern|#include|#define)\b/.test(code));
+
       const payload: CompileRequest = {
         code,
+        language: isC ? 'c' : 'mir',
+        filename: isC ? 'source.c' : 'source.mir',
         targetTriple,
         optLevel,
         features,

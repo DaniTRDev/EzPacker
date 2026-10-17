@@ -100,10 +100,24 @@ flowchart LR
 
 ### 📖 Essential Guides
 - **[First Steps & Quickstart](first_steps.md)**: Write your first MIR module, compile to native object code, inspect intermediate pipeline states, and link with host C/C++ toolchains.
-- **[Comprehensive Build Guide](build_guide.md)**: Toolchain requirements, CMake configuration options, step-by-step compilation on Windows and Linux, running test suites, and generating docs.
-- **[Examples & Use Cases](examples.md)**: In-depth technical walkthrough of all 12 bundled MIR modules (arithmetic, control flow, ABI lowering, crypto hashing, load-folding, recursion, epilogues, exceptions, float conversions, and vector SIMD/AVX).
+- **[Comprehensive Build Guide](build_guide.md)**: Toolchain requirements, CMake configuration options, step-by-step compilation on Windows and Linux, running test suites, web IDE setup, and generating docs.
+- **[Examples & Use Cases](examples.md)**: In-depth technical walkthrough of bundled MIR and C11 modules (arithmetic, control flow, ABI lowering, crypto hashing, load-folding, recursion, epilogues, exceptions, float conversions, vector SIMD/AVX, and YARPGen C kernels).
 - **[How to Build a Target Architecture](how_to_build_a_target.md)**: Complete architectural tutorial on adding a new CPU architecture backend to EzPacker from first principles.
-- **[YARPGen Differential Testing](yarpgen_differential_testing.md)**: End-to-end differential fuzzing and verification suite comparing EzPacker against GCC/Clang with automated reproducer triage.
+- **[YARPGen Differential Testing](yarpgen_differential_testing.md)**: Dual-mode testing infrastructure (bulk multi-file compilation + 3,600+ LOC single-file mega stress test) comparing EzPacker against GCC/Clang with automated reproducer triage.
+
+### 🌐 Interactive Web Compiler Explorer (`web/`)
+EzPacker includes a full-stack, local-first web application featuring:
+- **Live Monaco Editor**: Syntax highlighting for both C11 source and EzPacker SSA MIR with auto-detection.
+- **Multi-Stage Pipeline Inspection**: Side-by-side inspection of Generic MIR, Legalized MIR, Lowered Machine MIR, and Native Assembly.
+- **Interactive CFG & Dataflow Viewers**: Rendered control flow graphs and live-interval liveness matrices for all compilation passes.
+- **Object Binary Dissector**: In-depth PE/COFF and ELF64 section, symbol, and relocation table inspection.
+- **Doxygen Documentation Bridge**: Interactive hovering over symbols to reveal docstrings, parameters, return types, and definitions extracted from Doxygen XML.
+
+To launch the web interface:
+```bash
+# Start the full-stack server (serves the pre-built web client at http://localhost:3001)
+npm start --prefix web/server
+```
 
 ### 🏛️ Subproject Overviews
 Every non-vendored subproject in the repository is documented in detail:
@@ -118,6 +132,7 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine (`ezc`). | [EzCompiler Guide](projects/EzCompiler.md) |
 | **`EzTargets`** | Architecture backends: modular x86-64 and RISC-V 64-bit targets (synthesized `X86_64TargetDesc` and `RiscV64TargetDesc`, `VR256` registers, VEX prefix encoder, RV64IMAFD table-driven encoder, compiler-rt libcalls, `X86_64FrameLowerer`, `RiscV64FrameLowerer`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
 | **`EzLinker`** | System linker driver and exception runtime: automated toolchain detection (`lld`, `link.exe`), C stdlib / compiler-rt injection, and SjLj exception runtime (`ez-ld`). | [EzLinker Guide](projects/EzLinker.md) |
+| **`web`** | Compiler Explorer & Web IDE: React/Vite client and Node.js bridge for live interactive compilation, CFG inspection, and Doxygen symbol exploration. | [Web Explorer](file:///E:/Repos/EzPacker/web/) |
 
 ### 🔍 Complete API Reference
 - **[Generated Doxygen API Documentation](doxygen/index.html)**: Interactive class hierarchies, inheritance diagrams, member documentation, and source code cross-references. Generate locally on demand via:
