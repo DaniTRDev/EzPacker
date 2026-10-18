@@ -852,4 +852,5 @@ void chibicc_reset_state(void) {
   current_file = NULL;
   at_bol = false;
   has_space = false;
+  chibicc_reset_preprocessor();
 }

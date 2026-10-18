@@ -53,6 +53,8 @@ struct CommandLineOptions
     std::vector<std::string> targetFeatures; ///< Target feature modifiers (e.g. "+avx", "-sse").
     std::vector<std::string> includePaths;   ///< Include directories (-I) for C preprocessor lookup.
     std::vector<std::string> macroDefines;   ///< Preprocessor macro definitions (-D).
+    bool freestanding{ true };               ///< Compiles in a standalone/freestanding environment without standard library.
+    bool noStdLib{ true };                   ///< Standalone compilation without standard library dependencies.
 };
 
 /**
