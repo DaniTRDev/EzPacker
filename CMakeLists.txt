@@ -80,6 +80,7 @@ if (EZPACKER_BUILD_TESTS)
     add_subdirectory(tests/EzCompilerTestSuite)
     add_subdirectory(tests/EzCompilerEndToEndTests)
     add_subdirectory(tests/EzLinkerTestSuite)
+    add_subdirectory(tests/YarpgenDifferentialTests)
 
     EzPacker_BuildTests("${CMAKE_CURRENT_SOURCE_DIR}/CMake/TestMain.cpp")
 endif ()

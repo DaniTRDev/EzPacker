@@ -18,7 +18,10 @@
 
 #include "chibicc.h"
 
+#include "Function/MirFunctionStackFrame.h"
+
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 
@@ -56,7 +59,9 @@ MirType *mapType(MirTypeTable *tt, struct Type *ty)
         case TY_PTR:
         case TY_ARRAY:
         case TY_VLA:
-            return tt->i64(); // 64-bit address space
+            if (ty->base)
+                return tt->getPtr(mapType(tt, ty->base));
+            return tt->getPtr(tt->_void());
         default:
             if (ty->size <= 1)
                 return tt->i8();
@@ -93,25 +98,72 @@ class FunctionLowerer
     {
     }
 
+    void collectAddressTaken(Node *node, std::unordered_set<Obj *> &addrTaken)
+    {
+        if (!node)
+            return;
+        if (node->kind == ND_ADDR && node->lhs && node->lhs->kind == ND_VAR && node->lhs->var && node->lhs->var->is_local)
+        {
+            addrTaken.insert(node->lhs->var);
+        }
+        collectAddressTaken(node->lhs, addrTaken);
+        collectAddressTaken(node->rhs, addrTaken);
+        collectAddressTaken(node->cond, addrTaken);
+        collectAddressTaken(node->then, addrTaken);
+        collectAddressTaken(node->els, addrTaken);
+        collectAddressTaken(node->init, addrTaken);
+        collectAddressTaken(node->inc, addrTaken);
+        collectAddressTaken(node->body, addrTaken);
+        collectAddressTaken(node->next, addrTaken);
+        for (Node *n = node->args; n; n = n->next)
+        {
+            collectAddressTaken(n, addrTaken);
+        }
+    }
+
     void lower()
     {
+        std::unordered_set<Obj *> addrTaken;
+        if (m_chibiFunc->body)
+        {
+            collectAddressTaken(m_chibiFunc->body, addrTaken);
+        }
+
         // 1. Register formal parameters
         for (Obj *p = m_chibiFunc->params; p; p = p->next)
         {
             MirType *pType = mapType(m_tt, p->ty);
             MirRegister *pReg = m_opBuilder.buildVReg(pType, p->name ? p->name : "param");
             MirFunctionBuilder(&m_bCtx).addParam(m_func, pReg);
-            m_localVars[p] = pReg;
+            if (addrTaken.contains(p))
+            {
+                StackFrameObject *slot = m_func->getStackFrame()->createStaticStackObj(pType);
+                m_localStackSlots[p] = slot;
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .STORE(m_opBuilder.buildRef(slot), pReg);
+            }
+            else
+            {
+                m_localVars[p] = pReg;
+            }
         }
 
         // 2. Register local variables
         for (Obj *v = m_chibiFunc->locals; v; v = v->next)
         {
-            if (m_localVars.find(v) == m_localVars.end())
+            if (m_localVars.find(v) == m_localVars.end() && m_localStackSlots.find(v) == m_localStackSlots.end())
             {
                 MirType *vType = mapType(m_tt, v->ty);
-                MirRegister *vReg = m_opBuilder.buildVReg(vType, v->name ? v->name : "local");
-                m_localVars[v] = vReg;
+                if (addrTaken.contains(v))
+                {
+                    StackFrameObject *slot = m_func->getStackFrame()->createStaticStackObj(vType);
+                    m_localStackSlots[v] = slot;
+                }
+                else
+                {
+                    MirRegister *vReg = m_opBuilder.buildVReg(vType, v->name ? v->name : "local");
+                    m_localVars[v] = vReg;
+                }
             }
         }
 
@@ -131,7 +183,9 @@ class FunctionLowerer
             }
             else
             {
-                MirOperand *zero = m_opBuilder.buildInt(m_func->getReturnType(), FlexInt(0));
+                MirType *retType = m_func->getReturnType();
+                uint16_t retBits = static_cast<uint16_t>(retType->getTotalSizeInBits());
+                MirOperand *zero = m_opBuilder.buildInt(retType, FlexInt(0, retBits));
                 inst.RET(zero);
             }
         }
@@ -162,11 +216,26 @@ class FunctionLowerer
             MirType *gType = mapType(m_tt, ty);
             MirGlobalVarBuilder gb(&m_bCtx);
             gb.setConstant(false);
-            gb.setInitializer(m_opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
+            if (gType->getKind() == MirTypeKind::Integer)
+            {
+                gb.setInitializer(m_opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
+            }
             gv = gb.build(MirLinkage::External, gType, std::pmr::string(name, m_bCtx.getGlobalAllocator()));
             m_bCtx.appendGlobalVar(gv);
         }
         return gv;
+    }
+
+    MirRegister *ensureRegister(MirOperand *op, MirType *fallbackType = nullptr, const std::string &hint = "reg")
+    {
+        if (op && op->isOfType<MirRegister>())
+        {
+            return static_cast<MirRegister *>(op);
+        }
+        MirType *ty = (op && op->getMirType()) ? op->getMirType() : (fallbackType ? fallbackType : m_tt->i32());
+        MirRegister *vreg = m_opBuilder.buildVReg(ty, hint);
+        MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).MOV(vreg, op);
+        return vreg;
     }
 
     void lowerStatement(Node *node)
@@ -213,8 +282,9 @@ class FunctionLowerer
                 MirBlock *joinB = createBlock("if_join");
 
                 MirOperand *cond = lowerExpression(node->cond);
+                MirRegister *condReg = ensureRegister(cond, m_tt->i1(), "if_cond");
                 MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .BR_COND(cond,
+                        .BR_COND(condReg,
                                  m_opBuilder.buildRef(thenB),
                                  m_opBuilder.buildRef(elseB ? elseB : joinB));
 
@@ -262,8 +332,9 @@ class FunctionLowerer
                 if (node->cond)
                 {
                     MirOperand *cond = lowerExpression(node->cond);
+                    MirRegister *condReg = ensureRegister(cond, m_tt->i1(), "for_cond");
                     MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                            .BR_COND(cond,
+                            .BR_COND(condReg,
                                      m_opBuilder.buildRef(bodyB),
                                      m_opBuilder.buildRef(exitB));
                 }
@@ -331,8 +402,9 @@ class FunctionLowerer
                 if (node->cond)
                 {
                     MirOperand *cond = lowerExpression(node->cond);
+                    MirRegister *condReg = ensureRegister(cond, m_tt->i1(), "do_cond");
                     MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                            .BR_COND(cond,
+                            .BR_COND(condReg,
                                      m_opBuilder.buildRef(bodyB),
                                      m_opBuilder.buildRef(exitB));
                 }
@@ -370,12 +442,26 @@ class FunctionLowerer
                 {
                     return m_opBuilder.buildFloat(t, FlexFloat(static_cast<double>(node->fval)));
                 }
-                return m_opBuilder.buildInt(t, FlexInt(node->val, static_cast<uint16_t>(t->getTotalSizeInBits())));
+                uint16_t bits = static_cast<uint16_t>(t->getTotalSizeInBits());
+                if (node->ty && node->ty->is_unsigned)
+                {
+                    return m_opBuilder.buildInt(t, FlexInt(static_cast<uint64_t>(node->val), bits));
+                }
+                return m_opBuilder.buildInt(t, FlexInt(node->val, bits));
             }
             case ND_VAR:
             {
                 if (node->var->is_local)
                 {
+                    auto slotIt = m_localStackSlots.find(node->var);
+                    if (slotIt != m_localStackSlots.end())
+                    {
+                        MirType *t = mapType(m_tt, node->var->ty);
+                        MirRegister *valReg = m_opBuilder.buildVReg(t, node->var->name ? node->var->name : "lval");
+                        MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                                .LOAD(valReg, m_opBuilder.buildRef(slotIt->second));
+                        return valReg;
+                    }
                     auto it = m_localVars.find(node->var);
                     if (it != m_localVars.end())
                     {
@@ -400,6 +486,13 @@ class FunctionLowerer
                 MirOperand *rhs = lowerExpression(node->rhs);
                 if (node->lhs->kind == ND_VAR && node->lhs->var->is_local)
                 {
+                    auto slotIt = m_localStackSlots.find(node->lhs->var);
+                    if (slotIt != m_localStackSlots.end())
+                    {
+                        MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                                .STORE(m_opBuilder.buildRef(slotIt->second), rhs);
+                        return rhs;
+                    }
                     auto it = m_localVars.find(node->lhs->var);
                     MirRegister *dest = (it != m_localVars.end()) ? it->second : nullptr;
                     if (!dest)
@@ -421,10 +514,13 @@ class FunctionLowerer
                 else if (node->lhs->kind == ND_DEREF)
                 {
                     MirOperand *addr = lowerExpression(node->lhs->lhs);
+                    MirType *ptrType = (addr && addr->getMirType() && addr->getMirType()->getKind() == MirTypeKind::Pointer)
+                                           ? addr->getMirType()
+                                           : m_tt->getPtr(rhs->getMirType());
                     MirRegister *baseReg = addr->get<MirRegister>();
-                    if (!baseReg)
+                    if (!baseReg || !baseReg->getMirType() || baseReg->getMirType()->getKind() != MirTypeKind::Pointer)
                     {
-                        baseReg = m_opBuilder.buildVReg(m_tt->i64(), "base_tmp");
+                        baseReg = m_opBuilder.buildVReg(ptrType, "base_tmp");
                         MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
                                 .MOV(baseReg, addr);
                     }
@@ -467,7 +563,19 @@ class FunctionLowerer
 
                 lhs = ensureReg(lhs, "lhs");
 
-                bool rhsMustBeReg = is_flonum(node->ty) ||
+                bool rhsIsLargeImm = false;
+                if (rhs && rhs->isOfType<MirInteger>())
+                {
+                    auto *imm = static_cast<MirInteger *>(rhs);
+                    int64_t val = imm->getValue().getI64();
+                    if (val < -2147483648LL || val > 2147483647LL)
+                    {
+                        rhsIsLargeImm = true;
+                    }
+                }
+
+                bool rhsMustBeReg = rhsIsLargeImm ||
+                                    is_flonum(node->ty) ||
                                     node->kind == ND_MUL ||
                                     node->kind == ND_DIV ||
                                     node->kind == ND_MOD ||
@@ -559,7 +667,8 @@ class FunctionLowerer
                 MirOperand *val = lowerExpression(node->lhs);
                 MirType *resType = mapType(m_tt, node->ty);
                 MirRegister *dest = m_opBuilder.buildVReg(resType, "neg");
-                MirOperand *zero = m_opBuilder.buildInt(resType, FlexInt(0));
+                uint16_t resBits = static_cast<uint16_t>(resType->getTotalSizeInBits());
+                MirOperand *zero = m_opBuilder.buildInt(resType, FlexInt(0, resBits));
                 MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
                 MirRegister *zeroReg = m_opBuilder.buildVReg(resType, "zero");
                 inst.MOV(zeroReg, zero);
@@ -575,13 +684,14 @@ class FunctionLowerer
             case ND_NOT:
             {
                 MirOperand *val = lowerExpression(node->lhs);
+                MirType *valType = (val && val->getMirType()) ? val->getMirType() : m_tt->i32();
                 MirType *resType = mapType(m_tt, node->ty);
                 MirRegister *dest = m_opBuilder.buildVReg(resType, "not");
-                MirOperand *zero = m_opBuilder.buildInt(resType, FlexInt(0));
+                MirOperand *zero = m_opBuilder.buildInt(valType, FlexInt(0, static_cast<uint16_t>(valType->getTotalSizeInBits())));
                 MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
                 if (!val->isOfType<MirRegister>())
                 {
-                    MirRegister *valReg = m_opBuilder.buildVReg(val->getMirType() ? val->getMirType() : resType, "val");
+                    MirRegister *valReg = m_opBuilder.buildVReg(valType, "val");
                     inst.MOV(valReg, val);
                     val = valReg;
                 }
@@ -611,22 +721,62 @@ class FunctionLowerer
                 if (node->lhs->kind == ND_VAR && !node->lhs->var->is_local)
                 {
                     MirGlobalVar *gv = findOrCreateGlobal(node->lhs->var->name, node->lhs->var->ty);
-                    MirRegister *addr = m_opBuilder.buildVReg(m_tt->i64(), "gaddr");
+                    MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->lhs->var->ty));
+                    MirRegister *addr = m_opBuilder.buildVReg(ptrType, "gaddr");
                     MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
                             .MOV_ADDR(addr, m_opBuilder.buildRef(gv, 0));
                     return addr;
                 }
-                // Fallback for local address-of
+                else if (node->lhs->kind == ND_VAR && node->lhs->var->is_local)
+                {
+                    Obj *var = node->lhs->var;
+                    StackFrameObject *slot = nullptr;
+                    auto slotIt = m_localStackSlots.find(var);
+                    if (slotIt != m_localStackSlots.end())
+                    {
+                        slot = slotIt->second;
+                    }
+                    else
+                    {
+                        MirType *varType = mapType(m_tt, var->ty);
+                        slot = m_func->getStackFrame()->createStaticStackObj(varType);
+                        m_localStackSlots[var] = slot;
+                        auto regIt = m_localVars.find(var);
+                        if (regIt != m_localVars.end())
+                        {
+                            MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                                    .STORE(m_opBuilder.buildRef(slot), regIt->second);
+                        }
+                    }
+                    MirType *ptrType = m_tt->getPtr(mapType(m_tt, var->ty));
+                    MirRegister *addr = m_opBuilder.buildVReg(ptrType, "laddr");
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .MOV(addr, m_opBuilder.buildRef(slot));
+                    return addr;
+                }
+                else if (node->lhs->kind == ND_DEREF)
+                {
+                    return lowerExpression(node->lhs->lhs);
+                }
                 return m_opBuilder.buildInt(m_tt->i64(), FlexInt(0));
             }
             case ND_DEREF:
             {
+                if (node->ty->kind == TY_ARRAY || node->ty->kind == TY_STRUCT || node->ty->kind == TY_UNION ||
+                    node->ty->kind == TY_FUNC || node->ty->kind == TY_VLA)
+                {
+                    return lowerExpression(node->lhs);
+                }
+
                 MirOperand *addr = lowerExpression(node->lhs);
                 MirType *resType = mapType(m_tt, node->ty);
+                MirType *ptrType = (addr && addr->getMirType() && addr->getMirType()->getKind() == MirTypeKind::Pointer)
+                                       ? addr->getMirType()
+                                       : m_tt->getPtr(resType);
                 MirRegister *baseReg = addr->get<MirRegister>();
-                if (!baseReg)
+                if (!baseReg || !baseReg->getMirType() || baseReg->getMirType()->getKind() != MirTypeKind::Pointer)
                 {
-                    baseReg = m_opBuilder.buildVReg(m_tt->i64(), "base_tmp");
+                    baseReg = m_opBuilder.buildVReg(ptrType, "base_tmp");
                     MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
                             .MOV(baseReg, addr);
                 }
@@ -691,6 +841,70 @@ class FunctionLowerer
                     return src;
                 }
 
+                if (src->isOfType<MirInteger>())
+                {
+                    auto *imm = src->get<MirInteger>();
+                    uint16_t srcBits = static_cast<uint16_t>(srcType->getTotalSizeInBits());
+                    uint16_t destBits = static_cast<uint16_t>(destType->getTotalSizeInBits());
+                    bool srcUnsigned = (node->lhs->ty && node->lhs->ty->is_unsigned);
+                    bool destUnsigned = (node->ty && node->ty->is_unsigned);
+
+                    uint64_t uval = imm->getValue().getU64();
+                    if (srcBits < 64)
+                    {
+                        uval &= ((1ULL << srcBits) - 1);
+                    }
+
+                    int64_t sval = 0;
+                    if (srcUnsigned)
+                    {
+                        sval = static_cast<int64_t>(uval);
+                    }
+                    else
+                    {
+                        if (srcBits < 64 && (uval & (1ULL << (srcBits - 1))))
+                        {
+                            sval = static_cast<int64_t>(uval | ~((1ULL << srcBits) - 1));
+                        }
+                        else
+                        {
+                            sval = static_cast<int64_t>(uval);
+                        }
+                    }
+
+                    if (node->lhs->ty && node->lhs->ty->kind == TY_BOOL)
+                    {
+                        sval = (sval != 0) ? 1 : 0;
+                        uval = (uval != 0) ? 1 : 0;
+                    }
+                    if (node->ty && node->ty->kind == TY_BOOL)
+                    {
+                        sval = (sval != 0) ? 1 : 0;
+                        uval = (uval != 0) ? 1 : 0;
+                    }
+
+                    if (destUnsigned)
+                    {
+                        if (destBits < 64)
+                        {
+                            uval = static_cast<uint64_t>(sval) & ((1ULL << destBits) - 1);
+                        }
+                        else
+                        {
+                            uval = static_cast<uint64_t>(sval);
+                        }
+                        return m_opBuilder.buildInt(destType, FlexInt(uval, destBits));
+                    }
+                    else
+                    {
+                        if (destBits < 64 && (sval & (1LL << (destBits - 1))))
+                        {
+                            sval = sval | ~((1LL << destBits) - 1);
+                        }
+                        return m_opBuilder.buildInt(destType, FlexInt(sval, destBits));
+                    }
+                }
+
                 MirRegister *dest = m_opBuilder.buildVReg(destType, "cast");
                 MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
 
@@ -699,6 +913,13 @@ class FunctionLowerer
                     MirRegister *srcReg = m_opBuilder.buildVReg(srcType, "cast_src");
                     inst.MOV(srcReg, src);
                     src = srcReg;
+                }
+
+                if (node->ty && node->ty->kind == TY_BOOL)
+                {
+                    MirOperand *zero = m_opBuilder.buildInt(srcType, FlexInt(0, static_cast<uint16_t>(srcType->getTotalSizeInBits())));
+                    inst.CMP_NE(dest, src, zero);
+                    return dest;
                 }
 
                 if (destType->getTotalSizeInBits() < srcType->getTotalSizeInBits())
@@ -721,6 +942,7 @@ class FunctionLowerer
             case ND_COND:
             {
                 MirOperand *cond = lowerExpression(node->cond);
+                MirRegister *condReg = ensureRegister(cond, m_tt->i1(), "tern_cond");
                 MirType *resType = mapType(m_tt, node->ty);
                 MirRegister *dest = m_opBuilder.buildVReg(resType, "cond_val");
 
@@ -729,7 +951,7 @@ class FunctionLowerer
                 MirBlock *joinB = createBlock("cond_join");
 
                 MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .BR_COND(cond,
+                        .BR_COND(condReg,
                                  m_opBuilder.buildRef(thenB),
                                  m_opBuilder.buildRef(elseB));
 
@@ -744,6 +966,112 @@ class FunctionLowerer
                 MirOperand *elseVal = lowerExpression(node->els);
                 MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
                         .MOV(dest, elseVal);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .JMP(m_opBuilder.buildRef(joinB));
+
+                m_currentBlock = joinB;
+                return dest;
+            }
+            case ND_COMMA:
+            {
+                if (node->lhs)
+                    lowerExpression(node->lhs);
+                if (node->rhs)
+                    return lowerExpression(node->rhs);
+                return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0));
+            }
+            case ND_STMT_EXPR:
+            {
+                MirOperand *lastVal = nullptr;
+                for (Node *s = node->body; s; s = s->next)
+                {
+                    if (s->kind == ND_EXPR_STMT)
+                    {
+                        lastVal = lowerExpression(s->lhs);
+                    }
+                    else
+                    {
+                        lowerStatement(s);
+                    }
+                }
+                return lastVal ? lastVal : m_opBuilder.buildInt(m_tt->i32(), FlexInt(0));
+            }
+            case ND_LOGAND:
+            {
+                MirType *resType = mapType(m_tt, node->ty);
+                MirRegister *dest = m_opBuilder.buildVReg(resType, "logand");
+
+                MirBlock *rhsB = createBlock("logand_rhs");
+                MirBlock *falseB = createBlock("logand_false");
+                MirBlock *joinB = createBlock("logand_join");
+
+                MirOperand *lhsVal = lowerExpression(node->lhs);
+                MirRegister *lhsReg = ensureRegister(lhsVal, m_tt->i1(), "logand_lhs");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .BR_COND(lhsReg,
+                                 m_opBuilder.buildRef(rhsB),
+                                 m_opBuilder.buildRef(falseB));
+
+                m_currentBlock = rhsB;
+                MirOperand *rhsVal = lowerExpression(node->rhs);
+                MirType *rhsType = (rhsVal && rhsVal->getMirType()) ? rhsVal->getMirType() : resType;
+                uint16_t rhsBits = static_cast<uint16_t>(rhsType->getTotalSizeInBits());
+                MirOperand *zero = m_opBuilder.buildInt(rhsType, FlexInt(0, rhsBits));
+                MirRegister *boolRhs = m_opBuilder.buildVReg(resType, "bool_rhs");
+                MirRegister *rhsReg = ensureRegister(rhsVal, rhsType, "rhs_val");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .CMP_NE(boolRhs, rhsReg, zero);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .MOV(dest, boolRhs);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .JMP(m_opBuilder.buildRef(joinB));
+
+                m_currentBlock = falseB;
+                uint16_t resBits = static_cast<uint16_t>(resType->getTotalSizeInBits());
+                MirOperand *zeroRes = m_opBuilder.buildInt(resType, FlexInt(0, resBits));
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .MOV(dest, zeroRes);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .JMP(m_opBuilder.buildRef(joinB));
+
+                m_currentBlock = joinB;
+                return dest;
+            }
+            case ND_LOGOR:
+            {
+                MirType *resType = mapType(m_tt, node->ty);
+                MirRegister *dest = m_opBuilder.buildVReg(resType, "logor");
+
+                MirBlock *rhsB = createBlock("logor_rhs");
+                MirBlock *trueB = createBlock("logor_true");
+                MirBlock *joinB = createBlock("logor_join");
+
+                MirOperand *lhsVal = lowerExpression(node->lhs);
+                MirRegister *lhsReg = ensureRegister(lhsVal, m_tt->i1(), "logor_lhs");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .BR_COND(lhsReg,
+                                 m_opBuilder.buildRef(trueB),
+                                 m_opBuilder.buildRef(rhsB));
+
+                m_currentBlock = trueB;
+                uint16_t resBits = static_cast<uint16_t>(resType->getTotalSizeInBits());
+                MirOperand *oneRes = m_opBuilder.buildInt(resType, FlexInt(1, resBits));
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .MOV(dest, oneRes);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .JMP(m_opBuilder.buildRef(joinB));
+
+                m_currentBlock = rhsB;
+                MirOperand *rhsVal = lowerExpression(node->rhs);
+                MirType *rhsType = (rhsVal && rhsVal->getMirType()) ? rhsVal->getMirType() : resType;
+                uint16_t rhsBits = static_cast<uint16_t>(rhsType->getTotalSizeInBits());
+                MirOperand *zero = m_opBuilder.buildInt(rhsType, FlexInt(0, rhsBits));
+                MirRegister *boolRhs = m_opBuilder.buildVReg(resType, "bool_rhs");
+                MirRegister *rhsReg = ensureRegister(rhsVal, rhsType, "rhs_val");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .CMP_NE(boolRhs, rhsReg, zero);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .MOV(dest, boolRhs);
                 MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
                         .JMP(m_opBuilder.buildRef(joinB));
 
@@ -767,6 +1095,7 @@ class FunctionLowerer
     MirBlock *m_continueBlock{ nullptr };
     size_t m_blockCounter{ 0 };
     std::unordered_map<Obj *, MirRegister *> m_localVars;
+    std::unordered_map<Obj *, StackFrameObject *> m_localStackSlots;
 };
 
 } // namespace
@@ -819,9 +1148,10 @@ bool CFrontendAdapter::compileSourceToMir(DriverContext &ctx, std::string_view s
                 else
                     initVal = *(const int8_t *)obj->init_data;
 
-                gb.setInitializer(opBuilder.buildInt(gType, FlexInt(initVal, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
+                MirType *initType = (gType->getKind() == MirTypeKind::Integer) ? gType : typeTable->i64();
+                gb.setInitializer(opBuilder.buildInt(initType, FlexInt(initVal, static_cast<uint16_t>(initType->getTotalSizeInBits()))));
             }
-            else
+            else if (obj->is_definition && gType->getKind() == MirTypeKind::Integer)
             {
                 gb.setInitializer(opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
             }
@@ -901,9 +1231,11 @@ bool CFrontendAdapter::compileStringToMir(DriverContext &ctx, std::string_view s
                     initVal = *(const int16_t *)obj->init_data;
                 else
                     initVal = *(const int8_t *)obj->init_data;
-                gb.setInitializer(opBuilder.buildInt(gType, FlexInt(initVal, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
+
+                MirType *initType = (gType->getKind() == MirTypeKind::Integer) ? gType : typeTable->i64();
+                gb.setInitializer(opBuilder.buildInt(initType, FlexInt(initVal, static_cast<uint16_t>(initType->getTotalSizeInBits()))));
             }
-            else
+            else if (obj->is_definition && gType->getKind() == MirTypeKind::Integer)
             {
                 gb.setInitializer(opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
             }

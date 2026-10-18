@@ -42,4 +42,18 @@ FetchContent_Declare(
 EzCMK_AddVendor(https://github.com/rui314/chibicc
         90d1f7f199cc55b13c7fdb5839d1409806633fdb
         chibicc
+)
+
+FetchContent_Declare(
+        yarpgen
+        GIT_REPOSITORY https://github.com/intel/yarpgen.git
+        GIT_TAG 1adb290f453505838f3aa33dc571f292b0c1810f
+        PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory
+                      "${CMAKE_CURRENT_SOURCE_DIR}/CMake/yarpgen/overlay"
+                      "<SOURCE_DIR>"
+)
+
+EzCMK_AddVendor(https://github.com/intel/yarpgen
+        1adb290f453505838f3aa33dc571f292b0c1810f
+        yarpgen
 )

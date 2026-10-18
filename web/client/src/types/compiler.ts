@@ -1,5 +1,7 @@
 export interface CompileRequest {
   code: string;
+  language?: 'mir' | 'c';
+  filename?: string;
   targetTriple?: string;
   optLevel?: 'O0' | 'O1' | 'O2' | 'Os';
   features?: string[];

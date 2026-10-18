@@ -87,10 +87,15 @@ export class CompilerRunner {
   public async compile(req: CompileRequest): Promise<CompileResponse> {
     const startTime = performance.now();
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ezc_web_'));
-    const tempMirFile = path.join(tempDir, 'source.mir');
+    const isC = req.language === 'c' ||
+      (Boolean(req.filename) && req.filename!.endsWith('.c')) ||
+      (!req.code.includes('fn @') && !req.code.includes('function @') &&
+        (/\b(int|void|char|short|long|float|double|struct|typedef|extern|#include|#define)\b/.test(req.code)));
+    const sourceFileName = isC ? 'source.c' : 'source.mir';
+    const tempSourceFile = path.join(tempDir, sourceFileName);
 
     try {
-      fs.writeFileSync(tempMirFile, req.code, 'utf-8');
+      fs.writeFileSync(tempSourceFile, req.code, 'utf-8');
 
       // Common flags
       const baseFlags: string[] = [];
@@ -118,7 +123,7 @@ export class CompilerRunner {
       const telemetryFlags = [...baseFlags, '--time-passes', '--print-passes', '-v'];
 
       // 1. Run main assembly compilation (-S)
-      const asmRes = await this.executeEzc([...telemetryFlags, '-S', tempMirFile]);
+      const asmRes = await this.executeEzc([...telemetryFlags, '-S', tempSourceFile]);
 
       // Parse the output for assembly, passes, diagnostics, CFG and liveness
       const parsedAsm = parseCompilerOutput(asmRes.stdout, asmRes.stderr, req.code);
@@ -132,10 +137,10 @@ export class CompilerRunner {
       if (asmRes.exitCode === 0) {
         const tempObjFile = path.join(tempDir, 'output.obj');
         const [mirRes, legRes, lowRes, objRes] = await Promise.all([
-          this.executeEzc([...baseFlags, '--emit-mir', tempMirFile]),
-          this.executeEzc([...baseFlags, '--emit-legalized-mir', tempMirFile]),
-          this.executeEzc([...baseFlags, '--emit-lowered-mir', tempMirFile]),
-          this.executeEzc([...baseFlags, '-o', tempObjFile, tempMirFile]),
+          this.executeEzc([...baseFlags, '--emit-mir', tempSourceFile]),
+          this.executeEzc([...baseFlags, '--emit-legalized-mir', tempSourceFile]),
+          this.executeEzc([...baseFlags, '--emit-lowered-mir', tempSourceFile]),
+          this.executeEzc([...baseFlags, '-o', tempObjFile, tempSourceFile]),
         ]);
 
         genericMir = extractCleanMir(mirRes.stdout);

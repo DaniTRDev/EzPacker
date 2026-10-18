@@ -46,6 +46,7 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
     switch (inst->getOpCode())
     {
         case MirInstructionOpCode::MOV:
+        case MirInstructionOpCode::MOV_ADDR:
             return selectMOV(ctx, inst);
         case MirInstructionOpCode::JMP:
             return selectJMP(ctx, inst);
@@ -72,6 +73,28 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
         case MirInstructionOpCode::CMP_UGT:
         case MirInstructionOpCode::CMP_UGE:
             return selectCMP(ctx, inst);
+        case MirInstructionOpCode::TRUNC:
+            return selectTRUNC(ctx, inst);
+        case MirInstructionOpCode::SEXT:
+            return selectSEXT(ctx, inst);
+        case MirInstructionOpCode::ZEXT:
+            return selectZEXT(ctx, inst);
+        case MirInstructionOpCode::SDIV:
+        case MirInstructionOpCode::IDIV:
+            return selectDIV(ctx, inst, /*isSigned=*/true, /*isRem=*/false);
+        case MirInstructionOpCode::UDIV:
+        case MirInstructionOpCode::DIV:
+            return selectDIV(ctx, inst, /*isSigned=*/false, /*isRem=*/false);
+        case MirInstructionOpCode::REM:
+            return selectDIV(ctx, inst, /*isSigned=*/true, /*isRem=*/true);
+        case MirInstructionOpCode::SHL:
+        case MirInstructionOpCode::SHR:
+        case MirInstructionOpCode::SAR:
+            return selectSHIFT(ctx, inst);
+        case MirInstructionOpCode::SUB:
+            return selectSUB(ctx, inst);
+        case MirInstructionOpCode::ADD:
+            return selectADD(ctx, inst);
         default:
             break;
     }
@@ -134,18 +157,34 @@ bool X86_64TargetInstructionSelector::selectBR_COND(MirBuilderContext *ctx, MirI
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
     MirOperandBuilder ob(ctx);
 
+    bool is64 = false;
     if (auto *r = cond->get<MirRegister>())
     {
-        if (!r->getRegClass())
+        if (r->getRegClass())
+        {
+            is64 = (r->getRegClass() == findClass("GPR64"));
+        }
+        else if (r->getMirType() && r->getMirType()->getTotalSizeInBits() == 64)
+        {
+            is64 = true;
+            r->setClass(findClass("GPR64"));
+        }
+        else
         {
             r->setClass(findClass("GPR32"));
         }
     }
+    else if (cond->getMirType() && cond->getMirType()->getTotalSizeInBits() == 64)
+    {
+        is64 = true;
+    }
 
-    auto *zeroImm = ob.buildInt(ctx->getTypeTable()->i32(), FlexInt(static_cast<int32_t>(0)));
+    auto cmpOp = is64 ? x86_64TargetInst::CMP64ri : x86_64TargetInst::CMP32ri;
+    auto *zeroImm = ob.buildInt(is64 ? ctx->getTypeTable()->i64() : ctx->getTypeTable()->i32(),
+                                FlexInt(0, is64 ? 64 : 32));
 
-    // Emit: CMP32ri %cond, 0
-    ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::CMP32ri),
+    // Emit: CMP %cond, 0
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(cmpOp),
                    inst->getSourceRef(),
                    { cond, zeroImm });
 
@@ -282,10 +321,28 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
     // 2. Emit CMP (CMP64ri/rr or CMP32ri/rr)
     if (rhs->getType() == MirOperandType::Integer)
     {
-        auto cmpOp = is64 ? x86_64TargetInst::CMP64ri : x86_64TargetInst::CMP32ri;
-        ib.buildTarget(x86_64TargetInst::getTargetDesc(cmpOp),
-                       inst->getSourceRef(),
-                       { lhs, rhs });
+        auto *imm = rhs->get<MirInteger>();
+        int64_t val = imm->getValue().getI64();
+        if (is64 && (val < -2147483648LL || val > 2147483647LL))
+        {
+            MirRegister *vreg = ob.buildVReg(ctx->getTypeTable()->i64(), "imm64");
+            vreg->setClass(findClass("GPR64"));
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV64ri),
+                           inst->getSourceRef(),
+                           { vreg, rhs });
+            rhs = vreg;
+            auto cmpOp = x86_64TargetInst::CMP64rr;
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(cmpOp),
+                           inst->getSourceRef(),
+                           { lhs, rhs });
+        }
+        else
+        {
+            auto cmpOp = is64 ? x86_64TargetInst::CMP64ri : x86_64TargetInst::CMP32ri;
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(cmpOp),
+                           inst->getSourceRef(),
+                           { lhs, rhs });
+        }
     }
     else if (rhs->getType() == MirOperandType::Register)
     {
@@ -497,7 +554,15 @@ bool X86_64TargetInstructionSelector::selectSTORE(MirBuilderContext *ctx, MirIns
         }
     }
 
-    if (auto *r = val->get<MirRegister>())
+    if (!val->isOfType<MirRegister>())
+    {
+        MirType *valType = val->getMirType() ? val->getMirType() : ctx->getTypeTable()->i32();
+        MirRegister *valReg = ob.buildVReg(valType, "store_val");
+        valReg->setClass(findClass(valClass));
+        ib.MOV(valReg, val);
+        val = valReg;
+    }
+    else if (auto *r = val->get<MirRegister>())
     {
         if (!r->getRegClass())
         {
@@ -835,6 +900,592 @@ bool X86_64TargetInstructionSelector::selectMOV(MirBuilderContext *ctx, MirInstr
     }
 
     return false;
+}
+
+bool X86_64TargetInstructionSelector::selectTRUNC(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 2)
+        return false;
+
+    auto *dst = inst->getOperand(0);
+    auto *src = inst->getOperand(1);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    size_t dstBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 32;
+
+    if (src->getType() == MirOperandType::Integer)
+    {
+        auto op = (dstBits <= 8)  ? x86_64TargetInst::MOV8ri
+                : (dstBits <= 16) ? x86_64TargetInst::MOV16ri
+                : (dstBits <= 32) ? x86_64TargetInst::MOV32ri
+                                  : x86_64TargetInst::MOV64ri;
+        std::string_view gprClass = (dstBits <= 8)  ? "GPR8"
+                                  : (dstBits <= 16) ? "GPR16"
+                                  : (dstBits <= 32) ? "GPR32"
+                                                    : "GPR64";
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass(gprClass));
+        }
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+
+    auto op = (dstBits <= 8)  ? x86_64TargetInst::MOV8rr
+            : (dstBits <= 16) ? x86_64TargetInst::MOV16rr
+            : (dstBits <= 32) ? x86_64TargetInst::MOV32rr
+                              : x86_64TargetInst::MOV64rr;
+    std::string_view regClass = (dstBits <= 8)  ? "GPR8"
+                              : (dstBits <= 16) ? "GPR16"
+                              : (dstBits <= 32) ? "GPR32"
+                                                : "GPR64";
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(regClass));
+    }
+    if (auto *r = src->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(regClass));
+    }
+
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src });
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectSEXT(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 2)
+        return false;
+
+    auto *dst = inst->getOperand(0);
+    auto *src = inst->getOperand(1);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    size_t dstBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64;
+    size_t srcBits = src->getMirType() ? src->getMirType()->getTotalSizeInBits() : 32;
+
+    if (src->getType() == MirOperandType::Integer)
+    {
+        auto op = (dstBits == 64) ? x86_64TargetInst::MOV64ri : x86_64TargetInst::MOV32ri;
+        std::string_view gprClass = (dstBits == 64) ? "GPR64" : "GPR32";
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass(gprClass));
+        }
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+
+    x86_64TargetInst::OpCode op = x86_64TargetInst::MOVSX64_32;
+    std::string_view dstClass = "GPR64";
+    std::string_view srcClass = "GPR32";
+
+    if (dstBits > 32)
+    {
+        dstClass = "GPR64";
+        if (srcBits <= 8)
+        {
+            op = x86_64TargetInst::MOVSX64_8;
+            srcClass = "GPR8";
+        }
+        else if (srcBits <= 16)
+        {
+            op = x86_64TargetInst::MOVSX64_16;
+            srcClass = "GPR16";
+        }
+        else
+        {
+            op = x86_64TargetInst::MOVSX64_32;
+            srcClass = "GPR32";
+        }
+    }
+    else
+    {
+        dstClass = "GPR32";
+        if (srcBits <= 8)
+        {
+            op = x86_64TargetInst::MOVSX32_8;
+            srcClass = "GPR8";
+        }
+        else
+        {
+            op = x86_64TargetInst::MOVSX32_16;
+            srcClass = "GPR16";
+        }
+    }
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(dstClass));
+    }
+    if (auto *r = src->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(srcClass));
+    }
+
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src });
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectZEXT(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 2)
+        return false;
+
+    auto *dst = inst->getOperand(0);
+    auto *src = inst->getOperand(1);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    size_t dstBits = dst->getMirType() ? dst->getMirType()->getTotalSizeInBits() : 64;
+    size_t srcBits = src->getMirType() ? src->getMirType()->getTotalSizeInBits() : 32;
+
+    if (src->getType() == MirOperandType::Integer)
+    {
+        auto op = (dstBits == 64) ? x86_64TargetInst::MOV64ri : x86_64TargetInst::MOV32ri;
+        std::string_view gprClass = (dstBits == 64) ? "GPR64" : "GPR32";
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+                r->setClass(findClass(gprClass));
+        }
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+
+    x86_64TargetInst::OpCode op = x86_64TargetInst::MOV32rr;
+    std::string_view dstClass = "GPR64";
+    std::string_view srcClass = "GPR32";
+
+    if (dstBits > 32)
+    {
+        dstClass = "GPR64";
+        if (srcBits <= 8)
+        {
+            op = x86_64TargetInst::MOVZX64_8;
+            srcClass = "GPR8";
+        }
+        else if (srcBits <= 16)
+        {
+            op = x86_64TargetInst::MOVZX64_16;
+            srcClass = "GPR16";
+        }
+        else
+        {
+            op = x86_64TargetInst::MOV32rr;
+            dstClass = "GPR32";
+            srcClass = "GPR32";
+        }
+    }
+    else
+    {
+        dstClass = "GPR32";
+        if (srcBits <= 8)
+        {
+            op = x86_64TargetInst::MOVZX32_8;
+            srcClass = "GPR8";
+        }
+        else
+        {
+            op = x86_64TargetInst::MOVZX32_16;
+            srcClass = "GPR16";
+        }
+    }
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(dstClass));
+    }
+    if (auto *r = src->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(srcClass));
+    }
+
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src });
+    inst->eraseFromOwner();
+    return true;
+}
+
+/**
+ * Lowers an integer division or remainder instruction (SDIV, IDIV, UDIV, DIV, REM) into
+ * x86-64 IDIV32r/IDIV64r or DIV32r/DIV64r using fixed registers RAX/EAX and RDX/EDX.
+ */
+bool X86_64TargetInstructionSelector::selectDIV(MirBuilderContext *ctx, MirInstruction *inst, bool isSigned, bool isRem)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    bool is64 = false;
+    if (dst->getMirType() && dst->getMirType()->getTotalSizeInBits() == 64)
+    {
+        is64 = true;
+    }
+    else if (lhs->getMirType() && lhs->getMirType()->getTotalSizeInBits() == 64)
+    {
+        is64 = true;
+    }
+
+    MirType *type = is64 ? ctx->getTypeTable()->i64() : ctx->getTypeTable()->i32();
+    std::string_view gprClass = is64 ? "GPR64" : "GPR32";
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+        {
+            r->setClass(findClass(gprClass));
+        }
+    }
+
+    MirOperandBuilder ob(ctx);
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+
+    // Register IDs from x86_64.tdesc: RAX = 0, RDX = 2
+    MirRegister *raxPhys = ob.buildPhysReg(type, 0, is64 ? "rax" : "eax", findClass(gprClass));
+    MirRegister *rdxPhys = ob.buildPhysReg(type, 2, is64 ? "rdx" : "edx", findClass(gprClass));
+
+    // 1. Load dividend (lhs) into RAX / EAX
+    if (lhs->getType() == MirOperandType::Integer)
+    {
+        auto movOp = is64 ? x86_64TargetInst::MOV64ri : x86_64TargetInst::MOV32ri;
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { raxPhys, lhs });
+    }
+    else
+    {
+        if (auto *r = lhs->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+            {
+                r->setClass(findClass(gprClass));
+            }
+        }
+        auto movOp = is64 ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { raxPhys, lhs });
+    }
+
+    // 2. Set up RDX / EDX
+    if (isSigned)
+    {
+        // Sign-extend EAX/RAX into EDX/RDX: copy to EDX, then SAR by 31 (or 63)
+        auto movOp = is64 ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { rdxPhys, raxPhys });
+
+        auto sarOp = is64 ? x86_64TargetInst::SAR64ri : x86_64TargetInst::SAR32ri;
+        auto *shiftAmt = ob.buildInt(ctx->getTypeTable()->i8(), FlexInt(is64 ? 63 : 31, 8));
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(sarOp), inst->getSourceRef(), { rdxPhys, rdxPhys, shiftAmt });
+    }
+    else
+    {
+        // Zero RDX / EDX
+        auto movOp = is64 ? x86_64TargetInst::MOV64ri : x86_64TargetInst::MOV32ri;
+        auto *zeroImm = ob.buildInt(type, FlexInt(0, is64 ? 64 : 32));
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { rdxPhys, zeroImm });
+    }
+
+    // 3. Ensure divisor (rhs) is in a register (IDIV does not take immediate operands)
+    if (rhs->getType() == MirOperandType::Integer)
+    {
+        MirRegister *rhsReg = ob.buildVReg(type, "div_rhs");
+        rhsReg->setClass(findClass(gprClass));
+        auto movOp = is64 ? x86_64TargetInst::MOV64ri : x86_64TargetInst::MOV32ri;
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { rhsReg, rhs });
+        rhs = rhsReg;
+    }
+    else if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+        {
+            r->setClass(findClass(gprClass));
+        }
+    }
+
+    // 4. Emit IDIV / DIV
+    auto idivOp = isSigned
+            ? (is64 ? x86_64TargetInst::IDIV64r : x86_64TargetInst::IDIV32r)
+            : (is64 ? x86_64TargetInst::DIV64r : x86_64TargetInst::DIV32r);
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(idivOp), inst->getSourceRef(), { rhs });
+
+    // 5. Retrieve result into dst (quotient in RAX/EAX, remainder in RDX/EDX)
+    auto movOp = is64 ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
+    if (isRem)
+    {
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { dst, rdxPhys });
+        // Touch raxPhys to keep it live across IDIV so rhs cannot collide with rax
+        MirRegister *dummy = ob.buildVReg(type, "div_clobber");
+        dummy->setClass(findClass(gprClass));
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { dummy, raxPhys });
+    }
+    else
+    {
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { dst, raxPhys });
+        // Touch rdxPhys to keep it live across IDIV so rhs cannot collide with rdx
+        MirRegister *dummy = ob.buildVReg(type, "div_clobber");
+        dummy->setClass(findClass(gprClass));
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { dummy, rdxPhys });
+    }
+
+    inst->eraseFromOwner();
+    return true;
+}
+
+/**
+ * Lowers integer shift instructions (SHL, SHR, SAR) for immediate and register shift amounts.
+ */
+bool X86_64TargetInstructionSelector::selectSHIFT(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        return false;
+    }
+
+    auto *dst = inst->getOperand(0);
+    auto *src = inst->getOperand(1);
+    auto *amt = inst->getOperand(2);
+
+    bool is64 = false;
+    if (dst->getMirType() && dst->getMirType()->getTotalSizeInBits() == 64)
+    {
+        is64 = true;
+    }
+    else if (src->getMirType() && src->getMirType()->getTotalSizeInBits() == 64)
+    {
+        is64 = true;
+    }
+
+    std::string_view gprClass = is64 ? "GPR64" : "GPR32";
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+        {
+            r->setClass(findClass(gprClass));
+        }
+    }
+    if (auto *r = src->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+        {
+            r->setClass(findClass(gprClass));
+        }
+    }
+
+    MirOperandBuilder ob(ctx);
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+
+    if (amt->getType() == MirOperandType::Integer)
+    {
+        int64_t rawAmt = amt->get<MirInteger>()->getValue().getI64();
+        uint8_t mask = is64 ? 63 : 31;
+        auto *amt8 = ob.buildInt(ctx->getTypeTable()->i8(), FlexInt(rawAmt & mask, 8));
+
+        x86_64TargetInst::OpCode op;
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::SHL:
+                op = is64 ? x86_64TargetInst::SHL64ri : x86_64TargetInst::SHL32ri;
+                break;
+            case MirInstructionOpCode::SHR:
+                op = is64 ? x86_64TargetInst::SHR64ri : x86_64TargetInst::SHR32ri;
+                break;
+            case MirInstructionOpCode::SAR:
+                op = is64 ? x86_64TargetInst::SAR64ri : x86_64TargetInst::SAR32ri;
+                break;
+            default:
+                return false;
+        }
+
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src, amt8 });
+    }
+    else
+    {
+        // Variable shift requires shift count in %cl (ECX/RCX, reg ID 1 in x86_64.tdesc)
+        MirType *amtType = is64 ? ctx->getTypeTable()->i64() : ctx->getTypeTable()->i32();
+        MirRegister *rcxPhys = ob.buildPhysReg(amtType, 1, is64 ? "rcx" : "ecx", findClass(gprClass));
+
+        if (amt->getType() == MirOperandType::Register)
+        {
+            if (auto *r = amt->get<MirRegister>())
+            {
+                if (!r->getRegClass())
+                {
+                    r->setClass(findClass(gprClass));
+                }
+            }
+            auto movOp = is64 ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { rcxPhys, amt });
+        }
+
+        x86_64TargetInst::OpCode op;
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::SHL:
+                op = is64 ? x86_64TargetInst::SHL64rCL : x86_64TargetInst::SHL32rCL;
+                break;
+            case MirInstructionOpCode::SHR:
+                op = is64 ? x86_64TargetInst::SHR64rCL : x86_64TargetInst::SHR32rCL;
+                break;
+            case MirInstructionOpCode::SAR:
+                op = is64 ? x86_64TargetInst::SAR64rCL : x86_64TargetInst::SAR32rCL;
+                break;
+            default:
+                return false;
+        }
+
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(op), inst->getSourceRef(), { dst, src });
+
+        // Keep rcxPhys live across the shift instruction so src/dst cannot collide with rcx
+        MirRegister *dummy = ob.buildVReg(amtType, "cl_clobber");
+        dummy->setClass(findClass(gprClass));
+        auto movOp = is64 ? x86_64TargetInst::MOV64rr : x86_64TargetInst::MOV32rr;
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(movOp), inst->getSourceRef(), { dummy, rcxPhys });
+    }
+
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectSUB(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+        return false;
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+
+    bool is64 = (dst->getMirType() && dst->getMirType()->getTotalSizeInBits() == 64);
+    std::string_view gprClass = is64 ? "GPR64" : "GPR32";
+
+    if (rhs->getType() == MirOperandType::Integer)
+    {
+        auto *imm = rhs->get<MirInteger>();
+        int64_t val = imm->getValue().getI64();
+        if (val >= -2147483648LL && val <= 2147483647LL)
+        {
+            auto subOp = is64 ? x86_64TargetInst::SUB64ri : x86_64TargetInst::SUB32ri;
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(subOp),
+                           inst->getSourceRef(),
+                           { dst, lhs, rhs });
+            inst->eraseFromOwner();
+            return true;
+        }
+        else
+        {
+            MirRegister *vreg = ob.buildVReg(ctx->getTypeTable()->i64(), "imm64");
+            vreg->setClass(findClass("GPR64"));
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV64ri),
+                           inst->getSourceRef(),
+                           { vreg, rhs });
+            rhs = vreg;
+        }
+    }
+
+    if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(gprClass));
+    }
+    if (auto *r = lhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(gprClass));
+    }
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(gprClass));
+    }
+
+    auto subOp = is64 ? x86_64TargetInst::SUB64rr : x86_64TargetInst::SUB32rr;
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(subOp),
+                   inst->getSourceRef(),
+                   { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectADD(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 3)
+        return false;
+
+    auto *dst = inst->getOperand(0);
+    auto *lhs = inst->getOperand(1);
+    auto *rhs = inst->getOperand(2);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+
+    bool is64 = (dst->getMirType() && dst->getMirType()->getTotalSizeInBits() == 64);
+    std::string_view gprClass = is64 ? "GPR64" : "GPR32";
+
+    if (rhs->getType() == MirOperandType::Integer)
+    {
+        auto *imm = rhs->get<MirInteger>();
+        int64_t val = imm->getValue().getI64();
+        if (val >= -2147483648LL && val <= 2147483647LL)
+        {
+            auto addOp = is64 ? x86_64TargetInst::ADD64ri : x86_64TargetInst::ADD32ri;
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(addOp),
+                           inst->getSourceRef(),
+                           { dst, lhs, rhs });
+            inst->eraseFromOwner();
+            return true;
+        }
+        else
+        {
+            MirRegister *vreg = ob.buildVReg(ctx->getTypeTable()->i64(), "imm64");
+            vreg->setClass(findClass("GPR64"));
+            ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV64ri),
+                           inst->getSourceRef(),
+                           { vreg, rhs });
+            rhs = vreg;
+        }
+    }
+
+    if (auto *r = rhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(gprClass));
+    }
+    if (auto *r = lhs->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(gprClass));
+    }
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass(gprClass));
+    }
+
+    auto addOp = is64 ? x86_64TargetInst::ADD64rr : x86_64TargetInst::ADD32rr;
+    ib.buildTarget(x86_64TargetInst::getTargetDesc(addOp),
+                   inst->getSourceRef(),
+                   { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
 }
 
 } // namespace EzTargets::X86_64

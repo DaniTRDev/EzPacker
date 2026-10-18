@@ -208,7 +208,7 @@ void CompilationPipeline::printPassRunning(std::string_view passName, const MirF
 {
     if (m_ctx.getOptions().printPasses)
     {
-        std::cout << "[Pass] Running " << passName << " on " << (func ? func->getName() : "") << "\n";
+        std::cout << "[Pass] Running " << passName << " on " << (func ? func->getName() : "") << std::endl;
     }
 }
 

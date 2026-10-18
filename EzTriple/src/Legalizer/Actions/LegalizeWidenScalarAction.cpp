@@ -77,6 +77,21 @@ LegalizationResult LegalizeWidenScalar(LegalizeCtx &ctx, size_t operandSlot, Mir
             MirOperand *srcOp = instr->getOperand(i);
             if (srcOp && (instr->getOperandFlag(i) & MirOperandFlag::Read))
             {
+                if (instr->getOpCode() == MirInstructionOpCode::LOAD)
+                {
+                    if (srcOp->getType() == MirOperandType::Memory)
+                    {
+                        srcOp->setMirType(targetType);
+                    }
+                    continue;
+                }
+
+                if (srcOp->getType() == MirOperandType::Memory ||
+                    (srcOp->getMirType() && srcOp->getMirType()->getKind() == MirTypeKind::Pointer))
+                {
+                    continue;
+                }
+
                 if (srcOp->getMirType() &&
                     srcOp->getMirType()->getTotalSizeInBytes() < targetType->getTotalSizeInBytes())
                 {

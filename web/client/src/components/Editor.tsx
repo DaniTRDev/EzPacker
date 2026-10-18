@@ -145,14 +145,20 @@ export const Editor: React.FC = () => {
     clearJumpLocation();
   }, [jumpToLocation, clearJumpLocation]);
 
+  const isC = !code.includes('fn @') && !code.includes('function @') &&
+    (/\b(int|void|char|short|long|float|double|struct|typedef|extern|#include|#define)\b/.test(code));
+  const editorLanguage = isC ? 'c' : EZPACKER_MIR_LANGUAGE_ID;
+
   return (
     <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-800/80">
       {/* Editor sub-header */}
       <div className="h-9 px-3 bg-zinc-900/60 border-b border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400 select-none">
         <div className="flex items-center space-x-2">
           <Code2 className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="font-medium text-zinc-300">source.mir</span>
-          <span className="text-[10px] text-zinc-400 font-mono">EzPacker SSA MIR</span>
+          <span className="font-medium text-zinc-300">{isC ? 'source.c' : 'source.mir'}</span>
+          <span className="text-[10px] text-zinc-400 font-mono">
+            {isC ? 'C11 Frontend (chibicc)' : 'EzPacker SSA MIR'}
+          </span>
         </div>
         <div className="flex items-center space-x-2 text-[11px]">
           {result && !result.success && (
@@ -168,7 +174,7 @@ export const Editor: React.FC = () => {
       <div className="flex-1 min-h-0">
         <MonacoEditor
           height="100%"
-          language={EZPACKER_MIR_LANGUAGE_ID}
+          language={editorLanguage}
           theme="ezpacker-dark"
           value={code}
           onChange={(val) => setCode(val || '')}
