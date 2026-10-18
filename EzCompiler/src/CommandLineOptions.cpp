@@ -122,6 +122,16 @@ void CommandLineParser::setupArguments()
             .append()
             .default_value(std::vector<std::string>{});
 
+    m_program->add_argument("-ffreestanding", "--freestanding")
+            .help("Compile in a standalone/freestanding environment without standard library (default)")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("-nostdlib", "--nostdlib")
+            .help("Do not use or link against standard libraries")
+            .default_value(false)
+            .implicit_value(true);
+
     m_program->add_argument("-V", "--version")
             .help("Print version information")
             .default_value(false)
@@ -374,6 +384,15 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
 
     outOptions.includePaths = m_program->get<std::vector<std::string>>("-I");
     outOptions.macroDefines = m_program->get<std::vector<std::string>>("-D");
+
+    if (m_program->is_used("-ffreestanding"))
+    {
+        outOptions.freestanding = m_program->get<bool>("-ffreestanding");
+    }
+    if (m_program->is_used("-nostdlib"))
+    {
+        outOptions.noStdLib = m_program->get<bool>("-nostdlib");
+    }
 
     return true;
 }

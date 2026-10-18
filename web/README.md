@@ -10,6 +10,7 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
 
 - **Monaco Code Editor**:
   - Full syntax highlighting for EzPacker Generic MIR (`.mir`) keywords, opcodes, types, registers, and branch labels.
+  - Native editing for Standalone / Freestanding C11 (`.c`, `.i`) source files compiled directly via the embedded modular `chibicc` frontend.
   - Real-time compiler diagnostics with line-and-column navigation.
   - Debounced auto-compilation and `Ctrl+Enter` trigger.
 - **Seven Dedicated Workspace Tabs**:
@@ -36,6 +37,7 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
     - x86-64: `x86_64-pc-windows-msvc`, `x86_64-linux-gnu`, `x86_64-apple-darwin`
     - RISC-V 64: `riscv64-unknown-linux-gnu`, `riscv64-unknown-elf`, `riscv64`
   - Optimization levels: `-O0`, `-O1`, `-O2`, `-Os`.
+  - Freestanding / Standalone flags: `-ffreestanding`, `-nostdlib`.
   - Feature flags: x86-64 (`+avx`, `+avx2`, `+sse2`, etc.) and RISC-V (`+m`, `+a`, `+f`, `+d`, `+v`, `+c`).
   - Code generation flags: Position Independent Code (`-fPIC`), RTTI toggle.
 - **12 Bundled Examples**:

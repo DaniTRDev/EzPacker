@@ -41,6 +41,9 @@ class CFrontendAdapter : public IFrontendAdapter
     void defineMacro(std::string_view name, std::string_view value = "1");
 
   private:
+    bool lowerAstToMir(DriverContext &ctx, struct Obj *astRoot, MirBuilderContext &outMirCtx);
+
+  private:
     CFrontend::ChibiccWrapper m_wrapper;
 };
 

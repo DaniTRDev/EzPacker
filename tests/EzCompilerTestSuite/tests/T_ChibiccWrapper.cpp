@@ -103,3 +103,39 @@ TEST_F(EzCompilerTestSuite, TestChibiccConsecutiveParsesWithStateReset)
     ASSERT_NE(fn2, nullptr);
     EXPECT_STREQ(fn2->name, "f2");
 }
+
+TEST_F(EzCompilerTestSuite, TestChibiccFreestandingMacros)
+{
+    ChibiccWrapper wrapper;
+    const std::string standaloneCheck = R"c(
+#if __STDC_HOSTED__ != 0
+#error "Expected __STDC_HOSTED__ to be 0 in freestanding environment"
+#endif
+
+#if !defined(__EZPACKER_STANDALONE__) || __EZPACKER_STANDALONE__ != 1
+#error "Expected __EZPACKER_STANDALONE__ to be defined as 1"
+#endif
+
+#if !defined(__STDC_FREESTANDING__) || __STDC_FREESTANDING__ != 1
+#error "Expected __STDC_FREESTANDING__ to be defined as 1"
+#endif
+
+#if defined(linux) || defined(unix) || defined(__gnu_linux__)
+#error "Hosted Linux/Unix macros must not be predefined"
+#endif
+
+int standalone_kernel_entry(void) {
+    return 0xCAFE;
+}
+)c";
+
+    auto result = wrapper.parseString(standaloneCheck);
+    ASSERT_TRUE(result.success) << "Failed to parse freestanding macros: " << result.errorMessage;
+    ASSERT_NE(result.astRoot, nullptr);
+
+    Obj *fn = findObject(result.astRoot, "standalone_kernel_entry");
+    ASSERT_NE(fn, nullptr);
+    EXPECT_TRUE(fn->is_function);
+    EXPECT_STREQ(fn->name, "standalone_kernel_entry");
+}
+

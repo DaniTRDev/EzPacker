@@ -157,7 +157,7 @@ export const Editor: React.FC = () => {
           <Code2 className="w-3.5 h-3.5 text-zinc-400" />
           <span className="font-medium text-zinc-300">{isC ? 'source.c' : 'source.mir'}</span>
           <span className="text-[10px] text-zinc-400 font-mono">
-            {isC ? 'C11 Frontend (chibicc)' : 'EzPacker SSA MIR'}
+            {isC ? 'Standalone C11 Frontend (chibicc)' : 'EzPacker SSA MIR'}
           </span>
         </div>
         <div className="flex items-center space-x-2 text-[11px]">

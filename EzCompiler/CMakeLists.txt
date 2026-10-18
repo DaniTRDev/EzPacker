@@ -8,6 +8,8 @@ set(EZCOMPILER_LIB_FILES_LIST
         "include/CompilationPipeline.h"
         "include/EmissionEngine.h"
         "include/CFrontend/ChibiccWrapper.h"
+        "include/CFrontend/CFrontendTypeMapper.h"
+        "include/CFrontend/CFrontendFunctionLowerer.h"
         "include/CFrontend/CFrontendAdapter.h"
 
         "src/CommandLineOptions.cpp"
@@ -18,6 +20,8 @@ set(EZCOMPILER_LIB_FILES_LIST
         "src/CompilationPipeline.cpp"
         "src/EmissionEngine.cpp"
         "src/CFrontend/ChibiccWrapper.cpp"
+        "src/CFrontend/CFrontendTypeMapper.cpp"
+        "src/CFrontend/CFrontendFunctionLowerer.cpp"
         "src/CFrontend/CFrontendAdapter.cpp"
 )
 

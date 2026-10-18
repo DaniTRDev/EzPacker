@@ -14,7 +14,7 @@ EzPacker's end-to-end pipeline cleanly separates target-independent optimization
 flowchart TD
     subgraph Frontend["1. Frontend & Input"]
         InputMIR["Source MIR (.mir)"] --> Parser["MirLexer & MirParser"]
-        InputC["C Source (.c, .i)"] --> CFrontend["chibicc C Frontend\n(ChibiccWrapper & CFrontendAdapter)"]
+        InputC["C Source (.c, .i)"] --> CFrontend["Standalone C11 Frontend\n(ChibiccWrapper, CFrontendTypeMapper,\nCFrontendFunctionLowerer, CFrontendAdapter)"]
         Parser --> InMemMIR["In-Memory SSA MIR\n(MirFunction, MirBlock, MirInstruction)"]
         CFrontend --> InMemMIR
     end
@@ -85,7 +85,7 @@ flowchart LR
 ## 2. Core Capabilities & Design Highlights
 
 - **Pure C++20 Design**: Leverages concepts, `<format>`, ranges, and polymorphic memory resources (`std::pmr`) for memory efficiency and zero heap fragmentation during pass execution.
-- **Embedded C11 Frontend (`chibicc`)**: Direct ingestion of C source files (`.c`) and preprocessed files (`.i`) using an embedded, sandboxed build of Rui Ueyama's `chibicc`, lowering directly to SSA MIR with error trapping via `setjmp`/`longjmp` and preprocessor `-I`/`-D` support.
+- **Modular Standalone C11 Frontend (`chibicc`)**: Direct ingestion of C source files (`.c`) and preprocessed files (`.i`) using a clean, modular frontend (`ChibiccWrapper`, `CFrontendTypeMapper`, `CFrontendFunctionLowerer`, `CFrontendAdapter`). Conforms to freestanding C11 (`__STDC_HOSTED__ = 0`, `__STDC_FREESTANDING__ = 1`, `__EZPACKER_STANDALONE__ = 1`) without hosted library dependencies, lowering directly to SSA MIR with error trapping via `setjmp`/`longjmp`.
 - **Multi-Stage Optimization Pipeline**: Generic SSA peephole optimizer (`MirPeepholePass`), conservative copy/two-address register coalescing (George & Briggs criteria) with copy affinity coloring, redundant copy elimination, and post-frame machine peephole optimizer (`MirTargetPeepholePass`).
 - **Table-Driven 3-Tier Legalizer & Libcalls**: Dense primary matrix indexed by opcode and compact type provides $O(1)$ legality dispatch, combined with multi-slot signature matchers, compiler-rt runtime libcall mappings (`__multi3`, `__divti3`), and declarative algebraic strength reduction rules.
 - **Bottom-Up Maximal Munch Instruction Selection**: Tree-matching pattern matching that automatically synthesizes SIB addressing modes, performs opportunistic memory load-folding (`ADD64rm`), and prioritizes AVX over SSE via cost-ordered matching.

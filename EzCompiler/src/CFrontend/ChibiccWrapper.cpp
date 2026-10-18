@@ -31,6 +31,9 @@ void ChibiccWrapper::setupDefaultMacros()
     defineMacro("__chibicc__", "1");
     defineMacro("__STDC__", "1");
     defineMacro("__STDC_VERSION__", "201112L");
+    defineMacro("__STDC_HOSTED__", "0");
+    defineMacro("__EZPACKER_STANDALONE__", "1");
+    defineMacro("__STDC_FREESTANDING__", "1");
 }
 
 ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
