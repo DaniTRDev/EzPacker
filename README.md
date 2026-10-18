@@ -4,7 +4,7 @@
 [![CMake](https://img.shields.io/badge/CMake-3.27%2B-064F8C.svg?logo=cmake)](https://cmake.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**EzPacker** is a modular, high-performance compiler backend, Machine Intermediate Representation (MIR) framework, and binary code generation engine written in modern ISO C++20. It embeds Rui Ueyama's C11 reference C compiler (`chibicc`) as a modular, standalone in-process frontend, enabling direct compilation of freestanding C source files (`.c`, `.i`) alongside SSA-form intermediate representation (`.mir`).
+**EzPacker** is a modular, high-performance compiler backend, Machine Intermediate Representation (MIR) framework, and binary code generation engine written in modern ISO C++20. It embeds Rui Ueyama's C11 reference C compiler (`chibicc`) as a modular, standalone in-process frontend, enabling direct compilation of freestanding C source files (`.c`, `.i`) alongside SSA-form intermediate representation (`.mir`). It bundles all 9 ISO C11 §4.p6 freestanding headers (`<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`, `<stdalign.h>`, `<stdnoreturn.h>`, `<iso646.h>`, `<float.h>`, `<stdarg.h>`) with automated include discovery and virtual in-memory fallback for zero-dependency kernel/firmware builds.
 
 EzPacker transforms intermediate representation into native, relocatable machine code object files (**ELF64** `.o` for Linux; **PE/COFF** `.obj` for Windows) targeting x86-64 (with full SSE and AVX vector extensions) and native 64-bit RISC-V (**riscv64** with standard RV64GCV extensions and RVV 1.0 vector lowering).
 

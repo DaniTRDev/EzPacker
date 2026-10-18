@@ -19,6 +19,11 @@ using namespace CFrontend;
 
 CFrontendAdapter::CFrontendAdapter() = default;
 
+std::string CFrontendAdapter::getBundledFreestandingIncludeDir()
+{
+    return CFrontend::ChibiccWrapper::getBundledFreestandingIncludeDir();
+}
+
 void CFrontendAdapter::addIncludePath(std::string_view path)
 {
     m_wrapper.addIncludePath(path);

@@ -901,25 +901,37 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                     uval = (uval != 0) ? 1 : 0;
                 }
 
-                if (destUnsigned)
+                if (destType->getKind() == MirTypeKind::Integer)
                 {
-                    if (destBits < 64)
+                    if (destUnsigned)
                     {
-                        uval = static_cast<uint64_t>(sval) & ((1ULL << destBits) - 1);
+                        if (destBits < 64)
+                        {
+                            uval = static_cast<uint64_t>(sval) & ((1ULL << destBits) - 1);
+                        }
+                        else
+                        {
+                            uval = static_cast<uint64_t>(sval);
+                        }
+                        return m_opBuilder.buildInt(destType, FlexInt(uval, destBits));
                     }
                     else
                     {
-                        uval = static_cast<uint64_t>(sval);
+                        if (destBits < 64 && (sval & (1LL << (destBits - 1))))
+                        {
+                            sval = sval | ~((1LL << destBits) - 1);
+                        }
+                        return m_opBuilder.buildInt(destType, FlexInt(sval, destBits));
                     }
-                    return m_opBuilder.buildInt(destType, FlexInt(uval, destBits));
                 }
-                else
+                else if (destType->getKind() == MirTypeKind::Pointer)
                 {
-                    if (destBits < 64 && (sval & (1LL << (destBits - 1))))
-                    {
-                        sval = sval | ~((1LL << destBits) - 1);
-                    }
-                    return m_opBuilder.buildInt(destType, FlexInt(sval, destBits));
+                    uint16_t ptrBits = static_cast<uint16_t>(destType->getTotalSizeInBits());
+                    MirInteger *ptrInt = m_opBuilder.buildInt(m_tt->getIntegerTypeBySize(ptrBits), FlexInt(static_cast<uint64_t>(sval), ptrBits));
+                    MirRegister *dest = m_opBuilder.buildVReg(destType, "ptr_val");
+                    MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                    inst.MOV(dest, ptrInt);
+                    return dest;
                 }
             }
 

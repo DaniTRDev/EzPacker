@@ -323,8 +323,28 @@ The C frontend is decoupled into dedicated, single-responsibility components:
    - All hosted standard library assumptions (e.g. `stdio.h`, `stdlib.h`, and hosted target macros like `linux` or `unix`) are eliminated.
    - Command-line flags `-ffreestanding` and `-nostdlib` are supported by `CommandLineParser` and forwarded to the driver.
 
-6. **CLI Driver Ingestion (`FrontendAdapter.cpp`)**:
-   - `FrontendAdapter` inspects the input file extension. When `.c` or `.i` is detected, it delegates parsing to `CFrontendAdapter`, passing all configured `-I` include directories and `-D` macro definitions.
+6. **Bundled ISO C11 Freestanding Headers**:
+   - In conformance with ISO C11 §4.p6 ("Freestanding implementations"), EzPacker provides all 9 mandated freestanding C11 headers:
+     - `<stdint.h>`: Fixed-width integer types (`int8_t` through `uint64_t`), least, fast, pointer-holding (`intptr_t`, `uintptr_t`), and maximum-width types with corresponding limits and literal macros.
+     - `<stddef.h>`: Fundamental standard definitions (`size_t`, `ptrdiff_t`, `wchar_t`, `max_align_t`, `NULL`, and `offsetof`).
+     - `<stdbool.h>`: Boolean type macro (`bool` -> `_Bool`), `true`, `false`, and `__bool_true_false_are_defined`.
+     - `<limits.h>`: Basic integral type ranges and sizes (`CHAR_BIT`, `INT_MIN/MAX`, `UINT_MAX`, `LONG_MIN/MAX`, `ULLONG_MAX`).
+     - `<stdalign.h>`: Alignment specifier macros (`alignas`, `alignof`, `__alignas_is_defined`, `__alignof_is_defined`).
+     - `<stdnoreturn.h>`: Function return convenience macro (`noreturn` -> `_Noreturn`).
+     - `<iso646.h>`: Alternative operator spellings (`and`, `or`, `not`, `xor`, `bitand`, `bitor`, `compl`, etc.).
+     - `<float.h>`: IEEE 754 floating-point characteristics, radix, limits, mantissa digits, and epsilon definitions.
+     - `<stdarg.h>`: Variadic argument macros (`va_list`, `va_start`, `va_arg`, `va_copy`, `va_end`) matching chibicc calling convention ABI.
+
+7. **Dual-Resolution Architecture (Disk Auto-Discovery + In-Memory Fallback)**:
+   - **Disk Auto-Discovery**:
+     - `CFrontendAdapter::getBundledFreestandingIncludeDir()` and `ChibiccWrapper::getBundledFreestandingIncludeDir()` automatically locate the headers directory on disk by querying (1) the `EZPACKER_FREESTANDING_DIR` environment variable, (2) the compiled-in definition `EZPACKER_FREESTANDING_INCLUDE_DIR`, (3) executable-relative paths (`include/freestanding`), and (4) working directory fallbacks.
+     - The discovered path is injected into chibicc's preprocessor search path list.
+   - **In-Memory Fallback**:
+     - If the headers directory is not present on disk (such as when relocating binaries without copying header assets), chibicc's preprocessor (`preprocess.c` and `tokenize.c`) falls back to virtual paths `<builtin>/<header.h>`.
+     - Content is retrieved instantly from embedded in-memory string literals in `builtin_headers.h`, guaranteeing 100% resilient zero-setup compilation anywhere.
+
+8. **CLI Driver Ingestion (`FrontendAdapter.cpp`)**:
+   - `FrontendAdapter` inspects the input file extension. When `.c` or `.i` is detected, it delegates parsing to `CFrontendAdapter`, passing all configured `-I` include directories and `-D` macro definitions, and automatically resolving bundled freestanding headers.
 
 ---
 

@@ -224,3 +224,73 @@ TEST_F(CFrontendAdapterTest, CompilesStandaloneKernelWithoutStandardLibrary)
     verifyMir(bCtx);
 }
 
+TEST_F(CFrontendAdapterTest, CompilesFreestandingKernelWithStdintAndStddef)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        #include <stdint.h>
+        #include <stddef.h>
+        #include <stdbool.h>
+
+        struct PacketHeader {
+            uint32_t magic;
+            uint16_t length;
+            uint16_t sequence;
+        };
+
+        static uint32_t s_packet_count = 0;
+
+        bool process_packet(struct PacketHeader *pkt) {
+            if (pkt == NULL)
+                return false;
+
+            if (pkt->magic == 0xDEADBEEF) {
+                s_packet_count = s_packet_count + 1;
+                return true;
+            }
+            return false;
+        }
+
+        uint32_t get_total_packets(void) {
+            return s_packet_count;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "kernel_net.c");
+    ASSERT_TRUE(success);
+
+    // Verify functions
+    EXPECT_EQ(bCtx->getFunctions().size(), 2u);
+
+    bool foundProcess = false;
+    bool foundGetTotal = false;
+    for (MirFunction *fn : bCtx->getFunctions())
+    {
+        if (fn && std::string_view(fn->getName()) == "process_packet")
+            foundProcess = true;
+        if (fn && std::string_view(fn->getName()) == "get_total_packets")
+            foundGetTotal = true;
+    }
+    EXPECT_TRUE(foundProcess);
+    EXPECT_TRUE(foundGetTotal);
+
+    // Verify global variable s_packet_count
+    bool foundGlobal = false;
+    for (MirGlobalVar *gv : bCtx->getGlobalVars())
+    {
+        if (gv && std::string_view(gv->getName()) == "s_packet_count")
+        {
+            foundGlobal = true;
+            EXPECT_EQ(gv->getLinkage(), MirLinkage::Internal);
+            break;
+        }
+    }
+    EXPECT_TRUE(foundGlobal);
+
+    verifyMir(bCtx);
+}
+
+

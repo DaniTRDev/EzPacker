@@ -36,6 +36,12 @@ class CFrontendAdapter : public IFrontendAdapter
     void addIncludePath(std::string_view path);
 
     /**
+     * Resolves the disk path to the bundled ISO C11 freestanding headers directory.
+     * Returns empty string if not found on disk.
+     */
+    static std::string getBundledFreestandingIncludeDir();
+
+    /**
      * Adds a preprocessor macro definition (-D).
      */
     void defineMacro(std::string_view name, std::string_view value = "1");

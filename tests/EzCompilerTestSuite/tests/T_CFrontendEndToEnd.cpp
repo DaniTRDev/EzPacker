@@ -233,3 +233,72 @@ TEST_F(CFrontendEndToEndTest, TestCSourceLoopsAndOptimizationO2)
     EXPECT_FALSE(asmOutput.empty());
     EXPECT_NE(asmOutput.find("fib"), std::string::npos);
 }
+
+// Tests full end-to-end compilation of a C source file including freestanding headers to ELF64 object.
+TEST_F(CFrontendEndToEndTest, TestFreestandingHeadersEndToEndToElf)
+{
+    const std::string cPath = "test_freestanding_elf.c";
+    const std::string outPath = "test_freestanding_elf.o";
+    registerCleanup(cPath);
+    registerCleanup(outPath);
+
+    {
+        std::ofstream out(cPath);
+        out << R"c(
+            #include <stdint.h>
+            #include <stddef.h>
+            #include <stdbool.h>
+            #include <limits.h>
+
+            uint32_t process_stream(const uint8_t *buffer, size_t len) {
+                if (buffer == NULL || len == 0)
+                    return 0;
+
+                uint32_t checksum = 0;
+                for (size_t i = 0; i < len; i = i + 1) {
+                    checksum = checksum + (uint32_t)buffer[i];
+                }
+                return checksum;
+            }
+        )c";
+    }
+
+    CommandLineOptions options;
+    options.inputFilePath = cPath;
+    options.outputFilePath = outPath;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.optLevel = OptimizationLevel::O1;
+    options.emissionStage = EmissionStage::Object;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    MirModuleLoader loader;
+    ASSERT_TRUE(loader.compileSourceToMir(ctx, cPath, *ctx.getBuilderContext()));
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    EmissionEngine emitter(ctx);
+    EXPECT_TRUE(emitter.emitModule(*ctx.getBuilderContext(), outPath));
+
+    ASSERT_TRUE(std::filesystem::exists(outPath));
+    uintmax_t fileSize = std::filesystem::file_size(outPath);
+    ASSERT_GE(fileSize, 64u);
+
+    std::ifstream inFile(outPath, std::ios::binary);
+    ASSERT_TRUE(inFile.is_open());
+
+    std::vector<uint8_t> header(64);
+    inFile.read(reinterpret_cast<char *>(header.data()), 64);
+    inFile.close();
+
+    // Verify ELF header
+    EXPECT_EQ(header[0], 0x7F);
+    EXPECT_EQ(header[1], 'E');
+    EXPECT_EQ(header[2], 'L');
+    EXPECT_EQ(header[3], 'F');
+    EXPECT_EQ(header[4], 2); // 64-bit
+    EXPECT_EQ(header[5], 1); // Little-endian
+}
+

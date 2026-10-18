@@ -139,3 +139,53 @@ int standalone_kernel_entry(void) {
     EXPECT_STREQ(fn->name, "standalone_kernel_entry");
 }
 
+TEST_F(EzCompilerTestSuite, TestChibiccFreestandingHeaders)
+{
+    ChibiccWrapper wrapper;
+    const std::string source = R"c(
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <stdalign.h>
+#include <stdnoreturn.h>
+#include <iso646.h>
+#include <float.h>
+#include <stdarg.h>
+
+noreturn void system_halt(void) {
+    while (1) {}
+}
+
+int freestanding_eval(int count, ...) {
+    uint32_t u = UINT32_MAX;
+    int32_t i = INT32_MIN;
+    size_t s = sizeof(u);
+    bool flag = true;
+    alignas(8) int x = 42;
+    float f = FLT_MAX;
+    int char_bits = CHAR_BIT;
+
+    if (flag and u != 0) {
+        return (int)s + char_bits;
+    }
+    return 0;
+}
+)c";
+
+    auto result = wrapper.parseString(source);
+    ASSERT_TRUE(result.success) << "Failed to parse freestanding headers: " << result.errorMessage;
+    ASSERT_NE(result.astRoot, nullptr);
+
+    Obj *evalFn = findObject(result.astRoot, "freestanding_eval");
+    ASSERT_NE(evalFn, nullptr);
+    EXPECT_TRUE(evalFn->is_function);
+    EXPECT_STREQ(evalFn->name, "freestanding_eval");
+
+    Obj *haltFn = findObject(result.astRoot, "system_halt");
+    ASSERT_NE(haltFn, nullptr);
+    EXPECT_TRUE(haltFn->is_function);
+    EXPECT_STREQ(haltFn->name, "system_halt");
+}
+
+

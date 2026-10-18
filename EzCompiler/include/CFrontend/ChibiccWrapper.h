@@ -36,6 +36,12 @@ class ChibiccWrapper
     ~ChibiccWrapper();
 
     /**
+     * Resolves the disk path to the bundled ISO C11 freestanding headers directory.
+     * Returns empty string if not found on disk.
+     */
+    static std::string getBundledFreestandingIncludeDir();
+
+    /**
      * Adds an include directory for header resolution (<...> and "...").
      */
     void addIncludePath(std::string_view path);
