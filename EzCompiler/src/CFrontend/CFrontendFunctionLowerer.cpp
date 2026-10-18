@@ -39,9 +39,17 @@ void CFrontendFunctionLowerer::collectAddressTaken(Node *node, std::unordered_se
 {
     if (!node)
         return;
-    if (node->kind == ND_ADDR && node->lhs && node->lhs->kind == ND_VAR && node->lhs->var && node->lhs->var->is_local)
+    if (node->kind == ND_ADDR || node->kind == ND_MEMBER)
     {
-        addrTaken.insert(node->lhs->var);
+        Node *cur = node->lhs;
+        while (cur && cur->kind == ND_MEMBER)
+        {
+            cur = cur->lhs;
+        }
+        if (cur && cur->kind == ND_VAR && cur->var && cur->var->is_local)
+        {
+            addrTaken.insert(cur->var);
+        }
     }
     collectAddressTaken(node->lhs, addrTaken);
     collectAddressTaken(node->rhs, addrTaken);
@@ -72,7 +80,7 @@ void CFrontendFunctionLowerer::lower()
         MirType *pType = mapType(m_tt, p->ty);
         MirRegister *pReg = m_opBuilder.buildVReg(pType, p->name ? p->name : "param");
         MirFunctionBuilder(&m_bCtx).addParam(m_func, pReg);
-        if (addrTaken.contains(p))
+        if (addrTaken.contains(p) || p->ty->kind == TY_STRUCT || p->ty->kind == TY_UNION)
         {
             StackFrameObject *slot = m_func->getStackFrame()->createStaticStackObj(pType);
             m_localStackSlots[p] = slot;
@@ -91,7 +99,7 @@ void CFrontendFunctionLowerer::lower()
         if (m_localVars.find(v) == m_localVars.end() && m_localStackSlots.find(v) == m_localStackSlots.end())
         {
             MirType *vType = mapType(m_tt, v->ty);
-            if (addrTaken.contains(v))
+            if (addrTaken.contains(v) || v->ty->kind == TY_STRUCT || v->ty->kind == TY_UNION || v->ty->kind == TY_ARRAY)
             {
                 StackFrameObject *slot = m_func->getStackFrame()->createStaticStackObj(vType);
                 m_localStackSlots[v] = slot;
@@ -172,6 +180,89 @@ MirRegister *CFrontendFunctionLowerer::ensureRegister(MirOperand *op, MirType *f
     MirRegister *vreg = m_opBuilder.buildVReg(ty, hint);
     MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).MOV(vreg, op);
     return vreg;
+}
+
+MirRegister *CFrontendFunctionLowerer::lowerAddr(Node *node)
+{
+    if (!node)
+    {
+        return m_opBuilder.buildVReg(m_tt->getPtr(m_tt->i8()), "null_addr");
+    }
+
+    switch (node->kind)
+    {
+        case ND_VAR:
+        {
+            if (node->var->is_local)
+            {
+                StackFrameObject *slot = nullptr;
+                auto slotIt = m_localStackSlots.find(node->var);
+                if (slotIt != m_localStackSlots.end())
+                {
+                    slot = slotIt->second;
+                }
+                else
+                {
+                    MirType *varType = mapType(m_tt, node->var->ty);
+                    slot = m_func->getStackFrame()->createStaticStackObj(varType);
+                    m_localStackSlots[node->var] = slot;
+                    auto regIt = m_localVars.find(node->var);
+                    if (regIt != m_localVars.end())
+                    {
+                        MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                                .STORE(m_opBuilder.buildRef(slot), regIt->second);
+                    }
+                }
+                MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->var->ty));
+                MirRegister *addr = m_opBuilder.buildVReg(ptrType, "laddr");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .MOV(addr, m_opBuilder.buildRef(slot));
+                return addr;
+            }
+            else
+            {
+                MirGlobalVar *gv = findOrCreateGlobal(node->var->name, node->var->ty);
+                MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->var->ty));
+                MirRegister *addr = m_opBuilder.buildVReg(ptrType, "gaddr");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .MOV_ADDR(addr, m_opBuilder.buildRef(gv, 0));
+                return addr;
+            }
+        }
+        case ND_DEREF:
+        {
+            MirOperand *addrOp = lowerExpression(node->lhs);
+            MirType *ptrType = (addrOp && addrOp->getMirType() && addrOp->getMirType()->getKind() == MirTypeKind::Pointer)
+                                   ? addrOp->getMirType()
+                                   : m_tt->getPtr(mapType(m_tt, node->ty));
+            return ensureRegister(addrOp, ptrType, "deref_base");
+        }
+        case ND_MEMBER:
+        {
+            MirRegister *baseAddr = lowerAddr(node->lhs);
+            if (node->member && node->member->offset != 0)
+            {
+                MirType *ptrType = baseAddr->getMirType();
+                MirRegister *memberAddr = m_opBuilder.buildVReg(ptrType, "mem_addr");
+                MirOperand *offsetImm = m_opBuilder.buildInt(m_tt->i64(), FlexInt(node->member->offset));
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .ADD(memberAddr, baseAddr, offsetImm);
+                return memberAddr;
+            }
+            return baseAddr;
+        }
+        case ND_COMMA:
+        {
+            if (node->lhs)
+                lowerExpression(node->lhs);
+            return lowerAddr(node->rhs);
+        }
+        default:
+        {
+            MirOperand *val = lowerExpression(node);
+            return ensureRegister(val, m_tt->getPtr(mapType(m_tt, node->ty)), "fallback_addr");
+        }
+    }
 }
 
 void CFrontendFunctionLowerer::lowerStatement(Node *node)
@@ -391,6 +482,14 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                 auto slotIt = m_localStackSlots.find(node->var);
                 if (slotIt != m_localStackSlots.end())
                 {
+                    if (node->var->ty->kind == TY_ARRAY || node->var->ty->kind == TY_STRUCT || node->var->ty->kind == TY_UNION)
+                    {
+                        MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->var->ty));
+                        MirRegister *addr = m_opBuilder.buildVReg(ptrType, node->var->name ? node->var->name : "laddr");
+                        MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                                .MOV(addr, m_opBuilder.buildRef(slotIt->second));
+                        return addr;
+                    }
                     MirType *t = mapType(m_tt, node->var->ty);
                     MirRegister *valReg = m_opBuilder.buildVReg(t, node->var->name ? node->var->name : "lval");
                     MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
@@ -460,6 +559,14 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                             .MOV(baseReg, addr);
                 }
                 MirMemory *mem = m_opBuilder.buildMem(rhs->getMirType(), baseReg, FlexInt(0));
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .STORE(mem, rhs);
+                return rhs;
+            }
+            else if (node->lhs->kind == ND_MEMBER)
+            {
+                MirRegister *addr = lowerAddr(node->lhs);
+                MirMemory *mem = m_opBuilder.buildMem(rhs->getMirType(), addr, FlexInt(0));
                 MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
                         .STORE(mem, rhs);
                 return rhs;
@@ -622,7 +729,9 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             MirType *valType = (val && val->getMirType()) ? val->getMirType() : m_tt->i32();
             MirType *resType = mapType(m_tt, node->ty);
             MirRegister *dest = m_opBuilder.buildVReg(resType, "not");
-            MirOperand *zero = m_opBuilder.buildInt(valType, FlexInt(0, static_cast<uint16_t>(valType->getTotalSizeInBits())));
+            uint16_t valBits = static_cast<uint16_t>(valType->getTotalSizeInBits());
+            MirType *intValType = (valType->getKind() == MirTypeKind::Integer) ? valType : m_tt->getIntegerTypeBySize(valBits);
+            MirOperand *zero = m_opBuilder.buildInt(intValType, FlexInt(0, valBits));
             MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
             if (!val->isOfType<MirRegister>())
             {
@@ -653,47 +762,21 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
         }
         case ND_ADDR:
         {
-            if (node->lhs->kind == ND_VAR && !node->lhs->var->is_local)
+            return lowerAddr(node->lhs);
+        }
+        case ND_MEMBER:
+        {
+            MirRegister *addr = lowerAddr(node);
+            if (node->ty->kind == TY_ARRAY || node->ty->kind == TY_STRUCT || node->ty->kind == TY_UNION)
             {
-                MirGlobalVar *gv = findOrCreateGlobal(node->lhs->var->name, node->lhs->var->ty);
-                MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->lhs->var->ty));
-                MirRegister *addr = m_opBuilder.buildVReg(ptrType, "gaddr");
-                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .MOV_ADDR(addr, m_opBuilder.buildRef(gv, 0));
                 return addr;
             }
-            else if (node->lhs->kind == ND_VAR && node->lhs->var->is_local)
-            {
-                Obj *var = node->lhs->var;
-                StackFrameObject *slot = nullptr;
-                auto slotIt = m_localStackSlots.find(var);
-                if (slotIt != m_localStackSlots.end())
-                {
-                    slot = slotIt->second;
-                }
-                else
-                {
-                    MirType *varType = mapType(m_tt, var->ty);
-                    slot = m_func->getStackFrame()->createStaticStackObj(varType);
-                    m_localStackSlots[var] = slot;
-                    auto regIt = m_localVars.find(var);
-                    if (regIt != m_localVars.end())
-                    {
-                        MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                                .STORE(m_opBuilder.buildRef(slot), regIt->second);
-                    }
-                }
-                MirType *ptrType = m_tt->getPtr(mapType(m_tt, var->ty));
-                MirRegister *addr = m_opBuilder.buildVReg(ptrType, "laddr");
-                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .MOV(addr, m_opBuilder.buildRef(slot));
-                return addr;
-            }
-            else if (node->lhs->kind == ND_DEREF)
-            {
-                return lowerExpression(node->lhs->lhs);
-            }
-            return m_opBuilder.buildInt(m_tt->i64(), FlexInt(0));
+            MirType *resType = mapType(m_tt, node->ty);
+            MirMemory *mem = m_opBuilder.buildMem(resType, addr, FlexInt(0));
+            MirRegister *dest = m_opBuilder.buildVReg(resType, "member");
+            MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                    .LOAD(dest, mem);
+            return dest;
         }
         case ND_DEREF:
         {
@@ -852,7 +935,9 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
             if (node->ty && node->ty->kind == TY_BOOL)
             {
-                MirOperand *zero = m_opBuilder.buildInt(srcType, FlexInt(0, static_cast<uint16_t>(srcType->getTotalSizeInBits())));
+                uint16_t srcBits = static_cast<uint16_t>(srcType->getTotalSizeInBits());
+                MirType *intSrcType = (srcType->getKind() == MirTypeKind::Integer) ? srcType : m_tt->getIntegerTypeBySize(srcBits);
+                MirOperand *zero = m_opBuilder.buildInt(intSrcType, FlexInt(0, srcBits));
                 inst.CMP_NE(dest, src, zero);
                 return dest;
             }

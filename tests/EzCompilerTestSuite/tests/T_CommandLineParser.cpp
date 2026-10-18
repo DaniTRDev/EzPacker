@@ -327,4 +327,28 @@ TEST_F(EzCompilerTestSuite, TestDefaultExceptionConstants)
     EXPECT_NE(kDefaultExceptionTypeId, 0u);
 }
 
+TEST_F(EzCompilerTestSuite, TestFreestandingCommandLineOptions)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
+
+    // 1. Default -> standalone / freestanding enabled
+    {
+        std::vector<std::string> args = { "ezc", "kernel.c" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_TRUE(options.freestanding);
+        EXPECT_TRUE(options.noStdLib);
+    }
+
+    // 2. Explicit -ffreestanding and -nostdlib
+    {
+        std::vector<std::string> args = { "ezc", "kernel.c", "-ffreestanding", "-nostdlib" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_TRUE(options.freestanding);
+        EXPECT_TRUE(options.noStdLib);
+    }
+}
+
+
 

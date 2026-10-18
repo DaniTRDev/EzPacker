@@ -168,3 +168,59 @@ TEST_F(CFrontendAdapterTest, ReportsSyntaxErrorGracefully)
     bool success = adapter.compileStringToMir(*ctx, badCode, *bCtx, "bad.c");
     EXPECT_FALSE(success);
 }
+
+TEST_F(CFrontendAdapterTest, CompilesStandaloneKernelWithoutStandardLibrary)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        // Freestanding standalone device driver routine
+        struct UartDriver {
+            unsigned int rx_fifo;
+            unsigned int tx_fifo;
+            unsigned int status;
+            unsigned int control;
+        };
+
+        static unsigned int s_tx_counter = 0;
+
+        int uart_transmit_byte(struct UartDriver *dev, unsigned int byte_val) {
+            if (!dev)
+                return -1;
+            while ((dev->status & 0x01) == 0) {
+                // busy wait
+            }
+            dev->tx_fifo = byte_val & 0xFF;
+            s_tx_counter = s_tx_counter + 1;
+            return 0;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "uart_driver.c");
+    ASSERT_TRUE(success);
+
+    // Verify MIR function generated
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *func = bCtx->getFunctions().front();
+    ASSERT_NE(func, nullptr);
+    EXPECT_EQ(std::string_view(func->getName()), "uart_transmit_byte");
+    EXPECT_EQ(func->getParamCount(), 2u);
+
+    // Verify static global counter variable
+    bool foundCounter = false;
+    for (MirGlobalVar *gv : bCtx->getGlobalVars())
+    {
+        if (gv && std::string_view(gv->getName()) == "s_tx_counter")
+        {
+            foundCounter = true;
+            EXPECT_EQ(gv->getLinkage(), MirLinkage::Internal);
+            break;
+        }
+    }
+    EXPECT_TRUE(foundCounter);
+
+    verifyMir(bCtx);
+}
+

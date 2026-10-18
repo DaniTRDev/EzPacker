@@ -60,6 +60,7 @@ class CFrontendFunctionLowerer
 
     void lowerStatement(struct Node *node);
     MirOperand *lowerExpression(struct Node *node);
+    MirRegister *lowerAddr(struct Node *node);
 
   private:
     DriverContext &m_driverCtx;
