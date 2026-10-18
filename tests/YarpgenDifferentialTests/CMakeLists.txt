@@ -7,8 +7,12 @@ endif()
 
 message(STATUS "Configuring EzPacker YARPGen Test Suites...")
 
-# 1. Locate Python 3 Interpreter
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+# 1. Locate Python 3 Interpreter (Optional, non-blocking)
+find_package(Python3 COMPONENTS Interpreter)
+if(NOT Python3_FOUND)
+    message(STATUS "[YarpgenDifferentialTests] Python 3 interpreter not detected; differential script targets skipped.")
+    return()
+endif()
 
 # 2. Intel YARPGen Binary (imported via CMake/Vendor.cmake)
 set(YARPGEN_EXECUTABLE "" CACHE FILEPATH "Path to pre-built yarpgen executable")
@@ -35,10 +39,9 @@ else()
     set(REF_COMPILER_FLAG --compile-only)
 endif()
 
-set(YARPGEN_RUNNER "${CMAKE_CURRENT_SOURCE_DIR}/yarpgen_runner.py")
-set(YARPGEN_BULK_BENCH "${CMAKE_CURRENT_SOURCE_DIR}/yarpgen_bulk_bench.py")
-set(YARPGEN_STRESS_BENCH "${CMAKE_CURRENT_SOURCE_DIR}/yarpgen_stress_bench.py")
+set(YARPGEN_SUITE "${CMAKE_CURRENT_SOURCE_DIR}/yarpgen_suite.py")
 set(YARPGEN_MEGA_STRESS_C "${CMAKE_CURRENT_SOURCE_DIR}/mega_stress.c")
+set(YARPGEN_MEGA_STRESS_DRIVER "${CMAKE_CURRENT_SOURCE_DIR}/mega_stress_driver.c")
 set(YARPGEN_BULK_CORPUS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/bulk_corpus")
 set(SEEDS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/regression_seeds.txt")
 
@@ -50,10 +53,10 @@ else()
 endif()
 
 # =========================================================================
-# TEST TYPE 1: Bulk File Compilation Suite (Multiple Small/Medium Files)
+# TEST TYPE 1: Bulk File Compilation Suite
 # =========================================================================
 add_custom_target(bulk-ezc
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_BULK_BENCH}"
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" bulk
         --ezc-bin "$<TARGET_FILE:ezc>"
         --corpus-dir "${YARPGEN_BULK_CORPUS_DIR}"
         --target "${DEFAULT_TARGET_TRIPLE}"
@@ -61,12 +64,12 @@ add_custom_target(bulk-ezc
         ${REF_COMPILER_FLAG}
     DEPENDS ezc
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMENT "[Bulk] Running Bulk File Compilation & Verification on 25 Small/Medium Files"
+    COMMENT "[Bulk] Running Bulk File Compilation & Verification"
     VERBATIM
 )
 
 add_custom_target(bulk-ezc-compile
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_BULK_BENCH}"
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" bulk
         --ezc-bin "$<TARGET_FILE:ezc>"
         --corpus-dir "${YARPGEN_BULK_CORPUS_DIR}"
         --target "${DEFAULT_TARGET_TRIPLE}"
@@ -74,27 +77,14 @@ add_custom_target(bulk-ezc-compile
         --compile-only
     DEPENDS ezc
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMENT "[Bulk] Running Pure Compilation Throughput Benchmark on 25 Small/Medium Files"
-    VERBATIM
-)
-
-add_custom_target(bulk-ezc-regenerate
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_BULK_BENCH}"
-        --ezc-bin "$<TARGET_FILE:ezc>"
-        --yarpgen-bin "${YARPGEN_BIN}"
-        --corpus-dir "${YARPGEN_BULK_CORPUS_DIR}"
-        --target "${DEFAULT_TARGET_TRIPLE}"
-        --regenerate --count 25
-    DEPENDS ezc ${YARPGEN_DEP}
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMENT "[Bulk] Regenerating Bulk Test Suite of 25 Small/Medium Files via Intel YARPGen"
+    COMMENT "[Bulk] Running Pure Compilation Throughput Benchmark"
     VERBATIM
 )
 
 # CTest: Bulk Compilation Throughput & Stability
 add_test(
     NAME "EzCompilerYarpgen_BulkCompilation"
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_BULK_BENCH}"
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" bulk
         --ezc-bin "$<TARGET_FILE:ezc>"
         --corpus-dir "${YARPGEN_BULK_CORPUS_DIR}"
         --target "${DEFAULT_TARGET_TRIPLE}"
@@ -106,11 +96,11 @@ set_tests_properties("EzCompilerYarpgen_BulkCompilation" PROPERTIES
     LABELS "Bulk;Compilation;Yarpgen;EzCompiler"
 )
 
-# CTest: Bulk Differential Verification (Source of Truth)
+# CTest: Bulk Differential Verification
 if(REFERENCE_C_COMPILER)
     add_test(
         NAME "EzCompilerYarpgen_BulkDifferential"
-        COMMAND ${Python3_EXECUTABLE} "${YARPGEN_BULK_BENCH}"
+        COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" bulk
             --ezc-bin "$<TARGET_FILE:ezc>"
             --corpus-dir "${YARPGEN_BULK_CORPUS_DIR}"
             --ref-compiler "${REFERENCE_C_COMPILER}"
@@ -124,12 +114,13 @@ if(REFERENCE_C_COMPILER)
 endif()
 
 # =========================================================================
-# TEST TYPE 2: Single Big File Stress Compilation (+3k LOCs)
+# TEST TYPE 2: Single Big File Stress Compilation
 # =========================================================================
 add_custom_target(stress-ezc
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" stress
         --ezc-bin "$<TARGET_FILE:ezc>"
         --file "${YARPGEN_MEGA_STRESS_C}"
+        --driver "${YARPGEN_MEGA_STRESS_DRIVER}"
         --target "${DEFAULT_TARGET_TRIPLE}"
         --opt-level "all"
         ${REF_COMPILER_FLAG}
@@ -140,35 +131,23 @@ add_custom_target(stress-ezc
 )
 
 add_custom_target(stress-ezc-passes
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" stress
         --ezc-bin "$<TARGET_FILE:ezc>"
         --file "${YARPGEN_MEGA_STRESS_C}"
         --target "${DEFAULT_TARGET_TRIPLE}"
         --opt-level "all"
         --compile-only
+        -v
     DEPENDS ezc
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMENT "[Stress] Profiling Compiler Passes on 3,600+ LOC Monolithic Translation Unit"
-    VERBATIM
-)
-
-add_custom_target(stress-ezc-regenerate
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
-        --ezc-bin "$<TARGET_FILE:ezc>"
-        --yarpgen-bin "${YARPGEN_BIN}"
-        --file "${YARPGEN_MEGA_STRESS_C}"
-        --target "${DEFAULT_TARGET_TRIPLE}"
-        --regenerate
-    DEPENDS ezc ${YARPGEN_DEP}
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMENT "[Stress] Regenerating Single-File Mega Stress Test Suite via Intel YARPGen"
+    COMMENT "[Stress] Profiling Compiler Passes on Monolithic Translation Unit"
     VERBATIM
 )
 
 # CTest: Stress Compilation on Single Big File
 add_test(
     NAME "EzCompilerYarpgen_StressCompilation"
-    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
+    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" stress
         --ezc-bin "$<TARGET_FILE:ezc>"
         --file "${YARPGEN_MEGA_STRESS_C}"
         --target "${DEFAULT_TARGET_TRIPLE}"
@@ -184,9 +163,10 @@ set_tests_properties("EzCompilerYarpgen_StressCompilation" PROPERTIES
 if(REFERENCE_C_COMPILER)
     add_test(
         NAME "EzCompilerYarpgen_StressDifferential"
-        COMMAND ${Python3_EXECUTABLE} "${YARPGEN_STRESS_BENCH}"
+        COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" stress
             --ezc-bin "$<TARGET_FILE:ezc>"
             --file "${YARPGEN_MEGA_STRESS_C}"
+            --driver "${YARPGEN_MEGA_STRESS_DRIVER}"
             --ref-compiler "${REFERENCE_C_COMPILER}"
             --target "${DEFAULT_TARGET_TRIPLE}"
             --opt-level "O0"
@@ -202,48 +182,50 @@ endif()
 # =========================================================================
 if(REFERENCE_C_COMPILER)
     add_custom_target(fuzz-ezc
-        COMMAND ${Python3_EXECUTABLE} "${YARPGEN_RUNNER}"
+        COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" fuzz
             --ezc-bin "$<TARGET_FILE:ezc>"
             --yarpgen-bin "${YARPGEN_BIN}"
             --ref-compiler "${REFERENCE_C_COMPILER}"
             --target "${DEFAULT_TARGET_TRIPLE}"
             --iterations 25
-            --jobs 4
             --work-dir "${CMAKE_CURRENT_BINARY_DIR}/fuzz_work"
             --reproducers-dir "${CMAKE_BINARY_DIR}/yarpgen_reproducers"
         DEPENDS ezc ${YARPGEN_DEP}
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-        COMMENT "[Fuzz] Executing 25 parallel YARPGen differential test runs against ${REFERENCE_C_COMPILER}"
+        COMMENT "[Fuzz] Executing 25 YARPGen differential test runs against ${REFERENCE_C_COMPILER}"
         VERBATIM
     )
 
     if(EXISTS "${SEEDS_FILE}")
-        file(STRINGS "${SEEDS_FILE}" REGRESSION_SEEDS)
-        foreach(LINE IN LISTS REGRESSION_SEEDS)
-            string(STRIP "${LINE}" LINE)
-            if(LINE MATCHES "^#" OR LINE STREQUAL "")
-                continue()
-            endif()
+        add_custom_target(seeds-ezc
+            COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" seeds
+                --ezc-bin "$<TARGET_FILE:ezc>"
+                --yarpgen-bin "${YARPGEN_BIN}"
+                --ref-compiler "${REFERENCE_C_COMPILER}"
+                --target "${DEFAULT_TARGET_TRIPLE}"
+                --seeds-file "${SEEDS_FILE}"
+                --work-dir "${CMAKE_CURRENT_BINARY_DIR}/seeds_work"
+                --reproducers-dir "${CMAKE_BINARY_DIR}/yarpgen_reproducers"
+            DEPENDS ezc ${YARPGEN_DEP}
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+            COMMENT "[Seeds] Verifying curated regression seeds against ${REFERENCE_C_COMPILER}"
+            VERBATIM
+        )
 
-            string(REGEX MATCH "^[0-9]+" SEED "${LINE}")
-            if(SEED)
-                add_test(
-                    NAME "EzCompilerYarpgen_Seed_${SEED}"
-                    COMMAND ${Python3_EXECUTABLE} "${YARPGEN_RUNNER}"
-                        --ezc-bin "$<TARGET_FILE:ezc>"
-                        --yarpgen-bin "${YARPGEN_BIN}"
-                        --ref-compiler "${REFERENCE_C_COMPILER}"
-                        --target "${DEFAULT_TARGET_TRIPLE}"
-                        --seed "${SEED}"
-                        --opt-levels "O0,O2"
-                        --work-dir "${CMAKE_CURRENT_BINARY_DIR}/seed_${SEED}"
-                        --reproducers-dir "${CMAKE_BINARY_DIR}/yarpgen_reproducers"
-                )
-                set_tests_properties("EzCompilerYarpgen_Seed_${SEED}" PROPERTIES
-                    TIMEOUT 180
-                    LABELS "Differential;Yarpgen;Regression;EzCompiler"
-                )
-            endif()
-        endforeach()
+        add_test(
+            NAME "EzCompilerYarpgen_RegressionSeeds"
+            COMMAND ${Python3_EXECUTABLE} "${YARPGEN_SUITE}" seeds
+                --ezc-bin "$<TARGET_FILE:ezc>"
+                --yarpgen-bin "${YARPGEN_BIN}"
+                --ref-compiler "${REFERENCE_C_COMPILER}"
+                --target "${DEFAULT_TARGET_TRIPLE}"
+                --seeds-file "${SEEDS_FILE}"
+                --work-dir "${CMAKE_CURRENT_BINARY_DIR}/seeds_work"
+                --reproducers-dir "${CMAKE_BINARY_DIR}/yarpgen_reproducers"
+        )
+        set_tests_properties("EzCompilerYarpgen_RegressionSeeds" PROPERTIES
+            TIMEOUT 240
+            LABELS "Differential;Yarpgen;Regression;EzCompiler"
+        )
     endif()
 endif()

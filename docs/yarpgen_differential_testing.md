@@ -57,29 +57,23 @@ EzPacker provides two distinct test suites designed for different testing and be
 
 Exercises the compiler on a diverse fleet of independent, small-to-medium translation units (25 files in `tests/YarpgenDifferentialTests/bulk_corpus/`, each ~80–250 LOC, ~3,000 LOC total):
 - **Compilation Mode**: Verifies that `ezc` compiles all 25 files without crashes, assertions, or frontend errors across optimization levels (`-O0`, `-O1`, `-O2`, `-Os`). Measures compilation throughput (LOC/sec and files/sec).
-- **Differential Verification Mode**: Compiles each test with both GCC/Clang (`-O3`) and `ezc`, links with companion drivers (`driver_001.c` .. `driver_025.c`), executes, and asserts that `ezc_checksum == ref_checksum`.
+- **Differential Verification Mode**: Compiles each test with both GCC/Clang (`-O3`) and `ezc`, links with companion drivers (`driver_001.c` .. `driver_010.c`), executes, and asserts that `ezc_checksum == ref_checksum`.
 
 #### How to Run:
 ```bash
 # 1. Run via CMake Custom Target (Differential Verification if GCC/Clang found, else compilation):
-cmake --build cmake-build-debug --target bulk-ezc
+cmake --build build --target bulk-ezc
 
-# 2. Run Pure Compilation Throughput Benchmark (All 25 files across -O0, -O1, -O2, -Os):
-cmake --build cmake-build-debug --target bulk-ezc-compile
+# 2. Run Pure Compilation Throughput Benchmark across -O0, -O1, -O2, -Os:
+cmake --build build --target bulk-ezc-compile
 
 # 3. Run in CTest:
-ctest --test-dir cmake-build-debug -R "EzCompilerYarpgen_BulkCompilation" --output-on-failure
-ctest --test-dir cmake-build-debug -R "EzCompilerYarpgen_BulkDifferential" --output-on-failure
+ctest --test-dir build -R "EzCompilerYarpgen_BulkCompilation" --output-on-failure
+ctest --test-dir build -R "EzCompilerYarpgen_BulkDifferential" --output-on-failure
 
 # 4. Standalone Python CLI:
-python tests/YarpgenDifferentialTests/yarpgen_bulk_bench.py --compile-only --opt-levels O0,O2
-python tests/YarpgenDifferentialTests/yarpgen_bulk_bench.py --ref-compiler gcc --opt-levels O0
-```
-
-#### Regenerating the Bulk Corpus:
-You can synthesize a new batch of 25 small/medium tests via YARPGen on demand:
-```bash
-cmake --build cmake-build-debug --target bulk-ezc-regenerate
+python tests/YarpgenDifferentialTests/yarpgen_suite.py bulk --compile-only --opt-levels O0,O2
+python tests/YarpgenDifferentialTests/yarpgen_suite.py bulk --ref-compiler gcc --opt-levels O0
 ```
 
 ---
@@ -95,18 +89,19 @@ Stresses the compiler pipeline using a single monolithic translation unit contai
 #### How to Run:
 ```bash
 # 1. Run Single Big File Stress Benchmark & Pass Profiler across all optimization levels:
-cmake --build cmake-build-debug --target stress-ezc-passes
+cmake --build build --target stress-ezc-passes
 
 # 2. Run Full Stress Compilation with Reference Compiler Verification:
-cmake --build cmake-build-debug --target stress-ezc
+cmake --build build --target stress-ezc
 
 # 3. Run in CTest:
-ctest --test-dir cmake-build-debug -R "EzCompilerYarpgen_StressCompilation" --output-on-failure
-ctest --test-dir cmake-build-debug -R "EzCompilerYarpgen_StressDifferential" --output-on-failure
+ctest --test-dir build -R "EzCompilerYarpgen_StressCompilation" --output-on-failure
+ctest --test-dir build -R "EzCompilerYarpgen_StressDifferential" --output-on-failure
 
 # 4. Standalone Python CLI:
-python tests/YarpgenDifferentialTests/yarpgen_stress_bench.py --opt-level O0 --compile-only
-python tests/YarpgenDifferentialTests/yarpgen_stress_bench.py --opt-level O0 --ref-compiler gcc
+python tests/YarpgenDifferentialTests/yarpgen_suite.py stress --opt-level O0 --compile-only
+python tests/YarpgenDifferentialTests/yarpgen_suite.py stress --opt-level all -v
+python tests/YarpgenDifferentialTests/yarpgen_suite.py stress --opt-level O0 --ref-compiler gcc
 ```
 
 ---
@@ -115,55 +110,33 @@ python tests/YarpgenDifferentialTests/yarpgen_stress_bench.py --opt-level O0 --r
 
 YARPGen is imported into EzPacker using the standard vendor API in [`CMake/Vendor.cmake`](../CMake/Vendor.cmake):
 ```cmake
-FetchContent_Declare(
-        yarpgen
-        GIT_REPOSITORY https://github.com/intel/yarpgen.git
-        GIT_TAG 1adb290f453505838f3aa33dc571f292b0c1810f
-        PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory
-                      "${CMAKE_CURRENT_SOURCE_DIR}/CMake/yarpgen/overlay"
-                      "<SOURCE_DIR>"
-)
-
 EzCMK_AddVendor(https://github.com/intel/yarpgen
         1adb290f453505838f3aa33dc571f292b0c1810f
         yarpgen
 )
 ```
 
-### Clean Overlay Pattern:
-Upstream YARPGen's CMake scripts have side effects when included as a subproject (e.g. copying executables into `${CMAKE_SOURCE_DIR}/scripts` and building unused internal unit tests). To prevent repository pollution, EzPacker supplies an overlay in [`CMake/yarpgen/overlay/CMakeLists.txt`](../CMake/yarpgen/overlay/CMakeLists.txt):
-- Builds target `yarpgen` directly into `${CMAKE_RUNTIME_OUTPUT_DIRECTORY}` (`bin/yarpgen.exe`).
-- Excludes unused unit test binaries (`type_test`, `data_test`, etc.).
-- Normalizes compiler flags across MSVC, MinGW, and Clang.
+The target `yarpgen` is automatically imported and linked into the CMake dependency graph without requiring custom build overlays.
 
 ---
 
-## ⚙️ CLI Runners Reference
+## ⚙️ Unified CLI Reference (`yarpgen_suite.py`)
 
-### `yarpgen_bulk_bench.py`
-| Argument | Description | Default |
-| :--- | :--- | :--- |
-| `--ezc-bin <path>` | Path to EzPacker `ezc` executable | Auto-detected |
-| `--ref-compiler <path>` | Path to reference C compiler (`gcc` or `clang`) | Auto-detected |
-| `--corpus-dir <path>` | Directory containing small/medium C test files | `bulk_corpus` |
-| `--opt-levels <list>` | Comma-separated optimization levels | `O0,O2` |
-| `--jobs <J>`, `-j` | Concurrent worker threads | `4` |
-| `--compile-only` | Run pure compilation throughput test without execution | `false` |
-| `--regenerate` | Synthesize N fresh files in `bulk_corpus` via YARPGen | `false` |
-| `--count <N>` | Number of files when regenerating | `25` |
-| `--json-out <path>` | Export benchmark metrics to JSON file | None |
+All testing workflows are consolidated into a single unified runner:
 
-### `yarpgen_stress_bench.py`
-| Argument | Description | Default |
-| :--- | :--- | :--- |
-| `--file <path>` | Path to monolithic C stress file | `mega_stress.c` |
-| `--ezc-bin <path>` | Path to EzPacker `ezc` executable | Auto-detected |
-| `--ref-compiler <path>` | Path to reference C compiler for differential testing | None |
-| `--opt-level <opt>` | Optimization level (`O0`, `O1`, `O2`, `Os`, or `all`) | `all` |
-| `--compile-only` | Run compilation and pass profiling without execution | `false` |
-| `--regenerate` | Synthesize monolithic stress file via YARPGen | `false` |
-| `--json-out <path>` | Export pass timings and metrics to JSON file | None |
-| `--markdown-out <path>` | Export pass distribution report to Markdown | None |
+```bash
+# Stress monolithic benchmark and pass profiler
+python tests/YarpgenDifferentialTests/yarpgen_suite.py stress [--file <path>] [--opt-level O0|O1|O2|Os|all] [--compile-only] [-v]
+
+# Bulk corpus compilation and differential verifier
+python tests/YarpgenDifferentialTests/yarpgen_suite.py bulk [--corpus-dir <path>] [--opt-levels O0,O2] [--compile-only]
+
+# Continuous differential fuzzing
+python tests/YarpgenDifferentialTests/yarpgen_suite.py fuzz [--iterations N] [--seed S] [--work-dir <path>]
+
+# Curated regression seeds verification
+python tests/YarpgenDifferentialTests/yarpgen_suite.py seeds [--seeds-file <path>]
+```
 
 ---
 
