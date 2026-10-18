@@ -79,3 +79,4 @@ bool process_incoming_frame(const struct PacketHeader *pkt) {
 uint32_t get_total_processed(void) {
     return g_packets_processed;
 }
+
