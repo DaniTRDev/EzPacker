@@ -40,7 +40,8 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
   - Freestanding / Standalone flags: `-ffreestanding`, `-nostdlib`.
   - Feature flags: x86-64 (`+avx`, `+avx2`, `+sse2`, etc.) and RISC-V (`+m`, `+a`, `+f`, `+d`, `+v`, `+c`).
   - Code generation flags: Position Independent Code (`-fPIC`), RTTI toggle.
-- **12 Bundled Examples**:
+- **14 Bundled Examples**:
+  - Standalone freestanding C11 kernel modules (`09_freestanding_kernel.c`, `c_yarpgen_kernel.c`) exercising ISO C11 headers (`<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`).
   - Arithmetic, branch control flow, loops, recursive factorial, SIMD vectorization, structured exception handling (`exception_handling.mir`), and memory pointer examples from `examples/`.
 
 ## Architecture
