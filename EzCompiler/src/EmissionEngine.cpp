@@ -96,19 +96,6 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         gvarById[gvar->getId()] = gvar;
 
-        // External declarations (no initializer, external linkage) are undefined symbols in this module.
-        if (gvar->getLinkage() == MirLinkage::External && !gvar->getInitializer())
-        {
-            symbols.push_back({ .m_name = gvar->getName(),
-                                .m_section = SectionType::Undefined,
-                                .m_offset = 0,
-                                .m_size = 0,
-                                .m_isGlobal = true,
-                                .m_isWeak = false,
-                                .m_isFunction = false });
-            continue;
-        }
-
         // Size the object from its value or pointee type, rounding bits up to whole bytes.
         MirType *valType = gvar->getType();
         if (valType && valType->getKind() == MirTypeKind::Pointer && valType->getPointedType())
