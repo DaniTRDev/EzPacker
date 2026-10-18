@@ -55,3 +55,4 @@ static inline void *__va_arg_fp(__va_elem *ap, int sz, int align) {
 typedef va_list __gnuc_va_list;
 
 #endif /* _EZPACKER_STDARG_H */
+

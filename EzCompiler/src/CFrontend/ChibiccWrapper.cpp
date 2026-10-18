@@ -1,8 +1,20 @@
 #include "CFrontend/ChibiccWrapper.h"
 #include <csetjmp>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <vector>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 #include "chibicc.h"
 
@@ -16,8 +28,79 @@ ChibiccWrapper::ChibiccWrapper()
 
 ChibiccWrapper::~ChibiccWrapper() = default;
 
+std::string ChibiccWrapper::getBundledFreestandingIncludeDir()
+{
+    // 1. Environment variable override
+    const char *envDir = std::getenv("EZPACKER_FREESTANDING_DIR");
+    if (envDir && *envDir)
+    {
+        std::filesystem::path p(envDir);
+        std::error_code ec;
+        if (std::filesystem::is_directory(p, ec))
+            return std::filesystem::weakly_canonical(p, ec).string();
+    }
+
+    // 2. Compile-time definition
+#ifdef EZPACKER_FREESTANDING_INCLUDE_DIR
+    {
+        std::filesystem::path p(EZPACKER_FREESTANDING_INCLUDE_DIR);
+        std::error_code ec;
+        if (std::filesystem::is_directory(p, ec) && std::filesystem::exists(p / "stdint.h", ec))
+            return std::filesystem::weakly_canonical(p, ec).string();
+    }
+#endif
+
+    // 3. Executable-relative resolution
+#if defined(_WIN32)
+    char exePath[MAX_PATH];
+    DWORD len = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    if (len > 0 && len < MAX_PATH)
+    {
+        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+        std::vector<std::filesystem::path> candidates = {
+            exeDir / "include" / "freestanding",
+            exeDir / ".." / "include" / "freestanding",
+            exeDir / ".." / ".." / "include" / "freestanding",
+            exeDir / ".." / ".." / ".." / "include" / "freestanding"
+        };
+        for (const auto &cand : candidates)
+        {
+            std::error_code ec;
+            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdint.h", ec))
+                return std::filesystem::weakly_canonical(cand, ec).string();
+        }
+    }
+#endif
+
+    // 4. Working directory / relative paths
+    std::error_code cwdEc;
+    std::filesystem::path cwd = std::filesystem::current_path(cwdEc);
+    if (!cwdEc)
+    {
+        std::vector<std::filesystem::path> candidates = {
+            cwd / "include" / "freestanding",
+            cwd / "bin" / "include" / "freestanding",
+            cwd / ".." / "include" / "freestanding",
+            cwd / ".." / ".." / "include" / "freestanding"
+        };
+        for (const auto &cand : candidates)
+        {
+            std::error_code ec;
+            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdint.h", ec))
+                return std::filesystem::weakly_canonical(cand, ec).string();
+        }
+    }
+
+    return {};
+}
+
 void ChibiccWrapper::addIncludePath(std::string_view path)
 {
+    for (const auto &inc : m_includePaths)
+    {
+        if (inc == path)
+            return;
+    }
     m_includePaths.emplace_back(path);
 }
 
@@ -59,6 +142,24 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
     for (const auto &inc : m_includePaths)
     {
         strarray_push(&include_paths, const_cast<char *>(inc.c_str()));
+    }
+
+    std::string fsDir = getBundledFreestandingIncludeDir();
+    if (!fsDir.empty())
+    {
+        bool found = false;
+        for (const auto &inc : m_includePaths)
+        {
+            if (inc == fsDir)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            strarray_push(&include_paths, const_cast<char *>(fsDir.c_str()));
+        }
     }
 
     for (const auto &[name, val] : m_macros)

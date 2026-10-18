@@ -38,3 +38,25 @@ EzCMK_AddExecutable(NAME "ezc"
         LINKED_LIBRARIES "EzCompilerLib;EzTargetsX86_64Registration;EzTargetsRiscV64Registration"
         INCLUDED_DIRS "include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/Registration/include;${CMAKE_SOURCE_DIR}/EzTargets/RiscV64/Registration/include"
 )
+
+target_compile_definitions(EzCompilerLib PRIVATE
+    EZPACKER_FREESTANDING_INCLUDE_DIR="${CMAKE_SOURCE_DIR}/include/freestanding"
+)
+
+if (NOT DEFINED EZPACKER_TARGET_BIN_DIR OR EZPACKER_TARGET_BIN_DIR STREQUAL "")
+    set(EZPACKER_TARGET_BIN_DIR "${CMAKE_BINARY_DIR}/bin")
+endif ()
+
+file(MAKE_DIRECTORY "${EZPACKER_TARGET_BIN_DIR}/include/freestanding")
+file(COPY "${CMAKE_SOURCE_DIR}/include/freestanding/" DESTINATION "${EZPACKER_TARGET_BIN_DIR}/include/freestanding")
+
+add_custom_target(EzPacker_CopyFreestandingHeaders ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${EZPACKER_TARGET_BIN_DIR}/include/freestanding"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/include/freestanding" "${EZPACKER_TARGET_BIN_DIR}/include/freestanding"
+    COMMENT "[EzPacker] Copying freestanding headers to ${EZPACKER_TARGET_BIN_DIR}/include/freestanding"
+    VERBATIM
+)
+
+add_dependencies(EzCompilerLib EzPacker_CopyFreestandingHeaders)
+add_dependencies(ezc EzPacker_CopyFreestandingHeaders)
+

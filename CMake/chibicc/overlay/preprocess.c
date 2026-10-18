@@ -23,6 +23,7 @@
 // https://github.com/rui314/chibicc/wiki/cpp.algo.pdf
 
 #include "chibicc.h"
+#include "builtin_headers.h"
 
 typedef struct MacroParam MacroParam;
 struct MacroParam {
@@ -710,6 +711,14 @@ char *search_include_paths(char *filename) {
     include_next_idx = i + 1;
     return path;
   }
+
+  // Built-in fallback for ISO C11 freestanding headers
+  if (chibicc_is_builtin_header(filename)) {
+    char *path = format("<builtin>/%s", filename);
+    hashmap_put(&include_cache, filename, path);
+    return path;
+  }
+
   return NULL;
 }
 

@@ -13,3 +13,4 @@ typedef long double        max_align_t;
 #define offsetof(type, member) ((size_t)&(((type *)0)->member))
 
 #endif /* _EZPACKER_STDDEF_H */
+

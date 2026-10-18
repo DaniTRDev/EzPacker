@@ -52,6 +52,11 @@ bool MirModuleLoader::compileSourceToMir(DriverContext &ctx, std::string_view so
         {
             cAdapter.addIncludePath(inc);
         }
+        std::string fsDir = CFrontendAdapter::getBundledFreestandingIncludeDir();
+        if (!fsDir.empty())
+        {
+            cAdapter.addIncludePath(fsDir);
+        }
         for (const auto &def : ctx.getOptions().macroDefines)
         {
             size_t eqPos = def.find('=');

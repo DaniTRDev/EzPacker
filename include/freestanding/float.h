@@ -49,3 +49,4 @@
 #define FLT_EVAL_METHOD 0
 
 #endif /* _EZPACKER_FLOAT_H */
+

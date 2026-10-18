@@ -122,3 +122,4 @@ typedef unsigned long long uintmax_t;
 #define UINTMAX_C(c)       c ## ULL
 
 #endif /* _EZPACKER_STDINT_H */
+

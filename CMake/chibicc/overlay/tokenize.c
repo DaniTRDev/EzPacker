@@ -1,4 +1,5 @@
 #include "chibicc.h"
+#include "builtin_headers.h"
 
 // Input file
 static File *current_file;
@@ -669,6 +670,22 @@ Token *tokenize(File *file) {
 
 // Returns the contents of a given file.
 static char *read_file(char *path) {
+  if (strncmp(path, "<builtin>/", 10) == 0) {
+    const char *content = chibicc_get_builtin_header(path + 10);
+    if (content) {
+      size_t len = strlen(content);
+      char *buf = malloc(len + 2);
+      if (!buf)
+        return NULL;
+      memcpy(buf, content, len);
+      if (len == 0 || buf[len - 1] != '\n')
+        buf[len++] = '\n';
+      buf[len] = '\0';
+      return buf;
+    }
+    return NULL;
+  }
+
   FILE *fp;
 
   if (strcmp(path, "-") == 0) {

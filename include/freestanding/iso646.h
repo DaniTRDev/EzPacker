@@ -14,3 +14,4 @@
 #define xor_eq  ^=
 
 #endif /* _EZPACKER_ISO646_H */
+
