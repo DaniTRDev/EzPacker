@@ -41,14 +41,14 @@ export function loadExamples(): ExampleFile[] {
 
     const isC = file.endsWith('.c');
     const defaultDesc = isC
-      ? `Demonstrates ${title.toLowerCase()} in C11 compiled directly via EzPacker's embedded chibicc frontend.`
+      ? `Demonstrates ${title.toLowerCase()} in freestanding C11 compiled directly via EzPacker's embedded standalone chibicc frontend.`
       : `Demonstrates ${title.toLowerCase()} in EzPacker SSA MIR.`;
     const description = descLines.join(' ') || defaultDesc;
 
     examples.push({
       id: baseId,
       filename: file,
-      title: isC ? `[C11] ${title}` : title,
+      title: isC ? `[Standalone C11] ${title}` : title,
       description,
       code: content,
     });

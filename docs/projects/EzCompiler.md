@@ -256,50 +256,74 @@ Diagnostic and Timing Toggles:
 
 EzPacker embeds Rui Ueyama's C11 reference C compiler (`chibicc`) as a native, in-process C frontend library (`chibicc_frontend`). This allows `ezc` to directly ingest C source files (`.c`) and preprocessed C files (`.i`), parse them into an Abstract Syntax Tree (AST), and lower them into generic SSA MIR for downstream optimization and native code emission.
 
-### Architecture
+### Modular Architecture
+
+The C frontend is decoupled into dedicated, single-responsibility components:
 
 ```
-       C Source (.c / .i)
-               |
-               v
-  +--------------------------+
-  |      ChibiccWrapper      | <--- [-I include_dirs, -D macro_defines]
-  |  - Tokenize & Preprocess |
-  |  - Parse C11 AST (Obj)   |
-  |  - Error Trapping (SjLj) |
-  +--------------------------+
-               |
-               v AST (Obj*)
-  +--------------------------+
-  |    CFrontendAdapter      |
-  |  - Type Mapping          |
-  |  - Control Flow (CFG)    |
-  |  - SSA Lowering          |
-  |  - Expr / Stmt Lowering  |
-  +--------------------------+
-               |
-               v
-       MirModule (SSA MIR)
-               |
-               v
-       CompilationPipeline
+                  C Source (.c / .i)
+                          |
+                          v
+             +--------------------------+
+             |      ChibiccWrapper      | <--- [-I include_dirs, -D macro_defines]
+             |  - Tokenize & Preprocess |
+             |  - Standalone Macros     |
+             |  - Parse C11 AST (Obj)   |
+             |  - Error Trapping (SjLj) |
+             +--------------------------+
+                          |
+                          v AST (Obj*)
+             +--------------------------+
+             |    CFrontendAdapter      | <--- High-level coordinator
+             |  - Global Var Lowering   |
+             |  - Function Dispatch     |
+             +--------------------------+
+                     /          \
+                    v            v
+  +--------------------+      +------------------------------+
+  | CFrontendTypeMapper|      |  CFrontendFunctionLowerer    |
+  | - Integral Types   |      |  - Param / Local Allocation  |
+  | - Pointers/Arrays  |      |  - Address Lowering (lowerAddr)|
+  | - Structs/Unions   |      |  - CFG & Branch Construction |
+  | - Function Types   |      |  - Expression / Stmt Lowering|
+  +--------------------+      +------------------------------+
+                                             |
+                                             v
+                                    MirModule (SSA MIR)
+                                             |
+                                             v
+                                    CompilationPipeline
 ```
 
 ### Key Components
 
 1. **`ChibiccWrapper` (`EzCompiler/include/CFrontend/ChibiccWrapper.h`)**:
-   - Encapsulates chibicc's global tokenizer, preprocessor, and parser states in a clean C++ interface.
+   - Encapsulates chibicc's global tokenizer, preprocessor, and parser states in a clean, re-entrant C++ interface.
    - Manages include search paths (`addIncludePath`) and command-line macro definitions (`addMacroDefine`).
    - Implements thread-safe / re-entrant error trapping via `setjmp` / `longjmp`. Syntax errors, missing includes, or unclosed macros are captured and converted into EzPacker `DiagnosticCollector` messages rather than abruptly calling `exit(1)`.
+   - Cleans and isolates preprocessor caches, include guards, and macro tables between compilation units via `chibicc_reset_preprocessor()`.
 
-2. **`CFrontendAdapter` (`EzCompiler/include/CFrontend/CFrontendAdapter.h`)**:
+2. **`CFrontendTypeMapper` (`EzCompiler/include/CFrontend/CFrontendTypeMapper.h`)**:
+   - Standalone type conversion engine that maps chibicc `Type` structures to EzPacker `MirType` instances within `MirTypeTable`.
+   - Maps C primitives (`void`, `_Bool`, `char`, `short`, `int`, `long`, `float`, `double`, `long double`), pointers, arrays, structs, unions, and function types.
+
+3. **`CFrontendFunctionLowerer` (`EzCompiler/include/CFrontend/CFrontendFunctionLowerer.h`)**:
+   - Specialized function-level AST lowerer translating chibicc AST nodes into basic blocks (`MirBlock`) and instructions (`MirInstruction`).
+   - Analyzes address-taken variables (`collectAddressTaken`) and allocates parameters/locals to virtual registers or static stack slots (`StackFrameObject`) accordingly.
+   - Computes lvalue memory addresses uniformly via `lowerAddr()`, supporting direct variables, dereferences (`*ptr`), struct member accesses (`struct.member` and `ptr->member`), and array accesses.
+   - Constructs structured control flow (`if-else`, loops, `break`, `continue`, `return`) and arithmetic, logical, comparison, and casting expressions.
+
+4. **`CFrontendAdapter` (`EzCompiler/include/CFrontend/CFrontendAdapter.h`)**:
    - Implements `IFrontendAdapter` to interface with `MirModuleLoader`.
-   - Traverses the chibicc AST `Obj` linked list (representing functions and global variables) and converts them into EzPacker `MirFunction`, `MirGlobalVar`, `MirBlock`, and `MirInstruction` nodes.
-   - Maps C fundamental types (`void`, `bool`, `char`, `short`, `int`, `long`, `float`, `double`, pointers, arrays) to corresponding `MirType` instances in `MirTypeTable`.
-   - Lowers control flow structures (`if-else`, `while`, `for`, `do-while`, `switch`/`case`, `goto`, `break`, `continue`, `return`) into explicit CFG basic blocks with phi-free or SSA-ready conditional branches (`BR_COND`, `BR`).
-   - Materializes register operands as needed for instructions requiring virtual registers (e.g. `IMUL`, floating-point arithmetic, bitwise shifts).
+   - Orchestrates the AST translation pass (`lowerAstToMir`), creating global variables (`MirGlobalVar`) with proper linkage (`Internal` for static, `External` for extern) and delegating each function definition to `CFrontendFunctionLowerer`.
 
-3. **CLI Driver Ingestion (`FrontendAdapter.cpp`)**:
+5. **Standalone / Freestanding Software Orientation**:
+   - The C frontend is strictly oriented for standalone/freestanding systems programming (operating system kernels, bootloaders, embedded firmware, and freestanding runtime software).
+   - Standard conformance: `__STDC_HOSTED__` is set to `0`. The preprocessor automatically injects `__STDC_FREESTANDING__ = 1` and `__EZPACKER_STANDALONE__ = 1`.
+   - All hosted standard library assumptions (e.g. `stdio.h`, `stdlib.h`, and hosted target macros like `linux` or `unix`) are eliminated.
+   - Command-line flags `-ffreestanding` and `-nostdlib` are supported by `CommandLineParser` and forwarded to the driver.
+
+6. **CLI Driver Ingestion (`FrontendAdapter.cpp`)**:
    - `FrontendAdapter` inspects the input file extension. When `.c` or `.i` is detected, it delegates parsing to `CFrontendAdapter`, passing all configured `-I` include directories and `-D` macro definitions.
 
 ---
@@ -316,4 +340,6 @@ EzPacker embeds Rui Ueyama's C11 reference C compiler (`chibicc`) as a native, i
 | Emission Engine | `EzCompiler/include/EmissionEngine.h` | `EmissionEngine` |
 | Frontend | `EzCompiler/include/FrontendAdapter.h` | `IFrontendAdapter`, `MirModuleLoader` |
 | C Frontend Wrapper | `EzCompiler/include/CFrontend/ChibiccWrapper.h` | `ChibiccWrapper` |
-| C Frontend Lowerer | `EzCompiler/include/CFrontend/CFrontendAdapter.h` | `CFrontendAdapter` |
+| C Frontend Type Mapper | `EzCompiler/include/CFrontend/CFrontendTypeMapper.h` | `mapType`, `CFrontendTypeMapper` |
+| C Frontend Lowerer | `EzCompiler/include/CFrontend/CFrontendFunctionLowerer.h` | `CFrontendFunctionLowerer` |
+| C Frontend Adapter | `EzCompiler/include/CFrontend/CFrontendAdapter.h` | `CFrontendAdapter` |
