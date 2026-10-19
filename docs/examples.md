@@ -329,7 +329,7 @@ fib_rec:
 ---
 
 ### 2.10 `exception_handling.mir`: Structured Exception Handling (SjLj)
-Demonstrates setjmp/longjmp (SjLj) based exception handling using EzPacker's native `TRY`, `THROW`, and `CATCH` intermediate representation instructions:
+Demonstrates freestanding setjmp/longjmp (SjLj) based exception handling using EzPacker's native `TRY`, `THROW`, and `CATCH` intermediate representation instructions:
 
 ```mir
 fn @safe_divide(i64 %a, i64 %b) -> i64 {
@@ -382,11 +382,13 @@ on_overdraft:
 ```
 
 #### Under the Hood:
-1. `TRY label %try_body, label %catch_block` registers the protected region and handler landing pad.
+1. `TRY label %try_body, label %catch_block` registers the protected region and handler landing pad via `__ez_try_enter()` and custom assembly `__ez_setjmp()`, saving all callee-saved registers into `EzJmpBuf`.
 2. `THROW %payload` moves the exception payload into the platform ABI's first argument register (`rdi` on System V AMD64, `rcx` on Win64), automatically attaches `@__ez_default_rtti` as the second argument (`rsi` on System V AMD64, `rdx` on Win64), and emits a direct call to `__ez_throw`.
 3. `THROW %payload, @CustomRtti` passes the specified type descriptor symbol to `__ez_throw`, enabling rich RTTI-based inspection and hierarchical type matching.
 4. `THROW` (0-operand) automatically attaches both `@__ez_default_payload` and `@__ez_default_rtti`.
 5. `CATCH %dst` invokes runtime libcall `__ez_get_current_exception` and moves the caught exception payload into `%dst`.
+6. `PUSH_REGS` and `POP_REGS` MIR pseudo-instructions enable target-agnostic register preservation and context restoration, dynamically querying calling conventions at instruction selection time.
+7. Uncaught exceptions trigger a safe freestanding trap (`__builtin_trap()`) without dependency on hosted C runtime libraries (`msvcrt.dll`, libc).
 - Consult [How to Build a Target Architecture](how_to_build_a_target.md) to understand how instructions, encodings, and calling conventions are defined.
 - Return to the [EzPacker Documentation Index](index.md).
 

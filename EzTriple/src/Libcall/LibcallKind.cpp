@@ -138,13 +138,13 @@ LibcallProvider getLibcallProvider(LibcallKind kind)
         case LibcallKind::StackProbe:
             return LibcallProvider::TargetBuiltin;
 
-        // Exception handling
+        // Exception handling (freestanding EzExceptionRuntime)
         case LibcallKind::EzTryEnter:
         case LibcallKind::EzTryLeave:
         case LibcallKind::EzThrow:
         case LibcallKind::EzCatchMatch:
         case LibcallKind::EzGetCurrentEx:
-            return LibcallProvider::CRuntime;
+            return LibcallProvider::Custom;
 
         default:
             return LibcallProvider::Custom;

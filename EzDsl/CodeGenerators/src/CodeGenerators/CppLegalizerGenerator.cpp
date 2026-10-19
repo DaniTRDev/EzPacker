@@ -584,10 +584,11 @@ void CppLegalizerGenerator::emitSource(CppSourceEmitter &emitter) const
     }
 
     emitter.emitLine("// Tier 1: Dense 2D Primary Matrix (O(1))");
-    emitter.emitLine("if (q.m_operandCount > 0 && q.m_compactIds[0] < MAX_COMPACT_TYPES)");
+    emitter.emitLine("uint8_t primaryCid = (q.m_operandCount == 0) ? 1 : q.m_compactIds[0];");
+    emitter.emitLine("if (primaryCid < MAX_COMPACT_TYPES)");
     emitter.emitLine("{");
     emitter.indent();
-    emitter.emitLine("LegalityResponse fastResp = g_{}_PrimaryMatrix[opIdx][q.m_compactIds[0]];", m_targetName);
+    emitter.emitLine("LegalityResponse fastResp = g_{}_PrimaryMatrix[opIdx][primaryCid];", m_targetName);
     emitter.emitLine("if (fastResp.m_action != LegalizeActionKind::Unsupported)");
     emitter.emitLine("{");
     emitter.indent();

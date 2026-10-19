@@ -67,6 +67,12 @@ class X86_64TargetInstructionSelector : public x86_64InstructionSelector
     /// Lowers a TRY instruction into control flow to the protected body block.
     bool selectTRY(MirBuilderContext *ctx, MirInstruction *inst);
 
+    /// Lowers a PUSH_REGS pseudo instruction to target stack pushes.
+    bool selectPUSH_REGS(MirBuilderContext *ctx, MirInstruction *inst);
+
+    /// Lowers a POP_REGS pseudo instruction to target stack pops.
+    bool selectPOP_REGS(MirBuilderContext *ctx, MirInstruction *inst);
+
     /// Lowers an integer division or remainder operation (SDIV, UDIV, REM).
     bool selectDIV(MirBuilderContext *ctx, MirInstruction *inst, bool isSigned, bool isRem);
 

@@ -16,6 +16,7 @@ void chibicc_set_error_jmp(jmp_buf *buf);
 const char *chibicc_get_last_error(void);
 void chibicc_reset_state(void);
 void chibicc_reset_preprocessor(void);
+void chibicc_reset_parser(void);
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>

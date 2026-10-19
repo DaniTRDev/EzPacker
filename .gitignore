@@ -142,6 +142,7 @@ fabric.properties
 # Graphifyy
 /graphify-out
 /.agents
+/.codegraph/
 
 # YARPGen Differential Testing Artifacts
 /.yarpgen_work/

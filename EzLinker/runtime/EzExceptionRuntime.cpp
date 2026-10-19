@@ -1,10 +1,144 @@
 #include "EzExceptionRuntime.h"
 #include "Rtti/RttiDescriptor.h"
-#include <cstdio>
-#include <cstdlib>
-#include <iostream>
 
 extern "C" {
+
+#if defined(__x86_64__) || defined(_M_X64)
+#if defined(_WIN32)
+__attribute__((naked)) int __ez_setjmp(struct EzJmpBuf *buf)
+{
+    __asm__ volatile (
+        "movq %rbx, 0(%rcx)\n\t"
+        "movq %rbp, 8(%rcx)\n\t"
+        "movq %rdi, 16(%rcx)\n\t"
+        "movq %rsi, 24(%rcx)\n\t"
+        "movq %r12, 32(%rcx)\n\t"
+        "movq %r13, 40(%rcx)\n\t"
+        "movq %r14, 48(%rcx)\n\t"
+        "movq %r15, 56(%rcx)\n\t"
+        "leaq 8(%rsp), %rax\n\t" // RSP before call
+        "movq %rax, 64(%rcx)\n\t"
+        "movq (%rsp), %rax\n\t"  // return address
+        "movq %rax, 72(%rcx)\n\t"
+        "xorl %eax, %eax\n\t"
+        "ret\n\t"
+    );
+}
+
+__attribute__((naked)) void __ez_longjmp(struct EzJmpBuf *buf, int val)
+{
+    __asm__ volatile (
+        "movl %edx, %eax\n\t"
+        "testl %eax, %eax\n\t"
+        "jnz 1f\n\t"
+        "movl $1, %eax\n\t"
+    "1:\n\t"
+        "movq 0(%rcx), %rbx\n\t"
+        "movq 8(%rcx), %rbp\n\t"
+        "movq 16(%rcx), %rdi\n\t"
+        "movq 24(%rcx), %rsi\n\t"
+        "movq 32(%rcx), %r12\n\t"
+        "movq 40(%rcx), %r13\n\t"
+        "movq 48(%rcx), %r14\n\t"
+        "movq 56(%rcx), %r15\n\t"
+        "movq 64(%rcx), %rsp\n\t"
+        "jmp *72(%rcx)\n\t"
+    );
+}
+#else
+__attribute__((naked)) int __ez_setjmp(struct EzJmpBuf *buf)
+{
+    __asm__ volatile (
+        "movq %rbx, 0(%rdi)\n\t"
+        "movq %rbp, 8(%rdi)\n\t"
+        "movq %r12, 16(%rdi)\n\t"
+        "movq %r13, 24(%rdi)\n\t"
+        "movq %r14, 32(%rdi)\n\t"
+        "movq %r15, 40(%rdi)\n\t"
+        "leaq 8(%rsp), %rax\n\t"
+        "movq %rax, 48(%rdi)\n\t"
+        "movq (%rsp), %rax\n\t"
+        "movq %rax, 56(%rdi)\n\t"
+        "xorl %eax, %eax\n\t"
+        "ret\n\t"
+    );
+}
+
+__attribute__((naked)) void __ez_longjmp(struct EzJmpBuf *buf, int val)
+{
+    __asm__ volatile (
+        "movl %esi, %eax\n\t"
+        "testl %eax, %eax\n\t"
+        "jnz 1f\n\t"
+        "movl $1, %eax\n\t"
+    "1:\n\t"
+        "movq 0(%rdi), %rbx\n\t"
+        "movq 8(%rdi), %rbp\n\t"
+        "movq 16(%rdi), %r12\n\t"
+        "movq 24(%rdi), %r13\n\t"
+        "movq 32(%rdi), %r14\n\t"
+        "movq 40(%rdi), %r15\n\t"
+        "movq 48(%rdi), %rsp\n\t"
+        "jmp *56(%rdi)\n\t"
+    );
+}
+#endif
+#elif defined(__riscv) && (__riscv_xlen == 64)
+__attribute__((naked)) int __ez_setjmp(struct EzJmpBuf *buf)
+{
+    __asm__ volatile (
+        "sd ra, 0(a0)\n\t"
+        "sd sp, 8(a0)\n\t"
+        "sd s0, 16(a0)\n\t"
+        "sd s1, 24(a0)\n\t"
+        "sd s2, 32(a0)\n\t"
+        "sd s3, 40(a0)\n\t"
+        "sd s4, 48(a0)\n\t"
+        "sd s5, 56(a0)\n\t"
+        "sd s6, 64(a0)\n\t"
+        "sd s7, 72(a0)\n\t"
+        "sd s8, 80(a0)\n\t"
+        "sd s9, 88(a0)\n\t"
+        "sd s10, 96(a0)\n\t"
+        "sd s11, 104(a0)\n\t"
+        "li a0, 0\n\t"
+        "ret\n\t"
+    );
+}
+
+__attribute__((naked)) void __ez_longjmp(struct EzJmpBuf *buf, int val)
+{
+    __asm__ volatile (
+        "ld ra, 0(a0)\n\t"
+        "ld sp, 8(a0)\n\t"
+        "ld s0, 16(a0)\n\t"
+        "ld s1, 24(a0)\n\t"
+        "ld s2, 32(a0)\n\t"
+        "ld s3, 40(a0)\n\t"
+        "ld s4, 48(a0)\n\t"
+        "ld s5, 56(a0)\n\t"
+        "ld s6, 64(a0)\n\t"
+        "ld s7, 72(a0)\n\t"
+        "ld s8, 80(a0)\n\t"
+        "ld s9, 88(a0)\n\t"
+        "ld s10, 96(a0)\n\t"
+        "ld s11, 104(a0)\n\t"
+        "seqz a0, a1\n\t"
+        "add a0, a0, a1\n\t"
+        "ret\n\t"
+    );
+}
+#else
+int __ez_setjmp(struct EzJmpBuf *buf)
+{
+    return __builtin_setjmp((void **)buf->regs);
+}
+
+void __ez_longjmp(struct EzJmpBuf *buf, int val)
+{
+    __builtin_longjmp((void **)buf->regs, val ? val : 1);
+}
+#endif
 
 extern EZ_EX_API const EzCore::RttiTypeDescriptor __ez_default_rtti;
 extern EZ_EX_API const EzCore::RichExceptionPayload __ez_default_payload;
@@ -64,38 +198,8 @@ EZ_EX_API void __ez_throw(void *payload, const void *rtti)
 
     if (g_ezTopFrame == nullptr)
     {
-        // Uncaught exception handling
-        std::cerr << "fatal error: uncaught exception";
-        if (effectiveRtti)
-        {
-            const auto *desc = static_cast<const EzCore::RttiTypeDescriptor *>(effectiveRtti);
-            if (!desc->typeName.empty())
-            {
-                std::cerr << " of type '" << desc->typeName << "'";
-            }
-            if (!desc->declarationSite.filePath.empty())
-            {
-                std::cerr << " (type declared at " << desc->declarationSite.filePath << ":" << desc->declarationSite.line << ")";
-            }
-        }
-        if (effectivePayload && effectivePayload != &__ez_default_payload)
-        {
-            const auto *rich = static_cast<const EzCore::RichExceptionPayload *>(effectivePayload);
-            if (rich && !rich->throwSite.filePath.empty())
-            {
-                std::cerr << "\n  at " << rich->throwSite.filePath << ":" << rich->throwSite.line << ":" << rich->throwSite.column;
-                if (!rich->throwSite.functionName.empty())
-                {
-                    std::cerr << " in " << rich->throwSite.functionName;
-                }
-                if (!rich->throwSite.snippet.empty())
-                {
-                    std::cerr << "\n  " << rich->throwSite.snippet;
-                }
-            }
-        }
-        std::cerr << std::endl;
-        std::abort();
+        // Uncaught exception handling: trigger hardware fault trap
+        __builtin_trap();
     }
 
     EzExceptionFrame *target = g_ezTopFrame;
@@ -108,7 +212,7 @@ EZ_EX_API void __ez_throw(void *payload, const void *rtti)
     target->currentRtti = effectiveRtti;
     target->isCaught = 1;
 
-    longjmp(target->jmpBuf, 1);
+    __ez_longjmp(&target->jmpBuf, 1);
 }
 
 EZ_EX_API int __ez_catch_matches(const void *thrownRtti, const void *filterRtti)

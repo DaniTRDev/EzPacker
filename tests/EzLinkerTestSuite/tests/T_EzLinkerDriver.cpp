@@ -28,7 +28,7 @@ TEST_F(EzLinkerTestSuite, TestMsvcArgumentGeneration)
     EXPECT_TRUE(hasArg("utils.obj"));
     EXPECT_TRUE(hasArg("/libpath:C:\\libs"));
     EXPECT_TRUE(hasArg("mylib.lib"));
-    EXPECT_TRUE(hasArg("msvcrt.lib"));
+    EXPECT_FALSE(hasArg("msvcrt.lib"));
     EXPECT_TRUE(hasArg("kernel32.lib"));
     EXPECT_TRUE(hasArg("/subsystem:console"));
     EXPECT_TRUE(hasArg("/entry:mainCRTStartup"));
@@ -59,7 +59,7 @@ TEST_F(EzLinkerTestSuite, TestElfArgumentGeneration)
     EXPECT_TRUE(hasArg("main.o"));
     EXPECT_TRUE(hasArg("-L/usr/local/lib"));
     EXPECT_TRUE(hasArg("-lm"));
-    EXPECT_TRUE(hasArg("-lc"));
+    EXPECT_FALSE(hasArg("-lc"));
     EXPECT_TRUE(hasArg("-lgcc"));
     EXPECT_TRUE(hasArg("-shared"));
 }

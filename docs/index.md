@@ -46,7 +46,7 @@ flowchart TD
     subgraph Linking["5. Linking & Runtime (EzLinker / ez-ld)"]
         ElfWriter --> Linker["EzLinkerDriver\n(Toolchain Detection & Command Synthesis)"]
         CoffWriter --> Linker
-        Linker --> Runtime["Injected Runtimes:\n- C Standard Library (libc / msvcrt)\n- Compiler Legalizer Helpers (compiler-rt / libgcc)\n- EzExceptionRuntime (SjLj Unwinding & RTTI)"]
+        Linker --> Runtime["Injected Runtimes:\n- Freestanding EzStd.mir (Standalone Standard Library)\n- Compiler Legalizer Helpers (compiler-rt / libgcc)\n- Freestanding EzExceptionRuntime (Custom SjLj & RTTI)"]
         Runtime --> SystemLinker{"System Linker\n(lld, link.exe, ld, gcc)"}
         SystemLinker --> FinalBin["Native Executable (.exe / ELF)\nor Shared Library (.dll / .so)"]
     end
@@ -131,7 +131,7 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzTriple`** | Target-independent backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer. | [EzTriple Guide](projects/EzTriple.md) |
 | **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, and emission engine (`ezc`). | [EzCompiler Guide](projects/EzCompiler.md) |
 | **`EzTargets`** | Architecture backends: modular x86-64 and RISC-V 64-bit targets (synthesized `X86_64TargetDesc` and `RiscV64TargetDesc`, `VR256` registers, VEX prefix encoder, RV64IMAFD table-driven encoder, compiler-rt libcalls, `X86_64FrameLowerer`, `RiscV64FrameLowerer`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
-| **`EzLinker`** | System linker driver and exception runtime: automated toolchain detection (`lld`, `link.exe`), C stdlib / compiler-rt injection, and SjLj exception runtime (`ez-ld`). | [EzLinker Guide](projects/EzLinker.md) |
+| **`EzLinker`** | System linker driver and freestanding runtime: automated toolchain detection (`lld`, `link.exe`), decoupled C stdlib, freestanding `EzStd.mir` and custom assembly `EzExceptionRuntime` (`ez-ld`). | [EzLinker Guide](projects/EzLinker.md) |
 | **`web`** | Compiler Explorer & Web IDE: React/Vite client and Node.js bridge for live interactive compilation, CFG inspection, and Doxygen symbol exploration. | [Web Explorer](file:///E:/Repos/EzPacker/web/) |
 
 ### 🔍 Complete API Reference

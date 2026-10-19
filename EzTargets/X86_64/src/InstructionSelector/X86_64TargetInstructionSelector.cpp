@@ -13,6 +13,7 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionRegisterInfo.h"
+#include "Function/CallingConvDesc.h"
 #include <map>
 
 namespace EzTargets::X86_64
@@ -54,6 +55,10 @@ bool X86_64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruct
             return selectBR_COND(ctx, inst);
         case MirInstructionOpCode::TRY:
             return selectTRY(ctx, inst);
+        case MirInstructionOpCode::PUSH_REGS:
+            return selectPUSH_REGS(ctx, inst);
+        case MirInstructionOpCode::POP_REGS:
+            return selectPOP_REGS(ctx, inst);
         case MirInstructionOpCode::CALL:
             return selectCALL(ctx, inst);
         case MirInstructionOpCode::LOAD:
@@ -1484,6 +1489,84 @@ bool X86_64TargetInstructionSelector::selectADD(MirBuilderContext *ctx, MirInstr
     ib.buildTarget(x86_64TargetInst::getTargetDesc(addOp),
                    inst->getSourceRef(),
                    { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectPUSH_REGS(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+    const auto *descPush = x86_64TargetInst::getTargetDesc(x86_64TargetInst::PUSH64r);
+
+    if (inst->getOperandCount() == 0)
+    {
+        // Target-agnostic lowering: query calling convention descriptor dynamically
+        MirFunction *func = (inst->getOwner() ? inst->getOwner()->getOwner() : nullptr);
+        CallingConvDesc *cc = func ? func->getCallingConv() : nullptr;
+        if (cc)
+        {
+            const auto &callees = cc->getAllCalleeSavedRegs();
+            for (const auto &regRef : callees)
+            {
+                MirRegister *reg = ob.buildPhysReg(ctx->getTypeTable()->i64(), regRef.getId(), "", regRef.getClass());
+                ib.buildTarget(descPush, inst->getSourceRef(), { reg });
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < inst->getOperandCount(); ++i)
+        {
+            auto *op = inst->getOperand(i);
+            if (auto *r = op->get<MirRegister>())
+            {
+                if (!r->getRegClass())
+                    r->setClass(findClass("GPR64"));
+            }
+            ib.buildTarget(descPush, inst->getSourceRef(), { op });
+        }
+    }
+
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool X86_64TargetInstructionSelector::selectPOP_REGS(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+    const auto *descPop = x86_64TargetInst::getTargetDesc(x86_64TargetInst::POP64r);
+
+    if (inst->getOperandCount() == 0)
+    {
+        // Target-agnostic lowering: pop in reverse order of callee-saved registers
+        MirFunction *func = (inst->getOwner() ? inst->getOwner()->getOwner() : nullptr);
+        CallingConvDesc *cc = func ? func->getCallingConv() : nullptr;
+        if (cc)
+        {
+            const auto &callees = cc->getAllCalleeSavedRegs();
+            for (auto it = callees.rbegin(); it != callees.rend(); ++it)
+            {
+                MirRegister *reg = ob.buildPhysReg(ctx->getTypeTable()->i64(), it->getId(), "", it->getClass());
+                ib.buildTarget(descPop, inst->getSourceRef(), { reg });
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < inst->getOperandCount(); ++i)
+        {
+            auto *op = inst->getOperand(i);
+            if (auto *r = op->get<MirRegister>())
+            {
+                if (!r->getRegClass())
+                    r->setClass(findClass("GPR64"));
+            }
+            ib.buildTarget(descPop, inst->getSourceRef(), { op });
+        }
+    }
+
     inst->eraseFromOwner();
     return true;
 }

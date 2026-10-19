@@ -204,11 +204,11 @@ TEST_F(EzTripleTestSuite, TestTargetLibcallRegistryOpcodeInference)
 // Verifies exception handling runtime libcalls and signatures
 TEST_F(EzTripleTestSuite, TestExceptionLibcalls)
 {
-    EXPECT_TRUE(isCRuntime(LibcallKind::EzTryEnter));
-    EXPECT_TRUE(isCRuntime(LibcallKind::EzTryLeave));
-    EXPECT_TRUE(isCRuntime(LibcallKind::EzThrow));
-    EXPECT_TRUE(isCRuntime(LibcallKind::EzCatchMatch));
-    EXPECT_TRUE(isCRuntime(LibcallKind::EzGetCurrentEx));
+    EXPECT_EQ(getLibcallProvider(LibcallKind::EzTryEnter), LibcallProvider::Custom);
+    EXPECT_EQ(getLibcallProvider(LibcallKind::EzTryLeave), LibcallProvider::Custom);
+    EXPECT_EQ(getLibcallProvider(LibcallKind::EzThrow), LibcallProvider::Custom);
+    EXPECT_EQ(getLibcallProvider(LibcallKind::EzCatchMatch), LibcallProvider::Custom);
+    EXPECT_EQ(getLibcallProvider(LibcallKind::EzGetCurrentEx), LibcallProvider::Custom);
 
     EXPECT_EQ(getLibcallKindName(LibcallKind::EzTryEnter), "EzTryEnter");
     EXPECT_EQ(getLibcallKindName(LibcallKind::EzThrow), "EzThrow");

@@ -3,11 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#ifndef __USE_MINGW_SETJMP_NON_SEH
-#define __USE_MINGW_SETJMP_NON_SEH 1
-#endif
-#include <setjmp.h>
-
 #include "abi_test_common.h"
 #include "../../EzLinker/runtime/EzExceptionRuntime.h"
 
@@ -102,6 +97,41 @@ EZ_EX_API uint64_t __ez_get_rtti_type_id(const void *rtti) {
     return desc->typeId;
 }
 
+__attribute__((sysv_abi, naked)) int __ez_setjmp(struct EzJmpBuf *buf) {
+    __asm__ volatile (
+        "movq %rbx, 0(%rdi)\n\t"
+        "movq %rbp, 8(%rdi)\n\t"
+        "movq %r12, 16(%rdi)\n\t"
+        "movq %r13, 24(%rdi)\n\t"
+        "movq %r14, 32(%rdi)\n\t"
+        "movq %r15, 40(%rdi)\n\t"
+        "leaq 8(%rsp), %rax\n\t"
+        "movq %rax, 48(%rdi)\n\t"
+        "movq (%rsp), %rax\n\t"
+        "movq %rax, 56(%rdi)\n\t"
+        "xorl %eax, %eax\n\t"
+        "ret\n\t"
+    );
+}
+
+__attribute__((sysv_abi, naked)) void __ez_longjmp(struct EzJmpBuf *buf, int val) {
+    __asm__ volatile (
+        "movl %esi, %eax\n\t"
+        "testl %eax, %eax\n\t"
+        "jnz 1f\n\t"
+        "movl $1, %eax\n\t"
+    "1:\n\t"
+        "movq 0(%rdi), %rbx\n\t"
+        "movq 8(%rdi), %rbp\n\t"
+        "movq 16(%rdi), %r12\n\t"
+        "movq 24(%rdi), %r13\n\t"
+        "movq 32(%rdi), %r14\n\t"
+        "movq 40(%rdi), %r15\n\t"
+        "movq 48(%rdi), %rsp\n\t"
+        "jmp *56(%rdi)\n\t"
+    );
+}
+
 EZ_EX_API void __ez_throw(void *payload, const void *rtti) {
     if (!s_sysv_top_frame) {
         fprintf(stderr, "fatal: uncaught SysV exception\n");
@@ -109,12 +139,12 @@ EZ_EX_API void __ez_throw(void *payload, const void *rtti) {
     }
     struct EzExceptionFrame *target = s_sysv_top_frame;
     s_sysv_top_frame = target->prev;
-    s_sysv_payload = payload ? payload : (void *)__ez_get_default_payload();
+    s_sysv_payload = payload ? payload : (void *)__ez_default_payload;
     s_sysv_rtti = rtti ? rtti : __ez_get_default_rtti();
     target->currentPayload = s_sysv_payload;
     target->currentRtti = s_sysv_rtti;
     target->isCaught = 1;
-    longjmp(target->jmpBuf, 1);
+    __ez_longjmp(&target->jmpBuf, 1);
 }
 
 EZ_EX_API void *__ez_get_current_exception(void) {
@@ -158,7 +188,7 @@ int main(void) {
     {
         struct EzExceptionFrame frame;
         __ez_try_enter(&frame);
-        if (setjmp(frame.jmpBuf) == 0) {
+        if (__ez_setjmp(&frame.jmpBuf) == 0) {
             test_simple_throw_catch(50);
             assert(0 && "Expected test_simple_throw_catch to throw!");
         } else {
@@ -182,7 +212,7 @@ int main(void) {
     {
         struct EzExceptionFrame frame;
         __ez_try_enter(&frame);
-        if (setjmp(frame.jmpBuf) == 0) {
+        if (__ez_setjmp(&frame.jmpBuf) == 0) {
             test_conditional_throw(100, 250);
             assert(0 && "Expected test_conditional_throw to throw overdraft!");
         } else {
@@ -201,7 +231,7 @@ int main(void) {
     {
         struct EzExceptionFrame frame;
         __ez_try_enter(&frame);
-        if (setjmp(frame.jmpBuf) == 0) {
+        if (__ez_setjmp(&frame.jmpBuf) == 0) {
             test_throw_custom_rtti(0);
             assert(0 && "Expected test_throw_custom_rtti to throw!");
         } else {

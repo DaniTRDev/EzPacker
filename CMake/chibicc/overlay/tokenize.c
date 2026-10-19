@@ -870,4 +870,5 @@ void chibicc_reset_state(void) {
   at_bol = false;
   has_space = false;
   chibicc_reset_preprocessor();
+  chibicc_reset_parser();
 }
