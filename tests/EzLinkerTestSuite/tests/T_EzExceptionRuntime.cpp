@@ -99,7 +99,7 @@ TEST_F(EzLinkerTestSuite, TestSjLjThrowAndCatch)
     EzExceptionFrame frame{};
     __ez_try_enter(&frame);
 
-    if (setjmp(frame.jmpBuf) == 0)
+    if (__ez_setjmp(&frame.jmpBuf) == 0)
     {
         // Try body: throw exception
         helperThrow(&dummyPayload, &exType);
@@ -140,7 +140,7 @@ TEST_F(EzLinkerTestSuite, TestMultiCatch)
     EzExceptionFrame frame{};
     __ez_try_enter(&frame);
 
-    if (setjmp(frame.jmpBuf) == 0)
+    if (__ez_setjmp(&frame.jmpBuf) == 0)
     {
         helperThrow(&dummyPayload, &typeB);
     }
@@ -174,7 +174,7 @@ TEST_F(EzLinkerTestSuite, TestThrowWithoutRttiAttachesDefault)
     EzExceptionFrame frame{};
     __ez_try_enter(&frame);
 
-    if (setjmp(frame.jmpBuf) == 0)
+    if (__ez_setjmp(&frame.jmpBuf) == 0)
     {
         // Throw with NULL rtti
         __ez_throw(&dummyPayload, nullptr);
@@ -205,7 +205,7 @@ TEST_F(EzLinkerTestSuite, TestThrowNullPayloadUsesDefaultPayload)
     EzExceptionFrame frame{};
     __ez_try_enter(&frame);
 
-    if (setjmp(frame.jmpBuf) == 0)
+    if (__ez_setjmp(&frame.jmpBuf) == 0)
     {
         // Throw with NULL payload and NULL rtti
         __ez_throw(nullptr, nullptr);

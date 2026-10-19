@@ -62,6 +62,22 @@ TEST_F(MirExceptionsTest, T_EXC_01_MetadataAndFlags)
     EXPECT_EQ(throwMeta.m_operandMeta.m_count, 2);
     EXPECT_EQ(throwMeta.m_operandMeta.m_slots[0].type, ExpectedOperandType::RegImm);
     EXPECT_EQ(throwMeta.m_operandMeta.m_slots[1].type, ExpectedOperandType::VariadicArgs);
+
+    // 4. PUSH_REGS instruction metadata
+    const MirInstructionMetadata &pushRegsMeta = getMeta(MirInstructionOpCode::PUSH_REGS);
+    EXPECT_EQ(pushRegsMeta.m_opcode, MirInstructionOpCode::PUSH_REGS);
+    EXPECT_EQ(pushRegsMeta.m_category, MirInstructionCategory::MirCat_ControlFlow);
+    EXPECT_EQ(pushRegsMeta.m_tier, MirInstructionTier::PassInternal);
+    EXPECT_TRUE(pushRegsMeta.m_flags & MirInstructionFlags::HasSideEffect);
+    EXPECT_TRUE(pushRegsMeta.m_flags & MirInstructionFlags::VariadicArgs);
+
+    // 5. POP_REGS instruction metadata
+    const MirInstructionMetadata &popRegsMeta = getMeta(MirInstructionOpCode::POP_REGS);
+    EXPECT_EQ(popRegsMeta.m_opcode, MirInstructionOpCode::POP_REGS);
+    EXPECT_EQ(popRegsMeta.m_category, MirInstructionCategory::MirCat_ControlFlow);
+    EXPECT_EQ(popRegsMeta.m_tier, MirInstructionTier::PassInternal);
+    EXPECT_TRUE(popRegsMeta.m_flags & MirInstructionFlags::HasSideEffect);
+    EXPECT_TRUE(popRegsMeta.m_flags & MirInstructionFlags::VariadicArgs);
 }
 
 /**
@@ -203,4 +219,48 @@ TEST_F(MirExceptionsTest, T_EXC_04_NegativeVerification)
     auto *pass = runPass<MirVerifierPass>(ctx);
     ASSERT_NE(pass, nullptr);
     EXPECT_FALSE(pass->getResult().isValid());
+}
+
+/**
+ * T_EXC_05: Programmatic building and verification of PUSH_REGS and POP_REGS pseudo instructions.
+ */
+TEST_F(MirExceptionsTest, T_EXC_05_PushPopRegsBuilding)
+{
+    auto *ctx = getBuilderCtx();
+    auto *func = getTestFunc();
+    auto *entryBlk = func->getEntryPoint();
+
+    MirOperandBuilder opBuilder(ctx);
+    MirInstructionBuilder ib(ctx, entryBlk, InsertionType::Append);
+
+    MirRegister *r1 = opBuilder.buildVReg(ctx->getTypeTable()->i64(), "ctx_r1");
+    MirRegister *r2 = opBuilder.buildVReg(ctx->getTypeTable()->i64(), "ctx_r2");
+
+    // 1. Build PUSH_REGS with operands
+    MirInstruction *pushInst = ib.PUSH_REGS(r1, r2);
+    ASSERT_NE(pushInst, nullptr);
+    EXPECT_EQ(pushInst->getOpCode(), MirInstructionOpCode::PUSH_REGS);
+    EXPECT_EQ(pushInst->getOperandCount(), 2);
+
+    // 2. Build POP_REGS with operands
+    MirInstruction *popInst = ib.POP_REGS(r2, r1);
+    ASSERT_NE(popInst, nullptr);
+    EXPECT_EQ(popInst->getOpCode(), MirInstructionOpCode::POP_REGS);
+    EXPECT_EQ(popInst->getOperandCount(), 2);
+
+    // 3. Build empty PUSH_REGS and POP_REGS (target-derived context)
+    MirInstruction *pushEmpty = ib.PUSH_REGS();
+    ASSERT_NE(pushEmpty, nullptr);
+    EXPECT_EQ(pushEmpty->getOpCode(), MirInstructionOpCode::PUSH_REGS);
+    EXPECT_EQ(pushEmpty->getOperandCount(), 0);
+
+    MirInstruction *popEmpty = ib.POP_REGS();
+    ASSERT_NE(popEmpty, nullptr);
+    EXPECT_EQ(popEmpty->getOpCode(), MirInstructionOpCode::POP_REGS);
+    EXPECT_EQ(popEmpty->getOperandCount(), 0);
+
+    // 4. Run verifier
+    auto *pass = runPass<MirVerifierPass>(ctx);
+    ASSERT_NE(pass, nullptr);
+    EXPECT_TRUE(pass->getResult().isValid());
 }

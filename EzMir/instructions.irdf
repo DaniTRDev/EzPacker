@@ -453,6 +453,22 @@ ir_inst THROW(AnyValue:payload IN, VariadicArgs:rttiInfo IN) {
     FLAGS(IsTerminator, HasSideEffect, VariadicArgs);
 }
 
+// Context Push: Pushes registers onto the hardware stack for context preservation across exception boundaries.
+// Supports empty argument lists (to push all callee-saved registers for the target ABI) or explicit registers.
+ir_inst PUSH_REGS(VariadicArgs:regs IN) {
+    CATEGORY(ControlFlow);
+    TIER(PassInternal);
+    FLAGS(HasSideEffect, VariadicArgs);
+}
+
+// Context Pop: Pops registers off the hardware stack to restore execution context upon exception landing.
+// Supports empty argument lists (to pop all callee-saved registers in reverse order) or explicit registers.
+ir_inst POP_REGS(VariadicArgs:regs OUT) {
+    CATEGORY(ControlFlow);
+    TIER(PassInternal);
+    FLAGS(HasSideEffect, VariadicArgs);
+}
+
 // ============================================================================
 // TYPE CASTING & CONVERSIONS
 // ============================================================================

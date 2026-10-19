@@ -84,6 +84,14 @@ action POP {
     LEGAL(GPR_SCALARS, ptr);
 };
 
+action PUSH_REGS {
+    LEGAL(_void, GPR_SCALARS, ptr);
+};
+
+action POP_REGS {
+    LEGAL(_void, GPR_SCALARS, ptr);
+};
+
 action ALLOC {
     LEGAL(ptr);
 };

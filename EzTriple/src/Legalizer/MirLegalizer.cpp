@@ -172,6 +172,11 @@ void MirLegalizer::fillQuery(MirInstruction *inst, LegalityQuery &q, size_t &pre
     q.m_immValue = 0;
     q.m_hasImm = false;
 
+    if (limit == 0)
+    {
+        q.m_compactIds[0] = 1; // Default to _void (compact ID 1) for zero-operand instructions
+    }
+
     for (size_t i = 0; i < limit; ++i)
     {
         // Reset each populated slot before writing it, in case the previous fill used a null

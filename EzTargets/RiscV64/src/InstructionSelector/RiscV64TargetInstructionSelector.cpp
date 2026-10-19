@@ -13,6 +13,7 @@
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
 #include "Function/MirFunctionRegisterInfo.h"
+#include "Function/CallingConvDesc.h"
 
 namespace EzTargets::RiscV64
 {
@@ -45,6 +46,12 @@ bool RiscV64TargetInstructionSelector::select(MirBuilderContext *ctx, MirInstruc
             return selectBR_COND(ctx, inst);
         case MirInstructionOpCode::TRY:
             return selectTRY(ctx, inst);
+        case MirInstructionOpCode::PUSH_REGS:
+            return selectPUSH_REGS(ctx, inst);
+        case MirInstructionOpCode::POP_REGS:
+            return selectPOP_REGS(ctx, inst);
+        case MirInstructionOpCode::TRUNC:
+            return selectTRUNC(ctx, inst);
         case MirInstructionOpCode::CALL:
             return selectCALL(ctx, inst);
         case MirInstructionOpCode::LOAD:
@@ -1148,6 +1155,139 @@ bool RiscV64TargetInstructionSelector::selectVectorALU(MirBuilderContext *ctx, M
     ib.buildTarget(riscv64TargetInst::getTargetDesc(op),
                    inst->getSourceRef(),
                    { dst, lhs, rhs });
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool RiscV64TargetInstructionSelector::selectPUSH_REGS(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+    const auto *descAddi = riscv64TargetInst::getTargetDesc(riscv64TargetInst::ADDI64ri);
+    const auto *descSd = riscv64TargetInst::getTargetDesc(riscv64TargetInst::SD);
+
+    MirRegister *spReg = ob.buildPhysReg(ctx->getTypeTable()->i64(), 2, "sp", findClass("GPR64"));
+    MirInteger *neg16 = ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(static_cast<int64_t>(-16)));
+    MirInteger *off0 = ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(static_cast<int64_t>(0)));
+
+    if (inst->getOperandCount() == 0)
+    {
+        // Target-agnostic lowering: query calling convention descriptor dynamically
+        MirFunction *func = (inst->getOwner() ? inst->getOwner()->getOwner() : nullptr);
+        CallingConvDesc *cc = func ? func->getCallingConv() : nullptr;
+        if (cc)
+        {
+            const auto &callees = cc->getAllCalleeSavedRegs();
+            for (const auto &regRef : callees)
+            {
+                MirRegister *reg = ob.buildPhysReg(ctx->getTypeTable()->i64(), regRef.getId(), "", regRef.getClass());
+                ib.buildTarget(descAddi, inst->getSourceRef(), { spReg, spReg, neg16 });
+                ib.buildTarget(descSd, inst->getSourceRef(), { reg, spReg, off0 });
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < inst->getOperandCount(); ++i)
+        {
+            auto *op = inst->getOperand(i);
+            if (auto *r = op->get<MirRegister>())
+            {
+                if (!r->getRegClass())
+                    r->setClass(findClass("GPR64"));
+            }
+            ib.buildTarget(descAddi, inst->getSourceRef(), { spReg, spReg, neg16 });
+            ib.buildTarget(descSd, inst->getSourceRef(), { op, spReg, off0 });
+        }
+    }
+
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool RiscV64TargetInstructionSelector::selectPOP_REGS(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+    const auto *descAddi = riscv64TargetInst::getTargetDesc(riscv64TargetInst::ADDI64ri);
+    const auto *descLd = riscv64TargetInst::getTargetDesc(riscv64TargetInst::LD);
+
+    MirRegister *spReg = ob.buildPhysReg(ctx->getTypeTable()->i64(), 2, "sp", findClass("GPR64"));
+    MirInteger *pos16 = ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(static_cast<int64_t>(16)));
+    MirInteger *off0 = ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(static_cast<int64_t>(0)));
+
+    if (inst->getOperandCount() == 0)
+    {
+        // Target-agnostic lowering: pop in reverse order of callee-saved registers
+        MirFunction *func = (inst->getOwner() ? inst->getOwner()->getOwner() : nullptr);
+        CallingConvDesc *cc = func ? func->getCallingConv() : nullptr;
+        if (cc)
+        {
+            const auto &callees = cc->getAllCalleeSavedRegs();
+            for (auto it = callees.rbegin(); it != callees.rend(); ++it)
+            {
+                MirRegister *reg = ob.buildPhysReg(ctx->getTypeTable()->i64(), it->getId(), "", it->getClass());
+                ib.buildTarget(descLd, inst->getSourceRef(), { reg, spReg, off0 });
+                ib.buildTarget(descAddi, inst->getSourceRef(), { spReg, spReg, pos16 });
+            }
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < inst->getOperandCount(); ++i)
+        {
+            auto *op = inst->getOperand(i);
+            if (auto *r = op->get<MirRegister>())
+            {
+                if (!r->getRegClass())
+                    r->setClass(findClass("GPR64"));
+            }
+            ib.buildTarget(descLd, inst->getSourceRef(), { op, spReg, off0 });
+            ib.buildTarget(descAddi, inst->getSourceRef(), { spReg, spReg, pos16 });
+        }
+    }
+
+    inst->eraseFromOwner();
+    return true;
+}
+
+bool RiscV64TargetInstructionSelector::selectTRUNC(MirBuilderContext *ctx, MirInstruction *inst)
+{
+    if (inst->getOperandCount() < 2)
+        return false;
+
+    auto *dst = inst->getOperand(0);
+    auto *src = inst->getOperand(1);
+
+    MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
+    MirOperandBuilder ob(ctx);
+
+    if (auto *r = dst->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("GPR64"));
+    }
+
+    if (src->getType() == MirOperandType::Integer)
+    {
+        MirRegister *zeroReg = ob.buildPhysReg(ctx->getTypeTable()->i64(), 0, "zero", findClass("GPR64"));
+        ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::ADDI64ri),
+                       inst->getSourceRef(),
+                       { dst, zeroReg, src });
+        inst->eraseFromOwner();
+        return true;
+    }
+
+    if (auto *r = src->get<MirRegister>())
+    {
+        if (!r->getRegClass())
+            r->setClass(findClass("GPR64"));
+    }
+
+    MirOperand *imm0 = ob.buildInt(ctx->getTypeTable()->i64(), FlexInt(static_cast<int64_t>(0)));
+    ib.buildTarget(riscv64TargetInst::getTargetDesc(riscv64TargetInst::ADDI64ri),
+                   inst->getSourceRef(),
+                   { dst, src, imm0 });
     inst->eraseFromOwner();
     return true;
 }

@@ -11,7 +11,7 @@
 @g_dword = external var i32 = 100000;
 @g_qword = external var i64 = 0x1122334455667788;
 @g_const_int = external const i32 = 987654;
-@g_bss_int = external var i32;
+@g_bss_int = external var i32 = 0;
 @g_bss_zero = external var i64 = 0;
 @g_internal_counter = internal var i32 = 10;
 @g_weak_val = weak var i32 = 777;

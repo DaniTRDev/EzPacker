@@ -1,0 +1,171 @@
+; ==============================================================================
+; EzStd.mir: Freestanding Standard Runtime Library for EzPacker
+;
+; Provides self-contained implementations of memory and process routines
+; in pure Machine Intermediate Representation, eliminating dependencies on
+; hosted standard C library (libc / msvcrt / ucrt).
+;
+; Routines:
+;   - @memcpy:   memory copy
+;   - @memset:   memory fill
+;   - @memmove:  overlap-safe memory copy
+;   - @memcmp:   memory comparison
+;   - @bzero:    memory zeroing
+;   - @abort:    abnormal process termination
+;   - @exit:     process termination
+; ==============================================================================
+
+fn @memcpy(ptr %dst, ptr %src, i64 %n) -> ptr {
+entry:
+    %zero = MOV i64 0;
+    %one = MOV i64 1;
+    BR label %check;
+
+check:
+    %i = PHI i64 [%zero, %entry], [%next_i, %body];
+    %cond = CMP_ULT i1 %i, %n;
+    BR_COND %cond, label %body, label %exit;
+
+body:
+    %byte = LOAD i8 [ptr %src + %i * 1 + 0];
+    STORE [ptr %dst + %i * 1 + 0], i8 %byte;
+    %next_i = ADD i64 %i, %one;
+    BR label %check;
+
+exit:
+    RET ptr %dst;
+}
+
+fn @memset(ptr %dst, i32 %val, i64 %n) -> ptr {
+entry:
+    %zero = MOV i64 0;
+    %one = MOV i64 1;
+    %bval = TRUNC i8 %val;
+    BR label %check;
+
+check:
+    %i = PHI i64 [%zero, %entry], [%next_i, %body];
+    %cond = CMP_ULT i1 %i, %n;
+    BR_COND %cond, label %body, label %exit;
+
+body:
+    STORE [ptr %dst + %i * 1 + 0], i8 %bval;
+    %next_i = ADD i64 %i, %one;
+    BR label %check;
+
+exit:
+    RET ptr %dst;
+}
+
+fn @bzero(ptr %dst, i64 %n) -> _void {
+entry:
+    %zero = MOV i64 0;
+    %zero_byte = MOV i8 0;
+    %one = MOV i64 1;
+    BR label %check;
+
+check:
+    %i = PHI i64 [%zero, %entry], [%next_i, %body];
+    %cond = CMP_ULT i1 %i, %n;
+    BR_COND %cond, label %body, label %exit;
+
+body:
+    STORE [ptr %dst + %i * 1 + 0], i8 %zero_byte;
+    %next_i = ADD i64 %i, %one;
+    BR label %check;
+
+exit:
+    %ret_v = MOV i64 0;
+    RET i64 %ret_v;
+}
+
+fn @memmove(ptr %dst, ptr %src, i64 %n) -> ptr {
+entry:
+    %zero = MOV i64 0;
+    %one = MOV i64 1;
+    %is_overlap = CMP_UGT i1 %dst, %src;
+    BR_COND %is_overlap, label %backward_init, label %forward_check;
+
+forward_check:
+    %i_fwd = PHI i64 [%zero, %entry], [%next_i_fwd, %forward_body];
+    %cond_fwd = CMP_ULT i1 %i_fwd, %n;
+    BR_COND %cond_fwd, label %forward_body, label %done;
+
+forward_body:
+    %byte_fwd = LOAD i8 [ptr %src + %i_fwd * 1 + 0];
+    STORE [ptr %dst + %i_fwd * 1 + 0], i8 %byte_fwd;
+    %next_i_fwd = ADD i64 %i_fwd, %one;
+    BR label %forward_check;
+
+backward_init:
+    BR label %backward_check;
+
+backward_check:
+    %i_bwd = PHI i64 [%n, %backward_init], [%prev_i_bwd, %backward_body];
+    %cond_bwd = CMP_UGT i1 %i_bwd, %zero;
+    BR_COND %cond_bwd, label %backward_body, label %done;
+
+backward_body:
+    %prev_i_bwd = SUB i64 %i_bwd, %one;
+    %byte_bwd = LOAD i8 [ptr %src + %prev_i_bwd * 1 + 0];
+    STORE [ptr %dst + %prev_i_bwd * 1 + 0], i8 %byte_bwd;
+    BR label %backward_check;
+
+done:
+    RET ptr %dst;
+}
+
+fn @memcmp(ptr %s1, ptr %s2, i64 %n) -> i32 {
+entry:
+    %zero = MOV i64 0;
+    %one = MOV i64 1;
+    BR label %check;
+
+check:
+    %i = PHI i64 [%zero, %entry], [%next_i, %compare];
+    %has_more = CMP_ULT i1 %i, %n;
+    BR_COND %has_more, label %compare, label %equal_exit;
+
+compare:
+    %b1 = LOAD i8 [ptr %s1 + %i * 1 + 0];
+    %b2 = LOAD i8 [ptr %s2 + %i * 1 + 0];
+    %is_diff = CMP_NE i1 %b1, %b2;
+    BR_COND %is_diff, label %diff_branch, label %advance;
+
+advance:
+    %next_i = ADD i64 %i, %one;
+    BR label %check;
+
+diff_branch:
+    %is_gt = CMP_UGT i1 %b1, %b2;
+    BR_COND %is_gt, label %ret_pos, label %ret_neg;
+
+ret_pos:
+    %pos_one = MOV i32 1;
+    RET i32 %pos_one;
+
+ret_neg:
+    %neg_one = MOV i32 -1;
+    RET i32 %neg_one;
+
+equal_exit:
+    %zero_res = MOV i32 0;
+    RET i32 %zero_res;
+}
+
+fn @abort() -> _void {
+entry:
+    BR label %trap;
+
+trap:
+    BR label %trap;
+}
+
+fn @exit(i32 %status) -> _void {
+entry:
+    BR label %trap;
+
+trap:
+    BR label %trap;
+}
+

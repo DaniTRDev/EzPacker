@@ -173,19 +173,21 @@ my_app.exe
 
 ---
 
-## 6. Exception Handling & RTTI Quickstart
+## 6. Freestanding Exception Handling & RTTI Quickstart
 
-EzPacker features native structured exception handling using C's `<setjmp.h>` setjmp/longjmp (SjLj) model:
+EzPacker features native structured exception handling using a freestanding, custom setjmp/longjmp model independent of host C runtimes:
 
 - **IR Instructions**:
-  - `TRY label %body, label %catch`: Enters protected block, saving thread-local context.
-  - `THROW <payload>`: Unwinds the active stack frame and jumps to the nearest active catch handler.
+  - `TRY label %body, label %catch`: Enters protected block, saving thread-local context via custom `__ez_try_enter` and `__ez_setjmp`.
+  - `THROW <payload>`: Unwinds the active stack frame and restores context via `__ez_longjmp` to the nearest active catch handler.
   - `CATCH <dstRegister>`: Captures the exception payload and filters based on RTTI.
+  - `PUSH_REGS` / `POP_REGS`: MIR pseudo-instructions for target-agnostic register preservation and context restoration dynamically querying calling conventions.
 - **RTTI & Source Reference Options**:
   - `--rtti` (default): Captures full type descriptor metadata and source coordinates (file, line, col, func, code snippet) in `RichExceptionPayload`.
   - `--no-rtti` / `-fno-rtti`: Strips runtime type descriptor references for minimal binary footprint.
-- **Runtime Helper**:
-  - Handled by `EzExceptionRuntime` (`libEzExceptionRuntime.a` / `EzExceptionRuntime.lib`), which `ez-ld` injects automatically.
+- **Runtime Helpers & Standard Library**:
+  - Handled by `EzExceptionRuntime` (`libEzExceptionRuntime.a` / `EzExceptionRuntime.lib`), which uses naked inline assembly for `x86_64` (Win64 & SysV) and `riscv64`, completely eliminating C stdlib SjLj dependencies.
+  - Fundamental memory and process runtime operations are provided by freestanding `EzStd.mir` (`@memcpy`, `@memset`, `@bzero`, `@memmove`, `@memcmp`, `@abort`, `@exit`).
 
 ---
 

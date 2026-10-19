@@ -1,7 +1,6 @@
 #ifndef EZEXCEPTION_RUNTIME_H
 #define EZEXCEPTION_RUNTIME_H
 
-#include <setjmp.h>
 #ifdef __cplusplus
 #include <cstdint>
 #else
@@ -26,16 +25,36 @@ extern "C" {
 #endif
 
 /**
- * Thread-local exception context frame containing SjLj jump buffer and unwind links.
+ * Architecture-neutral context buffer for saving/restoring processor state across
+ * exception unwinding boundaries without any libc / setjmp dependencies.
+ * Holds SP, FP, PC/RA, and callee-saved registers (256 bytes).
+ */
+struct EzJmpBuf
+{
+    uint64_t regs[32];
+};
+
+/**
+ * Thread-local exception context frame containing custom jump buffer and unwind links.
  */
 struct EzExceptionFrame
 {
-    jmp_buf jmpBuf;                  ///< Standard C setjmp buffer.
+    struct EzJmpBuf jmpBuf;          ///< Freestanding context buffer (replaces C setjmp).
     struct EzExceptionFrame *prev;   ///< Link to enclosing parent exception frame.
     void *currentPayload;            ///< Exception value or RichExceptionPayload pointer.
     const void *currentRtti;         ///< Type descriptor pointer (or nullptr when --no-rtti).
     int isCaught;                    ///< Flag indicating if exception was matched and handled.
 };
+
+/**
+ * Saves execution context into buf. Returns 0 on direct invocation, non-zero when restored.
+ */
+EZ_EX_API int __ez_setjmp(struct EzJmpBuf *buf);
+
+/**
+ * Restores execution context from buf, transferring control back to __ez_setjmp call site.
+ */
+EZ_EX_API void __ez_longjmp(struct EzJmpBuf *buf, int val) __attribute__((noreturn));
 
 /**
  * Registers an exception frame on the thread-local exception stack.
@@ -50,7 +69,7 @@ EZ_EX_API void __ez_try_leave(struct EzExceptionFrame *frame);
 
 /**
  * Raises an exception with the given payload and RTTI descriptor, unwinding
- * to the nearest active try frame via longjmp.
+ * to the nearest active try frame via __ez_longjmp.
  */
 EZ_EX_API void __ez_throw(void *payload, const void *rtti);
 

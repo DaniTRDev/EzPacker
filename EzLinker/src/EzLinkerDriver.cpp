@@ -107,20 +107,6 @@ void EzLinkerDriver::appendMsvcArgs(const LinkerOptions &opts, std::vector<std::
             args.push_back("/libpath:" + mp.string());
         }
 
-        // C Runtime libraries
-        if (opts.isStatic)
-        {
-            args.push_back("libcmt.lib");
-            args.push_back("libvcruntime.lib");
-            args.push_back("libucrt.lib");
-        }
-        else
-        {
-            args.push_back("msvcrt.lib");
-            args.push_back("vcruntime.lib");
-            args.push_back("ucrt.lib");
-        }
-
         // Win32 base libraries
         args.push_back("kernel32.lib");
         args.push_back("user32.lib");
@@ -205,15 +191,6 @@ void EzLinkerDriver::appendElfArgs(const LinkerOptions &opts, std::vector<std::s
     for (const auto &lib : opts.libraries)
     {
         args.push_back("-l" + lib);
-    }
-
-    // Default C runtime libraries
-    if (!opts.noDefaultLibs)
-    {
-        args.push_back("-lc");
-        args.push_back("-lm");
-        args.push_back("-lpthread");
-        args.push_back("-ldl");
     }
 
     // Compiler-rt / legalizer helpers

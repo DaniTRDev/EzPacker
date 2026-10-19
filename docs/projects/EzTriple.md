@@ -157,6 +157,11 @@ Transforms generic SSA opcodes into concrete machine instruction descriptors:
   ```
 - **Load-Folding Optimization**:
   Automatically folds memory loads into consuming ALU instructions (e.g., `ADD %dst, %src, (LOAD %addr)` -> `ADD64rm %dst, %src, %addr`) when the loaded value has a single user and no intervening memory store clobbers the address.
+- **Context Preservation Pseudo-Instructions (`PUSH_REGS` & `POP_REGS`)**:
+  - Defined in `instructions.irdf` as variadic control-flow pseudo-instructions with side effects to manage register stacking and context restoration.
+  - **Dynamic Callee-Saved Register Lowering**: When emitted with zero operands (`PUSH_REGS;` or `POP_REGS;`), instruction selectors query the function's active calling convention descriptor (`CallingConvDesc::getAllCalleeSavedRegs()`) at lowering time rather than relying on hardcoded register lists.
+  - **Explicit Operand Lowering**: When supplied with explicit register operands (`PUSH_REGS %r1, %r2, ...;`), the instruction selector emits target push/pop sequences in exact operand order (forward order for pushes, reverse order for pops).
+  - Supported across `x86_64` (emits `PUSH64r`/`POP64r`) and `riscv64` (emits stack frame adjustments with `SD`/`LD`).
 
 ---
 
