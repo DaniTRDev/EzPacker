@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import MonacoEditor from '@monaco-editor/react';
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { useCompilerStore } from '../store/compilerStore';
+import { PassPipelineNav } from './PassPipelineNav';
+import { PassInspector } from './PassInspector';
 import { PassViewer } from './PassViewer';
 import { DiffViewer } from './DiffViewer';
 import { CfgViewer } from './CfgViewer';
@@ -8,7 +11,7 @@ import { LivenessViewer } from './LivenessViewer';
 import { StackViewer } from './StackViewer';
 import { ObjectViewer } from './ObjectViewer';
 import { SymbolInspector } from './SymbolInspector';
-import { EZPACKER_MIR_LANGUAGE_ID } from '../grammar/mirLang';
+import { EZPACKER_MIR_LANGUAGE_ID, registerMirLanguage } from '../grammar/mirLang';
 import { stripAnsi } from '../utils/ansi';
 import {
   Layers,
@@ -24,6 +27,8 @@ import {
   Network,
   Server,
   Clock,
+  Workflow,
+  Sparkles,
 } from 'lucide-react';
 
 export const OutputPanel: React.FC = () => {
@@ -40,6 +45,9 @@ export const OutputPanel: React.FC = () => {
 
   const [isDiffMode, setIsDiffMode] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const passes = result?.pipeline?.passes || [];
+  const mutatedPassesCount = passes.filter((p) => p.modifiedMir).length;
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -65,11 +73,35 @@ export const OutputPanel: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-zinc-950 overflow-hidden select-none">
-      {/* Primary Workspace Navigation Bar (De-bloated 3-Mode Architecture) */}
+      {/* Primary Workspace Navigation Bar */}
       <div className="h-10 px-3 bg-zinc-900/90 border-b border-zinc-800 flex items-center justify-between text-xs shrink-0 backdrop-blur-sm">
-        {/* Left: 3 Primary Workspace Modes */}
+        {/* Left: Primary Workspace Modes */}
         <div className="flex items-center space-x-1">
-          {/* 1. Pipeline Mode */}
+          {/* 1. Pass Inspector Mode (Primary Compiler Workbench) */}
+          <button
+            onClick={() => setViewMode('passes')}
+            className={`px-3 py-1.5 font-medium rounded flex items-center space-x-1.5 transition-all ${
+              viewMode === 'passes'
+                ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-sm ring-1 ring-emerald-500/30'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
+            }`}
+            title="Inspect every individual compiler pass result, timing, and delta diff"
+          >
+            <Workflow className="w-3.5 h-3.5" />
+            <span>Passes</span>
+            {passes.length > 0 && (
+              <span className="text-[10px] px-1 py-0.2 rounded bg-zinc-950 text-zinc-300 font-mono flex items-center space-x-0.5">
+                <span>{passes.length}</span>
+                {mutatedPassesCount > 0 && (
+                  <span className="text-emerald-400 font-bold" title={`${mutatedPassesCount} mutated passes`}>
+                    •{mutatedPassesCount}Δ
+                  </span>
+                )}
+              </span>
+            )}
+          </button>
+
+          {/* 2. Coarse Pipeline Stages Mode */}
           <button
             onClick={() => setViewMode('pipeline')}
             className={`px-3 py-1.5 font-medium rounded flex items-center space-x-1.5 transition-all ${
@@ -77,12 +109,13 @@ export const OutputPanel: React.FC = () => {
                 ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
             }`}
+            title="Inspect major stages: MIR, Legalized, Lowered, Assembly, Object"
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Pipeline</span>
+            <span>Stages</span>
           </button>
 
-          {/* 2. Deep Analysis Mode */}
+          {/* 3. Deep Analysis Mode */}
           <button
             onClick={() => setViewMode('analysis')}
             className={`px-3 py-1.5 font-medium rounded flex items-center space-x-1.5 transition-all ${
@@ -90,6 +123,7 @@ export const OutputPanel: React.FC = () => {
                 ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
             }`}
+            title="CFG Topology, Liveness, and Stack Frame layout"
           >
             <Activity className="w-3.5 h-3.5" />
             <span>Analysis</span>
@@ -100,7 +134,7 @@ export const OutputPanel: React.FC = () => {
             )}
           </button>
 
-          {/* 3. Symbol & ABI Inspector Mode */}
+          {/* 4. Symbol & ABI Inspector Mode */}
           <button
             onClick={() => setViewMode('symbols')}
             className={`px-3 py-1.5 font-medium rounded flex items-center space-x-1.5 transition-all ${
@@ -108,6 +142,7 @@ export const OutputPanel: React.FC = () => {
                 ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
             }`}
+            title="Inspect object symbols and correlated Doxygen documentation"
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span>Symbols & Docs</span>
@@ -182,7 +217,7 @@ export const OutputPanel: React.FC = () => {
                   }`}
                   title="Compiled Relocatable Object File (.o/.obj)"
                 >
-                  <span>Object (.o/.obj)</span>
+                  <span>Object</span>
                 </button>
               </div>
 
@@ -267,6 +302,28 @@ export const OutputPanel: React.FC = () => {
       {/* Main Workspace Body */}
       <div className="flex-1 min-h-0 relative">
         {/* ============================================================== */}
+        {/* Mode 0: Pass Pipeline Workbench (Split Nav + Inspector)        */}
+        {/* ============================================================== */}
+        {viewMode === 'passes' && (
+          <PanelGroup direction="horizontal">
+            {/* Left: Compact Pass Pipeline Navigator */}
+            <Panel defaultSize={32} minSize={20} maxSize={50} className="h-full">
+              <PassPipelineNav />
+            </Panel>
+
+            {/* Resize Divider */}
+            <PanelResizeHandle className="w-1.5 bg-zinc-900 hover:bg-emerald-500/50 active:bg-emerald-500 transition-colors cursor-col-resize relative group">
+              <div className="absolute inset-y-0 -left-1 -right-1" />
+            </PanelResizeHandle>
+
+            {/* Right: Pass Inspector */}
+            <Panel defaultSize={68} minSize={40} className="h-full">
+              <PassInspector />
+            </Panel>
+          </PanelGroup>
+        )}
+
+        {/* ============================================================== */}
         {/* Mode 1: Compilation Pipeline View                              */}
         {/* ============================================================== */}
         {viewMode === 'pipeline' && (
@@ -280,6 +337,7 @@ export const OutputPanel: React.FC = () => {
               language={pipelineStage === 'asm' ? 'shell' : EZPACKER_MIR_LANGUAGE_ID}
               theme="ezpacker-dark"
               value={stripAnsi(getActivePipelineCode()) || (isCompiling ? '// Lowering compiler passes...' : '// Stage output not available')}
+              beforeMount={(monaco) => registerMirLanguage(monaco)}
               options={{
                 readOnly: true,
                 fontSize: 13,

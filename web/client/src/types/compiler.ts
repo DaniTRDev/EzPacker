@@ -8,6 +8,7 @@ export interface CompileRequest {
   isPositionIndependent?: boolean;
   enableRtti?: boolean;
   diagLevel?: 'error' | 'warning' | 'trace' | 'debug';
+  emitObject?: boolean;
 }
 
 export interface DiagnosticItem {
@@ -118,9 +119,88 @@ export interface DoxygenStatus {
   errorMessage?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Native Pipeline Telemetry Types (emitted by ezc --dump-pipeline-json)
+// ---------------------------------------------------------------------------
+
+export type CompilerPassStage = 'Verification' | 'MiddleEnd' | 'Legalization' | 'TargetLowering';
+
+export interface PassTelemetryRecord {
+  index: number;
+  name: string;
+  stage: CompilerPassStage;
+  function?: string;
+  type: 'FunctionPass' | 'ModulePass';
+  durationMs: number;
+  modifiedMir: boolean;
+  instructionCount: number;
+  blockCount: number;
+  mirDump: string;
+}
+
+export interface CfgBlockTelemetry {
+  id: number | string;
+  name: string;
+  instructionCount?: number;
+  predecessors: string[];
+  successors: string[];
+  instructions: string[];
+}
+
+export interface LivenessInfo {
+  def: string[];
+  use: string[];
+  liveIn: string[];
+  liveOut: string[];
+}
+
+export interface StackSlotTelemetry {
+  name: string;
+  offset: number;
+  size: number;
+}
+
+export interface FrameLayoutTelemetry {
+  totalFrameSize: number;
+  calleeSavedSize: number;
+  stackSlots: StackSlotTelemetry[];
+}
+
+export interface FunctionTelemetry {
+  name: string;
+  blocks: CfgBlockTelemetry[];
+  liveness: Record<string, LivenessInfo>;
+  frameLayout?: FrameLayoutTelemetry;
+}
+
+export interface PipelineDiagnostic {
+  severity: 'error' | 'warning' | 'trace' | 'debug';
+  component: string;
+  message: string;
+  file: string;
+  line: number;
+  col: number;
+}
+
+export interface PipelineTelemetryJson {
+  target: string;
+  optLevel: string;
+  inputFile: string;
+  initialMir: string;
+  assembly: string;
+  passes: PassTelemetryRecord[];
+  diagnostics: PipelineDiagnostic[];
+  functions: Record<string, FunctionTelemetry>;
+}
+
+// ---------------------------------------------------------------------------
+// Top-Level Compile Response
+// ---------------------------------------------------------------------------
+
 export interface CompileResponse {
   success: boolean;
   exitCode: number;
+  pipeline?: PipelineTelemetryJson;
   asm?: string;
   mir?: string;
   legalizedMir?: string;
