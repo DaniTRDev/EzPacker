@@ -636,5 +636,55 @@ TEST_F(CFrontendAdapterTest, CompilesFloatingPointAndNumericConversions)
     verifyMir(bCtx);
 }
 
+TEST_F(CFrontendAdapterTest, CompilesFullChibiccAstCoverage)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_stmt_expr(int x) {
+            int y = ({ int a = x * 2; int b = a + 3; b * 2; });
+            return y;
+        }
+
+        int test_do_while(int n) {
+            int sum = 0;
+            int i = 0;
+            do {
+                sum += i;
+                i++;
+            } while (i < n);
+            return sum;
+        }
+
+        int test_logical_and_or(int a, int b) {
+            if ((a > 0 && b > 0) || (a < 0 && b < 0)) {
+                return 1;
+            }
+            return 0;
+        }
+
+        int test_ternary_and_comma(int a, int b) {
+            int x = (a++, (b > a) ? (b - a) : (a - b));
+            return x;
+        }
+
+        int test_unary_ops(int a) {
+            int neg = -a;
+            int bitnot = ~a;
+            int lognot = !a;
+            ; // null statement
+            return neg + bitnot + lognot;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "ast_coverage.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 5u);
+    verifyMir(bCtx);
+}
+
 
 
