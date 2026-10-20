@@ -92,6 +92,7 @@ add_test(
         --compile-only
 )
 set_tests_properties("EzCompilerYarpgen_BulkCompilation" PROPERTIES
+    RUN_SERIAL TRUE
     TIMEOUT 120
     LABELS "Bulk;Compilation;Yarpgen;EzCompiler"
 )
@@ -108,6 +109,7 @@ if(REFERENCE_C_COMPILER)
             --opt-levels "O0"
     )
     set_tests_properties("EzCompilerYarpgen_BulkDifferential" PROPERTIES
+        RUN_SERIAL TRUE
         TIMEOUT 180
         LABELS "Bulk;Differential;Yarpgen;EzCompiler"
     )
@@ -155,6 +157,7 @@ add_test(
         --compile-only
 )
 set_tests_properties("EzCompilerYarpgen_StressCompilation" PROPERTIES
+    RUN_SERIAL TRUE
     TIMEOUT 120
     LABELS "Stress;Compilation;Yarpgen;EzCompiler"
 )
@@ -172,6 +175,7 @@ if(REFERENCE_C_COMPILER)
             --opt-level "O0"
     )
     set_tests_properties("EzCompilerYarpgen_StressDifferential" PROPERTIES
+        RUN_SERIAL TRUE
         TIMEOUT 180
         LABELS "Stress;Differential;Yarpgen;EzCompiler"
     )
@@ -224,6 +228,7 @@ if(REFERENCE_C_COMPILER)
                 --reproducers-dir "${CMAKE_BINARY_DIR}/yarpgen_reproducers"
         )
         set_tests_properties("EzCompilerYarpgen_RegressionSeeds" PROPERTIES
+            RUN_SERIAL TRUE
             TIMEOUT 240
             LABELS "Differential;Yarpgen;Regression;EzCompiler"
         )

@@ -656,22 +656,14 @@ void CFrontendFunctionLowerer::lowerStatement(Node *node)
         {
             if (node->var)
             {
-                StackFrameObject *slot = nullptr;
                 auto slotIt = m_localStackSlots.find(node->var);
                 if (slotIt != m_localStackSlots.end())
                 {
-                    slot = slotIt->second;
-                }
-                else
-                {
-                    MirType *varType = mapType(m_tt, node->var->ty);
-                    slot = m_func->getStackFrame()->createStaticStackObj(varType);
-                    m_localStackSlots[node->var] = slot;
-                }
-                MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->var->ty));
-                MirRegister *baseAddr = m_opBuilder.buildVReg(ptrType, "memzero_addr");
-                MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
-                inst.MOV(baseAddr, m_opBuilder.buildRef(slot));
+                    StackFrameObject *slot = slotIt->second;
+                    MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->var->ty));
+                    MirRegister *baseAddr = m_opBuilder.buildVReg(ptrType, "memzero_addr");
+                    MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                    inst.MOV(baseAddr, m_opBuilder.buildRef(slot));
 
                 size_t sz = static_cast<size_t>(node->var->ty && node->var->ty->size > 0 ? node->var->ty->size : 0);
                 if (sz > 0 && sz <= 64)
@@ -712,6 +704,7 @@ void CFrontendFunctionLowerer::lowerStatement(Node *node)
                     MirOperand *valOp = m_opBuilder.buildInt(m_tt->i32(), FlexInt(0, 32));
                     MirOperand *lenOp = m_opBuilder.buildInt(m_tt->i64(), FlexInt(static_cast<int64_t>(sz), 64));
                     inst.build(MirInstructionOpCode::CALL, nullptr, { baseAddr, callee, baseAddr, valOp, lenOp });
+                }
                 }
             }
             break;
