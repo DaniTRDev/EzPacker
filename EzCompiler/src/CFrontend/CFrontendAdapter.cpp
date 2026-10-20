@@ -134,7 +134,10 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
             }
 
             CFrontendFunctionLowerer lowerer(ctx, outMirCtx, func, obj);
-            lowerer.lower();
+            if (!lowerer.lower())
+            {
+                return false;
+            }
         }
     }
 

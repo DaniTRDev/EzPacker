@@ -18,6 +18,7 @@
 #include "Function/MirFunctionStackFrame.h"
 #include "chibicc.h"
 #include <algorithm>
+#include <cctype>
 #include <vector>
 
 namespace EzCompiler::CFrontend
@@ -73,7 +74,7 @@ void CFrontendFunctionLowerer::collectAddressTaken(Node *node, std::unordered_se
     }
 }
 
-void CFrontendFunctionLowerer::lower()
+bool CFrontendFunctionLowerer::lower()
 {
     std::unordered_set<Obj *> addrTaken;
     if (m_chibiFunc->body)
@@ -141,6 +142,8 @@ void CFrontendFunctionLowerer::lower()
             inst.RET(zero);
         }
     }
+
+    return !m_hasError;
 }
 
 MirBlock *CFrontendFunctionLowerer::createBlock(const char *prefix)
@@ -686,6 +689,81 @@ void CFrontendFunctionLowerer::lowerStatement(Node *node)
                     MirOperand *valOp = m_opBuilder.buildInt(m_tt->i32(), FlexInt(0, 32));
                     MirOperand *lenOp = m_opBuilder.buildInt(m_tt->i64(), FlexInt(static_cast<int64_t>(sz), 64));
                     inst.build(MirInstructionOpCode::CALL, nullptr, { baseAddr, callee, baseAddr, valOp, lenOp });
+                }
+            }
+            break;
+        }
+        case ND_ASM:
+        {
+            std::string asmStr = node->asm_str ? node->asm_str : "";
+            while (!asmStr.empty() && (std::isspace(static_cast<unsigned char>(asmStr.front())) || asmStr.front() == '"'))
+            {
+                asmStr.erase(asmStr.begin());
+            }
+            while (!asmStr.empty() && (std::isspace(static_cast<unsigned char>(asmStr.back())) ||
+                                      asmStr.back() == ';' || asmStr.back() == '"'))
+            {
+                asmStr.pop_back();
+            }
+
+            if (asmStr.empty())
+            {
+                break;
+            }
+
+            if (!m_currentBlock)
+            {
+                m_currentBlock = createBlock("asm_entry");
+            }
+            else if (isBlockTerminated(m_currentBlock))
+            {
+                m_currentBlock = createBlock("after_asm");
+            }
+
+            const MirTargetInstructionDesc *targetDesc = nullptr;
+            if (m_driverCtx.getTargetDesc())
+            {
+                targetDesc = m_driverCtx.getTargetDesc()->findInstructionDesc(asmStr);
+            }
+
+            if (targetDesc)
+            {
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .buildTarget(targetDesc, nullptr, {});
+            }
+            else
+            {
+                std::string lowerMnemonic = asmStr;
+                for (char &c : lowerMnemonic)
+                {
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                }
+
+                if (lowerMnemonic == "nop")
+                {
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .NOP(nullptr);
+                }
+                else if (lowerMnemonic == "syscall")
+                {
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .SYSCALL(nullptr);
+                }
+                else if (lowerMnemonic == "halt")
+                {
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .HALT(nullptr);
+                }
+                else
+                {
+                    m_hasError = true;
+                    if (m_driverCtx.getDiagCollector())
+                    {
+                        m_driverCtx.getDiagCollector()->error(
+                                "CFrontend",
+                                "unrecognized or unsupported inline assembly instruction '{}'",
+                                asmStr);
+                    }
                 }
             }
             break;
@@ -1395,6 +1473,79 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
         case ND_MEMZERO:
             lowerStatement(node);
             return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0, 32));
+        case ND_ASM:
+            lowerStatement(node);
+            return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0));
+        case ND_CAS:
+        {
+            MirType *valType = mapType(m_tt, node->cas_addr && node->cas_addr->ty && node->cas_addr->ty->base
+                                                     ? node->cas_addr->ty->base
+                                                     : node->ty);
+            MirOperand *addrOp = lowerExpression(node->cas_addr);
+            MirRegister *addrReg = ensureRegister(addrOp, m_tt->getPtr(valType), "cas_addr");
+
+            MirOperand *oldOp = lowerExpression(node->cas_old);
+            MirRegister *oldReg = ensureRegister(oldOp, m_tt->getPtr(valType), "cas_old_ptr");
+
+            MirOperand *newValOp = lowerExpression(node->cas_new);
+            MirRegister *newValReg = ensureRegister(newValOp, valType, "cas_new_val");
+
+            MirMemory *memAddr = m_opBuilder.buildMem(valType, addrReg, FlexInt(0, 64));
+            MirRegister *currentVal = m_opBuilder.buildVReg(valType, "cas_curr_val");
+            MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+            inst.LOAD(currentVal, memAddr);
+
+            MirMemory *memOld = m_opBuilder.buildMem(valType, oldReg, FlexInt(0, 64));
+            MirRegister *expectedVal = m_opBuilder.buildVReg(valType, "cas_exp_val");
+            inst.LOAD(expectedVal, memOld);
+
+            MirRegister *cmp = m_opBuilder.buildVReg(m_tt->i1(), "cas_cmp");
+            inst.CMP_EQ(cmp, currentVal, expectedVal);
+
+            MirBlock *successB = createBlock("cas_success");
+            MirBlock *failB = createBlock("cas_fail");
+            MirBlock *joinB = createBlock("cas_join");
+            inst.BR_COND(cmp, m_opBuilder.buildRef(successB), m_opBuilder.buildRef(failB));
+
+            MirType *resType = mapType(m_tt, node->ty);
+            uint16_t resBits = static_cast<uint16_t>(resType->getTotalSizeInBits());
+            MirOperand *one = m_opBuilder.buildInt(resType, FlexInt(1, resBits));
+            MirOperand *zero = m_opBuilder.buildInt(resType, FlexInt(0, resBits));
+            MirRegister *resReg = m_opBuilder.buildVReg(resType, "cas_res");
+
+            // Success: store newValReg to *addr, set res=1, jump to joinB
+            MirInstructionBuilder instSuccess(&m_bCtx, successB, InsertionType::Append);
+            instSuccess.STORE(memAddr, newValReg);
+            instSuccess.MOV(resReg, one);
+            instSuccess.JMP(m_opBuilder.buildRef(joinB));
+
+            // Fail: store currentVal to *oldReg, set res=0, jump to joinB
+            MirInstructionBuilder instFail(&m_bCtx, failB, InsertionType::Append);
+            instFail.STORE(memOld, currentVal);
+            instFail.MOV(resReg, zero);
+            instFail.JMP(m_opBuilder.buildRef(joinB));
+
+            m_currentBlock = joinB;
+            return resReg;
+        }
+        case ND_EXCH:
+        {
+            MirType *valType = mapType(m_tt, node->ty);
+            MirOperand *addrOp = lowerExpression(node->lhs);
+            MirRegister *addrReg = ensureRegister(addrOp, m_tt->getPtr(valType), "exch_addr");
+
+            MirOperand *newValOp = lowerExpression(node->rhs);
+            MirRegister *newValReg = ensureRegister(newValOp, valType, "exch_new");
+
+            MirMemory *mem = m_opBuilder.buildMem(valType, addrReg, FlexInt(0, 64));
+            MirRegister *oldValReg = m_opBuilder.buildVReg(valType, "exch_old");
+
+            MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+            inst.LOAD(oldValReg, mem);
+            inst.STORE(mem, newValReg);
+
+            return oldValReg;
+        }
         case ND_NULL_EXPR:
             return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0));
         default:

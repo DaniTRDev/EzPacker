@@ -48,8 +48,9 @@ class CFrontendFunctionLowerer
 
     /**
      * Executes the lowering pass on the function AST.
+     * Returns true on success, false if any diagnostic error was recorded.
      */
-    void lower();
+    bool lower();
 
   private:
     void collectAddressTaken(struct Node *node, std::unordered_set<struct Obj *> &addrTaken);
@@ -77,6 +78,7 @@ class CFrontendFunctionLowerer
     std::unordered_map<struct Obj *, MirRegister *> m_localVars;
     std::unordered_map<struct Obj *, StackFrameObject *> m_localStackSlots;
     std::unordered_map<std::string, MirBlock *> m_labeledBlocks;
+    bool m_hasError{ false };
 };
 
 } // namespace CFrontend

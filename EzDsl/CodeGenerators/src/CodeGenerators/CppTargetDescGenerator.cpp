@@ -264,6 +264,7 @@ void CppTargetDescGenerator::emitHeader(CppSourceEmitter &emitter,
             emitter.emitLine("MirRegisterBank *createRegisterBank(const char *name) override;");
             emitter.emitLine("std::unique_ptr<GenericCodeEmitter> createCodeEmitter() override;");
             emitter.emitLine("TargetRelocationResolver *getRelocationResolver() override;");
+            emitter.emitLine("const MirTargetInstructionDesc *findInstructionDesc(std::string_view mnemonic) const override;");
             emitter.emitBlankLine();
             emitter.emitComment("Convenience accessors for target-specific conventions, formats and settings.");
             emitter.emitLine("void setPositionIndependent(bool isPositionIndependent) { m_isPic = isPositionIndependent; }");
@@ -370,6 +371,7 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitInclude("Operand/MirRegisterBank.h");
     emitter.emitInclude("Operand/MirRegisterClass.h");
     emitter.emitInclude(std::format("{}RegisterInfo.h", ns));
+    emitter.emitInclude(std::format("{}TargetInstructionTable.h", targetLower));
     emitter.emitInclude("Descriptors/TargetRelocationResolver.h");
     emitter.emitInclude("Descriptors/TargetBinaryDesc.h");
     emitter.emitInclude("Function/CallingConvDesc.h");
@@ -720,6 +722,13 @@ void CppTargetDescGenerator::emitSource(CppSourceEmitter &emitter,
                 emitter.emitLine("m_relocResolver = std::make_unique<{}RelocationResolver>();", ns);
             }
             emitter.emitLine("return m_relocResolver.get();");
+        }
+        emitter.emitBlankLine();
+
+        emitter.emitLine("const MirTargetInstructionDesc *{}::findInstructionDesc(std::string_view mnemonic) const", className);
+        {
+            auto s = emitter.enterScope();
+            emitter.emitLine("return EzTargets::{}::{}TargetInst::findTargetDesc(mnemonic);", ns, targetLower);
         }
     }
 }

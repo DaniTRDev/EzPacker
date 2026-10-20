@@ -2,6 +2,7 @@
 #include "CFrontend/CFrontendAdapter.h"
 #include "DriverContext.h"
 #include "Builder/MirBuilderContext.h"
+#include "Block/MirBlock.h"
 #include "Function/MirFunction.h"
 #include "GlobalVar/MirGlobalVar.h"
 #include "MirPasses/Passes/MirVerifierPass.h"
@@ -449,6 +450,84 @@ TEST_F(CFrontendAdapterTest, CompilesStructPartialInitializerMemzero)
     ASSERT_TRUE(success);
 
     ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesInlineAssemblyAndSystemInstructions)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        void test_system_ops(void) {
+            __asm__("nop");
+            __asm__("pause");
+            __asm__("cli");
+            __asm__("sti");
+            __asm__("syscall");
+            __asm__("hlt");
+            __asm__("wbinvd");
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "system_asm.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *fn = bCtx->getFunctions().front();
+    ASSERT_NE(fn, nullptr);
+    ASSERT_NE(fn->getEntryPoint(), nullptr);
+    EXPECT_GT(fn->getEntryPoint()->getInstrCount(), 5u);
+
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, ReportsErrorOnUnrecognizedInlineAssembly)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *badCode = R"c(
+        void test_bad_asm(void) {
+            __asm__("this_is_an_invalid_instruction_xyz");
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, badCode, *bCtx, "bad_asm.c");
+    EXPECT_FALSE(success);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesAtomicCompareAndSwapAndExchange)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_cas(int *ptr, int expected, int desired) {
+            int old_val = expected;
+            if (__builtin_compare_and_swap(ptr, &old_val, desired)) {
+                return 1;
+            }
+            return 0;
+        }
+
+        int test_exchange(int *ptr, int new_val) {
+            return __builtin_atomic_exchange(ptr, new_val);
+        }
+
+        int test_atomic_type(_Atomic int *counter) {
+            *counter += 1;
+            return *counter;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "atomics.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 3u);
     verifyMir(bCtx);
 }
 

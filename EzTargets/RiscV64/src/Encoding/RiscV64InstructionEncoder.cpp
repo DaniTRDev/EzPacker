@@ -74,6 +74,53 @@ bool InstructionEncoder::encode(const EncodingDesc &desc,
             return true;
         }
 
+        if (desc.m_opcode == 0x73)
+        {
+            if (desc.m_funct3 == 0 && desc.m_funct7 == 0x00)
+            {
+                emitWord(out, 0x00000073); // ecall
+                return true;
+            }
+            if (desc.m_funct3 == 0 && desc.m_funct7 == 0x01)
+            {
+                emitWord(out, 0x00100073); // ebreak
+                return true;
+            }
+            if (desc.m_funct3 == 0 && desc.m_funct7 == 0x02)
+            {
+                emitWord(out, 0x00200073); // uret
+                return true;
+            }
+            if (desc.m_funct3 == 0x02 && desc.m_funct7 == 0x08)
+            {
+                emitWord(out, 0x10200073); // sret
+                return true;
+            }
+            if (desc.m_funct3 == 0x02 && desc.m_funct7 == 0x18)
+            {
+                emitWord(out, 0x30200073); // mret
+                return true;
+            }
+            if (desc.m_funct3 == 0x05 && desc.m_funct7 == 0x08)
+            {
+                emitWord(out, 0x10500073); // wfi
+                return true;
+            }
+        }
+        else if (desc.m_opcode == 0x0F)
+        {
+            if (desc.m_funct3 == 0)
+            {
+                emitWord(out, 0x0FF0000F); // fence
+                return true;
+            }
+            if (desc.m_funct3 == 1)
+            {
+                emitWord(out, 0x0000100F); // fence.i
+                return true;
+            }
+        }
+
         // CALL pseudo: jal ra, target
         if (desc.m_relocOperand != 0xFF || (!operands.empty() && operands[0].m_needsReloc))
         {

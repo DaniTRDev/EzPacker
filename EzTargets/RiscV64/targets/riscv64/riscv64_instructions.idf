@@ -1414,3 +1414,93 @@ target_inst FMV_D(FPR64:dst OUT, FPR64:src IN) {
         operands { dst => rd; src => rs1; };
     };
 };
+
+// ============================================================================
+// SYSTEM INSTRUCTIONS
+// ============================================================================
+
+target_inst ECALL() {
+    MNEMONIC("ecall");
+    FLAGS(HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x73];
+        funct3: 0x0;
+        funct7: 0x0;
+    };
+};
+
+target_inst EBREAK() {
+    MNEMONIC("ebreak");
+    FLAGS(HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x73];
+        funct3: 0x0;
+        funct7: 0x1;
+    };
+};
+
+target_inst URET() {
+    MNEMONIC("uret");
+    FLAGS(IsReturn, HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x73];
+        funct3: 0x0;
+        funct7: 0x2;
+    };
+};
+
+target_inst SRET() {
+    MNEMONIC("sret");
+    FLAGS(IsReturn, HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x73];
+        funct3: 0x2;
+        funct7: 0x8;
+    };
+};
+
+target_inst MRET() {
+    MNEMONIC("mret");
+    FLAGS(IsReturn, HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x73];
+        funct3: 0x2;
+        funct7: 0x18;
+    };
+};
+
+target_inst WFI() {
+    MNEMONIC("wfi");
+    FLAGS(HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x73];
+        funct3: 0x5;
+        funct7: 0x8;
+    };
+};
+
+target_inst FENCE() {
+    MNEMONIC("fence");
+    FLAGS(HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x0F];
+        funct3: 0x0;
+    };
+};
+
+target_inst FENCE_I() {
+    MNEMONIC("fence.i");
+    FLAGS(HasSideEffect);
+    ENCODING {
+        form: pseudo;
+        opcode: [0x0F];
+        funct3: 0x1;
+    };
+};

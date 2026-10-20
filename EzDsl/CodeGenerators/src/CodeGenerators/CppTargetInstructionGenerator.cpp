@@ -128,6 +128,7 @@ void CppTargetInstructionGenerator::emitHeader(CppSourceEmitter &emitter,
         emitter.emitBlankLine();
 
         emitter.emitLine("const MirTargetInstructionDesc *getTargetDesc(OpCode op);");
+        emitter.emitLine("const MirTargetInstructionDesc *findTargetDesc(std::string_view mnemonic);");
         emitter.emitLine("void initializeTargetInstructionTable(::TargetDesc *target);");
     }
 
@@ -147,6 +148,8 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter,
     emitter.emitInclude("Operand/MirRegisterClass.h");
     emitter.emitInclude("Operand/MirRegisterBank.h");
     emitter.emitLine("#include <string_view>");
+    emitter.emitLine("#include <cstring>");
+    emitter.emitLine("#include <cctype>");
     emitter.emitBlankLine();
 
     std::string ns = std::format("{}::{}TargetInst", m_namespaceRoot, m_targetName);
@@ -210,6 +213,43 @@ void CppTargetInstructionGenerator::emitSource(CppSourceEmitter &emitter,
                 emitter.emitLine("return nullptr;");
             }
             emitter.emitLine("return &s_descs[static_cast<size_t>(op) - 1];");
+        }
+        emitter.emitBlankLine();
+
+        // findTargetDesc
+        emitter.emitLine("const MirTargetInstructionDesc *findTargetDesc(std::string_view mnemonic)");
+        {
+            auto fnScope = emitter.enterBlock();
+            emitter.emitLine("auto equalsIgnoreCase = [](std::string_view a, const char *b) -> bool {");
+            emitter.indent();
+            emitter.emitLine("if (!b) return false;");
+            emitter.emitLine("size_t bLen = std::strlen(b);");
+            emitter.emitLine("if (a.size() != bLen) return false;");
+            emitter.emitLine("for (size_t i = 0; i < a.size(); ++i)");
+            emitter.emitLine("{");
+            emitter.indent();
+            emitter.emitLine("if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i])))");
+            emitter.indent();
+            emitter.emitLine("return false;");
+            emitter.dedent();
+            emitter.dedent();
+            emitter.emitLine("}");
+            emitter.emitLine("return true;");
+            emitter.dedent();
+            emitter.emitLine("};");
+            emitter.emitBlankLine();
+            emitter.emitLine("for (size_t i = 0; i < static_cast<size_t>(OPCODE_COUNT) - 1; ++i)");
+            emitter.emitLine("{");
+            emitter.indent();
+            emitter.emitLine("if (equalsIgnoreCase(mnemonic, s_descs[i].getName()))");
+            emitter.emitLine("{");
+            emitter.indent();
+            emitter.emitLine("return &s_descs[i];");
+            emitter.dedent();
+            emitter.emitLine("}");
+            emitter.dedent();
+            emitter.emitLine("}");
+            emitter.emitLine("return nullptr;");
         }
         emitter.emitBlankLine();
 
