@@ -1467,6 +1467,39 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                     inst.MOV(dest, ptrInt);
                     return dest;
                 }
+                else if (destType->getKind() == MirTypeKind::FloatingPoint)
+                {
+                    double dval = srcUnsigned ? static_cast<double>(uval) : static_cast<double>(sval);
+                    if (destBits == 32)
+                        return m_opBuilder.buildFloat(destType, FlexFloat(static_cast<float>(dval)));
+                    return m_opBuilder.buildFloat(destType, FlexFloat(dval));
+                }
+            }
+            else if (src->isOfType<MirFloat>())
+            {
+                auto *fImm = src->get<MirFloat>();
+                double val = fImm->getValue().getDouble();
+                if (destType->getKind() == MirTypeKind::FloatingPoint)
+                {
+                    if (destType->getTotalSizeInBits() == 32)
+                        return m_opBuilder.buildFloat(destType, FlexFloat(static_cast<float>(val)));
+                    return m_opBuilder.buildFloat(destType, FlexFloat(val));
+                }
+                else if (destType->getKind() == MirTypeKind::Integer)
+                {
+                    if (node->ty && node->ty->kind == TY_BOOL)
+                    {
+                        return m_opBuilder.buildInt(destType, FlexInt((val != 0.0) ? 1ULL : 0ULL, 1));
+                    }
+                    uint16_t destBits = static_cast<uint16_t>(destType->getTotalSizeInBits());
+                    if (isUnsignedType(node->ty))
+                    {
+                        uint64_t uval = static_cast<uint64_t>(val);
+                        return m_opBuilder.buildInt(destType, FlexInt(uval, destBits));
+                    }
+                    int64_t sval = static_cast<int64_t>(val);
+                    return m_opBuilder.buildInt(destType, FlexInt(sval, destBits));
+                }
             }
 
             MirRegister *dest = m_opBuilder.buildVReg(destType, "cast");
@@ -1481,6 +1514,14 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
             if (node->ty && node->ty->kind == TY_BOOL)
             {
+                if (srcType->getKind() == MirTypeKind::FloatingPoint)
+                {
+                    MirOperand *fzero = m_opBuilder.buildFloat(srcType, FlexFloat(0.0));
+                    MirRegister *zeroReg = m_opBuilder.buildVReg(srcType, "fzero");
+                    inst.MOV(zeroReg, fzero);
+                    inst.FCMP(dest, src, zeroReg);
+                    return dest;
+                }
                 uint16_t srcBits = static_cast<uint16_t>(srcType->getTotalSizeInBits());
                 MirType *intSrcType = (srcType->getKind() == MirTypeKind::Integer) ? srcType : m_tt->getIntegerTypeBySize(srcBits);
                 MirOperand *zero = m_opBuilder.buildInt(intSrcType, FlexInt(0, srcBits));
@@ -1488,20 +1529,61 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                 return dest;
             }
 
-            if (destType->getTotalSizeInBits() < srcType->getTotalSizeInBits())
+            if (srcType->getKind() == MirTypeKind::FloatingPoint && destType->getKind() == MirTypeKind::FloatingPoint)
             {
-                inst.TRUNC(dest, src);
-            }
-            else if (destType->getTotalSizeInBits() > srcType->getTotalSizeInBits())
-            {
-                if (isUnsignedType(node->lhs->ty))
-                    inst.ZEXT(dest, src);
+                if (destType->getTotalSizeInBits() > srcType->getTotalSizeInBits())
+                {
+                    inst.FPEXT(dest, src);
+                }
+                else if (destType->getTotalSizeInBits() < srcType->getTotalSizeInBits())
+                {
+                    inst.FPTRUNC(dest, src);
+                }
                 else
-                    inst.SEXT(dest, src);
+                {
+                    inst.MOV(dest, src);
+                }
+            }
+            else if (srcType->getKind() != MirTypeKind::FloatingPoint && destType->getKind() == MirTypeKind::FloatingPoint)
+            {
+                if (isUnsignedType(node->lhs->ty) && srcType->getTotalSizeInBits() < 64)
+                {
+                    MirRegister *zextReg = m_opBuilder.buildVReg(m_tt->i64(), "zext_fp");
+                    inst.ZEXT(zextReg, src);
+                    src = zextReg;
+                }
+                inst.SITOFP(dest, src);
+            }
+            else if (srcType->getKind() == MirTypeKind::FloatingPoint && destType->getKind() != MirTypeKind::FloatingPoint)
+            {
+                if (destType->getTotalSizeInBits() >= 32)
+                {
+                    inst.FPTOSI(dest, src);
+                }
+                else
+                {
+                    MirRegister *tmpReg = m_opBuilder.buildVReg(m_tt->i32(), "fptosi_tmp");
+                    inst.FPTOSI(tmpReg, src);
+                    inst.TRUNC(dest, tmpReg);
+                }
             }
             else
             {
-                inst.MOV(dest, src);
+                if (destType->getTotalSizeInBits() < srcType->getTotalSizeInBits())
+                {
+                    inst.TRUNC(dest, src);
+                }
+                else if (destType->getTotalSizeInBits() > srcType->getTotalSizeInBits())
+                {
+                    if (isUnsignedType(node->lhs->ty))
+                        inst.ZEXT(dest, src);
+                    else
+                        inst.SEXT(dest, src);
+                }
+                else
+                {
+                    inst.MOV(dest, src);
+                }
             }
             return dest;
         }

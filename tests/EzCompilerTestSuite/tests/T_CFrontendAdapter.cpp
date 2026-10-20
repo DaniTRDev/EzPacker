@@ -598,5 +598,43 @@ TEST_F(CFrontendAdapterTest, CompilesIndirectFunctionCallsAndPointers)
     verifyMir(bCtx);
 }
 
+TEST_F(CFrontendAdapterTest, CompilesFloatingPointAndNumericConversions)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        float test_int_to_float(int x) {
+            return (float)x;
+        }
+
+        double test_float_to_double(float f) {
+            return (double)f;
+        }
+
+        int test_double_to_int(double d) {
+            return (int)d;
+        }
+
+        _Bool test_float_to_bool(float f) {
+            return (_Bool)f;
+        }
+
+        float test_float_constants(void) {
+            float a = (float)42;
+            double b = (double)3.14f;
+            int c = (int)9.99;
+            return a + (float)b + (float)c;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "conversions.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 5u);
+    verifyMir(bCtx);
+}
+
 
 
