@@ -3,8 +3,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { fileURLToPath } from 'url';
-import { CompileRequest, CompileResponse, PassTiming, DiagnosticItem, FunctionAnalysis, ObjectAnalysis, DoxygenDocEntity } from './types.js';
-import { parseCompilerOutput, extractCleanMir, extractCleanAsm, stripAnsi } from './parser.js';
+import {
+  CompileRequest,
+  CompileResponse,
+  PassTiming,
+  DiagnosticItem,
+  FunctionAnalysis,
+  CfgBlock,
+  ObjectAnalysis,
+  PipelineTelemetryJson,
+} from './types.js';
+import { stripAnsi, extractCleanAsm } from './parser.js';
 import { parseObjectFile } from './objectParser.js';
 import { DoxygenRunner } from './doxygen.js';
 
@@ -93,72 +102,165 @@ export class CompilerRunner {
         (/\b(int|void|char|short|long|float|double|struct|typedef|extern|#include|#define)\b/.test(req.code)));
     const sourceFileName = isC ? 'source.c' : 'source.mir';
     const tempSourceFile = path.join(tempDir, sourceFileName);
+    const tempJsonFile = path.join(tempDir, 'pipeline.json');
+    const tempObjFile = path.join(tempDir, 'output.obj');
 
     try {
       fs.writeFileSync(tempSourceFile, req.code, 'utf-8');
 
-      // Common flags
-      const baseFlags: string[] = [];
+      // Build single unified ezc command line
+      const args: string[] = [
+        '-o', tempObjFile,
+        '--dump-pipeline-json', tempJsonFile,
+        '-v',
+        '--time-passes',
+        '--print-passes',
+      ];
+
       if (req.targetTriple) {
-        baseFlags.push('--target', req.targetTriple);
+        args.push('--target', req.targetTriple);
       }
       if (req.optLevel) {
-        baseFlags.push(`-${req.optLevel}`);
+        args.push(`-${req.optLevel}`);
       }
       if (req.isPositionIndependent) {
-        baseFlags.push('-fPIC');
+        args.push('-fPIC');
       }
       if (req.enableRtti === false) {
-        baseFlags.push('--no-rtti');
+        args.push('--no-rtti');
       } else {
-        baseFlags.push('--rtti');
+        args.push('--rtti');
       }
       if (req.features && req.features.length > 0) {
         for (const feat of req.features) {
-          baseFlags.push('--target-feature', feat);
+          args.push('--target-feature', feat);
         }
       }
 
-      // Main run with telemetry flags to get timings, diagnostics, CFG and liveness
-      const telemetryFlags = [...baseFlags, '--time-passes', '--print-passes', '-v'];
+      args.push(tempSourceFile);
 
-      // 1. Run main assembly compilation (-S)
-      const asmRes = await this.executeEzc([...telemetryFlags, '-S', tempSourceFile]);
+      // Execute ezc once
+      const ezcRes = await this.executeEzc(args);
 
-      // Parse the output for assembly, passes, diagnostics, CFG and liveness
-      const parsedAsm = parseCompilerOutput(asmRes.stdout, asmRes.stderr, req.code);
+      let pipelineData: PipelineTelemetryJson | undefined;
+      if (fs.existsSync(tempJsonFile)) {
+        try {
+          const jsonContent = fs.readFileSync(tempJsonFile, 'utf-8');
+          pipelineData = JSON.parse(jsonContent) as PipelineTelemetryJson;
+        } catch (jsonErr: any) {
+          console.warn('[CompilerRunner] Failed to parse pipeline telemetry JSON:', jsonErr.message);
+        }
+      }
 
-      let genericMir = '';
-      let legalizedMir = '';
-      let loweredMir = '';
-      let objectInfo: ObjectAnalysis | undefined = undefined;
+      let objectInfo: ObjectAnalysis | undefined;
+      if (fs.existsSync(tempObjFile)) {
+        try {
+          objectInfo = parseObjectFile(tempObjFile);
+        } catch (objErr: any) {
+          console.warn('[CompilerRunner] Failed parsing object file:', objErr.message);
+        }
+      }
 
-      // If compilation succeeded, fetch clean intermediates and object binary concurrently
-      if (asmRes.exitCode === 0) {
-        const tempObjFile = path.join(tempDir, 'output.obj');
-        const [mirRes, legRes, lowRes, objRes] = await Promise.all([
-          this.executeEzc([...baseFlags, '--emit-mir', tempSourceFile]),
-          this.executeEzc([...baseFlags, '--emit-legalized-mir', tempSourceFile]),
-          this.executeEzc([...baseFlags, '--emit-lowered-mir', tempSourceFile]),
-          this.executeEzc([...baseFlags, '-o', tempObjFile, tempSourceFile]),
-        ]);
+      // Convert pass results to legacy PassTiming array
+      const passes: PassTiming[] = (pipelineData?.passes || []).map((p) => ({
+        name: p.name,
+        target: p.function,
+        durationMs: p.durationMs,
+      }));
 
-        genericMir = extractCleanMir(mirRes.stdout);
-        legalizedMir = extractCleanMir(legRes.stdout);
-        loweredMir = extractCleanMir(lowRes.stdout);
+      // Extract diagnostics
+      const diagnostics: DiagnosticItem[] = (pipelineData?.diagnostics || []).map((d) => ({
+        type: d.severity,
+        component: d.component || 'EzCompiler',
+        message: d.message,
+        file: d.file || undefined,
+        line: d.line > 0 ? d.line : undefined,
+        col: d.col > 0 ? d.col : undefined,
+      }));
 
-        if (fs.existsSync(tempObjFile)) {
-          try {
-            objectInfo = parseObjectFile(tempObjFile);
-          } catch (objErr: any) {
-            console.warn('[CompilerRunner] Failed parsing object file:', objErr.message);
+      // If ezc failed and diagnostics are empty, extract error from stderr
+      if (ezcRes.exitCode !== 0 && diagnostics.length === 0 && ezcRes.stderr) {
+        const cleanErr = stripAnsi(ezcRes.stderr).trim();
+        if (cleanErr) {
+          diagnostics.push({
+            type: 'error',
+            component: 'EzCompiler',
+            message: cleanErr,
+          });
+        }
+      }
+
+      // Convert functions telemetry to FunctionAnalysis
+      const functions: Record<string, FunctionAnalysis> = {};
+      if (pipelineData?.functions) {
+        for (const [fnName, fnTel] of Object.entries(pipelineData.functions)) {
+          const blocks: Record<string, CfgBlock> = {};
+          for (const b of fnTel.blocks || []) {
+            const blockIdStr = String(b.id);
+            const blockObj: CfgBlock = {
+              id: blockIdStr,
+              blockNumber: typeof b.id === 'number' ? b.id : (parseInt(blockIdStr, 10) || undefined),
+              instructionCount: b.instructionCount ?? (b.instructions?.length || 0),
+              instructions: b.instructions || [],
+              predecessors: b.predecessors || [],
+              successors: b.successors || [],
+            };
+            blocks[blockIdStr] = blockObj;
+            if (b.name && b.name !== blockIdStr) {
+              blocks[b.name] = blockObj;
+            }
           }
+
+          const liveness: Record<string, { def: string[]; use: string[]; liveIn: string[]; liveOut: string[] }> = {};
+          if (fnTel.liveness && typeof fnTel.liveness === 'object') {
+            if (Array.isArray(fnTel.liveness)) {
+              for (const l of fnTel.liveness as any[]) {
+                liveness[l.blockId] = {
+                  def: l.def || [],
+                  use: l.use || [],
+                  liveIn: l.liveIn || [],
+                  liveOut: l.liveOut || [],
+                };
+              }
+            } else {
+              for (const [blkKey, l] of Object.entries(fnTel.liveness)) {
+                liveness[blkKey] = {
+                  def: (l as any).def || [],
+                  use: (l as any).use || [],
+                  liveIn: (l as any).liveIn || [],
+                  liveOut: (l as any).liveOut || [],
+                };
+              }
+            }
+          }
+
+          functions[fnName] = {
+            name: fnName,
+            blocks,
+            liveness,
+            frameLayout: fnTel.frameLayout
+              ? {
+                  totalSize: fnTel.frameLayout.totalFrameSize,
+                  calleeSaveSize: fnTel.frameLayout.calleeSavedSize,
+                }
+              : undefined,
+          };
         }
       }
+
+      // Find representative snapshots for coarse legacy stage views
+      const allPasses = pipelineData?.passes || [];
+      const legalPasses = allPasses.filter((p) => p.stage === 'Legalization');
+      const lowerPasses = allPasses.filter((p) => p.stage === 'TargetLowering');
+
+      const genericMir = pipelineData?.initialMir || '';
+      const legalizedMir = (legalPasses.length > 0 ? legalPasses[legalPasses.length - 1].mirDump : '') || genericMir;
+      const loweredMir = (lowerPasses.length > 0 ? lowerPasses[lowerPasses.length - 1].mirDump : '') || legalizedMir;
+      const cleanAsm = pipelineData?.assembly || extractCleanAsm(ezcRes.stdout);
 
       // Collect symbol candidates for Doxygen documentation lookup
       const symbolCandidates = new Set<string>();
-      for (const fn of Object.keys(parsedAsm.functions)) {
+      for (const fn of Object.keys(functions)) {
         symbolCandidates.add(fn);
       }
       if (objectInfo) {
@@ -179,20 +281,20 @@ export class CompilerRunner {
         : {};
 
       const durationMs = Math.round((performance.now() - startTime) * 100) / 100;
-      const cleanAsm = extractCleanAsm(asmRes.stdout);
 
       return {
-        success: asmRes.exitCode === 0,
-        exitCode: asmRes.exitCode,
-        asm: cleanAsm || parsedAsm.cleanOutput,
+        success: ezcRes.exitCode === 0,
+        exitCode: ezcRes.exitCode,
+        pipeline: pipelineData,
+        asm: cleanAsm,
         mir: genericMir,
-        legalizedMir: legalizedMir,
-        loweredMir: loweredMir,
-        rawOutput: stripAnsi(asmRes.stdout),
-        rawStderr: stripAnsi(asmRes.stderr),
-        passes: parsedAsm.passes,
-        diagnostics: parsedAsm.diagnostics,
-        functions: parsedAsm.functions,
+        legalizedMir,
+        loweredMir,
+        rawOutput: stripAnsi(ezcRes.stdout),
+        rawStderr: stripAnsi(ezcRes.stderr),
+        passes,
+        diagnostics,
+        functions,
         objectInfo,
         doxygenStatus: this.doxygenRunner?.getStatus(),
         matchedSymbols: Object.keys(matchedSymbols).length > 0 ? matchedSymbols : undefined,
