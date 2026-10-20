@@ -48,12 +48,14 @@ class CFrontendFunctionLowerer
 
     /**
      * Executes the lowering pass on the function AST.
+     * Returns true on success, false if any diagnostic error was recorded.
      */
-    void lower();
+    bool lower();
 
   private:
     void collectAddressTaken(struct Node *node, std::unordered_set<struct Obj *> &addrTaken);
     MirBlock *createBlock(const char *prefix);
+    MirBlock *getOrCreateBlockForLabel(const std::string &uniqueLabel);
     MirGlobalVar *findGlobal(std::string_view name);
     MirGlobalVar *findOrCreateGlobal(std::string_view name, struct Type *ty);
     MirRegister *ensureRegister(MirOperand *op, MirType *fallbackType = nullptr, const std::string &hint = "reg");
@@ -75,6 +77,8 @@ class CFrontendFunctionLowerer
     size_t m_blockCounter{ 0 };
     std::unordered_map<struct Obj *, MirRegister *> m_localVars;
     std::unordered_map<struct Obj *, StackFrameObject *> m_localStackSlots;
+    std::unordered_map<std::string, MirBlock *> m_labeledBlocks;
+    bool m_hasError{ false };
 };
 
 } // namespace CFrontend

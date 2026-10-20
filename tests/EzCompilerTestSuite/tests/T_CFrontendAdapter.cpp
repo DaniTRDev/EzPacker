@@ -2,6 +2,7 @@
 #include "CFrontend/CFrontendAdapter.h"
 #include "DriverContext.h"
 #include "Builder/MirBuilderContext.h"
+#include "Block/MirBlock.h"
 #include "Function/MirFunction.h"
 #include "GlobalVar/MirGlobalVar.h"
 #include "MirPasses/Passes/MirVerifierPass.h"
@@ -292,5 +293,398 @@ TEST_F(CFrontendAdapterTest, CompilesFreestandingKernelWithStdintAndStddef)
 
     verifyMir(bCtx);
 }
+
+TEST_F(CFrontendAdapterTest, CompilesSwitchCaseWithDefaultAndRanges)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_switch(int x) {
+            int res = 0;
+            switch (x) {
+                case 1:
+                    res = 10;
+                    break;
+                case 2 ... 5:
+                    res = 20;
+                    break;
+                case 10:
+                    res = 30;
+                default:
+                    res = res + 5;
+                    break;
+            }
+            return res;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "switch.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *func = bCtx->getFunctions().front();
+    ASSERT_NE(func, nullptr);
+    EXPECT_GT(func->getBlockCount(), 4u);
+
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesGotoAndLabels)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_goto(int n) {
+            int sum = 0;
+            int i = 0;
+        loop_start:
+            if (i >= n)
+                goto loop_end;
+            sum = sum + i;
+            i = i + 1;
+            goto loop_start;
+        loop_end:
+            return sum;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "goto.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *func = bCtx->getFunctions().front();
+    ASSERT_NE(func, nullptr);
+
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesLabelsAsValuesAndComputedGoto)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_computed_goto(int op) {
+            void *dispatch_table[2];
+            dispatch_table[0] = &&do_add;
+            dispatch_table[1] = &&do_sub;
+            int val = 10;
+            if (op == 0)
+                goto *dispatch_table[0];
+            else
+                goto *dispatch_table[1];
+
+        do_add:
+            val = val + 5;
+            return val;
+
+        do_sub:
+            val = val - 5;
+            return val;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "computed_goto.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *func = bCtx->getFunctions().front();
+    ASSERT_NE(func, nullptr);
+
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesVariableLengthArraysAndAlloca)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_vla(int n) {
+            int arr[n];
+            for (int i = 0; i < n; i = i + 1) {
+                arr[i] = i * 2;
+            }
+            return arr[0] + arr[n - 1];
+        }
+
+        void *test_alloca(int sz) {
+            return __builtin_alloca(sz);
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "vla.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 2u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesStructPartialInitializerMemzero)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        struct LargeBuffer {
+            int a;
+            int b;
+            int c;
+            int d;
+        };
+
+        int test_init_memzero() {
+            struct LargeBuffer buf = { 42 };
+            return buf.a + buf.b;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "memzero.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesInlineAssemblyAndSystemInstructions)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        void test_system_ops(void) {
+            __asm__("nop");
+            __asm__("pause");
+            __asm__("cli");
+            __asm__("sti");
+            __asm__("syscall");
+            __asm__("hlt");
+            __asm__("wbinvd");
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "system_asm.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *fn = bCtx->getFunctions().front();
+    ASSERT_NE(fn, nullptr);
+    ASSERT_NE(fn->getEntryPoint(), nullptr);
+    EXPECT_GT(fn->getEntryPoint()->getInstrCount(), 5u);
+
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, ReportsErrorOnUnrecognizedInlineAssembly)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *badCode = R"c(
+        void test_bad_asm(void) {
+            __asm__("this_is_an_invalid_instruction_xyz");
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, badCode, *bCtx, "bad_asm.c");
+    EXPECT_FALSE(success);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesAtomicCompareAndSwapAndExchange)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_cas(int *ptr, int expected, int desired) {
+            int old_val = expected;
+            if (__builtin_compare_and_swap(ptr, &old_val, desired)) {
+                return 1;
+            }
+            return 0;
+        }
+
+        int test_exchange(int *ptr, int new_val) {
+            return __builtin_atomic_exchange(ptr, new_val);
+        }
+
+        int test_atomic_type(_Atomic int *counter) {
+            *counter += 1;
+            return *counter;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "atomics.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 3u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesBitfieldMemberAccessAndAssignment)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        struct Flags {
+            unsigned int is_ready : 1;
+            unsigned int mode : 3;
+            int priority : 4;
+            unsigned int tag : 8;
+        };
+
+        int test_bitfields(struct Flags *f) {
+            f->is_ready = 1;
+            f->mode = 5;
+            f->priority = -2;
+            int r = f->is_ready + f->mode + f->priority;
+            return r;
+        }
+
+        int test_local_bitfields(void) {
+            struct Flags f;
+            f.is_ready = 0;
+            f.mode = 7;
+            f.priority = 3;
+            return f.mode + f.priority;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "bitfields.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 2u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesIndirectFunctionCallsAndPointers)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int add_fn(int a, int b) {
+            return a + b;
+        }
+
+        int test_func_ptr(int x, int y) {
+            int (*fp)(int, int) = add_fn;
+            return fp(x, y);
+        }
+
+        int test_indirect_call_deref(int x, int y) {
+            int (*fp)(int, int) = &add_fn;
+            return (*fp)(x, y);
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "func_ptr.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 3u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesFloatingPointAndNumericConversions)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        float test_int_to_float(int x) {
+            return (float)x;
+        }
+
+        double test_float_to_double(float f) {
+            return (double)f;
+        }
+
+        int test_double_to_int(double d) {
+            return (int)d;
+        }
+
+        _Bool test_float_to_bool(float f) {
+            return (_Bool)f;
+        }
+
+        float test_float_constants(void) {
+            float a = (float)42;
+            double b = (double)3.14f;
+            int c = (int)9.99;
+            return a + (float)b + (float)c;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "conversions.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 5u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesFullChibiccAstCoverage)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_stmt_expr(int x) {
+            int y = ({ int a = x * 2; int b = a + 3; b * 2; });
+            return y;
+        }
+
+        int test_do_while(int n) {
+            int sum = 0;
+            int i = 0;
+            do {
+                sum += i;
+                i++;
+            } while (i < n);
+            return sum;
+        }
+
+        int test_logical_and_or(int a, int b) {
+            if ((a > 0 && b > 0) || (a < 0 && b < 0)) {
+                return 1;
+            }
+            return 0;
+        }
+
+        int test_ternary_and_comma(int a, int b) {
+            int x = (a++, (b > a) ? (b - a) : (a - b));
+            return x;
+        }
+
+        int test_unary_ops(int a) {
+            int neg = -a;
+            int bitnot = ~a;
+            int lognot = !a;
+            ; // null statement
+            return neg + bitnot + lognot;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "ast_coverage.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 5u);
+    verifyMir(bCtx);
+}
+
 
 

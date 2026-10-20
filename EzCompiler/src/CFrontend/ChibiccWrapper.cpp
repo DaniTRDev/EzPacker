@@ -117,6 +117,11 @@ void ChibiccWrapper::setupDefaultMacros()
     defineMacro("__STDC_HOSTED__", "0");
     defineMacro("__EZPACKER_STANDALONE__", "1");
     defineMacro("__STDC_FREESTANDING__", "1");
+    defineMacro("__builtin_alloca", "alloca");
+    defineMacro("__asm__", "asm");
+    defineMacro("__asm", "asm");
+    defineMacro("__volatile", "volatile");
+    defineMacro("__inline", "inline");
 }
 
 ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)

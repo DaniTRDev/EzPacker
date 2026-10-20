@@ -139,6 +139,11 @@ class TargetDesc
     virtual TargetRelocationResolver *getRelocationResolver() { return nullptr; }
 
     /**
+     * Finds a target instruction descriptor by mnemonic (case-insensitive), or nullptr if not found.
+     */
+    virtual const class MirTargetInstructionDesc *findInstructionDesc(std::string_view /*mnemonic*/) const { return nullptr; }
+
+    /**
      * Checks if the specified extension is enabled for this target.
      */
     virtual bool hasExtension(std::string_view name) const { return m_extensions.has(name); }

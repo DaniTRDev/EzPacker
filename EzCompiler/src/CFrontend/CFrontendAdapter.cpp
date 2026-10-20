@@ -11,6 +11,7 @@
 #include "Type/MirTypeTable.h"
 #include "FlexNumber/FlexInt.h"
 #include "chibicc.h"
+#include <unordered_map>
 
 namespace EzCompiler
 {
@@ -63,6 +64,7 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
     auto *typeTable = ctx.getTypeTable();
     MirFunctionBuilder funcBuilder(&outMirCtx);
     MirOperandBuilder opBuilder(&outMirCtx);
+    std::unordered_map<Obj *, MirFunction *> funcMap;
 
     // Pass 1: Global Variables and Function Declarations
     for (Obj *obj = astRoot; obj; obj = obj->next)
@@ -112,18 +114,15 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
                 paramTypes.push_back(mapType(typeTable, p->ty));
             }
             MirLinkage linkage = obj->is_static ? MirLinkage::Internal : MirLinkage::External;
-            funcBuilder.declare(retType,
-                                std::span<MirType *const>(paramTypes.data(), paramTypes.size()),
-                                obj->name,
-                                linkage);
+            MirFunction *func = funcBuilder.declare(retType,
+                                                    std::span<MirType *const>(paramTypes.data(), paramTypes.size()),
+                                                    obj->name,
+                                                    linkage);
+            funcMap[obj] = func;
         }
-    }
-
-    // Pass 2: Function Definitions
-    for (Obj *obj = astRoot; obj; obj = obj->next)
-    {
-        if (obj->is_function && obj->is_definition && obj->body)
+        else
         {
+            // Function definition: build MirFunction upfront so it exists in outMirCtx
             MirType *retType = mapType(typeTable, obj->ty->return_ty);
             MirLinkage linkage = obj->is_static ? MirLinkage::Internal : MirLinkage::External;
             MirFunction *func = funcBuilder.build(retType, {}, obj->name, linkage);
@@ -132,9 +131,21 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
                 ctx.getDiagCollector()->error("CFrontend", "Failed to build MIR function for {}", obj->name);
                 return false;
             }
+            funcMap[obj] = func;
+        }
+    }
 
+    // Pass 2: Lower Function Bodies
+    for (Obj *obj = astRoot; obj; obj = obj->next)
+    {
+        if (obj->is_function && obj->is_definition && obj->body)
+        {
+            MirFunction *func = funcMap[obj];
             CFrontendFunctionLowerer lowerer(ctx, outMirCtx, func, obj);
-            lowerer.lower();
+            if (!lowerer.lower())
+            {
+                return false;
+            }
         }
     }
 

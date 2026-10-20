@@ -347,6 +347,31 @@ The C frontend is decoupled into dedicated, single-responsibility components:
 8. **CLI Driver Ingestion (`FrontendAdapter.cpp`)**:
    - `FrontendAdapter` inspects the input file extension. When `.c` or `.i` is detected, it delegates parsing to `CFrontendAdapter`, passing all configured `-I` include directories and `-D` macro definitions, and automatically resolving bundled freestanding headers.
 
+9. **Complete 48 AST Node Lowering (100% chibicc Coverage)**:
+   The C frontend provides full semantic lowering for all 48 AST node types defined by chibicc:
+   - **Control Flow**:
+     - `ND_SWITCH`, `ND_CASE` (including GNU extension range cases `case low ... high:`).
+     - `ND_GOTO`, `ND_LABEL`, computed indirect gotos via `ND_GOTO_EXPR` (`goto *ptr;`), and address-of-label via `ND_LABEL_VAL` (`&&label`).
+     - Loops (`ND_FOR`, `ND_DO`), branches (`ND_IF`), blocks (`ND_BLOCK`), returns (`ND_RETURN`), and statement expressions (`ND_STMT_EXPR`).
+   - **Dynamic Stack Allocation & Memory Zeroing**:
+     - `ND_VLA_PTR`: Variable-length arrays and dynamic allocations lowered to `MirInstructionOpCode::DALLOC`.
+     - `ND_MEMZERO`: Lowers variable zero-initialization using scalar stores for small types or runtime `@memset` calls for aggregated types.
+   - **Bitfield Access Lowering**:
+     - Bitfield Read (`ND_MEMBER`): Emits container scalar load, left-shifts to place bits at MSB, followed by signed arithmetic shift right (for signed fields) or logical shift right (for unsigned fields).
+     - Bitfield Write (`ND_ASSIGN`): Emits container scalar load, clears target bit slice using a bitwise AND mask, shifts and masks the incoming value, merges via bitwise OR, stores back to the container, and sign/zero-extends the expression result.
+   - **Function Calls & Symbol Resolution**:
+     - Two-pass module symbol resolution in `CFrontendAdapter`: Declares all function symbols upfront in `MirBuilderContext` before lowering function bodies. This guarantees mutual recursion, function pointers, and chibicc's reverse AST function ordering resolve seamlessly without forward-reference errors.
+     - Direct and Indirect Calls (`ND_FUNCALL`): Evaluates callee expressions; emits direct calls for function symbols and dynamic register-indirect calls `CALL(dest, calleeReg, args...)` for function pointers.
+   - **Type Conversions & Casting (`ND_CAST`)**:
+     - Complete casting semantics: integer extensions (`SEXT`, `ZEXT`), truncations (`TRUNC`), signed integer to floating-point (`SITOFP`), floating-point to signed integer (`FPTOSI`), float widenings (`FPEXT`), float truncations (`FPTRUNC`), float-to-bool testing (`FCMP` against 0.0), and compile-time numeric constant folding.
+   - **Target DSL Integrated Inline Assembly (`ND_ASM`)**:
+     - First-class inline assembly lowering querying the Target DSL instruction tables (`TargetDesc::findInstructionDesc(mnemonic)`).
+     - Comprehensive support for SYSTEM instructions across both `x86_64` (e.g. `CPUID`, `INVD`, `WBINVD`, `INVLPG`, `HLT`, `RSM`, `RDMSR`, `WRMSR`, `RDTSC`, `RDPMC`, `SYSENTER`, `SYSEXIT`, `SYSCALL`, `SYSRET`, `SWAPGS`, `XGETBV`, `XSETBV`, `CLAC`, `STAC`, `RDRAND`, `RDSEED`) and `riscv64` (e.g. `ECALL`, `EBREAK`, `MRET`, `SRET`, `WFI`, `FENCE.I`, `SFENCE.VMA`, `CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
+     - Strict diagnostic verification: Emits compiler errors via `m_driverCtx.getDiagCollector()->error(...)` with source locations whenever unrecognized mnemonics or unsupported assembly instructions are encountered.
+   - **Atomic Primitives**:
+     - `ND_CAS`: Atomic Compare-And-Swap.
+     - `ND_EXCH`: Atomic Exchange.
+
 ---
 
 

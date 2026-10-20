@@ -1112,6 +1112,11 @@ void init_macros(void) {
   define_macro("__volatile__", "volatile");
   define_macro("__x86_64", "1");
   define_macro("__x86_64__", "1");
+  define_macro("__builtin_alloca", "alloca");
+  define_macro("__asm__", "asm");
+  define_macro("__asm", "asm");
+  define_macro("__volatile", "volatile");
+  define_macro("__inline", "inline");
 
   add_builtin("__FILE__", file_macro);
   add_builtin("__LINE__", line_macro);
