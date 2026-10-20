@@ -96,6 +96,18 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         gvarById[gvar->getId()] = gvar;
 
+        if (gvar->isDeclaration())
+        {
+            symbols.push_back({ .m_name = gvar->getName(),
+                                .m_section = SectionType::Undefined,
+                                .m_offset = 0,
+                                .m_size = 0,
+                                .m_isGlobal = (gvar->getLinkage() != MirLinkage::Internal),
+                                .m_isWeak = (gvar->getLinkage() == MirLinkage::Weak),
+                                .m_isFunction = false });
+            continue;
+        }
+
         // Size the object from its value or pointee type, rounding bits up to whole bytes.
         MirType *valType = gvar->getType();
         if (valType && valType->getKind() == MirTypeKind::Pointer && valType->getPointedType())

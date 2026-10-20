@@ -24,6 +24,12 @@ MirGlobalVarBuilder &MirGlobalVarBuilder::setConstant(bool constant)
     return *this;
 }
 
+MirGlobalVarBuilder &MirGlobalVarBuilder::setIsDeclaration(bool isDecl)
+{
+    m_isDeclaration = isDecl;
+    return *this;
+}
+
 /**
  * Sets the initializer operand, validating that only constant values (integers or floats) are used.
  */
@@ -64,6 +70,10 @@ MirGlobalVar *MirGlobalVarBuilder::build(MirLinkage linkage,
                                                        m_initializer,
                                                        sourceRef,
                                                        std::move(name));
+    if (m_isDeclaration)
+    {
+        var->setIsDeclaration(true);
+    }
 
     // Only format the full variable dump when the trace diagnostic is actually enabled.
     if (m_ctx->getDiagCollector()->isDiagEnabledForType(DiagnosticMessageType::Diag_Trace))

@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-EzPacker provides 12 bundled MIR test and demonstration modules in the `examples/` directory. These modules exercise every layer of the compiler:
+EzPacker provides bundled MIR and standalone freestanding C11 modules in the `examples/` directory. These modules exercise every layer of the compiler:
 - High-level arithmetic and bitwise logic.
 - Complex multi-block control flow graphs with conditional branching and phi-nodes.
 - ABI lowering differences between System V AMD64 (Linux) and Microsoft Win64 (Windows).
@@ -16,6 +16,7 @@ EzPacker provides 12 bundled MIR test and demonstration modules in the `examples
 - Structured Exception Handling (SjLj) with `TRY`, `THROW`, and `CATCH` instructions lowered to runtime libcalls.
 - IEEE-754 precision conversions (`FPEXT`, `FPTRUNC`) and signed integer-to-float conversions (`SITOFP`, `FPTOSI`).
 - 128-bit SSE and 256-bit AVX/AVX2 SIMD vector operations (`v4f32`, `v8f32`, `v4i32`, `v8i32`, `v4f64`) with non-destructive 3-operand VEX prefix encoding.
+- **Freestanding Baremetal C11 Compilation**: Direct compilation of standalone C11 source files with **zero dependency on hosted standard C libraries** (`<stdio.h>`, etc.), relying strictly on freestanding headers (`<stdint.h>`, `<stdbool.h>`, `<stddef.h>`, `<limits.h>`). Ideal for baremetal microcontroller firmware, bootloaders, and OS kernels.
 
 ---
 
@@ -613,6 +614,65 @@ ezc examples/c_yarpgen_kernel.c --emit-mir
 
 # 3. Inspect Legalized MIR
 ezc examples/c_yarpgen_kernel.c --emit-legalized-mir
+```
+
+---
+
+### 2.14 `c_microcontroller_gpio.c`: Baremetal Microcontroller MMIO GPIO Driver
+Demonstrates compiling pure freestanding C11 for embedded microcontrollers without any standard library:
+- Memory-Mapped I/O (MMIO) register access using `volatile uint32_t *`.
+- Pin direction, pull-up/pull-down configuration, atomic set/clear operations.
+- Busy-wait timing delay loops utilizing volatile memory barriers.
+
+```c
+#include <stdint.h>
+#include <stdbool.h>
+
+#define GPIO_BASE 0x40020000UL
+#define GPIO_MODER   (*(volatile uint32_t *)(GPIO_BASE + 0x00))
+#define GPIO_ODR     (*(volatile uint32_t *)(GPIO_BASE + 0x14))
+#define GPIO_BSRR    (*(volatile uint32_t *)(GPIO_BASE + 0x18))
+
+void gpio_pin_set(uint8_t pin) {
+    if (pin < 16) {
+        GPIO_BSRR = (1UL << pin);
+    }
+}
+
+void delay_cycles(volatile uint32_t count) {
+    while (count > 0) {
+        count = count - 1;
+    }
+}
+```
+
+#### Compilation:
+```bash
+# Compile to baremetal object file with optimization
+ezc -O2 examples/c_microcontroller_gpio.c -o gpio.o
+```
+
+---
+
+### 2.15 `c_kernel_queue.c`: Interrupt-Safe Circular Event Queue
+Demonstrates standalone kernel-space data structures:
+- Bounded ring buffer with wrap-around indexing.
+- Standalone FNV-1a checksum calculation without external hashing libraries.
+- Header-only types using `<stdint.h>`, `<stdbool.h>`, `<stddef.h>`.
+
+#### Compilation:
+```bash
+ezc -O2 examples/c_kernel_queue.c -o kernel_queue.o
+```
+
+---
+
+### 2.16 `09_freestanding_kernel.c`: Standalone UART Packet Framing
+Demonstrates packet deserialization, frame magic verification, and FIFO ring-buffering for an operating system kernel driver without stdlib.
+
+#### Compilation:
+```bash
+ezc -O2 examples/09_freestanding_kernel.c -o uart_frame.o
 ```
 
 ---

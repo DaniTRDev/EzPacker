@@ -21,6 +21,11 @@
 namespace EzCompiler::CFrontend
 {
 
+static inline bool isUnsignedType(Type *ty)
+{
+    return ty != nullptr && (ty->is_unsigned || ty->kind == TY_BOOL);
+}
+
 CFrontendFunctionLowerer::CFrontendFunctionLowerer(DriverContext &driverCtx,
                                                    MirBuilderContext &bCtx,
                                                    MirFunction *mirFunc,
@@ -160,10 +165,7 @@ MirGlobalVar *CFrontendFunctionLowerer::findOrCreateGlobal(std::string_view name
         MirType *gType = mapType(m_tt, ty);
         MirGlobalVarBuilder gb(&m_bCtx);
         gb.setConstant(false);
-        if (gType->getKind() == MirTypeKind::Integer)
-        {
-            gb.setInitializer(m_opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
-        }
+        gb.setIsDeclaration(true);
         gv = gb.build(MirLinkage::External, gType, std::pmr::string(name, m_bCtx.getGlobalAllocator()));
         m_bCtx.appendGlobalVar(gv);
     }
@@ -469,7 +471,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                 return m_opBuilder.buildFloat(t, FlexFloat(static_cast<double>(node->fval)));
             }
             uint16_t bits = static_cast<uint16_t>(t->getTotalSizeInBits());
-            if (node->ty && node->ty->is_unsigned)
+            if (isUnsignedType(node->ty))
             {
                 return m_opBuilder.buildInt(t, FlexInt(static_cast<uint64_t>(node->val), bits));
             }
@@ -655,7 +657,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                 case ND_DIV:
                     if (is_flonum(node->ty))
                         inst.FDIV(dest, lhs, rhs);
-                    else if (node->ty->is_unsigned)
+                    else if (isUnsignedType(node->ty))
                         inst.UDIV(dest, lhs, rhs);
                     else
                         inst.SDIV(dest, lhs, rhs);
@@ -676,7 +678,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                     inst.SHL(dest, lhs, rhs);
                     break;
                 case ND_SHR:
-                    if (node->ty->is_unsigned)
+                    if (isUnsignedType(node->ty))
                         inst.SHR(dest, lhs, rhs);
                     else
                         inst.SAR(dest, lhs, rhs);
@@ -688,13 +690,13 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                     inst.CMP_NE(dest, lhs, rhs);
                     break;
                 case ND_LT:
-                    if (node->lhs->ty->is_unsigned)
+                    if (isUnsignedType(node->lhs->ty))
                         inst.CMP_ULT(dest, lhs, rhs);
                     else
                         inst.CMP_SLT(dest, lhs, rhs);
                     break;
                 case ND_LE:
-                    if (node->lhs->ty->is_unsigned)
+                    if (isUnsignedType(node->lhs->ty))
                         inst.CMP_ULE(dest, lhs, rhs);
                     else
                         inst.CMP_SLE(dest, lhs, rhs);
@@ -864,8 +866,8 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                 auto *imm = src->get<MirInteger>();
                 uint16_t srcBits = static_cast<uint16_t>(srcType->getTotalSizeInBits());
                 uint16_t destBits = static_cast<uint16_t>(destType->getTotalSizeInBits());
-                bool srcUnsigned = (node->lhs->ty && node->lhs->ty->is_unsigned);
-                bool destUnsigned = (node->ty && node->ty->is_unsigned);
+                bool srcUnsigned = isUnsignedType(node->lhs->ty);
+                bool destUnsigned = isUnsignedType(node->ty);
 
                 uint64_t uval = imm->getValue().getU64();
                 if (srcBits < 64)
@@ -903,6 +905,10 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
                 if (destType->getKind() == MirTypeKind::Integer)
                 {
+                    if (node->ty && node->ty->kind == TY_BOOL)
+                    {
+                        return m_opBuilder.buildInt(destType, FlexInt(static_cast<uint64_t>((uval != 0 || sval != 0) ? 1ULL : 0ULL), 1));
+                    }
                     if (destUnsigned)
                     {
                         if (destBits < 64)
@@ -960,7 +966,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             }
             else if (destType->getTotalSizeInBits() > srcType->getTotalSizeInBits())
             {
-                if (node->lhs->ty->is_unsigned)
+                if (isUnsignedType(node->lhs->ty))
                     inst.ZEXT(dest, src);
                 else
                     inst.SEXT(dest, src);

@@ -54,5 +54,14 @@ export function loadExamples(): ExampleFile[] {
     });
   }
 
+  // Prioritize standalone C11 baremetal examples, then MIR examples
+  examples.sort((a, b) => {
+    const aIsC = a.filename.endsWith('.c');
+    const bIsC = b.filename.endsWith('.c');
+    if (aIsC && !bIsC) return -1;
+    if (!aIsC && bIsC) return 1;
+    return a.filename.localeCompare(b.filename);
+  });
+
   return examples;
 }

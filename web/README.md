@@ -10,7 +10,7 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
 
 - **Monaco Code Editor**:
   - Full syntax highlighting for EzPacker Generic MIR (`.mir`) keywords, opcodes, types, registers, and branch labels.
-  - Native editing for Standalone / Freestanding C11 (`.c`, `.i`) source files compiled directly via the embedded modular `chibicc` frontend.
+  - Native editing for Standalone / Freestanding C11 (`.c`, `.i`) source files compiled directly via the embedded modular standalone `chibicc` frontend with zero standard library dependencies.
   - Real-time compiler diagnostics with line-and-column navigation.
   - Debounced auto-compilation and `Ctrl+Enter` trigger.
 - **Seven Dedicated Workspace Tabs**:
@@ -34,15 +34,19 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
   - Resilient error handling that surfaces non-crashing diagnostics when Doxygen is missing or misconfigured.
 - **Compiler Configuration & Targets**:
   - Target triple selection:
-    - x86-64: `x86_64-pc-windows-msvc`, `x86_64-linux-gnu`, `x86_64-apple-darwin`
+    - x86-64: `x86_64-pc-windows-coff` / `x86_64-pc-windows-msvc`, `x86_64-linux-gnu`, `x86_64-apple-darwin`
     - RISC-V 64: `riscv64-unknown-linux-gnu`, `riscv64-unknown-elf`, `riscv64`
   - Optimization levels: `-O0`, `-O1`, `-O2`, `-Os`.
-  - Freestanding / Standalone flags: `-ffreestanding`, `-nostdlib`.
+  - Freestanding / Standalone flags: `-ffreestanding`, `-nostdlib` (zero dependency on hosted libc).
   - Feature flags: x86-64 (`+avx`, `+avx2`, `+sse2`, etc.) and RISC-V (`+m`, `+a`, `+f`, `+d`, `+v`, `+c`).
   - Code generation flags: Position Independent Code (`-fPIC`), RTTI toggle.
-- **14 Bundled Examples**:
-  - Standalone freestanding C11 kernel modules (`09_freestanding_kernel.c`, `c_yarpgen_kernel.c`) exercising ISO C11 headers (`<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`).
-  - Arithmetic, branch control flow, loops, recursive factorial, SIMD vectorization, structured exception handling (`exception_handling.mir`), and memory pointer examples from `examples/`.
+- **16 Bundled Examples**:
+  - Freestanding baremetal C11 microcontroller and kernel modules:
+    - `c_microcontroller_gpio.c`: Baremetal MMIO GPIO register driver with volatile memory operations, pin direction configuration, and busy-wait timing loops.
+    - `c_kernel_queue.c`: Interrupt-safe circular event buffer with packet frame hashing without stdlib.
+    - `09_freestanding_kernel.c`: Standalone UART framing and ring buffer routine using freestanding headers `<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`.
+    - `c_yarpgen_kernel.c`: Standalone YARPGen arithmetic and control flow kernel.
+  - Generic MIR modules: arithmetic, branch control flow, calling conventions, crypto primitives, exceptions, floating point, SIMD vectorization (`vector_simd_avx.mir`).
 
 ## Architecture
 
@@ -57,7 +61,7 @@ EzPacker Web Explorer provides an intuitive UI for inspecting intermediate repre
 ### Prerequisites
 
 - Node.js >= 18
-- Built `ezc.exe` located at `cmake-build-debug/bin/ezc.exe` (or in `PATH`).
+- Built `ezc.exe` located at `build/bin/ezc.exe` (or in `PATH`).
 
 ### Running Locally
 

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include "abi_test_common.h"
-#include "../../EzLinker/runtime/EzExceptionRuntime.h"
+#include "../../../EzLinker/runtime/EzExceptionRuntime.h"
 
 // Declarations of functions defined in 12_exceptions.mir
 ABI_ATTR extern int64_t test_simple_throw_catch(int64_t val);
@@ -252,4 +252,5 @@ int main(void) {
     printf("[E2E Test 12] PASS: All exception tests succeeded.\n");
     return 0;
 }
+
 

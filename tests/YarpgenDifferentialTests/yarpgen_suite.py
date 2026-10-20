@@ -107,6 +107,14 @@ class SuiteHarness:
             repo_root / "bin" / "yarpgen",
         ])
         self.ref_cc = ref_compiler or (find_binary("gcc", []) or find_binary("clang", []))
+        if self.ref_cc:
+            ref_dir = str(self.ref_cc.parent)
+            if ref_dir not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = f"{ref_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+        if self.ezc:
+            ezc_dir = str(self.ezc.parent)
+            if ezc_dir not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = f"{ezc_dir}{os.pathsep}{os.environ.get('PATH', '')}" 
 
     def compile_ezc(self, src: Path, obj_out: Path, opt: str, time_passes: bool = False, timeout_sec: int = 60) -> Tuple[bool, float, Dict[str, CompilerPass], str]:
         if not self.ezc:
@@ -145,7 +153,7 @@ class SuiteHarness:
         ezc_exe = work_dir / f"ezc_tmp_{opt}{ext}"
 
         # 1. Compile & run reference
-        ref_cmd = [str(self.ref_cc), "-O3", str(src.resolve()), str(driver.resolve()), "-o", str(ref_exe.resolve())]
+        ref_cmd = [str(self.ref_cc), "-O3", "-fcommon", "-Wl,--allow-multiple-definition", str(src.resolve()), str(driver.resolve()), "-o", str(ref_exe.resolve())]
         try:
             res = subprocess.run(ref_cmd, cwd=str(work_dir), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout_sec)
             if res.returncode != 0 or not ref_exe.exists():
@@ -158,7 +166,7 @@ class SuiteHarness:
             ref_exe.unlink(missing_ok=True)
 
         # 2. Link & run ezc object
-        link_cmd = [str(self.ref_cc), str(driver.resolve()), str(obj.resolve()), "-o", str(ezc_exe.resolve())]
+        link_cmd = [str(self.ref_cc), "-fcommon", "-Wl,--allow-multiple-definition", str(driver.resolve()), str(obj.resolve()), "-o", str(ezc_exe.resolve())]
         try:
             res = subprocess.run(link_cmd, cwd=str(work_dir), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout_sec)
             if res.returncode != 0 or not ezc_exe.exists():
@@ -344,37 +352,38 @@ def cmd_seeds(args, suite: SuiteHarness) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="EzPacker YARPGen Unified Test & Benchmark Suite")
-    parser.add_argument("--ezc-bin", type=Path, help="Path to ezc compiler binary")
-    parser.add_argument("--yarpgen-bin", type=Path, help="Path to yarpgen binary")
-    parser.add_argument("--ref-compiler", type=Path, help="Path to reference C compiler (gcc/clang)")
-    parser.add_argument("--target", type=str, default="", help="Target triple")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose progress and pass timings")
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--ezc-bin", type=Path, help="Path to ezc compiler binary")
+    common.add_argument("--yarpgen-bin", type=Path, help="Path to yarpgen binary")
+    common.add_argument("--ref-compiler", type=Path, help="Path to reference C compiler (gcc/clang)")
+    common.add_argument("--target", type=str, default="", help="Target triple")
+    common.add_argument("-v", "--verbose", action="store_true", help="Verbose progress and pass timings")
 
+    parser = argparse.ArgumentParser(description="EzPacker YARPGen Unified Test & Benchmark Suite", parents=[common])
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     # stress
-    p_stress = sub.add_parser("stress", help="Single big file stress benchmark and pass profiler")
+    p_stress = sub.add_parser("stress", parents=[common], help="Single big file stress benchmark and pass profiler")
     p_stress.add_argument("--file", type=Path, default="mega_stress.c", help="Monolithic stress C file")
     p_stress.add_argument("--driver", type=Path, default=None, help="Companion verification driver C file")
     p_stress.add_argument("--opt-level", type=str, default="all", choices=["O0", "O1", "O2", "Os", "all"])
     p_stress.add_argument("--compile-only", action="store_true", help="Skip differential verification")
 
     # bulk
-    p_bulk = sub.add_parser("bulk", help="Bulk multi-file compilation and throughput benchmark")
+    p_bulk = sub.add_parser("bulk", parents=[common], help="Bulk multi-file compilation and throughput benchmark")
     p_bulk.add_argument("--corpus-dir", type=Path, default="bulk_corpus", help="Directory of C test files")
     p_bulk.add_argument("--opt-levels", type=str, default="O0,O2", help="Comma-separated optimization levels")
     p_bulk.add_argument("--compile-only", action="store_true", help="Skip differential verification")
 
     # fuzz
-    p_fuzz = sub.add_parser("fuzz", help="Differential fuzzing campaign against GCC/Clang")
+    p_fuzz = sub.add_parser("fuzz", parents=[common], help="Differential fuzzing campaign against GCC/Clang")
     p_fuzz.add_argument("--iterations", type=int, default=25, help="Number of fuzzing rounds")
     p_fuzz.add_argument("--seed", type=int, default=None, help="Specific seed to run")
     p_fuzz.add_argument("--work-dir", type=Path, default="fuzz_work", help="Ephemeral working directory")
     p_fuzz.add_argument("--reproducers-dir", type=Path, default="reproducers", help="Target dir for reproducers")
 
     # seeds
-    p_seeds = sub.add_parser("seeds", help="Run curated seeds regression list")
+    p_seeds = sub.add_parser("seeds", parents=[common], help="Run curated seeds regression list")
     p_seeds.add_argument("--seeds-file", type=Path, default="regression_seeds.txt", help="Seed list file")
     p_seeds.add_argument("--work-dir", type=Path, default="seeds_work", help="Ephemeral working directory")
     p_seeds.add_argument("--reproducers-dir", type=Path, default="reproducers", help="Target dir for reproducers")
