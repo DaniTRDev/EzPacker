@@ -7,8 +7,11 @@ import {
   TargetInfo,
   DoxygenDocEntity,
   DoxygenStatus,
-  ObjectAnalysis,
+  CompilerPassStage,
 } from '../types/compiler';
+
+export type PassFilterOption = 'all' | 'mutations' | CompilerPassStage;
+export type PassInspectorMode = 'snapshot' | 'diff_prev' | 'diff_initial' | 'cfg' | 'liveness';
 
 interface CompilerState {
   code: string;
@@ -24,9 +27,16 @@ interface CompilerState {
   error: string | null;
 
   // View Organization
-  viewMode: 'pipeline' | 'analysis' | 'symbols';
+  viewMode: 'passes' | 'pipeline' | 'analysis' | 'symbols';
   pipelineStage: 'mir' | 'legalizedMir' | 'loweredMir' | 'asm' | 'object';
   analysisTab: 'cfg' | 'liveness' | 'stack' | 'passes';
+
+  // Compiler Developer Workbench State (Pass-by-Pass Inspection)
+  selectedPassIndex: number;
+  passFilter: PassFilterOption;
+  passSearchQuery: string;
+  passInspectorMode: PassInspectorMode;
+  diffTargetPassIndex: number | null;
 
   // Legacy tab compatibility
   activeTab: 'asm' | 'stages' | 'diff' | 'passes' | 'cfg' | 'liveness' | 'stack';
@@ -57,9 +67,15 @@ interface CompilerState {
   setEnableRtti: (rtti: boolean) => void;
   setAutoCompile: (auto: boolean) => void;
 
-  setViewMode: (mode: 'pipeline' | 'analysis' | 'symbols') => void;
+  setViewMode: (mode: 'passes' | 'pipeline' | 'analysis' | 'symbols') => void;
   setPipelineStage: (stage: 'mir' | 'legalizedMir' | 'loweredMir' | 'asm' | 'object') => void;
   setAnalysisTab: (tab: 'cfg' | 'liveness' | 'stack' | 'passes') => void;
+
+  setSelectedPassIndex: (index: number) => void;
+  setPassFilter: (filter: PassFilterOption) => void;
+  setPassSearchQuery: (query: string) => void;
+  setPassInspectorMode: (mode: PassInspectorMode) => void;
+  setDiffTargetPassIndex: (index: number | null) => void;
 
   setActiveTab: (tab: 'asm' | 'stages' | 'diff' | 'passes' | 'cfg' | 'liveness' | 'stack') => void;
   setSelectedStage: (stage: 'mir' | 'legalizedMir' | 'loweredMir') => void;
@@ -115,9 +131,17 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
   result: null,
   error: null,
 
-  viewMode: 'pipeline',
+  // Primary view organization (defaults to 'passes' for rich compiler workbench)
+  viewMode: 'passes',
   pipelineStage: 'asm',
   analysisTab: 'cfg',
+
+  // Compiler Developer Workbench State
+  selectedPassIndex: 0,
+  passFilter: 'all',
+  passSearchQuery: '',
+  passInspectorMode: 'snapshot',
+  diffTargetPassIndex: null,
 
   activeTab: 'asm',
   selectedStage: 'mir',
@@ -193,6 +217,26 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
     set({ analysisTab, viewMode: 'analysis' });
   },
 
+  setSelectedPassIndex: (selectedPassIndex: number) => {
+    set({ selectedPassIndex });
+  },
+
+  setPassFilter: (passFilter: PassFilterOption) => {
+    set({ passFilter });
+  },
+
+  setPassSearchQuery: (passSearchQuery: string) => {
+    set({ passSearchQuery });
+  },
+
+  setPassInspectorMode: (passInspectorMode: PassInspectorMode) => {
+    set({ passInspectorMode });
+  },
+
+  setDiffTargetPassIndex: (diffTargetPassIndex: number | null) => {
+    set({ diffTargetPassIndex });
+  },
+
   setActiveTab: (activeTab) => {
     set({ activeTab });
   },
@@ -213,9 +257,11 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
     const { examples } = get();
     const ex = examples.find(e => e.id === id);
     if (ex) {
+      const extraFeatures = ex.id.includes('avx') ? ['+avx', '+avx2'] : [];
       set({
         selectedExampleId: id,
         code: ex.code,
+        features: extraFeatures.length > 0 ? extraFeatures : get().features,
       });
       get().compile();
     }
@@ -335,9 +381,16 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
         ? data.matchedSymbols[selSym]
         : get().selectedDocEntity;
 
+      const passes = data.pipeline?.passes || [];
+      let passIdx = get().selectedPassIndex;
+      if (passIdx >= passes.length && passes.length > 0) {
+        passIdx = passes.length - 1;
+      }
+
       set({
         result: data,
         isCompiling: false,
+        selectedPassIndex: passIdx,
         selectedAnalysisFunc: validFunc,
         doxygenStatus: data.doxygenStatus || get().doxygenStatus,
         selectedDocEntity: updatedDoc,
@@ -368,24 +421,13 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
       if (examplesRes.ok) {
         const examples: ExampleFile[] = await examplesRes.json();
         set({ examples });
-
-        const defaultEx = examples.find(e => e.id === 'arithmetic_32bit') || examples[0];
-        if (defaultEx) {
-          set({
-            selectedExampleId: defaultEx.id,
-            code: defaultEx.code,
-          });
-        }
       }
 
-      // Check Doxygen status
+      // Initial compilation
+      get().compile();
       get().checkDoxygenStatus();
-
-      // Initial compile
-      get().compile();
-    } catch (err) {
-      console.error('Failed to load initial metadata:', err);
-      get().compile();
+    } catch (err: any) {
+      console.warn('Initial data load warning:', err.message);
     }
   },
 }));

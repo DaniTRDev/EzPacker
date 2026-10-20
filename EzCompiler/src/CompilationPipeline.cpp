@@ -6,6 +6,7 @@
 #include "Instruction/MirInstruction.h"
 #include "Instruction/MirInstructionBuilder.h"
 #include "Instruction/MirTargetInstructionDesc.h"
+#include "MirPasses/MirPass.h"
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "MirPasses/Passes/NonSsaToSsaPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
@@ -19,6 +20,7 @@
 #include "FrameLowerer/MirFrameLowererPass.h"
 #include "Passes/MirTargetPeepholePass.h"
 #include "MirPasses/MirPassManager.h"
+#include "Printer/MirPrinter.h"
 #include <chrono>
 
 namespace EzCompiler
@@ -40,31 +42,28 @@ std::string dumpFunctions(MirBuilderContext *bCtx, Formatter &formatter)
         return out;
     }
 
-    for (MirFunction *func : bCtx->getFunctions())
+    for (const MirFunction *func : bCtx->getFunctions())
     {
         if (!func)
         {
             continue;
         }
+
         formatter.beginFunction(out, func);
-        for (MirBlock *block : func->getBlocks())
+
+        for (const MirBlock *block : func->getBlocks())
         {
-            if (!block)
-            {
-                continue;
-            }
             formatter.beginBlock(out, func, block);
-            for (MirInstruction *inst : block->getInstructions())
+
+            for (const MirInstruction *inst : block->getInstructions())
             {
-                if (!inst)
-                {
-                    continue;
-                }
                 formatter.instruction(out, inst);
             }
         }
+
         formatter.endFunction(out, func);
     }
+
     return out;
 }
 
@@ -75,7 +74,7 @@ struct MirDumpFormatter
     {
         if (func && func->isDeclaration())
         {
-            out += std::format("declare @{}()\n\n", func->getName());
+            out += std::format("declare @{}();\n\n", func->getName());
             return;
         }
         out += std::format("function @{}() {{\n", func->getName());
@@ -134,14 +133,53 @@ struct AssemblyDumpFormatter
 
 } // namespace
 
-CompilationPipeline::CompilationPipeline(DriverContext &ctx) : m_ctx(ctx) {}
+CompilationPipeline::CompilationPipeline(DriverContext &ctx) : m_ctx(ctx)
+{
+    if (!m_ctx.getOptions().pipelineDumpJsonPath.empty())
+    {
+        m_telemetry = std::make_unique<PipelineTelemetry>();
+        m_telemetry->setTarget(m_ctx.getOptions().target.toString());
+        m_telemetry->setInputFile(m_ctx.getOptions().inputFilePath);
+
+        std::string optStr = "O0";
+        switch (m_ctx.getOptions().optLevel)
+        {
+        case OptimizationLevel::O0: optStr = "O0"; break;
+        case OptimizationLevel::O1: optStr = "O1"; break;
+        case OptimizationLevel::O2: optStr = "O2"; break;
+        case OptimizationLevel::Os: optStr = "Os"; break;
+        }
+        m_telemetry->setOptLevel(optStr);
+        m_telemetry->bindSourceManager(m_ctx.getSourceManager());
+
+        if (m_ctx.getDiagCollector())
+        {
+            m_ctx.getDiagCollector()->addListener(m_telemetry.get());
+        }
+    }
+}
+
+void CompilationPipeline::writeTelemetryIfRequested()
+{
+    if (m_telemetry && !m_ctx.getOptions().pipelineDumpJsonPath.empty())
+    {
+        m_telemetry->setAssembly(dumpAssembly());
+        m_telemetry->writeToFile(m_ctx.getOptions().pipelineDumpJsonPath);
+    }
+}
 
 bool CompilationPipeline::runPipeline()
 {
     MirBuilderContext *bCtx = m_ctx.getBuilderContext();
     if (!bCtx)
     {
+        writeTelemetryIfRequested();
         return false;
+    }
+
+    if (m_telemetry)
+    {
+        m_telemetry->setInitialMir(dumpCurrentMir());
     }
 
     // Build one pass manager per stage (and register its analyses) once, instead of reconstructing
@@ -169,12 +207,14 @@ bool CompilationPipeline::runPipeline()
         // 0. Input MIR Verification Pass (verifies SizeMatch, operand types, invariants before middle-end)
         if (!runInputVerification(func, middleEndManager))
         {
+            writeTelemetryIfRequested();
             return false;
         }
 
         // 1. Middle-End Passes (CFG, SSA, Liveness)
         if (!runMiddleEndPasses(func, middleEndManager))
         {
+            writeTelemetryIfRequested();
             return false;
         }
 
@@ -186,6 +226,7 @@ bool CompilationPipeline::runPipeline()
         // 2. Legalization Passes (Signatures, Ops, Types)
         if (!runLegalizationPasses(func, legalizationManager))
         {
+            writeTelemetryIfRequested();
             return false;
         }
 
@@ -197,10 +238,12 @@ bool CompilationPipeline::runPipeline()
         // 3. Backend Target Lowering (ABI, ISel, RegAlloc, Frame)
         if (!runTargetLoweringPasses(func, targetLoweringManager))
         {
+            writeTelemetryIfRequested();
             return false;
         }
     }
 
+    writeTelemetryIfRequested();
     return true;
 }
 
@@ -218,8 +261,163 @@ bool CompilationPipeline::reportPassFailure(const char *message)
     return false;
 }
 
+void CompilationPipeline::recordPassTelemetry(std::string_view passName,
+                                              std::string_view stage,
+                                              MirFunction *func,
+                                              MirPassManager *passManager,
+                                              const ::MirPassResult &result,
+                                              double durationMs,
+                                              CodeFlowAnalysisPass *cfPass,
+                                              LivenessAnalysisPass *lvPass)
+{
+    if (!m_telemetry)
+    {
+        return;
+    }
+
+    PassTelemetryRecord rec;
+    rec.index = m_passCounter++;
+    rec.passName = std::string(passName);
+    rec.stage = std::string(stage);
+    rec.functionName = func ? std::string(func->getName()) : "";
+    rec.passType = result.m_modifiedMir ? "Transform" : "Analysis";
+    rec.durationMs = durationMs;
+    rec.modifiedMir = result.m_modifiedMir;
+    rec.blockCount = func ? func->getBlockCount() : 0;
+
+    size_t instCount = 0;
+    if (func)
+    {
+        for (const MirBlock *b : func->getBlocks())
+        {
+            instCount += b->getInstructions().size();
+        }
+    }
+    rec.instructionCount = instCount;
+    rec.mirDump = dumpCurrentMir();
+
+    m_telemetry->recordPass(std::move(rec));
+
+    if (func)
+    {
+        captureFunctionTelemetry(func, passManager, cfPass, lvPass);
+    }
+}
+
+void CompilationPipeline::captureFunctionTelemetry(MirFunction *func,
+                                                       MirPassManager *passManager,
+                                                       CodeFlowAnalysisPass *cfPass,
+                                                       LivenessAnalysisPass *lvPass)
+{
+    if (!func || !m_telemetry)
+    {
+        return;
+    }
+
+    FunctionTelemetry ft;
+    ft.name = std::string(func->getName());
+
+    if (!cfPass && passManager)
+    {
+        cfPass = passManager->getCachedAnalysis<CodeFlowAnalysisPass>();
+    }
+    if (!lvPass && passManager)
+    {
+        lvPass = passManager->getCachedAnalysis<LivenessAnalysisPass>();
+    }
+
+    for (const MirBlock *block : func->getBlocks())
+    {
+        CfgBlockTelemetry blk;
+        blk.id = block->getId();
+        blk.name = std::string(block->getName());
+        blk.instructionCount = block->getInstructions().size();
+
+        for (const MirInstruction *inst : block->getInstructions())
+        {
+            blk.instructions.push_back(inst->toString());
+        }
+
+        if (cfPass && cfPass->getResult())
+        {
+            const CodeFlowResult *cfg = cfPass->getResult();
+            for (MirId predId : cfg->getPredecessors(block->getId()))
+            {
+                MirBlock *predBlk = func->getBlock(predId);
+                if (predBlk)
+                {
+                    blk.predecessors.push_back(std::string(predBlk->getName()));
+                }
+                else
+                {
+                    blk.predecessors.push_back(std::format("%blk{}", predId));
+                }
+            }
+            for (MirId succId : cfg->getSuccessors(block->getId()))
+            {
+                MirBlock *succBlk = func->getBlock(succId);
+                if (succBlk)
+                {
+                    blk.successors.push_back(std::string(succBlk->getName()));
+                }
+                else
+                {
+                    blk.successors.push_back(std::format("%blk{}", succId));
+                }
+            }
+        }
+
+        ft.blocks.push_back(std::move(blk));
+
+        if (lvPass && lvPass->getResult())
+        {
+            LivenessResult *lres = lvPass->getResult();
+            LivenessBlockTelemetry lbt;
+            lbt.blockId = block->getId();
+            lbt.blockName = std::string(block->getName());
+
+            auto fillRegSet = [](const std::pmr::unordered_set<MirRegisterRef> &src, std::vector<std::string> &dst) {
+                for (const auto &ref : src)
+                {
+                    dst.push_back(MirPrinter::printToString(ref));
+                }
+            };
+
+            auto itDef = lres->m_def.find(block->getId());
+            if (itDef != lres->m_def.end()) fillRegSet(itDef->second, lbt.def);
+
+            auto itUse = lres->m_use.find(block->getId());
+            if (itUse != lres->m_use.end()) fillRegSet(itUse->second, lbt.use);
+
+            auto itLiveIn = lres->m_liveIn.find(block->getId());
+            if (itLiveIn != lres->m_liveIn.end()) fillRegSet(itLiveIn->second, lbt.liveIn);
+
+            auto itLiveOut = lres->m_liveOut.find(block->getId());
+            if (itLiveOut != lres->m_liveOut.end()) fillRegSet(itLiveOut->second, lbt.liveOut);
+
+            ft.liveness.push_back(std::move(lbt));
+        }
+    }
+
+    if (func->getAnalysisData())
+    {
+        ft.frameLayout.isComputed = true;
+        ft.frameLayout.calleeSaveSize = func->getAnalysisData()->m_calleeSavedAreaSize;
+        ft.frameLayout.totalSize = func->getAnalysisData()->m_totalFrameSize;
+        ft.frameLayout.hasCalls = func->getAnalysisData()->m_hasCalls;
+        ft.frameLayout.hasDynamicAllocs = func->getAnalysisData()->m_hasDynamicAllocs;
+        for (const auto &regRef : func->getUsedCalleeSavedRegs())
+        {
+            ft.frameLayout.usedCalleeSavedRegs.push_back(MirPrinter::printToString(regRef));
+        }
+    }
+
+    m_telemetry->updateFunctionAnalysis(std::string(func->getName()), std::move(ft));
+}
+
 template <typename PassT, typename... Args>
 bool CompilationPipeline::runCheckedPass(std::string_view passName,
+                                         std::string_view stage,
                                          MirFunction *func,
                                          MirPassManager *passManager,
                                          const char *failureMessage,
@@ -229,12 +427,28 @@ bool CompilationPipeline::runCheckedPass(std::string_view passName,
 
     const auto start = std::chrono::steady_clock::now();
     PassT pass(std::forward<Args>(args)...);
-    MirPassResult result = pass.run(m_ctx.getBuilderContext()->getFunctions().to_iterator(func), passManager);
+    ::MirPassResult result = pass.run(m_ctx.getBuilderContext()->getFunctions().to_iterator(func), passManager);
+    const double elapsedMs =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     if (m_ctx.getOptions().timePasses)
     {
-        const double elapsedMs =
-                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
         std::cout << "[Time] " << passName << ": " << elapsedMs << " ms\n";
+    }
+
+    CodeFlowAnalysisPass *cfPass = nullptr;
+    LivenessAnalysisPass *lvPass = nullptr;
+    if constexpr (std::is_same_v<PassT, CodeFlowAnalysisPass>)
+    {
+        cfPass = &pass;
+    }
+    if constexpr (std::is_same_v<PassT, LivenessAnalysisPass>)
+    {
+        lvPass = &pass;
+    }
+
+    if (m_telemetry)
+    {
+        recordPassTelemetry(passName, stage, func, passManager, result, elapsedMs, cfPass, lvPass);
     }
 
     if (!result.m_succeeded)
@@ -248,7 +462,7 @@ bool CompilationPipeline::runInputVerification(MirFunction *func, MirPassManager
 {
     MirBuilderContext *bCtx = m_ctx.getBuilderContext();
     return runCheckedPass<MirVerifierPass>(
-            "MirVerifierPass", func, &passManager, "Input MIR verification failed", bCtx);
+            "MirVerifierPass", "Verification", func, &passManager, "Input MIR verification failed", bCtx);
 }
 
 bool CompilationPipeline::runMiddleEndPasses(MirFunction *func, MirPassManager &passManager)
@@ -258,17 +472,29 @@ bool CompilationPipeline::runMiddleEndPasses(MirFunction *func, MirPassManager &
 
     // Materialize the CFG analysis so subsequent passes can retrieve it from the manager.
     printPassRunning("CodeFlowAnalysisPass", func);
+    const auto cfStart = std::chrono::steady_clock::now();
     CodeFlowAnalysisPass *cfPass = passManager.getAnalysis<CodeFlowAnalysisPass>(bCtx);
     (void)cfPass;
+    const double cfElapsedMs =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cfStart).count();
+    if (m_ctx.getOptions().timePasses)
+    {
+        std::cout << "[Time] CodeFlowAnalysisPass: " << cfElapsedMs << " ms\n";
+    }
+    if (m_telemetry)
+    {
+        ::MirPassResult cfRes{ false, true, true };
+        recordPassTelemetry("CodeFlowAnalysisPass", "MiddleEnd", func, &passManager, cfRes, cfElapsedMs);
+    }
 
     if (!runCheckedPass<NonSsaToSsaPass>(
-                "NonSsaToSsaPass", func, &passManager, "SSA construction failed", bCtx))
+                "NonSsaToSsaPass", "MiddleEnd", func, &passManager, "SSA construction failed", bCtx))
     {
         return false;
     }
 
     if (!runCheckedPass<LivenessAnalysisPass>(
-                "LivenessAnalysisPass", func, &passManager, "Liveness analysis failed", bCtx))
+                "LivenessAnalysisPass", "MiddleEnd", func, &passManager, "Liveness analysis failed", bCtx))
     {
         return false;
     }
@@ -276,13 +502,13 @@ bool CompilationPipeline::runMiddleEndPasses(MirFunction *func, MirPassManager &
     if (m_ctx.getOptions().optLevel != OptimizationLevel::O0)
     {
         if (!runCheckedPass<MirPeepholePass>(
-                    "MirPeepholePass", func, &passManager, "Generic peephole optimization failed", bCtx))
+                    "MirPeepholePass", "MiddleEnd", func, &passManager, "Generic peephole optimization failed", bCtx))
         {
             return false;
         }
         passManager.invalidateAnalysis();
         if (!runCheckedPass<LivenessAnalysisPass>(
-                    "LivenessAnalysisPass", func, &passManager, "Liveness analysis update failed", bCtx))
+                    "LivenessAnalysisPass", "MiddleEnd", func, &passManager, "Liveness analysis update failed", bCtx))
         {
             return false;
         }
@@ -299,6 +525,7 @@ bool CompilationPipeline::runLegalizationPasses(MirFunction *func, MirPassManage
 
     if (!runCheckedPass<MirFunctionSignatureLegalizerPass>(
                 "MirFunctionSignatureLegalizerPass",
+                "Legalization",
                 func,
                 &passManager,
                 "Function signature legalization failed",
@@ -309,7 +536,7 @@ bool CompilationPipeline::runLegalizationPasses(MirFunction *func, MirPassManage
     }
 
     if (!runCheckedPass<MirLegalizerPass>(
-                "MirLegalizerPass", func, &passManager, "Operation legalization failed", bCtx, targetDesc))
+                "MirLegalizerPass", "Legalization", func, &passManager, "Operation legalization failed", bCtx, targetDesc))
     {
         return false;
     }
@@ -324,13 +551,13 @@ bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func, MirPassMana
     passManager.invalidateAnalysis();
 
     if (!runCheckedPass<MirAbiLowererPass>(
-                "MirAbiLowererPass", func, &passManager, "ABI lowering failed", bCtx))
+                "MirAbiLowererPass", "TargetLowering", func, &passManager, "ABI lowering failed", bCtx))
     {
         return false;
     }
 
     if (!runCheckedPass<MirInstructionSelectorPass>(
-                "MirInstructionSelectorPass", func, &passManager, "Instruction selection failed", bCtx, targetDesc))
+                "MirInstructionSelectorPass", "TargetLowering", func, &passManager, "Instruction selection failed", bCtx, targetDesc))
     {
         return false;
     }
@@ -338,6 +565,7 @@ bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func, MirPassMana
     const bool enableCoalescing = (m_ctx.getOptions().optLevel != OptimizationLevel::O0);
     if (!runCheckedPass<MirRegisterAllocatorPass>(
                 "MirRegisterAllocatorPass",
+                "TargetLowering",
                 func,
                 &passManager,
                 "Register allocation failed",
@@ -349,7 +577,7 @@ bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func, MirPassMana
     }
 
     if (!runCheckedPass<MirFrameLowererPass>(
-                "MirFrameLowererPass", func, &passManager, "Frame lowering failed", bCtx, targetDesc))
+                "MirFrameLowererPass", "TargetLowering", func, &passManager, "Frame lowering failed", bCtx, targetDesc))
     {
         return false;
     }
@@ -357,7 +585,7 @@ bool CompilationPipeline::runTargetLoweringPasses(MirFunction *func, MirPassMana
     if (m_ctx.getOptions().optLevel != OptimizationLevel::O0)
     {
         if (!runCheckedPass<MirTargetPeepholePass>(
-                    "MirTargetPeepholePass", func, &passManager, "Target peephole optimization failed", bCtx, targetDesc))
+                    "MirTargetPeepholePass", "TargetLowering", func, &passManager, "Target peephole optimization failed", bCtx, targetDesc))
         {
             return false;
         }

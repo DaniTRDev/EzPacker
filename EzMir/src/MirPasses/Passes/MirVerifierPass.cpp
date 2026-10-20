@@ -246,6 +246,28 @@ bool MirVerifierPass::verifyOperandCount(MirInstruction *inst, const MirInstruct
         return true;
     }
 
+    // Special case: CALL can be void (at least 1 operand: target) or value-returning (at least 2 operands: dst, target).
+    if (inst->hasOpcode(MirInstructionOpCode::CALL))
+    {
+        bool hasDst = actualCount > 0 && inst->getOperand(0) && inst->getOperand(0)->isOfType<MirRegister>();
+        size_t minRequired = hasDst ? 2 : 1;
+        if (actualCount < minRequired)
+        {
+            if (m_ctx && m_ctx->getDiagCollector())
+            {
+                m_ctx->getDiagCollector()->error(
+                        "MirVerifierPass",
+                        "Instruction 'CALL' requires at least {} operands, but found {}",
+                        minRequired,
+                        actualCount)
+                        << inst->getSourceRef();
+            }
+            m_result.m_errorCount++;
+            return false;
+        }
+        return true;
+    }
+
     const bool isVariadic = (meta.m_flags & MirInstructionFlags::VariadicArgs);
     if (isVariadic)
     {
@@ -328,12 +350,36 @@ bool MirVerifierPass::verifyOperandKinds(MirInstruction *inst, const MirInstruct
             expectedFlag = meta.m_operandMeta.m_slots[meta.m_operandMeta.m_count - 1].flags;
         }
 
-        // For CALL instructions, operand 1 is the call target: can be a symbolic reference (@func),
+        // For CALL instructions, operand target can be a symbolic reference (@func),
         // named runtime symbol, or indirect register/address value.
-        if (inst->hasOpcode(MirInstructionOpCode::CALL) && i == 1)
+        if (inst->hasOpcode(MirInstructionOpCode::CALL))
         {
-            expectedType = ExpectedOperandType::Register | ExpectedOperandType::Reference |
-                           ExpectedOperandType::RuntimeSymbol | ExpectedOperandType::Integer;
+            bool hasDst = inst->getOperandCount() > 0 &&
+                          inst->getOperand(0) &&
+                          inst->getOperand(0)->isOfType<MirRegister>();
+            if (hasDst)
+            {
+                if (i == 1)
+                {
+                    expectedType = ExpectedOperandType::Register | ExpectedOperandType::Reference |
+                                   ExpectedOperandType::RuntimeSymbol | ExpectedOperandType::Integer;
+                    expectedFlag = MirOperandFlag::Read;
+                }
+            }
+            else
+            {
+                if (i == 0)
+                {
+                    expectedType = ExpectedOperandType::Register | ExpectedOperandType::Reference |
+                                   ExpectedOperandType::RuntimeSymbol | ExpectedOperandType::Integer;
+                    expectedFlag = MirOperandFlag::Read;
+                }
+                else
+                {
+                    expectedType = ExpectedOperandType::Any;
+                    expectedFlag = MirOperandFlag::Read;
+                }
+            }
         }
 
         // For MOV instructions, operand 1 can be a symbolic reference (address of global or stack slot).

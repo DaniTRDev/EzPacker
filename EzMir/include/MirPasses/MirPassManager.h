@@ -44,11 +44,30 @@ class MirPassManager
     /**
      * Computes the topologically sorted execution pipeline resolving all declared pass dependencies.
      */
+    template <typename PassType>
+    bool hasPass() const
+    {
+        return m_passesBlueprint.find(std::type_index(typeid(PassType))) != m_passesBlueprint.end();
+    }
+
     void generatePipeline();
 
     /**
      * Retrieves an analysis pass result on-demand, executing the analysis pass if not already cached.
      */
+    template <typename AnalysisPass>
+        requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
+    AnalysisPass *getCachedAnalysis() const
+    {
+        std::type_index passId = std::type_index(typeid(AnalysisPass));
+        auto it = m_validAnalyses.find(passId);
+        if (it != m_validAnalyses.end())
+        {
+            return static_cast<AnalysisPass *>(it->second);
+        }
+        return nullptr;
+    }
+
     template <typename AnalysisPass>
         requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
     AnalysisPass *getAnalysis(class MirBuilderContext *ctx)

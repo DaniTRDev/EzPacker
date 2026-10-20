@@ -3,10 +3,14 @@
 
 #include "EzCompilerCommon.h"
 #include "CommandLineOptions.h"
+#include "MirPasses/MirPass.h"
+#include "PipelineTelemetry.h"
 
 class MirBuilderContext;
 class MirFunction;
 class MirPassManager;
+class CodeFlowAnalysisPass;
+class LivenessAnalysisPass;
 
 namespace EzCompiler
 {
@@ -40,6 +44,9 @@ class CompilationPipeline
      * Dumps assembly-like instruction listings for lowered functions.
      */
     std::string dumpAssembly() const;
+
+    PipelineTelemetry *getTelemetry() { return m_telemetry.get(); }
+    void writeTelemetryIfRequested();
 
   private:
     /**
@@ -82,13 +89,30 @@ class CompilationPipeline
      */
     template <typename PassT, typename... Args>
     bool runCheckedPass(std::string_view passName,
+                        std::string_view stage,
                         MirFunction *func,
                         MirPassManager *passManager,
                         const char *failureMessage,
                         Args &&...args);
 
   private:
+    void recordPassTelemetry(std::string_view passName,
+                             std::string_view stage,
+                             MirFunction *func,
+                             MirPassManager *passManager,
+                             const ::MirPassResult &result,
+                             double durationMs,
+                             CodeFlowAnalysisPass *cfPass = nullptr,
+                             LivenessAnalysisPass *lvPass = nullptr);
+    void captureFunctionTelemetry(MirFunction *func,
+                                  MirPassManager *passManager,
+                                  CodeFlowAnalysisPass *cfPass = nullptr,
+                                  LivenessAnalysisPass *lvPass = nullptr);
+
+  private:
     DriverContext &m_ctx; ///< Driver context supplying diagnostics, allocators and target descriptors.
+    std::unique_ptr<PipelineTelemetry> m_telemetry;
+    size_t m_passCounter{ 0 };
 };
 
 } // namespace EzCompiler

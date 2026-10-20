@@ -246,6 +246,7 @@ Diagnostic and Timing Toggles:
   --print-passes                 Print pass names as they execute
   --time-passes                  Report per-pass execution duration
   --diag-threshold <level>       Minimum reported severity (debug, trace, warning, error)
+  --dump-pipeline-json <path>    Emit structured pass telemetry and MIR snapshots as JSON
   --version                      Print compiler version banner
   -h, --help                     Display usage information
 ```
@@ -348,7 +349,38 @@ The C frontend is decoupled into dedicated, single-responsibility components:
 
 ---
 
-## 8. Header & Class Index
+
+---
+
+## 8. Native Pipeline Telemetry Engine (PipelineTelemetry)
+
+EzCompiler includes a high-performance native pipeline telemetry recorder (PipelineTelemetry.h / PipelineTelemetry.cpp) designed for automated verification, compiler developer debugging, and web workbench integration.
+
+### Core Capabilities
+- **Per-Pass Telemetry Records**:
+  - 
+ame: Name of the executed pass (e.g., MirVerifierPass, NonSsaToSsaPass, MirPeepholePass, MirLegalizerPass, MirInstructionSelectorPass, MirRegisterAllocatorPass, MirFrameLowererPass).
+  - stage: Compilation stage (Verification, MiddleEnd, Legalization, TargetLowering).
+  - unction: Target function name for function-level passes.
+  - 	ype: FunctionPass or ModulePass.
+  - durationMs: High-resolution pass execution duration in milliseconds.
+  - modifiedMir: Boolean mutation flag indicating whether the pass modified instructions, operands, or basic blocks.
+  - instructionCount & lockCount: Function metrics post-pass.
+  - mirDump: Complete formatted MIR text snapshot immediately following the pass.
+- **Deep Analysis Topologies**:
+  - locks: Basic block definitions with numeric IDs, label names, entry flags, predecessors, successors, and instruction listings.
+  - liveness: Register definition (def), use (use), liveIn, and liveOut sets per block.
+  - rameLayout: Total stack frame size, callee-saved registers, and stack slots.
+- **Diagnostics Trapping**:
+  - Structured capture of all frontend, parser, and pass diagnostics (error, warning, 	race, debug) with source locations.
+  - Telemetry JSON is written deterministically even when compilation fails, providing compiler engineers with complete diagnostic and pass history up to the point of failure.
+
+### Command-Line Usage
+`ash
+ezc input.mir -o output.o --dump-pipeline-json pipeline.json
+`
+
+## 9. Header & Class Index
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
@@ -363,3 +395,4 @@ The C frontend is decoupled into dedicated, single-responsibility components:
 | C Frontend Type Mapper | `EzCompiler/include/CFrontend/CFrontendTypeMapper.h` | `mapType`, `CFrontendTypeMapper` |
 | C Frontend Lowerer | `EzCompiler/include/CFrontend/CFrontendFunctionLowerer.h` | `CFrontendFunctionLowerer` |
 | C Frontend Adapter | `EzCompiler/include/CFrontend/CFrontendAdapter.h` | `CFrontendAdapter` |
+| Pipeline Telemetry | EzCompiler/include/PipelineTelemetry.h | PipelineTelemetry, PassRecord, FunctionTelemetry |

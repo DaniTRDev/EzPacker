@@ -146,6 +146,16 @@ MirOperandFlag MirInstruction::getOperandFlag(size_t index) const
         return MirOperandFlag::None;
     }
 
+    // Special case: CALL without a destination register has only input operands
+    if (getOpCode() == MirInstructionOpCode::CALL)
+    {
+        bool hasDst = !m_operands.empty() && m_operands[0] && m_operands[0]->isOfType<MirRegister>();
+        if (!hasDst)
+        {
+            return MirOperandFlag::Read;
+        }
+    }
+
     // 1. Locate the variadic expansion slot if one exists. The slot position is encoded directly
     //    in the generated metadata by declaring that operand with ExpectedOperandType::VariadicArgs
     //    (e.g. UNMERGE_VALUES repeats a leading OUT slot, PHI/MERGE_VALUES/CALL a trailing IN slot).

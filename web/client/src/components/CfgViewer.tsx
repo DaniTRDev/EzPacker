@@ -25,7 +25,15 @@ export const CfgViewer: React.FC = () => {
 
   // Stably sort blocks: entry block first, then sorted by blockNumber
   const blocks = useMemo(() => {
-    const list = Object.values(activeFunc?.blocks || {});
+    const rawList = Object.values(activeFunc?.blocks || {});
+    const seen = new Set<string>();
+    const list: typeof rawList = [];
+    for (const b of rawList) {
+      if (!seen.has(b.id)) {
+        seen.add(b.id);
+        list.push(b);
+      }
+    }
     return list.sort((a, b) => {
       const isAEntry = a.id === 'entry' || a.id === 'entryPoint';
       const isBEntry = b.id === 'entry' || b.id === 'entryPoint';

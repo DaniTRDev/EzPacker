@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DiffEditor } from '@monaco-editor/react';
 import { useCompilerStore } from '../store/compilerStore';
-import { EZPACKER_MIR_LANGUAGE_ID } from '../grammar/mirLang';
+import { EZPACKER_MIR_LANGUAGE_ID, registerMirLanguage } from '../grammar/mirLang';
 import { stripAnsi } from '../utils/ansi';
-import { GitCompare, ArrowRight } from 'lucide-react';
+import { GitCompare, ArrowRight, Layers } from 'lucide-react';
 
 export const DiffViewer: React.FC = () => {
   const {
@@ -12,6 +12,12 @@ export const DiffViewer: React.FC = () => {
     diffStageB,
     setDiffStages,
   } = useCompilerStore();
+
+  const [diffMode, setDiffMode] = useState<'stage' | 'pass'>('stage');
+  const [passA, setPassA] = useState<number>(0);
+  const [passB, setPassB] = useState<number>(1);
+
+  const passes = result?.pipeline?.passes || [];
 
   const stages: Array<{ id: 'mir' | 'legalizedMir' | 'loweredMir' | 'asm'; label: string }> = [
     { id: 'mir', label: '1. Generic SSA MIR' },
@@ -34,46 +40,113 @@ export const DiffViewer: React.FC = () => {
     }
   };
 
-  const originalContent = stripAnsi(getStageContent(diffStageA));
-  const modifiedContent = stripAnsi(getStageContent(diffStageB));
+  const originalContent =
+    diffMode === 'pass' && passes.length > 0
+      ? passes[passA]?.mirDump || ''
+      : stripAnsi(getStageContent(diffStageA));
+
+  const modifiedContent =
+    diffMode === 'pass' && passes.length > 0
+      ? passes[passB]?.mirDump || ''
+      : stripAnsi(getStageContent(diffStageB));
 
   return (
-    <div className="h-full flex flex-col bg-zinc-950 overflow-hidden">
-      {/* Diff Stage Selectors */}
-      <div className="h-10 px-3 bg-zinc-900/60 border-b border-zinc-800/80 flex items-center justify-between text-xs select-none">
+    <div className="h-full flex flex-col bg-zinc-950 overflow-hidden text-xs">
+      {/* Diff Controls Header */}
+      <div className="h-10 px-3 bg-zinc-900/60 border-b border-zinc-800/80 flex items-center justify-between select-none shrink-0">
         <div className="flex items-center space-x-2">
           <GitCompare className="w-4 h-4 text-emerald-400" />
-          <span className="font-semibold text-zinc-200">IR Stage Comparison</span>
+          <span className="font-semibold text-zinc-200">IR Diff Comparison</span>
+
+          {/* Diff Mode Toggle */}
+          {passes.length > 0 && (
+            <div className="ml-3 flex items-center bg-zinc-950 p-0.5 rounded border border-zinc-800 text-[11px] font-mono">
+              <button
+                onClick={() => setDiffMode('stage')}
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  diffMode === 'stage'
+                    ? 'bg-zinc-800 text-emerald-300 font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Stages
+              </button>
+              <button
+                onClick={() => setDiffMode('pass')}
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  diffMode === 'pass'
+                    ? 'bg-zinc-800 text-emerald-300 font-semibold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Passes ({passes.length})
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* Left Stage */}
-          <select
-            value={diffStageA}
-            onChange={(e) => setDiffStages(e.target.value as any, diffStageB)}
-            className="h-7 px-2 text-xs font-medium bg-zinc-950/80 border border-zinc-800 rounded text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer"
-          >
-            {stages.map((s) => (
-              <option key={`left-${s.id}`} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          {diffMode === 'stage' ? (
+            <>
+              {/* Left Stage */}
+              <select
+                value={diffStageA}
+                onChange={(e) => setDiffStages(e.target.value as any, diffStageB)}
+                className="h-7 px-2 text-xs font-medium bg-zinc-950/80 border border-zinc-800 rounded text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer"
+              >
+                {stages.map((s) => (
+                  <option key={`left-${s.id}`} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
 
-          <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
+              <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
 
-          {/* Right Stage */}
-          <select
-            value={diffStageB}
-            onChange={(e) => setDiffStages(diffStageA, e.target.value as any)}
-            className="h-7 px-2 text-xs font-medium bg-zinc-950/80 border border-zinc-800 rounded text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer"
-          >
-            {stages.map((s) => (
-              <option key={`right-${s.id}`} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+              {/* Right Stage */}
+              <select
+                value={diffStageB}
+                onChange={(e) => setDiffStages(diffStageA, e.target.value as any)}
+                className="h-7 px-2 text-xs font-medium bg-zinc-950/80 border border-zinc-800 rounded text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer"
+              >
+                {stages.map((s) => (
+                  <option key={`right-${s.id}`} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <>
+              {/* Left Pass */}
+              <select
+                value={passA}
+                onChange={(e) => setPassA(Number(e.target.value))}
+                className="h-7 px-2 text-xs font-mono bg-zinc-950/80 border border-zinc-800 rounded text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer max-w-[220px]"
+              >
+                {passes.map((p, idx) => (
+                  <option key={`pass-a-${idx}`} value={idx}>
+                    #{idx + 1}: {p.name} {p.modifiedMir ? '(Δ)' : ''}
+                  </option>
+                ))}
+              </select>
+
+              <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
+
+              {/* Right Pass */}
+              <select
+                value={passB}
+                onChange={(e) => setPassB(Number(e.target.value))}
+                className="h-7 px-2 text-xs font-mono bg-zinc-950/80 border border-zinc-800 rounded text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer max-w-[220px]"
+              >
+                {passes.map((p, idx) => (
+                  <option key={`pass-b-${idx}`} value={idx}>
+                    #{idx + 1}: {p.name} {p.modifiedMir ? '(Δ)' : ''}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
       </div>
 
@@ -85,6 +158,7 @@ export const DiffViewer: React.FC = () => {
           theme="ezpacker-dark"
           original={originalContent}
           modified={modifiedContent}
+          beforeMount={(monaco) => registerMirLanguage(monaco)}
           options={{
             readOnly: true,
             fontSize: 12,

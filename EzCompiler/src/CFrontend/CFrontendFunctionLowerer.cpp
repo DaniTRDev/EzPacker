@@ -815,7 +815,9 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             }
 
             MirType *retType = mapType(m_tt, node->ty);
-            MirRegister *dest = m_opBuilder.buildVReg(retType, "call_ret");
+            bool isVoid = (retType && retType->getKind() == MirTypeKind::Void) ||
+                          (node->ty && node->ty->kind == TY_VOID);
+            MirRegister *dest = isVoid ? nullptr : m_opBuilder.buildVReg(retType, "call_ret");
 
             MirFunction *calleeFunc = nullptr;
             for (MirFunction *f : m_bCtx.getFunctions())
@@ -838,7 +840,10 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             }
 
             std::vector<MirOperand *> operands;
-            operands.push_back(dest);
+            if (dest)
+            {
+                operands.push_back(dest);
+            }
             operands.push_back(callee);
 
             for (Node *arg = node->args; arg; arg = arg->next)
@@ -855,6 +860,11 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             MirOperand *src = lowerExpression(node->lhs);
             MirType *srcType = mapType(m_tt, node->lhs->ty);
             MirType *destType = mapType(m_tt, node->ty);
+
+            if (!src || (destType && destType->getKind() == MirTypeKind::Void) || (node->ty && node->ty->kind == TY_VOID))
+            {
+                return nullptr;
+            }
 
             if (srcType == destType)
             {
