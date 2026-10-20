@@ -44,6 +44,12 @@ class MirPassManager
     /**
      * Computes the topologically sorted execution pipeline resolving all declared pass dependencies.
      */
+    template <typename PassType>
+    bool hasPass() const
+    {
+        return m_passesBlueprint.find(std::type_index(typeid(PassType))) != m_passesBlueprint.end();
+    }
+
     void generatePipeline();
 
     /**

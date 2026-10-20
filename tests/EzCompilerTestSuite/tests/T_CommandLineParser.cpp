@@ -350,5 +350,18 @@ TEST_F(EzCompilerTestSuite, TestFreestandingCommandLineOptions)
     }
 }
 
+TEST_F(EzCompilerTestSuite, TestDumpPipelineJsonOption)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
 
+    std::vector<std::string> args = { "ezc", "input.mir", "--dump-pipeline-json", "pipeline.json" };
+    EXPECT_TRUE(parser.parse(args, options, err));
+    EXPECT_EQ(options.pipelineDumpJsonPath, "pipeline.json");
 
+    // Missing path argument should fail
+    std::vector<std::string> missingArg = { "ezc", "input.mir", "--dump-pipeline-json" };
+    EXPECT_FALSE(parser.parse(missingArg, options, err));
+    EXPECT_NE(err.find("Missing path"), std::string::npos);
+}

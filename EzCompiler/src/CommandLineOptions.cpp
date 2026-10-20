@@ -97,6 +97,11 @@ void CommandLineParser::setupArguments()
             .metavar("<level>")
             .default_value(std::string("warning"));
 
+    m_program->add_argument("--dump-pipeline-json")
+            .help("Emit structured compilation pass telemetry and snapshots as JSON to the specified path")
+            .metavar("<path>")
+            .default_value(std::string(""));
+
     m_program->add_argument("--diag-out")
             .help("Sets the output file for diagnostics")
             .metavar("<path>")
@@ -378,6 +383,16 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
 
     std::string outDiagPath = m_program->get<std::string>("--diag-out");
     outOptions.diagOutFilePath = outDiagPath;
+    if (m_program->is_used("--dump-pipeline-json"))
+    {
+        std::string p = m_program->get<std::string>("--dump-pipeline-json");
+        if (p.empty())
+        {
+            outError = "Missing path for --dump-pipeline-json";
+            return false;
+        }
+        outOptions.pipelineDumpJsonPath = std::move(p);
+    }
 
     // Target features collected from --target-feature, -mattr, and dynamic -m flags
     outOptions.targetFeatures = std::move(extractedFeatures);

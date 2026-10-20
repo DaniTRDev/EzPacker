@@ -47,15 +47,18 @@ int runCompiler(int argc, char **argv)
         return EzCli::kError;
     }
 
+    // Initialize compilation pipeline early so telemetry records frontend diagnostics as well.
+    EzCompiler::CompilationPipeline pipeline(ctx);
+
     // Translate the input into generic MIR.
     EzCompiler::MirModuleLoader loader;
     if (!loader.compileSourceToMir(ctx, options.inputFilePath, *ctx.getBuilderContext()))
     {
+        pipeline.writeTelemetryIfRequested();
         return EzCli::kError;
     }
 
     // Run the middle-end and backend pass pipeline.
-    EzCompiler::CompilationPipeline pipeline(ctx);
     if (!pipeline.runPipeline())
     {
         return EzCli::kError;

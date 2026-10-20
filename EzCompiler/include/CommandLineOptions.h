@@ -55,6 +55,7 @@ struct CommandLineOptions
     std::vector<std::string> macroDefines;   ///< Preprocessor macro definitions (-D).
     bool freestanding{ true };               ///< Compiles in a standalone/freestanding environment without standard library.
     bool noStdLib{ true };                   ///< Standalone compilation without standard library dependencies.
+    std::string pipelineDumpJsonPath;        ///< Destination path for complete compiler pipeline telemetry in JSON format.
 };
 
 /**
