@@ -531,4 +531,72 @@ TEST_F(CFrontendAdapterTest, CompilesAtomicCompareAndSwapAndExchange)
     verifyMir(bCtx);
 }
 
+TEST_F(CFrontendAdapterTest, CompilesBitfieldMemberAccessAndAssignment)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        struct Flags {
+            unsigned int is_ready : 1;
+            unsigned int mode : 3;
+            int priority : 4;
+            unsigned int tag : 8;
+        };
+
+        int test_bitfields(struct Flags *f) {
+            f->is_ready = 1;
+            f->mode = 5;
+            f->priority = -2;
+            int r = f->is_ready + f->mode + f->priority;
+            return r;
+        }
+
+        int test_local_bitfields(void) {
+            struct Flags f;
+            f.is_ready = 0;
+            f.mode = 7;
+            f.priority = 3;
+            return f.mode + f.priority;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "bitfields.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 2u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesIndirectFunctionCallsAndPointers)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int add_fn(int a, int b) {
+            return a + b;
+        }
+
+        int test_func_ptr(int x, int y) {
+            int (*fp)(int, int) = add_fn;
+            return fp(x, y);
+        }
+
+        int test_indirect_call_deref(int x, int y) {
+            int (*fp)(int, int) = &add_fn;
+            return (*fp)(x, y);
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "func_ptr.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 3u);
+    verifyMir(bCtx);
+}
+
+
 

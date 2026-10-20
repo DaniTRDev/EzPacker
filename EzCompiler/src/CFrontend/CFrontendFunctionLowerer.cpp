@@ -241,6 +241,29 @@ MirRegister *CFrontendFunctionLowerer::lowerAddr(Node *node)
             }
             else
             {
+                if (node->var->ty && node->var->ty->kind == TY_FUNC)
+                {
+                    MirFunction *calleeFunc = nullptr;
+                    for (MirFunction *f : m_bCtx.getFunctions())
+                    {
+                        if (f && std::string_view(f->getName()) == node->var->name)
+                        {
+                            calleeFunc = f;
+                            break;
+                        }
+                    }
+                    if (!calleeFunc)
+                    {
+                        MirFunctionBuilder fb(&m_bCtx);
+                        calleeFunc = fb.declare(m_tt->i32(), std::span<MirType *const>{}, node->var->name, MirLinkage::External);
+                    }
+                    MirOperand *fnRef = m_opBuilder.buildRef(calleeFunc);
+                    MirType *ptrType = m_tt->getPtr(m_tt->i8());
+                    MirRegister *addr = m_opBuilder.buildVReg(ptrType, "fn_addr");
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .MOV(addr, fnRef);
+                    return addr;
+                }
                 MirGlobalVar *gv = findOrCreateGlobal(node->var->name, node->var->ty);
                 MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->var->ty));
                 MirRegister *addr = m_opBuilder.buildVReg(ptrType, "gaddr");
@@ -833,6 +856,24 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             }
             else
             {
+                if (node->var->ty && node->var->ty->kind == TY_FUNC)
+                {
+                    MirFunction *calleeFunc = nullptr;
+                    for (MirFunction *f : m_bCtx.getFunctions())
+                    {
+                        if (f && std::string_view(f->getName()) == node->var->name)
+                        {
+                            calleeFunc = f;
+                            break;
+                        }
+                    }
+                    if (!calleeFunc)
+                    {
+                        MirFunctionBuilder fb(&m_bCtx);
+                        calleeFunc = fb.declare(m_tt->i32(), std::span<MirType *const>{}, node->var->name, MirLinkage::External);
+                    }
+                    return m_opBuilder.buildRef(calleeFunc);
+                }
                 MirGlobalVar *gv = findOrCreateGlobal(node->var->name, node->var->ty);
                 MirRegister *valReg = m_opBuilder.buildVReg(mapType(m_tt, node->var->ty), "gval");
                 MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
@@ -890,11 +931,83 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             }
             else if (node->lhs->kind == ND_MEMBER)
             {
-                MirRegister *addr = lowerAddr(node->lhs);
-                MirMemory *mem = m_opBuilder.buildMem(rhs->getMirType(), addr, FlexInt(0));
-                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .STORE(mem, rhs);
-                return rhs;
+                if (node->lhs->member && node->lhs->member->is_bitfield)
+                {
+                    int bitWidth = node->lhs->member->bit_width;
+                    int bitOffset = node->lhs->member->bit_offset;
+                    Type *memberTy = node->lhs->member->ty;
+                    MirType *containerType = mapType(m_tt, memberTy);
+                    uint16_t containerBits = static_cast<uint16_t>(containerType->getTotalSizeInBits());
+
+                    MirRegister *addr = lowerAddr(node->lhs);
+                    MirMemory *mem = m_opBuilder.buildMem(containerType, addr, FlexInt(0));
+                    MirRegister *oldVal = m_opBuilder.buildVReg(containerType, "bf_old");
+                    MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                    inst.LOAD(oldVal, mem);
+
+                    uint64_t mask = (bitWidth >= 64) ? ~0ULL : ((1ULL << bitWidth) - 1ULL);
+                    uint64_t shiftedMask = (mask << bitOffset);
+                    uint64_t clearMask = ~shiftedMask;
+                    if (containerBits < 64)
+                    {
+                        clearMask &= ((1ULL << containerBits) - 1ULL);
+                    }
+
+                    MirOperand *clearMaskImm = m_opBuilder.buildInt(containerType, FlexInt(clearMask, containerBits));
+                    MirRegister *clearedOld = m_opBuilder.buildVReg(containerType, "bf_cleared");
+                    inst.AND(clearedOld, oldVal, clearMaskImm);
+
+                    MirRegister *rhsReg = ensureRegister(rhs, containerType, "bf_rhs");
+                    if (rhsReg->getMirType() != containerType)
+                    {
+                        MirRegister *conv = m_opBuilder.buildVReg(containerType, "bf_rhs_conv");
+                        if (containerBits < rhsReg->getMirType()->getTotalSizeInBits())
+                            inst.TRUNC(conv, rhsReg);
+                        else
+                            inst.ZEXT(conv, rhsReg);
+                        rhsReg = conv;
+                    }
+
+                    MirOperand *maskImm = m_opBuilder.buildInt(containerType, FlexInt(mask, containerBits));
+                    MirRegister *maskedRhs = m_opBuilder.buildVReg(containerType, "bf_rhs_masked");
+                    inst.AND(maskedRhs, rhsReg, maskImm);
+
+                    MirRegister *shiftedRhs = maskedRhs;
+                    if (bitOffset > 0)
+                    {
+                        shiftedRhs = m_opBuilder.buildVReg(containerType, "bf_rhs_shifted");
+                        MirOperand *offsetImm = m_opBuilder.buildInt(containerType, FlexInt(bitOffset, containerBits));
+                        inst.SHL(shiftedRhs, maskedRhs, offsetImm);
+                    }
+
+                    MirRegister *newWord = m_opBuilder.buildVReg(containerType, "bf_new");
+                    inst.OR(newWord, clearedOld, shiftedRhs);
+                    inst.STORE(mem, newWord);
+
+                    MirRegister *resultVal = maskedRhs;
+                    if (!isUnsignedType(memberTy))
+                    {
+                        uint16_t signShift = containerBits - bitWidth;
+                        if (signShift > 0)
+                        {
+                            MirOperand *sShiftImm = m_opBuilder.buildInt(containerType, FlexInt(signShift, containerBits));
+                            MirRegister *sShl = m_opBuilder.buildVReg(containerType, "bf_ret_shl");
+                            inst.SHL(sShl, maskedRhs, sShiftImm);
+                            MirRegister *sSar = m_opBuilder.buildVReg(containerType, "bf_ret_sar");
+                            inst.SAR(sSar, sShl, sShiftImm);
+                            resultVal = sSar;
+                        }
+                    }
+                    return resultVal;
+                }
+                else
+                {
+                    MirRegister *addr = lowerAddr(node->lhs);
+                    MirMemory *mem = m_opBuilder.buildMem(rhs->getMirType(), addr, FlexInt(0));
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .STORE(mem, rhs);
+                    return rhs;
+                }
             }
             return rhs;
         }
@@ -1096,6 +1209,48 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             {
                 return addr;
             }
+            if (node->member && node->member->is_bitfield)
+            {
+                int bitWidth = node->member->bit_width;
+                int bitOffset = node->member->bit_offset;
+                Type *memberTy = node->member->ty;
+                MirType *containerType = mapType(m_tt, memberTy);
+                uint16_t containerBits = static_cast<uint16_t>(containerType->getTotalSizeInBits());
+
+                MirMemory *mem = m_opBuilder.buildMem(containerType, addr, FlexInt(0));
+                MirRegister *rawWord = m_opBuilder.buildVReg(containerType, "bf_raw");
+                MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                inst.LOAD(rawWord, mem);
+
+                MirRegister *currentVal = rawWord;
+                uint16_t shlAmt = containerBits - bitWidth - bitOffset;
+                uint16_t shrAmt = containerBits - bitWidth;
+
+                if (shlAmt > 0)
+                {
+                    MirRegister *shlReg = m_opBuilder.buildVReg(containerType, "bf_shl");
+                    MirOperand *shlImm = m_opBuilder.buildInt(containerType, FlexInt(shlAmt, containerBits));
+                    inst.SHL(shlReg, currentVal, shlImm);
+                    currentVal = shlReg;
+                }
+
+                if (shrAmt > 0)
+                {
+                    MirRegister *shrReg = m_opBuilder.buildVReg(containerType, "bf_shr");
+                    MirOperand *shrImm = m_opBuilder.buildInt(containerType, FlexInt(shrAmt, containerBits));
+                    if (isUnsignedType(memberTy))
+                    {
+                        inst.SHR(shrReg, currentVal, shrImm);
+                    }
+                    else
+                    {
+                        inst.SAR(shrReg, currentVal, shrImm);
+                    }
+                    currentVal = shrReg;
+                }
+
+                return currentVal;
+            }
             MirType *resType = mapType(m_tt, node->ty);
             MirMemory *mem = m_opBuilder.buildMem(resType, addr, FlexInt(0));
             MirRegister *dest = m_opBuilder.buildVReg(resType, "member");
@@ -1131,63 +1286,92 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
         }
         case ND_FUNCALL:
         {
-            std::string_view calleeName = "func";
-            if (node->lhs && node->lhs->kind == ND_VAR && node->lhs->var && node->lhs->var->name)
-            {
-                calleeName = node->lhs->var->name;
-            }
+            bool isDirectCall = (node->lhs && node->lhs->kind == ND_VAR && node->lhs->var &&
+                                 node->lhs->var->name && node->lhs->var->ty &&
+                                 node->lhs->var->ty->kind == TY_FUNC);
 
-            if (calleeName == "alloca" || calleeName == "__builtin_alloca")
+            if (isDirectCall)
             {
-                MirOperand *szOp = node->args ? lowerExpression(node->args) : m_opBuilder.buildInt(m_tt->i64(), FlexInt(0, 64));
-                MirRegister *szReg = ensureRegister(szOp, m_tt->i64(), "alloca_sz");
-                MirType *ptrType = m_tt->getPtr(m_tt->i8());
-                MirRegister *allocaDest = m_opBuilder.buildVReg(ptrType, "alloca_buf");
-                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                        .DALLOC(allocaDest, szReg);
-                return allocaDest;
-            }
-
-            MirType *retType = mapType(m_tt, node->ty);
-            bool isVoid = (retType && retType->getKind() == MirTypeKind::Void) ||
-                          (node->ty && node->ty->kind == TY_VOID);
-            MirRegister *dest = isVoid ? nullptr : m_opBuilder.buildVReg(retType, "call_ret");
-
-            MirFunction *calleeFunc = nullptr;
-            for (MirFunction *f : m_bCtx.getFunctions())
-            {
-                if (f && std::string_view(f->getName()) == calleeName)
+                std::string_view calleeName = node->lhs->var->name;
+                if (calleeName == "alloca" || calleeName == "__builtin_alloca")
                 {
-                    calleeFunc = f;
-                    break;
+                    MirOperand *szOp = node->args ? lowerExpression(node->args) : m_opBuilder.buildInt(m_tt->i64(), FlexInt(0, 64));
+                    MirRegister *szReg = ensureRegister(szOp, m_tt->i64(), "alloca_sz");
+                    MirType *ptrType = m_tt->getPtr(m_tt->i8());
+                    MirRegister *allocaDest = m_opBuilder.buildVReg(ptrType, "alloca_buf");
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .DALLOC(allocaDest, szReg);
+                    return allocaDest;
                 }
-            }
 
-            MirOperand *callee = nullptr;
-            if (calleeFunc)
-            {
-                callee = m_opBuilder.buildRef(calleeFunc);
+                MirType *retType = mapType(m_tt, node->ty);
+                bool isVoid = (retType && retType->getKind() == MirTypeKind::Void) ||
+                              (node->ty && node->ty->kind == TY_VOID);
+                MirRegister *dest = isVoid ? nullptr : m_opBuilder.buildVReg(retType, "call_ret");
+
+                MirFunction *calleeFunc = nullptr;
+                for (MirFunction *f : m_bCtx.getFunctions())
+                {
+                    if (f && std::string_view(f->getName()) == calleeName)
+                    {
+                        calleeFunc = f;
+                        break;
+                    }
+                }
+
+                MirOperand *callee = nullptr;
+                if (calleeFunc)
+                {
+                    callee = m_opBuilder.buildRef(calleeFunc);
+                }
+                else
+                {
+                    callee = m_opBuilder.buildRtSymbol(std::pmr::string(calleeName, m_bCtx.getGlobalAllocator()));
+                }
+
+                std::vector<MirOperand *> operands;
+                if (dest)
+                {
+                    operands.push_back(dest);
+                }
+                operands.push_back(callee);
+
+                for (Node *arg = node->args; arg; arg = arg->next)
+                {
+                    operands.push_back(lowerExpression(arg));
+                }
+
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .build(MirInstructionOpCode::CALL, nullptr, operands);
+                return dest;
             }
             else
             {
-                callee = m_opBuilder.buildRtSymbol(std::pmr::string(calleeName, m_bCtx.getGlobalAllocator()));
-            }
+                MirOperand *calleeOp = lowerExpression(node->lhs);
+                MirType *ptrType = m_tt->getPtr(m_tt->i8());
+                MirRegister *calleeReg = ensureRegister(calleeOp, ptrType, "callee_ptr");
 
-            std::vector<MirOperand *> operands;
-            if (dest)
-            {
-                operands.push_back(dest);
-            }
-            operands.push_back(callee);
+                MirType *retType = mapType(m_tt, node->ty);
+                bool isVoid = (retType && retType->getKind() == MirTypeKind::Void) ||
+                              (node->ty && node->ty->kind == TY_VOID);
+                MirRegister *dest = isVoid ? nullptr : m_opBuilder.buildVReg(retType, "call_ret");
 
-            for (Node *arg = node->args; arg; arg = arg->next)
-            {
-                operands.push_back(lowerExpression(arg));
-            }
+                std::vector<MirOperand *> operands;
+                if (dest)
+                {
+                    operands.push_back(dest);
+                }
+                operands.push_back(calleeReg);
 
-            MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-                    .build(MirInstructionOpCode::CALL, nullptr, operands);
-            return dest;
+                for (Node *arg = node->args; arg; arg = arg->next)
+                {
+                    operands.push_back(lowerExpression(arg));
+                }
+
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .build(MirInstructionOpCode::CALL, nullptr, operands);
+                return dest;
+            }
         }
         case ND_CAST:
         {
