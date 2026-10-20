@@ -398,4 +398,58 @@ TEST_F(CFrontendAdapterTest, CompilesLabelsAsValuesAndComputedGoto)
     verifyMir(bCtx);
 }
 
+TEST_F(CFrontendAdapterTest, CompilesVariableLengthArraysAndAlloca)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_vla(int n) {
+            int arr[n];
+            for (int i = 0; i < n; i = i + 1) {
+                arr[i] = i * 2;
+            }
+            return arr[0] + arr[n - 1];
+        }
+
+        void *test_alloca(int sz) {
+            return __builtin_alloca(sz);
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "vla.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 2u);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesStructPartialInitializerMemzero)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        struct LargeBuffer {
+            int a;
+            int b;
+            int c;
+            int d;
+        };
+
+        int test_init_memzero() {
+            struct LargeBuffer buf = { 42 };
+            return buf.a + buf.b;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "memzero.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    verifyMir(bCtx);
+}
+
 

@@ -207,6 +207,7 @@ MirRegister *CFrontendFunctionLowerer::lowerAddr(Node *node)
 
     switch (node->kind)
     {
+        case ND_VLA_PTR:
         case ND_VAR:
         {
             if (node->var->is_local)
@@ -625,6 +626,70 @@ void CFrontendFunctionLowerer::lowerStatement(Node *node)
             m_currentBlock = createBlock("after_goto_expr");
             break;
         }
+        case ND_MEMZERO:
+        {
+            if (node->var)
+            {
+                StackFrameObject *slot = nullptr;
+                auto slotIt = m_localStackSlots.find(node->var);
+                if (slotIt != m_localStackSlots.end())
+                {
+                    slot = slotIt->second;
+                }
+                else
+                {
+                    MirType *varType = mapType(m_tt, node->var->ty);
+                    slot = m_func->getStackFrame()->createStaticStackObj(varType);
+                    m_localStackSlots[node->var] = slot;
+                }
+                MirType *ptrType = m_tt->getPtr(mapType(m_tt, node->var->ty));
+                MirRegister *baseAddr = m_opBuilder.buildVReg(ptrType, "memzero_addr");
+                MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                inst.MOV(baseAddr, m_opBuilder.buildRef(slot));
+
+                size_t sz = static_cast<size_t>(node->var->ty && node->var->ty->size > 0 ? node->var->ty->size : 0);
+                if (sz > 0 && sz <= 64)
+                {
+                    size_t offset = 0;
+                    while (sz - offset >= 8)
+                    {
+                        MirMemory *mem = m_opBuilder.buildMem(m_tt->i64(), baseAddr, FlexInt(static_cast<int64_t>(offset), 64));
+                        MirOperand *zero = m_opBuilder.buildInt(m_tt->i64(), FlexInt(0, 64));
+                        inst.STORE(mem, zero);
+                        offset += 8;
+                    }
+                    if (sz - offset >= 4)
+                    {
+                        MirMemory *mem = m_opBuilder.buildMem(m_tt->i32(), baseAddr, FlexInt(static_cast<int64_t>(offset), 64));
+                        MirOperand *zero = m_opBuilder.buildInt(m_tt->i32(), FlexInt(0, 32));
+                        inst.STORE(mem, zero);
+                        offset += 4;
+                    }
+                    if (sz - offset >= 2)
+                    {
+                        MirMemory *mem = m_opBuilder.buildMem(m_tt->i16(), baseAddr, FlexInt(static_cast<int64_t>(offset), 64));
+                        MirOperand *zero = m_opBuilder.buildInt(m_tt->i16(), FlexInt(0, 16));
+                        inst.STORE(mem, zero);
+                        offset += 2;
+                    }
+                    if (sz - offset >= 1)
+                    {
+                        MirMemory *mem = m_opBuilder.buildMem(m_tt->i8(), baseAddr, FlexInt(static_cast<int64_t>(offset), 64));
+                        MirOperand *zero = m_opBuilder.buildInt(m_tt->i8(), FlexInt(0, 8));
+                        inst.STORE(mem, zero);
+                        offset += 1;
+                    }
+                }
+                else if (sz > 64)
+                {
+                    MirOperand *callee = m_opBuilder.buildRtSymbol(std::pmr::string("memset", m_bCtx.getGlobalAllocator()));
+                    MirOperand *valOp = m_opBuilder.buildInt(m_tt->i32(), FlexInt(0, 32));
+                    MirOperand *lenOp = m_opBuilder.buildInt(m_tt->i64(), FlexInt(static_cast<int64_t>(sz), 64));
+                    inst.build(MirInstructionOpCode::CALL, nullptr, { baseAddr, callee, baseAddr, valOp, lenOp });
+                }
+            }
+            break;
+        }
         case ND_NULL_EXPR:
             break;
         default:
@@ -656,6 +721,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             }
             return m_opBuilder.buildInt(t, FlexInt(node->val, bits));
         }
+        case ND_VLA_PTR:
         case ND_VAR:
         {
             if (node->var->is_local)
@@ -699,7 +765,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
         case ND_ASSIGN:
         {
             MirOperand *rhs = lowerExpression(node->rhs);
-            if (node->lhs->kind == ND_VAR && node->lhs->var->is_local)
+            if ((node->lhs->kind == ND_VAR || node->lhs->kind == ND_VLA_PTR) && node->lhs->var->is_local)
             {
                 auto slotIt = m_localStackSlots.find(node->lhs->var);
                 if (slotIt != m_localStackSlots.end())
@@ -719,7 +785,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                         .MOV(dest, rhs);
                 return dest;
             }
-            else if (node->lhs->kind == ND_VAR && !node->lhs->var->is_local)
+            else if ((node->lhs->kind == ND_VAR || node->lhs->kind == ND_VLA_PTR) && !node->lhs->var->is_local)
             {
                 MirGlobalVar *gv = findOrCreateGlobal(node->lhs->var->name, node->lhs->var->ty);
                 MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
@@ -991,6 +1057,17 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             if (node->lhs && node->lhs->kind == ND_VAR && node->lhs->var && node->lhs->var->name)
             {
                 calleeName = node->lhs->var->name;
+            }
+
+            if (calleeName == "alloca" || calleeName == "__builtin_alloca")
+            {
+                MirOperand *szOp = node->args ? lowerExpression(node->args) : m_opBuilder.buildInt(m_tt->i64(), FlexInt(0, 64));
+                MirRegister *szReg = ensureRegister(szOp, m_tt->i64(), "alloca_sz");
+                MirType *ptrType = m_tt->getPtr(m_tt->i8());
+                MirRegister *allocaDest = m_opBuilder.buildVReg(ptrType, "alloca_buf");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .DALLOC(allocaDest, szReg);
+                return allocaDest;
             }
 
             MirType *retType = mapType(m_tt, node->ty);
@@ -1315,6 +1392,9 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
                     .MOV(addrReg, m_opBuilder.buildRef(target));
             return addrReg;
         }
+        case ND_MEMZERO:
+            lowerStatement(node);
+            return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0, 32));
         case ND_NULL_EXPR:
             return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0));
         default:
