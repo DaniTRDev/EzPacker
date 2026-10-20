@@ -17,6 +17,8 @@
 #include "FlexNumber/FlexFloat.h"
 #include "Function/MirFunctionStackFrame.h"
 #include "chibicc.h"
+#include <algorithm>
+#include <vector>
 
 namespace EzCompiler::CFrontend
 {
@@ -145,6 +147,18 @@ MirBlock *CFrontendFunctionLowerer::createBlock(const char *prefix)
 {
     MirBlockBuilder bb(&m_bCtx, m_func);
     return bb.build(nullptr, std::string(prefix) + "_" + std::to_string(++m_blockCounter));
+}
+
+MirBlock *CFrontendFunctionLowerer::getOrCreateBlockForLabel(const std::string &uniqueLabel)
+{
+    auto it = m_labeledBlocks.find(uniqueLabel);
+    if (it != m_labeledBlocks.end())
+    {
+        return it->second;
+    }
+    MirBlock *b = createBlock(uniqueLabel.c_str());
+    m_labeledBlocks[uniqueLabel] = b;
+    return b;
 }
 
 MirGlobalVar *CFrontendFunctionLowerer::findGlobal(std::string_view name)
@@ -448,6 +462,171 @@ void CFrontendFunctionLowerer::lowerStatement(Node *node)
             m_currentBlock = exitB;
             break;
         }
+        case ND_SWITCH:
+        {
+            MirBlock *exitB = createBlock("switch_exit");
+            if (node->brk_label)
+            {
+                m_labeledBlocks[node->brk_label] = exitB;
+            }
+
+            MirOperand *condVal = lowerExpression(node->cond);
+            MirRegister *condReg = ensureRegister(condVal, m_tt->i32(), "switch_cond");
+
+            // Collect all cases in order
+            std::vector<Node *> cases;
+            for (Node *c = node->case_next; c; c = c->case_next)
+            {
+                cases.push_back(c);
+            }
+            std::reverse(cases.begin(), cases.end());
+
+            // Pre-create target blocks for each case
+            for (Node *c : cases)
+            {
+                if (c->label)
+                {
+                    getOrCreateBlockForLabel(c->label);
+                }
+            }
+
+            MirBlock *defaultB = nullptr;
+            if (node->default_case && node->default_case->label)
+            {
+                defaultB = getOrCreateBlockForLabel(node->default_case->label);
+            }
+
+            // Emit dispatch checks
+            for (size_t i = 0; i < cases.size(); ++i)
+            {
+                Node *c = cases[i];
+                MirBlock *caseTarget = getOrCreateBlockForLabel(c->label);
+                MirBlock *nextCheck = createBlock("switch_check");
+
+                uint16_t bits = static_cast<uint16_t>(condReg->getMirType()->getTotalSizeInBits());
+                if (c->begin == c->end)
+                {
+                    MirOperand *valImm = m_opBuilder.buildInt(condReg->getMirType(), FlexInt(static_cast<int64_t>(c->begin), static_cast<size_t>(bits)));
+                    MirRegister *cmp = m_opBuilder.buildVReg(m_tt->i1(), "case_cmp");
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .CMP_EQ(cmp, condReg, valImm);
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .BR_COND(cmp, m_opBuilder.buildRef(caseTarget), m_opBuilder.buildRef(nextCheck));
+                }
+                else
+                {
+                    MirOperand *beginImm = m_opBuilder.buildInt(condReg->getMirType(), FlexInt(static_cast<int64_t>(c->begin), static_cast<size_t>(bits)));
+                    MirOperand *endImm = m_opBuilder.buildInt(condReg->getMirType(), FlexInt(static_cast<int64_t>(c->end), static_cast<size_t>(bits)));
+                    MirRegister *cmpLow = m_opBuilder.buildVReg(m_tt->i1(), "case_ge");
+                    MirRegister *cmpHigh = m_opBuilder.buildVReg(m_tt->i1(), "case_le");
+                    MirRegister *inRange = m_opBuilder.buildVReg(m_tt->i1(), "case_in_range");
+                    MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                    inst.CMP_SGE(cmpLow, condReg, beginImm);
+                    inst.CMP_SLE(cmpHigh, condReg, endImm);
+                    inst.AND(inRange, cmpLow, cmpHigh);
+                    inst.BR_COND(inRange, m_opBuilder.buildRef(caseTarget), m_opBuilder.buildRef(nextCheck));
+                }
+                m_currentBlock = nextCheck;
+            }
+
+            // If no case matched: jump to default (if exists) or exit
+            if (!isBlockTerminated(m_currentBlock))
+            {
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .JMP(m_opBuilder.buildRef(defaultB ? defaultB : exitB));
+            }
+
+            MirBlock *oldBreak = m_breakBlock;
+            m_breakBlock = exitB;
+
+            // Lower switch body
+            m_currentBlock = createBlock("switch_body_start");
+            lowerStatement(node->then);
+
+            if (!isBlockTerminated(m_currentBlock))
+            {
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .JMP(m_opBuilder.buildRef(exitB));
+            }
+
+            m_breakBlock = oldBreak;
+            m_currentBlock = exitB;
+            break;
+        }
+        case ND_CASE:
+        {
+            if (node->label)
+            {
+                MirBlock *caseB = getOrCreateBlockForLabel(node->label);
+                if (m_currentBlock && !isBlockTerminated(m_currentBlock))
+                {
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .JMP(m_opBuilder.buildRef(caseB));
+                }
+                m_currentBlock = caseB;
+            }
+            if (node->lhs)
+            {
+                lowerStatement(node->lhs);
+            }
+            break;
+        }
+        case ND_GOTO:
+        {
+            std::string lbl = node->unique_label ? node->unique_label : (node->label ? node->label : "");
+            if (!lbl.empty())
+            {
+                MirBlock *target = getOrCreateBlockForLabel(lbl);
+                if (m_currentBlock && !isBlockTerminated(m_currentBlock))
+                {
+                    MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                            .JMP(m_opBuilder.buildRef(target));
+                }
+                m_currentBlock = createBlock("after_goto");
+            }
+            break;
+        }
+        case ND_LABEL:
+        {
+            std::string lbl = node->unique_label ? node->unique_label : (node->label ? node->label : "label");
+            MirBlock *lblBlock = getOrCreateBlockForLabel(lbl);
+            if (m_currentBlock && !isBlockTerminated(m_currentBlock))
+            {
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                        .JMP(m_opBuilder.buildRef(lblBlock));
+            }
+            m_currentBlock = lblBlock;
+            if (node->lhs)
+            {
+                lowerStatement(node->lhs);
+            }
+            break;
+        }
+        case ND_GOTO_EXPR:
+        {
+            MirOperand *targetOp = lowerExpression(node->lhs);
+            if (!m_labeledBlocks.empty())
+            {
+                MirRegister *targetReg = ensureRegister(targetOp, m_tt->getPtr(m_tt->i8()), "goto_target");
+                std::vector<std::pair<std::string, MirBlock *>> targets(m_labeledBlocks.begin(), m_labeledBlocks.end());
+                for (size_t i = 0; i < targets.size(); ++i)
+                {
+                    MirBlock *destB = targets[i].second;
+                    MirBlock *nextCheck = (i + 1 < targets.size()) ? createBlock("computed_goto_next") : destB;
+                    MirRegister *addrReg = m_opBuilder.buildVReg(m_tt->getPtr(m_tt->i8()), "lbl_addr_check");
+                    MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
+                    inst.MOV(addrReg, m_opBuilder.buildRef(destB));
+                    MirRegister *cmp = m_opBuilder.buildVReg(m_tt->i1(), "is_dest");
+                    inst.CMP_EQ(cmp, targetReg, addrReg);
+                    inst.BR_COND(cmp, m_opBuilder.buildRef(destB), m_opBuilder.buildRef(nextCheck));
+                    m_currentBlock = nextCheck;
+                }
+            }
+            m_currentBlock = createBlock("after_goto_expr");
+            break;
+        }
+        case ND_NULL_EXPR:
+            break;
         default:
             lowerExpression(node);
             break;
@@ -1126,6 +1305,18 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             m_currentBlock = joinB;
             return dest;
         }
+        case ND_LABEL_VAL:
+        {
+            std::string lbl = node->unique_label ? node->unique_label : (node->label ? node->label : "");
+            MirBlock *target = getOrCreateBlockForLabel(lbl);
+            MirType *ptrType = m_tt->getPtr(m_tt->i8());
+            MirRegister *addrReg = m_opBuilder.buildVReg(ptrType, "lbl_val");
+            MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
+                    .MOV(addrReg, m_opBuilder.buildRef(target));
+            return addrReg;
+        }
+        case ND_NULL_EXPR:
+            return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0));
         default:
             return m_opBuilder.buildInt(m_tt->i32(), FlexInt(0));
     }

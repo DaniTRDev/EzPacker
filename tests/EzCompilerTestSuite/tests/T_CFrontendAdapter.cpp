@@ -293,4 +293,109 @@ TEST_F(CFrontendAdapterTest, CompilesFreestandingKernelWithStdintAndStddef)
     verifyMir(bCtx);
 }
 
+TEST_F(CFrontendAdapterTest, CompilesSwitchCaseWithDefaultAndRanges)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_switch(int x) {
+            int res = 0;
+            switch (x) {
+                case 1:
+                    res = 10;
+                    break;
+                case 2 ... 5:
+                    res = 20;
+                    break;
+                case 10:
+                    res = 30;
+                default:
+                    res = res + 5;
+                    break;
+            }
+            return res;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "switch.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *func = bCtx->getFunctions().front();
+    ASSERT_NE(func, nullptr);
+    EXPECT_GT(func->getBlockCount(), 4u);
+
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesGotoAndLabels)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_goto(int n) {
+            int sum = 0;
+            int i = 0;
+        loop_start:
+            if (i >= n)
+                goto loop_end;
+            sum = sum + i;
+            i = i + 1;
+            goto loop_start;
+        loop_end:
+            return sum;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "goto.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *func = bCtx->getFunctions().front();
+    ASSERT_NE(func, nullptr);
+
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesLabelsAsValuesAndComputedGoto)
+{
+    auto ctx = createDriverContext();
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        int test_computed_goto(int op) {
+            void *dispatch_table[2];
+            dispatch_table[0] = &&do_add;
+            dispatch_table[1] = &&do_sub;
+            int val = 10;
+            if (op == 0)
+                goto *dispatch_table[0];
+            else
+                goto *dispatch_table[1];
+
+        do_add:
+            val = val + 5;
+            return val;
+
+        do_sub:
+            val = val - 5;
+            return val;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "computed_goto.c");
+    ASSERT_TRUE(success);
+
+    ASSERT_EQ(bCtx->getFunctions().size(), 1u);
+    MirFunction *func = bCtx->getFunctions().front();
+    ASSERT_NE(func, nullptr);
+
+    verifyMir(bCtx);
+}
+
 
