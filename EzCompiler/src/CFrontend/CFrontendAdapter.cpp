@@ -74,6 +74,10 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
             MirLinkage linkage = obj->is_static ? MirLinkage::Internal : MirLinkage::External;
             MirGlobalVarBuilder gb(&outMirCtx);
             gb.setConstant(false);
+            if (!obj->is_definition)
+            {
+                gb.setIsDeclaration(true);
+            }
 
             if (obj->init_data)
             {

@@ -140,6 +140,26 @@ python tests/YarpgenDifferentialTests/yarpgen_suite.py seeds [--seeds-file <path
 
 ---
 
+## 🧪 Freestanding YARP End-to-End Suite (`EzCompilerEndToEndTests/yarp_corpus/`)
+
+In addition to differential fuzzing against GCC/Clang, EzPacker features a dedicated **freestanding end-to-end test suite** in `tests/EzCompilerEndToEndTests/yarp_corpus/` designed to verify standalone C11 compilation without hosted C standard library dependencies:
+
+- **Zero stdlib headers**: Test units compile purely against ISO C11 freestanding headers (`<stdint.h>`, `<stdbool.h>`, `<stddef.h>`, `<limits.h>`).
+- **Deterministic 64-bit verification**: Test drivers use `freestanding_driver.h` providing a 64-bit hashing primitive (`hash_step`) and return `0` on successful verification or non-zero exit codes on failure, eliminating `<stdio.h>` and `printf`.
+- **Cross-Platform ABI verification**:
+  - Compiles to **Windows x86_64 COFF** (`.obj`) and verifies against Microsoft Win64 ABI (`-DABI_WIN64`).
+  - Compiles to **Linux x86_64 ELF** (`.o`) and verifies against System V AMD64 ABI (`-DABI_SYSV`).
+  - Validates ELF relocatables and section headers using `elf_validator`.
+- **Curated test areas**:
+  - `yarp_01_arithmetic_logic`: 64-bit/32-bit arithmetic, bitwise masks, sign-extension, and multi-term algebra.
+  - `yarp_02_branch_loops`: Nested loops, conditional branching, and early loop breaks.
+  - `yarp_03_memory_arrays`: Array indexing, pointer arithmetic, buffer reversal, and memory accumulators.
+  - `yarp_04_type_conversions`: Signed/unsigned widening, narrowing truncation, and bitcasts.
+  - `yarp_05_structs_globals`: Struct layouts, member offset arithmetic, and file-scope global variables.
+  - `yarp_06_nested_calls`: Cross-function parameter passing, deep call chains, and accumulator folding.
+
+---
+
 ## 🏷️ CTest Labels Summary
 
 All tests are integrated into CTest and can be filtered by labels:
@@ -149,6 +169,7 @@ All tests are integrated into CTest and can be filtered by labels:
 - `ctest -L Differential`: Runs execution and checksum verification against GCC/Clang.
 - `ctest -L Regression`: Runs curated deterministic seed regression tests.
 - `ctest -L Yarpgen`: Runs the entire YARPGen test fleet.
+- `ctest -L Freestanding`: Runs the freestanding YARP end-to-end tests without stdlib.
 
 ---
 

@@ -63,6 +63,21 @@ EzCompiler simple_math.mir --target x86_64-unknown-linux-gnu -o simple_math.o
 EzCompiler simple_math.mir --target x86_64-pc-windows-coff -o simple_math.obj
 ```
 
+### 3.3 Compiling Standalone Freestanding C11 (Microcontrollers & Kernels)
+EzPacker compiles ISO C11 source files directly with **zero dependency on hosted standard C libraries**:
+
+```bash
+# Compile baremetal C file to native object file
+ezc -O2 my_kernel.c -o my_kernel.o
+
+# Cross-compile for Linux ELF64 (baremetal / kernel module)
+ezc -O2 --target x86_64-linux-gnu my_kernel.c -o my_kernel_linux.o
+
+# Cross-compile for Windows PE/COFF
+ezc -O2 --target x86_64-pc-windows-coff my_kernel.c -o my_kernel_win.obj
+```
+Bundled freestanding headers (`<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`, etc.) are automatically resolved by EzPacker's embedded standalone frontend, making it directly suited for microcontroller firmware, bootloaders, and OS kernels.
+
 ---
 
 ## 4. Inspecting the Compiler Pipeline Stages

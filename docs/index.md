@@ -175,3 +175,22 @@ dot3:
     pop     rbp
     ret
 ```
+
+### Standalone Freestanding C11 (Microcontrollers & Kernels)
+
+EzPacker's embedded modular C frontend compiles pure standalone C11 with **zero dependencies on hosted libc**:
+
+```c
+// gpio_driver.c (Freestanding Baremetal MMIO)
+#include <stdint.h>
+#define GPIO_ODR (*(volatile uint32_t *)0x40020014UL)
+
+void toggle_pin(uint8_t pin) {
+    GPIO_ODR ^= (1UL << pin);
+}
+```
+
+```bash
+# Compile directly to native object code
+ezc -O2 gpio_driver.c -o gpio_driver.o
+```

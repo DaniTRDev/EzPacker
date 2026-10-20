@@ -63,7 +63,22 @@ class MirGlobalVar
      */
     const std::pmr::string &getName() const;
 
+    /**
+     * Checks if this global variable is an external declaration (defined elsewhere).
+     */
+    bool isDeclaration() const;
+
+    /**
+     * Sets whether this global variable is an external declaration.
+     */
+    void setIsDeclaration(bool isDecl);
+
   private:
+    /**
+     * Indicates whether the global variable is an external declaration without local storage.
+     */
+    bool m_isDeclaration = false;
+
     /**
      * Indicates whether the global variable is immutable/read-only.
      */

@@ -31,6 +31,11 @@ class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
     MirGlobalVarBuilder &setConstant(bool constant);
 
     /**
+     * Sets whether the constructed global variable is an external declaration.
+     */
+    MirGlobalVarBuilder &setIsDeclaration(bool isDecl);
+
+    /**
      * Assigns the constant initializer operand (must be a constant type: MirInteger, MirFloat, or MirConstantArray).
      * Emits a diagnostic error if an invalid operand is supplied.
      */
@@ -51,6 +56,11 @@ class MirGlobalVarBuilder : public MirBuilder<MirGlobalVar>
      * Initializer operand to attach to the global variable.
      */
     class MirOperand *m_initializer;
+
+    /**
+     * Indicates whether the global variable is an external declaration.
+     */
+    bool m_isDeclaration = false;
 };
 
 #endif // EZPACKER_MIRGLOBALVARBUILDER_H

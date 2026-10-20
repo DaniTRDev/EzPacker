@@ -57,3 +57,7 @@ SourceReference *MirGlobalVar::getSourceRef() const { return m_sourceRef; }
  * Returns the symbolic name of the global variable.
  */
 const std::pmr::string &MirGlobalVar::getName() const { return m_name; }
+
+bool MirGlobalVar::isDeclaration() const { return m_isDeclaration; }
+
+void MirGlobalVar::setIsDeclaration(bool isDecl) { m_isDeclaration = isDecl; }
