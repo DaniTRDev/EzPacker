@@ -299,3 +299,4 @@ export const PassInspector: React.FC = () => {
     </div>
   );
 };
+

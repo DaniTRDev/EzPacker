@@ -161,9 +161,11 @@ export interface StackSlotTelemetry {
 }
 
 export interface FrameLayoutTelemetry {
-  totalFrameSize: number;
-  calleeSavedSize: number;
-  stackSlots: StackSlotTelemetry[];
+  totalSize?: number;
+  totalFrameSize?: number;
+  calleeSaveSize?: number;
+  calleeSavedSize?: number;
+  stackSlots?: StackSlotTelemetry[];
 }
 
 export interface FunctionTelemetry {

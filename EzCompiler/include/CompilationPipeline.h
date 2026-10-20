@@ -9,6 +9,8 @@
 class MirBuilderContext;
 class MirFunction;
 class MirPassManager;
+class CodeFlowAnalysisPass;
+class LivenessAnalysisPass;
 
 namespace EzCompiler
 {
@@ -99,8 +101,13 @@ class CompilationPipeline
                              MirFunction *func,
                              MirPassManager *passManager,
                              const ::MirPassResult &result,
-                             double durationMs);
-    void captureFunctionTelemetry(MirFunction *func, MirPassManager *passManager);
+                             double durationMs,
+                             CodeFlowAnalysisPass *cfPass = nullptr,
+                             LivenessAnalysisPass *lvPass = nullptr);
+    void captureFunctionTelemetry(MirFunction *func,
+                                  MirPassManager *passManager,
+                                  CodeFlowAnalysisPass *cfPass = nullptr,
+                                  LivenessAnalysisPass *lvPass = nullptr);
 
   private:
     DriverContext &m_ctx; ///< Driver context supplying diagnostics, allocators and target descriptors.

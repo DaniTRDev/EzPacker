@@ -131,8 +131,15 @@ export class CompilerRunner {
       } else {
         args.push('--rtti');
       }
-      if (req.features && req.features.length > 0) {
-        for (const feat of req.features) {
+      const isSimd256 = req.code && (req.code.includes('v8f32') || req.code.includes('v4f64') || req.code.includes('v8i32'));
+      const activeFeatures = [...(req.features || [])];
+      if (isSimd256) {
+        if (!activeFeatures.includes('+avx')) activeFeatures.push('+avx');
+        if (!activeFeatures.includes('+avx2')) activeFeatures.push('+avx2');
+      }
+
+      if (activeFeatures.length > 0) {
+        for (const feat of activeFeatures) {
           args.push('--target-feature', feat);
         }
       }
@@ -240,8 +247,8 @@ export class CompilerRunner {
             liveness,
             frameLayout: fnTel.frameLayout
               ? {
-                  totalSize: fnTel.frameLayout.totalFrameSize,
-                  calleeSaveSize: fnTel.frameLayout.calleeSavedSize,
+                  totalSize: fnTel.frameLayout.totalSize ?? fnTel.frameLayout.totalFrameSize ?? 0,
+                  calleeSaveSize: fnTel.frameLayout.calleeSaveSize ?? fnTel.frameLayout.calleeSavedSize ?? 0,
                 }
               : undefined,
           };

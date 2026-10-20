@@ -55,6 +55,7 @@ struct LivenessBlockTelemetry
 
 struct FrameLayoutTelemetry
 {
+    bool isComputed{ false };
     size_t calleeSaveSize{ 0 };
     size_t totalSize{ 0 };
     bool hasCalls{ false };
@@ -110,3 +111,4 @@ class PipelineTelemetry : public DiagnosticListener
 } // namespace EzCompiler
 
 #endif // EZPACKER_PIPELINE_TELEMETRY_H
+

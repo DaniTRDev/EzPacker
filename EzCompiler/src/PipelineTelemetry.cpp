@@ -60,7 +60,28 @@ void PipelineTelemetry::recordPass(PassTelemetryRecord record)
 
 void PipelineTelemetry::updateFunctionAnalysis(const std::string &fnName, FunctionTelemetry telemetry)
 {
-    m_functions[fnName] = std::move(telemetry);
+    auto it = m_functions.find(fnName);
+    if (it == m_functions.end())
+    {
+        m_functions[fnName] = std::move(telemetry);
+        return;
+    }
+
+    FunctionTelemetry &existing = it->second;
+    existing.name = telemetry.name;
+
+    if (!telemetry.blocks.empty())
+    {
+        existing.blocks = std::move(telemetry.blocks);
+    }
+    if (!telemetry.liveness.empty())
+    {
+        existing.liveness = std::move(telemetry.liveness);
+    }
+    if (telemetry.frameLayout.isComputed)
+    {
+        existing.frameLayout = std::move(telemetry.frameLayout);
+    }
 }
 
 void PipelineTelemetry::onDiag(const DiagnosticMessage &msg)
@@ -246,3 +267,4 @@ bool PipelineTelemetry::writeToFile(const std::filesystem::path &path) const
 }
 
 } // namespace EzCompiler
+

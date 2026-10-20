@@ -266,7 +266,9 @@ void CompilationPipeline::recordPassTelemetry(std::string_view passName,
                                               MirFunction *func,
                                               MirPassManager *passManager,
                                               const ::MirPassResult &result,
-                                              double durationMs)
+                                              double durationMs,
+                                              CodeFlowAnalysisPass *cfPass,
+                                              LivenessAnalysisPass *lvPass)
 {
     if (!m_telemetry)
     {
@@ -298,11 +300,14 @@ void CompilationPipeline::recordPassTelemetry(std::string_view passName,
 
     if (func)
     {
-        captureFunctionTelemetry(func, passManager);
+        captureFunctionTelemetry(func, passManager, cfPass, lvPass);
     }
 }
 
-void CompilationPipeline::captureFunctionTelemetry(MirFunction *func, MirPassManager *passManager)
+void CompilationPipeline::captureFunctionTelemetry(MirFunction *func,
+                                                       MirPassManager *passManager,
+                                                       CodeFlowAnalysisPass *cfPass,
+                                                       LivenessAnalysisPass *lvPass)
 {
     if (!func || !m_telemetry)
     {
@@ -312,18 +317,13 @@ void CompilationPipeline::captureFunctionTelemetry(MirFunction *func, MirPassMan
     FunctionTelemetry ft;
     ft.name = std::string(func->getName());
 
-    CodeFlowAnalysisPass *cfPass = nullptr;
-    LivenessAnalysisPass *lvPass = nullptr;
-    if (passManager)
+    if (!cfPass && passManager)
     {
-        if (passManager->hasPass<CodeFlowAnalysisPass>())
-        {
-            cfPass = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx.getBuilderContext());
-        }
-        if (passManager->hasPass<LivenessAnalysisPass>())
-        {
-            lvPass = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx.getBuilderContext());
-        }
+        cfPass = passManager->getCachedAnalysis<CodeFlowAnalysisPass>();
+    }
+    if (!lvPass && passManager)
+    {
+        lvPass = passManager->getCachedAnalysis<LivenessAnalysisPass>();
     }
 
     for (const MirBlock *block : func->getBlocks())
@@ -401,6 +401,7 @@ void CompilationPipeline::captureFunctionTelemetry(MirFunction *func, MirPassMan
 
     if (func->getAnalysisData())
     {
+        ft.frameLayout.isComputed = true;
         ft.frameLayout.calleeSaveSize = func->getAnalysisData()->m_calleeSavedAreaSize;
         ft.frameLayout.totalSize = func->getAnalysisData()->m_totalFrameSize;
         ft.frameLayout.hasCalls = func->getAnalysisData()->m_hasCalls;
@@ -434,9 +435,20 @@ bool CompilationPipeline::runCheckedPass(std::string_view passName,
         std::cout << "[Time] " << passName << ": " << elapsedMs << " ms\n";
     }
 
+    CodeFlowAnalysisPass *cfPass = nullptr;
+    LivenessAnalysisPass *lvPass = nullptr;
+    if constexpr (std::is_same_v<PassT, CodeFlowAnalysisPass>)
+    {
+        cfPass = &pass;
+    }
+    if constexpr (std::is_same_v<PassT, LivenessAnalysisPass>)
+    {
+        lvPass = &pass;
+    }
+
     if (m_telemetry)
     {
-        recordPassTelemetry(passName, stage, func, passManager, result, elapsedMs);
+        recordPassTelemetry(passName, stage, func, passManager, result, elapsedMs, cfPass, lvPass);
     }
 
     if (!result.m_succeeded)

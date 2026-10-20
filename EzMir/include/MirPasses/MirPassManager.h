@@ -57,6 +57,19 @@ class MirPassManager
      */
     template <typename AnalysisPass>
         requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
+    AnalysisPass *getCachedAnalysis() const
+    {
+        std::type_index passId = std::type_index(typeid(AnalysisPass));
+        auto it = m_validAnalyses.find(passId);
+        if (it != m_validAnalyses.end())
+        {
+            return static_cast<AnalysisPass *>(it->second);
+        }
+        return nullptr;
+    }
+
+    template <typename AnalysisPass>
+        requires(std::is_base_of_v<IMirAnalysisPass, AnalysisPass>)
     AnalysisPass *getAnalysis(class MirBuilderContext *ctx)
     {
         std::type_index passId = std::type_index(typeid(AnalysisPass));

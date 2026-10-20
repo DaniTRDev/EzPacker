@@ -257,9 +257,11 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
     const { examples } = get();
     const ex = examples.find(e => e.id === id);
     if (ex) {
+      const extraFeatures = ex.id.includes('avx') ? ['+avx', '+avx2'] : [];
       set({
         selectedExampleId: id,
         code: ex.code,
+        features: extraFeatures.length > 0 ? extraFeatures : get().features,
       });
       get().compile();
     }
