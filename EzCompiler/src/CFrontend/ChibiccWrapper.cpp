@@ -94,6 +94,81 @@ std::string ChibiccWrapper::getBundledFreestandingIncludeDir()
     return {};
 }
 
+std::string ChibiccWrapper::getBundledHostedIncludeDir()
+{
+    // 1. Environment variable override
+    const char *envDir = std::getenv("EZPACKER_C11STD_DIR");
+    if (envDir && *envDir)
+    {
+        std::filesystem::path p(envDir);
+        std::error_code ec;
+        if (std::filesystem::is_directory(p, ec))
+            return std::filesystem::weakly_canonical(p, ec).string();
+    }
+
+    // 2. Compile-time definition
+#ifdef EZPACKER_C11STD_INCLUDE_DIR
+    {
+        std::filesystem::path p(EZPACKER_C11STD_INCLUDE_DIR);
+        std::error_code ec;
+        if (std::filesystem::is_directory(p, ec) && std::filesystem::exists(p / "stdio.h", ec))
+            return std::filesystem::weakly_canonical(p, ec).string();
+    }
+#endif
+
+    // 3. Executable-relative resolution
+#if defined(_WIN32)
+    char exePath[MAX_PATH];
+    DWORD len = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    if (len > 0 && len < MAX_PATH)
+    {
+        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+        std::vector<std::filesystem::path> candidates = {
+            exeDir / "include" / "c11std",
+            exeDir / ".." / "include" / "c11std",
+            exeDir / ".." / ".." / "include" / "c11std",
+            exeDir / ".." / ".." / ".." / "include" / "c11std",
+            exeDir / "EzLibStdC" / "include",
+            exeDir / ".." / "EzLibStdC" / "include"
+        };
+        for (const auto &cand : candidates)
+        {
+            std::error_code ec;
+            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdio.h", ec))
+                return std::filesystem::weakly_canonical(cand, ec).string();
+        }
+    }
+#endif
+
+    // 4. Working directory / relative paths
+    std::error_code cwdEc;
+    std::filesystem::path cwd = std::filesystem::current_path(cwdEc);
+    if (!cwdEc)
+    {
+        std::vector<std::filesystem::path> candidates = {
+            cwd / "include" / "c11std",
+            cwd / "bin" / "include" / "c11std",
+            cwd / ".." / "include" / "c11std",
+            cwd / ".." / ".." / "include" / "c11std",
+            cwd / "EzLibStdC" / "include"
+        };
+        for (const auto &cand : candidates)
+        {
+            std::error_code ec;
+            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdio.h", ec))
+                return std::filesystem::weakly_canonical(cand, ec).string();
+        }
+    }
+
+    return {};
+}
+
+void ChibiccWrapper::setHostedMode(bool hosted)
+{
+    m_hosted = hosted;
+    setupDefaultMacros();
+}
+
 void ChibiccWrapper::addIncludePath(std::string_view path)
 {
     for (const auto &inc : m_includePaths)
@@ -111,18 +186,39 @@ void ChibiccWrapper::defineMacro(std::string_view name, std::string_view value)
 
 void ChibiccWrapper::setupDefaultMacros()
 {
+    m_macros.clear();
     defineMacro("__chibicc__", "1");
     defineMacro("__STDC__", "1");
     defineMacro("__STDC_VERSION__", "201112L");
-    defineMacro("__STDC_HOSTED__", "0");
-    defineMacro("__EZPACKER_STANDALONE__", "1");
-    defineMacro("__STDC_FREESTANDING__", "1");
+    if (m_hosted)
+    {
+        defineMacro("__STDC_HOSTED__", "1");
+    }
+    else
+    {
+        defineMacro("__STDC_HOSTED__", "0");
+        defineMacro("__EZPACKER_STANDALONE__", "1");
+        defineMacro("__STDC_FREESTANDING__", "1");
+    }
     defineMacro("__builtin_alloca", "alloca");
     defineMacro("__asm__", "asm");
     defineMacro("__asm", "asm");
     defineMacro("__volatile", "volatile");
+    defineMacro("__volatile__", "volatile");
     defineMacro("__inline", "inline");
+    defineMacro("__inline__", "inline");
+    defineMacro("__const", "const");
+    defineMacro("__const__", "const");
+    defineMacro("__restrict", "restrict");
+    defineMacro("__restrict__", "restrict");
+    defineMacro("__extension__", "");
+    defineMacro("__attribute__(x)", "");
+    defineMacro("__builtin_expect(x, v)", "(x)");
+    defineMacro("__builtin_constant_p(x)", "0");
+    return;
 }
+
+
 
 ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
 {
@@ -149,13 +245,13 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
         strarray_push(&include_paths, const_cast<char *>(inc.c_str()));
     }
 
-    std::string fsDir = getBundledFreestandingIncludeDir();
-    if (!fsDir.empty())
+    std::string sysDir = m_hosted ? getBundledHostedIncludeDir() : getBundledFreestandingIncludeDir();
+    if (!sysDir.empty())
     {
         bool found = false;
         for (const auto &inc : m_includePaths)
         {
-            if (inc == fsDir)
+            if (inc == sysDir)
             {
                 found = true;
                 break;
@@ -163,7 +259,7 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
         }
         if (!found)
         {
-            strarray_push(&include_paths, const_cast<char *>(fsDir.c_str()));
+            strarray_push(&include_paths, const_cast<char *>(sysDir.c_str()));
         }
     }
 

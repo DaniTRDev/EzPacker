@@ -42,6 +42,23 @@ class ChibiccWrapper
     static std::string getBundledFreestandingIncludeDir();
 
     /**
+     * Resolves the disk path to the bundled ISO C11 hosted headers directory (include/c11std).
+     * Returns empty string if not found on disk.
+     */
+    static std::string getBundledHostedIncludeDir();
+
+    /**
+     * Sets whether the compiler environment is hosted (true) or freestanding (false).
+     * Updates default macros like __STDC_HOSTED__ and include paths accordingly.
+     */
+    void setHostedMode(bool hosted);
+
+    /**
+     * Returns true if the wrapper is currently configured for a hosted compilation environment.
+     */
+    [[nodiscard]] bool isHostedMode() const noexcept { return m_hosted; }
+
+    /**
      * Adds an include directory for header resolution (<...> and "...").
      */
     void addIncludePath(std::string_view path);
@@ -69,6 +86,7 @@ class ChibiccWrapper
   private:
     std::vector<std::string> m_includePaths;
     std::vector<std::pair<std::string, std::string>> m_macros;
+    bool m_hosted{ false };
 };
 
 } // namespace EzCompiler::CFrontend

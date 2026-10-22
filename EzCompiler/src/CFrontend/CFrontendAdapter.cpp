@@ -25,6 +25,11 @@ std::string CFrontendAdapter::getBundledFreestandingIncludeDir()
     return CFrontend::ChibiccWrapper::getBundledFreestandingIncludeDir();
 }
 
+std::string CFrontendAdapter::getBundledHostedIncludeDir()
+{
+    return CFrontend::ChibiccWrapper::getBundledHostedIncludeDir();
+}
+
 void CFrontendAdapter::addIncludePath(std::string_view path)
 {
     m_wrapper.addIncludePath(path);
