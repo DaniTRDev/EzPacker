@@ -13,6 +13,7 @@ add_library(EzLibStdC STATIC
     src/stdlib/stdlib.c
     src/stdio/stdio.c
     src/time/time.c
+    src/os/crt_start.c
 )
 
 target_include_directories(EzLibStdC PUBLIC

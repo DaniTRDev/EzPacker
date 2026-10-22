@@ -17,94 +17,185 @@ struct _FILE *stderr = &g_stderr_file;
 
 int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
     size_t written = 0;
+#define EMIT_CHAR(c) do { \
+    if (str && written + 1 < size) str[written] = (c); \
+    ++written; \
+} while (0)
+
     for (const char *p = format; *p; ++p) {
         if (*p != '%') {
-            if (str && written + 1 < size) str[written] = *p;
-            ++written;
+            EMIT_CHAR(*p);
             continue;
         }
         ++p;
         if (!*p) break;
         if (*p == '%') {
-            if (str && written + 1 < size) str[written] = '%';
-            ++written;
+            EMIT_CHAR('%');
             continue;
         }
+
+        // Flags
+        int left_align = 0;
+        int zero_pad = 0;
+        while (*p == '-' || *p == '0' || *p == '+' || *p == ' ') {
+            if (*p == '-') left_align = 1;
+            else if (*p == '0') zero_pad = 1;
+            ++p;
+        }
+        if (left_align) zero_pad = 0;
+
+        // Width
+        int width = 0;
+        while (*p >= '0' && *p <= '9') {
+            width = width * 10 + (*p - '0');
+            ++p;
+        }
+
+        // Precision
+        int prec = -1;
+        if (*p == '.') {
+            ++p;
+            prec = 0;
+            while (*p >= '0' && *p <= '9') {
+                prec = prec * 10 + (*p - '0');
+                ++p;
+            }
+        }
+
+        // Length
+        int is_long = 0;
+        while (*p == 'l' || *p == 'z' || *p == 'h') {
+            if (*p == 'l') ++is_long;
+            ++p;
+        }
+
         if (*p == 'c') {
             int c = va_arg(ap, int);
-            if (str && written + 1 < size) str[written] = (char)c;
-            ++written;
+            int pad = (width > 1) ? width - 1 : 0;
+            if (!left_align) { while (pad-- > 0) EMIT_CHAR(' '); }
+            EMIT_CHAR((char)c);
+            if (left_align) { while (pad-- > 0) EMIT_CHAR(' '); }
             continue;
         }
+
         if (*p == 's') {
             const char *s = va_arg(ap, const char *);
             if (!s) s = "(null)";
-            while (*s) {
-                if (str && written + 1 < size) str[written] = *s;
-                ++written;
-                ++s;
-            }
+            int slen = (int)strlen(s);
+            if (prec >= 0 && prec < slen) slen = prec;
+            int pad = (width > slen) ? width - slen : 0;
+            if (!left_align) { while (pad-- > 0) EMIT_CHAR(' '); }
+            for (int i = 0; i < slen; ++i) EMIT_CHAR(s[i]);
+            if (left_align) { while (pad-- > 0) EMIT_CHAR(' '); }
             continue;
         }
+
         if (*p == 'd' || *p == 'i') {
-            long long val = va_arg(ap, int);
-            if (val < 0) {
-                if (str && written + 1 < size) str[written] = '-';
-                ++written;
-                val = -val;
-            }
-            char buf[32];
-            int idx = 0;
-            if (val == 0) buf[idx++] = '0';
+            long long val = (is_long >= 2) ? va_arg(ap, long long)
+                          : (is_long == 1) ? (long long)va_arg(ap, long)
+                          : (long long)va_arg(ap, int);
+            int is_neg = (val < 0);
+            unsigned long long uval = is_neg ? (unsigned long long)(-val) : (unsigned long long)val;
+
+            char digits[32];
+            int dcount = 0;
+            if (uval == 0) digits[dcount++] = '0';
             else {
-                char rev[32];
-                int r = 0;
-                while (val > 0) {
-                    rev[r++] = (char)('0' + (val % 10));
-                    val /= 10;
+                while (uval > 0) {
+                    digits[dcount++] = (char)('0' + (uval % 10));
+                    uval /= 10;
                 }
-                while (r > 0) buf[idx++] = rev[--r];
             }
-            buf[idx] = '\0';
-            for (int k = 0; k < idx; ++k) {
-                if (str && written + 1 < size) str[written] = buf[k];
-                ++written;
-            }
+            int total_len = dcount + (is_neg ? 1 : 0);
+            int pad = (width > total_len) ? width - total_len : 0;
+
+            if (!left_align && !zero_pad) { while (pad-- > 0) EMIT_CHAR(' '); }
+            if (is_neg) EMIT_CHAR('-');
+            if (!left_align && zero_pad) { while (pad-- > 0) EMIT_CHAR('0'); }
+            for (int i = dcount - 1; i >= 0; --i) EMIT_CHAR(digits[i]);
+            if (left_align) { while (pad-- > 0) EMIT_CHAR(' '); }
             continue;
         }
+
         if (*p == 'u' || *p == 'x' || *p == 'X' || *p == 'p') {
-            unsigned long long uval = (*p == 'p') ? (unsigned long long)va_arg(ap, void *) : (unsigned long long)va_arg(ap, unsigned int);
+            unsigned long long uval = (*p == 'p') ? (unsigned long long)va_arg(ap, void *)
+                                    : (is_long >= 2) ? va_arg(ap, unsigned long long)
+                                    : (is_long == 1) ? (unsigned long long)va_arg(ap, unsigned long)
+                                    : (unsigned long long)va_arg(ap, unsigned int);
             int base = (*p == 'u') ? 10 : 16;
-            char buf[32];
-            int idx = 0;
-            if (*p == 'p') {
-                if (str && written + 1 < size) str[written] = '0';
-                ++written;
-                if (str && written + 1 < size) str[written] = 'x';
-                ++written;
-            }
-            if (uval == 0) buf[idx++] = '0';
+            char digits[32];
+            int dcount = 0;
+            if (uval == 0) digits[dcount++] = '0';
             else {
-                char rev[32];
-                int r = 0;
                 while (uval > 0) {
-                    int d = uval % base;
-                    rev[r++] = (char)(d < 10 ? '0' + d : (*p == 'X' ? 'A' : 'a') + (d - 10));
+                    int d = (int)(uval % base);
+                    digits[dcount++] = (char)(d < 10 ? '0' + d : (*p == 'X' ? 'A' : 'a') + (d - 10));
                     uval /= base;
                 }
-                while (r > 0) buf[idx++] = rev[--r];
             }
-            buf[idx] = '\0';
-            for (int k = 0; k < idx; ++k) {
-                if (str && written + 1 < size) str[written] = buf[k];
-                ++written;
-            }
+            int pfx_len = (*p == 'p') ? 2 : 0;
+            int total_len = dcount + pfx_len;
+            int pad = (width > total_len) ? width - total_len : 0;
+
+            if (!left_align && !zero_pad) { while (pad-- > 0) EMIT_CHAR(' '); }
+            if (*p == 'p') { EMIT_CHAR('0'); EMIT_CHAR('x'); }
+            if (!left_align && zero_pad) { while (pad-- > 0) EMIT_CHAR('0'); }
+            for (int i = dcount - 1; i >= 0; --i) EMIT_CHAR(digits[i]);
+            if (left_align) { while (pad-- > 0) EMIT_CHAR(' '); }
             continue;
         }
-        // Generic fallback for unhandled specifier
-        if (str && written + 1 < size) str[written] = *p;
-        ++written;
+
+        if (*p == 'f') {
+            double fval = va_arg(ap, double);
+            int is_neg = (fval < 0.0);
+            if (is_neg) fval = -fval;
+            if (prec < 0) prec = 6;
+
+            long long int_part = (long long)fval;
+            double frac_part = fval - (double)int_part;
+
+            char buf[64];
+            int bidx = 0;
+
+            char int_digits[32];
+            int idcount = 0;
+            if (int_part == 0) int_digits[idcount++] = '0';
+            else {
+                long long tmp = int_part;
+                while (tmp > 0) {
+                    int_digits[idcount++] = (char)('0' + (tmp % 10));
+                    tmp /= 10;
+                }
+            }
+            while (idcount > 0) buf[bidx++] = int_digits[--idcount];
+
+            if (prec > 0) {
+                buf[bidx++] = '.';
+                for (int i = 0; i < prec; ++i) {
+                    frac_part *= 10.0;
+                    int digit = (int)frac_part;
+                    if (digit > 9) digit = 9;
+                    buf[bidx++] = (char)('0' + digit);
+                    frac_part -= (double)digit;
+                }
+            }
+            buf[bidx] = '\0';
+
+            int total_len = bidx + (is_neg ? 1 : 0);
+            int pad = (width > total_len) ? width - total_len : 0;
+
+            if (!left_align && !zero_pad) { while (pad-- > 0) EMIT_CHAR(' '); }
+            if (is_neg) EMIT_CHAR('-');
+            if (!left_align && zero_pad) { while (pad-- > 0) EMIT_CHAR('0'); }
+            for (int i = 0; i < bidx; ++i) EMIT_CHAR(buf[i]);
+            if (left_align) { while (pad-- > 0) EMIT_CHAR(' '); }
+            continue;
+        }
+
+        EMIT_CHAR(*p);
     }
+#undef EMIT_CHAR
+
     if (str && size > 0) {
         if (written < size) str[written] = '\0';
         else str[size - 1] = '\0';
@@ -197,3 +288,190 @@ int fclose(struct _FILE *stream) {
     (void)stream;
     return 0;
 }
+
+int fprintf(struct _FILE *stream, const char *format, ...) {
+
+    char buf[1024];
+
+    va_list ap;
+
+    va_start(ap, format);
+
+    int res = vsnprintf(buf, sizeof(buf), format, ap);
+
+    va_end(ap);
+
+    fputs(buf, stream);
+
+    return res;
+
+}
+
+
+
+int vfprintf(struct _FILE *stream, const char *format, va_list ap) {
+
+    char buf[1024];
+
+    int res = vsnprintf(buf, sizeof(buf), format, ap);
+
+    fputs(buf, stream);
+
+    return res;
+
+}
+
+
+
+int fflush(struct _FILE *stream) {
+
+    (void)stream;
+
+    return 0;
+
+}
+
+
+
+int fgetc(struct _FILE *stream) {
+
+    (void)stream;
+
+    return -1;
+
+}
+
+
+
+int getc(struct _FILE *stream) {
+
+    return fgetc(stream);
+
+}
+
+
+
+int getchar(void) {
+
+    return fgetc(stdin);
+
+}
+
+
+
+int putc(int c, struct _FILE *stream) {
+
+    return fputc(c, stream);
+
+}
+
+
+
+char *fgets(char *s, int size, struct _FILE *stream) {
+
+    (void)s; (void)size; (void)stream;
+
+    return NULL;
+
+}
+
+
+
+int ungetc(int c, struct _FILE *stream) {
+
+    (void)c; (void)stream;
+
+    return -1;
+
+}
+
+
+
+int fseek(struct _FILE *stream, long offset, int whence) {
+
+    (void)stream; (void)offset; (void)whence;
+
+    return -1;
+
+}
+
+
+
+long ftell(struct _FILE *stream) {
+
+    (void)stream;
+
+    return -1L;
+
+}
+
+
+
+void rewind(struct _FILE *stream) {
+
+    (void)stream;
+
+}
+
+
+
+int feof(struct _FILE *stream) {
+
+    (void)stream;
+
+    return 0;
+
+}
+
+
+
+int ferror(struct _FILE *stream) {
+
+    (void)stream;
+
+    return 0;
+
+}
+
+
+
+void clearerr(struct _FILE *stream) {
+
+    (void)stream;
+
+}
+
+
+
+void perror(const char *s) {
+
+    if (s && *s) {
+
+        fputs(s, stderr);
+
+        fputs(": Unknown error\n", stderr);
+
+    }
+
+}
+
+
+
+int remove(const char *pathname) {
+
+    (void)pathname;
+
+    return -1;
+
+}
+
+
+
+int rename(const char *oldpath, const char *newpath) {
+
+    (void)oldpath; (void)newpath;
+
+    return -1;
+
+}
+
