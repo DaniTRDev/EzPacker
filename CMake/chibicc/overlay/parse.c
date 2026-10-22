@@ -106,6 +106,7 @@ static Node *current_switch;
 
 static Obj *builtin_alloca;
 
+static Token *attribute_list(Token *tok, Type *ty);
 static bool is_typename(Token *tok);
 static Type *declspec(Token **rest, Token *tok, VarAttr *attr);
 static Type *typename(Token **rest, Token *tok);
@@ -427,6 +428,11 @@ static Type *declspec(Token **rest, Token *tok, VarAttr *attr) {
       continue;
     }
 
+    if (equal(tok, "__attribute__")) {
+      tok = attribute_list(tok, ty);
+      continue;
+    }
+
     // These keywords are recognized but ignored.
     if (consume(&tok, tok, "const") || consume(&tok, tok, "volatile") ||
         consume(&tok, tok, "auto") || consume(&tok, tok, "register") ||
@@ -698,7 +704,9 @@ static Type *declarator(Token **rest, Token *tok, Type *ty) {
     tok = tok->next;
   }
 
-  ty = type_suffix(rest, tok, ty);
+  ty = type_suffix(&tok, tok, ty);
+  tok = attribute_list(tok, ty);
+  *rest = tok;
   ty->name = name;
   ty->name_pos = name_pos;
   return ty;
@@ -1503,7 +1511,7 @@ static bool is_typename(Token *tok) {
       "typedef", "enum", "static", "extern", "_Alignas", "signed", "unsigned",
       "const", "volatile", "auto", "register", "restrict", "__restrict",
       "__restrict__", "_Noreturn", "float", "double", "typeof", "inline",
-      "_Thread_local", "__thread", "_Atomic",
+      "_Thread_local", "__thread", "_Atomic", "__attribute__",
     };
 
     for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++)
@@ -2595,32 +2603,57 @@ static void struct_members(Token **rest, Token *tok, Type *ty) {
   ty->members = head.next;
 }
 
-// attribute = ("__attribute__" "(" "(" "packed" ")" ")")*
+// attribute = ("__attribute__" "(" "(" ... ")" ")")*
 static Token *attribute_list(Token *tok, Type *ty) {
   while (consume(&tok, tok, "__attribute__")) {
+    if (!equal(tok, "("))
+      continue;
     tok = skip(tok, "(");
+    if (!equal(tok, "("))
+      continue;
     tok = skip(tok, "(");
 
     bool first = true;
 
     while (!consume(&tok, tok, ")")) {
-      if (!first)
-        tok = skip(tok, ",");
+      if (!first && consume(&tok, tok, ",")) {
+      }
       first = false;
 
       if (consume(&tok, tok, "packed")) {
-        ty->is_packed = true;
+        if (ty)
+          ty->is_packed = true;
         continue;
       }
 
       if (consume(&tok, tok, "aligned")) {
-        tok = skip(tok, "(");
-        ty->align = const_expr(&tok, tok);
-        tok = skip(tok, ")");
+        if (consume(&tok, tok, "(")) {
+          int align = const_expr(&tok, tok);
+          if (ty)
+            ty->align = align;
+          tok = skip(tok, ")");
+        }
         continue;
       }
 
-      error_tok(tok, "unknown attribute");
+      // Skip arbitrary attribute identifier and optional (arguments)
+      if (tok->kind == TK_IDENT || tok->kind == TK_KEYWORD) {
+        tok = tok->next;
+        if (consume(&tok, tok, "(")) {
+          int depth = 1;
+          while (depth > 0 && tok->kind != TK_EOF) {
+            if (equal(tok, "("))
+              depth++;
+            else if (equal(tok, ")"))
+              depth--;
+            tok = tok->next;
+          }
+        }
+        continue;
+      }
+
+      if (!equal(tok, ")") && tok->kind != TK_EOF)
+        tok = tok->next;
     }
 
     tok = skip(tok, ")");
@@ -3136,6 +3169,7 @@ static Token *parse_typedef(Token *tok, Type *basety) {
     first = false;
 
     Type *ty = declarator(&tok, tok, basety);
+    tok = attribute_list(tok, ty);
     if (!ty->name)
       error_tok(ty->name_pos, "typedef name omitted");
     push_scope(get_ident(ty->name))->type_def = ty;
@@ -3222,6 +3256,7 @@ static Token *function(Token *tok, Type *basety, VarAttr *attr) {
 
   fn->is_root = !(fn->is_static && fn->is_inline);
 
+  tok = attribute_list(tok, ty);
   if (consume(&tok, tok, ";"))
     return tok;
 
@@ -3270,6 +3305,7 @@ static Token *global_variable(Token *tok, Type *basety, VarAttr *attr) {
     first = false;
 
     Type *ty = declarator(&tok, tok, basety);
+    tok = attribute_list(tok, ty);
     if (!ty->name)
       error_tok(ty->name_pos, "variable name omitted");
 
