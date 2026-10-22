@@ -101,3 +101,138 @@ TEST_F(EzLinkerTestSuite, TestNoDefaultLibsFlag)
     EXPECT_FALSE(hasArg("kernel32.lib"));
     EXPECT_FALSE(hasArg("EzExceptionRuntime.lib"));
 }
+
+TEST_F(EzLinkerTestSuite, TestHostedMsvcArgumentGeneration)
+
+{
+
+    EzLinker::EzLinkerDriver driver;
+
+    EzLinker::DetectedLinker msvcLinker;
+
+    msvcLinker.kind = EzLinker::SystemLinkerKind::MsvcLink;
+
+    msvcLinker.path = "link.exe";
+
+
+
+    EzLinker::LinkerOptions opts;
+
+    opts.inputFiles = { "main.obj" };
+
+    opts.outputFile = "test.exe";
+
+    opts.isHosted = true;
+
+
+
+    auto args = driver.buildLinkerArguments(opts, msvcLinker);
+
+
+
+    auto hasArg = [&](const std::string &expected) {
+
+        return std::find(args.begin(), args.end(), expected) != args.end();
+
+    };
+
+
+
+    EXPECT_TRUE(hasArg("EzLibStdC.lib"));
+
+
+    EXPECT_TRUE(hasArg("kernel32.lib"));
+
+}
+
+
+
+TEST_F(EzLinkerTestSuite, TestHostedElfArgumentGeneration)
+
+{
+
+    EzLinker::EzLinkerDriver driver;
+
+    EzLinker::DetectedLinker elfLinker;
+
+    elfLinker.kind = EzLinker::SystemLinkerKind::LldElf;
+
+    elfLinker.path = "/usr/bin/ld.lld";
+
+
+
+    EzLinker::LinkerOptions opts;
+
+    opts.inputFiles = { "main.o" };
+
+    opts.outputFile = "test.out";
+
+    opts.isHosted = true;
+
+
+
+    auto args = driver.buildLinkerArguments(opts, elfLinker);
+
+
+
+    auto hasArg = [&](const std::string &expected) {
+
+        return std::find(args.begin(), args.end(), expected) != args.end();
+
+    };
+
+
+
+    EXPECT_TRUE(hasArg("-lEzLibStdC"));
+
+    EXPECT_TRUE(hasArg("-lc"));
+
+    EXPECT_TRUE(hasArg("-lgcc"));
+
+}
+
+
+
+TEST_F(EzLinkerTestSuite, TestCustomLibStdCPath)
+
+{
+
+    EzLinker::EzLinkerDriver driver;
+
+    EzLinker::DetectedLinker msvcLinker;
+
+    msvcLinker.kind = EzLinker::SystemLinkerKind::MsvcLink;
+
+    msvcLinker.path = "link.exe";
+
+
+
+    EzLinker::LinkerOptions opts;
+
+    opts.inputFiles = { "main.obj" };
+
+    opts.outputFile = "test.exe";
+
+    opts.isHosted = true;
+
+    opts.libStdCPath = "C:\\custom\\lib\\EzLibStdC.lib";
+
+
+
+    auto args = driver.buildLinkerArguments(opts, msvcLinker);
+
+
+
+    auto hasArg = [&](const std::string &expected) {
+
+        return std::find(args.begin(), args.end(), expected) != args.end();
+
+    };
+
+
+
+    EXPECT_TRUE(hasArg("/libpath:C:\\custom\\lib"));
+    EXPECT_TRUE(hasArg("EzLibStdC.lib"));
+
+}
+

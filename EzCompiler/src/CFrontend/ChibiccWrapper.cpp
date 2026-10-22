@@ -193,6 +193,7 @@ void ChibiccWrapper::setupDefaultMacros()
     if (m_hosted)
     {
         defineMacro("__STDC_HOSTED__", "1");
+        defineMacro("__EZPACKER_HOSTED__", "1");
     }
     else
     {
@@ -235,6 +236,15 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
 
     chibicc_reset_state();
     init_macros();
+
+    if (m_hosted)
+    {
+        undef_macro(const_cast<char *>("__EZPACKER_STANDALONE__"));
+        undef_macro(const_cast<char *>("__STDC_FREESTANDING__"));
+        undef_macro(const_cast<char *>("__STDC_HOSTED__"));
+        define_macro(const_cast<char *>("__STDC_HOSTED__"), const_cast<char *>("1"));
+        define_macro(const_cast<char *>("__EZPACKER_HOSTED__"), const_cast<char *>("1"));
+    }
 
     include_paths.data = nullptr;
     include_paths.capacity = 0;

@@ -186,6 +186,92 @@ int freestanding_eval(int count, ...) {
     ASSERT_NE(haltFn, nullptr);
     EXPECT_TRUE(haltFn->is_function);
     EXPECT_STREQ(haltFn->name, "system_halt");
-}
-
-
+}
+TEST_F(EzCompilerTestSuite, TestChibiccHostedMacros)
+{
+    ChibiccWrapper wrapper;
+    wrapper.setHostedMode(true);
+    const std::string hostedCheck = R"c(
+#if !defined(__STDC_HOSTED__) || __STDC_HOSTED__ != 1
+#error "Expected __STDC_HOSTED__ to be 1 in hosted environment"
+#endif
+
+#if !defined(__EZPACKER_HOSTED__) || __EZPACKER_HOSTED__ != 1
+#error "Expected __EZPACKER_HOSTED__ to be defined as 1"
+#endif
+
+#if defined(__STDC_FREESTANDING__) || defined(__EZPACKER_STANDALONE__)
+#error "Freestanding macros must not be defined in hosted mode"
+#endif
+
+int hosted_main(void) {
+    return 0;
+}
+)c";
+
+    auto result = wrapper.parseString(hostedCheck);
+    ASSERT_TRUE(result.success) << "Failed to parse hosted macros: " << result.errorMessage;
+    ASSERT_NE(result.astRoot, nullptr);
+
+    Obj *fn = findObject(result.astRoot, "hosted_main");
+    ASSERT_NE(fn, nullptr);
+    EXPECT_TRUE(fn->is_function);
+    EXPECT_STREQ(fn->name, "hosted_main");
+}
+
+TEST_F(EzCompilerTestSuite, TestChibiccGnuAttributes)
+{
+    ChibiccWrapper wrapper;
+    const std::string source = R"c(
+typedef int __attribute__((aligned(8))) aligned_int;
+__attribute__((visibility("default"))) int g_public_var = 100;
+__attribute__((nothrow, nonnull(1))) int helper_fn(int *ptr) {
+    return *ptr;
+}
+)c";
+
+    auto result = wrapper.parseString(source);
+    ASSERT_TRUE(result.success) << "Failed to parse GNU attributes: " << result.errorMessage;
+    ASSERT_NE(result.astRoot, nullptr);
+
+    Obj *var = findObject(result.astRoot, "g_public_var");
+    ASSERT_NE(var, nullptr);
+    EXPECT_FALSE(var->is_function);
+
+    Obj *fn = findObject(result.astRoot, "helper_fn");
+    ASSERT_NE(fn, nullptr);
+    EXPECT_TRUE(fn->is_function);
+}
+
+TEST_F(EzCompilerTestSuite, TestChibiccHostedHeaders)
+{
+    ChibiccWrapper wrapper;
+    wrapper.setHostedMode(true);
+    const std::string source = R"c(
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <time.h>
+#include <math.h>
+
+int hosted_demo(void) {
+    char buf[64];
+    size_t len = strlen("EzPacker C11");
+    int c = toupper('a');
+    assert(len > 0);
+    return (int)len + c;
+}
+)c";
+
+    auto result = wrapper.parseString(source);
+    ASSERT_TRUE(result.success) << "Failed to parse hosted headers: " << result.errorMessage;
+    ASSERT_NE(result.astRoot, nullptr);
+
+    Obj *fn = findObject(result.astRoot, "hosted_demo");
+    ASSERT_NE(fn, nullptr);
+    EXPECT_TRUE(fn->is_function);
+    EXPECT_STREQ(fn->name, "hosted_demo");
+}

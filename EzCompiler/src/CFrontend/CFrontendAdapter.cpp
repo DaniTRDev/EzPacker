@@ -43,6 +43,7 @@ void CFrontendAdapter::defineMacro(std::string_view name, std::string_view value
 
 bool CFrontendAdapter::compileSourceToMir(DriverContext &ctx, std::string_view sourcePath, MirBuilderContext &outMirCtx)
 {
+    m_wrapper.setHostedMode(!ctx.getOptions().freestanding);
     auto parseRes = m_wrapper.parseFile(sourcePath);
     if (!parseRes.success)
     {
@@ -55,6 +56,7 @@ bool CFrontendAdapter::compileSourceToMir(DriverContext &ctx, std::string_view s
 
 bool CFrontendAdapter::compileStringToMir(DriverContext &ctx, std::string_view sourceCode, MirBuilderContext &outMirCtx, std::string_view virtualFileName)
 {
+    m_wrapper.setHostedMode(!ctx.getOptions().freestanding);
     auto parseRes = m_wrapper.parseString(sourceCode, virtualFileName);
     if (!parseRes.success)
     {
