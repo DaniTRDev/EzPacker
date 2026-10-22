@@ -12,6 +12,7 @@
 #include "FlexNumber/FlexInt.h"
 #include "chibicc.h"
 #include <unordered_map>
+#include <unordered_set>
 
 namespace EzCompiler
 {
@@ -71,11 +72,20 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
     MirOperandBuilder opBuilder(&outMirCtx);
     std::unordered_map<Obj *, MirFunction *> funcMap;
 
+    std::unordered_map<std::string, MirFunction *> nameToFunc;
+    std::unordered_set<std::string> declaredGlobals;
+
     // Pass 1: Global Variables and Function Declarations
     for (Obj *obj = astRoot; obj; obj = obj->next)
     {
         if (!obj->is_function)
         {
+            if (declaredGlobals.count(obj->name))
+            {
+                continue;
+            }
+            declaredGlobals.insert(obj->name);
+
             // Global Variable
             MirType *gType = mapType(typeTable, obj->ty);
             MirLinkage linkage = obj->is_static ? MirLinkage::Internal : MirLinkage::External;
@@ -111,6 +121,12 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
         }
         else if (!obj->is_definition || !obj->body)
         {
+            if (auto it = nameToFunc.find(obj->name); it != nameToFunc.end())
+            {
+                funcMap[obj] = it->second;
+                continue;
+            }
+
             // External function prototype
             MirType *retType = mapType(typeTable, obj->ty->return_ty);
             std::vector<MirType *> paramTypes;
@@ -124,9 +140,16 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
                                                     obj->name,
                                                     linkage);
             funcMap[obj] = func;
+            nameToFunc[obj->name] = func;
         }
         else
         {
+            if (auto it = nameToFunc.find(obj->name); it != nameToFunc.end())
+            {
+                funcMap[obj] = it->second;
+                continue;
+            }
+
             // Function definition: build MirFunction upfront so it exists in outMirCtx
             MirType *retType = mapType(typeTable, obj->ty->return_ty);
             MirLinkage linkage = obj->is_static ? MirLinkage::Internal : MirLinkage::External;
@@ -137,6 +160,7 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
                 return false;
             }
             funcMap[obj] = func;
+            nameToFunc[obj->name] = func;
         }
     }
 
