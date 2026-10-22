@@ -13,6 +13,52 @@
 namespace EzLinker
 {
 
+std::filesystem::path EzLinkerDriver::findEzLibStdCLibrary(const std::string &targetTriple)
+{
+    const char *envPath = std::getenv("EZPACKER_LIBSTDC_PATH");
+    if (envPath && *envPath)
+    {
+        std::filesystem::path p(envPath);
+        std::error_code ec;
+        if (std::filesystem::exists(p, ec))
+            return std::filesystem::weakly_canonical(p, ec);
+    }
+
+    std::vector<std::filesystem::path> searchRoots = {
+        std::filesystem::current_path(),
+        std::filesystem::current_path() / "lib",
+        std::filesystem::current_path() / "bin",
+        std::filesystem::current_path() / "build" / "lib",
+        std::filesystem::current_path() / "build" / "bin",
+        std::filesystem::current_path() / "cmake-build-debug" / "lib",
+        std::filesystem::current_path() / "cmake-build-release" / "lib"
+    };
+
+    std::vector<std::string> libNames = {
+        "EzLibStdC.lib",
+        "libEzLibStdC.a",
+        "EzLibStdC.a",
+        "libEzLibStdC.lib",
+        "libEzLibStdC.so",
+        "EzLibStdC.dll"
+    };
+
+    for (const auto &root : searchRoots)
+    {
+        for (const auto &name : libNames)
+        {
+            std::filesystem::path candidate = root / name;
+            std::error_code ec;
+            if (std::filesystem::exists(candidate, ec))
+            {
+                return std::filesystem::weakly_canonical(candidate, ec);
+            }
+        }
+    }
+
+    return {};
+}
+
 std::filesystem::path EzLinkerDriver::findEzExceptionRuntimeLibrary(const std::string &targetTriple)
 {
     // Search current directory, build/lib, and relative paths
@@ -112,6 +158,29 @@ void EzLinkerDriver::appendMsvcArgs(const LinkerOptions &opts, std::vector<std::
         args.push_back("user32.lib");
     }
 
+    // Standard C runtime / EzLibStdC
+    if (opts.isHosted && !opts.noDefaultLibs)
+    {
+        std::filesystem::path libStdCPath = opts.libStdCPath;
+        if (libStdCPath.empty())
+        {
+            libStdCPath = findEzLibStdCLibrary(opts.targetTriple);
+        }
+
+        if (!libStdCPath.empty())
+        {
+            if (libStdCPath.has_parent_path())
+            {
+                args.push_back("/libpath:" + libStdCPath.parent_path().string());
+            }
+            args.push_back(libStdCPath.filename().string());
+        }
+        else
+        {
+            args.push_back("EzLibStdC.lib");
+        }
+    }
+
     // Compiler-rt / legalizer helpers
     if (!opts.noCompilerRt)
     {
@@ -199,6 +268,35 @@ void EzLinkerDriver::appendElfArgs(const LinkerOptions &opts, std::vector<std::s
         args.push_back("-lgcc");
     }
 
+    // Standard C runtime / EzLibStdC
+    if (opts.isHosted && !opts.noDefaultLibs)
+    {
+        std::filesystem::path libStdCPath = opts.libStdCPath;
+        if (libStdCPath.empty())
+        {
+            libStdCPath = findEzLibStdCLibrary(opts.targetTriple);
+        }
+
+        if (!libStdCPath.empty())
+        {
+            if (libStdCPath.has_parent_path())
+            {
+                args.push_back("-L" + libStdCPath.parent_path().string());
+            }
+            std::string stem = libStdCPath.stem().string();
+            if (stem.starts_with("lib"))
+            {
+                stem = stem.substr(3);
+            }
+            args.push_back("-l" + stem);
+        }
+        else
+        {
+            args.push_back("-lEzLibStdC");
+        }
+        args.push_back("-lc");
+    }
+
     // Exception runtime helper
     if (!opts.noExceptionRuntime)
     {
@@ -276,6 +374,34 @@ void EzLinkerDriver::appendDriverArgs(const LinkerOptions &opts, std::vector<std
     if (opts.isStatic)
     {
         args.push_back("-static");
+    }
+
+    if (opts.isHosted && !opts.noDefaultLibs)
+    {
+        std::filesystem::path libStdCPath = opts.libStdCPath;
+        if (libStdCPath.empty())
+        {
+            libStdCPath = findEzLibStdCLibrary(opts.targetTriple);
+        }
+
+        if (!libStdCPath.empty())
+        {
+            if (libStdCPath.has_parent_path())
+            {
+                args.push_back("-L" + libStdCPath.parent_path().string());
+            }
+            std::string stem = libStdCPath.stem().string();
+            if (stem.starts_with("lib"))
+            {
+                stem = stem.substr(3);
+            }
+            args.push_back("-l" + stem);
+        }
+        else
+        {
+            args.push_back("-lEzLibStdC");
+        }
+        args.push_back("-lc");
     }
 
     if (!opts.noExceptionRuntime)

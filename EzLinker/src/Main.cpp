@@ -60,6 +60,18 @@ int runLinker(int argc, char **argv)
         .help("Synthesize and display the linker command line without executing")
         .flag();
 
+    program.add_argument("--hosted")
+        .help("Link in a hosted environment with C standard library (EzLibStdC)")
+        .flag();
+
+    program.add_argument("--freestanding")
+        .help("Link in a freestanding environment without standard library")
+        .flag();
+
+    program.add_argument("--libstdc-path")
+        .help("Custom path to EzLibStdC library")
+        .default_value(std::string(""));
+
     program.add_argument("--nodefaultlibs")
         .help("Do not automatically link C standard libraries")
         .flag();
@@ -98,6 +110,15 @@ int runLinker(int argc, char **argv)
     opts.isStatic = program.get<bool>("--static");
     opts.verbose = program.get<bool>("-v");
     opts.dryRun = program.get<bool>("--dry-run");
+    opts.isHosted = program.get<bool>("--hosted");
+    if (program.get<bool>("--freestanding"))
+    {
+        opts.isHosted = false;
+    }
+    if (program.is_used("--libstdc-path"))
+    {
+        opts.libStdCPath = program.get<std::string>("--libstdc-path");
+    }
     opts.noDefaultLibs = program.get<bool>("--nodefaultlibs");
     opts.noCompilerRt = program.get<bool>("--no-compiler-rt");
     opts.noExceptionRuntime = program.get<bool>("--no-exception-rt");
