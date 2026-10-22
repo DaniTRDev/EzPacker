@@ -48,14 +48,28 @@ bool MirModuleLoader::compileSourceToMir(DriverContext &ctx, std::string_view so
     if (p.extension() == ".c" || p.extension() == ".i")
     {
         CFrontendAdapter cAdapter;
+        const bool isHosted = ctx.getOptions().isHosted();
+        cAdapter.setHostedMode(isHosted);
+
         for (const auto &inc : ctx.getOptions().includePaths)
         {
             cAdapter.addIncludePath(inc);
         }
-        std::string fsDir = CFrontendAdapter::getBundledFreestandingIncludeDir();
-        if (!fsDir.empty())
+        if (isHosted)
         {
-            cAdapter.addIncludePath(fsDir);
+            std::string hDir = CFrontendAdapter::getBundledHostedIncludeDir();
+            if (!hDir.empty())
+            {
+                cAdapter.addIncludePath(hDir);
+            }
+        }
+        else
+        {
+            std::string fsDir = CFrontendAdapter::getBundledFreestandingIncludeDir();
+            if (!fsDir.empty())
+            {
+                cAdapter.addIncludePath(fsDir);
+            }
         }
         for (const auto &def : ctx.getOptions().macroDefines)
         {

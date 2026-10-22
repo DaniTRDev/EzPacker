@@ -56,6 +56,7 @@ struct CommandLineOptions
     bool freestanding{ true };               ///< Compiles in a standalone/freestanding environment without standard library.
     bool noStdLib{ true };                   ///< Standalone compilation without standard library dependencies.
     std::string pipelineDumpJsonPath;        ///< Destination path for complete compiler pipeline telemetry in JSON format.
+    [[nodiscard]] bool isHosted() const noexcept { return !freestanding; }
 };
 
 /**

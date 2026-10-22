@@ -300,5 +300,142 @@ TEST_F(CFrontendEndToEndTest, TestFreestandingHeadersEndToEndToElf)
     EXPECT_EQ(header[3], 'F');
     EXPECT_EQ(header[4], 2); // 64-bit
     EXPECT_EQ(header[5], 1); // Little-endian
-}
-
+}
+// Tests full end-to-end compilation of a hosted C source file including C11 stdio/stdlib/string to an ELF64 object file.
+TEST_F(CFrontendEndToEndTest, TestFullCompilationHostedCSourceToElf64)
+{
+    const std::string cPath = "test_hosted_elf.c";
+    const std::string outPath = "test_hosted_elf.o";
+    registerCleanup(cPath);
+    registerCleanup(outPath);
+
+    {
+        std::ofstream out(cPath);
+        out << R"c(
+            #include <stdio.h>
+            #include <stdlib.h>
+            #include <string.h>
+
+            int run_demo(const char *msg) {
+                if (msg == NULL)
+                    return -1;
+                size_t len = strlen(msg);
+                char *buf = (char *)malloc(len + 1);
+                if (buf == NULL)
+                    return -2;
+                memcpy(buf, msg, len);
+                buf[len] = '\0';
+                int res = puts(buf);
+                free(buf);
+                return res;
+            }
+        )c";
+    }
+
+    CommandLineOptions options;
+    options.inputFilePath = cPath;
+    options.outputFilePath = outPath;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.optLevel = OptimizationLevel::O1;
+    options.emissionStage = EmissionStage::Object;
+    options.freestanding = false;
+    options.noStdLib = false;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    MirModuleLoader loader;
+    ASSERT_TRUE(loader.compileSourceToMir(ctx, cPath, *ctx.getBuilderContext()));
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    EmissionEngine emitter(ctx);
+    EXPECT_TRUE(emitter.emitModule(*ctx.getBuilderContext(), outPath));
+
+    ASSERT_TRUE(std::filesystem::exists(outPath));
+    uintmax_t fileSize = std::filesystem::file_size(outPath);
+    ASSERT_GE(fileSize, 64u);
+
+    std::ifstream inFile(outPath, std::ios::binary);
+    ASSERT_TRUE(inFile.is_open());
+
+    std::vector<uint8_t> header(64);
+    inFile.read(reinterpret_cast<char *>(header.data()), 64);
+    inFile.close();
+
+    // Verify ELF header
+    EXPECT_EQ(header[0], 0x7F);
+    EXPECT_EQ(header[1], 'E');
+    EXPECT_EQ(header[2], 'L');
+    EXPECT_EQ(header[3], 'F');
+    EXPECT_EQ(header[4], 2); // 64-bit
+    EXPECT_EQ(header[5], 1); // Little-endian
+}
+
+// Tests full end-to-end compilation of a hosted C source file including C11 stdio/stdlib/string to a COFF object file.
+TEST_F(CFrontendEndToEndTest, TestFullCompilationHostedCSourceToCoff)
+{
+    const std::string cPath = "test_hosted_coff.c";
+    const std::string outPath = "test_hosted_coff.obj";
+    registerCleanup(cPath);
+    registerCleanup(outPath);
+
+    {
+        std::ofstream out(cPath);
+        out << R"c(
+            #include <stdio.h>
+            #include <stdlib.h>
+            #include <string.h>
+
+            int run_coff_demo(const char *msg) {
+                if (msg == NULL)
+                    return -1;
+                size_t len = strlen(msg);
+                char *buf = (char *)malloc(len + 1);
+                if (buf == NULL)
+                    return -2;
+                memcpy(buf, msg, len);
+                buf[len] = '\0';
+                int res = puts(buf);
+                free(buf);
+                return res;
+            }
+        )c";
+    }
+
+    CommandLineOptions options;
+    options.inputFilePath = cPath;
+    options.outputFilePath = outPath;
+    options.target = TargetTriple::parse("x86_64-pc-windows-coff");
+    options.optLevel = OptimizationLevel::O1;
+    options.emissionStage = EmissionStage::Object;
+    options.freestanding = false;
+    options.noStdLib = false;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    MirModuleLoader loader;
+    ASSERT_TRUE(loader.compileSourceToMir(ctx, cPath, *ctx.getBuilderContext()));
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    EmissionEngine emitter(ctx);
+    EXPECT_TRUE(emitter.emitModule(*ctx.getBuilderContext(), outPath));
+
+    ASSERT_TRUE(std::filesystem::exists(outPath));
+    uintmax_t fileSize = std::filesystem::file_size(outPath);
+    ASSERT_GE(fileSize, 20u);
+
+    std::ifstream inFile(outPath, std::ios::binary);
+    ASSERT_TRUE(inFile.is_open());
+
+    uint16_t machine = 0;
+    inFile.read(reinterpret_cast<char *>(&machine), sizeof(machine));
+    inFile.close();
+
+    // Verify AMD64 COFF machine type (0x8664)
+    EXPECT_EQ(machine, 0x8664);
+}

@@ -684,7 +684,92 @@ TEST_F(CFrontendAdapterTest, CompilesFullChibiccAstCoverage)
 
     ASSERT_EQ(bCtx->getFunctions().size(), 5u);
     verifyMir(bCtx);
-}
-
-
-
+}
+TEST_F(CFrontendAdapterTest, CompilesHostedStandardLibraryFunctions)
+{
+    CommandLineOptions options;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.optLevel = OptimizationLevel::O0;
+    options.emissionStage = EmissionStage::GenericMir;
+    options.freestanding = false;
+    options.noStdLib = false;
+
+    auto ctx = std::make_unique<DriverContext>(options);
+    ASSERT_TRUE(ctx->initialize());
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        #include <stdio.h>
+        #include <stdlib.h>
+        #include <string.h>
+
+        int test_hosted_runtime(const char *msg) {
+            size_t len = strlen(msg);
+            char *buf = (char *)malloc(len + 1);
+            if (!buf) {
+                return -1;
+            }
+            strcpy(buf, msg);
+            printf("Hosted output: %s\n", buf);
+            free(buf);
+            return 0;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "hosted_runtime.c");
+    ASSERT_TRUE(success);
+
+    // Verify test_hosted_runtime exists and functions from headers are lowered
+    bool foundTestFn = false;
+    for (auto *fn : bCtx->getFunctions())
+    {
+        if (std::string_view(fn->getName()) == "test_hosted_runtime")
+        {
+            foundTestFn = true;
+            EXPECT_GT(fn->getBlockCount(), 0u);
+        }
+    }
+    EXPECT_TRUE(foundTestFn);
+    verifyMir(bCtx);
+}
+
+TEST_F(CFrontendAdapterTest, CompilesHostedHeadersCoverage)
+{
+    CommandLineOptions options;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.optLevel = OptimizationLevel::O0;
+    options.emissionStage = EmissionStage::GenericMir;
+    options.freestanding = false;
+    options.noStdLib = false;
+
+    auto ctx = std::make_unique<DriverContext>(options);
+    ASSERT_TRUE(ctx->initialize());
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        #include <assert.h>
+        #include <ctype.h>
+        #include <errno.h>
+        #include <math.h>
+        #include <stddef.h>
+        #include <stdint.h>
+        #include <stdio.h>
+        #include <stdlib.h>
+        #include <string.h>
+        #include <time.h>
+
+        int run_c11_checks(int x) {
+            int is_digit = isdigit(x);
+            int is_alpha = isalpha(x);
+            time_t t = time(NULL);
+            assert(x >= 0);
+            return is_digit + is_alpha + (int)t;
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "c11_checks.c");
+    ASSERT_TRUE(success);
+    verifyMir(bCtx);
+}

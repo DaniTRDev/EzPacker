@@ -21,12 +21,14 @@ struct EZLINKER_API LinkerOptions
     std::string entryPoint;                              ///< Custom entry point symbol name.
     std::string subsystem;                               ///< Subsystem (console, windows, etc.).
     std::filesystem::path exceptionRuntimePath;          ///< Optional override for EzExceptionRuntime path.
+    std::filesystem::path libStdCPath;                   ///< Optional override for EzLibStdC path.
     std::vector<std::string> rawLinkerArgs;              ///< Raw arguments passed verbatim to the linker.
 
     bool isShared{ false };                              ///< Link as a shared library / DLL.
     bool isStatic{ false };                              ///< Link statically where applicable.
     bool verbose{ false };                               ///< Print verbose diagnostics and linker invocations.
     bool dryRun{ false };                                ///< Synthesize command line without executing the linker.
+    bool isHosted{ false };                              ///< Link in a hosted environment with C standard library (EzLibStdC).
     bool noDefaultLibs{ false };                         ///< Do not automatically inject C standard libraries.
     bool noCompilerRt{ false };                          ///< Do not automatically inject compiler-rt / builtins.
     bool noExceptionRuntime{ false };                    ///< Do not automatically inject EzExceptionRuntime.
@@ -71,6 +73,11 @@ public:
      * Discovers the built EzExceptionRuntime library file in the build tree or install prefix.
      */
     static std::filesystem::path findEzExceptionRuntimeLibrary(const std::string &targetTriple = "");
+
+    /**
+     * Discovers the built EzLibStdC library file in the build tree or install prefix.
+     */
+    static std::filesystem::path findEzLibStdCLibrary(const std::string &targetTriple = "");
 
 private:
     void appendMsvcArgs(const LinkerOptions &opts, std::vector<std::string> &args) const;

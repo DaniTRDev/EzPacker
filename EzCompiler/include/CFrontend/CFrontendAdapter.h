@@ -42,6 +42,22 @@ class CFrontendAdapter : public IFrontendAdapter
     static std::string getBundledFreestandingIncludeDir();
 
     /**
+     * Resolves the disk path to the bundled ISO C11 hosted headers directory (include/c11std).
+     * Returns empty string if not found on disk.
+     */
+    static std::string getBundledHostedIncludeDir();
+
+    /**
+     * Sets whether the compiler environment is hosted (true) or freestanding (false).
+     */
+    void setHostedMode(bool hosted) { m_wrapper.setHostedMode(hosted); }
+
+    /**
+     * Returns true if the frontend is configured in hosted mode.
+     */
+    [[nodiscard]] bool isHostedMode() const noexcept { return m_wrapper.isHostedMode(); }
+
+    /**
      * Adds a preprocessor macro definition (-D).
      */
     void defineMacro(std::string_view name, std::string_view value = "1");

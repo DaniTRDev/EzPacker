@@ -350,6 +350,18 @@ TEST_F(EzCompilerTestSuite, TestFreestandingCommandLineOptions)
     }
 }
 
+TEST_F(EzCompilerTestSuite, TestHostedCommandLineOptions)
+{
+    CommandLineParser parser;
+    CommandLineOptions options;
+    std::string err;
+
+    std::vector<std::string> args = { "ezc", "main.c", "-fhosted" };
+    EXPECT_TRUE(parser.parse(args, options, err));
+    EXPECT_FALSE(options.freestanding);
+    EXPECT_FALSE(options.noStdLib);
+}
+
 TEST_F(EzCompilerTestSuite, TestDumpPipelineJsonOption)
 {
     CommandLineParser parser;

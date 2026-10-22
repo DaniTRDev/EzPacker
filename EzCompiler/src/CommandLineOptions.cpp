@@ -127,6 +127,11 @@ void CommandLineParser::setupArguments()
             .append()
             .default_value(std::vector<std::string>{});
 
+    m_program->add_argument("-fhosted", "--hosted")
+            .help("Compile in a hosted environment with C standard library support")
+            .default_value(false)
+            .implicit_value(true);
+
     m_program->add_argument("-ffreestanding", "--freestanding")
             .help("Compile in a standalone/freestanding environment without standard library (default)")
             .default_value(false)
@@ -400,7 +405,20 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
     outOptions.includePaths = m_program->get<std::vector<std::string>>("-I");
     outOptions.macroDefines = m_program->get<std::vector<std::string>>("-D");
 
-    if (m_program->is_used("-ffreestanding"))
+    const bool flagHosted = m_program->get<bool>("-fhosted");
+    const bool flagFreestanding = m_program->get<bool>("-ffreestanding");
+    if (flagHosted && flagFreestanding)
+    {
+        outError = "conflicting environment flags: choose at most one of -fhosted or -ffreestanding";
+        return false;
+    }
+
+    if (flagHosted)
+    {
+        outOptions.freestanding = false;
+        outOptions.noStdLib = false;
+    }
+    else if (m_program->is_used("-ffreestanding"))
     {
         outOptions.freestanding = m_program->get<bool>("-ffreestanding");
     }

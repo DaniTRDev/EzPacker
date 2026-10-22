@@ -34,11 +34,19 @@ MirType *mapType(MirTypeTable *tt, struct Type *ty)
         case TY_LDOUBLE:
             return tt->f64();
         case TY_PTR:
-        case TY_ARRAY:
-        case TY_VLA:
             if (ty->base)
                 return tt->getPtr(mapType(tt, ty->base));
             return tt->getPtr(tt->_void());
+        case TY_ARRAY:
+        case TY_VLA:
+            if (ty->base)
+            {
+                size_t len = (ty->array_len > 0) ? static_cast<size_t>(ty->array_len)
+                           : (ty->base->size > 0) ? static_cast<size_t>(ty->size / ty->base->size)
+                           : static_cast<size_t>(ty->size);
+                return tt->getArray(mapType(tt, ty->base), len > 0 ? len : 1);
+            }
+            return tt->getArray(tt->i8(), ty->size > 0 ? static_cast<size_t>(ty->size) : 1);
         default:
             if (ty->size <= 1)
                 return tt->i8();
@@ -46,7 +54,9 @@ MirType *mapType(MirTypeTable *tt, struct Type *ty)
                 return tt->i16();
             if (ty->size <= 4)
                 return tt->i32();
-            return tt->i64();
+            if (ty->size <= 8)
+                return tt->i64();
+            return tt->getArray(tt->i8(), static_cast<size_t>(ty->size));
     }
 }
 
@@ -59,4 +69,3 @@ bool isBlockTerminated(const MirBlock *block)
 }
 
 } // namespace EzCompiler::CFrontend
-
