@@ -65,6 +65,12 @@ SystemLinkerKind SystemLinkerDetector::classifyLinker(const std::filesystem::pat
     }
     if (filename == "link" || filename == "link.exe")
     {
+        std::string pStr = path.string();
+        for (char &c : pStr) c = (char)::tolower((unsigned char)c);
+        if (pStr.find("/usr/bin") != std::string::npos || pStr.find("\\usr\\bin") != std::string::npos)
+        {
+            return SystemLinkerKind::Unknown;
+        }
         return SystemLinkerKind::MsvcLink;
     }
     if (filename == "ld" || filename == "ld.exe")
@@ -183,6 +189,11 @@ std::filesystem::path SystemLinkerDetector::findExecutableOnPath(const std::stri
             std::error_code ec;
             if (std::filesystem::exists(full, ec) && !std::filesystem::is_directory(full, ec))
             {
+                if (cand == "link" || cand == "link.exe") {
+                    std::string pStr = full.string();
+                    for (char &c : pStr) c = (char)::tolower((unsigned char)c);
+                    if (pStr.find("/usr/bin") != std::string::npos || pStr.find("\\usr\\bin") != std::string::npos) { continue; }
+                }
                 return full;
             }
         }
@@ -359,6 +370,7 @@ DetectedLinker SystemLinkerDetector::detectForWindows(const std::string &targetT
             DetectedLinker dl;
             dl.path = found;
             dl.kind = classifyLinker(found);
+            if (!dl.isValid()) { continue; }
             dl.version = queryVersion(found, dl.kind);
             return dl;
         }
@@ -387,6 +399,7 @@ DetectedLinker SystemLinkerDetector::detectForLinux(const std::string &targetTri
             DetectedLinker dl;
             dl.path = found;
             dl.kind = classifyLinker(found);
+            if (!dl.isValid()) { continue; }
             dl.version = queryVersion(found, dl.kind);
             return dl;
         }

@@ -284,6 +284,61 @@ foreach(TEST_NAME IN LISTS MIR_BACKEND_TESTS)
     endif()
 endforeach()
 
+# =========================================================================
+# TIER 3: C11 Hosted End-to-End Tests (EzLibStdC + ezc + ez-ld)
+# =========================================================================
+set(C11_HOSTED_TESTS
+    test_exec
+    test_arr
+    test_malloc
+    test_sz
+    test_field
+    test_div
+    test_qsort
+    test_debug
+)
+
+if(HOST_IS_WINDOWS)
+    set(EZLD_BIN "$<TARGET_FILE:ez-ld>")
+
+    foreach(TEST_NAME IN LISTS C11_HOSTED_TESTS)
+        set(C_SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/${TEST_NAME}.c")
+        set(HOSTED_OBJ "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_hosted.obj")
+        set(HOSTED_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_hosted${CMAKE_EXECUTABLE_SUFFIX}")
+
+        # 1. Compile C11 hosted test with ezc -fhosted
+        add_custom_command(
+            OUTPUT "${HOSTED_OBJ}"
+            COMMAND ${CMAKE_COMMAND} -E env "PATH=${CMAKE_BINARY_DIR}/bin;$ENV{PATH}" "${EZC_BIN}" -fhosted "${C_SRC_FILE}" -o "${HOSTED_OBJ}"
+            DEPENDS ezc "${C_SRC_FILE}" EzPacker_CopyStandardLibraries
+            COMMENT "[EzCompiler E2E / Hosted] Compiling ${TEST_NAME}.c with ezc -fhosted"
+            VERBATIM
+        )
+
+        # 2. Link with ez-ld --hosted against EzLibStdC
+        add_custom_command(
+            OUTPUT "${HOSTED_EXE}"
+            COMMAND ${CMAKE_COMMAND} -E env "PATH=${CMAKE_BINARY_DIR}/bin;$ENV{PATH}" "${EZLD_BIN}" --hosted --no-exception-rt --libstdc-path "${CMAKE_BINARY_DIR}/lib/libEzLibStdC.a" "${HOSTED_OBJ}" -o "${HOSTED_EXE}"
+            DEPENDS ez-ld "${HOSTED_OBJ}" EzPacker_CopyStandardLibraries
+            COMMENT "[EzCompiler E2E / Hosted] Linking ${TEST_NAME} with ez-ld --hosted"
+            VERBATIM
+        )
+
+        list(APPEND ALL_E2E_OUTPUTS "${HOSTED_OBJ}" "${HOSTED_EXE}")
+
+        # 3. Register CTest runtime test
+        add_test(
+            NAME "EzCompilerEndToEnd_Hosted_${TEST_NAME}"
+            COMMAND "${HOSTED_EXE}"
+        )
+
+        set_tests_properties("EzCompilerEndToEnd_Hosted_${TEST_NAME}" PROPERTIES
+            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin"
+            LABELS "E2E;Hosted;C11;EzCompiler"
+        )
+    endforeach()
+endif()
+
 # Master CMake target for the end-to-end test suite
 add_custom_target(EzCompilerEndToEndTests ALL
     DEPENDS ${ALL_E2E_OUTPUTS} elf_validator
