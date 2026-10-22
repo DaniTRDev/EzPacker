@@ -10,7 +10,7 @@ EzPacker is a modern C++20 compiler backend and code generation framework. It ac
 
 This quickstart guide walks you through:
 1. Writing your first MIR module.
-2. Compiling the module with the `EzCompiler` command-line driver.
+2. Compiling the module with the `EzCompiler` (`ezc`) command-line driver.
 3. Inspecting the compiler pipeline stages.
 4. Linking the resulting object file into a runnable native binary.
 
@@ -40,27 +40,27 @@ entry:
 
 ---
 
-## 3. Compiling with `EzCompiler`
+## 3. Compiling with `EzCompiler` (`ezc`)
 
-The `EzCompiler` executable drives the compilation pipeline.
+The `ezc` / `EzCompiler` executable drives the compilation pipeline.
 
 ### 3.1 Basic Compilation to Native Object File
 To compile `simple_math.mir` to an object file matching your host platform:
 
 ```bash
-EzCompiler simple_math.mir -o simple_math.o
+ezc simple_math.mir -o simple_math.o
 ```
-On Windows, `EzCompiler` automatically emits a PE/COFF object file `simple_math.obj`; on Linux, it emits an ELF64 object file `simple_math.o`.
+On Windows, `ezc` automatically emits a PE/COFF object file `simple_math.obj`; on Linux, it emits an ELF64 object file `simple_math.o`.
 
 ### 3.2 Explicit Target Triples
 You can cross-compile or explicitly request a specific OS object format using `--target`:
 
 ```bash
 # Target Linux ELF64 (uses System V AMD64 calling convention)
-EzCompiler simple_math.mir --target x86_64-unknown-linux-gnu -o simple_math.o
+ezc simple_math.mir --target x86_64-unknown-linux-gnu -o simple_math.o
 
 # Target Windows PE/COFF (uses Microsoft Win64 calling convention)
-EzCompiler simple_math.mir --target x86_64-pc-windows-coff -o simple_math.obj
+ezc simple_math.mir --target x86_64-pc-windows-coff -o simple_math.obj
 ```
 
 ### 3.3 Compiling Standalone Freestanding C11 (Microcontrollers & Kernels)
@@ -78,6 +78,15 @@ ezc -O2 --target x86_64-pc-windows-coff my_kernel.c -o my_kernel_win.obj
 ```
 Bundled freestanding headers (`<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`, etc.) are automatically resolved by EzPacker's embedded standalone frontend, making it directly suited for microcontroller firmware, bootloaders, and OS kernels.
 
+### 3.4 Compiling Hosted ISO C11 Applications (`-fhosted`)
+For hosted user-space software requiring dynamic memory allocation (`malloc`/`free`), standard I/O (`printf`), math, time, and assertions:
+
+```bash
+# Compile with all 28 ISO C11 standard library headers enabled
+ezc -fhosted -O2 app.c -o app.o
+```
+Under `-fhosted`, `ezc` predefines `__STDC_HOSTED__ = 1` and automatically includes `include/c11std`.
+
 ---
 
 ## 4. Inspecting the Compiler Pipeline Stages
@@ -87,32 +96,32 @@ EzPacker provides inspection gates that halt compilation at specific milestones 
 ### 4.1 Inspecting Middle-End Generic MIR (`--emit-mir`)
 Dumps the generic SSA MIR after control-flow analysis, SSA construction, and liveness analysis:
 ```bash
-EzCompiler simple_math.mir --emit-mir
+ezc simple_math.mir --emit-mir
 ```
 
 ### 4.2 Inspecting Legalized MIR (`--emit-legalized-mir`)
 Dumps the MIR after type and opcode legalization (e.g. scalar widening, strength reduction, libcall substitution):
 ```bash
-EzCompiler simple_math.mir --emit-legalized-mir
+ezc simple_math.mir --emit-legalized-mir
 ```
 
 ### 4.3 Inspecting Target-Lowered Machine MIR (`--emit-lowered-mir`)
 Dumps the MIR after instruction selection, graph-coloring register allocation, and frame lowering (PEI):
 ```bash
-EzCompiler simple_math.mir --emit-lowered-mir
+ezc simple_math.mir --emit-lowered-mir
 ```
 *Notice that virtual registers (`%sum`, `%factor`) have been replaced by physical hardware registers (`edi`, `esi`, `eax` on Linux; `ecx`, `edx`, `eax` on Windows), and the function includes prologue/epilogue instructions.*
 
 ### 4.4 Emitting Human-Readable Assembly (`--emit-asm` or `-S`)
 Emits formatted assembly instructions:
 ```bash
-EzCompiler simple_math.mir --emit-asm -o simple_math.s
+ezc simple_math.mir --emit-asm -o simple_math.s
 ```
 
 ### 4.5 Tracing Passes & Execution Times
 To observe the compilation pass pipeline in real time:
 ```bash
-EzCompiler simple_math.mir --print-passes --time-passes -o simple_math.o
+ezc simple_math.mir --print-passes --time-passes -o simple_math.o
 ```
 Output:
 ```text
@@ -150,7 +159,14 @@ ez-ld simple_math.obj main.c -o my_app.exe
 ez-ld simple_math.obj main.c -o my_app.exe --dry-run
 ```
 
-### 5.2 Traditional Manual Linking
+### 5.2 Automated Linking with Hosted Runtime (`EzLibStdC`)
+When compiling standard C programs with `-fhosted`, link using `ez-ld --hosted`:
+```bash
+# Ingests object files and automatically links EzLibStdC and CRT startup
+ez-ld --hosted app.o -o app.exe
+```
+
+### 5.3 Traditional Manual Linking
 
 The object files produced by `EzPacker` are 100% compliant with standard system linkers (`ld`, `lld`, `link.exe`, `gcc`, `clang`, `cl.exe`).
 
@@ -223,7 +239,9 @@ EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symb
 ## 8. Next Steps
 
 - Consult the [Build Guide](build_guide.md) to set up and compile EzPacker from source.
-- Explore the [Examples Guide](examples.md) for deep dives into complex control flow, 64-bit hashing, memory load-folding, and recursion.
+- Explore the [Examples Guide](examples.md) for deep dives into complex control flow, 64-bit hashing, memory load-folding, recursion, and hosted C11 pipelines.
+- Explore the [Web Developer Workbench Guide](web_workbench.md) to interactively inspect compiler passes, CFG, and binary object sections.
+- Review the [Technical TODOs & Optimization Roadmap](todos.md) for upcoming compiler passes, runtime facilities, and target architectures.
 - Learn how to add new architectures in [How to Build a Target Architecture](how_to_build_a_target.md).
 - Browse the subproject documentation:
   - [EzCore](projects/EzCore.md)
@@ -233,5 +251,6 @@ EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symb
   - [EzTriple](projects/EzTriple.md)
   - [EzCompiler](projects/EzCompiler.md)
   - [EzTargets](projects/EzTargets.md)
+  - [EzLibStdC](projects/EzLibStdC.md)
   - [EzLinker](projects/EzLinker.md)
 - Explore the full C++ API in the [Doxygen Documentation](doxygen/index.html).

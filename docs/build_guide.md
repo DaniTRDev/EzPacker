@@ -75,7 +75,7 @@ cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 # 3. Compile all targets
 cmake --build build --config Release -j
 ```
-Binaries (`ezc`, `ez-ld`, `EzDslCli`) and test executables will be placed in `build/bin/` (or `build/bin/Release/`).
+Binaries (`ezc`, `ez-ld`, `EzDslCli`), static libraries (`EzLibStdC`, `EzExceptionRuntime`), and test executables will be placed in `build/bin/` (or `build/bin/Release/`) and `build/lib/`.
 
 ### 4.2 Windows / Linux (Ninja Generator)
 Using Ninja delivers significantly faster parallel compilation:
@@ -120,9 +120,9 @@ You can run individual test suites targeting specific subsystems:
 | **`EzDslCliTestSuite`** | `bin/EzDslCliTestSuite` | Tests the `EzDslCli` driver executable. |
 | **`EzTripleTestSuite`** | `bin/EzTripleTestSuite` | Tests legalizer matrices, ABI lowerer, instruction selector, register allocator, and frame lowerer across x86-64 and RISC-V 64 architectures. |
 | **`EzCodeEmitterTestSuite`** | `bin/EzCodeEmitterTestSuite` | Tests binary machine encoding (x86-64 ModR/M/VEX and RISC-V R/I/S/B/U/J formats), branch relaxation, ELF64 (`EM_X86_64` and `EM_RISCV`), and COFF object serialization. |
-| **`EzCompilerTestSuite`** | `bin/EzCompilerTestSuite` | Tests compiler option parsing, target resolvers (including `riscv64`), and pipeline pass sequencing. |
+| **`EzCompilerTestSuite`** | `bin/EzCompilerTestSuite` | Tests compiler option parsing, target resolvers (including `riscv64`), pipeline telemetry recording, and pipeline pass sequencing. |
 | **`EzLinkerTestSuite`** | `bin/EzLinkerTestSuite` | Tests system linker detection (`SystemLinkerDetector`), command synthesis (`EzLinkerDriver`), and SjLj exception runtime (`EzExceptionRuntime`). |
-| **`EzCompilerEndToEndTests`** | `bin/EzCompilerEndToEndTests` | Full end-to-end compilation of sample MIR modules to executable object files across Win64, SysV AMD64, and RISC-V ELF64 ABIs. |
+| **`EzCompilerEndToEndTests`** | `bin/EzCompilerEndToEndTests` | Full end-to-end compilation of sample MIR and C11 modules (including Tier 1 freestanding MIR, Tier 2 freestanding C11, and Tier 3 hosted C11 in `tests/EzCompilerEndToEndTests/c11_hosted/`) across Win64, SysV AMD64, and RISC-V ELF64 ABIs. |
 | **`TEST_ALL`** | `bin/TEST_ALL` | Unified monolithic test runner executing all unit and integration tests. |
 
 Example running a single test suite:
@@ -170,7 +170,7 @@ doxygen docs/Doxyfile
 The generated HTML documentation will be located in `docs/doxygen/index.html`. Open this file in any web browser to explore the full interactive API reference.
 
 ### 6.3 Building & Running the Web Compiler Explorer (`web/`)
-EzPacker includes an interactive web IDE and Compiler Explorer in `web/`:
+EzPacker includes an interactive web IDE and Compiler Explorer in `web/` (see the [Web Developer Workbench Guide](web_workbench.md)):
 
 ```bash
 # 1. Install dependencies
@@ -188,7 +188,6 @@ npm start --prefix web/server
 npm test --prefix web/server
 ```
 
-
 ---
 
 ## 7. Troubleshooting
@@ -203,4 +202,6 @@ npm test --prefix web/server
 
 - Proceed to [First Steps](first_steps.md) to compile your first MIR file.
 - Review [Examples & Use Cases](examples.md) to inspect real-world compiler outputs.
+- Explore the [Web Developer Workbench Guide](web_workbench.md) to inspect compiler passes and telemetry.
+- Consult the [Technical TODOs & Optimization Roadmap](todos.md) for planned features and optimizations.
 - Consult the [Subproject Documentation](projects/EzCompiler.md) for architectural deep dives.
