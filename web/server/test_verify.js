@@ -345,6 +345,30 @@ async function runTests() {
     throw new Error('Expected at least one C example file to be discovered');
   }
 
+  // 11. Test Hosted C11 Compilation via vendored musl headers
+  const hostedExample = examples.find(e => e.filename === '10_hosted_c11_pipeline.c');
+  if (hostedExample) {
+    console.log(`\nTesting hosted C11 compilation via musl headers: ${hostedExample.filename}...`);
+    const hostedRes = await runner.compile({
+      code: hostedExample.code,
+      filename: hostedExample.filename,
+      language: 'c',
+      hosted: true,
+      targetTriple: 'x86_64-unknown-linux-gnu',
+      optLevel: 'O1',
+    });
+    if (!hostedRes.success) {
+      console.error('Hosted C11 compilation failed:', hostedRes.diagnostics);
+      throw new Error(`Expected hosted C11 compilation to succeed for ${hostedExample.filename}`);
+    }
+    assertNoAnsi(hostedRes.asm || '', 'hosted_c_asm');
+    assertNoAnsi(hostedRes.mir || '', 'hosted_c_mir');
+    if (!hostedRes.functions || !hostedRes.functions['main']) {
+      throw new Error('Expected main function in hosted C11 compilation result');
+    }
+    console.log(`[PASS] Compiled hosted C11 source ${hostedExample.filename} with musl headers in ${hostedRes.executionDurationMs}ms.`);
+  }
+
   console.log('\n=== All Server Bridge Tests PASSED Successfully! ===');
 }
 

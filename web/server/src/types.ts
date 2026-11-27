@@ -9,6 +9,7 @@ export interface CompileRequest {
   enableRtti?: boolean;
   diagLevel?: 'error' | 'warning' | 'trace' | 'debug';
   emitObject?: boolean;
+  hosted?: boolean;
 }
 
 export interface DiagnosticItem {
