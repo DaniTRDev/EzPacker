@@ -439,3 +439,74 @@ TEST_F(CFrontendEndToEndTest, TestFullCompilationHostedCSourceToCoff)
     // Verify AMD64 COFF machine type (0x8664)
     EXPECT_EQ(machine, 0x8664);
 }
+
+
+// Tests full end-to-end compilation of hosted C11 + musl features (snprintf, strtol, errno, ctype, argc/argv) to ELF64.
+TEST_F(CFrontendEndToEndTest, TestFullCompilationHostedMuslFeaturesToElf64)
+{
+    const std::string cPath = "test_hosted_musl_elf.c";
+    const std::string outPath = "test_hosted_musl_elf.o";
+    registerCleanup(cPath);
+    registerCleanup(outPath);
+
+    {
+        std::ofstream out(cPath);
+        out << R"c(
+            #include <ctype.h>
+            #include <errno.h>
+            #include <inttypes.h>
+            #include <stdio.h>
+            #include <stdlib.h>
+            #include <string.h>
+
+            int main(int argc, char **argv) {
+                errno = 0;
+                char *endp = NULL;
+                long val = strtol("1234", &endp, 10);
+                char buf[64];
+                snprintf(buf, sizeof(buf), "argc=%d val=%ld ch=%c", argc, val, toupper('z'));
+                if (argv && argv[0]) {
+                    puts(buf);
+                }
+                return errno != 0;
+            }
+        )c";
+    }
+
+    CommandLineOptions options;
+    options.inputFilePath = cPath;
+    options.outputFilePath = outPath;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.optLevel = OptimizationLevel::O1;
+    options.emissionStage = EmissionStage::Object;
+    options.freestanding = false;
+    options.noStdLib = false;
+
+    DriverContext ctx(options);
+    ASSERT_TRUE(ctx.initialize());
+
+    MirModuleLoader loader;
+    ASSERT_TRUE(loader.compileSourceToMir(ctx, cPath, *ctx.getBuilderContext()));
+
+    CompilationPipeline pipeline(ctx);
+    EXPECT_TRUE(pipeline.runPipeline());
+
+    EmissionEngine emitter(ctx);
+    EXPECT_TRUE(emitter.emitModule(*ctx.getBuilderContext(), outPath));
+
+    ASSERT_TRUE(std::filesystem::exists(outPath));
+    ASSERT_GE(std::filesystem::file_size(outPath), 64u);
+
+    std::ifstream inFile(outPath, std::ios::binary);
+    ASSERT_TRUE(inFile.is_open());
+    std::vector<uint8_t> header(64);
+    inFile.read(reinterpret_cast<char *>(header.data()), 64);
+    inFile.close();
+
+    EXPECT_EQ(header[0], 0x7F);
+    EXPECT_EQ(header[1], 'E');
+    EXPECT_EQ(header[2], 'L');
+    EXPECT_EQ(header[3], 'F');
+    EXPECT_EQ(header[4], 2);
+    EXPECT_EQ(header[5], 1);
+}

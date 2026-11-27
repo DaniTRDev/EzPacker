@@ -285,7 +285,7 @@ foreach(TEST_NAME IN LISTS MIR_BACKEND_TESTS)
 endforeach()
 
 # =========================================================================
-# TIER 3: C11 Hosted End-to-End Tests (EzLibStdC + ezc + ez-ld)
+# TIER 3: C11 Hosted End-to-End Tests (EzMusl + ezc + ez-ld)
 # =========================================================================
 set(C11_HOSTED_TESTS
     test_exec
@@ -296,48 +296,171 @@ set(C11_HOSTED_TESTS
     test_div
     test_qsort
     test_debug
+    test_stdio_format
+    test_stdio_file_io
+    test_stdlib_alloc_conv
+    test_stdlib_sort_search
+    test_string_mem
+    test_ctype_errno
+    test_time_assert
 )
 
+set(EZLD_BIN "$<TARGET_FILE:ez-ld>")
+
 if(HOST_IS_WINDOWS)
-    set(EZLD_BIN "$<TARGET_FILE:ez-ld>")
-
-    foreach(TEST_NAME IN LISTS C11_HOSTED_TESTS)
-        set(C_SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/${TEST_NAME}.c")
-        set(HOSTED_OBJ "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_hosted.obj")
-        set(HOSTED_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_hosted${CMAKE_EXECUTABLE_SUFFIX}")
-
-        # 1. Compile C11 hosted test with ezc -fhosted
-        add_custom_command(
-            OUTPUT "${HOSTED_OBJ}"
-            COMMAND ${CMAKE_COMMAND} -E env "PATH=${CMAKE_BINARY_DIR}/bin;$ENV{PATH}" "${EZC_BIN}" -fhosted "${C_SRC_FILE}" -o "${HOSTED_OBJ}"
-            DEPENDS ezc "${C_SRC_FILE}" EzPacker_CopyStandardLibraries
-            COMMENT "[EzCompiler E2E / Hosted] Compiling ${TEST_NAME}.c with ezc -fhosted"
-            VERBATIM
-        )
-
-        # 2. Link with ez-ld --hosted against EzLibStdC
-        add_custom_command(
-            OUTPUT "${HOSTED_EXE}"
-            COMMAND ${CMAKE_COMMAND} -E env "PATH=${CMAKE_BINARY_DIR}/bin;$ENV{PATH}" "${EZLD_BIN}" --hosted --no-exception-rt --libstdc-path "${CMAKE_BINARY_DIR}/lib/libEzLibStdC.a" "${HOSTED_OBJ}" -o "${HOSTED_EXE}"
-            DEPENDS ez-ld "${HOSTED_OBJ}" EzPacker_CopyStandardLibraries
-            COMMENT "[EzCompiler E2E / Hosted] Linking ${TEST_NAME} with ez-ld --hosted"
-            VERBATIM
-        )
-
-        list(APPEND ALL_E2E_OUTPUTS "${HOSTED_OBJ}" "${HOSTED_EXE}")
-
-        # 3. Register CTest runtime test
-        add_test(
-            NAME "EzCompilerEndToEnd_Hosted_${TEST_NAME}"
-            COMMAND "${HOSTED_EXE}"
-        )
-
-        set_tests_properties("EzCompilerEndToEnd_Hosted_${TEST_NAME}" PROPERTIES
-            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin"
-            LABELS "E2E;Hosted;C11;EzCompiler"
-        )
-    endforeach()
+    set(HOSTED_OBJ_EXT ".obj")
+    set(HOSTED_ENV --modify "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin" --modify "PATH=path_list_prepend:${COMPILER_DIR}")
+    set(HOSTED_LINK_EXTRA_DEPS "")
+    if(TARGET EzPacker_CopyStandardLibraries)
+        list(APPEND HOSTED_LINK_EXTRA_DEPS EzPacker_CopyStandardLibraries)
+    endif()
+    set(HOSTED_RUN_ENV "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${COMPILER_DIR}")
+else()
+    set(HOSTED_OBJ_EXT ".o")
+    set(HOSTED_ENV --modify "LD_LIBRARY_PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin" --modify "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
+    set(HOSTED_LINK_EXTRA_DEPS EzMusl_crt1)
+    set(HOSTED_RUN_ENV "LD_LIBRARY_PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin;PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
 endif()
+
+function(ezpacker_add_hosted_e2e_target TARGET_ID C_SRC_PATH)
+    cmake_parse_arguments(ARG "" "OUT_EXE_VAR" "" ${ARGN})
+    set(HOSTED_OBJ "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_ID}_hosted${HOSTED_OBJ_EXT}")
+    set(HOSTED_EXE "${CMAKE_CURRENT_BINARY_DIR}/${TARGET_ID}_hosted${CMAKE_EXECUTABLE_SUFFIX}")
+
+    add_custom_command(
+        OUTPUT "${HOSTED_OBJ}"
+        COMMAND ${CMAKE_COMMAND} -E env ${HOSTED_ENV} "${EZC_BIN}" -fhosted "${C_SRC_PATH}" -o "${HOSTED_OBJ}"
+        DEPENDS ezc EzMusl_StageHeaders "${C_SRC_PATH}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+        COMMENT "[EzCompiler E2E / Hosted] Compiling ${TARGET_ID} with ezc -fhosted"
+        VERBATIM
+    )
+
+    add_custom_command(
+        OUTPUT "${HOSTED_EXE}"
+        COMMAND ${CMAKE_COMMAND} -E env ${HOSTED_ENV} "${EZLD_BIN}" --hosted --no-exception-rt --musl-path "$<TARGET_FILE:EzMusl>" "${HOSTED_OBJ}" -o "${HOSTED_EXE}"
+        DEPENDS ez-ld EzMusl ${HOSTED_LINK_EXTRA_DEPS} "${HOSTED_OBJ}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+        COMMENT "[EzCompiler E2E / Hosted] Linking ${TARGET_ID} with ez-ld --hosted (EzMusl)"
+        VERBATIM
+    )
+
+    list(APPEND ALL_E2E_OUTPUTS "${HOSTED_OBJ}" "${HOSTED_EXE}")
+    set(ALL_E2E_OUTPUTS "${ALL_E2E_OUTPUTS}" PARENT_SCOPE)
+    if(ARG_OUT_EXE_VAR)
+        set(${ARG_OUT_EXE_VAR} "${HOSTED_EXE}" PARENT_SCOPE)
+    endif()
+endfunction()
+
+foreach(TEST_NAME IN LISTS C11_HOSTED_TESTS)
+    set(C_SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/${TEST_NAME}.c")
+    ezpacker_add_hosted_e2e_target("${TEST_NAME}" "${C_SRC_FILE}" OUT_EXE_VAR HOSTED_EXE)
+
+    add_test(
+        NAME "EzCompilerEndToEnd_Hosted_${TEST_NAME}"
+        COMMAND "${HOSTED_EXE}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+
+    set_tests_properties("EzCompilerEndToEnd_Hosted_${TEST_NAME}" PROPERTIES
+        ENVIRONMENT_MODIFICATION "${HOSTED_RUN_ENV}"
+        LABELS "E2E;Hosted;C11;Musl;EzCompiler"
+    )
+endforeach()
+
+# CRT argc/argv + atexit LIFO ordering test
+ezpacker_add_hosted_e2e_target("test_crt_args_exit" "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/test_crt_args_exit.c" OUT_EXE_VAR ARGS_EXE)
+add_test(
+    NAME "EzCompilerEndToEnd_Hosted_test_crt_args_exit"
+    COMMAND "${ARGS_EXE}" "alpha" "beta"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+set_tests_properties("EzCompilerEndToEnd_Hosted_test_crt_args_exit" PROPERTIES
+    ENVIRONMENT_MODIFICATION "${HOSTED_RUN_ENV}"
+    PASS_REGULAR_EXPRESSION "argc=3 arg1=alpha arg2=beta.*atexit_first.*atexit_second"
+    LABELS "E2E;Hosted;C11;Musl;CRT;EzCompiler"
+)
+
+# CRT exit(42) + atexit cleanup propagation test
+ezpacker_add_hosted_e2e_target("test_crt_exit_code" "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/test_crt_exit_code.c" OUT_EXE_VAR EXIT_CODE_EXE)
+add_test(
+    NAME "EzCompilerEndToEnd_Hosted_test_crt_exit_code"
+    COMMAND ${CMAKE_COMMAND}
+        "-DTEST_EXE=${EXIT_CODE_EXE}"
+        "-DEXPECTED_EXIT_CODE=42"
+        "-DEXPECTED_OUTPUT_SUBSTR=exit_code_atexit_ran"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/VerifyExitCode.cmake"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+set_tests_properties("EzCompilerEndToEnd_Hosted_test_crt_exit_code" PROPERTIES
+    ENVIRONMENT_MODIFICATION "${HOSTED_RUN_ENV}"
+    LABELS "E2E;Hosted;C11;Musl;CRT;EzCompiler"
+)
+
+# Real-world hosted example pipeline test
+ezpacker_add_hosted_e2e_target("example_10_hosted_c11_pipeline" "${CMAKE_SOURCE_DIR}/examples/10_hosted_c11_pipeline.c" OUT_EXE_VAR EX10_EXE)
+add_test(
+    NAME "EzCompilerEndToEnd_Hosted_example_10_pipeline"
+    COMMAND "${EX10_EXE}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+set_tests_properties("EzCompilerEndToEnd_Hosted_example_10_pipeline" PROPERTIES
+    ENVIRONMENT_MODIFICATION "${HOSTED_RUN_ENV}"
+    PASS_REGULAR_EXPRESSION "Pipeline test completed successfully"
+    LABELS "E2E;Hosted;C11;Musl;Examples;EzCompiler"
+)
+
+# Linux POSIX + musl syscall tests (unistd, fcntl, stat, unlink)
+if(NOT HOST_IS_WINDOWS)
+    ezpacker_add_hosted_e2e_target("test_posix_musl" "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/test_posix_musl.c" OUT_EXE_VAR POSIX_EXE)
+    add_test(
+        NAME "EzCompilerEndToEnd_Hosted_test_posix_musl"
+        COMMAND "${POSIX_EXE}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    set_tests_properties("EzCompilerEndToEnd_Hosted_test_posix_musl" PROPERTIES
+        ENVIRONMENT_MODIFICATION "${HOSTED_RUN_ENV}"
+        PASS_REGULAR_EXPRESSION "posix_musl ok"
+        LABELS "E2E;Hosted;POSIX;Musl;EzCompiler"
+    )
+endif()
+
+# Negative E2E tests: freestanding rejects stdio, freestanding link rejects undefined libc symbols, syntax error fails
+add_test(
+    NAME "EzCompilerEndToEnd_Neg_FreestandingRejectsStdio"
+    COMMAND ${CMAKE_COMMAND} -E env ${HOSTED_ENV} "${EZC_BIN}" -ffreestanding
+        "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/test_exec.c"
+        -o "${CMAKE_CURRENT_BINARY_DIR}/neg_freestanding_stdio${HOSTED_OBJ_EXT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+set_tests_properties("EzCompilerEndToEnd_Neg_FreestandingRejectsStdio" PROPERTIES
+    WILL_FAIL TRUE
+    LABELS "E2E;Negative;Freestanding;EzCompiler"
+)
+
+add_test(
+    NAME "EzCompilerEndToEnd_Neg_FreestandingLinkRejectsUndefined"
+    COMMAND ${CMAKE_COMMAND} -E env ${HOSTED_ENV} "${EZLD_BIN}" --freestanding --no-exception-rt
+        "${CMAKE_CURRENT_BINARY_DIR}/test_exec_hosted${HOSTED_OBJ_EXT}"
+        -o "${CMAKE_CURRENT_BINARY_DIR}/neg_freestanding_link${CMAKE_EXECUTABLE_SUFFIX}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+set_tests_properties("EzCompilerEndToEnd_Neg_FreestandingLinkRejectsUndefined" PROPERTIES
+    WILL_FAIL TRUE
+    LABELS "E2E;Negative;Freestanding;EzLinker"
+)
+
+add_test(
+    NAME "EzCompilerEndToEnd_Neg_HostedSyntaxError"
+    COMMAND ${CMAKE_COMMAND} -E env ${HOSTED_ENV} "${EZC_BIN}" -fhosted
+        "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/neg_syntax_error.c"
+        -o "${CMAKE_CURRENT_BINARY_DIR}/neg_syntax_error${HOSTED_OBJ_EXT}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+set_tests_properties("EzCompilerEndToEnd_Neg_HostedSyntaxError" PROPERTIES
+    WILL_FAIL TRUE
+    LABELS "E2E;Negative;Hosted;EzCompiler"
+)
 
 # Master CMake target for the end-to-end test suite
 add_custom_target(EzCompilerEndToEndTests ALL

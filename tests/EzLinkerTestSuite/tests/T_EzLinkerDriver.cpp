@@ -1,5 +1,7 @@
 #include "EzLinkerTestSuite.h"
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 
 TEST_F(EzLinkerTestSuite, TestMsvcArgumentGeneration)
 {
@@ -42,6 +44,7 @@ TEST_F(EzLinkerTestSuite, TestElfArgumentGeneration)
     elfLinker.path = "/usr/bin/ld.lld";
 
     EzLinker::LinkerOptions opts;
+    opts.targetTriple = "x86_64-unknown-linux-gnu";
     opts.inputFiles = { "main.o" };
     opts.outputFile = "test.out";
     opts.libSearchPaths = { "/usr/local/lib" };
@@ -103,136 +106,253 @@ TEST_F(EzLinkerTestSuite, TestNoDefaultLibsFlag)
 }
 
 TEST_F(EzLinkerTestSuite, TestHostedMsvcArgumentGeneration)
-
 {
-
     EzLinker::EzLinkerDriver driver;
-
     EzLinker::DetectedLinker msvcLinker;
-
     msvcLinker.kind = EzLinker::SystemLinkerKind::MsvcLink;
-
     msvcLinker.path = "link.exe";
 
-
-
     EzLinker::LinkerOptions opts;
-
+    opts.targetTriple = "x86_64-pc-windows-msvc";
     opts.inputFiles = { "main.obj" };
-
     opts.outputFile = "test.exe";
-
     opts.isHosted = true;
-
-
 
     auto args = driver.buildLinkerArguments(opts, msvcLinker);
 
-
-
     auto hasArg = [&](const std::string &expected) {
-
         return std::find(args.begin(), args.end(), expected) != args.end();
-
     };
 
-
-
-    EXPECT_TRUE(hasArg("EzLibStdC.lib"));
-
-
+    EXPECT_TRUE(hasArg("EzMusl.lib") || hasArg("libEzMusl.a"));
     EXPECT_TRUE(hasArg("kernel32.lib"));
-
+    EXPECT_TRUE(hasArg("user32.lib"));
+    EXPECT_TRUE(hasArg("/entry:mainCRTStartup"));
+    EXPECT_TRUE(hasArg("/subsystem:console"));
 }
 
-
-
 TEST_F(EzLinkerTestSuite, TestHostedElfArgumentGeneration)
-
 {
-
     EzLinker::EzLinkerDriver driver;
-
     EzLinker::DetectedLinker elfLinker;
-
     elfLinker.kind = EzLinker::SystemLinkerKind::LldElf;
-
     elfLinker.path = "/usr/bin/ld.lld";
 
-
-
     EzLinker::LinkerOptions opts;
-
+    opts.targetTriple = "x86_64-unknown-linux-gnu";
     opts.inputFiles = { "main.o" };
-
     opts.outputFile = "test.out";
-
     opts.isHosted = true;
-
-
 
     auto args = driver.buildLinkerArguments(opts, elfLinker);
 
-
-
     auto hasArg = [&](const std::string &expected) {
-
         return std::find(args.begin(), args.end(), expected) != args.end();
-
     };
 
-
-
-    EXPECT_TRUE(hasArg("-lEzLibStdC"));
-
-    EXPECT_TRUE(hasArg("-lc"));
-
+    EXPECT_TRUE(hasArg("-lEzMusl") || hasArg("-l:EzMusl.lib"));
+    EXPECT_FALSE(hasArg("-lc"));
     EXPECT_TRUE(hasArg("-lgcc"));
-
 }
 
-
-
-TEST_F(EzLinkerTestSuite, TestCustomLibStdCPath)
-
+TEST_F(EzLinkerTestSuite, TestCustomMuslPath)
 {
-
     EzLinker::EzLinkerDriver driver;
-
     EzLinker::DetectedLinker msvcLinker;
-
     msvcLinker.kind = EzLinker::SystemLinkerKind::MsvcLink;
-
     msvcLinker.path = "link.exe";
 
-
-
     EzLinker::LinkerOptions opts;
-
+    opts.targetTriple = "x86_64-pc-windows-msvc";
     opts.inputFiles = { "main.obj" };
-
     opts.outputFile = "test.exe";
-
     opts.isHosted = true;
-
-    opts.libStdCPath = "C:\\custom\\lib\\EzLibStdC.lib";
-
-
+    opts.muslPath = "C:/custom/lib/EzMusl.lib";
 
     auto args = driver.buildLinkerArguments(opts, msvcLinker);
 
-
-
     auto hasArg = [&](const std::string &expected) {
-
         return std::find(args.begin(), args.end(), expected) != args.end();
-
     };
 
-
-
-    EXPECT_TRUE(hasArg("/libpath:C:\\custom\\lib"));
-    EXPECT_TRUE(hasArg("EzLibStdC.lib"));
-
+    EXPECT_TRUE(hasArg("/libpath:C:/custom/lib"));
+    EXPECT_TRUE(hasArg("EzMusl.lib"));
+    EXPECT_TRUE(hasArg("/entry:mainCRTStartup"));
 }
 
+TEST_F(EzLinkerTestSuite, TestCustomMuslPathElf)
+{
+    EzLinker::EzLinkerDriver driver;
+    EzLinker::DetectedLinker elfLinker;
+    elfLinker.kind = EzLinker::SystemLinkerKind::LldElf;
+    elfLinker.path = "/usr/bin/ld.lld";
+
+    EzLinker::LinkerOptions opts;
+    opts.targetTriple = "x86_64-unknown-linux-gnu";
+    opts.inputFiles = { "main.o" };
+    opts.outputFile = "test.out";
+    opts.isHosted = true;
+    opts.muslPath = "/opt/musl/lib/libEzMusl.a";
+
+    auto args = driver.buildLinkerArguments(opts, elfLinker);
+
+    auto hasArg = [&](const std::string &expected) {
+        return std::find(args.begin(), args.end(), expected) != args.end();
+    };
+
+    EXPECT_TRUE(hasArg("-L/opt/musl/lib"));
+    EXPECT_TRUE(hasArg("-lEzMusl"));
+    EXPECT_FALSE(hasArg("-lc"));
+}
+
+TEST_F(EzLinkerTestSuite, TestHostedElfCrt1OrderingAndSharedExclusion)
+{
+    const auto tempDir = std::filesystem::temp_directory_path() / "ez_linker_musl_crt1_test";
+    std::error_code ec;
+    std::filesystem::create_directories(tempDir, ec);
+    const auto fakeMusl = tempDir / "libEzMusl.a";
+    const auto fakeCrt1 = tempDir / "crt1.o";
+    {
+        std::ofstream(fakeMusl) << "!<arch>\n";
+        std::ofstream(fakeCrt1) << "ELF";
+    }
+
+    EzLinker::EzLinkerDriver driver;
+    EzLinker::DetectedLinker elfLinker;
+    elfLinker.kind = EzLinker::SystemLinkerKind::LldElf;
+    elfLinker.path = "/usr/bin/ld.lld";
+
+    // Executable: crt1.o must appear before main.o and -lEzMusl after main.o
+    {
+        EzLinker::LinkerOptions opts;
+        opts.targetTriple = "x86_64-unknown-linux-gnu";
+        opts.inputFiles = { "main.o" };
+        opts.outputFile = "app.out";
+        opts.isHosted = true;
+        opts.muslPath = fakeMusl;
+
+        auto args = driver.buildLinkerArguments(opts, elfLinker);
+        auto crtIt = std::find(args.begin(), args.end(), std::filesystem::weakly_canonical(fakeCrt1, ec).string());
+        auto objIt = std::find(args.begin(), args.end(), "main.o");
+        auto libIt = std::find(args.begin(), args.end(), "-lEzMusl");
+
+        ASSERT_NE(crtIt, args.end());
+        ASSERT_NE(objIt, args.end());
+        ASSERT_NE(libIt, args.end());
+        EXPECT_LT(crtIt, objIt);
+        EXPECT_LT(objIt, libIt);
+    }
+
+    // Shared library: crt1.o must NOT be injected
+    {
+        EzLinker::LinkerOptions opts;
+        opts.targetTriple = "x86_64-unknown-linux-gnu";
+        opts.inputFiles = { "lib.o" };
+        opts.outputFile = "libfoo.so";
+        opts.isHosted = true;
+        opts.isShared = true;
+        opts.muslPath = fakeMusl;
+
+        auto args = driver.buildLinkerArguments(opts, elfLinker);
+        auto crtIt = std::find(args.begin(), args.end(), std::filesystem::weakly_canonical(fakeCrt1, ec).string());
+        EXPECT_EQ(crtIt, args.end());
+        EXPECT_TRUE(std::find(args.begin(), args.end(), "-shared") != args.end());
+        EXPECT_TRUE(std::find(args.begin(), args.end(), "-lEzMusl") != args.end());
+    }
+
+    std::filesystem::remove_all(tempDir, ec);
+}
+
+TEST_F(EzLinkerTestSuite, TestHostedWithNoDefaultLibsSuppressesMusl)
+{
+    EzLinker::EzLinkerDriver driver;
+
+    // MSVC hosted + nodefaultlibs
+    {
+        EzLinker::DetectedLinker msvcLinker;
+        msvcLinker.kind = EzLinker::SystemLinkerKind::MsvcLink;
+        msvcLinker.path = "link.exe";
+
+        EzLinker::LinkerOptions opts;
+        opts.targetTriple = "x86_64-pc-windows-msvc";
+        opts.inputFiles = { "main.obj" };
+        opts.isHosted = true;
+        opts.noDefaultLibs = true;
+        opts.muslPath = "C:\\custom\\EzMusl.lib";
+
+        auto args = driver.buildLinkerArguments(opts, msvcLinker);
+        EXPECT_EQ(std::find(args.begin(), args.end(), "EzMusl.lib"), args.end());
+        EXPECT_EQ(std::find(args.begin(), args.end(), "kernel32.lib"), args.end());
+    }
+
+    // ELF hosted + nodefaultlibs
+    {
+        EzLinker::DetectedLinker elfLinker;
+        elfLinker.kind = EzLinker::SystemLinkerKind::LldElf;
+        elfLinker.path = "/usr/bin/ld.lld";
+
+        EzLinker::LinkerOptions opts;
+        opts.targetTriple = "x86_64-unknown-linux-gnu";
+        opts.inputFiles = { "main.o" };
+        opts.isHosted = true;
+        opts.noDefaultLibs = true;
+        opts.muslPath = "/opt/musl/libEzMusl.a";
+
+        auto args = driver.buildLinkerArguments(opts, elfLinker);
+        EXPECT_EQ(std::find(args.begin(), args.end(), "-lEzMusl"), args.end());
+        EXPECT_EQ(std::find(args.begin(), args.end(), "-lc"), args.end());
+    }
+}
+
+TEST_F(EzLinkerTestSuite, TestHostedWindowsLdAndLinuxDriverArgs)
+{
+    EzLinker::EzLinkerDriver driver;
+
+    // Windows GNU ld hosted args
+    {
+        EzLinker::DetectedLinker gnuLd;
+        gnuLd.kind = EzLinker::SystemLinkerKind::GnuBfd;
+        gnuLd.path = "ld.exe";
+
+        EzLinker::LinkerOptions opts;
+        opts.targetTriple = "x86_64-pc-windows-gnu";
+        opts.inputFiles = { "main.obj" };
+        opts.outputFile = "app.exe";
+        opts.isHosted = true;
+        opts.muslPath = "C:/musl/libEzMusl.a";
+
+        auto args = driver.buildLinkerArguments(opts, gnuLd);
+        auto hasArg = [&](const std::string &expected) {
+            return std::find(args.begin(), args.end(), expected) != args.end();
+        };
+
+        EXPECT_TRUE(hasArg("-lEzMusl"));
+        EXPECT_TRUE(hasArg("-lkernel32"));
+        EXPECT_TRUE(hasArg("-e"));
+        EXPECT_TRUE(hasArg("mainCRTStartup"));
+    }
+
+    // Linux gcc compiler driver hosted args
+    {
+        EzLinker::DetectedLinker gccDriver;
+        gccDriver.kind = EzLinker::SystemLinkerKind::GccDriver;
+        gccDriver.path = "/usr/bin/gcc";
+
+        EzLinker::LinkerOptions opts;
+        opts.targetTriple = "x86_64-unknown-linux-gnu";
+        opts.inputFiles = { "main.o" };
+        opts.outputFile = "app.out";
+        opts.isHosted = true;
+        opts.muslPath = "/opt/musl/libEzMusl.a";
+
+        auto args = driver.buildLinkerArguments(opts, gccDriver);
+        auto hasArg = [&](const std::string &expected) {
+            return std::find(args.begin(), args.end(), expected) != args.end();
+        };
+
+        EXPECT_TRUE(hasArg("-nostdlib"));
+        EXPECT_TRUE(hasArg("-lEzMusl"));
+        EXPECT_TRUE(hasArg("-lgcc"));
+        EXPECT_FALSE(hasArg("-lc"));
+    }
+}

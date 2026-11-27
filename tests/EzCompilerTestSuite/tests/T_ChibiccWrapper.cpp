@@ -1,6 +1,7 @@
 #include "EzCompilerTestSuite.h"
 #include "CFrontend/ChibiccWrapper.h"
 #include "chibicc.h"
+#include <filesystem>
 
 using namespace EzCompiler::CFrontend;
 
@@ -275,3 +276,125 @@ int hosted_demo(void) {
     EXPECT_TRUE(fn->is_function);
     EXPECT_STREQ(fn->name, "hosted_demo");
 }
+
+
+TEST_F(EzCompilerTestSuite, TestChibiccBundledIncludeDirsResolved)
+{
+    std::string freestandingDir = ChibiccWrapper::getBundledFreestandingIncludeDir();
+    std::string muslDir = ChibiccWrapper::getBundledHostedIncludeDir();
+    std::string muslCompatDir = ChibiccWrapper::getBundledHostedCompatIncludeDir();
+
+    ASSERT_FALSE(freestandingDir.empty());
+    ASSERT_FALSE(muslDir.empty());
+    ASSERT_FALSE(muslCompatDir.empty());
+
+    EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(freestandingDir) / "stdint.h"));
+    EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(muslDir) / "stdio.h"));
+    EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(muslDir) / "bits" / "alltypes.h"));
+    EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(muslCompatDir) / "stdarg.h"));
+}
+
+TEST_F(EzCompilerTestSuite, TestChibiccTargetMacros)
+{
+    // Windows hosted macros
+    {
+        ChibiccWrapper wrapper;
+        wrapper.setTargetTriple(EzCompiler::TargetTriple::parse("x86_64-pc-windows-msvc"));
+        wrapper.setHostedMode(true);
+        const std::string src = R"c(
+#if !defined(_WIN32) || !defined(_WIN64)
+#error "Expected _WIN32 and _WIN64 in Windows hosted mode"
+#endif
+#if defined(__ELF__) || defined(__linux__)
+#error "ELF/Linux macros must not be defined for Windows target"
+#endif
+int win_fn(void) { return 1; }
+)c";
+        auto res = wrapper.parseString(src);
+        ASSERT_TRUE(res.success) << res.errorMessage;
+        EXPECT_NE(findObject(res.astRoot, "win_fn"), nullptr);
+    }
+
+    // Linux x86_64 hosted macros
+    {
+        ChibiccWrapper wrapper;
+        wrapper.setTargetTriple(EzCompiler::TargetTriple::parse("x86_64-unknown-linux-gnu"));
+        wrapper.setHostedMode(true);
+        const std::string src = R"c(
+#if !defined(__ELF__) || !defined(__linux__) || !defined(__gnu_linux__)
+#error "Expected Linux ELF macros in Linux hosted mode"
+#endif
+#if !defined(_LP64) || !defined(__x86_64__)
+#error "Expected LP64 and x86_64 macros"
+#endif
+int lin_fn(void) { return 2; }
+)c";
+        auto res = wrapper.parseString(src);
+        ASSERT_TRUE(res.success) << res.errorMessage;
+        EXPECT_NE(findObject(res.astRoot, "lin_fn"), nullptr);
+    }
+
+    // RISC-V64 hosted macros
+    {
+        ChibiccWrapper wrapper;
+        wrapper.setTargetTriple(EzCompiler::TargetTriple::parse("riscv64-unknown-linux-gnu"));
+        wrapper.setHostedMode(true);
+        const std::string src = R"c(
+#if !defined(__riscv) || __riscv_xlen != 64
+#error "Expected RISC-V 64 macros"
+#endif
+#if defined(__x86_64__)
+#error "x86_64 macro must not be defined for RISC-V target"
+#endif
+int rv_fn(void) { return 3; }
+)c";
+        auto res = wrapper.parseString(src);
+        ASSERT_TRUE(res.success) << res.errorMessage;
+        EXPECT_NE(findObject(res.astRoot, "rv_fn"), nullptr);
+    }
+}
+
+TEST_F(EzCompilerTestSuite, TestChibiccMuslHeadersComprehensive)
+{
+    ChibiccWrapper wrapper;
+    wrapper.setTargetTriple(EzCompiler::TargetTriple::parse("x86_64-unknown-linux-gnu"));
+    wrapper.setHostedMode(true);
+    const std::string source = R"c(
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <float.h>
+#include <inttypes.h>
+#include <limits.h>
+#include <locale.h>
+#include <math.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
+#include <wchar.h>
+
+int musl_all_headers_eval(int argc, char **argv) {
+    pid_t pid = getpid();
+    int64_t val = INT64_C(42);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%" PRId64, val);
+    return argc + (int)pid + (argv != NULL);
+}
+)c";
+
+    auto result = wrapper.parseString(source);
+    ASSERT_TRUE(result.success) << "Failed to parse comprehensive musl headers: " << result.errorMessage;
+    ASSERT_NE(result.astRoot, nullptr);
+    EXPECT_NE(findObject(result.astRoot, "musl_all_headers_eval"), nullptr);
+}

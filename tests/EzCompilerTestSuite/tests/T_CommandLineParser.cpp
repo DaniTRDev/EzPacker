@@ -356,10 +356,36 @@ TEST_F(EzCompilerTestSuite, TestHostedCommandLineOptions)
     CommandLineOptions options;
     std::string err;
 
-    std::vector<std::string> args = { "ezc", "main.c", "-fhosted" };
-    EXPECT_TRUE(parser.parse(args, options, err));
-    EXPECT_FALSE(options.freestanding);
-    EXPECT_FALSE(options.noStdLib);
+    {
+        std::vector<std::string> args = { "ezc", "main.c", "-fhosted" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_FALSE(options.freestanding);
+        EXPECT_FALSE(options.noStdLib);
+        EXPECT_TRUE(options.isHosted());
+    }
+
+    {
+        std::vector<std::string> args = { "ezc", "main.c", "--hosted" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_FALSE(options.freestanding);
+        EXPECT_FALSE(options.noStdLib);
+        EXPECT_TRUE(options.isHosted());
+    }
+
+    {
+        std::vector<std::string> args = { "ezc", "main.c", "--freestanding", "--nostdlib" };
+        EXPECT_TRUE(parser.parse(args, options, err));
+        EXPECT_TRUE(options.freestanding);
+        EXPECT_TRUE(options.noStdLib);
+        EXPECT_FALSE(options.isHosted());
+    }
+
+    // Conflicting -fhosted and -ffreestanding must be rejected
+    {
+        std::vector<std::string> args = { "ezc", "main.c", "-fhosted", "-ffreestanding" };
+        EXPECT_FALSE(parser.parse(args, options, err));
+        EXPECT_NE(err.find("conflicting environment flags"), std::string::npos);
+    }
 }
 
 TEST_F(EzCompilerTestSuite, TestDumpPipelineJsonOption)
