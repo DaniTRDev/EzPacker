@@ -105,6 +105,7 @@ flowchart LR
 - **[How to Build a Target Architecture](how_to_build_a_target.md)**: Complete architectural tutorial on adding a new CPU architecture backend to EzPacker from first principles.
 - **[Web Developer Workbench Guide](web_workbench.md)**: Live interactive compiler explorer, fine-grained pass inspection with delta diffing, CFG/liveness analyzers, and COFF/ELF binary dissection.
 - **[YARPGen Differential Testing](yarpgen_differential_testing.md)**: Dual-mode testing infrastructure (bulk multi-file compilation + 3,600+ LOC single-file mega stress test) comparing EzPacker against GCC/Clang with automated reproducer triage.
+- **[Compiler Stage Performance Benchmarks](performance_benchmarks.md)**: Release-mode per-stage/per-pass timing breakdown, empirical scaling analysis, and comparisons against GCC and public compilers.
 - **[Technical TODOs & Optimization Roadmap](todos.md)**: Catalog of identified technical debt, incomplete runtime facilities, future middle-end optimization passes, and architecture expansions.
 
 ### 🌐 Interactive Web Compiler Explorer (`web/`)
