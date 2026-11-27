@@ -30,7 +30,8 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 - **[EzTriple](docs/projects/EzTriple.md)** - Backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer.
 - **[EzCompiler](docs/projects/EzCompiler.md)** - Compiler driver executable (`ezc`), options parsing, and pipeline orchestration.
 - **[EzTargets](docs/projects/EzTargets.md)** - Architecture backends, featuring the x86-64 target (with vector extensions) and native RISC-V 64-bit target (`riscv64` with float and RVV 1.0 vector lowering).
-- **[EzLinker](docs/projects/EzLinker.md)** - System linker driver (`ez-ld`), automated toolchain detection, runtime library injection, and SjLj exception runtime.
+- **[EzLinker](docs/projects/EzLinker.md)** - System linker driver (`ez-ld`), automated toolchain detection, `EzMusl` hosted runtime linking, and SjLj exception runtime.
+- **[EzMusl](docs/projects/EzMusl.md)** - Vendored `musl` 1.2.5 C standard library integrated via `EzCMK` with Linux ELF64 and Windows Win32 abstractions.
 - **[web](web/)** - Full-stack Web Compiler Explorer and IDE powered by React, Vite, Monaco Editor, and Express.
 
 ---

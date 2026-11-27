@@ -654,27 +654,27 @@ The C frontend is decoupled into dedicated, single-responsibility components:
 
      - Predefines `__STDC_HOSTED__ = 1` and `__EZPACKER_HOSTED__ = 1`, and automatically undefines freestanding macros.
 
-     - Automatically resolves all 28 ISO C11 standard library headers from `include/c11std` and coordinates linking with `EzLibStdC` runtime.
+     - Automatically resolves staged `musl` 1.2.5 ISO C11 headers from `include/musl` (with `include/musl-compat` overlay for `chibicc`) and coordinates linking with `EzMusl` runtime.
 
      - Supports GCC/GNU attributes (`__attribute__((...))`) for compatibility with standard libraries.
 
 
 
-6. **Bundled ISO C11 Standard Headers & EzLibStdC Runtime**:
+6. **Bundled ISO C11 Standard Headers & `EzMusl` Runtime**:
 
    - **Freestanding Headers (9 headers in `include/freestanding`)**:
 
      - `<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`, `<stdalign.h>`, `<stdnoreturn.h>`, `<iso646.h>`, `<float.h>`, `<stdarg.h>`.
 
-   - **Full Hosted ISO C11 Standard Headers (28 headers in `include/c11std`)**:
+   - **Full Hosted `musl` 1.2.5 ISO C11 Standard Headers (`include/musl` + `include/musl-compat`)**:
 
-     - Complete ISO C11 standard library headers: `<assert.h>`, `<complex.h>`, `<ctype.h>`, `<errno.h>`, `<fenv.h>`, `<float.h>`, `<inttypes.h>`, `<iso646.h>`, `<limits.h>`, `<locale.h>`, `<math.h>`, `<setjmp.h>`, `<signal.h>`, `<stdalign.h>`, `<stdarg.h>`, `<stdatomic.h>`, `<stdbool.h>`, `<stddef.h>`, `<stdint.h>`, `<stdio.h>`, `<stdlib.h>`, `<stdnoreturn.h>`, `<string.h>`, `<tgmath.h>`, `<threads.h>`, `<time.h>`, `<uchar.h>`, `<wchar.h>`, `<wctype.h>`.
+     - Complete ISO C11 and POSIX headers from vendored `musl` 1.2.5 (`<assert.h>`, `<complex.h>`, `<ctype.h>`, `<errno.h>`, `<fenv.h>`, `<float.h>`, `<inttypes.h>`, `<iso646.h>`, `<limits.h>`, `<locale.h>`, `<math.h>`, `<setjmp.h>`, `<signal.h>`, `<stdalign.h>`, `<stdarg.h>`, `<stdatomic.h>`, `<stdbool.h>`, `<stddef.h>`, `<stdint.h>`, `<stdio.h>`, `<stdlib.h>`, `<stdnoreturn.h>`, `<string.h>`, `<tgmath.h>`, `<threads.h>`, `<time.h>`, `<uchar.h>`, `<wchar.h>`, `<wctype.h>`), including generated `bits/alltypes.h` and `bits/syscall.h`.
 
-   - **Permissive MIT Standard C Runtime (`EzLibStdC`)**:
+   - **Vendored `musl` 1.2.5 Standard C Runtime (`EzMusl`)**:
 
-     - Cross-platform implementation of C11 runtime facilities targeting Windows (`Win32`/`PE-COFF`) and Linux (`POSIX`/`ELF64`).
+     - Cross-platform C11 runtime configured via `EzCMK` targeting Linux (`ELF64` native syscalls + `crt1.o`) and Windows (`PE/COFF` Win32 syscall translation + `mainCRTStartup`).
 
-     - Zero GPL copyleft restrictions, ensuring complete commercial and open-source license compatibility with MIT.
+     - Zero GPL copyleft restrictions, ensuring complete commercial and open-source license compatibility under MIT.
 
 
 

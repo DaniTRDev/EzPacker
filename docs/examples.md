@@ -677,8 +677,8 @@ ezc -O2 examples/09_freestanding_kernel.c -o uart_frame.o
 
 ---
 
-### 2.17 10_hosted_c11_pipeline.c: Hosted C11 Sensor Telemetry Pipeline with EzLibStdC
-Demonstrates compiling a complete, real-world hosted ISO C11 pipeline leveraging the EzLibStdC runtime library:
+### 2.17 10_hosted_c11_pipeline.c: Hosted C11 Sensor Telemetry Pipeline with EzMusl
+Demonstrates compiling a complete, real-world hosted ISO C11 pipeline leveraging the vendored `musl` 1.2.5 (`EzMusl`) runtime library:
 - **Standard Library Ingestion**: Includes <stdio.h>, <stdlib.h>, <string.h>, <ctype.h>, <time.h>, and <assert.h>.
 - **Dynamic Memory Allocation**: Allocates telemetry batch structures dynamically using malloc() and frees them via ree().
 - **String Parsing & Normalization**: Iterates through sensor tag strings, normalizing characters using isalpha() and 	oupper().
@@ -730,19 +730,19 @@ static int compare_sensors_by_health(const void *a, const void *b) {
 # 1. Compile with hosted C11 headers enabled
 ezc -fhosted -O2 examples/10_hosted_c11_pipeline.c -o telemetry.o
 
-# 2. Link with EzLibStdC runtime and CRT startup entry point
+# 2. Link with EzMusl runtime and CRT startup entry point
 ez-ld --hosted telemetry.o -o telemetry.exe
 
 # 3. Execute native binary
 ./telemetry.exe
-`
+```
 
 ---
 
 ## 3. Next Steps
 
 - Explore the [Interactive Web Compiler Explorer](web_workbench.md) to inspect live MIR, CFG, and pass pipelines.
-- Consult the [EzLibStdC Guide](projects/EzLibStdC.md) for full details on the standard C runtime implementation.
+- Consult the [EzMusl Guide](projects/EzMusl.md) for full details on the vendored `musl` C runtime integration.
 - Review the [Technical TODOs & Optimization Roadmap](todos.md) for future language and optimizer goals.
 - Consult [How to Build a Target Architecture](how_to_build_a_target.md) to understand how instructions, encodings, and calling conventions are defined.
 - Return to the [EzPacker Documentation Index](index.md).
