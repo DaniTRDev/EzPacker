@@ -43,7 +43,8 @@ EzCMK_AddExecutable(NAME "ezc"
 
 target_compile_definitions(EzCompilerLib PRIVATE
     EZPACKER_FREESTANDING_INCLUDE_DIR="${CMAKE_SOURCE_DIR}/include/freestanding"
-    EZPACKER_C11STD_INCLUDE_DIR="${CMAKE_SOURCE_DIR}/include/c11std"
+    EZPACKER_MUSL_INCLUDE_DIR="${EZPACKER_TARGET_BIN_DIR}/include/musl"
+    EZPACKER_MUSL_COMPAT_INCLUDE_DIR="${CMAKE_SOURCE_DIR}/EzMusl/compat_include"
 )
 
 if (NOT DEFINED EZPACKER_TARGET_BIN_DIR OR EZPACKER_TARGET_BIN_DIR STREQUAL "")
@@ -56,12 +57,10 @@ file(COPY "${CMAKE_SOURCE_DIR}/include/freestanding/" DESTINATION "${EZPACKER_TA
 add_custom_target(EzPacker_CopyFreestandingHeaders ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory "${EZPACKER_TARGET_BIN_DIR}/include/freestanding"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/include/freestanding" "${EZPACKER_TARGET_BIN_DIR}/include/freestanding"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${EZPACKER_TARGET_BIN_DIR}/include/c11std"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/include/c11std" "${EZPACKER_TARGET_BIN_DIR}/include/c11std"
-    COMMENT "[EzPacker] Copying standard headers to ${EZPACKER_TARGET_BIN_DIR}/include"
+    COMMENT "[EzPacker] Copying freestanding headers to ${EZPACKER_TARGET_BIN_DIR}/include/freestanding"
     VERBATIM
 )
 
-add_dependencies(EzCompilerLib EzPacker_CopyFreestandingHeaders)
-add_dependencies(ezc EzPacker_CopyFreestandingHeaders)
+add_dependencies(EzCompilerLib EzPacker_CopyFreestandingHeaders EzMusl_StageHeaders)
+add_dependencies(ezc EzPacker_CopyFreestandingHeaders EzMusl_StageHeaders)
 

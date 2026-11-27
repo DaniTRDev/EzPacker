@@ -157,4 +157,16 @@ function(ezmusl_stage_public_headers MUSL_SRC_DIR ARCH GEN_INCLUDE_DIR STAGE_DIR
     endforeach()
     file(COPY "${GEN_INCLUDE_DIR}/bits/alltypes.h" DESTINATION "${STAGE_DIR}/bits")
     file(COPY "${GEN_INCLUDE_DIR}/bits/syscall.h" DESTINATION "${STAGE_DIR}/bits")
+
+    # On Windows LLP64 targets, libEzMusl uses 32-bit long and 64-bit long long,
+    # so PRId64/PRIdPTR must expand to "ll" instead of "l" when _WIN32 is defined.
+    if (EXISTS "${STAGE_DIR}/inttypes.h")
+        file(READ "${STAGE_DIR}/inttypes.h" _inttypes)
+        string(REPLACE
+            "#if UINTPTR_MAX == UINT64_MAX\n#define __PRI64  \"l\"\n#define __PRIPTR \"l\""
+            "#if defined(_WIN32)\n#define __PRI64  \"ll\"\n#define __PRIPTR \"ll\"\n#elif UINTPTR_MAX == UINT64_MAX\n#define __PRI64  \"l\"\n#define __PRIPTR \"l\""
+            _inttypes "${_inttypes}"
+        )
+        file(WRITE "${STAGE_DIR}/inttypes.h" "${_inttypes}")
+    endif ()
 endfunction()

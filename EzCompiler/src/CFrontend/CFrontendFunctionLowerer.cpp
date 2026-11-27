@@ -2249,7 +2249,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
                 case ND_LT:
 
-                    if (isUnsignedType(node->lhs->ty))
+                    if (isUnsignedType(node->lhs->ty) || is_flonum(node->lhs->ty))
 
                         inst.CMP_ULT(dest, lhs, rhs);
 
@@ -2261,7 +2261,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
                 case ND_LE:
 
-                    if (isUnsignedType(node->lhs->ty))
+                    if (isUnsignedType(node->lhs->ty) || is_flonum(node->lhs->ty))
 
                         inst.CMP_ULE(dest, lhs, rhs);
 

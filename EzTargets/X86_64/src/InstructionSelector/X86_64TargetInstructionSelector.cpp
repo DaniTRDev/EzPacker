@@ -299,6 +299,62 @@ bool X86_64TargetInstructionSelector::selectCMP(MirBuilderContext *ctx, MirInstr
     MirInstructionBuilder ib(ctx, inst, InsertionType::InsertBefore);
     MirOperandBuilder ob(ctx);
 
+    bool isFloat = (lhs->getMirType() && lhs->getMirType()->getKind() == MirTypeKind::FloatingPoint);
+    if (isFloat)
+    {
+        bool is64 = (lhs->getMirType()->getTotalSizeInBits() == 64);
+        std::string_view fprClass = is64 ? "FPR64" : "FPR32";
+
+        if (auto *r = lhs->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+            {
+                r->setClass(findClass(fprClass));
+            }
+        }
+        if (auto *r = rhs->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+            {
+                r->setClass(findClass(fprClass));
+            }
+        }
+        if (auto *r = dst->get<MirRegister>())
+        {
+            if (!r->getRegClass())
+            {
+                r->setClass(findClass("GPR32"));
+            }
+        }
+
+        auto *zeroImm = ob.buildInt(ctx->getTypeTable()->i32(), FlexInt(static_cast<int32_t>(0)));
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(x86_64TargetInst::MOV32ri),
+                       inst->getSourceRef(),
+                       { dst, zeroImm });
+
+        auto ucomiOp = is64 ? x86_64TargetInst::UCOMISD : x86_64TargetInst::UCOMISS;
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(ucomiOp),
+                       inst->getSourceRef(),
+                       { lhs, rhs });
+
+        x86_64TargetInst::OpCode setccOp = x86_64TargetInst::SETE;
+        switch (inst->getOpCode())
+        {
+            case MirInstructionOpCode::CMP_EQ:  setccOp = x86_64TargetInst::SETE; break;
+            case MirInstructionOpCode::CMP_NE:  setccOp = x86_64TargetInst::SETNE; break;
+            case MirInstructionOpCode::CMP_ULT: setccOp = x86_64TargetInst::SETB; break;
+            case MirInstructionOpCode::CMP_ULE: setccOp = x86_64TargetInst::SETBE; break;
+            case MirInstructionOpCode::CMP_UGT: setccOp = x86_64TargetInst::SETA; break;
+            case MirInstructionOpCode::CMP_UGE: setccOp = x86_64TargetInst::SETAE; break;
+            default: return false;
+        }
+        ib.buildTarget(x86_64TargetInst::getTargetDesc(setccOp),
+                       inst->getSourceRef(),
+                       { dst });
+        inst->eraseFromOwner();
+        return true;
+    }
+
     bool is64 = (lhs->getMirType() && lhs->getMirType()->getTotalSizeInBits() == 64);
     std::string_view gprClass = is64 ? "GPR64" : "GPR32";
 

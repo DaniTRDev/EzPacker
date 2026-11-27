@@ -2,6 +2,7 @@
 #define EZPACKER_CHIBICC_WRAPPER_H
 
 #include "EzCompilerCommon.h"
+#include "TargetTriple.h"
 #include <string_view>
 #include <string>
 #include <vector>
@@ -42,10 +43,21 @@ class ChibiccWrapper
     static std::string getBundledFreestandingIncludeDir();
 
     /**
-     * Resolves the disk path to the bundled ISO C11 hosted headers directory (include/c11std).
+     * Resolves the disk path to the bundled musl ISO C11 hosted headers directory (include/musl).
      * Returns empty string if not found on disk.
      */
     static std::string getBundledHostedIncludeDir();
+
+    /**
+     * Resolves the disk path to the bundled chibicc hosted compatibility overlay headers (include/musl-compat).
+     * Returns empty string if not found on disk.
+     */
+    static std::string getBundledHostedCompatIncludeDir();
+
+    /**
+     * Sets the target triple used to configure preprocessor platform/architecture macros.
+     */
+    void setTargetTriple(const TargetTriple &triple);
 
     /**
      * Sets whether the compiler environment is hosted (true) or freestanding (false).
@@ -86,6 +98,7 @@ class ChibiccWrapper
   private:
     std::vector<std::string> m_includePaths;
     std::vector<std::pair<std::string, std::string>> m_macros;
+    TargetTriple m_target{ TargetTriple::getHostTriple() };
     bool m_hosted{ false };
 };
 

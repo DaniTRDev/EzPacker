@@ -255,12 +255,12 @@ action SAR {
 // ============================================================================
 
 action CMP_EQ {
-    LEGAL(i32, i64, ptr);
+    LEGAL(i32, i64, ptr, f32, f64);
     WIDENS(i8, i16) >> i32;
 };
 
 action CMP_NE {
-    LEGAL(i32, i64, ptr);
+    LEGAL(i32, i64, ptr, f32, f64);
     WIDENS(i8, i16) >> i32;
 };
 
@@ -285,22 +285,22 @@ action CMP_SGE {
 };
 
 action CMP_ULT {
-    LEGAL(i32, i64, ptr);
+    LEGAL(i32, i64, ptr, f32, f64);
     WIDENS(i8, i16) >> i32;
 };
 
 action CMP_ULE {
-    LEGAL(i32, i64, ptr);
+    LEGAL(i32, i64, ptr, f32, f64);
     WIDENS(i8, i16) >> i32;
 };
 
 action CMP_UGT {
-    LEGAL(i32, i64, ptr);
+    LEGAL(i32, i64, ptr, f32, f64);
     WIDENS(i8, i16) >> i32;
 };
 
 action CMP_UGE {
-    LEGAL(i32, i64, ptr);
+    LEGAL(i32, i64, ptr, f32, f64);
     WIDENS(i8, i16) >> i32;
 };
 
