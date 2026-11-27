@@ -151,6 +151,7 @@ static long long win32_sys_read(int fd, void *buf, size_t count)
     init_fds();
     if (fd < 0 || fd >= EZ_MAX_FDS || !g_fds[fd].open) return -EBADF;
     if (count == 0) return 0;
+    if (!buf) return -EFAULT;
     unsigned long chunk = (count > 0x7fffffffULL) ? 0x7fffffffUL : (unsigned long)count;
     unsigned long read_bytes = 0;
     if (!ReadFile(g_fds[fd].handle, buf, chunk, &read_bytes, NULL)) {
@@ -166,6 +167,7 @@ static long long win32_sys_write(int fd, const void *buf, size_t count)
     init_fds();
     if (fd < 0 || fd >= EZ_MAX_FDS || !g_fds[fd].open) return -EBADF;
     if (count == 0) return 0;
+    if (!buf) return -EFAULT;
     if (g_fds[fd].flags & O_APPEND) {
         SetFilePointerEx(g_fds[fd].handle, 0, NULL, 2 /* FILE_END */);
     }
@@ -272,11 +274,11 @@ static long long win32_sys_fstat_handle(EZ_HANDLE h, struct kstat *kst)
     long long sec = 0;
     long nsec = 0;
     filetime_to_unix_nsec(info.ftLastAccessTime, &sec, &nsec);
-    kst->st_atime_sec = (long)sec; kst->st_atime_nsec = nsec;
+    kst->st_atime_sec = sec; kst->st_atime_nsec = nsec;
     filetime_to_unix_nsec(info.ftLastWriteTime, &sec, &nsec);
-    kst->st_mtime_sec = (long)sec; kst->st_mtime_nsec = nsec;
+    kst->st_mtime_sec = sec; kst->st_mtime_nsec = nsec;
     filetime_to_unix_nsec(info.ftCreationTime, &sec, &nsec);
-    kst->st_ctime_sec = (long)sec; kst->st_ctime_nsec = nsec;
+    kst->st_ctime_sec = sec; kst->st_ctime_nsec = nsec;
     return 0;
 }
 
@@ -298,11 +300,11 @@ static long long win32_sys_stat_path(const char *path, struct kstat *kst)
     long long sec = 0;
     long nsec = 0;
     filetime_to_unix_nsec(data.ftLastAccessTime, &sec, &nsec);
-    kst->st_atime_sec = (long)sec; kst->st_atime_nsec = nsec;
+    kst->st_atime_sec = sec; kst->st_atime_nsec = nsec;
     filetime_to_unix_nsec(data.ftLastWriteTime, &sec, &nsec);
-    kst->st_mtime_sec = (long)sec; kst->st_mtime_nsec = nsec;
+    kst->st_mtime_sec = sec; kst->st_mtime_nsec = nsec;
     filetime_to_unix_nsec(data.ftCreationTime, &sec, &nsec);
-    kst->st_ctime_sec = (long)sec; kst->st_ctime_nsec = nsec;
+    kst->st_ctime_sec = sec; kst->st_ctime_nsec = nsec;
     return 0;
 }
 
@@ -328,6 +330,8 @@ long long __ez_win32_syscall(long n,
     case SYS_readv: {
         const struct iovec *iov = (const struct iovec *)a2;
         int iovcnt = (int)a3;
+        if (iovcnt < 0) return -EINVAL;
+        if (iovcnt > 0 && !iov) return -EFAULT;
         long long total = 0;
         for (int i = 0; i < iovcnt; i++) {
             if (iov[i].iov_len == 0) continue;
@@ -342,6 +346,8 @@ long long __ez_win32_syscall(long n,
     case SYS_writev: {
         const struct iovec *iov = (const struct iovec *)a2;
         int iovcnt = (int)a3;
+        if (iovcnt < 0) return -EINVAL;
+        if (iovcnt > 0 && !iov) return -EFAULT;
         long long total = 0;
         for (int i = 0; i < iovcnt; i++) {
             if (iov[i].iov_len == 0) continue;
@@ -365,9 +371,12 @@ long long __ez_win32_syscall(long n,
     case SYS_lseek: {
         int fd = (int)a1;
         if (fd < 0 || fd >= EZ_MAX_FDS || !g_fds[fd].open) return -EBADF;
+        if (a3 < 0 || a3 > 2) return -EINVAL;
+        unsigned long ftype = GetFileType(g_fds[fd].handle);
+        if (ftype == EZ_FILE_TYPE_CHAR || ftype == EZ_FILE_TYPE_PIPE) return -ESPIPE;
         long long new_pos = 0;
         if (!SetFilePointerEx(g_fds[fd].handle, a2, &new_pos, (unsigned long)a3)) {
-            return -ESPIPE;
+            return -EINVAL;
         }
         return new_pos;
     }
@@ -455,6 +464,7 @@ long long __ez_win32_syscall(long n,
     case SYS_getcwd: {
         char *buf = (char *)a1;
         unsigned long len = (unsigned long)a2;
+        if (!buf || len == 0) return -EINVAL;
         unsigned long res = GetCurrentDirectoryA(len, buf);
         if (res == 0) return -ENOENT;
         if (res >= len) return -ERANGE;
@@ -478,7 +488,7 @@ long long __ez_win32_syscall(long n,
         } else {
             newfd = (int)a2;
             if (newfd < 0 || newfd >= EZ_MAX_FDS) return -EBADF;
-            if (newfd == oldfd) return newfd;
+            if (newfd == oldfd) return (n == SYS_dup3) ? -EINVAL : newfd;
             if (g_fds[newfd].open) win32_sys_close(newfd);
         }
         EZ_HANDLE dup_h = EZ_INVALID_HANDLE_VALUE;
@@ -502,7 +512,7 @@ long long __ez_win32_syscall(long n,
         if (!ts) return -EFAULT;
         if (clk == CLOCK_MONOTONIC) {
             long long freq = 1, cnt = 0;
-            QueryPerformanceFrequency(&freq);
+            if (!QueryPerformanceFrequency(&freq) || freq <= 0) freq = 1;
             QueryPerformanceCounter(&cnt);
             ts->tv_sec = (time_t)(cnt / freq);
             ts->tv_nsec = (long)(((cnt % freq) * 1000000000LL) / freq);
@@ -538,6 +548,7 @@ long long __ez_win32_syscall(long n,
             ? (const struct timespec *)a1
             : (const struct timespec *)a3;
         if (req) {
+            if (req->tv_sec < 0 || req->tv_nsec < 0 || req->tv_nsec >= 1000000000L) return -EINVAL;
             unsigned long ms = (unsigned long)(req->tv_sec * 1000LL + req->tv_nsec / 1000000L);
             Sleep(ms);
         }
@@ -559,6 +570,7 @@ long long __ez_win32_syscall(long n,
     case SYS_getrandom: {
         unsigned char *buf = (unsigned char *)a1;
         size_t len = (size_t)a2;
+        if (len > 0 && !buf) return -EFAULT;
         long long qpc = 0;
         QueryPerformanceCounter(&qpc);
         uint64_t s = (uint64_t)qpc ^ ((uint64_t)GetCurrentProcessId() << 32);
@@ -586,11 +598,13 @@ long long __ez_win32_syscall(long n,
 
     case SYS_tkill:
     case SYS_tgkill:
-    case SYS_kill:
-        if ((int)a2 == 6 /* SIGABRT */ || (int)a3 == 6) {
+    case SYS_kill: {
+        int sig = (n == SYS_tgkill) ? (int)a3 : (int)a2;
+        if (sig == 6 /* SIGABRT */) {
             ExitProcess(134);
         }
         return 0;
+    }
 
     default:
         return -ENOSYS;

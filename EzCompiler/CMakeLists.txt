@@ -41,15 +41,15 @@ EzCMK_AddExecutable(NAME "ezc"
         INCLUDED_DIRS "include;${CMAKE_SOURCE_DIR}/EzTargets/X86_64/Registration/include;${CMAKE_SOURCE_DIR}/EzTargets/RiscV64/Registration/include"
 )
 
+if (NOT DEFINED EZPACKER_TARGET_BIN_DIR OR EZPACKER_TARGET_BIN_DIR STREQUAL "")
+    set(EZPACKER_TARGET_BIN_DIR "${CMAKE_BINARY_DIR}/bin")
+endif ()
+
 target_compile_definitions(EzCompilerLib PRIVATE
     EZPACKER_FREESTANDING_INCLUDE_DIR="${CMAKE_SOURCE_DIR}/include/freestanding"
     EZPACKER_MUSL_INCLUDE_DIR="${EZPACKER_TARGET_BIN_DIR}/include/musl"
     EZPACKER_MUSL_COMPAT_INCLUDE_DIR="${CMAKE_SOURCE_DIR}/EzMusl/compat_include"
 )
-
-if (NOT DEFINED EZPACKER_TARGET_BIN_DIR OR EZPACKER_TARGET_BIN_DIR STREQUAL "")
-    set(EZPACKER_TARGET_BIN_DIR "${CMAKE_BINARY_DIR}/bin")
-endif ()
 
 file(MAKE_DIRECTORY "${EZPACKER_TARGET_BIN_DIR}/include/freestanding")
 file(COPY "${CMAKE_SOURCE_DIR}/include/freestanding/" DESTINATION "${EZPACKER_TARGET_BIN_DIR}/include/freestanding")

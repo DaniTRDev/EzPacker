@@ -95,8 +95,13 @@ static void parse_cmdline_and_env(int *out_argc, char ***out_argv)
 
     /* Stack layout expected by musl's __libc_start_main:
        argv[0..argc-1], NULL, envp[0..envc-1], NULL, auxv pairs..., AT_NULL, 0 */
-    size_t total_slots = (size_t)argc + 1 + (size_t)envc + 1 + 16;
+    size_t total_slots = (size_t)argc + 1 + (size_t)envc + 1 + 32;
     uintptr_t *vec = (uintptr_t *)HeapAlloc(heap, 8, total_slots * sizeof(uintptr_t));
+    if (!vec) {
+        *out_argc = 0;
+        *out_argv = NULL;
+        return;
+    }
 
     int idx = 0;
     for (int i = 0; i < argc; i++) {
