@@ -32,4 +32,7 @@ EzCMK_AddExecutable(NAME "ez-ld"
 )
 
 # Alias target so 'cmake --build . --target EzLinker' works seamlessly
+if (TARGET EzMusl)
+    add_dependencies(ez-ld EzMusl)
+endif ()
 add_custom_target(EzLinker DEPENDS ez-ld)
