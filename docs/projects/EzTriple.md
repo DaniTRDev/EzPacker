@@ -171,7 +171,7 @@ EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register 
 
 ```
       +--------------------------------------------------+
-      |        Build Interference Graph (m_iGraph)       |
+      |   Build Dense Interference Graph (m_adjBits)     |
       |   (Nodes = VRegs, Edges = Concurrent Liveness)   |
       +--------------------------------------------------+
                                 |
@@ -215,6 +215,8 @@ EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register 
 ```
 
 #### Working Context (`RegisterAllocatorCtx`)
+`RegisterAllocatorCtx` uses a deterministic dense-indexed interference graph (`m_idToReg`, `m_regToId`, `m_adjBits` backed by `DenseBitSet`, and `m_adjList`) paired with union-find coalescing (`m_leader`, `m_coalescedAway`), dense degree/status bitsets (`m_degree`, `m_removed`, `m_reservedDense`, `m_unspillableDense`), and cached per-class color limits (`m_classColorLimits`):
+
 ```cpp
 struct RegisterAllocatorCtx
 {
@@ -223,21 +225,28 @@ struct RegisterAllocatorCtx
     TargetDesc *m_targetDesc;
     std::pmr::memory_resource *m_allocator;
 
-    std::pmr::vector<MirRegisterRef> m_selectStack;
-    std::pmr::unordered_set<MirRegisterRef> m_removedNodes;
     std::pmr::unordered_set<MirRegisterRef> m_reservedRegs;
     std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_allocatedRegs;
-    std::pmr::unordered_map<MirRegisterRef, size_t> m_degree;
     std::pmr::unordered_map<MirRegisterRef, StackFrameObject *> m_spilledRegs;
-    std::pmr::unordered_map<MirRegisterRef, std::pmr::set<MirRegisterRef>> m_iGraph;
     std::pmr::unordered_set<MirRegisterRef> m_unspillableRegs;
     std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
     bool m_spillCostsValid{ false };
-
-    // Coalescing & affinity state
-    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_coalescedRegs;
-    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_affinity;
     bool m_coalescingEnabled{ true };
+
+    // Dense-indexed interference graph & per-iteration state
+    std::pmr::vector<MirRegisterRef> m_idToReg;
+    std::pmr::unordered_map<MirRegisterRef, uint32_t> m_regToId;
+    std::pmr::vector<DenseBitSet> m_adjBits;
+    std::pmr::vector<std::pmr::vector<uint32_t>> m_adjList;
+    std::pmr::vector<uint32_t> m_degree;
+    std::pmr::vector<uint32_t> m_leader;
+    DenseBitSet m_removed;
+    DenseBitSet m_coalescedAway;
+    DenseBitSet m_reservedDense;
+    DenseBitSet m_unspillableDense;
+    std::pmr::vector<uint32_t> m_selectStack;
+    std::pmr::vector<std::pmr::vector<uint32_t>> m_affinity;
+    std::pmr::vector<size_t> m_classColorLimits;
 };
 ```
 
@@ -265,7 +274,7 @@ protected:
 When coalescing is enabled (`m_coalescingEnabled = true`, active at `-O1`, `-O2`, `-Os`):
 1. **Conservative Coalescing Criteria**:
    - **George's Criterion (Virtual into Physical)**: Merges virtual register $u$ into physical register $v$ if every neighbor $t$ of $u$ either already interferes with $v$ or has low degree ($\text{deg}(t) < K$). Guarantees the physical node's simplification degree does not increase unsafely.
-   - **Briggs' Criterion (Virtual into Virtual)**: Merges non-interfering virtual registers $u$ and $v$ if the combined node has fewer than $K$ neighbors of significant degree ($\ge K$).
+   - **Briggs' Criterion (Virtual into Virtual)**: Merges non-interfering virtual registers $u$ and $v$ if the combined node has fewer than $K$ neighbors of significant degree ($\ge K$). Evaluated in linear-scan passes using zero-allocation `DenseBitSet::copyOr` bitwise unions and symmetric `m_adjBits`/`m_adjList` updates.
    - **Two-Address Constraint Preservation**: Automatically coalesces destination registers with first source operands (`m_coalesceSrc`) for destructive operations (e.g. x86-64 ALU instructions).
 2. **Affinity-Biased Color Selection (`selectColors`)**:
    - Records affinity preferences between copy-related register pairs in `m_affinity`.

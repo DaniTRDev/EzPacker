@@ -78,9 +78,8 @@ TEST_F(MirRegisterCoalescerTest, TestCoalesceVirtualToVirtual)
     EXPECT_TRUE(buildOk);
 
     // v0 and v1 do not interfere (v0 dies at the copy into v1)
-    auto it0 = regCtx.m_iGraph.find(v0->getRef());
-    ASSERT_NE(it0, regCtx.m_iGraph.end());
-    EXPECT_FALSE(it0->second.contains(v1->getRef()));
+    ASSERT_TRUE(regCtx.hasNode(v0->getRef()));
+    EXPECT_FALSE(regCtx.hasEdge(v0->getRef(), v1->getRef()));
 
     bool coalesced = allocator->coalesce(&regCtx);
     EXPECT_TRUE(coalesced);
@@ -226,9 +225,8 @@ TEST_F(MirRegisterCoalescerTest, TestInterferingRegistersNotCoalesced)
     EXPECT_TRUE(allocator->buildInterferenceGraph(livenessResult, &regCtx));
 
     // v0 and v2 must interfere because v0 is live-out of the MOV v2, v0 instruction
-    auto itV0 = regCtx.m_iGraph.find(v0->getRef());
-    ASSERT_NE(itV0, regCtx.m_iGraph.end());
-    EXPECT_TRUE(itV0->second.contains(v2->getRef()));
+    ASSERT_TRUE(regCtx.hasNode(v0->getRef()));
+    EXPECT_TRUE(regCtx.hasEdge(v0->getRef(), v2->getRef()));
 
     // Coalesce cannot merge v0 and v2
     allocator->coalesce(&regCtx);
@@ -316,17 +314,16 @@ TEST_F(MirRegisterCoalescerTest, TestAffinityBiasing)
     ASSERT_NE(allocator, nullptr);
 
     // Add both to interference graph without interfering with each other
-    regCtx.m_iGraph[v0->getRef()];
-    regCtx.m_iGraph[v1->getRef()];
+    uint32_t id0 = regCtx.getOrAddNode(v0->getRef());
+    uint32_t id1 = regCtx.getOrAddNode(v1->getRef());
 
     // Establish affinity between v0 and v1
-    regCtx.m_affinity[v0->getRef()].push_back(v1->getRef());
-    regCtx.m_affinity[v1->getRef()].push_back(v0->getRef());
+    regCtx.addAffinity(v0->getRef(), v1->getRef());
 
     // Push both onto select stack
     allocator->evaluateInterferenceGraphDegree(&regCtx);
-    regCtx.m_selectStack.push_back(v0->getRef());
-    regCtx.m_selectStack.push_back(v1->getRef());
+    regCtx.m_selectStack.push_back(id0);
+    regCtx.m_selectStack.push_back(id1);
 
     // Select colors
     EXPECT_TRUE(allocator->selectColors(&regCtx));
@@ -449,4 +446,111 @@ TEST_F(MirRegisterCoalescerTest, TestRegisterAllocatorPassWithCoalescing)
         instCount++;
     }
     EXPECT_EQ(instCount, 4);
+}
+
+// ============================================================================
+// 8. Adversarial Edge-Case Tests (Cascading Coalesce Symmetry & Unspillable)
+// ============================================================================
+
+TEST_F(MirRegisterCoalescerTest, TestCascadingCoalesceWithoutRestartMaintainsSymmetry)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("cascading_coalesce", typeTable->i64());
+    auto *entry = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+    auto *gpr = getTargetDesc()->getGprClass();
+
+    auto *v0 = ob.buildVReg(typeTable->i64(), "v0", nullptr, gpr);
+    auto *v1 = ob.buildVReg(typeTable->i64(), "v1", nullptr, gpr);
+    auto *v2 = ob.buildVReg(typeTable->i64(), "v2", nullptr, gpr);
+    auto *v3 = ob.buildVReg(typeTable->i64(), "v3", nullptr, gpr);
+    auto *x0 = ob.buildVReg(typeTable->i64(), "x0", nullptr, gpr);
+    auto *x1 = ob.buildVReg(typeTable->i64(), "x1", nullptr, gpr);
+    auto *imm1 = ob.buildInt(typeTable->i64(), FlexInt(1));
+
+    // x0 is live across v0; x1 is live across v3; chain v0 -> v1 -> v2 -> v3
+    ib.MOV(x0, imm1);
+    ib.MOV(x1, imm1);
+    ib.MOV(v0, imm1);
+    ib.ADD(v0, v0, x0);
+    ib.MOV(v1, v0);
+    ib.MOV(v2, v1);
+    ib.MOV(v3, v2);
+    ib.ADD(v3, v3, x1);
+    ib.RET(v3);
+
+    MirPassManager passManager(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    passManager.addPass<CodeFlowAnalysisPass>(ctx);
+    passManager.addPass<LivenessAnalysisPass>(ctx);
+    auto *livenessResult = passManager.getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    RegisterAllocatorCtx regCtx(ctx, func, getTargetDesc(), ctx->getGlobalAllocator());
+    auto *allocator = getTargetDesc()->getRegisterAllocator();
+    ASSERT_TRUE(allocator->buildInterferenceGraph(livenessResult, &regCtx));
+    EXPECT_TRUE(allocator->coalesce(&regCtx));
+
+    MirRegisterRef leader = regCtx.getCoalescedLeader(v0->getRef());
+    EXPECT_EQ(regCtx.getCoalescedLeader(v1->getRef()), leader);
+    EXPECT_EQ(regCtx.getCoalescedLeader(v2->getRef()), leader);
+    EXPECT_EQ(regCtx.getCoalescedLeader(v3->getRef()), leader);
+
+    // Verify graph symmetry, zero self-loops, and exact adjBits <-> adjList consistency
+    for (uint32_t id = 0; id < regCtx.m_idToReg.size(); ++id)
+    {
+        EXPECT_FALSE(regCtx.m_adjBits[id].test(id)) << "Self-edge detected on node " << id;
+        EXPECT_EQ(regCtx.m_adjList[id].size(), regCtx.m_adjBits[id].count())
+                << "Duplicate or missing neighbor in adjList for node " << id;
+        if (regCtx.m_coalescedAway.test(id))
+        {
+            EXPECT_TRUE(regCtx.m_adjList[id].empty());
+            EXPECT_EQ(regCtx.m_adjBits[id].count(), 0U);
+        }
+        for (uint32_t nb : regCtx.m_adjList[id])
+        {
+            EXPECT_TRUE(regCtx.m_adjBits[id].test(nb));
+            EXPECT_TRUE(regCtx.m_adjBits[nb].test(id));
+            EXPECT_FALSE(regCtx.m_coalescedAway.test(nb));
+        }
+    }
+}
+
+TEST_F(MirRegisterCoalescerTest, TestCoalesceTransfersUnspillableFlag)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("coalesce_unspillable", typeTable->i64());
+    auto *entry = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+    auto *gpr = getTargetDesc()->getGprClass();
+
+    auto *v0 = ob.buildVReg(typeTable->i64(), "v0", nullptr, gpr);
+    auto *v1 = ob.buildVReg(typeTable->i64(), "v1", nullptr, gpr);
+    auto *imm = ob.buildInt(typeTable->i64(), FlexInt(5));
+
+    ib.MOV(v0, imm);
+    ib.MOV(v1, v0);
+    ib.RET(v1);
+
+    MirPassManager passManager(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    passManager.addPass<CodeFlowAnalysisPass>(ctx);
+    passManager.addPass<LivenessAnalysisPass>(ctx);
+    auto *livenessResult = passManager.getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    RegisterAllocatorCtx regCtx(ctx, func, getTargetDesc(), ctx->getGlobalAllocator());
+    regCtx.m_unspillableRegs.insert(v1->getRef());
+
+    auto *allocator = getTargetDesc()->getRegisterAllocator();
+    ASSERT_TRUE(allocator->buildInterferenceGraph(livenessResult, &regCtx));
+    EXPECT_TRUE(allocator->coalesce(&regCtx));
+
+    MirRegisterRef leader = regCtx.getCoalescedLeader(v1->getRef());
+    uint32_t leaderId = regCtx.findNode(leader);
+    ASSERT_NE(leaderId, RegisterAllocatorCtx::InvalidNode);
+    EXPECT_TRUE(regCtx.m_unspillableDense.test(leaderId));
+    EXPECT_TRUE(regCtx.m_unspillableRegs.contains(leader));
 }

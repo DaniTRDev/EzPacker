@@ -86,13 +86,11 @@ TEST_F(MirRegisterAllocatorTest, TestInterferenceGraphNonOverlapping)
     EXPECT_TRUE(buildOk);
 
     // v0 and v1 must NOT interfere
-    auto it0 = regCtx.m_iGraph.find(v0->getRef());
-    ASSERT_NE(it0, regCtx.m_iGraph.end());
-    EXPECT_FALSE(it0->second.contains(v1->getRef()));
+    ASSERT_TRUE(regCtx.hasNode(v0->getRef()));
+    EXPECT_FALSE(regCtx.hasEdge(v0->getRef(), v1->getRef()));
 
-    auto it1 = regCtx.m_iGraph.find(v1->getRef());
-    ASSERT_NE(it1, regCtx.m_iGraph.end());
-    EXPECT_FALSE(it1->second.contains(v0->getRef()));
+    ASSERT_TRUE(regCtx.hasNode(v1->getRef()));
+    EXPECT_FALSE(regCtx.hasEdge(v1->getRef(), v0->getRef()));
 }
 
 // Verifies simultaneously live virtual registers interfere symmetrically.
@@ -139,13 +137,11 @@ TEST_F(MirRegisterAllocatorTest, TestInterferenceGraphOverlapping)
     EXPECT_TRUE(buildOk);
 
     // v0 and v1 MUST interfere with each other symmetrically
-    auto it0 = regCtx.m_iGraph.find(v0->getRef());
-    ASSERT_NE(it0, regCtx.m_iGraph.end());
-    EXPECT_TRUE(it0->second.contains(v1->getRef()));
+    ASSERT_TRUE(regCtx.hasNode(v0->getRef()));
+    EXPECT_TRUE(regCtx.hasEdge(v0->getRef(), v1->getRef()));
 
-    auto it1 = regCtx.m_iGraph.find(v1->getRef());
-    ASSERT_NE(it1, regCtx.m_iGraph.end());
-    EXPECT_TRUE(it1->second.contains(v0->getRef()));
+    ASSERT_TRUE(regCtx.hasNode(v1->getRef()));
+    EXPECT_TRUE(regCtx.hasEdge(v1->getRef(), v0->getRef()));
 }
 
 // ============================================================================
@@ -185,8 +181,8 @@ TEST_F(MirRegisterAllocatorTest, TestDegreeEvaluationAndReservedRegs)
     allocator->evaluateInterferenceGraphDegree(&regCtx);
 
     // Virtual registers have degree equal to their neighbor count
-    EXPECT_EQ(regCtx.m_degree[v0->getRef()], regCtx.m_iGraph[v0->getRef()].size());
-    EXPECT_EQ(regCtx.m_degree[v1->getRef()], regCtx.m_iGraph[v1->getRef()].size());
+    EXPECT_EQ(regCtx.getDegree(v0->getRef()), regCtx.getNeighborCount(v0->getRef()));
+    EXPECT_EQ(regCtx.getDegree(v1->getRef()), regCtx.getNeighborCount(v1->getRef()));
 
     // Frame pointer must be marked reserved
     auto *cc = getTargetDesc()->getMockCallingConv();
@@ -506,4 +502,132 @@ TEST_F(MirRegisterAllocatorTest, TestRegisterAllocatorPassEndToEnd)
             }
         }
     }
+}
+
+// ============================================================================
+// 8. Adversarial Edge-Case Tests (DenseBitSet PMR, Empty/Unreachable/Self-Loop, 2-Addr)
+// ============================================================================
+
+TEST_F(MirRegisterAllocatorTest, TestDenseBitSetWordBoundariesAndPmr)
+{
+    std::byte buf[4096];
+    std::pmr::monotonic_buffer_resource arena(buf, sizeof(buf), std::pmr::null_memory_resource());
+    std::pmr::vector<DenseBitSet> vec(&arena);
+    vec.emplace_back(130);
+    vec.emplace_back(64);
+
+    // Word boundary bits: 0, 63, 64, 65, 127, 128
+    vec[0].set(0);
+    vec[0].set(63);
+    vec[0].set(64);
+    vec[0].set(128);
+    EXPECT_EQ(vec[0].count(), 4U);
+
+    vec[1].set(63);
+    vec[1].set(65); // Out of bounds for 64-bit capacity -> ignored
+    EXPECT_EQ(vec[1].count(), 1U);
+
+    vec[0].clearBit(63);
+    EXPECT_FALSE(vec[0].test(63));
+    EXPECT_EQ(vec[0].count(), 3U);
+
+    // Self-aliased copyOr where dst grows to match b
+    DenseBitSet b(130, &arena);
+    b.set(65);
+    b.set(127);
+    vec[1].copyOr(vec[1], b);
+    EXPECT_TRUE(vec[1].test(63));
+    EXPECT_TRUE(vec[1].test(65));
+    EXPECT_TRUE(vec[1].test(127));
+
+    std::vector<size_t> collected;
+    vec[1].forEachSetBit([&](size_t bit) { collected.push_back(bit); });
+    ASSERT_EQ(collected.size(), 3U);
+    EXPECT_EQ(collected[0], 63U);
+    EXPECT_EQ(collected[1], 65U);
+    EXPECT_EQ(collected[2], 127U);
+
+    // Shrinking resize and reset
+    vec[1].resize(64);
+    EXPECT_FALSE(vec[1].test(65));
+    vec[1].reset();
+    EXPECT_EQ(vec[1].count(), 0U);
+}
+
+TEST_F(MirRegisterAllocatorTest, TestEmptyFunctionAndUnreachableSelfLoop)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+
+    // 1. Empty entry block function
+    auto *emptyFunc = createTestFunction("empty_func", typeTable->_void());
+    MirPassManager pm1(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    pm1.addPass<CodeFlowAnalysisPass>(ctx);
+    pm1.addPass<LivenessAnalysisPass>(ctx);
+    auto *allocPass1 = pm1.addPass<MirRegisterAllocatorPass>(ctx, getTargetDesc(), true);
+    MirPassResult res1 = pm1.runPass(allocPass1, ctx);
+    EXPECT_TRUE(res1.m_succeeded);
+
+    // 2. Function with unreachable self-loop block
+    auto *loopFunc = createTestFunction("unreachable_loop", typeTable->i32());
+    auto *entry = loopFunc->getEntryPoint();
+    auto *deadLoop = MirBlockBuilder(ctx, loopFunc).build(nullptr, "dead_loop");
+
+    MirOperandBuilder ob(ctx);
+    auto *gpr = getTargetDesc()->getGprClass();
+    auto *v0 = ob.buildVReg(typeTable->i32(), "v0", nullptr, gpr);
+    auto *vDead = ob.buildVReg(typeTable->i32(), "vDead", nullptr, gpr);
+    auto *imm1 = ob.buildInt(typeTable->i32(), FlexInt(1));
+
+    MirInstructionBuilder ibEntry(ctx, entry, InsertionType::Append);
+    ibEntry.MOV(v0, imm1);
+    ibEntry.RET(v0);
+
+    MirInstructionBuilder ibDead(ctx, deadLoop, InsertionType::Append);
+    ibDead.MOV(vDead, imm1);
+    ibDead.ADD(vDead, vDead, imm1);
+    ibDead.JMP(ob.buildRef(deadLoop));
+
+    MirPassManager pm2(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    pm2.addPass<CodeFlowAnalysisPass>(ctx);
+    pm2.addPass<LivenessAnalysisPass>(ctx);
+    auto *allocPass2 = pm2.addPass<MirRegisterAllocatorPass>(ctx, getTargetDesc(), true);
+    MirPassResult res2 = pm2.runPass(allocPass2, ctx);
+    EXPECT_TRUE(res2.m_succeeded);
+}
+
+TEST_F(MirRegisterAllocatorTest, TestTwoAddressOperandIdx2Interference)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("two_addr_idx2", typeTable->i64());
+    auto *entry = func->getEntryPoint();
+
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+    auto *gpr = getTargetDesc()->getGprClass();
+
+    auto *v0 = ob.buildVReg(typeTable->i64(), "v0", nullptr, gpr);
+    auto *v1 = ob.buildVReg(typeTable->i64(), "v1", nullptr, gpr);
+    auto *vDst = ob.buildVReg(typeTable->i64(), "vDst", nullptr, gpr);
+    auto *imm = ob.buildInt(typeTable->i64(), FlexInt(7));
+
+    ib.MOV(v0, imm);
+    ib.MOV(v1, imm);
+    // vDst = v0 + v1 (v1 is operand index 2; must interfere with vDst even if v1 dies here)
+    ib.ADD(vDst, v0, v1);
+    ib.RET(vDst);
+
+    MirPassManager passManager(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    passManager.addPass<CodeFlowAnalysisPass>(ctx);
+    passManager.addPass<LivenessAnalysisPass>(ctx);
+    auto *livenessResult = passManager.getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    RegisterAllocatorCtx regCtx(ctx, func, getTargetDesc(), ctx->getGlobalAllocator());
+    auto *allocator = getTargetDesc()->getRegisterAllocator();
+    ASSERT_TRUE(allocator->buildInterferenceGraph(livenessResult, &regCtx));
+
+    // vDst must interfere symmetrically with v1 (operand index 2)
+    EXPECT_TRUE(regCtx.hasEdge(vDst->getRef(), v1->getRef()));
+    EXPECT_TRUE(regCtx.hasEdge(v1->getRef(), vDst->getRef()));
 }

@@ -65,13 +65,7 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
         iterationCount++;
 
         // Reset per-iteration allocation state (preserve m_spilledRegs and m_unspillableRegs across iterations)
-        ctx->m_selectStack.clear();
-        ctx->m_removedNodes.clear();
-        ctx->m_allocatedRegs.clear();
-        ctx->m_degree.clear();
-        ctx->m_iGraph.clear();
-        ctx->m_coalescedRegs.clear();
-        ctx->m_affinity.clear();
+        ctx->resetIterationState();
 
         LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
         LivenessResult *result = livenessAnalysis->getResult();
