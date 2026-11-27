@@ -79,9 +79,38 @@ This document tracks the end-to-end compilation throughput, memory footprint (pe
 
 ---
 
-## 5. Identified Baseline Bottlenecks
+## 5. Post-Optimization Results (Milestones 1–4)
 
-1. **`MirRegisterAllocatorPass` ($O(\text{BB}^3)$ / $O(\text{VReg}^2)$)**: `std::pmr::unordered_map<MirRegisterRef, std::pmr::set<MirRegisterRef>>` interference graph + `coalesce()` restarting from candidate 0 on every merge (`break;`) + per-candidate `unordered_set` allocations in Briggs checks.
-2. **Monotonic Arena Retention (331–704 MB RSS)**: `RegisterAllocatorCtx` and `LivenessAnalysisPass::computeGlobalLiveness()` allocate temporary structures into `MirBuilderContext::getGlobalAllocator()` (`monotonic_buffer_resource`), retaining dead graph/liveness allocations across spill iterations.
-3. **Module-Wide Liveness/CFG Invalidation**: `MirRegisterAllocatorPass::run()` calls `passManager->invalidateAnalysis()` on every spill iteration, forcing `CodeFlowAnalysisPass` and `LivenessAnalysisPass` to recompute across all 148 functions.
-4. **Eager Spill-Cost Scan & `-O0` Copy Churn**: `simplify()` eagerly computes spill costs even when zero spills occur, and `-O0` skips lightweight `MOV` affinity hints.
+Following the 4 optimization milestones (dense-indexed interference graph & linear-scan coalescing, split persistent/iteration-scoped PMR scratch arenas, per-function liveness recomputation, and lazy spill-cost evaluation):
+
+### Before vs After: Real Corpus (`x86_64-linux-gnu` & `riscv64-unknown-linux-gnu`)
+| Input (LOC) | Target | Opt | Before Med (ms) | After Med (ms) | Speedup | After KLOC/s | Before RSS (KB) | After RSS (KB) |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `examples/mega_stress.c` (3,623) | `x86_64` | `-O0` | 1,065.54 | **873.28** | **1.22x** | 4.15 | 319,836 | **213,928** (-33.1%) |
+| `examples/mega_stress.c` (3,623) | `x86_64` | `-O2` | 1,315.87 | **919.09** | **1.43x** | 3.94 | 331,744 | **221,012** (-33.4%) |
+| `examples/09_freestanding_kernel.c` (82) | `x86_64` | `-O2` | 9.14 | **8.56** | 1.07x | 9.58 | 10,484 | 9,716 |
+| `examples/c_kernel_queue.c` (107) | `x86_64` | `-O2` | 11.03 | **10.04** | 1.10x | 10.65 | 11,012 | 9,988 |
+| `examples/branch_control_flow.mir` (66) | `riscv64` | `-O2` | 9.55 | **9.28** | 1.03x | 7.12 | 9,564 | 8,712 |
+| `examples/exception_handling.mir` (68) | `riscv64` | `-O2` | 18.04 | **10.21** | **1.77x** | 6.66 | 9,516 | 9,064 |
+
+On `examples/mega_stress.c -O2` (`--time-passes`), `MirRegisterAllocatorPass` total time dropped from `1,036.11 ms` to **`635.81 ms`** (**1.63x**), and max single-function RA time dropped from `73.28 ms` to **`6.36 ms`** (**11.5x**).
+
+### Before vs After: Synthetic Scaling (`-O2`)
+| Stress Workload | Before Wall (ms) | After Wall (ms) | Speedup | Before RSS (KB) | After RSS (KB) | Memory Reduction |
+|---|---:|---:|---:|---:|---:|---:|
+| `synth_vreg_200.c` (200 vars, 1 BB) | 13,908.45 | **36.15** | **384.7x** | 704,096 | **14,112** | **49.9x** |
+| `synth_vreg_800.c` (800 vars, 1 BB) | *(infeasible)* | **188.12** | — | — | **35,060** | — |
+| `synth_bb_150.c` (150 BBs) | 17,283.53 | **238.22** | **72.5x** | 160,464 | **109,404** | 1.47x |
+| `synth_bb_600.c` (600 BBs) | *(>1,000s proj.)* | **4,045.33** | — | — | 1,510,540 | — |
+
+- **Empirical `-O2` Scaling Exponents ($\alpha$)**:
+  - Virtual register pressure (`25..200`): **$O(N^{2.05}) \to O(N^{0.72})$** (near-linear up to 800 vars at $\alpha = 0.87$).
+  - Basic block count (`25..150`): **$O(N^{2.91}) \to O(N^{1.54})$**.
+
+---
+
+## 6. Remaining Optimization Roadmap
+
+1. **Fast `-O0` Linear-Scan Register Allocator**: On `mega_stress.c -O0` (148 functions), Chaitin-Briggs graph coloring still accounts for `683.48 ms` (~4.6 ms/function). Adding a dedicated `-O0` linear-scan allocator would bring `-O0` throughput closer to `gcc -O0` (31.29 KLOC/s) and `chibicc` (7–15 KLOC/s).
+2. **Sparse Liveness & Per-Function `MirPassManager` Scoping**: `synth_bb_600` still exhibits $O(\text{BB}^{1.66})$ in `LivenessAnalysisPass` and $O(\text{BB}^{2.08})$ in RA; `CodeFlowAnalysisPass` + `LivenessAnalysisPass` still consume `150.5 ms` combined on `mega_stress.c -O2`. Replacing dense `m_adjBits` matrix allocation in large-BB functions with sparse bitvectors/adjacency lists and caching `LivenessResult` directly as `DenseBitSet` would further cut both wall time and RSS.
+3. **Frontend & `.text` Size**: `ezc -O2` `.text` (`27,766 B` on `mega_stress.c`) remains 2.81x larger than `gcc -O2` (`9,863 B`); middle-end dead-code elimination, constant folding, and GVN/CSE passes would close the code-size gap.
