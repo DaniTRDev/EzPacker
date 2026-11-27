@@ -63,6 +63,12 @@ class LivenessAnalysisPass : public IMirAnalysisPass
                       class MirPassManager *passManager) override;
 
     /**
+     * Recomputes liveness for a single function in-place using an already-valid CFG,
+     * clearing any prior per-block liveness entries for that function first.
+     */
+    bool recomputeForFunction(class MirFunction *func, class CodeFlowResult *cfg);
+
+    /**
      * Formats and prints def/use and live-in/live-out sets to diagnostics.
      */
     void printResult() override;
@@ -78,7 +84,7 @@ class LivenessAnalysisPass : public IMirAnalysisPass
      * LiveIn[B] = Use[B] U (LiveOut[B] - Def[B])
      * LiveOut[B] = U { LiveIn[S] for S in Successors(B) }
      */
-    void computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
+    bool computeGlobalLiveness(class MirFunction *func, class CodeFlowResult *cfg);
 
   private:
     LivenessResult m_result;            // Accumulated liveness sets for every function, keyed by global block ID.

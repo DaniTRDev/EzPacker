@@ -199,6 +199,7 @@ EzMir passes operate on `MirFunction` instances and are orchestrated by `MirPass
   ```
 - Computes linear **Live Intervals** $[start, end]$ for every virtual and physical register.
 - Surfaces the `LivenessResult` structure directly consumed by `MirRegisterAllocator` (stored in `m_arena`), while all temporary per-function bitsets, universe tables, and flattened CFG indices in `computeGlobalLiveness()` are allocated inside a function-scoped `std::pmr::monotonic_buffer_resource` scratch arena and reclaimed upon return.
+- Materializes `m_liveIn` and `m_liveOut` sparsely using `DenseBitSet::forEachSetBit`, and exposes `recomputeForFunction(MirFunction *, CodeFlowResult *)` to clear and recompute a single function's liveness in-place without invalidating module-wide CFG or other functions' analyses.
 
 ### 3.5 `MirPeepholePass` (`MirPasses/Passes/MirPeepholePass.h`)
 Generic SSA-level transformation pass (`IMirTransformPass`) active during optimization stages (`-O1`, `-O2`, `-Os`). Iterates over basic blocks and instructions until a fixed point is reached or the iteration budget is exhausted:

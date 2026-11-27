@@ -704,3 +704,62 @@ TEST_F(MirRegisterAllocatorTest, TestMultiIterationSpillingAndContextLifetime)
         }
     }
 }
+
+TEST_F(MirRegisterAllocatorTest, TestRecomputeForFunctionPreservesOtherFunctionLiveness)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+
+    auto *funcA = createTestFunction("func_a_spill", typeTable->i64());
+    auto *funcB = createTestFunction("func_b_other", typeTable->i64());
+
+    auto *alloc = ctx->getGlobalAllocator();
+    std::pmr::polymorphic_allocator<> pAlloc(alloc);
+    auto *tinyBank = pAlloc.new_object<MirRegisterBank>("TinyBankMultiFunc", alloc);
+    auto *tinyClass = pAlloc.new_object<MirRegisterClass>("Tiny2_MultiFunc", tinyBank, alloc);
+    tinyBank->addClass("Tiny2_MultiFunc", tinyClass);
+    tinyClass->addRegister("k0", 64, 0, {});
+    tinyClass->addRegister("k1", 64, 0, {});
+
+    MirOperandBuilder ob(ctx);
+    auto *imm1 = ob.buildInt(typeTable->i64(), FlexInt(1));
+
+    // Populate funcA
+    {
+        auto *entryA = funcA->getEntryPoint();
+        MirInstructionBuilder ib(ctx, entryA, InsertionType::Append);
+        auto *v0 = ob.buildVReg(typeTable->i64(), "a0", nullptr, tinyClass);
+        auto *v1 = ob.buildVReg(typeTable->i64(), "a1", nullptr, tinyClass);
+        ib.MOV(v0, imm1);
+        ib.ADD(v1, v0, imm1);
+        ib.RET(v1);
+    }
+
+    // Populate funcB
+    MirRegister *b0 = nullptr;
+    {
+        auto *entryB = funcB->getEntryPoint();
+        MirInstructionBuilder ib(ctx, entryB, InsertionType::Append);
+        b0 = ob.buildVReg(typeTable->i64(), "b0", nullptr, tinyClass);
+        ib.MOV(b0, imm1);
+        ib.RET(b0);
+    }
+
+    MirPassManager passManager(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    passManager.addPass<CodeFlowAnalysisPass>(ctx);
+    auto *livenessPass = passManager.addPass<LivenessAnalysisPass>(ctx);
+    CodeFlowResult *cfg = passManager.getAnalysis<CodeFlowAnalysisPass>(ctx)->getResult();
+    LivenessResult *livenessRes = passManager.getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    size_t entryBId = funcB->getEntryPoint()->getId();
+    ASSERT_TRUE(livenessRes->m_def[entryBId].contains(b0->getRef()));
+
+    // Recomputing liveness for funcA must preserve funcB's liveness entries
+    EXPECT_TRUE(livenessPass->recomputeForFunction(funcA, cfg));
+    EXPECT_TRUE(livenessRes->m_def[entryBId].contains(b0->getRef()));
+
+    // Full MirRegisterAllocatorPass run on module with passManager
+    auto *allocPass = passManager.addPass<MirRegisterAllocatorPass>(ctx, getTargetDesc(), true);
+    MirPassResult res = passManager.runPass(allocPass, ctx);
+    EXPECT_TRUE(res.m_succeeded);
+}

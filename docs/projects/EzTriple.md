@@ -210,9 +210,12 @@ EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register 
               v [Success]                       v [Spill Occurred]
      +-------------------+            +--------------------+
      |   RewriteColors   |            | Insert Spills/     |
-     | (VRegs -> PRegs)  |            | Reloads & Repeat   |
-     +-------------------+            +--------------------+
+     | (VRegs -> PRegs)  |            | Reloads & Recompute|
+     +-------------------+            | Function Liveness  |
+                                      +--------------------+
 ```
+
+On intermediate spill iterations, `MirRegisterAllocatorPass::run()` invokes `LivenessAnalysisPass::recomputeForFunction(func, cfgResult)` using the cached `CodeFlowResult` (since spill rewriting does not alter CFG edges), avoiding module-wide CFG/liveness invalidation until the function's allocation completes.
 
 #### Working Context (`RegisterAllocatorCtx`)
 `RegisterAllocatorCtx` separates persistent cross-iteration state (`m_persistentAlloc`: `m_spilledRegs`, `m_unspillableRegs`, `m_reservedRegs`, `m_allocatedRegs`) from ephemeral per-iteration state (`ScratchState` on `m_scratchAlloc`: `m_idToReg`, `m_regToId`, `m_adjBits` backed by `DenseBitSet`, `m_adjList`, `m_leader`, `m_coalescedAway`, `m_degree`, `m_removed`, `m_reservedDense`, `m_unspillableDense`, `m_selectStack`, `m_affinity`, `m_classColorLimits`, `m_spillCosts`). `MirRegisterAllocatorPass::run()` creates an iteration-scoped `std::pmr::monotonic_buffer_resource` per spill iteration (`beginIteration` / `endIteration`), reclaiming 100% of scratch memory after each iteration while keeping `m_contexts[func]` valid:

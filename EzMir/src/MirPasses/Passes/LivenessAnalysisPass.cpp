@@ -96,16 +96,28 @@ MirPassResult LivenessAnalysisPass::run(IntrusiveLinkedList<MirFunction>::const_
 }
 
 /**
- * Solves the backward liveness dataflow equations: assigns dense indices to blocks, computes
- * block-local def/use (upward-exposed uses), builds a global register universe, runs a fixed-point
- * iteration over the CFG using DenseBitSets, then materializes the resulting live-in/live-out sets.
+ * Recomputes liveness for a single function in-place using an already-valid CFG.
  */
-void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResult *cfg)
+bool LivenessAnalysisPass::recomputeForFunction(MirFunction *func, CodeFlowResult *cfg)
 {
+    return computeGlobalLiveness(func, cfg);
+}
+
+/**
+ * Solves the backward liveness dataflow equations: clears any prior entries for func, assigns
+ * dense indices to blocks, computes block-local def/use (upward-exposed uses), builds a global
+ * register universe, runs a fixed-point iteration over the CFG using DenseBitSets, then
+ * materializes the resulting live-in/live-out sets via forEachSetBit.
+ */
+bool LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResult *cfg)
+{
+    if (!func || !cfg)
+        return false;
+
     const auto &blocks = func->getBlocks();
     const size_t numBlocks = blocks.size();
     if (numBlocks == 0)
-        return;
+        return true;
 
     // Function-scoped scratch arena for all ephemeral bitsets, maps, and CFG indices;
     // m_result (m_def, m_use, m_liveIn, m_liveOut) remains in m_arena.
@@ -114,7 +126,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
             scratchBuf.data(), scratchBuf.size(), std::pmr::new_delete_resource());
 
     // -------------------------------------------------------------------------
-    // 1. Assign Contiguous [0, numBlocks) Indices to Basic Blocks
+    // 1. Assign Contiguous [0, numBlocks) Indices to Basic Blocks & Clear Prior Results
     // -------------------------------------------------------------------------
     std::pmr::vector<const MirBlock *> blockList(&scratchArena);
     blockList.reserve(numBlocks);
@@ -125,13 +137,14 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     for (const MirBlock *block : blocks)
     {
         blockList.push_back(block);
-        blockIdToDenseIdx.emplace(block->getId(), bIdx++);
-
         MirId bId = block->getId();
-        m_result.m_def.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
-        m_result.m_use.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
-        m_result.m_liveIn.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
-        m_result.m_liveOut.emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena));
+        blockIdToDenseIdx.emplace(bId, bIdx++);
+
+        // Clear any stale entries from previous spill iterations before any early return.
+        m_result.m_def.try_emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena)).first->second.clear();
+        m_result.m_use.try_emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena)).first->second.clear();
+        m_result.m_liveIn.try_emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena)).first->second.clear();
+        m_result.m_liveOut.try_emplace(bId, std::pmr::unordered_set<MirRegisterRef>(m_arena)).first->second.clear();
     }
 
     const auto *regInfo = func->getRegisterInfo();
@@ -224,7 +237,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
 
     const size_t numGlobalBits = globalRegUniverse.size();
     if (numGlobalBits == 0)
-        return;
+        return true;
 
     // -------------------------------------------------------------------------
     // 4. Populate Compact Global Def/Use BitSets
@@ -319,14 +332,11 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
         const auto &inBits = globalLiveInBits[i];
         const auto &outBits = globalLiveOutBits[i];
 
-        for (size_t bit = 0; bit < numGlobalBits; ++bit)
-        {
-            if (inBits.test(bit))
-                inSet.insert(globalRegUniverse[bit]);
-            if (outBits.test(bit))
-                outSet.insert(globalRegUniverse[bit]);
-        }
+        inBits.forEachSetBit([&](size_t bit) { inSet.insert(globalRegUniverse[bit]); });
+        outBits.forEachSetBit([&](size_t bit) { outSet.insert(globalRegUniverse[bit]); });
     }
+
+    return true;
 }
 
 /**

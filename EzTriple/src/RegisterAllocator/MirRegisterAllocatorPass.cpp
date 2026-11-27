@@ -3,6 +3,7 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
 #include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "RegisterAllocator/MirRegisterAllocator.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
@@ -40,13 +41,13 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
     size_t iterationCount = 0;
     constexpr size_t maxIterations = 100;
 
-    if (!m_ctx || !m_targetDesc || !m_regAllocator || !func)
+    if (!m_ctx || !m_targetDesc || !m_regAllocator || !func || !passManager)
     {
         if (m_ctx)
         {
             m_ctx->getDiagCollector()->error(getName(),
-                                             "Register allocator pass is missing its context, target descriptor or "
-                                             "target allocator");
+                                             "Register allocator pass is missing its context, target descriptor, "
+                                             "target allocator, or pass manager");
         }
         return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
     }
@@ -58,13 +59,37 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
 
     auto cleanupFailure = [&]() -> MirPassResult
     {
+        if (passManager)
+        {
+            passManager->invalidateAnalysis();
+        }
         alloc.delete_object(ctx);
         return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
     };
 
+    LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
+    CodeFlowAnalysisPass *cfgPass = passManager->getCachedAnalysis<CodeFlowAnalysisPass>();
+    if (!cfgPass)
+    {
+        cfgPass = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx);
+    }
+
     while (!allocationComplete && iterationCount < maxIterations)
     {
         iterationCount++;
+
+        if (iterationCount > 1)
+        {
+            // Spill rewriting only inserts/updates instructions within existing blocks; CFG edges are
+            // invariant, so recompute liveness for this function only without module-wide invalidation.
+            CodeFlowResult *cfgResult = cfgPass ? cfgPass->getResult() : nullptr;
+            if (!livenessAnalysis || !livenessAnalysis->recomputeForFunction(func, cfgResult))
+            {
+                passManager->invalidateAnalysis();
+                livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
+                cfgPass = passManager->getCachedAnalysis<CodeFlowAnalysisPass>();
+            }
+        }
 
         // Iteration-scoped scratch arena: 100% of graph/coalescing/simplification memory
         // is reclaimed at the end of every spill iteration.
@@ -73,8 +98,12 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
                 stackBuf.data(), stackBuf.size(), std::pmr::new_delete_resource());
         ctx->beginIteration(&iterScratch);
 
-        LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
-        LivenessResult *result = livenessAnalysis->getResult();
+        LivenessResult *result = livenessAnalysis ? livenessAnalysis->getResult() : nullptr;
+        if (!result)
+        {
+            ctx->endIteration();
+            return cleanupFailure();
+        }
 
         if (!m_regAllocator->buildInterferenceGraph(result, ctx))
         {
@@ -110,15 +139,18 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
             m_regAllocator->rewriteColors(ctx);
         }
         ctx->endIteration();
-        passManager->invalidateAnalysis();
     }
 
     if (!allocationComplete)
     {
+        passManager->invalidateAnalysis();
         m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                 << "Register allocation exceeded maximum iteration limit without converging for " << func->getName();
         return cleanupFailure();
     }
+
+    // Invalidate cached analyses once on completion so downstream passes see the rewritten MIR.
+    passManager->invalidateAnalysis();
 
     m_result.m_contexts[func] = ctx;
     m_result.m_resolvedFunctions.insert(func);
