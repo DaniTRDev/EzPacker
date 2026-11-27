@@ -2960,7 +2960,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
                     {
 
-                        return m_opBuilder.buildInt(destType, FlexInt((val != 0.0) ? 1ULL : 0ULL, 1));
+                        return m_opBuilder.buildInt(destType, FlexInt(static_cast<uint64_t>((val != 0.0) ? 1 : 0), 1));
 
                     }
 
