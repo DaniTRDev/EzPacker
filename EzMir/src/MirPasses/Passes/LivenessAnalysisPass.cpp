@@ -9,6 +9,8 @@
 #include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "Printer/MirPrinter.h"
 
+#include <array>
+#include <cstddef>
 #include <vector>
 
 /**
@@ -105,13 +107,19 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     if (numBlocks == 0)
         return;
 
+    // Function-scoped scratch arena for all ephemeral bitsets, maps, and CFG indices;
+    // m_result (m_def, m_use, m_liveIn, m_liveOut) remains in m_arena.
+    std::array<std::byte, 32 * 1024> scratchBuf;
+    std::pmr::monotonic_buffer_resource scratchArena(
+            scratchBuf.data(), scratchBuf.size(), std::pmr::new_delete_resource());
+
     // -------------------------------------------------------------------------
     // 1. Assign Contiguous [0, numBlocks) Indices to Basic Blocks
     // -------------------------------------------------------------------------
-    std::pmr::vector<const MirBlock *> blockList(m_arena);
+    std::pmr::vector<const MirBlock *> blockList(&scratchArena);
     blockList.reserve(numBlocks);
 
-    std::pmr::unordered_map<MirId, uint32_t> blockIdToDenseIdx(numBlocks * 2, m_arena);
+    std::pmr::unordered_map<MirId, uint32_t> blockIdToDenseIdx(numBlocks * 2, &scratchArena);
 
     uint32_t bIdx = 0;
     for (const MirBlock *block : blocks)
@@ -138,8 +146,8 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
         auto &defSet = m_result.m_def[blockId];
         auto &useSet = m_result.m_use[blockId];
 
-        std::pmr::vector<MirRegisterRef> readRegs(m_arena);
-        std::pmr::vector<MirRegisterRef> writtenRegs(m_arena);
+        std::pmr::vector<MirRegisterRef> readRegs(&scratchArena);
+        std::pmr::vector<MirRegisterRef> writtenRegs(&scratchArena);
 
         for (const MirInstruction *instr : block->getInstructions())
         {
@@ -163,8 +171,8 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     // -------------------------------------------------------------------------
     // 3. Build Global Register Universe
     // -------------------------------------------------------------------------
-    std::pmr::vector<MirRegisterRef> globalRegUniverse(m_arena);
-    std::pmr::unordered_map<MirRegisterRef, uint32_t> globalRegToIdx(m_arena);
+    std::pmr::vector<MirRegisterRef> globalRegUniverse(&scratchArena);
+    std::pmr::unordered_map<MirRegisterRef, uint32_t> globalRegToIdx(&scratchArena);
 
     auto getOrAddGlobalReg = [&](const MirRegisterRef &reg) -> uint32_t
     {
@@ -221,10 +229,10 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     // -------------------------------------------------------------------------
     // 4. Populate Compact Global Def/Use BitSets
     // -------------------------------------------------------------------------
-    std::pmr::vector<DenseBitSet> globalDefBits(m_arena);
-    std::pmr::vector<DenseBitSet> globalUseBits(m_arena);
-    std::pmr::vector<DenseBitSet> globalLiveInBits(m_arena);
-    std::pmr::vector<DenseBitSet> globalLiveOutBits(m_arena);
+    std::pmr::vector<DenseBitSet> globalDefBits(&scratchArena);
+    std::pmr::vector<DenseBitSet> globalUseBits(&scratchArena);
+    std::pmr::vector<DenseBitSet> globalLiveInBits(&scratchArena);
+    std::pmr::vector<DenseBitSet> globalLiveOutBits(&scratchArena);
 
     globalDefBits.reserve(numBlocks);
     globalUseBits.reserve(numBlocks);
@@ -258,7 +266,7 @@ void LivenessAnalysisPass::computeGlobalLiveness(MirFunction *func, CodeFlowResu
     // -------------------------------------------------------------------------
     // 5. Flatten CFG Successor Indices
     // -------------------------------------------------------------------------
-    std::pmr::vector<std::pmr::vector<uint32_t>> denseSuccessors(numBlocks, m_arena);
+    std::pmr::vector<std::pmr::vector<uint32_t>> denseSuccessors(numBlocks, &scratchArena);
     for (size_t i = 0; i < numBlocks; ++i)
     {
         MirId blockId = blockList[i]->getId();

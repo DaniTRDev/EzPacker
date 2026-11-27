@@ -322,8 +322,8 @@ TEST_F(MirRegisterCoalescerTest, TestAffinityBiasing)
 
     // Push both onto select stack
     allocator->evaluateInterferenceGraphDegree(&regCtx);
-    regCtx.m_selectStack.push_back(id0);
-    regCtx.m_selectStack.push_back(id1);
+    regCtx.pushSelectStack(id0);
+    regCtx.pushSelectStack(id1);
 
     // Select colors
     EXPECT_TRUE(allocator->selectColors(&regCtx));
@@ -498,21 +498,22 @@ TEST_F(MirRegisterCoalescerTest, TestCascadingCoalesceWithoutRestartMaintainsSym
     EXPECT_EQ(regCtx.getCoalescedLeader(v3->getRef()), leader);
 
     // Verify graph symmetry, zero self-loops, and exact adjBits <-> adjList consistency
-    for (uint32_t id = 0; id < regCtx.m_idToReg.size(); ++id)
+    const auto &s = *regCtx.m_scratch;
+    for (uint32_t id = 0; id < s.m_idToReg.size(); ++id)
     {
-        EXPECT_FALSE(regCtx.m_adjBits[id].test(id)) << "Self-edge detected on node " << id;
-        EXPECT_EQ(regCtx.m_adjList[id].size(), regCtx.m_adjBits[id].count())
+        EXPECT_FALSE(s.m_adjBits[id].test(id)) << "Self-edge detected on node " << id;
+        EXPECT_EQ(s.m_adjList[id].size(), s.m_adjBits[id].count())
                 << "Duplicate or missing neighbor in adjList for node " << id;
-        if (regCtx.m_coalescedAway.test(id))
+        if (s.m_coalescedAway.test(id))
         {
-            EXPECT_TRUE(regCtx.m_adjList[id].empty());
-            EXPECT_EQ(regCtx.m_adjBits[id].count(), 0U);
+            EXPECT_TRUE(s.m_adjList[id].empty());
+            EXPECT_EQ(s.m_adjBits[id].count(), 0U);
         }
-        for (uint32_t nb : regCtx.m_adjList[id])
+        for (uint32_t nb : s.m_adjList[id])
         {
-            EXPECT_TRUE(regCtx.m_adjBits[id].test(nb));
-            EXPECT_TRUE(regCtx.m_adjBits[nb].test(id));
-            EXPECT_FALSE(regCtx.m_coalescedAway.test(nb));
+            EXPECT_TRUE(s.m_adjBits[id].test(nb));
+            EXPECT_TRUE(s.m_adjBits[nb].test(id));
+            EXPECT_FALSE(s.m_coalescedAway.test(nb));
         }
     }
 }
@@ -551,6 +552,6 @@ TEST_F(MirRegisterCoalescerTest, TestCoalesceTransfersUnspillableFlag)
     MirRegisterRef leader = regCtx.getCoalescedLeader(v1->getRef());
     uint32_t leaderId = regCtx.findNode(leader);
     ASSERT_NE(leaderId, RegisterAllocatorCtx::InvalidNode);
-    EXPECT_TRUE(regCtx.m_unspillableDense.test(leaderId));
+    EXPECT_TRUE(regCtx.m_scratch->m_unspillableDense.test(leaderId));
     EXPECT_TRUE(regCtx.m_unspillableRegs.contains(leader));
 }

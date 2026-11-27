@@ -43,8 +43,10 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
     const auto analysisData = func->getAnalysisData();
     const auto &blockList = func->getBlocks();
 
+    auto &s = *ctx->m_scratch;
+
     // Instruction stream drives spill costs, so invalidate any cost cache built for a previous state.
-    ctx->m_spillCostsValid = false;
+    s.m_spillCostsValid = false;
 
     // Reserve the frame and stack pointer registers first so dense node insertion tracks m_reservedDense.
     if (cc)
@@ -86,9 +88,9 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
         }
     }
 
-    DenseBitSet live(ctx->m_allocator);
-    std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
-    std::pmr::vector<MirRegisterRef> uses(ctx->m_allocator);
+    DenseBitSet live(ctx->m_scratchAlloc);
+    std::pmr::vector<MirRegisterRef> defs(ctx->m_scratchAlloc);
+    std::pmr::vector<MirRegisterRef> uses(ctx->m_scratchAlloc);
 
     for (MirBlock *block : blockList)
     {
@@ -99,7 +101,7 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
         for (MirRegisterRef regRef : liveOutSet)
         {
             uint32_t id = addNode(regRef, ctx);
-            live.resize(ctx->m_adjCapacity);
+            live.resize(s.m_adjCapacity);
             live.set(id);
         }
 
@@ -134,7 +136,7 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
                                     uint32_t liveId = static_cast<uint32_t>(liveBit);
                                     if (csId == liveId)
                                         return;
-                                    const MirRegisterRef &liveRegRef = ctx->m_idToReg[liveId];
+                                    const MirRegisterRef &liveRegRef = s.m_idToReg[liveId];
                                     auto *liveBank =
                                             liveRegRef.getClass() ? liveRegRef.getClass()->getBank() : nullptr;
                                     if (!csBank || !liveBank || csBank == liveBank)
@@ -157,7 +159,7 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
                             uint32_t liveId = static_cast<uint32_t>(liveBit);
                             if (defId == liveId)
                                 return;
-                            const MirRegisterRef &liveRegRef = ctx->m_idToReg[liveId];
+                            const MirRegisterRef &liveRegRef = s.m_idToReg[liveId];
                             auto *liveBank = liveRegRef.getClass() ? liveRegRef.getClass()->getBank() : nullptr;
                             if (!defBank || !liveBank || defBank == liveBank)
                             {
@@ -198,7 +200,7 @@ bool MirRegisterAllocator::buildInterferenceGraph(LivenessResult *liveness, Regi
             for (const MirRegisterRef &useRegRef : uses)
             {
                 uint32_t useId = addNode(useRegRef, ctx);
-                live.resize(ctx->m_adjCapacity);
+                live.resize(s.m_adjCapacity);
                 live.set(useId);
             }
         }
@@ -219,14 +221,16 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
         return false;
     }
 
+    auto &s = *ctx->m_scratch;
+
     struct CoalesceCandidate
     {
         uint32_t dstId;
         uint32_t srcId;
     };
 
-    std::pmr::vector<CoalesceCandidate> candidates(ctx->m_allocator);
-    std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
+    std::pmr::vector<CoalesceCandidate> candidates(ctx->m_scratchAlloc);
+    std::pmr::vector<MirRegisterRef> defs(ctx->m_scratchAlloc);
 
     for (MirBlock *block : func->getBlocks())
     {
@@ -285,13 +289,13 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
     }
 
     // Ensure color limits are precomputed for all nodes before candidate scanning.
-    for (uint32_t id = 0; id < ctx->m_idToReg.size(); ++id)
+    for (uint32_t id = 0; id < s.m_idToReg.size(); ++id)
     {
-        (void)ctx->getColorLimit(ctx->m_idToReg[id].getClass());
+        (void)ctx->getColorLimit(s.m_idToReg[id].getClass());
     }
 
-    DenseBitSet combinedNeighbors(ctx->m_adjCapacity, ctx->m_allocator);
-    std::pmr::vector<uint32_t> neighborsOfV(ctx->m_allocator);
+    DenseBitSet combinedNeighbors(s.m_adjCapacity, ctx->m_scratchAlloc);
+    std::pmr::vector<uint32_t> neighborsOfV(ctx->m_scratchAlloc);
 
     bool anyCoalesced = false;
     bool changed = true;
@@ -311,13 +315,13 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
             }
 
             // Ensure physical register is always 'u' if there is one
-            if (ctx->m_idToReg[u].isVirtual() && ctx->m_idToReg[v].isPhysical())
+            if (s.m_idToReg[u].isVirtual() && s.m_idToReg[v].isPhysical())
             {
                 std::swap(u, v);
             }
 
-            const MirRegisterRef uRef = ctx->m_idToReg[u];
-            const MirRegisterRef vRef = ctx->m_idToReg[v];
+            const MirRegisterRef uRef = s.m_idToReg[u];
+            const MirRegisterRef vRef = s.m_idToReg[v];
 
             // Cannot coalesce two distinct physical registers
             if (uRef.isPhysical() && vRef.isPhysical())
@@ -326,7 +330,7 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
             }
 
             // Cannot coalesce reserved physical registers
-            if (ctx->m_reservedDense.test(u) || ctx->m_reservedDense.test(v))
+            if (s.m_reservedDense.test(u) || s.m_reservedDense.test(v))
             {
                 continue;
             }
@@ -338,7 +342,7 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
             }
 
             // If they interfere, they cannot be coalesced
-            if (ctx->m_adjBits[u].test(v))
+            if (s.m_adjBits[u].test(v))
             {
                 continue;
             }
@@ -350,17 +354,17 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
                 // George's criterion: for each neighbor t of v,
                 // either t already interferes with u, or t is a low-degree virtual node (deg(t) < K_t)
                 bool satisfiesGeorge = true;
-                for (uint32_t t : ctx->m_adjList[v])
+                for (uint32_t t : s.m_adjList[v])
                 {
-                    if (t == u || ctx->m_adjBits[u].test(t))
+                    if (t == u || s.m_adjBits[u].test(t))
                     {
                         continue;
                     }
 
-                    if (ctx->m_idToReg[t].isVirtual())
+                    if (s.m_idToReg[t].isVirtual())
                     {
-                        const size_t degT = ctx->m_adjList[t].size();
-                        const size_t Kt = ctx->m_classColorLimits[ctx->m_nodeClassIdx[t]];
+                        const size_t degT = s.m_adjList[t].size();
+                        const size_t Kt = s.m_classColorLimits[s.m_nodeClassIdx[t]];
                         if (degT < Kt)
                         {
                             continue;
@@ -377,9 +381,9 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
             {
                 // Both are virtual: Briggs' criterion
                 // Number of combined neighbors with significant degree (>= K_t) must be < K_u
-                const size_t Ku = ctx->m_classColorLimits[ctx->m_nodeClassIdx[u]];
+                const size_t Ku = s.m_classColorLimits[s.m_nodeClassIdx[u]];
 
-                combinedNeighbors.copyOr(ctx->m_adjBits[u], ctx->m_adjBits[v]);
+                combinedNeighbors.copyOr(s.m_adjBits[u], s.m_adjBits[v]);
                 combinedNeighbors.clearBit(u);
                 combinedNeighbors.clearBit(v);
 
@@ -388,14 +392,14 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
                         [&](size_t bit)
                         {
                             const uint32_t t = static_cast<uint32_t>(bit);
-                            if (ctx->m_idToReg[t].isPhysical())
+                            if (s.m_idToReg[t].isPhysical())
                             {
                                 significantDegreeCount++;
                             }
                             else
                             {
-                                const size_t degT = ctx->m_adjList[t].size();
-                                const size_t Kt = ctx->m_classColorLimits[ctx->m_nodeClassIdx[t]];
+                                const size_t degT = s.m_adjList[t].size();
+                                const size_t Kt = s.m_classColorLimits[s.m_nodeClassIdx[t]];
                                 if (degT >= Kt)
                                 {
                                     significantDegreeCount++;
@@ -409,8 +413,8 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
             if (canCoalesce)
             {
                 // Coalesce v into u
-                ctx->m_leader[v] = u;
-                ctx->m_coalescedAway.set(v);
+                s.m_leader[v] = u;
+                s.m_coalescedAway.set(v);
 
                 if (uRef.isPhysical() && ctx->m_targetFunction)
                 {
@@ -429,16 +433,16 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
                     }
                 }
 
-                if (ctx->m_unspillableDense.test(v))
+                if (s.m_unspillableDense.test(v))
                 {
-                    ctx->m_unspillableDense.set(u);
-                    ctx->m_unspillableDense.clearBit(v);
+                    s.m_unspillableDense.set(u);
+                    s.m_unspillableDense.clearBit(v);
                     ctx->m_unspillableRegs.insert(uRef);
                     ctx->m_unspillableRegs.erase(vRef);
                 }
 
                 // Symmetrically merge active interference edges of v into u
-                neighborsOfV.assign(ctx->m_adjList[v].begin(), ctx->m_adjList[v].end());
+                neighborsOfV.assign(s.m_adjList[v].begin(), s.m_adjList[v].end());
                 for (uint32_t w : neighborsOfV)
                 {
                     ctx->removeEdge(v, w);
@@ -454,13 +458,13 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
             else
             {
                 // Add affinity bias so selectColors prefers the same physical register
-                auto &affU = ctx->m_affinity[u];
+                auto &affU = s.m_affinity[u];
                 if (std::find(affU.begin(), affU.end(), v) == affU.end())
                 {
                     affU.push_back(v);
                 }
 
-                auto &affV = ctx->m_affinity[v];
+                auto &affV = s.m_affinity[v];
                 if (std::find(affV.begin(), affV.end(), u) == affV.end())
                 {
                     affV.push_back(u);
@@ -478,15 +482,16 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
  */
 bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
 {
-    const uint32_t numNodes = static_cast<uint32_t>(ctx->m_idToReg.size());
+    auto &s = *ctx->m_scratch;
+    const uint32_t numNodes = static_cast<uint32_t>(s.m_idToReg.size());
     size_t totalVirtualNodes = 0;
 
     for (uint32_t id = 0; id < numNodes; ++id)
     {
-        if (ctx->m_coalescedAway.test(id))
+        if (s.m_coalescedAway.test(id))
             continue;
 
-        const MirRegisterRef &node = ctx->m_idToReg[id];
+        const MirRegisterRef &node = s.m_idToReg[id];
         if (node.isVirtual())
         {
             totalVirtualNodes++;
@@ -503,37 +508,37 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
         }
     }
 
-    std::pmr::vector<uint32_t> lowDegreeQueue(ctx->m_allocator);
+    std::pmr::vector<uint32_t> lowDegreeQueue(ctx->m_scratchAlloc);
     lowDegreeQueue.reserve(totalVirtualNodes);
 
-    std::pmr::vector<uint32_t> spillCandidates(ctx->m_allocator);
+    std::pmr::vector<uint32_t> spillCandidates(ctx->m_scratchAlloc);
     spillCandidates.reserve(totalVirtualNodes);
 
-    std::pmr::vector<double> rawCostCache(numNodes, 0.0, ctx->m_allocator);
+    std::pmr::vector<double> rawCostCache(numNodes, 0.0, ctx->m_scratchAlloc);
 
     for (uint32_t id = 0; id < numNodes; ++id)
     {
-        if (ctx->m_coalescedAway.test(id))
+        if (s.m_coalescedAway.test(id))
             continue;
 
-        const MirRegisterRef &node = ctx->m_idToReg[id];
+        const MirRegisterRef &node = s.m_idToReg[id];
         if (!node.isVirtual())
             continue;
 
-        const size_t K = ctx->m_classColorLimits[ctx->m_nodeClassIdx[id]];
-        if (ctx->m_degree[id] < K)
+        const size_t K = s.m_classColorLimits[s.m_nodeClassIdx[id]];
+        if (s.m_degree[id] < K)
         {
             lowDegreeQueue.push_back(id);
         }
 
         rawCostCache[id] = calculateSpillCost(node, ctx);
-        if (!ctx->m_unspillableDense.test(id))
+        if (!s.m_unspillableDense.test(id))
         {
             spillCandidates.push_back(id);
         }
     }
 
-    while (ctx->m_selectStack.size() < totalVirtualNodes)
+    while (s.m_selectStack.size() < totalVirtualNodes)
     {
         uint32_t candidate = RegisterAllocatorCtx::InvalidNode;
 
@@ -543,7 +548,7 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
             uint32_t nodeId = lowDegreeQueue.back();
             lowDegreeQueue.pop_back();
 
-            if (!ctx->m_removed.test(nodeId))
+            if (!s.m_removed.test(nodeId))
             {
                 candidate = nodeId;
                 break;
@@ -559,14 +564,14 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
             for (size_t i = 0; i < spillCandidates.size();)
             {
                 const uint32_t nodeId = spillCandidates[i];
-                if (ctx->m_removed.test(nodeId))
+                if (s.m_removed.test(nodeId))
                 {
                     spillCandidates[i] = spillCandidates.back();
                     spillCandidates.pop_back();
                     continue;
                 }
 
-                double deg = static_cast<double>(ctx->m_degree[nodeId]);
+                double deg = static_cast<double>(s.m_degree[nodeId]);
                 double costRatio = rawCostCache[nodeId] / std::max(1.0, deg);
 
                 if (costRatio < minCostRatio)
@@ -590,7 +595,7 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
         {
             for (uint32_t id = 0; id < numNodes; ++id)
             {
-                if (!ctx->m_coalescedAway.test(id) && ctx->m_idToReg[id].isVirtual() && !ctx->m_removed.test(id))
+                if (!s.m_coalescedAway.test(id) && s.m_idToReg[id].isVirtual() && !s.m_removed.test(id))
                 {
                     candidate = id;
                     break;
@@ -603,22 +608,22 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
             break;
         }
 
-        ctx->m_removed.set(candidate);
-        ctx->m_selectStack.push_back(candidate);
+        s.m_removed.set(candidate);
+        s.m_selectStack.push_back(candidate);
 
         // Update active degree of neighbors and push newly simplified neighbors
-        for (uint32_t neighbor : ctx->m_adjList[candidate])
+        for (uint32_t neighbor : s.m_adjList[candidate])
         {
-            if (!ctx->m_coalescedAway.test(neighbor) && ctx->m_idToReg[neighbor].isVirtual() &&
-                !ctx->m_removed.test(neighbor))
+            if (!s.m_coalescedAway.test(neighbor) && s.m_idToReg[neighbor].isVirtual() &&
+                !s.m_removed.test(neighbor))
             {
-                if (ctx->m_degree[neighbor] > 0 && ctx->m_degree[neighbor] != RegisterAllocatorCtx::InfiniteDegree)
+                if (s.m_degree[neighbor] > 0 && s.m_degree[neighbor] != RegisterAllocatorCtx::InfiniteDegree)
                 {
-                    uint32_t oldDeg = ctx->m_degree[neighbor];
-                    ctx->m_degree[neighbor]--;
+                    uint32_t oldDeg = s.m_degree[neighbor];
+                    s.m_degree[neighbor]--;
 
-                    const size_t K = ctx->m_classColorLimits[ctx->m_nodeClassIdx[neighbor]];
-                    if (oldDeg == K && ctx->m_degree[neighbor] < K)
+                    const size_t K = s.m_classColorLimits[s.m_nodeClassIdx[neighbor]];
+                    if (oldDeg == K && s.m_degree[neighbor] < K)
                     {
                         lowDegreeQueue.push_back(neighbor);
                     }
@@ -636,8 +641,9 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
  */
 bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
 {
+    auto &s = *ctx->m_scratch;
     MirFunctionBuilder fBuilder(ctx->m_ctx);
-    std::pmr::unordered_set<MirRegisterRef> spilledNodes(ctx->m_allocator);
+    std::pmr::unordered_set<MirRegisterRef> spilledNodes(ctx->m_scratchAlloc);
 
     auto isSameBank = [](MirRegisterClass *c1, MirRegisterClass *c2)
     {
@@ -646,11 +652,11 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
         return c1->getBank() == c2->getBank();
     };
 
-    while (!ctx->m_selectStack.empty())
+    while (!s.m_selectStack.empty())
     {
-        uint32_t nodeId = ctx->m_selectStack.back();
-        ctx->m_selectStack.pop_back();
-        const MirRegisterRef node = ctx->m_idToReg[nodeId];
+        uint32_t nodeId = s.m_selectStack.back();
+        s.m_selectStack.pop_back();
+        const MirRegisterRef node = s.m_idToReg[nodeId];
 
         // Color ids are physical register indices within a class (16 on x86-64), so a per-node
         // bitmask replaces a heap-backed set and its hashing.
@@ -677,12 +683,12 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
 
         // 2. Lock colors taken by interfering neighbors in the same register bank.
         // GPR and FPR families only compete within their own bank.
-        for (uint32_t neighborId : ctx->m_adjList[nodeId])
+        for (uint32_t neighborId : s.m_adjList[nodeId])
         {
-            if (ctx->m_removed.test(neighborId))
+            if (s.m_removed.test(neighborId))
                 continue;
 
-            const MirRegisterRef &neighbor = ctx->m_idToReg[neighborId];
+            const MirRegisterRef &neighbor = s.m_idToReg[neighborId];
             if (neighbor.isPhysical())
             {
                 if (isSameBank(neighbor.getClass(), node.getClass()))
@@ -707,12 +713,12 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
         std::optional<MirRegisterRef> assignedPhysReg;
 
         // Affinity-biased selection: prefer colors of coalescing/affinity partners
-        if (nodeId < ctx->m_affinity.size())
+        if (nodeId < s.m_affinity.size())
         {
-            for (uint32_t partnerId : ctx->m_affinity[nodeId])
+            for (uint32_t partnerId : s.m_affinity[nodeId])
             {
                 uint32_t leaderId = ctx->getLeaderId(partnerId);
-                const MirRegisterRef &leaderPartner = ctx->m_idToReg[leaderId];
+                const MirRegisterRef &leaderPartner = s.m_idToReg[leaderId];
                 MirRegisterRef prefColor;
                 if (leaderPartner.isPhysical())
                 {
@@ -766,11 +772,11 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
             }
 
             ctx->m_allocatedRegs[node] = physRef;
-            ctx->m_removed.clearBit(nodeId);
+            s.m_removed.clearBit(nodeId);
         }
         else
         {
-            if (ctx->m_unspillableDense.test(nodeId) || ctx->m_unspillableRegs.contains(node))
+            if (s.m_unspillableDense.test(nodeId) || ctx->m_unspillableRegs.contains(node))
             {
                 auto log = ctx->m_ctx->getDiagCollector()->builder(Diag_Error, "MirRegisterAllocator");
                 log << "Unspillable temporary register ran out of colors during select!";
@@ -797,22 +803,23 @@ bool MirRegisterAllocator::selectColors(RegisterAllocatorCtx *ctx)
  */
 void MirRegisterAllocator::evaluateInterferenceGraphDegree(RegisterAllocatorCtx *ctx)
 {
-    const uint32_t numNodes = static_cast<uint32_t>(ctx->m_idToReg.size());
+    auto &s = *ctx->m_scratch;
+    const uint32_t numNodes = static_cast<uint32_t>(s.m_idToReg.size());
     for (uint32_t id = 0; id < numNodes; ++id)
     {
-        if (ctx->m_coalescedAway.test(id))
+        if (s.m_coalescedAway.test(id))
             continue;
 
-        const MirRegisterRef &node = ctx->m_idToReg[id];
+        const MirRegisterRef &node = s.m_idToReg[id];
         if (node.isPhysical())
         {
-            ctx->m_degree[id] = RegisterAllocatorCtx::InfiniteDegree;
+            s.m_degree[id] = RegisterAllocatorCtx::InfiniteDegree;
             ctx->m_allocatedRegs[node] = node;
-            ctx->m_removed.clearBit(id);
+            s.m_removed.clearBit(id);
         }
         else
         {
-            ctx->m_degree[id] = static_cast<uint32_t>(ctx->m_adjList[id].size());
+            s.m_degree[id] = static_cast<uint32_t>(s.m_adjList[id].size());
         }
     }
 }
@@ -927,13 +934,14 @@ void MirRegisterAllocator::eliminateRedundantCopies(RegisterAllocatorCtx *ctx)
  */
 double MirRegisterAllocator::calculateSpillCost(MirRegisterRef node, RegisterAllocatorCtx *ctx)
 {
-    if (!ctx->m_spillCostsValid)
+    auto &s = *ctx->m_scratch;
+    if (!s.m_spillCostsValid)
     {
-        ctx->m_spillCostsValid = true;
-        ctx->m_spillCosts.clear();
+        s.m_spillCostsValid = true;
+        s.m_spillCosts.clear();
 
-        std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
-        std::pmr::vector<MirRegisterRef> uses(ctx->m_allocator);
+        std::pmr::vector<MirRegisterRef> defs(ctx->m_scratchAlloc);
+        std::pmr::vector<MirRegisterRef> uses(ctx->m_scratchAlloc);
 
         for (MirBlock *block : ctx->m_targetFunction->getBlocks())
         {
@@ -942,20 +950,20 @@ double MirRegisterAllocator::calculateSpillCost(MirRegisterRef node, RegisterAll
                 inst->getUsedRegisters(uses);
                 for (const auto &use : uses)
                 {
-                    ctx->m_spillCosts[use] += 1.0;
+                    s.m_spillCosts[use] += 1.0;
                 }
 
                 inst->getDefinedRegisters(defs);
                 for (const auto &def : defs)
                 {
-                    ctx->m_spillCosts[def] += 1.0;
+                    s.m_spillCosts[def] += 1.0;
                 }
             }
         }
     }
 
-    auto it = ctx->m_spillCosts.find(node);
-    return it != ctx->m_spillCosts.end() ? it->second : 0.0;
+    auto it = s.m_spillCosts.find(node);
+    return it != s.m_spillCosts.end() ? it->second : 0.0;
 }
 
 /**
@@ -979,8 +987,8 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
     MirOperandBuilder opBuilder(ctx->m_ctx);
 
     // 1. Map defining instructions for rematerialization checks
-    std::pmr::unordered_map<MirRegisterRef, MirInstruction *> definingInstMap(ctx->m_allocator);
-    std::pmr::vector<MirRegisterRef> defs(ctx->m_allocator);
+    std::pmr::unordered_map<MirRegisterRef, MirInstruction *> definingInstMap(ctx->m_scratchAlloc);
+    std::pmr::vector<MirRegisterRef> defs(ctx->m_scratchAlloc);
     for (MirBlock *block : func->getBlocks())
     {
         for (MirInstruction *inst : block->getInstructions())
@@ -1030,7 +1038,7 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
             std::vector<DeferredSpill> postSpills;
 
             // Track rewritten registers for this instruction to prevent duplicate reload temporaries
-            std::pmr::unordered_map<MirRegisterRef, MirRegister *> reloadedTemps(ctx->m_allocator);
+            std::pmr::unordered_map<MirRegisterRef, MirRegister *> reloadedTemps(ctx->m_scratchAlloc);
 
             auto rewriteRegisterOp = [&](MirRegister *regOp, bool isRead, bool isWrite) -> MirRegister *
             {

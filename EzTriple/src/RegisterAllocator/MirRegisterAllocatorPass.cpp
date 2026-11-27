@@ -7,6 +7,8 @@
 #include "RegisterAllocator/MirRegisterAllocator.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 #include "Printer/MirPrinter.h"
+#include <array>
+#include <cstddef>
 
 /**
  * Caches the builder context, target allocator and result storage for this pass. Missing
@@ -64,14 +66,19 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
     {
         iterationCount++;
 
-        // Reset per-iteration allocation state (preserve m_spilledRegs and m_unspillableRegs across iterations)
-        ctx->resetIterationState();
+        // Iteration-scoped scratch arena: 100% of graph/coalescing/simplification memory
+        // is reclaimed at the end of every spill iteration.
+        std::array<std::byte, 64 * 1024> stackBuf;
+        std::pmr::monotonic_buffer_resource iterScratch(
+                stackBuf.data(), stackBuf.size(), std::pmr::new_delete_resource());
+        ctx->beginIteration(&iterScratch);
 
         LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
         LivenessResult *result = livenessAnalysis->getResult();
 
         if (!m_regAllocator->buildInterferenceGraph(result, ctx))
         {
+            ctx->endIteration();
             m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                     << "Failed to build interference graph for function " << func->getName();
             return cleanupFailure();
@@ -89,6 +96,7 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
         // Simplify Graph Nodes onto Select Stack
         if (!m_regAllocator->simplify(ctx))
         {
+            ctx->endIteration();
             m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                     << "Simplification failed for function " << func->getName();
             return cleanupFailure();
@@ -96,6 +104,12 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
 
         // Assign Colors (or emit spills and rewrite IR)
         allocationComplete = m_regAllocator->selectColors(ctx);
+        if (allocationComplete)
+        {
+            // Rewrite Virtual Registers to Physical Registers while scratch coalesced leader map is live
+            m_regAllocator->rewriteColors(ctx);
+        }
+        ctx->endIteration();
         passManager->invalidateAnalysis();
     }
 
@@ -105,9 +119,6 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
                 << "Register allocation exceeded maximum iteration limit without converging for " << func->getName();
         return cleanupFailure();
     }
-
-    // Rewrite Virtual Registers to Physical Registers in MIR
-    m_regAllocator->rewriteColors(ctx);
 
     m_result.m_contexts[func] = ctx;
     m_result.m_resolvedFunctions.insert(func);

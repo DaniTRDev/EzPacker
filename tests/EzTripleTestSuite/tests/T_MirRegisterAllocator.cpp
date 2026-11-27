@@ -230,7 +230,7 @@ TEST_F(MirRegisterAllocatorTest, TestSimplificationAndColorSelection)
 
     bool simplifyOk = allocator->simplify(&regCtx);
     EXPECT_TRUE(simplifyOk);
-    EXPECT_EQ(regCtx.m_selectStack.size(), 3);
+    EXPECT_EQ(regCtx.getSelectStackSize(), 3);
 
     bool selectOk = allocator->selectColors(&regCtx);
     EXPECT_TRUE(selectOk);
@@ -630,4 +630,77 @@ TEST_F(MirRegisterAllocatorTest, TestTwoAddressOperandIdx2Interference)
     // vDst must interfere symmetrically with v1 (operand index 2)
     EXPECT_TRUE(regCtx.hasEdge(vDst->getRef(), v1->getRef()));
     EXPECT_TRUE(regCtx.hasEdge(v1->getRef(), vDst->getRef()));
+}
+
+TEST_F(MirRegisterAllocatorTest, TestMultiIterationSpillingAndContextLifetime)
+{
+    auto *ctx = getBuilderCtx();
+    auto *typeTable = ctx->getTypeTable();
+    auto *func = createTestFunction("multi_iter_spill", typeTable->i64());
+    auto *entry = func->getEntryPoint();
+
+    // Constrained register class with only 2 physical registers to force spilling
+    auto *alloc = ctx->getGlobalAllocator();
+    std::pmr::polymorphic_allocator<> pAlloc(alloc);
+    auto *tinyBank = pAlloc.new_object<MirRegisterBank>("TinyBankMulti", alloc);
+    auto *tinyClass = pAlloc.new_object<MirRegisterClass>("Tiny2_Multi", tinyBank, alloc);
+    tinyBank->addClass("Tiny2_Multi", tinyClass);
+    tinyClass->addRegister("m0", 64, 0, {});
+    tinyClass->addRegister("m1", 64, 0, {});
+
+    MirInstructionBuilder ib(ctx, entry, InsertionType::Append);
+    MirOperandBuilder ob(ctx);
+
+    auto *base = ob.buildVReg(typeTable->i64(), "base", nullptr, tinyClass);
+    auto *imm1 = ob.buildInt(typeTable->i64(), FlexInt(1));
+    ib.MOV(base, imm1);
+
+    // 5 simultaneously-live non-rematerializable vregs
+    std::vector<MirRegister *> vregs;
+    for (int i = 0; i < 5; ++i)
+    {
+        auto *v = ob.buildVReg(typeTable->i64(), "mv" + std::to_string(i), nullptr, tinyClass);
+        ib.ADD(v, i == 0 ? base : vregs.back(), imm1);
+        vregs.push_back(v);
+    }
+
+    auto *acc = ob.buildVReg(typeTable->i64(), "acc", nullptr, tinyClass);
+    ib.ADD(acc, vregs[0], vregs[1]);
+    for (size_t i = 2; i < vregs.size(); ++i)
+    {
+        ib.ADD(acc, acc, vregs[i]);
+    }
+    ib.RET(acc);
+
+    MirPassManager passManager(ctx->getDiagCollector(), ctx->getGlobalAllocator());
+    passManager.addPass<CodeFlowAnalysisPass>(ctx);
+    passManager.addPass<LivenessAnalysisPass>(ctx);
+    auto *allocPass = passManager.addPass<MirRegisterAllocatorPass>(ctx, getTargetDesc(), true);
+
+    MirPassResult res = passManager.runPass(allocPass, ctx);
+    EXPECT_TRUE(res.m_succeeded);
+    EXPECT_TRUE(res.m_modifiedMir);
+
+    const auto &passResult = allocPass->getResult();
+    auto ctxIt = passResult.m_contexts.find(func);
+    ASSERT_NE(ctxIt, passResult.m_contexts.end());
+    RegisterAllocatorCtx *savedCtx = ctxIt->second;
+    ASSERT_NE(savedCtx, nullptr);
+
+    // Persistent state must survive endIteration() and remain valid after run()
+    EXPECT_FALSE(savedCtx->m_spilledRegs.empty());
+    EXPECT_FALSE(savedCtx->m_unspillableRegs.empty());
+    EXPECT_FALSE(savedCtx->m_scratch.has_value());
+    EXPECT_EQ(savedCtx->m_scratchAlloc, savedCtx->m_persistentAlloc);
+
+    for (MirInstruction *inst : entry->getInstructions())
+    {
+        for (MirOperand *op : inst->getOperands())
+        {
+            if (op->isOfType<MirRegister>())
+            {
+                EXPECT_TRUE(op->get<MirRegister>()->getRef().isPhysical());
+            }
+        }
+    }
 }

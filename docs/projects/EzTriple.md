@@ -215,38 +215,42 @@ EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register 
 ```
 
 #### Working Context (`RegisterAllocatorCtx`)
-`RegisterAllocatorCtx` uses a deterministic dense-indexed interference graph (`m_idToReg`, `m_regToId`, `m_adjBits` backed by `DenseBitSet`, and `m_adjList`) paired with union-find coalescing (`m_leader`, `m_coalescedAway`), dense degree/status bitsets (`m_degree`, `m_removed`, `m_reservedDense`, `m_unspillableDense`), and cached per-class color limits (`m_classColorLimits`):
+`RegisterAllocatorCtx` separates persistent cross-iteration state (`m_persistentAlloc`: `m_spilledRegs`, `m_unspillableRegs`, `m_reservedRegs`, `m_allocatedRegs`) from ephemeral per-iteration state (`ScratchState` on `m_scratchAlloc`: `m_idToReg`, `m_regToId`, `m_adjBits` backed by `DenseBitSet`, `m_adjList`, `m_leader`, `m_coalescedAway`, `m_degree`, `m_removed`, `m_reservedDense`, `m_unspillableDense`, `m_selectStack`, `m_affinity`, `m_classColorLimits`, `m_spillCosts`). `MirRegisterAllocatorPass::run()` creates an iteration-scoped `std::pmr::monotonic_buffer_resource` per spill iteration (`beginIteration` / `endIteration`), reclaiming 100% of scratch memory after each iteration while keeping `m_contexts[func]` valid:
 
 ```cpp
 struct RegisterAllocatorCtx
 {
+    struct ScratchState
+    {
+        std::pmr::vector<MirRegisterRef> m_idToReg;
+        std::pmr::unordered_map<MirRegisterRef, uint32_t> m_regToId;
+        std::pmr::vector<DenseBitSet> m_adjBits;
+        std::pmr::vector<std::pmr::vector<uint32_t>> m_adjList;
+        std::pmr::vector<uint32_t> m_degree;
+        std::pmr::vector<uint32_t> m_leader;
+        DenseBitSet m_removed;
+        DenseBitSet m_coalescedAway;
+        DenseBitSet m_reservedDense;
+        DenseBitSet m_unspillableDense;
+        std::pmr::vector<uint32_t> m_selectStack;
+        std::pmr::vector<std::pmr::vector<uint32_t>> m_affinity;
+        std::pmr::vector<size_t> m_classColorLimits;
+        std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
+        bool m_spillCostsValid{ false };
+    };
+
     MirBuilderContext *m_ctx;
     MirFunction *m_targetFunction;
     TargetDesc *m_targetDesc;
-    std::pmr::memory_resource *m_allocator;
+    std::pmr::memory_resource *m_persistentAlloc;
+    std::pmr::memory_resource *m_scratchAlloc;
 
     std::pmr::unordered_set<MirRegisterRef> m_reservedRegs;
     std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_allocatedRegs;
     std::pmr::unordered_map<MirRegisterRef, StackFrameObject *> m_spilledRegs;
     std::pmr::unordered_set<MirRegisterRef> m_unspillableRegs;
-    std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
-    bool m_spillCostsValid{ false };
     bool m_coalescingEnabled{ true };
-
-    // Dense-indexed interference graph & per-iteration state
-    std::pmr::vector<MirRegisterRef> m_idToReg;
-    std::pmr::unordered_map<MirRegisterRef, uint32_t> m_regToId;
-    std::pmr::vector<DenseBitSet> m_adjBits;
-    std::pmr::vector<std::pmr::vector<uint32_t>> m_adjList;
-    std::pmr::vector<uint32_t> m_degree;
-    std::pmr::vector<uint32_t> m_leader;
-    DenseBitSet m_removed;
-    DenseBitSet m_coalescedAway;
-    DenseBitSet m_reservedDense;
-    DenseBitSet m_unspillableDense;
-    std::pmr::vector<uint32_t> m_selectStack;
-    std::pmr::vector<std::pmr::vector<uint32_t>> m_affinity;
-    std::pmr::vector<size_t> m_classColorLimits;
+    std::optional<ScratchState> m_scratch;
 };
 ```
 

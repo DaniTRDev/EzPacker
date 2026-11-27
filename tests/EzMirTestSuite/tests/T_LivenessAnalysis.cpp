@@ -482,3 +482,56 @@ TEST_F(LivenessAnalysisTest, TestDeadCodeDefinitions)
     EXPECT_TRUE(NotLiveIn(res, entryBlock->getId(), vDead->getRegId()));
     EXPECT_TRUE(NotLiveOut(res, entryBlock->getId(), vDead->getRegId()));
 }
+
+/**
+ * Verifies that LivenessResult survives after computeGlobalLiveness()'s local scratchArena
+ * is destroyed (including when many registers overflow the stack scratch buffer).
+ */
+TEST_F(LivenessAnalysisTest, TestScratchArenaOverflowAndResultPersistence)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirBlockBuilder blockBuilder(ctx, getTestFunc());
+    MirOperandBuilder opBuilder(ctx);
+
+    MirBlock *entryBlock = getTestFunc()->getEntryPoint();
+    MirBlock *emptyUnreachable = blockBuilder.build(nullptr, "empty_unreachable");
+    MirBlock *exitBlock = blockBuilder.build(nullptr, "exit_block");
+    (void)emptyUnreachable;
+
+    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
+    std::vector<MirRegister *> regs;
+    regs.reserve(300);
+
+    {
+        MirInstructionBuilder eb(ctx, entryBlock, InsertionType::Append, entryBlock->end());
+        for (int i = 0; i < 300; ++i)
+        {
+            MirRegister *r = createInt32Reg("r" + std::to_string(i));
+            eb.MOV(r, imm1);
+            regs.push_back(r);
+        }
+        eb.JMP(opBuilder.buildRef(exitBlock));
+    }
+
+    {
+        MirInstructionBuilder xb(ctx, exitBlock, InsertionType::Append, exitBlock->end());
+        MirRegister *sum = createInt32Reg("sum");
+        xb.MOV(sum, imm1);
+        for (MirRegister *r : regs)
+        {
+            xb.ADD(sum, sum, r);
+        }
+        xb.RET(sum);
+    }
+
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+    ASSERT_NE(res, nullptr);
+
+    for (MirRegister *r : regs)
+    {
+        EXPECT_TRUE(IsLiveOut(res, entryBlock->getId(), r->getRegId()));
+        EXPECT_TRUE(IsLiveIn(res, exitBlock->getId(), r->getRegId()));
+    }
+}

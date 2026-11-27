@@ -7,108 +7,113 @@
 #include "Operand/MirRegisterReference.h"
 #include <algorithm>
 #include <limits>
+#include <optional>
 
 /**
  * Working context for graph-coloring register allocation on a single function,
- * containing the dense-indexed interference graph, degree tables, select stack, and spill tracking.
+ * separating persistent cross-iteration spill state (m_persistentAlloc) from
+ * ephemeral per-iteration graph/coalescing/simplification scratch state (m_scratchAlloc).
  */
 struct RegisterAllocatorCtx
 {
     static constexpr uint32_t InvalidNode = std::numeric_limits<uint32_t>::max();
     static constexpr uint32_t InfiniteDegree = std::numeric_limits<uint32_t>::max();
 
+    /**
+     * Ephemeral per-iteration dense interference graph and simplification state.
+     * Destroyed at the end of every spill iteration so its monotonic scratch arena
+     * can be reclaimed immediately without dangling memory_resource pointers.
+     */
+    struct ScratchState
+    {
+        size_t m_adjCapacity{ 0 };
+        std::pmr::vector<MirRegisterRef> m_idToReg;
+        std::pmr::unordered_map<MirRegisterRef, uint32_t> m_regToId;
+        std::pmr::vector<DenseBitSet> m_adjBits;
+        std::pmr::vector<std::pmr::vector<uint32_t>> m_adjList;
+        std::pmr::vector<uint32_t> m_degree;
+        std::pmr::vector<uint32_t> m_leader;
+        DenseBitSet m_removed;
+        DenseBitSet m_coalescedAway;
+        DenseBitSet m_reservedDense;
+        DenseBitSet m_unspillableDense;
+        std::pmr::vector<uint32_t> m_selectStack;
+        std::pmr::vector<std::pmr::vector<uint32_t>> m_affinity;
+        std::pmr::unordered_map<MirRegisterClass *, uint32_t> m_classToIdx;
+        std::pmr::vector<size_t> m_classColorLimits;
+        std::pmr::vector<uint32_t> m_nodeClassIdx;
+        std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
+        bool m_spillCostsValid{ false };
+
+        explicit ScratchState(std::pmr::memory_resource *alloc) :
+            m_idToReg(alloc), m_regToId(alloc), m_adjBits(alloc), m_adjList(alloc), m_degree(alloc), m_leader(alloc),
+            m_removed(alloc), m_coalescedAway(alloc), m_reservedDense(alloc), m_unspillableDense(alloc),
+            m_selectStack(alloc), m_affinity(alloc), m_classToIdx(alloc), m_classColorLimits(alloc),
+            m_nodeClassIdx(alloc), m_spillCosts(alloc)
+        {
+        }
+    };
+
     class MirBuilderContext *m_ctx;      ///< Shared builder context used when rewriting registers.
     class MirFunction *m_targetFunction; ///< Function whose registers are being allocated.
     class TargetDesc *m_targetDesc;      ///< Target supplying register classes and spill hooks.
 
-    // Explicit PMR allocator handle for context containers
-    std::pmr::memory_resource *m_allocator;
+    std::pmr::memory_resource *m_persistentAlloc; ///< Arena for cross-iteration & pass-result state.
+    std::pmr::memory_resource *m_scratchAlloc;    ///< Arena for current iteration's ephemeral graph state.
 
-    // A set of registers that are reserved and CAN'T be used during allocation.
+    // Persistent across spill iterations
     std::pmr::unordered_set<MirRegisterRef> m_reservedRegs;
-
-    // First = Virtual Register. Second = Assigned Physical Register.
     std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_allocatedRegs;
-
-    // First = Register. Second = Assigned stack slot if spilled.
     std::pmr::unordered_map<MirRegisterRef, class StackFrameObject *> m_spilledRegs;
-
-    // Set of registers that can't be optimistically spilled.
     std::pmr::unordered_set<MirRegisterRef> m_unspillableRegs;
-
-    // Cached per-register spill costs, rebuilt once per interference-graph construction.
-    std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
-    bool m_spillCostsValid{ false };
-
-    // Controls whether conservative coalescing is executed during allocation.
     bool m_coalescingEnabled{ true };
 
-    // -------------------------------------------------------------------------
-    // Dense-indexed interference graph & per-iteration allocation state
-    // -------------------------------------------------------------------------
-    size_t m_adjCapacity{ 0 };
-    std::pmr::vector<MirRegisterRef> m_idToReg;
-    std::pmr::unordered_map<MirRegisterRef, uint32_t> m_regToId;
-    std::pmr::vector<DenseBitSet> m_adjBits;
-    std::pmr::vector<std::pmr::vector<uint32_t>> m_adjList;
-    std::pmr::vector<uint32_t> m_degree;
-    std::pmr::vector<uint32_t> m_leader;
-    DenseBitSet m_removed;
-    DenseBitSet m_coalescedAway;
-    DenseBitSet m_reservedDense;
-    DenseBitSet m_unspillableDense;
-    std::pmr::vector<uint32_t> m_selectStack;
-    std::pmr::vector<std::pmr::vector<uint32_t>> m_affinity;
-
-    // Cached per-register-class color limits for this function.
-    std::pmr::unordered_map<MirRegisterClass *, uint32_t> m_classToIdx;
-    std::pmr::vector<size_t> m_classColorLimits;
-    std::pmr::vector<uint32_t> m_nodeClassIdx;
+    // Ephemeral per-iteration state (scoped to m_scratchAlloc)
+    std::optional<ScratchState> m_scratch;
 
     /**
-     * Clears all per-iteration graph, coalescing, and coloring state while preserving
-     * cross-iteration spill tracking (m_spilledRegs, m_unspillableRegs).
+     * Begins a new allocation iteration backed by scratchAlloc, clearing m_allocatedRegs.
      */
-    void resetIterationState()
+    void beginIteration(std::pmr::memory_resource *scratchAlloc)
     {
-        m_adjCapacity = 0;
-        m_idToReg.clear();
-        m_regToId.clear();
-        m_adjBits.clear();
-        m_adjList.clear();
-        m_degree.clear();
-        m_leader.clear();
-        m_removed.reset();
-        m_coalescedAway.reset();
-        m_reservedDense.reset();
-        m_unspillableDense.reset();
-        m_selectStack.clear();
-        m_affinity.clear();
         m_allocatedRegs.clear();
-        m_classToIdx.clear();
-        m_classColorLimits.clear();
-        m_nodeClassIdx.clear();
-        m_spillCostsValid = false;
+        m_scratch.reset();
+        m_scratchAlloc = scratchAlloc ? scratchAlloc : m_persistentAlloc;
+        m_scratch.emplace(m_scratchAlloc);
     }
+
+    /**
+     * Destroys all ephemeral per-iteration containers before the iteration's scratch arena is released.
+     */
+    void endIteration()
+    {
+        m_scratch.reset();
+        m_scratchAlloc = m_persistentAlloc;
+    }
+
+    /**
+     * Resets per-iteration state in-place using the current scratch allocator (for standalone callers).
+     */
+    void resetIterationState() { beginIteration(m_scratchAlloc); }
 
     /**
      * Ensures capacity for at least targetCap dense nodes across all bitsets.
      */
     void ensureNodeCapacity(size_t targetCap)
     {
-        if (targetCap <= m_adjCapacity)
+        if (!m_scratch || targetCap <= m_scratch->m_adjCapacity)
             return;
 
-        size_t newCap = std::max<size_t>(64, m_adjCapacity * 2);
+        size_t newCap = std::max<size_t>(64, m_scratch->m_adjCapacity * 2);
         while (newCap < targetCap)
             newCap *= 2;
 
-        m_adjCapacity = newCap;
-        m_removed.resize(newCap);
-        m_coalescedAway.resize(newCap);
-        m_reservedDense.resize(newCap);
-        m_unspillableDense.resize(newCap);
-        for (auto &bits : m_adjBits)
+        m_scratch->m_adjCapacity = newCap;
+        m_scratch->m_removed.resize(newCap);
+        m_scratch->m_coalescedAway.resize(newCap);
+        m_scratch->m_reservedDense.resize(newCap);
+        m_scratch->m_unspillableDense.resize(newCap);
+        for (auto &bits : m_scratch->m_adjBits)
             bits.resize(newCap);
     }
 
@@ -117,25 +122,26 @@ struct RegisterAllocatorCtx
      */
     uint32_t getOrAddNode(MirRegisterRef reg)
     {
-        auto [it, inserted] = m_regToId.try_emplace(reg, static_cast<uint32_t>(m_idToReg.size()));
+        auto &s = *m_scratch;
+        auto [it, inserted] = s.m_regToId.try_emplace(reg, static_cast<uint32_t>(s.m_idToReg.size()));
         if (!inserted)
             return it->second;
 
         const uint32_t id = it->second;
         ensureNodeCapacity(id + 1);
 
-        m_idToReg.push_back(reg);
-        m_adjBits.emplace_back(m_adjCapacity);
-        m_adjList.emplace_back();
-        m_degree.push_back(0);
-        m_leader.push_back(id);
-        m_affinity.emplace_back();
-        m_nodeClassIdx.push_back(getOrAddClassIdx(reg.getClass()));
+        s.m_idToReg.push_back(reg);
+        s.m_adjBits.emplace_back(s.m_adjCapacity);
+        s.m_adjList.emplace_back();
+        s.m_degree.push_back(0);
+        s.m_leader.push_back(id);
+        s.m_affinity.emplace_back();
+        s.m_nodeClassIdx.push_back(getOrAddClassIdx(reg.getClass()));
 
         if (m_reservedRegs.contains(reg))
-            m_reservedDense.set(id);
+            s.m_reservedDense.set(id);
         if (m_unspillableRegs.contains(reg))
-            m_unspillableDense.set(id);
+            s.m_unspillableDense.set(id);
 
         return id;
     }
@@ -145,8 +151,10 @@ struct RegisterAllocatorCtx
      */
     [[nodiscard]] uint32_t findNode(MirRegisterRef reg) const
     {
-        auto it = m_regToId.find(reg);
-        return it != m_regToId.end() ? it->second : InvalidNode;
+        if (!m_scratch)
+            return InvalidNode;
+        auto it = m_scratch->m_regToId.find(reg);
+        return it != m_scratch->m_regToId.end() ? it->second : InvalidNode;
     }
 
     [[nodiscard]] bool hasNode(MirRegisterRef reg) const { return findNode(reg) != InvalidNode; }
@@ -157,7 +165,7 @@ struct RegisterAllocatorCtx
         uint32_t idB = findNode(b);
         if (idA == InvalidNode || idB == InvalidNode)
             return false;
-        return m_adjBits[idA].test(idB);
+        return m_scratch->m_adjBits[idA].test(idB);
     }
 
     /**
@@ -165,12 +173,13 @@ struct RegisterAllocatorCtx
      */
     void addEdge(uint32_t a, uint32_t b)
     {
-        if (a == b || m_adjBits[a].test(b))
+        auto &s = *m_scratch;
+        if (a == b || s.m_adjBits[a].test(b))
             return;
-        m_adjBits[a].set(b);
-        m_adjBits[b].set(a);
-        m_adjList[a].push_back(b);
-        m_adjList[b].push_back(a);
+        s.m_adjBits[a].set(b);
+        s.m_adjBits[b].set(a);
+        s.m_adjList[a].push_back(b);
+        s.m_adjList[b].push_back(a);
     }
 
     /**
@@ -178,10 +187,11 @@ struct RegisterAllocatorCtx
      */
     void removeEdge(uint32_t a, uint32_t b)
     {
-        if (!m_adjBits[a].test(b))
+        auto &s = *m_scratch;
+        if (!s.m_adjBits[a].test(b))
             return;
-        m_adjBits[a].clearBit(b);
-        m_adjBits[b].clearBit(a);
+        s.m_adjBits[a].clearBit(b);
+        s.m_adjBits[b].clearBit(a);
         auto swapErase = [](std::pmr::vector<uint32_t> &vec, uint32_t target)
         {
             for (size_t i = 0; i < vec.size(); ++i)
@@ -194,21 +204,25 @@ struct RegisterAllocatorCtx
                 }
             }
         };
-        swapErase(m_adjList[a], b);
-        swapErase(m_adjList[b], a);
+        swapErase(s.m_adjList[a], b);
+        swapErase(s.m_adjList[b], a);
     }
 
     [[nodiscard]] size_t getNeighborCount(MirRegisterRef reg) const
     {
         uint32_t id = findNode(reg);
-        return id != InvalidNode ? m_adjList[id].size() : 0;
+        return id != InvalidNode ? m_scratch->m_adjList[id].size() : 0;
     }
 
     [[nodiscard]] size_t getDegree(MirRegisterRef reg) const
     {
         uint32_t id = findNode(reg);
-        return id != InvalidNode ? m_degree[id] : 0;
+        return id != InvalidNode ? m_scratch->m_degree[id] : 0;
     }
+
+    void pushSelectStack(uint32_t id) { m_scratch->m_selectStack.push_back(id); }
+
+    [[nodiscard]] size_t getSelectStackSize() const { return m_scratch ? m_scratch->m_selectStack.size() : 0; }
 
     void addAffinity(MirRegisterRef a, MirRegisterRef b)
     {
@@ -216,17 +230,18 @@ struct RegisterAllocatorCtx
         uint32_t idB = getOrAddNode(b);
         if (idA == idB)
             return;
-        auto &affA = m_affinity[idA];
+        auto &affA = m_scratch->m_affinity[idA];
         if (std::find(affA.begin(), affA.end(), idB) == affA.end())
             affA.push_back(idB);
-        auto &affB = m_affinity[idB];
+        auto &affB = m_scratch->m_affinity[idB];
         if (std::find(affB.begin(), affB.end(), idA) == affB.end())
             affB.push_back(idA);
     }
 
     uint32_t getOrAddClassIdx(MirRegisterClass *cls)
     {
-        auto [it, inserted] = m_classToIdx.try_emplace(cls, static_cast<uint32_t>(m_classColorLimits.size()));
+        auto &s = *m_scratch;
+        auto [it, inserted] = s.m_classToIdx.try_emplace(cls, static_cast<uint32_t>(s.m_classColorLimits.size()));
         if (!inserted)
             return it->second;
 
@@ -240,20 +255,23 @@ struct RegisterAllocatorCtx
                     usableCount++;
             }
         }
-        m_classColorLimits.push_back(usableCount);
+        s.m_classColorLimits.push_back(usableCount);
         return it->second;
     }
 
     [[nodiscard]] size_t getColorLimit(MirRegisterClass *cls)
     {
         uint32_t idx = getOrAddClassIdx(cls);
-        return m_classColorLimits[idx];
+        return m_scratch->m_classColorLimits[idx];
     }
 
     [[nodiscard]] uint32_t getLeaderId(uint32_t id) const
     {
-        while (id < m_leader.size() && m_leader[id] != id)
-            id = m_leader[id];
+        if (!m_scratch)
+            return id;
+        const auto &leader = m_scratch->m_leader;
+        while (id < leader.size() && leader[id] != id)
+            id = leader[id];
         return id;
     }
 
@@ -262,20 +280,19 @@ struct RegisterAllocatorCtx
         uint32_t id = findNode(reg);
         if (id == InvalidNode)
             return reg;
-        return m_idToReg[getLeaderId(id)];
+        return m_scratch->m_idToReg[getLeaderId(id)];
     }
 
     explicit RegisterAllocatorCtx(class MirBuilderContext *ctx,
                                   class MirFunction *targetFunction,
                                   class TargetDesc *targetDesc,
-                                  std::pmr::memory_resource *alloc) :
-        m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc), m_allocator(alloc),
-        m_reservedRegs(alloc), m_allocatedRegs(alloc), m_spilledRegs(alloc), m_unspillableRegs(alloc),
-        m_spillCosts(alloc), m_idToReg(alloc), m_regToId(alloc), m_adjBits(alloc), m_adjList(alloc), m_degree(alloc),
-        m_leader(alloc), m_removed(alloc), m_coalescedAway(alloc), m_reservedDense(alloc), m_unspillableDense(alloc),
-        m_selectStack(alloc), m_affinity(alloc), m_classToIdx(alloc), m_classColorLimits(alloc),
-        m_nodeClassIdx(alloc)
+                                  std::pmr::memory_resource *persistentAlloc,
+                                  std::pmr::memory_resource *scratchAlloc = nullptr) :
+        m_ctx(ctx), m_targetFunction(targetFunction), m_targetDesc(targetDesc), m_persistentAlloc(persistentAlloc),
+        m_scratchAlloc(scratchAlloc ? scratchAlloc : persistentAlloc), m_reservedRegs(persistentAlloc),
+        m_allocatedRegs(persistentAlloc), m_spilledRegs(persistentAlloc), m_unspillableRegs(persistentAlloc)
     {
+        m_scratch.emplace(m_scratchAlloc);
     }
 };
 

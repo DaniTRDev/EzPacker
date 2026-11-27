@@ -73,7 +73,7 @@ MirInstruction *RiscV64RegisterAllocator::reMaterialize(RegisterAllocatorCtx *ct
                                                        MirInstruction *defInst)
 {
     MirInstructionBuilder iBuilder(ctx->m_ctx, block, InsertionType::InsertBefore, it);
-    std::pmr::vector<MirOperand *> ops(ctx->m_allocator);
+    std::pmr::vector<MirOperand *> ops(ctx->m_scratchAlloc);
     ops.reserve(defInst->getOperands().size());
     ops.push_back(dstReg);
     for (size_t i = 1; i < defInst->getOperands().size(); ++i)
