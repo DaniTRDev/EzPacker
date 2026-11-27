@@ -134,18 +134,6 @@ std::string resolveIncludeDir(const char *envVarName,
     return {};
 }
 
-void pushUniqueIncludePath(const std::string &path)
-{
-    if (path.empty())
-        return;
-    for (int i = 0; i < include_paths.len; ++i)
-    {
-        if (include_paths.data[i] && path == include_paths.data[i])
-            return;
-    }
-    strarray_push(&include_paths, const_cast<char *>(path.c_str()));
-}
-
 } // namespace
 
 ChibiccWrapper::ChibiccWrapper()
@@ -286,17 +274,23 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
     if (m_target.isWindows())
     {
         undef_macro(const_cast<char *>("__ELF__"));
-        define_macro(const_cast<char *>("_WIN32"), const_cast<char *>("1"));
-        define_macro(const_cast<char *>("_WIN64"), const_cast<char *>("1"));
-        define_macro(const_cast<char *>("__WIN32__"), const_cast<char *>("1"));
-        define_macro(const_cast<char *>("__WIN64__"), const_cast<char *>("1"));
+        if (m_hosted)
+        {
+            define_macro(const_cast<char *>("_WIN32"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("_WIN64"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__WIN32__"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__WIN64__"), const_cast<char *>("1"));
+        }
     }
     else if (m_target.isLinux())
     {
         define_macro(const_cast<char *>("__ELF__"), const_cast<char *>("1"));
-        define_macro(const_cast<char *>("__linux__"), const_cast<char *>("1"));
-        define_macro(const_cast<char *>("__linux"), const_cast<char *>("1"));
-        define_macro(const_cast<char *>("__gnu_linux__"), const_cast<char *>("1"));
+        if (m_hosted)
+        {
+            define_macro(const_cast<char *>("__linux__"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__linux"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__gnu_linux__"), const_cast<char *>("1"));
+        }
     }
 
     if (m_hosted)
@@ -312,19 +306,35 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
     include_paths.capacity = 0;
     include_paths.len = 0;
 
+    // Keep resolved include strings alive for the entire parseFile() invocation
+    // because chibicc's strarray_push stores raw char* pointers without copying.
+    std::vector<std::string> ownedIncludePaths;
+    ownedIncludePaths.reserve(m_includePaths.size() + 3);
+    auto pushOwnedIncludePath = [&](std::string path) {
+        if (path.empty())
+            return;
+        for (int i = 0; i < include_paths.len; ++i)
+        {
+            if (include_paths.data[i] && path == include_paths.data[i])
+                return;
+        }
+        ownedIncludePaths.push_back(std::move(path));
+        strarray_push(&include_paths, const_cast<char *>(ownedIncludePaths.back().c_str()));
+    };
+
     for (const auto &inc : m_includePaths)
     {
-        pushUniqueIncludePath(inc);
+        pushOwnedIncludePath(inc);
     }
 
     if (m_hosted)
     {
-        pushUniqueIncludePath(getBundledHostedCompatIncludeDir());
-        pushUniqueIncludePath(getBundledHostedIncludeDir());
+        pushOwnedIncludePath(getBundledHostedCompatIncludeDir());
+        pushOwnedIncludePath(getBundledHostedIncludeDir());
     }
     else
     {
-        pushUniqueIncludePath(getBundledFreestandingIncludeDir());
+        pushOwnedIncludePath(getBundledFreestandingIncludeDir());
     }
 
     for (const auto &[name, val] : m_macros)

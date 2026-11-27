@@ -120,6 +120,7 @@ if (WIN32)
         "${EZMUSL_UPSTREAM_DIR}/src/locale/dcngettext.c"
         "${EZMUSL_UPSTREAM_DIR}/src/locale/__lctrans.c"
         "${EZMUSL_UPSTREAM_DIR}/src/malloc/calloc.c"
+        "${EZMUSL_UPSTREAM_DIR}/src/malloc/libc_calloc.c"
         "${EZMUSL_UPSTREAM_DIR}/src/malloc/lite_malloc.c"
         "${EZMUSL_UPSTREAM_DIR}/src/math/tgamma.c"
         "${EZMUSL_UPSTREAM_DIR}/src/process/fork.c"

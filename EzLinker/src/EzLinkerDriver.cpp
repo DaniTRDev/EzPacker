@@ -11,6 +11,7 @@
 #define EZ_POPEN _popen
 #define EZ_PCLOSE _pclose
 #else
+#include <sys/wait.h>
 #include <unistd.h>
 #define EZ_POPEN popen
 #define EZ_PCLOSE pclose
@@ -671,7 +672,27 @@ LinkResult EzLinkerDriver::link(const LinkerOptions &opts) const
         res.output += buffer;
     }
 
-    res.exitCode = EZ_PCLOSE(pipe);
+    int rawStatus = EZ_PCLOSE(pipe);
+#if defined(_WIN32)
+    res.exitCode = rawStatus;
+#else
+    if (rawStatus == -1)
+    {
+        res.exitCode = 1;
+    }
+    else if (WIFEXITED(rawStatus))
+    {
+        res.exitCode = WEXITSTATUS(rawStatus);
+    }
+    else if (WIFSIGNALED(rawStatus))
+    {
+        res.exitCode = 128 + WTERMSIG(rawStatus);
+    }
+    else
+    {
+        res.exitCode = 1;
+    }
+#endif
     res.success = (res.exitCode == 0);
 
     return res;
