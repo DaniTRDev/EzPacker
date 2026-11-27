@@ -317,12 +317,6 @@ class MirRegisterAllocator
     bool coalesce(class RegisterAllocatorCtx *ctx);
 
     /**
-     * Populates lightweight MOV affinity hints without modifying the interference graph or coalescing
-     * nodes (used at -O0 so selectColors can still bias trivial copies deterministically).
-     */
-    void populateMoveAffinityHints(class RegisterAllocatorCtx *ctx);
-
-    /**
      * Simplifies the graph by removing nodes whose degree < K_class and pushing onto selectStack.
      */
     bool simplify(class RegisterAllocatorCtx *ctx);

@@ -267,7 +267,6 @@ public:
     bool buildInterferenceGraph(LivenessResult *liveness, RegisterAllocatorCtx *ctx);
     void evaluateInterferenceGraphDegree(RegisterAllocatorCtx *ctx);
     bool coalesce(RegisterAllocatorCtx *ctx);
-    void populateMoveAffinityHints(RegisterAllocatorCtx *ctx);
     bool simplify(RegisterAllocatorCtx *ctx);
     bool selectColors(RegisterAllocatorCtx *ctx);
     void rewriteColors(RegisterAllocatorCtx *ctx);
@@ -284,9 +283,8 @@ When coalescing is enabled (`m_coalescingEnabled = true`, active at `-O1`, `-O2`
    - **George's Criterion (Virtual into Physical)**: Merges virtual register $u$ into physical register $v$ if every neighbor $t$ of $u$ either already interferes with $v$ or has low degree ($\text{deg}(t) < K$). Guarantees the physical node's simplification degree does not increase unsafely.
    - **Briggs' Criterion (Virtual into Virtual)**: Merges non-interfering virtual registers $u$ and $v$ if the combined node has fewer than $K$ neighbors of significant degree ($\ge K$). Evaluated in linear-scan passes using zero-allocation `DenseBitSet::copyOr` bitwise unions and symmetric `m_adjBits`/`m_adjList` updates.
    - **Two-Address Constraint Preservation**: Automatically coalesces destination registers with first source operands (`m_coalesceSrc`) for destructive operations (e.g. x86-64 ALU instructions).
-2. **Affinity-Biased Color Selection (`selectColors`) & `-O0` Fast Path**:
+2. **Affinity-Biased Color Selection (`selectColors`)**:
    - Records affinity preferences between copy-related register pairs in `m_affinity`.
-   - When coalescing is disabled (`-O0`), `populateMoveAffinityHints()` performs a single linear pass over `MOV` instructions to record non-interfering copy hints without modifying the interference graph, enabling `selectColors()` + `eliminateRedundantCopies()` to eliminate trivial identity copies cleanly.
    - When assigning a physical color to an uncolored node, checks if its copy partner has already been colored and prioritizes that exact physical register if legal and unconstrained.
 3. **Lazy Spill-Cost Calculation (`simplify`)**:
    - `calculateSpillCost()` is deferred until `lowDegreeQueue` is exhausted and an optimistic spill candidate is actually needed (at most once per iteration via `m_spillCostsValid`), skipping the instruction scan completely on non-spilling functions.
