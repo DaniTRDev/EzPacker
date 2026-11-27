@@ -22,6 +22,13 @@ static inline char *chibicc_shim_strndup(const char *s, size_t n) {
 }
 #define strndup chibicc_shim_strndup
 
+#else
+#if defined(__GNUC__) || defined(__clang__)
+#include_next <strings.h>
+#else
+int strcasecmp(const char *, const char *);
+int strncasecmp(const char *, const char *, size_t);
+#endif
 #endif
 
 #endif // CHIBICC_SHIM_STRINGS_H

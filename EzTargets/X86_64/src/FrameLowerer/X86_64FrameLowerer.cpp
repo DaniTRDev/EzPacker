@@ -150,6 +150,7 @@ void X86_64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
 
     // 3. Push callee-saved registers:
     const auto &usedCallees = setup.m_func->getUsedCalleeSavedRegs();
+    size_t pushedCalleeCount = 0;
     for (const MirRegisterRef &regRef : usedCallees)
     {
         if (setup.m_hasFP && regRef == setup.m_fpRef)
@@ -158,6 +159,24 @@ void X86_64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
         }
         MirRegister *calleeReg = opBuilder.buildPhysReg(setup.m_ptrType, regRef.getId(), "", regRef.getClass());
         builder.buildTarget(setup.m_descPush, srcRef, { calleeReg });
+        ++pushedCalleeCount;
+    }
+
+    // 4. Maintain 16-byte stack alignment before any outgoing calls.
+    // On entry, %rsp is 16n + 8 (due to return address), so total prologue bytes must satisfy total % 16 == 8.
+    const size_t frameSizeBytes = (setup.m_analysisData && setup.m_analysisData->m_totalFrameSize > 0)
+                                          ? static_cast<size_t>(setup.m_analysisData->m_totalFrameSize)
+                                          : 0U;
+    const size_t totalPrologueBytes = (setup.m_hasFP ? 8U : 0U) + frameSizeBytes + (pushedCalleeCount * 8U);
+    if (totalPrologueBytes > 0)
+    {
+        const size_t misalign = (totalPrologueBytes + 8U) % 16U;
+        if (misalign != 0)
+        {
+            const size_t alignPad = 16U - misalign;
+            MirInteger *padImm = opBuilder.buildInt(setup.m_i64, FlexInt(static_cast<int64_t>(alignPad)));
+            builder.buildTarget(setup.m_descSub, srcRef, { setup.m_spReg, setup.m_spReg, padImm });
+        }
     }
 }
 
@@ -199,6 +218,31 @@ void X86_64FrameLowerer::insertEpilogue(FrameLowererCtx &ctx)
 
             MirInstructionBuilder epilogueBuilder(ctx.m_ctx, inst, InsertionType::InsertBefore);
             SourceReference *srcRef = inst->getSourceRef();
+
+            // 0. Undo prologue alignment padding before popping callee-saved registers:
+            size_t pushedCalleeCount = 0;
+            for (const MirRegisterRef &regRef : usedCallees)
+            {
+                if (setup.m_hasFP && regRef == setup.m_fpRef)
+                {
+                    continue;
+                }
+                ++pushedCalleeCount;
+            }
+            const size_t frameSizeBytes = (setup.m_analysisData && setup.m_analysisData->m_totalFrameSize > 0)
+                                                  ? static_cast<size_t>(setup.m_analysisData->m_totalFrameSize)
+                                                  : 0U;
+            const size_t totalPrologueBytes = (setup.m_hasFP ? 8U : 0U) + frameSizeBytes + (pushedCalleeCount * 8U);
+            if (totalPrologueBytes > 0)
+            {
+                const size_t misalign = (totalPrologueBytes + 8U) % 16U;
+                if (misalign != 0)
+                {
+                    const size_t alignPad = 16U - misalign;
+                    MirInteger *padImm = opBuilder.buildInt(setup.m_i64, FlexInt(static_cast<int64_t>(alignPad)));
+                    epilogueBuilder.buildTarget(setup.m_descAdd, srcRef, { setup.m_spReg, setup.m_spReg, padImm });
+                }
+            }
 
             // 1. Pop callee-saved registers in reverse order:
             for (auto rIt = usedCallees.rbegin(); rIt != usedCallees.rend(); ++rIt)

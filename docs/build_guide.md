@@ -42,6 +42,7 @@ EzPacker automates third-party dependency management through CMake's `FetchConte
 
 ### Vendored In-Tree Dependencies
 - **`LibBf`** (`LibBf/`): Fabrice Bellard's high-precision floating-point library used by `FlexFloat` to model IEEE 754 scalar and vector types (f32, f64, f128).
+- **`musl 1.2.5`** (`third_party/musl/` + `EzMusl/`): Official MIT-licensed `musl` C standard library configured via `EzCMK` as static library `EzMusl`, with pure-CMake header generation and cross-platform Linux ELF64 / Windows Win32 support.
 - **`chibicc overlay`** (`CMake/chibicc/overlay/`): Portable compatibility overlay headers (`chibicc.h`, `strings.h`) providing MSVC and cross-platform compatibility, re-entrant error handling, and macro-injected preprocessor/tokenizer definitions without modifying upstream source files.
 
 ---
@@ -75,7 +76,7 @@ cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 # 3. Compile all targets
 cmake --build build --config Release -j
 ```
-Binaries (`ezc`, `ez-ld`, `EzDslCli`), static libraries (`EzLibStdC`, `EzExceptionRuntime`), and test executables will be placed in `build/bin/` (or `build/bin/Release/`) and `build/lib/`.
+Binaries (`ezc`, `ez-ld`, `EzDslCli`), static libraries (`EzMusl`, `EzExceptionRuntime`, plus `crt1.o` on Linux), and test executables will be placed in `build/bin/` (or `build/bin/Release/`) and `build/lib/`.
 
 ### 4.2 Windows / Linux (Ninja Generator)
 Using Ninja delivers significantly faster parallel compilation:

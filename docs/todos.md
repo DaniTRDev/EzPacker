@@ -15,40 +15,17 @@ Items are organized by architectural subsystem and categorized by priority:
 
 ---
 
-## 2. Standard Runtime & CRT (`EzLibStdC`)
+## 2. Standard Runtime & CRT (`EzMusl`)
 
-### 2.1 File & Stream I/O Operations (`src/stdio/stdio.c`)
-- **[P1] Real File System Stream Implementation**:
-  - `fopen`, `fclose`, `fread`, `fwrite`, `fflush`: Currently return dummy pointers or stubs. Need real OS file descriptor bindings (`CreateFileW` / `ReadFile` / `WriteFile` / `CloseHandle` on Windows; `SYS_open`, `SYS_read`, `SYS_write`, `SYS_close` on Linux).
-  - Stream buffering: Implement full, line, and unbuffered I/O modes (`setvbuf`, `setbuf`) with a default 4KB or 8KB stream buffer.
-  - Positioning and inspection: Implement `fseek`, `ftell`, `rewind`, `feof`, `ferror`, `clearerr`.
-  - Line reading: Implement `fgets` and character pushback `ungetc`.
-  - File management: Implement `remove` and `rename` via OS APIs.
-- **[P2] Formatted Input & Floating-Point Formatting**:
-  - `vsnprintf` Floating-Point Formatting: Currently handles `%d`, `%i`, `%u`, `%x`, `%X`, `%p`, `%s`, `%c`. Floating-point specifiers (`%f`, `%e`, `%g`, `%a`) need conversion routines (Dragonbox or Grisu algorithm).
-  - Formatted Input Engine: Implement `scanf`, `fscanf`, `sscanf`, `vsscanf`.
-  - Console input: Real interactive `getchar()` / `fgetc(stdin)` reading from console input handles.
+> **Migration Note**: Legacy `EzLibStdC` (`STD-01`..`STD-03`: OS file descriptors, `mallocng` heap allocator, and floating-point `vsnprintf` formatting) has been replaced by vendored **musl 1.2.5** (`EzMusl`). Remaining items below track Windows Win32 platform parity extensions for `EzMusl`.
 
-### 2.2 Dynamic Memory Allocation (`src/os/os_support.h`, `src/stdlib/stdlib.c`)
-- **[P1] Linux Userspace Heap Allocator**:
-  - On Linux, `ez_os_alloc` directly invokes `SYS_mmap`, while `ez_os_free` is currently an empty stub (`#else /* empty */`).
-  - Calling `free()` on Linux leaks memory because individual allocations are not tracked with metadata or unmapped via `SYS_munmap`.
-  - `ez_os_realloc` on Linux currently allocates a new block without copying previous data.
-  - **Proposed Solution**: Implement a self-contained, high-performance two-level segregated fit (TLSF) or buddy/freelist allocator for Linux operating over `SYS_brk` or pooled `SYS_mmap` arenas, storing chunk headers (`size`, `flags`) preceding user pointers.
-- **[P2] Memory Alignment & Guard Pages**:
-  - Implement C11 `aligned_alloc(size_t alignment, size_t size)` ensuring power-of-two memory alignment.
-
-### 2.3 Additional ISO C11 Standard Headers & Facilities
-- **[P2] Multithreading Support (`<threads.h>`)**:
-  - Headers currently define typedef stubs (`thrd_t`, `mtx_t`, `cnd_t`, `tss_t`).
-  - Implement thread lifecycle (`thrd_create`, `thrd_join`, `thrd_detach`, `thrd_exit`) on Windows (`CreateThread`) and Linux (`SYS_clone` / `clone3`).
-  - Implement synchronization primitives (`mtx_init`, `mtx_lock`, `mtx_unlock`, `cnd_wait`, `cnd_signal`).
-- **[P2] Floating-Point Environment (`<fenv.h>`)**:
-  - Provide hardware control and status register manipulation for x86-64 SSE MXCSR / x87 control word (`stmxcsr`, `ldmxcsr`, `fnstcw`, `fldcw`) and RISC-V `fcsr` (`frcsr`, `fscsr`).
-  - Implement `feclearexcept`, `feraiseexcept`, `fegetround`, `fesetround`, `fegetenv`, `fesetenv`.
-- **[P3] Complex Arithmetic (`<complex.h>`) & Unicode (`<uchar.h>`, `<wchar.h>`)**:
-  - Implement mathematical routines for `double complex` and `float complex` (`cabs`, `csqrt`, `cpow`, `cexp`, `clog`).
-  - Implement UTF-16 and UTF-32 conversion functions (`c16rtomb`, `mbrtoc16`, `c32rtomb`, `mbrtoc32`).
+### 2.1 Windows Win32 Platform Parity Extensions (`EzMusl/win32/`)
+- **[P2] Win64 `setjmp`/`longjmp` Register Context (`win32_stubs.c`)**:
+  - Replace the stub `__sigsetjmp` / C-fallback `setjmp` with Win64 callee-saved register preservation (`rbx`, `rbp`, `rdi`, `rsi`, `r12`–`r15`, `rsp`, `rip`, `xmm6`–`xmm15`) for hosted C `setjmp`/`longjmp` on Windows.
+- **[P2] Windows Multithreading Runtime (`<threads.h>` / `<pthread.h>`)**:
+  - Back `pthread_create`, `pthread_join`, `thrd_create`, `mtx_*`, and `cnd_*` on Windows with Win32 `CreateThread` / `WaitOnAddress` / `WakeByAddressAll` and per-thread TLS slots for `__ez_win32_get_tp()`.
+- **[P3] Windows Directory & Signal Support**:
+  - Implement `SYS_getdents64` over `FindFirstFileA` / `FindNextFileA` (`<dirent.h>`) and Win32 console signal handlers (`SetConsoleCtrlHandler`).
 
 ---
 
@@ -153,10 +130,9 @@ Items are organized by architectural subsystem and categorized by priority:
 
 | ID | Subsystem | Action Item | Priority | Target Milestone |
 | :--- | :--- | :--- | :--- | :--- |
-| `STD-01` | `EzLibStdC` | Implement real OS file descriptor bindings (`fopen`, `fread`, `fwrite`) | P1 | v1.1 |
-| `STD-02` | `EzLibStdC` | Replace Linux `mmap` allocation with a tracked heap allocator | P1 | v1.1 |
-| `STD-03` | `EzLibStdC` | Add floating-point conversion routines to `vsnprintf` | P2 | v1.1 |
-| `STD-04` | `EzLibStdC` | Implement C11 multithreading runtime (`<threads.h>`) | P2 | v1.2 |
+| `STD-01` | `EzMusl` | Win64 callee-saved `setjmp`/`longjmp` register save/restore on Windows | P2 | v1.1 |
+| `STD-02` | `EzMusl` | Win32 `<threads.h>` / `pthread` runtime (`CreateThread` + `WaitOnAddress`) | P2 | v1.2 |
+| `STD-03` | `EzMusl` | Win32 `<dirent.h>` (`SYS_getdents64` via `FindFirstFileA`) | P3 | v1.2 |
 | `FE-01` | `EzCompiler` | Model native aggregate struct/union types in MIR | P1 | v1.1 |
 | `FE-02` | `EzCompiler` | True 80-bit/128-bit `long double` support | P2 | v1.2 |
 | `OPT-01` | `EzMir` | Implement Global Value Numbering (GVN) pass | P1 | v1.1 |

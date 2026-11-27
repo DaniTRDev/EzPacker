@@ -57,6 +57,11 @@ bool MirModuleLoader::compileSourceToMir(DriverContext &ctx, std::string_view so
         }
         if (isHosted)
         {
+            std::string compatDir = CFrontendAdapter::getBundledHostedCompatIncludeDir();
+            if (!compatDir.empty())
+            {
+                cAdapter.addIncludePath(compatDir);
+            }
             std::string hDir = CFrontendAdapter::getBundledHostedIncludeDir();
             if (!hDir.empty())
             {

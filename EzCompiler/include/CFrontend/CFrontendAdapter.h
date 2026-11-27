@@ -42,10 +42,16 @@ class CFrontendAdapter : public IFrontendAdapter
     static std::string getBundledFreestandingIncludeDir();
 
     /**
-     * Resolves the disk path to the bundled ISO C11 hosted headers directory (include/c11std).
+     * Resolves the disk path to the bundled musl ISO C11 hosted headers directory (include/musl).
      * Returns empty string if not found on disk.
      */
     static std::string getBundledHostedIncludeDir();
+
+    /**
+     * Resolves the disk path to the bundled chibicc hosted compatibility overlay headers (include/musl-compat).
+     * Returns empty string if not found on disk.
+     */
+    static std::string getBundledHostedCompatIncludeDir();
 
     /**
      * Sets whether the compiler environment is hosted (true) or freestanding (false).

@@ -131,6 +131,10 @@ export class CompilerRunner {
       } else {
         args.push('--rtti');
       }
+      const isHostedC = isC && (req.hosted === true || (req.hosted !== false && /#include\s*<(stdio|stdlib|string|ctype|time|assert|errno|unistd|fcntl)\.h>/.test(req.code)));
+      if (isHostedC) {
+        args.push('-fhosted');
+      }
       const isSimd256 = req.code && (req.code.includes('v8f32') || req.code.includes('v4f64') || req.code.includes('v8i32'));
       const activeFeatures = [...(req.features || [])];
       if (isSimd256) {

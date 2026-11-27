@@ -649,31 +649,17 @@ void CFrontendFunctionLowerer::lowerStatement(Node *node)
         }
 
         case ND_RETURN:
-
         {
-
-            MirInstructionBuilder inst(&m_bCtx, m_currentBlock, InsertionType::Append);
-
             if (node->lhs)
-
             {
-
                 MirOperand *val = lowerExpression(node->lhs);
-
-                inst.RET(val);
-
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).RET(val);
             }
-
             else
-
             {
-
-                inst.RET();
-
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).RET();
             }
-
             break;
-
         }
 
         case ND_EXPR_STMT:
@@ -2249,7 +2235,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
                 case ND_LT:
 
-                    if (isUnsignedType(node->lhs->ty))
+                    if (isUnsignedType(node->lhs->ty) || is_flonum(node->lhs->ty))
 
                         inst.CMP_ULT(dest, lhs, rhs);
 
@@ -2261,7 +2247,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
                 case ND_LE:
 
-                    if (isUnsignedType(node->lhs->ty))
+                    if (isUnsignedType(node->lhs->ty) || is_flonum(node->lhs->ty))
 
                         inst.CMP_ULE(dest, lhs, rhs);
 
@@ -2960,7 +2946,7 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
                     {
 
-                        return m_opBuilder.buildInt(destType, FlexInt((val != 0.0) ? 1ULL : 0ULL, 1));
+                        return m_opBuilder.buildInt(destType, FlexInt(static_cast<uint64_t>((val != 0.0) ? 1 : 0), 1));
 
                     }
 
@@ -3309,20 +3295,23 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             m_currentBlock = rhsB;
 
             MirOperand *rhsVal = lowerExpression(node->rhs);
-
             MirType *rhsType = (rhsVal && rhsVal->getMirType()) ? rhsVal->getMirType() : resType;
-
-            uint16_t rhsBits = static_cast<uint16_t>(rhsType->getTotalSizeInBits());
-
-            MirOperand *zero = m_opBuilder.buildInt(rhsType, FlexInt(0, rhsBits));
-
             MirRegister *boolRhs = m_opBuilder.buildVReg(resType, "bool_rhs");
-
             MirRegister *rhsReg = ensureRegister(rhsVal, rhsType, "rhs_val");
-
-            MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-
-                    .CMP_NE(boolRhs, rhsReg, zero);
+            if (rhsType->getKind() == MirTypeKind::FloatingPoint)
+            {
+                MirOperand *fzero = m_opBuilder.buildFloat(rhsType, FlexFloat(0.0));
+                MirRegister *zeroReg = m_opBuilder.buildVReg(rhsType, "fzero");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).MOV(zeroReg, fzero);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).FCMP(boolRhs, rhsReg, zeroReg);
+            }
+            else
+            {
+                uint16_t rhsBits = static_cast<uint16_t>(rhsType->getTotalSizeInBits());
+                MirType *intRhsType = (rhsType->getKind() == MirTypeKind::Integer) ? rhsType : m_tt->getIntegerTypeBySize(rhsBits);
+                MirOperand *zero = m_opBuilder.buildInt(intRhsType, FlexInt(0, rhsBits));
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).CMP_NE(boolRhs, rhsReg, zero);
+            }
 
             MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
 
@@ -3407,20 +3396,23 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
             m_currentBlock = rhsB;
 
             MirOperand *rhsVal = lowerExpression(node->rhs);
-
             MirType *rhsType = (rhsVal && rhsVal->getMirType()) ? rhsVal->getMirType() : resType;
-
-            uint16_t rhsBits = static_cast<uint16_t>(rhsType->getTotalSizeInBits());
-
-            MirOperand *zero = m_opBuilder.buildInt(rhsType, FlexInt(0, rhsBits));
-
             MirRegister *boolRhs = m_opBuilder.buildVReg(resType, "bool_rhs");
-
             MirRegister *rhsReg = ensureRegister(rhsVal, rhsType, "rhs_val");
-
-            MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
-
-                    .CMP_NE(boolRhs, rhsReg, zero);
+            if (rhsType->getKind() == MirTypeKind::FloatingPoint)
+            {
+                MirOperand *fzero = m_opBuilder.buildFloat(rhsType, FlexFloat(0.0));
+                MirRegister *zeroReg = m_opBuilder.buildVReg(rhsType, "fzero");
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).MOV(zeroReg, fzero);
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).FCMP(boolRhs, rhsReg, zeroReg);
+            }
+            else
+            {
+                uint16_t rhsBits = static_cast<uint16_t>(rhsType->getTotalSizeInBits());
+                MirType *intRhsType = (rhsType->getKind() == MirTypeKind::Integer) ? rhsType : m_tt->getIntegerTypeBySize(rhsBits);
+                MirOperand *zero = m_opBuilder.buildInt(intRhsType, FlexInt(0, rhsBits));
+                MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append).CMP_NE(boolRhs, rhsReg, zero);
+            }
 
             MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
 

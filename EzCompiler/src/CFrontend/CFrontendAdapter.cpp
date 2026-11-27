@@ -32,6 +32,11 @@ std::string CFrontendAdapter::getBundledHostedIncludeDir()
     return CFrontend::ChibiccWrapper::getBundledHostedIncludeDir();
 }
 
+std::string CFrontendAdapter::getBundledHostedCompatIncludeDir()
+{
+    return CFrontend::ChibiccWrapper::getBundledHostedCompatIncludeDir();
+}
+
 void CFrontendAdapter::addIncludePath(std::string_view path)
 {
     m_wrapper.addIncludePath(path);
@@ -44,6 +49,7 @@ void CFrontendAdapter::defineMacro(std::string_view name, std::string_view value
 
 bool CFrontendAdapter::compileSourceToMir(DriverContext &ctx, std::string_view sourcePath, MirBuilderContext &outMirCtx)
 {
+    m_wrapper.setTargetTriple(ctx.getOptions().target);
     m_wrapper.setHostedMode(!ctx.getOptions().freestanding);
     auto parseRes = m_wrapper.parseFile(sourcePath);
     if (!parseRes.success)
@@ -57,6 +63,7 @@ bool CFrontendAdapter::compileSourceToMir(DriverContext &ctx, std::string_view s
 
 bool CFrontendAdapter::compileStringToMir(DriverContext &ctx, std::string_view sourceCode, MirBuilderContext &outMirCtx, std::string_view virtualFileName)
 {
+    m_wrapper.setTargetTriple(ctx.getOptions().target);
     m_wrapper.setHostedMode(!ctx.getOptions().freestanding);
     auto parseRes = m_wrapper.parseString(sourceCode, virtualFileName);
     if (!parseRes.success)
@@ -150,6 +157,10 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
         }
         else
         {
+            if (obj->is_inline && !obj->is_live)
+            {
+                continue;
+            }
             if (auto it = nameToFunc.find(obj->name); it != nameToFunc.end())
             {
                 funcMap[obj] = it->second;
@@ -175,6 +186,10 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx, Obj *astRoot, MirBuilde
     {
         if (obj->is_function && obj->is_definition && obj->body)
         {
+            if (obj->is_inline && !obj->is_live)
+            {
+                continue;
+            }
             MirFunction *func = funcMap[obj];
             CFrontendFunctionLowerer lowerer(ctx, outMirCtx, func, obj);
             if (!lowerer.lower())

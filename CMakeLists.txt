@@ -51,7 +51,7 @@ add_subdirectory(EzTriple)
 add_subdirectory(EzCompiler)
 add_subdirectory(EzTargets)
 add_subdirectory(EzLinker)
-add_subdirectory(EzLibStdC)
+add_subdirectory(EzMusl)
 
 find_package(Doxygen OPTIONAL_COMPONENTS dot)
 if (DOXYGEN_FOUND)

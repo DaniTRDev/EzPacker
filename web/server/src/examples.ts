@@ -40,7 +40,10 @@ export function loadExamples(): ExampleFile[] {
     }
 
     const isC = file.endsWith('.c');
-    const defaultDesc = isC
+    const isHostedC = isC && /#include\s*<(stdio|stdlib|string|ctype|time|assert|errno|unistd|fcntl)\.h>/.test(content);
+    const defaultDesc = isHostedC
+      ? `Demonstrates ${title.toLowerCase()} in hosted C11 using vendored musl via EzPacker's embedded chibicc frontend.`
+      : isC
       ? `Demonstrates ${title.toLowerCase()} in freestanding C11 compiled directly via EzPacker's embedded standalone chibicc frontend.`
       : `Demonstrates ${title.toLowerCase()} in EzPacker SSA MIR.`;
     const description = descLines.join(' ') || defaultDesc;
@@ -48,7 +51,7 @@ export function loadExamples(): ExampleFile[] {
     examples.push({
       id: baseId,
       filename: file,
-      title: isC ? `[Standalone C11] ${title}` : title,
+      title: isHostedC ? `[Hosted C11] ${title}` : isC ? `[Standalone C11] ${title}` : title,
       description,
       code: content,
     });

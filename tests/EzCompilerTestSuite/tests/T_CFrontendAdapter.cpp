@@ -773,3 +773,78 @@ TEST_F(CFrontendAdapterTest, CompilesHostedHeadersCoverage)
     ASSERT_TRUE(success);
     verifyMir(bCtx);
 }
+
+
+TEST_F(CFrontendAdapterTest, CompilesHostedMuslPosixAndStdlibCoverage)
+{
+    CommandLineOptions options;
+    options.target = TargetTriple::parse("x86_64-unknown-linux-gnu");
+    options.optLevel = OptimizationLevel::O0;
+    options.emissionStage = EmissionStage::GenericMir;
+    options.freestanding = false;
+    options.noStdLib = false;
+
+    auto ctx = std::make_unique<DriverContext>(options);
+    ASSERT_TRUE(ctx->initialize());
+    auto *bCtx = ctx->getBuilderContext();
+
+    CFrontendAdapter adapter;
+    const char *code = R"c(
+        #include <errno.h>
+        #include <inttypes.h>
+        #include <stdarg.h>
+        #include <stdio.h>
+        #include <stdlib.h>
+        #include <string.h>
+        #include <unistd.h>
+        #include <fcntl.h>
+
+        static void on_cleanup(void) {}
+
+        static int int_cmp(const void *a, const void *b) {
+            int va = *(const int *)a;
+            int vb = *(const int *)b;
+            return (va > vb) - (va < vb);
+        }
+
+        static int format_vargs(char *out, size_t sz, const char *fmt, ...) {
+            va_list ap;
+            va_start(ap, fmt);
+            int n = vsnprintf(out, sz, fmt, ap);
+            va_end(ap);
+            return n;
+        }
+
+        int main(int argc, char **argv) {
+            atexit(on_cleanup);
+            errno = 0;
+            char *endp = NULL;
+            long parsed = strtol("0x2a", &endp, 0);
+            int *arr = (int *)calloc(4, sizeof(int));
+            arr = (int *)realloc(arr, 6 * sizeof(int));
+            int key = 20;
+            void *found = bsearch(&key, arr, 4, sizeof(int), int_cmp);
+            memmove(arr + 1, arr, 2 * sizeof(int));
+            char buf[64];
+            format_vargs(buf, sizeof(buf), "%" PRId64 " %d", (int64_t)parsed, argc);
+            pid_t pid = getpid();
+            free(arr);
+            return (found != NULL) + (int)pid + (argv != NULL ? 0 : 1);
+        }
+    )c";
+
+    bool success = adapter.compileStringToMir(*ctx, code, *bCtx, "musl_coverage.c");
+    ASSERT_TRUE(success);
+
+    bool foundMain = false;
+    for (auto *fn : bCtx->getFunctions())
+    {
+        if (std::string_view(fn->getName()) == "main")
+        {
+            foundMain = true;
+            EXPECT_GT(fn->getBlockCount(), 0u);
+        }
+    }
+    EXPECT_TRUE(foundMain);
+    verifyMir(bCtx);
+}

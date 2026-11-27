@@ -46,7 +46,7 @@ flowchart TD
     subgraph Linking["5. Linking & Runtime (EzLinker / ez-ld)"]
         ElfWriter --> Linker["EzLinkerDriver\n(Toolchain Detection & Command Synthesis)"]
         CoffWriter --> Linker
-        Linker --> Runtime["Injected Runtimes:\n- Freestanding EzStd.mir (Standalone Standard Library)\n- Hosted EzLibStdC (Permissive ISO C11 Runtime & CRT)\n- Compiler Legalizer Helpers (compiler-rt / libgcc)\n- Freestanding EzExceptionRuntime (Custom SjLj & RTTI)"]
+        Linker --> Runtime["Injected Runtimes:\n- Freestanding EzStd.mir (Standalone Standard Library)\n- Hosted EzMusl (Vendored musl 1.2.5 C11 Runtime & CRT)\n- Compiler Legalizer Helpers (compiler-rt / libgcc)\n- Freestanding EzExceptionRuntime (Custom SjLj & RTTI)"]
         Runtime --> SystemLinker{"System Linker\n(lld, link.exe, ld, gcc)"}
         SystemLinker --> FinalBin["Native Executable (.exe / ELF)\nor Shared Library (.dll / .so)"]
     end
@@ -85,7 +85,7 @@ flowchart LR
 ## 2. Core Capabilities & Design Highlights
 
 - **Pure C++20 Design**: Leverages concepts, `<format>`, ranges, and polymorphic memory resources (`std::pmr`) for memory efficiency and zero heap fragmentation during pass execution.
-- **Modular C11 Frontend (`chibicc`) & ISO C11 StdLib Support (`EzLibStdC`)**: Direct ingestion of C source files (`.c`) and preprocessed files (`.i`) using a clean, modular frontend (`ChibiccWrapper`, `CFrontendTypeMapper`, `CFrontendFunctionLowerer`, `CFrontendAdapter`). Supports both freestanding (`-ffreestanding`, default) and hosted (`-fhosted`) environments, bundling all 9 freestanding headers and all 28 ISO C11 standard library headers (`include/c11std`), lowering directly to SSA MIR with full GNU attribute support and cross-platform standard C runtime linking (`EzLibStdC`).
+- **Modular C11 Frontend (`chibicc`) & Hosted `musl` StdLib (`EzMusl`)**: Direct ingestion of C source files (`.c`) and preprocessed files (`.i`) using a clean, modular frontend (`ChibiccWrapper`, `CFrontendTypeMapper`, `CFrontendFunctionLowerer`, `CFrontendAdapter`). Supports both freestanding (`-ffreestanding`, default) and hosted (`-fhosted`) environments, bundling all 9 freestanding headers and vendored `musl` 1.2.5 ISO C11 headers (`include/musl`), lowering directly to SSA MIR with full GNU attribute support and cross-platform standard C runtime linking (`EzMusl`).
 - **Multi-Stage Optimization Pipeline**: Generic SSA peephole optimizer (`MirPeepholePass`), conservative copy/two-address register coalescing (George & Briggs criteria) with copy affinity coloring, redundant copy elimination, and post-frame machine peephole optimizer (`MirTargetPeepholePass`).
 - **Table-Driven 3-Tier Legalizer & Libcalls**: Dense primary matrix indexed by opcode and compact type provides $O(1)$ legality dispatch, combined with multi-slot signature matchers, compiler-rt runtime libcall mappings (`__multi3`, `__divti3`), and declarative algebraic strength reduction rules.
 - **Bottom-Up Maximal Munch Instruction Selection**: Tree-matching pattern matching that automatically synthesizes SIB addressing modes, performs opportunistic memory load-folding (`ADD64rm`), and prioritizes AVX over SSE via cost-ordered matching.
@@ -133,7 +133,7 @@ Every non-vendored subproject in the repository is documented in detail:
 | **`EzTriple`** | Target-independent backend lowering: Legalizer, ABI lowerer, instruction selector, register allocator, and frame lowerer. | [EzTriple Guide](projects/EzTriple.md) |
 | **`EzCompiler`** | Driver application: command-line parsing, `DriverContext`, target resolver, compilation pipeline, emission engine (`ezc`), and telemetry. | [EzCompiler Guide](projects/EzCompiler.md) |
 | **`EzTargets`** | Architecture backends: modular x86-64 and RISC-V 64-bit targets (synthesized `X86_64TargetDesc` and `RiscV64TargetDesc`, `VR256` registers, VEX prefix encoder, RV64IMAFD table-driven encoder, compiler-rt libcalls, `X86_64FrameLowerer`, `RiscV64FrameLowerer`, `BranchRelaxer`). | [EzTargets Guide](projects/EzTargets.md) |
-| **`EzLibStdC`** | Permissive MIT ISO C11 standard runtime library: `<stdio.h>`, `<stdlib.h>`, `<string.h>`, `<math.h>`, `<ctype.h>`, `<assert.h>`, `<time.h>`, `<errno.h>`, CRT startup (`_start`, `mainCRTStartup`), and OS abstraction (`os_support.h`). | [EzLibStdC Guide](projects/EzLibStdC.md) |
+| **`EzMusl`** | Vendored `musl` 1.2.5 ISO C11 standard runtime library configured via `EzCMK`: complete `<stdio.h>`, `<stdlib.h>`, `<string.h>`, `<math.h>`, `<ctype.h>`, `<assert.h>`, `<time.h>`, `<errno.h>`, CRT startup (`crt1.o` / `mainCRTStartup`), and Win32/Linux OS layers. | [EzMusl Guide](projects/EzMusl.md) |
 | **`EzLinker`** | System linker driver and freestanding runtime: automated toolchain detection (`lld`, `link.exe`), decoupled C stdlib, freestanding `EzStd.mir`, and custom assembly `EzExceptionRuntime` (`ez-ld`). | [EzLinker Guide](projects/EzLinker.md) |
 | **`web`** | Compiler Explorer & Web IDE: React/Vite client and Node.js bridge for live interactive compilation, CFG inspection, and Doxygen symbol exploration. | [Web Guide](web_workbench.md) |
 
@@ -200,9 +200,9 @@ void toggle_pin(uint8_t pin) {
 ezc -O2 gpio_driver.c -o gpio_driver.o
 ```
 
-### 4.3 Hosted ISO C11 with Standard Runtime (`EzLibStdC`)
+### 4.3 Hosted ISO C11 with `musl` Runtime (`EzMusl`)
 
-EzPacker can compile standard hosted C11 code, automatically resolving bundled C11 headers and linking against the `EzLibStdC` runtime:
+EzPacker can compile standard hosted C11 code, automatically resolving staged `musl` C11 headers and linking against the vendored `EzMusl` runtime:
 
 ```c
 // hello_hosted.c
@@ -221,9 +221,9 @@ int main(void) {
 ```
 
 ```bash
-# Compile with hosted C11 headers enabled
+# Compile with hosted musl C11 headers enabled
 ezc -fhosted -O2 hello_hosted.c -o hello_hosted.o
 
-# Automatically link with EzLibStdC and CRT startup code
+# Automatically link with EzMusl and CRT startup code
 ez-ld --hosted hello_hosted.o -o hello_hosted.exe
 ```

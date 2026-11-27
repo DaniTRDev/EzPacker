@@ -61,15 +61,15 @@ int runLinker(int argc, char **argv)
         .flag();
 
     program.add_argument("--hosted")
-        .help("Link in a hosted environment with C standard library (EzLibStdC)")
+        .help("Link in a hosted environment with musl C standard library (EzMusl)")
         .flag();
 
     program.add_argument("--freestanding")
         .help("Link in a freestanding environment without standard library")
         .flag();
 
-    program.add_argument("--libstdc-path")
-        .help("Custom path to EzLibStdC library")
+    program.add_argument("--musl-path")
+        .help("Custom path to EzMusl library archive (libEzMusl.a / EzMusl.lib)")
         .default_value(std::string(""));
 
     program.add_argument("--nodefaultlibs")
@@ -115,9 +115,9 @@ int runLinker(int argc, char **argv)
     {
         opts.isHosted = false;
     }
-    if (program.is_used("--libstdc-path"))
+    if (program.is_used("--musl-path"))
     {
-        opts.libStdCPath = program.get<std::string>("--libstdc-path");
+        opts.muslPath = program.get<std::string>("--musl-path");
     }
     opts.noDefaultLibs = program.get<bool>("--nodefaultlibs");
     opts.noCompilerRt = program.get<bool>("--no-compiler-rt");

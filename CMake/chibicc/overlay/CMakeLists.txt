@@ -12,6 +12,7 @@ set(CHIBICC_SOURCES
 )
 
 add_library(chibicc_frontend STATIC ${CHIBICC_SOURCES})
+set_target_properties(chibicc_frontend PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(chibicc_frontend PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"

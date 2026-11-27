@@ -82,10 +82,10 @@ Bundled freestanding headers (`<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limit
 For hosted user-space software requiring dynamic memory allocation (`malloc`/`free`), standard I/O (`printf`), math, time, and assertions:
 
 ```bash
-# Compile with all 28 ISO C11 standard library headers enabled
+# Compile with staged musl ISO C11 standard library headers enabled
 ezc -fhosted -O2 app.c -o app.o
 ```
-Under `-fhosted`, `ezc` predefines `__STDC_HOSTED__ = 1` and automatically includes `include/c11std`.
+Under `-fhosted`, `ezc` predefines `__STDC_HOSTED__ = 1` and `__EZPACKER_HOSTED__ = 1`, and automatically resolves `include/musl-compat` and `include/musl`.
 
 ---
 
@@ -159,10 +159,10 @@ ez-ld simple_math.obj main.c -o my_app.exe
 ez-ld simple_math.obj main.c -o my_app.exe --dry-run
 ```
 
-### 5.2 Automated Linking with Hosted Runtime (`EzLibStdC`)
+### 5.2 Automated Linking with Hosted `musl` Runtime (`EzMusl`)
 When compiling standard C programs with `-fhosted`, link using `ez-ld --hosted`:
 ```bash
-# Ingests object files and automatically links EzLibStdC and CRT startup
+# Ingests object files and automatically links EzMusl (plus crt1.o on Linux ELF64)
 ez-ld --hosted app.o -o app.exe
 ```
 
@@ -251,6 +251,6 @@ EzDslCli -i EzTargets/X86_64/targets/x86_64/x86_64_calling_conv.ezcc --dump-symb
   - [EzTriple](projects/EzTriple.md)
   - [EzCompiler](projects/EzCompiler.md)
   - [EzTargets](projects/EzTargets.md)
-  - [EzLibStdC](projects/EzLibStdC.md)
+  - [EzMusl](projects/EzMusl.md)
   - [EzLinker](projects/EzLinker.md)
 - Explore the full C++ API in the [Doxygen Documentation](doxygen/index.html).

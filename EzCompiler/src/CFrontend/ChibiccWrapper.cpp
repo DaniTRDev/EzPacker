@@ -14,12 +14,127 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#else
+#include <unistd.h>
 #endif
 
 #include "chibicc.h"
 
 namespace EzCompiler::CFrontend
 {
+
+namespace
+{
+
+std::filesystem::path getCurrentExecutableDir()
+{
+#if defined(_WIN32)
+    char exePath[MAX_PATH];
+    DWORD len = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    if (len > 0 && len < MAX_PATH)
+    {
+        return std::filesystem::path(exePath).parent_path();
+    }
+#elif defined(__linux__)
+    char exePath[4096];
+    ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+    if (len > 0)
+    {
+        exePath[len] = '\0';
+        return std::filesystem::path(exePath).parent_path();
+    }
+#endif
+    return {};
+}
+
+std::string resolveIncludeDir(const char *envVarName,
+                              const char *compileTimePath,
+                              const char *sentinelRelFile,
+                              const std::string &subDirName,
+                              const std::vector<std::filesystem::path> &extraFallbacks = {})
+{
+    if (envVarName)
+    {
+        const char *envDir = std::getenv(envVarName);
+        if (envDir && *envDir)
+        {
+            std::filesystem::path p(envDir);
+            std::error_code ec;
+            if (std::filesystem::is_directory(p, ec))
+                return std::filesystem::weakly_canonical(p, ec).string();
+        }
+    }
+
+    auto hasSentinel = [&](const std::filesystem::path &dir) -> bool {
+        std::error_code ec;
+        if (!std::filesystem::is_directory(dir, ec))
+            return false;
+        if (!sentinelRelFile || !*sentinelRelFile)
+            return true;
+        return std::filesystem::exists(dir / sentinelRelFile, ec);
+    };
+
+    if (compileTimePath && *compileTimePath)
+    {
+        std::filesystem::path p(compileTimePath);
+        if (hasSentinel(p))
+        {
+            std::error_code ec;
+            return std::filesystem::weakly_canonical(p, ec).string();
+        }
+    }
+
+    std::filesystem::path exeDir = getCurrentExecutableDir();
+    if (!exeDir.empty())
+    {
+        std::vector<std::filesystem::path> candidates = {
+            exeDir / "include" / subDirName,
+            exeDir / ".." / "include" / subDirName,
+            exeDir / ".." / ".." / "include" / subDirName,
+            exeDir / ".." / ".." / ".." / "include" / subDirName,
+        };
+        for (const auto &extra : extraFallbacks)
+        {
+            candidates.push_back(exeDir / extra);
+        }
+        for (const auto &cand : candidates)
+        {
+            if (hasSentinel(cand))
+            {
+                std::error_code ec;
+                return std::filesystem::weakly_canonical(cand, ec).string();
+            }
+        }
+    }
+
+    std::error_code cwdEc;
+    std::filesystem::path cwd = std::filesystem::current_path(cwdEc);
+    if (!cwdEc)
+    {
+        std::vector<std::filesystem::path> candidates = {
+            cwd / "include" / subDirName,
+            cwd / "bin" / "include" / subDirName,
+            cwd / ".." / "include" / subDirName,
+            cwd / ".." / ".." / "include" / subDirName,
+        };
+        for (const auto &extra : extraFallbacks)
+        {
+            candidates.push_back(cwd / extra);
+        }
+        for (const auto &cand : candidates)
+        {
+            if (hasSentinel(cand))
+            {
+                std::error_code ec;
+                return std::filesystem::weakly_canonical(cand, ec).string();
+            }
+        }
+    }
+
+    return {};
+}
+
+} // namespace
 
 ChibiccWrapper::ChibiccWrapper()
 {
@@ -30,137 +145,47 @@ ChibiccWrapper::~ChibiccWrapper() = default;
 
 std::string ChibiccWrapper::getBundledFreestandingIncludeDir()
 {
-    // 1. Environment variable override
-    const char *envDir = std::getenv("EZPACKER_FREESTANDING_DIR");
-    if (envDir && *envDir)
-    {
-        std::filesystem::path p(envDir);
-        std::error_code ec;
-        if (std::filesystem::is_directory(p, ec))
-            return std::filesystem::weakly_canonical(p, ec).string();
-    }
-
-    // 2. Compile-time definition
 #ifdef EZPACKER_FREESTANDING_INCLUDE_DIR
-    {
-        std::filesystem::path p(EZPACKER_FREESTANDING_INCLUDE_DIR);
-        std::error_code ec;
-        if (std::filesystem::is_directory(p, ec) && std::filesystem::exists(p / "stdint.h", ec))
-            return std::filesystem::weakly_canonical(p, ec).string();
-    }
+    const char *compiledDir = EZPACKER_FREESTANDING_INCLUDE_DIR;
+#else
+    const char *compiledDir = nullptr;
 #endif
-
-    // 3. Executable-relative resolution
-#if defined(_WIN32)
-    char exePath[MAX_PATH];
-    DWORD len = GetModuleFileNameA(NULL, exePath, MAX_PATH);
-    if (len > 0 && len < MAX_PATH)
-    {
-        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-        std::vector<std::filesystem::path> candidates = {
-            exeDir / "include" / "freestanding",
-            exeDir / ".." / "include" / "freestanding",
-            exeDir / ".." / ".." / "include" / "freestanding",
-            exeDir / ".." / ".." / ".." / "include" / "freestanding"
-        };
-        for (const auto &cand : candidates)
-        {
-            std::error_code ec;
-            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdint.h", ec))
-                return std::filesystem::weakly_canonical(cand, ec).string();
-        }
-    }
-#endif
-
-    // 4. Working directory / relative paths
-    std::error_code cwdEc;
-    std::filesystem::path cwd = std::filesystem::current_path(cwdEc);
-    if (!cwdEc)
-    {
-        std::vector<std::filesystem::path> candidates = {
-            cwd / "include" / "freestanding",
-            cwd / "bin" / "include" / "freestanding",
-            cwd / ".." / "include" / "freestanding",
-            cwd / ".." / ".." / "include" / "freestanding"
-        };
-        for (const auto &cand : candidates)
-        {
-            std::error_code ec;
-            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdint.h", ec))
-                return std::filesystem::weakly_canonical(cand, ec).string();
-        }
-    }
-
-    return {};
+    return resolveIncludeDir("EZPACKER_FREESTANDING_DIR", compiledDir, "stdint.h", "freestanding");
 }
 
 std::string ChibiccWrapper::getBundledHostedIncludeDir()
 {
-    // 1. Environment variable override
-    const char *envDir = std::getenv("EZPACKER_C11STD_DIR");
-    if (envDir && *envDir)
-    {
-        std::filesystem::path p(envDir);
-        std::error_code ec;
-        if (std::filesystem::is_directory(p, ec))
-            return std::filesystem::weakly_canonical(p, ec).string();
-    }
-
-    // 2. Compile-time definition
-#ifdef EZPACKER_C11STD_INCLUDE_DIR
-    {
-        std::filesystem::path p(EZPACKER_C11STD_INCLUDE_DIR);
-        std::error_code ec;
-        if (std::filesystem::is_directory(p, ec) && std::filesystem::exists(p / "stdio.h", ec))
-            return std::filesystem::weakly_canonical(p, ec).string();
-    }
+#ifdef EZPACKER_MUSL_INCLUDE_DIR
+    const char *compiledDir = EZPACKER_MUSL_INCLUDE_DIR;
+#else
+    const char *compiledDir = nullptr;
 #endif
+    return resolveIncludeDir("EZPACKER_MUSL_DIR",
+                             compiledDir,
+                             "bits/alltypes.h",
+                             "musl",
+                             { std::filesystem::path("EzMusl") / "staged_include",
+                               std::filesystem::path("build") / "bin" / "include" / "musl" });
+}
 
-    // 3. Executable-relative resolution
-#if defined(_WIN32)
-    char exePath[MAX_PATH];
-    DWORD len = GetModuleFileNameA(NULL, exePath, MAX_PATH);
-    if (len > 0 && len < MAX_PATH)
-    {
-        std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-        std::vector<std::filesystem::path> candidates = {
-            exeDir / "include" / "c11std",
-            exeDir / ".." / "include" / "c11std",
-            exeDir / ".." / ".." / "include" / "c11std",
-            exeDir / ".." / ".." / ".." / "include" / "c11std",
-            exeDir / "EzLibStdC" / "include",
-            exeDir / ".." / "EzLibStdC" / "include"
-        };
-        for (const auto &cand : candidates)
-        {
-            std::error_code ec;
-            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdio.h", ec))
-                return std::filesystem::weakly_canonical(cand, ec).string();
-        }
-    }
+std::string ChibiccWrapper::getBundledHostedCompatIncludeDir()
+{
+#ifdef EZPACKER_MUSL_COMPAT_INCLUDE_DIR
+    const char *compiledDir = EZPACKER_MUSL_COMPAT_INCLUDE_DIR;
+#else
+    const char *compiledDir = nullptr;
 #endif
+    return resolveIncludeDir("EZPACKER_MUSL_COMPAT_DIR",
+                             compiledDir,
+                             "stdarg.h",
+                             "musl-compat",
+                             { std::filesystem::path("EzMusl") / "compat_include",
+                               std::filesystem::path("..") / "EzMusl" / "compat_include" });
+}
 
-    // 4. Working directory / relative paths
-    std::error_code cwdEc;
-    std::filesystem::path cwd = std::filesystem::current_path(cwdEc);
-    if (!cwdEc)
-    {
-        std::vector<std::filesystem::path> candidates = {
-            cwd / "include" / "c11std",
-            cwd / "bin" / "include" / "c11std",
-            cwd / ".." / "include" / "c11std",
-            cwd / ".." / ".." / "include" / "c11std",
-            cwd / "EzLibStdC" / "include"
-        };
-        for (const auto &cand : candidates)
-        {
-            std::error_code ec;
-            if (std::filesystem::is_directory(cand, ec) && std::filesystem::exists(cand / "stdio.h", ec))
-                return std::filesystem::weakly_canonical(cand, ec).string();
-        }
-    }
-
-    return {};
+void ChibiccWrapper::setTargetTriple(const TargetTriple &triple)
+{
+    m_target = triple;
 }
 
 void ChibiccWrapper::setHostedMode(bool hosted)
@@ -216,10 +241,7 @@ void ChibiccWrapper::setupDefaultMacros()
     defineMacro("__attribute__(x)", "");
     defineMacro("__builtin_expect(x, v)", "(x)");
     defineMacro("__builtin_constant_p(x)", "0");
-    return;
 }
-
-
 
 ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
 {
@@ -237,6 +259,40 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
     chibicc_reset_state();
     init_macros();
 
+    // Align predefined target macros with the active TargetTriple while keeping
+    // chibicc's internal LP64 data model (_LP64 / __LP64__ / __SIZEOF_LONG__ == 8).
+    if (m_target.isRiscV64())
+    {
+        undef_macro(const_cast<char *>("__amd64"));
+        undef_macro(const_cast<char *>("__amd64__"));
+        undef_macro(const_cast<char *>("__x86_64"));
+        undef_macro(const_cast<char *>("__x86_64__"));
+        define_macro(const_cast<char *>("__riscv"), const_cast<char *>("1"));
+        define_macro(const_cast<char *>("__riscv_xlen"), const_cast<char *>("64"));
+    }
+
+    if (m_target.isWindows())
+    {
+        undef_macro(const_cast<char *>("__ELF__"));
+        if (m_hosted)
+        {
+            define_macro(const_cast<char *>("_WIN32"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("_WIN64"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__WIN32__"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__WIN64__"), const_cast<char *>("1"));
+        }
+    }
+    else if (m_target.isLinux())
+    {
+        define_macro(const_cast<char *>("__ELF__"), const_cast<char *>("1"));
+        if (m_hosted)
+        {
+            define_macro(const_cast<char *>("__linux__"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__linux"), const_cast<char *>("1"));
+            define_macro(const_cast<char *>("__gnu_linux__"), const_cast<char *>("1"));
+        }
+    }
+
     if (m_hosted)
     {
         undef_macro(const_cast<char *>("__EZPACKER_STANDALONE__"));
@@ -250,27 +306,35 @@ ChibiccParseResult ChibiccWrapper::parseFile(std::string_view filePath)
     include_paths.capacity = 0;
     include_paths.len = 0;
 
+    // Keep resolved include strings alive for the entire parseFile() invocation
+    // because chibicc's strarray_push stores raw char* pointers without copying.
+    std::vector<std::string> ownedIncludePaths;
+    ownedIncludePaths.reserve(m_includePaths.size() + 3);
+    auto pushOwnedIncludePath = [&](std::string path) {
+        if (path.empty())
+            return;
+        for (int i = 0; i < include_paths.len; ++i)
+        {
+            if (include_paths.data[i] && path == include_paths.data[i])
+                return;
+        }
+        ownedIncludePaths.push_back(std::move(path));
+        strarray_push(&include_paths, const_cast<char *>(ownedIncludePaths.back().c_str()));
+    };
+
     for (const auto &inc : m_includePaths)
     {
-        strarray_push(&include_paths, const_cast<char *>(inc.c_str()));
+        pushOwnedIncludePath(inc);
     }
 
-    std::string sysDir = m_hosted ? getBundledHostedIncludeDir() : getBundledFreestandingIncludeDir();
-    if (!sysDir.empty())
+    if (m_hosted)
     {
-        bool found = false;
-        for (const auto &inc : m_includePaths)
-        {
-            if (inc == sysDir)
-            {
-                found = true;
-                break;
-            }
-        }
-        if (!found)
-        {
-            strarray_push(&include_paths, const_cast<char *>(sysDir.c_str()));
-        }
+        pushOwnedIncludePath(getBundledHostedCompatIncludeDir());
+        pushOwnedIncludePath(getBundledHostedIncludeDir());
+    }
+    else
+    {
+        pushOwnedIncludePath(getBundledFreestandingIncludeDir());
     }
 
     for (const auto &[name, val] : m_macros)

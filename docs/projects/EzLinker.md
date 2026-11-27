@@ -12,10 +12,10 @@
 1. **Automated Linker Detection**: Discovers the preferred system linker (`lld-link`, `link.exe`, `ld.lld`, `ld.bfd`, `ld.gold`, or compiler drivers `clang`/`gcc`) across Windows and Linux.
 2. **Dual Freestanding & Hosted Execution Modes**:
    - **Freestanding Mode (Default)**: Produces standalone executables decoupled from host C runtime libraries (`-lc`, `msvcrt.lib`, `ucrt.lib`, etc.) for bare-metal systems, bootloaders, and OS kernels.
-   - **Hosted Mode (`--hosted`)**: Automatically injects and links the permissive MIT standard runtime library (`EzLibStdC`), linking C runtime startup code (`crt_start.o` defining `_start` / `mainCRTStartup`) and resolving C11 stdlib symbols.
+   - **Hosted Mode (`--hosted`)**: Automatically injects and links the vendored MIT-licensed `musl` 1.2.5 C standard library (`EzMusl`), linking C runtime startup (`crt1.o` defining `_start` on Linux ELF64; `mainCRTStartup` inside `EzMusl` on Windows PE/COFF) and resolving C11 stdlib symbols.
 3. **Freestanding Exception Runtime (`EzExceptionRuntime`)**: A fully standalone, C-free exception management runtime. Completely eliminates `<setjmp.h>`, `msvcrt.dll`, libc `longjmp`, `<cstdlib>`, and `<iostream>`, providing custom architecture-specific `__ez_setjmp` and `__ez_longjmp` implementations, thread-local exception frame unwinding, RTTI-based multicatch dispatch, and diagnostic reporting.
 4. **Standalone Standard Library (`EzStd.mir`)**: Provides freestanding implementations of fundamental memory operations (`@memcpy`, `@memset`, `@bzero`, `@memmove`, `@memcmp`) and process termination (`@abort`, `@exit`) written directly in generic MIR.
-5. **Unified Command-Line Interface (`ez-ld`)**: A cross-platform CLI supporting standard flags (`-o`, `-L`, `-l`, `--shared`, `--static`, `--target`, `--entry`, `--subsystem`, `--hosted`, `--freestanding`, `--libstdc-path`) with full dry-run introspection (`--dry-run`).
+5. **Unified Command-Line Interface (`ez-ld`)**: A cross-platform CLI supporting standard flags (`-o`, `-L`, `-l`, `--shared`, `--static`, `--target`, `--entry`, `--subsystem`, `--hosted`, `--freestanding`, `--musl-path`) with full dry-run introspection (`--dry-run`).
 
 ```
 +-------------------------------------------------------------------------------+
@@ -37,7 +37,7 @@
 |  | - Freestanding vs Hosted (--hosted) |                                      |
 |  | - Inject compiler-rt / libgcc       |                                      |
 |  | - Inject EzExceptionRuntime         |                                      |
-|  | - Inject EzLibStdC + CRT startup    |                                      |
+|  | - Inject EzMusl + CRT startup       |                                      |
 |  | - Synthesize Native Linker Command  |                                      |
 |  +-------------------------------------+                                      |
 |        |                                                                      |
@@ -82,18 +82,18 @@
 - **MSVC / LLD-Link Synthesis**:
   - Generates `/nologo`, `/out:<file>`, `/libpath:<dir>`, `<lib>.lib`.
   - In freestanding mode, injects `kernel32.lib` and `user32.lib` by default (standard C runtimes like `msvcrt.lib`, `libcmt.lib`, `ucrt.lib` are decoupled and not linked unless requested).
-  - In hosted mode (`--hosted`), automatically resolves and links `EzLibStdC.lib`, configuring the entry point to `mainCRTStartup`.
+  - In hosted mode (`--hosted`), automatically resolves and links `libEzMusl.a` / `EzMusl.lib`, configuring `/entry:mainCRTStartup`.
   - Configures subsystem (`/subsystem:console` or `/subsystem:windows`).
 - **ELF / GNU Synthesis**:
   - Generates `-o <file>`, `-L<dir>`, `-l<lib>`.
   - Decoupled from default C libraries in freestanding mode (`-lc`, `-lm`, `-lpthread`, `-ldl` are not injected unless explicitly requested).
-  - In hosted mode (`--hosted`), injects `libEzLibStdC.a` and points entry to `_start`.
+  - In hosted mode (`--hosted`), injects `crt1.o` and `libEzMusl.a` (`-lEzMusl`) without linking host `-lc` (and passes `-nostdlib` on `gcc`/`clang` drivers so host glibc is never pulled).
   - Injects legalizer helpers (`-lgcc` / `-lcompiler_rt`) when needed.
   - Configures `-shared`, `-static`, and `-e <entry>`.
-- **EzLibStdC Integration**:
-  - When `--hosted` is specified, `EzLinkerDriver` searches the local build directory or install tree for `EzLibStdC.lib` (Windows) or `libEzLibStdC.a` (Linux).
+- **`EzMusl` Integration**:
+  - When `--hosted` is specified, `EzLinkerDriver` searches the local build directory, `EZPACKER_MUSL_PATH`, or install tree for `EzMusl.lib` / `libEzMusl.a` (and `crt1.o` / `EZPACKER_MUSL_CRT1_PATH` for ELF targets).
   - Automatically appends the discovered library directory via `/libpath:` or `-L`.
-  - Can be manually overridden via `--libstdc-path <path>`.
+  - Can be manually overridden via `--musl-path <path>`.
 - **EzExceptionRuntime Automatic Linking**:
   - Locates `libEzExceptionRuntime.a` or `EzExceptionRuntime.lib` in the local build or install tree.
   - Automatically appends search directory and library flags unless `--no-exception-rt` is specified.
@@ -179,9 +179,9 @@ ez-ld [options] <inputs...>
 | `--static` | Directs static linking against runtime libraries. |
 | `-v`, `--verbose` | Emits detailed detection and command synthesis logs. |
 | `--dry-run` | Prints the synthesized linker command line without executing it. |
-| `--hosted` | Links against the C standard runtime library (`EzLibStdC`) and sets CRT startup entry. |
+| `--hosted` | Links against the vendored `musl` C standard runtime library (`EzMusl`) and configures CRT startup entry. |
 | `--freestanding` | Standalone mode (default); avoids linking standard C runtime libraries. |
-| `--libstdc-path <path>` | Explicit path to `EzLibStdC` library archive. |
+| `--musl-path <path>` | Explicit path to `EzMusl` library archive (`libEzMusl.a` / `EzMusl.lib`). |
 | `--nodefaultlibs` | Disables automatic injection of C standard libraries. |
 | `--no-compiler-rt` | Disables automatic injection of compiler-rt / libgcc helpers. |
 | `--no-exception-rt` | Disables automatic linking of `EzExceptionRuntime`. |
@@ -195,5 +195,5 @@ ez-ld [options] <inputs...>
 | :--- | :--- | :--- |
 | `EzLinkerLib` | Shared Library | Linker detection and command synthesis library. |
 | `EzExceptionRuntime` | Static Library | Low-level SjLj exception unwinding runtime. |
-| `EzLibStdC` | Static Library | Permissive MIT ISO C11 standard runtime library (Windows & Linux). |
+| `EzMusl` | Static Library | Vendored `musl` 1.2.5 ISO C11 standard runtime library (Linux ELF64 & Windows PE/COFF). |
 | `ez-ld` / `EzLinker` | Executable | Linker driver executable. |
