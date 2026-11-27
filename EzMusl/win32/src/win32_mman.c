@@ -32,7 +32,7 @@ __declspec(dllimport) int __stdcall VirtualFree(void *lpAddress, size_t dwSize, 
 __declspec(dllimport) int __stdcall VirtualProtect(void *lpAddress, size_t dwSize, unsigned long flNewProtect, unsigned long *lpflOldProtect);
 __declspec(dllimport) size_t __stdcall VirtualQuery(const void *lpAddress, EZ_MEMORY_BASIC_INFORMATION *lpBuffer, size_t dwLength);
 
-void __vm_wait(void) {}
+extern void __vm_wait(void);
 
 static unsigned long prot_to_win32(int prot)
 {

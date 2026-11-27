@@ -7,9 +7,9 @@
 #include "pthread_impl.h"
 
 /* Thread / cancellation stubs for single-process Win32 musl runtime */
-long __syscall_cp_c(syscall_arg_t nr,
-                    syscall_arg_t u, syscall_arg_t v, syscall_arg_t w,
-                    syscall_arg_t x, syscall_arg_t y, syscall_arg_t z)
+weak long __syscall_cp_c(syscall_arg_t nr,
+                         syscall_arg_t u, syscall_arg_t v, syscall_arg_t w,
+                         syscall_arg_t x, syscall_arg_t y, syscall_arg_t z)
 {
     return (long)__ez_win32_syscall((long)nr, u, v, w, x, y, z);
 }
@@ -18,7 +18,7 @@ long (__syscall_cp)(syscall_arg_t nr,
                     syscall_arg_t u, syscall_arg_t v, syscall_arg_t w,
                     syscall_arg_t x, syscall_arg_t y, syscall_arg_t z)
 {
-    return __syscall_cp_c(nr, u, v, w, x, y, z);
+    return (long)__ez_win32_syscall((long)nr, u, v, w, x, y, z);
 }
 
 long __syscall_cp_asm(volatile void *cancel, syscall_arg_t nr,
@@ -26,7 +26,7 @@ long __syscall_cp_asm(volatile void *cancel, syscall_arg_t nr,
                       syscall_arg_t x, syscall_arg_t y, syscall_arg_t z)
 {
     (void)cancel;
-    return __syscall_cp_c(nr, u, v, w, x, y, z);
+    return (long)__ez_win32_syscall((long)nr, u, v, w, x, y, z);
 }
 
 void __unmapself(void *base, size_t size)

@@ -410,20 +410,18 @@ set_tests_properties("EzCompilerEndToEnd_Hosted_example_10_pipeline" PROPERTIES
     LABELS "E2E;Hosted;C11;Musl;Examples;EzCompiler"
 )
 
-# Linux POSIX + musl syscall tests (unistd, fcntl, stat, unlink)
-if(NOT HOST_IS_WINDOWS)
-    ezpacker_add_hosted_e2e_target("test_posix_musl" "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/test_posix_musl.c" OUT_EXE_VAR POSIX_EXE)
-    add_test(
-        NAME "EzCompilerEndToEnd_Hosted_test_posix_musl"
-        COMMAND "${POSIX_EXE}"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    )
-    set_tests_properties("EzCompilerEndToEnd_Hosted_test_posix_musl" PROPERTIES
-        ENVIRONMENT_MODIFICATION "${HOSTED_RUN_ENV}"
-        PASS_REGULAR_EXPRESSION "posix_musl ok"
-        LABELS "E2E;Hosted;POSIX;Musl;EzCompiler"
-    )
-endif()
+# Cross-platform POSIX + musl syscall tests (unistd, fcntl, fdopen, stat, unlink)
+ezpacker_add_hosted_e2e_target("test_posix_musl" "${CMAKE_CURRENT_SOURCE_DIR}/c11_hosted/test_posix_musl.c" OUT_EXE_VAR POSIX_EXE)
+add_test(
+    NAME "EzCompilerEndToEnd_Hosted_test_posix_musl"
+    COMMAND "${POSIX_EXE}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+)
+set_tests_properties("EzCompilerEndToEnd_Hosted_test_posix_musl" PROPERTIES
+    ENVIRONMENT_MODIFICATION "${HOSTED_RUN_ENV}"
+    PASS_REGULAR_EXPRESSION "posix_musl ok"
+    LABELS "E2E;Hosted;POSIX;Musl;EzCompiler"
+)
 
 # Negative E2E tests: freestanding rejects stdio, freestanding link rejects undefined libc symbols, syntax error fails
 add_test(

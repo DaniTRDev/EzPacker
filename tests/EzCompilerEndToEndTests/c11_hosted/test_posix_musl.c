@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -21,11 +22,18 @@ int main(void) {
     assert(write(fd, payload, (size_t)len) == len);
     assert(lseek(fd, 0, SEEK_SET) == 0);
 
-    char buf[64];
-    memset(buf, 0, sizeof(buf));
-    assert(read(fd, buf, sizeof(buf) - 1) == len);
+    char *buf = (char *)malloc(64);
+    assert(buf != NULL);
+    memset(buf, 0, 64);
+    assert(read(fd, buf, 63) == len);
     assert(strcmp(buf, payload) == 0);
-    assert(close(fd) == 0);
+    free(buf);
+
+    /* Exercise fdopen + fclose alongside POSIX open/read/write/malloc
+       (regression test for Win32 COFF archive duplicate-symbol collisions). */
+    FILE *fp = fdopen(fd, "r+");
+    assert(fp != NULL);
+    assert(fclose(fp) == 0);
 
     struct stat st;
     assert(stat(path, &st) == 0);
