@@ -113,10 +113,15 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
             return cleanupFailure();
         }
 
-        // Conservatively coalesce copy-related and two-address registers
+        // Conservatively coalesce copy-related and two-address registers (or record lightweight
+        // MOV affinity hints at -O0 without modifying the interference graph).
         if (ctx->m_coalescingEnabled)
         {
             m_regAllocator->coalesce(ctx);
+        }
+        else
+        {
+            m_regAllocator->populateMoveAffinityHints(ctx);
         }
 
         // Compute Initial Node Degrees & Lock Physical Nodes

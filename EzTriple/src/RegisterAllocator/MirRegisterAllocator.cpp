@@ -477,6 +477,78 @@ bool MirRegisterAllocator::coalesce(RegisterAllocatorCtx *ctx)
 }
 
 /**
+ * Populates lightweight MOV affinity hints in a single deterministic pass without modifying the
+ * interference graph or coalescing nodes. Used at -O0 so selectColors can still bias trivial
+ * copies toward the same physical register.
+ */
+void MirRegisterAllocator::populateMoveAffinityHints(RegisterAllocatorCtx *ctx)
+{
+    MirFunction *func = ctx->m_targetFunction;
+    if (!func || !ctx->m_scratch)
+    {
+        return;
+    }
+
+    auto &s = *ctx->m_scratch;
+    for (MirBlock *block : func->getBlocks())
+    {
+        for (MirInstruction *inst : block->getInstructions())
+        {
+            bool isMove = (inst->getOpCode() == MirInstructionOpCode::MOV) ||
+                          (inst->getTargetDesc() &&
+                           (inst->getTargetDesc()->getTargetFlags() & MirInstructionFlags::IsMove));
+            if (!isMove || inst->getOperandCount() < 2)
+            {
+                continue;
+            }
+
+            MirOperand *op0 = inst->getOperand(0);
+            MirOperand *op1 = inst->getOperand(1);
+            if (!op0 || !op1 || !op0->isOfType<MirRegister>() || !op1->isOfType<MirRegister>())
+            {
+                continue;
+            }
+
+            const uint32_t u = ctx->findNode(op0->get<MirRegister>()->getRef());
+            const uint32_t v = ctx->findNode(op1->get<MirRegister>()->getRef());
+            if (u == RegisterAllocatorCtx::InvalidNode || v == RegisterAllocatorCtx::InvalidNode || u == v)
+            {
+                continue;
+            }
+
+            if (s.m_reservedDense.test(u) || s.m_reservedDense.test(v))
+            {
+                continue;
+            }
+
+            const MirRegisterRef &uRef = s.m_idToReg[u];
+            const MirRegisterRef &vRef = s.m_idToReg[v];
+            if ((uRef.isPhysical() && vRef.isPhysical()) || uRef.getClass() != vRef.getClass())
+            {
+                continue;
+            }
+
+            if (s.m_adjBits[u].test(v))
+            {
+                continue;
+            }
+
+            auto &affU = s.m_affinity[u];
+            if (std::find(affU.begin(), affU.end(), v) == affU.end())
+            {
+                affU.push_back(v);
+            }
+
+            auto &affV = s.m_affinity[v];
+            if (std::find(affV.begin(), affV.end(), u) == affV.end())
+            {
+                affV.push_back(u);
+            }
+        }
+    }
+}
+
+/**
  * Chaitin-Briggs simplification: repeatedly remove low-degree virtual nodes onto the select
  * stack; when none remain, optimistically spill the node with the best cost/degree ratio.
  */
@@ -514,7 +586,8 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
     std::pmr::vector<uint32_t> spillCandidates(ctx->m_scratchAlloc);
     spillCandidates.reserve(totalVirtualNodes);
 
-    std::pmr::vector<double> rawCostCache(numNodes, 0.0, ctx->m_scratchAlloc);
+    std::pmr::vector<double> rawCostCache(ctx->m_scratchAlloc);
+    bool rawCostCachePopulated = false;
 
     for (uint32_t id = 0; id < numNodes; ++id)
     {
@@ -531,7 +604,6 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
             lowDegreeQueue.push_back(id);
         }
 
-        rawCostCache[id] = calculateSpillCost(node, ctx);
         if (!s.m_unspillableDense.test(id))
         {
             spillCandidates.push_back(id);
@@ -555,9 +627,22 @@ bool MirRegisterAllocator::simplify(RegisterAllocatorCtx *ctx)
             }
         }
 
-        // 2. Chaitin optimistic spill candidate selection
+        // 2. Chaitin optimistic spill candidate selection (lazily compute spill costs only when needed)
         if (candidate == RegisterAllocatorCtx::InvalidNode)
         {
+            if (!rawCostCachePopulated && !spillCandidates.empty())
+            {
+                rawCostCachePopulated = true;
+                rawCostCache.assign(numNodes, 0.0);
+                for (uint32_t nodeId : spillCandidates)
+                {
+                    if (!s.m_removed.test(nodeId))
+                    {
+                        rawCostCache[nodeId] = calculateSpillCost(s.m_idToReg[nodeId], ctx);
+                    }
+                }
+            }
+
             double minCostRatio = std::numeric_limits<double>::max();
             size_t bestIdx = std::numeric_limits<size_t>::max();
 
