@@ -482,3 +482,118 @@ TEST_F(LivenessAnalysisTest, TestDeadCodeDefinitions)
     EXPECT_TRUE(NotLiveIn(res, entryBlock->getId(), vDead->getRegId()));
     EXPECT_TRUE(NotLiveOut(res, entryBlock->getId(), vDead->getRegId()));
 }
+
+/**
+ * Verifies that LivenessResult survives after computeGlobalLiveness()'s local scratchArena
+ * is destroyed (including when many registers overflow the stack scratch buffer).
+ */
+TEST_F(LivenessAnalysisTest, TestScratchArenaOverflowAndResultPersistence)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirBlockBuilder blockBuilder(ctx, getTestFunc());
+    MirOperandBuilder opBuilder(ctx);
+
+    MirBlock *entryBlock = getTestFunc()->getEntryPoint();
+    MirBlock *emptyUnreachable = blockBuilder.build(nullptr, "empty_unreachable");
+    MirBlock *exitBlock = blockBuilder.build(nullptr, "exit_block");
+    (void)emptyUnreachable;
+
+    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
+    std::vector<MirRegister *> regs;
+    regs.reserve(300);
+
+    {
+        MirInstructionBuilder eb(ctx, entryBlock, InsertionType::Append, entryBlock->end());
+        for (int i = 0; i < 300; ++i)
+        {
+            MirRegister *r = createInt32Reg("r" + std::to_string(i));
+            eb.MOV(r, imm1);
+            regs.push_back(r);
+        }
+        eb.JMP(opBuilder.buildRef(exitBlock));
+    }
+
+    {
+        MirInstructionBuilder xb(ctx, exitBlock, InsertionType::Append, exitBlock->end());
+        MirRegister *sum = createInt32Reg("sum");
+        xb.MOV(sum, imm1);
+        for (MirRegister *r : regs)
+        {
+            xb.ADD(sum, sum, r);
+        }
+        xb.RET(sum);
+    }
+
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+    ASSERT_NE(res, nullptr);
+
+    for (MirRegister *r : regs)
+    {
+        EXPECT_TRUE(IsLiveOut(res, entryBlock->getId(), r->getRegId()));
+        EXPECT_TRUE(IsLiveIn(res, exitBlock->getId(), r->getRegId()));
+    }
+}
+
+/**
+ * Verifies recomputeForFunction() handles null arguments, clears stale def/use/liveIn/liveOut
+ * sets even when numGlobalBits drops to 0, and leaves other functions' liveness untouched.
+ */
+TEST_F(LivenessAnalysisTest, TestRecomputeForFunctionClearsStaleStateAndHandlesNulls)
+{
+    MirBuilderContext *ctx = getBuilderCtx();
+    MirBlockBuilder blockBuilder(ctx, getTestFunc());
+    MirOperandBuilder opBuilder(ctx);
+
+    MirBlock *entryBlock = getTestFunc()->getEntryPoint();
+    MirBlock *exitBlock = blockBuilder.build(nullptr, "exit_recomp");
+
+    MirRegister *v0 = createInt32Reg("v0");
+    MirInteger *imm1 = opBuilder.buildInt(getTypeTable()->i32(), FlexInt(1));
+
+    {
+        MirInstructionBuilder eb(ctx, entryBlock, InsertionType::Append, entryBlock->end());
+        eb.MOV(v0, imm1);
+        eb.JMP(opBuilder.buildRef(exitBlock));
+    }
+    {
+        MirInstructionBuilder xb(ctx, exitBlock, InsertionType::Append, exitBlock->end());
+        xb.RET(v0);
+    }
+
+    getPassManager()->addPass<CodeFlowAnalysisPass>(ctx);
+    auto *livenessPass = getPassManager()->addPass<LivenessAnalysisPass>(ctx);
+    CodeFlowResult *cfg = getPassManager()->getAnalysis<CodeFlowAnalysisPass>(ctx)->getResult();
+    LivenessResult *res = getPassManager()->getAnalysis<LivenessAnalysisPass>(ctx)->getResult();
+
+    ASSERT_TRUE(IsLiveOut(res, entryBlock->getId(), v0->getRegId()));
+    ASSERT_TRUE(IsLiveIn(res, exitBlock->getId(), v0->getRegId()));
+
+    // Null guards
+    EXPECT_FALSE(livenessPass->recomputeForFunction(nullptr, cfg));
+    EXPECT_FALSE(livenessPass->recomputeForFunction(getTestFunc(), nullptr));
+
+    // Clear instructions so numGlobalBits drops to 0, then recompute in-place
+    auto eraseAll = [&](MirBlock *blk)
+    {
+        auto &insts = blk->getInstructions();
+        while (!insts.empty())
+        {
+            MirInstruction *inst = *insts.begin();
+            MirInstructionBuilder(ctx, inst, InsertionType::InsertBefore).erase(inst);
+        }
+    };
+    eraseAll(entryBlock);
+    eraseAll(exitBlock);
+
+    EXPECT_TRUE(livenessPass->recomputeForFunction(getTestFunc(), cfg));
+    EXPECT_TRUE(res->m_def[entryBlock->getId()].empty());
+    EXPECT_TRUE(res->m_use[entryBlock->getId()].empty());
+    EXPECT_TRUE(res->m_liveIn[entryBlock->getId()].empty());
+    EXPECT_TRUE(res->m_liveOut[entryBlock->getId()].empty());
+    EXPECT_TRUE(res->m_def[exitBlock->getId()].empty());
+    EXPECT_TRUE(res->m_use[exitBlock->getId()].empty());
+    EXPECT_TRUE(res->m_liveIn[exitBlock->getId()].empty());
+    EXPECT_TRUE(res->m_liveOut[exitBlock->getId()].empty());
+}

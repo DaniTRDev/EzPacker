@@ -348,24 +348,36 @@ public:
 class DenseBitSet
 {
 public:
+    using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
+
     DenseBitSet() = default;
-    explicit DenseBitSet(size_t numBits);
+    explicit DenseBitSet(allocator_type alloc);
+    explicit DenseBitSet(size_t numBits, allocator_type alloc = {});
 
     // Bit manipulation
     void set(size_t bit);
+    void clearBit(size_t bit);
     bool test(size_t bit) const;
+    void reset();
+    void resize(size_t numBits);
+    size_t count() const;
 
     // Bitwise union: this |= other
     // Returns true if this bitset changed value (new bits were set)
     bool unionWith(const DenseBitSet &other);
+    void copyOr(const DenseBitSet &a, const DenseBitSet &b);
 
     // Evaluates compiler liveness transfer equation:
     // LiveIn = Use | (LiveOut & ~Def)
     // Updates internal words in-place and returns true if any word changed value.
     bool computeLiveIn(const DenseBitSet &use, const DenseBitSet &liveOut, const DenseBitSet &def);
 
+    // Iterates set bit indices in ascending order using hardware std::countr_zero.
+    template <typename Fn>
+    void forEachSetBit(Fn &&fn) const;
+
 private:
-    std::vector<uint64_t> m_words;
+    std::pmr::vector<uint64_t> m_words;
 };
 ```
 

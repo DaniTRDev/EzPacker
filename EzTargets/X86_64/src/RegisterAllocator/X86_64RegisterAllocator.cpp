@@ -96,7 +96,7 @@ MirInstruction *X86_64RegisterAllocator::reMaterialize(RegisterAllocatorCtx *ctx
                                                        MirInstruction *defInst)
 {
     MirInstructionBuilder iBuilder(ctx->m_ctx, block, InsertionType::InsertBefore, it);
-    std::pmr::vector<MirOperand *> ops(ctx->m_allocator);
+    std::pmr::vector<MirOperand *> ops(ctx->m_scratchAlloc);
     ops.reserve(defInst->getOperands().size());
     // Reuse the original source operands (1..N) but write into the freshly assigned destination.
     ops.push_back(dstReg);

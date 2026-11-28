@@ -171,7 +171,7 @@ EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register 
 
 ```
       +--------------------------------------------------+
-      |        Build Interference Graph (m_iGraph)       |
+      |   Build Dense Interference Graph (m_adjBits)     |
       |   (Nodes = VRegs, Edges = Concurrent Liveness)   |
       +--------------------------------------------------+
                                 |
@@ -210,34 +210,50 @@ EzTriple implements a production-grade **Chaitin-Briggs Graph-Coloring Register 
               v [Success]                       v [Spill Occurred]
      +-------------------+            +--------------------+
      |   RewriteColors   |            | Insert Spills/     |
-     | (VRegs -> PRegs)  |            | Reloads & Repeat   |
-     +-------------------+            +--------------------+
+     | (VRegs -> PRegs)  |            | Reloads & Recompute|
+     +-------------------+            | Function Liveness  |
+                                      +--------------------+
 ```
 
+On intermediate spill iterations, `MirRegisterAllocatorPass::run()` invokes `LivenessAnalysisPass::recomputeForFunction(func, cfgResult)` using the cached `CodeFlowResult` (since spill rewriting does not alter CFG edges), avoiding module-wide CFG/liveness invalidation until the function's allocation completes.
+
 #### Working Context (`RegisterAllocatorCtx`)
+`RegisterAllocatorCtx` separates persistent cross-iteration state (`m_persistentAlloc`: `m_spilledRegs`, `m_unspillableRegs`, `m_reservedRegs`, `m_allocatedRegs`) from ephemeral per-iteration state (`ScratchState` on `m_scratchAlloc`: `m_idToReg`, `m_regToId`, `m_adjBits` backed by `DenseBitSet`, `m_adjList`, `m_leader`, `m_coalescedAway`, `m_degree`, `m_removed`, `m_reservedDense`, `m_unspillableDense`, `m_selectStack`, `m_affinity`, `m_classColorLimits`, `m_spillCosts`). `MirRegisterAllocatorPass::run()` creates an iteration-scoped `std::pmr::monotonic_buffer_resource` per spill iteration (`beginIteration` / `endIteration`), reclaiming 100% of scratch memory after each iteration while keeping `m_contexts[func]` valid:
+
 ```cpp
 struct RegisterAllocatorCtx
 {
+    struct ScratchState
+    {
+        std::pmr::vector<MirRegisterRef> m_idToReg;
+        std::pmr::unordered_map<MirRegisterRef, uint32_t> m_regToId;
+        std::pmr::vector<DenseBitSet> m_adjBits;
+        std::pmr::vector<std::pmr::vector<uint32_t>> m_adjList;
+        std::pmr::vector<uint32_t> m_degree;
+        std::pmr::vector<uint32_t> m_leader;
+        DenseBitSet m_removed;
+        DenseBitSet m_coalescedAway;
+        DenseBitSet m_reservedDense;
+        DenseBitSet m_unspillableDense;
+        std::pmr::vector<uint32_t> m_selectStack;
+        std::pmr::vector<std::pmr::vector<uint32_t>> m_affinity;
+        std::pmr::vector<size_t> m_classColorLimits;
+        std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
+        bool m_spillCostsValid{ false };
+    };
+
     MirBuilderContext *m_ctx;
     MirFunction *m_targetFunction;
     TargetDesc *m_targetDesc;
-    std::pmr::memory_resource *m_allocator;
+    std::pmr::memory_resource *m_persistentAlloc;
+    std::pmr::memory_resource *m_scratchAlloc;
 
-    std::pmr::vector<MirRegisterRef> m_selectStack;
-    std::pmr::unordered_set<MirRegisterRef> m_removedNodes;
     std::pmr::unordered_set<MirRegisterRef> m_reservedRegs;
     std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_allocatedRegs;
-    std::pmr::unordered_map<MirRegisterRef, size_t> m_degree;
     std::pmr::unordered_map<MirRegisterRef, StackFrameObject *> m_spilledRegs;
-    std::pmr::unordered_map<MirRegisterRef, std::pmr::set<MirRegisterRef>> m_iGraph;
     std::pmr::unordered_set<MirRegisterRef> m_unspillableRegs;
-    std::pmr::unordered_map<MirRegisterRef, double> m_spillCosts;
-    bool m_spillCostsValid{ false };
-
-    // Coalescing & affinity state
-    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_coalescedRegs;
-    std::pmr::unordered_map<MirRegisterRef, MirRegisterRef> m_affinity;
     bool m_coalescingEnabled{ true };
+    std::optional<ScratchState> m_scratch;
 };
 ```
 
@@ -265,12 +281,14 @@ protected:
 When coalescing is enabled (`m_coalescingEnabled = true`, active at `-O1`, `-O2`, `-Os`):
 1. **Conservative Coalescing Criteria**:
    - **George's Criterion (Virtual into Physical)**: Merges virtual register $u$ into physical register $v$ if every neighbor $t$ of $u$ either already interferes with $v$ or has low degree ($\text{deg}(t) < K$). Guarantees the physical node's simplification degree does not increase unsafely.
-   - **Briggs' Criterion (Virtual into Virtual)**: Merges non-interfering virtual registers $u$ and $v$ if the combined node has fewer than $K$ neighbors of significant degree ($\ge K$).
+   - **Briggs' Criterion (Virtual into Virtual)**: Merges non-interfering virtual registers $u$ and $v$ if the combined node has fewer than $K$ neighbors of significant degree ($\ge K$). Evaluated in linear-scan passes using zero-allocation `DenseBitSet::copyOr` bitwise unions and symmetric `m_adjBits`/`m_adjList` updates.
    - **Two-Address Constraint Preservation**: Automatically coalesces destination registers with first source operands (`m_coalesceSrc`) for destructive operations (e.g. x86-64 ALU instructions).
 2. **Affinity-Biased Color Selection (`selectColors`)**:
    - Records affinity preferences between copy-related register pairs in `m_affinity`.
    - When assigning a physical color to an uncolored node, checks if its copy partner has already been colored and prioritizes that exact physical register if legal and unconstrained.
-3. **Redundant Copy Elimination (`eliminateRedundantCopies`)**:
+3. **Lazy Spill-Cost Calculation (`simplify`)**:
+   - `calculateSpillCost()` is deferred until `lowDegreeQueue` is exhausted and an optimistic spill candidate is actually needed (at most once per iteration via `m_spillCostsValid`), skipping the instruction scan completely on non-spilling functions.
+4. **Redundant Copy Elimination (`eliminateRedundantCopies`)**:
    - Executed after `rewriteColors()`. Scans all basic blocks and erases machine move instructions (`MOV64rr`, etc.) whose destination and source resolve to the exact same physical register.
 
 ```cpp

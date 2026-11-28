@@ -3,10 +3,13 @@
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/MirFunction.h"
 #include "MirPasses/MirPassManager.h"
+#include "MirPasses/Passes/CodeFlowAnalysisPass.h"
 #include "MirPasses/Passes/LivenessAnalysisPass.h"
 #include "RegisterAllocator/MirRegisterAllocator.h"
 #include "RegisterAllocator/MirRegisterAllocatorPass.h"
 #include "Printer/MirPrinter.h"
+#include <array>
+#include <cstddef>
 
 /**
  * Caches the builder context, target allocator and result storage for this pass. Missing
@@ -38,13 +41,13 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
     size_t iterationCount = 0;
     constexpr size_t maxIterations = 100;
 
-    if (!m_ctx || !m_targetDesc || !m_regAllocator || !func)
+    if (!m_ctx || !m_targetDesc || !m_regAllocator || !func || !passManager)
     {
         if (m_ctx)
         {
             m_ctx->getDiagCollector()->error(getName(),
-                                             "Register allocator pass is missing its context, target descriptor or "
-                                             "target allocator");
+                                             "Register allocator pass is missing its context, target descriptor, "
+                                             "target allocator, or pass manager");
         }
         return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
     }
@@ -56,28 +59,55 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
 
     auto cleanupFailure = [&]() -> MirPassResult
     {
+        if (passManager)
+        {
+            passManager->invalidateAnalysis();
+        }
         alloc.delete_object(ctx);
         return { .m_modifiedMir = false, .m_executed = true, .m_succeeded = false };
     };
+
+    LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
+    CodeFlowAnalysisPass *cfgPass = passManager->getCachedAnalysis<CodeFlowAnalysisPass>();
+    if (!cfgPass)
+    {
+        cfgPass = passManager->getAnalysis<CodeFlowAnalysisPass>(m_ctx);
+    }
 
     while (!allocationComplete && iterationCount < maxIterations)
     {
         iterationCount++;
 
-        // Reset per-iteration allocation state (preserve m_spilledRegs and m_unspillableRegs across iterations)
-        ctx->m_selectStack.clear();
-        ctx->m_removedNodes.clear();
-        ctx->m_allocatedRegs.clear();
-        ctx->m_degree.clear();
-        ctx->m_iGraph.clear();
-        ctx->m_coalescedRegs.clear();
-        ctx->m_affinity.clear();
+        if (iterationCount > 1)
+        {
+            // Spill rewriting only inserts/updates instructions within existing blocks; CFG edges are
+            // invariant, so recompute liveness for this function only without module-wide invalidation.
+            CodeFlowResult *cfgResult = cfgPass ? cfgPass->getResult() : nullptr;
+            if (!livenessAnalysis || !livenessAnalysis->recomputeForFunction(func, cfgResult))
+            {
+                passManager->invalidateAnalysis();
+                livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
+                cfgPass = passManager->getCachedAnalysis<CodeFlowAnalysisPass>();
+            }
+        }
 
-        LivenessAnalysisPass *livenessAnalysis = passManager->getAnalysis<LivenessAnalysisPass>(m_ctx);
-        LivenessResult *result = livenessAnalysis->getResult();
+        // Iteration-scoped scratch arena: 100% of graph/coalescing/simplification memory
+        // is reclaimed at the end of every spill iteration.
+        std::array<std::byte, 64 * 1024> stackBuf;
+        std::pmr::monotonic_buffer_resource iterScratch(
+                stackBuf.data(), stackBuf.size(), std::pmr::new_delete_resource());
+        ctx->beginIteration(&iterScratch);
+
+        LivenessResult *result = livenessAnalysis ? livenessAnalysis->getResult() : nullptr;
+        if (!result)
+        {
+            ctx->endIteration();
+            return cleanupFailure();
+        }
 
         if (!m_regAllocator->buildInterferenceGraph(result, ctx))
         {
+            ctx->endIteration();
             m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                     << "Failed to build interference graph for function " << func->getName();
             return cleanupFailure();
@@ -95,6 +125,7 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
         // Simplify Graph Nodes onto Select Stack
         if (!m_regAllocator->simplify(ctx))
         {
+            ctx->endIteration();
             m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                     << "Simplification failed for function " << func->getName();
             return cleanupFailure();
@@ -102,18 +133,24 @@ MirPassResult MirRegisterAllocatorPass::run(IntrusiveLinkedList<class MirFunctio
 
         // Assign Colors (or emit spills and rewrite IR)
         allocationComplete = m_regAllocator->selectColors(ctx);
-        passManager->invalidateAnalysis();
+        if (allocationComplete)
+        {
+            // Rewrite Virtual Registers to Physical Registers while scratch coalesced leader map is live
+            m_regAllocator->rewriteColors(ctx);
+        }
+        ctx->endIteration();
     }
 
     if (!allocationComplete)
     {
+        passManager->invalidateAnalysis();
         m_ctx->getDiagCollector()->builder(Diag_Error, "RegisterAllocatorPass")
                 << "Register allocation exceeded maximum iteration limit without converging for " << func->getName();
         return cleanupFailure();
     }
 
-    // Rewrite Virtual Registers to Physical Registers in MIR
-    m_regAllocator->rewriteColors(ctx);
+    // Invalidate cached analyses once on completion so downstream passes see the rewritten MIR.
+    passManager->invalidateAnalysis();
 
     m_result.m_contexts[func] = ctx;
     m_result.m_resolvedFunctions.insert(func);
