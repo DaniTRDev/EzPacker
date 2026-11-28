@@ -21,6 +21,39 @@ struct SourceRefData
 };
 
 /**
+ * High-level structural kind of a type described by RTTI or debug information.
+ */
+enum class RttiTypeKind : uint8_t
+{
+    Unknown = 0,
+    Void,
+    Boolean,
+    SignedInt,
+    UnsignedInt,
+    Float,
+    Pointer,
+    Array,
+    Struct,
+    Union,
+    Enum,
+    Function,
+    Vector,
+    Typedef
+};
+
+/**
+ * Describes a single field/member within a composite RTTI type (struct or union).
+ */
+struct RttiMemberDescriptor
+{
+    std::string_view name;     ///< Field identifier.
+    uint64_t typeId{ 0 };      ///< 64-bit type hash of the member's type.
+    uint32_t byteOffset{ 0 };  ///< Byte offset from the start of the enclosing aggregate.
+    uint16_t bitOffset{ 0 };   ///< Bit offset within the storage unit for bitfields.
+    uint16_t bitWidth{ 0 };    ///< Width in bits (0 for non-bitfield members).
+};
+
+/**
  * Runtime Type Information (RTTI) descriptor capturing type identities, hierarchy, and declaration coordinates.
  */
 struct RttiTypeDescriptor
@@ -30,6 +63,11 @@ struct RttiTypeDescriptor
     uint32_t numBases{ 0 };                            ///< Number of direct base types.
     const RttiTypeDescriptor *const *bases{ nullptr }; ///< Base type array for hierarchical subtyping checks.
     SourceRefData declarationSite;                     ///< Location where type was defined.
+    uint64_t sizeInBytes{ 0 };                         ///< Size of the type in bytes (0 if unsized/unknown).
+    uint32_t alignment{ 0 };                           ///< Alignment requirement in bytes (0 if unknown).
+    RttiTypeKind kind{ RttiTypeKind::Unknown };        ///< Structural kind of the type.
+    uint32_t numMembers{ 0 };                          ///< Number of member descriptors (for struct/union).
+    const RttiMemberDescriptor *members{ nullptr };    ///< Member descriptor array (nullptr if none).
 
     /**
      * Checks if this type is identical to or derives from the target base type.
