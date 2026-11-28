@@ -1,4 +1,5 @@
 #include "EzCodeEmitterTestSuite.h"
+#include "Debug/IDebugInfoEmitter.h"
 #include "Helpers.h"
 #include "ObjectFormat/Elf64Writer.h"
 #include "ObjectFormat/CoffWriter.h"
@@ -373,4 +374,362 @@ TEST_F(EzCodeEmitterTestSuite, TestElf64SymbolLinkageAndWeak)
     ASSERT_NE(psWeakExtern, nullptr);
     EXPECT_EQ(psWeakExtern->bind, 2); // STB_WEAK
     EXPECT_EQ(psWeakExtern->shndx, 0); // SHN_UNDEF
+}
+
+// Verifies ELF64 extra sections, flags, STT_SECTION symbols, .rela<sec> emission, and clear().
+TEST_F(EzCodeEmitterTestSuite, TestElf64ExtraSectionsAndSectionRelocs)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateElfSections(sections, getAllocator());
+    CodeSection *textSec = sections[SectionType::Text];
+    textSec->emit8(0xC3);
+    textSec->finalize();
+
+    Elf64Writer writer;
+    writer.addSymbol(ObjectSymbol{ .m_name = "local_fn",
+                                   .m_section = SectionType::Text,
+                                   .m_offset = 0,
+                                   .m_size = 1,
+                                   .m_isGlobal = false,
+                                   .m_isFunction = true });
+    writer.addSymbol(ObjectSymbol{ .m_name = "main",
+                                   .m_section = SectionType::Text,
+                                   .m_offset = 0,
+                                   .m_size = 1,
+                                   .m_isGlobal = true,
+                                   .m_isFunction = true });
+
+    ExtraObjectSection debugInfo;
+    debugInfo.m_name = ".debug_info";
+    debugInfo.m_data = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C };
+    debugInfo.m_alignment = 1;
+    debugInfo.m_isDebug = true;
+    debugInfo.m_isAlloc = false;
+    debugInfo.m_isMergeStrings = false;
+    debugInfo.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                    .m_targetName = ".text",
+                                                    .m_targetIsSection = true,
+                                                    .m_type = TargetCodeRelocationType::Absolute64,
+                                                    .m_addend = 0 });
+    debugInfo.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 8,
+                                                    .m_targetName = ".debug_str",
+                                                    .m_targetIsSection = true,
+                                                    .m_type = TargetCodeRelocationType::Absolute32,
+                                                    .m_addend = 4 });
+    writer.addExtraSection(debugInfo);
+
+    ExtraObjectSection debugStr;
+    debugStr.m_name = ".debug_str";
+    debugStr.m_data = { 'f', 'o', 'o', '\0', 'b', 'a', 'r', '\0' };
+    debugStr.m_alignment = 1;
+    debugStr.m_isDebug = true;
+    debugStr.m_isAlloc = false;
+    debugStr.m_isMergeStrings = true;
+    writer.addExtraSection(debugStr);
+
+    ExtraObjectSection allocExtra;
+    allocExtra.m_name = ".eh_frame_custom";
+    allocExtra.m_data = { 0xAA, 0xBB };
+    allocExtra.m_alignment = 8;
+    allocExtra.m_isDebug = false;
+    allocExtra.m_isAlloc = true;
+    writer.addExtraSection(allocExtra);
+
+    std::vector<uint8_t> elfBytes = writer.write(sections);
+    ASSERT_GE(elfBytes.size(), 64u);
+
+    uint64_t e_shoff = 0;
+    std::memcpy(&e_shoff, &elfBytes[40], 8);
+    uint16_t e_shentsize = 0;
+    std::memcpy(&e_shentsize, &elfBytes[58], 2);
+    uint16_t e_shnum = 0;
+    std::memcpy(&e_shnum, &elfBytes[60], 2);
+    uint16_t e_shstrndx = 0;
+    std::memcpy(&e_shstrndx, &elfBytes[62], 2);
+
+    const uint8_t *shstrHdr = &elfBytes[e_shoff + e_shstrndx * e_shentsize];
+    uint64_t shstrOff = 0;
+    std::memcpy(&shstrOff, shstrHdr + 24, 8);
+
+    struct SecHeaderInfo
+    {
+        uint16_t idx;
+        std::string name;
+        uint32_t type;
+        uint64_t flags;
+        uint64_t offset;
+        uint64_t size;
+        uint32_t link;
+        uint32_t info;
+        uint64_t entsize;
+    };
+    std::vector<SecHeaderInfo> secHdrs;
+    for (uint16_t i = 0; i < e_shnum; ++i)
+    {
+        const uint8_t *sh = &elfBytes[e_shoff + i * e_shentsize];
+        SecHeaderInfo s{};
+        s.idx = i;
+        uint32_t sh_name = 0;
+        std::memcpy(&sh_name, sh, 4);
+        s.name = reinterpret_cast<const char *>(&elfBytes[shstrOff + sh_name]);
+        std::memcpy(&s.type, sh + 4, 4);
+        std::memcpy(&s.flags, sh + 8, 8);
+        std::memcpy(&s.offset, sh + 24, 8);
+        std::memcpy(&s.size, sh + 32, 8);
+        std::memcpy(&s.link, sh + 40, 4);
+        std::memcpy(&s.info, sh + 44, 4);
+        std::memcpy(&s.entsize, sh + 56, 8);
+        secHdrs.push_back(s);
+    }
+
+    auto findSec = [&](std::string_view name) -> const SecHeaderInfo * {
+        for (const auto &s : secHdrs)
+        {
+            if (s.name == name)
+                return &s;
+        }
+        return nullptr;
+    };
+
+    const SecHeaderInfo *shDebugInfo = findSec(".debug_info");
+    const SecHeaderInfo *shDebugStr = findSec(".debug_str");
+    const SecHeaderInfo *shAlloc = findSec(".eh_frame_custom");
+    const SecHeaderInfo *shRelaDebug = findSec(".rela.debug_info");
+    const SecHeaderInfo *shSymtab = findSec(".symtab");
+    const SecHeaderInfo *shText = findSec(".text");
+
+    ASSERT_NE(shDebugInfo, nullptr);
+    EXPECT_EQ(shDebugInfo->type, 1u);  // SHT_PROGBITS
+    EXPECT_EQ(shDebugInfo->flags, 0u); // non-alloc debug
+    EXPECT_EQ(shDebugInfo->size, 12u);
+
+    ASSERT_NE(shDebugStr, nullptr);
+    EXPECT_EQ(shDebugStr->type, 1u);
+    EXPECT_EQ(shDebugStr->flags, 0x30u); // SHF_MERGE | SHF_STRINGS
+    EXPECT_EQ(shDebugStr->entsize, 1u);
+
+    ASSERT_NE(shAlloc, nullptr);
+    EXPECT_EQ(shAlloc->flags, 0x2u); // SHF_ALLOC
+
+    ASSERT_NE(shSymtab, nullptr);
+    ASSERT_NE(shRelaDebug, nullptr);
+    EXPECT_EQ(shRelaDebug->type, 4u);    // SHT_RELA
+    EXPECT_EQ(shRelaDebug->flags, 0x40u); // SHF_INFO_LINK
+    EXPECT_EQ(shRelaDebug->link, shSymtab->idx);
+    EXPECT_EQ(shRelaDebug->info, shDebugInfo->idx);
+    EXPECT_EQ(shRelaDebug->size, 2u * 24u);
+
+    // Verify STT_SECTION symbols precede local_fn and main, and sh_info == index of main.
+    constexpr size_t ELF_SYM_SIZE = 24;
+    size_t numSyms = shSymtab->size / ELF_SYM_SIZE;
+    // NULL + 7 section symbols (.text, .rodata, .data, .bss, .debug_info, .debug_str, .eh_frame_custom) + local_fn + main = 10
+    ASSERT_EQ(numSyms, 10u);
+    EXPECT_EQ(shSymtab->info, 9u); // index of 'main' (1 NULL + 7 STT_SECTION + 1 local_fn)
+
+    // Verify section symbols at indices 1..7
+    uint16_t textSecSymIdx = 0;
+    uint16_t debugStrSecSymIdx = 0;
+    for (size_t i = 1; i <= 7; ++i)
+    {
+        const uint8_t *symData = &elfBytes[shSymtab->offset + i * ELF_SYM_SIZE];
+        uint8_t st_info = symData[4];
+        uint16_t st_shndx = 0;
+        std::memcpy(&st_shndx, symData + 6, 2);
+        EXPECT_EQ(st_info >> 4, 0u);   // STB_LOCAL
+        EXPECT_EQ(st_info & 0xF, 3u); // STT_SECTION
+        if (st_shndx == shText->idx)
+            textSecSymIdx = static_cast<uint16_t>(i);
+        if (st_shndx == shDebugStr->idx)
+            debugStrSecSymIdx = static_cast<uint16_t>(i);
+    }
+    EXPECT_NE(textSecSymIdx, 0u);
+    EXPECT_NE(debugStrSecSymIdx, 0u);
+
+    // Verify .rela.debug_info entries
+    uint64_t r0_info = 0;
+    std::memcpy(&r0_info, &elfBytes[shRelaDebug->offset + 8], 8);
+    EXPECT_EQ(static_cast<uint32_t>(r0_info >> 32), textSecSymIdx);
+    EXPECT_EQ(static_cast<uint32_t>(r0_info & 0xFFFFFFFFULL), 1u); // R_X86_64_64
+
+    uint64_t r1_info = 0;
+    int64_t r1_addend = 0;
+    std::memcpy(&r1_info, &elfBytes[shRelaDebug->offset + 24 + 8], 8);
+    std::memcpy(&r1_addend, &elfBytes[shRelaDebug->offset + 24 + 16], 8);
+    EXPECT_EQ(static_cast<uint32_t>(r1_info >> 32), debugStrSecSymIdx);
+    EXPECT_EQ(static_cast<uint32_t>(r1_info & 0xFFFFFFFFULL), 10u); // R_X86_64_32
+    EXPECT_EQ(r1_addend, 4);
+
+    // Verify clear() removes extra sections
+    writer.clear();
+    std::vector<uint8_t> clearedBytes = writer.write(sections);
+    uint16_t clearedShnum = 0;
+    std::memcpy(&clearedShnum, &clearedBytes[60], 2);
+    EXPECT_EQ(clearedShnum, 8u); // NULL, .text, .rodata, .data, .bss, .symtab, .strtab, .shstrtab
+}
+
+// Verifies COFF extra sections, long section names, SECREL/SECTION relocations, and section symbols.
+TEST_F(EzCodeEmitterTestSuite, TestCoffExtraSectionsLongNamesAndSecRel)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateCoffSections(sections, getAllocator());
+    CodeSection *textSec = sections[SectionType::Text];
+    textSec->emit8(0xC3);
+    textSec->finalize();
+
+    CoffWriter writer;
+    writer.addSymbol(ObjectSymbol{ .m_name = "main",
+                                   .m_section = SectionType::Text,
+                                   .m_offset = 0,
+                                   .m_size = 1,
+                                   .m_isGlobal = true,
+                                   .m_isFunction = true });
+
+    // Short name <= 8 bytes: ".debug$S"
+    ExtraObjectSection debugS;
+    debugS.m_name = ".debug$S";
+    debugS.m_data = { 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    debugS.m_alignment = 4;
+    debugS.m_isDebug = true;
+    debugS.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 4,
+                                                 .m_targetName = "main",
+                                                 .m_targetIsSection = false,
+                                                 .m_type = TargetCodeRelocationType::SecRel32 });
+    debugS.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 8,
+                                                 .m_targetName = ".text",
+                                                 .m_targetIsSection = true,
+                                                 .m_type = TargetCodeRelocationType::SectionIdx16 });
+    writer.addExtraSection(debugS);
+
+    // Long name > 8 bytes: ".debug_info"
+    ExtraObjectSection debugInfo;
+    debugInfo.m_name = ".debug_info";
+    debugInfo.m_data = { 0x11, 0x22, 0x33, 0x44 };
+    debugInfo.m_alignment = 1;
+    debugInfo.m_isDebug = true;
+    debugInfo.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                    .m_targetName = ".text",
+                                                    .m_targetIsSection = true,
+                                                    .m_type = TargetCodeRelocationType::SecRel32 });
+    writer.addExtraSection(debugInfo);
+
+    std::vector<uint8_t> coffBytes = writer.write(sections);
+    ASSERT_GE(coffBytes.size(), 20u);
+
+    uint16_t numSections = 0;
+    uint32_t symTablePtr = 0;
+    uint32_t numSymbols = 0;
+    std::memcpy(&numSections, &coffBytes[2], 2);
+    std::memcpy(&symTablePtr, &coffBytes[8], 4);
+    std::memcpy(&numSymbols, &coffBytes[12], 4);
+
+    ASSERT_EQ(numSections, 6u); // .text, .rdata, .data, .bss, .debug$S, .debug_info
+    // Symbols: main + .text section symbol (deduplicated across two relocs!) = 2
+    EXPECT_EQ(numSymbols, 2u);
+
+    uint32_t strTableOffset = symTablePtr + numSymbols * 18u;
+    uint32_t strTableSize = 0;
+    std::memcpy(&strTableSize, &coffBytes[strTableOffset], 4);
+    EXPECT_GT(strTableSize, 4u);
+
+    // Check section headers (starting at offset 20, each 40 bytes; extra sections start at index 4)
+    const uint8_t *shDebugS = &coffBytes[20 + 4 * 40];
+    EXPECT_EQ(std::string_view(reinterpret_cast<const char *>(shDebugS), 8), ".debug$S");
+    uint32_t debugSChars = 0;
+    std::memcpy(&debugSChars, shDebugS + 36, 4);
+    EXPECT_EQ(debugSChars, 0x42300040u); // align 4 debug
+
+    uint32_t debugSRelocPtr = 0;
+    uint16_t debugSNumRelocs = 0;
+    std::memcpy(&debugSRelocPtr, shDebugS + 24, 4);
+    std::memcpy(&debugSNumRelocs, shDebugS + 32, 2);
+    ASSERT_EQ(debugSNumRelocs, 2u);
+
+    uint16_t r0Type = 0;
+    std::memcpy(&r0Type, &coffBytes[debugSRelocPtr + 8], 2);
+    EXPECT_EQ(r0Type, 0x000Bu); // IMAGE_REL_AMD64_SECREL
+
+    uint16_t r1Type = 0;
+    std::memcpy(&r1Type, &coffBytes[debugSRelocPtr + 10 + 8], 2);
+    EXPECT_EQ(r1Type, 0x000Au); // IMAGE_REL_AMD64_SECTION
+
+    const uint8_t *shDebugInfo = &coffBytes[20 + 5 * 40];
+    EXPECT_EQ(shDebugInfo[0], '/');
+    uint32_t nameOff = static_cast<uint32_t>(std::stoul(reinterpret_cast<const char *>(shDebugInfo + 1)));
+    ASSERT_LT(nameOff, strTableSize);
+    EXPECT_STREQ(reinterpret_cast<const char *>(&coffBytes[strTableOffset + nameOff]), ".debug_info");
+
+    uint32_t debugInfoChars = 0;
+    std::memcpy(&debugInfoChars, shDebugInfo + 36, 4);
+    EXPECT_EQ(debugInfoChars, 0x42100040u); // align 1 debug
+
+    // Verify clear() removes extra sections
+    writer.clear();
+    std::vector<uint8_t> clearedBytes = writer.write(sections);
+    uint16_t clearedSections = 0;
+    std::memcpy(&clearedSections, &clearedBytes[2], 2);
+    EXPECT_EQ(clearedSections, 4u); // .text, .rdata, .data, .bss only
+}
+
+// Verifies ELF64 and COFF fail loudly when an extra section relocation targets a missing section or symbol.
+TEST_F(EzCodeEmitterTestSuite, TestExtraSectionRelocsFailLoudOnMissingTarget)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> elfSections(getAllocator());
+    Helpers::ObjectFormat::CreateElfSections(elfSections, getAllocator());
+    elfSections[SectionType::Text]->finalize();
+
+    {
+        Elf64Writer elfWriter;
+        ExtraObjectSection sec;
+        sec.m_name = ".debug_info";
+        sec.m_data = { 0, 0, 0, 0 };
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                  .m_targetName = ".nonexistent",
+                                                  .m_targetIsSection = true,
+                                                  .m_type = TargetCodeRelocationType::Absolute32 });
+        elfWriter.addExtraSection(sec);
+        EXPECT_THROW(elfWriter.write(elfSections), std::runtime_error);
+    }
+
+    {
+        Elf64Writer elfWriter;
+        ExtraObjectSection sec;
+        sec.m_name = ".debug_info";
+        sec.m_data = { 0, 0, 0, 0 };
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                  .m_targetName = "missing_sym",
+                                                  .m_targetIsSection = false,
+                                                  .m_type = TargetCodeRelocationType::Absolute64 });
+        elfWriter.addExtraSection(sec);
+        EXPECT_THROW(elfWriter.write(elfSections), std::runtime_error);
+    }
+
+    std::pmr::unordered_map<SectionType, CodeSection *> coffSections(getAllocator());
+    Helpers::ObjectFormat::CreateCoffSections(coffSections, getAllocator());
+    coffSections[SectionType::Text]->finalize();
+
+    {
+        CoffWriter coffWriter;
+        ExtraObjectSection sec;
+        sec.m_name = ".debug$S";
+        sec.m_data = { 0, 0, 0, 0 };
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                  .m_targetName = ".nonexistent",
+                                                  .m_targetIsSection = true,
+                                                  .m_type = TargetCodeRelocationType::SecRel32 });
+        coffWriter.addExtraSection(sec);
+        EXPECT_THROW(coffWriter.write(coffSections), std::runtime_error);
+    }
+
+    {
+        CoffWriter coffWriter;
+        ExtraObjectSection sec;
+        sec.m_name = ".debug$S";
+        sec.m_data = { 0, 0, 0, 0 };
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                  .m_targetName = "missing_sym",
+                                                  .m_targetIsSection = false,
+                                                  .m_type = TargetCodeRelocationType::SecRel32 });
+        coffWriter.addExtraSection(sec);
+        EXPECT_THROW(coffWriter.write(coffSections), std::runtime_error);
+    }
 }

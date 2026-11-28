@@ -35,7 +35,13 @@ enum class TargetCodeRelocationType : uint8_t
     GOTPCREL,
 
     /** 32-bit PC-relative reference to a Procedure Linkage Table (PLT) entry. */
-    PLTRel32
+    PLTRel32,
+
+    /** 32-bit section-relative offset (COFF IMAGE_REL_AMD64_SECREL = 0x000B). */
+    SecRel32,
+
+    /** 16-bit section index (COFF IMAGE_REL_AMD64_SECTION = 0x000A). */
+    SectionIdx16
 };
 
 /**

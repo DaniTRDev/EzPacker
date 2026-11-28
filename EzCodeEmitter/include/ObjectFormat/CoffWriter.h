@@ -34,18 +34,24 @@ class CoffWriter : public IObjectWriter
     void addRelocation(const ObjectRelocEntry &reloc) override;
 
     /**
+     * Registers an extra raw section (e.g., debug info section) to be emitted alongside standard sections.
+     */
+    void addExtraSection(const ExtraObjectSection &section) override;
+
+    /**
      * Generates a relocatable PE/COFF object file byte stream from the provided code sections.
      */
     std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections) override;
 
     /**
-     * Clears all registered symbols and relocations.
+     * Clears all registered symbols, relocations, and extra sections.
      */
     void clear() override;
 
   private:
-    std::vector<ObjectSymbol> m_symbols;    ///< Symbols to materialize in the COFF symbol table.
-    std::vector<ObjectRelocEntry> m_relocs; ///< Relocations to materialize per section.
+    std::vector<ObjectSymbol> m_symbols;           ///< Symbols to materialize in the COFF symbol table.
+    std::vector<ObjectRelocEntry> m_relocs;        ///< Relocations to materialize per section.
+    std::vector<ExtraObjectSection> m_extraSections; ///< Extra raw sections (e.g., CodeView debug sections).
 };
 
 } // namespace EzCodeEmitter::ObjectFormat
