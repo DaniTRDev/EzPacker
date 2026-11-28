@@ -18,6 +18,7 @@ set(EZCORE_FILES_LIST
         "include/SourceManager/GenericSourceManager.h"
         "include/SourceManager/SourceManager.h"
         "include/Rtti/RttiDescriptor.h"
+        "include/Debug/DebugInfo.h"
 
         "src/Diagnostics/DiagnosticBuilder.cpp"
         "src/Diagnostics/DiagnosticCollector.cpp"
@@ -28,6 +29,7 @@ set(EZCORE_FILES_LIST
         "src/FlexNumber/FlexInt.cpp"
         "src/HelperClasses/DenseBitSet.cpp"
         "src/SourceManager/SourceManager.cpp"
+        "src/Debug/DebugInfo.cpp"
 )
 
 EzCMK_ConfigureLib(NAME "EzCore"
@@ -73,5 +75,12 @@ if (EZPACKER_BUILD_TESTS)
             "EzCore"
             "gtest;GTest::gtest_main"
             "tests/T_FlexNumber.cpp"
+    )
+
+    EzPacker_AddTest(
+            "T_DebugInfo"
+            "EzCore"
+            "gtest;GTest::gtest_main"
+            "tests/T_DebugInfo.cpp"
     )
 endif ()

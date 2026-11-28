@@ -20,6 +20,7 @@ All comprehensive documentation resides in the [`docs/`](docs/) directory:
 - 🛠️ **[Comprehensive Build Guide](docs/build_guide.md)** - Prerequisites, CMake options, compiling on Windows and Linux, running tests, and web IDE setup.
 - 💡 **[Examples & Use Cases](docs/examples.md)** - In-depth breakdown of bundled MIR and C11 modules with assembly outputs.
 - 🎯 **[How to Build a Target Architecture](docs/how_to_build_a_target.md)** - Guide to adding and building new CPU targets from first principles.
+- 🐛 **[Debugging Information Guide](docs/debug_information.md)** - Architecture & user guide for DWARF v5 (ELF64) and CodeView CV8 / PDB (PE/COFF) debug emission.
 - 🔬 **[YARPGen Differential Testing](docs/yarpgen_differential_testing.md)** - Dual-mode differential fuzzing and stress testing engine comparing EzPacker with GCC/Clang.
 - ⚡ **[Performance Benchmarks](docs/performance_benchmarks.md)** - Stage-by-stage timing breakdown, scaling analysis, and comparisons against GCC/LLVM/TCC.
 

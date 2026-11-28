@@ -1,5 +1,6 @@
 #include "Block/MirBlock.h"
 #include "Builder/MirBuilderContext.h"
+#include "Debug/MirDebugMetadata.h"
 #include "Diagnostics/DiagnosticCollector.h"
 #include "Function/CallingConvDesc.h"
 #include "Function/MirFunction.h"
@@ -229,3 +230,16 @@ std::pmr::monotonic_buffer_resource *MirBuilderContext::getGlobalAllocator() { r
  * Returns the mutable list of global variables registered in this context.
  */
 std::pmr::list<MirGlobalVar *> &MirBuilderContext::getGlobalVars() { return m_globalVars; }
+
+MirBuilderContext::~MirBuilderContext() = default;
+
+MirDebugMetadata *MirBuilderContext::getDebugMetadata() const noexcept { return m_debugMeta.get(); }
+
+MirDebugMetadata *MirBuilderContext::getOrCreateDebugMetadata()
+{
+    if (!m_debugMeta)
+    {
+        m_debugMeta = std::make_unique<MirDebugMetadata>();
+    }
+    return m_debugMeta.get();
+}

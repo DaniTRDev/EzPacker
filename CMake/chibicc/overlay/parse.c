@@ -2672,6 +2672,9 @@ static Type *struct_union_decl(Token **rest, Token *tok) {
   if (tok->kind == TK_IDENT) {
     tag = tok;
     tok = tok->next;
+    ty->tag_name = tag;
+    ty->name = tag;
+    ty->name_pos = tag;
   }
 
   if (tag && !equal(tok, "{")) {

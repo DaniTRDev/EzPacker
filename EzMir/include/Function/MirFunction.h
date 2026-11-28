@@ -4,20 +4,37 @@
 #include "EzMirCommon.h"
 #include "MirFunctionRegisterInfo.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
+#include <unordered_map>
+
+/**
+ * Records the final register or stack spill assignment for a virtual register,
+ * populated by MirRegisterAllocator for debug location generation.
+ */
+struct MirFunctionDebugLocation
+{
+    bool isSpill{ false };    ///< True if the virtual register was spilled to a stack slot.
+    uint32_t physRegId{ 0 };  ///< Assigned hardware register ID (when isSpill is false).
+    bool isFpr{ false };      ///< True if physRegId refers to a floating-point/vector register.
+    size_t spillSlotId{ 0 };  ///< Assigned stack frame spill slot ID (when isSpill is true).
+};
 
 /**
  * Compiler pass analysis metrics collected during lowering and optimization pipelines.
  */
 struct MirFunctionAnalysisData
 {
-    bool m_hasCalls{ false };         // Set by AbiLowererPass.
-    bool m_hasDynamicAllocs{ false }; // Set by RegisterAllocator OR FrameLowererPass.
+    bool m_hasCalls{ false };         ///< Set by AbiLowererPass when the function contains call instructions.
+    bool m_hasDynamicAllocs{ false }; ///< Set by RegisterAllocator or FrameLowererPass for dynamic stack allocations.
 
-    // Total size (in bytes) occupied by pushed callee-saved registers.
-    size_t m_calleeSavedAreaSize = 0; // Set by FrameLowererPass.
+    size_t m_calleeSavedAreaSize = 0; ///< Total size (in bytes) occupied by pushed callee-saved registers (set by FrameLowererPass).
+    size_t m_totalFrameSize = 0;      ///< Total aligned stack payload size allocated during the prologue (set by FrameLowererPass).
+    size_t m_prologueInstCount{ 0 };  ///< Number of machine instructions emitted in the function prologue (set by FrameLowererPass).
 
-    // Total aligned stack payload size allocated during the prologue.
-    size_t m_totalFrameSize = 0; // Set by FrameLowererPass.
+    /// Final register/spill location per virtual register ID for debug variable tracking.
+    std::unordered_map<MirId, MirFunctionDebugLocation> m_vregToLocation;
+
+    /// Maps post-SSA renamed virtual register IDs back to their pre-SSA root virtual register ID.
+    std::unordered_map<MirId, MirId> m_ssaToRootVreg;
 };
 
 /**

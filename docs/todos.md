@@ -95,12 +95,12 @@ Items are organized by architectural subsystem and categorized by priority:
 
 ## 6. Linking, Debug Information & Object Emitter (`EzLinker` & `EzCodeEmitter`)
 
-### 6.1 Debug Information Generation
-- **[P1] DWARF v5 Emission (Linux ELF64)**:
-  - Generate `.debug_info`, `.debug_line`, `.debug_abbrev`, and `.debug_str` sections.
-  - Map `SourceLocation` metadata from `SourceManager` to line number tables so developers can debug compiled binaries in GDB / LLDB.
-- **[P1] CodeView / PDB Information Emission (Windows PE/COFF)**:
-  - Generate `.cv_info` and `.debug$S` / `.debug$T` sections for Visual Studio and WinDbg source stepping.
+### 6.1 Debug Information Generation ✅ Implemented
+- **[Implemented] DWARF v5 Emission (Linux ELF64)**:
+  - `Dwarf5Emitter` generates `.debug_info`, `.debug_abbrev`, `.debug_line`, `.debug_str`, `.debug_line_str`, and `.debug_frame` sections for x86-64 and RISC-V 64 (`-g` / `-g1` / `-g2`, `--debug-format=dwarf`).
+- **[Implemented] CodeView / PDB Information Emission (Windows PE/COFF)**:
+  - `CodeViewEmitter` generates `.debug$T` and `.debug$S` (CV8 C13) sections with `SECREL`/`SECTION` relocations, and `ez-ld -g` passes `/DEBUG` for PDB generation.
+  - See the **[Debugging Information Guide](debug_information.md)** for architecture, CLI flags, and workflows.
 
 ### 6.2 Native Linker Engine
 - **[P2] Direct Internal Object Linking**:
@@ -138,8 +138,8 @@ Items are organized by architectural subsystem and categorized by priority:
 | `OPT-01` | `EzMir` | Implement Global Value Numbering (GVN) pass | P1 | v1.1 |
 | `OPT-02` | `EzMir` | Implement Loop-Invariant Code Motion (LICM) | P2 | v1.2 |
 | `OPT-03` | `EzTriple` | Incorporate loop-depth weighting in register allocation | P1 | v1.1 |
-| `DBG-01` | `EzCodeEmitter` | Emit DWARF v5 line and symbol tables for Linux ELF64 | P1 | v1.1 |
-| `DBG-02` | `EzCodeEmitter` | Emit CodeView / PDB debug sections for Windows | P1 | v1.2 |
+| `DBG-01` | `EzCodeEmitter` | Emit DWARF v5 line and symbol tables for Linux ELF64 | ✅ Done | v1.1 |
+| `DBG-02` | `EzCodeEmitter` | Emit CodeView / PDB debug sections for Windows | ✅ Done | v1.2 |
 | `TGT-01` | `EzTargets` | Declarative RISC-V Bitmanip (Zba/Zbb/Zbc/Zbs) extension support | P2 | v1.2 |
 | `TGT-02` | `EzTargets` | AArch64 (ARM64) Target Architecture Backend | P3 | v2.0 |
 | `WEB-01` | `web` | Compile `ezc` to WebAssembly for offline in-browser execution | P2 | v1.2 |

@@ -32,6 +32,11 @@ class IObjectWriter
     virtual void addRelocation(const ObjectRelocEntry &reloc) = 0;
 
     /**
+     * Registers an extra raw section (e.g., debug info section) to be emitted alongside standard sections.
+     */
+    virtual void addExtraSection(const ExtraObjectSection &section) = 0;
+
+    /**
      * Generates a relocatable object file byte stream from the provided code sections.
      */
     virtual std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections) = 0;

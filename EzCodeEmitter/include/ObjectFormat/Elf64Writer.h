@@ -33,12 +33,17 @@ class Elf64Writer : public IObjectWriter
     void addRelocation(const ObjectRelocEntry &reloc) override;
 
     /**
+     * Registers an extra raw section (e.g., debug info section) to be emitted alongside standard sections.
+     */
+    void addExtraSection(const ExtraObjectSection &section) override;
+
+    /**
      * Generates a relocatable ELF64 object file byte stream from the provided code sections.
      */
     std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections) override;
 
     /**
-     * Clears all registered symbols and relocations.
+     * Clears all registered symbols, relocations, and extra sections.
      */
     void clear() override;
 
@@ -53,9 +58,10 @@ class Elf64Writer : public IObjectWriter
     uint16_t getMachine() const noexcept { return m_machine; }
 
   private:
-    std::vector<ObjectSymbol> m_symbols;    ///< Symbols to materialize in .symtab.
-    std::vector<ObjectRelocEntry> m_relocs; ///< Relocations to materialize in .rela.text.
-    uint16_t m_machine{ 62 };               ///< ELF machine architecture (default: EM_X86_64).
+    std::vector<ObjectSymbol> m_symbols;           ///< Symbols to materialize in .symtab.
+    std::vector<ObjectRelocEntry> m_relocs;        ///< Relocations to materialize in .rela.text.
+    std::vector<ExtraObjectSection> m_extraSections; ///< Extra raw sections (e.g., DWARF debug sections).
+    uint16_t m_machine{ 62 };                      ///< ELF machine architecture (default: EM_X86_64).
 };
 
 } // namespace EzCodeEmitter::ObjectFormat

@@ -16,6 +16,8 @@
 namespace EzCompiler
 {
 
+class PipelineTelemetry;
+
 /**
  * Top-level compiler execution context managing memory resources, diagnostics,
  * source tracking, target architecture descriptors, and intermediate representation states.
@@ -56,6 +58,9 @@ class DriverContext
     CallingConvDesc *getCallingConv() { return m_resolved.m_callingConv; } ///< Resolved calling convention.
     TargetBinaryDesc *getBinaryDesc() { return m_resolved.m_binaryDesc; }  ///< Resolved binary/object-format descriptor.
 
+    void setPipelineTelemetry(PipelineTelemetry *telemetry) noexcept { m_pipelineTelemetry = telemetry; }
+    PipelineTelemetry *getPipelineTelemetry() const noexcept { return m_pipelineTelemetry; }
+
   private:
     CommandLineOptions m_options; ///< Parsed invocation options.
 
@@ -68,6 +73,7 @@ class DriverContext
     std::unique_ptr<MirBuilderContext> m_builderCtx;      ///< Owns the MIR module builder context.
 
     ResolvedTarget m_resolved; ///< Single owner: target descriptor plus its convention/binary views.
+    PipelineTelemetry *m_pipelineTelemetry{ nullptr }; ///< Optional active telemetry collector.
 };
 
 } // namespace EzCompiler

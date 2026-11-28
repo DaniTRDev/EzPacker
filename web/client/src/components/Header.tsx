@@ -14,6 +14,12 @@ export const Header: React.FC = () => {
     setIsPositionIndependent,
     enableRtti,
     setEnableRtti,
+    enableDebugInfo,
+    setEnableDebugInfo,
+    debugLevel,
+    setDebugLevel,
+    debugFormat,
+    setDebugFormat,
     autoCompile,
     setAutoCompile,
     isCompiling,
@@ -108,13 +114,13 @@ export const Header: React.FC = () => {
           <button
             onClick={() => setFeaturesOpen(!featuresOpen)}
             className={`h-8 px-2.5 text-xs font-medium rounded-md border flex items-center space-x-1.5 transition-colors ${
-              features.length > 0 || isPositionIndependent
+              features.length > 0 || isPositionIndependent || enableDebugInfo
                 ? 'bg-zinc-800/80 text-emerald-300 border-zinc-700'
                 : 'bg-zinc-950/70 text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-200'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            <span>Flags ({features.length + (isPositionIndependent ? 1 : 0)})</span>
+            <span>Flags ({features.length + (isPositionIndependent ? 1 : 0) + (enableDebugInfo ? 1 : 0)})</span>
             <ChevronDown className="w-3 h-3 ml-0.5 text-zinc-400" />
           </button>
 
@@ -151,6 +157,60 @@ export const Header: React.FC = () => {
                   />
                   <span>--rtti (Generate Runtime Type Info)</span>
                 </label>
+                <label className="flex items-center space-x-2 cursor-pointer hover:text-zinc-100">
+                  <input
+                    type="checkbox"
+                    checked={enableDebugInfo}
+                    onChange={(e) => setEnableDebugInfo(e.target.checked)}
+                    className="rounded border-zinc-700 bg-zinc-950 text-emerald-500 focus:ring-emerald-500/30"
+                  />
+                  <span>-g (Emit Debug Information)</span>
+                </label>
+
+                {enableDebugInfo && (
+                  <div className="pl-5 pt-1 space-y-2 border-l border-zinc-800 ml-1.5">
+                    <div className="flex items-center justify-between space-x-1.5">
+                      <span className="text-[10px] text-zinc-400 font-mono">Level</span>
+                      <div className="flex items-center bg-zinc-950 p-0.5 rounded border border-zinc-800 text-[10px] font-mono">
+                        <button
+                          type="button"
+                          onClick={() => setDebugLevel('g1')}
+                          className={`px-1.5 py-0.5 rounded transition-colors ${
+                            debugLevel === 'g1'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          -g1 (Lines)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDebugLevel('g2')}
+                          className={`px-1.5 py-0.5 rounded transition-colors ${
+                            debugLevel === 'g2'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          -g2 (Full)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between space-x-1.5">
+                      <span className="text-[10px] text-zinc-400 font-mono">--debug-format</span>
+                      <select
+                        value={debugFormat}
+                        onChange={(e) => setDebugFormat(e.target.value as 'auto' | 'dwarf' | 'codeview')}
+                        className="h-6 pl-1.5 pr-4 text-[10px] font-mono bg-zinc-950 border border-zinc-800 rounded text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer"
+                      >
+                        <option value="auto">Auto</option>
+                        <option value="dwarf">DWARF v5</option>
+                        <option value="codeview">CodeView</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* CPU Feature Extensions */}

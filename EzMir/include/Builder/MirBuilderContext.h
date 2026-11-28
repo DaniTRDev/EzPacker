@@ -19,6 +19,7 @@ class MirBuilderContext
                       class DiagnosticCollector *diagCollector,
                       class MirTypeTable *typeTable,
                       std::pmr::monotonic_buffer_resource *globalArena);
+    ~MirBuilderContext();
 
     // Disable copy/move constructors to preserve safety across the arena resource references
     MirBuilderContext(const MirBuilderContext &) = delete;
@@ -104,6 +105,16 @@ class MirBuilderContext
      */
     std::pmr::list<class MirGlobalVar *> &getGlobalVars();
 
+    /**
+     * Returns the optional module debug metadata, or nullptr if debug info is not enabled.
+     */
+    struct MirDebugMetadata *getDebugMetadata() const noexcept;
+
+    /**
+     * Returns the module debug metadata, lazily creating it if not yet allocated.
+     */
+    struct MirDebugMetadata *getOrCreateDebugMetadata();
+
   private:
     class CallingConvDesc *m_defaultCallingConv; // Default calling convention used when building functions.
     class DiagnosticCollector *m_diagCollector;  // Sink for errors/traces raised while building MIR.
@@ -120,6 +131,7 @@ class MirBuilderContext
     std::pmr::map<MirId, class MirFunction *> m_functionIdToFunc;     // Used to search for functions.
     std::pmr::map<MirId, class MirGlobalVar *> m_globalVarIdToGVar;   // Used to search for global variables.
     std::pmr::map<MirId, class MirRegister *> m_registerIdToRegister; // Used to search for registers.
+    std::unique_ptr<struct MirDebugMetadata> m_debugMeta;             // Optional debug metadata sidecar.
 };
 
 #endif // EZMIR_MIR_BUILDER_CONTEXT_H

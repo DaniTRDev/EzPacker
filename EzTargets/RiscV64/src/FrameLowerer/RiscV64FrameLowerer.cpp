@@ -108,6 +108,7 @@ void RiscV64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
 
     SourceReference *srcRef = setup.m_func->getSourceRef();
     auto &instrList = entryBlock->getInstructions();
+    const size_t initialInstCount = instrList.size();
     auto it = instrList.begin();
     MirInstructionBuilder builder(ctx.m_ctx,
                                   entryBlock,
@@ -167,6 +168,23 @@ void RiscV64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
         {
             builder.buildTarget(setup.m_descSd, srcRef, { calleeReg, setup.m_spReg, off0 });
         }
+    }
+
+    const size_t prologueCount = instrList.size() - initialInstCount;
+    size_t marked = 0;
+    for (MirInstruction *inst : instrList)
+    {
+        if (marked >= prologueCount)
+        {
+            break;
+        }
+        inst->setIsPrologue(true);
+        ++marked;
+    }
+
+    if (setup.m_analysisData)
+    {
+        setup.m_analysisData->m_prologueInstCount = prologueCount;
     }
 }
 

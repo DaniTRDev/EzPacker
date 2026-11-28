@@ -2,6 +2,7 @@
 #define EZPACKER_C_FRONTEND_FUNCTION_LOWERER_H
 
 #include "EzCompilerCommon.h"
+#include "Debug/DebugInfo.h"
 #include "Operand/MirOperandBuilder.h"
 #include <unordered_map>
 #include <unordered_set>
@@ -11,7 +12,9 @@
 struct Obj;
 struct Node;
 struct Type;
+struct Token;
 class MirBuilderContext;
+struct MirDebugMetadata;
 class MirFunction;
 class MirBlock;
 class MirGlobalVar;
@@ -20,6 +23,7 @@ class MirOperand;
 class MirType;
 class MirTypeTable;
 class StackFrameObject;
+class SourceReference;
 
 namespace EzCompiler
 {
@@ -27,6 +31,24 @@ class DriverContext;
 
 namespace CFrontend
 {
+
+/**
+ * Shared source-file and debug-type registration state passed across the C frontend
+ * during AST-to-MIR lowering.
+ */
+struct CFrontendDebugContext
+{
+    std::unordered_map<const void *, size_t> fileToSrcMgrId;      ///< chibicc File* -> SourceManager file ID.
+    std::unordered_map<const void *, uint32_t> fileToDebugFileId; ///< chibicc File* -> DebugCompileUnit file ID.
+    std::unordered_map<const Type *, uint64_t> visitedTypes;      ///< Cycle-safe C Type* -> DebugType::typeId.
+    std::unordered_map<std::string, uint64_t> canonicalPrimitives; ///< Canonical primitive name -> DebugType::typeId.
+    std::unordered_map<uint64_t, uint64_t> canonicalPointers;      ///< Pointee typeId -> pointer DebugType::typeId.
+    uint64_t nextTypeId{ 1 };
+
+    SourceReference *createSourceRefFromToken(DriverContext &ctx, const Token *tok) const;
+    EzCore::Debug::DebugSourceLoc debugLocFromToken(DriverContext &ctx, const Token *tok) const;
+    uint64_t registerCType(DriverContext &ctx, const Type *ty, MirDebugMetadata &meta);
+};
 
 /**
  * Lowers a single chibicc C AST function (struct Obj) into an EzPacker SSA MIR function.
@@ -44,7 +66,8 @@ class CFrontendFunctionLowerer
     CFrontendFunctionLowerer(DriverContext &driverCtx,
                              MirBuilderContext &bCtx,
                              MirFunction *mirFunc,
-                             struct Obj *chibiFunc);
+                             struct Obj *chibiFunc,
+                             CFrontendDebugContext *debugCtx = nullptr);
 
     /**
      * Executes the lowering pass on the function AST.
@@ -69,6 +92,7 @@ class CFrontendFunctionLowerer
     MirBuilderContext &m_bCtx;
     MirFunction *m_func;
     struct Obj *m_chibiFunc;
+    CFrontendDebugContext *m_debugCtx{ nullptr };
     MirTypeTable *m_tt;
     MirOperandBuilder m_opBuilder;
     MirBlock *m_currentBlock{ nullptr };

@@ -59,3 +59,10 @@ EzPacker_AddTest(
         "tests/T_RiscV64CodeEmitter.cpp"
 )
 
+EzPacker_AddTest(
+        "T_DebugInfoEmitters"
+        "EzCodeEmitterTestSuite"
+        ""
+        "tests/T_DebugInfoEmitters.cpp"
+)
+

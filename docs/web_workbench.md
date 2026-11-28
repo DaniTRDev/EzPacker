@@ -127,6 +127,11 @@ Inspects emitted relocatable object files without needing external tools like `o
 - When hovering over compiler symbols, IR instruction mnemonics, or runtime helpers (`@__ez_throw`, `@__ez_try_enter`), the workbench queries the cached Doxygen XML database.
 - Displays full docstrings, parameter definitions, and return types inline within the editor.
 
+### 3.7 Debug Info Controls & Inspector (`DebugInfoViewer.tsx`)
+- **Compiler Flags**: Under the **Flags** popover (`Code Generation`), toggle `-g (Emit Debug Information)`, select granularity (`-g1 (Lines)` vs `-g2 (Full)`), and override `--debug-format` (`Auto`, `DWARF v5`, or `CodeView`).
+- **Debug Info Tab**: Dedicated inspector displaying emitted debug format (`DWARF5` / `CodeView`), granularity level, source file table, binary debug sections (`.debug_*`, `.debug$S`, `.debug$T` with byte sizes, relocation counts, and C13 subsection/type record counts), line table summary, debug types, and function/global variable records.
+- **Object Dissector Integration**: Debug sections are tagged with a `DEBUG` pill in `ObjectViewer.tsx`, and COFF/ELF64 debug relocations (`IMAGE_REL_AMD64_SECTION`, `IMAGE_REL_AMD64_SECREL`, `R_X86_64_32`, `R_RISCV_32`, `R_RISCV_64`) are decoded.
+
 ---
 
 ## 4. Native Pipeline Telemetry Protocol

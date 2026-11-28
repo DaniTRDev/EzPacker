@@ -125,6 +125,11 @@ export const ObjectViewer: React.FC = () => {
                   <div className="flex items-center justify-between pb-2 border-b border-zinc-800/70 mb-2.5">
                     <div className="flex items-center space-x-2">
                       <span className="font-bold text-sm text-emerald-400">{sec.name}</span>
+                      {(sec.isDebug || sec.name.startsWith('.debug')) && (
+                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-700/50">
+                          DEBUG
+                        </span>
+                      )}
                       <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300">
                         {sec.size} bytes
                       </span>

@@ -385,8 +385,10 @@ public:
 3. Invokes `CodeSection::finalize()` to calculate label offsets and resolve alignment directives.
 
 4. Selects the appropriate `IObjectWriter` (`Elf64Writer` or `CoffWriter`) based on `TargetBinaryDesc::getObjectFormat()`.
+5. When debug info is enabled (`-g`, `-g1`, `-g2`), resolves instruction offsets, variable locations (`m_ssaToRootVreg`, `m_vregToLocation`), prologue boundaries (`m_isPrologue`), and CFI saved-register offsets into `DebugCompileUnit`, serializes them via `IDebugInfoEmitter` (`Dwarf5Emitter` or `CodeViewEmitter`), and registers the resulting `ExtraObjectSection` payloads with `IObjectWriter::addExtraSection()`.
+6. Emits symbol tables, relocations, and writes binary bytes to the destination file.
 
-5. Emits symbol tables, relocations, and writes binary bytes to the destination file.
+See the **[Debugging Information Guide](../debug_information.md)** for full details.
 
 
 
@@ -473,6 +475,20 @@ Optimization Level:
   -O2                            Full optimization pipeline
 
   -Os                            Size-focused optimization
+
+
+
+Debug Information Options:
+
+  -g, --debug-info               Generate full debug information (alias for -g2)
+
+  -g0                            Disable debug information generation [default]
+
+  -g1                            Generate line-table-only debug information
+
+  -g2                            Generate full debug information
+
+  --debug-format <format>        Debug container format: auto [default], dwarf, codeview
 
 
 
@@ -783,6 +799,9 @@ ame: Name of the executed pass (e.g., MirVerifierPass, NonSsaToSsaPass, MirPeeph
   - Structured capture of all frontend, parser, and pass diagnostics (error, warning, 	race, debug) with source locations.
   - Telemetry JSON is written deterministically even when compilation fails, providing compiler engineers with complete diagnostic and pass history up to the point of failure.
 
+- **Debug Information Telemetry (`DebugInfoTelemetry`)**:
+  - Captures whether debug info is enabled, resolved format (`DWARF5`, `CodeView`), granularity level, file/type/function/global/line-entry counts, and emitted debug section names.
+
 ### Command-Line Usage
 `ash
 ezc input.mir -o output.o --dump-pipeline-json pipeline.json
@@ -807,4 +826,4 @@ For full details on inspecting these JSON telemetry files within an interactive 
 | C Frontend Type Mapper | EzCompiler/include/CFrontend/CFrontendTypeMapper.h | mapType, CFrontendTypeMapper |
 | C Frontend Lowerer | EzCompiler/include/CFrontend/CFrontendFunctionLowerer.h | CFrontendFunctionLowerer |
 | C Frontend Adapter | EzCompiler/include/CFrontend/CFrontendAdapter.h | CFrontendAdapter |
-| Pipeline Telemetry | EzCompiler/include/PipelineTelemetry.h | PipelineTelemetry, PassRecord, FunctionTelemetry |
+| Pipeline Telemetry | EzCompiler/include/PipelineTelemetry.h | PipelineTelemetry, PassTelemetryRecord, FunctionTelemetry, DebugInfoTelemetry |

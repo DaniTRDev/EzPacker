@@ -861,17 +861,34 @@ void MirRegisterAllocator::rewriteColors(RegisterAllocatorCtx *ctx)
                     if (regRef.isVirtual())
                     {
                         MirRegisterRef leader = ctx->getCoalescedLeader(regRef);
+                        MirRegisterRef physRef;
                         if (leader.isPhysical())
                         {
-                            reg->setRef(leader);
+                            physRef = leader;
                         }
                         else
                         {
                             auto it = ctx->m_allocatedRegs.find(leader);
                             if (it != ctx->m_allocatedRegs.end())
                             {
-                                reg->setRef(it->second);
+                                physRef = it->second;
                             }
+                        }
+                        if (physRef.isPhysical())
+                        {
+                            bool isFpr = false;
+                            if (physRef.getClass() && physRef.getClass()->getBank())
+                            {
+                                std::string_view bankName = physRef.getClass()->getBank()->getName();
+                                isFpr = (bankName.find("FPR") != std::string_view::npos);
+                            }
+                            func->getAnalysisData()->m_vregToLocation[regRef.getId()] = {
+                                .isSpill = false,
+                                .physRegId = static_cast<uint32_t>(physRef.getId()),
+                                .isFpr = isFpr,
+                                .spillSlotId = 0
+                            };
+                            reg->setRef(physRef);
                         }
                     }
                 };
@@ -1029,6 +1046,12 @@ void MirRegisterAllocator::rewriteSpilledRegisters(const std::pmr::unordered_set
         {
             StackFrameObject *spillSlot = stackFrame->createStackSpill(vreg->getMirType());
             ctx->m_spilledRegs[spillRef] = spillSlot;
+            func->getAnalysisData()->m_vregToLocation[spillRef.getId()] = {
+                .isSpill = true,
+                .physRegId = 0,
+                .isFpr = false,
+                .spillSlotId = spillSlot->m_id
+            };
         }
     }
 

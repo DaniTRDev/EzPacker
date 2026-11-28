@@ -6,6 +6,7 @@ static File *current_file;
 
 // A list of all input files.
 static File **input_files;
+static int input_file_no = 0;
 
 // True if the current position is at the beginning of a line
 static bool at_bol;
@@ -852,20 +853,20 @@ Token *tokenize_file(char *path) {
   convert_universal_chars(p);
 
   // Save the filename for assembler .file directive.
-  static int file_no;
-  File *file = new_file(path, file_no + 1, p);
+  File *file = new_file(path, input_file_no + 1, p);
 
   // Save the filename for assembler .file directive.
-  input_files = realloc(input_files, sizeof(char *) * (file_no + 2));
-  input_files[file_no] = file;
-  input_files[file_no + 1] = NULL;
-  file_no++;
+  input_files = realloc(input_files, sizeof(char *) * (input_file_no + 2));
+  input_files[input_file_no] = file;
+  input_files[input_file_no + 1] = NULL;
+  input_file_no++;
 
   return tokenize(file);
 }
 
 void chibicc_reset_state(void) {
   input_files = NULL;
+  input_file_no = 0;
   current_file = NULL;
   at_bol = false;
   has_space = false;

@@ -32,6 +32,7 @@ struct EZLINKER_API LinkerOptions
     bool noDefaultLibs{ false };                         ///< Do not automatically inject C standard libraries.
     bool noCompilerRt{ false };                          ///< Do not automatically inject compiler-rt / builtins.
     bool noExceptionRuntime{ false };                    ///< Do not automatically inject EzExceptionRuntime.
+    bool emitDebugInfo{ false };                         ///< Emit debug information / PDB (/DEBUG on MSVC).
 };
 
 /**
@@ -39,10 +40,10 @@ struct EZLINKER_API LinkerOptions
  */
 struct EZLINKER_API LinkResult
 {
-    int exitCode{ 0 };
-    std::string commandLine;
-    std::string output;
-    bool success{ false };
+    int exitCode{ 0 };       ///< Process exit code returned by the underlying linker.
+    std::string commandLine; ///< Formatted linker command line that was executed or synthesized.
+    std::string output;      ///< Combined stdout/stderr captured from the linker process.
+    bool success{ false };   ///< True if linking succeeded with exit code 0.
 };
 
 /**

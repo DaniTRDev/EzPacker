@@ -41,6 +41,32 @@ struct ObjectRelocEntry
     int64_t m_addend{ 0 };                                             ///< Constant added to the resolved symbol value.
 };
 
+/**
+ * Relocation entry targeting a symbol or section from an extra (e.g. debug) object section.
+ */
+struct ExtraSectionReloc
+{
+    uint64_t m_offset{ 0 };                                                ///< Byte offset of the relocation field within the extra section.
+    std::string m_targetName;                                              ///< Target symbol or section name.
+    bool m_targetIsSection{ false };                                       ///< True if m_targetName names a section rather than a symbol.
+    TargetCodeRelocationType m_type{ TargetCodeRelocationType::Absolute64 }; ///< Fixup semantics.
+    int64_t m_addend{ 0 };                                                 ///< Constant added to the resolved target value.
+};
+
+/**
+ * Raw extra section (e.g., DWARF or CodeView debug section) to be emitted alongside standard code/data sections.
+ */
+struct ExtraObjectSection
+{
+    std::string m_name;                      ///< Section name (e.g., ".debug_info", ".debug$S").
+    std::vector<uint8_t> m_data;             ///< Raw section payload bytes.
+    uint64_t m_alignment{ 1 };               ///< Required section alignment in bytes.
+    bool m_isDebug{ true };                  ///< True for non-allocated debug sections.
+    bool m_isAlloc{ false };                 ///< True if section should be allocated in memory (SHF_ALLOC).
+    bool m_isMergeStrings{ false };          ///< True for mergeable null-terminated string sections (SHF_MERGE | SHF_STRINGS).
+    std::vector<ExtraSectionReloc> m_relocs; ///< Relocations applied to this section's data.
+};
+
 } // namespace EzCodeEmitter::ObjectFormat
 
 #endif // EZPACKER_OBJECT_SYMBOL_H

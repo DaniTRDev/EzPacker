@@ -4,6 +4,7 @@ set(EZMIR_FILES_LIST
         "include/Block/MirBlockBuilder.h"
         "include/Builder/MirBuilder.h"
         "include/Builder/MirBuilderContext.h"
+        "include/Debug/MirDebugMetadata.h"
         "include/Instruction/MirInstruction.h"
         "include/Instruction/MirInstructionBuilder.h"
         "include/Instruction/MirInstructionMetadata.h"

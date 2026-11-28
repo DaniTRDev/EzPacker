@@ -92,6 +92,31 @@ void CommandLineParser::setupArguments()
             .default_value(false)
             .implicit_value(true);
 
+    m_program->add_argument("-g", "--debug-info")
+            .help("Generate full debug information (alias for -g2)")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("-g0")
+            .help("Disable debug information generation (default)")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("-g1")
+            .help("Generate line-table-only debug information")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("-g2")
+            .help("Generate full debug information")
+            .default_value(false)
+            .implicit_value(true);
+
+    m_program->add_argument("--debug-format")
+            .help("Debug information container format (auto, dwarf, codeview)")
+            .metavar("<format>")
+            .default_value(std::string("auto"));
+
     m_program->add_argument("--diag-level")
             .help("Minimum diagnostic severity threshold (error, warning, trace, debug)")
             .metavar("<level>")
@@ -360,6 +385,51 @@ bool CommandLineParser::parse(const std::vector<std::string> &args,
         return false;
     }
     outOptions.enableRtti = !rttiOff;
+
+    // Debug level: reject contradictory flags rather than silently letting one win.
+    const bool dbgG = m_program->get<bool>("-g");
+    const bool dbgG0 = m_program->get<bool>("-g0");
+    const bool dbgG1 = m_program->get<bool>("-g1");
+    const bool dbgG2 = m_program->get<bool>("-g2");
+    const int dbgFlagCount =
+            static_cast<int>(dbgG) + static_cast<int>(dbgG0) + static_cast<int>(dbgG1) + static_cast<int>(dbgG2);
+    if (dbgFlagCount > 1)
+    {
+        outError = "conflicting debug info flags: choose at most one of -g/--debug-info, -g0, -g1, -g2";
+        return false;
+    }
+
+    if (dbgG || dbgG2)
+    {
+        outOptions.debugLevel = EzCore::Debug::DebugLevel::Full;
+    }
+    else if (dbgG1)
+    {
+        outOptions.debugLevel = EzCore::Debug::DebugLevel::LineTablesOnly;
+    }
+    else
+    {
+        outOptions.debugLevel = EzCore::Debug::DebugLevel::None;
+    }
+
+    std::string dbgFmt = m_program->get<std::string>("--debug-format");
+    if (dbgFmt == "auto")
+    {
+        outOptions.debugFormat = EzCore::Debug::DebugFormat::Auto;
+    }
+    else if (dbgFmt == "dwarf" || dbgFmt == "dwarf5")
+    {
+        outOptions.debugFormat = EzCore::Debug::DebugFormat::Dwarf5;
+    }
+    else if (dbgFmt == "codeview")
+    {
+        outOptions.debugFormat = EzCore::Debug::DebugFormat::CodeView;
+    }
+    else
+    {
+        outError = "unknown debug format '" + dbgFmt + "': expected auto, dwarf or codeview";
+        return false;
+    }
 
     // Diag level: every documented value is accepted, anything else is a hard error so a typo
     // cannot silently leave the default threshold in place.

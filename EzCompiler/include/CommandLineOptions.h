@@ -3,6 +3,7 @@
 
 #include "EzCompilerCommon.h"
 #include "TargetTriple.h"
+#include "Debug/DebugInfo.h"
 #include "Diagnostics/DiagnosticMessage.h"
 #include <argparse/argparse.hpp>
 
@@ -14,11 +15,11 @@ namespace EzCompiler
  */
 enum class EmissionStage
 {
-    Object,       // Emits native binary object file (.o / .obj) [default]
-    Assembly,     // Emits human-readable assembly text (.s)
-    GenericMir,   // Dumps generic SSA MIR post-frontend lowering
-    LegalizedMir, // Dumps MIR post-type/opcode legalization
-    LoweredMir    // Dumps target-lowered MIR post register allocation and frame lowering
+    Object,       ///< Emits native binary object file (.o / .obj) [default].
+    Assembly,     ///< Emits human-readable assembly text (.s).
+    GenericMir,   ///< Dumps generic SSA MIR post-frontend lowering.
+    LegalizedMir, ///< Dumps MIR post-type/opcode legalization.
+    LoweredMir    ///< Dumps target-lowered MIR post register allocation and frame lowering.
 };
 
 /**
@@ -49,6 +50,9 @@ struct CommandLineOptions
     bool timePasses{ false };            ///< Reports per-pass execution times.
     bool isPositionIndependent{ false }; ///< Generates position-independent code.
     bool enableRtti{ true };             ///< Generates runtime type information (RTTI) and source references.
+    EzCore::Debug::DebugLevel debugLevel{ EzCore::Debug::DebugLevel::None };   ///< Debug information granularity.
+    EzCore::Debug::DebugFormat debugFormat{ EzCore::Debug::DebugFormat::Auto }; ///< Target debug container format.
+    [[nodiscard]] bool emitDebugInfo() const noexcept { return debugLevel != EzCore::Debug::DebugLevel::None; }
     DiagnosticMessageType diagThreshold{ DiagnosticMessageType::Diag_Warning }; ///< Minimum reported severity.
     std::vector<std::string> targetFeatures; ///< Target feature modifiers (e.g. "+avx", "-sse").
     std::vector<std::string> includePaths;   ///< Include directories (-I) for C preprocessor lookup.

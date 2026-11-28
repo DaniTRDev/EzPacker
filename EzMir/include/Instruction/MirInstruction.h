@@ -135,6 +135,21 @@ class MirInstruction
     class SourceReference *getSourceRef() const;
 
     /**
+     * Updates the source location reference for diagnostics and debug info.
+     */
+    void setSourceRef(class SourceReference *ref);
+
+    /**
+     * Returns true if this instruction is part of a function prologue.
+     */
+    bool isPrologue() const noexcept { return m_isPrologue; }
+
+    /**
+     * Marks or unmarks this instruction as part of a function prologue.
+     */
+    void setIsPrologue(bool isPrologue) noexcept { m_isPrologue = isPrologue; }
+
+    /**
      * Casts and retrieves the const operand at the given index to concrete operand type T.
      */
     template <typename T>
@@ -262,6 +277,11 @@ class MirInstruction
      * Source code reference for diagnostics.
      */
     class SourceReference *m_sourceRef;
+
+    /**
+     * True if this instruction belongs to a function prologue.
+     */
+    bool m_isPrologue{ false };
 
     /**
      * List of operand pointers allocated in the context memory arena.

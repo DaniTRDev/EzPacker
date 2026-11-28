@@ -501,6 +501,10 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
 
             varStacks[origReg].push_back(newReg);
             pushedRegisters.push_back(origReg);
+            if (auto *ad = func->getAnalysisData())
+            {
+                ad->m_ssaToRootVreg[newReg->getRegId()] = origReg;
+            }
 
             collector->trace("NonSsaToSsaPass",
                              "Renamed PHI destination from base reg {} -> new reg {}",
@@ -600,6 +604,10 @@ void NonSsaToSsaPass::renameVariables(CodeFlowResult *cfg, MirFunction *func)
                         iBuilder.swapOperand(inst, newReg, i);
                         varStacks[origReg].push_back(newReg);
                         pushedRegisters.push_back(origReg);
+                        if (auto *ad = func->getAnalysisData())
+                        {
+                            ad->m_ssaToRootVreg[newReg->getRegId()] = origReg;
+                        }
 
                         collector->trace("NonSsaToSsaPass",
                                          "Renamed WRITE operand from base reg {} -> new reg {}",

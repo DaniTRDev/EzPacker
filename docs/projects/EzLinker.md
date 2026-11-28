@@ -178,6 +178,7 @@ ez-ld [options] <inputs...>
 | `--shared` | Generates a shared object (`.so`) or dynamic link library (`.dll`). |
 | `--static` | Directs static linking against runtime libraries. |
 | `-v`, `--verbose` | Emits detailed detection and command synthesis logs. |
+| `-g`, `--debug` | Emit debug information / PDB (`/DEBUG` on MSVC / `lld-link`). |
 | `--dry-run` | Prints the synthesized linker command line without executing it. |
 | `--hosted` | Links against the vendored `musl` C standard runtime library (`EzMusl`) and configures CRT startup entry. |
 | `--freestanding` | Standalone mode (default); avoids linking standard C runtime libraries. |
