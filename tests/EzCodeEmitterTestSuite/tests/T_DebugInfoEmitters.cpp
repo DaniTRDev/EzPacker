@@ -486,3 +486,162 @@ TEST_F(EzCodeEmitterTestSuite, TestCodeViewX86_64C13AndCoffWriter)
     const std::vector<uint8_t> coffBytes = coffWriter.write(sections);
     EXPECT_GT(coffBytes.size(), 64u);
 }
+
+TEST_F(EzCodeEmitterTestSuite, TestFunctionPointerBitfieldLeafAndRiscVCfa)
+{
+    // 1. DWARF5 x86-64: function pointer type, bitfield struct, leaf function (!hasFramePointer)
+    {
+        DebugCompileUnit cu;
+        cu.level = DebugLevel::Full;
+        cu.compDir = "/workspace";
+        cu.mainFile = "/workspace/test.c";
+        cu.pointerSize = 8;
+        cu.arch = DebugCompileUnit::TargetArch::X86_64;
+        const uint32_t fId = cu.addOrGetFile("/workspace/test.c");
+
+        DebugType intTy;
+        intTy.typeId = 1;
+        intTy.name = "int";
+        intTy.kind = EzCore::RttiTypeKind::SignedInt;
+        intTy.encoding = DebugBaseEncoding::Signed;
+        intTy.sizeInBytes = 4;
+        cu.addType(intTy);
+
+        DebugType fnTy;
+        fnTy.typeId = 2;
+        fnTy.kind = EzCore::RttiTypeKind::Function;
+        fnTy.returnTypeId = 1;
+        fnTy.paramTypeIds = { 1 };
+        fnTy.isVariadic = true;
+        cu.addType(fnTy);
+
+        DebugType fnPtrTy;
+        fnPtrTy.typeId = 3;
+        fnPtrTy.kind = EzCore::RttiTypeKind::Pointer;
+        fnPtrTy.sizeInBytes = 8;
+        fnPtrTy.referencedTypeId = 2;
+        cu.addType(fnPtrTy);
+
+        DebugType flagsTy;
+        flagsTy.typeId = 4;
+        flagsTy.name = "Flags";
+        flagsTy.kind = EzCore::RttiTypeKind::Struct;
+        flagsTy.sizeInBytes = 4;
+        flagsTy.declLoc = { fId, 2, 1 };
+        flagsTy.members = { { "active", 1, 0, 0, 1, true }, { "mode", 1, 0, 1, 3, true } };
+        cu.addType(flagsTy);
+
+        DebugFunction leafFn;
+        leafFn.name = "leaf_fn";
+        leafFn.returnTypeId = 1;
+        leafFn.declLoc = { fId, 5, 1 };
+        leafFn.sectionOffset = 0;
+        leafFn.codeSize = 12;
+        leafFn.prologueSize = 4;
+        leafFn.hasFramePointer = false;
+        leafFn.totalFrameSize = 16;
+        leafFn.savedRegs = { { 3, false, -16 } }; // RBX saved at CFA-16
+        leafFn.lineEntries = { { 0, fId, 5, 1, true, false, false } };
+        cu.functions.push_back(leafFn);
+
+        Dwarf5Emitter dwarf;
+        auto dSecs = dwarf.emit(cu);
+        std::pmr::unordered_map<SectionType, CodeSection *> secs(getAllocator());
+        Helpers::ObjectFormat::CreateElfSections(secs, getAllocator());
+        for (int i = 0; i < 12; ++i) secs[SectionType::Text]->emit8(0x90);
+        secs[SectionType::Text]->finalize();
+
+        Elf64Writer elf;
+        elf.setMachine(62);
+        elf.addSymbol({ .m_name = "leaf_fn", .m_section = SectionType::Text, .m_offset = 0, .m_size = 12, .m_isGlobal = true, .m_isFunction = true });
+        for (const auto &s : dSecs) elf.addExtraSection(s);
+
+        const auto bytes = elf.write(secs);
+        const std::filesystem::path tmpObj = std::filesystem::temp_directory_path() / "ezpacker_test_leaf_x64.o";
+        {
+            std::ofstream ofs(tmpObj, std::ios::binary);
+            ofs.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        }
+        int exitCode = -1;
+        const std::string out = runCommandAndCapture(
+                "LC_ALL=C readelf --debug-dump=info,abbrev,line,str,frames " + tmpObj.string() + " 2>&1", exitCode);
+        std::filesystem::remove(tmpObj);
+
+        EXPECT_EQ(exitCode, 0) << out;
+        EXPECT_NE(out.find("DW_TAG_subroutine_type"), std::string::npos) << out;
+        EXPECT_NE(out.find("DW_TAG_unspecified_parameters"), std::string::npos) << out;
+        EXPECT_NE(out.find("DW_AT_data_bit_offset"), std::string::npos) << out;
+        EXPECT_NE(out.find("DW_CFA_def_cfa_offset: 24"), std::string::npos) << out;
+        EXPECT_NE(out.find("DW_CFA_offset: r3 (rbx) at cfa-16"), std::string::npos) << out;
+
+        // Also check CodeView LF_BITFIELD (0x1205) & LF_PROCEDURE (0x1008)
+        CodeViewEmitter cv;
+        auto cvSecs = cv.emit(cu);
+        ASSERT_EQ(cvSecs.size(), 2u);
+        const auto &debugT = cvSecs[0].m_data;
+        bool sawBitfield = false;
+        bool sawProc = false;
+        size_t posT = 4;
+        while (posT < debugT.size())
+        {
+            const uint16_t recLen = readU16(debugT, posT);
+            const uint16_t leaf = readU16(debugT, posT + 2);
+            if (leaf == 0x1205) sawBitfield = true;
+            if (leaf == 0x1008) sawProc = true;
+            posT += 2 + recLen;
+        }
+        EXPECT_TRUE(sawBitfield);
+        EXPECT_TRUE(sawProc);
+    }
+
+    // 2. DWARF5 RISC-V 64: s0 = CFA (DW_CFA_def_cfa: r8 (s0) ofs 0)
+    {
+        DebugCompileUnit cu;
+        cu.level = DebugLevel::Full;
+        cu.compDir = "/workspace";
+        cu.mainFile = "/workspace/rv.c";
+        cu.pointerSize = 8;
+        cu.arch = DebugCompileUnit::TargetArch::RiscV64;
+        const uint32_t fId = cu.addOrGetFile("/workspace/rv.c");
+
+        DebugFunction fn;
+        fn.name = "rv_fn";
+        fn.declLoc = { fId, 1, 1 };
+        fn.sectionOffset = 0;
+        fn.codeSize = 24;
+        fn.prologueSize = 16;
+        fn.hasFramePointer = true;
+        fn.totalFrameSize = 32;
+        fn.lineEntries = { { 0, fId, 1, 1, true, false, false } };
+        cu.functions.push_back(fn);
+
+        Dwarf5Emitter dwarf;
+        auto dSecs = dwarf.emit(cu);
+        std::pmr::unordered_map<SectionType, CodeSection *> secs(getAllocator());
+        Helpers::ObjectFormat::CreateElfSections(secs, getAllocator());
+        for (int i = 0; i < 24; ++i) secs[SectionType::Text]->emit8(0x13);
+        secs[SectionType::Text]->finalize();
+
+        Elf64Writer elf;
+        elf.setMachine(243);
+        elf.addSymbol({ .m_name = "rv_fn", .m_section = SectionType::Text, .m_offset = 0, .m_size = 24, .m_isGlobal = true, .m_isFunction = true });
+        for (const auto &s : dSecs) elf.addExtraSection(s);
+
+        const auto bytes = elf.write(secs);
+        const std::filesystem::path tmpObj = std::filesystem::temp_directory_path() / "ezpacker_test_cfa_rv64.o";
+        {
+            std::ofstream ofs(tmpObj, std::ios::binary);
+            ofs.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        }
+        int exitCode = -1;
+        const std::string out = runCommandAndCapture(
+                "LC_ALL=C readelf --debug-dump=frames " + tmpObj.string() + " 2>&1", exitCode);
+        std::filesystem::remove(tmpObj);
+
+        EXPECT_EQ(exitCode, 0) << out;
+        EXPECT_NE(out.find("DW_CFA_def_cfa: r8 (s0) ofs 0"), std::string::npos) << out;
+        EXPECT_NE(out.find("DW_CFA_offset: r1 (ra) at cfa-8"), std::string::npos) << out;
+        EXPECT_NE(out.find("DW_CFA_offset: r8 (s0) at cfa-16"), std::string::npos) << out;
+    }
+}
+

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace EzCore::Debug
@@ -229,7 +230,8 @@ struct DebugCompileUnit
     enum class TargetArch : uint8_t
     {
         X86_64,
-        RiscV64
+        RiscV64,
+        AArch64
     };
 
     std::string producer{ "EzPacker ezc 1.0.0" };   ///< Producer identification string.
@@ -266,10 +268,15 @@ struct DebugCompileUnit
 
     /**
      * Validates structural invariants of the compile unit (pointer size, unique non-zero IDs,
-     * valid file references, non-empty symbol names).
+     * valid file and type references, monotonic line entries within function codeSize,
+     * and non-empty symbol names).
      * Returns true if valid; otherwise writes a diagnostic message to outError and returns false.
      */
     bool validate(std::string &outError) const;
+
+  private:
+    std::unordered_map<std::string, uint32_t> m_fileIndex; ///< Normalized fullPath -> 1-based fileId.
+    std::unordered_map<uint64_t, size_t> m_typeIndex;      ///< typeId -> index in types vector.
 };
 
 /**
@@ -283,6 +290,18 @@ uint16_t mapX86_64ToDwarfReg(uint32_t regId, bool isFpr);
  * Returns 0xFFFF if regId is out of range.
  */
 uint16_t mapRiscV64ToDwarfReg(uint32_t regId, bool isFpr);
+
+/**
+ * Maps an AArch64 hardware register index (x0..x30/sp=31 or v0..v31) to its DWARF register number.
+ * Returns 0xFFFF if regId is out of range.
+ */
+uint16_t mapAArch64ToDwarfReg(uint32_t regId, bool isFpr);
+
+/**
+ * Dispatches register-to-DWARF mapping for the specified target architecture.
+ * Returns 0xFFFF if regId is out of range or arch is unsupported.
+ */
+uint16_t mapTargetRegToDwarfReg(DebugCompileUnit::TargetArch arch, uint32_t regId, bool isFpr);
 
 /**
  * Maps an x86-64 hardware register index and operand size to its Microsoft CodeView CV_HREG_e ID.

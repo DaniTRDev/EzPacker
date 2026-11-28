@@ -55,43 +55,38 @@ uint32_t DebugCompileUnit::addOrGetFile(std::string_view fullPath)
     }
 
     std::string normalized = normalizePathSeparators(fullPath);
-    for (const auto &entry : files)
+    if (const auto it = m_fileIndex.find(normalized); it != m_fileIndex.end())
     {
-        if (entry.fullPath == normalized)
-        {
-            return entry.fileId;
-        }
+        return it->second;
     }
 
     DebugSourceFile fileEntry;
     fileEntry.fileId = static_cast<uint32_t>(files.size()) + 1;
     splitDirectoryAndFilename(normalized, fileEntry.directory, fileEntry.filename);
     fileEntry.fullPath = std::move(normalized);
+    m_fileIndex.emplace(fileEntry.fullPath, fileEntry.fileId);
     files.push_back(std::move(fileEntry));
     return files.back().fileId;
 }
 
 void DebugCompileUnit::addType(DebugType type)
 {
-    for (auto &existing : types)
+    if (const auto it = m_typeIndex.find(type.typeId); it != m_typeIndex.end() && it->second < types.size())
     {
-        if (existing.typeId == type.typeId)
-        {
-            existing = std::move(type);
-            return;
-        }
+        types[it->second] = std::move(type);
+        return;
     }
+
+    const size_t idx = types.size();
+    m_typeIndex[type.typeId] = idx;
     types.push_back(std::move(type));
 }
 
 const DebugType *DebugCompileUnit::findType(uint64_t typeId) const
 {
-    for (const auto &entry : types)
+    if (const auto it = m_typeIndex.find(typeId); it != m_typeIndex.end() && it->second < types.size())
     {
-        if (entry.typeId == typeId)
-        {
-            return &entry;
-        }
+        return &types[it->second];
     }
     return nullptr;
 }
@@ -143,6 +138,36 @@ bool DebugCompileUnit::validate(std::string &outError) const
         }
     }
 
+    for (const auto &type : types)
+    {
+        if (type.referencedTypeId != 0 && !typeIds.contains(type.referencedTypeId))
+        {
+            outError = "DebugCompileUnit: DebugType::referencedTypeId references unknown typeId";
+            return false;
+        }
+        if (type.returnTypeId != 0 && !typeIds.contains(type.returnTypeId))
+        {
+            outError = "DebugCompileUnit: DebugType::returnTypeId references unknown typeId";
+            return false;
+        }
+        for (uint64_t paramTypeId : type.paramTypeIds)
+        {
+            if (paramTypeId != 0 && !typeIds.contains(paramTypeId))
+            {
+                outError = "DebugCompileUnit: DebugType::paramTypeIds references unknown typeId";
+                return false;
+            }
+        }
+        for (const auto &member : type.members)
+        {
+            if (member.typeId != 0 && !typeIds.contains(member.typeId))
+            {
+                outError = "DebugCompileUnit: DebugMember::typeId references unknown typeId";
+                return false;
+            }
+        }
+    }
+
     for (const auto &func : functions)
     {
         if (func.name.empty())
@@ -150,16 +175,48 @@ bool DebugCompileUnit::validate(std::string &outError) const
             outError = "DebugCompileUnit: DebugFunction::name must not be empty";
             return false;
         }
+        if (func.returnTypeId != 0 && !typeIds.contains(func.returnTypeId))
+        {
+            outError = "DebugCompileUnit: DebugFunction::returnTypeId references unknown typeId";
+            return false;
+        }
         if (func.declLoc.fileId != 0 && !fileIds.contains(func.declLoc.fileId))
         {
             outError = "DebugCompileUnit: DebugFunction::declLoc references unknown fileId";
             return false;
         }
-        for (const auto &line : func.lineEntries)
+        for (const auto &param : func.parameters)
         {
+            if (param.typeId != 0 && !typeIds.contains(param.typeId))
+            {
+                outError = "DebugCompileUnit: DebugFunction parameter typeId references unknown typeId";
+                return false;
+            }
+        }
+        for (const auto &local : func.locals)
+        {
+            if (local.typeId != 0 && !typeIds.contains(local.typeId))
+            {
+                outError = "DebugCompileUnit: DebugFunction local typeId references unknown typeId";
+                return false;
+            }
+        }
+        for (size_t i = 0; i < func.lineEntries.size(); ++i)
+        {
+            const auto &line = func.lineEntries[i];
             if (line.fileId != 0 && !fileIds.contains(line.fileId))
             {
                 outError = "DebugCompileUnit: DebugLineEntry references unknown fileId";
+                return false;
+            }
+            if (func.codeSize > 0 && line.codeOffset >= func.codeSize)
+            {
+                outError = "DebugCompileUnit: DebugLineEntry::codeOffset exceeds function codeSize";
+                return false;
+            }
+            if (i > 0 && line.codeOffset < func.lineEntries[i - 1].codeOffset)
+            {
+                outError = "DebugCompileUnit: DebugFunction::lineEntries must be monotonically ordered by codeOffset";
                 return false;
             }
         }
@@ -170,6 +227,11 @@ bool DebugCompileUnit::validate(std::string &outError) const
         if (global.name.empty())
         {
             outError = "DebugCompileUnit: DebugGlobalVar::name must not be empty";
+            return false;
+        }
+        if (global.typeId != 0 && !typeIds.contains(global.typeId))
+        {
+            outError = "DebugCompileUnit: DebugGlobalVar::typeId references unknown typeId";
             return false;
         }
         if (global.declLoc.fileId != 0 && !fileIds.contains(global.declLoc.fileId))
@@ -234,6 +296,30 @@ uint16_t mapRiscV64ToDwarfReg(uint32_t regId, bool isFpr)
         return 0xFFFF;
     }
     return static_cast<uint16_t>(isFpr ? (32 + regId) : regId);
+}
+
+uint16_t mapAArch64ToDwarfReg(uint32_t regId, bool isFpr)
+{
+    if (regId >= 32)
+    {
+        return 0xFFFF;
+    }
+    // AArch64 DWARF: x0..x30/sp(31) -> 0..31, v0..v31 -> 64..95.
+    return static_cast<uint16_t>(isFpr ? (64 + regId) : regId);
+}
+
+uint16_t mapTargetRegToDwarfReg(DebugCompileUnit::TargetArch arch, uint32_t regId, bool isFpr)
+{
+    switch (arch)
+    {
+        case DebugCompileUnit::TargetArch::X86_64:
+            return mapX86_64ToDwarfReg(regId, isFpr);
+        case DebugCompileUnit::TargetArch::RiscV64:
+            return mapRiscV64ToDwarfReg(regId, isFpr);
+        case DebugCompileUnit::TargetArch::AArch64:
+            return mapAArch64ToDwarfReg(regId, isFpr);
+    }
+    return 0xFFFF;
 }
 
 uint16_t mapX86_64ToCodeViewReg(uint32_t regId, bool isFpr, uint32_t byteSize)

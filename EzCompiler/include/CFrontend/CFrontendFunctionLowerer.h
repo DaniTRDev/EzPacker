@@ -41,6 +41,8 @@ struct CFrontendDebugContext
     std::unordered_map<const void *, size_t> fileToSrcMgrId;      ///< chibicc File* -> SourceManager file ID.
     std::unordered_map<const void *, uint32_t> fileToDebugFileId; ///< chibicc File* -> DebugCompileUnit file ID.
     std::unordered_map<const Type *, uint64_t> visitedTypes;      ///< Cycle-safe C Type* -> DebugType::typeId.
+    std::unordered_map<std::string, uint64_t> canonicalPrimitives; ///< Canonical primitive name -> DebugType::typeId.
+    std::unordered_map<uint64_t, uint64_t> canonicalPointers;      ///< Pointee typeId -> pointer DebugType::typeId.
     uint64_t nextTypeId{ 1 };
 
     SourceReference *createSourceRefFromToken(DriverContext &ctx, const Token *tok) const;

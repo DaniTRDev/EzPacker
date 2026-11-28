@@ -405,37 +405,63 @@ std::vector<uint8_t> Elf64Writer::write(const std::pmr::unordered_map<SectionTyp
         symIndexMap[sym.m_name] = symIdx;
     }
 
-    // Build Relocations for .text (if any)
+    // Build Relocations for standard sections, grouped by SectionType.
     if (!m_relocs.empty())
     {
-        std::vector<Elf64_Rela> relaTable;
+        std::unordered_map<SectionType, std::vector<Elf64_Rela>> relocsBySection;
         for (const auto &reloc : m_relocs)
         {
+            auto itSec = sectionIndexMap.find(reloc.m_section);
+            if (itSec == sectionIndexMap.end())
+            {
+                throw std::runtime_error(
+                        std::format("Elf64Writer: relocation references a section that is not emitted"));
+            }
+
+            auto itSym = symIndexMap.find(reloc.m_symbolName);
+            if (itSym == symIndexMap.end())
+            {
+                throw std::runtime_error(
+                        std::format("Elf64Writer: relocation references unknown symbol '{}'", reloc.m_symbolName));
+            }
+
             Elf64_Rela r{};
             r.r_offset = reloc.m_offset;
-            uint32_t symIdx = 0;
-            auto itSym = symIndexMap.find(reloc.m_symbolName);
-            if (itSym != symIndexMap.end())
-            {
-                symIdx = itSym->second;
-            }
+            uint32_t symIdx = itSym->second;
             uint32_t rType = mapRelocType(reloc.m_type, m_machine);
             // r_info packs the symbol index in the high 32 bits and the type in the low 32.
             r.r_info = (static_cast<uint64_t>(symIdx) << 32) | (rType & 0xFFFFFFFFULL);
             r.r_addend = reloc.m_addend;
-            relaTable.push_back(r);
+            relocsBySection[reloc.m_section].push_back(r);
         }
 
-        SectionDesc relaDesc;
-        relaDesc.name = ".rela.text";
-        relaDesc.type = SHT_RELA;
-        relaDesc.flags = SHF_INFO_LINK;
-        relaDesc.align = 8;
-        relaDesc.entsize = sizeof(Elf64_Rela);
-        relaDesc.info = sectionIndexMap[SectionType::Text];
-        relaDesc.data.resize(relaTable.size() * sizeof(Elf64_Rela));
-        std::memcpy(relaDesc.data.data(), relaTable.data(), relaDesc.data.size());
-        sectionDescs.push_back(std::move(relaDesc));
+        constexpr SectionType stdSecOrder[] = {
+            SectionType::Text,
+            SectionType::ReadOnly,
+            SectionType::Data,
+            SectionType::NonInitialized
+        };
+        for (SectionType secType : stdSecOrder)
+        {
+            auto itRelocs = relocsBySection.find(secType);
+            if (itRelocs == relocsBySection.end() || itRelocs->second.empty())
+            {
+                continue;
+            }
+            uint16_t targetSecIdx = sectionIndexMap[secType];
+            const auto &relaTable = itRelocs->second;
+
+            SectionDesc relaDesc;
+            relaDesc.name = ".rela" + sectionDescs[targetSecIdx].name;
+            relaDesc.type = SHT_RELA;
+            relaDesc.flags = SHF_INFO_LINK;
+            relaDesc.align = 8;
+            relaDesc.entsize = sizeof(Elf64_Rela);
+            relaDesc.info = targetSecIdx;
+            relaDesc.data.resize(relaTable.size() * sizeof(Elf64_Rela));
+            std::memcpy(relaDesc.data.data(), relaTable.data(), relaDesc.data.size());
+            sectionDescs.push_back(std::move(relaDesc));
+        }
     }
 
     // Build Relocations for extra sections (if any)

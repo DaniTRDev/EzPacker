@@ -180,9 +180,21 @@ void X86_64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
         }
     }
 
+    const size_t prologueCount = instrList.size() - initialInstCount;
+    size_t marked = 0;
+    for (MirInstruction *inst : instrList)
+    {
+        if (marked >= prologueCount)
+        {
+            break;
+        }
+        inst->setIsPrologue(true);
+        ++marked;
+    }
+
     if (setup.m_analysisData)
     {
-        setup.m_analysisData->m_prologueInstCount = instrList.size() - initialInstCount;
+        setup.m_analysisData->m_prologueInstCount = prologueCount;
     }
 }
 

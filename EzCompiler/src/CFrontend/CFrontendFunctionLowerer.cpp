@@ -241,13 +241,14 @@ bool CFrontendFunctionLowerer::lower()
 
         if (debugMeta && p->name && p->name[0] != '\0')
         {
+            const Token *pTok = p->tok ? p->tok : (p->ty ? (p->ty->name_pos ? p->ty->name_pos : p->ty->name) : nullptr);
             MirDebugVarBinding binding;
             binding.funcName = std::string(m_func->getName());
             binding.varName = p->name;
             binding.typeId = m_debugCtx->registerCType(m_driverCtx, p->ty, *debugMeta);
             binding.isParameter = true;
             binding.paramIndex = paramIdx;
-            binding.declLoc = m_debugCtx->debugLocFromToken(m_driverCtx, p->tok);
+            binding.declLoc = m_debugCtx->debugLocFromToken(m_driverCtx, pTok);
             binding.stackObjId = slotId;
             binding.vregId = vregId;
             debugMeta->varBindings.push_back(std::move(binding));
@@ -293,15 +294,16 @@ bool CFrontendFunctionLowerer::lower()
 
             }
 
-            if (debugMeta && v->name && v->name[0] != '\0')
+            if (debugMeta && v->name && v->name[0] != '\0' && std::string_view(v->name) != "__alloca_size__")
             {
+                const Token *vTok = v->tok ? v->tok : (v->ty ? (v->ty->name_pos ? v->ty->name_pos : v->ty->name) : nullptr);
                 MirDebugVarBinding binding;
                 binding.funcName = std::string(m_func->getName());
                 binding.varName = v->name;
                 binding.typeId = m_debugCtx->registerCType(m_driverCtx, v->ty, *debugMeta);
                 binding.isParameter = false;
                 binding.paramIndex = 0;
-                binding.declLoc = m_debugCtx->debugLocFromToken(m_driverCtx, v->tok);
+                binding.declLoc = m_debugCtx->debugLocFromToken(m_driverCtx, vTok);
                 binding.stackObjId = slotId;
                 binding.vregId = vregId;
                 debugMeta->varBindings.push_back(std::move(binding));

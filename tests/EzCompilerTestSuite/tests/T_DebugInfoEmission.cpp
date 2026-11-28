@@ -94,14 +94,15 @@ bool compileCSourceInProcess(const std::string &cSourcePath,
                              const std::string &tripleStr,
                              EzCore::Debug::DebugLevel level = EzCore::Debug::DebugLevel::Full,
                              EzCore::Debug::DebugFormat format = EzCore::Debug::DebugFormat::Auto,
-                             const std::string &telemetryJsonPath = {})
+                             const std::string &telemetryJsonPath = {},
+                             OptimizationLevel optLevel = OptimizationLevel::O0)
 {
     CommandLineOptions options;
     options.inputFilePath = cSourcePath;
     options.outputFilePath = outObjPath;
     options.target = TargetTriple::parse(tripleStr);
     options.emissionStage = EmissionStage::Object;
-    options.optLevel = OptimizationLevel::O0;
+    options.optLevel = optLevel;
     options.debugLevel = level;
     options.debugFormat = format;
     options.pipelineDumpJsonPath = telemetryJsonPath;
@@ -217,6 +218,10 @@ TEST_F(EzCompilerTestSuite, C11X86_64Elf64DwarfValidationAndTelemetry)
     EXPECT_NE(dump.find("DW_TAG_variable"), std::string::npos);
     EXPECT_NE(dump.find("g_counter"), std::string::npos);
     EXPECT_NE(dump.find("Line Number Statements"), std::string::npos);
+    EXPECT_NE(dump.find("DW_AT_location"), std::string::npos);
+
+    // Verify decl_line is non-zero for functions/locals/params (sum_pair is on line 6).
+    EXPECT_EQ(dump.find("DW_AT_decl_line   : 0"), std::string::npos) << dump;
 
     std::ifstream jf(jsonPath);
     std::stringstream jbuf;
@@ -226,6 +231,48 @@ TEST_F(EzCompilerTestSuite, C11X86_64Elf64DwarfValidationAndTelemetry)
     EXPECT_NE(jsonStr.find("\"enabled\": true"), std::string::npos);
     EXPECT_NE(jsonStr.find("\"format\": \"Dwarf5\""), std::string::npos);
     EXPECT_NE(jsonStr.find(".debug_info"), std::string::npos);
+
+    // Verify -O2 SSA-renamed local variables retain DW_AT_location and empty TU emits valid CU.
+    const std::filesystem::path optSrc = "t_dbg_opt2.c";
+    const std::filesystem::path optObj = "t_dbg_opt2.o";
+    {
+        std::ofstream out(optSrc);
+        out << "int accum(int x, int y) {\n"
+            << "    int res = x + 1;\n"
+            << "    res = res + y;\n"
+            << "    return res;\n"
+            << "}\n";
+    }
+    ASSERT_TRUE(compileCSourceInProcess(optSrc.string(),
+                                        optObj.string(),
+                                        "x86_64-unknown-linux-gnu",
+                                        EzCore::Debug::DebugLevel::Full,
+                                        EzCore::Debug::DebugFormat::Dwarf5,
+                                        {},
+                                        OptimizationLevel::O2));
+    std::string optDump = runShellCapture("readelf --debug-dump=info,line " + optObj.string(), exitCode);
+    EXPECT_EQ(exitCode, 0) << optDump;
+    EXPECT_NE(optDump.find("DW_AT_location"), std::string::npos) << optDump;
+    EXPECT_EQ(optDump.find("DW_AT_decl_line   : 0"), std::string::npos) << optDump;
+    std::filesystem::remove(optSrc);
+    std::filesystem::remove(optObj);
+
+    const std::filesystem::path emptySrc = "t_dbg_empty.c";
+    const std::filesystem::path emptyObj = "t_dbg_empty.o";
+    {
+        std::ofstream out(emptySrc);
+        out << "// empty translation unit\n";
+    }
+    ASSERT_TRUE(compileCSourceInProcess(emptySrc.string(),
+                                        emptyObj.string(),
+                                        "x86_64-unknown-linux-gnu",
+                                        EzCore::Debug::DebugLevel::Full,
+                                        EzCore::Debug::DebugFormat::Dwarf5));
+    std::string emptyDump = runShellCapture("readelf --debug-dump=info " + emptyObj.string(), exitCode);
+    EXPECT_EQ(exitCode, 0) << emptyDump;
+    EXPECT_NE(emptyDump.find("DW_TAG_compile_unit"), std::string::npos) << emptyDump;
+    std::filesystem::remove(emptySrc);
+    std::filesystem::remove(emptyObj);
 
     std::filesystem::remove(srcPath);
     std::filesystem::remove(objPath);

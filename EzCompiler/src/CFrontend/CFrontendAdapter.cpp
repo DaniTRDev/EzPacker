@@ -52,6 +52,23 @@ void CFrontendAdapter::defineMacro(std::string_view name, std::string_view value
 namespace CFrontend
 {
 
+static const Token *getObjDeclToken(const Obj *obj)
+{
+    if (!obj)
+    {
+        return nullptr;
+    }
+    if (obj->tok)
+    {
+        return obj->tok;
+    }
+    if (obj->ty)
+    {
+        return obj->ty->name_pos ? obj->ty->name_pos : obj->ty->name;
+    }
+    return nullptr;
+}
+
 SourceReference *CFrontendDebugContext::createSourceRefFromToken(DriverContext &ctx, const Token *tok) const
 {
     if (!tok || !tok->file || !tok->loc || !tok->file->contents)
@@ -133,6 +150,93 @@ uint64_t CFrontendDebugContext::registerCType(DriverContext &ctx, const Type *ty
         return it->second;
     }
 
+    // Deduplicate canonical primitive types so identical C types (e.g. "int") share one DebugType.
+    auto registerPrimitive = [&](EzCore::RttiTypeKind kind,
+                                 EzCore::Debug::DebugBaseEncoding enc,
+                                 const char *name,
+                                 uint64_t bytes,
+                                 uint32_t align) -> uint64_t {
+        if (auto it = canonicalPrimitives.find(name); it != canonicalPrimitives.end())
+        {
+            visitedTypes[ty] = it->second;
+            return it->second;
+        }
+        const uint64_t id = nextTypeId++;
+        visitedTypes[ty] = id;
+        canonicalPrimitives[name] = id;
+        EzCore::Debug::DebugType prim;
+        prim.typeId = id;
+        prim.name = name;
+        prim.kind = kind;
+        prim.encoding = enc;
+        prim.sizeInBytes = bytes;
+        prim.alignment = align;
+        meta.compileUnit.addType(std::move(prim));
+        return id;
+    };
+
+    switch (ty->kind)
+    {
+        case TY_BOOL:
+            return registerPrimitive(EzCore::RttiTypeKind::Boolean,
+                                     EzCore::Debug::DebugBaseEncoding::Boolean,
+                                     "_Bool",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 1,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 1);
+        case TY_CHAR:
+            return registerPrimitive(ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt
+                                                     : EzCore::RttiTypeKind::SignedInt,
+                                     ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::UnsignedChar
+                                                     : EzCore::Debug::DebugBaseEncoding::SignedChar,
+                                     ty->is_unsigned ? "unsigned char" : "char",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 1,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 1);
+        case TY_SHORT:
+            return registerPrimitive(ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt
+                                                     : EzCore::RttiTypeKind::SignedInt,
+                                     ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::Unsigned
+                                                     : EzCore::Debug::DebugBaseEncoding::Signed,
+                                     ty->is_unsigned ? "unsigned short" : "short",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 2,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 2);
+        case TY_INT:
+            return registerPrimitive(ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt
+                                                     : EzCore::RttiTypeKind::SignedInt,
+                                     ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::Unsigned
+                                                     : EzCore::Debug::DebugBaseEncoding::Signed,
+                                     ty->is_unsigned ? "unsigned int" : "int",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 4,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 4);
+        case TY_LONG:
+            return registerPrimitive(ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt
+                                                     : EzCore::RttiTypeKind::SignedInt,
+                                     ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::Unsigned
+                                                     : EzCore::Debug::DebugBaseEncoding::Signed,
+                                     ty->is_unsigned ? "unsigned long" : "long",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 8,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 8);
+        case TY_FLOAT:
+            return registerPrimitive(EzCore::RttiTypeKind::Float,
+                                     EzCore::Debug::DebugBaseEncoding::Float,
+                                     "float",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 4,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 4);
+        case TY_DOUBLE:
+            return registerPrimitive(EzCore::RttiTypeKind::Float,
+                                     EzCore::Debug::DebugBaseEncoding::Float,
+                                     "double",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 8,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 8);
+        case TY_LDOUBLE:
+            return registerPrimitive(EzCore::RttiTypeKind::Float,
+                                     EzCore::Debug::DebugBaseEncoding::Float,
+                                     "long double",
+                                     ty->size > 0 ? static_cast<uint64_t>(ty->size) : 16,
+                                     ty->align > 0 ? static_cast<uint32_t>(ty->align) : 16);
+        default:
+            break;
+    }
+
     const uint64_t typeId = nextTypeId++;
     visitedTypes[ty] = typeId; // Pre-insert before recursing to break self-referential cycles.
 
@@ -147,51 +251,9 @@ uint64_t CFrontendDebugContext::registerCType(DriverContext &ctx, const Type *ty
 
     switch (ty->kind)
     {
-        case TY_BOOL:
-            dt.kind = EzCore::RttiTypeKind::Boolean;
-            dt.encoding = EzCore::Debug::DebugBaseEncoding::Boolean;
-            dt.name = "_Bool";
-            break;
-        case TY_CHAR:
-            dt.kind = ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt : EzCore::RttiTypeKind::SignedInt;
-            dt.encoding = ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::UnsignedChar
-                                          : EzCore::Debug::DebugBaseEncoding::SignedChar;
-            dt.name = ty->is_unsigned ? "unsigned char" : "char";
-            break;
-        case TY_SHORT:
-            dt.kind = ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt : EzCore::RttiTypeKind::SignedInt;
-            dt.encoding = ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::Unsigned
-                                          : EzCore::Debug::DebugBaseEncoding::Signed;
-            dt.name = ty->is_unsigned ? "unsigned short" : "short";
-            break;
-        case TY_INT:
-            dt.kind = ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt : EzCore::RttiTypeKind::SignedInt;
-            dt.encoding = ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::Unsigned
-                                          : EzCore::Debug::DebugBaseEncoding::Signed;
-            dt.name = ty->is_unsigned ? "unsigned int" : "int";
-            break;
-        case TY_LONG:
-            dt.kind = ty->is_unsigned ? EzCore::RttiTypeKind::UnsignedInt : EzCore::RttiTypeKind::SignedInt;
-            dt.encoding = ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::Unsigned
-                                          : EzCore::Debug::DebugBaseEncoding::Signed;
-            dt.name = ty->is_unsigned ? "unsigned long" : "long";
-            break;
-        case TY_FLOAT:
-            dt.kind = EzCore::RttiTypeKind::Float;
-            dt.encoding = EzCore::Debug::DebugBaseEncoding::Float;
-            dt.name = "float";
-            break;
-        case TY_DOUBLE:
-            dt.kind = EzCore::RttiTypeKind::Float;
-            dt.encoding = EzCore::Debug::DebugBaseEncoding::Float;
-            dt.name = "double";
-            break;
-        case TY_LDOUBLE:
-            dt.kind = EzCore::RttiTypeKind::Float;
-            dt.encoding = EzCore::Debug::DebugBaseEncoding::Float;
-            dt.name = "long double";
-            break;
         case TY_ENUM:
+            // Note: chibicc folds enum constants into VarScope at parse time and does not retain
+            // enumerator lists on struct Type, so dt.enumerators remains empty here.
             dt.kind = EzCore::RttiTypeKind::Enum;
             dt.encoding = ty->is_unsigned ? EzCore::Debug::DebugBaseEncoding::Unsigned
                                           : EzCore::Debug::DebugBaseEncoding::Signed;
@@ -204,11 +266,20 @@ uint64_t CFrontendDebugContext::registerCType(DriverContext &ctx, const Type *ty
             break;
         case TY_PTR:
         case TY_VLA:
+        {
+            const uint64_t baseId = registerCType(ctx, ty->base, meta);
+            if (auto it = canonicalPointers.find(baseId); it != canonicalPointers.end())
+            {
+                visitedTypes[ty] = it->second;
+                return it->second;
+            }
+            canonicalPointers[baseId] = typeId;
             dt.kind = EzCore::RttiTypeKind::Pointer;
-            dt.referencedTypeId = registerCType(ctx, ty->base, meta);
+            dt.referencedTypeId = baseId;
             if (dt.sizeInBytes == 0)
                 dt.sizeInBytes = 8;
             break;
+        }
         case TY_ARRAY:
             dt.kind = EzCore::RttiTypeKind::Array;
             dt.referencedTypeId = registerCType(ctx, ty->base, meta);
@@ -293,11 +364,6 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx,
                                      MirBuilderContext &outMirCtx,
                                      std::string_view virtualFileName)
 {
-    if (!astRoot)
-    {
-        return true;
-    }
-
     CFrontendDebugContext debugCtx;
     const bool emitDebug = ctx.getOptions().emitDebugInfo();
     MirDebugMetadata *debugMeta = emitDebug ? outMirCtx.getOrCreateDebugMetadata() : nullptr;
@@ -367,6 +433,11 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx,
         }
     }
 
+    if (!astRoot)
+    {
+        return true;
+    }
+
     MirTypeTable *typeTable = outMirCtx.getTypeTable();
     MirOperandBuilder opBuilder(&outMirCtx);
     MirFunctionBuilder funcBuilder(&outMirCtx);
@@ -414,18 +485,19 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx,
                 gb.setInitializer(opBuilder.buildInt(gType, FlexInt(0, static_cast<uint16_t>(gType->getTotalSizeInBits()))));
             }
 
-            SourceReference *gSrcRef = debugCtx.createSourceRefFromToken(ctx, obj->tok);
+            const Token *gTok = getObjDeclToken(obj);
+            SourceReference *gSrcRef = debugCtx.createSourceRefFromToken(ctx, gTok);
             MirGlobalVar *gv = gb.build(linkage, gType, std::pmr::string(obj->name, outMirCtx.getGlobalAllocator()), gSrcRef);
             outMirCtx.appendGlobalVar(gv);
             nameToGlobal[obj->name] = gv;
 
-            if (debugMeta)
+            if (debugMeta && obj->name && std::string_view(obj->name).rfind(".L..", 0) != 0)
             {
                 MirDebugGlobalBinding gBind;
                 gBind.gvarId = gv->getId();
                 gBind.name = obj->name ? obj->name : "";
                 gBind.typeId = debugCtx.registerCType(ctx, obj->ty, *debugMeta);
-                gBind.declLoc = debugCtx.debugLocFromToken(ctx, obj->tok);
+                gBind.declLoc = debugCtx.debugLocFromToken(ctx, gTok);
                 gBind.isExternal = !obj->is_static;
                 gBind.isConstant = false;
                 debugMeta->globalBindings.push_back(std::move(gBind));
@@ -447,7 +519,8 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx,
                 paramTypes.push_back(mapType(typeTable, p->ty));
             }
             MirLinkage linkage = obj->is_static ? MirLinkage::Internal : MirLinkage::External;
-            SourceReference *fSrcRef = debugCtx.createSourceRefFromToken(ctx, obj->tok);
+            const Token *fTok = getObjDeclToken(obj);
+            SourceReference *fSrcRef = debugCtx.createSourceRefFromToken(ctx, fTok);
             MirFunction *func = funcBuilder.declare(retType,
                                                     std::span<MirType *const>(paramTypes.data(), paramTypes.size()),
                                                     obj->name,
@@ -463,7 +536,7 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx,
                 fBind.funcId = func->getId();
                 fBind.name = obj->name ? obj->name : "";
                 fBind.returnTypeId = debugCtx.registerCType(ctx, obj->ty->return_ty, *debugMeta);
-                fBind.declLoc = debugCtx.debugLocFromToken(ctx, obj->tok);
+                fBind.declLoc = debugCtx.debugLocFromToken(ctx, fTok);
                 fBind.isExternal = !obj->is_static;
                 debugMeta->funcBindings.push_back(std::move(fBind));
             }
@@ -483,7 +556,8 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx,
             // Function definition: build MirFunction upfront so it exists in outMirCtx
             MirType *retType = mapType(typeTable, obj->ty->return_ty);
             MirLinkage linkage = obj->is_static ? MirLinkage::Internal : MirLinkage::External;
-            SourceReference *fSrcRef = debugCtx.createSourceRefFromToken(ctx, obj->tok);
+            const Token *fTok = getObjDeclToken(obj);
+            SourceReference *fSrcRef = debugCtx.createSourceRefFromToken(ctx, fTok);
             MirFunction *func = funcBuilder.build(retType, {}, obj->name, linkage, nullptr, fSrcRef);
             if (!func)
             {
@@ -499,7 +573,7 @@ bool CFrontendAdapter::lowerAstToMir(DriverContext &ctx,
                 fBind.funcId = func->getId();
                 fBind.name = obj->name ? obj->name : "";
                 fBind.returnTypeId = debugCtx.registerCType(ctx, obj->ty->return_ty, *debugMeta);
-                fBind.declLoc = debugCtx.debugLocFromToken(ctx, obj->tok);
+                fBind.declLoc = debugCtx.debugLocFromToken(ctx, fTok);
                 fBind.isExternal = !obj->is_static;
                 debugMeta->funcBindings.push_back(std::move(fBind));
             }

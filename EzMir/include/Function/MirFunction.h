@@ -37,6 +37,9 @@ struct MirFunctionAnalysisData
 
     // Final register/spill location per virtual register ID for debug variable tracking.
     std::unordered_map<MirId, MirFunctionDebugLocation> m_vregToLocation;
+
+    // Maps post-SSA renamed virtual register IDs back to their pre-SSA root virtual register ID.
+    std::unordered_map<MirId, MirId> m_ssaToRootVreg;
 };
 
 /**

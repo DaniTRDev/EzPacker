@@ -207,6 +207,93 @@ TEST(DebugInfoTest, ValidateCompileUnit)
     // Zero typeId.
     cu.types[0].typeId = 0;
     EXPECT_FALSE(cu.validate(err));
+    cu.types[0].typeId = t.typeId;
+
+    // Dangling referencedTypeId in DebugType.
+    DebugType ptrType;
+    ptrType.typeId = computeTypeId("int*");
+    ptrType.kind = RttiTypeKind::Pointer;
+    ptrType.referencedTypeId = 999999ULL;
+    cu.addType(ptrType);
+    EXPECT_FALSE(cu.validate(err));
+    ptrType.referencedTypeId = t.typeId;
+    cu.addType(ptrType);
+    EXPECT_TRUE(cu.validate(err));
+
+    // Dangling member typeId in DebugType.
+    DebugType structType;
+    structType.typeId = computeTypeId("S");
+    structType.kind = RttiTypeKind::Struct;
+    structType.members.push_back({ "f", 888888ULL, 0, 0, 0, false });
+    cu.addType(structType);
+    EXPECT_FALSE(cu.validate(err));
+    structType.members[0].typeId = t.typeId;
+    cu.addType(structType);
+    EXPECT_TRUE(cu.validate(err));
+
+    // Dangling function returnTypeId and variable typeId.
+    cu.functions[0].returnTypeId = 777777ULL;
+    EXPECT_FALSE(cu.validate(err));
+    cu.functions[0].returnTypeId = t.typeId;
+
+    DebugVariable localVar;
+    localVar.name = "x";
+    localVar.typeId = 666666ULL;
+    cu.functions[0].locals.push_back(localVar);
+    EXPECT_FALSE(cu.validate(err));
+    cu.functions[0].locals[0].typeId = t.typeId;
+    EXPECT_TRUE(cu.validate(err));
+
+    // Dangling global typeId.
+    cu.globals[0].typeId = 555555ULL;
+    EXPECT_FALSE(cu.validate(err));
+    cu.globals[0].typeId = t.typeId;
+    EXPECT_TRUE(cu.validate(err));
+
+    // Non-monotonic lineEntries and codeOffset >= codeSize.
+    cu.functions[0].codeSize = 32;
+    cu.functions[0].lineEntries.push_back({ 16, fileId, 5, 1, true, false, false });
+    cu.functions[0].lineEntries.push_back({ 8, fileId, 6, 1, true, false, false });
+    EXPECT_FALSE(cu.validate(err));
+
+    cu.functions[0].lineEntries[2].codeOffset = 32; // == codeSize (out of bounds)
+    EXPECT_FALSE(cu.validate(err));
+
+    cu.functions[0].lineEntries[2].codeOffset = 24;
+    EXPECT_TRUE(cu.validate(err));
+}
+
+TEST(DebugInfoTest, IndexedLookupAndCopyability)
+{
+    DebugCompileUnit cu;
+    constexpr size_t kCount = 2000;
+    for (size_t i = 0; i < kCount; ++i)
+    {
+        const std::string path = "src/dir_" + std::to_string(i / 20) + "/file_" + std::to_string(i) + ".c";
+        const uint32_t id = cu.addOrGetFile(path);
+        EXPECT_EQ(id, static_cast<uint32_t>(i + 1));
+
+        DebugType dt;
+        dt.typeId = computeTypeId("type_" + std::to_string(i));
+        dt.name = "type_" + std::to_string(i);
+        dt.kind = RttiTypeKind::SignedInt;
+        cu.addType(dt);
+    }
+
+    // Deduplication and updates still work in O(1).
+    EXPECT_EQ(cu.addOrGetFile("src\\dir_0\\file_0.c"), 1u);
+    EXPECT_EQ(cu.files.size(), kCount);
+
+    const uint64_t midId = computeTypeId("type_1000");
+    const DebugType *found = cu.findType(midId);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found->name, "type_1000");
+
+    // Copy and move preserve index consistency.
+    DebugCompileUnit copied = cu;
+    EXPECT_EQ(copied.addOrGetFile("src/dir_0/file_0.c"), 1u);
+    ASSERT_NE(copied.findType(midId), nullptr);
+    EXPECT_EQ(copied.findType(midId)->name, "type_1000");
 }
 
 TEST(DebugInfoTest, RegisterMappings)
@@ -237,6 +324,19 @@ TEST(DebugInfoTest, RegisterMappings)
     EXPECT_EQ(mapRiscV64ToDwarfReg(31, true), 63u);  // f31
     EXPECT_EQ(mapRiscV64ToDwarfReg(32, false), 0xFFFFu);
     EXPECT_EQ(mapRiscV64ToDwarfReg(32, true), 0xFFFFu);
+
+    // AArch64 DWARF
+    EXPECT_EQ(mapAArch64ToDwarfReg(0, false), 0u);
+    EXPECT_EQ(mapAArch64ToDwarfReg(31, false), 31u);
+    EXPECT_EQ(mapAArch64ToDwarfReg(0, true), 64u);
+    EXPECT_EQ(mapAArch64ToDwarfReg(31, true), 95u);
+    EXPECT_EQ(mapAArch64ToDwarfReg(32, false), 0xFFFFu);
+    EXPECT_EQ(mapAArch64ToDwarfReg(32, true), 0xFFFFu);
+
+    // Unified TargetArch dispatcher
+    EXPECT_EQ(mapTargetRegToDwarfReg(DebugCompileUnit::TargetArch::X86_64, 4, false), 7u);
+    EXPECT_EQ(mapTargetRegToDwarfReg(DebugCompileUnit::TargetArch::RiscV64, 2, true), 34u);
+    EXPECT_EQ(mapTargetRegToDwarfReg(DebugCompileUnit::TargetArch::AArch64, 1, true), 65u);
 
     // x86-64 CodeView
     EXPECT_EQ(mapX86_64ToCodeViewReg(0, false, 8), 328u);  // RAX

@@ -25,8 +25,10 @@ constexpr uint64_t DW_TAG_member = 0x0d;
 constexpr uint64_t DW_TAG_pointer_type = 0x0f;
 constexpr uint64_t DW_TAG_compile_unit = 0x11;
 constexpr uint64_t DW_TAG_structure_type = 0x13;
+constexpr uint64_t DW_TAG_subroutine_type = 0x15;
 constexpr uint64_t DW_TAG_typedef = 0x16;
 constexpr uint64_t DW_TAG_union_type = 0x17;
+constexpr uint64_t DW_TAG_unspecified_parameters = 0x18;
 constexpr uint64_t DW_TAG_subrange_type = 0x21;
 constexpr uint64_t DW_TAG_base_type = 0x24;
 constexpr uint64_t DW_TAG_enumerator = 0x28;
@@ -371,7 +373,47 @@ std::vector<uint8_t> buildLocationExpr(const EzCore::Debug::DebugVarLocation &lo
     return expr;
 }
 
+// Maps a 1-based DebugCompileUnit fileId to its 0-based DWARF v5 .debug_line file index.
+struct DwarfFileMap
+{
+    std::unordered_map<uint32_t, uint32_t> fileIdToDwarfIdx;
+    bool hasMainFileInFiles{ false };
+    uint32_t mainFileId{ 0 };
+
+    uint32_t map(uint32_t fileId) const
+    {
+        auto it = fileIdToDwarfIdx.find(fileId);
+        return (it != fileIdToDwarfIdx.end()) ? it->second : 0;
+    }
+};
+
+DwarfFileMap buildDwarfFileMap(const EzCore::Debug::DebugCompileUnit &cu)
+{
+    DwarfFileMap fm;
+    fm.fileIdToDwarfIdx[0] = 0;
+
+    std::string normMain = cu.mainFile;
+    std::replace(normMain.begin(), normMain.end(), '\\', '/');
+
+    uint32_t nextIdx = 1;
+    for (const auto &f : cu.files)
+    {
+        if (!normMain.empty() && f.fullPath == normMain && !fm.hasMainFileInFiles)
+        {
+            fm.hasMainFileInFiles = true;
+            fm.mainFileId = f.fileId;
+            fm.fileIdToDwarfIdx[f.fileId] = 0;
+        }
+        else
+        {
+            fm.fileIdToDwarfIdx[f.fileId] = nextIdx++;
+        }
+    }
+    return fm;
+}
+
 ObjectFormat::ExtraObjectSection buildDebugLineSection(const EzCore::Debug::DebugCompileUnit &cu,
+                                                       const DwarfFileMap &fileMap,
                                                        StringTableBuilder &lineStrTab)
 {
     ObjectFormat::ExtraObjectSection sec;
@@ -441,7 +483,7 @@ ObjectFormat::ExtraObjectSection buildDebugLineSection(const EzCore::Debug::Debu
     Dwarf5Emitter::appendUleb128(out, DW_LNCT_directory_index);
     Dwarf5Emitter::appendUleb128(out, DW_FORM_udata);
 
-    // Entry 0 = mainFile, Entries 1..N = cu.files
+    // Entry 0 = mainFile, Entries 1..N = remaining cu.files (avoiding duplicate mainFile)
     std::string mainDir;
     std::string mainFilename;
     EzCore::Debug::splitDirectoryAndFilename(cu.mainFile, mainDir, mainFilename);
@@ -449,14 +491,19 @@ ObjectFormat::ExtraObjectSection buildDebugLineSection(const EzCore::Debug::Debu
     {
         mainFilename = cu.mainFile;
     }
-    const uint32_t mainDirIdx = addDir(mainDir); // Note: mainDir should already be in dirs or compDir
+    const uint32_t mainDirIdx = addDir(mainDir);
 
-    Dwarf5Emitter::appendUleb128(out, 1 + cu.files.size());
+    const size_t totalFiles = 1 + cu.files.size() - (fileMap.hasMainFileInFiles ? 1 : 0);
+    Dwarf5Emitter::appendUleb128(out, totalFiles);
     emitLineStrp(out, sec.m_relocs, lineStrTab, mainFilename);
     Dwarf5Emitter::appendUleb128(out, mainDirIdx);
 
     for (const auto &f : cu.files)
     {
+        if (fileMap.hasMainFileInFiles && f.fileId == fileMap.mainFileId)
+        {
+            continue;
+        }
         emitLineStrp(out, sec.m_relocs, lineStrTab, f.filename);
         Dwarf5Emitter::appendUleb128(out, dirIndexMap[f.directory]);
     }
@@ -497,11 +544,12 @@ ObjectFormat::ExtraObjectSection buildDebugLineSection(const EzCore::Debug::Debu
                 curAddr = targetAddr;
             }
 
-            if (entry.fileId != curFile)
+            const uint32_t mappedFile = fileMap.map(entry.fileId);
+            if (mappedFile != curFile)
             {
                 appendU8(out, DW_LNS_set_file);
-                Dwarf5Emitter::appendUleb128(out, entry.fileId);
-                curFile = entry.fileId;
+                Dwarf5Emitter::appendUleb128(out, mappedFile);
+                curFile = mappedFile;
             }
 
             if (entry.column != curCol)
@@ -630,45 +678,115 @@ ObjectFormat::ExtraObjectSection buildDebugFrameSection(const EzCore::Debug::Deb
         emitTextAddr64(out, sec.m_relocs, fn.sectionOffset);
         appendU64(out, fn.codeSize);
 
-        if (fn.hasFramePointer && fn.prologueSize > 0)
+        auto emitSavedRegs = [&](bool skipRbp, bool skipRaAndS0)
         {
-            if (!isRiscV)
+            for (const auto &saved : fn.savedRegs)
             {
-                appendU8(out, DW_CFA_advance_loc1);
-                appendU8(out, 1);
-                appendU8(out, DW_CFA_def_cfa_offset);
-                Dwarf5Emitter::appendUleb128(out, 16);
-                appendU8(out, static_cast<uint8_t>(DW_CFA_offset | 6)); // RBP
-                Dwarf5Emitter::appendUleb128(out, 2);
-                appendU8(out, DW_CFA_def_cfa_register);
-                Dwarf5Emitter::appendUleb128(out, 6); // RBP
+                const uint16_t dreg =
+                        isRiscV ? EzCore::Debug::mapRiscV64ToDwarfReg(saved.regId, saved.isFpr)
+                                : EzCore::Debug::mapX86_64ToDwarfReg(saved.regId, saved.isFpr);
+                if (dreg == 0xFFFF || saved.cfaOffset >= 0)
+                {
+                    continue;
+                }
+                if (skipRbp && dreg == 6)
+                {
+                    continue;
+                }
+                if (skipRaAndS0 && (dreg == 1 || dreg == 8))
+                {
+                    continue;
+                }
+                if (dreg < 64)
+                {
+                    appendU8(out, static_cast<uint8_t>(DW_CFA_offset | dreg));
+                }
+                else
+                {
+                    appendU8(out, DW_CFA_offset_extended);
+                    Dwarf5Emitter::appendUleb128(out, dreg);
+                }
+                Dwarf5Emitter::appendUleb128(out, static_cast<uint64_t>((-saved.cfaOffset) / 8));
             }
-            else
+        };
+
+        if (!isRiscV)
+        {
+            if (fn.hasFramePointer)
             {
+                if (fn.prologueSize > 0)
+                {
+                    appendU8(out, DW_CFA_advance_loc1);
+                    appendU8(out, 1);
+                    appendU8(out, DW_CFA_def_cfa_offset);
+                    Dwarf5Emitter::appendUleb128(out, 16);
+                    appendU8(out, static_cast<uint8_t>(DW_CFA_offset | 6)); // RBP
+                    Dwarf5Emitter::appendUleb128(out, 2);
+                    if (fn.prologueSize >= 4)
+                    {
+                        appendU8(out, DW_CFA_advance_loc1);
+                        appendU8(out, 3);
+                        appendU8(out, DW_CFA_def_cfa_register);
+                        Dwarf5Emitter::appendUleb128(out, 6); // RBP
+                    }
+                }
+                emitSavedRegs(true, false);
+            }
+            else if (fn.totalFrameSize > 0 || !fn.savedRegs.empty())
+            {
+                if (fn.prologueSize > 0)
+                {
+                    appendU8(out, DW_CFA_advance_loc1);
+                    appendU8(out, static_cast<uint8_t>(std::min<uint32_t>(fn.prologueSize, 255)));
+                }
+                if (fn.totalFrameSize > 0)
+                {
+                    appendU8(out, DW_CFA_def_cfa_offset);
+                    Dwarf5Emitter::appendUleb128(out, static_cast<uint64_t>(fn.totalFrameSize + 8));
+                }
+                emitSavedRegs(false, false);
+            }
+        }
+        else
+        {
+            if (fn.hasFramePointer)
+            {
+                if (fn.prologueSize > 0)
+                {
+                    const uint8_t adv = static_cast<uint8_t>(std::min<uint32_t>(fn.prologueSize, 16) / 2);
+                    if (adv > 0)
+                    {
+                        appendU8(out, DW_CFA_advance_loc1);
+                        appendU8(out, adv);
+                    }
+                }
+                // s0 = sp + 16 = CFA => CFA = s0 + 0; ra at CFA-8 (1), s0 at CFA-16 (2)
+                appendU8(out, DW_CFA_def_cfa);
+                Dwarf5Emitter::appendUleb128(out, 8);
+                Dwarf5Emitter::appendUleb128(out, 0);
+                appendU8(out, static_cast<uint8_t>(DW_CFA_offset | 1));
+                Dwarf5Emitter::appendUleb128(out, 1);
+                appendU8(out, static_cast<uint8_t>(DW_CFA_offset | 8));
+                Dwarf5Emitter::appendUleb128(out, 2);
+                emitSavedRegs(false, true);
+            }
+            else if (fn.totalFrameSize > 0 || !fn.savedRegs.empty())
+            {
+                if (fn.prologueSize > 0)
+                {
+                    const uint8_t adv = static_cast<uint8_t>(std::min<uint32_t>(fn.prologueSize, 255) / 2);
+                    if (adv > 0)
+                    {
+                        appendU8(out, DW_CFA_advance_loc1);
+                        appendU8(out, adv);
+                    }
+                }
                 if (fn.totalFrameSize > 0)
                 {
                     appendU8(out, DW_CFA_def_cfa_offset);
                     Dwarf5Emitter::appendUleb128(out, static_cast<uint64_t>(fn.totalFrameSize));
                 }
-                for (const auto &saved : fn.savedRegs)
-                {
-                    const uint16_t dreg = EzCore::Debug::mapRiscV64ToDwarfReg(saved.regId, saved.isFpr);
-                    if (dreg != 0xFFFF && saved.cfaOffset < 0)
-                    {
-                        if (dreg < 64)
-                        {
-                            appendU8(out, static_cast<uint8_t>(DW_CFA_offset | dreg));
-                        }
-                        else
-                        {
-                            appendU8(out, DW_CFA_offset_extended);
-                            Dwarf5Emitter::appendUleb128(out, dreg);
-                        }
-                        Dwarf5Emitter::appendUleb128(out, static_cast<uint64_t>((-saved.cfaOffset) / 8));
-                    }
-                }
-                appendU8(out, DW_CFA_def_cfa_register);
-                Dwarf5Emitter::appendUleb128(out, 8); // s0/fp
+                emitSavedRegs(false, false);
             }
         }
 
@@ -728,8 +846,9 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
     StringTableBuilder strTab;
     StringTableBuilder lineStrTab;
     AbbrevTableBuilder abbrevTab;
+    const DwarfFileMap fileMap = buildDwarfFileMap(cu);
 
-    ObjectFormat::ExtraObjectSection lineSec = buildDebugLineSection(cu, lineStrTab);
+    ObjectFormat::ExtraObjectSection lineSec = buildDebugLineSection(cu, fileMap, lineStrTab);
     ObjectFormat::ExtraObjectSection frameSec = buildDebugFrameSection(cu);
 
     ObjectFormat::ExtraObjectSection infoSec;
@@ -810,8 +929,46 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
     };
     std::vector<Ref4Patch> refPatches;
 
+    uint32_t fallbackTypeDieOffset = 0;
+    auto ensureFallbackType = [&]() -> uint32_t
+    {
+        if (fallbackTypeDieOffset != 0)
+        {
+            return fallbackTypeDieOffset;
+        }
+        AbbrevSpec baseSpec;
+        baseSpec.tag = DW_TAG_base_type;
+        baseSpec.hasChildren = false;
+        baseSpec.attrs = {
+            { DW_AT_name, DW_FORM_strp },
+            { DW_AT_encoding, DW_FORM_data1 },
+            { DW_AT_byte_size, DW_FORM_udata }
+        };
+        fallbackTypeDieOffset = static_cast<uint32_t>(info.size());
+        appendUleb128(info, abbrevTab.getOrAdd(baseSpec));
+        emitStrp(info, infoSec.m_relocs, strTab, "__unknown_type");
+        appendU8(info, DW_ATE_unsigned);
+        appendUleb128(info, 1);
+        return fallbackTypeDieOffset;
+    };
+
+    auto isResolvableNonVoidType = [&](uint64_t typeId) -> bool
+    {
+        if (typeId == 0)
+        {
+            return false;
+        }
+        const auto *found = cu.findType(typeId);
+        return found != nullptr && found->kind != EzCore::RttiTypeKind::Void;
+    };
+
     auto emitTypeRef4 = [&](uint64_t targetTypeId)
     {
+        if (!isResolvableNonVoidType(targetTypeId))
+        {
+            appendU32(info, ensureFallbackType());
+            return;
+        }
         refPatches.push_back({ info.size(), targetTypeId });
         appendU32(info, 0);
     };
@@ -940,7 +1097,7 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
                     appendUleb128(info, abbrevTab.getOrAdd(aggSpec));
                     emitStrp(info, infoSec.m_relocs, strTab, ty.name);
                     appendUleb128(info, ty.sizeInBytes);
-                    appendUleb128(info, ty.declLoc.fileId);
+                    appendUleb128(info, fileMap.map(ty.declLoc.fileId));
                     appendUleb128(info, ty.declLoc.line);
 
                     for (const auto &member : ty.members)
@@ -998,7 +1155,7 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
                     emitStrp(info, infoSec.m_relocs, strTab, ty.name);
                     appendU8(info, DW_ATE_signed);
                     appendUleb128(info, ty.sizeInBytes > 0 ? ty.sizeInBytes : 4);
-                    appendUleb128(info, ty.declLoc.fileId);
+                    appendUleb128(info, fileMap.map(ty.declLoc.fileId));
                     appendUleb128(info, ty.declLoc.line);
 
                     AbbrevSpec etorSpec;
@@ -1041,8 +1198,50 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
                     }
                     break;
                 }
+                case EzCore::RttiTypeKind::Function:
+                {
+                    const bool hasRet = isResolvableNonVoidType(ty.returnTypeId);
+                    const bool hasChildren = (!ty.paramTypeIds.empty() || ty.isVariadic);
+                    AbbrevSpec subSpec;
+                    subSpec.tag = DW_TAG_subroutine_type;
+                    subSpec.hasChildren = hasChildren;
+                    if (hasRet)
+                    {
+                        subSpec.attrs.emplace_back(DW_AT_type, DW_FORM_ref4);
+                    }
+                    appendUleb128(info, abbrevTab.getOrAdd(subSpec));
+                    if (hasRet)
+                    {
+                        emitTypeRef4(ty.returnTypeId);
+                    }
+                    if (!ty.paramTypeIds.empty())
+                    {
+                        AbbrevSpec paramSpec;
+                        paramSpec.tag = DW_TAG_formal_parameter;
+                        paramSpec.hasChildren = false;
+                        paramSpec.attrs = { { DW_AT_type, DW_FORM_ref4 } };
+                        const uint32_t paramCode = abbrevTab.getOrAdd(paramSpec);
+                        for (uint64_t pTypeId : ty.paramTypeIds)
+                        {
+                            appendUleb128(info, paramCode);
+                            emitTypeRef4(pTypeId);
+                        }
+                    }
+                    if (ty.isVariadic)
+                    {
+                        AbbrevSpec varSpec;
+                        varSpec.tag = DW_TAG_unspecified_parameters;
+                        varSpec.hasChildren = false;
+                        appendUleb128(info, abbrevTab.getOrAdd(varSpec));
+                    }
+                    if (hasChildren)
+                    {
+                        appendU8(info, 0);
+                    }
+                    break;
+                }
                 default:
-                    // Fallback base_type for Unknown/Function if referenced
+                    // Fallback base_type for Unknown if referenced
                     AbbrevSpec spec;
                     spec.tag = DW_TAG_base_type;
                     spec.hasChildren = false;
@@ -1085,7 +1284,7 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
             {
                 emitTypeRef4(global.typeId);
             }
-            appendUleb128(info, global.declLoc.fileId);
+            appendUleb128(info, fileMap.map(global.declLoc.fileId));
             appendUleb128(info, global.declLoc.line);
 
             // DW_OP_addr + 8-byte reloc to section+offset
@@ -1159,7 +1358,7 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
         {
             emitStrp(info, infoSec.m_relocs, strTab, fn.linkageName);
         }
-        appendUleb128(info, fn.declLoc.fileId);
+        appendUleb128(info, fileMap.map(fn.declLoc.fileId));
         appendUleb128(info, fn.declLoc.line);
         if (hasRetType)
         {
@@ -1213,7 +1412,7 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
                     }
                 }
                 emitStrp(info, infoSec.m_relocs, strTab, var.name);
-                appendUleb128(info, var.declLoc.fileId);
+                appendUleb128(info, fileMap.map(var.declLoc.fileId));
                 appendUleb128(info, var.declLoc.line);
                 if (hasVarType)
                 {
@@ -1239,14 +1438,12 @@ std::vector<ObjectFormat::ExtraObjectSection> Dwarf5Emitter::emit(const EzCore::
         appendU8(info, 0); // End CU children
     }
 
-    // Patch all DW_FORM_ref4 offsets
+    // Patch all DW_FORM_ref4 offsets (never leaving 0 pointing at CU header)
     for (const auto &patch : refPatches)
     {
         auto it = typeDieOffsets.find(patch.targetTypeId);
-        if (it != typeDieOffsets.end())
-        {
-            patchU32(info, patch.patchOffset, it->second);
-        }
+        const uint32_t targetOff = (it != typeDieOffsets.end()) ? it->second : ensureFallbackType();
+        patchU32(info, patch.patchOffset, targetOff);
     }
 
     // Patch CU unit_length

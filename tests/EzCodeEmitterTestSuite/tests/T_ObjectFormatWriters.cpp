@@ -733,3 +733,205 @@ TEST_F(EzCodeEmitterTestSuite, TestExtraSectionRelocsFailLoudOnMissingTarget)
         EXPECT_THROW(coffWriter.write(coffSections), std::runtime_error);
     }
 }
+
+// Verifies ELF64 standard relocations in .data emit .rela.data and unknown m_relocs symbols fail loud.
+TEST_F(EzCodeEmitterTestSuite, TestElf64DataRelocsAndUnknownSymbolFailLoud)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateElfSections(sections, getAllocator());
+    sections[SectionType::Text]->emit8(0xC3);
+    sections[SectionType::Text]->finalize();
+
+    CodeSection *dataSec = sections[SectionType::Data];
+    dataSec->emit64(0);
+    dataSec->finalize();
+
+    {
+        Elf64Writer elfWriter;
+        elfWriter.addSymbol(ObjectSymbol{ .m_name = "target_fn",
+                                          .m_section = SectionType::Text,
+                                          .m_offset = 0,
+                                          .m_size = 1,
+                                          .m_isGlobal = true,
+                                          .m_isFunction = true });
+        elfWriter.addRelocation(ObjectRelocEntry{ .m_section = SectionType::Data,
+                                                  .m_offset = 0,
+                                                  .m_symbolName = "target_fn",
+                                                  .m_type = TargetCodeRelocationType::Absolute64,
+                                                  .m_addend = 0 });
+
+        std::vector<uint8_t> elfBytes = elfWriter.write(sections);
+        uint64_t e_shoff = 0;
+        std::memcpy(&e_shoff, &elfBytes[40], 8);
+        uint16_t e_shentsize = 0;
+        std::memcpy(&e_shentsize, &elfBytes[58], 2);
+        uint16_t e_shnum = 0;
+        std::memcpy(&e_shnum, &elfBytes[60], 2);
+        uint16_t e_shstrndx = 0;
+        std::memcpy(&e_shstrndx, &elfBytes[62], 2);
+
+        const uint8_t *shstrHdr = &elfBytes[e_shoff + e_shstrndx * e_shentsize];
+        uint64_t shstrOff = 0;
+        std::memcpy(&shstrOff, shstrHdr + 24, 8);
+
+        uint16_t dataIdx = 0;
+        uint32_t relaDataInfo = 0;
+        bool foundRelaData = false;
+        bool foundRelaText = false;
+        for (uint16_t i = 0; i < e_shnum; ++i)
+        {
+            const uint8_t *sh = &elfBytes[e_shoff + i * e_shentsize];
+            uint32_t sh_name = 0;
+            std::memcpy(&sh_name, sh, 4);
+            std::string name(reinterpret_cast<const char *>(&elfBytes[shstrOff + sh_name]));
+            if (name == ".data")
+                dataIdx = i;
+            if (name == ".rela.data")
+            {
+                foundRelaData = true;
+                std::memcpy(&relaDataInfo, sh + 44, 4);
+            }
+            if (name == ".rela.text")
+                foundRelaText = true;
+        }
+        EXPECT_TRUE(foundRelaData);
+        EXPECT_FALSE(foundRelaText);
+        EXPECT_EQ(relaDataInfo, dataIdx);
+    }
+
+    // Fail-loud on unknown symbol in standard m_relocs (ELF64 & COFF)
+    {
+        Elf64Writer elfWriter;
+        elfWriter.addRelocation(ObjectRelocEntry{ .m_section = SectionType::Text,
+                                                  .m_offset = 0,
+                                                  .m_symbolName = "does_not_exist",
+                                                  .m_type = TargetCodeRelocationType::PCRel32 });
+        EXPECT_THROW(elfWriter.write(sections), std::runtime_error);
+    }
+
+    {
+        std::pmr::unordered_map<SectionType, CodeSection *> coffSections(getAllocator());
+        Helpers::ObjectFormat::CreateCoffSections(coffSections, getAllocator());
+        coffSections[SectionType::Text]->emit8(0xC3);
+        coffSections[SectionType::Text]->finalize();
+
+        CoffWriter coffWriter;
+        coffWriter.addRelocation(ObjectRelocEntry{ .m_section = SectionType::Text,
+                                                   .m_offset = 0,
+                                                   .m_symbolName = "does_not_exist",
+                                                   .m_type = TargetCodeRelocationType::PCRel32 });
+        EXPECT_THROW(coffWriter.write(coffSections), std::runtime_error);
+    }
+}
+
+// Verifies COFF ExtraSectionReloc::m_addend patches section bytes and rejects out-of-bounds offsets.
+TEST_F(EzCodeEmitterTestSuite, TestCoffExtraSectionAddendPatching)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateCoffSections(sections, getAllocator());
+    sections[SectionType::Text]->emit8(0xC3);
+    sections[SectionType::Text]->finalize();
+
+    {
+        CoffWriter coffWriter;
+        coffWriter.addSymbol(ObjectSymbol{ .m_name = "main",
+                                           .m_section = SectionType::Text,
+                                           .m_offset = 0,
+                                           .m_size = 1,
+                                           .m_isGlobal = true,
+                                           .m_isFunction = true });
+
+        ExtraObjectSection sec;
+        sec.m_name = ".debug$S";
+        sec.m_data.resize(12, 0);
+        sec.m_alignment = 4;
+        sec.m_isDebug = true;
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                  .m_targetName = "main",
+                                                  .m_targetIsSection = false,
+                                                  .m_type = TargetCodeRelocationType::SecRel32,
+                                                  .m_addend = 0x1234 });
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 4,
+                                                  .m_targetName = ".text",
+                                                  .m_targetIsSection = true,
+                                                  .m_type = TargetCodeRelocationType::Absolute64,
+                                                  .m_addend = 0x1122334455667788LL });
+        coffWriter.addExtraSection(sec);
+
+        std::vector<uint8_t> coffBytes = coffWriter.write(sections);
+        const uint8_t *shDebugS = &coffBytes[20 + 4 * 40];
+        uint32_t ptrRaw = 0;
+        std::memcpy(&ptrRaw, shDebugS + 20, 4);
+        ASSERT_GT(ptrRaw, 0u);
+
+        int32_t patched32 = 0;
+        int64_t patched64 = 0;
+        std::memcpy(&patched32, &coffBytes[ptrRaw], 4);
+        std::memcpy(&patched64, &coffBytes[ptrRaw + 4], 8);
+        EXPECT_EQ(patched32, 0x1234);
+        EXPECT_EQ(patched64, 0x1122334455667788LL);
+    }
+
+    // Out-of-bounds addend must throw
+    {
+        CoffWriter coffWriter;
+        ExtraObjectSection sec;
+        sec.m_name = ".debug$S";
+        sec.m_data.resize(4, 0);
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 2,
+                                                  .m_targetName = ".text",
+                                                  .m_targetIsSection = true,
+                                                  .m_type = TargetCodeRelocationType::SecRel32,
+                                                  .m_addend = 16 });
+        coffWriter.addExtraSection(sec);
+        EXPECT_THROW(coffWriter.write(sections), std::runtime_error);
+    }
+}
+
+// Verifies COFF IMAGE_SCN_LNK_NRELOC_OVFL when a section has > 65535 relocations.
+TEST_F(EzCodeEmitterTestSuite, TestCoffRelocationOverflowNrelocOvfl)
+{
+    std::pmr::unordered_map<SectionType, CodeSection *> sections(getAllocator());
+    Helpers::ObjectFormat::CreateCoffSections(sections, getAllocator());
+    sections[SectionType::Text]->emit8(0xC3);
+    sections[SectionType::Text]->finalize();
+
+    CoffWriter coffWriter;
+    ExtraObjectSection sec;
+    sec.m_name = ".debug$S";
+    sec.m_data.resize(4, 0);
+    constexpr uint32_t kNumRelocs = 65536;
+    sec.m_relocs.reserve(kNumRelocs);
+    for (uint32_t i = 0; i < kNumRelocs; ++i)
+    {
+        sec.m_relocs.push_back(ExtraSectionReloc{ .m_offset = 0,
+                                                  .m_targetName = ".text",
+                                                  .m_targetIsSection = true,
+                                                  .m_type = TargetCodeRelocationType::SecRel32 });
+    }
+    coffWriter.addExtraSection(sec);
+
+    std::vector<uint8_t> coffBytes = coffWriter.write(sections);
+    const uint8_t *shDebugS = &coffBytes[20 + 4 * 40];
+    uint32_t ptrRelocs = 0;
+    uint16_t numRelocs = 0;
+    uint32_t chars = 0;
+    std::memcpy(&ptrRelocs, shDebugS + 24, 4);
+    std::memcpy(&numRelocs, shDebugS + 32, 2);
+    std::memcpy(&chars, shDebugS + 36, 4);
+
+    EXPECT_NE(chars & 0x01000000u, 0u); // IMAGE_SCN_LNK_NRELOC_OVFL
+    EXPECT_EQ(numRelocs, 0xFFFFu);
+    ASSERT_GT(ptrRelocs, 0u);
+
+    uint32_t ovflCount = 0;
+    uint32_t ovflSym = 1;
+    uint16_t ovflType = 1;
+    std::memcpy(&ovflCount, &coffBytes[ptrRelocs], 4);
+    std::memcpy(&ovflSym, &coffBytes[ptrRelocs + 4], 4);
+    std::memcpy(&ovflType, &coffBytes[ptrRelocs + 8], 2);
+
+    EXPECT_EQ(ovflCount, kNumRelocs + 1);
+    EXPECT_EQ(ovflSym, 0u);
+    EXPECT_EQ(ovflType, 0u);
+}

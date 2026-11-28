@@ -488,8 +488,8 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         emitter->beginFunction(&emitterCtx, func);
 
-        const size_t prologueInstCount = func->getAnalysisData() ? func->getAnalysisData()->m_prologueInstCount : 0;
-        size_t instIdx = 0;
+        bool seenPrologueInst = false;
+        bool emittedPrologueEnd = false;
         uint32_t prologueSize = 0;
         std::vector<EzCore::Debug::DebugLineEntry> fnLineEntries;
 
@@ -535,9 +535,16 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
                     if (emitDebug && debugMeta)
                     {
-                        if (prologueInstCount > 0 && instIdx + 1 == prologueInstCount)
+                        bool isPrologueEnd = false;
+                        if (inst->isPrologue())
                         {
                             prologueSize = static_cast<uint32_t>(textSection->getCurrentOffset() - fnOffset);
+                            seenPrologueInst = true;
+                        }
+                        else if (seenPrologueInst && !emittedPrologueEnd)
+                        {
+                            isPrologueEnd = true;
+                            emittedPrologueEnd = true;
                         }
 
                         SourceReference *srcRef = inst->getSourceRef();
@@ -552,7 +559,6 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                                 const uint32_t col = (srcRef->m_beginOffset >= lr->m_beginOffset)
                                                              ? static_cast<uint32_t>(srcRef->m_beginOffset - lr->m_beginOffset + 1)
                                                              : 1;
-                                const bool isPrologueEnd = (prologueInstCount > 0 && instIdx == prologueInstCount);
                                 const uint64_t relOffset = instStartOffset - fnOffset;
 
                                 if (fnLineEntries.empty())
@@ -583,8 +589,6 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                             }
                         }
                     }
-
-                    ++instIdx;
 
                 }
 
@@ -1056,6 +1060,22 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
                 else if (vb.vregId.has_value() && ad)
                 {
                     auto itLoc = ad->m_vregToLocation.find(*vb.vregId);
+                    if (itLoc == ad->m_vregToLocation.end())
+                    {
+                        // Follow SSA-renamed versions back to their pre-SSA root virtual register ID.
+                        for (const auto &[ssaId, rootId] : ad->m_ssaToRootVreg)
+                        {
+                            if (rootId == *vb.vregId)
+                            {
+                                auto candidate = ad->m_vregToLocation.find(ssaId);
+                                if (candidate != ad->m_vregToLocation.end())
+                                {
+                                    itLoc = candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     if (itLoc != ad->m_vregToLocation.end())
                     {
                         const auto &loc = itLoc->second;

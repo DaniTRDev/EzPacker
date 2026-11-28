@@ -1,6 +1,8 @@
 #include "Debug/CodeViewEmitter.h"
 
+#include <algorithm>
 #include <cstring>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -35,6 +37,7 @@ constexpr uint16_t LF_POINTER = 0x1002;
 constexpr uint16_t LF_PROCEDURE = 0x1008;
 constexpr uint16_t LF_ARGLIST = 0x1201;
 constexpr uint16_t LF_FIELDLIST = 0x1203;
+constexpr uint16_t LF_BITFIELD = 0x1205;
 constexpr uint16_t LF_ENUMERATE = 0x1502;
 constexpr uint16_t LF_ARRAY = 0x1503;
 constexpr uint16_t LF_STRUCTURE = 0x1505;
@@ -276,7 +279,15 @@ class TypeTableBuilder
                 std::vector<uint8_t> flPayload;
                 for (const auto &member : ty->members)
                 {
-                    const uint32_t mType = resolveType(member.typeId);
+                    uint32_t mType = resolveType(member.typeId);
+                    if (member.isBitfield)
+                    {
+                        std::vector<uint8_t> bfRec;
+                        appendU32(bfRec, mType);
+                        appendU8(bfRec, static_cast<uint8_t>(member.bitWidth));
+                        appendU8(bfRec, static_cast<uint8_t>(member.bitOffset));
+                        mType = emitRecord(LF_BITFIELD, bfRec);
+                    }
                     appendU16(flPayload, LF_MEMBER);
                     appendU16(flPayload, 0x0003); // public
                     appendU32(flPayload, mType);
@@ -318,6 +329,26 @@ class TypeTableBuilder
             case EzCore::RttiTypeKind::Typedef:
                 cvIdx = resolveType(ty->referencedTypeId);
                 break;
+            case EzCore::RttiTypeKind::Function:
+            {
+                std::vector<uint8_t> argRec;
+                appendU32(argRec, static_cast<uint32_t>(ty->paramTypeIds.size()));
+                for (uint64_t pTypeId : ty->paramTypeIds)
+                {
+                    appendU32(argRec, resolveType(pTypeId));
+                }
+                const uint32_t argListIdx = emitRecord(LF_ARGLIST, argRec);
+
+                const uint32_t retType = resolveType(ty->returnTypeId);
+                std::vector<uint8_t> procRec;
+                appendU32(procRec, retType);
+                appendU8(procRec, 0); // CV_CALL_NEAR_C
+                appendU8(procRec, 0); // funcattr
+                appendU16(procRec, static_cast<uint16_t>(ty->paramTypeIds.size()));
+                appendU32(procRec, argListIdx);
+                cvIdx = emitRecord(LF_PROCEDURE, procRec);
+                break;
+            }
             default:
                 cvIdx = T_VOID;
                 break;
@@ -383,6 +414,10 @@ class TypeTableBuilder
                 rec.push_back(static_cast<uint8_t>(0xF0U + i));
             }
         }
+        if (rec.size() > 0xFFFDu)
+        {
+            throw std::runtime_error("CodeViewEmitter: type record exceeds 16-bit CV record length limit");
+        }
         appendU16(m_data, static_cast<uint16_t>(rec.size()));
         m_data.insert(m_data.end(), rec.begin(), rec.end());
         return m_nextTypeIndex++;
@@ -418,10 +453,20 @@ class TypeTableBuilder
 
 void emitSymRecord(std::vector<uint8_t> &buf, uint16_t kind, const std::vector<uint8_t> &payload)
 {
-    const uint16_t recLen = static_cast<uint16_t>(2 + payload.size());
+    const size_t rawLen = 2 + payload.size();
+    const size_t pad = (4 - ((2 + rawLen) % 4)) % 4;
+    if (rawLen + pad > 0xFFFFu)
+    {
+        throw std::runtime_error("CodeViewEmitter: symbol record exceeds 16-bit CV record length limit");
+    }
+    const uint16_t recLen = static_cast<uint16_t>(rawLen + pad);
     appendU16(buf, recLen);
     appendU16(buf, kind);
     buf.insert(buf.end(), payload.begin(), payload.end());
+    for (size_t i = 0; i < pad; ++i)
+    {
+        buf.push_back(0);
+    }
 }
 
 void appendC13Subsection(std::vector<uint8_t> &out,
@@ -540,13 +585,27 @@ std::vector<ObjectFormat::ExtraObjectSection> CodeViewEmitter::emit(const EzCore
         appendU16(fileChecksums, 0); // pad to 4 bytes
     };
 
-    if (!cu.mainFile.empty())
-    {
-        registerFileChecksum(0, cu.mainFile);
-    }
+    std::string normMain = cu.mainFile;
+    std::replace(normMain.begin(), normMain.end(), '\\', '/');
+    uint32_t mainFileIdInFiles = 0;
     for (const auto &f : cu.files)
     {
         registerFileChecksum(f.fileId, f.fullPath);
+        if (!normMain.empty() && f.fullPath == normMain && mainFileIdInFiles == 0)
+        {
+            mainFileIdInFiles = f.fileId;
+        }
+    }
+    if (!cu.mainFile.empty())
+    {
+        if (mainFileIdInFiles != 0)
+        {
+            fileIdToChecksumOff[0] = fileIdToChecksumOff[mainFileIdInFiles];
+        }
+        else
+        {
+            registerFileChecksum(0, cu.mainFile);
+        }
     }
 
     // Build DEBUG_S_SYMBOLS

@@ -73,6 +73,7 @@ constexpr uint32_t SCN_TEXT = 0x60500020;  // Code, Execute, Read, Align 16
 constexpr uint32_t SCN_RDATA = 0x40500040; // InitData, Read, Align 16
 constexpr uint32_t SCN_DATA = 0xC0300040;  // InitData, Read, Write, Align 8
 constexpr uint32_t SCN_BSS = 0xC0300080;   // UninitData, Read, Write, Align 8
+constexpr uint32_t COFF_SCN_LNK_NRELOC_OVFL = 0x01000000; // IMAGE_SCN_LNK_NRELOC_OVFL: extended reloc count in first entry.
 
 constexpr uint16_t COFF_REL_AMD64_ADDR64 = 0x0001;  // 64-bit absolute address.
 constexpr uint16_t COFF_REL_AMD64_ADDR32 = 0x0002;  // 32-bit absolute address.
@@ -276,6 +277,9 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
             rec.SectionNumber = itSec->second;
         }
         rec.Type = sym.m_isFunction ? 0x0020 : 0x0000;
+        // Note: PE/COFF weak externals (IMAGE_SYM_CLASS_WEAK_EXTERNAL = 105) require a mandatory 18-byte
+        // auxiliary symbol record pointing to a default/alias symbol index. ObjectSymbol does not carry
+        // an alias target, so weak symbols map to COFF_SYM_CLASS_EXTERNAL / COFF_SYM_CLASS_STATIC here.
         rec.StorageClass = sym.m_isGlobal ? COFF_SYM_CLASS_EXTERNAL : COFF_SYM_CLASS_STATIC;
         rec.NumberOfAuxSymbols = 0;
 
@@ -297,7 +301,12 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
         CoffRelocation r{};
         r.VirtualAddress = static_cast<uint32_t>(reloc.m_offset);
         auto itSym = symIndexMap.find(reloc.m_symbolName);
-        r.SymbolTableIndex = (itSym != symIndexMap.end()) ? itSym->second : 0;
+        if (itSym == symIndexMap.end())
+        {
+            throw std::runtime_error(
+                    std::format("CoffWriter: relocation references unknown symbol '{}'", reloc.m_symbolName));
+        }
+        r.SymbolTableIndex = itSym->second;
         r.Type = mapCoffRelocType(reloc.m_type);
         secInfos[secIdx].relocs.push_back(r);
     }
@@ -368,6 +377,68 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
                 symIdx = itSym->second;
             }
 
+            if (reloc.m_addend != 0)
+            {
+                auto &secData = secInfos[targetSecVecIdx].data;
+                size_t patchBytes = 0;
+                switch (reloc.m_type)
+                {
+                    case TargetCodeRelocationType::Absolute64:
+                        patchBytes = 8;
+                        break;
+                    case TargetCodeRelocationType::Absolute32:
+                    case TargetCodeRelocationType::PCRel32:
+                    case TargetCodeRelocationType::BranchRel32:
+                    case TargetCodeRelocationType::PLTRel32:
+                    case TargetCodeRelocationType::GOTPCREL:
+                    case TargetCodeRelocationType::SecRel32:
+                        patchBytes = 4;
+                        break;
+                    case TargetCodeRelocationType::SectionIdx16:
+                        patchBytes = 2;
+                        break;
+                    default:
+                        throw std::runtime_error(std::format(
+                                "CoffWriter: extra section '{}' relocation at offset {} has non-zero addend {} for unsupported type",
+                                extra.m_name,
+                                reloc.m_offset,
+                                reloc.m_addend));
+                }
+
+                if (reloc.m_offset > secData.size() || patchBytes > secData.size() - reloc.m_offset)
+                {
+                    throw std::runtime_error(std::format(
+                            "CoffWriter: extra section '{}' relocation at offset {} (width {}) with addend {} exceeds section size {}",
+                            extra.m_name,
+                            reloc.m_offset,
+                            patchBytes,
+                            reloc.m_addend,
+                            secData.size()));
+                }
+
+                if (patchBytes == 8)
+                {
+                    int64_t val = 0;
+                    std::memcpy(&val, secData.data() + reloc.m_offset, 8);
+                    val += reloc.m_addend;
+                    std::memcpy(secData.data() + reloc.m_offset, &val, 8);
+                }
+                else if (patchBytes == 4)
+                {
+                    int32_t val = 0;
+                    std::memcpy(&val, secData.data() + reloc.m_offset, 4);
+                    val += static_cast<int32_t>(reloc.m_addend);
+                    std::memcpy(secData.data() + reloc.m_offset, &val, 4);
+                }
+                else
+                {
+                    int16_t val = 0;
+                    std::memcpy(&val, secData.data() + reloc.m_offset, 2);
+                    val += static_cast<int16_t>(reloc.m_addend);
+                    std::memcpy(secData.data() + reloc.m_offset, &val, 2);
+                }
+            }
+
             CoffRelocation r{};
             r.VirtualAddress = static_cast<uint32_t>(reloc.m_offset);
             r.SymbolTableIndex = symIdx;
@@ -434,15 +505,21 @@ std::vector<uint8_t> CoffWriter::write(const std::pmr::unordered_map<SectionType
         auto &info = secInfos[i];
         auto &hdr = sectionHeaders[i];
 
-        if (info.relocs.size() > 65535)
+        if (info.relocs.size() >= 0xFFFF)
         {
-            throw std::runtime_error(std::format(
-                    "CoffWriter: section '{}' has {} relocations (exceeds COFF 16-bit limit of 65535)",
-                    info.name,
-                    info.relocs.size()));
-        }
+            hdr.Characteristics |= COFF_SCN_LNK_NRELOC_OVFL;
+            CoffRelocation ovfl{};
+            ovfl.VirtualAddress = static_cast<uint32_t>(info.relocs.size() + 1);
+            ovfl.SymbolTableIndex = 0;
+            ovfl.Type = 0;
+            info.relocs.insert(info.relocs.begin(), ovfl);
 
-        if (!info.relocs.empty())
+            currentOffset = static_cast<uint32_t>(alignTo(currentOffset, 4));
+            hdr.PointerToRelocations = currentOffset;
+            hdr.NumberOfRelocations = 0xFFFF;
+            currentOffset += static_cast<uint32_t>(info.relocs.size() * sizeof(CoffRelocation));
+        }
+        else if (!info.relocs.empty())
         {
             currentOffset = static_cast<uint32_t>(alignTo(currentOffset, 4));
             hdr.PointerToRelocations = currentOffset;
