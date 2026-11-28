@@ -66,4 +66,11 @@ EzPacker_AddTest(
         "tests/T_CFrontendEndToEnd.cpp"
 )
 
+EzPacker_AddTest(
+        "T_DebugInfoEmission"
+        "EzCompilerTestSuite"
+        ""
+        "tests/T_DebugInfoEmission.cpp"
+)
+
 

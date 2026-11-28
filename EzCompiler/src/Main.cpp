@@ -86,6 +86,8 @@ int runCompiler(int argc, char **argv)
         return EzCli::kError;
     }
 
+    pipeline.writeTelemetryIfRequested();
+
     return EzCli::kSuccess;
 }
 

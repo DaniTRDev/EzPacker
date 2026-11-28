@@ -24,6 +24,7 @@ struct ChibiccParseResult
     bool success{ false };
     std::string errorMessage;
     struct Obj *astRoot{ nullptr }; // Linked list of Obj (functions and globals)
+    std::string virtualFileName;    // Optional virtual display name when parsed from memory
 };
 
 /**

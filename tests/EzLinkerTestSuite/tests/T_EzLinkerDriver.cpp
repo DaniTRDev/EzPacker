@@ -356,3 +356,26 @@ TEST_F(EzLinkerTestSuite, TestHostedWindowsLdAndLinuxDriverArgs)
         EXPECT_FALSE(hasArg("-lc"));
     }
 }
+
+TEST_F(EzLinkerTestSuite, TestMsvcEmitDebugInfoFlag)
+{
+    EzLinker::EzLinkerDriver driver;
+    EzLinker::DetectedLinker msvcLinker;
+    msvcLinker.kind = EzLinker::SystemLinkerKind::MsvcLink;
+    msvcLinker.path = "link.exe";
+
+    EzLinker::LinkerOptions opts;
+    opts.targetTriple = "x86_64-pc-windows-msvc";
+    opts.inputFiles = { "main.obj" };
+    opts.outputFile = "app.exe";
+    opts.noDefaultLibs = true;
+    opts.emitDebugInfo = true;
+    opts.dryRun = true;
+
+    auto args = driver.buildLinkerArguments(opts, msvcLinker);
+    EXPECT_NE(std::find(args.begin(), args.end(), "/DEBUG"), args.end());
+
+    opts.emitDebugInfo = false;
+    auto argsNoDbg = driver.buildLinkerArguments(opts, msvcLinker);
+    EXPECT_EQ(std::find(argsNoDbg.begin(), argsNoDbg.end(), "/DEBUG"), argsNoDbg.end());
+}

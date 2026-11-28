@@ -4,6 +4,19 @@
 #include "EzMirCommon.h"
 #include "MirFunctionRegisterInfo.h"
 #include "HelperClasses/IntrusiveLinkedList.h"
+#include <unordered_map>
+
+/**
+ * Records the final register or stack spill assignment for a virtual register,
+ * populated by MirRegisterAllocator for debug location generation.
+ */
+struct MirFunctionDebugLocation
+{
+    bool isSpill{ false };
+    uint32_t physRegId{ 0 };
+    bool isFpr{ false };
+    size_t spillSlotId{ 0 };
+};
 
 /**
  * Compiler pass analysis metrics collected during lowering and optimization pipelines.
@@ -18,6 +31,12 @@ struct MirFunctionAnalysisData
 
     // Total aligned stack payload size allocated during the prologue.
     size_t m_totalFrameSize = 0; // Set by FrameLowererPass.
+
+    // Number of machine instructions emitted in the function prologue.
+    size_t m_prologueInstCount{ 0 }; // Set by FrameLowererPass.
+
+    // Final register/spill location per virtual register ID for debug variable tracking.
+    std::unordered_map<MirId, MirFunctionDebugLocation> m_vregToLocation;
 };
 
 /**

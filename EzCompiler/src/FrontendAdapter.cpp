@@ -1,8 +1,11 @@
 #include "FrontendAdapter.h"
 #include "CFrontend/CFrontendAdapter.h"
+#include "Debug/MirDebugMetadata.h"
 #include "DriverContext.h"
 #include "Function/MirFunction.h"
 #include "Function/MirFunctionBuilder.h"
+#include "Function/MirFunctionStackFrame.h"
+#include "GlobalVar/MirGlobalVar.h"
 #include "Block/MirBlock.h"
 #include "Block/MirBlockBuilder.h"
 #include "Instruction/MirInstructionBuilder.h"
@@ -12,6 +15,7 @@
 #include "FlexNumber/FlexInt.h"
 #include "Parser/MirParser.h"
 #include <fstream>
+#include <unordered_map>
 
 namespace EzCompiler
 {
@@ -148,6 +152,192 @@ bool MirModuleLoader::loadMirFile(DriverContext &ctx, std::string_view mirPath, 
     {
         ctx.getDiagCollector()->error("EzCompiler", "Failed to parse MIR file: {}", mirPath);
         return false;
+    }
+
+    if (ctx.getOptions().emitDebugInfo())
+    {
+        MirDebugMetadata *meta = outMirCtx.getOrCreateDebugMetadata();
+        meta->compileUnit.language = EzCore::Debug::DebugLanguage::Mir;
+        meta->compileUnit.level = ctx.getOptions().debugLevel;
+        std::error_code cwdEc;
+        meta->compileUnit.compDir = std::filesystem::current_path(cwdEc).string();
+        meta->compileUnit.mainFile = std::string(mirPath);
+        meta->compileUnit.arch = ctx.getOptions().target.isRiscV()
+                                         ? EzCore::Debug::DebugCompileUnit::TargetArch::RiscV64
+                                         : EzCore::Debug::DebugCompileUnit::TargetArch::X86_64;
+        meta->compileUnit.pointerSize = 8;
+        meta->compileUnit.isLittleEndian = true;
+        meta->compileUnit.addOrGetFile(mirPath);
+
+        std::unordered_map<const MirType *, uint64_t> visitedTypes;
+        uint64_t nextTypeId = 1;
+
+        auto debugLocFromRef = [&](SourceReference *ref) -> EzCore::Debug::DebugSourceLoc {
+            EzCore::Debug::DebugSourceLoc loc;
+            if (!ref || ref->m_sourceFileId == 0)
+            {
+                return loc;
+            }
+            std::string_view fname = ctx.getSourceManager()->getSourceName(ref->m_sourceFileId);
+            loc.fileId = meta->compileUnit.addOrGetFile(fname);
+            if (const SourceLineRange *lr = ctx.getSourceManager()->getReferenceLine(ref))
+            {
+                loc.line = static_cast<uint32_t>(lr->m_lineNumber);
+                loc.column = static_cast<uint32_t>(ref->m_beginOffset - lr->m_beginOffset + 1);
+            }
+            return loc;
+        };
+
+        std::function<uint64_t(const MirType *)> registerMirType = [&](const MirType *ty) -> uint64_t {
+            if (!ty || ty->getKind() == MirTypeKind::Void)
+            {
+                return 0;
+            }
+            if (auto it = visitedTypes.find(ty); it != visitedTypes.end())
+            {
+                return it->second;
+            }
+
+            const uint64_t typeId = nextTypeId++;
+            visitedTypes[ty] = typeId;
+
+            EzCore::Debug::DebugType dt;
+            dt.typeId = typeId;
+            dt.name = std::string(ty->getName());
+            dt.sizeInBytes = ty->getTotalSizeInBytes();
+            dt.alignment = static_cast<uint32_t>(std::max<size_t>(1, ty->getMaxAlignmentInBits() / 8));
+
+            const auto &subs = ty->getSubTypes();
+            switch (ty->getKind())
+            {
+                case MirTypeKind::Integer:
+                    if (ty->getTotalSizeInBits() == 1)
+                    {
+                        dt.kind = EzCore::RttiTypeKind::Boolean;
+                        dt.encoding = EzCore::Debug::DebugBaseEncoding::Boolean;
+                    }
+                    else
+                    {
+                        dt.kind = EzCore::RttiTypeKind::SignedInt;
+                        dt.encoding = EzCore::Debug::DebugBaseEncoding::Signed;
+                    }
+                    break;
+                case MirTypeKind::FloatingPoint:
+                    dt.kind = EzCore::RttiTypeKind::Float;
+                    dt.encoding = EzCore::Debug::DebugBaseEncoding::Float;
+                    break;
+                case MirTypeKind::Pointer:
+                    dt.kind = EzCore::RttiTypeKind::Pointer;
+                    dt.referencedTypeId = subs.empty() ? 0 : registerMirType(subs[0]);
+                    if (dt.sizeInBytes == 0)
+                        dt.sizeInBytes = 8;
+                    break;
+                case MirTypeKind::Array:
+                    dt.kind = EzCore::RttiTypeKind::Array;
+                    dt.referencedTypeId = subs.empty() ? 0 : registerMirType(subs[0]);
+                    if (!subs.empty() && subs[0] && subs[0]->getTotalSizeInBytes() > 0)
+                    {
+                        dt.arrayLength = dt.sizeInBytes / subs[0]->getTotalSizeInBytes();
+                    }
+                    break;
+                case MirTypeKind::Vector:
+                    dt.kind = EzCore::RttiTypeKind::Vector;
+                    dt.referencedTypeId = subs.empty() ? 0 : registerMirType(subs[0]);
+                    if (!subs.empty() && subs[0] && subs[0]->getTotalSizeInBytes() > 0)
+                    {
+                        dt.arrayLength = dt.sizeInBytes / subs[0]->getTotalSizeInBytes();
+                    }
+                    break;
+                case MirTypeKind::Function:
+                    dt.kind = EzCore::RttiTypeKind::Function;
+                    if (!subs.empty())
+                    {
+                        dt.returnTypeId = registerMirType(subs[0]);
+                        for (size_t i = 1; i < subs.size(); ++i)
+                        {
+                            dt.paramTypeIds.push_back(registerMirType(subs[i]));
+                        }
+                    }
+                    break;
+                default:
+                    dt.kind = EzCore::RttiTypeKind::Unknown;
+                    break;
+            }
+
+            meta->compileUnit.addType(std::move(dt));
+            return typeId;
+        };
+
+        for (MirGlobalVar *gv : outMirCtx.getGlobalVars())
+        {
+            if (!gv)
+            {
+                continue;
+            }
+            MirDebugGlobalBinding gBind;
+            gBind.gvarId = gv->getId();
+            gBind.name = std::string(gv->getName());
+            gBind.typeId = registerMirType(gv->getType());
+            gBind.declLoc = debugLocFromRef(gv->getSourceRef());
+            gBind.isExternal = (gv->getLinkage() != MirLinkage::Internal);
+            gBind.isConstant = gv->isConstant();
+            meta->globalBindings.push_back(std::move(gBind));
+        }
+
+        for (MirFunction *fn : outMirCtx.getFunctions())
+        {
+            if (!fn)
+            {
+                continue;
+            }
+            MirDebugFuncBinding fBind;
+            fBind.funcId = fn->getId();
+            fBind.name = std::string(fn->getName());
+            fBind.returnTypeId = registerMirType(fn->getReturnType());
+            fBind.declLoc = debugLocFromRef(fn->getSourceRef());
+            fBind.isExternal = (fn->getLinkage() != MirLinkage::Internal);
+            meta->funcBindings.push_back(std::move(fBind));
+
+            uint32_t paramIdx = 0;
+            for (MirRegister *param : fn->getParameters())
+            {
+                if (!param)
+                {
+                    continue;
+                }
+                MirDebugVarBinding vBind;
+                vBind.funcName = std::string(fn->getName());
+                vBind.varName = param->getName().empty() ? ("arg" + std::to_string(paramIdx))
+                                                         : std::string(param->getName());
+                vBind.typeId = registerMirType(param->getMirType());
+                vBind.isParameter = true;
+                vBind.paramIndex = paramIdx;
+                vBind.declLoc = fBind.declLoc;
+                vBind.vregId = param->getRef().getId();
+                meta->varBindings.push_back(std::move(vBind));
+                ++paramIdx;
+            }
+
+            if (fn->getStackFrame())
+            {
+                size_t localIdx = 0;
+                for (StackFrameObject *obj : fn->getStackFrame()->getObjects())
+                {
+                    if (!obj || obj->m_source != StackFrameObjectSource::Variable)
+                    {
+                        continue;
+                    }
+                    MirDebugVarBinding vBind;
+                    vBind.funcName = std::string(fn->getName());
+                    vBind.varName = "local_" + std::to_string(localIdx++);
+                    vBind.typeId = registerMirType(obj->m_type);
+                    vBind.isParameter = false;
+                    vBind.declLoc = fBind.declLoc;
+                    vBind.stackObjId = obj->m_id;
+                    meta->varBindings.push_back(std::move(vBind));
+                }
+            }
+        }
     }
 
     return true;

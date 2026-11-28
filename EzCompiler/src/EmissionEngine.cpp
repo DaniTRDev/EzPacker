@@ -2,9 +2,19 @@
 
 #include "DriverContext.h"
 
+#include "PipelineTelemetry.h"
+
 #include "Builder/MirBuilderContext.h"
 
+#include "Debug/MirDebugMetadata.h"
+
+#include "Debug/IDebugInfoEmitter.h"
+
 #include "Function/MirFunction.h"
+
+#include "Function/MirFunctionStackFrame.h"
+
+#include "Function/CallingConvDesc.h"
 
 #include "Block/MirBlock.h"
 
@@ -29,6 +39,8 @@
 #include "ObjectFormat/CoffWriter.h"
 
 #include "Operand/MirOperands.h"
+
+#include "Operand/MirRegisterBank.h"
 
 #include "GlobalVar/MirGlobalVar.h"
 
@@ -171,6 +183,25 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
     funcById.reserve(mirCtx.getFunctions().size());
 
     gvarById.reserve(mirCtx.getGlobalVars().size());
+
+    const bool emitDebug = m_ctx.getOptions().emitDebugInfo();
+    MirDebugMetadata *debugMeta = emitDebug ? mirCtx.getOrCreateDebugMetadata() : nullptr;
+
+    struct EmittedGlobalDebug
+    {
+        std::string sectionName;
+        uint64_t sectionOffset{ 0 };
+        uint64_t sizeInBytes{ 0 };
+    };
+    struct EmittedFuncDebug
+    {
+        uint64_t sectionOffset{ 0 };
+        uint64_t codeSize{ 0 };
+        uint32_t prologueSize{ 0 };
+        std::vector<EzCore::Debug::DebugLineEntry> lineEntries;
+    };
+    std::unordered_map<MirId, EmittedGlobalDebug> emittedGlobals;
+    std::unordered_map<MirId, EmittedFuncDebug> emittedFuncs;
 
 
 
@@ -395,6 +426,22 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
                             .m_isFunction = false });
 
+        if (emitDebug)
+        {
+            std::string secName = ".data";
+            if (targetSecType == SectionType::ReadOnly)
+            {
+                secName = ".rodata";
+            }
+            else if (targetSecType == SectionType::NonInitialized)
+            {
+                secName = ".bss";
+            }
+            emittedGlobals[gvar->getId()] = { .sectionName = std::move(secName),
+                                              .sectionOffset = gvOffset,
+                                              .sizeInBytes = gvSize };
+        }
+
     }
 
 
@@ -441,7 +488,10 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         emitter->beginFunction(&emitterCtx, func);
 
-
+        const size_t prologueInstCount = func->getAnalysisData() ? func->getAnalysisData()->m_prologueInstCount : 0;
+        size_t instIdx = 0;
+        uint32_t prologueSize = 0;
+        std::vector<EzCore::Debug::DebugLineEntry> fnLineEntries;
 
         for (MirBlock *block : func->getBlocks())
 
@@ -475,11 +525,66 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
                 {
 
+                    const uint64_t instStartOffset = textSection->getCurrentOffset();
+
                     // getOperands() exposes const pointers; emitInst accepts that const span directly.
 
                     const auto &ops = inst->getOperands();
 
                     emitter->emitInst(inst->getTargetDesc(), std::span<MirOperand *const>(ops.data(), ops.size()));
+
+                    if (emitDebug && debugMeta)
+                    {
+                        if (prologueInstCount > 0 && instIdx + 1 == prologueInstCount)
+                        {
+                            prologueSize = static_cast<uint32_t>(textSection->getCurrentOffset() - fnOffset);
+                        }
+
+                        SourceReference *srcRef = inst->getSourceRef();
+                        if (srcRef && srcRef->m_sourceFileId != 0 && m_ctx.getSourceManager())
+                        {
+                            std::string_view fname = m_ctx.getSourceManager()->getSourceName(srcRef->m_sourceFileId);
+                            const uint32_t dbgFileId = debugMeta->compileUnit.addOrGetFile(fname);
+                            const SourceLineRange *lr = m_ctx.getSourceManager()->getReferenceLine(srcRef);
+                            if (dbgFileId != 0 && lr && lr->m_lineNumber > 0)
+                            {
+                                const uint32_t line = static_cast<uint32_t>(lr->m_lineNumber);
+                                const uint32_t col = (srcRef->m_beginOffset >= lr->m_beginOffset)
+                                                             ? static_cast<uint32_t>(srcRef->m_beginOffset - lr->m_beginOffset + 1)
+                                                             : 1;
+                                const bool isPrologueEnd = (prologueInstCount > 0 && instIdx == prologueInstCount);
+                                const uint64_t relOffset = instStartOffset - fnOffset;
+
+                                if (fnLineEntries.empty())
+                                {
+                                    fnLineEntries.push_back({ .codeOffset = relOffset,
+                                                              .fileId = dbgFileId,
+                                                              .line = line,
+                                                              .column = col,
+                                                              .isStmt = true,
+                                                              .prologueEnd = isPrologueEnd,
+                                                              .epilogueBegin = false });
+                                }
+                                else
+                                {
+                                    auto &prev = fnLineEntries.back();
+                                    if (prev.fileId != dbgFileId || prev.line != line || prev.column != col ||
+                                        (isPrologueEnd && !prev.prologueEnd))
+                                    {
+                                        fnLineEntries.push_back({ .codeOffset = relOffset,
+                                                                  .fileId = dbgFileId,
+                                                                  .line = line,
+                                                                  .column = col,
+                                                                  .isStmt = true,
+                                                                  .prologueEnd = isPrologueEnd,
+                                                                  .epilogueBegin = false });
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    ++instIdx;
 
                 }
 
@@ -492,6 +597,14 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
         emitter->endFunction(&emitterCtx, func);
 
         uint64_t fnSize = textSection->getCurrentOffset() - fnOffset;
+
+        if (emitDebug)
+        {
+            emittedFuncs[func->getId()] = { .sectionOffset = fnOffset,
+                                            .codeSize = fnSize,
+                                            .prologueSize = prologueSize,
+                                            .lineEntries = std::move(fnLineEntries) };
+        }
 
 
 
@@ -805,6 +918,236 @@ bool EmissionEngine::emitModule(MirBuilderContext &mirCtx, std::string_view outp
 
         writer->addRelocation(reloc);
 
+    }
+
+    if (emitDebug && debugMeta)
+    {
+        auto &cu = debugMeta->compileUnit;
+        cu.level = m_ctx.getOptions().debugLevel;
+        cu.arch = m_ctx.getOptions().target.isRiscV()
+                          ? EzCore::Debug::DebugCompileUnit::TargetArch::RiscV64
+                          : EzCore::Debug::DebugCompileUnit::TargetArch::X86_64;
+        cu.pointerSize = 8;
+        cu.isLittleEndian = true;
+        if (cu.compDir.empty())
+        {
+            std::error_code cwdEc;
+            cu.compDir = std::filesystem::current_path(cwdEc).string();
+        }
+        if (cu.mainFile.empty())
+        {
+            cu.mainFile = m_ctx.getOptions().inputFilePath;
+        }
+        if (!cu.mainFile.empty())
+        {
+            cu.addOrGetFile(cu.mainFile);
+        }
+
+        cu.functions.clear();
+        for (MirFunction *func : mirCtx.getFunctions())
+        {
+            if (!func || func->isDeclaration())
+            {
+                continue;
+            }
+            auto itFn = emittedFuncs.find(func->getId());
+            if (itFn == emittedFuncs.end())
+            {
+                continue;
+            }
+
+            const MirDebugFuncBinding *fBind = nullptr;
+            for (const auto &b : debugMeta->funcBindings)
+            {
+                if (b.funcId == func->getId() || b.name == std::string_view(func->getName()))
+                {
+                    fBind = &b;
+                    break;
+                }
+            }
+
+            EzCore::Debug::DebugFunction df;
+            df.name = std::string(func->getName());
+            df.returnTypeId = fBind ? fBind->returnTypeId : 0;
+            df.declLoc = fBind ? fBind->declLoc : EzCore::Debug::DebugSourceLoc{};
+            if (df.declLoc.fileId == 0 && !cu.files.empty())
+            {
+                df.declLoc.fileId = cu.files.front().fileId;
+            }
+            df.sectionOffset = itFn->second.sectionOffset;
+            df.codeSize = itFn->second.codeSize;
+            df.prologueSize = itFn->second.prologueSize;
+            df.isExternal = (func->getLinkage() != MirLinkage::Internal);
+            CallingConvDesc *cc = func->getCallingConv();
+            df.hasFramePointer = cc ? cc->hasFramePointer(func) : true;
+            auto *ad = func->getAnalysisData();
+            df.totalFrameSize = ad ? static_cast<int64_t>(ad->m_totalFrameSize) : 0;
+
+            // Record callee-saved register spill offsets for CFI/unwind generation.
+            if (cu.arch == EzCore::Debug::DebugCompileUnit::TargetArch::RiscV64 && df.hasFramePointer)
+            {
+                df.savedRegs.push_back({ .regId = 1, .isFpr = false, .cfaOffset = -8 });  // ra
+                df.savedRegs.push_back({ .regId = 8, .isFpr = false, .cfaOffset = -16 }); // s0/fp
+                int64_t cfaOff = -16 - df.totalFrameSize;
+                for (const MirRegisterRef &regRef : func->getUsedCalleeSavedRegs())
+                {
+                    if (regRef.getId() == 8)
+                    {
+                        continue;
+                    }
+                    cfaOff -= 16;
+                    bool isFpr = (regRef.getClass() && regRef.getClass()->getBank() &&
+                                  std::string_view(regRef.getClass()->getBank()->getName()).find("FPR") !=
+                                          std::string_view::npos);
+                    df.savedRegs.push_back({ .regId = static_cast<uint32_t>(regRef.getId()),
+                                             .isFpr = isFpr,
+                                             .cfaOffset = cfaOff });
+                }
+            }
+            else if (cu.arch == EzCore::Debug::DebugCompileUnit::TargetArch::X86_64 && df.hasFramePointer)
+            {
+                df.savedRegs.push_back({ .regId = 5, .isFpr = false, .cfaOffset = -16 }); // rbp
+                int64_t cfaOff = -16 - df.totalFrameSize;
+                for (const MirRegisterRef &regRef : func->getUsedCalleeSavedRegs())
+                {
+                    if (regRef.getId() == 5)
+                    {
+                        continue;
+                    }
+                    cfaOff -= 8;
+                    bool isFpr = (regRef.getClass() && regRef.getClass()->getBank() &&
+                                  std::string_view(regRef.getClass()->getBank()->getName()).find("FPR") !=
+                                          std::string_view::npos);
+                    df.savedRegs.push_back({ .regId = static_cast<uint32_t>(regRef.getId()),
+                                             .isFpr = isFpr,
+                                             .cfaOffset = cfaOff });
+                }
+            }
+
+            // Resolve parameter & local variable locations.
+            for (const auto &vb : debugMeta->varBindings)
+            {
+                if (vb.funcName != df.name)
+                {
+                    continue;
+                }
+                EzCore::Debug::DebugVariable dv;
+                dv.name = vb.varName;
+                dv.typeId = vb.typeId;
+                dv.isParameter = vb.isParameter;
+                dv.paramIndex = vb.paramIndex;
+                dv.declLoc = vb.declLoc;
+                if (dv.declLoc.fileId == 0 && df.declLoc.fileId != 0)
+                {
+                    dv.declLoc.fileId = df.declLoc.fileId;
+                }
+                dv.scopeStartOffset = 0;
+                dv.scopeEndOffset = df.codeSize;
+
+                if (vb.stackObjId.has_value() && func->getStackFrame())
+                {
+                    if (StackFrameObject *obj = func->getStackFrame()->getObjectFromId(*vb.stackObjId))
+                    {
+                        dv.location.kind = df.hasFramePointer ? EzCore::Debug::DebugLocationKind::FrameBaseOffset
+                                                              : EzCore::Debug::DebugLocationKind::StackPointerOffset;
+                        dv.location.offset = obj->m_offset;
+                    }
+                }
+                else if (vb.vregId.has_value() && ad)
+                {
+                    auto itLoc = ad->m_vregToLocation.find(*vb.vregId);
+                    if (itLoc != ad->m_vregToLocation.end())
+                    {
+                        const auto &loc = itLoc->second;
+                        if (loc.isSpill && func->getStackFrame())
+                        {
+                            if (StackFrameObject *obj = func->getStackFrame()->getObjectFromId(loc.spillSlotId))
+                            {
+                                dv.location.kind = df.hasFramePointer
+                                                           ? EzCore::Debug::DebugLocationKind::FrameBaseOffset
+                                                           : EzCore::Debug::DebugLocationKind::StackPointerOffset;
+                                dv.location.offset = obj->m_offset;
+                            }
+                        }
+                        else if (!loc.isSpill)
+                        {
+                            dv.location.kind = EzCore::Debug::DebugLocationKind::Register;
+                            dv.location.regId = loc.physRegId;
+                            dv.location.isFpr = loc.isFpr;
+                        }
+                    }
+                }
+
+                if (dv.isParameter)
+                {
+                    df.parameters.push_back(std::move(dv));
+                }
+                else
+                {
+                    df.locals.push_back(std::move(dv));
+                }
+            }
+
+            df.lineEntries = itFn->second.lineEntries;
+            cu.functions.push_back(std::move(df));
+        }
+
+        cu.globals.clear();
+        for (const auto &gb : debugMeta->globalBindings)
+        {
+            auto itGv = emittedGlobals.find(gb.gvarId);
+            if (itGv == emittedGlobals.end())
+            {
+                continue;
+            }
+            EzCore::Debug::DebugGlobalVar dg;
+            dg.name = gb.name;
+            dg.typeId = gb.typeId;
+            dg.declLoc = gb.declLoc;
+            dg.isExternal = gb.isExternal;
+            dg.isConstant = gb.isConstant;
+            dg.sizeInBytes = itGv->second.sizeInBytes;
+            dg.sectionName = itGv->second.sectionName;
+            dg.sectionOffset = itGv->second.sectionOffset;
+            cu.globals.push_back(std::move(dg));
+        }
+
+        const bool isCoff = (binDesc->getObjectFormat() == TargetObjectFormat::COFF);
+        auto dbgEmitter = EzCodeEmitter::Debug::createDebugInfoEmitter(m_ctx.getOptions().debugFormat, isCoff);
+        std::vector<EzCodeEmitter::ObjectFormat::ExtraObjectSection> dbgSections = dbgEmitter->emit(cu);
+        std::vector<std::string> emittedSectionNames;
+        emittedSectionNames.reserve(dbgSections.size());
+        for (auto &sec : dbgSections)
+        {
+            emittedSectionNames.push_back(sec.m_name);
+            writer->addExtraSection(std::move(sec));
+        }
+
+        if (PipelineTelemetry *telemetry = m_ctx.getPipelineTelemetry())
+        {
+            DebugInfoTelemetry dbgTel;
+            dbgTel.enabled = true;
+            if (m_ctx.getOptions().debugFormat == EzCore::Debug::DebugFormat::CodeView ||
+                (m_ctx.getOptions().debugFormat == EzCore::Debug::DebugFormat::Auto && isCoff))
+            {
+                dbgTel.format = "CodeView";
+            }
+            else
+            {
+                dbgTel.format = "Dwarf5";
+            }
+            dbgTel.level = (cu.level == EzCore::Debug::DebugLevel::LineTablesOnly) ? "LineTablesOnly" : "Full";
+            dbgTel.fileCount = cu.files.size();
+            dbgTel.typeCount = cu.types.size();
+            dbgTel.functionCount = cu.functions.size();
+            dbgTel.globalCount = cu.globals.size();
+            for (const auto &fn : cu.functions)
+            {
+                dbgTel.lineEntryCount += fn.lineEntries.size();
+            }
+            dbgTel.emittedSections = std::move(emittedSectionNames);
+            telemetry->setDebugInfo(std::move(dbgTel));
+        }
     }
 
     std::vector<uint8_t> outputBytes = writer->write(sections);

@@ -390,6 +390,7 @@ ChibiccParseResult ChibiccWrapper::parseString(std::string_view sourceCode, std:
     }
 
     auto res = parseFile(tempFile.string());
+    res.virtualFileName = std::string(virtualFileName);
     std::filesystem::remove(tempFile, ec);
     return res;
 }

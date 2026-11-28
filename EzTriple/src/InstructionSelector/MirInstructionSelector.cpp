@@ -100,6 +100,8 @@ bool MirInstructionSelector::selectBlock(MirBuilderContext *ctx, MirBlock *block
 
         if (!curr->isSelected() && curr->getTargetDesc() == nullptr)
         {
+            MirInstruction *after = curr->getNext();
+            SourceReference *origRef = curr->getSourceRef();
             if (!select(ctx, curr))
             {
                 ctx->getDiagCollector()->error("MirInstructionSelector",
@@ -107,6 +109,18 @@ bool MirInstructionSelector::selectBlock(MirBuilderContext *ctx, MirBlock *block
                                                curr->getOpCodeName())
                         << curr->getSourceRef();
                 return false;
+            }
+            if (origRef)
+            {
+                MirInstruction *scan = after ? after->getPrev() : block->back();
+                while (scan && scan != prev)
+                {
+                    if (!scan->getSourceRef())
+                    {
+                        scan->setSourceRef(origRef);
+                    }
+                    scan = scan->getPrev();
+                }
             }
         }
 

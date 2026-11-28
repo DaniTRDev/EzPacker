@@ -361,6 +361,7 @@ struct Type {
   // Declaration
   Token *name;
   Token *name_pos;
+  Token *tag_name;
 
   // Array
   int array_len;

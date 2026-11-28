@@ -222,6 +222,8 @@ size_t MirInstruction::getOperandCount() const { return m_operands.size(); }
  */
 SourceReference *MirInstruction::getSourceRef() const { return m_sourceRef; }
 
+void MirInstruction::setSourceRef(SourceReference *ref) { m_sourceRef = ref; }
+
 /**
  * Returns const reference to the operand list.
  */

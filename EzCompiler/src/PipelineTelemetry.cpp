@@ -241,6 +241,23 @@ std::string PipelineTelemetry::toJson() const
 
         ss << "    }" << (++fnIdx < m_functions.size() ? "," : "") << "\n";
     }
+    ss << "  },\n";
+    ss << "  \"debugInfo\": {\n";
+    ss << "    \"enabled\": " << (m_debugInfo.enabled ? "true" : "false") << ",\n";
+    ss << "    \"format\": \"" << escapeJson(m_debugInfo.format) << "\",\n";
+    ss << "    \"level\": \"" << escapeJson(m_debugInfo.level) << "\",\n";
+    ss << "    \"fileCount\": " << m_debugInfo.fileCount << ",\n";
+    ss << "    \"typeCount\": " << m_debugInfo.typeCount << ",\n";
+    ss << "    \"functionCount\": " << m_debugInfo.functionCount << ",\n";
+    ss << "    \"globalCount\": " << m_debugInfo.globalCount << ",\n";
+    ss << "    \"lineEntryCount\": " << m_debugInfo.lineEntryCount << ",\n";
+    ss << "    \"emittedSections\": [";
+    for (size_t si = 0; si < m_debugInfo.emittedSections.size(); ++si)
+    {
+        ss << "\"" << escapeJson(m_debugInfo.emittedSections[si]) << "\""
+           << (si + 1 < m_debugInfo.emittedSections.size() ? ", " : "");
+    }
+    ss << "]\n";
     ss << "  }\n";
     ss << "}\n";
 

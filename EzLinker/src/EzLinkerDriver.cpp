@@ -301,6 +301,10 @@ std::string EzLinkerDriver::buildCommandLineString(const std::filesystem::path &
 void EzLinkerDriver::appendMsvcArgs(const LinkerOptions &opts, std::vector<std::string> &args) const
 {
     args.push_back("/nologo");
+    if (opts.emitDebugInfo)
+    {
+        args.push_back("/DEBUG");
+    }
 
     std::string outPath = opts.outputFile.empty() ? "a.exe" : opts.outputFile;
     args.push_back("/out:" + outPath);

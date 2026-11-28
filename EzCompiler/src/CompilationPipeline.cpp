@@ -138,6 +138,7 @@ CompilationPipeline::CompilationPipeline(DriverContext &ctx) : m_ctx(ctx)
     if (!m_ctx.getOptions().pipelineDumpJsonPath.empty())
     {
         m_telemetry = std::make_unique<PipelineTelemetry>();
+        m_ctx.setPipelineTelemetry(m_telemetry.get());
         m_telemetry->setTarget(m_ctx.getOptions().target.toString());
         m_telemetry->setInputFile(m_ctx.getOptions().inputFilePath);
 

@@ -56,6 +56,10 @@ int runLinker(int argc, char **argv)
         .help("Print verbose linker diagnostic logs and synthesized command line")
         .flag();
 
+    program.add_argument("-g", "--debug")
+        .help("Emit debug information (/DEBUG on MSVC)")
+        .flag();
+
     program.add_argument("--dry-run")
         .help("Synthesize and display the linker command line without executing")
         .flag();
@@ -109,6 +113,7 @@ int runLinker(int argc, char **argv)
     opts.isShared = program.get<bool>("--shared");
     opts.isStatic = program.get<bool>("--static");
     opts.verbose = program.get<bool>("-v");
+    opts.emitDebugInfo = program.get<bool>("-g");
     opts.dryRun = program.get<bool>("--dry-run");
     opts.isHosted = program.get<bool>("--hosted");
     if (program.get<bool>("--freestanding"))

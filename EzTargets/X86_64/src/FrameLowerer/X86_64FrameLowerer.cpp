@@ -104,6 +104,7 @@ void X86_64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
     SourceReference *srcRef = setup.m_func->getSourceRef();
 
     auto &instrList = entryBlock->getInstructions();
+    const size_t initialInstCount = instrList.size();
     auto it = instrList.begin();
     MirInstructionBuilder builder(ctx.m_ctx,
                                   entryBlock,
@@ -177,6 +178,11 @@ void X86_64FrameLowerer::insertPrologue(FrameLowererCtx &ctx)
             MirInteger *padImm = opBuilder.buildInt(setup.m_i64, FlexInt(static_cast<int64_t>(alignPad)));
             builder.buildTarget(setup.m_descSub, srcRef, { setup.m_spReg, setup.m_spReg, padImm });
         }
+    }
+
+    if (setup.m_analysisData)
+    {
+        setup.m_analysisData->m_prologueInstCount = instrList.size() - initialInstCount;
     }
 }
 

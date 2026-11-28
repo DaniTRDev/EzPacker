@@ -135,6 +135,11 @@ class MirInstruction
     class SourceReference *getSourceRef() const;
 
     /**
+     * Updates the source location reference for diagnostics and debug info.
+     */
+    void setSourceRef(class SourceReference *ref);
+
+    /**
      * Casts and retrieves the const operand at the given index to concrete operand type T.
      */
     template <typename T>

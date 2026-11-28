@@ -2,6 +2,8 @@
 
 #include "CFrontend/CFrontendTypeMapper.h"
 
+#include "Debug/MirDebugMetadata.h"
+
 #include "DriverContext.h"
 
 #include "Block/MirBlock.h"
@@ -60,13 +62,38 @@ static inline bool isUnsignedType(Type *ty)
 
 
 
+namespace
+{
+struct ScopedSourceStamp
+{
+    MirBlock *&currentBlock;
+    SourceReference *ref;
+
+    ~ScopedSourceStamp()
+    {
+        if (!ref || !currentBlock)
+        {
+            return;
+        }
+        for (MirInstruction *inst = currentBlock->getInstructions().back();
+             inst != nullptr && inst->getSourceRef() == nullptr;
+             inst = inst->getPrev())
+        {
+            inst->setSourceRef(ref);
+        }
+    }
+};
+} // namespace
+
 CFrontendFunctionLowerer::CFrontendFunctionLowerer(DriverContext &driverCtx,
 
                                                    MirBuilderContext &bCtx,
 
                                                    MirFunction *mirFunc,
 
-                                                   Obj *chibiFunc)
+                                                   Obj *chibiFunc,
+
+                                                   CFrontendDebugContext *debugCtx)
 
     : m_driverCtx(driverCtx),
 
@@ -75,6 +102,8 @@ CFrontendFunctionLowerer::CFrontendFunctionLowerer(DriverContext &driverCtx,
       m_func(mirFunc),
 
       m_chibiFunc(chibiFunc),
+
+      m_debugCtx(debugCtx),
 
       m_tt(driverCtx.getTypeTable()),
 
@@ -166,9 +195,14 @@ bool CFrontendFunctionLowerer::lower()
 
 
 
-    // 1. Register formal parameters
+    MirDebugMetadata *debugMeta = (m_driverCtx.getOptions().emitDebugInfo() && m_debugCtx)
+                                          ? m_bCtx.getOrCreateDebugMetadata()
+                                          : nullptr;
 
-    for (Obj *p = m_chibiFunc->params; p; p = p->next)
+    // 1. Register formal parameters
+    uint32_t paramIdx = 0;
+
+    for (Obj *p = m_chibiFunc->params; p; p = p->next, ++paramIdx)
 
     {
 
@@ -178,6 +212,9 @@ bool CFrontendFunctionLowerer::lower()
 
         MirFunctionBuilder(&m_bCtx).addParam(m_func, pReg);
 
+        std::optional<size_t> slotId;
+        std::optional<MirId> vregId;
+
         if (addrTaken.contains(p) || p->ty->kind == TY_STRUCT || p->ty->kind == TY_UNION)
 
         {
@@ -185,6 +222,7 @@ bool CFrontendFunctionLowerer::lower()
             StackFrameObject *slot = m_func->getStackFrame()->createStaticStackObj(pType);
 
             m_localStackSlots[p] = slot;
+            slotId = slot->m_id;
 
             MirInstructionBuilder(&m_bCtx, m_currentBlock, InsertionType::Append)
 
@@ -197,7 +235,22 @@ bool CFrontendFunctionLowerer::lower()
         {
 
             m_localVars[p] = pReg;
+            vregId = pReg->getRef().getId();
 
+        }
+
+        if (debugMeta && p->name && p->name[0] != '\0')
+        {
+            MirDebugVarBinding binding;
+            binding.funcName = std::string(m_func->getName());
+            binding.varName = p->name;
+            binding.typeId = m_debugCtx->registerCType(m_driverCtx, p->ty, *debugMeta);
+            binding.isParameter = true;
+            binding.paramIndex = paramIdx;
+            binding.declLoc = m_debugCtx->debugLocFromToken(m_driverCtx, p->tok);
+            binding.stackObjId = slotId;
+            binding.vregId = vregId;
+            debugMeta->varBindings.push_back(std::move(binding));
         }
 
     }
@@ -215,6 +268,8 @@ bool CFrontendFunctionLowerer::lower()
         {
 
             MirType *vType = mapType(m_tt, v->ty);
+            std::optional<size_t> slotId;
+            std::optional<MirId> vregId;
 
             if (addrTaken.contains(v) || v->ty->kind == TY_STRUCT || v->ty->kind == TY_UNION || v->ty->kind == TY_ARRAY)
 
@@ -223,6 +278,7 @@ bool CFrontendFunctionLowerer::lower()
                 StackFrameObject *slot = m_func->getStackFrame()->createStaticStackObj(vType);
 
                 m_localStackSlots[v] = slot;
+                slotId = slot->m_id;
 
             }
 
@@ -233,7 +289,22 @@ bool CFrontendFunctionLowerer::lower()
                 MirRegister *vReg = m_opBuilder.buildVReg(vType, v->name ? v->name : "local");
 
                 m_localVars[v] = vReg;
+                vregId = vReg->getRef().getId();
 
+            }
+
+            if (debugMeta && v->name && v->name[0] != '\0')
+            {
+                MirDebugVarBinding binding;
+                binding.funcName = std::string(m_func->getName());
+                binding.varName = v->name;
+                binding.typeId = m_debugCtx->registerCType(m_driverCtx, v->ty, *debugMeta);
+                binding.isParameter = false;
+                binding.paramIndex = 0;
+                binding.declLoc = m_debugCtx->debugLocFromToken(m_driverCtx, v->tok);
+                binding.stackObjId = slotId;
+                binding.vregId = vregId;
+                debugMeta->varBindings.push_back(std::move(binding));
             }
 
         }
@@ -626,7 +697,9 @@ void CFrontendFunctionLowerer::lowerStatement(Node *node)
 
         return;
 
-
+    ScopedSourceStamp sourceStamp{ m_currentBlock,
+                                   (m_debugCtx && node->tok) ? m_debugCtx->createSourceRefFromToken(m_driverCtx, node->tok)
+                                                             : nullptr };
 
     switch (node->kind)
 
@@ -1584,7 +1657,9 @@ MirOperand *CFrontendFunctionLowerer::lowerExpression(Node *node)
 
     }
 
-
+    ScopedSourceStamp sourceStamp{ m_currentBlock,
+                                   (m_debugCtx && node->tok) ? m_debugCtx->createSourceRefFromToken(m_driverCtx, node->tok)
+                                                             : nullptr };
 
     switch (node->kind)
 

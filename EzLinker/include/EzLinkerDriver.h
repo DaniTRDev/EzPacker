@@ -32,6 +32,7 @@ struct EZLINKER_API LinkerOptions
     bool noDefaultLibs{ false };                         ///< Do not automatically inject C standard libraries.
     bool noCompilerRt{ false };                          ///< Do not automatically inject compiler-rt / builtins.
     bool noExceptionRuntime{ false };                    ///< Do not automatically inject EzExceptionRuntime.
+    bool emitDebugInfo{ false };                         ///< Emit debug information / PDB (/DEBUG on MSVC).
 };
 
 /**

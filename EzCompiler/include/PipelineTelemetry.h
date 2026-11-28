@@ -71,6 +71,19 @@ struct FunctionTelemetry
     FrameLayoutTelemetry frameLayout;
 };
 
+struct DebugInfoTelemetry
+{
+    bool enabled{ false };
+    std::string format;
+    std::string level;
+    size_t fileCount{ 0 };
+    size_t typeCount{ 0 };
+    size_t functionCount{ 0 };
+    size_t globalCount{ 0 };
+    size_t lineEntryCount{ 0 };
+    std::vector<std::string> emittedSections;
+};
+
 /**
  * Diagnostic observer and telemetry collector recording pass-by-pass snapshots,
  * metrics, CFG topologies, liveness intervals, and frame layout for compiler developer tooling.
@@ -86,6 +99,7 @@ class PipelineTelemetry : public DiagnosticListener
     void setInputFile(std::string_view file) { m_inputFile = file; }
     void setInitialMir(std::string mir) { m_initialMir = std::move(mir); }
     void setAssembly(std::string asmText) { m_assembly = std::move(asmText); }
+    void setDebugInfo(DebugInfoTelemetry debugInfo) { m_debugInfo = std::move(debugInfo); }
 
     void recordPass(PassTelemetryRecord record);
     void updateFunctionAnalysis(const std::string &fnName, FunctionTelemetry telemetry);
@@ -105,6 +119,7 @@ class PipelineTelemetry : public DiagnosticListener
     std::vector<PassTelemetryRecord> m_passes;
     std::vector<DiagnosticTelemetryRecord> m_diagnostics;
     std::unordered_map<std::string, FunctionTelemetry> m_functions;
+    DebugInfoTelemetry m_debugInfo;
     GenericSourceManager *m_srcMgr{ nullptr };
 };
 
