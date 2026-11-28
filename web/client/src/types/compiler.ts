@@ -7,6 +7,9 @@ export interface CompileRequest {
   features?: string[];
   isPositionIndependent?: boolean;
   enableRtti?: boolean;
+  enableDebugInfo?: boolean;
+  debugLevel?: 'g0' | 'g1' | 'g2';
+  debugFormat?: 'auto' | 'dwarf' | 'codeview';
   diagLevel?: 'error' | 'warning' | 'trace' | 'debug';
   emitObject?: boolean;
 }
@@ -60,6 +63,7 @@ export interface ObjectSectionInfo {
   virtualAddress: number;
   characteristics: string;
   hexPreview?: string;
+  isDebug?: boolean;
 }
 
 export interface ObjectSymbolInfo {
@@ -79,6 +83,18 @@ export interface ObjectRelocInfo {
   addend?: number;
 }
 
+export interface ObjectDebugSectionSummary {
+  name: string;
+  size: number;
+  subsectionCount?: number;
+  recordCount?: number;
+}
+
+export interface ObjectDebugSummary {
+  format: string;
+  sections: ObjectDebugSectionSummary[];
+}
+
 export interface ObjectAnalysis {
   format: 'COFF' | 'ELF64' | 'Unknown';
   fileSize: number;
@@ -86,6 +102,7 @@ export interface ObjectAnalysis {
   symbols: ObjectSymbolInfo[];
   relocations: ObjectRelocInfo[];
   hexDump?: string;
+  debugSummary?: ObjectDebugSummary;
 }
 
 export interface DoxygenParamInfo {
@@ -182,6 +199,88 @@ export interface PipelineDiagnostic {
   col: number;
 }
 
+export interface DebugSourceFileEntry {
+  fileId: number;
+  filename: string;
+  directory?: string;
+}
+
+export interface DebugLineEntry {
+  functionName?: string;
+  codeOffset: number;
+  file: string;
+  line: number;
+  col?: number;
+  isStmt?: boolean;
+  prologueEnd?: boolean;
+  epilogueBegin?: boolean;
+}
+
+export interface DebugTypeMember {
+  name: string;
+  typeName?: string;
+  offsetBytes?: number;
+  sizeBytes?: number;
+}
+
+export interface DebugTypeEntry {
+  typeId: number | string;
+  name: string;
+  kind: string;
+  sizeInBytes: number;
+  alignment?: number;
+  members?: DebugTypeMember[];
+  params?: string[];
+}
+
+export interface DebugVariableEntry {
+  name: string;
+  typeName?: string;
+  location?: string;
+  reg?: string;
+  declLoc?: string;
+}
+
+export interface DebugFunctionEntry {
+  name: string;
+  sectionOffset?: number;
+  codeSize?: number;
+  prologueSize?: number;
+  totalFrameSize?: number;
+  hasFramePointer?: boolean;
+  parameters?: DebugVariableEntry[];
+  locals?: DebugVariableEntry[];
+}
+
+export interface DebugGlobalEntry {
+  name: string;
+  typeName?: string;
+  section?: string;
+  offset?: number;
+  declLoc?: string;
+}
+
+export interface DebugInfoTelemetry {
+  enabled: boolean;
+  format: string;
+  level: string;
+  fileCount: number;
+  typeCount: number;
+  functionCount: number;
+  globalCount: number;
+  lineEntryCount: number;
+  emittedSections: string[];
+  language?: string;
+  producer?: string;
+  compDir?: string;
+  mainFile?: string;
+  files?: DebugSourceFileEntry[];
+  lines?: DebugLineEntry[];
+  types?: DebugTypeEntry[];
+  functions?: DebugFunctionEntry[];
+  globals?: DebugGlobalEntry[];
+}
+
 export interface PipelineTelemetryJson {
   target: string;
   optLevel: string;
@@ -191,6 +290,7 @@ export interface PipelineTelemetryJson {
   passes: PassTelemetryRecord[];
   diagnostics: PipelineDiagnostic[];
   functions: Record<string, FunctionTelemetry>;
+  debugInfo?: DebugInfoTelemetry;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +311,7 @@ export interface CompileResponse {
   diagnostics: DiagnosticItem[];
   functions: Record<string, FunctionAnalysis>;
   objectInfo?: ObjectAnalysis;
+  debugInfo?: DebugInfoTelemetry;
   doxygenStatus?: DoxygenStatus;
   matchedSymbols?: Record<string, DoxygenDocEntity>;
   executionDurationMs: number;

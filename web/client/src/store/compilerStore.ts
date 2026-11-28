@@ -20,6 +20,9 @@ interface CompilerState {
   features: string[];
   isPositionIndependent: boolean;
   enableRtti: boolean;
+  enableDebugInfo: boolean;
+  debugLevel: 'g1' | 'g2';
+  debugFormat: 'auto' | 'dwarf' | 'codeview';
   autoCompile: boolean;
 
   isCompiling: boolean;
@@ -27,7 +30,7 @@ interface CompilerState {
   error: string | null;
 
   // View Organization
-  viewMode: 'passes' | 'pipeline' | 'analysis' | 'symbols';
+  viewMode: 'passes' | 'pipeline' | 'analysis' | 'symbols' | 'debug';
   pipelineStage: 'mir' | 'legalizedMir' | 'loweredMir' | 'asm' | 'object';
   analysisTab: 'cfg' | 'liveness' | 'stack' | 'passes';
 
@@ -65,9 +68,12 @@ interface CompilerState {
   toggleFeature: (feature: string) => void;
   setIsPositionIndependent: (pic: boolean) => void;
   setEnableRtti: (rtti: boolean) => void;
+  setEnableDebugInfo: (enable: boolean) => void;
+  setDebugLevel: (level: 'g1' | 'g2') => void;
+  setDebugFormat: (format: 'auto' | 'dwarf' | 'codeview') => void;
   setAutoCompile: (auto: boolean) => void;
 
-  setViewMode: (mode: 'passes' | 'pipeline' | 'analysis' | 'symbols') => void;
+  setViewMode: (mode: 'passes' | 'pipeline' | 'analysis' | 'symbols' | 'debug') => void;
   setPipelineStage: (stage: 'mir' | 'legalizedMir' | 'loweredMir' | 'asm' | 'object') => void;
   setAnalysisTab: (tab: 'cfg' | 'liveness' | 'stack' | 'passes') => void;
 
@@ -125,6 +131,9 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
   features: ['+avx2', '+sse2'],
   isPositionIndependent: false,
   enableRtti: true,
+  enableDebugInfo: true,
+  debugLevel: 'g2',
+  debugFormat: 'auto',
   autoCompile: true,
 
   isCompiling: false,
@@ -199,6 +208,21 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
   setEnableRtti: (enableRtti: boolean) => {
     set({ enableRtti });
     get().compile();
+  },
+
+  setEnableDebugInfo: (enableDebugInfo: boolean) => {
+    set({ enableDebugInfo });
+    if (get().autoCompile) get().compile();
+  },
+
+  setDebugLevel: (debugLevel: 'g1' | 'g2') => {
+    set({ debugLevel });
+    if (get().autoCompile) get().compile();
+  },
+
+  setDebugFormat: (debugFormat: 'auto' | 'dwarf' | 'codeview') => {
+    set({ debugFormat });
+    if (get().autoCompile) get().compile();
   },
 
   setAutoCompile: (autoCompile: boolean) => {
@@ -342,7 +366,17 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
   },
 
   compile: async () => {
-    const { code, targetTriple, optLevel, features, isPositionIndependent, enableRtti } = get();
+    const {
+      code,
+      targetTriple,
+      optLevel,
+      features,
+      isPositionIndependent,
+      enableRtti,
+      enableDebugInfo,
+      debugLevel,
+      debugFormat,
+    } = get();
     set({ isCompiling: true, error: null });
     try {
       const isC = !code.includes('fn @') && !code.includes('function @') &&
@@ -357,6 +391,9 @@ export const useCompilerStore = create<CompilerState>((set, get) => ({
         features,
         isPositionIndependent,
         enableRtti,
+        enableDebugInfo,
+        debugLevel: enableDebugInfo ? debugLevel : 'g0',
+        debugFormat,
       };
 
       const res = await fetch('/api/compile', {

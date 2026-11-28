@@ -7,6 +7,9 @@ export interface CompileRequest {
   features?: string[];
   isPositionIndependent?: boolean;
   enableRtti?: boolean;
+  enableDebugInfo?: boolean;
+  debugLevel?: 'g0' | 'g1' | 'g2';
+  debugFormat?: 'auto' | 'dwarf' | 'codeview';
   diagLevel?: 'error' | 'warning' | 'trace' | 'debug';
   emitObject?: boolean;
   hosted?: boolean;
@@ -61,6 +64,7 @@ export interface ObjectSectionInfo {
   virtualAddress: number;
   characteristics: string;
   hexPreview?: string;
+  isDebug?: boolean;
 }
 
 export interface ObjectSymbolInfo {
@@ -80,6 +84,18 @@ export interface ObjectRelocInfo {
   addend?: number;
 }
 
+export interface ObjectDebugSectionSummary {
+  name: string;
+  size: number;
+  subsectionCount?: number;
+  recordCount?: number;
+}
+
+export interface ObjectDebugSummary {
+  format: string;
+  sections: ObjectDebugSectionSummary[];
+}
+
 export interface ObjectAnalysis {
   format: 'COFF' | 'ELF64' | 'Unknown';
   fileSize: number;
@@ -87,6 +103,7 @@ export interface ObjectAnalysis {
   symbols: ObjectSymbolInfo[];
   relocations: ObjectRelocInfo[];
   hexDump?: string;
+  debugSummary?: ObjectDebugSummary;
 }
 
 export interface DoxygenParamInfo {
@@ -185,6 +202,18 @@ export interface PipelineDiagnostic {
   col: number;
 }
 
+export interface DebugInfoTelemetry {
+  enabled: boolean;
+  format: string;
+  level: string;
+  fileCount: number;
+  typeCount: number;
+  functionCount: number;
+  globalCount: number;
+  lineEntryCount: number;
+  emittedSections: string[];
+}
+
 export interface PipelineTelemetryJson {
   target: string;
   optLevel: string;
@@ -194,6 +223,7 @@ export interface PipelineTelemetryJson {
   passes: PassTelemetryRecord[];
   diagnostics: PipelineDiagnostic[];
   functions: Record<string, FunctionTelemetry>;
+  debugInfo?: DebugInfoTelemetry;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +244,7 @@ export interface CompileResponse {
   diagnostics: DiagnosticItem[];
   functions: Record<string, FunctionAnalysis>;
   objectInfo?: ObjectAnalysis;
+  debugInfo?: DebugInfoTelemetry;
   doxygenStatus?: DoxygenStatus;
   matchedSymbols?: Record<string, DoxygenDocEntity>;
   executionDurationMs: number;

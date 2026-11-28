@@ -11,12 +11,14 @@ import { LivenessViewer } from './LivenessViewer';
 import { StackViewer } from './StackViewer';
 import { ObjectViewer } from './ObjectViewer';
 import { SymbolInspector } from './SymbolInspector';
+import { DebugInfoViewer } from './DebugInfoViewer';
 import { EZPACKER_MIR_LANGUAGE_ID, registerMirLanguage } from '../grammar/mirLang';
 import { stripAnsi } from '../utils/ansi';
 import {
   Layers,
   Activity,
   BookOpen,
+  Bug,
   GitCompare,
   Copy,
   Check,
@@ -149,6 +151,25 @@ export const OutputPanel: React.FC = () => {
             {result?.objectInfo && (
               <span className="text-[10px] px-1 py-0.2 rounded bg-zinc-950 text-zinc-400 font-mono">
                 {result.objectInfo.symbols.length}
+              </span>
+            )}
+          </button>
+
+          {/* 5. Debug Info Inspector Mode */}
+          <button
+            onClick={() => setViewMode('debug')}
+            className={`px-3 py-1.5 font-medium rounded flex items-center space-x-1.5 transition-all ${
+              viewMode === 'debug'
+                ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-sm ring-1 ring-emerald-500/30'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850'
+            }`}
+            title="Inspect DWARF v5 / CodeView debug sections, line tables, types, and functions"
+          >
+            <Bug className="w-3.5 h-3.5" />
+            <span>Debug Info</span>
+            {result?.debugInfo?.enabled && (
+              <span className="text-[10px] px-1 py-0.2 rounded bg-zinc-950 text-emerald-400 font-mono">
+                {result.debugInfo.emittedSections?.length || result.debugInfo.functionCount}
               </span>
             )}
           </button>
@@ -368,6 +389,11 @@ export const OutputPanel: React.FC = () => {
         {/* Mode 3: Interactive Symbol & ABI Inspector                     */}
         {/* ============================================================== */}
         {viewMode === 'symbols' && <SymbolInspector />}
+
+        {/* ============================================================== */}
+        {/* Mode 4: Interactive Debug Info Inspector                       */}
+        {/* ============================================================== */}
+        {viewMode === 'debug' && <DebugInfoViewer />}
       </div>
     </div>
   );

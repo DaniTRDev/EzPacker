@@ -36,10 +36,12 @@ export class CompilerRunner {
     }
 
     const candidates = [
-      path.join(projectRoot, 'cmake-build-debug', 'bin', 'ezc.exe'),
-      path.join(projectRoot, 'cmake-build-debug', 'bin', 'ezc'),
+      path.join(projectRoot, 'cmake-build-release', 'bin', 'ezc.exe'),
+      path.join(projectRoot, 'cmake-build-release', 'bin', 'ezc'),
       path.join(projectRoot, 'build', 'bin', 'ezc.exe'),
       path.join(projectRoot, 'build', 'bin', 'ezc'),
+      path.join(projectRoot, 'cmake-build-debug', 'bin', 'ezc.exe'),
+      path.join(projectRoot, 'cmake-build-debug', 'bin', 'ezc'),
       path.join(projectRoot, 'build', 'Release', 'bin', 'ezc.exe'),
     ];
 
@@ -130,6 +132,14 @@ export class CompilerRunner {
         args.push('--no-rtti');
       } else {
         args.push('--rtti');
+      }
+      if (req.enableDebugInfo !== false) {
+        args.push(`-${req.debugLevel || 'g2'}`);
+        if (req.debugFormat && req.debugFormat !== 'auto') {
+          args.push('--debug-format', req.debugFormat);
+        }
+      } else {
+        args.push('-g0');
       }
       const isHostedC = isC && (req.hosted === true || (req.hosted !== false && /#include\s*<(stdio|stdlib|string|ctype|time|assert|errno|unistd|fcntl)\.h>/.test(req.code)));
       if (isHostedC) {
@@ -307,6 +317,7 @@ export class CompilerRunner {
         diagnostics,
         functions,
         objectInfo,
+        debugInfo: pipelineData?.debugInfo,
         doxygenStatus: this.doxygenRunner?.getStatus(),
         matchedSymbols: Object.keys(matchedSymbols).length > 0 ? matchedSymbols : undefined,
         executionDurationMs: durationMs,

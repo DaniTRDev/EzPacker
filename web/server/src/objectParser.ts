@@ -1,5 +1,12 @@
 import * as fs from 'fs';
-import { ObjectAnalysis, ObjectSectionInfo, ObjectSymbolInfo, ObjectRelocInfo } from './types.js';
+import {
+  ObjectAnalysis,
+  ObjectDebugSectionSummary,
+  ObjectDebugSummary,
+  ObjectSectionInfo,
+  ObjectSymbolInfo,
+  ObjectRelocInfo,
+} from './types.js';
 
 /**
  * Parses binary object files (.obj / .o) emitted by EzPacker (COFF or ELF64).
@@ -149,6 +156,7 @@ function parseCoff(buf: Buffer): ObjectAnalysis {
       virtualAddress,
       characteristics: charDesc.join(' | ') || `0x${characteristics.toString(16)}`,
       hexPreview: hexPreview || undefined,
+      isDebug: secName.startsWith('.debug'),
     });
   }
 
@@ -242,6 +250,8 @@ function parseCoff(buf: Buffer): ObjectAnalysis {
         if (relocType === 1) typeName = 'IMAGE_REL_AMD64_ADDR64';
         else if (relocType === 2) typeName = 'IMAGE_REL_AMD64_ADDR32';
         else if (relocType === 4) typeName = 'IMAGE_REL_AMD64_REL32';
+        else if (relocType === 0x000a) typeName = 'IMAGE_REL_AMD64_SECTION';
+        else if (relocType === 0x000b) typeName = 'IMAGE_REL_AMD64_SECREL';
 
         relocations.push({
           section: secName,
@@ -253,6 +263,8 @@ function parseCoff(buf: Buffer): ObjectAnalysis {
     }
   }
 
+  const debugSummary = extractCoffDebugSummary(buf, sections);
+
   return {
     format: 'COFF',
     fileSize: buf.length,
@@ -260,7 +272,55 @@ function parseCoff(buf: Buffer): ObjectAnalysis {
     symbols,
     relocations,
     hexDump: formatHexDump(buf),
+    debugSummary,
   };
+}
+
+function extractCoffDebugSummary(buf: Buffer, sections: ObjectSectionInfo[]): ObjectDebugSummary | undefined {
+  const debugSections: ObjectDebugSectionSummary[] = [];
+
+  for (const sec of sections) {
+    if (!sec.isDebug) continue;
+    const summary: ObjectDebugSectionSummary = {
+      name: sec.name,
+      size: sec.size,
+    };
+
+    if (sec.offset > 0 && sec.size >= 4 && sec.offset + sec.size <= buf.length) {
+      const signature = buf.readUInt32LE(sec.offset);
+      if (signature === 0x00000004) {
+        const end = sec.offset + sec.size;
+        let cursor = sec.offset + 4;
+
+        if (sec.name === '.debug$S') {
+          let subsectionCount = 0;
+          while (cursor + 8 <= end) {
+            const subLen = buf.readUInt32LE(cursor + 4);
+            cursor += 8;
+            if (cursor + subLen > end) break;
+            subsectionCount++;
+            const alignedLen = (subLen + 3) & ~3;
+            cursor += alignedLen;
+          }
+          summary.subsectionCount = subsectionCount;
+        } else if (sec.name === '.debug$T') {
+          let recordCount = 0;
+          while (cursor + 2 <= end) {
+            const recLen = buf.readUInt16LE(cursor);
+            if (recLen === 0 || cursor + 2 + recLen > end) break;
+            recordCount++;
+            cursor += 2 + recLen;
+          }
+          summary.recordCount = recordCount;
+        }
+      }
+    }
+
+    debugSections.push(summary);
+  }
+
+  if (debugSections.length === 0) return undefined;
+  return { format: 'CodeView', sections: debugSections };
 }
 
 /**
@@ -336,6 +396,7 @@ function parseElf64(buf: Buffer): ObjectAnalysis {
         virtualAddress: sh_addr,
         characteristics: flagDesc.join(' | ') || `0x${sh_flags.toString(16)}`,
         hexPreview: hexPreview || undefined,
+        isDebug: name.startsWith('.debug'),
       });
     }
   }
@@ -430,6 +491,7 @@ function parseElf64(buf: Buffer): ObjectAnalysis {
         if (typeVal === 1) typeName = 'R_X86_64_64';
         else if (typeVal === 2) typeName = 'R_X86_64_PC32';
         else if (typeVal === 4) typeName = 'R_X86_64_PLT32';
+        else if (typeVal === 10) typeName = 'R_X86_64_32';
       }
 
       relocations.push({
@@ -442,6 +504,10 @@ function parseElf64(buf: Buffer): ObjectAnalysis {
     }
   }
 
+  const dwarfSections: ObjectDebugSectionSummary[] = sections
+    .filter((s) => s.isDebug)
+    .map((s) => ({ name: s.name, size: s.size }));
+
   return {
     format: 'ELF64',
     fileSize: buf.length,
@@ -449,5 +515,6 @@ function parseElf64(buf: Buffer): ObjectAnalysis {
     symbols,
     relocations,
     hexDump: formatHexDump(buf),
+    debugSummary: dwarfSections.length > 0 ? { format: 'DWARF', sections: dwarfSections } : undefined,
   };
 }
