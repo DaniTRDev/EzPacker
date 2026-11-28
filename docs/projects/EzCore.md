@@ -526,10 +526,19 @@ Attaches source code coordinates directly to thrown values for rich runtime diag
 ```cpp
 struct RichExceptionPayload
 {
-    void *payload{ nullptr };       ///< Pointer to active exception object or numeric code.
-    SourceRefData throwSite;        ///< Source coordinate where exception was thrown.
+    void *payload{ nullptr };
+    const RttiTypeDescriptor *rtti{ nullptr };
+    SourceRefData throwSite;
 };
 ```
+
+### 7.3 Target-Independent Debug Information (`include/Debug/DebugInfo.h`)
+`EzCore::Debug` defines the shared, format-independent debug metadata model consumed by frontends, `EzMir`, `EzCompiler`, and `EzCodeEmitter`:
+- **`DebugCompileUnit`**: Root container holding `DebugSourceFile` entries (`addOrGetFile`), `DebugType` descriptors (`addType`/`findType`), `DebugFunction` records (line entries, parameters, locals, saved callee-saved registers), and `DebugGlobalVar` records, with structural `validate()`.
+- **Enumerations**: `DebugLevel` (`None`, `LineTablesOnly`, `Full`), `DebugFormat` (`Auto`, `Dwarf5`, `CodeView`), `DebugLanguage` (`C11`, `Mir`), `DebugBaseEncoding`, `DebugLocationKind`.
+- **Register Mapping Helpers**: `mapX86_64ToDwarfReg()`, `mapRiscV64ToDwarfReg()`, `mapAArch64ToDwarfReg()`, `mapTargetRegToDwarfReg()`, and `mapX86_64ToCodeViewReg()`.
+
+See the **[Debugging Information Guide](../debug_information.md)** for full architectural details.
 
 ---
 
@@ -549,4 +558,5 @@ struct RichExceptionPayload
 | Containers | `EzCore/include/HelperClasses/DenseBitSet.h` | `DenseBitSet` |
 | Source Coordinates | `EzCore/include/SourceManager/GenericSourceManager.h` | `SourceReference`, `SourceLineRange`, `SourceFileEntry`, `GenericSourceManager` |
 | Source Coordinates | `EzCore/include/SourceManager/SourceManager.h` | `SourceManager` |
-| RTTI & Exceptions | `EzCore/include/Rtti/RttiDescriptor.h` | `RttiTypeDescriptor`, `SourceRefData`, `RichExceptionPayload` |
+| RTTI & Exceptions | `EzCore/include/Rtti/RttiDescriptor.h` | `RttiTypeDescriptor`, `RttiTypeKind`, `RttiMemberDescriptor`, `SourceRefData`, `RichExceptionPayload` |
+| Debug Information | `EzCore/include/Debug/DebugInfo.h` | `DebugCompileUnit`, `DebugType`, `DebugFunction`, `DebugVariable`, `DebugLineEntry`, `DebugGlobalVar` |

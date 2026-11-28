@@ -27,9 +27,9 @@ enum class DebugLevel : uint8_t
  */
 enum class DebugFormat : uint8_t
 {
-    Auto = 0, ///< Select format automatically from the target triple (DWARF5 for ELF, CodeView for COFF/PE).
-    Dwarf5 = 1,
-    CodeView = 2
+    Auto = 0,     ///< Select format automatically from the target triple (DWARF5 for ELF, CodeView for COFF/PE).
+    Dwarf5 = 1,   ///< Emit DWARF v5 debug sections (.debug_info, .debug_line, .debug_frame, etc.).
+    CodeView = 2  ///< Emit Microsoft CodeView CV8 C13 debug sections (.debug$T, .debug$S).
 };
 
 /**
@@ -46,14 +46,14 @@ enum class DebugLanguage : uint16_t
  */
 enum class DebugBaseEncoding : uint8_t
 {
-    None = 0,
-    Address,
-    Boolean,
-    Float,
-    Signed,
-    SignedChar,
-    Unsigned,
-    UnsignedChar
+    None = 0,     ///< Unspecified or non-primitive encoding.
+    Address,      ///< Pointer / machine address (DW_ATE_address).
+    Boolean,      ///< Boolean truth value (DW_ATE_boolean).
+    Float,        ///< IEEE-754 floating-point value (DW_ATE_float).
+    Signed,       ///< Signed binary integer (DW_ATE_signed).
+    SignedChar,   ///< Signed character (DW_ATE_signed_char).
+    Unsigned,     ///< Unsigned binary integer (DW_ATE_unsigned).
+    UnsignedChar  ///< Unsigned character (DW_ATE_unsigned_char).
 };
 
 /**
@@ -229,9 +229,9 @@ struct DebugCompileUnit
      */
     enum class TargetArch : uint8_t
     {
-        X86_64,
-        RiscV64,
-        AArch64
+        X86_64,  ///< 64-bit x86-64 / AMD64 architecture.
+        RiscV64, ///< 64-bit RISC-V (RV64) architecture.
+        AArch64  ///< 64-bit ARM (AArch64) architecture.
     };
 
     std::string producer{ "EzPacker ezc 1.0.0" };   ///< Producer identification string.

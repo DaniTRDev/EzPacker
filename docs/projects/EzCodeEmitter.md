@@ -272,6 +272,7 @@ public:
 
     virtual void addSymbol(const ObjectSymbol &sym) = 0;
     virtual void addRelocation(const ObjectRelocEntry &reloc) = 0;
+    virtual void addExtraSection(const ExtraObjectSection &section) = 0;
     virtual std::vector<uint8_t> write(const std::pmr::unordered_map<SectionType, CodeSection *> &sections) = 0;
     virtual void clear() = 0;
 };
@@ -287,11 +288,22 @@ public:
 ### 5.2 `CoffWriter` (`ObjectFormat/CoffWriter.h`)
 - Generates Microsoft Common Object File Format (`PE-COFF`) relocatable object files.
 - Builds COFF section headers (`.text$mn`, `.rdata`, `.data`).
-- Maps `TargetCodeRelocationType` into AMD64 COFF relocation types (`IMAGE_REL_AMD64_ADDR64`, `IMAGE_REL_AMD64_ADDR32NB`, `IMAGE_REL_AMD64_REL32`).
+- Maps `TargetCodeRelocationType` into AMD64 COFF relocation types (`IMAGE_REL_AMD64_ADDR64`, `IMAGE_REL_AMD64_ADDR32NB`, `IMAGE_REL_AMD64_REL32`, `IMAGE_REL_AMD64_SECTION`, `IMAGE_REL_AMD64_SECREL`).
 
 ---
 
-## 6. Header & Class Index
+## 6. Debug Information Emitters (`Debug/`)
+
+`EzCodeEmitter::Debug` serializes `EzCore::Debug::DebugCompileUnit` into `ExtraObjectSection` payloads and `ExtraSectionReloc` fixups registered via `IObjectWriter::addExtraSection()`:
+- **`IDebugInfoEmitter` (`Debug/IDebugInfoEmitter.h`)**: Format-independent interface with `createDebugInfoEmitter(DebugFormat, bool isCoff)` factory.
+- **`Dwarf5Emitter` (`Debug/Dwarf5Emitter.h`)**: Emits ELF64 DWARF v5 sections (`.debug_str`, `.debug_line_str`, `.debug_abbrev`, `.debug_info`, `.debug_line`, `.debug_frame`) for x86-64 and RISC-V 64.
+- **`CodeViewEmitter` (`Debug/CodeViewEmitter.h`)**: Emits Windows PE/COFF CodeView CV8 C13 sections (`.debug$T`, `.debug$S`) with `SecRel32`/`SecIndex16` relocations for PDB generation.
+
+See the **[Debugging Information Guide](../debug_information.md)** for full details.
+
+---
+
+## 7. Header & Class Index
 
 | Component | Header Location | Key Classes / Structs |
 |---|---|---|
@@ -300,6 +312,9 @@ public:
 | Interface | `EzCodeEmitter/include/GenericCodeEmitter.h` | `GenericCodeEmitter` |
 | Results | `EzCodeEmitter/include/Encoding/EncodeResult.h` | `EncodeResult` |
 | Object Writer | `EzCodeEmitter/include/ObjectFormat/IObjectWriter.h` | `IObjectWriter` |
-| Object Writer | `EzCodeEmitter/include/ObjectFormat/ObjectSymbol.h` | `ObjectSymbol`, `ObjectRelocEntry` |
+| Object Writer | `EzCodeEmitter/include/ObjectFormat/ObjectSymbol.h` | `ObjectSymbol`, `ObjectRelocEntry`, `ExtraObjectSection`, `ExtraSectionReloc` |
 | Object Writer | `EzCodeEmitter/include/ObjectFormat/Elf64Writer.h` | `Elf64Writer` |
 | Object Writer | `EzCodeEmitter/include/ObjectFormat/CoffWriter.h` | `CoffWriter` |
+| Debug Emitters | `EzCodeEmitter/include/Debug/IDebugInfoEmitter.h` | `IDebugInfoEmitter`, `createDebugInfoEmitter` |
+| Debug Emitters | `EzCodeEmitter/include/Debug/Dwarf5Emitter.h` | `Dwarf5Emitter` |
+| Debug Emitters | `EzCodeEmitter/include/Debug/CodeViewEmitter.h` | `CodeViewEmitter` |

@@ -13,14 +13,14 @@
  */
 struct MirDebugVarBinding
 {
-    std::string funcName;
-    std::string varName;
-    uint64_t typeId{ 0 };
-    bool isParameter{ false };
-    uint32_t paramIndex{ 0 };
-    EzCore::Debug::DebugSourceLoc declLoc;
-    std::optional<size_t> stackObjId;
-    std::optional<MirId> vregId;
+    std::string funcName;                  ///< Enclosing function name.
+    std::string varName;                   ///< Source-level variable or parameter name.
+    uint64_t typeId{ 0 };                  ///< 64-bit type ID referencing DebugCompileUnit::types.
+    bool isParameter{ false };             ///< True if this binding represents a formal parameter.
+    uint32_t paramIndex{ 0 };              ///< 0-based parameter index (valid when isParameter is true).
+    EzCore::Debug::DebugSourceLoc declLoc; ///< Source declaration coordinates.
+    std::optional<size_t> stackObjId;      ///< Stack frame object ID when stack-allocated.
+    std::optional<MirId> vregId;           ///< Pre-SSA root virtual register ID when register-promoted.
 };
 
 /**
@@ -28,11 +28,11 @@ struct MirDebugVarBinding
  */
 struct MirDebugFuncBinding
 {
-    MirId funcId{ MIRID_INVALID };
-    std::string name;
-    uint64_t returnTypeId{ 0 };
-    EzCore::Debug::DebugSourceLoc declLoc;
-    bool isExternal{ true };
+    MirId funcId{ MIRID_INVALID };         ///< MIR function ID in MirBuilderContext.
+    std::string name;                      ///< Source-level function name.
+    uint64_t returnTypeId{ 0 };            ///< 64-bit return type ID (0 for void).
+    EzCore::Debug::DebugSourceLoc declLoc; ///< Source declaration coordinates.
+    bool isExternal{ true };               ///< True if the function has external linkage.
 };
 
 /**
@@ -40,12 +40,12 @@ struct MirDebugFuncBinding
  */
 struct MirDebugGlobalBinding
 {
-    MirId gvarId{ MIRID_INVALID };
-    std::string name;
-    uint64_t typeId{ 0 };
-    EzCore::Debug::DebugSourceLoc declLoc;
-    bool isExternal{ true };
-    bool isConstant{ false };
+    MirId gvarId{ MIRID_INVALID };         ///< MIR global variable ID in MirBuilderContext.
+    std::string name;                      ///< Global/static symbol name.
+    uint64_t typeId{ 0 };                  ///< 64-bit type ID referencing DebugCompileUnit::types.
+    EzCore::Debug::DebugSourceLoc declLoc; ///< Source declaration coordinates.
+    bool isExternal{ true };               ///< True if the variable has external linkage.
+    bool isConstant{ false };              ///< True if the variable is read-only / constant.
 };
 
 /**
@@ -55,10 +55,10 @@ struct MirDebugGlobalBinding
  */
 struct MirDebugMetadata
 {
-    EzCore::Debug::DebugCompileUnit compileUnit;
-    std::vector<MirDebugVarBinding> varBindings;
-    std::vector<MirDebugFuncBinding> funcBindings;
-    std::vector<MirDebugGlobalBinding> globalBindings;
+    EzCore::Debug::DebugCompileUnit compileUnit;       ///< Target-independent compile unit container.
+    std::vector<MirDebugVarBinding> varBindings;       ///< Parameter and local variable bindings.
+    std::vector<MirDebugFuncBinding> funcBindings;     ///< Function bindings.
+    std::vector<MirDebugGlobalBinding> globalBindings; ///< Global and static variable bindings.
 };
 
 #endif // EZMIR_MIR_DEBUG_METADATA_H

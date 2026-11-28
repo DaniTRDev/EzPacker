@@ -15,11 +15,11 @@ namespace EzCompiler
  */
 enum class EmissionStage
 {
-    Object,       // Emits native binary object file (.o / .obj) [default]
-    Assembly,     // Emits human-readable assembly text (.s)
-    GenericMir,   // Dumps generic SSA MIR post-frontend lowering
-    LegalizedMir, // Dumps MIR post-type/opcode legalization
-    LoweredMir    // Dumps target-lowered MIR post register allocation and frame lowering
+    Object,       ///< Emits native binary object file (.o / .obj) [default].
+    Assembly,     ///< Emits human-readable assembly text (.s).
+    GenericMir,   ///< Dumps generic SSA MIR post-frontend lowering.
+    LegalizedMir, ///< Dumps MIR post-type/opcode legalization.
+    LoweredMir    ///< Dumps target-lowered MIR post register allocation and frame lowering.
 };
 
 /**
